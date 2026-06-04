@@ -5,7 +5,15 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🐛 Bug fixes
-- Suppressed false HEMS auth repair issues for sites without Heat Pump context while keeping optional HEMS polling backoff active. (#697)
+- None
+
+## v3.1.0 - 2026-06-04
+
+### 🐛 Bug fixes
+- Suppressed false HEMS auth repair issues for sites without Heat Pump context while keeping optional HEMS polling backoff active. (#697, #698)
+
+### 🔄 Other changes
+- Bumped the integration manifest version to `3.1.0`.
 
 ## v3.0.12 - 2026-05-30
 
