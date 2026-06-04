@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 ## v3.1.0 - 2026-06-04
 
 ### 🐛 Bug fixes
+- Fixed IQ Battery system profile status so successful BatteryConfig profile writes are promoted from the authoritative profile endpoint, stale live/status payloads do not revert the selected profile, and unconfirmed writes remain pending until the cloud confirms or the pending repair timeout is reached. (#694)
 - Suppressed false HEMS auth repair issues for sites without Heat Pump context while keeping optional HEMS polling backoff active. (#697, #698)
 
 ### 🔄 Other changes
