@@ -3804,6 +3804,7 @@ def test_hems_auth_circuit_is_coordinator_backed(
     mock_issue_registry,
 ):
     coord = coordinator_factory()
+    coord._selected_type_keys = {"heatpump"}  # noqa: SLF001
 
     assert coord._hems_auth_circuit_active() is False  # noqa: SLF001
     assert coord._note_hems_auth_failure(  # noqa: SLF001
@@ -3836,6 +3837,62 @@ def test_hems_auth_circuit_is_coordinator_backed(
     assert coord._hems_auth_backoff_until is None  # noqa: SLF001
     assert coord._hems_auth_last_reason == "unauthorized"  # noqa: SLF001
     assert coord._hems_auth_failure_count == 2  # noqa: SLF001
+
+
+def test_hems_auth_circuit_suppresses_repair_without_heatpump_context(
+    coordinator_factory,
+    mock_issue_registry,
+):
+    coord = coordinator_factory()
+
+    assert coord._note_hems_auth_failure(  # noqa: SLF001
+        coord_mod.Unauthorized(),
+        endpoint="hems_devices",
+    )
+
+    assert coord._hems_auth_circuit_active() is True  # noqa: SLF001
+    assert coord._hems_auth_failure_count == 1  # noqa: SLF001
+    assert not mock_issue_registry.created
+
+
+def test_hems_auth_repair_context_respects_disabled_heatpump_group(
+    coordinator_factory,
+    mock_issue_registry,
+):
+    coord = coordinator_factory()
+    coord._selected_type_keys = {"envoy", "encharge"}  # noqa: SLF001
+    coord.inventory_view.has_type = MagicMock(return_value=True)
+    coord._heatpump_known_present = True  # noqa: SLF001
+
+    assert coord._hems_auth_repair_context_available() is False  # noqa: SLF001
+    assert coord._note_hems_auth_failure(  # noqa: SLF001
+        coord_mod.Unauthorized(),
+        endpoint="hems_devices",
+    )
+    assert not mock_issue_registry.created
+
+
+def test_hems_auth_repair_context_handles_defensive_fallbacks(
+    coordinator_factory,
+):
+    coord = coordinator_factory()
+    coord.inventory_view.has_type = MagicMock(side_effect=RuntimeError("bad"))
+    coord._heatpump_known_present = True  # noqa: SLF001
+
+    assert coord._hems_auth_repair_context_available() is True  # noqa: SLF001
+
+    coord = coordinator_factory()
+    coord.inventory_view.has_type = MagicMock(side_effect=RuntimeError("bad"))
+    coord.heatpump_runtime.heatpump_entities_established = MagicMock(
+        side_effect=RuntimeError("bad")
+    )
+
+    assert coord._hems_auth_repair_context_available() is False  # noqa: SLF001
+
+    coord = coordinator_factory()
+    coord.heatpump_runtime.heatpump_entities_established = None
+
+    assert coord._hems_auth_repair_context_available() is False  # noqa: SLF001
 
 
 def test_hems_auth_circuit_restores_and_persists_config_entry_state(

@@ -4566,6 +4566,31 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             return int(err.status), "forbidden" if err.status == 403 else "unauthorized"
         return None
 
+    def _hems_auth_repair_context_available(self) -> bool:
+        """Return True when HEMS auth failures should be surfaced to the user."""
+
+        selected = getattr(self, "_selected_type_keys", None)
+        if isinstance(selected, (set, list, tuple)) and selected:
+            return any(normalize_type_key(key) == "heatpump" for key in selected)
+        inventory_view = getattr(self, "inventory_view", None)
+        has_type = getattr(inventory_view, "has_type", None)
+        if callable(has_type):
+            try:
+                if has_type("heatpump"):
+                    return True
+            except Exception:  # noqa: BLE001 - defensive diagnostics guard
+                pass
+        if bool(getattr(self, "_heatpump_known_present", False)):
+            return True
+        runtime = getattr(self, "heatpump_runtime", None)
+        established = getattr(runtime, "heatpump_entities_established", None)
+        if callable(established):
+            try:
+                return bool(established())
+            except Exception:  # noqa: BLE001 - defensive diagnostics guard
+                return False
+        return False
+
     def _note_hems_auth_failure(
         self,
         err: BaseException,
@@ -4597,7 +4622,17 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         self._persist_hems_auth_circuit_state()
         diagnostics = getattr(self, "diagnostics", None)
         if diagnostics is not None:
-            diagnostics.create_hems_auth_degraded_issue()
+            repairs_enabled = bool(
+                getattr(diagnostics, "degraded_service_repair_issues_enabled", True)
+            )
+            if self._hems_auth_repair_context_available() or not repairs_enabled:
+                diagnostics.create_hems_auth_degraded_issue()
+            else:
+                clear_issue = getattr(
+                    diagnostics, "clear_hems_auth_degraded_issue", None
+                )
+                if callable(clear_issue):
+                    clear_issue()
         _LOGGER.warning(
             "Pausing optional HEMS polling for site %s after HEMS auth failure: endpoint=%s status=%s reason=%s failure_count=%s retry_at=%s",
             redact_site_id(self.site_id),
