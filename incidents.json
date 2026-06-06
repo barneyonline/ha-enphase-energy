@@ -1,19 +1,7 @@
 {
   "current_status": "Fully Operational",
-  "generated_at": "2026-06-06T21:36:43.660576Z",
+  "generated_at": "2026-06-06T23:02:25.369993Z",
   "incidents": [
-    {
-      "active": false,
-      "duration_minutes": 77,
-      "ended_at": "2026-05-07T23:52:09.654067Z",
-      "failed_checks": [
-        "battery_config",
-        "evse_scheduler"
-      ],
-      "last_seen_at": "2026-05-07T22:34:13.339931Z",
-      "started_at": "2026-05-07T22:34:13.339931Z",
-      "status": "Degraded"
-    },
     {
       "active": false,
       "duration_minutes": 37,
