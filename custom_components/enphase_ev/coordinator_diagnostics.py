@@ -1342,7 +1342,10 @@ class CoordinatorDiagnostics:
                         continue
                     if bool(getattr(view, "has_valid_cache", False)):
                         continue
-                    if getattr(view, "state", None) == "unavailable":
+                    if getattr(view, "state", None) == "unavailable" and (
+                        getattr(view, "last_error", None)
+                        or getattr(view, "cache_age", None) is not None
+                    ):
                         has_current_day_unavailable = True
                         break
         if available and not has_current_day_unavailable:
