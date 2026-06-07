@@ -4,8 +4,38 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- None
+
 ### 🔧 Improvements
-- Improved Home Assistant device firmware metadata so aggregate Battery, Microinverter, and Heat Pump devices can show firmware summaries in the Devices table when inventory data includes versions.
+- None
+
+### 🔄 Other changes
+- None
+
+## v3.1.2 - 2026-06-08
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Fixed config-entry reload compatibility for Home Assistant 2026.6 by letting active update listeners handle reloads while preserving reload-helper behavior for unloaded or setup-failed entries. (#703)
+
+### 🔧 Improvements
+- Improved Home Assistant device firmware metadata so aggregate Battery, Microinverter, and Heat Pump devices can show firmware summaries in the Devices table when inventory data includes versions. (#706)
+
+### 🔄 Other changes
+- Updated the Codecov GitHub Action from v6 to v7. (#704)
+- Bumped the integration manifest version to `3.1.2`.
 
 ## v3.1.1 - 2026-06-07
 
