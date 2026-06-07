@@ -204,7 +204,7 @@ jobs:
         run: pytest --cov=custom_components.enphase_ev --cov-report=term-missing --cov-report=xml --cov-fail-under=95 --junitxml=junit.xml -o junit_family=legacy
       - name: Import Codecov GPG key
         if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
-        run: curl -fsSL https://keybase.io/codecovsecops/pgp_keys.asc | gpg --no-default-keyring --keyring trustedkeys.gpg --import
+        run: curl -fsSL https://keybase.io/codecovsecops/pgp_keys.asc | gpg --import
       - name: Upload coverage to Codecov
         if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
         uses: codecov/codecov-action@v6
