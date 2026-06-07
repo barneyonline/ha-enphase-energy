@@ -284,7 +284,7 @@ class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
         self._mfa_code_sent = False
         self._pending_user_errors: dict[str, str] | None = None
 
-    @callback
+    @callback  # type: ignore[untyped-decorator]
     def _async_update_entry_and_abort(
         self,
         entry: EnphaseConfigEntry,
