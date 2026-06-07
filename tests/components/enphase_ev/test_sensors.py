@@ -23,6 +23,30 @@ def _mk_coord_with(sn: str, payload: dict):
     return coord
 
 
+def test_statistical_energy_sensor_classes_declare_state_class():
+    from homeassistant.components.sensor import SensorDeviceClass
+
+    from custom_components.enphase_ev import sensor as sensor_module
+
+    statistical_device_classes = {
+        SensorDeviceClass.BATTERY,
+        SensorDeviceClass.CURRENT,
+        SensorDeviceClass.ENERGY,
+        SensorDeviceClass.ENERGY_STORAGE,
+        SensorDeviceClass.POWER,
+    }
+
+    missing_state_class = sorted(
+        name
+        for name, cls in vars(sensor_module).items()
+        if isinstance(cls, type)
+        and getattr(cls, "_attr_device_class", None) in statistical_device_classes
+        and getattr(cls, "_attr_state_class", None) is None
+    )
+
+    assert missing_state_class == []
+
+
 def test_charging_level_fallback():
     from custom_components.enphase_ev.sensor import EnphaseChargingLevelSensor
 
@@ -412,6 +436,8 @@ def test_storm_alert_sensor_states():
 def test_battery_overall_charge_sensor_states():
     from types import SimpleNamespace
 
+    from homeassistant.components.sensor import SensorStateClass
+
     from custom_components.enphase_ev.sensor import EnphaseBatteryOverallChargeSensor
 
     coord = SimpleNamespace(
@@ -452,6 +478,7 @@ def test_battery_overall_charge_sensor_states():
     sensor = EnphaseBatteryOverallChargeSensor(coord)
     assert sensor.available is True
     assert sensor.native_value == 47.8
+    assert sensor.state_class == SensorStateClass.MEASUREMENT
     assert sensor.device_info["identifiers"] == {("enphase_ev", "type:site:encharge")}
     provided = {"identifiers": {("enphase_ev", "type:site:encharge")}}
     coord.inventory_view.type_device_info = lambda _key: provided
@@ -550,6 +577,8 @@ def test_battery_cfg_schedule_status_sensor_states():
 def test_battery_storage_charge_sensor_snapshot():
     from types import SimpleNamespace
 
+    from homeassistant.components.sensor import SensorStateClass
+
     from custom_components.enphase_ev.sensor import EnphaseBatteryStorageChargeSensor
 
     snapshot = {
@@ -573,6 +602,7 @@ def test_battery_storage_charge_sensor_snapshot():
     assert sensor.available is True
     assert sensor.name == "IQ Battery 5P"
     assert sensor.native_value == 48.0
+    assert sensor.state_class == SensorStateClass.MEASUREMENT
     assert sensor.extra_state_attributes["serial_number"] == "BAT-1"
     assert sensor.device_info["identifiers"] == {("enphase_ev", "type:site:encharge")}
 
@@ -627,6 +657,8 @@ def test_battery_storage_charge_sensor_edge_paths():
 def test_battery_storage_detail_sensors_state_and_attributes():
     from types import SimpleNamespace
 
+    from homeassistant.components.sensor import SensorStateClass
+
     from custom_components.enphase_ev.sensor import (
         EnphaseBatteryStorageCycleCountSensor,
         EnphaseBatteryStorageHealthSensor,
@@ -669,6 +701,7 @@ def test_battery_storage_detail_sensors_state_and_attributes():
 
     assert health.available is True
     assert health.native_value == 98.6
+    assert health.state_class == SensorStateClass.MEASUREMENT
     assert cycle.native_value == 123
     assert last_reported.entity_registry_enabled_default is False
     assert last_reported.available is True
@@ -799,6 +832,8 @@ def test_battery_site_summary_sensors_state_and_attributes():
     from types import SimpleNamespace
     from datetime import datetime, timezone
 
+    from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+
     from custom_components.enphase_ev.sensor import (
         EnphaseBatteryAvailableEnergySensor,
         EnphaseBatteryAvailablePowerSensor,
@@ -833,7 +868,8 @@ def test_battery_site_summary_sensors_state_and_attributes():
     energy = EnphaseBatteryAvailableEnergySensor(coord)
     power = EnphaseBatteryAvailablePowerSensor(coord)
 
-    assert energy.state_class is None
+    assert energy.device_class == SensorDeviceClass.ENERGY_STORAGE
+    assert energy.state_class == SensorStateClass.MEASUREMENT
     assert energy.available is True
     assert energy.native_value == 4.75
     assert (
@@ -932,6 +968,8 @@ def test_battery_last_reported_sensor_states_and_attributes():
 def test_ac_battery_storage_sensors_state_and_attributes():
     from types import SimpleNamespace
 
+    from homeassistant.components.sensor import SensorStateClass
+
     from custom_components.enphase_ev.sensor import (
         EnphaseAcBatteryStorageChargeSensor,
         EnphaseAcBatteryStorageCycleCountSensor,
@@ -977,6 +1015,7 @@ def test_ac_battery_storage_sensors_state_and_attributes():
     assert charge.available is True
     assert charge.name == "BAT-AC-1"
     assert charge.native_value == 48.4
+    assert charge.state_class == SensorStateClass.MEASUREMENT
     assert charge.extra_state_attributes["battery_id"] == "67890"
 
     assert status.native_value == "warning"

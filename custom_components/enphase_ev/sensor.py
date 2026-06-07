@@ -3269,6 +3269,7 @@ class EnphaseBatteryStorageChargeSensor(_EnphaseBatteryStorageBaseSensor):
     _attr_translation_key = "battery_storage_charge"
     _attr_device_class = SensorDeviceClass.BATTERY
     _attr_native_unit_of_measurement = "%"
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coord: EnphaseCoordinator, serial: str) -> None:
         super().__init__(coord, serial, "_charge_level")
@@ -3344,6 +3345,7 @@ class EnphaseBatteryStorageHealthSensor(_EnphaseBatteryStorageBaseSensor):
     _attr_translation_key = "battery_storage_health"
     _attr_device_class = SensorDeviceClass.BATTERY
     _attr_native_unit_of_measurement = "%"
+    _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coord: EnphaseCoordinator, serial: str) -> None:
@@ -3501,6 +3503,7 @@ class EnphaseAcBatteryStorageChargeSensor(_EnphaseAcBatteryStorageBaseSensor):
     _attr_translation_key = "ac_battery_storage_charge"
     _attr_device_class = SensorDeviceClass.BATTERY
     _attr_native_unit_of_measurement = "%"
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coord: EnphaseCoordinator, serial: str) -> None:
         super().__init__(coord, serial, "_charge_level")
@@ -7891,6 +7894,7 @@ class EnphaseBatteryOverallChargeSensor(_SiteBaseEntity):
     _attr_translation_key = "battery_overall_charge"
     _attr_device_class = SensorDeviceClass.BATTERY
     _attr_native_unit_of_measurement = "%"
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coord: EnphaseCoordinator):
         super().__init__(
@@ -8037,8 +8041,9 @@ class EnphaseBatteryScheduleModeSensor(_BaseBatteryScheduleInventorySensor):
 
 class EnphaseBatteryAvailableEnergySensor(_SiteBaseEntity):
     _attr_translation_key = "battery_available_energy"
-    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_device_class = SensorDeviceClass.ENERGY_STORAGE
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coord: EnphaseCoordinator):
         super().__init__(

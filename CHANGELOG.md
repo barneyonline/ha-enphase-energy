@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🐛 Bug fixes
-- None
+- Added long-term statistics metadata to IQ Battery and AC Battery charge sensors so Home Assistant's Energy Dashboard can select them as battery state-of-charge sensors, and classified battery available energy as stored energy.
 
 ## v3.1.0 - 2026-06-04
 
