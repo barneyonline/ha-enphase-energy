@@ -1,60 +1,8 @@
 {
   "current_status": "Fully Operational",
-  "generated_at": "2026-06-07T01:36:36.103941Z",
+  "generated_at": "2026-06-07T06:23:25.369766Z",
   "retention_days": 30,
   "samples": [
-    {
-      "checked_at": "2026-05-08T02:12:39.056804Z",
-      "checks_failed": 10,
-      "failed_check_names": [
-        "battery_config",
-        "battery_runtime",
-        "discovery",
-        "evse_scheduler",
-        "inventory",
-        "microinverters",
-        "site_energy",
-        "site_live",
-        "system_dashboard_details",
-        "system_dashboard_tree"
-      ],
-      "status": "Degraded"
-    },
-    {
-      "checked_at": "2026-05-08T02:50:13.986633Z",
-      "checks_failed": 10,
-      "failed_check_names": [
-        "battery_config",
-        "battery_runtime",
-        "discovery",
-        "evse_scheduler",
-        "inventory",
-        "microinverters",
-        "site_energy",
-        "site_live",
-        "system_dashboard_details",
-        "system_dashboard_tree"
-      ],
-      "status": "Degraded"
-    },
-    {
-      "checked_at": "2026-05-08T04:41:46.936142Z",
-      "checks_failed": 2,
-      "failed_check_names": [
-        "battery_config",
-        "evse_scheduler"
-      ],
-      "status": "Degraded"
-    },
-    {
-      "checked_at": "2026-05-08T05:29:47.710356Z",
-      "checks_failed": 2,
-      "failed_check_names": [
-        "battery_config",
-        "evse_runtime"
-      ],
-      "status": "Down"
-    },
     {
       "checked_at": "2026-05-08T07:07:30.175438Z",
       "checks_failed": 2,
@@ -2571,6 +2519,14 @@
     },
     {
       "checked_at": "2026-06-07T01:36:36.103941Z",
+      "checks_failed": 1,
+      "failed_check_names": [
+        "battery_config"
+      ],
+      "status": "Fully Operational"
+    },
+    {
+      "checked_at": "2026-06-07T06:23:25.369766Z",
       "checks_failed": 1,
       "failed_check_names": [
         "battery_config"
