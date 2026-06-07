@@ -31,6 +31,7 @@ from custom_components.enphase_ev import (
     _migrate_cloud_entities_to_cloud_device,
     _migrate_legacy_gateway_type_devices,
     _migrate_orphaned_update_entities_to_type_devices,
+    _inventory_type_device_sw_version_for_registry,
     _normalize_selected_type_keys,
     _normalize_evse_model_name,
     _registry_charger_metadata_signature,
@@ -82,6 +83,10 @@ def _with_inventory_view(coord):
             coord, "type_device_sw_version", lambda _type_key: None
         ),
     )
+    if hasattr(coord, "type_device_sw_version_summary"):
+        coord.inventory_view.type_device_sw_version_summary = (
+            coord.type_device_sw_version_summary
+        )
     return coord
 
 
@@ -2597,6 +2602,96 @@ def test_sync_type_devices_uses_model_and_hw_summary(config_entry) -> None:
     assert device.model_id == "IQ7A-72-2-US x16"
     assert device.sw_version == "520-00082-r01-v04.30.32 x16"
     assert device.hw_version == "IQ7A-72-2-US x16"
+
+
+def test_sync_type_devices_uses_inventory_view_firmware_summaries(
+    config_entry,
+) -> None:
+    from custom_components.enphase_ev.inventory_view import InventoryView
+
+    site_id = config_entry.data[CONF_SITE_ID]
+    dev_reg = _FakeDeviceRegistry()
+    heatpump_member = {
+        "device_type": "HEAT_PUMP",
+        "device_uid": "HP-1",
+        "name": "Heat Pump",
+        "firmware-version": "3.0",
+        "part-number": "PN-1",
+    }
+    coord = SimpleNamespace(
+        site_id=site_id,
+        _selected_type_keys=None,
+        _type_device_order=["encharge", "microinverter", "heatpump"],
+        _type_device_buckets={
+            "encharge": {
+                "type_key": "encharge",
+                "type_label": "Battery",
+                "count": 3,
+                "devices": [
+                    {"serial_number": "BAT-1", "sw_version": "1.0"},
+                    {"serial_number": "BAT-2", "sw_version": "1.0"},
+                    {"serial_number": "BAT-3", "sw_version": "2.0"},
+                ],
+            },
+            "microinverter": {
+                "type_key": "microinverter",
+                "type_label": "Microinverters",
+                "count": 3,
+                "devices": [
+                    {"serial_number": "INV-1", "fw1": "4.0"},
+                    {"serial_number": "INV-2", "fw1": "4.0"},
+                    {"serial_number": "INV-3", "fw2": "5.0"},
+                ],
+            },
+            "heatpump": {
+                "type_key": "heatpump",
+                "type_label": "Heat Pump",
+                "count": 1,
+                "devices": [heatpump_member],
+            },
+        },
+        heatpump_runtime=SimpleNamespace(
+            _heatpump_primary_member=lambda: heatpump_member
+        ),
+        inventory_runtime=SimpleNamespace(),
+    )
+    coord.inventory_view = InventoryView(coord)
+
+    type_devices = _sync_type_devices(config_entry, coord, dev_reg, site_id)
+
+    assert type_devices["encharge"].sw_version == "1.0 x2, 2.0 x1"
+    assert type_devices["microinverter"].sw_version == "4.0 x2, 5.0 x1"
+    assert type_devices["heatpump"].sw_version == "3.0"
+
+
+def test_inventory_type_device_sw_version_for_registry_fallbacks() -> None:
+    assert (
+        _inventory_type_device_sw_version_for_registry(SimpleNamespace(), "envoy")
+        is None
+    )
+    assert (
+        _inventory_type_device_sw_version_for_registry(
+            SimpleNamespace(type_device_sw_version=lambda _key: "7.0"), "envoy"
+        )
+        == "7.0"
+    )
+    assert (
+        _inventory_type_device_sw_version_for_registry(
+            SimpleNamespace(
+                type_device_sw_version_summary=lambda _key: " ",
+                type_device_sw_version=lambda _key: "8.0",
+            ),
+            "envoy",
+        )
+        == "8.0"
+    )
+    assert (
+        _inventory_type_device_sw_version_for_registry(
+            SimpleNamespace(type_device_sw_version_summary=lambda _key: " "),
+            "envoy",
+        )
+        is None
+    )
 
 
 def test_sync_type_devices_updates_existing_hw_summary(config_entry) -> None:

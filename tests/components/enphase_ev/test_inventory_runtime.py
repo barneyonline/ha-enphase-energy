@@ -248,6 +248,34 @@ def test_inventory_runtime_summary_and_inverter_helper_paths(
         }
     }
     assert coord.inventory_view.type_device_sw_version("microinverter") is None
+    coord._type_device_buckets = {  # noqa: SLF001
+        "encharge": {
+            "type_key": "encharge",
+            "type_label": "Battery",
+            "count": 3,
+            "devices": [
+                {"serial_number": "BAT-1", "sw_version": "1.0"},
+                {"serial_number": "BAT-2", "sw_version": "1.0"},
+                {"serial_number": "BAT-3", "sw_version": "2.0"},
+            ],
+        },
+        "microinverter": {
+            "type_key": "microinverter",
+            "type_label": "Microinverters",
+            "count": 3,
+            "devices": [
+                {"serial_number": "INV-1", "fw1": "4.0"},
+                {"serial_number": "INV-2", "fw1": "4.0"},
+                {"serial_number": "INV-3", "fw2": "5.0"},
+            ],
+        },
+    }
+    battery_info = coord.inventory_view.type_device_info("encharge")
+    inverter_info = coord.inventory_view.type_device_info("microinverter")
+    assert battery_info is not None
+    assert inverter_info is not None
+    assert battery_info["sw_version"] == "1.0 x2, 2.0 x1"
+    assert inverter_info["sw_version"] == "4.0 x2, 5.0 x1"
     coord._type_device_buckets = {"encharge": "bad"}  # noqa: SLF001
     assert coord.inventory_view.type_device_hw_version("encharge") is None
     coord._type_device_buckets = {  # noqa: SLF001
@@ -1970,6 +1998,9 @@ def test_inventory_runtime_merge_heatpump_bucket_uses_worst_status_fallback(
     }
     assert bucket["model_summary"] == "PN-1 x1"
     assert bucket["firmware_summary"] == "1.2.3 x1"
+    info = coord.inventory_view.type_device_info("heatpump")
+    assert info is not None
+    assert info["sw_version"] == "1.2.3"
 
 
 def test_inventory_runtime_system_dashboard_and_microinverter_edge_paths(

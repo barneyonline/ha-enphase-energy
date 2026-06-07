@@ -279,6 +279,29 @@ def test_inventory_view_iter_type_keys_uses_selected_keys_when_no_order_or_bucke
     assert coord.inventory_view.iter_type_keys() == ["envoy", "iqevse"]
 
 
+def test_inventory_view_iter_type_keys_handles_iter_serials_error() -> None:
+    from custom_components.enphase_ev.inventory_view import InventoryView
+
+    def _bad_iter_serials():
+        raise RuntimeError("boom")
+
+    view = InventoryView(
+        SimpleNamespace(
+            site_id=RANDOM_SITE_ID,
+            data={},
+            serials=[],
+            iter_serials=_bad_iter_serials,
+            _type_device_order=None,
+            _type_device_buckets=None,
+            _selected_type_keys=None,
+            _battery_has_encharge=False,
+            _battery_has_acb=False,
+        )
+    )
+
+    assert view.iter_type_keys() == ["envoy"]
+
+
 def test_inventory_view_type_identifier_requires_present_type(
     hass, monkeypatch
 ) -> None:
@@ -582,9 +605,17 @@ def test_type_device_summary_helpers_for_battery_and_microinverter(
     assert coord.inventory_view.type_device_serial_number("encharge") is None
     assert coord.inventory_view.type_device_model_id("encharge") is None
     assert coord.inventory_view.type_device_sw_version("encharge") is None
+    assert (
+        coord.inventory_view.type_device_sw_version_summary("encharge")
+        == "1.0 x2, 2.0 x1"
+    )
     assert coord.inventory_view.type_device_model_id("microinverter") is None
     assert coord.inventory_view.type_device_hw_version("microinverter") is None
     assert coord.inventory_view.type_device_sw_version("microinverter") is None
+    assert (
+        coord.inventory_view.type_device_sw_version_summary("microinverter")
+        == "4.0 x2, 5.0 x1"
+    )
 
 
 def test_type_device_helper_branches_for_mac_and_labels(hass, monkeypatch) -> None:
