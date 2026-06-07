@@ -4,8 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## v3.1.1 - 2026-06-07
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- Added long-term statistics metadata to IQ Battery and AC Battery charge sensors so Home Assistant's Energy Dashboard can select them as battery state-of-charge sensors, and classified battery available energy as stored energy. (#701)
+
 ### 🐛 Bug fixes
-- Added long-term statistics metadata to IQ Battery and AC Battery charge sensors so Home Assistant's Energy Dashboard can select them as battery state-of-charge sensors, and classified battery available energy as stored energy.
+- Avoided startup session-history repair warnings before the first session-history cache entry is materialized, while preserving repair reporting for real unavailable cache entries. (#700)
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Bumped the integration manifest version to `3.1.1`.
 
 ## v3.1.0 - 2026-06-04
 
