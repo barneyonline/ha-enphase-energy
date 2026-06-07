@@ -1229,7 +1229,9 @@ async def test_finalize_login_entry_without_state_aborts(hass) -> None:
 
 
 @pytest.mark.asyncio
-async def test_finalize_login_entry_reconfigure_uses_core_helper(hass) -> None:
+async def test_finalize_login_entry_reconfigure_uses_reload_helper_without_listener(
+    hass,
+) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={
@@ -1248,6 +1250,7 @@ async def test_finalize_login_entry_reconfigure_uses_core_helper(hass) -> None:
     flow._selected_site_id = "12345"
     flow._remember_password = False
     flow._email = "user@example.com"
+    flow.async_update_and_abort = Mock()
     flow.async_update_reload_and_abort = Mock(
         return_value={"type": FlowResultType.ABORT, "reason": "handled"}
     )
@@ -1255,9 +1258,135 @@ async def test_finalize_login_entry_reconfigure_uses_core_helper(hass) -> None:
     result = await flow._finalize_login_entry(["EV123"], 45)
 
     assert result == {"type": FlowResultType.ABORT, "reason": "handled"}
+    flow.async_update_and_abort.assert_not_called()
     flow.async_update_reload_and_abort.assert_called_once()
     kwargs = flow.async_update_reload_and_abort.call_args.kwargs
-    assert kwargs["data_updates"][CONF_HEATPUMP_DISCOVERY_HANDLED] is True
+    assert kwargs["data"][CONF_HEATPUMP_DISCOVERY_HANDLED] is True
+
+
+@pytest.mark.asyncio
+async def test_finalize_login_entry_reconfigure_uses_update_helper_with_listener(
+    hass,
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_SITE_ID: "12345",
+            CONF_EMAIL: "user@example.com",
+            CONF_REMEMBER_PASSWORD: False,
+            CONF_HEATPUMP_DISCOVERY_HANDLED: True,
+        },
+    )
+    entry.add_to_hass(hass)
+    entry.add_update_listener(AsyncMock())
+
+    flow = _make_flow(hass)
+    flow._reconfigure_entry = entry
+    flow._auth_tokens = TOKENS
+    flow._sites = {"12345": "Garage"}
+    flow._selected_site_id = "12345"
+    flow._remember_password = False
+    flow._email = "user@example.com"
+    flow.async_update_and_abort = Mock(
+        return_value={"type": FlowResultType.ABORT, "reason": "handled"}
+    )
+    flow.async_update_reload_and_abort = Mock()
+
+    result = await flow._finalize_login_entry(["EV123"], 45)
+
+    assert result == {"type": FlowResultType.ABORT, "reason": "handled"}
+    flow.async_update_and_abort.assert_called_once()
+    flow.async_update_reload_and_abort.assert_not_called()
+    kwargs = flow.async_update_and_abort.call_args.kwargs
+    assert kwargs["data"][CONF_HEATPUMP_DISCOVERY_HANDLED] is True
+
+
+def test_update_entry_helper_uses_update_helper_without_title_when_listener_present(
+    hass,
+) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.add_to_hass(hass)
+    entry.add_update_listener(AsyncMock())
+
+    flow = _make_flow(hass)
+    captured: dict[str, object] = {}
+
+    def _sync_update(entry_obj, *, data, reason):
+        captured["entry"] = entry_obj
+        captured["data"] = dict(data)
+        captured["reason"] = reason
+        return {"type": FlowResultType.ABORT, "reason": "sync"}
+
+    flow.async_update_and_abort = _sync_update  # type: ignore[assignment]
+    flow.async_update_reload_and_abort = Mock()
+
+    result = flow._async_update_entry_and_abort(
+        entry,
+        data={CONF_SITE_ID: "12345"},
+        reason="reconfigure_successful",
+    )
+
+    assert result == {"type": FlowResultType.ABORT, "reason": "sync"}
+    assert captured["entry"] is entry
+    assert captured["data"] == {CONF_SITE_ID: "12345"}
+    assert captured["reason"] == "reconfigure_successful"
+    flow.async_update_reload_and_abort.assert_not_called()
+
+
+def test_update_entry_helper_uses_reload_helper_without_title_when_no_listener(
+    hass,
+) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.add_to_hass(hass)
+
+    flow = _make_flow(hass)
+    captured: dict[str, object] = {}
+
+    def _sync_update(entry_obj, *, data, reason):
+        captured["entry"] = entry_obj
+        captured["data"] = dict(data)
+        captured["reason"] = reason
+        return {"type": FlowResultType.ABORT, "reason": "sync"}
+
+    flow.async_update_and_abort = Mock()
+    flow.async_update_reload_and_abort = _sync_update  # type: ignore[assignment]
+
+    result = flow._async_update_entry_and_abort(
+        entry,
+        data={CONF_SITE_ID: "12345"},
+        reason="reconfigure_successful",
+    )
+
+    assert result == {"type": FlowResultType.ABORT, "reason": "sync"}
+    assert captured["entry"] is entry
+    assert captured["data"] == {CONF_SITE_ID: "12345"}
+    assert captured["reason"] == "reconfigure_successful"
+    flow.async_update_and_abort.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_update_entry_helper_falls_back_for_legacy_core(hass) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.add_to_hass(hass)
+
+    flow = _make_flow(hass)
+    flow.async_update_and_abort = None  # type: ignore[method-assign]
+    flow.async_update_reload_and_abort = None  # type: ignore[method-assign]
+    reload_entry = AsyncMock(return_value=True)
+
+    with patch.object(hass.config_entries, "async_reload", reload_entry):
+        result = flow._async_update_entry_and_abort(
+            entry,
+            title="Site: 12345",
+            data={CONF_SITE_ID: "12345"},
+            reason="reconfigure_successful",
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.title == "Site: 12345"
+    reload_entry.assert_awaited_once_with(entry.entry_id)
 
 
 @pytest.mark.asyncio
@@ -1396,7 +1525,7 @@ async def test_reauth_step_remember_password_preserves_opt_out(hass) -> None:
 
 
 @pytest.mark.asyncio
-async def test_finalize_login_entry_sync_update_removes_none(hass) -> None:
+async def test_finalize_login_entry_reload_helper_removes_none(hass) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id="12345",
@@ -1427,12 +1556,13 @@ async def test_finalize_login_entry_sync_update_removes_none(hass) -> None:
     flow._password = None
     flow._email = "user@example.com"
 
-    captured: dict[str, dict] = {}
+    captured: dict[str, object] = {}
 
-    def _sync_update(entry_obj, *, data_updates, reason):
+    def _sync_update(entry_obj, *, data, reason, title=None):
         captured["entry"] = entry_obj
-        captured["data"] = dict(data_updates)
+        captured["data"] = dict(data)
         captured["reason"] = reason
+        captured["title"] = title
         return {"type": FlowResultType.ABORT, "reason": "sync"}
 
     flow.async_update_reload_and_abort = _sync_update  # type: ignore[assignment]
@@ -1442,6 +1572,7 @@ async def test_finalize_login_entry_sync_update_removes_none(hass) -> None:
     assert result == {"type": FlowResultType.ABORT, "reason": "sync"}
     assert captured["entry"] is entry
     assert captured["reason"] == "reconfigure_successful"
+    assert captured["title"] == "Site: 12345"
     assert CONF_PASSWORD not in captured["data"]
     assert CONF_SESSION_ID not in captured["data"]
     assert CONF_COOKIE not in captured["data"]
@@ -1453,7 +1584,7 @@ async def test_finalize_login_entry_sync_update_removes_none(hass) -> None:
 
 
 @pytest.mark.asyncio
-async def test_finalize_login_entry_sync_update_passes_reason(hass) -> None:
+async def test_finalize_login_entry_reload_helper_passes_reauth_reason(hass) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id="12345",
@@ -1477,10 +1608,11 @@ async def test_finalize_login_entry_sync_update_passes_reason(hass) -> None:
 
     captured: dict[str, object] = {}
 
-    def _sync_update(entry_obj, *, data_updates, reason):
+    def _sync_update(entry_obj, *, data, reason, title=None):
         captured["entry"] = entry_obj
-        captured["data"] = dict(data_updates)
+        captured["data"] = dict(data)
         captured["reason"] = reason
+        captured["title"] = title
         return {"type": FlowResultType.ABORT, "reason": "sync"}
 
     flow.async_update_reload_and_abort = _sync_update  # type: ignore[assignment]
@@ -1490,6 +1622,7 @@ async def test_finalize_login_entry_sync_update_passes_reason(hass) -> None:
     assert result == {"type": FlowResultType.ABORT, "reason": "sync"}
     assert captured["entry"] is entry
     assert captured["reason"] == "reauth_successful"
+    assert captured["title"] == "Site: 12345"
 
 
 @pytest.mark.asyncio

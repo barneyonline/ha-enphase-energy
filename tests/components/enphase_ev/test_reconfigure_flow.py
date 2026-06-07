@@ -200,7 +200,7 @@ async def test_reconfigure_allows_disabling_all_devices(hass, monkeypatch) -> No
     monkeypatch.setattr(
         hass.config_entries,
         "async_update_entry",
-        lambda _entry, **kwargs: updated.update(kwargs),
+        lambda entry=None, **kwargs: updated.update(kwargs),
     )
     monkeypatch.setattr(
         hass.config_entries, "async_reload", AsyncMock(return_value=True)
