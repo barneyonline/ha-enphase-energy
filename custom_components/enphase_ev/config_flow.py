@@ -6,6 +6,7 @@ import asyncio
 import logging
 import re
 import time
+from collections.abc import Mapping
 from typing import Any, cast
 
 import voluptuous as vol
@@ -282,6 +283,49 @@ class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
         self._mfa_resend_available_at: float | None = None
         self._mfa_code_sent = False
         self._pending_user_errors: dict[str, str] | None = None
+
+    @callback  # type: ignore[untyped-decorator]
+    def _async_update_entry_and_abort(
+        self,
+        entry: EnphaseConfigEntry,
+        *,
+        data: Mapping[str, Any],
+        reason: str,
+        title: str | None = None,
+    ) -> FlowResult:
+        has_update_listeners = bool(getattr(entry, "update_listeners", ()))
+        if has_update_listeners and callable(
+            update_and_abort := getattr(self, "async_update_and_abort", None)
+        ):
+            if title is not None:
+                return update_and_abort(
+                    entry,
+                    title=title,
+                    data=data,
+                    reason=reason,
+                )
+            return update_and_abort(entry, data=data, reason=reason)
+
+        update_reload_and_abort = getattr(self, "async_update_reload_and_abort", None)
+        if callable(update_reload_and_abort):
+            if title is not None:
+                return update_reload_and_abort(
+                    entry,
+                    title=title,
+                    data=data,
+                    reason=reason,
+                )
+            return update_reload_and_abort(entry, data=data, reason=reason)
+
+        update_kwargs: dict[str, Any] = {"data": data}
+        if title is not None:
+            update_kwargs["title"] = title
+        self.hass.config_entries.async_update_entry(entry, **update_kwargs)
+        self.hass.async_create_task(
+            self.hass.config_entries.async_reload(entry.entry_id),
+            f"reload {entry.domain} config entry {entry.entry_id}",
+        )
+        return self.async_abort(reason=reason)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -728,10 +772,6 @@ class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
 
             self._abort_if_unique_id_mismatch(reason="wrong_account")
             desired_title = _site_entry_title(str(self._selected_site_id))
-            if self._reconfigure_entry.title != desired_title:
-                self.hass.config_entries.async_update_entry(
-                    self._reconfigure_entry, title=desired_title
-                )
             merged = dict(self._reconfigure_entry.data)
             for key, value in data.items():
                 if value is None:
@@ -750,18 +790,17 @@ class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
             merged.pop(CONF_HEMS_AUTH_LAST_REASON, None)
             if not self._remember_password:
                 merged.pop(CONF_PASSWORD, None)
-                return self.async_update_reload_and_abort(
-                    self._reconfigure_entry,
-                    data_updates=merged,
-                    reason=reason,
-                )
-            self.hass.config_entries.async_update_entry(
-                self._reconfigure_entry, data=merged
+            title = (
+                desired_title
+                if self._reconfigure_entry.title != desired_title
+                else None
             )
-            await self.hass.config_entries.async_reload(
-                self._reconfigure_entry.entry_id
+            return self._async_update_entry_and_abort(
+                self._reconfigure_entry,
+                title=title,
+                data=merged,
+                reason=reason,
             )
-            return self.async_abort(reason=reason)
 
         self._abort_if_unique_id_configured()
         title = _site_entry_title(str(self._selected_site_id))
