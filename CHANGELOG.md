@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### 🔧 Improvements
+- Improved Home Assistant device firmware metadata so aggregate Battery, Microinverter, and Heat Pump devices can show firmware summaries in the Devices table when inventory data includes versions.
+
 ## v3.1.1 - 2026-06-07
 
 ### 🚧 Breaking changes

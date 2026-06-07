@@ -952,6 +952,33 @@ def test_helper_functions_cover_edge_paths() -> None:
     assert _as_bool(_BadStr()) is None
 
 
+def test_charger_installed_version_ignores_mixed_iqevse_inventory_summary() -> None:
+    from custom_components.enphase_ev.inventory_view import InventoryView
+
+    coord = SimpleNamespace(
+        site_id=TEST_EVSE_SITE_ID,
+        data={},
+        _type_device_buckets={
+            "iqevse": {
+                "type_key": "iqevse",
+                "type_label": "EV Chargers",
+                "count": 2,
+                "devices": [
+                    {"serial_number": "SN1", "sw_version": "1.0"},
+                    {"serial_number": "SN2", "sw_version": "2.0"},
+                ],
+            }
+        },
+        _type_device_order=["iqevse"],
+        _selected_type_keys=None,
+    )
+    coord.inventory_view = InventoryView(coord)
+
+    assert coord.inventory_view.type_device_sw_version("iqevse") is None
+    assert coord.inventory_view.type_device_sw_version_summary("iqevse") is None
+    assert _charger_installed_version(coord, "SN1") is None
+
+
 def test_device_info_falls_back_when_coordinator_does_not_supply_info() -> None:
     coord = DummyCoordinator()
     coord.inventory_view.type_device_info = lambda _type: None

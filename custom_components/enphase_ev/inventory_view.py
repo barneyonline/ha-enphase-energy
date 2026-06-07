@@ -576,9 +576,15 @@ class InventoryView:
             "envoy_sw_version",
             "sw_version",
             "firmware_version",
+            "firmwareVersion",
+            "firmware-version",
             "software_version",
+            "softwareVersion",
+            "software-version",
             "system_version",
             "application_version",
+            "applicationVersion",
+            "application-version",
         )
         if normalized == "envoy":
             member = self._envoy_preferred_member()
@@ -599,18 +605,53 @@ class InventoryView:
             sw_version = self._type_member_single_value(
                 self._type_bucket_members(normalized), *sw_keys
             )
-            if sw_version:
-                return sw_version
-            return self._type_member_summary(
-                self._type_bucket_members(normalized), *sw_keys
-            )
+            return sw_version
         if normalized in ("encharge", "iqevse", "generator"):
             return self._type_member_single_value(
-                self._type_bucket_members(normalized),
-                *sw_keys,
+                self._type_bucket_members(normalized), *sw_keys
             )
         if normalized == "microinverter":
             return self._type_member_single_value(
+                self._type_bucket_members(normalized),
+                "fw1",
+                "fw2",
+                *sw_keys,
+            )
+        return None
+
+    def type_device_sw_version_summary(
+        self, type_key: object
+    ) -> str | None:  # pragma: no cover
+        normalized = normalize_type_key(type_key)
+        if not normalized:
+            return None
+        sw_version = self.type_device_sw_version(normalized)
+        if sw_version:
+            return sw_version
+        sw_keys = (
+            "envoy_sw_version",
+            "sw_version",
+            "firmware_version",
+            "firmwareVersion",
+            "firmware-version",
+            "software_version",
+            "softwareVersion",
+            "software-version",
+            "system_version",
+            "application_version",
+            "applicationVersion",
+            "application-version",
+        )
+        if normalized in ("encharge", "generator"):
+            return self._type_member_summary(
+                self._type_bucket_members(normalized), *sw_keys
+            )
+        if normalized == "heatpump":
+            return self._type_member_summary(
+                self._type_bucket_members(normalized), *sw_keys
+            )
+        if normalized == "microinverter":
+            return self._type_member_summary(
                 self._type_bucket_members(normalized),
                 "fw1",
                 "fw2",
@@ -704,7 +745,7 @@ class InventoryView:
         model_id = self.type_device_model_id(type_key)
         if model_id:
             info_kwargs["model_id"] = model_id
-        sw_version = self.type_device_sw_version(type_key)
+        sw_version = self.type_device_sw_version_summary(type_key)
         if sw_version:
             info_kwargs["sw_version"] = sw_version
         hw_summary = self.type_device_hw_version(type_key)

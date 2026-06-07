@@ -269,8 +269,8 @@ def _sync_type_devices(
         model_id = _clean_optional_text(inventory_view.type_device_model_id(type_key))
         if _is_redundant_model_id(model, model_id):
             model_id = None
-        sw_version = _clean_optional_text(
-            inventory_view.type_device_sw_version(type_key)
+        sw_version = _inventory_type_device_sw_version_for_registry(
+            inventory_view, type_key
         )
         if not label or not name:
             continue
@@ -318,6 +318,24 @@ def _sync_type_devices(
         if isinstance(ident, tuple) and len(ident) == 2:
             type_devices_by_identifier[ident] = created
     return type_devices
+
+
+def _inventory_type_device_sw_version_for_registry(
+    inventory_view: object, type_key: object
+) -> str | None:
+    sw_version_getter = getattr(inventory_view, "type_device_sw_version_summary", None)
+    if not callable(sw_version_getter):
+        sw_version_getter = getattr(inventory_view, "type_device_sw_version", None)
+        if not callable(sw_version_getter):
+            return None
+        return _clean_optional_text(sw_version_getter(type_key))
+    sw_version = _clean_optional_text(sw_version_getter(type_key))
+    if sw_version is not None:
+        return sw_version
+    single_version_getter = getattr(inventory_view, "type_device_sw_version", None)
+    if not callable(single_version_getter):
+        return None
+    return _clean_optional_text(single_version_getter(type_key))
 
 
 def _sync_charger_devices(
@@ -418,7 +436,9 @@ def _registry_type_metadata_signature(coord) -> tuple[tuple[object, ...], ...]:
                     inventory_view.type_device_serial_number(type_key)
                 ),
                 _clean_optional_text(inventory_view.type_device_model_id(type_key)),
-                _clean_optional_text(inventory_view.type_device_sw_version(type_key)),
+                _inventory_type_device_sw_version_for_registry(
+                    inventory_view, type_key
+                ),
             )
         )
     return tuple(signature)

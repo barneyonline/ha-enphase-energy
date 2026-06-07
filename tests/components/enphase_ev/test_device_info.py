@@ -29,6 +29,7 @@ def test_device_info_uses_display_name_and_model():
     assert info["model"] == "Garage Charger (IQ-EVSE-EU-3032)"
     assert "model_id" not in info
     assert info["serial_number"] == "555555555555"
+    assert info["sw_version"] == "3.1"
     assert info["connections"] == {(CONNECTION_NETWORK_MAC, "00:11:22:33:44:55")}
 
 
