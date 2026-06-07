@@ -207,14 +207,14 @@ jobs:
         run: curl -fsSL https://keybase.io/codecovsecops/pgp_keys.asc | gpg --import
       - name: Upload coverage to Codecov
         if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml
           fail_ci_if_error: true
       - name: Upload test results to Codecov
         if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./junit.xml
