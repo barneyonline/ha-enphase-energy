@@ -1,6 +1,6 @@
 {
   "current_status": "Down",
-  "generated_at": "2026-06-11T01:59:36.304437Z",
+  "generated_at": "2026-06-11T06:58:45.140961Z",
   "incidents": [
     {
       "active": false,
@@ -141,7 +141,7 @@
       "status": "Down"
     },
     {
-      "active": true,
+      "active": false,
       "duration_minutes": 0,
       "ended_at": null,
       "failed_checks": [
@@ -149,6 +149,17 @@
       ],
       "last_seen_at": "2026-06-11T01:59:36.304437Z",
       "started_at": "2026-06-11T01:59:36.304437Z",
+      "status": "Down"
+    },
+    {
+      "active": true,
+      "duration_minutes": 0,
+      "ended_at": null,
+      "failed_checks": [
+        "auth"
+      ],
+      "last_seen_at": "2026-06-11T06:58:45.140961Z",
+      "started_at": "2026-06-11T06:58:45.140961Z",
       "status": "Down"
     }
   ],
