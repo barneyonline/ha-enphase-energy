@@ -140,7 +140,9 @@ from .runtime_helpers import (
     coerce_int as helper_coerce_int,
     coerce_optional_int as helper_coerce_optional_int,
     copy_diagnostics_value,
+    evse_session_energy_uses_wh,
     normalize_poll_intervals,
+    normalize_evse_session_energy,
     normalize_iso_date,
     redact_battery_payload,
     resolve_inverter_start_date,
@@ -3555,19 +3557,15 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                 if session_end is None and sess.get("plg_out_at") is not None:
                     session_end = _sec(sess.get("plg_out_at"))
 
-            # Session energy normalization: many deployments report Wh in e_c
-            session_energy_wh = _as_float(sess.get("e_c"))
-            ses_kwh = session_energy_wh
-            if isinstance(ses_kwh, (int, float)):
-                try:
-                    if ses_kwh > 200:
-                        ses_kwh = round(float(ses_kwh) / 1000.0, 2)
-                    else:
-                        ses_kwh = round(float(ses_kwh), 2)
-                except Exception:
-                    ses_kwh = session_energy_wh
-            else:
-                ses_kwh = sess.get("e_c")
+            session_energy_raw = sess.get("e_c")
+            ses_kwh, session_energy_wh, session_energy_unit = (
+                normalize_evse_session_energy(
+                    session_energy_raw,
+                    wh_hint=evse_session_energy_uses_wh(obj, sess),
+                )
+            )
+            if session_energy_raw is not None and ses_kwh is None:
+                ses_kwh = session_energy_raw
 
             display_name = obj.get("displayName") or obj.get("name")
             if display_name is not None:
@@ -3641,6 +3639,8 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                     else None
                 ),
                 "suspended_by_evse": suspended_by_evse,
+                "session_energy_raw": session_energy_raw,
+                "session_energy_unit": session_energy_unit,
                 "session_energy_wh": session_energy_wh,
                 "session_kwh": ses_kwh,
                 "session_miles": session_miles,
@@ -4018,6 +4018,21 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                 # Prefer displayName from summary v2 for user-facing names
                 if item.get("displayName"):
                     cur["display_name"] = str(item.get("displayName"))
+                if cur.get("session_energy_raw") is not None and (
+                    cur.get("session_energy_unit") != "Wh"
+                    and evse_session_energy_uses_wh(cur, item)
+                ):
+                    session_kwh, session_wh, session_unit = (
+                        normalize_evse_session_energy(
+                            cur.get("session_energy_raw"),
+                            wh_hint=True,
+                        )
+                    )
+                    if session_kwh is not None:
+                        cur["session_kwh"] = session_kwh
+                    if session_wh is not None:
+                        cur["session_energy_wh"] = session_wh
+                    cur["session_energy_unit"] = session_unit
             self._seed_nominal_voltage_option_from_api()
 
         for sn, cur in out.items():

@@ -501,6 +501,7 @@ async def test_coordinator_runtime_delegate_helpers_cover_direct_runtime_calls(
 
 
 def test_coordinator_static_and_class_runtime_helpers_cover_delegate_paths():
+    assert coord_mod._coerce_floatish(1) == 1.0  # noqa: SLF001
     assert EnphaseCoordinator._format_inverter_model_summary({"IQ8": 2}) == "IQ8 x2"
     assert (
         EnphaseCoordinator._heatpump_member_primary_id({"device_uid": "HP-1"}) == "HP-1"

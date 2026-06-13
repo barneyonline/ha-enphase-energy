@@ -66,6 +66,7 @@ from .runtime_helpers import (
     coerce_optional_text as _gateway_clean_text,
     inventory_type_available as _type_available,
     inventory_type_device_info as _type_device_info,
+    normalize_evse_session_energy,
 )
 from .sensor_registry import (
     AC_BATTERY_ENTITY_UNIQUE_SUFFIXES as AC_BATTERY_ENTITY_UNIQUE_SUFFIXES,
@@ -1252,18 +1253,14 @@ class EnphaseEnergyTodaySensor(EnphaseBaseEntity, SensorEntity, RestoreEntity):
                 energy_kwh = round(float(session_kwh), 2)
             except Exception:  # noqa: BLE001
                 energy_kwh = None
-        if energy_kwh is None and session_wh is not None:
-            try:
-                wh_val = float(session_wh)
-            except Exception:  # noqa: BLE001
-                wh_val = None
-            if wh_val is not None:
-                if wh_val > 200:
-                    energy_kwh = round(wh_val / 1000.0, 2)
-                    energy_wh = round(wh_val, 3)
-                else:
-                    energy_kwh = round(wh_val, 2)
-                    energy_wh = round(wh_val * 1000.0, 3)
+        if session_wh is not None:
+            wh_kwh, wh_value, _unit = normalize_evse_session_energy(
+                session_wh,
+                wh_hint=True,
+            )
+            if energy_kwh is None:
+                energy_kwh = wh_kwh
+            energy_wh = wh_value
         if energy_kwh is not None and energy_wh is None:
             try:
                 energy_wh = round(energy_kwh * 1000.0, 3)

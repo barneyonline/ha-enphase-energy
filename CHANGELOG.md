@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Fixed Last Session energy normalization for IQ-EVSE chargers so small Wh payloads such as `140.038 Wh` are reported as `0.14 kWh` instead of `140.04 kWh`. (#708)
 
 ### 🔧 Improvements
 - None
