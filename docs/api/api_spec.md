@@ -278,7 +278,7 @@ The web-app Live Vitals capture also used the `api/v2` status alias, returning a
 
 Observed field behavior:
 - `session_d` may still describe the most recent completed charge session even when `charging=false` and `pluggedIn=false`.
-- Session energy units vary by response shape; values greater than `200` have been observed as Wh, while smaller values may already be kWh.
+- Session energy units vary by response shape; IQ-EVSE and modern session payloads report `session_d.e_c` as Wh even below `200`, while some legacy payloads may already report smaller values as kWh.
 - `sch_d.status=1` with `sch_d.info[].type="greencharging"` indicates an active green-charging policy window; `startTime` and `endTime` are Unix seconds.
 - `connectorStatusType="AVAILABLE"` can coexist with `connected=true`, meaning the charger is reachable but idle.
 - `smartEV.hasEVDetails` and top-level `isEVDetailsSet` are separate flags and can disagree in the same payload.
@@ -6120,7 +6120,7 @@ There is no single universal header set; the implementation varies headers by en
 | `connectorStatusReason` | Additional enum reason (e.g., `INSUFFICIENT_SOLAR`); observed value so far: `""` |
 | `connectorId` | Connector index within `connectors[]`; observed value so far: `1` |
 | `dlbActive` | Per-connector Dynamic Load Balancing activity flag; observed value so far: `false` |
-| `session_d.e_c` | Session energy (Wh if >200, else kWh) |
+| `session_d.e_c` | Session energy (Wh for IQ-EVSE/modern session payloads; legacy payloads may report small values as kWh) |
 | `session_d.start_time` | Epoch seconds when session started |
 | `chargeLevelDetails.min/max` | Min/max allowed amps |
 | `chargeLevelDetails.granularity` | Charge-current step size as a string; observed value so far: `"1"` |

@@ -53,6 +53,86 @@ def coerce_optional_text(value: object) -> str | None:
     return text or None
 
 
+def _text_contains_iq_evse(value: object) -> bool:
+    try:
+        text = str(value).strip().upper()
+    except Exception:  # noqa: BLE001
+        return False
+    return "IQ-EVSE" in text
+
+
+def evse_session_energy_uses_wh(*sources: object) -> bool:
+    """Return true when EVSE session energy is known to be reported as Wh."""
+
+    for source in sources:
+        if not isinstance(source, dict):
+            continue
+        for key in (
+            "modelId",
+            "model_id",
+            "sku",
+            "model",
+            "modelName",
+            "model_name",
+            "partNumber",
+            "part_number",
+        ):
+            value = source.get(key)
+            if value is not None and _text_contains_iq_evse(value):
+                return True
+        session = source.get("session_d")
+        if isinstance(session, dict) and evse_session_energy_uses_wh(session):
+            return True
+        if any(
+            key in source
+            for key in (
+                "strt_chrg",
+                "plg_in_at",
+                "plg_out_at",
+                "auth_status",
+                "auth_type",
+                "auth_id",
+                "charge_level",
+            )
+        ):
+            return True
+    return False
+
+
+def normalize_evse_session_energy(
+    value: object,
+    *,
+    wh_hint: bool = False,
+) -> tuple[float | None, float | None, str | None]:
+    """Normalize EVSE session energy to kWh, Wh, and the inferred source unit."""
+
+    if value is None:
+        return None, None, None
+    try:
+        numeric_value = float(value)
+    except Exception:  # noqa: BLE001
+        return None, None, None
+
+    if wh_hint or numeric_value > 200:
+        try:
+            return (
+                round(numeric_value / 1000.0, 2),
+                round(numeric_value, 3),
+                "Wh",
+            )
+        except Exception:  # noqa: BLE001
+            return None, None, "Wh"
+
+    try:
+        return (
+            round(numeric_value, 2),
+            round(numeric_value * 1000.0, 3),
+            "kWh",
+        )
+    except Exception:  # noqa: BLE001
+        return None, None, "kWh"
+
+
 def iso_or_none(value: datetime | None) -> str | None:
     if value is None:
         return None

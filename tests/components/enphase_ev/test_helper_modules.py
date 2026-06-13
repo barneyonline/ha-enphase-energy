@@ -115,6 +115,36 @@ def test_runtime_helpers_cover_parsing_dates_and_redaction(monkeypatch) -> None:
     }
     assert runtime_helpers.coerce_optional_text("  value  ") == "value"
     assert runtime_helpers.coerce_optional_text(BadStr()) is None
+    assert runtime_helpers.evse_session_energy_uses_wh("bad-source") is False
+    assert runtime_helpers.evse_session_energy_uses_wh({"modelId": BadStr()}) is False
+    assert runtime_helpers.evse_session_energy_uses_wh(
+        {"session_d": {"plg_in_at": "2026-06-13T17:06:43Z"}}
+    )
+    assert runtime_helpers.normalize_evse_session_energy("140.038", wh_hint=True) == (
+        0.14,
+        140.038,
+        "Wh",
+    )
+    assert runtime_helpers.normalize_evse_session_energy("3.52") == (
+        3.52,
+        3520.0,
+        "kWh",
+    )
+    with monkeypatch.context() as ctx:
+        ctx.setattr(
+            "builtins.round",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("boom")),
+        )
+        assert runtime_helpers.normalize_evse_session_energy(250) == (
+            None,
+            None,
+            "Wh",
+        )
+        assert runtime_helpers.normalize_evse_session_energy(2) == (
+            None,
+            None,
+            "kWh",
+        )
 
     inventory_view = MagicMock(
         has_type_for_entities=MagicMock(return_value=True),

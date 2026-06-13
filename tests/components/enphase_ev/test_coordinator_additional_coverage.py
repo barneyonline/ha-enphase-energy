@@ -2088,7 +2088,133 @@ async def test_async_update_data_success_enriches_payload(
     assert sn in result
     entry = result[sn]
     assert entry["charge_mode"] == "IDLE"
+    assert entry["session_energy_raw"] == 100
+    assert entry["session_energy_unit"] == "Wh"
+    assert entry["session_energy_wh"] == pytest.approx(100.0)
+    assert entry["session_kwh"] == pytest.approx(0.1)
     assert entry["energy_today_sessions_kwh"] == 2.0
+
+
+@pytest.mark.asyncio
+async def test_async_update_data_normalizes_small_iq_evse_session_wh(
+    coordinator_factory,
+):
+    coord = coordinator_factory(serials=["EV1"])
+    coord.client.status = AsyncMock(
+        return_value={
+            "evChargerData": [
+                {
+                    "sn": "EV1",
+                    "name": "Garage",
+                    "charging": False,
+                    "pluggedIn": True,
+                    "faulted": False,
+                    "session_d": {
+                        "start_time": 1781370420,
+                        "e_c": 140.038,
+                    },
+                    "connectors": [
+                        {"connectorStatusType": coord_mod.SUSPENDED_EVSE_STATUS}
+                    ],
+                }
+            ],
+            "ts": "2026-06-13T17:15:58Z[UTC]",
+        }
+    )
+    coord._async_resolve_charge_modes = AsyncMock(return_value={})
+    coord.summary = SimpleNamespace(
+        prepare_refresh=lambda **kwargs: True,
+        async_fetch=AsyncMock(
+            return_value=[
+                {
+                    "serialNumber": "EV1",
+                    "modelId": "IQ-EVSE-NA-1080-0100-0100",
+                    "modelName": "IQ-EVSE-80R",
+                }
+            ]
+        ),
+        invalidate=lambda: None,
+    )
+
+    class _DummyHistory:
+        cache_ttl = 60
+
+        def get_cache_view(self, *_args, **_kwargs):
+            return SimpleNamespace(sessions=[], needs_refresh=False, blocked=False)
+
+        def schedule_enrichment(self, *_args, **_kwargs):
+            return None
+
+        def sum_energy(self, sessions):
+            return 0.0
+
+    coord.session_history = _DummyHistory()
+
+    result = await coord._async_update_data()
+
+    entry = result["EV1"]
+    assert entry["session_energy_raw"] == pytest.approx(140.038)
+    assert entry["session_energy_unit"] == "Wh"
+    assert entry["session_energy_wh"] == pytest.approx(140.038)
+    assert entry["session_kwh"] == pytest.approx(0.14)
+
+
+@pytest.mark.asyncio
+async def test_async_update_data_preserves_unparseable_session_energy(
+    coordinator_factory,
+):
+    class BadEnergy:
+        def __float__(self):
+            raise ValueError("bad energy")
+
+    bad_energy = BadEnergy()
+    coord = coordinator_factory(serials=["EV1"])
+    coord.client.status = AsyncMock(
+        return_value={
+            "evChargerData": [
+                {
+                    "sn": "EV1",
+                    "name": "Garage",
+                    "charging": False,
+                    "pluggedIn": True,
+                    "faulted": False,
+                    "session_d": {"e_c": bad_energy},
+                    "connectors": [
+                        {"connectorStatusType": coord_mod.SUSPENDED_EVSE_STATUS}
+                    ],
+                }
+            ],
+            "ts": "2026-06-13T17:15:58Z[UTC]",
+        }
+    )
+    coord._async_resolve_charge_modes = AsyncMock(return_value={})
+    coord.summary = SimpleNamespace(
+        prepare_refresh=lambda **kwargs: False,
+        async_fetch=AsyncMock(return_value=[]),
+        invalidate=lambda: None,
+    )
+
+    class _DummyHistory:
+        cache_ttl = 60
+
+        def get_cache_view(self, *_args, **_kwargs):
+            return SimpleNamespace(sessions=[], needs_refresh=False, blocked=False)
+
+        def schedule_enrichment(self, *_args, **_kwargs):
+            return None
+
+        def sum_energy(self, sessions):
+            return 0.0
+
+    coord.session_history = _DummyHistory()
+
+    result = await coord._async_update_data()
+
+    entry = result["EV1"]
+    assert entry["session_energy_raw"] is bad_energy
+    assert entry["session_energy_unit"] is None
+    assert entry["session_energy_wh"] is None
+    assert entry["session_kwh"] is bad_energy
 
 
 @pytest.mark.asyncio

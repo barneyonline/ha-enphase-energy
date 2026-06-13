@@ -78,11 +78,14 @@ def test_last_session_helper_branches(monkeypatch):
 
     # Energy fallback paths
     kwh, wh = sensor._coerce_energy(None, 150.0)
-    assert kwh == pytest.approx(150.0)
-    assert wh == pytest.approx(150000.0)
+    assert kwh == pytest.approx(0.15)
+    assert wh == pytest.approx(150.0)
     kwh2, wh2 = sensor._coerce_energy(None, 250.0)
     assert kwh2 == pytest.approx(0.25)
     assert wh2 == pytest.approx(250.0)
+    kwh3, wh3 = sensor._coerce_energy(None, 140.038)
+    assert kwh3 == pytest.approx(0.14)
+    assert wh3 == pytest.approx(140.038)
 
     # History context when realtime lacks energy
     data = {
