@@ -1615,7 +1615,7 @@ class BatteryRuntime:
         if overlapping is not None:
             raise_translated_service_validation(
                 translation_domain=DOMAIN,
-                translation_key="exceptions.battery_schedule_overlap",
+                translation_key="battery_schedule_overlap",
                 translation_placeholders=battery_schedule_overlap_placeholders(
                     overlapping,
                     hass=getattr(self.coordinator, "hass", None),
@@ -1635,7 +1635,7 @@ class BatteryRuntime:
     ) -> None:
         raise_translated_service_validation(
             translation_domain=DOMAIN,
-            translation_key=f"exceptions.{key}",
+            translation_key=key,
             translation_placeholders=placeholders,
             message=message,
         )
@@ -5119,7 +5119,7 @@ class BatteryRuntime:
             return
         raise_translated_service_validation(
             translation_domain=DOMAIN,
-            translation_key=f"exceptions.{key}",
+            translation_key=key,
             translation_placeholders=placeholders,
             message=message,
         )

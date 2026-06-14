@@ -1154,7 +1154,7 @@ def _raise_tariff_validation(
 ) -> None:
     raise_translated_service_validation(
         translation_domain=DOMAIN,
-        translation_key=f"exceptions.{key}",
+        translation_key=key,
         translation_placeholders=placeholders,
         message=message,
     )
