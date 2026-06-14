@@ -926,17 +926,76 @@ def _migrate_legacy_gateway_type_devices(
             continue
         _move_device_to_gateway(legacy_device, matched_type_key)
 
+    _remove_legacy_site_device(hass, entry, coord, dev_reg, site_id_text)
+
+
+def _is_legacy_site_device(device: object, legacy_site_ident: tuple[str, str]) -> bool:
+    """Return True for the old site-only placeholder device."""
+
+    identifiers = getattr(device, "identifiers", None)
+    if not identifiers:
+        return False
+    return set(identifiers) == {legacy_site_ident}
+
+
+def _remove_legacy_site_device(
+    hass: HomeAssistant,
+    entry: EnphaseConfigEntry,
+    coord,
+    dev_reg,
+    site_id: object,
+) -> None:
+    """Remove the legacy Enphase Site placeholder device."""
+
+    if er is None:
+        return
+    try:
+        site_id_text = str(site_id).strip()
+    except Exception:  # noqa: BLE001
+        site_id_text = ""
+    if not site_id_text:
+        return
+
+    entry_id = getattr(entry, "entry_id", None)
+    gateway_device_id = None
+    gateway_ident = coord.inventory_view.type_identifier("envoy") or (
+        DOMAIN,
+        f"type:{site_id_text}:envoy",
+    )
+    gateway_device = dev_reg.async_get_device(identifiers={gateway_ident})
+    if gateway_device is not None:
+        gateway_device_id = getattr(gateway_device, "id", None)
+
     legacy_site_ident = (DOMAIN, f"site:{site_id_text}")
     legacy_site_device = dev_reg.async_get_device(identifiers={legacy_site_ident})
     if legacy_site_device is None:
         return
+    if not _is_legacy_site_device(legacy_site_device, legacy_site_ident):
+        return
+    config_entries = getattr(legacy_site_device, "config_entries", None)
+    if config_entries is not None and entry_id not in config_entries:
+        return
     legacy_site_device_id = getattr(legacy_site_device, "id", None)
-    if legacy_site_device_id is None or legacy_site_device_id == gateway_device_id:
+    if legacy_site_device_id is None:
+        return
+    if gateway_device_id is not None and legacy_site_device_id == gateway_device_id:
+        return
+
+    try:
+        ent_reg = er.async_get(hass)
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug(
+            "Skipping legacy site-device cleanup for site %s: %s",
+            redact_site_id(site_id_text),
+            redact_text(err, site_ids=(site_id_text,)),
+        )
         return
 
     moved_site_entities = 0
     for reg_entry in entries_for_device(ent_reg, legacy_site_device_id):
         if not is_owned_entity(reg_entry, entry_id):
+            continue
+        if gateway_device_id is None:
             continue
         entity_id = getattr(reg_entry, "entity_id", None)
         if not entity_id:
@@ -960,6 +1019,7 @@ def _migrate_legacy_gateway_type_devices(
         )
         return
 
+    remove_device = getattr(dev_reg, "async_remove_device", None)
     if callable(remove_device):
         try:
             remove_device(legacy_site_device_id)
@@ -1211,6 +1271,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
     site_id = entry.data.get("site_id")
     dev_reg = dr.async_get(hass)
     _sync_registry_devices(entry, coord, dev_reg, site_id)
+    _remove_legacy_site_device(hass, entry, coord, dev_reg, site_id)
     _remove_evse_type_device_and_entities(hass, entry, dev_reg, site_id)
     _migrate_orphaned_update_entities_to_type_devices(hass, entry, site_id)
     _complete_startup_migrations_if_ready(hass, entry, coord, dev_reg, site_id)
@@ -1226,6 +1287,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
                 _remove_evse_type_device_and_entities(hass, entry, dev_reg, site_id)
                 _migrate_orphaned_update_entities_to_type_devices(hass, entry, site_id)
                 last_registry_signature = current_signature
+            _remove_legacy_site_device(hass, entry, coord, dev_reg, site_id)
             _complete_startup_migrations_if_ready(hass, entry, coord, dev_reg, site_id)
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug(
