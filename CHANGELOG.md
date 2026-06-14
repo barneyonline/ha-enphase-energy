@@ -11,13 +11,31 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- Fixed Last Session energy normalization for IQ-EVSE chargers so small Wh payloads such as `140.038 Wh` are reported as `0.14 kWh` instead of `140.04 kWh`. (#708)
+- None
 
 ### 🔧 Improvements
 - None
 
 ### 🔄 Other changes
 - None
+
+## v3.1.3 - 2026-06-14
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Fixed Last Session energy normalization for IQ-EVSE chargers so small Wh payloads such as `140.038 Wh` are reported as `0.14 kWh` instead of `140.04 kWh`. (#709)
+- Removed stale legacy Enphase site-only placeholder devices from the Home Assistant device registry during setup and registry sync, while preserving real or merged devices. (#710)
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Bumped the integration manifest version to `3.1.3`.
 
 ## v3.1.2 - 2026-06-08
 
