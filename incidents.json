@@ -1,20 +1,7 @@
 {
   "current_status": "Fully Operational",
-  "generated_at": "2026-06-14T08:52:53.833942Z",
+  "generated_at": "2026-06-14T11:29:36.558958Z",
   "incidents": [
-    {
-      "active": false,
-      "duration_minutes": 0,
-      "ended_at": null,
-      "failed_checks": [
-        "battery_config",
-        "battery_runtime",
-        "microinverters"
-      ],
-      "last_seen_at": "2026-05-15T09:48:18.406754Z",
-      "started_at": "2026-05-15T09:48:18.406754Z",
-      "status": "Down"
-    },
     {
       "active": false,
       "duration_minutes": 75,
