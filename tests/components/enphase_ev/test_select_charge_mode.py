@@ -789,8 +789,8 @@ async def test_select_platform_skips_system_profile_without_battery(
 
 
 @pytest.mark.asyncio
-async def test_select_platform_adds_system_profile_after_permission_refresh(
-    hass, config_entry, coordinator_factory
+async def test_select_platform_retains_system_profile_while_permission_unknown(
+    hass, config_entry, coordinator_factory, monkeypatch
 ) -> None:
     from custom_components.enphase_ev.const import (
         OPT_BATTERY_SCHEDULES_ENABLED,
@@ -807,6 +807,7 @@ async def test_select_platform_adds_system_profile_after_permission_refresh(
     coord._battery_profile = "self-consumption"  # noqa: SLF001
     coord._battery_user_is_owner = None  # noqa: SLF001
     coord._battery_user_is_installer = None  # noqa: SLF001
+    coord._devices_inventory_ready = True  # noqa: SLF001
     object.__setattr__(
         config_entry,
         "options",
@@ -833,20 +834,43 @@ async def test_select_platform_adds_system_profile_after_permission_refresh(
     coord.async_add_topology_listener = capture_topology  # type: ignore[attr-defined]
     coord.async_add_listener = capture_update  # type: ignore[attr-defined]
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    prune_spy = MagicMock()
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.select.prune_managed_entities", prune_spy
+    )
 
     await async_setup_entry(hass, config_entry, capture_add)
 
-    assert len(added) == 1
-    assert all(isinstance(entity, ChargeModeSelect) for entity in added[0])
     assert len(topology_callbacks) == 1
     assert len(update_callbacks) == 1
+    flat_added = [entity for group in added for entity in group]
+    system_profile = next(
+        entity for entity in flat_added if isinstance(entity, SystemProfileSelect)
+    )
+    assert system_profile.available is False
+    assert any(
+        isinstance(entity, ChargeModeSelect) and entity._sn == "1111"
+        for entity in flat_added
+    )
 
+    system_profile_unique_id = f"enphase_ev_site_{coord.site_id}_system_profile"
+    prune_spy.reset_mock()
+    coord._battery_user_is_owner = False  # noqa: SLF001
+    coord._battery_user_is_installer = False  # noqa: SLF001
+    update_callbacks[0]()
+
+    active_unique_ids = prune_spy.call_args.kwargs["active_unique_ids"]
+    assert system_profile_unique_id in active_unique_ids
+
+    prune_spy.reset_mock()
     coord._battery_user_is_owner = True  # noqa: SLF001
     coord._battery_user_is_installer = False  # noqa: SLF001
     update_callbacks[0]()
 
     flat_added = [entity for group in added for entity in group]
-    assert any(isinstance(entity, SystemProfileSelect) for entity in flat_added)
+    assert sum(isinstance(entity, SystemProfileSelect) for entity in flat_added) == 1
+    active_unique_ids = prune_spy.call_args.kwargs["active_unique_ids"]
+    assert system_profile_unique_id in active_unique_ids
 
 
 @pytest.mark.asyncio

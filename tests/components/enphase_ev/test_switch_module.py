@@ -268,6 +268,35 @@ def test_switch_battery_write_access_confirmed_falls_back_to_false() -> None:
     assert switch_mod._battery_write_access_confirmed(coord) is False
 
 
+def test_charge_from_grid_retention_honors_explicit_negative_flags() -> None:
+    coord = SimpleNamespace()
+
+    coord.battery_system_task = True
+    assert switch_mod._charge_from_grid_retained(coord) is False
+
+    coord.battery_system_task = False
+    coord.battery_cfg_control_show = False
+    assert switch_mod._charge_from_grid_retained(coord) is False
+
+    coord.battery_cfg_control_show = None
+    coord._battery_hide_charge_from_grid = True  # noqa: SLF001
+    assert switch_mod._charge_from_grid_retained(coord) is False
+
+    coord._battery_hide_charge_from_grid = False  # noqa: SLF001
+    coord.battery_cfg_control_locked = True
+    assert switch_mod._charge_from_grid_retained(coord) is False
+
+    coord.battery_cfg_control_locked = False
+    assert switch_mod._charge_from_grid_retained(coord) is True
+
+    coord.battery_system_task = True
+    assert switch_mod._charge_from_grid_schedule_retained(coord) is False
+
+    coord.battery_system_task = False
+    coord.battery_cfg_control_show_day_schedule = False
+    assert switch_mod._charge_from_grid_schedule_retained(coord) is False
+
+
 def test_switch_pending_helper_edge_paths() -> None:
     entity = SimpleNamespace(
         hass=object(),
@@ -564,7 +593,7 @@ async def test_async_setup_entry_syncs_chargers(
 
 
 @pytest.mark.asyncio
-async def test_async_setup_entry_adds_cfg_switches_when_support_becomes_available(
+async def test_async_setup_entry_keeps_cfg_switches_while_permission_unknown(
     hass, config_entry, coordinator_factory
 ) -> None:
     coord = coordinator_factory()
@@ -588,8 +617,18 @@ async def test_async_setup_entry_adds_cfg_switches_when_support_becomes_availabl
 
     await async_setup_entry(hass, config_entry, _capture)
 
-    assert not any(isinstance(entity, ChargeFromGridSwitch) for entity in added)
-    assert not any(isinstance(entity, ChargeFromGridScheduleSwitch) for entity in added)
+    charge_switch = next(
+        entity for entity in added if isinstance(entity, ChargeFromGridSwitch)
+    )
+    schedule_switch = next(
+        entity for entity in added if isinstance(entity, ChargeFromGridScheduleSwitch)
+    )
+    storm_guard_switch = next(
+        entity for entity in added if isinstance(entity, StormGuardSwitch)
+    )
+    assert charge_switch.available is False
+    assert schedule_switch.available is False
+    assert storm_guard_switch.available is False
 
     coord._battery_user_is_owner = True  # noqa: SLF001
     coord._battery_charge_from_grid = True  # noqa: SLF001
@@ -599,8 +638,12 @@ async def test_async_setup_entry_adds_cfg_switches_when_support_becomes_availabl
 
     listener_callbacks[0]()
 
-    assert any(isinstance(entity, ChargeFromGridSwitch) for entity in added)
-    assert any(isinstance(entity, ChargeFromGridScheduleSwitch) for entity in added)
+    assert charge_switch.available is True
+    assert schedule_switch.available is True
+    assert sum(isinstance(entity, ChargeFromGridSwitch) for entity in added) == 1
+    assert (
+        sum(isinstance(entity, ChargeFromGridScheduleSwitch) for entity in added) == 1
+    )
 
 
 @pytest.mark.asyncio
@@ -680,6 +723,88 @@ async def test_async_setup_entry_adds_supported_battery_site_switches_and_prunes
         not in active_unique_ids
     )
     assert f"enphase_ev_site_{coord.site_id}_charge_from_grid" not in active_unique_ids
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_keeps_loaded_site_switches_when_support_disproven(
+    hass, config_entry, coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord._battery_has_encharge = True  # noqa: SLF001
+    coord._battery_user_is_owner = None  # noqa: SLF001
+    coord._battery_user_is_installer = None  # noqa: SLF001
+    coord._battery_show_storm_guard = True  # noqa: SLF001
+    listener_callbacks = []
+    original_add_listener = coord.async_add_listener
+
+    def _capture_listener(callback):
+        listener_callbacks.append(callback)
+        return original_add_listener(callback)
+
+    coord.async_add_listener = MagicMock(side_effect=_capture_listener)
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    prune_spy = MagicMock()
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.switch.prune_managed_entities", prune_spy
+    )
+
+    added = []
+
+    def _capture(entities, update_before_add=False):
+        added.extend(entities)
+
+    await async_setup_entry(hass, config_entry, _capture)
+
+    assert any(isinstance(entity, StormGuardSwitch) for entity in added)
+    assert any(isinstance(entity, ChargeFromGridSwitch) for entity in added)
+    assert any(isinstance(entity, ChargeFromGridScheduleSwitch) for entity in added)
+
+    prune_spy.reset_mock()
+    coord._battery_show_storm_guard = False  # noqa: SLF001
+    coord._battery_cfg_control = (  # noqa: SLF001
+        coord.battery_runtime._parse_battery_control_capability(
+            {
+                "show": False,
+                "showDaySchedule": False,
+                "forceScheduleSupported": False,
+            }
+        )
+    )
+    listener_callbacks[0]()
+
+    active_unique_ids = prune_spy.call_args_list[0].kwargs["active_unique_ids"]
+    assert f"enphase_ev_site_{coord.site_id}_storm_guard" in active_unique_ids
+    assert f"enphase_ev_site_{coord.site_id}_charge_from_grid" in active_unique_ids
+    assert (
+        f"enphase_ev_site_{coord.site_id}_charge_from_grid_schedule"
+        in active_unique_ids
+    )
+
+    added.clear()
+    prune_spy.reset_mock()
+    coord._battery_show_storm_guard = True  # noqa: SLF001
+    coord._battery_cfg_control = (  # noqa: SLF001
+        coord.battery_runtime._parse_battery_control_capability(
+            {
+                "show": True,
+                "showDaySchedule": True,
+                "forceScheduleSupported": True,
+            }
+        )
+    )
+    listener_callbacks[0]()
+
+    assert not any(isinstance(entity, StormGuardSwitch) for entity in added)
+    assert not any(isinstance(entity, ChargeFromGridSwitch) for entity in added)
+    assert not any(isinstance(entity, ChargeFromGridScheduleSwitch) for entity in added)
+    active_unique_ids = prune_spy.call_args_list[0].kwargs["active_unique_ids"]
+    assert f"enphase_ev_site_{coord.site_id}_storm_guard" in active_unique_ids
+    assert f"enphase_ev_site_{coord.site_id}_charge_from_grid" in active_unique_ids
+    assert (
+        f"enphase_ev_site_{coord.site_id}_charge_from_grid_schedule"
+        in active_unique_ids
+    )
 
 
 @pytest.mark.asyncio

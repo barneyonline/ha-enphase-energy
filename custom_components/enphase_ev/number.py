@@ -47,6 +47,15 @@ def _battery_write_access_confirmed(coord: EnphaseCoordinator) -> bool:
     return False
 
 
+def _battery_write_access_explicitly_denied(coord: EnphaseCoordinator) -> bool:
+    if getattr(coord, "battery_write_access_confirmed", None) is True:
+        return False
+    return (
+        getattr(coord, "battery_user_is_owner", None) is False
+        and getattr(coord, "battery_user_is_installer", None) is False
+    )
+
+
 def _battery_schedule_editor_active(
     coord: EnphaseCoordinator, entry: EnphaseConfigEntry | None
 ) -> bool:
@@ -66,17 +75,16 @@ def _retained_site_number_unique_ids(
     unique_ids: set[str] = set()
     if not _type_available(coord, "encharge"):
         return unique_ids
+    write_access_denied = _battery_write_access_explicitly_denied(coord)
+    core_unique_ids = {
+        f"{DOMAIN}_site_{coord.site_id}_battery_reserve",
+        f"{DOMAIN}_site_{coord.site_id}_battery_shutdown_level",
+    }
     if not battery_scheduler_enabled(entry):
-        if _battery_write_access_confirmed(coord):
-            if getattr(coord, "battery_reserve_editable", False):
-                unique_ids.add(f"{DOMAIN}_site_{coord.site_id}_battery_reserve")
-            unique_ids.add(f"{DOMAIN}_site_{coord.site_id}_battery_shutdown_level")
-        return unique_ids
+        return set() if write_access_denied else core_unique_ids
     editor_active = _battery_schedule_editor_active(coord, entry)
-    if _battery_write_access_confirmed(coord):
-        if getattr(coord, "battery_reserve_editable", False):
-            unique_ids.add(f"{DOMAIN}_site_{coord.site_id}_battery_reserve")
-        unique_ids.add(f"{DOMAIN}_site_{coord.site_id}_battery_shutdown_level")
+    if not write_access_denied:
+        unique_ids |= core_unique_ids
     if editor_active:
         unique_ids.add(f"{DOMAIN}_site_{coord.site_id}_battery_schedule_edit_limit")
     return unique_ids
@@ -145,7 +153,6 @@ async def async_setup_entry(
         retained_site_number_unique_ids: set[str],
     ) -> dict[str, NumberEntity]:
         site_entities: dict[str, NumberEntity] = {}
-        write_access_confirmed = _battery_write_access_confirmed(coord)
 
         entity_factories: dict[str, Callable[[], NumberEntity]] = {
             f"{DOMAIN}_site_{coord.site_id}_battery_reserve": lambda: BatteryReserveNumber(
@@ -161,9 +168,9 @@ async def async_setup_entry(
                 f"{DOMAIN}_site_{coord.site_id}_battery_schedule_edit_limit"
             ] = lambda: BatteryScheduleEditLimitNumber(coord, entry)
 
-        active_site_number_unique_ids: set[str] = set()
-        if write_access_confirmed:
-            active_site_number_unique_ids |= _core_site_number_unique_ids()
+        active_site_number_unique_ids = (
+            retained_site_number_unique_ids & _core_site_number_unique_ids()
+        )
         if battery_scheduler_enabled(entry):
             active_site_number_unique_ids |= retained_site_number_unique_ids & {
                 f"{DOMAIN}_site_{coord.site_id}_battery_schedule_edit_limit"
@@ -190,9 +197,9 @@ async def async_setup_entry(
             if unique_id not in added_site_number_unique_ids
         )
         if _site_has_battery(coord) and _type_available(coord, "encharge"):
-            if _battery_write_access_confirmed(coord):
-                active_site_number_unique_ids = _core_site_number_unique_ids()
-                active_site_number_unique_ids |= set(tariff_entities)
+            active_site_number_unique_ids |= (
+                retained_site_number_unique_ids & _core_site_number_unique_ids()
+            )
             if battery_scheduler_enabled(entry):
                 active_site_number_unique_ids |= retained_site_number_unique_ids & {
                     f"{DOMAIN}_site_{coord.site_id}_battery_schedule_edit_limit"
@@ -223,13 +230,25 @@ async def async_setup_entry(
             async_add_entities(entities, update_before_add=False)
         known_serials.intersection_update(current_serials)
         known_serials.update(serials)
-        added_site_number_unique_ids.intersection_update(active_site_number_unique_ids)
 
         if not inventory_ready:
             return
 
         # Registry cleanup waits for inventory so numbers are not removed while
         # optional BatteryConfig endpoints are still warming up.
+        if _site_has_battery(coord) and _type_available(coord, "encharge"):
+            loaded_site_number_unique_ids = {
+                unique_id
+                for unique_id in added_site_number_unique_ids
+                if unique_id in _managed_site_number_unique_ids()
+            }
+        else:
+            loaded_site_number_unique_ids = set()
+        loaded_tariff_number_unique_ids = {
+            unique_id
+            for unique_id in added_site_number_unique_ids
+            if _tariff_number_managed(unique_id)
+        }
         active_charger_unique_ids = {
             _charger_number_unique_id(sn) for sn in current_serials
         }
@@ -239,6 +258,8 @@ async def async_setup_entry(
             domain="number",
             active_unique_ids={
                 *active_site_number_unique_ids,
+                *loaded_site_number_unique_ids,
+                *loaded_tariff_number_unique_ids,
                 *active_charger_unique_ids,
             },
             is_managed=lambda unique_id: (

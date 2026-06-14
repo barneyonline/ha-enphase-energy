@@ -203,9 +203,48 @@ def _battery_write_access_confirmed(coord: EnphaseCoordinator) -> bool:
     return False
 
 
+def _battery_write_access_explicitly_denied(coord: EnphaseCoordinator) -> bool:
+    if getattr(coord, "battery_write_access_confirmed", None) is True:
+        return False
+    return (
+        getattr(coord, "battery_user_is_owner", None) is False
+        and getattr(coord, "battery_user_is_installer", None) is False
+    )
+
+
 def _storm_guard_visible(coord: EnphaseCoordinator) -> bool:
     show_storm_guard = getattr(coord, "battery_show_storm_guard", None)
     return show_storm_guard is not False
+
+
+def _charge_from_grid_retained(coord: EnphaseCoordinator) -> bool:
+    if getattr(coord, "battery_system_task", None) is True:
+        return False
+    cfg_show = getattr(coord, "battery_cfg_control_show", None)
+    if cfg_show is False:
+        return False
+    if (
+        cfg_show is None
+        and getattr(coord, "_battery_hide_charge_from_grid", None) is True
+    ):
+        return False
+    if getattr(coord, "battery_cfg_control_locked", None) is True:
+        return False
+    return True
+
+
+def _charge_from_grid_schedule_retained(coord: EnphaseCoordinator) -> bool:
+    if not _charge_from_grid_retained(coord):
+        return False
+    show_day_schedule = getattr(coord, "battery_cfg_control_show_day_schedule", None)
+    if show_day_schedule is False:
+        return False
+    force_supported = getattr(
+        coord,
+        "battery_cfg_control_force_schedule_supported",
+        None,
+    )
+    return force_supported is not False
 
 
 def _retained_site_switch_keys(
@@ -216,21 +255,18 @@ def _retained_site_switch_keys(
     if (
         _site_has_battery(coord)
         and _type_available(coord, "envoy")
-        and _battery_write_access_confirmed(coord)
+        and not _battery_write_access_explicitly_denied(coord)
         and _storm_guard_visible(coord)
-        and getattr(coord, "storm_guard_state", None) is not None
-        and getattr(coord, "storm_evse_enabled", None) is not None
     ):
         retained.add("storm_guard")
-    if _type_available(coord, "encharge") and _battery_write_access_confirmed(coord):
+    if _type_available(
+        coord, "encharge"
+    ) and not _battery_write_access_explicitly_denied(coord):
         if getattr(coord, "savings_use_battery_switch_available", None) is not False:
             retained.add("savings_use_battery_after_peak")
-        if getattr(coord, "charge_from_grid_control_available", None) is not False:
+        if _charge_from_grid_retained(coord):
             retained.add("charge_from_grid")
-        if (
-            getattr(coord, "charge_from_grid_force_schedule_available", None)
-            is not False
-        ):
+        if _charge_from_grid_schedule_retained(coord):
             retained.add("charge_from_grid_schedule")
         if getattr(coord, "discharge_to_grid_schedule_available", None) is not False:
             retained.add("discharge_to_grid_schedule")

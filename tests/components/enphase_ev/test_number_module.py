@@ -247,12 +247,94 @@ async def test_async_setup_entry_prunes_stale_number_entities_when_inventory_rea
 
 
 @pytest.mark.asyncio
-async def test_async_setup_entry_skips_site_numbers_without_confirmed_write_access(
+async def test_async_setup_entry_keeps_site_numbers_while_permission_unknown(
+    hass, config_entry, monkeypatch
+) -> None:
+    coord = SimpleNamespace()
+    coord.site_id = "123456"
+    coord.battery_write_access_confirmed = False
+    coord.inventory_view = SimpleNamespace(
+        has_type_for_entities=lambda type_key: type_key == "encharge",
+        type_device_info=lambda _type_key: None,
+    )
+    coord.serials = {RANDOM_SERIAL}
+    coord._serial_order = [RANDOM_SERIAL]
+    coord.data = {RANDOM_SERIAL: {"name": "Garage EV"}}
+    coord.iter_serials = lambda: [RANDOM_SERIAL]
+    listener_callbacks = []
+
+    def _capture_listener(callback):
+        listener_callbacks.append(callback)
+        return lambda: None
+
+    coord.async_add_listener = MagicMock(side_effect=_capture_listener)
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord.last_update_success = True
+
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    prune_spy = MagicMock()
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.number.prune_managed_entities", prune_spy
+    )
+
+    added = []
+    await async_setup_entry(
+        hass,
+        config_entry,
+        lambda entities, update_before_add=False: added.extend(entities),
+    )
+
+    assert any(isinstance(ent, ChargingAmpsNumber) for ent in added)
+    reserve = next(ent for ent in added if isinstance(ent, BatteryReserveNumber))
+    shutdown = next(ent for ent in added if isinstance(ent, BatteryShutdownLevelNumber))
+    assert reserve.available is False
+    assert shutdown.available is False
+    assert not any(isinstance(ent, BatteryScheduleEditLimitNumber) for ent in added)
+
+    reserve_unique_id = f"enphase_ev_site_{coord.site_id}_battery_reserve"
+    shutdown_unique_id = f"enphase_ev_site_{coord.site_id}_battery_shutdown_level"
+
+    added.clear()
+    prune_spy.reset_mock()
+    coord.battery_user_is_owner = False
+    coord.battery_user_is_installer = False
+    listener_callbacks[0]()
+
+    active_unique_ids = prune_spy.call_args.kwargs["active_unique_ids"]
+    assert reserve_unique_id in active_unique_ids
+    assert shutdown_unique_id in active_unique_ids
+
+    prune_spy.reset_mock()
+    coord.battery_write_access_confirmed = True
+    listener_callbacks[0]()
+
+    assert not any(isinstance(ent, BatteryReserveNumber) for ent in added)
+    assert not any(isinstance(ent, BatteryShutdownLevelNumber) for ent in added)
+    active_unique_ids = prune_spy.call_args.kwargs["active_unique_ids"]
+    assert reserve_unique_id in active_unique_ids
+    assert shutdown_unique_id in active_unique_ids
+
+    prune_spy.reset_mock()
+    coord.inventory_view = SimpleNamespace(
+        has_type_for_entities=lambda _type_key: False,
+        type_device_info=lambda _type_key: None,
+    )
+    listener_callbacks[0]()
+
+    active_unique_ids = prune_spy.call_args.kwargs["active_unique_ids"]
+    assert reserve_unique_id not in active_unique_ids
+    assert shutdown_unique_id not in active_unique_ids
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_skips_site_numbers_when_write_access_denied(
     hass, config_entry
 ) -> None:
     coord = SimpleNamespace()
     coord.site_id = "123456"
     coord.battery_write_access_confirmed = False
+    coord.battery_user_is_owner = False
+    coord.battery_user_is_installer = False
     coord.inventory_view = SimpleNamespace(
         has_type_for_entities=lambda type_key: type_key == "encharge",
         type_device_info=lambda _type_key: None,
@@ -276,7 +358,6 @@ async def test_async_setup_entry_skips_site_numbers_without_confirmed_write_acce
     assert any(isinstance(ent, ChargingAmpsNumber) for ent in added)
     assert not any(isinstance(ent, BatteryReserveNumber) for ent in added)
     assert not any(isinstance(ent, BatteryShutdownLevelNumber) for ent in added)
-    assert not any(isinstance(ent, BatteryScheduleEditLimitNumber) for ent in added)
 
 
 def test_charging_number_converts_values(hass, config_entry) -> None:
@@ -788,3 +869,71 @@ async def test_tariff_rate_numbers_are_created_and_stale_entries_pruned(
         f"enphase_ev_site_{coord.site_id}_tariff_import_rate_default_week_off_peak_number"
     ]
     assert ent_reg.async_get_entity_id("number", "enphase_ev", stale_unique_id) is None
+
+
+@pytest.mark.asyncio
+async def test_tariff_rate_number_registry_is_kept_when_loaded_spec_disappears(
+    hass, config_entry, monkeypatch
+) -> None:
+    payload = {
+        "purchase": {
+            "typeKind": "single",
+            "typeId": "flat",
+            "seasons": [
+                {
+                    "id": "default",
+                    "days": [
+                        {
+                            "id": "week",
+                            "periods": [{"id": "off-peak", "rate": "0.18"}],
+                        }
+                    ],
+                }
+            ],
+        },
+    }
+    coord = _make_coordinator(hass, config_entry, {})
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord.tariff_import_rate = parse_tariff_rate(payload, "purchase")
+    listener_callbacks = []
+
+    def _capture_listener(callback):
+        listener_callbacks.append(callback)
+        return lambda: None
+
+    coord.async_add_listener = MagicMock(side_effect=_capture_listener)
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    prune_spy = MagicMock()
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.number.prune_managed_entities", prune_spy
+    )
+    added = []
+
+    await async_setup_entry(
+        hass, config_entry, lambda entities, **_: added.extend(entities)
+    )
+
+    unique_id = (
+        f"enphase_ev_site_{coord.site_id}"
+        "_tariff_import_rate_default_week_off_peak_number"
+    )
+    assert any(
+        isinstance(entity, EnphaseTariffRateNumber) and entity.unique_id == unique_id
+        for entity in added
+    )
+
+    added.clear()
+    prune_spy.reset_mock()
+    coord.tariff_import_rate = None
+    listener_callbacks[0]()
+
+    active_unique_ids = prune_spy.call_args.kwargs["active_unique_ids"]
+    assert unique_id in active_unique_ids
+
+    prune_spy.reset_mock()
+    coord.tariff_import_rate = parse_tariff_rate(payload, "purchase")
+    listener_callbacks[0]()
+
+    assert not any(isinstance(entity, EnphaseTariffRateNumber) for entity in added)
+    active_unique_ids = prune_spy.call_args.kwargs["active_unique_ids"]
+    assert unique_id in active_unique_ids

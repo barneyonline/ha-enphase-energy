@@ -19,6 +19,23 @@ All notable changes to this project will be documented in this file.
 ### 🔄 Other changes
 - None
 
+## v3.1.4 - 2026-06-14
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Fixed IQ Battery and Storm Guard entities disappearing during startup when early refreshes completed before BatteryConfig control capability details were fully populated.
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Bumped the integration manifest version to `3.1.4`.
+
 ## v3.1.3 - 2026-06-14
 
 ### 🚧 Breaking changes
