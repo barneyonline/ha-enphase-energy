@@ -270,6 +270,8 @@ async def test_async_setup_entry_keeps_site_numbers_while_permission_unknown(
     coord.async_add_listener = MagicMock(side_effect=_capture_listener)
     coord._devices_inventory_ready = True  # noqa: SLF001
     coord.last_update_success = True
+    coord.battery_reserve_editable = True
+    coord.battery_shutdown_level_available = True
 
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
     prune_spy = MagicMock()
@@ -287,8 +289,8 @@ async def test_async_setup_entry_keeps_site_numbers_while_permission_unknown(
     assert any(isinstance(ent, ChargingAmpsNumber) for ent in added)
     reserve = next(ent for ent in added if isinstance(ent, BatteryReserveNumber))
     shutdown = next(ent for ent in added if isinstance(ent, BatteryShutdownLevelNumber))
-    assert reserve.available is False
-    assert shutdown.available is False
+    assert reserve.available is True
+    assert shutdown.available is True
     assert not any(isinstance(ent, BatteryScheduleEditLimitNumber) for ent in added)
 
     reserve_unique_id = f"enphase_ev_site_{coord.site_id}_battery_reserve"
@@ -303,6 +305,8 @@ async def test_async_setup_entry_keeps_site_numbers_while_permission_unknown(
     active_unique_ids = prune_spy.call_args.kwargs["active_unique_ids"]
     assert reserve_unique_id in active_unique_ids
     assert shutdown_unique_id in active_unique_ids
+    assert reserve.available is False
+    assert shutdown.available is False
 
     prune_spy.reset_mock()
     coord.battery_write_access_confirmed = True

@@ -404,7 +404,7 @@ class SystemProfileSelect(CoordinatorEntity, SelectEntity):
                 return False
         elif not available:
             return False
-        if not _battery_write_access_confirmed(self._coord):
+        if _battery_write_access_explicitly_denied(self._coord):
             return False
         return bool(self.options)
 
