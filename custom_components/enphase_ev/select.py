@@ -26,6 +26,7 @@ from .ac_battery_support import (
     AC_BATTERY_SOC_OPTIONS,
     ac_battery_control_available,
     ac_battery_device_info,
+    ac_battery_entities_available,
     ac_battery_soc_option_label,
 )
 from .const import DOMAIN
@@ -141,6 +142,15 @@ def _battery_write_access_confirmed(coord: EnphaseCoordinator) -> bool:
     return owner is True or installer is True
 
 
+def _battery_write_access_explicitly_denied(coord: EnphaseCoordinator) -> bool:
+    if getattr(coord, "battery_write_access_confirmed", None) is True:
+        return False
+    return (
+        getattr(coord, "battery_user_is_owner", None) is False
+        and getattr(coord, "battery_user_is_installer", None) is False
+    )
+
+
 def _retain_system_profile(coord: EnphaseCoordinator) -> bool:
     if not _site_has_battery(coord):
         return False
@@ -148,14 +158,12 @@ def _retain_system_profile(coord: EnphaseCoordinator) -> bool:
         return False
     available = getattr(coord, "battery_profile_selection_available", None)
     if available is not None:
-        return bool(available and _battery_write_access_confirmed(coord))
+        return bool(available and not _battery_write_access_explicitly_denied(coord))
     if not getattr(coord, "battery_controls_available", False):
         return False
-    owner = getattr(coord, "battery_user_is_owner", None)
-    installer = getattr(coord, "battery_user_is_installer", None)
-    if owner is False and installer is False:
+    if _battery_write_access_explicitly_denied(coord):
         return False
-    return _battery_write_access_confirmed(coord)
+    return True
 
 
 def _retain_ac_battery_target_soc(coord: EnphaseCoordinator) -> bool:
@@ -241,12 +249,7 @@ async def async_setup_entry(
         retain_system_profile = _retain_system_profile(coord)
         retain_ac_battery_target_soc = _retain_ac_battery_target_soc(coord)
         retain_battery_schedule_editor = _retain_battery_schedule_editor(coord, entry)
-        if (
-            not site_entity_added
-            and _site_has_battery(coord)
-            and _battery_write_access_confirmed(coord)
-            and _type_available(coord, "envoy")
-        ):
+        if not site_entity_added and retain_system_profile:
             async_add_entities([SystemProfileSelect(coord)], update_before_add=False)
             site_entity_added = True
         if not ac_battery_select_added and retain_ac_battery_target_soc:
@@ -263,16 +266,23 @@ async def async_setup_entry(
                 update_before_add=False,
             )
             battery_schedule_editor_added = True
-        if not retain_system_profile:
-            site_entity_added = False
-        if not retain_ac_battery_target_soc:
-            ac_battery_select_added = False
-        if not retain_battery_schedule_editor:
-            battery_schedule_editor_added = False
         if not inventory_ready:
             return
         # Site-level selects are dynamic because BatteryConfig permissions and
         # AC Battery support are learned after setup.
+        system_profile_loaded = (
+            site_entity_added
+            and _site_has_battery(coord)
+            and _type_available(coord, "envoy")
+        )
+        ac_battery_target_soc_loaded = (
+            ac_battery_select_added and ac_battery_entities_available(coord)
+        )
+        battery_schedule_editor_loaded = (
+            battery_schedule_editor_added
+            and _site_has_battery(coord)
+            and _type_available(coord, "encharge")
+        )
         prune_managed_entities(
             ent_reg,
             entry.entry_id,
@@ -280,18 +290,23 @@ async def async_setup_entry(
             active_unique_ids={
                 unique_id
                 for unique_id, retained in (
-                    (_system_profile_unique_id(), retain_system_profile),
+                    (
+                        _system_profile_unique_id(),
+                        retain_system_profile or system_profile_loaded,
+                    ),
                     (
                         f"{DOMAIN}_site_{coord.site_id}_ac_battery_target_state_of_charge",
-                        retain_ac_battery_target_soc,
+                        retain_ac_battery_target_soc or ac_battery_target_soc_loaded,
                     ),
                     (
                         _battery_schedule_select_unique_id(),
-                        retain_battery_schedule_editor,
+                        retain_battery_schedule_editor
+                        or battery_schedule_editor_loaded,
                     ),
                     (
                         _battery_new_schedule_type_unique_id(),
-                        retain_battery_schedule_editor,
+                        retain_battery_schedule_editor
+                        or battery_schedule_editor_loaded,
                     ),
                 )
                 if retained
