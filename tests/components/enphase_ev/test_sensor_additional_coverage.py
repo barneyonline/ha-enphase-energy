@@ -3644,7 +3644,7 @@ def test_dry_contacts_inventory_sensor_state_and_attributes(
     assert sensor.available is True
     assert sensor.native_value == "Closed | Open"
     assert sensor.entity_registry_enabled_default is False
-    assert sensor._attr_name == "Dry Contacts"  # noqa: SLF001
+    assert sensor._attr_translation_key == "dry_contacts"  # noqa: SLF001
     attrs = sensor.extra_state_attributes
     assert attrs["name"] == "Dry Contacts"
     assert attrs["member_count"] == 2

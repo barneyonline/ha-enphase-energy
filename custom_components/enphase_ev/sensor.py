@@ -1179,7 +1179,6 @@ class EnphaseEnergyTodaySensor(EnphaseBaseEntity, SensorEntity, RestoreEntity):
         super().__init__(coord, sn)
         # Preserve unique_id for continuity even though the semantics changed
         self._attr_unique_id = f"{DOMAIN}_{sn}_energy_today"
-        self._attr_name = "Last Session"
         self._last_session_kwh: float | None = None
         self._last_session_wh: float | None = None
         self._last_session_start: float | None = None
@@ -6547,7 +6546,7 @@ class EnphaseSystemControllerInventorySensor(_SiteBaseEntity):
 
 
 class EnphaseDryContactsInventorySensor(_SiteBaseEntity):
-    _attr_name = "Dry Contacts"
+    _attr_translation_key = "dry_contacts"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_entity_registry_enabled_default = False
     _unrecorded_attributes = _SiteBaseEntity._unrecorded_attributes.union(

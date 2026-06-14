@@ -447,6 +447,9 @@
     },
     "tariff_structure_invalid": {
       "message": "La structure tarifaire est invalide."
+    },
+    "firmware_advisory_only": {
+      "message": "Les mises à jour du firmware sont fournies à titre indicatif uniquement."
     }
   },
   "options": {
@@ -1742,6 +1745,9 @@
             "name": "Tarifs configurés"
           }
         }
+      },
+      "dry_contacts": {
+        "name": "Contacts secs"
       }
     },
     "number": {

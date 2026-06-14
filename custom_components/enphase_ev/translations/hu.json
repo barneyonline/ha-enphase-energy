@@ -447,6 +447,9 @@
     },
     "tariff_structure_invalid": {
       "message": "A tarifa szerkezete érvénytelen."
+    },
+    "firmware_advisory_only": {
+      "message": "Firmware updates are advisory only."
     }
   },
   "options": {
@@ -1742,6 +1745,9 @@
             "name": "Beállított díjszabások"
           }
         }
+      },
+      "dry_contacts": {
+        "name": "Dry Contacts"
       }
     },
     "number": {

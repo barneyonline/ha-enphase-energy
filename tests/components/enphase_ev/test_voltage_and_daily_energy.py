@@ -66,5 +66,5 @@ def test_last_session_sensor_name_and_value(monkeypatch):
     )
 
     ent = EnphaseEnergyTodaySensor(coord, sn)
-    assert ent.name == "Last Session"
+    assert ent.translation_key == "last_session"
     assert ent.native_value == 1.0
