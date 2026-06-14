@@ -601,16 +601,13 @@ class StormGuardSwitch(CoordinatorEntity, SwitchEntity):
     def available(self) -> bool:  # type: ignore[override]
         if not super().available:
             return False
-        if not _battery_write_access_confirmed(self._coord):
+        if _battery_write_access_explicitly_denied(self._coord):
             return False
         if not _storm_guard_visible(self._coord):
             return False
         if not _type_available(self._coord, "envoy"):
             return False
-        return (
-            self._coord.storm_guard_state is not None
-            and self._coord.storm_evse_enabled is not None
-        )
+        return self._coord.storm_guard_state is not None
 
     @property
     def is_on(self) -> bool:
@@ -656,7 +653,7 @@ class SavingsUseBatteryAfterPeakSwitch(CoordinatorEntity, SwitchEntity):
             return False
         return (
             _type_available(self._coord, "encharge")
-            and _battery_write_access_confirmed(self._coord)
+            and not _battery_write_access_explicitly_denied(self._coord)
             and self._coord.savings_use_battery_switch_available
         )
 
@@ -696,7 +693,7 @@ class ChargeFromGridSwitch(CoordinatorEntity, SwitchEntity):
             return False
         return (
             _type_available(self._coord, "encharge")
-            and _battery_write_access_confirmed(self._coord)
+            and not _battery_write_access_explicitly_denied(self._coord)
             and self._coord.charge_from_grid_control_available
         )
 
@@ -746,7 +743,7 @@ class ChargeFromGridScheduleSwitch(CoordinatorEntity, SwitchEntity):
             return False
         return (
             _type_available(self._coord, "encharge")
-            and _battery_write_access_confirmed(self._coord)
+            and not _battery_write_access_explicitly_denied(self._coord)
             and self._coord.charge_from_grid_force_schedule_available
         )
 
@@ -814,7 +811,7 @@ class _BaseBatteryScheduleSwitch(CoordinatorEntity, SwitchEntity):
             return False
         return (
             _type_available(self._coord, "encharge")
-            and _battery_write_access_confirmed(self._coord)
+            and not _battery_write_access_explicitly_denied(self._coord)
             and bool(getattr(self._coord, self._availability_attr, False))
         )
 

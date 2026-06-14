@@ -600,6 +600,12 @@ async def test_async_setup_entry_keeps_cfg_switches_while_permission_unknown(
     coord._battery_write_access_confirmed = False  # noqa: SLF001
     coord._battery_user_is_owner = None  # noqa: SLF001
     coord._battery_user_is_installer = None  # noqa: SLF001
+    coord._storm_guard_state = "disabled"  # noqa: SLF001
+    coord._storm_evse_enabled = None  # noqa: SLF001
+    coord._battery_charge_from_grid = True  # noqa: SLF001
+    coord._battery_charge_from_grid_schedule_enabled = True  # noqa: SLF001
+    coord._battery_charge_begin_time = 120  # noqa: SLF001
+    coord._battery_charge_end_time = 300  # noqa: SLF001
     listener_callbacks = []
     original_add_listener = coord.async_add_listener
 
@@ -626,9 +632,9 @@ async def test_async_setup_entry_keeps_cfg_switches_while_permission_unknown(
     storm_guard_switch = next(
         entity for entity in added if isinstance(entity, StormGuardSwitch)
     )
-    assert charge_switch.available is False
-    assert schedule_switch.available is False
-    assert storm_guard_switch.available is False
+    assert charge_switch.available is True
+    assert schedule_switch.available is True
+    assert storm_guard_switch.available is True
 
     coord._battery_user_is_owner = True  # noqa: SLF001
     coord._battery_charge_from_grid = True  # noqa: SLF001
@@ -1921,7 +1927,7 @@ def test_storm_guard_switch_is_on_prefers_pending_state(coordinator_factory) -> 
     assert StormGuardSwitch(coord).is_on is True
 
 
-def test_storm_guard_switch_unavailable_without_confirmed_write_access(
+def test_storm_guard_switch_available_while_write_access_unknown(
     coordinator_factory,
 ) -> None:
     coord = coordinator_factory()
@@ -1930,7 +1936,19 @@ def test_storm_guard_switch_unavailable_without_confirmed_write_access(
     coord._storm_guard_state = "enabled"  # noqa: SLF001
     coord._storm_evse_enabled = True  # noqa: SLF001
     sw = StormGuardSwitch(coord)
-    assert sw.available is False
+    assert sw.available is True
+
+
+def test_storm_guard_switch_unavailable_when_write_access_denied(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord._battery_user_is_owner = False  # noqa: SLF001
+    coord._battery_user_is_installer = False  # noqa: SLF001
+    coord._storm_guard_state = "enabled"  # noqa: SLF001
+    coord._storm_evse_enabled = True  # noqa: SLF001
+
+    assert StormGuardSwitch(coord).available is False
 
 
 def test_storm_guard_switch_unavailable_without_coordinator(
@@ -1978,7 +1996,7 @@ def test_savings_use_battery_switch_unavailable_without_coordinator(
     assert sw.available is False
 
 
-def test_savings_use_battery_switch_unavailable_without_confirmed_write_access(
+def test_savings_use_battery_switch_available_while_write_access_unknown(
     coordinator_factory,
 ) -> None:
     coord = coordinator_factory()
@@ -1987,7 +2005,7 @@ def test_savings_use_battery_switch_unavailable_without_confirmed_write_access(
     coord._battery_show_savings_mode = True  # noqa: SLF001
     coord._battery_profile = "cost_savings"  # noqa: SLF001
     sw = SavingsUseBatteryAfterPeakSwitch(coord)
-    assert sw.available is False
+    assert sw.available is True
 
 
 def test_charge_from_grid_switch_availability(coordinator_factory) -> None:

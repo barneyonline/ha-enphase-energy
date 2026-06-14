@@ -292,7 +292,7 @@ class BatteryReserveNumber(CoordinatorEntity, NumberEntity):
             return False
         return (
             _type_available(self._coord, "encharge")
-            and _battery_write_access_confirmed(self._coord)
+            and not _battery_write_access_explicitly_denied(self._coord)
             and self._coord.battery_reserve_editable
         )
 
@@ -444,7 +444,7 @@ class BatteryShutdownLevelNumber(CoordinatorEntity, NumberEntity):
             return False
         return (
             _type_available(self._coord, "encharge")
-            and _battery_write_access_confirmed(self._coord)
+            and not _battery_write_access_explicitly_denied(self._coord)
             and self._coord.battery_shutdown_level_available
         )
 

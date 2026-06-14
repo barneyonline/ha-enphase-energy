@@ -19,6 +19,23 @@ All notable changes to this project will be documented in this file.
 ### 🔄 Other changes
 - None
 
+## v3.1.5 - 2026-06-14
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Fixed System Profile, Storm Guard, and IQ Battery control entities staying unavailable during startup while BatteryConfig permission details were still loading.
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Bumped the integration manifest version to `3.1.5`.
+
 ## v3.1.4 - 2026-06-14
 
 ### 🚧 Breaking changes

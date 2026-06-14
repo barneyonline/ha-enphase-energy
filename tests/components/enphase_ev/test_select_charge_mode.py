@@ -283,6 +283,10 @@ def test_select_helper_fallbacks() -> None:
     assert select_mod._battery_write_access_confirmed(coord) is True
     assert select_mod._retain_system_profile(coord) is True
 
+    coord.battery_write_access_confirmed = False
+    assert select_mod._battery_write_access_confirmed(coord) is False
+    coord.battery_write_access_confirmed = None
+
     coord.battery_profile_selection_available = False
     assert select_mod._retain_system_profile(coord) is False
 
@@ -847,7 +851,7 @@ async def test_select_platform_retains_system_profile_while_permission_unknown(
     system_profile = next(
         entity for entity in flat_added if isinstance(entity, SystemProfileSelect)
     )
-    assert system_profile.available is False
+    assert system_profile.available is True
     assert any(
         isinstance(entity, ChargeModeSelect) and entity._sn == "1111"
         for entity in flat_added
@@ -1093,7 +1097,29 @@ def test_system_profile_select_unavailable_for_read_only_user(coordinator_factor
     assert sel.available is False
 
 
-def test_system_profile_select_unavailable_without_confirmed_write_access(
+def test_system_profile_select_unavailable_when_fallback_permission_denied() -> None:
+    from custom_components.enphase_ev.select import SystemProfileSelect
+
+    coord = SimpleNamespace(
+        site_id="site",
+        hass=None,
+        last_update_success=True,
+        battery_profile_selection_available=True,
+        battery_write_access_confirmed=False,
+        battery_user_is_owner=False,
+        battery_user_is_installer=False,
+        battery_profile_option_labels={"self-consumption": "Self-Consumption"},
+        battery_profile_option_keys=["self-consumption"],
+        battery_selected_profile="self-consumption",
+        inventory_view=SimpleNamespace(
+            has_type_for_entities=lambda type_key: type_key == "envoy"
+        ),
+    )
+
+    assert SystemProfileSelect(coord).available is False
+
+
+def test_system_profile_select_available_while_write_access_unknown(
     coordinator_factory,
 ):
     from custom_components.enphase_ev.select import SystemProfileSelect
@@ -1105,7 +1131,7 @@ def test_system_profile_select_unavailable_without_confirmed_write_access(
     coord._battery_user_is_installer = None  # noqa: SLF001
     sel = SystemProfileSelect(coord)
 
-    assert sel.available is False
+    assert sel.available is True
 
 
 @pytest.mark.asyncio
@@ -1275,22 +1301,32 @@ def test_system_profile_select_availability_fallback_and_device_info(
 ) -> None:
     from custom_components.enphase_ev.select import SystemProfileSelect
 
-    coord = coordinator_factory()
-    coord.inventory_view.type_device_info = lambda _type_key: None
-    coord._battery_profile_selection_available = None  # noqa: SLF001
-    coord._battery_controls_available = False  # noqa: SLF001
-    coord._battery_show_charge_from_grid = True  # noqa: SLF001
-    coord._battery_profile = "self-consumption"  # noqa: SLF001
+    coord = SimpleNamespace(
+        site_id="site",
+        hass=None,
+        last_update_success=True,
+        battery_has_encharge=True,
+        battery_profile_selection_available=None,
+        battery_controls_available=False,
+        battery_write_access_confirmed=None,
+        battery_user_is_owner=True,
+        battery_user_is_installer=False,
+        battery_profile_option_labels={"self-consumption": "Self-Consumption"},
+        battery_profile_option_keys=["self-consumption"],
+        battery_selected_profile="self-consumption",
+        inventory_view=SimpleNamespace(
+            has_type_for_entities=lambda type_key: type_key == "envoy",
+            type_device_info=lambda _type_key: None,
+        ),
+    )
 
     sel = SystemProfileSelect(coord)
     assert sel.available is False
-    assert sel.device_info["identifiers"] == {
-        ("enphase_ev", f"type:{coord.site_id}:envoy")
-    }
+    assert sel.device_info["identifiers"] == {("enphase_ev", "type:site:envoy")}
 
-    coord._battery_controls_available = True  # noqa: SLF001
-    coord._battery_user_is_owner = False  # noqa: SLF001
-    coord._battery_user_is_installer = False  # noqa: SLF001
+    coord.battery_controls_available = True
+    coord.battery_user_is_owner = False
+    coord.battery_user_is_installer = False
     assert sel.available is False
 
     coord.inventory_view.has_type_for_entities = lambda _type_key: False
