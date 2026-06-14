@@ -1182,9 +1182,9 @@
         }
       },
       "grid_mode": {
-        "name": "Mode grille",
+        "name": "Mode réseau",
         "state": {
-          "on_grid": "Sur la grille",
+          "on_grid": "Sur le réseau",
           "off_grid": "Hors réseau",
           "unknown": "Inconnu"
         }
@@ -2069,7 +2069,7 @@
         "name": "Annuler le changement de profil en attente"
       },
       "request_grid_toggle_otp": {
-        "name": "Demander la grille de basculement OTP"
+        "name": "Demander le code OTP de basculement réseau"
       },
       "storm_alert_opt_out": {
         "name": "Se désinscrire de l'alerte de tempête"
@@ -2365,8 +2365,8 @@
       }
     },
     "request_grid_toggle_otp": {
-      "name": "Demander la grille de basculement OTP",
-      "description": "Envoyez le code à usage unique requis avant de changer le mode grille du site.",
+      "name": "Demander le code OTP de basculement réseau",
+      "description": "Envoyez le code à usage unique requis avant de changer le mode réseau du site.",
       "sections": {
         "advanced": {
           "name": "Options avancées"
@@ -2380,8 +2380,8 @@
       }
     },
     "set_grid_mode": {
-      "name": "Définir le mode grille",
-      "description": "Changez le mode grille du site après avoir validé le code à usage unique.",
+      "name": "Définir le mode réseau",
+      "description": "Changez le mode réseau du site après avoir validé le code à usage unique.",
       "sections": {
         "advanced": {
           "name": "Options avancées"
@@ -2389,7 +2389,7 @@
       },
       "fields": {
         "mode": {
-          "name": "Mode grille",
+          "name": "Mode réseau",
           "description": "Sélectionnez on_grid ou off_grid."
         },
         "otp": {
