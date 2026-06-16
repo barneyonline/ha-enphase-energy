@@ -618,6 +618,33 @@ def test_battery_cfg_schedule_status_strings_localized_for_non_english_locales()
             ), f"{name} should localize {path} (still matches English)"
 
 
+def test_externalized_i18n_strings_localized_for_non_english_locales() -> None:
+    """Guard newly externalized user-facing strings from English fallbacks."""
+
+    translations_dir = (
+        pathlib.Path(__file__).resolve().parents[3]
+        / "custom_components"
+        / "enphase_ev"
+        / "translations"
+    )
+    en_data = json.loads((translations_dir / "en.json").read_text(encoding="utf-8"))
+    paths = [
+        "exceptions.firmware_advisory_only.message",
+        "entity.sensor.dry_contacts.name",
+    ]
+    for locale in translations_dir.glob("*.json"):
+        name = locale.name
+        if name == "en.json" or name.startswith("en-"):
+            continue
+        data = json.loads(locale.read_text(encoding="utf-8"))
+        for path in paths:
+            value = _at_path(data, path)
+            assert value.strip(), f"{name} missing value for {path}"
+            assert value != _at_path(
+                en_data, path
+            ), f"{name} should localize {path} (still matches English)"
+
+
 def test_battery_schedule_editor_strings_localized_for_non_english_locales() -> None:
     """Guard battery schedule strings from silently falling back to English."""
 

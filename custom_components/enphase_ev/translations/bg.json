@@ -449,7 +449,7 @@
       "message": "Структурата на тарифата е невалидна."
     },
     "firmware_advisory_only": {
-      "message": "Firmware updates are advisory only."
+      "message": "Актуализациите на фърмуера са само с информативна цел."
     }
   },
   "options": {
@@ -1747,7 +1747,7 @@
         }
       },
       "dry_contacts": {
-        "name": "Dry Contacts"
+        "name": "Сухи контакти"
       }
     },
     "number": {

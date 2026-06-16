@@ -449,7 +449,7 @@
       "message": "A estrutura tarifária é inválida."
     },
     "firmware_advisory_only": {
-      "message": "Firmware updates are advisory only."
+      "message": "As atualizações de firmware são apenas informativas."
     }
   },
   "options": {
@@ -1747,7 +1747,7 @@
         }
       },
       "dry_contacts": {
-        "name": "Dry Contacts"
+        "name": "Contatos secos"
       }
     },
     "number": {

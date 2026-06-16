@@ -449,7 +449,7 @@
       "message": "Tarifa struktūra nav derīga."
     },
     "firmware_advisory_only": {
-      "message": "Firmware updates are advisory only."
+      "message": "Aparātprogrammatūras atjauninājumi ir tikai informatīvi."
     }
   },
   "options": {
@@ -1747,7 +1747,7 @@
         }
       },
       "dry_contacts": {
-        "name": "Dry Contacts"
+        "name": "Sausie kontakti"
       }
     },
     "number": {

@@ -449,7 +449,7 @@
       "message": "Tariffstrukturen är ogiltig."
     },
     "firmware_advisory_only": {
-      "message": "Firmware updates are advisory only."
+      "message": "Firmwareuppdateringar är endast rådgivande."
     }
   },
   "options": {
@@ -1747,7 +1747,7 @@
         }
       },
       "dry_contacts": {
-        "name": "Dry Contacts"
+        "name": "Potentialfria kontakter"
       }
     },
     "number": {

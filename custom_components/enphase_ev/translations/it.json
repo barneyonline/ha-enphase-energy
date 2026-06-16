@@ -449,7 +449,7 @@
       "message": "La struttura tariffaria non è valida."
     },
     "firmware_advisory_only": {
-      "message": "Firmware updates are advisory only."
+      "message": "Gli aggiornamenti firmware sono solo informativi."
     }
   },
   "options": {
@@ -1747,7 +1747,7 @@
         }
       },
       "dry_contacts": {
-        "name": "Dry Contacts"
+        "name": "Contatti puliti"
       }
     },
     "number": {

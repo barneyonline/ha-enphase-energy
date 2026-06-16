@@ -449,7 +449,7 @@
       "message": "A tarifa szerkezete érvénytelen."
     },
     "firmware_advisory_only": {
-      "message": "Firmware updates are advisory only."
+      "message": "A firmware-frissítések csak tájékoztató jellegűek."
     }
   },
   "options": {
@@ -1747,7 +1747,7 @@
         }
       },
       "dry_contacts": {
-        "name": "Dry Contacts"
+        "name": "Száraz kontaktusok"
       }
     },
     "number": {
