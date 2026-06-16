@@ -447,6 +447,9 @@
     },
     "tariff_structure_invalid": {
       "message": "Tariffirakenne on virheellinen."
+    },
+    "firmware_advisory_only": {
+      "message": "Laiteohjelmistopäivitykset ovat vain tiedoksi."
     }
   },
   "options": {
@@ -1742,6 +1745,9 @@
             "name": "Määritetyt hinnat"
           }
         }
+      },
+      "dry_contacts": {
+        "name": "Potentiaalivapaat koskettimet"
       }
     },
     "number": {

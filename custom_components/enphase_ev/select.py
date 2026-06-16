@@ -428,7 +428,7 @@ class SystemProfileSelect(CoordinatorEntity, SelectEntity):
         if selected_key is None:
             raise_translated_service_validation(
                 translation_domain=DOMAIN,
-                translation_key="exceptions.selected_system_profile_unavailable",
+                translation_key="selected_system_profile_unavailable",
                 message="Selected system profile is not available.",
             )
         try:
@@ -439,7 +439,7 @@ class SystemProfileSelect(CoordinatorEntity, SelectEntity):
             if err.status == 403:
                 raise_translated_service_validation(
                     translation_domain=DOMAIN,
-                    translation_key="exceptions.system_profile_update_forbidden",
+                    translation_key="system_profile_update_forbidden",
                     message=(
                         "System profile update was rejected by Enphase "
                         "(HTTP 403 Forbidden)."
@@ -448,7 +448,7 @@ class SystemProfileSelect(CoordinatorEntity, SelectEntity):
             if err.status == 401:
                 raise_translated_service_validation(
                     translation_domain=DOMAIN,
-                    translation_key="exceptions.system_profile_update_unauthorized",
+                    translation_key="system_profile_update_unauthorized",
                     message=(
                         "System profile update could not be authenticated. "
                         "Reauthenticate and try again."
@@ -456,19 +456,19 @@ class SystemProfileSelect(CoordinatorEntity, SelectEntity):
                 )
             raise_translated_service_validation(
                 translation_domain=DOMAIN,
-                translation_key="exceptions.system_profile_update_failed",
+                translation_key="system_profile_update_failed",
                 message="System profile update failed.",
             )
         except aiohttp.ClientError:
             raise_translated_service_validation(
                 translation_domain=DOMAIN,
-                translation_key="exceptions.system_profile_update_network",
+                translation_key="system_profile_update_network",
                 message="System profile update failed due to a network error. Try again.",
             )
         except asyncio.TimeoutError:
             raise_translated_service_validation(
                 translation_domain=DOMAIN,
-                translation_key="exceptions.system_profile_update_timeout",
+                translation_key="system_profile_update_timeout",
                 message="System profile update timed out. Try again.",
             )
 
@@ -702,7 +702,7 @@ class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):
         if not self._coord.scheduler_available:
             raise_translated_service_validation(
                 translation_domain=DOMAIN,
-                translation_key="exceptions.scheduler_service_unavailable",
+                translation_key="scheduler_service_unavailable",
                 message=(
                     "Charging mode selection is unavailable while the Enphase "
                     "scheduler service is down."
@@ -741,7 +741,7 @@ class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):
         except SchedulerUnavailable:
             raise_translated_service_validation(
                 translation_domain=DOMAIN,
-                translation_key="exceptions.scheduler_service_unavailable",
+                translation_key="scheduler_service_unavailable",
                 message=(
                     "Charging mode selection is unavailable while the Enphase "
                     "scheduler service is down."
@@ -758,7 +758,7 @@ class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):
                 raise ServiceValidationError(
                     "Enable at least one schedule before selecting Scheduled charging.",
                     translation_domain=DOMAIN,
-                    translation_key="exceptions.schedule_required",
+                    translation_key="schedule_required",
                 )
             raise
 
@@ -812,7 +812,7 @@ class AcBatteryTargetStateOfChargeSelect(CoordinatorEntity, SelectEntity):
             raise_translated_service_validation(
                 translation_domain=DOMAIN,
                 translation_key=(
-                    "exceptions.selected_ac_battery_target_state_of_charge_unavailable"
+                    "selected_ac_battery_target_state_of_charge_unavailable"
                 ),
                 message="Selected AC Battery target state of charge is not available.",
             )

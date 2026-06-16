@@ -39,8 +39,10 @@ def test_entity_naming_and_availability():
 
     ent = EnphaseEnergyTodaySensor(coord, RANDOM_SERIAL)
     assert ent.available is True
-    # Uses has_entity_name; entity name is the suffix only
-    assert ent.name == "Last Session"
+    # Uses has_entity_name with a translation key; the display name now comes
+    # from the translations instead of a hardcoded _attr_name.
+    assert ent.has_entity_name is True
+    assert ent.translation_key == "last_session"
     # Device name comes from coordinator data
     assert ent.device_info["name"] == "Garage EV"
     # Unique ID includes domain, serial, and key

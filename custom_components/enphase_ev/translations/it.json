@@ -447,6 +447,9 @@
     },
     "tariff_structure_invalid": {
       "message": "La struttura tariffaria non è valida."
+    },
+    "firmware_advisory_only": {
+      "message": "Gli aggiornamenti firmware sono solo informativi."
     }
   },
   "options": {
@@ -1742,6 +1745,9 @@
             "name": "Tariffe configurate"
           }
         }
+      },
+      "dry_contacts": {
+        "name": "Contatti puliti"
       }
     },
     "number": {

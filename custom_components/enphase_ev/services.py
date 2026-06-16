@@ -90,7 +90,7 @@ def async_setup_services(
     ) -> None:
         raise_translated_service_validation(
             translation_domain=DOMAIN,
-            translation_key=f"exceptions.{key}",
+            translation_key=key,
             translation_placeholders=placeholders,
             message=message,
         )
@@ -554,7 +554,7 @@ def async_setup_services(
         if overlapping is not None:
             raise_translated_service_validation(
                 translation_domain=DOMAIN,
-                translation_key="exceptions.battery_schedule_overlap",
+                translation_key="battery_schedule_overlap",
                 translation_placeholders=battery_schedule_overlap_placeholders(
                     overlapping, hass=hass
                 ),
@@ -739,12 +739,12 @@ def async_setup_services(
         if not site_ids:
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
-                translation_key="exceptions.grid_site_required",
+                translation_key="grid_site_required",
             )
         if len(site_ids) > 1:
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
-                translation_key="exceptions.grid_site_ambiguous",
+                translation_key="grid_site_ambiguous",
                 translation_placeholders={"count": str(len(site_ids))},
             )
         target = next(iter(site_ids))
@@ -753,7 +753,7 @@ def async_setup_services(
             return coordinators[0]
         raise ServiceValidationError(
             translation_domain=DOMAIN,
-            translation_key="exceptions.grid_site_required",
+            translation_key="grid_site_required",
         )
 
     def _extract_entity_ids(call: ServiceCall) -> list[str]:
@@ -1090,7 +1090,7 @@ def async_setup_services(
         if not device_ids:
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
-                translation_key="exceptions.grid_site_required",
+                translation_key="grid_site_required",
             )
 
         targets: list[tuple[str, str, EnphaseCoordinator]] = []
@@ -1099,7 +1099,7 @@ def async_setup_services(
             if routing_context is None:
                 raise ServiceValidationError(
                     translation_domain=DOMAIN,
-                    translation_key="exceptions.grid_site_required",
+                    translation_key="grid_site_required",
                 )
             sn, site_id, config_entry_ids = routing_context
             coord = await _get_coordinator_for_sn(
@@ -1110,7 +1110,7 @@ def async_setup_services(
             if coord is None:
                 raise ServiceValidationError(
                     translation_domain=DOMAIN,
-                    translation_key="exceptions.grid_site_required",
+                    translation_key="grid_site_required",
                 )
             targets.append((device_id, sn, coord))
 

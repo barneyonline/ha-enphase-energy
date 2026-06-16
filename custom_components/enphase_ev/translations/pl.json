@@ -447,6 +447,9 @@
     },
     "tariff_structure_invalid": {
       "message": "Struktura taryfy jest nieprawidłowa."
+    },
+    "firmware_advisory_only": {
+      "message": "Aktualizacje oprogramowania układowego mają wyłącznie charakter informacyjny."
     }
   },
   "options": {
@@ -1742,6 +1745,9 @@
             "name": "Skonfigurowane stawki"
           }
         }
+      },
+      "dry_contacts": {
+        "name": "Styki bezpotencjałowe"
       }
     },
     "number": {

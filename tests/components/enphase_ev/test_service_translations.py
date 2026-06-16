@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import json
 import pathlib
+import re
 
 
 def test_clear_reauth_issue_device_field_translated() -> None:
@@ -617,6 +618,33 @@ def test_battery_cfg_schedule_status_strings_localized_for_non_english_locales()
             ), f"{name} should localize {path} (still matches English)"
 
 
+def test_externalized_i18n_strings_localized_for_non_english_locales() -> None:
+    """Guard newly externalized user-facing strings from English fallbacks."""
+
+    translations_dir = (
+        pathlib.Path(__file__).resolve().parents[3]
+        / "custom_components"
+        / "enphase_ev"
+        / "translations"
+    )
+    en_data = json.loads((translations_dir / "en.json").read_text(encoding="utf-8"))
+    paths = [
+        "exceptions.firmware_advisory_only.message",
+        "entity.sensor.dry_contacts.name",
+    ]
+    for locale in translations_dir.glob("*.json"):
+        name = locale.name
+        if name == "en.json" or name.startswith("en-"):
+            continue
+        data = json.loads(locale.read_text(encoding="utf-8"))
+        for path in paths:
+            value = _at_path(data, path)
+            assert value.strip(), f"{name} missing value for {path}"
+            assert value != _at_path(
+                en_data, path
+            ), f"{name} should localize {path} (still matches English)"
+
+
 def test_battery_schedule_editor_strings_localized_for_non_english_locales() -> None:
     """Guard battery schedule strings from silently falling back to English."""
 
@@ -677,6 +705,33 @@ def test_translated_user_facing_errors_require_translation_keys() -> None:
                 f"{relative_path}:{node.lineno} raises {name} "
                 "without translation_key"
             )
+
+
+def test_exception_translation_keys_have_no_redundant_prefix() -> None:
+    """Guard against the redundant ``exceptions.`` prefix on exception keys.
+
+    Home Assistant resolves exception messages at
+    ``component.{domain}.exceptions.{translation_key}.message`` and prepends the
+    ``exceptions.`` segment itself. Passing a ``translation_key`` that already
+    starts with ``exceptions.`` doubles that segment, so the lookup misses and
+    the raw key is surfaced to the user instead of the translated message.
+    """
+
+    root = (
+        pathlib.Path(__file__).resolve().parents[3] / "custom_components" / "enphase_ev"
+    )
+    pattern = re.compile(r'translation_key\s*=\s*\(?\s*f?"exceptions\.')
+    offenders: list[str] = []
+    for path in sorted(root.glob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        for match in pattern.finditer(text):
+            lineno = text.count("\n", 0, match.start()) + 1
+            offenders.append(f"{path.name}:{lineno}")
+    assert not offenders, (
+        "translation_key must not include the 'exceptions.' prefix; "
+        "Home Assistant adds it automatically when resolving exception "
+        f"messages. Offending sites: {offenders}"
+    )
 
 
 def test_evse_schedule_editor_strings_exist_for_all_locales() -> None:

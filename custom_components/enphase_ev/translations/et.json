@@ -447,6 +447,9 @@
     },
     "tariff_structure_invalid": {
       "message": "Tariifi struktuur on vigane."
+    },
+    "firmware_advisory_only": {
+      "message": "Püsivara värskendused on ainult informatiivsed."
     }
   },
   "options": {
@@ -1742,6 +1745,9 @@
             "name": "Seadistatud tariifid"
           }
         }
+      },
+      "dry_contacts": {
+        "name": "Kuivkontaktid"
       }
     },
     "number": {

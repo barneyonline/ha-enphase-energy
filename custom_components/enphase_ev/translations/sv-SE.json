@@ -447,6 +447,9 @@
     },
     "tariff_structure_invalid": {
       "message": "Tariffstrukturen är ogiltig."
+    },
+    "firmware_advisory_only": {
+      "message": "Firmwareuppdateringar är endast rådgivande."
     }
   },
   "options": {
@@ -1742,6 +1745,9 @@
             "name": "Konfigurerade tariffer"
           }
         }
+      },
+      "dry_contacts": {
+        "name": "Potentialfria kontakter"
       }
     },
     "number": {

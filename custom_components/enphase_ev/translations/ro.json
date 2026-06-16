@@ -447,6 +447,9 @@
     },
     "tariff_structure_invalid": {
       "message": "Structura tarifului este invalidă."
+    },
+    "firmware_advisory_only": {
+      "message": "Actualizările de firmware sunt doar informative."
     }
   },
   "options": {
@@ -1742,6 +1745,9 @@
             "name": "Tarife configurate"
           }
         }
+      },
+      "dry_contacts": {
+        "name": "Contacte uscate"
       }
     },
     "number": {

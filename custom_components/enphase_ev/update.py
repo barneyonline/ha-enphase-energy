@@ -191,7 +191,11 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
         self, version: str | None, backup: bool, **kwargs: Any
     ) -> None:
         """Reject install requests; these entities only advertise firmware status."""
-        raise HomeAssistantError("Firmware updates are advisory only")
+        raise HomeAssistantError(
+            "Firmware updates are advisory only",
+            translation_domain=DOMAIN,
+            translation_key="firmware_advisory_only",
+        )
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -384,7 +388,11 @@ class ChargerFirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateE
         self, version: str | None, backup: bool, **kwargs: Any
     ) -> None:
         """Reject install requests; these entities only advertise firmware status."""
-        raise HomeAssistantError("Firmware updates are advisory only")
+        raise HomeAssistantError(
+            "Firmware updates are advisory only",
+            translation_domain=DOMAIN,
+            translation_key="firmware_advisory_only",
+        )
 
     @callback
     def _handle_coordinator_update(self) -> None:

@@ -447,6 +447,9 @@
     },
     "tariff_structure_invalid": {
       "message": "Tariff structure is invalid."
+    },
+    "firmware_advisory_only": {
+      "message": "Firmware updates are advisory only."
     }
   },
   "options": {
@@ -1742,6 +1745,9 @@
             "name": "Configured Rates"
           }
         }
+      },
+      "dry_contacts": {
+        "name": "Dry Contacts"
       }
     },
     "number": {

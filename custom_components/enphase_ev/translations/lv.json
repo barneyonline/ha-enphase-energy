@@ -447,6 +447,9 @@
     },
     "tariff_structure_invalid": {
       "message": "Tarifa struktūra nav derīga."
+    },
+    "firmware_advisory_only": {
+      "message": "Aparātprogrammatūras atjauninājumi ir tikai informatīvi."
     }
   },
   "options": {
@@ -1742,6 +1745,9 @@
             "name": "Konfigurētie tarifi"
           }
         }
+      },
+      "dry_contacts": {
+        "name": "Sausie kontakti"
       }
     },
     "number": {

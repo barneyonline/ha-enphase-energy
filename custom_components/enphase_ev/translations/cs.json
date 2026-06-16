@@ -447,6 +447,9 @@
     },
     "tariff_structure_invalid": {
       "message": "Struktura tarifu je neplatná."
+    },
+    "firmware_advisory_only": {
+      "message": "Aktualizace firmwaru jsou pouze informativní."
     }
   },
   "options": {
@@ -1742,6 +1745,9 @@
             "name": "Nakonfigurované sazby"
           }
         }
+      },
+      "dry_contacts": {
+        "name": "Suché kontakty"
       }
     },
     "number": {

@@ -1092,7 +1092,7 @@ class AppAuthenticationSwitch(EnphaseBaseEntity, SwitchEntity):
         except AuthSettingsUnavailable:
             raise_translated_service_validation(
                 translation_domain=DOMAIN,
-                translation_key="exceptions.auth_settings_service_unavailable",
+                translation_key="auth_settings_service_unavailable",
                 message=(
                     "Authentication settings are unavailable while the Enphase "
                     "service is down."
@@ -1108,7 +1108,7 @@ class AppAuthenticationSwitch(EnphaseBaseEntity, SwitchEntity):
         except AuthSettingsUnavailable:
             raise_translated_service_validation(
                 translation_domain=DOMAIN,
-                translation_key="exceptions.auth_settings_service_unavailable",
+                translation_key="auth_settings_service_unavailable",
                 message=(
                     "Authentication settings are unavailable while the Enphase "
                     "service is down."

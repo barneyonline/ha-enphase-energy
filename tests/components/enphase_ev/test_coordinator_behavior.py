@@ -2638,8 +2638,8 @@ async def test_async_restart_after_amp_change_handles_start_error(hass, monkeypa
 @pytest.mark.parametrize(
     ("translation_key", "expected_reason"),
     [
-        ("exceptions.charger_not_plugged", "not plugged in"),
-        ("exceptions.auth_required", "authentication required"),
+        ("charger_not_plugged", "not plugged in"),
+        ("auth_required", "authentication required"),
     ],
 )
 async def test_async_restart_after_amp_change_validation_reasons(

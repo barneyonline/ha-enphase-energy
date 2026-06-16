@@ -1057,7 +1057,7 @@ class EvseRuntime:
         display = data.get("display_name") or data.get("name") or sn
         raise ServiceValidationError(
             translation_domain=DOMAIN,
-            translation_key="exceptions.charger_not_plugged",
+            translation_key="charger_not_plugged",
             translation_placeholders={"name": str(display)},
         )
 

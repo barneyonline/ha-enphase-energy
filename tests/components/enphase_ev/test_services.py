@@ -278,9 +278,7 @@ async def test_trigger_message_handler_requires_confirmation_for_advanced_messag
             SimpleNamespace(data={"requested_message": "BootNotification"})
         )
 
-    assert (
-        err.value.translation_key == "exceptions.trigger_message_confirmation_required"
-    )
+    assert err.value.translation_key == "trigger_message_confirmation_required"
 
     with pytest.raises(ServiceValidationError) as err:
         await registered[(DOMAIN, "trigger_message")](
@@ -292,9 +290,7 @@ async def test_trigger_message_handler_requires_confirmation_for_advanced_messag
             )
         )
 
-    assert (
-        err.value.translation_key == "exceptions.trigger_message_confirmation_required"
-    )
+    assert err.value.translation_key == "trigger_message_confirmation_required"
 
 
 @pytest.mark.asyncio
@@ -985,11 +981,11 @@ async def test_update_tariff_rejects_invalid_rate_entity_targets(
     )
 
     for entity_id, translation_key in (
-        ("number.missing", "exceptions.tariff_rate_entity_invalid"),
-        (other_platform.entity_id, "exceptions.tariff_rate_entity_invalid"),
-        (wrong_unique_id.entity_id, "exceptions.tariff_rate_entity_invalid"),
-        (unknown_site_entity.entity_id, "exceptions.tariff_rate_entity_invalid"),
-        (missing_locator.entity_id, "exceptions.tariff_rate_target_invalid"),
+        ("number.missing", "tariff_rate_entity_invalid"),
+        (other_platform.entity_id, "tariff_rate_entity_invalid"),
+        (wrong_unique_id.entity_id, "tariff_rate_entity_invalid"),
+        (unknown_site_entity.entity_id, "tariff_rate_entity_invalid"),
+        (missing_locator.entity_id, "tariff_rate_target_invalid"),
     ):
         with pytest.raises(ServiceValidationError) as err:
             await handlers[(DOMAIN, "update_tariff")](
@@ -1006,17 +1002,17 @@ async def test_update_tariff_rejects_missing_and_incomplete_updates(
 
     with pytest.raises(ServiceValidationError) as err:
         await handlers[(DOMAIN, "update_tariff")](SimpleNamespace(data={}))
-    assert err.value.translation_key == "exceptions.tariff_update_required"
+    assert err.value.translation_key == "tariff_update_required"
 
     with pytest.raises(ServiceValidationError) as err:
         await handlers[(DOMAIN, "update_tariff")](
             SimpleNamespace(data={"billing_start_date": "2026-04-01"})
         )
-    assert err.value.translation_key == "exceptions.tariff_billing_incomplete"
+    assert err.value.translation_key == "tariff_billing_incomplete"
 
     with pytest.raises(ServiceValidationError) as err:
         await handlers[(DOMAIN, "update_tariff")](SimpleNamespace(data={"rate": 0.2}))
-    assert err.value.translation_key == "exceptions.tariff_rate_entity_required"
+    assert err.value.translation_key == "tariff_rate_entity_required"
 
 
 @pytest.mark.asyncio
@@ -1409,8 +1405,8 @@ async def test_update_tariff_guided_structural_fields_validate_inputs(
                 SimpleNamespace(data={"site_id": "tariff-site", **data})
             )
         assert err.value.translation_key in {
-            "exceptions.tariff_structure_invalid",
-            "exceptions.tariff_rate_invalid",
+            "tariff_structure_invalid",
+            "tariff_rate_invalid",
         }
     coord.tariff_runtime.async_update_tariff.assert_not_awaited()
 
@@ -1474,7 +1470,7 @@ async def test_update_tariff_rejects_duplicate_and_cross_site_rates(
                 }
             )
         )
-    assert err.value.translation_key == "exceptions.tariff_rate_entity_duplicate"
+    assert err.value.translation_key == "tariff_rate_entity_duplicate"
 
     with pytest.raises(ServiceValidationError) as err:
         await handlers[(DOMAIN, "update_tariff")](
@@ -1487,7 +1483,7 @@ async def test_update_tariff_rejects_duplicate_and_cross_site_rates(
                 }
             )
         )
-    assert err.value.translation_key == "exceptions.tariff_site_mismatch"
+    assert err.value.translation_key == "tariff_site_mismatch"
 
     with pytest.raises(ServiceValidationError) as err:
         await handlers[(DOMAIN, "update_tariff")](
@@ -1501,7 +1497,7 @@ async def test_update_tariff_rejects_duplicate_and_cross_site_rates(
                 }
             )
         )
-    assert err.value.translation_key == "exceptions.tariff_site_mismatch"
+    assert err.value.translation_key == "tariff_site_mismatch"
 
     with pytest.raises(ServiceValidationError) as err:
         await handlers[(DOMAIN, "update_tariff")](
@@ -1512,4 +1508,4 @@ async def test_update_tariff_rejects_duplicate_and_cross_site_rates(
                 }
             )
         )
-    assert err.value.translation_key == "exceptions.tariff_rate_entity_invalid"
+    assert err.value.translation_key == "tariff_rate_entity_invalid"

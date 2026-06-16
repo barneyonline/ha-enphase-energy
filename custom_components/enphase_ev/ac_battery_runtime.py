@@ -667,7 +667,7 @@ class AcBatteryRuntime:
         if not rows:
             raise_translated_service_validation(
                 translation_domain=DOMAIN,
-                translation_key="exceptions.ac_battery_unavailable",
+                translation_key="ac_battery_unavailable",
                 message="No AC Battery devices are currently available.",
             )
         target_soc = None

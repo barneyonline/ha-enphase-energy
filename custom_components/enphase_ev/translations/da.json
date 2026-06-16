@@ -447,6 +447,9 @@
     },
     "tariff_structure_invalid": {
       "message": "Tarifstrukturen er ugyldig."
+    },
+    "firmware_advisory_only": {
+      "message": "Firmwareopdateringer er kun vejledende."
     }
   },
   "options": {
@@ -1742,6 +1745,9 @@
             "name": "Konfigurerede tariffer"
           }
         }
+      },
+      "dry_contacts": {
+        "name": "Potentialfrie kontakter"
       }
     },
     "number": {

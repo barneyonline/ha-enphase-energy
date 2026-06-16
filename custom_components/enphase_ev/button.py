@@ -636,13 +636,13 @@ class EvseScheduleSaveButton(_EvseScheduleButton):
             raise ServiceValidationError(
                 "Select at least one weekday for the schedule.",
                 translation_domain=DOMAIN,
-                translation_key="exceptions.evse_schedule_day_required",
+                translation_key="evse_schedule_day_required",
             )
         if form.start_time == form.end_time:
             raise ServiceValidationError(
                 "Schedule start and end times must be different.",
                 translation_domain=DOMAIN,
-                translation_key="exceptions.evse_schedule_times_different",
+                translation_key="evse_schedule_times_different",
             )
         schedule_sync = getattr(self._coord, "schedule_sync", None)
         if schedule_sync is None:
@@ -653,7 +653,7 @@ class EvseScheduleSaveButton(_EvseScheduleButton):
             raise ServiceValidationError(
                 "Enphase rejected the schedule change.",
                 translation_domain=DOMAIN,
-                translation_key="exceptions.evse_schedule_change_rejected",
+                translation_key="evse_schedule_change_rejected",
             )
 
 

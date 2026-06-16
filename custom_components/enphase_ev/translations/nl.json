@@ -447,6 +447,9 @@
     },
     "tariff_structure_invalid": {
       "message": "De tariefstructuur is ongeldig."
+    },
+    "firmware_advisory_only": {
+      "message": "Firmware-updates zijn alleen ter informatie."
     }
   },
   "options": {
@@ -1742,6 +1745,9 @@
             "name": "Geconfigureerde tarieven"
           }
         }
+      },
+      "dry_contacts": {
+        "name": "Droge contacten"
       }
     },
     "number": {

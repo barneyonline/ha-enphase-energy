@@ -140,7 +140,7 @@ def test_tariff_update_parsers_cover_passthrough_and_invalid_inputs() -> None:
         TariffBillingUpdate.from_object(
             {"billing_frequency": "MONTH", "billing_interval_value": 1}
         )
-    assert err.value.translation_key == "exceptions.tariff_billing_start_date_invalid"
+    assert err.value.translation_key == "tariff_billing_start_date_invalid"
 
     locator = TariffRateLocator(
         branch="purchase",
@@ -1962,9 +1962,9 @@ async def test_tariff_runtime_rejects_invalid_structural_tariffs(
     coord.client.site_tariff_update = AsyncMock()
 
     invalid_inputs = (
-        ({"tariff_payload": []}, "exceptions.tariff_structure_invalid"),
-        ({"tariff_payload": {"currency": "$"}}, "exceptions.tariff_structure_invalid"),
-        ({"purchase_tariff": []}, "exceptions.tariff_structure_invalid"),
+        ({"tariff_payload": []}, "tariff_structure_invalid"),
+        ({"tariff_payload": {"currency": "$"}}, "tariff_structure_invalid"),
+        ({"purchase_tariff": []}, "tariff_structure_invalid"),
         (
             {
                 "purchase_tariff": {
@@ -1973,7 +1973,7 @@ async def test_tariff_runtime_rejects_invalid_structural_tariffs(
                     "seasons": [],
                 }
             },
-            "exceptions.tariff_structure_invalid",
+            "tariff_structure_invalid",
         ),
         (
             {
@@ -1983,7 +1983,7 @@ async def test_tariff_runtime_rejects_invalid_structural_tariffs(
                     "seasons": [{"id": "default", "days": []}],
                 }
             },
-            "exceptions.tariff_structure_invalid",
+            "tariff_structure_invalid",
         ),
         (
             {
@@ -1993,7 +1993,7 @@ async def test_tariff_runtime_rejects_invalid_structural_tariffs(
                     "seasons": ["default"],
                 }
             },
-            "exceptions.tariff_structure_invalid",
+            "tariff_structure_invalid",
         ),
         (
             {
@@ -2003,7 +2003,7 @@ async def test_tariff_runtime_rejects_invalid_structural_tariffs(
                     "seasons": [{"id": "default", "days": ["week"]}],
                 }
             },
-            "exceptions.tariff_structure_invalid",
+            "tariff_structure_invalid",
         ),
         (
             {
@@ -2013,7 +2013,7 @@ async def test_tariff_runtime_rejects_invalid_structural_tariffs(
                     "seasons": [{"id": "default", "days": [{"id": "week"}]}],
                 }
             },
-            "exceptions.tariff_structure_invalid",
+            "tariff_structure_invalid",
         ),
         (
             {
@@ -2028,7 +2028,7 @@ async def test_tariff_runtime_rejects_invalid_structural_tariffs(
                     ],
                 }
             },
-            "exceptions.tariff_structure_invalid",
+            "tariff_structure_invalid",
         ),
         (
             {
@@ -2055,7 +2055,7 @@ async def test_tariff_runtime_rejects_invalid_structural_tariffs(
                     ],
                 }
             },
-            "exceptions.tariff_rate_invalid",
+            "tariff_rate_invalid",
         ),
         (
             {
@@ -2065,7 +2065,7 @@ async def test_tariff_runtime_rejects_invalid_structural_tariffs(
                     "seasons": [{"id": "default"}],
                 }
             },
-            "exceptions.tariff_structure_invalid",
+            "tariff_structure_invalid",
         ),
         (
             {
@@ -2075,7 +2075,7 @@ async def test_tariff_runtime_rejects_invalid_structural_tariffs(
                     "seasons": [{"id": "default", "tiers": ["tier-1"]}],
                 }
             },
-            "exceptions.tariff_structure_invalid",
+            "tariff_structure_invalid",
         ),
         (
             {
@@ -2090,7 +2090,7 @@ async def test_tariff_runtime_rejects_invalid_structural_tariffs(
                     ],
                 }
             },
-            "exceptions.tariff_structure_invalid",
+            "tariff_structure_invalid",
         ),
     )
     for kwargs, translation_key in invalid_inputs:
@@ -2223,7 +2223,7 @@ async def test_tariff_runtime_rejects_structural_time_and_tier_bounds(
     for kwargs in invalid_inputs:
         with pytest.raises(ServiceValidationError) as err:
             await TariffRuntime(coord).async_update_tariff(**kwargs)
-        assert err.value.translation_key == "exceptions.tariff_structure_invalid"
+        assert err.value.translation_key == "tariff_structure_invalid"
     coord.client.site_tariff.assert_not_awaited()
     coord.client.site_tariff_update.assert_not_awaited()
 
@@ -2248,7 +2248,7 @@ async def test_tariff_runtime_rejects_structural_time_and_tier_bounds(
                 }
             }
         )
-    assert err.value.translation_key == "exceptions.tariff_rate_api_unavailable"
+    assert err.value.translation_key == "tariff_rate_api_unavailable"
 
 
 @pytest.mark.asyncio
@@ -2385,7 +2385,7 @@ async def test_tariff_runtime_rejects_invalid_billing_and_duplicates(
 
     with pytest.raises(ServiceValidationError) as err:
         await TariffRuntime(coord).async_update_tariff()
-    assert err.value.translation_key == "exceptions.tariff_update_required"
+    assert err.value.translation_key == "tariff_update_required"
 
     coord.client.site_tariff_billing_update = None
     with pytest.raises(ServiceValidationError) as err:
@@ -2396,7 +2396,7 @@ async def test_tariff_runtime_rejects_invalid_billing_and_duplicates(
                 "billing_interval_value": 30,
             }
         )
-    assert err.value.translation_key == "exceptions.tariff_billing_api_unavailable"
+    assert err.value.translation_key == "tariff_billing_api_unavailable"
 
     with pytest.raises(ServiceValidationError) as err:
         await TariffRuntime(coord).async_update_tariff(
@@ -2406,7 +2406,7 @@ async def test_tariff_runtime_rejects_invalid_billing_and_duplicates(
                 "billing_interval_value": 1,
             }
         )
-    assert err.value.translation_key == "exceptions.tariff_billing_start_date_invalid"
+    assert err.value.translation_key == "tariff_billing_start_date_invalid"
 
     with pytest.raises(ServiceValidationError) as err:
         await TariffRuntime(coord).async_update_tariff(
@@ -2416,7 +2416,7 @@ async def test_tariff_runtime_rejects_invalid_billing_and_duplicates(
                 "billing_interval_value": 1,
             }
         )
-    assert err.value.translation_key == "exceptions.tariff_billing_frequency_invalid"
+    assert err.value.translation_key == "tariff_billing_frequency_invalid"
 
     with pytest.raises(ServiceValidationError) as err:
         await TariffRuntime(coord).async_update_tariff(
@@ -2426,7 +2426,7 @@ async def test_tariff_runtime_rejects_invalid_billing_and_duplicates(
                 "billing_interval_value": 25,
             }
         )
-    assert err.value.translation_key == "exceptions.tariff_billing_interval_invalid"
+    assert err.value.translation_key == "tariff_billing_interval_invalid"
 
     duplicate_update = {
         "locator": {
@@ -2441,7 +2441,7 @@ async def test_tariff_runtime_rejects_invalid_billing_and_duplicates(
         await TariffRuntime(coord).async_update_tariff(
             rate_updates=[duplicate_update, duplicate_update]
         )
-    assert err.value.translation_key == "exceptions.tariff_rate_target_duplicate"
+    assert err.value.translation_key == "tariff_rate_target_duplicate"
     coord.client.site_tariff_update.assert_not_awaited()
 
 

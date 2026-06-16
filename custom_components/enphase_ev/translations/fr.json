@@ -125,7 +125,7 @@
       "message": "Sélectionnez au moins un jour de la semaine pour la programmation."
     },
     "evse_schedule_times_different": {
-      "message": "Les heures de début et de fin de la programmation doivent être différentes."
+      "message": "Les heures de début et de fin du planning doivent être différentes."
     },
     "evse_schedule_change_rejected": {
       "message": "Enphase a rejeté la modification de la programmation."
@@ -447,6 +447,9 @@
     },
     "tariff_structure_invalid": {
       "message": "La structure tarifaire est invalide."
+    },
+    "firmware_advisory_only": {
+      "message": "Les mises à jour du firmware sont fournies à titre indicatif uniquement."
     }
   },
   "options": {
@@ -459,7 +462,7 @@
           "migrate_envoy": "Migrer l’historique Envoy"
         },
         "menu_option_descriptions": {
-          "settings": "Ajuster l’interrogation et le comportement.",
+          "settings": "Ajuster la scrutation et le comportement.",
           "migrate_envoy": "Récupérez les identifiants d’entité d’énergie Enphase Envoy sélectionnés afin que l’historique Home Assistant Energy continue sous cette intégration."
         },
         "data": {
@@ -492,7 +495,7 @@
           "api_timeout": "Secondes avant l’expiration des requêtes API.",
           "nominal_voltage": "Tension de secours utilisée pour estimer la puissance du chargeur.",
           "session_history_interval": "Minutes d'attente entre les récupérations de l'historique de session depuis le cloud.",
-          "schedule_sync_enabled": "Gérer les horaires des chargeurs IQ EV",
+          "schedule_sync_enabled": "Gérer les plannings des chargeurs IQ EV",
           "reauth": "Lancer le processus de connexion pour rafraîchir les identifiants sans supprimer l'intégration.",
           "forget_password": "Supprime le mot de passe stocké. Le rafraîchissement automatique ne sera plus tenté.",
           "type_heatpump": "Inclut des capteurs d'état, de diagnostic et de consommation de la pompe à chaleur.",
@@ -515,7 +518,7 @@
           "api_timeout": "Délai d'expiration API (s)",
           "nominal_voltage": "Tension nominale (V)",
           "session_history_interval": "Intervalle d'historique de session (min)",
-          "schedule_sync_enabled": "Activer la prise en charge du planificateur",
+          "schedule_sync_enabled": "Activer le planificateur de chargeur EV",
           "reauth": "Démarrer la réauthentification",
           "forget_password": "Oublier le mot de passe stocké",
           "type_heatpump": "Pompe à chaleur",
@@ -534,7 +537,7 @@
           "api_timeout": "Secondes avant l’expiration des requêtes API.",
           "nominal_voltage": "Tension de secours utilisée pour estimer la puissance du chargeur.",
           "session_history_interval": "Minutes d'attente entre les récupérations de l'historique de session depuis le cloud.",
-          "schedule_sync_enabled": "Gérer la gestion des plannings Enphase",
+          "schedule_sync_enabled": "Gérer les plannings des chargeurs IQ EV",
           "reauth": "Lancer le processus de connexion pour rafraîchir les identifiants sans supprimer l'intégration.",
           "forget_password": "Supprime le mot de passe stocké. Le rafraîchissement automatique ne sera plus tenté.",
           "type_heatpump": "Inclut des capteurs d'état, de diagnostic et de consommation de la pompe à chaleur.",
@@ -913,7 +916,7 @@
         "name": "Débranché à"
       },
       "schedule_type": {
-        "name": "Type de planification"
+        "name": "Type de planning"
       },
       "schedule_start": {
         "name": "Début planifié"
@@ -1156,7 +1159,7 @@
       "battery_overall_status": {
         "name": "État général de la batterie",
         "state": {
-          "normal": "Normale",
+          "normal": "Normal",
           "warning": "Avertissement",
           "error": "Erreur",
           "unknown": "Inconnu"
@@ -1179,9 +1182,9 @@
         }
       },
       "grid_mode": {
-        "name": "Mode grille",
+        "name": "Mode réseau",
         "state": {
-          "on_grid": "Sur la grille",
+          "on_grid": "Sur le réseau",
           "off_grid": "Hors réseau",
           "unknown": "Inconnu"
         }
@@ -1193,7 +1196,7 @@
         "name": "Puissance batterie disponible"
       },
       "battery_storage_status": {
-        "name": "Statut de {serial}",
+        "name": "État de {serial}",
         "state": {
           "charging": "En charge",
           "discharging": "Décharge",
@@ -1208,7 +1211,7 @@
         "name": "Nombre de cycles de {serial}"
       },
       "battery_storage_last_reported": {
-        "name": "Dernier signalement de {serial}"
+        "name": "Dernier relevé de {serial}"
       },
       "battery_last_reported": {
         "name": "Dernier signalement de Batterie"
@@ -1235,7 +1238,7 @@
             "name": "Date de debut"
           },
           "billing_frequency": {
-            "name": "Frequence de facturation"
+            "name": "Fréquence de facturation"
           },
           "billing_interval_value": {
             "name": "Valeur d intervalle de facturation"
@@ -1249,7 +1252,7 @@
         }
       },
       "tariff_import_rate": {
-        "name": "Tarif d import",
+        "name": "Tarif d’importation",
         "state_attributes": {
           "rate_structure": {
             "name": "Structure tarifaire"
@@ -1272,7 +1275,7 @@
         }
       },
       "tariff_import_rate_value": {
-        "name": "Tarif d import {detail}",
+        "name": "Tarif d’importation {detail}",
         "state_attributes": {
           "rate_structure": {
             "name": "Structure tarifaire"
@@ -1340,7 +1343,7 @@
         }
       },
       "tariff_export_rate": {
-        "name": "Tarif d export",
+        "name": "Tarif d’exportation",
         "state_attributes": {
           "rate_structure": {
             "name": "Structure tarifaire"
@@ -1355,7 +1358,7 @@
             "name": "Devise"
           },
           "export_plan": {
-            "name": "Plan d export"
+            "name": "Plan d’export"
           },
           "seasons": {
             "name": "Saisons"
@@ -1366,7 +1369,7 @@
         }
       },
       "tariff_export_rate_value": {
-        "name": "Tarif d export {detail}",
+        "name": "Tarif d’exportation {detail}",
         "state_attributes": {
           "rate_structure": {
             "name": "Structure tarifaire"
@@ -1381,7 +1384,7 @@
             "name": "Devise"
           },
           "export_plan": {
-            "name": "Plan d export"
+            "name": "Plan d’export"
           },
           "season_id": {
             "name": "ID de saison"
@@ -1544,9 +1547,9 @@
       "ac_battery_overall_status": {
         "name": "État global de la batterie AC",
         "state": {
-          "charging": "En charge",
-          "discharging": "Décharge",
-          "idle": "Inactif",
+          "normal": "Normal",
+          "warning": "Avertissement",
+          "error": "Erreur",
           "unknown": "Inconnu"
         }
       },
@@ -1562,9 +1565,9 @@
       "ac_battery_storage_status": {
         "name": "État de {serial}",
         "state": {
-          "charging": "En charge",
-          "discharging": "Décharge",
-          "idle": "Inactif",
+          "normal": "Normal",
+          "warning": "Avertissement",
+          "error": "Erreur",
           "unknown": "Inconnu"
         }
       },
@@ -1682,7 +1685,7 @@
             "name": "Devise"
           },
           "export_plan": {
-            "name": "Plan d export"
+            "name": "Plan d’export"
           },
           "season_id": {
             "name": "ID de saison"
@@ -1742,6 +1745,9 @@
             "name": "Tarifs configurés"
           }
         }
+      },
+      "dry_contacts": {
+        "name": "Contacts secs"
       }
     },
     "number": {
@@ -1770,7 +1776,7 @@
         "name": "Limite du planning de batterie"
       },
       "tariff_import_rate_value": {
-        "name": "Tarif d import {detail}",
+        "name": "Tarif d’importation {detail}",
         "state_attributes": {
           "rate_structure": {
             "name": "Structure tarifaire"
@@ -1838,7 +1844,7 @@
         }
       },
       "tariff_export_rate_value": {
-        "name": "Tarif d export {detail}",
+        "name": "Tarif d’exportation {detail}",
         "state_attributes": {
           "rate_structure": {
             "name": "Structure tarifaire"
@@ -1853,7 +1859,7 @@
             "name": "Devise"
           },
           "export_plan": {
-            "name": "Plan d export"
+            "name": "Plan d’export"
           },
           "season_id": {
             "name": "ID de saison"
@@ -2063,7 +2069,7 @@
         "name": "Annuler le changement de profil en attente"
       },
       "request_grid_toggle_otp": {
-        "name": "Demander la grille de basculement OTP"
+        "name": "Demander le code OTP de basculement réseau"
       },
       "storm_alert_opt_out": {
         "name": "Se désinscrire de l'alerte de tempête"
@@ -2300,7 +2306,7 @@
         },
         "site_id": {
           "name": "ID du site",
-          "description": "Identifiant de site optionnel ; détecté automatiquement lorsqu'un périphérique de site est sélectionné."
+          "description": "Identifiant de site facultatif ; détecté automatiquement lorsqu’un appareil de site est sélectionné."
         }
       }
     },
@@ -2314,7 +2320,7 @@
         },
         "site_id": {
           "name": "ID du site",
-          "description": "Identifiant de site optionnel ; détecté automatiquement lorsqu'un périphérique de site est sélectionné."
+          "description": "Identifiant de site facultatif ; détecté automatiquement lorsqu’un appareil de site est sélectionné."
         }
       }
     },
@@ -2329,7 +2335,7 @@
       "fields": {
         "site_id": {
           "name": "ID du site",
-          "description": "Identifiant de site optionnel ; détecté automatiquement lorsqu'un périphérique de site est sélectionné."
+          "description": "Identifiant de site facultatif ; détecté automatiquement lorsqu’un appareil de site est sélectionné."
         }
       }
     },
@@ -2344,7 +2350,7 @@
       "fields": {
         "site_id": {
           "name": "ID du site",
-          "description": "Identifiant de site optionnel ; détecté automatiquement lorsqu'un périphérique de site est sélectionné."
+          "description": "Identifiant de site facultatif ; détecté automatiquement lorsqu’un appareil de site est sélectionné."
         }
       }
     },
@@ -2359,8 +2365,8 @@
       }
     },
     "request_grid_toggle_otp": {
-      "name": "Demander la grille de basculement OTP",
-      "description": "Envoyez le code à usage unique requis avant de changer le mode grille du site.",
+      "name": "Demander le code OTP de basculement réseau",
+      "description": "Envoyez le code à usage unique requis avant de changer le mode réseau du site.",
       "sections": {
         "advanced": {
           "name": "Options avancées"
@@ -2369,13 +2375,13 @@
       "fields": {
         "site_id": {
           "name": "ID du site",
-          "description": "Identifiant de site optionnel ; détecté automatiquement lorsqu'un périphérique de site est sélectionné."
+          "description": "Identifiant de site facultatif ; détecté automatiquement lorsqu’un appareil de site est sélectionné."
         }
       }
     },
     "set_grid_mode": {
-      "name": "Définir le mode grille",
-      "description": "Changez le mode grille du site après avoir validé le code à usage unique.",
+      "name": "Définir le mode réseau",
+      "description": "Changez le mode réseau du site après avoir validé le code à usage unique.",
       "sections": {
         "advanced": {
           "name": "Options avancées"
@@ -2383,7 +2389,7 @@
       },
       "fields": {
         "mode": {
-          "name": "Mode grille",
+          "name": "Mode réseau",
           "description": "Sélectionnez on_grid ou off_grid."
         },
         "otp": {
@@ -2392,7 +2398,7 @@
         },
         "site_id": {
           "name": "ID du site",
-          "description": "Identifiant de site optionnel ; détecté automatiquement lorsqu'un périphérique de site est sélectionné."
+          "description": "Identifiant de site facultatif ; détecté automatiquement lorsqu’un appareil de site est sélectionné."
         }
       }
     },
@@ -2410,7 +2416,7 @@
         },
         "limit": {
           "name": "Limite de charge",
-          "description": "Niveau de charge maximal de la batterie (%)."
+          "description": "État de charge maximal de la batterie (%)."
         },
         "site_id": {
           "name": "ID du site",
@@ -2429,7 +2435,7 @@
       "fields": {
         "site_id": {
           "name": "ID du site",
-          "description": "Identifiant de site facultatif ; détecté automatiquement lorsqu’un appareil de site est sélectionné."
+          "description": "Identifiant de site facultatif ; détecté automatiquement lorsqu’un appareil de site est sélectionné."
         },
         "config_entry_id": {
           "name": "ID de l’entrée de configuration",
@@ -2587,7 +2593,7 @@
         },
         "site_id": {
           "name": "ID du site",
-          "description": "Identifiant de site facultatif; détecté automatiquement lorsqu’un appareil de site est sélectionné."
+          "description": "Identifiant de site facultatif ; détecté automatiquement lorsqu’un appareil de site est sélectionné."
         }
       }
     },
@@ -2640,8 +2646,8 @@
           "description": "Identifiant de site facultatif pour les mises à jour de facturation."
         },
         "config_entry_id": {
-          "name": "ID d’entrée de configuration",
-          "description": "Identifiant facultatif d’entrée de configuration pour un seul site Enphase."
+          "name": "ID de l’entrée de configuration",
+          "description": "Identifiant facultatif de l’entrée de configuration pour une seule entrée de site Enphase."
         },
         "tariff_payload": {
           "name": "Charge utile tarifaire",
@@ -2731,7 +2737,7 @@
         },
         "site_id": {
           "name": "ID du site",
-          "description": "Identifiant de site facultatif, détecté automatiquement lorsqu’un appareil est sélectionné."
+          "description": "Identifiant de site facultatif ; détecté automatiquement lorsqu’un appareil de site est sélectionné."
         }
       }
     }
