@@ -312,6 +312,91 @@ async def test_heatpump_power_holds_stale_running_repeated_site_sample(
 
 
 @pytest.mark.asyncio
+async def test_heatpump_power_uses_inventory_error_when_runtime_state_is_stale(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(serials=[])
+    runtime = coord.heatpump_runtime
+    coord._devices_inventory_payload = {"curr_date_site": "2026-04-05"}  # noqa: SLF001
+    coord._battery_timezone = "UTC"  # noqa: SLF001
+    coord.inventory_runtime._set_type_device_buckets(  # noqa: SLF001
+        {
+            "heatpump": {
+                "type_key": "heatpump",
+                "count": 1,
+                "devices": [
+                    {
+                        "device_type": "HEAT_PUMP",
+                        "device_uid": "HP-1",
+                        "name": "Heat Pump",
+                        "statusText": "Error",
+                    }
+                ],
+            }
+        },
+        ["heatpump"],
+    )
+    now = time.monotonic()
+    runtime._heatpump_runtime_state = {  # noqa: SLF001
+        "device_uid": "HP-1",
+        "heatpump_status": "RUNNING",
+    }
+    runtime._heatpump_runtime_state_last_success_mono = now - 5.0  # noqa: SLF001
+    runtime._heatpump_runtime_state_last_success_utc = datetime(  # noqa: SLF001
+        2026, 4, 5, 0, 15, tzinfo=timezone.utc
+    )
+    runtime._heatpump_power_sample_history = [  # noqa: SLF001
+        {
+            "device_uid": "HP-1",
+            "day_key": "2026-04-05",
+            "timezone": "UTC",
+            "energy_wh": 100.0,
+            "sample_utc": datetime(2026, 4, 5, 0, 0, tzinfo=timezone.utc),
+        }
+    ]
+    coord.client._hems_site_supported = True  # noqa: SLF001
+    coord.client.hems_heatpump_state = AsyncMock(return_value=None)
+    coord.client.pv_system_today = AsyncMock(
+        return_value=_site_today_payload(150.0, timestamp="2026-04-05T00:20:00Z")
+    )
+    coord.client.hems_energy_consumption = AsyncMock(
+        return_value={
+            "type": "hems-device-details",
+            "timestamp": "2026-04-05T00:20:00Z",
+            "data": {
+                "heat-pump": [
+                    {
+                        "device_uid": "HP-1",
+                        "device_name": "Heat Pump",
+                        "consumption": [{"details": [150.0]}],
+                    }
+                ]
+            },
+        }
+    )
+    _seed_previous_heatpump_daily_snapshot(
+        coord,
+        energy_wh=150.0,
+        timestamp="2026-04-05T00:15:00Z",
+        day_key="2026-04-05",
+        timezone_name="UTC",
+        device_name="Heat Pump",
+    )
+
+    await runtime._async_refresh_heatpump_power(force=True)  # noqa: SLF001
+
+    assert coord.heatpump_runtime_state_using_stale is True
+    assert coord.heatpump_power_w == pytest.approx(0.0)
+    assert coord.heatpump_power_last_error is None
+    selected = coord._heatpump_power_snapshot["selected_payload"]  # noqa: SLF001
+    assert selected["runtime_mode"] == "RUNNING"
+    assert selected["status"] == "Error"
+    assert selected["raw_validation"] == "accepted_idle_zero"
+    assert selected["power_validation"] == "accepted_idle_zero"
+    assert selected["smoothed"] is False
+
+
+@pytest.mark.asyncio
 async def test_heatpump_diagnostics_clears_livestream_when_circuit_active_without_fetcher(
     coordinator_factory,
 ) -> None:
@@ -723,6 +808,92 @@ def test_heatpump_power_summary_smooths_running_zero_from_history(
             site_interval_seconds=900.0,
         ),
         runtime_snapshot={"heatpump_status": "RUNNING"},
+    )
+
+    assert summary is not None
+    assert summary["raw_value_w"] == pytest.approx(0.0)
+    assert summary["raw_validation"] == "accepted_zero_delta"
+    assert summary["accepted_value_w"] == pytest.approx(15.0)
+    assert summary["power_window_seconds"] == pytest.approx(1200.0)
+    assert summary["power_validation"] == "smoothed_active_delta"
+    assert summary["smoothed"] is True
+
+
+@pytest.mark.parametrize(
+    "heatpump_status",
+    (
+        "OFFLINE",
+        "ERROR",
+        "FAULTED",
+        "CRITICAL",
+        "NOT_REPORTING",
+        "DISCONNECTED",
+    ),
+)
+def test_heatpump_power_summary_does_not_smooth_inactive_zero_from_history(
+    coordinator_factory, heatpump_status: str
+) -> None:
+    runtime = coordinator_factory(serials=[]).heatpump_runtime
+    runtime._heatpump_power_sample_history = [  # noqa: SLF001
+        {
+            "device_uid": "HP-1",
+            "day_key": "2026-04-02",
+            "timezone": "UTC",
+            "energy_wh": 100.0,
+            "sample_utc": datetime(2026, 4, 2, 0, 0, tzinfo=timezone.utc),
+        }
+    ]
+    runtime._heatpump_daily_consumption_previous = (
+        _heatpump_daily_snapshot(  # noqa: SLF001
+            energy_wh=150.0,
+            timestamp="2026-04-02T00:15:00Z",
+        )
+    )
+
+    summary = runtime._heatpump_power_summary_from_daily_snapshot(  # noqa: SLF001
+        _heatpump_daily_snapshot(
+            energy_wh=150.0,
+            timestamp="2026-04-02T00:20:00Z",
+            site_interval_seconds=900.0,
+        ),
+        runtime_snapshot={"heatpump_status": heatpump_status},
+    )
+
+    assert summary is not None
+    assert summary["raw_value_w"] == pytest.approx(0.0)
+    assert summary["accepted_value_w"] == pytest.approx(0.0)
+    assert summary["raw_validation"] == "accepted_idle_zero"
+    assert summary["power_validation"] == "accepted_idle_zero"
+    assert summary["smoothed"] is False
+
+
+def test_heatpump_power_summary_smooths_unrecognized_runtime_zero_from_history(
+    coordinator_factory,
+) -> None:
+    runtime = coordinator_factory(serials=[]).heatpump_runtime
+    runtime._heatpump_power_sample_history = [  # noqa: SLF001
+        {
+            "device_uid": "HP-1",
+            "day_key": "2026-04-02",
+            "timezone": "UTC",
+            "energy_wh": 100.0,
+            "sample_utc": datetime(2026, 4, 2, 0, 0, tzinfo=timezone.utc),
+        }
+    ]
+    runtime._heatpump_daily_consumption_previous = (
+        _heatpump_daily_snapshot(  # noqa: SLF001
+            energy_wh=105.0,
+            timestamp="2026-04-02T00:15:00Z",
+        )
+    )
+
+    summary = runtime._heatpump_power_summary_from_daily_snapshot(  # noqa: SLF001
+        _heatpump_daily_snapshot(
+            energy_wh=105.0,
+            timestamp="2026-04-02T00:20:00Z",
+            site_interval_seconds=900.0,
+        ),
+        runtime_snapshot={"heatpump_status": "UNKNOWN"},
     )
 
     assert summary is not None

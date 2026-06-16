@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Fixed Heat Pump power smoothing so offline/error HEMS states no longer carry forward stale running power estimates. (#715)
 
 ### 🔧 Improvements
 - None
