@@ -1,9 +1,9 @@
 # Service Status History
 
-- Current status: **Down**
-- Last updated: `2026-06-17 19:24 UTC`
+- Current status: **Fully Operational**
+- Last updated: `2026-06-17 21:28 UTC`
 - Failed checks in latest run: `1`
-- Latest failed checks: auth
+- Latest failed checks: battery_config
 - Retained hourly samples: `261`
 - Incident windows in last 30 days: `13`
 
@@ -16,8 +16,8 @@ gantt
     title Enphase Service Status Incident Timeline (Last 30 Days)
     dateFormat  YYYY-MM-DDTHH:mm:ss
     axisFormat  %b %d
-    Window start :vert, window-start, 2026-05-18T19:24:51, 0ms
-    Window end :vert, window-end, 2026-06-17T19:24:51, 0ms
+    Window start :vert, window-start, 2026-05-18T21:28:37, 0ms
+    Window end :vert, window-end, 2026-06-17T21:28:37, 0ms
     section Down
     Down 1 (2026-05-20 2251 UTC) :crit, down-1, 2026-05-20T22:51:14, 75m
     Down 2 (2026-05-24 1757 UTC) :crit, down-2, 2026-05-24T17:57:41, 86m
@@ -51,7 +51,7 @@ gantt
 | Down | 2026-06-10 12:19 UTC | Unknown after last seen 2026-06-10 12:19 UTC | Observed 0m | battery_config, discovery, evse_scheduler |
 | Down | 2026-06-11 01:59 UTC | Unknown after last seen 2026-06-11 01:59 UTC | Observed 0m | auth |
 | Down | 2026-06-11 06:58 UTC | Unknown after last seen 2026-06-11 06:58 UTC | Observed 0m | auth |
-| Down | 2026-06-17 19:24 UTC | Ongoing (last seen 2026-06-17 19:24 UTC) | Observed at latest check | auth |
+| Down | 2026-06-17 19:24 UTC | Unknown after last seen 2026-06-17 19:24 UTC | Observed 0m | auth |
 
 ## Raw Artifacts
 
