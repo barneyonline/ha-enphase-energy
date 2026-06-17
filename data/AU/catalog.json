@@ -4,30 +4,30 @@
     "envoy": {
       "document_topic_id": 217,
       "latest": {
-        "countries_text": "Australia and New Zealand # Feature classification Feature Description 1 Issue resolution Bug fixes Fixes an issue where the IQ Gateway software does not apply the default Power Export Limit (PEL) from the CSIP server to the grid profile, resulting in the system not adhering to the CSIP PEL command Fixes an issue where the ERPI IEEE 2030.5 Client in the IQ Gateway software becomes unresponsive if the CSIP server does not respond to the Client\u2019s initial message Fixes an issue where the Master Resource Identifier (MRID) assigned to each Mirror Usage Point is not unique, causing parsing errors or making the IEEE 2030.5 client unresponsive Addresses unhandled error messages encountered by the IEEE 2030.5 client in the IQ Gateway software and implements timeout handling and retry mechanisms Fixes an issue where the single-phase site reports zero values for the unused phases of multi-phase voltage readings, instead of omitting the unused phases Fixes an issue where CSIP PEL commands fail to reduce Production output on IQ8 Microinverters in an IQ7 and IQ8 (Mixed) Microinverter system under the 2030.5 profile This release is being deployed via an over-the-air update to sites in Australia and New Zealand. Gateways supported : IQ Gateway Metered Microinverters supported : IQ8 Series Microinverters IQ7 Series Microinverters S Series Microinverters Batteries supported : IQ Battery 5P IQ Battery 5P with FlexPhase System controllers supported: IQ System Controller 3 INT Supported system configurations : Grid-tied (without backup) Solar Only systems with IQ8 Series Microinverters, and IQ Gateway Metered or IQ System Controller 3 INT Grid-tied (without backup) Solar Only systems with IQ7 Series Microinverters and/or S Series Microinverters, and IQ Gateway Metered or IQ System Controller 3 INT Grid-tied (without backup) Solar Only systems with IQ8 Series Microinverters and IQ7 Series Microinverters (Mixed), and IQ Gateway Metered or IQ System Controller 3 INT Grid-tied (without backup) Solar Only systems with compatible third-party string inverters, and IQ Gateway Metered Grid-tied (without backup) solar and storage systems with IQ7 Series Microinverters and/or S Series Microinverters or compatible third-party string inverters, and IQ Gateway Metered, and ACB1.0/ACB1.5 Grid-tied (without backup) solar and storage systems with IQ8 Series Microinverters or IQ7 Series Microinverters and/or S Series Microinverters or third-party string inverters, IQ Gateway Metered, and IQ Battery 5P Grid-tied (without backup) solar and storage systems with IQ8 Series Microinverters, IQ7 Series Microinverters (Mixed), IQ Gateway Metered, and IQ Battery 5P Grid-forming (with backup) solar and storage systems with IQ8 Series Microinverters or IQ7 Series Microinverters and/or S Series Microinverters, IQ System Controller 3 INT, and IQ Battery 5P Grid-forming (with backup) solar and storage systems with IQ8 Series Microinverters and IQ7 Series Microinverters (Mixed), IQ System Controller 3 INT, and IQ Battery 5P Grid-tied (without backup) solar and storage systems with IQ8 Series Microinverters, IQ Battery 5P or IQ Battery 5P with FlexPhase, and IQ Gateway Metered. Grid-tied (without backup) solar and storage systems with IQ7 Series Microinverters and/or S Series Microinverters, IQ Battery 5P or IQ Battery 5P with FlexPhase, and IQ Gateway Metered Grid-tied (without backup) solar and storage systems with IQ8 Series Microinverters and IQ7 Series Microinverters (Mixed), IQ Battery 5P or IQ Battery 5P with FlexPhase, and IQ Gateway Metered Grid-tied (without backup) solar and storage systems with compatible third-party string inverters, IQ Battery 5P or IQ Battery 5P with FlexPhase, and IQ Gateway Metered Grid-forming (with backup) solar and storage systems with IQ8 Series Microinverters, IQ Battery 5P or IQ Battery 5P with FlexPhase, and IQ System Controller 3 INT Grid-forming (with backup) solar and storage systems with IQ7 Series Microinverters and/or S Series Microinverters, IQ Battery 5P or IQ Battery 5P with FlexPhase, and IQ System Controller 3 INT Grid-forming (with backup) solar and storage systems with IQ8 Series Microinverters and IQ7 Series Microinverters (Mixed), IQ Battery 5P or IQ Battery 5P with FlexPhase, and IQ System Controller 3 INT",
+        "countries_text": "Australia and New Zealand #",
         "document_topic_id": 217,
-        "media_id": "29464",
+        "media_id": "34113",
         "product_media_name_id": null,
         "product_type": "141",
-        "release_date": "2025-11-03",
-        "summary": "IQ Gateway software version 8.3.5232 is the fleet release for Australia and New Zealand, delivering CSIP-related fixes and enhanced system stability. Countries : Australia and New Zealand # Feature classification Feature Description 1 Issue resolution Bug fixes Fixes an issue where the IQ Gateway software does not apply the default Power Export Limit (PEL) from the CSIP server to the grid profile, resulting in the system not adhering to the CSIP PEL command Fixes an issue where the ERPI IEEE...",
-        "title": "IQ Gateway software release notes (8.3.5232)",
+        "release_date": "2026-05-28",
+        "summary": "IQ Gateway software version 8.3.5528 introduces compatibility between IQ Battery 5P, IQ Battery 5P with FlexPhase, and PowerMatch technology, designed to maximize battery efficiency in typical operation. PowerMatch delivers more usable energy, longer battery life, and greater long\u2011term savings. Compatibility between IQ Battery 5P and IQ Battery 5P with FlexPhase gives homeowners the option to add IQ Battery 5P with FlexPhase to the existing IQ Battery 5P system. Countries: Australia and New Z...",
+        "title": "IQ Gateway software release notes (8.3.5528)",
         "urls_by_locale": {
           "en-au": "https://enphase.com/en-au/installers/resources/documentation/communication?product_type=141&f%5B0%5D=document%3A217&search_api_language=en-au&field_alternative_language=en-au"
         },
-        "version": "8.3.5232"
+        "version": "8.3.5528"
       },
       "product_media_name_id": null
     }
   },
-  "generated_at": "2026-06-04T08:00:33.071500Z",
+  "generated_at": "2026-06-17T08:36:43.286171Z",
   "schema_version": 1,
   "source": {
     "apps_url": "https://enphase.com/installers/resources/documentation/communication",
     "crawl": {
       "envoy": {
         "bootstrap_error_targets": [],
-        "count": 197,
+        "count": 201,
         "crawl_error_targets": [],
         "empty_release_targets": [
           "https://enphase.com/en-lac/|en-lac",
@@ -206,7 +206,7 @@
           "https://enphase.com/en-au/|en-au": {
             "apps_url": "https://enphase.com/en-au/installers/resources/documentation/communication",
             "bootstrap_error": null,
-            "count": 5,
+            "count": 6,
             "crawl_error": null,
             "pages": [
               "https://enphase.com/en-au/installers/resources/documentation/communication?product_type=141&f%5B0%5D=document%3A217&search_api_language=en-au&field_alternative_language=en-au&page=0"
@@ -778,7 +778,7 @@
           "https://enphase.com/|en": {
             "apps_url": "https://enphase.com/installers/resources/documentation/communication",
             "bootstrap_error": null,
-            "count": 14,
+            "count": 16,
             "crawl_error": null,
             "pages": [
               "https://enphase.com/installers/resources/documentation/communication?product_type=141&f%5B0%5D=document%3A217&search_api_language=en&field_alternative_language=en&page=0",
@@ -805,7 +805,7 @@
           "https://enphase.com/|en-ca": {
             "apps_url": "https://enphase.com/installers/resources/documentation/communication",
             "bootstrap_error": null,
-            "count": 7,
+            "count": 8,
             "crawl_error": null,
             "pages": [
               "https://enphase.com/installers/resources/documentation/communication?product_type=141&f%5B0%5D=document%3A217&search_api_language=en-ca&field_alternative_language=en-ca&page=0"
