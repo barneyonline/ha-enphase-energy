@@ -34,6 +34,7 @@ from .parsing_helpers import (
     heatpump_device_state,
     heatpump_member_device_type,
     heatpump_pairing_status,
+    heatpump_status_bucket,
     heatpump_status_text,
     parse_inverter_last_report,
     type_member_text,
@@ -62,6 +63,8 @@ _HEATPUMP_ACTIVE_SMOOTHING_MIN_WINDOW_S = 15 * 60.0
 _HEATPUMP_ACTIVE_SMOOTHING_MAX_WINDOW_S = 30 * 60.0
 _HEATPUMP_POWER_SEEDED_STALE_AFTER_S = 30 * 60.0
 _HEATPUMP_POWER_HOLD_STALE_ERRORS = {"seeded_waiting_for_delta", "repeated_sample"}
+_HEATPUMP_INACTIVE_RUNTIME_MODES = {"IDLE", "OFF", "STOPPED", "STANDBY"}
+_HEATPUMP_INACTIVE_STATUS_BUCKETS = {"error", "not_reporting"}
 _SITE_TODAY_HEATPUMP_TOTAL_KEYS = (
     "consumed_wh",
     "consumption_wh",
@@ -73,6 +76,10 @@ _SITE_TODAY_HEATPUMP_TOTAL_KEYS = (
     "value",
     "total",
 )
+
+
+def _heatpump_status_is_inactive(value: object) -> bool:
+    return heatpump_status_bucket(value) in _HEATPUMP_INACTIVE_STATUS_BUCKETS
 
 
 class HeatpumpRuntime:
@@ -1049,6 +1056,9 @@ class HeatpumpRuntime:
                 "device_state": (
                     heatpump_device_state(member) if isinstance(member, dict) else None
                 ),
+                "member_status": (
+                    heatpump_status_text(member) if isinstance(member, dict) else None
+                ),
                 "split_daily_energy_wh": split_daily_energy_wh,
                 "daily_solar_wh": daily_solar_wh,
                 "daily_battery_wh": daily_battery_wh,
@@ -1345,7 +1355,18 @@ class HeatpumpRuntime:
         device_uid = coerce_optional_text(snapshot.get("split_device_uid"))
         day_key = coerce_optional_text(snapshot.get("day_key"))
         runtime_mode = self._heatpump_runtime_mode(runtime_snapshot)
-        is_idle = runtime_mode in {"IDLE", "OFF", "STOPPED", "STANDBY"}
+        member = self._heatpump_member_for_uid(device_uid) if device_uid else None
+        member_status = (
+            heatpump_status_text(member)
+            if isinstance(member, dict)
+            else coerce_optional_text(snapshot.get("member_status"))
+        )
+        is_inactive_runtime = (
+            runtime_mode in _HEATPUMP_INACTIVE_RUNTIME_MODES
+            or _heatpump_status_is_inactive(runtime_mode)
+            or _heatpump_status_is_inactive(member_status)
+        )
+        is_active = not is_inactive_runtime
         current_energy_wh = coerce_optional_float(snapshot.get("daily_energy_wh"))
         current_split_energy_wh = coerce_optional_float(
             snapshot.get("split_daily_energy_wh")
@@ -1390,7 +1411,7 @@ class HeatpumpRuntime:
         power_source = "site_today_heatpump_delta"
 
         if current_energy_wh is None or current_sample_utc is None:
-            if is_idle:
+            if is_inactive_runtime:
                 accepted_value = 0.0
                 validation = "accepted_idle_without_delta"
             else:
@@ -1401,7 +1422,7 @@ class HeatpumpRuntime:
             or previous_sample_utc is None
             or previous_day_key != day_key
         ):
-            if is_idle:
+            if is_inactive_runtime:
                 accepted_value = 0.0
                 validation = "accepted_idle_seeded"
             else:
@@ -1411,7 +1432,7 @@ class HeatpumpRuntime:
             window_s = (current_sample_utc - previous_sample_utc).total_seconds()
             series_start_utc = previous_sample_utc
             if window_s <= 0:
-                if is_idle:
+                if is_inactive_runtime:
                     accepted_value = 0.0
                     validation = "accepted_idle_repeated_sample"
                 else:
@@ -1420,7 +1441,7 @@ class HeatpumpRuntime:
             else:
                 delta_wh = current_energy_wh - previous_energy_wh
                 if delta_wh < 0:
-                    if is_idle:
+                    if is_inactive_runtime:
                         accepted_value = 0.0
                         validation = "accepted_idle_reset"
                     else:
@@ -1429,20 +1450,25 @@ class HeatpumpRuntime:
                 elif delta_wh <= _HEATPUMP_POWER_MIN_DELTA_WH:
                     accepted_value = 0.0
                     validation = (
-                        "accepted_idle_zero" if is_idle else "accepted_zero_delta"
+                        "accepted_idle_zero"
+                        if is_inactive_runtime
+                        else "accepted_zero_delta"
                     )
                 else:
                     effective_window_s = (
                         window_s if window_s > 0 else _HEATPUMP_POWER_DEFAULT_WINDOW_S
                     )
                     candidate_value = (delta_wh * 3600.0) / effective_window_s
-                    if is_idle and candidate_value > _HEATPUMP_IDLE_POWER_MAX_W:
+                    if (
+                        is_inactive_runtime
+                        and candidate_value > _HEATPUMP_IDLE_POWER_MAX_W
+                    ):
                         accepted_value = candidate_value
                         validation = _HEATPUMP_IDLE_HIGH_DELTA_PENDING
                         idle_high_delta_pending = True
                     else:
                         accepted_value = candidate_value
-                        if is_idle:
+                        if is_inactive_runtime:
                             validation = "accepted_idle_delta"
 
         raw_value = accepted_value
@@ -1454,7 +1480,7 @@ class HeatpumpRuntime:
         display_validation = validation
         smoothed = False
         if (
-            is_idle
+            is_inactive_runtime
             and not rejected
             and current_energy_wh is not None
             and current_sample_utc is not None
@@ -1488,7 +1514,7 @@ class HeatpumpRuntime:
                 validation = "rejected_idle_high_delta"
                 display_validation = validation
         elif (
-            not is_idle
+            is_active
             and not rejected
             and current_energy_wh is not None
             and current_sample_utc is not None
@@ -1530,11 +1556,7 @@ class HeatpumpRuntime:
             "member_device_type": snapshot.get("member_device_type"),
             "pairing_status": snapshot.get("pairing_status"),
             "device_state": snapshot.get("device_state"),
-            "status": (
-                heatpump_status_text(self._heatpump_member_for_uid(device_uid))
-                if device_uid
-                else None
-            ),
+            "status": member_status,
             "recommended": self._heatpump_power_candidate_is_recommended(device_uid),
             "detail_count": 1 if current_split_energy_wh is not None else 0,
             "reported_detail_value": (
