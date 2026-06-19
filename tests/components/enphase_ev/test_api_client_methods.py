@@ -3303,6 +3303,20 @@ async def test_start_charging_not_ready_on_409() -> None:
 
 
 @pytest.mark.asyncio
+async def test_start_charging_raises_503_without_trying_fallback() -> None:
+    client = _make_client()
+    error = _make_cre(503, '{"errorMessageCode":"iqevc_ms-10007"}')
+    client._json = AsyncMock(side_effect=error)
+
+    with pytest.raises(aiohttp.ClientResponseError) as err:
+        await client.start_charging("SN", 32, connector_id=1)
+
+    assert err.value is error
+    assert client._json.await_count == 1
+    assert client._start_variant_idx is None
+
+
+@pytest.mark.asyncio
 async def test_start_charging_interprets_errors() -> None:
     body = {
         "error": {
@@ -3602,13 +3616,167 @@ async def test_stop_charging_handles_noop_status() -> None:
     client._json = AsyncMock(side_effect=[_make_cre(404), {"status": "ok"}])
     out = await client.stop_charging("SN")
     assert out == {"status": "not_active"}
-    assert client._stop_variant_idx == 0
+    assert client._stop_variant_idx is None
+
+
+@pytest.mark.asyncio
+async def test_control_candidates_keep_legacy_singular_fallbacks() -> None:
+    client = _make_client()
+
+    start_urls = [
+        url for _method, url, _payload in client._start_charging_candidates("SN", 32, 1)
+    ]
+    stop_urls = [
+        url for _method, url, _payload in client._stop_charging_candidates("SN")
+    ]
+
+    assert any("/ev_chargers/" in url for url in start_urls)
+    assert any("/ev_charger/" in url for url in start_urls)
+    assert any("/ev_chargers/" in url for url in stop_urls)
+    assert any("/ev_charger/" in url for url in stop_urls)
+
+
+@pytest.mark.asyncio
+async def test_stop_charging_raises_503_without_trying_fallback() -> None:
+    client = _make_client()
+    error = _make_cre(503, '{"errorMessageCode":"iqevc_ms-10007"}')
+    client._json = AsyncMock(side_effect=error)
+
+    with pytest.raises(aiohttp.ClientResponseError) as err:
+        await client.stop_charging("SN")
+
+    assert err.value is error
+    assert client._json.await_count == 1
+    assert client._stop_variant_idx is None
+
+
+@pytest.mark.asyncio
+async def test_stop_charging_routing_404_is_not_noop(monkeypatch) -> None:
+    client = _make_client()
+    monkeypatch.setattr(
+        client,
+        "_stop_charging_candidates",
+        lambda _sn: [
+            ("POST", "https://example.test/ev_charger/SN/stop_charging", None)
+        ],
+    )
+    error = _make_cre(404, '{"type":"about:blank","detail":"No static resource"}')
+    client._json = AsyncMock(side_effect=error)
+
+    with pytest.raises(aiohttp.ClientResponseError) as err:
+        await client.stop_charging("SN")
+
+    assert err.value is error
+    assert client._stop_variant_idx is None
+
+
+@pytest.mark.asyncio
+async def test_stop_charging_about_blank_404_with_spacing_is_not_noop(
+    monkeypatch,
+) -> None:
+    client = _make_client()
+    monkeypatch.setattr(
+        client,
+        "_stop_charging_candidates",
+        lambda _sn: [("POST", "https://example.test/stop_charging", None)],
+    )
+    error = _make_cre(404, '{ "type": "about:blank", "detail": "No static resource" }')
+    client._json = AsyncMock(side_effect=error)
+
+    with pytest.raises(aiohttp.ClientResponseError) as err:
+        await client.stop_charging("SN")
+
+    assert err.value is error
+    assert client._stop_variant_idx is None
+
+
+@pytest.mark.asyncio
+async def test_stop_charging_semantic_404_remains_noop() -> None:
+    client = _make_client()
+    client._json = AsyncMock(
+        side_effect=[
+            _make_cre(
+                404,
+                '{"type":"about:blank","title":"Not Found","detail":"charger is not active"}',
+            )
+        ]
+    )
+
+    out = await client.stop_charging("SN")
+
+    assert out == {"status": "not_active"}
+    assert client._stop_variant_idx is None
+
+
+@pytest.mark.asyncio
+async def test_stop_charging_routing_404_falls_back_to_legacy_singular() -> None:
+    client = _make_client()
+    error = _make_cre(404, '{"type":"about:blank","detail":"No static resource"}')
+    client._json = AsyncMock(side_effect=[error, _make_cre(405), {"status": "ok"}])
+
+    out = await client.stop_charging("SN")
+
+    assert out == {"status": "ok"}
+    assert client._json.await_count == 3
+    args, _kwargs = client._json.await_args
+    assert "/ev_charger/" in args[1]
+    assert client._stop_variant_idx == 2
+
+
+@pytest.mark.asyncio
+async def test_stop_charging_routing_404_from_json_response_uses_derived_flag() -> None:
+    session = _FakeSession(
+        [
+            _FakeResponse(
+                status=404,
+                json_body={},
+                text_body='{ "type": "about:blank", "detail": "No static resource" }',
+            ),
+            _FakeResponse(status=405, json_body={}, text_body="method not allowed"),
+            _FakeResponse(status=200, json_body={"status": "ok"}),
+        ]
+    )
+    client = _make_client(session)
+
+    out = await client.stop_charging("SN")
+
+    assert out == {"status": "ok"}
+    assert len(session.calls) == 3
+    assert "/ev_charger/" in session.calls[-1][1]
+    assert client._stop_variant_idx == 2
+
+
+@pytest.mark.asyncio
+async def test_start_charging_invalid_level_500_from_json_response_sets_flag() -> None:
+    session = _FakeSession(
+        [
+            _FakeResponse(
+                status=500,
+                json_body={},
+                text_body='{"error":{"displayMessage":"Invalid charge level","code":"500"}}',
+            ),
+        ]
+    )
+    client = _make_client(session)
+
+    with pytest.raises(aiohttp.ClientResponseError) as err:
+        await client.start_charging("SN", 32)
+
+    assert getattr(err.value, "enphase_invalid_charge_level", False) is True
+    assert len(session.calls) == 1
+
+
+def test_stop_charging_routing_404_helper_handles_empty_message() -> None:
+    assert not api.EnphaseEVClient._is_routing_not_found(None)
+    assert not api.EnphaseEVClient._is_routing_not_found("")
+    assert not api.EnphaseEVClient._is_invalid_charge_level_error(None)
+    assert not api.EnphaseEVClient._is_invalid_charge_level_error("")
 
 
 @pytest.mark.asyncio
 async def test_stop_charging_raises_last_exception() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(500)] * 3)
+    client._json = AsyncMock(side_effect=[_make_cre(405)] * 3)
     with pytest.raises(aiohttp.ClientResponseError):
         await client.stop_charging("SN")
 

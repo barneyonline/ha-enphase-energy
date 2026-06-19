@@ -1419,6 +1419,26 @@ def test_auth_refresh_suspended_active_clears_expired_window(hass, monkeypatch):
     coord._persist_auth_refresh_suspension_state.assert_called_once_with()
 
 
+def test_note_auth_refresh_suspended_clears_custom_reauth_issue(hass):
+    from custom_components.enphase_ev.coordinator import EnphaseCoordinator
+
+    coord = _attach_evse_runtime(EnphaseCoordinator.__new__(EnphaseCoordinator))
+    coord.hass = hass
+    coord._persist_auth_refresh_suspension_state = MagicMock()
+    coord.diagnostics = SimpleNamespace(
+        clear_reauth_issue=MagicMock(),
+        create_reauth_issue=MagicMock(),
+    )
+    suspended_until = datetime.now(timezone.utc) + timedelta(hours=1)
+
+    coord._note_auth_refresh_suspended(suspended_until=suspended_until)
+
+    assert coord._auth_refresh_suspended_until_utc == suspended_until
+    coord._persist_auth_refresh_suspension_state.assert_called_once_with()
+    coord.diagnostics.clear_reauth_issue.assert_called_once_with()
+    coord.diagnostics.create_reauth_issue.assert_not_called()
+
+
 def test_clear_auth_repair_issues_on_success_clears_reauth_when_not_suspended(hass):
     from custom_components.enphase_ev.coordinator import EnphaseCoordinator
 
@@ -1486,7 +1506,10 @@ async def test_attempt_auto_refresh_suspends_after_repeated_rejections(
     coord._auth_refresh_suspended_until_utc = None
     coord.client = SimpleNamespace(update_credentials=MagicMock())
     coord._persist_tokens = MagicMock()
-    coord.diagnostics = SimpleNamespace(create_reauth_issue=MagicMock())
+    coord.diagnostics = SimpleNamespace(
+        clear_reauth_issue=MagicMock(),
+        create_reauth_issue=MagicMock(),
+    )
 
     calls = 0
 
@@ -1513,7 +1536,8 @@ async def test_attempt_auto_refresh_suspends_after_repeated_rejections(
     assert coord._auth_refresh_rejected_until is None
     assert coord._auth_refresh_rejected_ends_utc is None
     assert coord._auth_refresh_suspended_until_utc is not None
-    coord.diagnostics.create_reauth_issue.assert_called_once_with()
+    coord.diagnostics.clear_reauth_issue.assert_called_once_with()
+    coord.diagnostics.create_reauth_issue.assert_not_called()
 
     assert await coord._attempt_auto_refresh() is False
     assert calls == AUTH_REFRESH_REJECTED_SUSPEND_THRESHOLD
@@ -1578,7 +1602,10 @@ def test_note_auth_refresh_rejected_threshold_handles_utcnow_error(monkeypatch, 
     coord._auth_refresh_rejected_ends_utc = datetime.now(timezone.utc) + timedelta(
         seconds=60
     )
-    coord.diagnostics = SimpleNamespace(create_reauth_issue=MagicMock())
+    coord.diagnostics = SimpleNamespace(
+        clear_reauth_issue=MagicMock(),
+        create_reauth_issue=MagicMock(),
+    )
 
     monkeypatch.setattr(
         arr_mod.dt_util,
@@ -1592,7 +1619,8 @@ def test_note_auth_refresh_rejected_threshold_handles_utcnow_error(monkeypatch, 
     assert coord._auth_refresh_rejected_until is None
     assert coord._auth_refresh_rejected_ends_utc is None
     assert coord._auth_refresh_suspended_until_utc is not None
-    coord.diagnostics.create_reauth_issue.assert_called_once_with()
+    coord.diagnostics.clear_reauth_issue.assert_called_once_with()
+    coord.diagnostics.create_reauth_issue.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -2234,7 +2262,7 @@ async def test_handle_client_unauthorized_creates_issue_after_failures(
         await coord._handle_client_unauthorized()
 
     assert coord._unauth_errors == 2
-    assert created and created[0][0][2] == "reauth_required"
+    assert created == []
 
 
 def test_blocked_auth_failure_message_handles_missing_timestamp():

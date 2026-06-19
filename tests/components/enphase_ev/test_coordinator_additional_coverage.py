@@ -3927,7 +3927,10 @@ async def test_handle_client_unauthorized_paths(
     coord._unauth_errors = 1
     with pytest.raises(coord_mod.ConfigEntryAuthFailed):
         await coord._handle_client_unauthorized()
-    assert any(issue[1] == "reauth_required" for issue in mock_issue_registry.created)
+    assert not any(
+        issue[1] == "reauth_required" for issue in mock_issue_registry.created
+    )
+    assert any(issue[1] == "reauth_required" for issue in mock_issue_registry.deleted)
 
 
 def test_persist_tokens_updates_entry(coordinator_factory, config_entry):
