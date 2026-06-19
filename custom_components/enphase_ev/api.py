@@ -4378,6 +4378,14 @@ class EnphaseEVClient:
                                     message=message,
                                     headers=r.headers,
                                 )
+                                response_error.enphase_routing_not_found = (
+                                    r.status == 404
+                                    and self._is_routing_not_found(body_text)
+                                )
+                                response_error.enphase_invalid_charge_level = (
+                                    r.status == 500
+                                    and self._is_invalid_charge_level_error(body_text)
+                                )
                                 if _is_scheduler_charging_mode_endpoint(endpoint):
                                     code, display = _scheduler_error_context_from_text(
                                         body_text
@@ -4897,6 +4905,8 @@ class EnphaseEVClient:
                 _record_variant(idx)
                 return result
             except aiohttp.ClientResponseError as e:
+                if e.status >= 500:
+                    raise
                 # 409/422 (and similar) often indicate not plugged in or not ready.
                 # Treat these as benign no-ops instead of surfacing as errors.
                 if e.status in (409, 422):
@@ -4991,6 +5001,41 @@ class EnphaseEVClient:
             ),
         ]
 
+    @staticmethod
+    def _is_routing_not_found(message: str | None) -> bool:
+        """Return True when a 404 is a routing miss rather than action state."""
+
+        if not message:
+            return False
+        text = message.strip()
+        lower = text.lower()
+        if "no static resource" in lower:
+            return True
+        try:
+            parsed = json.loads(text)
+        except (TypeError, ValueError):
+            return False
+        if not isinstance(parsed, dict):
+            return False
+        detail_parts = [
+            parsed.get("detail"),
+            parsed.get("title"),
+            parsed.get("message"),
+            parsed.get("error"),
+        ]
+        return any(
+            isinstance(part, str) and "no static resource" in part.lower()
+            for part in detail_parts
+        )
+
+    @staticmethod
+    def _is_invalid_charge_level_error(message: str | None) -> bool:
+        """Return True when a response reports an invalid charge level."""
+
+        if not message:
+            return False
+        return "invalid charge level" in message.lower()
+
     async def stop_charging(self, sn: str) -> dict:
         """Stop charging; try multiple endpoint variants."""
         candidates = self._stop_charging_candidates(sn)
@@ -5017,10 +5062,17 @@ class EnphaseEVClient:
                 self._stop_variant_idx = idx
                 return result
             except aiohttp.ClientResponseError as e:
+                if e.status >= 500:
+                    raise
+                if e.status == 404 and (
+                    getattr(e, "enphase_routing_not_found", False)
+                    or self._is_routing_not_found(e.message)
+                ):
+                    last_exc = e
+                    continue
                 # If charger is not plugged in or already stopped, some backends
                 # respond with 400/404/409. Treat these as benign no-ops.
                 if e.status in (400, 404, 409, 422):
-                    self._stop_variant_idx = idx  # cache the working path even if no-op
                     return {"status": "not_active"}
                 last_exc = e
                 continue

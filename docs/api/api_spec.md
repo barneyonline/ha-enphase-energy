@@ -4450,6 +4450,7 @@ Fallback variants observed:
 - No body (uses last stored level)
 - The implementation caches working variants, with separate preferences for requests that should include or omit the charging level.
 - Backend `409`/`422` or parsed "not plugged" errors are normalized to `{ "status": "not_ready" }`; "already in charging state" is normalized to `{ "status": "already_charging" }`.
+- Transient backend `5xx` responses are raised immediately instead of falling through to method, path, or payload fallbacks. The EVSE runtime still retries without a charge-level payload when a `500` response explicitly reports an invalid charge level and no explicit setpoint was requested.
 
 Typical response:
 ```json
@@ -4464,7 +4465,11 @@ Fallbacks: `POST`, singular path `/ev_charger/`.
 ```json
 { "status": "accepted" }
 ```
-Implementation note: backend `400`, `404`, `409`, or `422` responses are treated as benign no-op `{ "status": "not_active" }`, and the working variant is cached.
+Implementation notes:
+- Successful responses cache the working variant.
+- Backend `400`, semantic `404`, `409`, or `422` responses are treated as benign no-op `{ "status": "not_active" }` but do not cache the variant.
+- Routing `404` responses with `No static resource` in the response text or JSON problem details are treated as route failures so fallback variants can still be tried.
+- Transient backend `5xx` responses are raised immediately instead of falling through to method or path fallbacks.
 
 ### 3.3 Trigger OCPP Message
 ```

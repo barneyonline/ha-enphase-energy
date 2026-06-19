@@ -4466,8 +4466,9 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         self._auth_refresh_suspended_until_utc = suspended_until.astimezone(_tz.utc)
         self._persist_auth_refresh_suspension_state()
         diagnostics = getattr(self, "diagnostics", None)
-        if diagnostics is not None:
-            diagnostics.create_reauth_issue()
+        clear_reauth_issue = getattr(diagnostics, "clear_reauth_issue", None)
+        if callable(clear_reauth_issue):
+            clear_reauth_issue()
 
     def _clear_auth_repair_issues_on_success(self) -> None:
         """Clear auth repairs unless auto-refresh suspension should keep reauth visible."""
@@ -4859,8 +4860,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             self.diagnostics.create_auth_block_issue()
             raise self._auth_block_update_failed()
 
-        if self._unauth_errors >= 2:
-            self.diagnostics.create_reauth_issue()
+        self.diagnostics.clear_reauth_issue()
 
         raise ConfigEntryAuthFailed
 

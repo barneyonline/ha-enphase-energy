@@ -2235,18 +2235,13 @@ async def test_handle_client_unauthorized_failure(monkeypatch, hass):
     with pytest.raises(ConfigEntryAuthFailed):
         await coord._handle_client_unauthorized()
 
-    assert deleted == ["too_many_active_sessions"]
+    assert deleted == [
+        "reauth_required",
+        "auth_blocked",
+        "too_many_active_sessions",
+    ]
     assert coord._unauth_errors >= 2
-    issue_id, payload = created[-1]
-    assert issue_id == "reauth_required"
-    placeholders = payload["translation_placeholders"]
-    assert placeholders["site_id"] == coord.site_id
-    assert placeholders["site_name"] == "Garage Site"
-    assert placeholders["last_status"] == "401"
-    assert placeholders["last_error"] == "unauthorized"
-    metrics = payload["data"]["site_metrics"]
-    assert metrics["site_name"] == "Garage Site"
-    assert metrics["last_error"] == "unauthorized"
+    assert created == []
 
 
 @pytest.mark.asyncio

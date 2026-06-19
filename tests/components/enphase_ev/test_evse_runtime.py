@@ -492,6 +492,42 @@ async def test_evse_runtime_start_charging_invalid_level_falls_back_and_caches(
 
 
 @pytest.mark.asyncio
+async def test_evse_runtime_start_charging_invalid_level_flag_falls_back(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(serials=["EV1"])
+    runtime = coord.evse_runtime
+    coord.data = {"EV1": {"plugged": True, "charge_mode_pref": "MANUAL_CHARGING"}}
+    coord.pick_start_amps = MagicMock(return_value=28)
+    coord.set_last_set_amps = MagicMock()
+    coord.set_desired_charging = MagicMock()
+    coord.set_charging_expectation = MagicMock()
+    coord.kick_fast = MagicMock()
+    coord.async_start_streaming = AsyncMock()
+    coord.async_request_refresh = AsyncMock()
+    coord.require_plugged = MagicMock()
+    invalid_level_error = _client_response_error(
+        500,
+        message="HTTP error from Enphase endpoint (status=500, body_length=61)",
+    )
+    invalid_level_error.enphase_invalid_charge_level = True
+    coord.client.start_charging = AsyncMock(
+        side_effect=[invalid_level_error, {"status": "ok"}]
+    )
+
+    await runtime.async_start_charging("EV1")
+
+    assert coord.client.start_charging.await_args_list[1] == call(
+        "EV1",
+        28,
+        1,
+        include_level=False,
+        strict_preference=True,
+    )
+    assert coord._start_without_level_fallback == {"EV1": True}  # noqa: SLF001
+
+
+@pytest.mark.asyncio
 async def test_evse_runtime_start_charging_uses_cached_no_level_fallback(
     coordinator_factory,
 ) -> None:

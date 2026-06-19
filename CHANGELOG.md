@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 - Fixed Heat Pump power smoothing so offline/error HEMS states no longer carry forward stale running power estimates. (#715)
+- Fixed IQ EV Charger start and stop charging requests so transient Enphase service errors are not masked by legacy endpoint fallbacks, preventing Home Assistant from reporting a successful stop while charging continues. (#717)
+- Fixed duplicate reauthentication repair issues by relying on Home Assistant's native config-entry repair and clearing stale Enphase reauth repairs.
 
 ### 🔧 Improvements
 - None

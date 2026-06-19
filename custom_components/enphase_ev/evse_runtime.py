@@ -716,7 +716,10 @@ class EvseRuntime:
                 and include_level is True
                 and not strict_preference
                 and err.status == 500
-                and "invalid charge level" in str(err.message or "").lower()
+                and (
+                    getattr(err, "enphase_invalid_charge_level", False)
+                    or "invalid charge level" in str(err.message or "").lower()
+                )
             ):
                 # Some chargers reject starts with a charge level when no explicit
                 # setpoint was requested, but accept the same command without it.
