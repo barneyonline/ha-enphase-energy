@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Negalima pradėti įkrauti, nes {name} reikalauja autentifikavimo naudojant „Enphase“ programą arba RFID."
     },
+    "start_charging_rejected": {
+      "message": "„Enphase“ atmetė įkrovimo paleidimą (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "Šioje svetainėje tinklelio valdymas nepasiekiamas."
     },

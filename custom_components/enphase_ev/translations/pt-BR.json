@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Não é possível iniciar a cobrança porque {name} requer autenticação por meio do aplicativo Enphase ou RFID."
     },
+    "start_charging_rejected": {
+      "message": "O início da carga foi rejeitado pela Enphase (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "O controle de grade não está disponível para este site."
     },

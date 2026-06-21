@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Kan ikke starte opladningen, fordi {name} kræver godkendelse via Enphase-appen eller RFID."
     },
+    "start_charging_rejected": {
+      "message": "Start af opladning blev afvist af Enphase (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "Gitterstyring er ikke tilgængelig for dette websted."
     },

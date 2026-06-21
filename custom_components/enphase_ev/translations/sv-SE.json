@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Det går inte att börja ladda eftersom {name} kräver autentisering via Enphase-appen eller RFID."
     },
+    "start_charging_rejected": {
+      "message": "Start av laddning avvisades av Enphase (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "Nätstyrning är inte tillgänglig för den här anläggningen."
     },

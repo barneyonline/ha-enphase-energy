@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Fixed IQ EV Charger start charging controls so repeated start requests while already charging do not surface Enphase endpoint 404 errors in Home Assistant, while explicit amp updates still reach Enphase.
 
 ### 🔧 Improvements
 - None

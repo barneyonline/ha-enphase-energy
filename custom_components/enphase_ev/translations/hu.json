@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "A töltés nem indítható el, mert a {name} hitelesítést igényel az Enphase alkalmazáson vagy az RFID-n keresztül."
     },
+    "start_charging_rejected": {
+      "message": "Az Enphase elutasította a töltés indítását (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "A rácsvezérlés nem érhető el ezen a webhelyen."
     },

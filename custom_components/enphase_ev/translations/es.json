@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "No se puede comenzar a cargar porque {name} requiere autenticación a través de la aplicación Enphase o RFID."
     },
+    "start_charging_rejected": {
+      "message": "Enphase rechazó el inicio de la carga (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "El control de red no está disponible para este sitio."
     },

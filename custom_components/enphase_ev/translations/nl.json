@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Kan niet beginnen met opladen omdat {name} authenticatie via de Enphase-app of RFID vereist."
     },
+    "start_charging_rejected": {
+      "message": "Het starten van laden is geweigerd door Enphase (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "Netbeheer is niet beschikbaar voor deze site."
     },

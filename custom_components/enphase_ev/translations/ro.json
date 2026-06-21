@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Nu se poate începe încărcarea deoarece {name} necesită autentificare prin aplicația Enphase sau RFID."
     },
+    "start_charging_rejected": {
+      "message": "Pornirea încărcării a fost respinsă de Enphase (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "Controlul rețelei nu este disponibil pentru acest site."
     },
