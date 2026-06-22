@@ -1,7 +1,7 @@
 # Service Status History
 
 - Current status: **Fully Operational**
-- Last updated: `2026-06-21 23:11 UTC`
+- Last updated: `2026-06-22 02:01 UTC`
 - Failed checks in latest run: `1`
 - Latest failed checks: battery_config
 - Retained hourly samples: `261`
@@ -16,8 +16,8 @@ gantt
     title Enphase Service Status Incident Timeline (Last 30 Days)
     dateFormat  YYYY-MM-DDTHH:mm:ss
     axisFormat  %b %d
-    Window start :vert, window-start, 2026-05-22T23:11:31, 0ms
-    Window end :vert, window-end, 2026-06-21T23:11:31, 0ms
+    Window start :vert, window-start, 2026-05-23T02:01:22, 0ms
+    Window end :vert, window-end, 2026-06-22T02:01:22, 0ms
     section Down
     Down 1 (2026-05-24 1757 UTC) :crit, down-1, 2026-05-24T17:57:41, 86m
     Down 2 (2026-05-26 2144 UTC) :crit, down-2, 2026-05-26T21:44:11, 85m
