@@ -643,6 +643,14 @@ class EvseRuntime:
             data = (coord.data or {}).get(sn_str, {})
         except Exception:
             data = {}
+        if requested_amps is None and evse_power_is_actively_charging(
+            data.get("connector_status"),
+            data.get("charging"),
+            suspended_by_evse=data.get("suspended_by_evse", False),
+        ):
+            coord.set_desired_charging(sn_str, True)
+            coord.set_charging_expectation(sn_str, True, hold_for=hold_seconds)
+            return {"status": "already_charging"}
         if data.get("auth_required") is True:
             display = data.get("display_name") or data.get("name") or sn_str
             _LOGGER.warning(
@@ -735,6 +743,13 @@ class EvseRuntime:
                     coord._start_without_level_fallback = fallback_cache
                 fallback_cache[sn_str] = True
                 return result
+            if 400 <= err.status < 500:
+                raise ServiceValidationError(
+                    f"Start charging was rejected by Enphase (HTTP {err.status}).",
+                    translation_domain=DOMAIN,
+                    translation_key="start_charging_rejected",
+                    translation_placeholders={"status": str(err.status)},
+                ) from err
             raise
         if include_level is True and prefs.include_level is True:
             if isinstance(fallback_cache, dict):

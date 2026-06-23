@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Nevar sākt uzlādi, jo {name} nepieciešama autentifikācija, izmantojot lietotni Enphase vai RFID."
     },
+    "start_charging_rejected": {
+      "message": "Enphase noraidīja uzlādes sākšanu (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "Režģa vadība šai vietnei nav pieejama."
     },

@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Der Ladevorgang kann nicht gestartet werden, da {name} eine Authentifizierung über die Enphase-App oder RFID erfordert."
     },
+    "start_charging_rejected": {
+      "message": "Ladestart wurde von Enphase abgelehnt (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "Die Rastersteuerung ist für diese Site nicht verfügbar."
     },

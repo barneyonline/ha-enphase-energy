@@ -448,6 +448,76 @@ async def test_evse_runtime_start_stop_and_auto_resume_use_coordinator_hooks(
 
 
 @pytest.mark.asyncio
+async def test_evse_runtime_start_charging_noops_when_already_charging(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(serials=["EV1"])
+    runtime = coord.evse_runtime
+    coord.data = {
+        "EV1": {
+            "plugged": True,
+            "connector_status": "CHARGING",
+            "charging": True,
+            "charge_mode_pref": "MANUAL_CHARGING",
+        }
+    }
+    coord.require_plugged = MagicMock()
+    coord.pick_start_amps = MagicMock(return_value=28)
+    coord.set_desired_charging = MagicMock()
+    coord.set_charging_expectation = MagicMock()
+    coord.client.start_charging = AsyncMock()
+
+    result = await runtime.async_start_charging("EV1")
+
+    assert result == {"status": "already_charging"}
+    coord.require_plugged.assert_called_once_with("EV1")
+    coord.client.start_charging.assert_not_awaited()
+    coord.pick_start_amps.assert_not_called()
+    coord.set_desired_charging.assert_called_once_with("EV1", True)
+    coord.set_charging_expectation.assert_called_once_with(
+        "EV1",
+        True,
+        hold_for=90.0,
+    )
+
+
+@pytest.mark.asyncio
+async def test_evse_runtime_start_charging_sends_explicit_amps_when_already_charging(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(serials=["EV1"])
+    runtime = coord.evse_runtime
+    coord.data = {
+        "EV1": {
+            "plugged": True,
+            "connector_status": "CHARGING",
+            "charging": True,
+            "charge_mode_pref": "MANUAL_CHARGING",
+        }
+    }
+    coord.require_plugged = MagicMock()
+    coord.pick_start_amps = MagicMock(return_value=24)
+    coord.set_last_set_amps = MagicMock()
+    coord.set_desired_charging = MagicMock()
+    coord.set_charging_expectation = MagicMock()
+    coord.kick_fast = MagicMock()
+    coord.async_start_streaming = AsyncMock()
+    coord.async_request_refresh = AsyncMock()
+    coord.client.start_charging = AsyncMock(return_value={"status": "ok"})
+
+    await runtime.async_start_charging("EV1", requested_amps=24)
+
+    coord.client.start_charging.assert_awaited_once_with(
+        "EV1",
+        24,
+        1,
+        include_level=True,
+        strict_preference=True,
+    )
+    coord.set_last_set_amps.assert_called_once_with("EV1", 24)
+
+
+@pytest.mark.asyncio
 async def test_evse_runtime_start_charging_invalid_level_falls_back_and_caches(
     coordinator_factory,
 ) -> None:
@@ -606,6 +676,36 @@ async def test_evse_runtime_start_charging_reraises_non_fallback_errors(
     with pytest.raises(aiohttp.ClientResponseError):
         await runtime.async_start_charging("EV1")
 
+    coord.client.start_charging.assert_awaited_once_with(
+        "EV1",
+        28,
+        1,
+        include_level=True,
+        strict_preference=False,
+    )
+
+
+@pytest.mark.asyncio
+async def test_evse_runtime_start_charging_maps_client_errors_to_validation(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(serials=["EV1"])
+    runtime = coord.evse_runtime
+    coord.data = {"EV1": {"plugged": True, "charge_mode_pref": "MANUAL_CHARGING"}}
+    coord.pick_start_amps = MagicMock(return_value=28)
+    coord.require_plugged = MagicMock()
+    coord.client.start_charging = AsyncMock(
+        side_effect=_client_response_error(
+            404,
+            message="HTTP error from Enphase endpoint (status=404)",
+        )
+    )
+
+    with pytest.raises(ServiceValidationError) as err:
+        await runtime.async_start_charging("EV1")
+
+    assert err.value.translation_key == "start_charging_rejected"
+    assert err.value.translation_placeholders == {"status": "404"}
     coord.client.start_charging.assert_awaited_once_with(
         "EV1",
         28,

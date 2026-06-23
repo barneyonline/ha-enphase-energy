@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Зареждането не може да започне, защото {name} изисква удостоверяване чрез приложението Enphase или RFID."
     },
+    "start_charging_rejected": {
+      "message": "Стартирането на зареждането беше отхвърлено от Enphase (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "Контролът на мрежата не е наличен за този сайт."
     },

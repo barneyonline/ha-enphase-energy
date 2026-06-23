@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Δεν είναι δυνατή η έναρξη της φόρτισης επειδή το {name} απαιτεί έλεγχο ταυτότητας μέσω της εφαρμογής Enphase ή RFID."
     },
+    "start_charging_rejected": {
+      "message": "Η έναρξη φόρτισης απορρίφθηκε από την Enphase (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "Ο έλεγχος πλέγματος δεν είναι διαθέσιμος για αυτόν τον ιστότοπο."
     },

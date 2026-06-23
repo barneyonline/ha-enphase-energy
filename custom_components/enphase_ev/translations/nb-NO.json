@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Kan ikke starte ladingen fordi {name} krever autentisering via Enphase-appen eller RFID."
     },
+    "start_charging_rejected": {
+      "message": "Start av lading ble avvist av Enphase (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "Rutenettkontroll er utilgjengelig for dette nettstedet."
     },

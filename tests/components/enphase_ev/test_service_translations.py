@@ -629,6 +629,7 @@ def test_externalized_i18n_strings_localized_for_non_english_locales() -> None:
     )
     en_data = json.loads((translations_dir / "en.json").read_text(encoding="utf-8"))
     paths = [
+        "exceptions.start_charging_rejected.message",
         "exceptions.firmware_advisory_only.message",
         "entity.sensor.dry_contacts.name",
     ]
@@ -680,6 +681,7 @@ def test_translated_user_facing_errors_require_translation_keys() -> None:
     audited_files = [
         "ac_battery_runtime.py",
         "battery_runtime.py",
+        "evse_runtime.py",
         "select.py",
         "services.py",
         "switch.py",

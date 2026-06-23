@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Cannot start charging because {name} requires authentication via the Enphase app or RFID."
     },
+    "start_charging_rejected": {
+      "message": "Start charging was rejected by Enphase (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "Grid control is unavailable for this site."
     },

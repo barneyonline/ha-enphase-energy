@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Nabíjení nelze zahájit, protože {name} vyžaduje ověření prostřednictvím aplikace Enphase nebo RFID."
     },
+    "start_charging_rejected": {
+      "message": "Spuštění nabíjení bylo službou Enphase odmítnuto (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "Ovládání mřížky není pro tento web k dispozici."
     },

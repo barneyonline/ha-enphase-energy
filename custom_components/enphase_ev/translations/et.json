@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Laadimist ei saa alustada, kuna {name} nõuab autentimist rakenduse Enphase või RFID kaudu."
     },
+    "start_charging_rejected": {
+      "message": "Enphase lükkas laadimise alustamise tagasi (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "Võrgu juhtimine pole sellel saidil saadaval."
     },

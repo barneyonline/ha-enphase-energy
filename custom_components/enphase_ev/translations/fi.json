@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Lataus ei onnistu, koska {name} vaatii todennuksen Enphase-sovelluksen tai RFID:n kautta."
     },
+    "start_charging_rejected": {
+      "message": "Enphase hylkäsi latauksen käynnistyksen (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "Verkkoohjaus ei ole käytettävissä tälle sivustolle."
     },

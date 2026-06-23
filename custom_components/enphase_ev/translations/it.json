@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Impossibile avviare la ricarica perché {name} richiede l'autenticazione tramite l'app Enphase o RFID."
     },
+    "start_charging_rejected": {
+      "message": "L'avvio della ricarica è stato rifiutato da Enphase (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "Il controllo della griglia non è disponibile per questo sito."
     },

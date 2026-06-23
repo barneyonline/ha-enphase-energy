@@ -88,6 +88,9 @@
     "auth_required": {
       "message": "Nie można rozpocząć ładowania, ponieważ {name} wymaga uwierzytelnienia za pomocą aplikacji Enphase lub RFID."
     },
+    "start_charging_rejected": {
+      "message": "Uruchomienie ładowania zostało odrzucone przez Enphase (HTTP {status})."
+    },
     "grid_control_unavailable": {
       "message": "Sterowanie siecią jest niedostępne dla tej witryny."
     },
