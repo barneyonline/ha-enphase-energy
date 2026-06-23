@@ -3,7 +3,7 @@
 # pytest-homeassistant-custom-component pins exact Home Assistant patch releases.
 # Install that package with --no-deps in the workflow so this file can keep the
 # advertised integration minimum pinned to Home Assistant 2026.3.0.
-homeassistant==2026.3.0
+homeassistant==2026.6.0
 aiohttp
 async-timeout
 voluptuous
