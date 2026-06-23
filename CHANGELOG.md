@@ -17,7 +17,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔄 Other changes
-- None
+- Raised the minimum supported Home Assistant version to `2026.6.0`.
 
 ## v3.1.6 - 2026-06-19
 

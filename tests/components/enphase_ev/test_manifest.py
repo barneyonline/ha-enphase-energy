@@ -1,7 +1,7 @@
 import json
 import pathlib
 
-MIN_HOME_ASSISTANT_VERSION = "2026.3.0"
+MIN_HOME_ASSISTANT_VERSION = "2026.6.0"
 
 
 def test_manifest_keys_present():
