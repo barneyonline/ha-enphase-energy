@@ -1,4 +1,4 @@
-homeassistant>=2026.3.0
+homeassistant>=2026.6.0
 pytest
 pytest-asyncio
 pytest-homeassistant-custom-component

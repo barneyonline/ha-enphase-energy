@@ -162,8 +162,8 @@ jobs:
           # and install the plugin without dependencies for this minimum test path.
           python -m pip install --upgrade pip
           pip install --upgrade -r devtools/docker/requirements-min-ha.txt
-          pip install --no-deps "pytest-homeassistant-custom-component==0.13.317"
-          python -c "from homeassistant.const import __version__; assert __version__ == '2026.3.0', __version__; print(f'Home Assistant {__version__}')"
+          pip install --no-deps "pytest-homeassistant-custom-component==0.13.340"
+          python -c "from homeassistant.const import __version__; assert __version__ == '2026.6.0', __version__; print(f'Home Assistant {__version__}')"
       - name: Run minimum Home Assistant tests
         run: >
           pytest -q
