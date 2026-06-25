@@ -11,13 +11,32 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- Fixed IQ EV Charger start charging controls so repeated start requests while already charging do not surface Enphase endpoint 404 errors in Home Assistant, while explicit amp updates still reach Enphase.
+- None
 
 ### 🔧 Improvements
 - None
 
 ### 🔄 Other changes
-- Raised the minimum supported Home Assistant version to `2026.6.0`.
+- None
+
+## v3.1.8 - 2026-06-25
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Fixed IQ EV Charger start charging controls so repeated start requests while already charging do not surface Enphase endpoint 404 errors in Home Assistant, while explicit amp updates still reach Enphase. (#720)
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Bumped GitHub Actions checkout from `6` to `7`. (#721)
+- Raised the minimum supported Home Assistant version to `2026.6.0`. (#723)
+- Bumped the integration manifest version to `3.1.8`.
 
 ## v3.1.6 - 2026-06-19
 
