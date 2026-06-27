@@ -144,11 +144,15 @@ class _EVBoolSensor(EnphaseBaseEntity, BinarySensorEntity):
 
 
 class PluggedInBinarySensor(_EVBoolSensor):
+    _attr_device_class = BinarySensorDeviceClass.PLUG
+
     def __init__(self, coord: EnphaseCoordinator, sn: str):
         super().__init__(coord, sn, "plugged", "plugged_in")
 
 
 class ChargingBinarySensor(_EVBoolSensor):
+    _attr_device_class = BinarySensorDeviceClass.BATTERY_CHARGING
+
     def __init__(self, coord: EnphaseCoordinator, sn: str):
         super().__init__(coord, sn, "charging", "charging")
 
