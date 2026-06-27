@@ -945,6 +945,7 @@ async def test_schedule_sync_remove_all_helpers_filters_registry_entries(
         device_id=None,
         area_id=None,
         labels=set(),
+        disabled_by=None,
     )
     ent_reg.entities["switch.other_platform"] = SimpleNamespace(
         id="switch.other_platform",
@@ -956,6 +957,7 @@ async def test_schedule_sync_remove_all_helpers_filters_registry_entries(
         device_id=None,
         area_id=None,
         labels=set(),
+        disabled_by=None,
     )
     ent_reg.entities["switch.bad_unique"] = SimpleNamespace(
         id="switch.bad_unique",
@@ -967,6 +969,7 @@ async def test_schedule_sync_remove_all_helpers_filters_registry_entries(
         device_id=None,
         area_id=None,
         labels=set(),
+        disabled_by=None,
     )
     ent_reg.entities["switch.mismatch_entry"] = SimpleNamespace(
         id="switch.mismatch_entry",
@@ -978,6 +981,7 @@ async def test_schedule_sync_remove_all_helpers_filters_registry_entries(
         device_id=None,
         area_id=None,
         labels=set(),
+        disabled_by=None,
     )
     ent_reg.entities["switch.parse_fail"] = SimpleNamespace(
         id="switch.parse_fail",
@@ -989,6 +993,7 @@ async def test_schedule_sync_remove_all_helpers_filters_registry_entries(
         device_id=None,
         area_id=None,
         labels=set(),
+        disabled_by=None,
     )
     ent_reg.entities["switch.unknown_serial"] = SimpleNamespace(
         id="switch.unknown_serial",
@@ -1000,6 +1005,7 @@ async def test_schedule_sync_remove_all_helpers_filters_registry_entries(
         device_id=None,
         area_id=None,
         labels=set(),
+        disabled_by=None,
     )
     ent_reg.entities["schedule.bad_unique"] = SimpleNamespace(
         id="schedule.bad_unique",
@@ -1011,6 +1017,7 @@ async def test_schedule_sync_remove_all_helpers_filters_registry_entries(
         device_id=None,
         area_id=None,
         labels=set(),
+        disabled_by=None,
     )
     ent_reg.entities["schedule.mismatch_entry"] = SimpleNamespace(
         id="schedule.mismatch_entry",
@@ -1022,6 +1029,7 @@ async def test_schedule_sync_remove_all_helpers_filters_registry_entries(
         device_id=None,
         area_id=None,
         labels=set(),
+        disabled_by=None,
     )
 
     await sync._remove_all_helpers()

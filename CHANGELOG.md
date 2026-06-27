@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔧 Improvements
-- None
+- Added semantic device classes to IQ EV Charger plugged-in and charging binary sensors so Home Assistant automation triggers and conditions can recognize their purpose.
 
 ### 🔄 Other changes
 - None

@@ -736,8 +736,10 @@ def test_ev_bool_sensors_reflect_coordinator_state(
 
     plugged = PluggedInBinarySensor(coord, RANDOM_SERIAL)
     assert plugged.is_on is False
+    assert plugged.device_class == BinarySensorDeviceClass.PLUG
 
     charging = ChargingBinarySensor(coord, RANDOM_SERIAL)
+    assert charging.device_class == BinarySensorDeviceClass.BATTERY_CHARGING
     assert charging.icon == "mdi:flash"
 
     coord.data[RANDOM_SERIAL]["charging"] = 0
