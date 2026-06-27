@@ -1,6 +1,8 @@
 import json
 import pathlib
 
+import yaml
+
 MIN_HOME_ASSISTANT_VERSION = "2026.6.0"
 
 
@@ -66,3 +68,16 @@ def test_development_requirements_cover_minimum_homeassistant_version():
     assert hacs.get("homeassistant") == MIN_HOME_ASSISTANT_VERSION
     assert f"homeassistant>={MIN_HOME_ASSISTANT_VERSION}" in requirements_dev
     assert f"homeassistant=={MIN_HOME_ASSISTANT_VERSION}" in requirements_min_ha
+
+
+def test_service_actions_have_icons():
+    root = pathlib.Path(__file__).resolve().parents[3]
+    integration_dir = root / "custom_components" / "enphase_ev"
+
+    services = yaml.safe_load((integration_dir / "services.yaml").read_text())
+    icons = json.loads((integration_dir / "icons.json").read_text())
+
+    service_icons = icons.get("services", {})
+    assert set(service_icons) == set(services)
+    for service, icon_data in service_icons.items():
+        assert icon_data["service"].startswith("mdi:"), service
