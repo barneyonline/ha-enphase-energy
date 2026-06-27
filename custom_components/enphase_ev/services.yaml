@@ -1,7 +1,5 @@
 
 start_charging:
-  name: Start Charging
-  description: Start charging on the Enphase Energy charger
   target:
     entity:
       integration: enphase_ev
@@ -26,15 +24,12 @@ start_charging:
               step: 1
 
 stop_charging:
-  name: Stop Charging
-  description: Stop charging on the Enphase Energy charger
   target:
     entity:
       integration: enphase_ev
       domain: button
 
 trigger_message:
-  name: Trigger OCPP Message
   target:
     entity:
       integration: enphase_ev
@@ -56,8 +51,6 @@ trigger_message:
       collapsed: true
       fields:
         confirm_advanced:
-          name: Confirm Advanced Trigger
-          description: Required for advanced OCPP trigger messages that may prompt charger diagnostics, firmware, or boot notifications.
           required: false
           selector:
             boolean:
@@ -70,8 +63,6 @@ trigger_message:
           example: "1234567"
 
 clear_reauth_issue:
-  name: Clear Reauth Issue
-  description: Manually clear the integration's reauthentication issue notification
   target:
     entity:
       integration: enphase_ev
@@ -91,8 +82,6 @@ clear_reauth_issue:
       example: "1234567"
 
 try_reauth_now:
-  name: Try Reauth Now
-  description: Use stored credentials to try Enphase reauthentication immediately
   target:
     entity:
       integration: enphase_ev
@@ -112,8 +101,6 @@ try_reauth_now:
       example: "1234567"
 
 clear_hems_auth_backoff:
-  name: Clear HEMS Auth Backoff
-  description: Clear the temporary HEMS/Heat Pump auth backoff without performing password login
   target:
     entity:
       integration: enphase_ev
@@ -132,8 +119,6 @@ clear_hems_auth_backoff:
           multiline: false
       example: "1234567"
 start_live_stream:
-  name: Start Live Stream
-  description: Request faster cloud status updates for a short period
   target:
     entity:
       integration: enphase_ev
@@ -149,8 +134,6 @@ start_live_stream:
           example: "1234567"
 
 stop_live_stream:
-  name: Stop Live Stream
-  description: Stop the cloud live stream request
   target:
     entity:
       integration: enphase_ev
@@ -166,8 +149,6 @@ stop_live_stream:
           example: "1234567"
 
 sync_schedules:
-  name: Sync Schedules
-  description: Refresh Enphase schedules from the cloud
   fields:
     device_id:
       required: false
@@ -177,8 +158,6 @@ sync_schedules:
           multiple: true
 
 force_refresh:
-  name: Force Refresh
-  description: Refresh battery schedule data from the Enphase cloud immediately
   target:
     entity:
       integration: enphase_ev
@@ -199,8 +178,6 @@ force_refresh:
               multiline: false
 
 update_tariff:
-  name: Update Tariff
-  description: Update Enphase billing-cycle details, guided tariff structures, and one or more existing import or export tariff rate values.
   target:
     entity:
       integration: enphase_ev
@@ -504,8 +481,6 @@ update_tariff:
               multiline: false
 
 add_schedule:
-  name: Add Battery Schedule
-  description: Create a battery schedule for CFG, DTG, or RBD
   target:
     entity:
       integration: enphase_ev
@@ -570,8 +545,6 @@ add_schedule:
               multiline: false
 
 update_schedule:
-  name: Update Battery Schedule
-  description: Update a battery schedule by schedule ID
   target:
     entity:
       integration: enphase_ev
@@ -645,8 +618,6 @@ update_schedule:
               multiline: false
 
 delete_schedule:
-  name: Delete Battery Schedule
-  description: Delete one or more battery schedules by schedule ID
   target:
     entity:
       integration: enphase_ev
@@ -682,8 +653,6 @@ delete_schedule:
               multiline: false
 
 validate_schedule:
-  name: Validate Battery Schedule
-  description: Validate battery schedule permissions and return the Enphase API response
   target:
     entity:
       integration: enphase_ev
@@ -712,8 +681,6 @@ validate_schedule:
               multiline: false
 
 request_grid_toggle_otp:
-  name: Request Grid Toggle OTP
-  description: Send a one-time code required for changing site grid mode.
   target:
     entity:
       integration: enphase_ev
@@ -729,8 +696,6 @@ request_grid_toggle_otp:
           example: "1234567"
 
 set_grid_mode:
-  name: Set Grid Mode
-  description: Change site grid mode using a one-time code.
   target:
     entity:
       integration: enphase_ev
@@ -758,32 +723,19 @@ set_grid_mode:
           example: "1234567"
 
 update_cfg_schedule:
-  name: Update CFG Schedule
-  description: >
-    Update the charge-from-grid schedule start time, end time, and/or
-    charge limit in a single atomic operation.  Only one API call is
-    made to the Enphase cloud, avoiding multiple pending-sync cycles.
-    At least one of start_time, end_time, or limit must be provided;
-    omitted values are preserved from the current schedule.
   target:
     entity:
       integration: enphase_ev
   fields:
     start_time:
-      name: Start Time
-      description: CFG schedule start time (HH:MM:SS).
       required: false
       selector:
         time:
     end_time:
-      name: End Time
-      description: CFG schedule end time (HH:MM:SS).
       required: false
       selector:
         time:
     limit:
-      name: Charge Limit
-      description: Maximum battery state of charge (%).
       required: false
       selector:
         number:
@@ -795,8 +747,6 @@ update_cfg_schedule:
       collapsed: true
       fields:
         site_id:
-          name: Site ID
-          description: Enphase site ID (optional, resolved from device target).
           required: false
           selector:
             text:

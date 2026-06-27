@@ -5,6 +5,10 @@ import json
 import pathlib
 import re
 
+import yaml
+
+ROOT = pathlib.Path(__file__).resolve().parents[3] / "custom_components" / "enphase_ev"
+
 
 def test_clear_reauth_issue_device_field_translated() -> None:
     """Ensure device selector metadata is translated for all locales."""
@@ -22,6 +26,36 @@ def test_clear_reauth_issue_device_field_translated() -> None:
         entry = fields["device_id"]
         assert entry.get("name"), f"{lang} device_id name empty"
         assert entry.get("description"), f"{lang} device_id description empty"
+
+
+def test_service_display_text_lives_in_translations() -> None:
+    """Ensure service action display text follows Home Assistant translation docs."""
+
+    services = yaml.safe_load((ROOT / "services.yaml").read_text(encoding="utf-8"))
+    strings = json.loads((ROOT / "strings.json").read_text(encoding="utf-8"))
+
+    for service_key, service_data in services.items():
+        assert "name" not in service_data, service_key
+        assert "description" not in service_data, service_key
+        service_strings = strings["services"][service_key]
+        assert service_strings["name"].strip(), service_key
+        assert service_strings["description"].strip(), service_key
+
+        for field_key, field_data in service_data.get("fields", {}).items():
+            if "fields" in field_data:
+                section_strings = service_strings["sections"][field_key]
+                assert section_strings["name"].strip(), f"{service_key}.{field_key}"
+                nested_fields = field_data["fields"]
+            else:
+                nested_fields = {field_key: field_data}
+            for nested_key, nested_data in nested_fields.items():
+                assert "name" not in nested_data, f"{service_key}.{nested_key}"
+                assert "description" not in nested_data, f"{service_key}.{nested_key}"
+                field_strings = service_strings["fields"][nested_key]
+                assert field_strings["name"].strip(), f"{service_key}.{nested_key}"
+                assert field_strings[
+                    "description"
+                ].strip(), f"{service_key}.{nested_key}"
 
 
 def test_try_reauth_now_strings_exist_for_all_locales() -> None:

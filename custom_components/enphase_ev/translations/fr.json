@@ -2425,6 +2425,11 @@
           "name": "ID du site",
           "description": "ID de site Enphase (facultatif ; résolu à partir de l'appareil cible)."
         }
+      },
+      "sections": {
+        "advanced": {
+          "name": "Options avancées"
+        }
       }
     },
     "force_refresh": {
@@ -2727,6 +2732,11 @@
         "device_id": {
           "name": "Appareil",
           "description": "Appareil Enphase facultatif pour choisir le site des mises à jour de facturation ou de structure tarifaire."
+        }
+      },
+      "sections": {
+        "advanced": {
+          "name": "Options avancées"
         }
       }
     },

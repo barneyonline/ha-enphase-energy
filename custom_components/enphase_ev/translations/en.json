@@ -2425,6 +2425,11 @@
           "name": "Site ID",
           "description": "Enphase site ID (optional, resolved from device target)."
         }
+      },
+      "sections": {
+        "advanced": {
+          "name": "Advanced options"
+        }
       }
     },
     "force_refresh": {
@@ -2727,6 +2732,11 @@
         "device_id": {
           "name": "Device",
           "description": "Optional Enphase device to choose the site for billing or structural tariff updates."
+        }
+      },
+      "sections": {
+        "advanced": {
+          "name": "Advanced options"
         }
       }
     },

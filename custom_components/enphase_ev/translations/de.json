@@ -2425,6 +2425,11 @@
           "name": "Standort-ID",
           "description": "Enphase-Standort-ID (optional; wird aus dem Zielgerät ermittelt)."
         }
+      },
+      "sections": {
+        "advanced": {
+          "name": "Erweiterte Optionen"
+        }
       }
     },
     "force_refresh": {
@@ -2727,6 +2732,11 @@
         "device_id": {
           "name": "Gerät",
           "description": "Optionales Enphase-Gerät zur Auswahl des Standorts für Abrechnungs- oder Tarifstruktur-Updates."
+        }
+      },
+      "sections": {
+        "advanced": {
+          "name": "Erweiterte Optionen"
         }
       }
     },
