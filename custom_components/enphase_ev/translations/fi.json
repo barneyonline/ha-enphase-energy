@@ -2425,6 +2425,11 @@
           "name": "Sivuston tunnus",
           "description": "Enphase-sivuston tunnus (valinnainen; päätellään kohdelaitteesta)."
         }
+      },
+      "sections": {
+        "advanced": {
+          "name": "Lisäasetukset"
+        }
       }
     },
     "force_refresh": {
@@ -2727,6 +2732,11 @@
         "device_id": {
           "name": "Enphase-enhed",
           "description": "Valgfri Enphase-enhed til at vælge stedet for fakturerings- eller tarifstrukturændringer."
+        }
+      },
+      "sections": {
+        "advanced": {
+          "name": "Lisäasetukset"
         }
       }
     },

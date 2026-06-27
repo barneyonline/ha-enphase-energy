@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🔧 Improvements
 - Added semantic device classes to IQ EV Charger plugged-in and charging binary sensors so Home Assistant automation triggers and conditions can recognize their purpose.
+- Moved service action display text fully into Home Assistant translations.
 - Added Home Assistant service action icons for Enphase actions in automation and script editors.
 
 ### 🔄 Other changes

@@ -2425,6 +2425,11 @@
           "name": "ID del sitio",
           "description": "ID del sitio de Enphase (opcional; se resuelve desde el dispositivo de destino)."
         }
+      },
+      "sections": {
+        "advanced": {
+          "name": "Opciones avanzadas"
+        }
       }
     },
     "force_refresh": {
@@ -2727,6 +2732,11 @@
         "device_id": {
           "name": "Dispositivo",
           "description": "Dispositivo Enphase opcional para elegir el sitio de las actualizaciones de facturación o estructura tarifaria."
+        }
+      },
+      "sections": {
+        "advanced": {
+          "name": "Opciones avanzadas"
         }
       }
     },
