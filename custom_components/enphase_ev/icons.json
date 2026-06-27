@@ -1,4 +1,60 @@
 {
+  "services": {
+    "add_schedule": {
+      "service": "mdi:calendar-plus"
+    },
+    "clear_hems_auth_backoff": {
+      "service": "mdi:lock-open"
+    },
+    "clear_reauth_issue": {
+      "service": "mdi:account-check"
+    },
+    "delete_schedule": {
+      "service": "mdi:calendar-remove"
+    },
+    "force_refresh": {
+      "service": "mdi:refresh"
+    },
+    "request_grid_toggle_otp": {
+      "service": "mdi:message-lock"
+    },
+    "set_grid_mode": {
+      "service": "mdi:transmission-tower"
+    },
+    "start_charging": {
+      "service": "mdi:play"
+    },
+    "start_live_stream": {
+      "service": "mdi:cloud-sync"
+    },
+    "stop_charging": {
+      "service": "mdi:stop"
+    },
+    "stop_live_stream": {
+      "service": "mdi:cloud-off-outline"
+    },
+    "sync_schedules": {
+      "service": "mdi:calendar-sync"
+    },
+    "trigger_message": {
+      "service": "mdi:message-text"
+    },
+    "try_reauth_now": {
+      "service": "mdi:account-key"
+    },
+    "update_cfg_schedule": {
+      "service": "mdi:calendar-edit"
+    },
+    "update_schedule": {
+      "service": "mdi:calendar-edit"
+    },
+    "update_tariff": {
+      "service": "mdi:cash-multiple"
+    },
+    "validate_schedule": {
+      "service": "mdi:calendar-check"
+    }
+  },
   "entity": {
     "binary_sensor": {
       "cloud_reachable": {
