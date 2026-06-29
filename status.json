@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-06-29T01:35:59.912706Z",
+  "checked_at": "2026-06-29T06:46:18.714123Z",
   "checks": [
     {
       "affects": true,
@@ -47,7 +47,7 @@
       ],
       "group": "degraded",
       "name": "evse_scheduler",
-      "ok": true
+      "ok": false
     },
     {
       "affects": true,
@@ -59,7 +59,7 @@
       ],
       "group": "degraded",
       "name": "session_history",
-      "ok": true
+      "ok": false
     },
     {
       "affects": true,
@@ -206,7 +206,7 @@
       ],
       "group": "degraded",
       "name": "evse_control",
-      "ok": true
+      "ok": false
     }
   ],
   "endpoints": [
@@ -286,12 +286,12 @@
       "category": "evse_scheduler",
       "check_group": "evse_scheduler",
       "check_mode": "all",
-      "error": null,
+      "error": "HTTP 400",
       "group": "degraded",
       "method": "GET",
       "name": "scheduler_charge_mode",
-      "ok": true,
-      "status": 200,
+      "ok": false,
+      "status": 400,
       "url": "/service/evse_scheduler/api/v1/iqevc/charging-mode/{site_id}/{serial}/preference"
     },
     {
@@ -300,12 +300,12 @@
       "category": "evse_scheduler",
       "check_group": "evse_scheduler",
       "check_mode": "all",
-      "error": null,
+      "error": "HTTP 400",
       "group": "degraded",
       "method": "GET",
       "name": "scheduler_green_settings",
-      "ok": true,
-      "status": 200,
+      "ok": false,
+      "status": 400,
       "url": "/service/evse_scheduler/api/v1/iqevc/charging-mode/GREEN_CHARGING/{site_id}/{serial}/settings"
     },
     {
@@ -314,12 +314,12 @@
       "category": "evse_scheduler",
       "check_group": "evse_scheduler",
       "check_mode": "all",
-      "error": null,
+      "error": "HTTP 400",
       "group": "degraded",
       "method": "GET",
       "name": "scheduler_schedules",
-      "ok": true,
-      "status": 200,
+      "ok": false,
+      "status": 400,
       "url": "/service/evse_scheduler/api/v1/iqevc/charging-mode/SCHEDULED_CHARGING/{site_id}/{serial}/schedules"
     },
     {
@@ -334,7 +334,7 @@
       "name": "session_history_criteria",
       "ok": true,
       "status": 200,
-      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=82807049-6bc2-4c93-87b8-8fc5a646c3bf&username=2999024"
+      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=af903684-ebf5-48ca-b19c-b04301d9e9e4&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -342,12 +342,12 @@
       "category": "session_history",
       "check_group": "session_history",
       "check_mode": "all",
-      "error": null,
+      "error": "HTTP 404",
       "group": "degraded",
       "method": "POST",
       "name": "session_history",
-      "ok": true,
-      "status": 200,
+      "ok": false,
+      "status": 404,
       "url": "/service/enho_historical_events_ms/{site_id}/sessions/{serial}/history"
     },
     {
@@ -404,7 +404,7 @@
       "name": "evse_timeseries_daily_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=82807049-6bc2-4c93-87b8-8fc5a646c3bf&start_date=2026-06-29&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=af903684-ebf5-48ca-b19c-b04301d9e9e4&start_date=2026-06-29&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -418,7 +418,7 @@
       "name": "evse_timeseries_lifetime_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=82807049-6bc2-4c93-87b8-8fc5a646c3bf&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=af903684-ebf5-48ca-b19c-b04301d9e9e4&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -720,25 +720,25 @@
       "category": "evse_control",
       "check_group": "evse_control",
       "check_mode": "all",
-      "error": null,
+      "error": "HTTP 404",
       "group": "degraded",
       "method": "POST",
       "name": "auth_settings",
-      "ok": true,
-      "status": 200,
+      "ok": false,
+      "status": 404,
       "url": "/service/evse_controller/api/v1/{site_id}/ev_chargers/{serial}/ev_charger_config"
     }
   ],
-  "status": "Fully Operational",
+  "status": "Down",
   "summary": {
-    "checks_failed": 1,
-    "checks_failed_affecting": 0,
-    "checks_failed_broad_outage": 1,
+    "checks_failed": 4,
+    "checks_failed_affecting": 3,
+    "checks_failed_broad_outage": 4,
     "checks_failed_non_affecting": 1,
-    "checks_ok": 16,
+    "checks_ok": 13,
     "checks_total": 17,
-    "endpoints_failed": 1,
-    "endpoints_ok": 36,
+    "endpoints_failed": 6,
+    "endpoints_ok": 31,
     "endpoints_total": 37
   }
 }

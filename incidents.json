@@ -1,6 +1,6 @@
 {
-  "current_status": "Fully Operational",
-  "generated_at": "2026-06-29T01:35:59.912706Z",
+  "current_status": "Down",
+  "generated_at": "2026-06-29T06:46:18.714123Z",
   "incidents": [
     {
       "active": false,
@@ -95,6 +95,20 @@
       "last_seen_at": "2026-06-25T23:52:01.384229Z",
       "started_at": "2026-06-25T23:52:01.384229Z",
       "status": "Degraded"
+    },
+    {
+      "active": true,
+      "duration_minutes": 0,
+      "ended_at": null,
+      "failed_checks": [
+        "battery_config",
+        "evse_control",
+        "evse_scheduler",
+        "session_history"
+      ],
+      "last_seen_at": "2026-06-29T06:46:18.714123Z",
+      "started_at": "2026-06-29T06:46:18.714123Z",
+      "status": "Down"
     }
   ],
   "retention_days": 30
