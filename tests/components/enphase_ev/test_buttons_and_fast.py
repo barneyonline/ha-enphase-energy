@@ -506,6 +506,19 @@ async def test_button_platform_async_setup_entry_filters_known_serials(
 
     coord._ensure_serial_tracked("6666")
     coord.data["6666"] = {"sn": "6666", "name": "Aux Charger"}
+    coord.inventory_runtime._set_type_device_buckets(  # noqa: SLF001
+        {
+            "iqevse": {
+                "type_label": "EV Chargers",
+                "count": 2,
+                "devices": [
+                    {"serial_number": "5555"},
+                    {"serial_number": "6666"},
+                ],
+            }
+        },
+        ["iqevse"],
+    )
     listeners[0]()
 
     assert len(added) == 1

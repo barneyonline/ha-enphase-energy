@@ -68,6 +68,12 @@ from .runtime_helpers import (
     inventory_type_device_info as _type_device_info,
     normalize_evse_session_energy,
 )
+from .serial_discovery import (
+    active_ac_battery_serials_for_cleanup,
+    active_battery_serials_for_cleanup,
+    active_charger_serials_for_cleanup,
+    active_inverter_serials_for_cleanup,
+)
 from .sensor_registry import (
     AC_BATTERY_ENTITY_UNIQUE_SUFFIXES as AC_BATTERY_ENTITY_UNIQUE_SUFFIXES,
     AC_BATTERY_RETIRED_UNIQUE_SUFFIXES as AC_BATTERY_RETIRED_UNIQUE_SUFFIXES,
@@ -120,6 +126,30 @@ _battery_last_reported_snapshot = _battery_helpers.battery_last_reported_snapsho
 _battery_optional_bool = _battery_helpers.battery_optional_bool
 _battery_parse_timestamp = _battery_helpers.battery_parse_timestamp
 _battery_snapshot_last_reported = _battery_helpers.battery_snapshot_last_reported
+
+
+def _ac_battery_status_fallback_serials_for_setup(
+    coord: EnphaseCoordinator,
+) -> set[str] | None:
+    """Return AC Battery serials seeded by battery status for non-destructive setup."""
+
+    if not ac_battery_entities_available(coord):
+        return None
+    details = getattr(coord, "ac_battery_status_summary", None)
+    if (
+        not isinstance(details, dict)
+        or details.get("status_source") != "battery_status"
+    ):
+        return None
+    iter_ac_batteries = getattr(coord, "iter_ac_battery_serials", None)
+    if not callable(iter_ac_batteries):
+        return None
+    try:
+        return {
+            serial for sn in iter_ac_batteries() if sn and (serial := str(sn).strip())
+        }
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _type_label(coord: EnphaseCoordinator, type_key: str) -> str | None:
@@ -795,6 +825,14 @@ async def async_setup_entry(
 
     @callback
     def _async_sync_chargers() -> None:
+        active_charger_serials = active_charger_serials_for_cleanup(coord)
+        if active_charger_serials is not None:
+            registry_setup.prune_removed_charger_sensor_entities(active_charger_serials)
+            registry_setup.remove_missing_charger_entities(active_charger_serials)
+            known_serials.intersection_update(active_charger_serials)
+            registry_setup.known_charger_serials.intersection_update(
+                active_charger_serials
+            )
         serials = [sn for sn in coord.iter_serials() if sn and sn not in known_serials]
         per_serial_entities = []
         site_has_battery = _site_has_battery(coord)
@@ -830,20 +868,15 @@ async def async_setup_entry(
             async_add_entities(per_serial_entities, update_before_add=False)
         if serials:
             known_serials.update(serials)
+            registry_setup.known_charger_serials.update(serials)
 
     @callback
     def _async_sync_batteries() -> None:
-        site_has_battery = _site_has_battery(coord)
-        if not site_has_battery or not _type_available(coord, "encharge"):
-            current_serials: list[str] = []
-        else:
-            iter_batteries = getattr(coord, "iter_battery_serials", None)
-            current_serials = (
-                [sn for sn in iter_batteries() if sn]
-                if callable(iter_batteries)
-                else []
-            )
-        current_set = set(current_serials)
+        active_battery_serials = active_battery_serials_for_cleanup(coord)
+        if active_battery_serials is None:
+            return
+        current_serials = sorted(active_battery_serials)
+        current_set = active_battery_serials
 
         registry_setup.prune_battery_registry_once(current_set)
         registry_setup.remove_missing_battery_entities(current_set)
@@ -869,19 +902,20 @@ async def async_setup_entry(
 
     @callback
     def _async_sync_ac_batteries() -> None:
-        if not ac_battery_entities_available(coord):
-            current_serials: list[str] = []
-        else:
-            iter_ac_batteries = getattr(coord, "iter_ac_battery_serials", None)
-            current_serials = (
-                [sn for sn in iter_ac_batteries() if sn]
-                if callable(iter_ac_batteries)
-                else []
+        active_ac_battery_serials = active_ac_battery_serials_for_cleanup(coord)
+        cleanup_authoritative = active_ac_battery_serials is not None
+        if active_ac_battery_serials is None:
+            active_ac_battery_serials = _ac_battery_status_fallback_serials_for_setup(
+                coord
             )
-        current_set = set(current_serials)
+            if active_ac_battery_serials is None:
+                return
+        current_serials = sorted(active_ac_battery_serials)
+        current_set = active_ac_battery_serials
 
-        registry_setup.prune_ac_battery_registry_once(current_set)
-        registry_setup.remove_missing_ac_battery_entities(current_set)
+        if cleanup_authoritative:
+            registry_setup.prune_ac_battery_registry_once(current_set)
+            registry_setup.remove_missing_ac_battery_entities(current_set)
 
         serials = [
             sn
@@ -906,10 +940,11 @@ async def async_setup_entry(
 
     @callback
     def _async_sync_inverters() -> None:
-        current_serials = [
-            sn for sn in getattr(coord, "iter_inverter_serials", lambda: [])() if sn
-        ]
-        current_set = set(current_serials)
+        active_inverter_serials = active_inverter_serials_for_cleanup(coord)
+        if active_inverter_serials is None:
+            return
+        current_serials = sorted(active_inverter_serials)
+        current_set = active_inverter_serials
 
         registry_setup.prune_inverter_registry_once(current_set)
         registry_setup.remove_missing_inverter_entities(current_set)
@@ -937,16 +972,16 @@ async def async_setup_entry(
         current_type_keys = {
             key for key in coord.inventory_view.iter_type_keys() if key
         }
-        current_battery_serials = {
-            sn for sn in getattr(coord, "iter_battery_serials", lambda: [])() if sn
-        }
-        current_ac_battery_serials = {
-            sn for sn in getattr(coord, "iter_ac_battery_serials", lambda: [])() if sn
-        }
-        current_charger_serials = {sn for sn in coord.iter_serials() if sn}
-        current_inverter_serials = {
-            sn for sn in getattr(coord, "iter_inverter_serials", lambda: [])() if sn
-        }
+        current_battery_serials = active_battery_serials_for_cleanup(coord)
+        current_ac_battery_serials = active_ac_battery_serials_for_cleanup(coord)
+        if current_ac_battery_serials is None:
+            current_ac_battery_serials = _ac_battery_status_fallback_serials_for_setup(
+                coord
+            )
+        current_charger_serials = active_charger_serials_for_cleanup(coord)
+        if current_charger_serials is None:
+            current_charger_serials = {sn for sn in coord.iter_serials() if sn}
+        current_inverter_serials = active_inverter_serials_for_cleanup(coord)
 
         _async_sync_site_entities()
         _async_sync_type_inventory()

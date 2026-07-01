@@ -63,6 +63,14 @@ def _helper(registry: object) -> EnphaseSensorRegistrySetup:
 def test_sensor_registry_serial_parsers_ignore_non_string_unique_ids() -> None:
     helper = _helper(SimpleNamespace())
 
+    assert (
+        helper.battery_sensor_unique_id("BAT-1", "_status")
+        == f"{DOMAIN}_site_{SITE_ID}_battery_BAT-1_status"
+    )
+    assert (
+        helper.ac_battery_sensor_unique_id("ACBAT-1", "_status")
+        == f"{DOMAIN}_site_{SITE_ID}_ac_battery_ACBAT-1_status"
+    )
     assert helper.battery_serial_from_unique_id(None) is None
     assert helper.ac_battery_serial_from_unique_id(None) is None
 
@@ -176,6 +184,85 @@ def test_sensor_registry_prunes_historical_and_removed_site_entities() -> None:
     assert "battery_inactive_microinverters" not in helper.known_site_entity_keys
 
 
+def test_sensor_registry_prunes_removed_charger_sensor_entities() -> None:
+    registry = FakeRegistry(
+        {
+            "sensor.old_power": _entry(
+                "sensor.old_power",
+                f"{DOMAIN}_EVOLD_power",
+            ),
+            "sensor.old_status": _entry(
+                "sensor.old_status",
+                f"{DOMAIN}_EVOLD_status",
+            ),
+            "sensor.keep_power": _entry(
+                "sensor.keep_power",
+                f"{DOMAIN}_EVKEEP_power",
+            ),
+            "sensor.keep_connector_status": _entry(
+                "sensor.keep_connector_status",
+                f"{DOMAIN}_EVKEEP_connector_status",
+            ),
+            "sensor.keep_charger_authentication": _entry(
+                "sensor.keep_charger_authentication",
+                f"{DOMAIN}_EVKEEP_charger_authentication",
+            ),
+            "sensor.missing_power": _entry(
+                "sensor.missing_power",
+                f"{DOMAIN}_EVMISSING_power",
+            ),
+            "sensor.keep_site_status": _entry(
+                "sensor.keep_site_status",
+                f"{DOMAIN}_site_{SITE_ID}_service_status",
+            ),
+            "sensor.ignore_wrong_entry": _entry(
+                "sensor.ignore_wrong_entry",
+                f"{DOMAIN}_EVOTHER_power",
+                config_entry_id="other-entry",
+            ),
+        }
+    )
+    helper = _helper(registry)
+    helper.known_charger_serials.update({"EVKEEP", "EVMISSING"})
+
+    helper.prune_removed_charger_sensor_entities({"EVKEEP"})
+    helper.remove_missing_charger_entities({"EVKEEP"})
+    registry.entities["sensor.lookup_status"] = _entry(
+        "sensor.lookup_status",
+        helper.charger_sensor_unique_id("EVLOOKUP", "_status"),
+    )
+    helper.known_charger_serials.add("EVLOOKUP")
+    helper.remove_missing_charger_entities({"EVKEEP"})
+
+    assert Counter(registry.removed) == Counter(
+        {
+            "sensor.old_power",
+            "sensor.old_status",
+            "sensor.missing_power",
+            "sensor.lookup_status",
+        }
+    )
+    assert helper.known_charger_serials == {"EVKEEP"}
+    assert (
+        helper.charger_serial_from_unique_id(f"{DOMAIN}_EVKEEP_connector_status")
+        == "EVKEEP"
+    )
+    assert (
+        helper.charger_serial_from_unique_id(f"{DOMAIN}_EVKEEP_charger_authentication")
+        == "EVKEEP"
+    )
+    assert helper.charger_serial_from_unique_id("other_EV_power") is None
+    assert (
+        helper.charger_serial_from_unique_id(f"{DOMAIN}_site_{SITE_ID}_service_status")
+        is None
+    )
+    assert (
+        helper.charger_serial_from_unique_id(f"{DOMAIN}_inverter_INV_lifetime_energy")
+        is None
+    )
+    assert helper.charger_serial_from_unique_id(f"{DOMAIN}_EV_unknown") is None
+
+
 def test_sensor_registry_prunes_battery_ac_battery_and_inverter_entities() -> None:
     registry = FakeRegistry(
         {
@@ -207,6 +294,10 @@ def test_sensor_registry_prunes_battery_ac_battery_and_inverter_entities() -> No
                 "sensor.inverter_old_lifetime",
                 f"{DOMAIN}_inverter_INVOLD_lifetime_energy",
             ),
+            "sensor.inverter_keep_lifetime": _entry(
+                "sensor.inverter_keep_lifetime",
+                f"{DOMAIN}_inverter_INVKEEP_lifetime_energy",
+            ),
             "sensor.inverter_missing_lifetime": _entry(
                 "sensor.inverter_missing_lifetime",
                 f"{DOMAIN}_inverter_INVMISSING_lifetime_energy",
@@ -227,8 +318,12 @@ def test_sensor_registry_prunes_battery_ac_battery_and_inverter_entities() -> No
     helper.remove_missing_battery_entities({"KEEP"})
     helper.prune_ac_battery_registry_once({"ACKEEP"})
     helper.remove_missing_ac_battery_entities({"ACKEEP"})
-    helper.prune_inverter_registry_once({"INVKEEP"})
+    assert helper.inverter_lifetime_sensor_unique_id("INV") == (
+        f"{DOMAIN}_inverter_INV_lifetime_energy"
+    )
+    helper.prune_inverter_registry_once({"INVKEEP", "INVMISSING"})
     helper.remove_missing_inverter_entities({"INVKEEP"})
+    helper.prune_inverter_registry_once({"INVKEEP"})
 
     assert Counter(registry.removed) == Counter(
         {

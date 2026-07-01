@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from custom_components.enphase_ev.entity_cleanup import (
+    entries_for_device,
     is_owned_entity,
     iter_entity_registry_entries,
     prune_managed_entities,
@@ -32,6 +33,31 @@ def test_iter_entity_registry_entries_handles_edge_shapes() -> None:
         )
         == []
     )
+
+
+def test_entries_for_device_scans_registry_when_ha_helper_returns_empty(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.entity_cleanup.er.async_entries_for_device",
+        lambda _ent_reg, _device_id: [],
+    )
+    ent_reg = SimpleNamespace(
+        entities={
+            "sensor.attached": SimpleNamespace(
+                entity_id="sensor.attached",
+                device_id="device-1",
+            ),
+            "sensor.other": SimpleNamespace(
+                entity_id="sensor.other",
+                device_id="device-2",
+            ),
+        }
+    )
+
+    entries = entries_for_device(ent_reg, "device-1")
+
+    assert [entry.entity_id for entry in entries] == ["sensor.attached"]
 
 
 def test_is_owned_entity_filters_domain_platform_and_entry() -> None:

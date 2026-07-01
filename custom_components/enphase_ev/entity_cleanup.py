@@ -45,17 +45,25 @@ def iter_device_registry_entries(dev_reg) -> list[object]:
 
 def entries_for_device(ent_reg, device_id: str) -> list[object]:
     """Return entity registry entries attached to the given device."""
+    entries: list[object] = []
+    seen_entity_ids: set[object] = set()
     entries_for_device_func = getattr(er, "async_entries_for_device", None)
     if callable(entries_for_device_func):
         try:
-            return list(entries_for_device_func(ent_reg, device_id))
+            for entry in entries_for_device_func(ent_reg, device_id):
+                entries.append(entry)
+                seen_entity_ids.add(getattr(entry, "entity_id", id(entry)))
         except Exception:  # noqa: BLE001
             pass
-    return [
-        entry
-        for entry in iter_entity_registry_entries(ent_reg)
-        if getattr(entry, "device_id", None) == device_id
-    ]
+    for entry in iter_entity_registry_entries(ent_reg):
+        if getattr(entry, "device_id", None) != device_id:
+            continue
+        entity_id = getattr(entry, "entity_id", id(entry))
+        if entity_id in seen_entity_ids:
+            continue
+        entries.append(entry)
+        seen_entity_ids.add(entity_id)
+    return entries
 
 
 def is_owned_entity(

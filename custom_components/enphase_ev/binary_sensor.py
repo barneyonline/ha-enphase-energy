@@ -15,21 +15,43 @@ from .const import DOMAIN
 from .coordinator import EnphaseCoordinator
 from .device_info_helpers import _cloud_device_info
 from .entity import EnphaseBaseEntity
+from .entity_cleanup import prune_managed_entities
 from .runtime_helpers import (
     inventory_type_available as _type_available,
     inventory_type_device_info as _type_device_info,
 )
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
+from .serial_discovery import active_charger_serials_for_cleanup
+from .serial_entity_metadata import (
+    CHARGER_BINARY_SENSOR_UNIQUE_SUFFIXES,
+    HISTORICAL_CHARGER_BINARY_SENSOR_UNIQUE_SUFFIXES,
+    charger_entity_unique_ids,
+)
 from .sensor import (
     _heatpump_runtime_device_uid,
     _heatpump_runtime_snapshot,
 )
 
 PARALLEL_UPDATES = 0
-HISTORICAL_CHARGER_BINARY_SENSOR_UNIQUE_SUFFIXES: tuple[str, ...] = (
-    "_commissioned",
-    "_charger_problem",
-)
+
+
+def _charger_binary_sensor_unique_ids(serials: set[str]) -> set[str]:
+    return {
+        unique_id
+        for serial in serials
+        for unique_id in charger_entity_unique_ids(
+            serial, CHARGER_BINARY_SENSOR_UNIQUE_SUFFIXES
+        )
+    }
+
+
+def _is_managed_charger_binary_sensor(unique_id: str) -> bool:
+    site_prefix = f"{DOMAIN}_site_"
+    if unique_id.startswith(site_prefix):
+        return False
+    return unique_id.startswith(f"{DOMAIN}_") and unique_id.endswith(
+        CHARGER_BINARY_SENSOR_UNIQUE_SUFFIXES
+    )
 
 
 async def async_setup_entry(
@@ -104,6 +126,18 @@ async def async_setup_entry(
             heatpump_sg_ready_entity_added = True
         elif inventory_ready and not heatpump_runtime_available:
             _async_remove_site_binary_entity("heat_pump_sg_ready_active")
+        active_charger_serials = active_charger_serials_for_cleanup(coord)
+        if active_charger_serials is not None:
+            prune_managed_entities(
+                ent_reg,
+                entry.entry_id,
+                domain="binary_sensor",
+                active_unique_ids=_charger_binary_sensor_unique_ids(
+                    active_charger_serials
+                ),
+                is_managed=_is_managed_charger_binary_sensor,
+            )
+            known_serials.intersection_update(active_charger_serials)
         serials = [sn for sn in coord.iter_serials() if sn and sn not in known_serials]
         if not serials:
             return
