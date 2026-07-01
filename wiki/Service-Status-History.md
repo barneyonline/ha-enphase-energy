@@ -1,11 +1,11 @@
 # Service Status History
 
 - Current status: **Down**
-- Last updated: `2026-07-01 10:29 UTC`
+- Last updated: `2026-07-01 13:18 UTC`
 - Failed checks in latest run: `4`
 - Latest failed checks: evse_scheduler, session_history, battery_config, evse_control
-- Retained hourly samples: `255`
-- Incident windows in last 30 days: `22`
+- Retained hourly samples: `256`
+- Incident windows in last 30 days: `23`
 
 This page is generated from hourly synthetic checks against Enphase cloud endpoints. It may miss incidents that begin and recover between checks.
 
@@ -16,8 +16,8 @@ gantt
     title Enphase Service Status Incident Timeline (Last 30 Days)
     dateFormat  YYYY-MM-DDTHH:mm:ss
     axisFormat  %b %d
-    Window start :vert, window-start, 2026-06-01T10:29:24, 0ms
-    Window end :vert, window-end, 2026-07-01T10:29:24, 0ms
+    Window start :vert, window-start, 2026-06-01T13:18:31, 0ms
+    Window end :vert, window-end, 2026-07-01T13:18:31, 0ms
     section Down
     Down 1 (2026-06-07 1523 UTC) :crit, down-1, 2026-06-07T15:23:22, 87m
     Down 2 (2026-06-09 2117 UTC) :crit, down-2, 2026-06-09T21:17:17, 60m
@@ -40,6 +40,7 @@ gantt
     Down 19 (2026-07-01 0139 UTC) :crit, down-19, 2026-07-01T01:39:18, 60m
     Down 20 (2026-07-01 0625 UTC) :crit, down-20, 2026-07-01T06:25:35, 60m
     Down 21 (2026-07-01 1029 UTC) :crit, down-21, 2026-07-01T10:29:24, 60m
+    Down 22 (2026-07-01 1318 UTC) :crit, down-22, 2026-07-01T13:18:31, 60m
     section Degraded
     Degraded 1 (2026-06-25 2352 UTC) :active, degraded-1, 2026-06-25T23:52:01, 60m
 ```
@@ -69,7 +70,8 @@ gantt
 | Down | 2026-06-30 20:28 UTC | Unknown after last seen 2026-06-30 23:20 UTC | Observed 2h 51m | battery_config, evse_control, evse_scheduler, session_history |
 | Down | 2026-07-01 01:39 UTC | Unknown after last seen 2026-07-01 01:39 UTC | Observed 0m | battery_config, evse_control, evse_scheduler, session_history |
 | Down | 2026-07-01 06:25 UTC | Unknown after last seen 2026-07-01 06:25 UTC | Observed 0m | battery_config, evse_control, evse_scheduler, session_history |
-| Down | 2026-07-01 10:29 UTC | Ongoing (last seen 2026-07-01 10:29 UTC) | Observed at latest check | battery_config, evse_control, evse_scheduler, session_history |
+| Down | 2026-07-01 10:29 UTC | Unknown after last seen 2026-07-01 10:29 UTC | Observed 0m | battery_config, evse_control, evse_scheduler, session_history |
+| Down | 2026-07-01 13:18 UTC | Ongoing (last seen 2026-07-01 13:18 UTC) | Observed at latest check | battery_config, evse_control, evse_scheduler, session_history |
 
 ## Raw Artifacts
 
