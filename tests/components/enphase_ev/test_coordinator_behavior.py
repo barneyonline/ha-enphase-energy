@@ -3753,7 +3753,7 @@ async def test_first_refresh_populates_storm_guard_state_before_entities(
         async def storm_guard_profile(self, **_kwargs):
             return {
                 "data": {
-                    "stormGuardState": "enabled",
+                    "stormGuardState": "active",
                     "evseStormEnabled": True,
                 }
             }
