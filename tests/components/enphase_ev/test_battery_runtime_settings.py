@@ -5134,7 +5134,7 @@ async def test_battery_runtime_refresh_storm_guard_profile_caches_and_handles_ba
     coord.hass.config = BadConfig()
     coord.client.storm_guard_profile = AsyncMock(
         side_effect=[
-            {"data": {"stormGuardState": "enabled", "evseStormEnabled": False}},
+            {"data": {"stormGuardState": "active", "evseStormEnabled": False}},
             {"data": {"stormGuardState": "disabled", "evseStormEnabled": True}},
         ]
     )
@@ -5450,6 +5450,7 @@ def test_battery_runtime_storm_alert_and_guard_helper_edge_paths(
     assert runtime.normalize_storm_guard_state(True) == "enabled"
     assert runtime.normalize_storm_guard_state(0) == "disabled"
     assert runtime.normalize_storm_guard_state(" yes ") == "enabled"
+    assert runtime.normalize_storm_guard_state("active") == "enabled"
     assert runtime.normalize_storm_guard_state("off") == "disabled"
     assert runtime.storm_alert_status_is_inactive(None) is False
     assert runtime.storm_alert_is_active({"active": True}) is True

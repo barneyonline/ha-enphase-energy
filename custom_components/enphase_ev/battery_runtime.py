@@ -3675,7 +3675,7 @@ class BatteryRuntime:
             normalized = value.strip().lower()
             if normalized in ("enabled", "disabled"):
                 return normalized
-            if normalized in ("true", "1", "yes", "y", "on"):
+            if normalized in ("true", "1", "yes", "y", "on", "active"):
                 return "enabled"
             if normalized in ("false", "0", "no", "n", "off"):
                 return "disabled"

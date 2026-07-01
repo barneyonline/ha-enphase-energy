@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Fixed Storm Guard entities becoming unavailable while Enphase reports the active storm state during a weather alert.
 
 ### 🔧 Improvements
 - None
