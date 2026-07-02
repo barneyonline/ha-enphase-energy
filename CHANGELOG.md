@@ -11,13 +11,30 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- Fixed Storm Guard entities becoming unavailable while Enphase reports the active storm state during a weather alert.
+- None
 
 ### 🔧 Improvements
 - None
 
 ### 🔄 Other changes
 - None
+
+## v3.2.0 - 2026-07-02
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- Removed retired Enphase serial-backed devices and entities from Home Assistant registries when authoritative cloud discovery no longer reports them, while preserving aggregate/site devices and non-authoritative discovery states. (#732)
+
+### 🐛 Bug fixes
+- Fixed Storm Guard entities becoming unavailable while Enphase reports the active storm state during a weather alert. (#731)
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Bumped the integration manifest version to `3.2.0`.
 
 ## v3.1.9 - 2026-06-28
 
