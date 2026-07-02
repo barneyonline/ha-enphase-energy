@@ -1296,6 +1296,217 @@ def test_prune_runtime_caches_removes_stale_serial_state(coordinator_factory):
     coord.session_history.prune.assert_called_once()
 
 
+def test_prune_runtime_caches_drops_configured_retired_serial_after_inventory_ready(
+    coordinator_factory,
+):
+    coord = coordinator_factory(serials=["EV1", "EV2"])
+    coord._configured_serials = {"EV1", "EV2"}  # noqa: SLF001
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord.serials = {"EV1", "EV2"}
+    coord._serial_order = ["EV1", "EV2"]  # noqa: SLF001
+    coord.last_set_amps = {"EV1": 16, "EV2": 32}
+
+    coord._prune_runtime_caches(  # noqa: SLF001
+        active_serials={"EV1"},
+        keep_day_keys={"2020-01-02"},
+    )
+
+    assert coord.serials == {"EV1"}
+    assert coord._serial_order == ["EV1"]  # noqa: SLF001
+    assert coord.last_set_amps == {"EV1": 16}
+
+
+def test_iter_serials_uses_authoritative_active_inventory(coordinator_factory):
+    coord = coordinator_factory(serials=["EV1", "EV2"])
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord._type_device_buckets = {  # noqa: SLF001
+        "iqevse": {
+            "count": 3,
+            "devices": [
+                {"serial_number": "EV1"},
+                {"serialNumber": "EV1"},
+                {"serial": "EV3"},
+            ],
+        }
+    }
+    coord._type_device_order = ["iqevse"]  # noqa: SLF001
+    coord.data = {"EV2": {"status": "stale"}}
+
+    assert coord.iter_serials() == ["EV1", "EV3"]
+
+    coord._type_device_buckets = {"iqevse": {"count": 0, "devices": []}}  # noqa: SLF001
+    coord._type_device_order = []  # noqa: SLF001
+
+    assert coord.iter_serials() == []
+
+
+def test_iter_serials_waits_with_empty_non_authoritative_status_when_evse_bucket_missing(
+    coordinator_factory,
+):
+    coord = coordinator_factory(serials=["OLD"])
+    coord.discovery_snapshot.apply({"serial_order": ["NEW", "NEW"]})
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord._has_successful_refresh = True  # noqa: SLF001
+    coord._status_charger_data_authoritative = False  # noqa: SLF001
+    coord.data = {}
+    coord._type_device_buckets = {  # noqa: SLF001
+        "envoy": {
+            "count": 1,
+            "devices": [{"serial_number": "GW-1"}],
+        }
+    }
+    coord._type_device_order = ["envoy"]  # noqa: SLF001
+
+    assert coord._active_inventory_evse_serials() is None  # noqa: SLF001
+    assert coord.iter_serials() == ["NEW"]
+    assert coord.serials == {"NEW"}
+
+
+def test_iter_serials_drops_restored_snapshot_when_empty_status_is_authoritative(
+    coordinator_factory,
+):
+    coord = coordinator_factory(serials=["OLD"])
+    coord.discovery_snapshot.apply({"serial_order": ["NEW", "NEW"]})
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord._has_successful_refresh = True  # noqa: SLF001
+    coord._status_charger_data_authoritative = True  # noqa: SLF001
+    coord.data = {}
+    coord._type_device_buckets = {  # noqa: SLF001
+        "envoy": {
+            "count": 1,
+            "devices": [{"serial_number": "GW-1"}],
+        }
+    }
+    coord._type_device_order = ["envoy"]  # noqa: SLF001
+
+    assert coord.iter_serials() == []
+
+
+def test_iter_serials_uses_fresh_status_when_evse_bucket_missing(
+    coordinator_factory,
+):
+    coord = coordinator_factory(serials=["OLD"])
+    coord.discovery_snapshot.apply({"serial_order": ["RESTORED"]})
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord._has_successful_refresh = True  # noqa: SLF001
+    coord._status_charger_data_authoritative = True  # noqa: SLF001
+    coord.payload_using_stale = False
+    coord.data = {"ACTIVE": {"sn": "ACTIVE"}}
+    coord._type_device_buckets = {  # noqa: SLF001
+        "envoy": {
+            "count": 1,
+            "devices": [{"serial_number": "GW-1"}],
+        }
+    }
+    coord._type_device_order = ["envoy"]  # noqa: SLF001
+
+    assert coord.iter_serials() == ["ACTIVE"]
+
+
+def test_iter_serials_prefers_fresh_status_over_stale_evse_bucket(
+    coordinator_factory,
+):
+    coord = coordinator_factory(serials=["OLD"])
+    coord.discovery_snapshot.apply({"serial_order": ["OLD", "ACTIVE"]})
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord._has_successful_refresh = True  # noqa: SLF001
+    coord._status_charger_data_authoritative = True  # noqa: SLF001
+    coord.payload_using_stale = False
+    coord.data = {"ACTIVE": {"sn": "ACTIVE"}}
+    coord._type_device_buckets = {  # noqa: SLF001
+        "iqevse": {
+            "count": 2,
+            "devices": [
+                {"serial_number": "OLD"},
+                {"serial_number": "ACTIVE"},
+            ],
+        }
+    }
+    coord._type_device_order = ["iqevse"]  # noqa: SLF001
+
+    assert coord._active_inventory_evse_serials() == ["ACTIVE"]  # noqa: SLF001
+    assert coord.iter_serials() == ["ACTIVE"]
+
+
+def test_iter_serials_waits_when_only_stale_status_is_available(
+    coordinator_factory,
+):
+    coord = coordinator_factory(serials=["OLD"])
+    coord.discovery_snapshot.apply({"serial_order": ["RESTORED"]})
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord._has_successful_refresh = True  # noqa: SLF001
+    coord.payload_using_stale = True
+    coord.data = {"STALE": {"sn": "STALE"}}
+    coord._type_device_buckets = {  # noqa: SLF001
+        "envoy": {
+            "count": 1,
+            "devices": [{"serial_number": "GW-1"}],
+        }
+    }
+    coord._type_device_order = ["envoy"]  # noqa: SLF001
+
+    assert coord._active_inventory_evse_serials() is None  # noqa: SLF001
+    assert coord.iter_serials() == ["RESTORED", "STALE"]
+
+
+def test_iter_serials_uses_restored_snapshot_when_inventory_view_raises(
+    coordinator_factory,
+):
+    coord = coordinator_factory(serials=["OLD"])
+    coord.discovery_snapshot.apply({"serial_order": ["NEW"]})
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord.inventory_view = SimpleNamespace(
+        type_bucket=lambda _type_key: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
+
+    assert coord.iter_serials() == ["NEW", "OLD"]
+
+
+def test_iter_serials_handles_malformed_authoritative_inventory(coordinator_factory):
+    coord = coordinator_factory(serials=["EV1"])
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord.inventory_view = SimpleNamespace(
+        type_bucket=lambda _type_key: {"count": 1, "devices": "bad"}
+    )
+
+    assert coord.iter_serials() == ["EV1"]
+
+    coord.inventory_view = SimpleNamespace(
+        type_bucket=lambda _type_key: {"devices": []}
+    )
+
+    assert coord.iter_serials() == ["EV1"]
+
+    class BadSerial:
+        def __str__(self) -> str:
+            raise RuntimeError("boom")
+
+    class BadCount:
+        def __int__(self) -> int:
+            raise TypeError("boom")
+
+        def __str__(self) -> str:
+            raise TypeError("boom")
+
+    coord.inventory_view = SimpleNamespace(
+        type_bucket=lambda _type_key: {
+            "count": BadCount(),
+            "devices": [
+                "not-a-dict",
+                {"serial_number": BadSerial()},
+            ],
+        }
+    )
+
+    assert coord.iter_serials() == ["EV1"]
+
+    coord.inventory_view = SimpleNamespace(
+        type_bucket=lambda _type_key: {"count": 0, "devices": []}
+    )
+
+    assert coord.iter_serials() == []
+
+
 def test_cleanup_runtime_state_clears_session_history(coordinator_factory):
     coord = coordinator_factory(serials=["EV1"])
     clear = MagicMock()
@@ -2827,6 +3038,7 @@ def test_amp_helpers_and_expectation_management(coordinator_factory, monkeypatch
 
     coord.serials = None
     coord._serial_order = None
+    coord._devices_inventory_ready = False
     assert coord._ensure_serial_tracked("  EV2  ") is True
     assert "EV2" in coord.iter_serials()
 

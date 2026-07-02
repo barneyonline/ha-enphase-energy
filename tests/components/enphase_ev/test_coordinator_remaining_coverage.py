@@ -1637,6 +1637,7 @@ def test_ensure_serial_tracked_invalid_inputs(coordinator_factory):
 def test_iter_serials_falls_back_to_sorted(coordinator_factory):
     coord = coordinator_factory()
     coord._serial_order = []
+    coord._devices_inventory_ready = False
     coord.serials = {"B", "A"}
     ordered = coord.iter_serials()
     assert ordered[:2] == ["A", "B"]

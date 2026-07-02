@@ -20,6 +20,7 @@ class DiscoveryState:
     _warmup_task: Any = None
     _warmup_in_progress: bool = False
     _warmup_last_error: str | None = None
+    _restored_evse_serial_order: list[str] = field(default_factory=list)
     _restored_site_energy_channels: set[str] = field(default_factory=set)
     _restored_gateway_iq_energy_router_records: PayloadRecords = field(
         default_factory=list
@@ -155,6 +156,8 @@ class RefreshHealthState:
     _warmup_phase_timings: dict[str, float] = field(default_factory=dict)
     _refresh_performance_history: list[dict[str, object]] = field(default_factory=list)
     _has_successful_refresh: bool = False
+    _status_charger_data_authoritative: bool = False
+    _status_charger_data_serials: list[str] | None = None
     _session_history_cache_shim: dict[tuple[str, str], tuple[float, list[dict]]] = (
         field(default_factory=dict)
     )

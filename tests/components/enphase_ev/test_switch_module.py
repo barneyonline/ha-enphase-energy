@@ -581,6 +581,19 @@ async def test_async_setup_entry_syncs_chargers(
         "plugged": True,
     }
     coord._ensure_serial_tracked(new_serial)
+    coord.inventory_runtime._set_type_device_buckets(  # noqa: SLF001
+        {
+            "iqevse": {
+                "type_label": "EV Chargers",
+                "count": 2,
+                "devices": [
+                    {"serial_number": RANDOM_SERIAL},
+                    {"serial_number": new_serial},
+                ],
+            }
+        },
+        ["iqevse"],
+    )
 
     listener()
     charger_entities = [ent for ent in added if hasattr(ent, "_sn")]

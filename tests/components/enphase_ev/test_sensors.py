@@ -1271,6 +1271,7 @@ async def test_sensor_platform_adds_and_prunes_ac_battery_entities(
     coord._selected_type_keys = {"ac_battery"}  # noqa: SLF001
     coord._devices_inventory_ready = True  # noqa: SLF001
     coord._battery_has_acb = True  # noqa: SLF001
+    coord._ac_battery_devices_payload = {}  # noqa: SLF001
     coord._ac_battery_data = {  # noqa: SLF001
         "BAT-AC-1": {
             "serial_number": "BAT-AC-1",

@@ -234,6 +234,7 @@ class DiscoverySnapshotManager:
 
         serial_order = snapshot.get("serial_order")
         if isinstance(serial_order, list):
+            restored_serials: list[str] = []
             for serial in serial_order:
                 if serial is None:
                     continue
@@ -242,7 +243,12 @@ class DiscoverySnapshotManager:
                 except Exception:  # noqa: BLE001
                     continue
                 if text:
-                    self.coordinator._ensure_serial_tracked(text)
+                    restored_serials.append(text)
+            restored_serials = list(dict.fromkeys(restored_serials))
+            self.coordinator._restored_evse_serial_order = restored_serials
+            if restored_serials:
+                self.coordinator._serial_order = list(restored_serials)
+                self.coordinator.serials = set(restored_serials)
 
         grouped = snapshot.get("type_device_buckets")
         ordered = snapshot.get("type_device_order")

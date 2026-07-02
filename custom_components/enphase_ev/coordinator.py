@@ -414,6 +414,24 @@ def _coerce_int_list(value: object) -> list[int] | None:
     return parsed or None
 
 
+def _mapping_or_empty(value: object) -> dict:
+    """Return a mapping payload, or an empty mapping for malformed nested data."""
+
+    return value if isinstance(value, dict) else {}
+
+
+def _first_mapping_or_empty(value: object) -> dict:
+    """Return the first mapping from a nested list/dict payload."""
+
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, list) and value:
+        first = value[0]
+        if isinstance(first, dict):
+            return first
+    return {}
+
+
 def _power_as_float(raw: object) -> float | None:
     try:
         return float(raw)
@@ -2664,6 +2682,8 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         context: RefreshPipelineContext,
     ) -> dict:
         phase_timings = context.phase_timings
+        self._status_charger_data_authoritative = False
+        self._status_charger_data_serials = None
         self._backoff_until = None
         self._clear_backoff_timer()
         self._clear_auth_repair_issues_on_success()
@@ -2828,6 +2848,22 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         await asyncio.gather(task, return_exceptions=True)
         context.first_refresh_followups_task = None
 
+    def _evse_status_refresh_enabled(self) -> bool:
+        """Return True when this entry should continue polling EVSE status."""
+
+        if self.site_only:
+            return False
+        if self.serials:
+            return True
+        selected = getattr(self, "_selected_type_keys", None)
+        if isinstance(selected, (set, list, tuple)) and selected:
+            return any(normalize_type_key(key) == "iqevse" for key in selected)
+        if getattr(self, "_configured_serials", None):
+            return True
+        if getattr(self, "_restored_evse_serial_order", None):
+            return True
+        return bool(getattr(self, "_status_charger_data_authoritative", False))
+
     def _first_refresh_storm_guard_followups_needed(self) -> bool:
         if getattr(self, "_battery_has_encharge", None) is False:
             return False
@@ -2946,7 +2982,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             self.diagnostics.create_auth_block_issue()
             raise self._auth_block_update_failed()
 
-        if self.site_only or not self.serials:
+        if not self._evse_status_refresh_enabled():
             return await self._async_run_site_only_refresh_pipeline(context)
 
         # Handle backoff window
@@ -2960,12 +2996,27 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         if first_refresh:
             self._start_first_refresh_followups(context)
         status_refresh_succeeded = False
+        status_charger_data_authoritative = False
+        status_charger_data_serials: list[str] | None = None
         try:
             status_start = time.monotonic()
             data = await self.client.status()
             phase_timings["status_s"] = round(time.monotonic() - status_start, 3)
             if isinstance(data, dict):
                 self._status_payload_cache = dict(data)
+                raw_charger_data = data.get("evChargerData")
+                if isinstance(raw_charger_data, list):
+                    status_charger_data_serials = []
+                    status_charger_data_authoritative = True
+                    for charger in raw_charger_data:
+                        if not isinstance(charger, dict):
+                            status_charger_data_authoritative = False
+                            break
+                        serial = str(charger.get("sn") or "").strip()
+                        if not serial:
+                            status_charger_data_authoritative = False
+                            break
+                        status_charger_data_serials.append(serial)
             self._mark_payload_endpoint_success(
                 "status",
                 success_mono=time.monotonic(),
@@ -3014,6 +3065,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                 )
                 phase_timings["status_s"] = round(time.monotonic() - status_start, 3)
                 data = {"evChargerData": [], "ts": None}
+                status_charger_data_authoritative = False
             self._unauth_errors = 0
             self._payload_errors = 0
             self._network_errors = 0
@@ -3202,6 +3254,15 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                     retry_after=backoff,
                 )
         finally:
+            self._status_charger_data_authoritative = (
+                status_charger_data_authoritative
+                and not bool(getattr(self, "payload_using_stale", False))
+            )
+            self._status_charger_data_serials = (
+                list(dict.fromkeys(status_charger_data_serials or []))
+                if self._status_charger_data_authoritative
+                else None
+            )
             if not status_refresh_succeeded:
                 await self._async_cancel_first_refresh_followups(context)
             self.latency_ms = int((time.monotonic() - t0) * 1000)
@@ -3212,12 +3273,17 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         prev_data = self.data if isinstance(self.data, dict) else {}
         self._has_successful_refresh = True
         out: dict[str, dict] = {}
-        arr = data.get("evChargerData") or []
+        raw_charger_data = data.get("evChargerData")
+        arr = (
+            [charger for charger in raw_charger_data if isinstance(charger, dict)]
+            if isinstance(raw_charger_data, list)
+            else []
+        )
         data_ts = data.get("ts")
         records: list[tuple[str, dict]] = []
         charge_mode_candidates: list[str] = []
         for obj in arr:
-            sn = str(obj.get("sn") or "")
+            sn = str(obj.get("sn") or "").strip()
             if not sn:
                 continue
             self._ensure_serial_tracked(sn)
@@ -3267,7 +3333,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             return None, "unknown"
 
         for sn, obj in records:
-            conn0 = (obj.get("connectors") or [{}])[0]
+            conn0 = _first_mapping_or_empty(obj.get("connectors"))
             previous_entry = None
             if isinstance(self.data, dict):
                 previous_entry = self.data.get(sn)
@@ -3311,9 +3377,9 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                     self.set_last_set_amps(sn, int(charging_level))
                 except Exception:
                     pass
-            sch = obj.get("sch_d") or {}
-            sch_info0 = (sch.get("info") or [{}])[0]
-            sess = obj.get("session_d") or {}
+            sch = _mapping_or_empty(obj.get("sch_d"))
+            sch_info0 = _first_mapping_or_empty(sch.get("info"))
+            sess = _mapping_or_empty(obj.get("session_d"))
             smart_ev = obj.get("smartEV")
             if not isinstance(smart_ev, dict):
                 smart_ev = {}
@@ -3428,7 +3494,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                 obj.get("chargeMode"),
                 obj.get("chargingMode"),
                 obj.get("charge_mode"),
-                (obj.get("sch_d") or {}).get("mode"),
+                sch.get("mode"),
             ):
                 charge_mode = self._normalize_effective_charge_mode(
                     charge_mode_candidate
@@ -4131,7 +4197,10 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             background_by_day.setdefault((day_key, max_cache_age), []).append(sn)
         # Prune after day-keys are known so historical session-day entries in use
         # by current chargers are retained for normal TTL behavior.
-        self._prune_runtime_caches(active_serials=out.keys(), keep_day_keys=day_locals)
+        if bool(getattr(self, "_status_charger_data_authoritative", False)):
+            self._prune_runtime_caches(
+                active_serials=out.keys(), keep_day_keys=day_locals
+            )
 
         async def _async_fetch_immediate_session_updates(
             day_key: str,
@@ -6671,6 +6740,9 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         """Return charger serials in a stable order for entity setup."""
         if getattr(self, "site_only", False):
             return []
+        active_inventory_serials = self._active_inventory_evse_serials()
+        if active_inventory_serials is not None:
+            return active_inventory_serials
         ordered: list[str] = []
         serial_order = getattr(self, "_serial_order", None)
         known_serials = getattr(self, "serials", None)
@@ -6684,6 +6756,57 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             ordered.extend(str(sn) for sn in source.keys())
         # Deduplicate while preserving order
         return [sn for sn in dict.fromkeys(ordered) if sn]
+
+    def _active_inventory_evse_serials(self) -> list[str] | None:
+        """Return active EVSE serials once inventory has authoritatively loaded."""
+
+        if not bool(getattr(self, "_devices_inventory_ready", False)):
+            return None
+
+        status_serials: list[str] | None = None
+        if bool(getattr(self, "_status_charger_data_authoritative", False)):
+            cached_serials = getattr(self, "_status_charger_data_serials", None)
+            if isinstance(cached_serials, list):
+                status_serials = [str(sn) for sn in cached_serials if sn]
+            else:
+                source = self.data if isinstance(self.data, dict) else {}
+                status_serials = [str(sn) for sn in source if sn]
+            return status_serials
+        try:
+            bucket = self.inventory_view.type_bucket("iqevse")
+        except Exception:  # noqa: BLE001
+            return status_serials
+        if not isinstance(bucket, dict):
+            return status_serials
+        members = bucket.get("devices")
+        if not isinstance(members, list):
+            return status_serials
+        serials: list[str] = []
+        for member in members:
+            if not isinstance(member, dict):
+                continue
+            for key in ("serial_number", "serial", "serialNumber", "device_sn"):
+                raw_serial = member.get(key)
+                if raw_serial is None:
+                    continue
+                try:
+                    serial = str(raw_serial).strip()
+                except Exception:  # noqa: BLE001
+                    continue
+                if serial:
+                    serials.append(serial)
+                    break
+        if serials:
+            return [serial for serial in dict.fromkeys(serials) if serial]
+        if "count" not in bucket:
+            return status_serials
+        try:
+            count = int(bucket.get("count"))
+        except (TypeError, ValueError):
+            return status_serials
+        if count == 0:
+            return status_serials or []
+        return status_serials
 
     def iter_battery_serials(self) -> list[str]:
         """Return active battery identities in a stable order."""

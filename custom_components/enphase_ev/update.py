@@ -35,6 +35,7 @@ from .runtime_helpers import (
     inventory_type_device_info as _type_device_info,
 )
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
+from .serial_discovery import active_charger_serials_for_cleanup
 
 PARALLEL_UPDATES = 0
 
@@ -78,16 +79,26 @@ async def async_setup_entry(
 
     @callback
     def _async_sync_charger_updates() -> None:
+        active_serials = active_charger_serials_for_cleanup(coord)
         current_serials = (
-            set(_charger_serials(coord)) if _type_available(coord, "iqevse") else set()
+            active_serials
+            if active_serials is not None
+            else (
+                set(_charger_serials(coord))
+                if _type_available(coord, "iqevse")
+                else set()
+            )
         )
-        _async_prune_removed_charger_updates(
-            entry=entry,
-            ent_reg=ent_reg,
-            current_serials=current_serials,
-            known_serials=known_serials,
-        )
-        if not current_serials and not _type_available(coord, "iqevse"):
+        if active_serials is not None:
+            _async_prune_removed_charger_updates(
+                entry=entry,
+                ent_reg=ent_reg,
+                current_serials=current_serials,
+                known_serials=known_serials,
+            )
+        if not current_serials and (
+            active_serials is None and not _type_available(coord, "iqevse")
+        ):
             return
         known_serials.intersection_update(current_serials)
         serials = [sn for sn in current_serials if sn and sn not in known_serials]

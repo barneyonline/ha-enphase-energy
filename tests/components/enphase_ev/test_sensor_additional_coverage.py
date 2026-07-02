@@ -52,6 +52,32 @@ def _mk_coord(sn: str, payload: dict[str, Any]) -> Any:
     return coord
 
 
+def _mark_battery_status_ready(coord: Any) -> None:
+    coord._battery_status_payload = {}  # noqa: SLF001
+
+
+def _mark_inverter_inventory_ready(coord: Any) -> None:
+    coord._inverters_inventory_payload = {}  # noqa: SLF001
+
+
+def test_ac_battery_status_fallback_serials_guard_paths() -> None:
+    coord = SimpleNamespace(
+        battery_has_acb=True,
+        inventory_view=SimpleNamespace(has_type_for_entities=lambda _key: True),
+        ac_battery_status_summary={"status_source": "battery_status"},
+    )
+
+    assert sensor_mod._ac_battery_status_fallback_serials_for_setup(coord) is None
+
+    class BadSerial:
+        def __str__(self) -> str:
+            raise RuntimeError("boom")
+
+    coord.iter_ac_battery_serials = lambda: [BadSerial()]
+
+    assert sensor_mod._ac_battery_status_fallback_serials_for_setup(coord) is None
+
+
 @pytest.mark.asyncio
 async def test_async_setup_entry_registers_entities(
     hass, config_entry, coordinator_factory, monkeypatch
@@ -97,6 +123,19 @@ async def test_async_setup_entry_registers_entities(
     new_sn = "NEWSN123"
     coord.data[new_sn] = dict(coord.data[RANDOM_SERIAL], sn=new_sn)
     coord.serials.add(new_sn)
+    coord.inventory_runtime._set_type_device_buckets(  # noqa: SLF001
+        {
+            "iqevse": {
+                "type_label": "EV Chargers",
+                "count": 2,
+                "devices": [
+                    {"serial_number": RANDOM_SERIAL},
+                    {"serial_number": new_sn},
+                ],
+            }
+        },
+        ["iqevse"],
+    )
     sync_topology_cb()
     assert len({ent._sn for ent in added if hasattr(ent, "_sn")}) == 2
 
@@ -112,10 +151,12 @@ async def test_async_setup_entry_restored_topology_adds_dynamic_entities(
         "BAT-1": {"serial_number": "BAT-1", "name": "Battery 1"}
     }
     coord._battery_storage_order = ["BAT-1"]  # noqa: SLF001
+    _mark_battery_status_ready(coord)
     coord._inverter_data = {  # noqa: SLF001
         "INV-1": {"serial_number": "INV-1", "name": "Inverter 1"}
     }
     coord._inverter_order = ["INV-1"]  # noqa: SLF001
+    _mark_inverter_inventory_ready(coord)
     coord._restored_site_energy_channels = {"heat_pump"}  # noqa: SLF001
     coord._restored_gateway_iq_energy_router_records = [  # noqa: SLF001
         {
@@ -200,6 +241,7 @@ async def test_async_setup_entry_backfills_storm_guard_sensor_when_battery_appea
         "BAT-1": {"serial_number": "BAT-1", "name": "Battery 1"}
     }
     coord._battery_storage_order = ["BAT-1"]  # noqa: SLF001
+    _mark_battery_status_ready(coord)
 
     sync_topology_cb = next(
         cb for cb in callbacks if cb.__name__ == "_async_sync_topology"
@@ -537,6 +579,7 @@ async def test_async_setup_entry_adds_battery_storage_sensors(
         },
     }
     coord._battery_storage_order = ["BAT-1", "BAT-2"]  # noqa: SLF001
+    _mark_battery_status_ready(coord)
     coord._battery_aggregate_charge_pct = 47.5  # noqa: SLF001
     coord._battery_aggregate_status = "normal"  # noqa: SLF001
     coord._battery_aggregate_status_details = {  # noqa: SLF001
@@ -613,6 +656,7 @@ async def test_async_setup_entry_removes_battery_entity_on_serial_drop(
         }
     }
     coord._battery_storage_order = ["BAT-REMOVE"]  # noqa: SLF001
+    _mark_battery_status_ready(coord)
     callbacks: list[Any] = []
 
     def fake_add_listener(cb):
@@ -643,6 +687,7 @@ async def test_async_setup_entry_removes_battery_entity_on_serial_drop(
 
     coord._battery_storage_data = {}  # noqa: SLF001
     coord._battery_storage_order = []  # noqa: SLF001
+    _mark_battery_status_ready(coord)
     for callback in callbacks:
         callback()
 
@@ -660,6 +705,7 @@ async def test_async_setup_entry_removes_stale_battery_entity_after_restart(
     coord = coordinator_factory(serials=[RANDOM_SERIAL])
     coord._battery_storage_data = {}  # noqa: SLF001
     coord._battery_storage_order = []  # noqa: SLF001
+    _mark_battery_status_ready(coord)
     coord.async_add_topology_listener = lambda _cb: (lambda: None)  # type: ignore[assignment]
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
 
@@ -687,6 +733,185 @@ async def test_async_setup_entry_removes_stale_battery_entity_after_restart(
     await async_setup_entry(hass, config_entry, lambda *_args, **_kwargs: None)
 
     assert removed_ids == ["sensor.bat_old_status"]
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_waits_for_authoritative_serial_family_payloads_before_prune(
+    hass, config_entry, coordinator_factory, monkeypatch
+) -> None:
+    from custom_components.enphase_ev.const import DOMAIN
+    from custom_components.enphase_ev.sensor import async_setup_entry
+
+    coord = coordinator_factory(serials=[RANDOM_SERIAL])
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord._battery_status_payload = None  # noqa: SLF001
+    coord._ac_battery_devices_payload = None  # noqa: SLF001
+    coord._inverters_inventory_payload = None  # noqa: SLF001
+    coord._battery_has_acb = True  # noqa: SLF001
+    coord.include_inverters = True
+    coord.inventory_runtime._set_type_device_buckets(  # noqa: SLF001
+        {
+            "encharge": {"type_label": "Batteries", "count": 1, "devices": []},
+            "ac_battery": {"type_label": "AC Battery", "count": 1, "devices": []},
+            "microinverter": {
+                "type_label": "Microinverters",
+                "count": 1,
+                "devices": [],
+            },
+        },
+        ["encharge", "ac_battery", "microinverter"],
+    )
+    coord.async_add_topology_listener = lambda _cb: (lambda: None)  # type: ignore[assignment]
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+
+    removed_ids: list[str] = []
+
+    class FakeRegistry:
+        def __init__(self) -> None:
+            self.entities = {
+                "sensor.bat_unknown": SimpleNamespace(
+                    entity_id="sensor.bat_unknown",
+                    domain="sensor",
+                    platform=DOMAIN,
+                    unique_id=f"{DOMAIN}_site_{coord.site_id}_battery_BAT-OLD_status",
+                    config_entry_id=config_entry.entry_id,
+                ),
+                "sensor.ac_bat_unknown": SimpleNamespace(
+                    entity_id="sensor.ac_bat_unknown",
+                    domain="sensor",
+                    platform=DOMAIN,
+                    unique_id=f"{DOMAIN}_site_{coord.site_id}_ac_battery_ACBAT-OLD_status",
+                    config_entry_id=config_entry.entry_id,
+                ),
+                "sensor.inv_unknown": SimpleNamespace(
+                    entity_id="sensor.inv_unknown",
+                    domain="sensor",
+                    platform=DOMAIN,
+                    unique_id=f"{DOMAIN}_inverter_INV-OLD_lifetime_energy",
+                    config_entry_id=config_entry.entry_id,
+                ),
+            }
+
+        def async_get_entity_id(self, *_args):
+            return None
+
+        def async_remove(self, entity_id):
+            removed_ids.append(entity_id)
+            self.entities.pop(entity_id, None)
+
+    monkeypatch.setattr(sensor_mod.er, "async_get", lambda _hass: FakeRegistry())
+
+    await async_setup_entry(hass, config_entry, lambda *_args, **_kwargs: None)
+
+    assert removed_ids == []
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_adds_ac_battery_status_fallback_without_prune(
+    hass, config_entry, coordinator_factory, monkeypatch
+) -> None:
+    from custom_components.enphase_ev.const import DOMAIN
+    from custom_components.enphase_ev.sensor import async_setup_entry
+
+    coord = coordinator_factory(serials=[RANDOM_SERIAL])
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord._battery_has_acb = True  # noqa: SLF001
+    coord._ac_battery_devices_payload = None  # noqa: SLF001
+    coord._ac_battery_data = {  # noqa: SLF001
+        "BAT-AC-1": {
+            "serial_number": "BAT-AC-1",
+            "current_charge_pct": 55.0,
+            "status_normalized": "normal",
+        }
+    }
+    coord._ac_battery_order = ["BAT-AC-1"]  # noqa: SLF001
+    coord._ac_battery_aggregate_status_details = {  # noqa: SLF001
+        "status_source": "battery_status"
+    }
+    coord.inventory_runtime._set_type_device_buckets(  # noqa: SLF001
+        {"ac_battery": {"type_label": "AC Battery", "count": 1, "devices": []}},
+        ["ac_battery"],
+    )
+    coord.async_add_topology_listener = lambda _cb: (lambda: None)  # type: ignore[assignment]
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+
+    removed_ids: list[str] = []
+
+    class FakeRegistry:
+        def __init__(self) -> None:
+            self.entities = {
+                "sensor.ac_bat_old": SimpleNamespace(
+                    entity_id="sensor.ac_bat_old",
+                    domain="sensor",
+                    platform=DOMAIN,
+                    unique_id=f"{DOMAIN}_site_{coord.site_id}_ac_battery_ACBAT-OLD_status",
+                    config_entry_id=config_entry.entry_id,
+                )
+            }
+
+        def async_get_entity_id(self, *_args):
+            return None
+
+        def async_remove(self, entity_id):
+            removed_ids.append(entity_id)
+            self.entities.pop(entity_id, None)
+
+    monkeypatch.setattr(sensor_mod.er, "async_get", lambda _hass: FakeRegistry())
+
+    added: list[Any] = []
+
+    def _capture(entities, update_before_add=False):
+        added.extend(entities)
+
+    await async_setup_entry(hass, config_entry, _capture)
+
+    per_ac_prefix = f"{DOMAIN}_site_{coord.site_id}_ac_battery_BAT-AC-1"
+    per_ac_entities = [
+        entity
+        for entity in added
+        if getattr(entity, "unique_id", "").startswith(per_ac_prefix)
+    ]
+    assert len(per_ac_entities) == 6
+    assert removed_ids == []
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_serial_family_sync_returns_when_source_becomes_unknown(
+    hass, config_entry, coordinator_factory, monkeypatch
+) -> None:
+    from custom_components.enphase_ev.sensor import async_setup_entry
+
+    coord = coordinator_factory(serials=[RANDOM_SERIAL])
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    responses = {
+        "battery": [set(), None],
+        "ac_battery": [set(), None],
+        "inverter": [set(), None],
+    }
+
+    def _next_response(key: str):
+        values = responses[key]
+        return values.pop(0) if values else None
+
+    monkeypatch.setattr(
+        sensor_mod,
+        "active_battery_serials_for_cleanup",
+        lambda _coord: _next_response("battery"),
+    )
+    monkeypatch.setattr(
+        sensor_mod,
+        "active_ac_battery_serials_for_cleanup",
+        lambda _coord: _next_response("ac_battery"),
+    )
+    monkeypatch.setattr(
+        sensor_mod,
+        "active_inverter_serials_for_cleanup",
+        lambda _coord: _next_response("inverter"),
+    )
+
+    await async_setup_entry(hass, config_entry, lambda *_args, **_kwargs: None)
+
+    assert responses == {"battery": [], "ac_battery": [], "inverter": []}
 
 
 @pytest.mark.asyncio
@@ -802,6 +1027,7 @@ async def test_async_setup_entry_keeps_current_battery_entity(
         }
     }
     coord._battery_storage_order = ["BAT-KEEP"]  # noqa: SLF001
+    _mark_battery_status_ready(coord)
     coord.async_add_topology_listener = lambda _cb: (lambda: None)  # type: ignore[assignment]
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
 
@@ -847,6 +1073,7 @@ async def test_async_setup_entry_prunes_legacy_battery_last_reported_entities_fo
         }
     }
     coord._battery_storage_order = ["BAT-KEEP"]  # noqa: SLF001
+    _mark_battery_status_ready(coord)
     coord.async_add_topology_listener = lambda _cb: (lambda: None)  # type: ignore[assignment]
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
 
@@ -958,6 +1185,7 @@ async def test_async_setup_entry_adds_inverter_lifetime_sensors(
         }
     }
     coord._inverter_order = ["INV-A"]  # noqa: SLF001
+    _mark_inverter_inventory_ready(coord)
     coord._type_device_buckets = {  # noqa: SLF001
         "microinverter": {
             "type_key": "microinverter",
@@ -1004,6 +1232,7 @@ async def test_async_setup_entry_removes_deleted_inverter_entity(
         "INV-A": {"serial_number": "INV-A", "lifetime_production_wh": 100}
     }
     coord._inverter_order = ["INV-A"]  # noqa: SLF001
+    _mark_inverter_inventory_ready(coord)
     callbacks: list[Any] = []
 
     def _add_listener(cb):
@@ -1050,6 +1279,7 @@ async def test_async_setup_entry_removes_deleted_inverter_entity(
 
     coord._inverter_data = {}  # noqa: SLF001
     coord._inverter_order = []  # noqa: SLF001
+    _mark_inverter_inventory_ready(coord)
     sync_inverters()
 
     assert removed_ids == ["sensor.inv_a_lifetime_energy"]
@@ -1063,6 +1293,8 @@ async def test_async_setup_entry_removes_stale_inverter_entity_after_restart(
     from custom_components.enphase_ev.sensor import async_setup_entry
 
     coord = coordinator_factory(serials=[RANDOM_SERIAL])
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord._inverters_inventory_payload = {"inverters": []}  # noqa: SLF001
     coord._inverter_data = {}  # noqa: SLF001
     coord._inverter_order = []  # noqa: SLF001
     coord.async_add_topology_listener = lambda _cb: (lambda: None)  # type: ignore[assignment]
@@ -1102,6 +1334,8 @@ async def test_async_setup_entry_registry_cleanup_filters_irrelevant_entries(
     from custom_components.enphase_ev.sensor import async_setup_entry
 
     coord = coordinator_factory(serials=[RANDOM_SERIAL])
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord._inverters_inventory_payload = {"inverters": []}  # noqa: SLF001
     coord._inverter_data = {}  # noqa: SLF001
     coord._inverter_order = []  # noqa: SLF001
     coord.async_add_topology_listener = lambda _cb: (lambda: None)  # type: ignore[assignment]

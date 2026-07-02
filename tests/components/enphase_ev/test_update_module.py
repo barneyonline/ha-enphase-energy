@@ -79,6 +79,8 @@ class DummyCoordinator:
         self._iqevse_version = "25.37.1.13"
         self._listeners = []
         self._available_types = {"envoy", "microinverter", "iqevse"}
+        self._devices_inventory_ready = False
+        self._active_evse_serials: list[str] | None = None
         self._evse_feature_flags = {
             TEST_EVSE_SERIAL: {"iqevse_itk_fw_upgrade_status": True}
         }
@@ -130,6 +132,11 @@ class DummyCoordinator:
         }
 
     def iter_serials(self) -> list[str]:
+        return list(self.data)
+
+    def _active_inventory_evse_serials(self) -> list[str] | None:
+        if self._active_evse_serials is not None:
+            return self._active_evse_serials
         return list(self.data)
 
     def evse_feature_flag_enabled(self, key: str, sn: str | None = None) -> bool | None:
@@ -293,6 +300,7 @@ async def test_async_setup_entry_prunes_removed_charger_entities(
     hass, config_entry
 ) -> None:
     coord = DummyCoordinator()
+    coord._devices_inventory_ready = True
     config_entry.runtime_data = EnphaseRuntimeData(
         coordinator=coord,
         firmware_catalog=DummyCatalogManager(_catalog_payload()),
@@ -324,6 +332,8 @@ async def test_async_setup_entry_prunes_charger_entities_when_type_unavailable(
 ) -> None:
     coord = DummyCoordinator()
     coord._available_types = set()
+    coord._devices_inventory_ready = True
+    coord._active_evse_serials = []
     config_entry.runtime_data = EnphaseRuntimeData(
         coordinator=coord,
         firmware_catalog=DummyCatalogManager(_catalog_payload()),

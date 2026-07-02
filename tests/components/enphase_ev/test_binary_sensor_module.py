@@ -93,6 +93,19 @@ async def test_async_setup_entry_syncs_binary_sensors(
         "commissioned": False,
     }
     coord._ensure_serial_tracked(new_serial)
+    coord.inventory_runtime._set_type_device_buckets(  # noqa: SLF001
+        {
+            "iqevse": {
+                "type_label": "EV Chargers",
+                "count": 2,
+                "devices": [
+                    {"serial_number": RANDOM_SERIAL},
+                    {"serial_number": new_serial},
+                ],
+            }
+        },
+        ["iqevse"],
+    )
 
     sync_cb()
     assert len(added) == 7
@@ -152,6 +165,96 @@ async def test_async_setup_entry_prunes_historical_charger_binary_sensor_entitie
     assert fake_registry.async_remove.call_count == 2
     fake_registry.async_remove.assert_any_call("binary_sensor.old_commissioned")
     fake_registry.async_remove.assert_any_call("binary_sensor.old_problem")
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_prunes_removed_charger_binary_sensor_entities(
+    hass, config_entry, coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory(serials=["EVKEEP"])
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+
+    fake_registry = SimpleNamespace(
+        entities={
+            "binary_sensor.old_plugged": SimpleNamespace(
+                entity_id="binary_sensor.old_plugged",
+                domain="binary_sensor",
+                platform=DOMAIN,
+                unique_id=f"{DOMAIN}_EVOLD_plugged",
+                config_entry_id=config_entry.entry_id,
+            ),
+            "binary_sensor.keep_connected": SimpleNamespace(
+                entity_id="binary_sensor.keep_connected",
+                domain="binary_sensor",
+                platform=DOMAIN,
+                unique_id=f"{DOMAIN}_EVKEEP_connected",
+                config_entry_id=config_entry.entry_id,
+            ),
+            "binary_sensor.keep_site_status": SimpleNamespace(
+                entity_id="binary_sensor.keep_site_status",
+                domain="binary_sensor",
+                platform=DOMAIN,
+                unique_id=f"{DOMAIN}_site_{coord.site_id}_connected",
+                config_entry_id=config_entry.entry_id,
+            ),
+            "binary_sensor.ignore_wrong_entry": SimpleNamespace(
+                entity_id="binary_sensor.ignore_wrong_entry",
+                domain="binary_sensor",
+                platform=DOMAIN,
+                unique_id=f"{DOMAIN}_EVOTHER_plugged",
+                config_entry_id="other-entry",
+            ),
+        },
+        async_remove=MagicMock(),
+        async_get_entity_id=MagicMock(return_value=None),
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.binary_sensor.er.async_get",
+        lambda _hass: fake_registry,
+    )
+    monkeypatch.setattr(
+        coord, "async_add_topology_listener", lambda callback: _stub_listener()
+    )
+
+    await async_setup_entry(hass, config_entry, lambda *_args, **_kwargs: None)
+
+    fake_registry.async_remove.assert_called_once_with("binary_sensor.old_plugged")
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_waits_for_authoritative_charger_inventory_before_binary_prune(
+    hass, config_entry, coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory(serials=["EVKEEP"])
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord._active_inventory_evse_serials = lambda: None  # type: ignore[method-assign]
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+
+    fake_registry = SimpleNamespace(
+        entities={
+            "binary_sensor.old_plugged": SimpleNamespace(
+                entity_id="binary_sensor.old_plugged",
+                domain="binary_sensor",
+                platform=DOMAIN,
+                unique_id=f"{DOMAIN}_EVOLD_plugged",
+                config_entry_id=config_entry.entry_id,
+            ),
+        },
+        async_remove=MagicMock(),
+        async_get_entity_id=MagicMock(return_value=None),
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.binary_sensor.er.async_get",
+        lambda _hass: fake_registry,
+    )
+    monkeypatch.setattr(
+        coord, "async_add_topology_listener", lambda callback: _stub_listener()
+    )
+
+    await async_setup_entry(hass, config_entry, lambda *_args, **_kwargs: None)
+
+    fake_registry.async_remove.assert_not_called()
 
 
 @pytest.mark.asyncio

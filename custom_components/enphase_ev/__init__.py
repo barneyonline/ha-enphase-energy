@@ -38,6 +38,21 @@ from .entity_cleanup import (
 from .log_redaction import redact_identifier, redact_site_id, redact_text
 from .runtime_data import EnphaseConfigEntry, EnphaseRuntimeData, get_runtime_data
 from .runtime_helpers import coerce_optional_text as _clean_optional_text
+from .serial_discovery import (
+    active_serial_registry_identifiers,
+)
+from .serial_entity_metadata import (
+    AC_BATTERY_ENTITY_UNIQUE_SUFFIXES,
+    AC_BATTERY_RETIRED_UNIQUE_SUFFIXES,
+    BATTERY_ENTITY_UNIQUE_SUFFIXES,
+    BATTERY_RETIRED_UNIQUE_SUFFIXES,
+    CHARGER_BINARY_SENSOR_UNIQUE_SUFFIXES,
+    CHARGER_SENSOR_UNIQUE_SUFFIXES,
+    ac_battery_entity_serial_from_unique_id,
+    battery_entity_serial_from_unique_id,
+    charger_entity_serial_from_unique_id,
+    inverter_entity_serial_from_unique_id,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -85,6 +100,10 @@ _SITE_ENERGY_ENTITY_UNIQUE_ID_SUFFIXES: tuple[str, ...] = (
     "battery_discharge",
     "battery_power",
 )
+_CHARGER_ENTITY_UNIQUE_ID_SUFFIXES_BY_DOMAIN: dict[str, tuple[str, ...]] = {
+    "binary_sensor": CHARGER_BINARY_SENSOR_UNIQUE_SUFFIXES,
+    "sensor": CHARGER_SENSOR_UNIQUE_SUFFIXES,
+}
 _CLOUD_ENTITY_UNIQUE_ID_SUFFIXES_BY_DOMAIN: dict[str, tuple[str, ...]] = {
     "binary_sensor": ("cloud_reachable",),
     "sensor": (
@@ -404,11 +423,232 @@ def _sync_charger_devices(
         dev_reg.async_get_or_create(**kwargs)
 
 
+def _serial_entity_group_from_unique_id(
+    unique_id: object,
+    *,
+    domain: str,
+    site_id: object,
+) -> tuple[str, str] | None:
+    """Return the serial-backed entity group and serial for a unique ID."""
+
+    try:
+        site_text = str(site_id).strip()
+    except Exception:  # noqa: BLE001
+        site_text = ""
+    if domain == "binary_sensor":
+        serial = charger_entity_serial_from_unique_id(
+            unique_id,
+            _CHARGER_ENTITY_UNIQUE_ID_SUFFIXES_BY_DOMAIN["binary_sensor"],
+        )
+        return ("charger", serial) if serial is not None else None
+    if domain != "sensor":
+        return None
+
+    charger_serial = charger_entity_serial_from_unique_id(
+        unique_id,
+        _CHARGER_ENTITY_UNIQUE_ID_SUFFIXES_BY_DOMAIN["sensor"],
+    )
+    if charger_serial is not None:
+        return ("charger", charger_serial)
+    if site_text:
+        battery_serial = battery_entity_serial_from_unique_id(
+            unique_id,
+            site_id=site_text,
+            suffixes=(
+                *BATTERY_ENTITY_UNIQUE_SUFFIXES,
+                *BATTERY_RETIRED_UNIQUE_SUFFIXES,
+            ),
+        )
+        if battery_serial is not None:
+            return ("battery", battery_serial)
+
+        ac_battery_serial = ac_battery_entity_serial_from_unique_id(
+            unique_id,
+            site_id=site_text,
+            suffixes=(
+                *AC_BATTERY_ENTITY_UNIQUE_SUFFIXES,
+                *AC_BATTERY_RETIRED_UNIQUE_SUFFIXES,
+            ),
+        )
+        if ac_battery_serial is not None:
+            return ("ac_battery", ac_battery_serial)
+
+    inverter_serial = inverter_entity_serial_from_unique_id(unique_id)
+    if inverter_serial is not None:
+        return ("inverter", inverter_serial)
+    return None
+
+
+def _prune_inactive_serial_entities(
+    hass: HomeAssistant,
+    entry: EnphaseConfigEntry,
+    coord,
+    site_id: object,
+) -> int:
+    """Remove owned serial-backed entities no longer present in active discovery."""
+
+    if er is None or not bool(getattr(coord, "_devices_inventory_ready", False)):
+        return 0
+    try:
+        ent_reg = er.async_get(hass)
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug(
+            "Skipping inactive serial entity cleanup for site %s: %s",
+            redact_site_id(site_id),
+            redact_text(err, site_ids=(site_id,)),
+        )
+        return 0
+    active_serials_by_group = active_serial_registry_identifiers(coord)
+    entry_id = getattr(entry, "entry_id", None)
+    removed = 0
+    for reg_entry in iter_entity_registry_entries(ent_reg):
+        entry_domain = getattr(reg_entry, "domain", None)
+        if entry_domain is None:
+            entity_id = getattr(reg_entry, "entity_id", "")
+            entry_domain = (
+                entity_id.partition(".")[0] if isinstance(entity_id, str) else ""
+            )
+        if not is_owned_entity(reg_entry, entry_id, entry_domain):
+            continue
+        group_and_serial = _serial_entity_group_from_unique_id(
+            getattr(reg_entry, "unique_id", None),
+            domain=entry_domain,
+            site_id=site_id,
+        )
+        if group_and_serial is None:
+            continue
+        group, serial = group_and_serial
+        active_serials = active_serials_by_group.get(group)
+        if active_serials is None:
+            continue
+        if serial in active_serials:
+            continue
+        entity_id = getattr(reg_entry, "entity_id", None)
+        if not entity_id:
+            continue
+        try:
+            ent_reg.async_remove(entity_id)
+            removed += 1
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug(
+                "Failed removing inactive serial entity %s for site %s: %s",
+                redact_identifier(entity_id),
+                redact_site_id(site_id),
+                redact_text(err, site_ids=(site_id,), identifiers=(serial, entity_id)),
+            )
+    if removed:
+        _LOGGER.debug(
+            "Removed %s inactive serial entities for site %s",
+            removed,
+            redact_site_id(site_id),
+        )
+    return removed
+
+
+def _remove_empty_inactive_serial_devices(
+    hass: HomeAssistant,
+    entry: EnphaseConfigEntry,
+    coord,
+    dev_reg,
+    site_id: object,
+) -> int:
+    """Remove empty serial devices no longer present in active inventory."""
+
+    if er is None or not bool(getattr(coord, "_devices_inventory_ready", False)):
+        return 0
+    try:
+        ent_reg = er.async_get(hass)
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug(
+            "Skipping inactive serial device cleanup for site %s: %s",
+            redact_site_id(site_id),
+            redact_text(err, site_ids=(site_id,)),
+        )
+        return 0
+    remove_device = getattr(dev_reg, "async_remove_device", None)
+    if not callable(remove_device):
+        return 0
+
+    active_serials_by_group = active_serial_registry_identifiers(coord)
+    if any(serials is None for serials in active_serials_by_group.values()):
+        return 0
+    active_serials: set[str] = set()
+    for serials in active_serials_by_group.values():
+        active_serials.update(serials or set())
+    entry_id = getattr(entry, "entry_id", None)
+    removed = 0
+    for device in iter_device_registry_entries(dev_reg):
+        config_entries = getattr(device, "config_entries", None)
+        if config_entries is not None and entry_id not in config_entries:
+            continue
+        identifiers = getattr(device, "identifiers", None)
+        if not identifiers:
+            continue
+        inactive_serials: list[str] = []
+        has_active_serial = False
+        for ident_domain, ident_value in identifiers:
+            if ident_domain != DOMAIN:
+                continue
+            try:
+                ident_text = str(ident_value).strip()
+            except Exception:  # noqa: BLE001
+                continue
+            if (
+                not ident_text
+                or ident_text.startswith("type:")
+                or ident_text.startswith("site:")
+            ):
+                continue
+            if ident_text in active_serials:
+                has_active_serial = True
+                break
+            inactive_serials.append(ident_text)
+        if has_active_serial or not inactive_serials:
+            continue
+        device_id = getattr(device, "id", None)
+        if not device_id:
+            continue
+        remaining_entries = entries_for_device(ent_reg, device_id)
+        if remaining_entries:
+            _LOGGER.debug(
+                "Keeping inactive serial device %s for site %s; %s entities remain",
+                redact_identifier(inactive_serials[0]),
+                redact_site_id(site_id),
+                len(remaining_entries),
+            )
+            continue
+        try:
+            remove_device(device_id)
+            removed += 1
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug(
+                "Failed removing inactive serial device %s for site %s: %s",
+                redact_identifier(inactive_serials[0]),
+                redact_site_id(site_id),
+                redact_text(err, site_ids=(site_id,), identifiers=inactive_serials),
+            )
+    if removed:
+        _LOGGER.debug(
+            "Removed %s inactive serial devices for site %s",
+            removed,
+            redact_site_id(site_id),
+        )
+    return removed
+
+
 def _sync_registry_devices(
-    entry: EnphaseConfigEntry, coord, dev_reg, site_id: object
+    entry: EnphaseConfigEntry,
+    coord,
+    dev_reg,
+    site_id: object,
+    *,
+    hass: HomeAssistant | None = None,
 ) -> None:
     type_devices = _sync_type_devices(entry, coord, dev_reg, site_id)
     _sync_charger_devices(entry, coord, dev_reg, site_id, type_devices)
+    if hass is not None:
+        _prune_inactive_serial_entities(hass, entry, coord, site_id)
+        _remove_empty_inactive_serial_devices(hass, entry, coord, dev_reg, site_id)
 
 
 def _registry_type_metadata_signature(coord) -> tuple[tuple[object, ...], ...]:
@@ -1270,7 +1510,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
 
     site_id = entry.data.get("site_id")
     dev_reg = dr.async_get(hass)
-    _sync_registry_devices(entry, coord, dev_reg, site_id)
+    _sync_registry_devices(entry, coord, dev_reg, site_id, hass=hass)
     _remove_legacy_site_device(hass, entry, coord, dev_reg, site_id)
     _remove_evse_type_device_and_entities(hass, entry, dev_reg, site_id)
     _migrate_orphaned_update_entities_to_type_devices(hass, entry, site_id)
@@ -1283,10 +1523,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
         try:
             current_signature = _registry_metadata_signature(coord)
             if current_signature != last_registry_signature:
-                _sync_registry_devices(entry, coord, dev_reg, site_id)
+                _sync_registry_devices(entry, coord, dev_reg, site_id, hass=hass)
                 _remove_evse_type_device_and_entities(hass, entry, dev_reg, site_id)
                 _migrate_orphaned_update_entities_to_type_devices(hass, entry, site_id)
                 last_registry_signature = current_signature
+            else:
+                _prune_inactive_serial_entities(hass, entry, coord, site_id)
+                _remove_empty_inactive_serial_devices(
+                    hass, entry, coord, dev_reg, site_id
+                )
             _remove_legacy_site_device(hass, entry, coord, dev_reg, site_id)
             _complete_startup_migrations_if_ready(hass, entry, coord, dev_reg, site_id)
         except Exception as err:  # noqa: BLE001
@@ -1327,6 +1572,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
             hass.async_create_task(coro, name=name)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    _prune_inactive_serial_entities(hass, entry, coord, site_id)
+    _remove_empty_inactive_serial_devices(hass, entry, coord, dev_reg, site_id)
 
     # Start background work only after entities have been forwarded so restored
     # topology can create entities first and warmup can fill in live state later.

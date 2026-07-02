@@ -372,9 +372,10 @@ class EvseRuntime:
     def prune_serial_runtime_state(self, active_serials: Iterable[str]) -> set[str]:
         coord = self.coordinator
         keep_serials = self.normalize_serials(active_serials)
-        keep_serials.update(
-            self.normalize_serials(getattr(coord, "_configured_serials", ()))
-        )
+        if not bool(getattr(coord, "_devices_inventory_ready", False)):
+            keep_serials.update(
+                self.normalize_serials(getattr(coord, "_configured_serials", ()))
+            )
         if isinstance(getattr(coord, "serials", None), set):
             coord.serials.intersection_update(keep_serials)
         else:
