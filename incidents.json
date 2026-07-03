@@ -1,6 +1,6 @@
 {
   "current_status": "Down",
-  "generated_at": "2026-07-03T16:05:49.813217Z",
+  "generated_at": "2026-07-03T17:55:54.794762Z",
   "incidents": [
     {
       "active": false,
@@ -575,7 +575,7 @@
       "status": "Down"
     },
     {
-      "active": true,
+      "active": false,
       "duration_minutes": 0,
       "ended_at": null,
       "failed_checks": [
@@ -586,6 +586,20 @@
       ],
       "last_seen_at": "2026-07-03T16:05:49.813217Z",
       "started_at": "2026-07-03T16:05:49.813217Z",
+      "status": "Down"
+    },
+    {
+      "active": true,
+      "duration_minutes": 0,
+      "ended_at": null,
+      "failed_checks": [
+        "battery_config",
+        "evse_control",
+        "evse_scheduler",
+        "session_history"
+      ],
+      "last_seen_at": "2026-07-03T17:55:54.794762Z",
+      "started_at": "2026-07-03T17:55:54.794762Z",
       "status": "Down"
     }
   ],
