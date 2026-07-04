@@ -1,16 +1,8 @@
 {
   "current_status": "Down",
-  "generated_at": "2026-07-03T23:34:07.155870Z",
+  "generated_at": "2026-07-04T02:47:22.460046Z",
   "retention_days": 30,
   "samples": [
-    {
-      "checked_at": "2026-06-03T23:42:11.760430Z",
-      "checks_failed": 1,
-      "failed_check_names": [
-        "battery_config"
-      ],
-      "status": "Fully Operational"
-    },
     {
       "checked_at": "2026-06-04T03:54:39.584262Z",
       "checks_failed": 1,
@@ -2276,6 +2268,17 @@
     },
     {
       "checked_at": "2026-07-03T23:34:07.155870Z",
+      "checks_failed": 4,
+      "failed_check_names": [
+        "battery_config",
+        "evse_control",
+        "evse_scheduler",
+        "session_history"
+      ],
+      "status": "Down"
+    },
+    {
+      "checked_at": "2026-07-04T02:47:22.460046Z",
       "checks_failed": 4,
       "failed_check_names": [
         "battery_config",
