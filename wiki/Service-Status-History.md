@@ -1,11 +1,11 @@
 # Service Status History
 
 - Current status: **Down**
-- Last updated: `2026-07-04 02:47 UTC`
+- Last updated: `2026-07-04 06:18 UTC`
 - Failed checks in latest run: `4`
 - Latest failed checks: evse_scheduler, session_history, battery_config, evse_control
 - Retained hourly samples: `267`
-- Incident windows in last 30 days: `45`
+- Incident windows in last 30 days: `46`
 
 This page is generated from hourly synthetic checks against Enphase cloud endpoints. It may miss incidents that begin and recover between checks.
 
@@ -16,8 +16,8 @@ gantt
     title Enphase Service Status Incident Timeline (Last 30 Days)
     dateFormat  YYYY-MM-DDTHH:mm:ss
     axisFormat  %b %d
-    Window start :vert, window-start, 2026-06-04T02:47:22, 0ms
-    Window end :vert, window-end, 2026-07-04T02:47:22, 0ms
+    Window start :vert, window-start, 2026-06-04T06:18:09, 0ms
+    Window end :vert, window-end, 2026-07-04T06:18:09, 0ms
     section Down
     Down 1 (2026-06-07 1523 UTC) :crit, down-1, 2026-06-07T15:23:22, 87m
     Down 2 (2026-06-09 2117 UTC) :crit, down-2, 2026-06-09T21:17:17, 60m
@@ -63,6 +63,7 @@ gantt
     Down 42 (2026-07-03 1605 UTC) :crit, down-42, 2026-07-03T16:05:49, 60m
     Down 43 (2026-07-03 1755 UTC) :crit, down-43, 2026-07-03T17:55:54, 338m
     Down 44 (2026-07-04 0247 UTC) :crit, down-44, 2026-07-04T02:47:22, 60m
+    Down 45 (2026-07-04 0618 UTC) :crit, down-45, 2026-07-04T06:18:09, 60m
     section Degraded
     Degraded 1 (2026-06-25 2352 UTC) :active, degraded-1, 2026-06-25T23:52:01, 60m
 ```
@@ -115,7 +116,8 @@ gantt
 | Down | 2026-07-03 14:00 UTC | Unknown after last seen 2026-07-03 14:00 UTC | Observed 0m | battery_config, evse_control, evse_scheduler, session_history |
 | Down | 2026-07-03 16:05 UTC | Unknown after last seen 2026-07-03 16:05 UTC | Observed 0m | battery_config, evse_control, evse_scheduler, session_history |
 | Down | 2026-07-03 17:55 UTC | Unknown after last seen 2026-07-03 23:34 UTC | Observed 5h 38m | battery_config, evse_control, evse_scheduler, session_history |
-| Down | 2026-07-04 02:47 UTC | Ongoing (last seen 2026-07-04 02:47 UTC) | Observed at latest check | battery_config, evse_control, evse_scheduler, session_history |
+| Down | 2026-07-04 02:47 UTC | Unknown after last seen 2026-07-04 02:47 UTC | Observed 0m | battery_config, evse_control, evse_scheduler, session_history |
+| Down | 2026-07-04 06:18 UTC | Ongoing (last seen 2026-07-04 06:18 UTC) | Observed at latest check | battery_config, evse_control, evse_scheduler, session_history |
 
 ## Raw Artifacts
 
