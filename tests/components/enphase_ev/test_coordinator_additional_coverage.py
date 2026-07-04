@@ -42,14 +42,17 @@ from custom_components.enphase_ev.const import (
     DEFAULT_FAST_POLL_INTERVAL,
     DEFAULT_SLOW_POLL_INTERVAL,
     GREEN_BATTERY_SETTING,
+    ISSUE_AUTH_BLOCKED,
     ISSUE_CLOUD_ERRORS,
     ISSUE_DNS_RESOLUTION,
+    ISSUE_REAUTH_REQUIRED,
     ISSUE_NETWORK_UNREACHABLE,
     ISSUE_AUTH_SETTINGS_UNAVAILABLE,
     ISSUE_HEMS_AUTH_DEGRADED,
     ISSUE_SCHEDULER_UNAVAILABLE,
     ISSUE_SESSION_HISTORY_UNAVAILABLE,
     ISSUE_SITE_ENERGY_UNAVAILABLE,
+    ISSUE_TOO_MANY_ACTIVE_SESSIONS,
     MIN_FAST_POLL_INTERVAL,
     MIN_SLOW_POLL_INTERVAL,
     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
@@ -4143,6 +4146,25 @@ async def test_handle_client_unauthorized_paths(
         issue[1] == "reauth_required" for issue in mock_issue_registry.created
     )
     assert any(issue[1] == "reauth_required" for issue in mock_issue_registry.deleted)
+
+
+def test_create_reauth_issue_clears_auth_block_repairs(
+    coordinator_factory, mock_issue_registry
+) -> None:
+    coord = coordinator_factory()
+    coord._auth_block_issue_reported = True
+    coord.diagnostics.create_reauth_issue()
+
+    deleted_issue_ids = {issue_id for _domain, issue_id in mock_issue_registry.deleted}
+    assert ISSUE_AUTH_BLOCKED in deleted_issue_ids
+    assert ISSUE_TOO_MANY_ACTIVE_SESSIONS in deleted_issue_ids
+
+    domain, issue_id, payload = mock_issue_registry.created[-1]
+    assert domain == coord_mod.DOMAIN
+    assert issue_id == ISSUE_REAUTH_REQUIRED
+    assert payload["severity"] is coord_diag_mod.ir.IssueSeverity.ERROR
+    assert payload["translation_key"] == ISSUE_REAUTH_REQUIRED
+    assert "site_metrics" in payload["data"]
 
 
 def test_persist_tokens_updates_entry(coordinator_factory, config_entry):
