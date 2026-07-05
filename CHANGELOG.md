@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 - Fixed IQ Gateway firmware catalog generation so US commercial-only release notes are not advertised to residential/regional gateway update entities. (#735)
+- Fixed the Enphase Service Status badge so expected 4xx responses from ancillary Enphase probes no longer publish the service as down while Home Assistant reports the cloud service as OK.
 
 ### 🔧 Improvements
 - None
