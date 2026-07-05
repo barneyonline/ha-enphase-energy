@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Fixed IQ Gateway firmware catalog generation so US commercial-only release notes are not advertised to residential/regional gateway update entities. (#735)
 
 ### 🔧 Improvements
 - None
