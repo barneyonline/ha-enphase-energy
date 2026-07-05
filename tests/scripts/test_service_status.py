@@ -675,7 +675,7 @@ def test_endpoint_result_and_status_evaluation(service_status_module) -> None:
     assert details["summary"]["checks_failed_affecting"] == 1
 
 
-def test_evaluate_status_escalates_multiple_degraded_failures(
+def test_evaluate_status_keeps_multiple_degraded_failures_degraded(
     service_status_module,
 ) -> None:
     status, details = service_status_module._evaluate_status(
@@ -707,12 +707,12 @@ def test_evaluate_status_escalates_multiple_degraded_failures(
         ]
     )
 
-    assert status == "Down"
+    assert status == "Degraded"
     assert details["summary"]["checks_failed"] == 2
     assert details["summary"]["checks_failed_affecting"] == 2
 
 
-def test_evaluate_status_escalates_broad_non_affecting_outage(
+def test_evaluate_status_keeps_broad_non_affecting_outage_degraded(
     service_status_module,
 ) -> None:
     status, details = service_status_module._evaluate_status(
@@ -755,11 +755,88 @@ def test_evaluate_status_escalates_broad_non_affecting_outage(
         ]
     )
 
-    assert status == "Down"
+    assert status == "Degraded"
     assert details["summary"]["checks_failed"] == 3
     assert details["summary"]["checks_failed_affecting"] == 0
     assert details["summary"]["checks_failed_non_affecting"] == 3
     assert details["summary"]["checks_failed_broad_outage"] == 3
+
+
+def test_evaluate_status_keeps_healthy_runtime_with_failed_subservices_degraded(
+    service_status_module,
+) -> None:
+    status, details = service_status_module._evaluate_status(
+        [
+            {
+                "name": "auth",
+                "group": "other",
+                "ok": True,
+                "affects_status": True,
+                "affects_broad_outage": True,
+                "check_group": None,
+                "check_mode": "all",
+            },
+            {
+                "name": "discovery",
+                "group": "other",
+                "ok": True,
+                "affects_status": True,
+                "affects_broad_outage": True,
+                "check_group": None,
+                "check_mode": "all",
+            },
+            {
+                "name": "charger_status",
+                "group": "main",
+                "ok": True,
+                "affects_status": True,
+                "affects_broad_outage": True,
+                "check_group": None,
+                "check_mode": "all",
+            },
+            {
+                "name": "evse_scheduler",
+                "group": "degraded",
+                "ok": False,
+                "affects_status": True,
+                "affects_broad_outage": True,
+                "check_group": None,
+                "check_mode": "all",
+            },
+            {
+                "name": "session_history",
+                "group": "degraded",
+                "ok": False,
+                "affects_status": True,
+                "affects_broad_outage": True,
+                "check_group": None,
+                "check_mode": "all",
+            },
+            {
+                "name": "battery_config",
+                "group": "degraded",
+                "ok": False,
+                "affects_status": False,
+                "affects_broad_outage": True,
+                "check_group": None,
+                "check_mode": "all",
+            },
+            {
+                "name": "auth_settings",
+                "group": "degraded",
+                "ok": False,
+                "affects_status": True,
+                "affects_broad_outage": True,
+                "check_group": None,
+                "check_mode": "all",
+            },
+        ]
+    )
+
+    assert status == "Degraded"
+    assert details["summary"]["checks_failed"] == 4
+    assert details["summary"]["checks_failed_affecting"] == 3
+    assert details["summary"]["checks_failed_broad_outage"] == 4
 
 
 def test_evaluate_status_ignores_non_affecting_non_broad_outage_failures(
@@ -1259,6 +1336,68 @@ def test_main_success_generates_history_and_wiki(
         not in wiki_text
     )
     assert "raw.example.invalid/service-status/history.json" in wiki_text
+
+
+def test_main_treats_optional_probe_4xx_responses_as_operational(
+    service_status_module, tmp_path: Path, monkeypatch
+) -> None:
+    token = _jwt({"user_id": "user-1", "session_id": "session-1"})
+
+    monkeypatch.setenv("ENPHASE_EMAIL", "user@example.com")
+    monkeypatch.setenv("ENPHASE_PASSWORD", "secret")
+    monkeypatch.setenv("ENPHASE_SITE_ID", "SITE")
+    monkeypatch.delenv("ENPHASE_SERIAL", raising=False)
+    monkeypatch.setattr(
+        service_status_module,
+        "_cookie_header_for",
+        lambda url, jar: (
+            f"XSRF-TOKEN=xsrf-token; enlighten_manager_token_production={token}"
+            if "enlighten" in url
+            else ""
+        ),
+    )
+
+    def fake_request(opener, method, url, **kwargs):  # noqa: ARG001
+        if url == service_status_module.LOGIN_URL:
+            return 200, {}, b'{"session_id":"session-1","success":true}', None
+        if url == f"{service_status_module.ENTREZ_URL}/tokens":
+            return 400, {}, b"{}", "HTTP 400"
+        if url == service_status_module.SITE_SEARCH_URL:
+            return 200, {}, b'[{"site_id":"SITE"}]', None
+        if "ev_chargers/summary" in url:
+            return 200, {}, b'{"data":[{"serial":"SERIAL"}]}', None
+        if url.endswith("/ev_chargers/status"):
+            return 200, {}, b'{"evChargerData":[{"serial":"SERIAL"}]}', None
+        if "/service/evse_scheduler/" in url:
+            return 400, {}, b"{}", "HTTP 400"
+        if "/service/enho_historical_events_ms/" in url and method == "POST":
+            return 404, {}, b"{}", "HTTP 404"
+        if url.endswith("/schedules/isValid"):
+            return 403, {}, b"{}", "HTTP 403"
+        if "ev_charger_config" in url:
+            return 404, {}, b"{}", "HTTP 404"
+        return 200, {}, b"{}", None
+
+    monkeypatch.setattr(service_status_module, "_request", fake_request)
+
+    argv = [
+        "service_status.py",
+        "--output-dir",
+        str(tmp_path / "out"),
+    ]
+    old_argv = sys.argv
+    sys.argv = argv
+    try:
+        result = service_status_module.main()
+    finally:
+        sys.argv = old_argv
+
+    status_payload = json.loads((tmp_path / "out" / "status.json").read_text())
+
+    assert result == 0
+    assert status_payload["status"] == "Fully Operational"
+    assert status_payload["summary"]["checks_failed"] == 0
+    assert status_payload["summary"]["endpoints_failed"] == 0
 
 
 def test_main_checks_hems_endpoints_when_inventory_reports_hems(

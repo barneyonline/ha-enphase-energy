@@ -28,7 +28,6 @@ DEFAULT_WIKI_PAGE = "Service-Status-History.md"
 MIN_VISIBLE_INCIDENT_MINUTES = 60
 MAX_INCIDENT_SAMPLE_GAP_MINUTES = 90
 DEFAULT_REPOSITORY = "barneyonline/ha-enphase-energy"
-DOWN_FAILED_AFFECTING_CHECK_THRESHOLD = 2
 BROAD_OUTAGE_FAILED_CHECK_THRESHOLD = 3
 BROAD_OUTAGE_ENDPOINT_CATEGORIES = frozenset(
     {
@@ -555,9 +554,6 @@ def _evaluate_status(results: list[dict[str, Any]]) -> tuple[str, dict[str, Any]
     all_down = bool(affecting) and all(not c["ok"] for c in affecting)
     main_down = any(c["group"] == "main" for c in failed_affecting)
     degraded_down = any(c["group"] in ("degraded", "other") for c in failed_affecting)
-    multiple_affecting_down = (
-        len(failed_affecting) >= DOWN_FAILED_AFFECTING_CHECK_THRESHOLD
-    )
     failed_broad_outage_checks = [
         c for c in failed_checks if c.get("affects_broad_outage")
     ]
@@ -565,9 +561,9 @@ def _evaluate_status(results: list[dict[str, Any]]) -> tuple[str, dict[str, Any]
         len(failed_broad_outage_checks) >= BROAD_OUTAGE_FAILED_CHECK_THRESHOLD
     )
 
-    if main_down or all_down or multiple_affecting_down or broad_outage:
+    if main_down or all_down:
         status = "Down"
-    elif degraded_down:
+    elif degraded_down or broad_outage:
         status = "Degraded"
     else:
         status = "Fully Operational"
@@ -1447,6 +1443,7 @@ def main() -> int:
             group="degraded",
             category="evse_scheduler",
             headers=dict(control_headers),
+            ok_statuses=(200, 400, 401, 403, 404, 422),
         ),
         EndpointSpec(
             name="scheduler_green_settings",
@@ -1458,6 +1455,7 @@ def main() -> int:
             group="degraded",
             category="evse_scheduler",
             headers=dict(control_headers),
+            ok_statuses=(200, 400, 401, 403, 404, 422),
         ),
         EndpointSpec(
             name="scheduler_schedules",
@@ -1469,6 +1467,7 @@ def main() -> int:
             group="degraded",
             category="evse_scheduler",
             headers=dict(control_headers),
+            ok_statuses=(200, 400, 401, 403, 404, 422),
         ),
         EndpointSpec(
             name="session_history_criteria",
@@ -1477,6 +1476,7 @@ def main() -> int:
             group="degraded",
             category="session_history",
             headers=dict(history_headers),
+            ok_statuses=(200, 400, 401, 403, 404, 422),
         ),
         EndpointSpec(
             name="session_history",
@@ -1495,6 +1495,7 @@ def main() -> int:
                     "timezone": "UTC",
                 },
             },
+            ok_statuses=(200, 400, 401, 403, 404, 422),
         ),
         EndpointSpec(
             name="site_energy",
@@ -1644,7 +1645,7 @@ def main() -> int:
             headers=dict(battery_headers),
             json_body={"scheduleType": "cfg", "forceScheduleOpted": True},
             affects_status=False,
-            ok_statuses=(200, 400, 404, 422),
+            ok_statuses=(200, 400, 401, 403, 404, 422),
         ),
         EndpointSpec(
             name="devices_inventory",
@@ -1816,6 +1817,7 @@ def main() -> int:
                 {"key": "rfidSessionAuthentication"},
                 {"key": "sessionAuthentication"},
             ],
+            ok_statuses=(200, 400, 401, 403, 404, 422),
         ),
     ]
 
