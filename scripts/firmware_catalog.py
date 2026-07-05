@@ -45,6 +45,17 @@ TARGET_PRODUCTS: dict[str, dict[str, Any]] = {
     },
 }
 
+COMMERCIAL_ONLY_GATEWAY_TERMS = (
+    "iq gateway commercial 2",
+    "iq gateway commercial pro",
+)
+RESIDENTIAL_GATEWAY_TERMS = (
+    "envoy s",
+    "iq combiner",
+    "iq gateway metered",
+    "residential",
+)
+
 DEFAULT_TIMEOUT = 30
 DEFAULT_MAX_PAGES = 40
 SCHEMA_VERSION = 1
@@ -957,18 +968,29 @@ class ReleaseCardParser(HTMLParser):
         if not text:
             return None
 
-        for label in ("Countries", "Geographies"):
-            marker = f"{label}:"
-            idx = text.lower().find(marker.lower())
-            if idx < 0:
+        for label in (
+            "Countries",
+            "Geographies",
+            "Supported countries",
+            "Supported regions",
+        ):
+            match = re.search(
+                rf"\b{re.escape(label)}\s*:\s*",
+                text,
+                flags=re.IGNORECASE,
+            )
+            if match is None:
                 continue
-            tail = text[idx + len(marker) :].strip()
+            tail = text[match.end() :].strip()
             if not tail:
                 continue
             # Stop at likely next field labels in structured release notes.
             stops = [
+                "# Feature classification",
+                "Batteries supported:",
                 "Platforms supported:",
                 "Microinverters supported:",
+                "Gateways supported:",
                 "Supported system configurations:",
                 "Release notes:",
                 "Release note:",
@@ -1384,6 +1406,16 @@ def release_applies_to_country(
         card.countries_text, alias_map=alias_map
     )
     return country_applicability_matches(applicability, country_code)
+
+
+def release_applies_to_device(card: ReleaseCard, device_key: str) -> bool:
+    if device_key != "envoy":
+        return True
+
+    text = _collapse_ws(f"{card.title} {card.summary}").lower()
+    if not any(term in text for term in COMMERCIAL_ONLY_GATEWAY_TERMS):
+        return True
+    return any(term in text for term in RESIDENTIAL_GATEWAY_TERMS)
 
 
 def _is_same_release_card(left: ReleaseCard, right: ReleaseCard) -> bool:
@@ -1923,6 +1955,9 @@ def build_catalog(output_dir: Path, *, timeout: int, max_pages: int) -> None:
                     device_key,
                     err,
                 )
+            cards = [
+                card for card in cards if release_applies_to_device(card, device_key)
+            ]
             total_count += len(cards)
             target_crawl[str(target["key"])] = {
                 "site_url": target["site_url"],

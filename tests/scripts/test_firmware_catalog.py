@@ -404,6 +404,19 @@ def test_helper_edge_branches(
         )
         == "United States, Canada"
     )
+    assert (
+        parser._extract_country_text(
+            "Supported regions : United States. # Feature classification Feature"
+        )
+        == "United States"
+    )
+    assert (
+        parser._extract_country_text(
+            "Supported countries: The United States of America, Puerto Rico. "
+            "Gateways supported: IQ Gateway"
+        )
+        == "The United States of America, Puerto Rico"
+    )
     assert parser._extract_country_text("No labels here") is None
     parser._flush_card()
     assert parser.cards == []
@@ -464,6 +477,44 @@ def test_helper_edge_branches(
     ]
     assert firmware_catalog_module._token_to_iso("   ") is None
     assert firmware_catalog_module._token_to_iso("au") == "AU"
+
+    residential_gateway = firmware_catalog_module.ReleaseCard(
+        title="IQ Gateway software release notes (8.3.5421)",
+        version="8.3.5421",
+        release_date="2026-05-29",
+        media_id="residential-gateway",
+        langcode="en",
+        summary=(
+            "The IQ Gateway software version 8.3.5421 introduces support for "
+            "IQ9N Microinverters (residential) in North America."
+        ),
+        countries_text="United States",
+    )
+    commercial_gateway = firmware_catalog_module.ReleaseCard(
+        title="IQ Gateway software release notes (9.1.1188)",
+        version="9.1.1188",
+        release_date="2026-06-10",
+        media_id="commercial-gateway",
+        langcode="en",
+        summary=(
+            "IQ Gateway software version 9.1.1188 addresses stability issues "
+            "for grid-tied systems with IQ9N Microinverters (277 V) and "
+            "IQ Gateway Commercial Pro. Supported regions: United States."
+        ),
+        countries_text="United States",
+    )
+    assert (
+        firmware_catalog_module.release_applies_to_device(residential_gateway, "envoy")
+        is True
+    )
+    assert (
+        firmware_catalog_module.release_applies_to_device(commercial_gateway, "envoy")
+        is False
+    )
+    assert (
+        firmware_catalog_module.release_applies_to_device(commercial_gateway, "iqevse")
+        is True
+    )
 
     mapping = firmware_catalog_module.build_region_country_mapping(
         {
@@ -1600,6 +1651,19 @@ def test_build_catalog_filters_country_scoped_releases(
             "and the Philippines"
         ),
     )
+    commercial_envoy = firmware_catalog_module.ReleaseCard(
+        title="IQ Gateway software release notes (9.1.1188)",
+        version="9.1.1188",
+        release_date="2026-06-10",
+        media_id="commercial-envoy",
+        langcode="und",
+        summary=(
+            "IQ Gateway software version 9.1.1188 addresses stability issues "
+            "for grid-tied systems with IQ9N Microinverters (277 V) and "
+            "IQ Gateway Commercial Pro. Supported regions: United States."
+        ),
+        countries_text="United States",
+    )
     br_scoped_envoy = firmware_catalog_module.ReleaseCard(
         title="Notas de versao do software IQ Gateway (8.2.4401)",
         version="8.2.4401",
@@ -1621,7 +1685,7 @@ def test_build_catalog_filters_country_scoped_releases(
 
     def _fake_crawl_release_cards(**kwargs):
         if kwargs["product_media_name_id"] == 5002 and kwargs["search_locale"] == "en":
-            return [scoped_envoy, worldwide_envoy], [
+            return [commercial_envoy, scoped_envoy, worldwide_envoy], [
                 f"https://example.test/envoy/{kwargs['search_locale']}"
             ]
         if (
