@@ -124,6 +124,9 @@
     "charge_mode_invalid_option": {
       "message": "Vybraný režim nabíjení není k dispozici."
     },
+    "default_charge_level_unavailable": {
+      "message": "Nastavení výchozí úrovně nabíjení není dostupné, dokud je služba Enphase nedostupná."
+    },
     "evse_schedule_day_required": {
       "message": "Vyberte pro harmonogram alespoň jeden den v týdnu."
     },
@@ -1756,6 +1759,9 @@
     "number": {
       "charging_amps": {
         "name": "Nabíjecí ampéry"
+      },
+      "default_charge_level": {
+        "name": "Výchozí úroveň nabíjení"
       },
       "battery_reserve": {
         "name": "Rezerva baterie"

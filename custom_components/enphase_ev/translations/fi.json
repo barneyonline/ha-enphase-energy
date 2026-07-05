@@ -124,6 +124,9 @@
     "charge_mode_invalid_option": {
       "message": "Valittu lataustila ei ole käytettävissä."
     },
+    "default_charge_level_unavailable": {
+      "message": "Oletuslataustason asetukset eivät ole käytettävissä, kun Enphase-palvelu ei ole toiminnassa."
+    },
     "evse_schedule_day_required": {
       "message": "Valitse aikataululle vähintään yksi viikonpäivä."
     },
@@ -1756,6 +1759,9 @@
     "number": {
       "charging_amps": {
         "name": "Latausvahvistimet"
+      },
+      "default_charge_level": {
+        "name": "Oletuslataustaso"
       },
       "battery_reserve": {
         "name": "Akun varaus"

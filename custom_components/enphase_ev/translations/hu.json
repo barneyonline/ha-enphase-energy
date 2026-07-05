@@ -124,6 +124,9 @@
     "charge_mode_invalid_option": {
       "message": "A kiválasztott töltési mód nem érhető el."
     },
+    "default_charge_level_unavailable": {
+      "message": "Az alapértelmezett töltési szint beállításai nem érhetők el, amíg az Enphase szolgáltatás nem működik."
+    },
     "evse_schedule_day_required": {
       "message": "Válasszon legalább egy napot a hétből az ütemezéshez."
     },
@@ -1756,6 +1759,9 @@
     "number": {
       "charging_amps": {
         "name": "Töltési amper"
+      },
+      "default_charge_level": {
+        "name": "Alapértelmezett töltési szint"
       },
       "battery_reserve": {
         "name": "Akkumulátor tartalék"

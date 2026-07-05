@@ -4510,8 +4510,31 @@ async def test_startup_warmup_helper_refreshes_cover_fallback_and_merge_paths(
     assert merged_secondary[RANDOM_SERIAL]["rfid_auth_supported"] is True
     assert merged_secondary[RANDOM_SERIAL]["auth_required"] is True
     assert merged_secondary[RANDOM_SERIAL]["phase_switch_config"] == "auto"
+    assert merged_secondary[RANDOM_SERIAL]["default_charge_level_supported"] is True
     assert "default_charge_level" in merged_secondary[RANDOM_SERIAL]
     assert merged_secondary[RANDOM_SERIAL]["default_charge_level"] is None
+
+    coord.evse_runtime.async_resolve_charger_config = AsyncMock(  # type: ignore[method-assign]  # noqa: SLF001
+        return_value={RANDOM_SERIAL: {"phase_switch_config": "auto"}}
+    )
+    await coord.refresh_runner.async_refresh_secondary_evse_state_for_warmup()
+    merged_secondary = set_updated.call_args_list[-1].args[0]
+    assert merged_secondary[RANDOM_SERIAL]["default_charge_level_supported"] is False
+    assert (
+        merged_secondary[RANDOM_SERIAL]["default_charge_level_supported_source"]
+        == "charger_config"
+    )
+
+    coord.evse_runtime.async_resolve_charger_config = AsyncMock(  # type: ignore[method-assign]  # noqa: SLF001
+        return_value={RANDOM_SERIAL: {}}
+    )
+    await coord.refresh_runner.async_refresh_secondary_evse_state_for_warmup()
+    merged_secondary = set_updated.call_args_list[-1].args[0]
+    assert merged_secondary[RANDOM_SERIAL]["default_charge_level_supported"] is False
+    assert (
+        merged_secondary[RANDOM_SERIAL]["default_charge_level_supported_source"]
+        == "charger_config"
+    )
 
     coord.iter_serials = lambda: [""]  # type: ignore[assignment]
     await coord.refresh_runner.async_refresh_secondary_evse_state_for_warmup()

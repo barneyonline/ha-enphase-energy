@@ -16,10 +16,11 @@ import aiohttp
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.util import dt as dt_util
 
-from .api import AuthSettingsUnavailable, SchedulerUnavailable
+from .api import AuthSettingsUnavailable, ChargerConfigUnavailable, SchedulerUnavailable
 from .const import (
     AUTH_APP_SETTING,
     AUTH_RFID_SETTING,
+    DEFAULT_CHARGE_LEVEL_SETTING,
     DEFAULT_FAST_POLL_INTERVAL,
     DEFAULT_SLOW_POLL_INTERVAL,
     DOMAIN,
@@ -76,6 +77,7 @@ EVSE_INACTIVE_POWER_STATUSES: frozenset[str] = frozenset(
     {"SUSPENDED", "SUSPENDED_EV", SUSPENDED_EVSE_STATUS}
 )
 EVSE_ACTIVE_POWER_STATUSES: frozenset[str] = frozenset({"CHARGING", "FINISHING"})
+_MISSING_CHARGER_CONFIG_VALUE = object()
 
 
 @dataclass(slots=True)
@@ -1350,7 +1352,11 @@ class EvseRuntime:
             cache_fresh = True
             cached_values = dict(cached[0])
             if all(key in cached_values for key in requested):
-                return {key: cached_values[key] for key in requested}
+                return {
+                    key: cached_values[key]
+                    for key in requested
+                    if cached_values[key] is not _MISSING_CHARGER_CONFIG_VALUE
+                }
         elif cached:
             cached_values = dict(cached[0])
 
@@ -1358,7 +1364,12 @@ class EvseRuntime:
         if backoff_until is not None and backoff_until > now:
             if cache_fresh:
                 return {
-                    key: cached_values[key] for key in requested if key in cached_values
+                    key: cached_values[key]
+                    for key in requested
+                    if (
+                        key in cached_values
+                        and cached_values[key] is not _MISSING_CHARGER_CONFIG_VALUE
+                    )
                 }
             return None
 
@@ -1370,11 +1381,17 @@ class EvseRuntime:
             )
             if cache_fresh:
                 return {
-                    key: cached_values[key] for key in requested if key in cached_values
+                    key: cached_values[key]
+                    for key in requested
+                    if (
+                        key in cached_values
+                        and cached_values[key] is not _MISSING_CHARGER_CONFIG_VALUE
+                    )
                 }
             return None
 
         merged = dict(cached_values)
+        returned_keys: set[str] = set()
         if isinstance(settings, list):
             for item in settings:
                 if not isinstance(item, dict):
@@ -1386,14 +1403,23 @@ class EvseRuntime:
                     continue
                 if key_text not in seen:
                     continue
+                returned_keys.add(key_text)
                 if "value" in item:
                     merged[key_text] = item.get("value")
                 elif "reqValue" in item:
                     merged[key_text] = item.get("reqValue")
+        if isinstance(settings, list):
+            for key in requested:
+                if key not in returned_keys:
+                    merged[key] = _MISSING_CHARGER_CONFIG_VALUE
 
         coord._charger_config_cache[sn] = (merged, now)
         coord._charger_config_backoff_until.pop(sn, None)
-        return {key: merged[key] for key in requested if key in merged}
+        return {
+            key: merged[key]
+            for key in requested
+            if (key in merged and merged[key] is not _MISSING_CHARGER_CONFIG_VALUE)
+        }
 
     def set_charge_mode_cache(self, sn: str, mode: str) -> None:
         normalized = self.normalize_charge_mode_preference(mode)
@@ -1431,6 +1457,23 @@ class EvseRuntime:
             False,
             now,
         )
+
+    @staticmethod
+    def _coerce_charge_level(value: object) -> int | None:
+        if value in (None, ""):
+            return None
+        try:
+            return int(float(str(value).strip()))
+        except Exception:  # noqa: BLE001
+            return None
+
+    def set_default_charge_level_cache(self, sn: str, amps: int) -> None:
+        sn_str = str(sn)
+        now = time.monotonic()
+        cached = self.coordinator._charger_config_cache.get(sn_str)
+        values = dict(cached[0]) if cached else {}
+        values[DEFAULT_CHARGE_LEVEL_SETTING] = int(amps)
+        self.coordinator._charger_config_cache[sn_str] = (values, now)
 
     def _set_evse_toggle_pending(self, attr_name: str, sn: str, enabled: bool) -> None:
         pending = getattr(self.coordinator, attr_name, None)
@@ -1489,6 +1532,39 @@ class EvseRuntime:
         self.coordinator.mark_auth_settings_available()
         self.set_app_auth_cache(sn_str, enabled)
         self._set_evse_toggle_pending("_app_auth_pending", sn_str, enabled)
+        await self.coordinator.async_request_refresh()
+
+    async def async_set_default_charge_level(self, sn: str, amps: int) -> None:
+        sn_str = str(sn)
+        try:
+            response = await self.coordinator.client.set_default_charge_level(
+                sn_str,
+                int(amps),
+            )
+        except ChargerConfigUnavailable as err:
+            raise ServiceValidationError(
+                "Default charge level settings are unavailable while the Enphase "
+                "service is down.",
+                translation_domain=DOMAIN,
+                translation_key="default_charge_level_unavailable",
+            ) from err
+
+        accepted_amps = int(amps)
+        data = response.get("data") if isinstance(response, dict) else None
+        if isinstance(data, list):
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+                if item.get("key") != DEFAULT_CHARGE_LEVEL_SETTING:
+                    continue
+                raw_value = item.get("value")
+                if raw_value is None:
+                    raw_value = item.get("reqValue")
+                coerced = self._coerce_charge_level(raw_value)
+                if coerced is not None:
+                    accepted_amps = coerced
+                break
+        self.set_default_charge_level_cache(sn_str, accepted_amps)
         await self.coordinator.async_request_refresh()
 
     async def async_resolve_green_battery_settings(
@@ -1601,12 +1677,16 @@ class EvseRuntime:
                         filtered = {
                             key: cached_values[key]
                             for key in requested
-                            if key in cached_values
+                            if (
+                                key in cached_values
+                                and cached_values[key]
+                                is not _MISSING_CHARGER_CONFIG_VALUE
+                            )
                         }
                         if filtered:
                             results[sn] = filtered
                     continue
-                if response:
+                if response is not None:
                     results[sn] = response
         return results
 
@@ -1724,7 +1804,9 @@ class EvseRuntime:
             cached_values = dict(cached[0])
             if all(key in cached_values for key in requested):
                 results[sn] = {
-                    key: cached_values[key] for key in requested if key in cached_values
+                    key: cached_values[key]
+                    for key in requested
+                    if cached_values[key] is not _MISSING_CHARGER_CONFIG_VALUE
                 }
         return results
 

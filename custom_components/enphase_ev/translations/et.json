@@ -124,6 +124,9 @@
     "charge_mode_invalid_option": {
       "message": "Valitud laadimisrežiim pole saadaval."
     },
+    "default_charge_level_unavailable": {
+      "message": "Vaikimisi laadimistaseme seaded pole saadaval, kuni Enphase'i teenus ei tööta."
+    },
     "evse_schedule_day_required": {
       "message": "Valige ajakava jaoks vähemalt üks nädalapäev."
     },
@@ -1756,6 +1759,9 @@
     "number": {
       "charging_amps": {
         "name": "Laadimisamprid"
+      },
+      "default_charge_level": {
+        "name": "Vaikimisi laadimistase"
       },
       "battery_reserve": {
         "name": "Aku reserv"

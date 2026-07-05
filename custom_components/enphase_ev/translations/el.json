@@ -124,6 +124,9 @@
     "charge_mode_invalid_option": {
       "message": "Η επιλεγμένη λειτουργία φόρτισης δεν είναι διαθέσιμη."
     },
+    "default_charge_level_unavailable": {
+      "message": "Οι ρυθμίσεις προεπιλεγμένου επιπέδου φόρτισης δεν είναι διαθέσιμες όσο η υπηρεσία Enphase δεν λειτουργεί."
+    },
     "evse_schedule_day_required": {
       "message": "Επιλέξτε τουλάχιστον μία ημέρα της εβδομάδας για το πρόγραμμα."
     },
@@ -1756,6 +1759,9 @@
     "number": {
       "charging_amps": {
         "name": "Αμπέρ φόρτισης"
+      },
+      "default_charge_level": {
+        "name": "Προεπιλεγμένο επίπεδο φόρτισης"
       },
       "battery_reserve": {
         "name": "Απόθεμα μπαταρίας"

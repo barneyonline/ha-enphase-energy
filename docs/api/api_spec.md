@@ -437,7 +437,7 @@ Captured web requests include authenticated cookies, session tokens, user IDs, s
 
 Observed query parameters:
 - `site_id`: numeric site identifier.
-- `country`: optional ISO country code used by the web UI; observed value `DE`.
+- `country`: optional ISO country code used by the web UI; observed values include `DE` and `AU`.
 
 Example response:
 ```json
@@ -502,16 +502,16 @@ Observed structure:
 - `meta.serverTimeStamp` is an ISO 8601 timestamp string in this endpoint, unlike some other EVSE endpoints that return epoch milliseconds.
 
 Observed site-level flags:
-- `evse_charging_mode`, `evse_launch_countries`, `evse_charge_range_slider`, `off_peak_schedule`, `evse_phase_switching`, `ev_charging`
+- `evse_charging_mode`, `evse_multi_step_auto_ota`, `evse_launch_countries`, `evse_charge_range_slider`, `off_peak_schedule`, `evse_phase_switching`, `ev_charging`
 - `evse_beta_users`, `evse_prelogin_cta`, `default_off_peak_schedule`, `iqevse_smart_charging`, `iqevse_usebatterynew`
-- `evse_tamper_detection`, `ev_charger_faqs`, `evse_storm_guard`, `evse_auto_local_connection`, `evse_activation_logs`, `evse_ev_integration`
+- `evse_tamper_detection`, `ev_charger_faqs`, `evse_storm_guard`, `evse_auto_local_connection`, `evse_activation_logs`, `evse_bi_di_ux`, `evse_ev_integration`
 
 Observed per-charger flags:
 - Connectivity and setup: `evse_ble_control`, `evse_enpki_support`, `evse_network_settings`, `evse_gateway_connectivity`, `evse_connect_to_internet_flow_cellular`, `evse_wifi_recommendation`, `new_connect_to_internet_flow`
 - Electrical and load management: `dynamic_load_supported`, `phase_config_support`, `max_current_config_support`, `evse_operating_voltage`, `rcd_breaker_confirmation`
-- Charging controls: `evse_charge_level_gen1`, `evse_charge_level_control`, `evse_charging_modes_cancel_task`, `local_green_charging`, `plug_and_charge`
-- Identity and integrations: `evse_authentication`, `iqevse_rfid`, `evse_ocpp_server_settings`, `iqevse_meter_connection`, `evse_v2_livestream`, `evse_connector_lock`
-- Rollout and certification gates: `evse_ctep_certification`, `iqevse_itk_fw_upgrade_status`, `na_gen2_add_devices`
+- Charging controls: `evse_charge_level_gen1`, `evse_charge_level_control`, `evse_charging_modes_cancel_task`, `local_green_charging`, `iqevse_external_meter_green_charging`, `plug_and_charge`
+- Identity and integrations: `evse_authentication`, `iqevse_rfid`, `evse_ocpp_server_settings`, `iqevse_meter_connection`, `evse_v2_livestream`, `evse_connector_lock`, `evse_itk_external_meter_list`
+- Rollout and certification gates: `evse_ctep_certification`, `iqevse_itk_fw_upgrade_status`, `iqevse_itk_additional_fw_upgrade`, `na_gen2_add_devices`, `ocmf_eichrecht_mail_report`
 
 ### 2.3 Start Live Stream
 ```
@@ -573,7 +573,7 @@ Legacy or normalized client responses may still use:
 { "status": "accepted" }
 ```
 
-### 2.5 Session Authentication Settings (App + RFID)
+### 2.5 EV Charger Config (Authentication, Phase, Default Charge Level)
 ```
 POST /service/evse_controller/api/v1/<site_id>/ev_chargers/<sn>/ev_charger_config
 Body: [
@@ -616,14 +616,15 @@ Observed phase/default-charge read request:
 ```json
 [
   { "key": "DefaultChargeLevel" },
-  { "key": "phase_switch_config" }
+  { "key": "phase_switch_config" },
+  { "key": "ConnectorLock" }
 ]
 ```
 
 Observed response (anonymized):
 ```json
 {
-  "meta": { "serverTimeStamp": 1760000000000, "rowCount": 2 },
+  "meta": { "serverTimeStamp": 1760000000000, "rowCount": 3 },
   "data": [
     {
       "key": "DefaultChargeLevel",
@@ -633,7 +634,13 @@ Observed response (anonymized):
     },
     {
       "key": "phase_switch_config",
-      "value": "auto",
+      "value": "3",
+      "reqValue": null,
+      "status": 1
+    },
+    {
+      "key": "ConnectorLock",
+      "value": null,
       "reqValue": null,
       "status": 1
     }
@@ -671,14 +678,46 @@ Disable request payload:
 ]
 ```
 
+Update the default charge level:
+```
+PUT /service/evse_controller/api/v1/<site_id>/ev_chargers/<sn>/ev_charger_config
+Body: [ { "key": "DefaultChargeLevel", "value": <amps> } ]
+```
+
+Observed request payloads used integer amp values:
+```json
+[
+  { "key": "DefaultChargeLevel", "value": 30 }
+]
+```
+
+Observed response (anonymized):
+```json
+{
+  "meta": { "serverTimeStamp": 1760000000000, "rowCount": 1 },
+  "data": [
+    {
+      "key": "DefaultChargeLevel",
+      "value": "30",
+      "reqValue": null,
+      "status": 2
+    }
+  ],
+  "error": {}
+}
+```
+
 Notes:
 - `sessionAuthentication` controls "Auth via App"; `rfidSessionAuthentication` controls RFID auth.
-- `phase_switch_config` appears to expose the charger's automatic phase-switching mode; the observed read value was `"auto"`.
-- `DefaultChargeLevel` was observed as `null`; the exact semantics remain unconfirmed and may indicate unset/disabled state.
+- `phase_switch_config` appears to expose the charger's phase-switching mode; observed read values include `"3"`, and earlier captures used `"auto"`.
+- `ConnectorLock` can be requested through the same config read endpoint; the observed value was `null`.
+- `DefaultChargeLevel` was observed as `null` before update, which appears to indicate unset/disabled state. After writing `30`, the service returned `"30"` as a string with `status=2` and `reqValue=null`.
+- Implementation: Home Assistant exposes the Default Charge Level number entity only when this config read returns the `DefaultChargeLevel` key for that charger. Existing charge-level feature flags are treated as advisory because firmware/cloud rollout can differ across otherwise similar chargers.
+- Implementation: the Default Charge Level entity uses the same discovered charger amp limits as Charging Amps, but writes this persistent config value instead of updating the immediate/session charging setpoint.
 - When either setting is enabled, charging sessions require user authentication before starting.
-- Observed: read responses use `status=1`; update responses use `status=2`, with `value` reflecting the prior state and `reqValue` the desired state.
+- Observed: read responses use `status=1`; update responses use `status=2`. Authentication-setting update responses have shown `value` as the prior state and `reqValue` as the desired state, while `DefaultChargeLevel` returned the accepted target in `value` and left `reqValue` as `null`.
 - Observed: both `sessionAuthentication` and `rfidSessionAuthentication` can return `null` for both `value` and `reqValue`, which appears to represent a disabled or unset state.
-- Observed in one web capture: the request succeeded with session cookies plus XSRF cookies present, while `e-auth-token` was sent as `null` and no bearer token header was present. Treat the auth requirements here as UI-path dependent.
+- Observed web captures succeeded with session cookies, XSRF cookies, `e-auth-token`, and sometimes an `Authorization: Bearer <token>` overlay. Treat the auth requirements here as UI-path dependent.
 - Implementation: config reads first use normal today JSON headers plus the control `Authorization` overlay. If that returns `Unauthorized` or `403` while bearer auth was present, the client retries the same POST with both `Authorization` and `e-auth-token` explicitly suppressed.
 - Privacy: real captures include site IDs, charger serial numbers, cookies, JWTs, names, and email addresses. Redact all such values when preserving examples.
 

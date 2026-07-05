@@ -122,5 +122,7 @@ async def test_summary_v2_enrichment(hass, monkeypatch):
     assert st["model_id"] == "MODEL-SKU-0000"
     assert st["display_name"] == "Garage Charger"
     assert st["green_battery_supported"] is True
+    assert st["default_charge_level"] == "disabled"
+    assert "default_charge_level_supported" not in st
     assert st["energy_today_sessions"] == []
     assert st["energy_today_sessions_kwh"] == 0.0

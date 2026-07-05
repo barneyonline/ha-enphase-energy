@@ -32,6 +32,7 @@ from custom_components.enphase_ev.coordinator import (
 )
 from custom_components.enphase_ev.api import (
     AuthSettingsUnavailable,
+    ChargerConfigUnavailable,
     SchedulerUnavailable,
     Unauthorized,
 )
@@ -3646,8 +3647,103 @@ async def test_async_update_data_merges_charger_config_fallback_fields(
 
     assert "default_charge_level" in result[SERIAL_ONE]
     assert result[SERIAL_ONE]["default_charge_level"] is None
+    assert result[SERIAL_ONE]["default_charge_level_supported"] is True
+    assert result[SERIAL_ONE]["default_charge_level_supported_source"] == (
+        "charger_config"
+    )
     assert result[SERIAL_ONE]["phase_switch_config"] == "auto"
     coord.client.charger_config.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_async_update_data_keeps_default_charge_level_unsupported_when_omitted(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(serials=[SERIAL_ONE])
+    coord._has_successful_refresh = True  # noqa: SLF001
+    payload = {
+        "evChargerData": [
+            {
+                "sn": SERIAL_ONE,
+                "name": "Garage",
+                "connectors": [{}],
+                "pluggedIn": True,
+                "charging": False,
+                "faulted": False,
+                "session_d": {"e_c": 0},
+            }
+        ],
+        "ts": 0,
+    }
+    coord.client.status = AsyncMock(return_value=payload)
+    coord.client.charger_config = AsyncMock(
+        return_value=[{"key": PHASE_SWITCH_CONFIG_SETTING, "value": "auto"}]
+    )
+    coord.client.charger_auth_settings = AsyncMock(return_value=[])
+    coord.client.green_charging_settings = AsyncMock(return_value=[])
+    coord.summary.prepare_refresh = MagicMock(return_value=False)
+    coord.summary.async_fetch = AsyncMock(
+        return_value=[
+            {
+                "serialNumber": SERIAL_ONE,
+                "chargeLevelDetails": {"defaultChargeLevel": "30"},
+            }
+        ]
+    )
+    coord.energy._async_refresh_site_energy = AsyncMock()
+
+    result = await coord._async_update_data()
+
+    assert result[SERIAL_ONE]["default_charge_level"] == "30"
+    assert result[SERIAL_ONE]["default_charge_level_supported"] is False
+    assert result[SERIAL_ONE]["default_charge_level_supported_source"] == (
+        "charger_config"
+    )
+    assert result[SERIAL_ONE]["phase_switch_config"] == "auto"
+
+
+@pytest.mark.asyncio
+async def test_async_update_data_keeps_default_charge_level_unsupported_when_empty(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(serials=[SERIAL_ONE])
+    coord._has_successful_refresh = True  # noqa: SLF001
+    payload = {
+        "evChargerData": [
+            {
+                "sn": SERIAL_ONE,
+                "name": "Garage",
+                "connectors": [{}],
+                "pluggedIn": True,
+                "charging": False,
+                "faulted": False,
+                "session_d": {"e_c": 0},
+            }
+        ],
+        "ts": 0,
+    }
+    coord.client.status = AsyncMock(return_value=payload)
+    coord.client.charger_config = AsyncMock(return_value=[])
+    coord.client.charger_auth_settings = AsyncMock(return_value=[])
+    coord.client.green_charging_settings = AsyncMock(return_value=[])
+    coord.summary.prepare_refresh = MagicMock(return_value=False)
+    coord.summary.async_fetch = AsyncMock(
+        return_value=[
+            {
+                "serialNumber": SERIAL_ONE,
+                "chargeLevelDetails": {"defaultChargeLevel": "30"},
+            }
+        ]
+    )
+    coord.energy._async_refresh_site_energy = AsyncMock()
+
+    result = await coord._async_update_data()
+
+    assert result[SERIAL_ONE]["default_charge_level"] == "30"
+    assert result[SERIAL_ONE]["default_charge_level_supported"] is False
+    assert result[SERIAL_ONE]["default_charge_level_supported_source"] == (
+        "charger_config"
+    )
 
 
 @pytest.mark.asyncio
@@ -3731,6 +3827,81 @@ async def test_async_get_charger_config_returns_empty_with_no_valid_keys(
 
 
 @pytest.mark.asyncio
+async def test_async_set_default_charge_level_caches_accepted_value(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(serials=[SERIAL_ONE])
+    coord.client.set_default_charge_level = AsyncMock(
+        return_value={
+            "data": [{"key": DEFAULT_CHARGE_LEVEL_SETTING, "value": "30", "status": 2}]
+        }
+    )
+    coord.async_request_refresh = AsyncMock()
+
+    await coord.evse_runtime.async_set_default_charge_level(SERIAL_ONE, 24)
+
+    coord.client.set_default_charge_level.assert_awaited_once_with(SERIAL_ONE, 24)
+    assert coord._charger_config_cache[SERIAL_ONE][0][DEFAULT_CHARGE_LEVEL_SETTING] == (
+        30
+    )
+    coord.async_request_refresh.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_async_set_default_charge_level_uses_reqvalue_and_ignores_noise(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(serials=[SERIAL_ONE])
+    coord.client.set_default_charge_level = AsyncMock(
+        return_value={
+            "data": [
+                "invalid",
+                {"key": "Other", "value": "99"},
+                {"key": DEFAULT_CHARGE_LEVEL_SETTING, "value": None, "reqValue": "32"},
+            ]
+        }
+    )
+    coord.async_request_refresh = AsyncMock()
+
+    await coord.evse_runtime.async_set_default_charge_level(SERIAL_ONE, 24)
+
+    assert coord._charger_config_cache[SERIAL_ONE][0][DEFAULT_CHARGE_LEVEL_SETTING] == (
+        32
+    )
+
+
+@pytest.mark.asyncio
+async def test_async_set_default_charge_level_keeps_requested_value_for_bad_response(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(serials=[SERIAL_ONE])
+    coord.client.set_default_charge_level = AsyncMock(
+        return_value={"data": [{"key": DEFAULT_CHARGE_LEVEL_SETTING, "value": "bad"}]}
+    )
+    coord.async_request_refresh = AsyncMock()
+
+    await coord.evse_runtime.async_set_default_charge_level(SERIAL_ONE, 24)
+
+    assert coord._charger_config_cache[SERIAL_ONE][0][DEFAULT_CHARGE_LEVEL_SETTING] == (
+        24
+    )
+    assert coord.evse_runtime._coerce_charge_level(None) is None  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_async_set_default_charge_level_wraps_unavailable(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(serials=[SERIAL_ONE])
+    coord.client.set_default_charge_level = AsyncMock(
+        side_effect=ChargerConfigUnavailable("down")
+    )
+
+    with pytest.raises(ServiceValidationError):
+        await coord.evse_runtime.async_set_default_charge_level(SERIAL_ONE, 24)
+
+
+@pytest.mark.asyncio
 async def test_async_get_charger_config_returns_full_fresh_cache(
     coordinator_factory,
 ) -> None:
@@ -3754,6 +3925,40 @@ async def test_async_get_charger_config_returns_full_fresh_cache(
         PHASE_SWITCH_CONFIG_SETTING: "auto",
     }
     coord.client.charger_config.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_async_get_charger_config_caches_missing_requested_key(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(serials=[SERIAL_ONE])
+    coord.client.charger_config = AsyncMock(
+        return_value=[{"key": PHASE_SWITCH_CONFIG_SETTING, "value": "auto"}]
+    )
+
+    result = await coord.evse_runtime.async_get_charger_config(
+        SERIAL_ONE,
+        keys=(DEFAULT_CHARGE_LEVEL_SETTING, PHASE_SWITCH_CONFIG_SETTING),
+    )
+
+    assert result == {PHASE_SWITCH_CONFIG_SETTING: "auto"}
+    coord.client.charger_config.assert_awaited_once()
+
+    coord.client.charger_config.reset_mock()
+    result = await coord.evse_runtime.async_get_charger_config(
+        SERIAL_ONE,
+        keys=(DEFAULT_CHARGE_LEVEL_SETTING, PHASE_SWITCH_CONFIG_SETTING),
+    )
+
+    assert result == {PHASE_SWITCH_CONFIG_SETTING: "auto"}
+    coord.client.charger_config.assert_not_awaited()
+    assert (
+        coord.evse_runtime.charger_config_lookup_candidates(
+            [SERIAL_ONE],
+            keys=(DEFAULT_CHARGE_LEVEL_SETTING, PHASE_SWITCH_CONFIG_SETTING),
+        )
+        == []
+    )
 
 
 @pytest.mark.asyncio

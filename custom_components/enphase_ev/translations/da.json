@@ -124,6 +124,9 @@
     "charge_mode_invalid_option": {
       "message": "Den valgte opladningstilstand er ikke tilgængelig."
     },
+    "default_charge_level_unavailable": {
+      "message": "Indstillinger for standard ladeniveau er ikke tilgængelige, mens Enphase-tjenesten er nede."
+    },
     "evse_schedule_day_required": {
       "message": "Vælg mindst én ugedag for tidsplanen."
     },
@@ -1756,6 +1759,9 @@
     "number": {
       "charging_amps": {
         "name": "Opladningsampere"
+      },
+      "default_charge_level": {
+        "name": "Standard ladeniveau"
       },
       "battery_reserve": {
         "name": "Batterireserve"

@@ -124,6 +124,9 @@
     "charge_mode_invalid_option": {
       "message": "La modalità di ricarica selezionata non è disponibile."
     },
+    "default_charge_level_unavailable": {
+      "message": "Le impostazioni del livello di ricarica predefinito non sono disponibili mentre il servizio Enphase non è raggiungibile."
+    },
     "evse_schedule_day_required": {
       "message": "Seleziona almeno un giorno della settimana per la pianificazione."
     },
@@ -1756,6 +1759,9 @@
     "number": {
       "charging_amps": {
         "name": "Ampere di ricarica"
+      },
+      "default_charge_level": {
+        "name": "Livello di ricarica predefinito"
       },
       "battery_reserve": {
         "name": "Riserva della batteria"

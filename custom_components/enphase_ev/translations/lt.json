@@ -124,6 +124,9 @@
     "charge_mode_invalid_option": {
       "message": "Pasirinktas įkrovimo režimas nepasiekiamas."
     },
+    "default_charge_level_unavailable": {
+      "message": "Numatytojo įkrovimo lygio nustatymai nepasiekiami, kol Enphase paslauga neveikia."
+    },
     "evse_schedule_day_required": {
       "message": "Pasirinkite bent vieną savaitės dieną tvarkaraščiui."
     },
@@ -1756,6 +1759,9 @@
     "number": {
       "charging_amps": {
         "name": "Įkrovimo amperai"
+      },
+      "default_charge_level": {
+        "name": "Numatytasis įkrovimo lygis"
       },
       "battery_reserve": {
         "name": "Baterijos rezervas"

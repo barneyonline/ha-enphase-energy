@@ -124,6 +124,9 @@
     "charge_mode_invalid_option": {
       "message": "Izvēlētais uzlādes režīms nav pieejams."
     },
+    "default_charge_level_unavailable": {
+      "message": "Noklusējuma uzlādes līmeņa iestatījumi nav pieejami, kamēr Enphase pakalpojums nedarbojas."
+    },
     "evse_schedule_day_required": {
       "message": "Grafikam izvēlieties vismaz vienu nedēļas dienu."
     },
@@ -1756,6 +1759,9 @@
     "number": {
       "charging_amps": {
         "name": "Uzlādes ampēri"
+      },
+      "default_charge_level": {
+        "name": "Noklusējuma uzlādes līmenis"
       },
       "battery_reserve": {
         "name": "Akumulatora rezerve"

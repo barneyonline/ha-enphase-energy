@@ -6792,6 +6792,50 @@ async def test_charger_config_returns_empty_when_no_valid_keys() -> None:
 
 
 @pytest.mark.asyncio
+async def test_set_default_charge_level_uses_charger_config_put() -> None:
+    client = _make_client()
+    client._json = AsyncMock(
+        return_value={
+            "data": [{"key": DEFAULT_CHARGE_LEVEL_SETTING, "value": "30", "status": 2}]
+        }
+    )
+
+    result = await client.set_default_charge_level("SN", 30)
+
+    assert result == {
+        "data": [{"key": DEFAULT_CHARGE_LEVEL_SETTING, "value": "30", "status": 2}]
+    }
+    args, kwargs = client._json.await_args
+    assert args[0] == "PUT"
+    assert "ev_charger_config" in args[1]
+    assert kwargs["json"] == [{"key": DEFAULT_CHARGE_LEVEL_SETTING, "value": 30}]
+    expected_headers = client._today_json_headers()
+    expected_headers.update(client._control_headers())
+    assert kwargs["headers"] == expected_headers
+
+
+@pytest.mark.asyncio
+async def test_set_default_charge_level_wraps_config_unavailable() -> None:
+    client = _make_client()
+    client._json = AsyncMock(
+        side_effect=_make_cre(503, "ev_charger_config service unavailable")
+    )
+
+    with pytest.raises(api.ChargerConfigUnavailable):
+        await client.set_default_charge_level("SN", 30)
+    client._json.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_set_default_charge_level_reraises_non_config_error() -> None:
+    client = _make_client()
+    client._json = AsyncMock(side_effect=_make_cre(400, "bad request"))
+
+    with pytest.raises(aiohttp.ClientResponseError):
+        await client.set_default_charge_level("SN", 30)
+
+
+@pytest.mark.asyncio
 async def test_set_app_authentication_passes_payload() -> None:
     client = _make_client()
     client._json = AsyncMock(return_value={"status": "ok"})

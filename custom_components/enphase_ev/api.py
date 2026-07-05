@@ -31,6 +31,7 @@ from .const import (
     AUTH_APP_SETTING,
     AUTH_RFID_SETTING,
     BASE_URL,
+    DEFAULT_CHARGE_LEVEL_SETTING,
     DEFAULT_AUTH_TIMEOUT,
     ENTREZ_URL,
     GREEN_BATTERY_SETTING,
@@ -195,6 +196,10 @@ class EVSETimeseriesUnavailable(Exception):
 
 class AuthSettingsUnavailable(Exception):
     """Raised when the charger auth settings service is unavailable."""
+
+
+class ChargerConfigUnavailable(Exception):
+    """Raised when the charger config service is unavailable."""
 
 
 class OptionalEndpointUnavailable(Exception):
@@ -5847,6 +5852,27 @@ class EnphaseEVClient:
             if is_auth_settings_unavailable_error(err.message, err.status, url):
                 raise AuthSettingsUnavailable(str(err)) from err
             raise
+
+    async def set_default_charge_level(self, sn: str, amps: int) -> dict:
+        """Set the charger's stored default charge level.
+
+        PUT /service/evse_controller/api/v1/<site>/<sn>/ev_charger_config
+        Body: [{ "key": "DefaultChargeLevel", "value": <amps> }]
+        """
+        url = (
+            f"{BASE_URL}/service/evse_controller/api/v1/{self._site}/ev_chargers/"
+            f"{sn}/ev_charger_config"
+        )
+        headers = self._today_json_headers()
+        headers.update(self._control_headers())
+        payload = [{"key": DEFAULT_CHARGE_LEVEL_SETTING, "value": int(amps)}]
+        try:
+            response = await self._json("PUT", url, json=payload, headers=headers)
+        except aiohttp.ClientResponseError as err:
+            if is_auth_settings_unavailable_error(err.message, err.status, url):
+                raise ChargerConfigUnavailable(str(err)) from err
+            raise
+        return response if isinstance(response, dict) else {}
 
     async def get_schedules(self, sn: str) -> dict:
         """Return scheduler config and slots for the charger.
