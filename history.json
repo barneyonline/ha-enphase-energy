@@ -1,6 +1,6 @@
 {
   "current_status": "Down",
-  "generated_at": "2026-07-05T02:27:32.426110Z",
+  "generated_at": "2026-07-05T02:57:49.900321Z",
   "retention_days": 30,
   "samples": [
     {
@@ -2350,6 +2350,17 @@
     },
     {
       "checked_at": "2026-07-05T02:27:32.426110Z",
+      "checks_failed": 4,
+      "failed_check_names": [
+        "battery_config",
+        "evse_control",
+        "evse_scheduler",
+        "session_history"
+      ],
+      "status": "Down"
+    },
+    {
+      "checked_at": "2026-07-05T02:57:49.900321Z",
       "checks_failed": 4,
       "failed_check_names": [
         "battery_config",
