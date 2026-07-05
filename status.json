@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-07-05T02:57:49.900321Z",
+  "checked_at": "2026-07-05T04:16:47.977167Z",
   "checks": [
     {
       "affects": true,
@@ -47,7 +47,7 @@
       ],
       "group": "degraded",
       "name": "evse_scheduler",
-      "ok": false
+      "ok": true
     },
     {
       "affects": true,
@@ -59,7 +59,7 @@
       ],
       "group": "degraded",
       "name": "session_history",
-      "ok": false
+      "ok": true
     },
     {
       "affects": true,
@@ -122,7 +122,7 @@
       ],
       "group": "degraded",
       "name": "battery_config",
-      "ok": false
+      "ok": true
     },
     {
       "affects": false,
@@ -206,7 +206,7 @@
       ],
       "group": "degraded",
       "name": "evse_control",
-      "ok": false
+      "ok": true
     }
   ],
   "endpoints": [
@@ -286,11 +286,11 @@
       "category": "evse_scheduler",
       "check_group": "evse_scheduler",
       "check_mode": "all",
-      "error": "HTTP 400",
+      "error": null,
       "group": "degraded",
       "method": "GET",
       "name": "scheduler_charge_mode",
-      "ok": false,
+      "ok": true,
       "status": 400,
       "url": "/service/evse_scheduler/api/v1/iqevc/charging-mode/{site_id}/{serial}/preference"
     },
@@ -300,11 +300,11 @@
       "category": "evse_scheduler",
       "check_group": "evse_scheduler",
       "check_mode": "all",
-      "error": "HTTP 400",
+      "error": null,
       "group": "degraded",
       "method": "GET",
       "name": "scheduler_green_settings",
-      "ok": false,
+      "ok": true,
       "status": 400,
       "url": "/service/evse_scheduler/api/v1/iqevc/charging-mode/GREEN_CHARGING/{site_id}/{serial}/settings"
     },
@@ -314,11 +314,11 @@
       "category": "evse_scheduler",
       "check_group": "evse_scheduler",
       "check_mode": "all",
-      "error": "HTTP 400",
+      "error": null,
       "group": "degraded",
       "method": "GET",
       "name": "scheduler_schedules",
-      "ok": false,
+      "ok": true,
       "status": 400,
       "url": "/service/evse_scheduler/api/v1/iqevc/charging-mode/SCHEDULED_CHARGING/{site_id}/{serial}/schedules"
     },
@@ -334,7 +334,7 @@
       "name": "session_history_criteria",
       "ok": true,
       "status": 200,
-      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=3f2edbab-32de-4eda-9d76-e85b8074ef7e&username=2999024"
+      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=7d403e0d-3895-4e42-87b6-65161b065d65&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -342,11 +342,11 @@
       "category": "session_history",
       "check_group": "session_history",
       "check_mode": "all",
-      "error": "HTTP 404",
+      "error": null,
       "group": "degraded",
       "method": "POST",
       "name": "session_history",
-      "ok": false,
+      "ok": true,
       "status": 404,
       "url": "/service/enho_historical_events_ms/{site_id}/sessions/{serial}/history"
     },
@@ -404,7 +404,7 @@
       "name": "evse_timeseries_daily_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=3f2edbab-32de-4eda-9d76-e85b8074ef7e&start_date=2026-07-05&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=7d403e0d-3895-4e42-87b6-65161b065d65&start_date=2026-07-05&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -418,7 +418,7 @@
       "name": "evse_timeseries_lifetime_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=3f2edbab-32de-4eda-9d76-e85b8074ef7e&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=7d403e0d-3895-4e42-87b6-65161b065d65&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -524,11 +524,11 @@
       "category": "battery_config",
       "check_group": "battery_config",
       "check_mode": "all",
-      "error": "HTTP 403",
+      "error": null,
       "group": "degraded",
       "method": "POST",
       "name": "battery_schedule_validation",
-      "ok": false,
+      "ok": true,
       "status": 403,
       "url": "/service/batteryConfig/api/v1/battery/sites/{site_id}/schedules/isValid"
     },
@@ -720,25 +720,25 @@
       "category": "evse_control",
       "check_group": "evse_control",
       "check_mode": "all",
-      "error": "HTTP 404",
+      "error": null,
       "group": "degraded",
       "method": "POST",
       "name": "auth_settings",
-      "ok": false,
+      "ok": true,
       "status": 404,
       "url": "/service/evse_controller/api/v1/{site_id}/ev_chargers/{serial}/ev_charger_config"
     }
   ],
-  "status": "Down",
+  "status": "Fully Operational",
   "summary": {
-    "checks_failed": 4,
-    "checks_failed_affecting": 3,
-    "checks_failed_broad_outage": 4,
-    "checks_failed_non_affecting": 1,
-    "checks_ok": 13,
+    "checks_failed": 0,
+    "checks_failed_affecting": 0,
+    "checks_failed_broad_outage": 0,
+    "checks_failed_non_affecting": 0,
+    "checks_ok": 17,
     "checks_total": 17,
-    "endpoints_failed": 6,
-    "endpoints_ok": 31,
+    "endpoints_failed": 0,
+    "endpoints_ok": 37,
     "endpoints_total": 37
   }
 }
