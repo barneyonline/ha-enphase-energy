@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-07-07T18:32:04.985077Z",
+  "checked_at": "2026-07-07T20:48:57.746516Z",
   "checks": [
     {
       "affects": true,
@@ -122,7 +122,7 @@
       ],
       "group": "degraded",
       "name": "battery_config",
-      "ok": true
+      "ok": false
     },
     {
       "affects": false,
@@ -334,7 +334,7 @@
       "name": "session_history_criteria",
       "ok": true,
       "status": 200,
-      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=aa6eb96d-c534-4acb-8905-31b54eebd5c0&username=2999024"
+      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=aea27e3d-31b3-404f-8f8c-391eb80ad734&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -404,7 +404,7 @@
       "name": "evse_timeseries_daily_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=aa6eb96d-c534-4acb-8905-31b54eebd5c0&start_date=2026-07-07&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=aea27e3d-31b3-404f-8f8c-391eb80ad734&start_date=2026-07-07&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -418,7 +418,7 @@
       "name": "evse_timeseries_lifetime_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=aa6eb96d-c534-4acb-8905-31b54eebd5c0&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=aea27e3d-31b3-404f-8f8c-391eb80ad734&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -482,12 +482,12 @@
       "category": "battery_config",
       "check_group": "battery_config",
       "check_mode": "all",
-      "error": null,
+      "error": "The read operation timed out",
       "group": "degraded",
       "method": "GET",
       "name": "battery_settings",
-      "ok": true,
-      "status": 200,
+      "ok": false,
+      "status": null,
       "url": "/service/batteryConfig/api/v1/batterySettings/{site_id}?userId=2999024&source=enho"
     },
     {
@@ -731,14 +731,14 @@
   ],
   "status": "Fully Operational",
   "summary": {
-    "checks_failed": 0,
+    "checks_failed": 1,
     "checks_failed_affecting": 0,
-    "checks_failed_broad_outage": 0,
-    "checks_failed_non_affecting": 0,
-    "checks_ok": 17,
+    "checks_failed_broad_outage": 1,
+    "checks_failed_non_affecting": 1,
+    "checks_ok": 16,
     "checks_total": 17,
-    "endpoints_failed": 0,
-    "endpoints_ok": 37,
+    "endpoints_failed": 1,
+    "endpoints_ok": 36,
     "endpoints_total": 37
   }
 }
