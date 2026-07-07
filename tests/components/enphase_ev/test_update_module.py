@@ -15,6 +15,7 @@ from custom_components.enphase_ev.const import DOMAIN
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from custom_components.enphase_ev.update import (
     ChargerFirmwareUpdateEntity,
+    FirmwareVersionHistoryStore,
     FirmwareUpdateEntity,
     _async_prune_removed_charger_updates,
     _as_bool,
@@ -360,6 +361,190 @@ async def test_async_setup_entry_prunes_charger_entities_when_type_unavailable(
 
 
 @pytest.mark.asyncio
+async def test_firmware_version_history_store_records_bounded_changes(
+    hass, monkeypatch
+) -> None:
+    store = FirmwareVersionHistoryStore(hass, max_entries=2)
+    monkeypatch.setattr(
+        getattr(store, "_store"),
+        "async_delay_save",
+        lambda _data_func, _delay: None,
+    )
+    await store.async_load()
+    assert store.history_for(None) == []
+    assert (
+        store.record_installed_version(
+            unique_id=None,
+            version="1.0",
+            hass=hass,
+            entity_id="update.gateway_firmware",
+            name="Gateway Firmware",
+        )
+        == []
+    )
+    assert (
+        store.record_installed_version(
+            unique_id="update-1",
+            version=None,
+            hass=hass,
+            entity_id="update.gateway_firmware",
+            name="Gateway Firmware",
+        )
+        == []
+    )
+
+    times = iter(
+        [
+            "2026-07-01T00:00:00+00:00",
+            "2026-07-02T00:00:00+00:00",
+            "2026-07-03T00:00:00+00:00",
+            "2026-07-04T00:00:00+00:00",
+        ]
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.update._utc_now_iso",
+        lambda: next(times),
+    )
+    log_entry = MagicMock()
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.update.logbook.async_log_entry",
+        log_entry,
+    )
+
+    first = store.record_installed_version(
+        unique_id="update-1",
+        version="1.0",
+        hass=hass,
+        entity_id="update.gateway_firmware",
+        name="Gateway Firmware",
+    )
+    assert first == [
+        {
+            "version": "1.0",
+            "first_seen_utc": "2026-07-01T00:00:00+00:00",
+            "last_seen_utc": None,
+        }
+    ]
+    log_entry.assert_not_called()
+
+    assert (
+        store.record_installed_version(
+            unique_id="update-1",
+            version="1.0",
+            hass=hass,
+            entity_id="update.gateway_firmware",
+            name="Gateway Firmware",
+        )
+        == first
+    )
+
+    store.record_installed_version(
+        unique_id="update-1",
+        version="2.0",
+        hass=hass,
+        entity_id="update.gateway_firmware",
+        name="Gateway Firmware",
+    )
+    store.record_installed_version(
+        unique_id="update-1",
+        version="3.0",
+        hass=hass,
+        entity_id="update.gateway_firmware",
+        name="Gateway Firmware",
+    )
+
+    assert store.history_for("update-1") == [
+        {
+            "version": "2.0",
+            "first_seen_utc": "2026-07-02T00:00:00+00:00",
+            "last_seen_utc": "2026-07-03T00:00:00+00:00",
+        },
+        {
+            "version": "3.0",
+            "first_seen_utc": "2026-07-03T00:00:00+00:00",
+            "last_seen_utc": None,
+        },
+    ]
+    assert log_entry.call_count == 2
+    log_entry.assert_called_with(
+        hass,
+        name="Gateway Firmware",
+        message="installed firmware changed from 2.0 to 3.0",
+        domain=DOMAIN,
+        entity_id="update.gateway_firmware",
+    )
+
+    store.remove("update-1")
+    assert store.history_for("update-1") == []
+
+
+@pytest.mark.asyncio
+async def test_firmware_version_history_store_loads_clean_entries(
+    hass, monkeypatch
+) -> None:
+    store = FirmwareVersionHistoryStore(hass, max_entries=2)
+    backing_store = getattr(store, "_store")
+    monkeypatch.setattr(
+        backing_store,
+        "async_load",
+        AsyncMock(
+            return_value={
+                "entries": {
+                    "update-1": [
+                        "bad",
+                        {"version": "1.0"},
+                        {
+                            "version": "2.0",
+                            "first_seen_utc": "2026-07-02T00:00:00+00:00",
+                            "last_seen_utc": "2026-07-03T00:00:00+00:00",
+                        },
+                        {
+                            "version": "3.0",
+                            "first_seen_utc": "2026-07-03T00:00:00+00:00",
+                        },
+                    ],
+                    "update-empty": [],
+                }
+            },
+        ),
+    )
+
+    await store.async_load()
+
+    assert store.history_for("update-1") == [
+        {
+            "version": "2.0",
+            "first_seen_utc": "2026-07-02T00:00:00+00:00",
+            "last_seen_utc": "2026-07-03T00:00:00+00:00",
+        },
+        {
+            "version": "3.0",
+            "first_seen_utc": "2026-07-03T00:00:00+00:00",
+            "last_seen_utc": None,
+        },
+    ]
+    assert store.history_for("update-empty") == []
+
+    monkeypatch.setattr(backing_store, "async_load", AsyncMock(return_value=[]))
+    await store.async_load()
+    assert store.history_for("update-1") == []
+
+    monkeypatch.setattr(
+        backing_store, "async_load", AsyncMock(return_value={"entries": []})
+    )
+    await store.async_load()
+    assert store.history_for("update-1") == []
+
+    monkeypatch.setattr(
+        backing_store,
+        "async_load",
+        AsyncMock(return_value={"entries": {"bad": "not-list"}}),
+    )
+    await store.async_load()
+    assert store.history_for("bad") == []
+
+
+@pytest.mark.asyncio
 async def test_gateway_update_entity_states_and_release_url_selection(hass) -> None:
     coord = DummyCoordinator()
     manager = DummyCatalogManager(_catalog_payload())
@@ -453,14 +638,12 @@ async def test_gateway_update_entity_states_and_release_url_selection(hass) -> N
     assert entity.release_url == "https://example.test/envoy/au-regional"
     assert entity.release_summary == "Gateway regional"
     assert entity.extra_state_attributes["catalog_source_scope"] == "country"
-    assert entity.extra_state_attributes["locale_used"] == "en-au"
 
     coord.battery_country_code = None
     hass.config.country = None
     entity._refresh_from_catalog(regional_payload)
     assert entity.latest_version is None
     assert entity.release_url is None
-    assert entity.extra_state_attributes["country_used"] is None
     assert entity.extra_state_attributes["catalog_source_scope"] is None
 
     coord.battery_country_code = "AU"
@@ -482,6 +665,81 @@ async def test_gateway_update_entity_states_and_release_url_selection(hass) -> N
     assert entity.state is None
     coord._available_types = set()
     assert entity.available is False
+
+
+@pytest.mark.asyncio
+async def test_gateway_update_entity_exposes_version_history_and_logs_changes(
+    hass, monkeypatch
+) -> None:
+    coord = DummyCoordinator()
+    manager = DummyCatalogManager(_catalog_payload())
+    history = FirmwareVersionHistoryStore(hass)
+    monkeypatch.setattr(
+        getattr(history, "_store"),
+        "async_delay_save",
+        lambda _data_func, _delay: None,
+    )
+    await history.async_load()
+    times = iter(
+        [
+            "2026-07-01T00:00:00+00:00",
+            "2026-07-02T00:00:00+00:00",
+        ]
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.update._utc_now_iso",
+        lambda: next(times),
+    )
+    log_entry = MagicMock()
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.update.logbook.async_log_entry",
+        log_entry,
+    )
+
+    entity = FirmwareUpdateEntity(
+        coordinator=coord,
+        manager=manager,
+        device_type="envoy",
+        translation_key="gateway_firmware",
+        description=UpdateEntityDescription(key="gateway_firmware"),
+        installed_version_getter=_gateway_installed_version,
+        version_history=history,
+    )
+    entity.hass = hass
+    entity.entity_id = "update.gateway_firmware"
+
+    entity._refresh_from_catalog(manager.cached_catalog)
+    assert entity.extra_state_attributes["installed_version_history"] == [
+        {
+            "version": "8.2.4300",
+            "first_seen_utc": "2026-07-01T00:00:00+00:00",
+            "last_seen_utc": None,
+        }
+    ]
+    log_entry.assert_not_called()
+
+    coord._gateway_version = "8.2.4401"
+    entity._refresh_from_catalog(manager.cached_catalog)
+
+    assert entity.extra_state_attributes["installed_version_history"] == [
+        {
+            "version": "8.2.4300",
+            "first_seen_utc": "2026-07-01T00:00:00+00:00",
+            "last_seen_utc": "2026-07-02T00:00:00+00:00",
+        },
+        {
+            "version": "8.2.4401",
+            "first_seen_utc": "2026-07-02T00:00:00+00:00",
+            "last_seen_utc": None,
+        },
+    ]
+    log_entry.assert_called_once_with(
+        hass,
+        name="update.gateway_firmware",
+        message="installed firmware changed from 8.2.4300 to 8.2.4401",
+        domain=DOMAIN,
+        entity_id="update.gateway_firmware",
+    )
 
 
 @pytest.mark.asyncio
@@ -598,6 +856,76 @@ async def test_charger_update_entity_uses_fw_details_payload(hass) -> None:
     entity._refresh_from_details(manager.cached_details)
     assert entity.state == "on"
     assert entity.state_attributes["skipped_version"] is None
+
+
+@pytest.mark.asyncio
+async def test_charger_update_entity_exposes_version_history(hass, monkeypatch) -> None:
+    coord = DummyCoordinator()
+    manager = DummyEvseFirmwareManager(_evse_payload())
+    history = FirmwareVersionHistoryStore(hass)
+    monkeypatch.setattr(
+        getattr(history, "_store"),
+        "async_delay_save",
+        lambda _data_func, _delay: None,
+    )
+    await history.async_load()
+    times = iter(
+        [
+            "2026-07-01T00:00:00+00:00",
+            "2026-07-02T00:00:00+00:00",
+        ]
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.update._utc_now_iso",
+        lambda: next(times),
+    )
+    log_entry = MagicMock()
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.update.logbook.async_log_entry",
+        log_entry,
+    )
+    entity = ChargerFirmwareUpdateEntity(
+        coordinator=coord,
+        manager=manager,
+        catalog_manager=DummyCatalogManager(_catalog_payload()),
+        serial=TEST_EVSE_SERIAL,
+        description=UpdateEntityDescription(key="charger_firmware"),
+        version_history=history,
+    )
+    entity.hass = hass
+    entity.entity_id = "update.driveway_charger_firmware"
+
+    entity._refresh_from_details(manager.cached_details)
+    assert entity.extra_state_attributes["installed_version_history"] == [
+        {
+            "version": "25.37.1.13",
+            "first_seen_utc": "2026-07-01T00:00:00+00:00",
+            "last_seen_utc": None,
+        }
+    ]
+
+    manager.cached_details[TEST_EVSE_SERIAL]["currentFwVersion"] = "25.37.1.14"
+    entity._refresh_from_details(manager.cached_details)
+
+    assert entity.extra_state_attributes["installed_version_history"] == [
+        {
+            "version": "25.37.1.13",
+            "first_seen_utc": "2026-07-01T00:00:00+00:00",
+            "last_seen_utc": "2026-07-02T00:00:00+00:00",
+        },
+        {
+            "version": "25.37.1.14",
+            "first_seen_utc": "2026-07-02T00:00:00+00:00",
+            "last_seen_utc": None,
+        },
+    ]
+    log_entry.assert_called_once_with(
+        hass,
+        name="update.driveway_charger_firmware",
+        message="installed firmware changed from 25.37.1.13 to 25.37.1.14",
+        domain=DOMAIN,
+        entity_id="update.driveway_charger_firmware",
+    )
 
 
 @pytest.mark.asyncio
@@ -864,7 +1192,7 @@ async def test_refresh_from_catalog_none_and_locale_fallback_paths(hass) -> None
 
     entity._refresh_from_catalog(payload)
     assert entity.release_url == "https://example.test/envoy/de"
-    assert entity.extra_state_attributes["locale_used"] == "de-de"
+    assert entity.extra_state_attributes["catalog_source_scope"] == "global"
 
 
 def test_helper_functions_cover_edge_paths() -> None:
@@ -1018,6 +1346,7 @@ def test_device_info_falls_back_when_coordinator_does_not_supply_info() -> None:
 
 def test_prune_removed_charger_updates_covers_registry_filters() -> None:
     removed: list[str] = []
+    removed_history: list[str] = []
     ent_reg = SimpleNamespace(
         entities={
             "no_domain": SimpleNamespace(
@@ -1072,7 +1401,9 @@ def test_prune_removed_charger_updates_covers_registry_filters() -> None:
         ent_reg=ent_reg,
         current_serials={"KEEP_ME"},
         known_serials=known_serials,
+        version_history=SimpleNamespace(remove=removed_history.append),
     )
 
     assert removed == ["update.no_domain"]
+    assert removed_history == [_charger_update_unique_id("REMOVE_ME")]
     assert known_serials == {"KEEP_ME"}

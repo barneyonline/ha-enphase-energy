@@ -15,7 +15,7 @@ All notable changes to this project will be documented in this file.
 - Fixed the Enphase Service Status badge so expected 4xx responses from ancillary Enphase probes no longer publish the service as down while Home Assistant reports the cloud service as OK.
 
 ### 🔧 Improvements
-- None
+- Added a bounded installed firmware version history to firmware update entities, logged firmware version changes to Logbook, and reduced diagnostic-only firmware update attributes shown in Home Assistant.
 
 ### 🔄 Other changes
 - Documented newly observed EVSE feature flags and the Default Charge Level charger-config endpoint behavior.

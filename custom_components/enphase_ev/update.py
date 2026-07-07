@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from datetime import datetime, timezone
 from typing import Any
 
+from homeassistant.components import logbook
 from homeassistant.components.update import (
     UpdateDeviceClass,
     UpdateEntity,
@@ -15,6 +17,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -38,8 +41,136 @@ from .runtime_data import EnphaseConfigEntry, get_runtime_data
 from .serial_discovery import active_charger_serials_for_cleanup
 
 PARALLEL_UPDATES = 0
+FIRMWARE_HISTORY_STORAGE_KEY = f"{DOMAIN}_firmware_version_history"
+FIRMWARE_HISTORY_STORAGE_VERSION = 1
+FIRMWARE_HISTORY_MAX_ENTRIES = 10
+FIRMWARE_HISTORY_SAVE_DELAY = 5
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class FirmwareVersionHistoryStore:
+    """Persist bounded installed firmware version transitions."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        *,
+        max_entries: int = FIRMWARE_HISTORY_MAX_ENTRIES,
+    ) -> None:
+        self._store: Store[dict[str, Any]] = Store(
+            hass,
+            FIRMWARE_HISTORY_STORAGE_VERSION,
+            FIRMWARE_HISTORY_STORAGE_KEY,
+            private=True,
+        )
+        self._history: dict[str, list[dict[str, str | None]]] = {}
+        self._max_entries = max(1, max_entries)
+
+    async def async_load(self) -> None:
+        """Load stored firmware history."""
+        stored = await self._store.async_load()
+        if not isinstance(stored, dict):
+            self._history = {}
+            return
+
+        entries_by_id = stored.get("entries")
+        if not isinstance(entries_by_id, dict):
+            self._history = {}
+            return
+
+        history: dict[str, list[dict[str, str | None]]] = {}
+        for unique_id, entries in entries_by_id.items():
+            clean = self._clean_entries(entries)
+            if clean:
+                history[str(unique_id)] = clean
+        self._history = history
+
+    def history_for(self, unique_id: str | None) -> list[dict[str, str | None]]:
+        """Return a copy of the stored history for an update entity."""
+        if not unique_id:
+            return []
+        return [dict(entry) for entry in self._history.get(unique_id, [])]
+
+    def record_installed_version(
+        self,
+        *,
+        unique_id: str | None,
+        version: str | None,
+        hass: HomeAssistant | None,
+        entity_id: str | None,
+        name: str | None,
+    ) -> list[dict[str, str | None]]:
+        """Record a version transition and log user-visible changes."""
+        if not unique_id or not version:
+            return self.history_for(unique_id)
+
+        history = self._history.setdefault(unique_id, [])
+        current = history[-1] if history else None
+        current_version = _text(current.get("version")) if current else None
+
+        if current_version == version:
+            return self.history_for(unique_id)
+
+        now = _utc_now_iso()
+        if current is not None:
+            current["last_seen_utc"] = now
+        history.append(
+            {
+                "version": version,
+                "first_seen_utc": now,
+                "last_seen_utc": None,
+            }
+        )
+        del history[: max(0, len(history) - self._max_entries)]
+        self._schedule_save()
+
+        if current_version and hass is not None and entity_id is not None:
+            logbook.async_log_entry(
+                hass,
+                name=name or entity_id,
+                message=(
+                    "installed firmware changed from " f"{current_version} to {version}"
+                ),
+                domain=DOMAIN,
+                entity_id=entity_id,
+            )
+
+        return self.history_for(unique_id)
+
+    def remove(self, unique_id: str) -> None:
+        """Remove history for a retired update entity."""
+        if unique_id not in self._history:
+            return
+        self._history.pop(unique_id)
+        self._schedule_save()
+
+    def _schedule_save(self) -> None:
+        self._store.async_delay_save(
+            lambda: {"entries": self._history},
+            FIRMWARE_HISTORY_SAVE_DELAY,
+        )
+
+    def _clean_entries(self, entries: Any) -> list[dict[str, str | None]]:
+        if not isinstance(entries, list):
+            return []
+        clean: list[dict[str, str | None]] = []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            version = _text(entry.get("version"))
+            first_seen = _text(entry.get("first_seen_utc"))
+            last_seen = _text(entry.get("last_seen_utc"))
+            if not version or not first_seen:
+                continue
+            clean.append(
+                {
+                    "version": version,
+                    "first_seen_utc": first_seen,
+                    "last_seen_utc": last_seen,
+                }
+            )
+        return clean[-self._max_entries :]
 
 
 async def async_setup_entry(
@@ -53,6 +184,8 @@ async def async_setup_entry(
     evse_manager = runtime_data.evse_firmware_details or EvseFirmwareDetailsManager(
         lambda: coord.client
     )
+    version_history = FirmwareVersionHistoryStore(hass)
+    await version_history.async_load()
     ent_reg = er.async_get(hass)
 
     entities: list[UpdateEntity] = []
@@ -69,6 +202,7 @@ async def async_setup_entry(
                     entity_category=EntityCategory.DIAGNOSTIC,
                 ),
                 installed_version_getter=_gateway_installed_version,
+                version_history=version_history,
             )
         )
 
@@ -95,6 +229,7 @@ async def async_setup_entry(
                 ent_reg=ent_reg,
                 current_serials=current_serials,
                 known_serials=known_serials,
+                version_history=version_history,
             )
         if not current_serials and (
             active_serials is None and not _type_available(coord, "iqevse")
@@ -115,6 +250,7 @@ async def async_setup_entry(
                     device_class=UpdateDeviceClass.FIRMWARE,
                     entity_category=EntityCategory.DIAGNOSTIC,
                 ),
+                version_history=version_history,
             )
             for sn in serials
         ]
@@ -142,6 +278,7 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
         translation_key: str,
         description: UpdateEntityDescription,
         installed_version_getter: Callable[[EnphaseCoordinator], str | None],
+        version_history: FirmwareVersionHistoryStore | None = None,
     ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
@@ -149,6 +286,7 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
         self._manager = manager
         self._device_type = device_type
         self._installed_version_getter = installed_version_getter
+        self._version_history = version_history
         self._refresh_task = None
 
         self._attr_translation_key = translation_key
@@ -163,6 +301,7 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
         self._raw_installed_version: str | None = None
         self._raw_latest_version: str | None = None
         self._catalog_generated_at: str | None = None
+        self._installed_version_history: list[dict[str, str | None]] = []
 
         self._refresh_from_catalog(self._manager.cached_catalog)
 
@@ -186,12 +325,10 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         status = self._manager.status_snapshot()
         return {
-            "country_used": self._country_used,
-            "locale_used": self._locale_used,
             "catalog_source_scope": self._source_scope,
             "catalog_generated_at": self._catalog_generated_at,
-            "catalog_last_fetch_utc": status.get("last_fetch_utc"),
             "catalog_last_error": status.get("last_error"),
+            "installed_version_history": self._installed_version_history,
         }
 
     async def async_added_to_hass(self) -> None:
@@ -249,6 +386,7 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
         normalized_installed = normalize_version_token(raw_installed)
         self._raw_installed_version = raw_installed
         self._attr_installed_version = normalized_installed
+        self._update_installed_version_history(normalized_installed)
 
         selected = select_catalog_entry(
             catalog,
@@ -304,6 +442,19 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
         )
         _reconcile_skipped_version(self)
 
+    def _update_installed_version_history(self, version: str | None) -> None:
+        if self._version_history is None:
+            return
+        self._installed_version_history = (
+            self._version_history.record_installed_version(
+                unique_id=self.unique_id,
+                version=version,
+                hass=self.hass if self.entity_id is not None else None,
+                entity_id=self.entity_id,
+                name=self.entity_id,
+            )
+        )
+
 
 class ChargerFirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
     _attr_has_entity_name = True
@@ -317,6 +468,7 @@ class ChargerFirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateE
         catalog_manager: FirmwareCatalogManager,
         serial: str,
         description: UpdateEntityDescription,
+        version_history: FirmwareVersionHistoryStore | None = None,
     ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
@@ -324,6 +476,7 @@ class ChargerFirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateE
         self._manager = manager
         self._catalog_manager = catalog_manager
         self._serial = str(serial)
+        self._version_history = version_history
         self._refresh_task = None
 
         self._attr_unique_id = _charger_update_unique_id(self._serial)
@@ -342,6 +495,7 @@ class ChargerFirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateE
         self._source_scope: str | None = None
         self._catalog_generated_at: str | None = None
         self._catalog_latest_version: str | None = None
+        self._installed_version_history: list[dict[str, str | None]] = []
 
         self._refresh_from_details(self._manager.cached_details)
         self._refresh_from_catalog(self._catalog_manager.cached_catalog)
@@ -378,17 +532,12 @@ class ChargerFirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateE
             "last_updated_at": self._last_updated_at,
             "is_auto_ota": self._is_auto_ota,
             "firmware_rollout_enabled": self._firmware_rollout_enabled,
-            "country_used": self._country_used,
-            "locale_used": self._locale_used,
             "catalog_source_scope": self._source_scope,
             "catalog_generated_at": self._catalog_generated_at,
-            "catalog_last_fetch_utc": catalog_status.get("last_fetch_utc"),
             "catalog_last_error": catalog_status.get("last_error"),
-            "details_last_fetch_utc": status.get("last_fetch_utc"),
-            "details_last_success_utc": status.get("last_success_utc"),
             "details_last_error": status.get("last_error"),
             "details_using_stale": status.get("using_stale"),
-            "details_cache_expires_utc": status.get("cache_expires_utc"),
+            "installed_version_history": self._installed_version_history,
         }
 
     async def async_added_to_hass(self) -> None:
@@ -477,6 +626,7 @@ class ChargerFirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateE
         normalized_installed = normalize_version_token(raw_installed)
         self._raw_installed_version = raw_installed
         self._attr_installed_version = normalized_installed
+        self._update_installed_version_history(normalized_installed)
 
         raw_latest = _text(details.get("targetFwVersion")) if details else None
         normalized_latest = normalize_version_token(raw_latest)
@@ -500,6 +650,19 @@ class ChargerFirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateE
             self._coord, self._serial
         )
         _reconcile_skipped_version(self)
+
+    def _update_installed_version_history(self, version: str | None) -> None:
+        if self._version_history is None:
+            return
+        self._installed_version_history = (
+            self._version_history.record_installed_version(
+                unique_id=self.unique_id,
+                version=version,
+                hass=self.hass if self.entity_id is not None else None,
+                entity_id=self.entity_id,
+                name=self.entity_id,
+            )
+        )
 
     def _refresh_from_catalog(self, catalog: dict[str, Any] | None) -> None:
         country, locale = resolve_country_and_locale(self._coord, self.hass)
@@ -581,6 +744,7 @@ def _async_prune_removed_charger_updates(
     ent_reg,
     current_serials: set[str],
     known_serials: set[str],
+    version_history: FirmwareVersionHistoryStore | None = None,
 ) -> None:
     unique_suffix = "_charger_firmware"
     unique_prefix = f"{DOMAIN}_"
@@ -605,6 +769,8 @@ def _async_prune_removed_charger_updates(
         if not serial or serial in current_serials:
             continue
         ent_reg.async_remove(reg_entry.entity_id)
+        if version_history is not None:
+            version_history.remove(unique_id)
         known_serials.discard(serial)
 
 
@@ -628,6 +794,10 @@ def _charger_installed_version(coord: EnphaseCoordinator, serial: str) -> str | 
                     return version
 
     return _text(coord.inventory_view.type_device_sw_version("iqevse"))
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def _as_bool(value: Any) -> bool | None:
