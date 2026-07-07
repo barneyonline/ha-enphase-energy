@@ -8,17 +8,36 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
-- Added an IQ EV Charger Default Charge Level number entity for chargers whose Enphase config endpoint exposes the `DefaultChargeLevel` setting.
+- None
 
 ### 🐛 Bug fixes
-- Fixed IQ Gateway firmware catalog generation so US commercial-only release notes are not advertised to residential/regional gateway update entities. (#735)
-- Fixed the Enphase Service Status badge so expected 4xx responses from ancillary Enphase probes no longer publish the service as down while Home Assistant reports the cloud service as OK.
+- None
 
 ### 🔧 Improvements
-- Added a bounded installed firmware version history to firmware update entities, logged firmware version changes to Logbook, and reduced diagnostic-only firmware update attributes shown in Home Assistant.
+- None
 
 ### 🔄 Other changes
-- Documented newly observed EVSE feature flags and the Default Charge Level charger-config endpoint behavior.
+- None
+
+## v3.2.1 - 2026-07-07
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- Added an IQ EV Charger Default Charge Level number entity for chargers whose Enphase config endpoint exposes the `DefaultChargeLevel` setting. (#738)
+
+### 🐛 Bug fixes
+- Fixed IQ Gateway firmware catalog generation so US commercial-only release notes are not advertised to residential/regional gateway update entities. (#736)
+- Fixed the Enphase Service Status badge so expected 4xx responses from ancillary Enphase probes no longer publish the service as down while Home Assistant reports the cloud service as OK. (#737)
+
+### 🔧 Improvements
+- Added a bounded installed firmware version history to firmware update entities, logged firmware version changes to Logbook, and reduced diagnostic-only firmware update attributes shown in Home Assistant. (#740)
+
+### 🔄 Other changes
+- Added regression coverage for reauth repair issue cleanup. (#734)
+- Documented newly observed EVSE feature flags and the Default Charge Level charger-config endpoint behavior. (#738)
+- Bumped the integration manifest version to `3.2.1`.
 
 ## v3.2.0 - 2026-07-02
 
