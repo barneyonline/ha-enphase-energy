@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Fixed IQ EV Charger amp number ranges staying on fallback bounds for up to 10 minutes when the first EVSE summary payload omitted current-limit details.
 
 ### 🔧 Improvements
 - None
