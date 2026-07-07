@@ -23,6 +23,7 @@ def test_manifest_keys_present():
         data.get("iot_class") == "cloud_polling"
     ), "iot_class should be 'cloud_polling'"
     assert data.get("quality_scale") == "platinum", "quality_scale should be 'platinum'"
+    assert data.get("after_dependencies") == ["logbook", "recorder"]
 
 
 def test_branding_name_is_aligned_across_manifest_hacs_and_strings():

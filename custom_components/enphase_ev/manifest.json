@@ -2,6 +2,7 @@
   "domain": "enphase_ev",
   "name": "Enphase Energy",
   "after_dependencies": [
+    "logbook",
     "recorder"
   ],
   "codeowners": [
