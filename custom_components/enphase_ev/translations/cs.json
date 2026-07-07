@@ -1232,7 +1232,12 @@
         "name": "Měřič spotřeby"
       },
       "gateway_connectivity_status": {
-        "name": "Stav brány"
+        "name": "Stav brány",
+        "state_attributes": {
+          "ip_address": {
+            "name": "IP adresa"
+          }
+        }
       },
       "gateway_last_reported": {
         "name": "Brána naposledy hlášena"

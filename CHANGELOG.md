@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔧 Improvements
-- None
+- Exposed the IQ Gateway IP address on the Gateway Status entity attributes when available.
 
 ### 🔄 Other changes
 - None

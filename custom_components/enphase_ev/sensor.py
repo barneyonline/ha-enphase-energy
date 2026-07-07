@@ -3695,6 +3695,7 @@ _GATEWAY_LAST_REPORT_KEYS: tuple[str, ...] = (
     "last_reported",
     "lastReportedAt",
 )
+_GATEWAY_IP_KEYS: tuple[str, ...] = ("ip", "ip_address", "ip-address")
 
 
 def _gateway_optional_bool(value: object) -> bool | None:
@@ -3730,6 +3731,87 @@ def _gateway_normalize_status(value: object) -> str:
     if any(token in normalized for token in ("normal", "online", "connected", "ok")):
         return "normal"
     return "unknown"
+
+
+def _gateway_member_ip_address(member: dict[str, object]) -> str | None:
+    for key in _GATEWAY_IP_KEYS:
+        ip_address = _gateway_clean_text(member.get(key))
+        if ip_address:
+            return ip_address
+    return None
+
+
+def _gateway_ip_member_kind(member: dict[str, object]) -> str | None:
+    for key in ("channel_type", "channelType", "meter_type"):
+        channel_type = _gateway_clean_text(member.get(key))
+        if not channel_type:
+            continue
+        normalized = "".join(ch if ch.isalnum() else "_" for ch in channel_type.lower())
+        if (
+            normalized in ("enpower", "system_controller", "systemcontroller")
+            or "enpower" in normalized
+            or "system_controller" in normalized
+            or normalized.startswith("systemcontroller")
+        ):
+            return "controller"
+        if "production" in normalized or normalized in ("prod", "pv", "solar"):
+            return "production"
+        if "consumption" in normalized or normalized in (
+            "cons",
+            "load",
+            "site_load",
+        ):
+            return "consumption"
+    name = (_gateway_clean_text(member.get("name")) or "").lower()
+    if "system controller" in name:
+        return "controller"
+    if "controller" in name and "meter" not in name:
+        return "controller"
+    if "production" in name:
+        return "production"
+    if "consumption" in name:
+        return "consumption"
+    return None
+
+
+def _gateway_member_preferred_for_ip(member: dict[str, object]) -> bool:
+    if _gateway_ip_member_kind(member) in {"production", "consumption", "controller"}:
+        return False
+    name = (_gateway_clean_text(member.get("name")) or "").lower()
+    if "gateway" in name:
+        return True
+    return any(
+        member.get(key) is not None
+        for key in (
+            "envoy_sw_version",
+            "ap_mode",
+            "supportsEntrez",
+            "show_connection_details",
+        )
+    )
+
+
+def _gateway_summary_ip_address(
+    members: list[dict[str, object]],
+    dashboard_envoy: object,
+) -> str | None:
+    candidate_members = list(members)
+    if isinstance(dashboard_envoy, dict):
+        candidate_members.append(dashboard_envoy)
+    for member in candidate_members:
+        if _gateway_member_preferred_for_ip(member):
+            ip_address = _gateway_member_ip_address(member)
+            if ip_address:
+                return ip_address
+    for member in candidate_members:
+        ip_address = _gateway_member_ip_address(member)
+        if ip_address and _gateway_ip_member_kind(member) not in {
+            "production",
+            "consumption",
+            "controller",
+        }:
+            return ip_address
+    return None
 
 
 def _gateway_parse_timestamp(value: object) -> datetime | None:
@@ -3814,6 +3896,7 @@ def _gateway_inventory_snapshot(coord: EnphaseCoordinator) -> dict[str, object]:
     dashboard_envoy = detail_getter() if callable(detail_getter) else None
     if not members and isinstance(dashboard_envoy, dict):
         members = [dict(dashboard_envoy)]
+    ip_address = _gateway_summary_ip_address(members, dashboard_envoy)
     try:
         total_devices = int(bucket.get("count", len(members)))
     except Exception:  # noqa: BLE001
@@ -3937,6 +4020,7 @@ def _gateway_inventory_snapshot(coord: EnphaseCoordinator) -> dict[str, object]:
         "model_summary": _gateway_format_counts(model_counts),
         "firmware_counts": firmware_counts,
         "firmware_summary": _gateway_format_counts(firmware_counts),
+        "ip_address": ip_address,
         "latest_reported": latest_reported,
         "latest_reported_utc": (
             latest_reported.isoformat() if latest_reported is not None else None
@@ -7166,6 +7250,7 @@ class EnphaseGatewayConnectivityStatusSensor(_SiteBaseEntity):
             "status_summary": snapshot.get("status_summary"),
             "model_summary": snapshot.get("model_summary"),
             "firmware_summary": snapshot.get("firmware_summary"),
+            "ip_address": snapshot.get("ip_address"),
             "latest_reported_utc": snapshot.get("latest_reported_utc"),
             "latest_reported_device": snapshot.get("latest_reported_device"),
             "property_keys": snapshot.get("property_keys"),

@@ -136,6 +136,48 @@ class InventoryRuntime:
     def _type_member_text(self, member: dict[str, object], *keys: str) -> str | None:
         return type_member_text(member, *keys)
 
+    def _gateway_member_ip_address(self, member: dict[str, object]) -> str | None:
+        return self._type_member_text(member, "ip", "ip_address", "ip-address")
+
+    def _gateway_member_is_not_primary_gateway(self, member: dict[str, object]) -> bool:
+        member_kind = self.coordinator.inventory_view._envoy_member_kind(member)
+        return member_kind in {"production", "consumption", "controller"}
+
+    def _gateway_member_preferred_for_ip(self, member: dict[str, object]) -> bool:
+        if self._gateway_member_is_not_primary_gateway(member):
+            return False
+        name = (self._type_member_text(member, "name") or "").lower()
+        if "gateway" in name:
+            return True
+        return any(
+            member.get(key) is not None
+            for key in (
+                "envoy_sw_version",
+                "ap_mode",
+                "supportsEntrez",
+                "show_connection_details",
+            )
+        )
+
+    def _gateway_summary_ip_address(
+        self,
+        members: list[dict[str, object]],
+        dashboard_envoy: object,
+    ) -> str | None:
+        candidate_members = list(members)
+        if isinstance(dashboard_envoy, dict):
+            candidate_members.append(dashboard_envoy)
+        for member in candidate_members:
+            if self._gateway_member_preferred_for_ip(member):
+                ip_address = self._gateway_member_ip_address(member)
+                if ip_address:
+                    return ip_address
+        for member in candidate_members:
+            ip_address = self._gateway_member_ip_address(member)
+            if ip_address and not self._gateway_member_is_not_primary_gateway(member):
+                return ip_address
+        return None
+
     def _coerce_optional_text(self, value: object) -> str | None:
         return coerce_optional_text(value)
 
@@ -1206,6 +1248,7 @@ class InventoryRuntime:
             dashboard_envoy = self.coordinator.system_dashboard_envoy_detail()
         if not members and isinstance(dashboard_envoy, dict):
             members = [dict(dashboard_envoy)]
+        ip_address = self._gateway_summary_ip_address(members, dashboard_envoy)
         try:
             total_devices = int(bucket.get("count", len(members)) or 0)
         except Exception:
@@ -1340,6 +1383,7 @@ class InventoryRuntime:
             "model_summary": self._format_inverter_model_summary(model_counts),
             "firmware_counts": firmware_counts,
             "firmware_summary": self._format_inverter_model_summary(firmware_counts),
+            "ip_address": ip_address,
             "latest_reported": latest_reported,
             "latest_reported_utc": (
                 latest_reported.isoformat() if latest_reported is not None else None

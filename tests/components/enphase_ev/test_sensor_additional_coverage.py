@@ -1774,6 +1774,7 @@ def test_gateway_diagnostic_sensors_expose_inventory_summary(
                         "status": "normal",
                         "model": "IQ Gateway",
                         "envoy_sw_version": "8.2.0",
+                        "ip_address": "192.0.2.10",
                         "last_report": "2026-02-15T18:00:00Z",
                     },
                     {
@@ -1804,6 +1805,7 @@ def test_gateway_diagnostic_sensors_expose_inventory_summary(
     assert status_attrs["disconnected_devices"] == 1
     assert status_attrs["unknown_connection_devices"] == 1
     assert status_attrs["status_counts"]["warning"] == 1
+    assert status_attrs["ip_address"] == "192.0.2.10"
 
     last_reported_sensor = EnphaseGatewayLastReportedSensor(coord)
     assert last_reported_sensor.entity_registry_enabled_default is False
@@ -1827,6 +1829,91 @@ def test_gateway_diagnostic_sensors_handle_missing_inventory(
 
     assert EnphaseGatewayConnectivityStatusSensor(coord).native_value is None
     assert EnphaseGatewayLastReportedSensor(coord).native_value is None
+
+
+def test_gateway_status_ip_helper_paths() -> None:
+    assert (
+        sensor_mod._gateway_member_ip_address(  # noqa: SLF001
+            {"ip-address": " 192.0.2.20 "}
+        )
+        == "192.0.2.20"
+    )
+    assert (
+        sensor_mod._gateway_ip_member_kind({"channel_type": "enpower"})  # noqa: SLF001
+        == "controller"
+    )
+    assert (
+        sensor_mod._gateway_ip_member_kind(  # noqa: SLF001
+            {"channelType": "consumption_meter"}
+        )
+        == "consumption"
+    )
+    assert (
+        sensor_mod._gateway_ip_member_kind({"name": "Main Controller"})  # noqa: SLF001
+        == "controller"
+    )
+    assert (
+        sensor_mod._gateway_ip_member_kind({"name": "Production Meter"})  # noqa: SLF001
+        == "production"
+    )
+    assert (
+        sensor_mod._gateway_ip_member_kind(  # noqa: SLF001
+            {"name": "Consumption Meter"}
+        )
+        == "consumption"
+    )
+    assert (
+        sensor_mod._gateway_summary_ip_address(  # noqa: SLF001
+            [
+                {"name": "Meter", "ip_address": "192.0.2.30"},
+                {
+                    "name": "Communications device",
+                    "show_connection_details": True,
+                    "ip_address": "192.0.2.31",
+                },
+            ],
+            None,
+        )
+        == "192.0.2.31"
+    )
+    assert (
+        sensor_mod._gateway_summary_ip_address(  # noqa: SLF001
+            [{"name": "Production Meter", "ip_address": "192.0.2.32"}],
+            None,
+        )
+        is None
+    )
+    assert (
+        sensor_mod._gateway_summary_ip_address(  # noqa: SLF001
+            [{"name": "Unknown Device", "ip_address": "192.0.2.32"}],
+            None,
+        )
+        == "192.0.2.32"
+    )
+    assert (
+        sensor_mod._gateway_summary_ip_address(  # noqa: SLF001
+            [
+                {
+                    "name": "Production Meter",
+                    "channel_type": "production_meter",
+                    "show_connection_details": True,
+                    "ip_address": "192.0.2.33",
+                },
+                {
+                    "name": "System Controller",
+                    "show_connection_details": True,
+                    "ip_address": "192.0.2.34",
+                },
+                {
+                    "name": "Communications device",
+                    "show_connection_details": True,
+                    "ip_address": "192.0.2.35",
+                },
+            ],
+            None,
+        )
+        == "192.0.2.35"
+    )
 
 
 def test_microinverter_diagnostic_sensors_expose_inventory_summary(

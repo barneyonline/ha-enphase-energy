@@ -1232,7 +1232,12 @@
         "name": "Fogyasztásmérő"
       },
       "gateway_connectivity_status": {
-        "name": "Átjáró állapota"
+        "name": "Átjáró állapota",
+        "state_attributes": {
+          "ip_address": {
+            "name": "IP-cím"
+          }
+        }
       },
       "gateway_last_reported": {
         "name": "A Gateway legutóbbi jelentése"

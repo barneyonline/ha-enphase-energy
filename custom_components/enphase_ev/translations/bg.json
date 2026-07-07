@@ -1232,7 +1232,12 @@
         "name": "Разходомер"
       },
       "gateway_connectivity_status": {
-        "name": "Състояние на шлюза"
+        "name": "Състояние на шлюза",
+        "state_attributes": {
+          "ip_address": {
+            "name": "IP адрес"
+          }
+        }
       },
       "gateway_last_reported": {
         "name": "Последно докладван шлюз"
