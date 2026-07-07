@@ -124,6 +124,9 @@
     "charge_mode_invalid_option": {
       "message": "Modul de încărcare selectat nu este disponibil."
     },
+    "default_charge_level_unavailable": {
+      "message": "Setările nivelului implicit de încărcare nu sunt disponibile cât timp serviciul Enphase este indisponibil."
+    },
     "evse_schedule_day_required": {
       "message": "Selectați cel puțin o zi a săptămânii pentru programare."
     },
@@ -1756,6 +1759,9 @@
     "number": {
       "charging_amps": {
         "name": "Amperi de încărcare"
+      },
+      "default_charge_level": {
+        "name": "Nivel implicit de încărcare"
       },
       "battery_reserve": {
         "name": "Rezervă baterie"

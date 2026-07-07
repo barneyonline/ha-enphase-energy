@@ -3684,7 +3684,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                 if sess.get("auth_token") is not None
                 else sess.get("authToken")
             )
-            config_values = charger_config.get(sn) or {}
+            config_values = charger_config.get(sn)
 
             entry = {
                 "sn": sn,
@@ -3774,14 +3774,20 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                 )
                 if previous_lifetime_kwh is not None:
                     entry.setdefault("lifetime_kwh", previous_lifetime_kwh)
-            if PHASE_SWITCH_CONFIG_SETTING in config_values:
-                entry["phase_switch_config"] = config_values[
-                    PHASE_SWITCH_CONFIG_SETTING
-                ]
-            if DEFAULT_CHARGE_LEVEL_SETTING in config_values:
-                entry["default_charge_level"] = config_values[
-                    DEFAULT_CHARGE_LEVEL_SETTING
-                ]
+            if isinstance(config_values, dict):
+                if PHASE_SWITCH_CONFIG_SETTING in config_values:
+                    entry["phase_switch_config"] = config_values[
+                        PHASE_SWITCH_CONFIG_SETTING
+                    ]
+                if DEFAULT_CHARGE_LEVEL_SETTING in config_values:
+                    entry["default_charge_level_supported"] = True
+                    entry["default_charge_level_supported_source"] = "charger_config"
+                    entry["default_charge_level"] = config_values[
+                        DEFAULT_CHARGE_LEVEL_SETTING
+                    ]
+                else:
+                    entry["default_charge_level_supported"] = False
+                    entry["default_charge_level_supported_source"] = "charger_config"
             if green_supported is not None:
                 entry["green_battery_supported"] = green_supported
                 if green_supported:

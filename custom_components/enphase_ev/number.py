@@ -122,6 +122,7 @@ async def async_setup_entry(
     coord: EnphaseCoordinator = get_runtime_data(entry).coordinator
     ent_reg = er.async_get(hass)
     known_serials: set[str] = set()
+    added_default_charge_level_unique_ids: set[str] = set()
     added_site_number_unique_ids: set[str] = set()
 
     def _managed_site_number_unique_ids() -> set[str]:
@@ -148,6 +149,9 @@ async def async_setup_entry(
 
     def _charger_number_unique_id(sn: str) -> str:
         return f"{DOMAIN}_{sn}_amps_number"
+
+    def _default_charge_level_number_unique_id(sn: str) -> str:
+        return f"{DOMAIN}_{sn}_default_charge_level_number"
 
     def _site_number_entities_by_unique_id(
         retained_site_number_unique_ids: set[str],
@@ -226,8 +230,23 @@ async def async_setup_entry(
             entities = []
             for sn in serials:
                 entities.append(ChargingAmpsNumber(coord, sn))
+        for sn in current_serials:
+            data = coord.data.get(sn, {}) if isinstance(coord.data, dict) else {}
+            unique_id = _default_charge_level_number_unique_id(sn)
+            if (
+                isinstance(data, dict)
+                and data.get("default_charge_level_supported") is True
+                and unique_id not in added_default_charge_level_unique_ids
+            ):
+                entities.append(DefaultChargeLevelNumber(coord, sn))
         if entities:
             async_add_entities(entities, update_before_add=False)
+            added_default_charge_level_unique_ids.update(
+                entity.unique_id
+                for entity in entities
+                if isinstance(entity, DefaultChargeLevelNumber)
+                and isinstance(entity.unique_id, str)
+            )
         known_serials.intersection_update(current_serials)
         known_serials.update(serials)
 
@@ -252,6 +271,17 @@ async def async_setup_entry(
         active_charger_unique_ids = {
             _charger_number_unique_id(sn) for sn in current_serials
         }
+        for sn in current_serials:
+            data = coord.data.get(sn, {}) if isinstance(coord.data, dict) else {}
+            unique_id = _default_charge_level_number_unique_id(sn)
+            if isinstance(data, dict) and (
+                data.get("default_charge_level_supported") is True
+                or (
+                    unique_id in added_default_charge_level_unique_ids
+                    and data.get("default_charge_level_supported") is not False
+                )
+            ):
+                active_charger_unique_ids.add(unique_id)
         prune_managed_entities(
             ent_reg,
             entry.entry_id,
@@ -265,7 +295,13 @@ async def async_setup_entry(
             is_managed=lambda unique_id: (
                 unique_id in _managed_site_number_unique_ids()
                 or _tariff_number_managed(unique_id)
-                or unique_id.endswith(("_amps_number", "_schedule_edit_limit"))
+                or unique_id.endswith(
+                    (
+                        "_amps_number",
+                        "_default_charge_level_number",
+                        "_schedule_edit_limit",
+                    )
+                )
             ),
         )
 
@@ -424,6 +460,66 @@ class ChargingAmpsNumber(EnphaseBaseEntity, NumberEntity):
         ):
             # Restart the active session so the updated amps take effect
             self._coord.schedule_amp_restart(self._sn)
+
+
+class DefaultChargeLevelNumber(EnphaseBaseEntity, NumberEntity):
+    _attr_has_entity_name = True
+    _attr_translation_key = "default_charge_level"
+    _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
+
+    def __init__(self, coord: EnphaseCoordinator, sn: str):
+        super().__init__(coord, sn)
+        self._attr_unique_id = f"{DOMAIN}_{sn}_default_charge_level_number"
+
+    @staticmethod
+    def _coerce_amp(value) -> int | None:
+        return ChargingAmpsNumber._coerce_amp(value)
+
+    @property
+    def available(self) -> bool:  # type: ignore[override]
+        return (
+            super().available
+            and self.data.get("default_charge_level_supported") is True
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        value = self._coerce_amp(self.data.get("default_charge_level"))
+        return float(value) if value is not None else None
+
+    @property
+    def native_min_value(self) -> float:
+        v = self._coerce_amp(self.data.get("min_amp"))
+        return float(v) if v is not None else 6.0
+
+    @property
+    def native_max_value(self) -> float:
+        v = self._coerce_amp(self.data.get("max_amp"))
+        return float(v) if v is not None else 40.0
+
+    @property
+    def native_step(self) -> float:
+        v = self._coerce_amp(self.data.get("amp_granularity"))
+        return float(v) if v is not None and v > 0 else 1.0
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object | None]:
+        return {
+            "min_amp": self._coerce_amp(self.data.get("min_amp")),
+            "max_amp": self._coerce_amp(self.data.get("max_amp")),
+            "max_current": self._coerce_amp(self.data.get("max_current")),
+            "amp_granularity": self._coerce_amp(self.data.get("amp_granularity")),
+            "charging_amps": self._coerce_amp(self.data.get("charging_level")),
+            "default_charge_level_supported_source": self.data.get(
+                "default_charge_level_supported_source"
+            ),
+        }
+
+    async def async_set_native_value(self, value: float) -> None:
+        await self._coord.evse_runtime.async_set_default_charge_level(
+            self._sn,
+            int(value),
+        )
 
 
 class BatteryShutdownLevelNumber(CoordinatorEntity, NumberEntity):

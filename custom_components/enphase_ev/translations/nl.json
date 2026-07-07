@@ -124,6 +124,9 @@
     "charge_mode_invalid_option": {
       "message": "De geselecteerde laadmodus is niet beschikbaar."
     },
+    "default_charge_level_unavailable": {
+      "message": "Instellingen voor het standaard laadniveau zijn niet beschikbaar terwijl de Enphase-service niet beschikbaar is."
+    },
     "evse_schedule_day_required": {
       "message": "Selecteer minstens één weekdag voor het schema."
     },
@@ -1756,6 +1759,9 @@
     "number": {
       "charging_amps": {
         "name": "Laadampère"
+      },
+      "default_charge_level": {
+        "name": "Standaard laadniveau"
       },
       "battery_reserve": {
         "name": "Batterijreserve"

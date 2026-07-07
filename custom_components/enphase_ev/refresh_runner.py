@@ -454,9 +454,14 @@ class RefreshRunner:
                         PHASE_SWITCH_CONFIG_SETTING
                     ]
                 if DEFAULT_CHARGE_LEVEL_SETTING in config_values:
+                    payload["default_charge_level_supported"] = True
+                    payload["default_charge_level_supported_source"] = "charger_config"
                     payload["default_charge_level"] = config_values[
                         DEFAULT_CHARGE_LEVEL_SETTING
                     ]
+                else:
+                    payload["default_charge_level_supported"] = False
+                    payload["default_charge_level_supported_source"] = "charger_config"
         if working_data is None:
             coordinator.async_set_updated_data(merged)
 

@@ -124,6 +124,9 @@
     "charge_mode_invalid_option": {
       "message": "Der ausgewählte Lademodus ist nicht verfügbar."
     },
+    "default_charge_level_unavailable": {
+      "message": "Die Einstellungen für die Standard-Ladestufe sind nicht verfügbar, solange der Enphase-Dienst ausgefallen ist."
+    },
     "evse_schedule_day_required": {
       "message": "Wählen Sie mindestens einen Wochentag für den Zeitplan aus."
     },
@@ -1756,6 +1759,9 @@
     "number": {
       "charging_amps": {
         "name": "Ladestrom"
+      },
+      "default_charge_level": {
+        "name": "Standard-Ladestufe"
       },
       "battery_reserve": {
         "name": "Batteriereserve"

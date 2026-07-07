@@ -124,6 +124,9 @@
     "charge_mode_invalid_option": {
       "message": "Selected charging mode is not available."
     },
+    "default_charge_level_unavailable": {
+      "message": "Default charge level settings are unavailable while the Enphase service is down."
+    },
     "evse_schedule_day_required": {
       "message": "Select at least one weekday for the schedule."
     },
@@ -1765,6 +1768,9 @@
       },
       "charging_amps": {
         "name": "Charging Amps"
+      },
+      "default_charge_level": {
+        "name": "Default Charge Level"
       },
       "battery_dtg_schedule_limit": {
         "name": "Discharge To Grid Limit"

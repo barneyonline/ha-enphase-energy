@@ -124,6 +124,9 @@
     "charge_mode_invalid_option": {
       "message": "O modo de carregamento selecionado não está disponível."
     },
+    "default_charge_level_unavailable": {
+      "message": "As configurações do nível de carga padrão estão indisponíveis enquanto o serviço Enphase está fora do ar."
+    },
     "evse_schedule_day_required": {
       "message": "Selecione pelo menos um dia da semana para a programação."
     },
@@ -1756,6 +1759,9 @@
     "number": {
       "charging_amps": {
         "name": "Corrente de carga"
+      },
+      "default_charge_level": {
+        "name": "Nível de carga padrão"
       },
       "battery_reserve": {
         "name": "Reserva de bateria"

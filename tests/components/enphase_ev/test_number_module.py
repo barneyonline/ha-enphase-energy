@@ -14,6 +14,7 @@ from custom_components.enphase_ev.number import (
     BatteryScheduleEditLimitNumber,
     BatteryShutdownLevelNumber,
     ChargingAmpsNumber,
+    DefaultChargeLevelNumber,
     EnphaseTariffRateNumber,
     async_setup_entry,
 )
@@ -193,6 +194,34 @@ async def test_async_setup_entry_adds_site_numbers_and_charger_numbers(
     assert any(isinstance(ent, BatteryShutdownLevelNumber) for ent in added)
     assert any(isinstance(ent, BatteryScheduleEditLimitNumber) for ent in added)
     assert any(isinstance(ent, ChargingAmpsNumber) for ent in added)
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_adds_default_charge_level_when_supported(
+    hass, config_entry, coordinator_factory
+) -> None:
+    coord = coordinator_factory(
+        data={
+            RANDOM_SERIAL: {
+                "sn": RANDOM_SERIAL,
+                "name": "Garage",
+                "default_charge_level_supported": True,
+                "default_charge_level": 30,
+            }
+        }
+    )
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+
+    added: list = []
+
+    await async_setup_entry(
+        hass,
+        config_entry,
+        lambda entities, update_before_add=False: added.extend(entities),
+    )
+
+    assert any(isinstance(ent, ChargingAmpsNumber) for ent in added)
+    assert any(isinstance(ent, DefaultChargeLevelNumber) for ent in added)
 
 
 @pytest.mark.asyncio
@@ -459,6 +488,88 @@ def test_charging_number_uses_pick_start_for_non_applicable_and_safe_limit(
     coord.data[RANDOM_SERIAL]["min_amp"] = "16"
     assert number.native_value == 16.0
     assert number.native_max_value == 40.0
+
+
+def test_default_charge_level_number_uses_config_value_and_bounds(
+    hass, config_entry
+) -> None:
+    coord = _make_coordinator(
+        hass,
+        config_entry,
+        {
+            RANDOM_SERIAL: {
+                "default_charge_level_supported": True,
+                "default_charge_level_supported_source": "charger_config",
+                "default_charge_level": "30",
+                "charging_level": "24",
+                "min_amp": "6",
+                "max_amp": "48",
+                "max_current": "50",
+                "amp_granularity": "2",
+            }
+        },
+    )
+
+    number = DefaultChargeLevelNumber(coord, RANDOM_SERIAL)
+
+    assert number.available is True
+    assert number.native_value == 30.0
+    assert number.native_min_value == 6.0
+    assert number.native_max_value == 48.0
+    assert number.native_step == 2.0
+    assert number.extra_state_attributes == {
+        "min_amp": 6,
+        "max_amp": 48,
+        "max_current": 50,
+        "amp_granularity": 2,
+        "charging_amps": 24,
+        "default_charge_level_supported_source": "charger_config",
+    }
+
+
+def test_default_charge_level_number_unavailable_when_unsupported(
+    hass, config_entry
+) -> None:
+    coord = _make_coordinator(
+        hass,
+        config_entry,
+        {
+            RANDOM_SERIAL: {
+                "default_charge_level_supported": False,
+                "default_charge_level": "30",
+            }
+        },
+    )
+
+    number = DefaultChargeLevelNumber(coord, RANDOM_SERIAL)
+
+    assert number.available is False
+    assert number.native_value == 30.0
+
+
+@pytest.mark.asyncio
+async def test_default_charge_level_number_writes_persistent_default(
+    hass, config_entry
+) -> None:
+    coord = _make_coordinator(
+        hass,
+        config_entry,
+        {
+            RANDOM_SERIAL: {
+                "default_charge_level_supported": True,
+                "default_charge_level": 24,
+            }
+        },
+    )
+    coord.evse_runtime.async_set_default_charge_level = AsyncMock()
+
+    number = DefaultChargeLevelNumber(coord, RANDOM_SERIAL)
+    await number.async_set_native_value(30)
+
+    coord.evse_runtime.async_set_default_charge_level.assert_awaited_once_with(
+        RANDOM_SERIAL,
+        30,
+    )
 
 
 def test_battery_reserve_number_dynamic_bounds_and_device_info(

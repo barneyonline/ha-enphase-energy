@@ -124,6 +124,9 @@
     "charge_mode_invalid_option": {
       "message": "Избраният режим на зареждане не е наличен."
     },
+    "default_charge_level_unavailable": {
+      "message": "Настройките за ниво на зареждане по подразбиране не са налични, докато услугата Enphase е недостъпна."
+    },
     "evse_schedule_day_required": {
       "message": "Изберете поне един ден от седмицата за графика."
     },
@@ -1756,6 +1759,9 @@
     "number": {
       "charging_amps": {
         "name": "Ампери за зареждане"
+      },
+      "default_charge_level": {
+        "name": "Ниво на зареждане по подразбиране"
       },
       "battery_reserve": {
         "name": "Резервна батерия"

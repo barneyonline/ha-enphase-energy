@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
-- None
+- Added an IQ EV Charger Default Charge Level number entity for chargers whose Enphase config endpoint exposes the `DefaultChargeLevel` setting.
 
 ### 🐛 Bug fixes
 - Fixed IQ Gateway firmware catalog generation so US commercial-only release notes are not advertised to residential/regional gateway update entities. (#735)
@@ -18,7 +18,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔄 Other changes
-- None
+- Documented newly observed EVSE feature flags and the Default Charge Level charger-config endpoint behavior.
 
 ## v3.2.0 - 2026-07-02
 
