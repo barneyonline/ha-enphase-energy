@@ -809,6 +809,23 @@ def test_site_energy_import_direct_channel_takes_precedence(
     assert flows["grid_import"].fields_used == ["import"]
 
 
+def test_site_energy_sparse_positive_import_channel_falls_back_to_component_totals(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    payload = {
+        "import": [500, None, None],
+        "grid_home": [600, 700, 800],
+        "grid_battery": [50, 60, 70],
+        "interval_minutes": 60,
+    }
+    flows, _meta = coord.energy._aggregate_site_energy(payload)  # noqa: SLF001
+    assert flows is not None
+    assert flows["grid_import"].value_kwh == pytest.approx(2.28)
+    assert flows["grid_import"].bucket_count == 3
+    assert flows["grid_import"].fields_used == ["grid_home", "grid_battery"]
+
+
 def test_site_energy_sparse_zero_import_channel_falls_back_to_component_totals(
     coordinator_factory,
 ) -> None:
