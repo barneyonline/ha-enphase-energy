@@ -1271,7 +1271,12 @@
         "name": "Consumption Meter"
       },
       "gateway_connectivity_status": {
-        "name": "Gateway Status"
+        "name": "Gateway Status",
+        "state_attributes": {
+          "ip_address": {
+            "name": "IP Address"
+          }
+        }
       },
       "gateway_last_reported": {
         "name": "Gateway Last Reported"

@@ -1232,7 +1232,12 @@
         "name": "Kulutusmittari"
       },
       "gateway_connectivity_status": {
-        "name": "Yhdyskäytävän tila"
+        "name": "Yhdyskäytävän tila",
+        "state_attributes": {
+          "ip_address": {
+            "name": "IP-osoite"
+          }
+        }
       },
       "gateway_last_reported": {
         "name": "Gateway viimeksi raportoitu"

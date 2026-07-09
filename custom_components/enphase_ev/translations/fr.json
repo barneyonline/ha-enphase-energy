@@ -1232,7 +1232,12 @@
         "name": "Compteur de consommation"
       },
       "gateway_connectivity_status": {
-        "name": "État de la passerelle"
+        "name": "État de la passerelle",
+        "state_attributes": {
+          "ip_address": {
+            "name": "Adresse IP"
+          }
+        }
       },
       "gateway_last_reported": {
         "name": "Passerelle signalée pour la dernière fois"

@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 - Fixed Site Grid Import lifetime energy so sparse direct import buckets fall back to fuller component totals instead of leaving import totals stale. (#744)
 
 ### 🔧 Improvements
-- None
+- Exposed the IQ Gateway IP address on the Gateway Status entity attributes when available.
 
 ### 🔄 Other changes
 - None

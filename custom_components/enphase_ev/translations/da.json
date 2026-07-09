@@ -1232,7 +1232,12 @@
         "name": "Forbrugsmåler"
       },
       "gateway_connectivity_status": {
-        "name": "Gateway-status"
+        "name": "Gateway-status",
+        "state_attributes": {
+          "ip_address": {
+            "name": "IP-adresse"
+          }
+        }
       },
       "gateway_last_reported": {
         "name": "Gateway sidst rapporteret"

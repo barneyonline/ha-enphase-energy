@@ -1232,7 +1232,12 @@
         "name": "Contor de consum"
       },
       "gateway_connectivity_status": {
-        "name": "Stare gateway"
+        "name": "Stare gateway",
+        "state_attributes": {
+          "ip_address": {
+            "name": "Adresă IP"
+          }
+        }
       },
       "gateway_last_reported": {
         "name": "Gateway Raportat ultima dată"

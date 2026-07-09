@@ -1232,7 +1232,12 @@
         "name": "Tarbimismõõtur"
       },
       "gateway_connectivity_status": {
-        "name": "Lüüsi olek"
+        "name": "Lüüsi olek",
+        "state_attributes": {
+          "ip_address": {
+            "name": "IP-aadress"
+          }
+        }
       },
       "gateway_last_reported": {
         "name": "Gateway viimati teatatud"

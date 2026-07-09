@@ -1232,7 +1232,12 @@
         "name": "Medidor de consumo"
       },
       "gateway_connectivity_status": {
-        "name": "Estado de la puerta de enlace"
+        "name": "Estado de la puerta de enlace",
+        "state_attributes": {
+          "ip_address": {
+            "name": "Dirección IP"
+          }
+        }
       },
       "gateway_last_reported": {
         "name": "Puerta de enlace reportada por última vez"

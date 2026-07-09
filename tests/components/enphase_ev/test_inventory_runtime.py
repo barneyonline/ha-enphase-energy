@@ -154,12 +154,14 @@ def test_inventory_runtime_summary_and_inverter_helper_paths(
                     "connected": "yes",
                     "model": "IQ Gateway",
                     "envoy_sw_version": "8.2.0",
+                    "ip_address": "192.0.2.10",
                     "last_report": "2026-02-15T10:00:00Z",
                 },
                 {
                     "name": "Gateway B",
                     "status": "offline",
                     "connected": "no",
+                    "ip_address": "192.0.2.11",
                 },
                 {
                     "name": "Gateway C",
@@ -179,6 +181,45 @@ def test_inventory_runtime_summary_and_inverter_helper_paths(
     assert gateway_snapshot["connected_devices"] == 1
     assert gateway_snapshot["disconnected_devices"] == 1
     assert gateway_snapshot["unknown_connection_devices"] == 1
+    assert gateway_snapshot["ip_address"] == "192.0.2.10"
+    assert (
+        runtime._gateway_summary_ip_address(  # noqa: SLF001
+            [{"name": "Production Meter", "ip_address": "192.0.2.12"}],
+            None,
+        )
+        is None
+    )
+    assert (
+        runtime._gateway_summary_ip_address(  # noqa: SLF001
+            [{"name": "Unknown Device", "ip_address": "192.0.2.12"}],
+            None,
+        )
+        == "192.0.2.12"
+    )
+    assert (
+        runtime._gateway_summary_ip_address(  # noqa: SLF001
+            [
+                {
+                    "name": "Production Meter",
+                    "channel_type": "production_meter",
+                    "show_connection_details": True,
+                    "ip_address": "192.0.2.13",
+                },
+                {
+                    "name": "System Controller",
+                    "show_connection_details": True,
+                    "ip_address": "192.0.2.14",
+                },
+                {
+                    "name": "Communications device",
+                    "show_connection_details": True,
+                    "ip_address": "192.0.2.15",
+                },
+            ],
+            None,
+        )
+        == "192.0.2.15"
+    )
 
     micro_snapshot = runtime._build_microinverter_inventory_summary()  # noqa: SLF001
     assert micro_snapshot["connectivity_state"] == "degraded"

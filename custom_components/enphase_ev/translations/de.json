@@ -1232,7 +1232,12 @@
         "name": "Verbrauchsmesser"
       },
       "gateway_connectivity_status": {
-        "name": "Gateway-Status"
+        "name": "Gateway-Status",
+        "state_attributes": {
+          "ip_address": {
+            "name": "IP-Adresse"
+          }
+        }
       },
       "gateway_last_reported": {
         "name": "Zuletzt gemeldetes Gateway"

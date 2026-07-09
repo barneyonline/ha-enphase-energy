@@ -1232,7 +1232,12 @@
         "name": "Patēriņa skaitītājs"
       },
       "gateway_connectivity_status": {
-        "name": "Vārtejas statuss"
+        "name": "Vārtejas statuss",
+        "state_attributes": {
+          "ip_address": {
+            "name": "IP adrese"
+          }
+        }
       },
       "gateway_last_reported": {
         "name": "Gateway pēdējo reizi ziņots"
