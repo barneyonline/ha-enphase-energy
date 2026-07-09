@@ -3656,6 +3656,146 @@ async def test_async_update_data_merges_charger_config_fallback_fields(
 
 
 @pytest.mark.asyncio
+async def test_async_update_data_refetches_summary_when_amp_bounds_missing(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(serials=[SERIAL_ONE])
+    coord._has_successful_refresh = True  # noqa: SLF001
+    payload = {
+        "evChargerData": [
+            {
+                "sn": SERIAL_ONE,
+                "name": "Garage",
+                "connectors": [{}],
+                "pluggedIn": True,
+                "charging": False,
+                "faulted": False,
+                "chargeMode": "MANUAL",
+                "session_d": {"chargeLevel": "30", "e_c": 0},
+            }
+        ],
+        "ts": 0,
+    }
+    coord.client.status = AsyncMock(return_value=payload)
+    coord.client.charger_config = AsyncMock(return_value=[])
+    coord.client.charger_auth_settings = AsyncMock(return_value=[])
+    coord.client.green_charging_settings = AsyncMock(return_value=[])
+    coord.summary.prepare_refresh = MagicMock(return_value=False)
+    coord.summary.async_fetch = AsyncMock(
+        side_effect=[
+            [{"serialNumber": SERIAL_ONE, "maxCurrent": 30}],
+            [
+                {
+                    "serialNumber": SERIAL_ONE,
+                    "maxCurrent": 48,
+                    "chargeLevelDetails": {
+                        "min": "6",
+                        "max": "40",
+                        "granularity": "1",
+                    },
+                }
+            ],
+            [
+                {
+                    "serialNumber": SERIAL_ONE,
+                    "maxCurrent": 48,
+                    "chargeLevelDetails": {
+                        "min": "6",
+                        "max": "40",
+                        "granularity": "1",
+                    },
+                }
+            ],
+        ]
+    )
+    coord.energy._async_refresh_site_energy = AsyncMock()
+
+    first = await coord._async_update_data()
+    second = await coord._async_update_data()
+    coord.data = second
+    third = await coord._async_update_data()
+
+    assert first[SERIAL_ONE]["min_amp"] is None
+    assert first[SERIAL_ONE]["max_amp"] is None
+    assert second[SERIAL_ONE]["min_amp"] == 6
+    assert second[SERIAL_ONE]["max_amp"] == 40
+    assert third[SERIAL_ONE]["min_amp"] == 6
+    assert third[SERIAL_ONE]["max_amp"] == 40
+    assert [
+        call.kwargs["force"] for call in coord.summary.async_fetch.await_args_list
+    ] == [True, True, False]
+
+
+def test_summary_refresh_needed_for_amp_bounds_skips_invalid_serial_snapshots(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(serials=[SERIAL_ONE])
+    coord.iter_serials = lambda: ["", "NOT-A-DICT", SERIAL_ONE]  # type: ignore[method-assign]
+
+    assert (
+        coord._summary_refresh_needed_for_amp_bounds(  # noqa: SLF001
+            {
+                "NOT-A-DICT": "bad",
+                SERIAL_ONE: {"charging_amps_supported": True},
+            }
+        )
+        is True
+    )
+
+
+@pytest.mark.asyncio
+async def test_async_update_data_preserves_known_amp_bounds_when_summary_omits_them(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(
+        serials=[SERIAL_ONE],
+        data={
+            SERIAL_ONE: {
+                "sn": SERIAL_ONE,
+                "name": "Garage",
+                "min_amp": "6",
+                "max_amp": "40",
+                "amp_granularity": "1",
+                "max_current": "48",
+            }
+        },
+    )
+    coord._has_successful_refresh = True  # noqa: SLF001
+    coord.client.status = AsyncMock(
+        return_value={
+            "evChargerData": [
+                {
+                    "sn": SERIAL_ONE,
+                    "name": "Garage",
+                    "connectors": [{}],
+                    "pluggedIn": True,
+                    "charging": False,
+                    "faulted": False,
+                    "chargeMode": "MANUAL",
+                    "session_d": {"chargeLevel": "30", "e_c": 0},
+                }
+            ],
+            "ts": 0,
+        }
+    )
+    coord.client.charger_config = AsyncMock(return_value=[])
+    coord.client.charger_auth_settings = AsyncMock(return_value=[])
+    coord.client.green_charging_settings = AsyncMock(return_value=[])
+    coord.summary.prepare_refresh = MagicMock(return_value=False)
+    coord.summary.async_fetch = AsyncMock(
+        return_value=[{"serialNumber": SERIAL_ONE, "chargeLevelDetails": "bad"}]
+    )
+    coord.energy._async_refresh_site_energy = AsyncMock()
+
+    result = await coord._async_update_data()
+
+    assert result[SERIAL_ONE]["min_amp"] == 6
+    assert result[SERIAL_ONE]["max_amp"] == 40
+    assert result[SERIAL_ONE]["amp_granularity"] == 1
+    assert result[SERIAL_ONE]["max_current"] == "48"
+
+
+@pytest.mark.asyncio
 async def test_async_update_data_keeps_default_charge_level_unsupported_when_omitted(
     coordinator_factory,
 ) -> None:

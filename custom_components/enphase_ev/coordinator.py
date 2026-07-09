@@ -2927,6 +2927,55 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                 except Exception:
                     pass
 
+    @staticmethod
+    def _charger_amp_bounds_missing(data: dict[str, object]) -> bool:
+        """Return True when a charger snapshot still lacks number range bounds."""
+
+        charging_amps_supported = _coerce_optional_boolish(
+            data.get("charging_amps_supported")
+        )
+        if charging_amps_supported is False:
+            return False
+        has_amp_hint = any(
+            data.get(key) is not None
+            for key in (
+                "charging_level",
+                "session_charge_level",
+                "default_charge_level",
+                "max_current",
+            )
+        )
+        if charging_amps_supported is not True and not has_amp_hint:
+            return False
+        return (
+            _coerce_intish(data.get("min_amp")) is None
+            or _coerce_intish(data.get("max_amp")) is None
+        )
+
+    def _summary_refresh_needed_for_amp_bounds(
+        self, data: dict[str, dict[str, object]]
+    ) -> bool:
+        """Return True when cached summary data is missing EVSE amp bounds."""
+
+        previous_data = self.data if isinstance(self.data, dict) else {}
+        for sn in self.iter_serials():
+            if not sn:
+                continue
+            snapshot = data.get(sn)
+            if not isinstance(snapshot, dict):
+                continue
+            if self._charger_amp_bounds_missing(snapshot):
+                previous = previous_data.get(sn)
+                if isinstance(previous, dict):
+                    merged = dict(snapshot)
+                    for key in ("min_amp", "max_amp"):
+                        if merged.get(key) is None and previous.get(key) is not None:
+                            merged[key] = previous.get(key)
+                    if not self._charger_amp_bounds_missing(merged):
+                        continue
+                return True
+        return False
+
     def _finish_refresh_pipeline(
         self,
         context: RefreshPipelineContext,
@@ -3810,6 +3859,8 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             want_fast=polling_state["want_fast"],
             target_interval=float(polling_state["target"]),
         )
+        if not summary_force and self._summary_refresh_needed_for_amp_bounds(out):
+            summary_force = True
 
         # Enrich with summary v2 data
         summary_start = time.monotonic()
@@ -3825,20 +3876,29 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                 cur.setdefault("nominal_v", self._nominal_v)
                 prev_sn = prev_data.get(sn) if isinstance(prev_data, dict) else None
                 # Max current capability and phase/status
-                cur["max_current"] = item.get("maxCurrent")
+                max_current = item.get("maxCurrent")
+                if max_current is None and isinstance(prev_sn, dict):
+                    max_current = prev_sn.get("max_current")
+                cur["max_current"] = max_current
                 cld = item.get("chargeLevelDetails") or {}
+                if not isinstance(cld, dict):
+                    cld = {}
                 try:
                     cur["min_amp"] = (
                         int(str(cld.get("min"))) if cld.get("min") is not None else None
                     )
                 except Exception:
                     cur["min_amp"] = None
+                if cur["min_amp"] is None and isinstance(prev_sn, dict):
+                    cur["min_amp"] = _as_int(prev_sn.get("min_amp"))
                 try:
                     cur["max_amp"] = (
                         int(str(cld.get("max"))) if cld.get("max") is not None else None
                     )
                 except Exception:
                     cur["max_amp"] = None
+                if cur["max_amp"] is None and isinstance(prev_sn, dict):
+                    cur["max_amp"] = _as_int(prev_sn.get("max_amp"))
                 try:
                     cur["amp_granularity"] = (
                         int(str(cld.get("granularity")))
@@ -3847,6 +3907,8 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                     )
                 except Exception:
                     cur["amp_granularity"] = None
+                if cur["amp_granularity"] is None and isinstance(prev_sn, dict):
+                    cur["amp_granularity"] = _as_int(prev_sn.get("amp_granularity"))
                 if any(
                     cur.get(key) is not None
                     for key in (
