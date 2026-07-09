@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 - Fixed Site Grid Import lifetime energy so sparse direct import buckets fall back to fuller component totals instead of leaving import totals stale. (#744)
+- Fixed Grid Mode so it uses the gateway/battery grid-outage context endpoint instead of EV charger status data.
 
 ### 🔧 Improvements
 - Exposed the IQ Gateway IP address on the Gateway Status entity attributes when available.

@@ -120,10 +120,12 @@ STORM_GUARD_CACHE_TTL = 300.0
 STORM_ALERT_CACHE_TTL = 300.0
 STORM_GUARD_PENDING_HOLD_S = 90.0
 GRID_CONTROL_CHECK_CACHE_TTL = 60.0
+GRID_OUTAGE_CONTEXT_CACHE_TTL = 60.0
 # Keep the last confirmed grid-control state valid across the initial
 # endpoint-family cooldown window after a transient failure. This avoids
 # spurious ready/unknown flapping while the retry is intentionally deferred.
 GRID_CONTROL_CHECK_STALE_AFTER_S = 360.0
+GRID_OUTAGE_CONTEXT_STALE_AFTER_S = 360.0
 DRY_CONTACT_SETTINGS_CACHE_TTL = 300.0
 DRY_CONTACT_SETTINGS_FAILURE_CACHE_TTL = 15.0
 DRY_CONTACT_SETTINGS_STALE_AFTER_S = 900.0

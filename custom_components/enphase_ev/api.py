@@ -6878,6 +6878,18 @@ class EnphaseEVClient:
             return data
         return {}
 
+    async def off_grid_due_to_grid_outage(self) -> dict:
+        """Return live grid-outage/off-grid context for the site.
+
+        GET /app-api/<site_id>/off_grid_due_to_grid_outage
+        """
+
+        url = f"{BASE_URL}/app-api/{self._site}/off_grid_due_to_grid_outage"
+        data = await self._json("GET", url, headers=self._history_headers())
+        if isinstance(data, dict):
+            return data
+        return {}
+
     async def request_grid_toggle_otp(self) -> dict:
         """Request OTP delivery for a site grid-mode toggle.
 

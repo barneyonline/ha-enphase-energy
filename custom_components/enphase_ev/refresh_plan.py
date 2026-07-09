@@ -16,6 +16,7 @@ REFRESH_TASK_ENDPOINT_FAMILIES: dict[str, str] = {
     "storm_alert_s": "storm_alert",
     "tariff_s": "tariff",
     "grid_control_check_s": "grid_control_check",
+    "grid_outage_context_s": "grid_outage_context",
     "dry_contact_settings_s": "dry_contact_settings",
     "battery_status_s": "battery_status",
     "ac_battery_devices_s": "ac_battery_devices",
@@ -230,6 +231,12 @@ WARMUP_STATE_STAGE = RefreshStage(
             "battery_runtime",
             "async_refresh_grid_control_check",
         ),
+        object_method_task(
+            "grid_outage_context_s",
+            "grid outage context",
+            "battery_runtime",
+            "async_refresh_grid_outage_context",
+        ),
         method_task(
             "dry_contact_settings_s",
             "dry contact settings",
@@ -284,6 +291,12 @@ SITE_ONLY_FOLLOWUP_STAGE = RefreshStage(
             "grid control",
             "battery_runtime",
             "async_refresh_grid_control_check",
+        ),
+        object_method_task(
+            "grid_outage_context_s",
+            "grid outage context",
+            "battery_runtime",
+            "async_refresh_grid_outage_context",
         ),
         method_task(
             "dry_contact_settings_s",
@@ -599,6 +612,15 @@ def build_followup_plan(owner: object, *, force_full: bool = False) -> RefreshPl
                 "grid control",
                 "battery_runtime",
                 "async_refresh_grid_control_check",
+            )
+        )
+    if battery.grid_outage_context_refresh_due():
+        parallel.append(
+            object_method_task(
+                "grid_outage_context_s",
+                "grid outage context",
+                "battery_runtime",
+                "async_refresh_grid_outage_context",
             )
         )
     if battery.dry_contact_settings_refresh_due():
