@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 - Fixed IQ EV Charger amp number ranges staying on fallback bounds for up to 10 minutes when the first EVSE summary payload omitted current-limit details.
+- Fixed Site Grid Import lifetime energy so sparse direct import buckets fall back to fuller component totals instead of leaving import totals stale. (#744)
 
 ### 🔧 Improvements
 - None

@@ -369,8 +369,14 @@ class EnergyManager:
         fallback_count: int,
         fallback_fields: list[str],
     ) -> tuple[float, int, list[str]]:
-        """Prefer a direct channel unless it only reports zeros and fallback is richer."""
+        """Prefer direct channels unless they are zero-only or sparsely populated."""
 
+        if (
+            direct_count > 0
+            and fallback_count > direct_count
+            and fallback_total > direct_total
+        ):
+            return fallback_total, fallback_count, fallback_fields
         if direct_count > 0 and (
             direct_total > 0 or fallback_count <= 0 or fallback_total <= 0
         ):
