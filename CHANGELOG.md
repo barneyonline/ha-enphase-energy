@@ -11,15 +11,32 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- Fixed IQ EV Charger amp number ranges staying on fallback bounds for up to 10 minutes when the first EVSE summary payload omitted current-limit details.
-- Fixed Site Grid Import lifetime energy so sparse direct import buckets fall back to fuller component totals instead of leaving import totals stale. (#744)
-- Fixed Grid Mode so it uses the gateway/battery grid-outage context endpoint instead of EV charger status data.
+- None
 
 ### 🔧 Improvements
-- Exposed the IQ Gateway IP address on the Gateway Status entity attributes when available.
+- None
 
 ### 🔄 Other changes
 - None
+
+## v3.2.2 - 2026-07-09
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Fixed IQ EV Charger amp number ranges staying on fallback bounds for up to 10 minutes when the first EVSE summary payload omitted current-limit details. (#742)
+- Fixed Site Grid Import lifetime energy so sparse direct import buckets fall back to fuller component totals instead of leaving import totals stale. (#745, fixes #744)
+- Fixed Grid Mode so it uses the gateway/battery grid-outage context endpoint instead of EV charger status data. (#746)
+
+### 🔧 Improvements
+- Exposed the IQ Gateway IP address on the Gateway Status entity attributes when available. (#743)
+
+### 🔄 Other changes
+- Bumped the integration manifest version to `3.2.2`.
 
 ## v3.2.1 - 2026-07-07
 
