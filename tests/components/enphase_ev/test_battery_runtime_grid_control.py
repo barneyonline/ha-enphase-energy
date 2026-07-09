@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 import time
 from unittest.mock import AsyncMock
 
 import pytest
+
+from custom_components.enphase_ev.const import GRID_OUTAGE_CONTEXT_CACHE_TTL
 
 
 def test_grid_control_supported_is_unknown_before_first_payload(
@@ -183,6 +186,178 @@ async def test_refresh_grid_control_check_wraps_non_dict_redaction(
 
 
 @pytest.mark.asyncio
+async def test_refresh_grid_outage_context_caches_and_redacts(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord.client.off_grid_due_to_grid_outage = AsyncMock(
+        return_value={
+            "is_grid_outage": True,
+            "show_grid_connect": False,
+            "has_battery": True,
+            "is_sunlight_backup": False,
+            "token": "secret-token",
+        }
+    )
+
+    await coord.battery_runtime.async_refresh_grid_outage_context(force=True)
+
+    assert coord.grid_outage_context_supported is True
+    assert coord.grid_outage_is_grid_outage is True
+    assert coord.grid_mode == "off_grid"
+    assert coord._grid_outage_context_payload is not None  # noqa: SLF001
+    assert coord._grid_outage_context_payload["token"] == "[redacted]"  # noqa: SLF001
+
+    coord._grid_outage_context_cache_until = time.monotonic() + 300  # noqa: SLF001
+    coord.client.off_grid_due_to_grid_outage.reset_mock()
+    await coord.battery_runtime.async_refresh_grid_outage_context()
+    coord.client.off_grid_due_to_grid_outage.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_refresh_grid_outage_context_family_ttl_matches_cache(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord.client.off_grid_due_to_grid_outage = AsyncMock(
+        return_value={
+            "is_grid_outage": False,
+            "show_grid_connect": True,
+            "has_battery": True,
+            "is_sunlight_backup": False,
+        }
+    )
+
+    await coord.battery_runtime.async_refresh_grid_outage_context(force=True)
+
+    family_state = coord._endpoint_family_state("grid_outage_context")  # noqa: SLF001
+    assert family_state.last_success_mono is not None
+    assert family_state.next_retry_mono is not None
+    assert (
+        family_state.next_retry_mono - family_state.last_success_mono
+    ) == GRID_OUTAGE_CONTEXT_CACHE_TTL
+
+
+@pytest.mark.asyncio
+async def test_refresh_grid_outage_context_failure_marks_unknown_when_stale(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord.battery_runtime.parse_grid_outage_context_payload(
+        {
+            "is_grid_outage": False,
+            "show_grid_connect": True,
+            "has_battery": True,
+            "is_sunlight_backup": False,
+        }
+    )
+    coord._grid_outage_context_last_success_mono = (
+        time.monotonic() - 999
+    )  # noqa: SLF001
+    coord.client.off_grid_due_to_grid_outage = AsyncMock(
+        side_effect=RuntimeError("boom")
+    )
+
+    await coord.battery_runtime.async_refresh_grid_outage_context(force=True)
+
+    assert coord.grid_outage_context_supported is None
+    assert coord.grid_outage_is_grid_outage is None
+    assert coord.grid_mode is None
+    assert coord._grid_outage_context_failures == 1  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_refresh_grid_outage_context_keeps_recent_state_on_failure(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord.battery_runtime.parse_grid_outage_context_payload(
+        {
+            "is_grid_outage": False,
+            "show_grid_connect": True,
+            "has_battery": True,
+            "is_sunlight_backup": False,
+        }
+    )
+    coord._grid_outage_context_last_success_mono = time.monotonic()  # noqa: SLF001
+    coord.client.off_grid_due_to_grid_outage = AsyncMock(
+        side_effect=RuntimeError("boom")
+    )
+
+    await coord.battery_runtime.async_refresh_grid_outage_context(force=True)
+
+    assert coord.grid_outage_context_supported is True
+    assert coord.grid_mode == "on_grid"
+    assert coord._grid_outage_context_failures == 1  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_refresh_grid_outage_context_clears_when_endpoint_in_cooldown(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord.battery_runtime.parse_grid_outage_context_payload(
+        {
+            "is_grid_outage": False,
+            "show_grid_connect": True,
+            "has_battery": True,
+            "is_sunlight_backup": False,
+        }
+    )
+    coord._endpoint_family_should_run = lambda *_args, **_kwargs: False  # type: ignore[method-assign]  # noqa: SLF001
+    coord._endpoint_family_state = lambda *_args, **_kwargs: SimpleNamespace(  # type: ignore[method-assign]  # noqa: SLF001
+        cooldown_active=True
+    )
+    coord._endpoint_family_can_use_stale = lambda *_args, **_kwargs: False  # type: ignore[method-assign]  # noqa: SLF001
+
+    await coord.battery_runtime.async_refresh_grid_outage_context()
+
+    assert coord.grid_outage_context_supported is None
+    assert coord.grid_outage_is_grid_outage is None
+
+
+@pytest.mark.asyncio
+async def test_refresh_grid_outage_context_missing_fetcher_clears_state(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord.battery_runtime.parse_grid_outage_context_payload(
+        {
+            "is_grid_outage": True,
+            "show_grid_connect": False,
+            "has_battery": True,
+            "is_sunlight_backup": False,
+        }
+    )
+    coord.client.off_grid_due_to_grid_outage = None
+
+    await coord.battery_runtime.async_refresh_grid_outage_context(force=True)
+
+    assert coord.grid_outage_context_supported is None
+    assert coord.grid_mode is None
+
+
+@pytest.mark.asyncio
+async def test_refresh_grid_outage_context_wraps_non_dict_redaction(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord.client.off_grid_due_to_grid_outage = AsyncMock(
+        return_value={
+            "is_grid_outage": False,
+            "show_grid_connect": True,
+            "has_battery": True,
+            "is_sunlight_backup": False,
+        }
+    )
+    coord._redact_battery_payload = lambda _payload: "masked"  # type: ignore[method-assign]  # noqa: SLF001
+
+    await coord.battery_runtime.async_refresh_grid_outage_context(force=True)
+
+    assert coord._grid_outage_context_payload == {"value": "masked"}  # noqa: SLF001
+
+
+@pytest.mark.asyncio
 async def test_refresh_grid_control_check_failure_marks_unknown_when_stale(
     coordinator_factory,
 ) -> None:
@@ -310,37 +485,157 @@ def test_collect_site_metrics_includes_grid_control_last_success_age(
     assert isinstance(metrics["grid_control_last_success_age_s"], float)
 
 
-def test_grid_mode_normalization_and_raw_states(coordinator_factory) -> None:
+def test_grid_mode_uses_grid_outage_context(coordinator_factory) -> None:
     coord = coordinator_factory()
     assert coord._normalize_grid_mode_value(None) is None  # noqa: SLF001
+
+    coord.battery_runtime.parse_grid_outage_context_payload(
+        {
+            "is_grid_outage": False,
+            "show_grid_connect": True,
+            "has_battery": True,
+            "is_sunlight_backup": False,
+        }
+    )
+    assert coord.grid_mode_raw_states == ["is_grid_outage:false"]
+    assert coord.grid_mode == "on_grid"
+
+    coord.battery_runtime.parse_grid_outage_context_payload(
+        {
+            "data": {
+                "is_grid_outage": True,
+                "show_grid_connect": False,
+                "has_battery": True,
+                "is_sunlight_backup": False,
+            }
+        }
+    )
+    assert coord.grid_mode_raw_states == ["is_grid_outage:true"]
+    assert coord.grid_mode == "off_grid"
+
+    coord.battery_runtime.parse_grid_outage_context_payload({})
+    assert coord.grid_mode_raw_states == []
+    assert coord.grid_mode is None
 
     coord.data = {
         "A": {"off_grid_state": "ON_GRID"},
         "B": {"off_grid_state": "ON_GRID"},
     }
-    assert coord.grid_mode_raw_states == ["ON_GRID"]
-    assert coord.grid_mode == "on_grid"
-
-    coord.data = {
-        "A": {"off_grid_state": "OFF_GRID"},
-        "B": {"off_grid_state": "ON_GRID"},
-    }
-    assert coord.grid_mode == "unknown"
-
-    coord.data = {
-        "A": {"off_grid_state": "unexpected"},
-    }
-    assert coord.grid_mode == "unknown"
-
-    coord.data = {}
     assert coord.grid_mode is None
-
-    coord.data = {
-        "A": "bad",
-        "B": {"off_grid_state": None},
-        "C": {"off_grid_state": ""},
-    }
     assert coord.grid_mode_raw_states == []
+
+
+def test_parse_grid_outage_context_payload_tracks_fields(coordinator_factory) -> None:
+    coord = coordinator_factory()
+
+    coord.battery_runtime.parse_grid_outage_context_payload(
+        {
+            "is_grid_outage": "true",
+            "show_grid_connect": "false",
+            "has_battery": 1,
+            "is_sunlight_backup": 0,
+        }
+    )
+
+    assert coord.grid_outage_context_supported is True
+    assert coord.grid_outage_is_grid_outage is True
+    assert coord.grid_outage_show_grid_connect is False
+    assert coord.grid_outage_has_battery is True
+    assert coord.grid_outage_is_sunlight_backup is False
+
+    coord.battery_runtime.parse_grid_outage_context_payload(["bad"])
+
+    assert coord.grid_outage_context_supported is False
+    assert coord.grid_outage_is_grid_outage is None
+
+
+def test_grid_outage_context_metrics(coordinator_factory) -> None:
+    coord = coordinator_factory()
+    coord.battery_runtime.parse_grid_outage_context_payload(
+        {
+            "is_grid_outage": True,
+            "show_grid_connect": False,
+            "has_battery": True,
+            "is_sunlight_backup": False,
+        }
+    )
+    coord._grid_outage_context_last_success_mono = (
+        time.monotonic() - 1.0
+    )  # noqa: SLF001
+
+    metrics = coord.collect_site_metrics()
+
+    assert metrics["grid_outage_context_supported"] is True
+    assert metrics["grid_outage_is_grid_outage"] is True
+    assert metrics["grid_outage_show_grid_connect"] is False
+    assert metrics["grid_outage_context_fetch_failures"] == 0
+    assert metrics["grid_outage_context_data_stale"] is False
+    assert "grid_outage_context_last_success_age_s" in metrics
+
+
+def test_grid_outage_context_refresh_due_uses_cooldown_state(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord.battery_runtime.parse_grid_outage_context_payload(
+        {
+            "is_grid_outage": False,
+            "show_grid_connect": True,
+            "has_battery": True,
+            "is_sunlight_backup": False,
+        }
+    )
+    coord._endpoint_family_should_run = lambda *_args, **_kwargs: False  # type: ignore[method-assign]  # noqa: SLF001
+    coord._endpoint_family_state = lambda *_args, **_kwargs: SimpleNamespace(  # type: ignore[method-assign]  # noqa: SLF001
+        cooldown_active=True
+    )
+    coord._endpoint_family_can_use_stale = lambda *_args, **_kwargs: False  # type: ignore[method-assign]  # noqa: SLF001
+
+    assert coord.battery_runtime.grid_outage_context_refresh_due() is True
+
+
+def test_grid_outage_context_staleness_edges(coordinator_factory) -> None:
+    coord = coordinator_factory()
+
+    assert coord._grid_outage_context_is_stale() is True  # noqa: SLF001
+
+    coord.battery_runtime.parse_grid_outage_context_payload(
+        {
+            "is_grid_outage": False,
+            "show_grid_connect": True,
+            "has_battery": True,
+            "is_sunlight_backup": False,
+        }
+    )
+    coord._grid_outage_context_last_success_mono = time.monotonic() + 5  # noqa: SLF001
+    assert coord._grid_outage_context_is_stale() is False  # noqa: SLF001
+
+    coord._grid_outage_context_last_success_mono = (
+        time.monotonic() - 999
+    )  # noqa: SLF001
+    assert coord.grid_outage_context_supported is None
+
+
+def test_grid_mode_legacy_normalizer_is_retained(coordinator_factory) -> None:
+    coord = coordinator_factory()
+
+    assert coord._normalize_grid_mode_value("OFF_GRID") == "off_grid"  # noqa: SLF001
+    assert coord._normalize_grid_mode_value("ON_GRID") == "on_grid"  # noqa: SLF001
+    assert coord._normalize_grid_mode_value("unexpected") is None  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_coordinator_refresh_grid_outage_context_proxy(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord.battery_runtime.async_refresh_grid_outage_context = AsyncMock()  # type: ignore[method-assign]
+
+    await coord._async_refresh_grid_outage_context(force=True)  # noqa: SLF001
+
+    coord.battery_runtime.async_refresh_grid_outage_context.assert_awaited_once_with(
+        force=True
+    )
 
 
 @pytest.mark.asyncio

@@ -2546,6 +2546,40 @@ async def test_grid_control_check_uses_grid_control_check_endpoint() -> None:
 
 
 @pytest.mark.asyncio
+async def test_off_grid_due_to_grid_outage_uses_status_context_endpoint() -> None:
+    client = _make_client()
+    client._json = AsyncMock(return_value={"is_grid_outage": True})
+
+    result = await client.off_grid_due_to_grid_outage()
+
+    assert result == {"is_grid_outage": True}
+    client._json.assert_awaited_once_with(
+        "GET",
+        f"{api.BASE_URL}/app-api/SITE/off_grid_due_to_grid_outage",
+        headers={
+            "Accept": "*/*",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": f"{api.BASE_URL}/web/SITE/history/graph/years",
+            "User-Agent": api._ENLIGHTEN_BROWSER_USER_AGENT,
+            "Cookie": "COOKIE",
+            "e-auth-token": "EAUTH",
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_off_grid_due_to_grid_outage_returns_empty_when_payload_not_dict() -> (
+    None
+):
+    client = _make_client()
+    client._json = AsyncMock(return_value=["bad"])
+
+    result = await client.off_grid_due_to_grid_outage()
+
+    assert result == {}
+
+
+@pytest.mark.asyncio
 async def test_request_grid_toggle_otp_uses_endpoint() -> None:
     client = _make_client()
     client._json = AsyncMock(return_value={"success": "email sent successfully"})

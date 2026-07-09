@@ -294,6 +294,7 @@ class _RefreshOwner:
         )
         self.battery_runtime = SimpleNamespace(
             async_refresh_grid_control_check=self._async_refresh_grid_control_check,
+            async_refresh_grid_outage_context=self._async_refresh_grid_outage_context,
             async_refresh_battery_status=self._async_refresh_battery_status,
             battery_site_settings_refresh_due=lambda: True,
             battery_backup_history_refresh_due=lambda: True,
@@ -302,6 +303,7 @@ class _RefreshOwner:
             storm_guard_refresh_due=lambda: True,
             storm_alert_refresh_due=lambda: True,
             grid_control_check_refresh_due=lambda: True,
+            grid_outage_context_refresh_due=lambda: True,
             dry_contact_settings_refresh_due=lambda: True,
             battery_status_refresh_due=lambda: True,
             ac_battery_devices_refresh_due=lambda: True,
@@ -365,6 +367,10 @@ class _RefreshOwner:
     def _async_refresh_grid_control_check(self) -> str:
         self.calls.append("grid_control")
         return "grid-control"
+
+    def _async_refresh_grid_outage_context(self) -> str:
+        self.calls.append("grid_outage_context")
+        return "grid-outage-context"
 
     def _async_refresh_dry_contact_settings(self) -> str:
         self.calls.append("dry_contact")
@@ -449,6 +455,7 @@ def test_followup_refresh_stage_binds_zero_arg_calls() -> None:
         "storm_alert_s",
         "tariff_s",
         "grid_control_check_s",
+        "grid_outage_context_s",
         "dry_contact_settings_s",
         "current_power_s",
     ]
@@ -503,6 +510,7 @@ def test_dynamic_followup_plan_skips_up_to_date_tasks() -> None:
     owner.battery_runtime.storm_guard_refresh_due = lambda: False
     owner.battery_runtime.storm_alert_refresh_due = lambda: False
     owner.battery_runtime.grid_control_check_refresh_due = lambda: False
+    owner.battery_runtime.grid_outage_context_refresh_due = lambda: False
     owner.battery_runtime.dry_contact_settings_refresh_due = lambda: False
     owner.battery_runtime.battery_status_refresh_due = lambda: False
     owner.battery_runtime.ac_battery_devices_refresh_due = lambda: False
@@ -536,6 +544,7 @@ def test_dynamic_followup_plan_selects_due_subset() -> None:
     assert [task.timing_key for task in stage.parallel_tasks] == [
         "battery_site_settings_s",
         "tariff_s",
+        "grid_outage_context_s",
     ]
     assert [task.timing_key for task in stage.ordered_tasks] == [
         "battery_status_s",
@@ -569,6 +578,7 @@ def test_dynamic_site_only_followup_plan_creates_inverter_stage_without_base_fol
     owner.battery_runtime.storm_guard_refresh_due = lambda: False
     owner.battery_runtime.storm_alert_refresh_due = lambda: False
     owner.battery_runtime.grid_control_check_refresh_due = lambda: False
+    owner.battery_runtime.grid_outage_context_refresh_due = lambda: False
     owner.battery_runtime.dry_contact_settings_refresh_due = lambda: False
     owner.battery_runtime.battery_status_refresh_due = lambda: False
     owner.battery_runtime.ac_battery_devices_refresh_due = lambda: False
@@ -599,6 +609,7 @@ def test_dynamic_followup_plan_includes_due_evse_feature_flags() -> None:
     owner.battery_runtime.storm_guard_refresh_due = lambda: False
     owner.battery_runtime.storm_alert_refresh_due = lambda: False
     owner.battery_runtime.grid_control_check_refresh_due = lambda: False
+    owner.battery_runtime.grid_outage_context_refresh_due = lambda: False
     owner.battery_runtime.dry_contact_settings_refresh_due = lambda: False
     owner.battery_runtime.battery_status_refresh_due = lambda: False
     owner.battery_runtime.ac_battery_devices_refresh_due = lambda: False
@@ -743,7 +754,7 @@ async def test_coordinator_refresh_plan_runner_executes_each_stage(
     await coord.refresh_runner.async_run_refresh_plan({}, plan=FOLLOWUP_PLAN)
 
     assert seen == [
-        (None, True, 10, 4),
+        (None, True, 11, 4),
     ]
 
 

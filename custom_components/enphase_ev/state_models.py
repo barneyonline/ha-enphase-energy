@@ -322,6 +322,15 @@ class BatteryState:
     _grid_control_grid_outage_check: bool | None = None
     _grid_control_user_initiated_toggle: bool | None = None
     _grid_control_supported: bool | None = None
+    _grid_outage_context_cache_until: float | None = None
+    _grid_outage_context_last_success_mono: float | None = None
+    _grid_outage_context_failures: int = 0
+    _grid_outage_context_payload: PayloadMap | None = None
+    _grid_outage_context_supported: bool | None = None
+    _grid_outage_is_grid_outage: bool | None = None
+    _grid_outage_show_grid_connect: bool | None = None
+    _grid_outage_has_battery: bool | None = None
+    _grid_outage_is_sunlight_backup: bool | None = None
     _dry_contact_settings_cache_until: float | None = None
     _dry_contact_settings_last_success_mono: float | None = None
     _dry_contact_settings_failures: int = 0

@@ -311,6 +311,11 @@ class DummyCoordinator(SimpleNamespace):
             "disableGridControl": False,
             "activeDownload": False,
         }
+        self._grid_outage_context_payload = {
+            "is_grid_outage": False,
+            "show_grid_connect": True,
+            "has_battery": True,
+        }
         self._dry_contact_settings_payload = {
             "data": {
                 "contacts": [
@@ -663,6 +668,7 @@ class DummyCoordinator(SimpleNamespace):
             "settings_payload": self._battery_settings_payload,
             "status_payload": self._battery_status_payload,
             "grid_control_check_payload": self._grid_control_check_payload,
+            "grid_outage_context_payload": self._grid_outage_context_payload,
             "dry_contacts_payload": self._dry_contact_settings_payload,
             "backup_history_payload": self._battery_backup_history_payload,
             "hems_devices_payload": self._hems_devices_payload,
@@ -817,6 +823,12 @@ async def test_config_entry_diagnostics_includes_coordinator(
     assert (
         diag["coordinator"]["battery_config"]["grid_control_check_payload"][
             "disableGridControl"
+        ]
+        is False
+    )
+    assert (
+        diag["coordinator"]["battery_config"]["grid_outage_context_payload"][
+            "is_grid_outage"
         ]
         is False
     )

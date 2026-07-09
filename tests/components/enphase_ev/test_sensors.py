@@ -1757,7 +1757,12 @@ def test_grid_mode_sensor_states_and_attributes():
         battery_has_encharge=True,
         has_type=lambda key: key in ("envoy", "enpower"),
         grid_mode="on_grid",
-        grid_mode_raw_states=["ON_GRID"],
+        grid_mode_raw_states=["is_grid_outage:false"],
+        grid_outage_context_supported=True,
+        grid_outage_is_grid_outage=False,
+        grid_outage_show_grid_connect=True,
+        grid_outage_has_battery=True,
+        grid_outage_is_sunlight_backup=False,
         grid_control_supported=True,
         grid_toggle_allowed=True,
         last_success_utc=None,
@@ -1767,16 +1772,24 @@ def test_grid_mode_sensor_states_and_attributes():
     assert sensor.available is True
     assert sensor.native_value == "on_grid"
     attrs = sensor.extra_state_attributes
-    assert attrs["raw_states"] == ["ON_GRID"]
+    assert attrs["source"] == "grid_outage_context"
+    assert attrs["raw_states"] == ["is_grid_outage:false"]
+    assert attrs["grid_outage_context_supported"] is True
+    assert attrs["is_grid_outage"] is False
+    assert attrs["show_grid_connect"] is True
+    assert attrs["has_battery"] is True
+    assert attrs["is_sunlight_backup"] is False
     assert attrs["grid_control_supported"] is True
     assert attrs["grid_toggle_allowed"] is True
 
     coord.grid_mode = "off_grid"
-    coord.grid_mode_raw_states = ["OFF_GRID"]
+    coord.grid_mode_raw_states = ["is_grid_outage:true"]
+    coord.grid_outage_is_grid_outage = True
     assert sensor.native_value == "off_grid"
 
     coord.grid_mode = None
     coord.grid_mode_raw_states = []
+    coord.grid_outage_is_grid_outage = None
     assert sensor.native_value == "unknown"
     coord.last_success_utc = datetime(2026, 2, 15, 5, 31, 33, tzinfo=timezone.utc)
     coord.last_update_success = False
@@ -1793,7 +1806,12 @@ def test_grid_mode_sensor_unavailable_without_supported_types():
         battery_has_encharge=True,
         has_type=lambda _key: False,
         grid_mode="on_grid",
-        grid_mode_raw_states=["ON_GRID"],
+        grid_mode_raw_states=["is_grid_outage:false"],
+        grid_outage_context_supported=True,
+        grid_outage_is_grid_outage=False,
+        grid_outage_show_grid_connect=True,
+        grid_outage_has_battery=True,
+        grid_outage_is_sunlight_backup=False,
         grid_control_supported=True,
         grid_toggle_allowed=True,
         last_success_utc=None,
@@ -1813,7 +1831,12 @@ def test_grid_mode_sensor_unavailable_when_site_not_battery_capable():
         battery_has_enpower=False,
         has_type=lambda key: key in ("envoy", "enpower"),
         grid_mode="on_grid",
-        grid_mode_raw_states=["ON_GRID"],
+        grid_mode_raw_states=["is_grid_outage:false"],
+        grid_outage_context_supported=True,
+        grid_outage_is_grid_outage=False,
+        grid_outage_show_grid_connect=True,
+        grid_outage_has_battery=True,
+        grid_outage_is_sunlight_backup=False,
         grid_control_supported=True,
         grid_toggle_allowed=True,
         last_success_utc=None,

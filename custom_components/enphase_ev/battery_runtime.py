@@ -51,6 +51,8 @@ from .const import (
     FAST_TOGGLE_POLL_HOLD_S,
     GRID_CONTROL_CHECK_CACHE_TTL,
     GRID_CONTROL_CHECK_STALE_AFTER_S,
+    GRID_OUTAGE_CONTEXT_CACHE_TTL,
+    GRID_OUTAGE_CONTEXT_STALE_AFTER_S,
     SAVINGS_OPERATION_MODE_SUBTYPE,
     STORM_ALERT_CACHE_TTL,
     STORM_ALERT_INACTIVE_STATUSES,
@@ -714,6 +716,35 @@ class BatteryRuntime:
         if not callable(fetcher):
             return state_present
         family = "grid_control_check"
+        if coord._endpoint_family_should_run(family, force=force):
+            return True
+        return (
+            state_present
+            and coord._endpoint_family_state(family).cooldown_active
+            and not coord._endpoint_family_can_use_stale(family)
+        )
+
+    def grid_outage_context_refresh_due(self, *, force: bool = False) -> bool:
+        coord = self.coordinator
+        state = self.battery_state
+        now = time.monotonic()
+        if not force and state._grid_outage_context_cache_until:
+            if now < state._grid_outage_context_cache_until:
+                return False
+        state_present = any(
+            getattr(state, attr, None) is not None
+            for attr in (
+                "_grid_outage_context_supported",
+                "_grid_outage_is_grid_outage",
+                "_grid_outage_show_grid_connect",
+                "_grid_outage_has_battery",
+                "_grid_outage_is_sunlight_backup",
+            )
+        )
+        fetcher = getattr(coord.client, "off_grid_due_to_grid_outage", None)
+        if not callable(fetcher):
+            return state_present
+        family = "grid_outage_context"
         if coord._endpoint_family_should_run(family, force=force):
             return True
         return (
@@ -3364,6 +3395,45 @@ class BatteryRuntime:
             payload.get("userInitiatedGridToggle")
         )
 
+    def parse_grid_outage_context_payload(self, payload: object) -> None:
+        state = self.battery_state
+        keys = (
+            "is_grid_outage",
+            "show_grid_connect",
+            "has_battery",
+            "is_sunlight_backup",
+        )
+        if not isinstance(payload, dict):
+            state._grid_outage_context_supported = False
+            state._grid_outage_is_grid_outage = None
+            state._grid_outage_show_grid_connect = None
+            state._grid_outage_has_battery = None
+            state._grid_outage_is_sunlight_backup = None
+            return
+        data = payload.get("data")
+        if isinstance(data, dict):
+            payload = data
+        if not any(key in payload for key in keys):
+            state._grid_outage_context_supported = False
+            state._grid_outage_is_grid_outage = None
+            state._grid_outage_show_grid_connect = None
+            state._grid_outage_has_battery = None
+            state._grid_outage_is_sunlight_backup = None
+            return
+        state._grid_outage_context_supported = True
+        state._grid_outage_is_grid_outage = self._coerce_optional_bool(
+            payload.get("is_grid_outage")
+        )
+        state._grid_outage_show_grid_connect = self._coerce_optional_bool(
+            payload.get("show_grid_connect")
+        )
+        state._grid_outage_has_battery = self._coerce_optional_bool(
+            payload.get("has_battery")
+        )
+        state._grid_outage_is_sunlight_backup = self._coerce_optional_bool(
+            payload.get("is_sunlight_backup")
+        )
+
     def backup_history_tzinfo(self) -> _tz | ZoneInfo:
         tz_name = getattr(self.battery_state, "_battery_timezone", None)
         if isinstance(tz_name, str) and tz_name.strip():
@@ -3611,6 +3681,66 @@ class BatteryRuntime:
         state._grid_control_check_failures = 0
         state._grid_control_check_last_success_mono = now
         state._grid_control_check_cache_until = now + GRID_CONTROL_CHECK_CACHE_TTL
+        coord._note_endpoint_family_success(family)
+
+    async def async_refresh_grid_outage_context(self, *, force: bool = False) -> None:
+        coord = self.coordinator
+        state = self.battery_state
+        now = time.monotonic()
+        family = "grid_outage_context"
+        if not force and state._grid_outage_context_cache_until:
+            if now < state._grid_outage_context_cache_until:
+                return
+        if not coord._endpoint_family_should_run(family, force=force):
+            if state._grid_outage_context_supported is not None and (
+                coord._endpoint_family_state(family).cooldown_active
+                and not coord._endpoint_family_can_use_stale(family)
+            ):
+                state._grid_outage_context_supported = None
+                state._grid_outage_is_grid_outage = None
+                state._grid_outage_show_grid_connect = None
+                state._grid_outage_has_battery = None
+                state._grid_outage_is_sunlight_backup = None
+            return
+        fetcher = getattr(coord.client, "off_grid_due_to_grid_outage", None)
+        if not callable(fetcher):
+            state._grid_outage_context_supported = None
+            state._grid_outage_is_grid_outage = None
+            state._grid_outage_show_grid_connect = None
+            state._grid_outage_has_battery = None
+            state._grid_outage_is_sunlight_backup = None
+            return
+        try:
+            payload = await fetcher()
+        except Exception as err:  # noqa: BLE001
+            coord._note_endpoint_family_failure(family, err)
+            state._grid_outage_context_failures = max(
+                state._grid_outage_context_failures + 1,
+                coord._endpoint_family_state(family).consecutive_failures,
+            )
+            last_success = getattr(
+                state, "_grid_outage_context_last_success_mono", None
+            )
+            if (
+                not isinstance(last_success, (int, float))
+                or (now - float(last_success)) >= GRID_OUTAGE_CONTEXT_STALE_AFTER_S
+            ):
+                state._grid_outage_context_supported = None
+                state._grid_outage_is_grid_outage = None
+                state._grid_outage_show_grid_connect = None
+                state._grid_outage_has_battery = None
+                state._grid_outage_is_sunlight_backup = None
+            state._grid_outage_context_cache_until = now + 15.0
+            return
+        redacted_payload = coord.redact_battery_payload(payload)
+        if isinstance(redacted_payload, dict):
+            state._grid_outage_context_payload = redacted_payload
+        else:
+            state._grid_outage_context_payload = {"value": redacted_payload}
+        self.parse_grid_outage_context_payload(payload)
+        state._grid_outage_context_failures = 0
+        state._grid_outage_context_last_success_mono = now
+        state._grid_outage_context_cache_until = now + GRID_OUTAGE_CONTEXT_CACHE_TTL
         coord._note_endpoint_family_success(family)
 
     async def async_refresh_dry_contact_settings(self, *, force: bool = False) -> None:
