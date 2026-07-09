@@ -1,11 +1,11 @@
 # Service Status History
 
-- Current status: **Fully Operational**
-- Last updated: `2026-07-09 14:04 UTC`
-- Failed checks in latest run: `0`
-- Latest failed checks: None
+- Current status: **Degraded**
+- Last updated: `2026-07-09 17:01 UTC`
+- Failed checks in latest run: `1`
+- Latest failed checks: site_energy
 - Retained hourly samples: `277`
-- Incident windows in last 30 days: `51`
+- Incident windows in last 30 days: `52`
 
 This page is generated from hourly synthetic checks against Enphase cloud endpoints. It may miss incidents that begin and recover between checks.
 
@@ -16,8 +16,8 @@ gantt
     title Enphase Service Status Incident Timeline (Last 30 Days)
     dateFormat  YYYY-MM-DDTHH:mm:ss
     axisFormat  %b %d
-    Window start :vert, window-start, 2026-06-09T14:04:24, 0ms
-    Window end :vert, window-end, 2026-07-09T14:04:24, 0ms
+    Window start :vert, window-start, 2026-06-09T17:01:02, 0ms
+    Window end :vert, window-end, 2026-07-09T17:01:02, 0ms
     section Down
     Down 1 (2026-06-09 2117 UTC) :crit, down-1, 2026-06-09T21:17:17, 60m
     Down 2 (2026-06-10 1219 UTC) :crit, down-2, 2026-06-10T12:19:21, 60m
@@ -71,6 +71,7 @@ gantt
     Down 50 (2026-07-05 0227 UTC) :crit, down-50, 2026-07-05T02:27:32, 109m
     section Degraded
     Degraded 1 (2026-06-25 2352 UTC) :active, degraded-1, 2026-06-25T23:52:01, 60m
+    Degraded 2 (2026-07-09 1701 UTC) :active, degraded-2, 2026-07-09T17:01:02, 60m
 ```
 
 ## Incident Summary
@@ -128,6 +129,7 @@ gantt
 | Down | 2026-07-04 14:28 UTC | Unknown after last seen 2026-07-04 18:31 UTC | Observed 4h 3m | battery_config, evse_control, evse_scheduler, session_history |
 | Down | 2026-07-04 20:07 UTC | Unknown after last seen 2026-07-04 23:33 UTC | Observed 3h 26m | battery_config, evse_control, evse_scheduler, session_history |
 | Down | 2026-07-05 02:27 UTC | 2026-07-05 04:16 UTC | 1h 49m | battery_config, evse_control, evse_scheduler, session_history |
+| Degraded | 2026-07-09 17:01 UTC | Ongoing (last seen 2026-07-09 17:01 UTC) | Observed at latest check | site_energy |
 
 ## Raw Artifacts
 

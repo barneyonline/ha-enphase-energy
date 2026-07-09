@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-07-09T14:04:24.698705Z",
+  "checked_at": "2026-07-09T17:01:02.563957Z",
   "checks": [
     {
       "affects": true,
@@ -70,7 +70,7 @@
       ],
       "group": "degraded",
       "name": "site_energy",
-      "ok": true
+      "ok": false
     },
     {
       "affects": false,
@@ -334,7 +334,7 @@
       "name": "session_history_criteria",
       "ok": true,
       "status": 200,
-      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=8850d50a-f1c9-4060-b8b0-e2ef5e80eaf4&username=2999024"
+      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=36635720-1cfa-4f59-9e3a-c4e018d1b127&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -356,12 +356,12 @@
       "category": "site_energy",
       "check_group": "site_energy",
       "check_mode": "all",
-      "error": null,
+      "error": "HTTP 503",
       "group": "degraded",
       "method": "GET",
       "name": "site_energy",
-      "ok": true,
-      "status": 200,
+      "ok": false,
+      "status": 503,
       "url": "/pv/systems/{site_id}/lifetime_energy"
     },
     {
@@ -404,7 +404,7 @@
       "name": "evse_timeseries_daily_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=8850d50a-f1c9-4060-b8b0-e2ef5e80eaf4&start_date=2026-07-09&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=36635720-1cfa-4f59-9e3a-c4e018d1b127&start_date=2026-07-09&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -418,7 +418,7 @@
       "name": "evse_timeseries_lifetime_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=8850d50a-f1c9-4060-b8b0-e2ef5e80eaf4&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=36635720-1cfa-4f59-9e3a-c4e018d1b127&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -729,16 +729,16 @@
       "url": "/service/evse_controller/api/v1/{site_id}/ev_chargers/{serial}/ev_charger_config"
     }
   ],
-  "status": "Fully Operational",
+  "status": "Degraded",
   "summary": {
-    "checks_failed": 0,
-    "checks_failed_affecting": 0,
-    "checks_failed_broad_outage": 0,
+    "checks_failed": 1,
+    "checks_failed_affecting": 1,
+    "checks_failed_broad_outage": 1,
     "checks_failed_non_affecting": 0,
-    "checks_ok": 17,
+    "checks_ok": 16,
     "checks_total": 17,
-    "endpoints_failed": 0,
-    "endpoints_ok": 37,
+    "endpoints_failed": 1,
+    "endpoints_ok": 36,
     "endpoints_total": 37
   }
 }
