@@ -1,6 +1,6 @@
 {
-  "current_status": "Degraded",
-  "generated_at": "2026-07-09T17:01:02.563957Z",
+  "current_status": "Fully Operational",
+  "generated_at": "2026-07-09T19:07:11.252681Z",
   "retention_days": 30,
   "samples": [
     {
@@ -2319,6 +2319,12 @@
         "site_energy"
       ],
       "status": "Degraded"
+    },
+    {
+      "checked_at": "2026-07-09T19:07:11.252681Z",
+      "checks_failed": 0,
+      "failed_check_names": [],
+      "status": "Fully Operational"
     }
   ]
 }
