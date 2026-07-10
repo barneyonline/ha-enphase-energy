@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ast
 import argparse
+from datetime import date
 import json
 from http import HTTPStatus
 import sys
@@ -19,6 +20,16 @@ except Exception:  # pragma: no cover - exercised only when dev deps are missing
     raise
 
 QUALITY_LEVEL_ORDER = ("bronze", "silver", "gold", "platinum")
+OFFICIAL_RULE_CATALOG_SOURCE = (
+    "https://developers.home-assistant.io/docs/core/integration-quality-scale/rules/"
+)
+REQUIRED_DEVICE_TRIGGER_DOC_SNIPPETS = (
+    "platform: device",
+    "domain: enphase_ev",
+    "device_id:",
+    "entity_id:",
+    "type:",
+)
 OFFICIAL_REQUIRED_RULES: dict[str, tuple[str, ...]] = {
     "bronze": (
         "action-setup",
@@ -29,6 +40,8 @@ OFFICIAL_REQUIRED_RULES: dict[str, tuple[str, ...]] = {
         "config-flow",
         "dependency-transparency",
         "docs-actions",
+        "docs-triggers",
+        "docs-conditions",
         "docs-high-level-description",
         "docs-installation-instructions",
         "docs-removal-instructions",
@@ -81,7 +94,7 @@ OFFICIAL_REQUIRED_RULES: dict[str, tuple[str, ...]] = {
         "strict-typing",
     ),
 }
-NA_ALLOWED_RULES = {"discovery", "discovery-update-info"}
+NA_ALLOWED_RULES = {"discovery", "discovery-update-info", "docs-conditions"}
 STRICT_CONFIG_ENTRY_ALIASES = (
     "EnphaseConfigEntry: TypeAlias = ConfigEntry[EnphaseRuntimeData]",
     "type EnphaseConfigEntry = ConfigEntry[EnphaseRuntimeData]",
@@ -98,6 +111,32 @@ OPTIONAL_BRAND_ASSETS = ("logo.png",)
 
 def _load_yaml(path: Path) -> dict:
     return yaml.safe_load(path.read_text()) or {}
+
+
+def _validate_rule_catalog_metadata(data: dict) -> list[str]:
+    """Record a review against the canonical Home Assistant rule list."""
+
+    metadata = data.get("official_rule_catalog")
+    if not isinstance(metadata, dict):
+        return ["official_rule_catalog metadata is missing"]
+
+    messages: list[str] = []
+    source = str(metadata.get("source") or "").strip()
+    if source != OFFICIAL_RULE_CATALOG_SOURCE:
+        messages.append(
+            "official_rule_catalog.source must reference the canonical Home "
+            "Assistant rule list"
+        )
+
+    raw_reviewed = metadata.get("reviewed_on")
+    if not isinstance(raw_reviewed, date):
+        try:
+            date.fromisoformat(str(raw_reviewed or ""))
+        except ValueError:
+            messages.append("official_rule_catalog.reviewed_on must be an ISO date")
+            return messages
+
+    return messages
 
 
 def _status_for_rule(entry: object) -> str:
@@ -145,6 +184,65 @@ def _reference_path_exists(root: Path, reference: str) -> bool:
     if not path_text:
         return False
     return (root / path_text).exists()
+
+
+def _device_trigger_types(root: Path) -> set[str]:
+    """Return trigger type keys declared by the integration's TRIGGER_MAP."""
+
+    path = root / "custom_components" / "enphase_ev" / "device_trigger.py"
+    if not path.exists():
+        return set()
+    try:
+        tree = ast.parse(path.read_text(), filename=str(path))
+    except SyntaxError:
+        return set()
+    for node in tree.body:
+        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+            continue
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+        if not any(
+            isinstance(target, ast.Name) and target.id == "TRIGGER_MAP"
+            for target in targets
+        ):
+            continue
+        value = node.value
+        if not isinstance(value, ast.Dict):
+            return set()
+        return {
+            key.value
+            for key in value.keys
+            if isinstance(key, ast.Constant) and isinstance(key.value, str)
+        }
+    return set()
+
+
+def _validate_trigger_documentation(root: Path, doc_references: list[str]) -> list[str]:
+    """Ensure every implemented device trigger is named in referenced docs."""
+
+    trigger_types = _device_trigger_types(root)
+    if not trigger_types:
+        return ["docs-triggers could not find any declared device trigger types"]
+    docs_text: list[str] = []
+    for reference in doc_references:
+        path = root / reference.split("#", 1)[0].strip()
+        if path.is_file():
+            docs_text.append(path.read_text())
+    combined = "\n".join(docs_text).casefold()
+    missing = sorted(trigger for trigger in trigger_types if trigger not in combined)
+    if missing:
+        return [
+            "docs-triggers references do not document trigger type " + trigger
+            for trigger in missing
+        ]
+    missing_yaml = [
+        snippet
+        for snippet in REQUIRED_DEVICE_TRIGGER_DOC_SNIPPETS
+        if snippet not in combined
+    ]
+    return [
+        "docs-triggers references do not document YAML field " + snippet
+        for snippet in missing_yaml
+    ]
 
 
 def _manifest_domain(root: Path) -> str:
@@ -354,6 +452,7 @@ def validate_quality_scale(
     rules = data.get("rules") or {}
 
     messages: list[str] = []
+    rule_catalog_errors = _validate_rule_catalog_metadata(data)
     missing: list[str] = []
     missing_official_rules: list[tuple[str, str]] = []
     not_accepted: list[tuple[str, str]] = []
@@ -361,6 +460,8 @@ def validate_quality_scale(
     missing_references: list[str] = []
     missing_comments: list[str] = []
     bad_references: list[tuple[str, str]] = []
+    missing_doc_references: list[str] = []
+    incomplete_rule_docs: list[str] = []
 
     for level in _required_levels_for_claim(claimed_level):
         required = (levels.get(level) or {}).get("required") or []
@@ -394,10 +495,16 @@ def validate_quality_scale(
             if not any(references.values()):
                 missing_references.append(rule)
                 continue
+            if str(rule).startswith("docs-") and not references.get("docs"):
+                missing_doc_references.append(str(rule))
             for refs in references.values():
                 for reference in refs:
                     if not _reference_path_exists(root, reference):
                         bad_references.append((rule, reference))
+            if rule == "docs-triggers" and references.get("docs"):
+                incomplete_rule_docs.extend(
+                    _validate_trigger_documentation(root, references["docs"])
+                )
 
     if (
         missing
@@ -407,6 +514,9 @@ def validate_quality_scale(
         or missing_references
         or missing_comments
         or bad_references
+        or missing_doc_references
+        or incomplete_rule_docs
+        or rule_catalog_errors
     ):
         messages.append(
             f"Integration Quality Scale check failed for manifest level "
@@ -437,6 +547,15 @@ def validate_quality_scale(
             messages.extend(
                 f"  - {rule}: {reference}" for rule, reference in bad_references
             )
+        if missing_doc_references:
+            messages.append("- Documentation rules missing docs references:")
+            messages.extend(f"  - {rule}" for rule in missing_doc_references)
+        if incomplete_rule_docs:
+            messages.append("- Incomplete rule documentation:")
+            messages.extend(f"  - {detail}" for detail in incomplete_rule_docs)
+        if rule_catalog_errors:
+            messages.append("- Official rule catalog metadata errors:")
+            messages.extend(f"  - {detail}" for detail in rule_catalog_errors)
         return 1, messages
 
     brand_errors = _validate_brands_support(root, remote=validate_remote_brands)

@@ -114,4 +114,7 @@ Sign in with your Enlighten credentials; MFA is supported. See the wiki for deta
 
 ## Documentation
 
+See [device automation triggers and conditions](docs/device_automations.md) for the
+automation features provided directly by the integration.
+
 Refer to the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki), including [Envoy History Migration](https://github.com/barneyonline/ha-enphase-energy/wiki/Envoy-History-Migration) for preserving Energy dashboard history when migrating from Enphase Envoy.
