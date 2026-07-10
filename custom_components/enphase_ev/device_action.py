@@ -5,7 +5,7 @@ from typing import Any
 import voluptuous as vol
 from homeassistant.const import CONF_DEVICE_ID, CONF_TYPE
 from homeassistant.core import Context, HomeAssistant
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.typing import ConfigType
 
 from .const import DOMAIN
@@ -13,7 +13,25 @@ from .runtime_data import iter_coordinators
 
 ACTION_START = "start_charging"
 ACTION_STOP = "stop_charging"
-## Removed set_charging_amps action since amps are read-only now
+CONF_CHARGING_LEVEL = "charging_level"
+CONF_CONNECTOR_ID = "connector_id"
+
+ACTION_SCHEMA = vol.Any(
+    cv.DEVICE_ACTION_BASE_SCHEMA.extend(
+        {
+            vol.Required(CONF_TYPE): ACTION_START,
+            vol.Optional(CONF_CHARGING_LEVEL): vol.All(int, vol.Range(min=6, max=40)),
+            vol.Optional(CONF_CONNECTOR_ID, default=1): vol.All(
+                int, vol.Range(min=1, max=2)
+            ),
+        }
+    ),
+    cv.DEVICE_ACTION_BASE_SCHEMA.extend(
+        {
+            vol.Required(CONF_TYPE): ACTION_STOP,
+        }
+    ),
+)
 
 
 async def async_get_actions(
@@ -74,8 +92,8 @@ async def async_call_action_from_config(
         return
 
     if typ == ACTION_START:
-        level = config.get("charging_level")
-        connector_id = int(config.get("connector_id", 1))
+        level = config.get(CONF_CHARGING_LEVEL)
+        connector_id = config.get(CONF_CONNECTOR_ID, 1)
         await coord.async_start_charging(
             sn, requested_amps=level, connector_id=connector_id
         )
@@ -94,11 +112,11 @@ async def async_get_action_capabilities(
     typ = config[CONF_TYPE]
     fields: dict[object, object] = {}
     if typ in (ACTION_START,):
-        fields[vol.Optional("charging_level", default=32)] = vol.All(
+        fields[vol.Optional(CONF_CHARGING_LEVEL, default=32)] = vol.All(
             int, vol.Range(min=6, max=40)
         )
     if typ == ACTION_START:
-        fields[vol.Optional("connector_id", default=1)] = vol.All(
+        fields[vol.Optional(CONF_CONNECTOR_ID, default=1)] = vol.All(
             int, vol.Range(min=1, max=2)
         )
     return {"extra_fields": vol.Schema(fields) if fields else vol.Schema({})}

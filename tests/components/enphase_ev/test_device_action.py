@@ -9,8 +9,9 @@ from types import ModuleType, SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+import voluptuous as vol
 
-from homeassistant.const import CONF_DEVICE_ID
+from homeassistant.const import CONF_DEVICE_ID, CONF_DOMAIN
 from homeassistant.helpers import device_registry as dr
 
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
@@ -329,3 +330,56 @@ async def test_async_get_action_capabilities() -> None:
     )
     assert validated["charging_level"] == 24
     assert validated["connector_id"] == 1
+
+
+@pytest.mark.parametrize(
+    "action_type, extra",
+    [
+        ("unknown", {}),
+        (device_action.ACTION_START, {"charging_level": 5}),
+        (device_action.ACTION_START, {"charging_level": 41}),
+        (device_action.ACTION_START, {"charging_level": "not-an-integer"}),
+        (device_action.ACTION_START, {"connector_id": 0}),
+        (device_action.ACTION_START, {"connector_id": 3}),
+        (device_action.ACTION_START, {"connector_id": "not-an-integer"}),
+    ],
+)
+def test_action_schema_rejects_invalid_config(action_type, extra) -> None:
+    """Invalid device action types and fields should fail validation."""
+    with pytest.raises(vol.Invalid):
+        device_action.ACTION_SCHEMA(
+            {
+                CONF_DEVICE_ID: "device-id",
+                CONF_DOMAIN: DOMAIN,
+                CONF_TYPE: action_type,
+                **extra,
+            }
+        )
+
+
+def test_action_schema_validates_start_defaults() -> None:
+    """The action schema should validate and default a start action."""
+    validated = device_action.ACTION_SCHEMA(
+        {
+            CONF_DEVICE_ID: "device-id",
+            CONF_DOMAIN: DOMAIN,
+            CONF_TYPE: device_action.ACTION_START,
+            "charging_level": 24,
+        }
+    )
+
+    assert validated["charging_level"] == 24
+    assert validated["connector_id"] == 1
+
+
+def test_action_schema_rejects_start_fields_on_stop() -> None:
+    """Start-only options should not be accepted by the stop action."""
+    with pytest.raises(vol.Invalid):
+        device_action.ACTION_SCHEMA(
+            {
+                CONF_DEVICE_ID: "device-id",
+                CONF_DOMAIN: DOMAIN,
+                CONF_TYPE: device_action.ACTION_STOP,
+                "connector_id": 1,
+            }
+        )

@@ -8,7 +8,10 @@ from types import ModuleType
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import voluptuous as vol
 
+from homeassistant.const import CONF_DEVICE_ID, CONF_DOMAIN, CONF_PLATFORM, CONF_TYPE
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL, RANDOM_SITE_ID
@@ -199,11 +202,36 @@ async def test_async_attach_trigger_handles_missing_entity(hass, device_entry):
 
 
 @pytest.mark.asyncio
-async def test_async_attach_trigger_unknown_type_returns_noop(hass, device_entry):
-    """Unknown trigger types should produce a no-op detach callback."""
+async def test_async_attach_trigger_rejects_unknown_type(hass, device_entry):
+    """Unknown trigger types should be rejected instead of becoming a no-op."""
     device, _ = device_entry
-    detach = await device_trigger.async_attach_trigger(
-        hass, {"device_id": device.id, "type": "unknown"}, None, {}
-    )
-    assert callable(detach)
-    assert detach() is None
+    with pytest.raises(HomeAssistantError, match="Unhandled trigger type unknown"):
+        await device_trigger.async_attach_trigger(
+            hass, {"device_id": device.id, "type": "unknown"}, None, {}
+        )
+
+
+def test_trigger_schema_validates_known_trigger() -> None:
+    """Known device triggers and their optional entity should validate."""
+    config = {
+        CONF_PLATFORM: "device",
+        CONF_DOMAIN: DOMAIN,
+        CONF_DEVICE_ID: "device-id",
+        CONF_TYPE: "charging_started",
+        "entity_id": "binary_sensor.charging",
+    }
+
+    assert device_trigger.TRIGGER_SCHEMA(config) == config
+
+
+def test_trigger_schema_rejects_unknown_trigger() -> None:
+    """Unknown device trigger types should fail validation."""
+    with pytest.raises(vol.Invalid):
+        device_trigger.TRIGGER_SCHEMA(
+            {
+                CONF_PLATFORM: "device",
+                CONF_DOMAIN: DOMAIN,
+                CONF_DEVICE_ID: "device-id",
+                CONF_TYPE: "unknown",
+            }
+        )
