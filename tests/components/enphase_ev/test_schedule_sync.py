@@ -668,6 +668,7 @@ async def test_schedule_sync_post_patch_refresh_dedupes(hass, monkeypatch) -> No
     assert RANDOM_SERIAL not in str(names[0])
     assert "..." in str(names[0])
     assert RANDOM_SERIAL not in sync._pending_patch_refresh
+    assert sync._pending_patch_refresh_tasks == {}  # noqa: SLF001
 
 
 @pytest.mark.asyncio
@@ -1922,10 +1923,57 @@ async def test_schedule_sync_async_stop_clears_interval_and_coordinator_handlers
     called: list[str] = []
     sync._unsub_interval = lambda *_args: called.append("interval")
     sync._unsub_coordinator = lambda: called.append("coord")
+    sync._pending_patch_refresh.add(RANDOM_SERIAL)
+    sync._pending_patch_refresh_cancels[RANDOM_SERIAL] = lambda: called.append(
+        "patch"
+    )  # noqa: SLF001
 
     await sync.async_stop()
 
-    assert called == ["interval", "coord"]
+    assert called == ["interval", "coord", "patch"]
+    assert sync._pending_patch_refresh == set()
+    assert sync._pending_patch_refresh_cancels == {}  # noqa: SLF001
+    assert sync._pending_patch_refresh_tasks == {}  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_schedule_sync_stop_cancels_fired_post_patch_refresh(
+    hass, monkeypatch
+) -> None:
+    sync = ScheduleSync(hass, SimpleNamespace(), None)
+    callbacks: list[callable] = []
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    def _fake_call_later(_hass, _delay, action):
+        callbacks.append(action)
+        return lambda: None
+
+    async def _refresh(*, reason, serials) -> None:
+        assert reason == "patch"
+        assert serials == [RANDOM_SERIAL]
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    monkeypatch.setattr(schedule_sync_mod, "async_call_later", _fake_call_later)
+    sync.async_refresh = _refresh
+
+    sync._schedule_post_patch_refresh(RANDOM_SERIAL)
+    callbacks[0](None)
+    task = sync._pending_patch_refresh_tasks[RANDOM_SERIAL]  # noqa: SLF001
+    await started.wait()
+
+    await sync.async_stop()
+
+    assert cancelled.is_set()
+    assert task.cancelled()
+    assert sync._pending_patch_refresh == set()
+    assert sync._pending_patch_refresh_cancels == {}  # noqa: SLF001
+    assert sync._pending_patch_refresh_tasks == {}  # noqa: SLF001
 
 
 @pytest.mark.asyncio

@@ -335,6 +335,12 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
         await super().async_added_to_hass()
         await self._async_refresh_catalog()
 
+    async def async_will_remove_from_hass(self) -> None:
+        if self._refresh_task is not None and not self._refresh_task.done():
+            self._refresh_task.cancel()
+        self._refresh_task = None
+        await super().async_will_remove_from_hass()
+
     async def async_install(
         self, version: str | None, backup: bool, **kwargs: Any
     ) -> None:
@@ -543,6 +549,12 @@ class ChargerFirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateE
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         await self._async_refresh_state()
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._refresh_task is not None and not self._refresh_task.done():
+            self._refresh_task.cancel()
+        self._refresh_task = None
+        await super().async_will_remove_from_hass()
 
     async def async_install(
         self, version: str | None, backup: bool, **kwargs: Any

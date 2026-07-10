@@ -1040,6 +1040,8 @@ async def test_entity_refresh_and_scheduler_branches(hass, monkeypatch) -> None:
         "async_added_to_hass",
         AsyncMock(return_value=None),
     )
+    remove = AsyncMock(return_value=None)
+    monkeypatch.setattr(CoordinatorEntity, "async_will_remove_from_hass", remove)
     monkeypatch.setattr(
         CoordinatorEntity, "_handle_coordinator_update", lambda self: None
     )
@@ -1056,6 +1058,15 @@ async def test_entity_refresh_and_scheduler_branches(hass, monkeypatch) -> None:
         await running
     except asyncio.CancelledError:
         pass
+
+    pending_removal = hass.async_create_task(asyncio.sleep(60))
+    entity._refresh_task = pending_removal
+    await entity.async_will_remove_from_hass()
+    with pytest.raises(asyncio.CancelledError):
+        await pending_removal
+    assert pending_removal.cancelled()
+    assert entity._refresh_task is None
+    remove.assert_awaited_once_with()
 
     entity.hass = None
     entity._schedule_catalog_refresh()
@@ -1100,6 +1111,8 @@ async def test_charger_entity_refresh_branches(hass, monkeypatch) -> None:
         "async_added_to_hass",
         AsyncMock(return_value=None),
     )
+    remove = AsyncMock(return_value=None)
+    monkeypatch.setattr(CoordinatorEntity, "async_will_remove_from_hass", remove)
     monkeypatch.setattr(
         CoordinatorEntity, "_handle_coordinator_update", lambda self: None
     )
@@ -1117,6 +1130,15 @@ async def test_charger_entity_refresh_branches(hass, monkeypatch) -> None:
         await running
     except asyncio.CancelledError:
         pass
+
+    pending_removal = hass.async_create_task(asyncio.sleep(60))
+    entity._refresh_task = pending_removal
+    await entity.async_will_remove_from_hass()
+    with pytest.raises(asyncio.CancelledError):
+        await pending_removal
+    assert pending_removal.cancelled()
+    assert entity._refresh_task is None
+    remove.assert_awaited_once_with()
 
     entity.hass = None
     entity._schedule_details_refresh()

@@ -11,7 +11,9 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Fixed config-entry unload and entity removal leaving delayed backoff, schedule,
+  battery-profile recovery, or firmware refresh work running against retired
+  integration objects.
 
 ### 🔧 Improvements
 - None
