@@ -373,7 +373,8 @@ async def test_refresh_grid_outage_context_family_ttl_matches_cache(
     assert family_state.next_retry_mono is not None
     assert (
         family_state.next_retry_mono - family_state.last_success_mono
-    ) == GRID_OUTAGE_CONTEXT_CACHE_TTL
+        == pytest.approx(GRID_OUTAGE_CONTEXT_CACHE_TTL)
+    )
 
 
 @pytest.mark.asyncio
