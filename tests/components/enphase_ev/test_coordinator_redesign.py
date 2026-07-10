@@ -17,6 +17,9 @@ from custom_components.enphase_ev.refresh_plan import (
     FOLLOWUP_PLAN,
     HEATPUMP_FOLLOWUP_PLAN,
     SITE_ONLY_FOLLOWUP_PLAN,
+    RefreshPlan,
+    RefreshStage,
+    callback_task,
     bind_refresh_stage,
     bind_refresh_plan,
     build_followup_plan,
@@ -750,6 +753,7 @@ async def test_coordinator_refresh_plan_runner_executes_each_stage(
         ordered_calls,
         stage_key=None,
         defer_topology=False,
+        deadline_s=None,
     ) -> None:
         seen.append(
             (
@@ -1006,6 +1010,47 @@ async def test_refresh_runner_staged_calls_track_empty_stage_timing(
     await runner.async_run_staged_refresh_calls(phase_timings, stage_key="empty")
 
     assert phase_timings == {"empty_s": 0.0}
+
+
+@pytest.mark.asyncio
+async def test_refresh_plan_deadline_cancels_stage_and_continues(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    slow_cancelled = asyncio.Event()
+    later_stage_ran = asyncio.Event()
+
+    async def _slow(_owner) -> None:
+        try:
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            slow_cancelled.set()
+            raise
+
+    async def _later(_owner) -> None:
+        later_stage_ran.set()
+
+    plan = RefreshPlan(
+        stages=(
+            RefreshStage(
+                stage_key="bounded",
+                deadline_s=0.01,
+                parallel_tasks=(callback_task("slow_s", "slow", _slow),),
+            ),
+            RefreshStage(
+                stage_key="later",
+                parallel_tasks=(callback_task("later_s", "later", _later),),
+            ),
+        )
+    )
+    timings: dict[str, float] = {}
+
+    await coord.refresh_runner.async_run_refresh_plan(timings, plan=plan)
+
+    assert slow_cancelled.is_set() is True
+    assert later_stage_ran.is_set() is True
+    assert timings["bounded_deadline_exceeded"] == 1.0
+    assert timings["bounded_s"] >= 0.0
 
 
 def test_coordinator_lazily_creates_refresh_runner() -> None:

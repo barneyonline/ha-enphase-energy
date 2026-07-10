@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -83,19 +84,27 @@ async def test_async_refresh_fetcher_raises(coordinator_factory) -> None:
 
     await coord.current_power_runtime.async_refresh()
 
-    assert coord._current_power_consumption_w is None
+    assert coord._current_power_consumption_w == 100.0
+    assert coord.current_power_runtime.using_stale is True
+    assert (
+        coord._endpoint_family_state("current_power").consecutive_failures == 1
+    )  # noqa: SLF001
 
 
+@pytest.mark.parametrize("payload", [None, "x", {}, {"value": "nope"}])
 @pytest.mark.asyncio
-async def test_async_refresh_invalid_payload_shapes(coordinator_factory) -> None:
+async def test_async_refresh_invalid_payload_shapes(
+    coordinator_factory, payload
+) -> None:
     coord = coordinator_factory()
-    coord.client = SimpleNamespace(
-        latest_power=AsyncMock(side_effect=[None, "x", {}, {"value": "nope"}])
-    )
+    coord.client = SimpleNamespace(latest_power=AsyncMock(return_value=payload))
 
-    for _ in range(4):
-        await coord.current_power_runtime.async_refresh()
-        assert coord._current_power_consumption_w is None
+    await coord.current_power_runtime.async_refresh()
+
+    assert coord._current_power_consumption_w is None
+    assert (
+        coord._endpoint_family_state("current_power").consecutive_failures == 1
+    )  # noqa: SLF001
 
 
 @pytest.mark.asyncio
@@ -163,6 +172,47 @@ async def test_async_refresh_skips_fetch_inside_success_cache_ttl(
 
     assert fetcher.await_count == 1
     assert coord._current_power_consumption_w == 42.5
+
+
+@pytest.mark.asyncio
+async def test_async_refresh_failure_preserves_sample_and_suppresses_retry(
+    coordinator_factory,
+    monkeypatch,
+) -> None:
+    coord = coordinator_factory()
+    fetcher = AsyncMock(
+        side_effect=[{"value": 42.5, "units": "W"}, RuntimeError("network")]
+    )
+    coord.client = SimpleNamespace(latest_power=fetcher)
+    monotonic = 100.0
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.current_power_runtime.time.monotonic",
+        lambda: monotonic,
+    )
+
+    await coord.current_power_runtime.async_refresh()
+    coord._endpoint_family_state("current_power").next_retry_mono = None  # noqa: SLF001
+    monotonic = 161.0
+    await coord.current_power_runtime.async_refresh()
+    monotonic = 200.0
+    await coord.current_power_runtime.async_refresh()
+
+    assert fetcher.await_count == 2
+    assert coord._current_power_consumption_w == 42.5
+    assert coord._current_power_consumption_reported_units == "W"
+    assert coord.current_power_runtime.using_stale is True
+
+
+def test_refresh_due_suppresses_current_power_during_failure_backoff(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord.client = SimpleNamespace(latest_power=AsyncMock())
+    coord._endpoint_family_state("current_power").next_retry_mono = (  # noqa: SLF001
+        time.monotonic() + 300.0
+    )
+
+    assert coord.current_power_runtime.refresh_due() is False
 
 
 @pytest.mark.asyncio

@@ -26,6 +26,9 @@ All notable changes to this project will be documented in this file.
   integration objects.
 
 ### 🔧 Improvements
+- Bound optional Enlighten request queueing and startup warmup stages, reserve
+  cloud-read capacity for core status traffic, and retain the last current-power
+  sample with retry backoff when that optional endpoint is unavailable.
 - Documented the IQ EV Charger device automation triggers and the integration's
   use of standard Home Assistant conditions.
 - Reused a Home Assistant-managed stateless HTTP session for cookie-authenticated

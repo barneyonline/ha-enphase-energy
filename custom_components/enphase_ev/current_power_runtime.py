@@ -9,6 +9,7 @@ from datetime import datetime
 from datetime import timezone as _tz
 from typing import TYPE_CHECKING
 
+from .api import InvalidPayloadError
 from .log_redaction import redact_site_id, redact_text
 
 if TYPE_CHECKING:
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 CURRENT_POWER_CACHE_TTL_S = 60.0
+CURRENT_POWER_ENDPOINT_FAMILY = "current_power"
 
 
 @dataclass(slots=True)
@@ -42,11 +44,13 @@ class CurrentPowerRuntime:
     def __init__(self, coordinator: EnphaseCoordinator) -> None:
         self.coordinator = coordinator
         self._cache_until_mono: float | None = None
+        self.using_stale = False
 
     def clear(self) -> None:
         """Reset cached current power consumption samples."""
 
         self._cache_until_mono = None
+        self.using_stale = False
         CurrentPowerSample().apply_to(self.coordinator)
 
     def _cached_state_present(self) -> bool:
@@ -67,6 +71,10 @@ class CurrentPowerRuntime:
 
         fetcher = getattr(self.coordinator.client, "latest_power", None)
         if callable(fetcher):
+            if not self.coordinator._endpoint_family_should_run(
+                CURRENT_POWER_ENDPOINT_FAMILY
+            ):
+                return False
             cache_until = self._cache_until_mono
             if cache_until is not None and time.monotonic() < cache_until:
                 return False
@@ -85,11 +93,15 @@ class CurrentPowerRuntime:
         cache_until = self._cache_until_mono
         if cache_until is not None and now < cache_until:
             return
+        if not coord._endpoint_family_should_run(CURRENT_POWER_ENDPOINT_FAMILY):
+            self.using_stale = self._cached_state_present()
+            return
 
         try:
             payload = await fetcher()
         except Exception as err:  # noqa: BLE001
-            self.clear()
+            coord._note_endpoint_family_failure(CURRENT_POWER_ENDPOINT_FAMILY, err)
+            self.using_stale = self._cached_state_present()
             _LOGGER.debug(
                 "Skipping current power consumption refresh for site %s: %s",
                 redact_site_id(coord.site_id),
@@ -98,17 +110,17 @@ class CurrentPowerRuntime:
             return
 
         if not isinstance(payload, dict):
-            self.clear()
+            self._note_invalid_payload("Current-power response is not an object")
             return
 
         value = payload.get("value")
         try:
             numeric = float(str(value))
         except Exception:  # noqa: BLE001
-            self.clear()
+            self._note_invalid_payload("Current-power response has no numeric value")
             return
         if numeric != numeric or numeric in (float("inf"), float("-inf")):
-            self.clear()
+            self._note_invalid_payload("Current-power response value is not finite")
             return
 
         sampled_at = None
@@ -149,3 +161,18 @@ class CurrentPowerRuntime:
             source="app-api:get_latest_power",
         ).apply_to(coord)
         self._cache_until_mono = now + CURRENT_POWER_CACHE_TTL_S
+        self.using_stale = False
+        coord._note_endpoint_family_success(CURRENT_POWER_ENDPOINT_FAMILY)
+
+    def _note_invalid_payload(self, summary: str) -> None:
+        """Back off malformed responses while retaining the last valid sample."""
+
+        error = InvalidPayloadError(
+            summary,
+            endpoint="get_latest_power",
+            failure_kind="invalid_current_power_payload",
+        )
+        self.coordinator._note_endpoint_family_failure(
+            CURRENT_POWER_ENDPOINT_FAMILY, error
+        )
+        self.using_stale = self._cached_state_present()

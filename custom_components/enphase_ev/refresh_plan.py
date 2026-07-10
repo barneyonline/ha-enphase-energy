@@ -26,7 +26,10 @@ REFRESH_TASK_ENDPOINT_FAMILIES: dict[str, str] = {
     "hems_devices_s": "inventory_topology",
     "system_dashboard_s": "inventory_topology",
     "inverters_s": "inverter_inventory",
+    "current_power_s": "current_power",
 }
+
+WARMUP_STAGE_DEADLINE_S = 60.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +46,7 @@ class RefreshStage:
     ordered_tasks: tuple[RefreshTask, ...] = ()
     stage_key: str | None = None
     defer_topology: bool = False
+    deadline_s: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +55,7 @@ class BoundRefreshStage:
     ordered_calls: tuple[BoundRefreshCall, ...] = ()
     stage_key: str | None = None
     defer_topology: bool = False
+    deadline_s: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,6 +150,7 @@ def bind_refresh_stage(owner: object, stage: RefreshStage) -> BoundRefreshStage:
         ordered_calls=bind_refresh_tasks(owner, stage.ordered_tasks),
         stage_key=stage.stage_key,
         defer_topology=stage.defer_topology,
+        deadline_s=stage.deadline_s,
     )
 
 
@@ -157,6 +163,7 @@ def bind_refresh_plan(owner: object, plan: RefreshPlan) -> BoundRefreshPlan:
 WARMUP_DISCOVERY_STAGE = RefreshStage(
     stage_key="discovery",
     defer_topology=True,
+    deadline_s=WARMUP_STAGE_DEADLINE_S,
     parallel_tasks=(
         method_task(
             "battery_site_settings_s",
@@ -195,6 +202,7 @@ WARMUP_DISCOVERY_STAGE = RefreshStage(
 
 WARMUP_STATE_STAGE = RefreshStage(
     stage_key="state",
+    deadline_s=WARMUP_STAGE_DEADLINE_S,
     parallel_tasks=(
         method_task(
             "battery_backup_history_s",
@@ -418,6 +426,7 @@ FOLLOWUP_PLAN = RefreshPlan(stages=(FOLLOWUP_STAGE,))
 def warmup_energy_stage(working_data: dict[str, dict[str, object]]) -> RefreshStage:
     return RefreshStage(
         stage_key="energy",
+        deadline_s=WARMUP_STAGE_DEADLINE_S,
         parallel_tasks=(
             object_method_task(
                 "site_energy_s",
@@ -451,11 +460,15 @@ def warmup_energy_stage(working_data: dict[str, dict[str, object]]) -> RefreshSt
 
 
 def warmup_plan(working_data: dict[str, dict[str, object]]) -> RefreshPlan:
+    warmup_heatpump_stage = RefreshStage(
+        ordered_tasks=HEATPUMP_FOLLOWUP_STAGE.ordered_tasks,
+        deadline_s=WARMUP_STAGE_DEADLINE_S,
+    )
     return RefreshPlan(
         stages=(
             WARMUP_DISCOVERY_STAGE,
             WARMUP_STATE_STAGE,
-            HEATPUMP_FOLLOWUP_STAGE,
+            warmup_heatpump_stage,
             warmup_energy_stage(working_data),
         )
     )

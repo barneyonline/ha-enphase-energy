@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import asyncio
 import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -108,6 +109,57 @@ def test_should_limit_enlighten_read_request_handles_bad_string_casts() -> None:
 
     assert api._should_limit_enlighten_read_request(BadMethod(), api.BASE_URL) is False
     assert api._should_limit_enlighten_read_request("GET", BadUrl()) is False
+
+
+@pytest.mark.asyncio
+async def test_enlighten_request_timeout_includes_limiter_queue(monkeypatch) -> None:
+    limiter = asyncio.Semaphore(0)
+    monkeypatch.setattr(api, "_enlighten_read_semaphore", limiter)
+    session = FakeSession([FakeResponse(json_body={"ok": True})])
+
+    with pytest.raises(TimeoutError):
+        await api._request_json(
+            session, "GET", f"{api.BASE_URL}/service/test", timeout=0.01
+        )
+
+    assert session.calls == []
+
+
+@pytest.mark.asyncio
+async def test_optional_enlighten_reads_reserve_capacity_for_core(monkeypatch) -> None:
+    monkeypatch.setattr(api, "_enlighten_read_semaphore", asyncio.Semaphore(2))
+    monkeypatch.setattr(api, "_enlighten_optional_read_semaphore", asyncio.Semaphore(1))
+    release = asyncio.Event()
+    first_optional_entered = asyncio.Event()
+    second_optional_entered = asyncio.Event()
+    core_entered = asyncio.Event()
+
+    async def _optional(entered: asyncio.Event) -> None:
+        with api.enlighten_optional_read_scope():
+            async with api._enlighten_read_request_guard(  # noqa: SLF001
+                "GET", f"{api.BASE_URL}/service/optional"
+            ):
+                entered.set()
+                await release.wait()
+
+    async def _core() -> None:
+        async with api._enlighten_read_request_guard(  # noqa: SLF001
+            "GET", f"{api.BASE_URL}/service/core"
+        ):
+            core_entered.set()
+            await release.wait()
+
+    first = asyncio.create_task(_optional(first_optional_entered))
+    await asyncio.wait_for(first_optional_entered.wait(), timeout=1)
+    second = asyncio.create_task(_optional(second_optional_entered))
+    core = asyncio.create_task(_core())
+    await asyncio.wait_for(core_entered.wait(), timeout=1)
+
+    assert second_optional_entered.is_set() is False
+
+    release.set()
+    await asyncio.gather(first, second, core)
+    assert second_optional_entered.is_set() is True
 
 
 def test_cookie_header_from_map_empty() -> None:
