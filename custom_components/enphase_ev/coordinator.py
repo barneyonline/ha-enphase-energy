@@ -210,7 +210,7 @@ _CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
 def _typed_callback(func: _CallbackT) -> _CallbackT:
     """Apply Home Assistant's callback marker without losing callable typing."""
 
-    return callback(func)
+    return cast(_CallbackT, callback(func))
 
 
 # Session history can arrive after real-time charging state changes. These
@@ -285,7 +285,7 @@ def _charger_sample_datetime(value: object) -> datetime | None:
             return None
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=_tz.utc)
-        return parsed.astimezone(_tz.utc)
+        return cast(datetime, parsed.astimezone(_tz.utc))
     return None
 
 
@@ -518,7 +518,10 @@ class EnphaseCoordinator(
     _warmup_task: asyncio.Task[None] | None
     _battery_profile_recovery_restore_task: asyncio.Task[None] | None
     _streaming_stop_task: asyncio.Task[None] | None
-    _auth_refresh_task: asyncio.Task[None] | None
+    _auth_refresh_task: asyncio.Task[bool] | None
+    _auth_refresh_rejected_until: float | None
+    _email: str | None
+    _stored_password: str | None
     _gateway_inventory_summary_source: object
     _microinverter_inventory_summary_source: object
     _heatpump_inventory_summary_source: object
@@ -888,7 +891,7 @@ class EnphaseCoordinator(
     def __getattr__(self, name: str) -> Any:
         if name == "energy":
             energy = EnergyManager(
-                client_provider=lambda: getattr(self, "client", None),
+                client_provider=lambda: self.client,
                 site_id=str(getattr(self, "site_id", "")),
                 logger=_LOGGER,
                 summary_invalidator=getattr(
@@ -1215,7 +1218,7 @@ class EnphaseCoordinator(
             if retry_dt.tzinfo is None:
                 retry_dt = retry_dt.replace(tzinfo=_tz.utc)
             retry_dt = retry_dt.astimezone(_tz.utc)
-            return max(0.0, (retry_dt - dt_util.utcnow()).total_seconds())
+            return float(max(0.0, (retry_dt - dt_util.utcnow()).total_seconds()))
 
     def _endpoint_family_backoff_delay(
         self,
@@ -4555,7 +4558,7 @@ class EnphaseCoordinator(
             return None
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=_tz.utc)
-        return parsed.astimezone(_tz.utc)
+        return cast(datetime, parsed.astimezone(_tz.utc))
 
     @staticmethod
     def _format_auth_blocked_until(value: datetime | None) -> str | None:

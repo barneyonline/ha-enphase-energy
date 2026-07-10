@@ -10,7 +10,7 @@ import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, TypeVar, cast
 from zoneinfo import ZoneInfo
 
 from homeassistant.core import callback
@@ -63,7 +63,7 @@ _CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
 def _typed_callback(func: _CallbackT) -> _CallbackT:
     """Apply Home Assistant's callback marker without losing the callable type."""
 
-    return callback(func)
+    return cast(_CallbackT, callback(func))
 
 
 DEVICES_INVENTORY_CACHE_TTL = 600.0

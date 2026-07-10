@@ -247,7 +247,7 @@ class EvseRuntime:
             except Exception:
                 continue
             try:
-                return dt_util.as_local(dt_val)
+                return cast(datetime, dt_util.as_local(dt_val))
             except Exception:
                 return dt_val
         return day_local_default

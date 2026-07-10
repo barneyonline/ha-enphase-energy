@@ -299,10 +299,12 @@ class AuthRefreshRuntime:
         coord = self.coordinator
         session = async_get_clientsession(coord.hass)
         coord._auth_refresh_last_attempt_utc = dt_util.utcnow()
+        email = coord._email
+        password = coord._stored_password
+        if not isinstance(email, str) or not isinstance(password, str):
+            return False
         try:
-            tokens, _ = await async_authenticate(
-                session, coord._email, coord._stored_password
-            )
+            tokens, _ = await async_authenticate(session, email, password)
         except EnlightenAuthInvalidCredentials:
             coord._auth_refresh_last_failure_reason = "invalid_credentials"
             self.note_auth_refresh_rejected(
