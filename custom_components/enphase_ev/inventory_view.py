@@ -20,6 +20,7 @@ from .parsing_helpers import type_member_text
 
 if TYPE_CHECKING:  # pragma: no cover
     from .coordinator import EnphaseCoordinator
+    from .heatpump_runtime import HeatpumpRuntime
 
 
 class InventoryView:
@@ -30,14 +31,14 @@ class InventoryView:
 
     @property
     def site_id(self) -> str:
-        return self.coordinator.site_id
+        return str(self.coordinator.site_id)
 
     @property
-    def inventory_runtime(self):
+    def inventory_runtime(self) -> InventoryRuntime:
         return self.coordinator.inventory_runtime
 
     @property
-    def heatpump_runtime(self):
+    def heatpump_runtime(self) -> HeatpumpRuntime:
         return self.coordinator.heatpump_runtime
 
     def _has_known_chargers(self) -> bool:
@@ -176,7 +177,8 @@ class InventoryView:
             label = bucket.get("type_label")
             if isinstance(label, str) and label.strip():
                 return label
-        return type_display_label(normalized)
+        label = type_display_label(normalized)
+        return str(label) if label else None
 
     def type_identifier(
         self, type_key: object
@@ -187,14 +189,16 @@ class InventoryView:
         if not self._type_is_selected(normalized):
             return None
         if self.has_type(normalized):
-            return type_identifier(self.site_id, normalized)
+            identifier = type_identifier(self.site_id, normalized)
+            return identifier if isinstance(identifier, tuple) else None
         if normalized not in {"encharge", "ac_battery"}:
             return None
         # Battery controls can be discovered through BatteryConfig before the
         # generic devices inventory exposes a concrete member bucket.
         if not self.has_type_for_entities(normalized):
             return None
-        return type_identifier(self.site_id, normalized)
+        identifier = type_identifier(self.site_id, normalized)
+        return identifier if isinstance(identifier, tuple) else None
 
     def _type_bucket_members(self, type_key: object) -> list[dict[str, object]]:
         bucket = self.type_bucket(type_key)
@@ -207,7 +211,8 @@ class InventoryView:
 
     @staticmethod
     def _type_member_text(member: dict[str, object] | None, *keys: str) -> str | None:
-        return type_member_text(member, *keys)
+        value = type_member_text(member, *keys)
+        return str(value) if value else None
 
     def _type_summary_from_values(self, values: Iterable[object]) -> str | None:
         counts: dict[str, int] = {}
@@ -221,7 +226,8 @@ class InventoryView:
             if not text:
                 continue
             counts[text] = counts.get(text, 0) + 1
-        return InventoryRuntime._format_inverter_model_summary(counts)
+        summary = InventoryRuntime._format_inverter_model_summary(counts)
+        return str(summary) if summary else None
 
     def _type_member_summary(
         self,
@@ -402,7 +408,8 @@ class InventoryView:
         return self._envoy_system_controller_member()
 
     def _heatpump_primary_member(self) -> dict[str, object] | None:
-        return self.heatpump_runtime._heatpump_primary_member()
+        member = self.heatpump_runtime._heatpump_primary_member()
+        return member if isinstance(member, dict) else None
 
     def type_device_name(self, type_key: object) -> str | None:  # pragma: no cover
         normalized = normalize_type_key(type_key)
@@ -721,7 +728,9 @@ class InventoryView:
             )
         return None
 
-    def type_device_info(self, type_key: object):  # pragma: no cover
+    def type_device_info(
+        self, type_key: object
+    ) -> DeviceInfo | dict[str, object] | None:  # pragma: no cover
         normalized = normalize_type_key(type_key)
         if not normalized:
             return None
@@ -758,18 +767,22 @@ class InventoryView:
         return DeviceInfo(**info_kwargs)
 
     def gateway_iq_energy_router_records(self) -> list[dict[str, object]]:
-        return self.coordinator.discovery_snapshot.gateway_iq_energy_router_records()
+        records = self.coordinator.discovery_snapshot.gateway_iq_energy_router_records()
+        return [dict(record) for record in records if isinstance(record, dict)]
 
     def gateway_iq_energy_router_summary_records(self) -> list[dict[str, object]]:
-        return self.inventory_runtime.gateway_iq_energy_router_summary_records()
+        records = self.inventory_runtime.gateway_iq_energy_router_summary_records()
+        return [dict(record) for record in records if isinstance(record, dict)]
 
     def gateway_iq_energy_router_record(
         self, router_key: object
     ) -> dict[str, object] | None:
-        return self.inventory_runtime.gateway_iq_energy_router_record(router_key)
+        record = self.inventory_runtime.gateway_iq_energy_router_record(router_key)
+        return record if isinstance(record, dict) else None
 
     @staticmethod
     def parse_type_identifier(
         identifier: object,
     ) -> tuple[str, str] | None:  # pragma: no cover
-        return parse_type_identifier(identifier)
+        parsed = parse_type_identifier(identifier)
+        return parsed if isinstance(parsed, tuple) else None

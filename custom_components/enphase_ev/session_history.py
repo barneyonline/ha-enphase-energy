@@ -8,7 +8,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone as _tz
-from typing import Any, Awaitable, Callable, Iterable
+from typing import Any, Awaitable, Callable, Iterable, cast
 
 import aiohttp
 from homeassistant.core import HomeAssistant
@@ -29,7 +29,7 @@ SESSION_HISTORY_CACHE_DAY_RETENTION = 3
 class SessionCacheView:
     """Represents the current cache state for a serial."""
 
-    sessions: list[dict]
+    sessions: list[dict[str, Any]]
     cache_age: float | None
     needs_refresh: bool
     blocked: bool
@@ -48,7 +48,7 @@ class SessionCacheEntry:
     """Structured cache entry for a serial/day session-history result."""
 
     cached_at_mono: float | None
-    sessions: list[dict]
+    sessions: list[dict[str, Any]]
     state: str
     last_error: str | None
     has_valid_cache: bool
@@ -66,8 +66,8 @@ class SessionHistoryManager:
         cache_day_retention: int = SESSION_HISTORY_CACHE_DAY_RETENTION,
         failure_backoff: float = SESSION_HISTORY_FAILURE_BACKOFF_S,
         concurrency: int = SESSION_HISTORY_CONCURRENCY,
-        data_supplier: Callable[[], dict[str, dict] | None] | None = None,
-        publish_callback: Callable[[dict[str, dict]], None] | None = None,
+        data_supplier: Callable[[], dict[str, dict[str, Any]] | None] | None = None,
+        publish_callback: Callable[[dict[str, dict[str, Any]]], None] | None = None,
         site_id_getter: Callable[[], object] | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
@@ -80,7 +80,7 @@ class SessionHistoryManager:
         self._concurrency = max(1, int(concurrency))
         self._cache_day_retention = max(1, int(cache_day_retention))
         self._cache: dict[
-            tuple[str, str], SessionCacheEntry | tuple[float, list[dict]]
+            tuple[str, str], SessionCacheEntry | tuple[float, list[dict[str, Any]]]
         ] = {}
         self._block_until: dict[str, float] = {}
         self._refresh_in_progress: set[str] = set()
@@ -92,7 +92,7 @@ class SessionHistoryManager:
         self._site_id_getter = site_id_getter
         self._logger = logger or _LOGGER
         self._fetch_override: (
-            Callable[[str, datetime | None], Awaitable[list[dict]]] | None
+            Callable[[str, datetime | None], Awaitable[list[dict[str, Any]]]] | None
         ) = None
         self._service_available = True
         self._service_failures = 0
@@ -113,7 +113,7 @@ class SessionHistoryManager:
         return (site_id,) if site_id else ()
 
     def _redact_error(self, err: object) -> str:
-        return redact_text(err, site_ids=self._site_ids())
+        return str(redact_text(err, site_ids=self._site_ids()))
 
     @property
     def cache_ttl(self) -> float:
@@ -230,7 +230,7 @@ class SessionHistoryManager:
     def _history_timezone(self) -> str | None:
         tz_name = self._hass.config.time_zone
         if tz_name:
-            return tz_name
+            return str(tz_name)
         try:
             return str(dt_util.DEFAULT_TIME_ZONE)
         except Exception:
@@ -249,7 +249,7 @@ class SessionHistoryManager:
 
     def _coerce_cache_entry(
         self,
-        value: SessionCacheEntry | tuple[float, list[dict]] | None,
+        value: SessionCacheEntry | tuple[float, list[dict[str, Any]]] | None,
     ) -> SessionCacheEntry | None:
         if isinstance(value, SessionCacheEntry):
             return value
@@ -322,7 +322,7 @@ class SessionHistoryManager:
         now = now_mono or time.monotonic()
         cache_key = (serial, day_key)
         cached = self._get_cache_entry(cache_key)
-        sessions: list[dict] = []
+        sessions: list[dict[str, Any]] = []
         cache_age: float | None = None
         if cached:
             cached_ts = cached.cached_at_mono
@@ -393,7 +393,7 @@ class SessionHistoryManager:
         *,
         in_background: bool,
         max_cache_age: float | None = None,
-    ) -> dict[str, list[dict]]:
+    ) -> dict[str, list[dict[str, Any]]]:
         """Fetch session history for the provided serials."""
         updates = await self._async_enrich_sessions(
             serials,
@@ -410,13 +410,13 @@ class SessionHistoryManager:
         *,
         day_local: datetime,
         max_cache_age: float | None = None,
-    ) -> dict[str, list[dict]]:
+    ) -> dict[str, list[dict[str, Any]]]:
         serial_list = [sn for sn in dict.fromkeys(serials) if sn]
         if not serial_list:
             return {}
         semaphore = asyncio.Semaphore(self._concurrency)
 
-        async def _refresh(sn: str) -> tuple[str, list[dict] | None]:
+        async def _refresh(sn: str) -> tuple[str, list[dict[str, Any]] | None]:
             async with semaphore:
                 try:
                     if max_cache_age is None:
@@ -461,9 +461,9 @@ class SessionHistoryManager:
             for sn in serial_list
         ]
         responses = await asyncio.gather(*tasks, return_exceptions=True)
-        updates: dict[str, list[dict]] = {}
+        updates: dict[str, list[dict[str, Any]]] = {}
         for response in responses:
-            if isinstance(response, Exception):
+            if isinstance(response, BaseException):
                 self._logger.debug(
                     "Session history enrichment task error: %s",
                     self._redact_error(response),
@@ -475,14 +475,14 @@ class SessionHistoryManager:
             updates[sn] = sessions
         return updates
 
-    def _apply_updates(self, updates: dict[str, list[dict]]) -> None:
+    def _apply_updates(self, updates: dict[str, list[dict[str, Any]]]) -> None:
         """Merge enrichment results into the published coordinator data."""
         if not updates or not self._publish_callback or not self._data_supplier:
             return
         current = self._data_supplier()
         if not isinstance(current, dict):
             return
-        merged: dict[str, dict] | None = None
+        merged: dict[str, dict[str, Any]] | None = None
         for sn, sessions in updates.items():
             existing = current.get(sn)
             entry = dict(existing) if isinstance(existing, dict) else {}
@@ -502,7 +502,7 @@ class SessionHistoryManager:
 
     async def _async_refresh_filter_criteria(
         self,
-        criteria_fetcher: Callable[..., Awaitable[dict]],
+        criteria_fetcher: Callable[..., Awaitable[dict[str, Any]]],
     ) -> None:
         """Fetch site-scoped filter criteria once per cache window."""
 
@@ -529,10 +529,10 @@ class SessionHistoryManager:
         *,
         day_local: datetime | None = None,
         max_cache_age: float | None = None,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Return session history for the provided day, caching results."""
         if self._fetch_override is not None:
-            return await self._fetch_override(sn, day_local=day_local)
+            return await self._fetch_override(sn, day_local)
         if not sn:
             return []
         if day_local is None:
@@ -630,7 +630,9 @@ class SessionHistoryManager:
                 self._set_unavailable_entry(sn, day_key, now_mono, err)
                 return []
 
-        async def _fetch_page(offset: int, limit: int) -> tuple[list[dict], bool]:
+        async def _fetch_page(
+            offset: int, limit: int
+        ) -> tuple[list[dict[str, Any]], bool]:
             payload = await client.session_history(
                 sn,
                 start_date=api_day,
@@ -647,7 +649,7 @@ class SessionHistoryManager:
                 return [], False
             return items, has_more
 
-        results: list[dict] = []
+        results: list[dict[str, Any]] = []
         offset = 0
         limit = 50
         try:
@@ -813,7 +815,9 @@ class SessionHistoryManager:
 
     def set_fetch_override(
         self,
-        callback: Callable[[str, datetime | None], Awaitable[list[dict]]] | None,
+        callback: (
+            Callable[[str, datetime | None], Awaitable[list[dict[str, Any]]]] | None
+        ),
     ) -> None:
         """Allow callers to override the fetch implementation (legacy hook)."""
         self._fetch_override = callback
@@ -822,8 +826,8 @@ class SessionHistoryManager:
         self,
         *,
         local_dt: datetime,
-        results: list[dict],
-    ) -> list[dict]:
+        results: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         """Trim and normalise raw session history entries for a given local day."""
 
         try:
@@ -834,13 +838,16 @@ class SessionHistoryManager:
         day_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = day_start + timedelta(days=1)
 
-        def _parse_ts(value) -> datetime | None:
+        def _parse_ts(value: object) -> datetime | None:
             if value is None:
                 return None
             if isinstance(value, (int, float)):
                 try:
-                    return dt_util.as_local(
-                        datetime.fromtimestamp(float(value), tz=_tz.utc)
+                    return cast(
+                        datetime,
+                        dt_util.as_local(
+                            datetime.fromtimestamp(float(value), tz=_tz.utc)
+                        ),
                     )
                 except Exception:  # noqa: BLE001
                     return None
@@ -855,33 +862,33 @@ class SessionHistoryManager:
                 if dt_val.tzinfo is None:
                     dt_val = dt_val.replace(tzinfo=_tz.utc)
                 try:
-                    return dt_util.as_local(dt_val)
+                    return cast(datetime, dt_util.as_local(dt_val))
                 except Exception:  # noqa: BLE001
                     return None
             return None
 
-        def _as_float(val, *, precision: int | None = None) -> float | None:
+        def _as_float(val: object, *, precision: int | None = None) -> float | None:
             if val is None:
                 return None
             try:
-                out = float(val)
+                out = float(str(val))
                 if precision is not None:
                     return round(out, precision)
                 return out
             except Exception:  # noqa: BLE001
                 return None
 
-        def _as_int(val) -> int | None:
+        def _as_int(val: object) -> int | None:
             if val is None:
                 return None
             if isinstance(val, bool):
                 return int(val)
             try:
-                return int(float(val))
+                return int(float(str(val)))
             except Exception:  # noqa: BLE001
                 return None
 
-        def _as_bool(val) -> bool:
+        def _as_bool(val: object) -> bool:
             if isinstance(val, bool):
                 return val
             if isinstance(val, (int, float)):
@@ -890,7 +897,7 @@ class SessionHistoryManager:
                 return val.strip().lower() in ("true", "1", "yes", "y")
             return False
 
-        sessions: list[dict] = []
+        sessions: list[dict[str, Any]] = []
         for item in results:
             if not isinstance(item, dict):
                 continue
@@ -984,11 +991,11 @@ class SessionHistoryManager:
         )
         return sessions
 
-    def sum_energy(self, sessions: list[dict]) -> float:
+    def sum_energy(self, sessions: list[dict[str, Any]]) -> float:
         """Public wrapper for summing session energy."""
         return self._sum_session_energy(sessions)
 
-    def _sum_session_energy(self, sessions: list[dict]) -> float:
+    def _sum_session_energy(self, sessions: list[dict[str, Any]]) -> float:
         """Compute total energy from session entries."""
         total = 0.0
         for entry in sessions or []:

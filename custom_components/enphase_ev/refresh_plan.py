@@ -415,7 +415,7 @@ SITE_ONLY_FOLLOWUP_PLAN = RefreshPlan(
 FOLLOWUP_PLAN = RefreshPlan(stages=(FOLLOWUP_STAGE,))
 
 
-def warmup_energy_stage(working_data: dict[str, dict]) -> RefreshStage:
+def warmup_energy_stage(working_data: dict[str, dict[str, object]]) -> RefreshStage:
     return RefreshStage(
         stage_key="energy",
         parallel_tasks=(
@@ -450,7 +450,7 @@ def warmup_energy_stage(working_data: dict[str, dict]) -> RefreshStage:
     )
 
 
-def warmup_plan(working_data: dict[str, dict]) -> RefreshPlan:
+def warmup_plan(working_data: dict[str, dict[str, object]]) -> RefreshPlan:
     return RefreshPlan(
         stages=(
             WARMUP_DISCOVERY_STAGE,

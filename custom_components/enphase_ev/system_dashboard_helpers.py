@@ -75,12 +75,12 @@ def dashboard_simple_value(value: object) -> object | None:
                 out[str(key)] = simplified
         return out or None
     if isinstance(value, list):
-        out = [
+        items = [
             simplified
             for item in value
             if (simplified := dashboard_simple_value(item)) is not None
         ]
-        return out or None
+        return items or None
     return coerce_optional_text(value)
 
 
@@ -222,7 +222,8 @@ def system_dashboard_type_key(raw_type: object) -> str | None:
         token = "".join(ch if ch.isalnum() else "_" for ch in text.lower()).strip("_")
         if token in SYSTEM_DASHBOARD_TYPE_KEY_MAP:
             return SYSTEM_DASHBOARD_TYPE_KEY_MAP[token]
-    return normalize_type_key(raw_type)
+    normalized = normalize_type_key(raw_type)
+    return str(normalized) if normalized else None
 
 
 def system_dashboard_detail_records(

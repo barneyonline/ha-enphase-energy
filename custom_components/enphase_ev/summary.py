@@ -36,7 +36,7 @@ class SummaryStore:
         self._client_getter = client_getter
         self._site_id_getter = site_id_getter
         self._logger = logger or _LOGGER
-        self._cache: tuple[float, list[dict], float] | None = None
+        self._cache: tuple[float, list[dict[str, Any]], float] | None = None
         self._ttl: float = SUMMARY_IDLE_TTL
         self._lock = asyncio.Lock()
         self._state: dict[str, object] = {
@@ -64,7 +64,7 @@ class SummaryStore:
         return tuple(site_id for site_id in site_ids if site_id)
 
     def _redact_error(self, err: object, client: Any | None = None) -> str:
-        return redact_text(err, site_ids=self._site_ids(client))
+        return str(redact_text(err, site_ids=self._site_ids(client)))
 
     @property
     def ttl(self) -> float:
@@ -77,7 +77,7 @@ class SummaryStore:
 
     def _backoff_active(self) -> bool:
         backoff_until = self._state.get("backoff_until")
-        return bool(backoff_until and time.monotonic() < float(backoff_until))
+        return bool(backoff_until and time.monotonic() < float(str(backoff_until)))
 
     def _failure_backoff_delay(self, err: Exception, failures: int) -> float:
         retry_delay = 0.0
@@ -103,14 +103,16 @@ class SummaryStore:
                         )
         multiplier = 2 ** min(max(failures - 1, 0), 3)
         base_delay = max(self._ttl, SUMMARY_FAILURE_BACKOFF_S)
-        return max(
-            retry_delay,
-            min(SUMMARY_FAILURE_MAX_BACKOFF_S, base_delay * multiplier),
+        return float(
+            max(
+                retry_delay,
+                min(SUMMARY_FAILURE_MAX_BACKOFF_S, base_delay * multiplier),
+            )
         )
 
     def _get_cache(
         self,
-    ) -> tuple[float, list[dict], float] | None:
+    ) -> tuple[float, list[dict[str, Any]], float] | None:
         cache = self._cache
         if not cache:
             return None
@@ -146,7 +148,7 @@ class SummaryStore:
         self._ttl = summary_ttl
         return force
 
-    async def async_fetch(self, *, force: bool = False) -> list[dict]:
+    async def async_fetch(self, *, force: bool = False) -> list[dict[str, Any]]:
         """Return the cached summary, optionally forcing a refresh."""
         cache = self._get_cache()
         if not force and cache:
@@ -170,7 +172,7 @@ class SummaryStore:
             try:
                 summary = await client.summary_v2()
             except Exception as err:  # noqa: BLE001
-                failures = int(self._state.get("failures", 0) or 0) + 1
+                failures = int(str(self._state.get("failures", 0) or 0)) + 1
                 delay = self._failure_backoff_delay(err, failures)
                 self._state["available"] = False
                 self._state["last_failure_utc"] = dt_util.utcnow()
@@ -216,7 +218,7 @@ class SummaryStore:
             self._state["last_success_mono"] = time.monotonic()
             return summary_list
 
-    def _as_list(self, summary: Any) -> list[dict]:
+    def _as_list(self, summary: Any) -> list[dict[str, Any]]:
         """Normalize the raw summary payload into a list."""
         if not summary:
             return []
@@ -244,7 +246,7 @@ class SummaryStore:
         return {
             "available": bool(self._state.get("available", True)),
             "using_stale": bool(self._state.get("using_stale", False)),
-            "failures": int(self._state.get("failures", 0) or 0),
+            "failures": int(str(self._state.get("failures", 0) or 0)),
             "last_error": self._state.get("last_error"),
             "backoff_active": self._backoff_active(),
             "backoff_until": self._state.get("backoff_until"),

@@ -1289,25 +1289,25 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         return [key for key in ONBOARDING_SUPPORTED_TYPE_KEYS if key in selected]
 
     def _default_nominal_voltage(self) -> int:
-        configured = coerce_nominal_voltage(
+        configured: int | None = coerce_nominal_voltage(
             self._entry.options.get(OPT_NOMINAL_VOLTAGE)
         )
         if configured is not None:
-            return cast(int, configured)
+            return configured
 
         runtime_data = getattr(self._entry, "runtime_data", None)
         coordinator = getattr(runtime_data, "coordinator", None)
         if coordinator is not None:
             preferred = getattr(coordinator, "preferred_nominal_voltage", None)
             if callable(preferred):
-                value = coerce_nominal_voltage(preferred())
+                value: int | None = coerce_nominal_voltage(preferred())
                 if value is not None:
-                    return cast(int, value)
-            nominal = coerce_nominal_voltage(
+                    return value
+            nominal: int | None = coerce_nominal_voltage(
                 getattr(coordinator, "nominal_voltage", None)
             )
             if nominal is not None:
-                return cast(int, nominal)
+                return nominal
 
         return int(resolve_nominal_voltage_for_hass(self.hass))
 

@@ -6,7 +6,7 @@ from datetime import datetime
 from datetime import timezone as _tz
 
 from .labels import friendly_status_text, status_label
-from .runtime_helpers import coerce_optional_text
+from .runtime_helpers import coerce_optional_text as coerce_optional_text
 
 
 def coerce_optional_float(value: object) -> float | None:

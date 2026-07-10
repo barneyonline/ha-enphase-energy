@@ -156,7 +156,7 @@ def _archive_entity_id(
         current_ids=current_ids,
     )
     current_ids.add(archive_entity_id)
-    return archive_entity_id
+    return str(archive_entity_id)
 
 
 def _normalize_text(value: object) -> str:

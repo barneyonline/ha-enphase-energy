@@ -103,7 +103,7 @@ class CurrentPowerRuntime:
 
         value = payload.get("value")
         try:
-            numeric = float(value)
+            numeric = float(str(value))
         except Exception:  # noqa: BLE001
             self.clear()
             return
@@ -115,7 +115,7 @@ class CurrentPowerRuntime:
         sample_time = payload.get("time")
         if sample_time is not None:
             try:
-                sample_seconds = float(sample_time)
+                sample_seconds = float(str(sample_time))
                 if sample_seconds > 10**12:
                     # The app API has returned both seconds and milliseconds
                     # for this field across deployments.

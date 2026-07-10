@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from datetime import timezone as _tz
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Protocol
 
 from homeassistant.const import UnitOfPower
 from homeassistant.util import dt as dt_util
@@ -26,6 +26,10 @@ SITE_ENERGY_FAILURE_BACKOFF_S = 15 * 60
 HEMS_LIFETIME_FAILURE_BACKOFF_S = 60 * 60
 DEVICE_LIFETIME_CHANNELS: tuple[str, ...] = ("evse", "heatpump", "water_heater")
 HEMS_DEVICE_CHANNELS_META_KEY = "_hems_device_channels"
+
+
+class EnergyClient(Protocol):
+    async def lifetime_energy(self) -> dict[str, object] | None: ...
 
 
 @dataclass(slots=True)
@@ -55,7 +59,7 @@ class EnergyManager:
     def __init__(
         self,
         *,
-        client_provider: Callable[[], object],
+        client_provider: Callable[[], EnergyClient],
         site_id: str,
         logger: logging.Logger,
         summary_invalidator: Callable[[], None] | None = None,
@@ -185,7 +189,7 @@ class EnergyManager:
         except Exception:
             self._service_backoff_ends_utc = None
 
-    def _parse_site_energy_timestamp(self, value) -> datetime | None:
+    def _parse_site_energy_timestamp(self, value: object) -> datetime | None:
         """Best-effort parsing for last_report_date fields."""
         if value is None:
             return None
@@ -225,7 +229,7 @@ class EnergyManager:
         return None
 
     @staticmethod
-    def _coerce_energy_value(value) -> float | None:
+    def _coerce_energy_value(value: object) -> float | None:
         """Normalize numeric bucket values into floats."""
         if isinstance(value, (int, float)):
             try:
@@ -243,7 +247,7 @@ class EnergyManager:
         return None
 
     def _site_energy_interval_hours(
-        self, payload: dict | None
+        self, payload: dict[str, object] | None
     ) -> tuple[float | None, float | None]:
         """Extract reporting interval (minutes -> hours) from payload; defaults to 5 min."""
         if not isinstance(payload, dict):
@@ -259,7 +263,7 @@ class EnergyManager:
         return hours, minutes_float
 
     def _sum_energy_buckets(
-        self, values, _interval_hours: float | None
+        self, values: object, _interval_hours: float | None
     ) -> tuple[float, int]:
         """Return total Wh and bucket count for a field.
 
@@ -282,7 +286,10 @@ class EnergyManager:
         return total, count
 
     def _sum_energy_fields(
-        self, payload: dict, fields: Iterable[str], interval_hours: float | None
+        self,
+        payload: dict[str, object],
+        fields: Iterable[str],
+        interval_hours: float | None,
     ) -> tuple[float, int, list[str]]:
         """Aggregate Wh totals across multiple fields."""
         total = 0.0
@@ -300,7 +307,11 @@ class EnergyManager:
         return total, max_count, used
 
     def _diff_energy_fields(
-        self, payload: dict, minuend: str, subtrahend: str, interval_hours: float | None
+        self,
+        payload: dict[str, object],
+        minuend: str,
+        subtrahend: str,
+        interval_hours: float | None,
     ) -> tuple[float, int, list[str]]:
         """Derive a flow by subtracting one field from another."""
         pos_total, pos_count = self._sum_energy_buckets(
@@ -323,7 +334,7 @@ class EnergyManager:
 
     def _diff_energy_fields_multi(
         self,
-        payload: dict,
+        payload: dict[str, object],
         minuend: str,
         subtrahends: Iterable[str],
         interval_hours: float | None,
@@ -469,7 +480,7 @@ class EnergyManager:
         return last, None
 
     def _aggregate_site_energy(
-        self, payload: dict | None
+        self, payload: dict[str, object] | None
     ) -> tuple[dict[str, SiteEnergyFlow], dict[str, object]] | None:
         """Aggregate lifetime energy payload into kWh totals."""
         if not isinstance(payload, dict):
@@ -503,7 +514,7 @@ class EnergyManager:
             bucket_count: int,
             *,
             allow_zero: bool = False,
-        ):
+        ) -> None:
             if bucket_count <= 0 or total_wh < 0:
                 return
             if total_wh == 0 and not allow_zero:
@@ -717,7 +728,7 @@ class EnergyManager:
             if channel in bucket_lengths:
                 bucket_lengths[channel] = 0
 
-        meta = {
+        meta: dict[str, object] = {
             "start_date": start_date,
             "last_report_date": last_report_date,
             "update_pending": (
@@ -931,8 +942,8 @@ class EnergyManager:
     def _apply_lifetime_guard(
         self,
         sn: str,
-        raw_value,
-        prev: dict | None,
+        raw_value: object,
+        prev: dict[str, object] | None,
     ) -> float | None:
         state = self._lifetime_guard.setdefault(sn, LifetimeGuardState())
         prev_val: float | None = None
@@ -947,7 +958,7 @@ class EnergyManager:
             state.last = prev_val
 
         try:
-            sample = float(raw_value)
+            sample = float(str(raw_value))
         except (TypeError, ValueError):
             sample = None
 

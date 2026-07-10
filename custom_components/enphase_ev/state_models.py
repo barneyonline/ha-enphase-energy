@@ -159,9 +159,9 @@ class RefreshHealthState:
     _has_successful_refresh: bool = False
     _status_charger_data_authoritative: bool = False
     _status_charger_data_serials: list[str] | None = None
-    _session_history_cache_shim: dict[tuple[str, str], tuple[float, list[dict]]] = (
-        field(default_factory=dict)
-    )
+    _session_history_cache_shim: dict[
+        tuple[str, str], tuple[float, list[dict[str, object]]]
+    ] = field(default_factory=dict)
     _session_history_interval_min: int = 0
     _session_history_cache_ttl_value: float | None = None
     _session_history_day_retention: int = 0
