@@ -174,11 +174,11 @@ class AcBatteryRuntime:
         details["latest_reported_utc"] = None
         state._ac_battery_aggregate_status_details = details
         state._ac_battery_telemetry_cache_until = None
-        state._ac_battery_telemetry_payloads = None
+        setattr(state, "_ac_battery_telemetry_payloads", None)
 
     def _clear_ac_battery_events_state(self) -> None:
         state = self.battery_state
-        state._ac_battery_events_payloads = None
+        setattr(state, "_ac_battery_events_payloads", None)
 
     def _clear_ac_battery_device_state(self, *, refresh_topology: bool) -> None:
         state = self.battery_state
@@ -688,6 +688,7 @@ class AcBatteryRuntime:
             if not battery_id:
                 continue
             if enabled:
+                assert target_soc is not None
                 response = await coord.client.set_ac_battery_sleep(
                     battery_id, target_soc
                 )

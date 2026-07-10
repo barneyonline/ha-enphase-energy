@@ -137,19 +137,19 @@ class BatteryRuntime:
             func()
 
     def _coerce_int(self, value: object, *, default: int = 0) -> int:
-        return cast(int, coerce_int(value, default=default))
+        return coerce_int(value, default=default)
 
     def _coerce_optional_bool(self, value: object) -> bool | None:
-        return cast(bool | None, coerce_optional_bool(value))
+        return coerce_optional_bool(value)
 
     def _coerce_optional_text(self, value: object) -> str | None:
-        return cast(str | None, coerce_optional_text(value))
+        return coerce_optional_text(value)
 
     def _coerce_optional_int(self, value: object) -> int | None:
-        return cast(int | None, coerce_optional_int(value))
+        return coerce_optional_int(value)
 
     def _coerce_optional_float(self, value: object) -> float | None:
-        return cast(float | None, coerce_optional_float(value))
+        return coerce_optional_float(value)
 
     def _coerce_optional_kwh(self, value: object) -> float | None:
         func = getattr(self.coordinator, "_coerce_optional_kwh", None)
@@ -287,12 +287,13 @@ class BatteryRuntime:
             sanitized = sanitize_member(raw_member)
             if not sanitized:
                 return
-            identities = self._dry_contact_identity_map(sanitized)
+            sanitized_payload = cast(dict[str, object], sanitized)
+            identities = self._dry_contact_identity_map(sanitized_payload)
             dedupe_key = self._dry_contact_member_dedupe_key(identities, len(members))
             if dedupe_key in seen_keys:
                 return
             seen_keys.add(dedupe_key)
-            members.append(sanitized)
+            members.append(sanitized_payload)
 
         envoy_bucket = self.coordinator.inventory_view.type_bucket("envoy")
         if envoy_bucket is None:
@@ -381,7 +382,7 @@ class BatteryRuntime:
     def battery_profile_label(
         profile: str | None, hass: object | None = None
     ) -> str | None:
-        return cast(str | None, translated_battery_profile_label(profile, hass=hass))
+        return translated_battery_profile_label(profile, hass=hass)
 
     @staticmethod
     def _normalize_pending_sub_type(
@@ -611,8 +612,8 @@ class BatteryRuntime:
             getattr(self.battery_state, "_battery_polling_interval_s", None)
         )
         if polling_interval is None or polling_interval <= 0:
-            return cast(int, FAST_TOGGLE_POLL_HOLD_S)
-        return max(int(polling_interval), cast(int, FAST_TOGGLE_POLL_HOLD_S))
+            return FAST_TOGGLE_POLL_HOLD_S
+        return max(int(polling_interval), FAST_TOGGLE_POLL_HOLD_S)
 
     def _battery_profile_refresh_cache_ttl_seconds(self, default_ttl: float) -> float:
         current_interval = None
@@ -651,9 +652,7 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "battery_status", None)
         if not callable(fetcher):
             return False
-        return cast(
-            bool, coord._endpoint_family_should_run("battery_status", force=force)
-        )
+        return coord._endpoint_family_should_run("battery_status", force=force)
 
     def battery_backup_history_refresh_due(self, *, force: bool = False) -> bool:
         coord = self.coordinator
@@ -665,10 +664,7 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "battery_backup_history", None)
         if not callable(fetcher):
             return False
-        return cast(
-            bool,
-            coord._endpoint_family_should_run("battery_backup_history", force=force),
-        )
+        return coord._endpoint_family_should_run("battery_backup_history", force=force)
 
     def battery_settings_refresh_due(self, *, force: bool = False) -> bool:
         coord = self.coordinator
@@ -681,12 +677,9 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "battery_settings_details", None)
         if not callable(fetcher):
             return False
-        return cast(
-            bool,
-            coord._endpoint_family_should_run(
-                "battery_settings",
-                force=force or bool(pending_profile),
-            ),
+        return coord._endpoint_family_should_run(
+            "battery_settings",
+            force=force or bool(pending_profile),
         )
 
     def battery_schedules_refresh_due(self, *, force: bool = False) -> bool:
@@ -694,9 +687,7 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "battery_schedules", None)
         if not callable(fetcher):
             return False
-        return cast(
-            bool, coord._endpoint_family_should_run("battery_schedules", force=force)
-        )
+        return coord._endpoint_family_should_run("battery_schedules", force=force)
 
     def battery_site_settings_refresh_due(self, *, force: bool = False) -> bool:
         coord = self.coordinator
@@ -708,10 +699,7 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "battery_site_settings", None)
         if not callable(fetcher):
             return False
-        return cast(
-            bool,
-            coord._endpoint_family_should_run("battery_site_settings", force=force),
-        )
+        return coord._endpoint_family_should_run("battery_site_settings", force=force)
 
     def grid_control_check_refresh_due(self, *, force: bool = False) -> bool:
         coord = self.coordinator
@@ -832,12 +820,9 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "storm_guard_profile", None)
         if not callable(fetcher):
             return False
-        return cast(
-            bool,
-            coord._endpoint_family_should_run(
-                "storm_guard",
-                force=force or bool(pending_profile),
-            ),
+        return coord._endpoint_family_should_run(
+            "storm_guard",
+            force=force or bool(pending_profile),
         )
 
     def storm_alert_refresh_due(self, *, force: bool = False) -> bool:
@@ -850,7 +835,7 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "storm_guard_alert", None)
         if not callable(fetcher):
             return False
-        return cast(bool, coord._endpoint_family_should_run("storm_alert", force=force))
+        return coord._endpoint_family_should_run("storm_alert", force=force)
 
     def ac_battery_devices_refresh_due(self, *, force: bool = False) -> bool:
         return self._ac_battery_runtime.ac_battery_devices_refresh_due(force=force)
@@ -972,7 +957,7 @@ class BatteryRuntime:
     def current_savings_sub_type(self) -> str | None:
         selected_subtype = self.coordinator.battery_selected_operation_mode_sub_type
         if selected_subtype == SAVINGS_OPERATION_MODE_SUBTYPE:
-            return cast(str, SAVINGS_OPERATION_MODE_SUBTYPE)
+            return SAVINGS_OPERATION_MODE_SUBTYPE
         return None
 
     def target_operation_mode_sub_type(self, profile: str) -> str | None:
@@ -997,7 +982,7 @@ class BatteryRuntime:
             getattr(self.battery_state, "_battery_very_low_soc_min", None)
         )
         if value is None:
-            return cast(int, BATTERY_MIN_SOC_FALLBACK)
+            return BATTERY_MIN_SOC_FALLBACK
         return max(0, min(100, int(value)))
 
     def battery_reserve_min_bound(self) -> int:
@@ -1690,13 +1675,16 @@ class BatteryRuntime:
             exclude_schedule_id=exclude_schedule_id,
         )
         if overlapping is not None:
+            translation_placeholders = dict[str, object](
+                battery_schedule_overlap_placeholders(
+                    overlapping,
+                    hass=getattr(self.coordinator, "hass", None),
+                )
+            )
             raise_translated_service_validation(
                 translation_domain=DOMAIN,
                 translation_key="battery_schedule_overlap",
-                translation_placeholders=battery_schedule_overlap_placeholders(
-                    overlapping,
-                    hass=getattr(self.coordinator, "hass", None),
-                ),
+                translation_placeholders=translation_placeholders,
                 message=battery_schedule_overlap_message(
                     overlapping,
                     hass=getattr(self.coordinator, "hass", None),
@@ -4061,7 +4049,7 @@ class BatteryRuntime:
         coord = self.coordinator
         explicit_active = coord.coerce_optional_bool(alert.get("active"))
         if explicit_active is not None:
-            return cast(bool, explicit_active)
+            return explicit_active
         status = coord.coerce_optional_text(alert.get("status"))
         if status:
             normalized_status = status.strip().lower().replace("_", "-")
@@ -4122,7 +4110,7 @@ class BatteryRuntime:
         state._storm_alerts = normalized_alerts
         critical_active = coord.coerce_optional_bool(payload.get("criticalAlertActive"))
         if derived_alert_active is None:
-            return cast(bool | None, critical_active)
+            return critical_active
         if critical_active is None:
             return derived_alert_active
         return critical_active or derived_alert_active
@@ -4460,6 +4448,7 @@ class BatteryRuntime:
                 "charge_from_grid_schedule_time_invalid",
                 message="Charge-from-grid schedule time is invalid.",
             )
+        assert next_start is not None and next_end is not None
         if next_start == next_end:
             self._raise_validation(
                 "charge_from_grid_schedule_times_different",
@@ -4640,9 +4629,9 @@ class BatteryRuntime:
         normalized = str(schedule_type).lower()
         coord = self.coordinator
         if normalized == "dtg":
-            return cast(bool | None, coord.battery_dtg_control_enabled)
+            return coord.battery_dtg_control_enabled
         if normalized == "rbd":
-            return cast(bool | None, coord.battery_rbd_control_enabled)
+            return coord.battery_rbd_control_enabled
         return cast(
             bool | None,
             getattr(coord, self._battery_schedule_enabled_attr(schedule_type), None),
@@ -4852,11 +4841,11 @@ class BatteryRuntime:
         if normalized == "dtg":
             raw = coord.battery_dtg_control
             if isinstance(raw, dict):
-                control = raw
+                control = dict(raw)
         elif normalized == "rbd":
             raw = coord.battery_rbd_control
             if isinstance(raw, dict):
-                control = raw
+                control = dict(raw)
 
         if isinstance(control, dict):
             field_map = {
@@ -5470,7 +5459,7 @@ class BatteryRuntime:
                 continue
             serial = self.coordinator.coerce_optional_text(device.get("serial_number"))
             if serial:
-                return cast(str, serial)
+                return serial
         return None
 
     async def async_assert_grid_toggle_allowed(self) -> None:
