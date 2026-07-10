@@ -86,6 +86,8 @@ from .const import (
     DRY_CONTACT_SETTINGS_STALE_AFTER_S,
     DOMAIN,
     GRID_CONTROL_CHECK_STALE_AFTER_S,
+    GRID_MODE_STATUS_CACHE_TTL,
+    GRID_MODE_STATUS_STALE_AFTER_S,
     GRID_OUTAGE_CONTEXT_CACHE_TTL,
     GRID_OUTAGE_CONTEXT_STALE_AFTER_S,
     HEMS_AUTH_BACKOFF_STEPS_S,
@@ -903,6 +905,15 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             "grid_control_check": EndpointFamilyPolicy(
                 success_ttl_s=300.0,
                 stale_after_s=GRID_CONTROL_CHECK_STALE_AFTER_S,
+                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
+                max_backoff_s=3600.0,
+                optional=True,
+                suppress_after_failures=3,
+                support_state_on_success=True,
+            ),
+            "grid_mode_status": EndpointFamilyPolicy(
+                success_ttl_s=GRID_MODE_STATUS_CACHE_TTL,
+                stale_after_s=GRID_MODE_STATUS_STALE_AFTER_S,
                 failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
                 max_backoff_s=3600.0,
                 optional=True,
@@ -2353,6 +2364,9 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             "status_payload": getattr(self, "_battery_status_payload", None),
             "grid_control_check_payload": getattr(
                 self, "_grid_control_check_payload", None
+            ),
+            "grid_mode_status_payload": getattr(
+                self, "_grid_mode_status_payload", None
             ),
             "grid_outage_context_payload": getattr(
                 self, "_grid_outage_context_payload", None
@@ -6285,6 +6299,39 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             return None
         return getattr(self, "_grid_control_user_initiated_toggle", None)
 
+    def _grid_mode_status_is_stale(self) -> bool:
+        raw_supported = getattr(self, "_grid_mode_status_supported", None)
+        if raw_supported is None:
+            return True
+        last_success = getattr(self, "_grid_mode_status_last_success_mono", None)
+        if not isinstance(last_success, (int, float)):
+            return False
+        age = time.monotonic() - float(last_success)
+        if age < 0:
+            return False
+        return age >= GRID_MODE_STATUS_STALE_AFTER_S
+
+    @property
+    def grid_mode_status_supported(self) -> bool | None:
+        raw_supported = getattr(self, "_grid_mode_status_supported", None)
+        if raw_supported is None:
+            return None
+        if self._grid_mode_status_is_stale():
+            return None
+        return raw_supported
+
+    @property
+    def grid_mode_status(self) -> str | None:
+        if self.grid_mode_status_supported is not True:
+            return None
+        return getattr(self, "_grid_mode_status", None)
+
+    @property
+    def grid_mode_status_raw(self) -> str | None:
+        if self.grid_mode_status_supported is not True:
+            return None
+        return getattr(self, "_grid_mode_status_raw", None)
+
     def _grid_outage_context_is_stale(self) -> bool:
         raw_supported = getattr(self, "_grid_outage_context_supported", None)
         if raw_supported is None:
@@ -6422,20 +6469,41 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
 
     @property
     def grid_mode_raw_states(self) -> list[str]:
+        states: list[str] = []
+        status_raw = self.grid_mode_status_raw
+        if status_raw is not None:
+            states.append(f"grid_relay:{status_raw}")
         outage_state = self.grid_outage_is_grid_outage
         if outage_state is True:
-            return ["is_grid_outage:true"]
-        if outage_state is False:
-            return ["is_grid_outage:false"]
-        return []
+            states.append("is_grid_outage:true")
+        elif outage_state is False:
+            states.append("is_grid_outage:false")
+        show_connect = self.grid_outage_show_grid_connect
+        if show_connect is True:
+            states.append("show_grid_connect:true")
+        elif show_connect is False:
+            states.append("show_grid_connect:false")
+        return states
 
     @property
     def grid_mode(self) -> str | None:
+        status_mode = self.grid_mode_status
+        if status_mode in {"on_grid", "off_grid"}:
+            return status_mode
         outage_state = self.grid_outage_is_grid_outage
-        if outage_state is True:
+        show_connect = self.grid_outage_show_grid_connect
+        if outage_state is True or show_connect is True:
             return "off_grid"
-        if outage_state is False:
+        if show_connect is False or outage_state is False:
             return "on_grid"
+        return None
+
+    @property
+    def grid_mode_source(self) -> str | None:
+        if self.grid_mode_status in {"on_grid", "off_grid"}:
+            return "livestream_grid_relay"
+        if self.grid_outage_context_supported is True:
+            return "grid_outage_context"
         return None
 
     def _raise_grid_validation(

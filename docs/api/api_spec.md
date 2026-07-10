@@ -107,7 +107,7 @@ Status labels:
 | Site bootstrap payload | `GET` | `/app-api/<site_id>/data.json?app=<id>&device_status=non_retired&is_mobile=<id>` | authenticated session cookies + `e-auth-token` | Browser capture only |
 | Filtered site-device inventory | `POST` | `/service/site-device/api/v2/devices/list` | `e-auth-token` + cookies | Browser capture only |
 | Site live-stream flags | `GET` | `/app-api/<site_id>/show_livestream` | authenticated session cookies | Runtime |
-| Site live-status MQTT authorizer | `GET` | `/pv/aws_sigv4/livestream.json?serial_num=<gateway_sn>` | authenticated Enlighten session cookies + `e-auth-token`; browser capture used `Accept: */*`, `Referer: /web/<site_id>/today/graph/hours?v=3.4.0`, `X-Requested-With: XMLHttpRequest` | Browser capture only |
+| Site live-status MQTT authorizer | `GET` | `/pv/aws_sigv4/livestream.json?serial_num=<gateway_sn>` | authenticated Enlighten session cookies + `e-auth-token`; browser capture used `Accept: */*`, `Referer: /web/<site_id>/today/graph/hours?v=3.4.0`, `X-Requested-With: XMLHttpRequest` | Runtime |
 | Site live-vitals MQTT authorizer | `GET` | `/pv/aws_sigv4/livestream.json?serial_num=<gateway_sn>&live_debug=true` | authenticated Enlighten session cookies + `e-auth-token`; same browser XHR shape as the live-status authorizer | Browser capture only |
 | Site latest power | `GET` | `/app-api/<site_id>/get_latest_power` | `e-auth-token` + cookies | Runtime |
 | Site currency conversion settings | `GET` | `/app-api/<site_id>/get_currency_conversion.json` | authenticated session cookies + `e-auth-token` | Browser capture only |
@@ -1302,9 +1302,11 @@ Observed MQTT usage:
 - In a 60-second local capture, the topic emitted one binary message per second after successful subscribe.
 
 Observed payload format:
-- Payloads are binary and protobuf-like, not JSON.
-- The 60-second capture used 168-byte frames.
-- Numeric power values are signed varints scaled by `1_000_000` to kW.
+- The web-app live grid-status chip is driven from the MQTT payload field `meters.gridRelay`.
+- `meters.gridRelay=OPER_RELAY_CLOSED` maps to UI type `onGrid` and displays "On Grid".
+- `meters.gridRelay=OPER_RELAY_OPEN` maps to UI type `offGrid` and displays "Off Grid".
+- Production Live Status frames use the `DataMsg` protobuf schema. `DataMsg.meters` is field 3 and `MeterSummaryData.grid_relay` is nested field 5; the frontend converts that enum to the `OPER_RELAY_*` strings above.
+- Numeric power values in the binary shape are signed varints scaled by `1_000_000` to kW.
 - The first subfield in each repeated power group matched the visible web-app Live Status values. The second subfield often held a nearby related value; its meaning is not confirmed.
 
 Decoded field mapping from two web-app screenshot comparisons:
@@ -1318,7 +1320,8 @@ Decoded field mapping from two web-app screenshot comparisons:
 | EV charger consuming | root `field3.field4.field2` | divide by `1_000_000` | Candidate mapping. During an active charging capture, early frames were around `7.10-7.12` kW while the Live Status charger card showed `7.1` kW. A later labeled 30-second capture saw this path fluctuate from roughly `7.25` to `9.45` kW while the EVSE MQTT topic remained silent. |
 | Battery state of charge | root `field3.field6` | integer percent | Matched the battery charge percentage. |
 | System profile / mode | root `field3.field5` | enum/integer | Observed value `2` while the UI showed Self-Consumption; mapping needs more modes. |
-| Grid status | root `field3.field8` | enum/integer | Observed value `6` while UI showed On Grid; mapping needs more states. |
+| Grid status | root `field3.field5` | enum | `1` open, `2` closed, `3` off-grid with AC present, `4` off-grid ready for resync, `5` waiting to initialize on-grid |
+| Generator relay | root `field3.field8` | enum | Uses generator relay enum values beginning at `6` |
 | Battery reserve/limit hint | root `field3.field11.field1`, `field3.field11.field2` | integer / scaled integer | Observed values aligned with charge percentage and a `9900`-style value, likely a percent scaled by 100; exact semantics unconfirmed. |
 
 Implementation notes:
@@ -2458,6 +2461,7 @@ Observed structure:
 - `inverters` returns a summary object with `total`, `not_reporting`, `plc_comm`, `items[]`, and `device_link` rather than per-device rows.
 - Fields are family-specific and often localized (`statusText`, `channel_type`, meter labels, modem plan text).
 - `encharges` and `enpowers` both expose RF/link-health fields (`rssi_subghz`, `rssi_24ghz`, `rssi_dbm`) plus family-specific operating-state strings.
+- `enpowers[].operation_mode` can describe System Controller operating state, but the live web grid-status chip is driven by the site live-stream `meters.gridRelay` value instead.
 - `meters` expose configuration labels (`config_type`, `meter_type`) rather than firmware/network details.
 - `modems` expose provisioning state (`status`, `plan_end`, `part_number_with_sku`) instead of the gateway-style network payload.
 - These endpoints expose sensitive infrastructure details such as IP addresses, MAC-derived identifiers, and direct dashboard links; redact aggressively before sharing traces.
@@ -3521,6 +3525,7 @@ Example response (anonymized):
   "has_battery": true
 }
 ```
+`is_grid_outage=true` identifies an outage-driven off-grid state. When `show_grid_connect=true`, the Enphase UI is offering a reconnect action, which indicates the site is currently off grid even when `is_grid_outage=false`. This endpoint is useful fallback context; prefer the live-stream `meters.gridRelay` value when available.
 
 ### 2.12.6 Grid Toggle Request Sequence
 Both directions use a confirmation + OTP gate before the relay command is sent.

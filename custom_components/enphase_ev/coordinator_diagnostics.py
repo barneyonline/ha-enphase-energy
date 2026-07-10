@@ -864,6 +864,13 @@ class CoordinatorDiagnostics:
                 coord, "_grid_control_check_failures", 0
             ),
             "grid_control_data_stale": coord.grid_control_supported is None,
+            "grid_mode_source": coord.grid_mode_source,
+            "grid_mode_status_supported": coord.grid_mode_status_supported,
+            "grid_mode_status_raw": coord.grid_mode_status_raw,
+            "grid_mode_status_fetch_failures": getattr(
+                coord, "_grid_mode_status_failures", 0
+            ),
+            "grid_mode_status_data_stale": coord.grid_mode_status_supported is None,
             "grid_outage_context_supported": coord.grid_outage_context_supported,
             "grid_outage_is_grid_outage": coord.grid_outage_is_grid_outage,
             "grid_outage_show_grid_connect": coord.grid_outage_show_grid_connect,
@@ -899,6 +906,14 @@ class CoordinatorDiagnostics:
             age = time.monotonic() - float(grid_last_success)
             if age >= 0:
                 metrics["grid_control_last_success_age_s"] = round(age, 1)
+
+        grid_mode_last_success = getattr(
+            coord, "_grid_mode_status_last_success_mono", None
+        )
+        if isinstance(grid_mode_last_success, (int, float)):
+            age = time.monotonic() - float(grid_mode_last_success)
+            if age >= 0:
+                metrics["grid_mode_status_last_success_age_s"] = round(age, 1)
 
         grid_outage_last_success = getattr(
             coord, "_grid_outage_context_last_success_mono", None
