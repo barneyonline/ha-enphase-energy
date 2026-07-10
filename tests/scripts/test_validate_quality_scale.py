@@ -672,10 +672,15 @@ def test_validate_quality_scale_returns_brand_errors(
     assert messages == ["brand error"]
 
 
-def test_validate_quality_scale_returns_strict_typing_errors(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_gold_quality_claim_skips_platinum_strict_typing_contract(monkeypatch) -> None:
     root = Path(__file__).resolve().parents[2]
+    strict_validation_called = False
+
+    def _strict_typing_errors(_root: Path) -> list[str]:
+        nonlocal strict_validation_called
+        strict_validation_called = True
+        return ["strict error"]
+
     monkeypatch.setattr(
         validate_quality_scale,
         "_validate_brands_support",
@@ -684,10 +689,10 @@ def test_validate_quality_scale_returns_strict_typing_errors(
     monkeypatch.setattr(
         validate_quality_scale,
         "_validate_strict_typing_contract",
-        lambda root: ["strict error"],
+        _strict_typing_errors,
     )
 
     exit_code, messages = validate_quality_scale.validate_quality_scale(root)
 
-    assert exit_code == 1
-    assert messages == ["strict error"]
+    assert exit_code == 0, "\n".join(messages)
+    assert strict_validation_called is False

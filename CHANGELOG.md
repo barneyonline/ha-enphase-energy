@@ -19,7 +19,8 @@ All notable changes to this project will be documented in this file.
   integration objects.
 
 ### 🔧 Improvements
-- None
+- Corrected the integration quality claim to Gold until the full package passes
+  strict mypy, and added a CI baseline that prevents typing debt from increasing.
 
 ### 🔄 Other changes
 - None

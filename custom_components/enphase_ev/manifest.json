@@ -17,7 +17,7 @@
   "loggers": [
     "custom_components.enphase_ev"
   ],
-  "quality_scale": "platinum",
+  "quality_scale": "gold",
   "requirements": [],
   "version": "3.2.2"
 }

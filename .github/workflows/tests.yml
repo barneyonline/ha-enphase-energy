@@ -7,12 +7,13 @@ on:
       - 'tests/components/enphase_ev/**'
       - '.pre-commit-config.yaml'
       - '.ruff.toml'
-      - '.strict-typing'
       - 'devtools/docker/requirements-dev.txt'
       - 'devtools/docker/requirements-min-ha.txt'
       - 'quality_scale.yaml'
       - 'scripts/importtime_profile.py'
+      - 'scripts/check_strict_typing.py'
       - 'scripts/validate_quality_scale.py'
+      - 'tests/scripts/test_check_strict_typing.py'
       - 'tests/scripts/test_importtime_profile.py'
       - '.github/workflows/ci.yml'
       - '.github/workflows/tests.yml'
@@ -111,6 +112,8 @@ jobs:
           mypy --strict --ignore-missing-imports --follow-imports=skip
           custom_components/enphase_ev/runtime_data.py
           custom_components/enphase_ev/config_flow.py
+      - name: Prevent full-package strict typing regressions
+        run: python scripts/check_strict_typing.py --max-errors 1874
 
   python314-diagnostics:
     runs-on: ubuntu-latest

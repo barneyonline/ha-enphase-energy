@@ -22,7 +22,7 @@ def test_manifest_keys_present():
     assert (
         data.get("iot_class") == "cloud_polling"
     ), "iot_class should be 'cloud_polling'"
-    assert data.get("quality_scale") == "platinum", "quality_scale should be 'platinum'"
+    assert data.get("quality_scale") == "gold", "quality_scale should be 'gold'"
     assert data.get("after_dependencies") == ["logbook", "recorder"]
 
 

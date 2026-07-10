@@ -504,14 +504,13 @@ rules:
         - tests/components/enphase_ev/test_config_flow_coverage.py
         - tests/components/enphase_ev/test_coordinator_behavior.py
   strict-typing:
-    status: done
-    comment: Runtime data uses a typed ConfigEntry alias without an Any fallback, the package is marked typed, and CI validates the strict config-entry contract with mypy.
+    status: todo
+    comment: Full-package strict mypy coverage is tracked in CI, but the integration is not yet fully typed and therefore does not claim Platinum quality.
     references:
       code:
-        - .strict-typing
         - custom_components/enphase_ev/runtime_data.py
-        - custom_components/enphase_ev/py.typed
-        - scripts/validate_quality_scale.py
+        - scripts/check_strict_typing.py
+        - .github/workflows/tests.yml
       tests:
         - tests/components/enphase_ev/test_runtime_data.py
-        - tests/scripts/test_validate_quality_scale.py
+        - tests/scripts/test_check_strict_typing.py
