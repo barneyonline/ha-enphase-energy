@@ -1551,6 +1551,10 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         if self._warmup_task is not None:
             self._warmup_task.cancel()
             self._warmup_task = None
+        if self._battery_profile_recovery_restore_task is not None:
+            if not _task_done(self._battery_profile_recovery_restore_task):
+                self._battery_profile_recovery_restore_task.cancel()
+            self._battery_profile_recovery_restore_task = None
         for task in list(self._amp_restart_tasks.values()):
             if task is not None and not _task_done(task):
                 task.cancel()
@@ -1563,6 +1567,12 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             if not _task_done(self._auth_refresh_task):
                 self._auth_refresh_task.cancel()
             self._auth_refresh_task = None
+        self._clear_backoff_timer()
+        for task in list(self._backoff_refresh_tasks):
+            if not _task_done(task):
+                task.cancel()
+        self._backoff_refresh_tasks.clear()
+        self._backoff_until = None
         clear_streaming_state = getattr(self, "_clear_streaming_state", None)
         if callable(clear_streaming_state):
             clear_streaming_state()
@@ -6883,14 +6893,25 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
     def sync_battery_profile_pending_issue(self) -> None:
         self._sync_battery_profile_pending_issue()
 
+    def _start_backoff_refresh(self) -> None:
+        task = self.hass.async_create_task(
+            self.async_request_refresh(), name=f"{DOMAIN}_backoff_refresh"
+        )
+        if task is None:
+            return
+        tasks = getattr(self, "_backoff_refresh_tasks", None)
+        if tasks is None:
+            tasks = set()
+            self._backoff_refresh_tasks = tasks
+        tasks.add(task)
+        task.add_done_callback(tasks.discard)
+
     def _schedule_backoff_timer(self, delay: float) -> None:
         if delay <= 0:
             self._clear_backoff_timer()
             self._backoff_until = None
             self.backoff_ends_utc = None
-            self.hass.async_create_task(
-                self.async_request_refresh(), name=f"{DOMAIN}_backoff_refresh"
-            )
+            self._start_backoff_refresh()
             return
         self._clear_backoff_timer()
         try:
@@ -6898,14 +6919,15 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         except Exception:
             self.backoff_ends_utc = None
 
-        async def _resume(_now: datetime) -> None:
+        @callback
+        def _resume(_now: datetime) -> None:
             # Home Assistant should recover from cloud throttling on its own;
             # the timer clears diagnostic state and triggers one refresh when
             # the backoff window ends.
             self._backoff_cancel = None
             self._backoff_until = None
             self.backoff_ends_utc = None
-            await self.async_request_refresh()
+            self._start_backoff_refresh()
 
         self._backoff_cancel = async_call_later(self.hass, delay, _resume)
 

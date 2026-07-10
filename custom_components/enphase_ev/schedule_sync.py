@@ -74,6 +74,8 @@ class ScheduleSync:
         self._last_error: str | None = None
         self._last_status: str | None = None
         self._pending_patch_refresh: set[str] = set()
+        self._pending_patch_refresh_cancels: dict[str, Callable[[], None]] = {}
+        self._pending_patch_refresh_tasks: dict[str, asyncio.Future[None]] = {}
 
     async def async_start(self) -> None:
         self._disabled_cleanup_done = False
@@ -99,6 +101,16 @@ class ScheduleSync:
         if self._unsub_coordinator is not None:
             self._unsub_coordinator()
             self._unsub_coordinator = None
+        for cancel in self._pending_patch_refresh_cancels.values():
+            cancel()
+        self._pending_patch_refresh_cancels.clear()
+        tasks = tuple(self._pending_patch_refresh_tasks.values())
+        for task in tasks:
+            task.cancel()
+        self._pending_patch_refresh_tasks.clear()
+        self._pending_patch_refresh.clear()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     def diagnostics(self) -> dict[str, Any]:
         return {
@@ -152,20 +164,33 @@ class ScheduleSync:
 
         @callback
         def _run(_now) -> None:
-            self._pending_patch_refresh.discard(sn)
+            self._pending_patch_refresh_cancels.pop(sn, None)
             coro = self.async_refresh(reason="patch", serials=[sn])
             try:
-                self.hass.async_create_task(
+                task = self.hass.async_create_task(
                     coro,
                     name=f"{DOMAIN}_schedule_patch_refresh_{redact_identifier(sn)}",
                 )
             except TypeError:
                 coro.close()
-                self.hass.async_create_task(
+                task = self.hass.async_create_task(
                     self.async_refresh(reason="patch", serials=[sn])
                 )
+            if task is None:
+                self._pending_patch_refresh.discard(sn)
+                return
+            self._pending_patch_refresh_tasks[sn] = task
 
-        async_call_later(self.hass, PATCH_REFRESH_DELAY_S, _run)
+            def _clear(completed: asyncio.Future[None]) -> None:
+                if self._pending_patch_refresh_tasks.get(sn) is completed:
+                    self._pending_patch_refresh_tasks.pop(sn, None)
+                    self._pending_patch_refresh.discard(sn)
+
+            task.add_done_callback(_clear)
+
+        self._pending_patch_refresh_cancels[sn] = async_call_later(
+            self.hass, PATCH_REFRESH_DELAY_S, _run
+        )
 
     def _scheduler_backoff_active(self) -> bool:
         backoff_active = getattr(self._coordinator, "scheduler_backoff_active", None)
