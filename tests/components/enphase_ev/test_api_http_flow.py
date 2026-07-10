@@ -602,7 +602,7 @@ async def test_async_authenticate_success_with_jwt_fallback(monkeypatch) -> None
                 response_url=URL(api.BASE_URL),
             )
             return {"session_id": "sid123"}
-        if url == f"{api.ENTREZ_URL}/tokens":
+        if url == api.SELF_TOKEN_URL:
             token = _build_jwt(1_700_000_001)
             return {"token": token}
         if url == api.SITE_SEARCH_URL:
@@ -652,7 +652,7 @@ async def test_async_authenticate_falls_back_to_form_login_on_406(monkeypatch) -
         if url == api.LOGIN_URL:
             login_headers.append(headers or {})
             raise _make_cre(406, "Not Acceptable")
-        if url == f"{api.ENTREZ_URL}/tokens":
+        if url == api.SELF_TOKEN_URL:
             return {"token": "token123", "expires_at": 1_700_000_000}
         if url == api.SITE_SEARCH_URL:
             site_headers.append(headers or {})
@@ -912,7 +912,7 @@ async def test_async_validate_login_otp_success(monkeypatch) -> None:
         }
 
     async def fake_request_json(session, method, url, **kwargs):
-        if url == f"{api.ENTREZ_URL}/tokens":
+        if url == api.SELF_TOKEN_URL:
             return {"token": "token123"}
         if url == api.SITE_SEARCH_URL:
             return {"sites": [{"id": 1}]}
@@ -1277,7 +1277,7 @@ async def test_async_authenticate_token_endpoint_invalid_credentials(
         if url == api.LOGIN_URL:
             session.cookie_jar.update_cookies({}, response_url=URL(api.BASE_URL))
             return {"session_id": "sid123"}
-        if url == f"{api.ENTREZ_URL}/tokens":
+        if url == api.SELF_TOKEN_URL:
             raise _make_cre(403)
         raise AssertionError("Site discovery should not be reached")
 
@@ -1293,7 +1293,7 @@ async def test_async_authenticate_token_endpoint_missing(monkeypatch) -> None:
         if url == api.LOGIN_URL:
             session.cookie_jar.update_cookies({}, response_url=URL(api.BASE_URL))
             return {"session_id": "sid123"}
-        if url == f"{api.ENTREZ_URL}/tokens":
+        if url == api.SELF_TOKEN_URL:
             raise _make_cre(404)
         if url == api.SITE_SEARCH_URL:
             return {"sites": [{"id": 1}]}
@@ -1314,7 +1314,7 @@ async def test_async_authenticate_token_endpoint_generic_error(monkeypatch) -> N
         if url == api.LOGIN_URL:
             session.cookie_jar.update_cookies({}, response_url=URL(api.BASE_URL))
             return {"session_id": "sid123"}
-        if url == f"{api.ENTREZ_URL}/tokens":
+        if url == api.SELF_TOKEN_URL:
             raise _make_cre(500)
         if url == api.SITE_SEARCH_URL:
             return {"sites": [{"id": 2}]}
@@ -1335,7 +1335,7 @@ async def test_async_authenticate_token_endpoint_unavailable(monkeypatch) -> Non
         if url == api.LOGIN_URL:
             session.cookie_jar.update_cookies({}, response_url=URL(api.BASE_URL))
             return {"session_id": "sid123"}
-        if url == f"{api.ENTREZ_URL}/tokens":
+        if url == api.SELF_TOKEN_URL:
             raise api.EnlightenAuthUnavailable("unavailable")
         if url == api.SITE_SEARCH_URL:
             return {"sites": [{"id": "3"}]}
@@ -1356,7 +1356,7 @@ async def test_async_authenticate_token_endpoint_client_error(monkeypatch) -> No
         if url == api.LOGIN_URL:
             session.cookie_jar.update_cookies({}, response_url=URL(api.BASE_URL))
             return {"session_id": "sid123"}
-        if url == f"{api.ENTREZ_URL}/tokens":
+        if url == api.SELF_TOKEN_URL:
             raise aiohttp.ClientOSError()
         if url == api.SITE_SEARCH_URL:
             return {"sites": [{"id": "4"}]}

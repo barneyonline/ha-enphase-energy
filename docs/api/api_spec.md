@@ -6,7 +6,7 @@ _This reference consolidates observed Enlighten mobile/web APIs across EV chargi
 
 ## 1. Overview
 - **Base URL:** `https://enlighten.enphaseenergy.com`
-- **Auth:** The current implementation is cookie-first. Login establishes an Enlighten session cookie jar, then the client best-effort fetches an access token from Entrez and adds endpoint-specific headers on top. Many read endpoints work with cookies plus `e-auth-token`; scheduler, HEMS, and timeseries families prefer or require `Authorization: Bearer <jwt>`. BatteryConfig is now the main exception: it follows the homeowner web app request shape instead of the bearer/e-auth/cookie overlay used elsewhere.
+- **Auth:** The current implementation is cookie-first. Login establishes an Enlighten session cookie jar, then the client best-effort fetches an access token from `/users/self/token` and adds endpoint-specific headers on top. Many read endpoints work with cookies plus `e-auth-token`; scheduler, HEMS, and timeseries families prefer or require `Authorization: Bearer <jwt>`. BatteryConfig is now the main exception: reads prefer the homeowner web app's session-cookie request shape, while compatibility variants remain for sites that still accept token-backed shapes.
 - **Privacy:** Example identifiers, account details, LAN metadata, and credentials in this document use placeholders. Raw browser-export request headers often contain JWTs, cookies, email addresses, user IDs, LAN IPs, MAC addresses, and serial numbers; those values must be redacted before captures are shared or committed. When this spec lists "observed values", it intentionally preserves non-sensitive enum/flag values so newly seen behavior is not lost.
 - **Evidence date:** Implementation statements reflect `origin/main` at `0c71ed03`, synced locally on 2026-05-12. New browser/mobile captures should record the capture date, client surface, and endpoint family near the affected section.
 - **Payload examples:** Examples should be minimal shape excerpts. Prefer fields that drive parsing, auth, controls, or diagnostics, and omit long arrays or app-shell metadata unless those details affect implementation.
@@ -92,7 +92,8 @@ Status labels:
 | Domain | Method | Endpoint | Auth | Status |
 | --- | --- | --- | --- | --- |
 | Site discovery | `GET` | `/app-api/search_sites.json` | authenticated session cookies; implementation also sends `X-CSRF-Token` and, when available, `Authorization: Bearer <token>` + `e-auth-token: <token>` | Runtime |
-| Entrez token bootstrap | `POST` | `https://entrez.enphaseenergy.com/tokens` | authenticated session cookies + JSON body `{session_id,email}` | Runtime |
+| Enlighten session token bootstrap | `GET` | `/users/self/token` | authenticated Enlighten session cookies; optional `client_id` is not required by the current runtime | Runtime |
+| Entrez token bootstrap (retired) | `POST` | `https://entrez.enphaseenergy.com/tokens` | formerly authenticated session cookies + JSON body `{session_id,email}` | Documented only |
 | JWT token bootstrap (legacy / documented capture) | `GET` | `/app-api/jwt_token.json` | authenticated Enlighten session cookies | Documented only |
 | JWT token fallback (legacy / documented capture) | `GET` | `/service/auth_ms_enho/api/v1/session/token` | session cookies + `_enlighten_4_session` echoed as `e-auth-token` | Browser capture only |
 | Mobile/web shared constants | `GET` | `https://enlighten-mobile-38d22.firebaseio.com/enho_constants.json` | none observed | Browser capture only |
@@ -157,10 +158,10 @@ Status labels:
 | Stop charging | `PUT` | `/service/evse_controller/<site_id>/ev_chargers/<sn>/stop_charging` | `e-auth-token` + cookies | Runtime |
 | EV charger config read/write | `POST/PUT` | `/service/evse_controller/api/v1/<site_id>/ev_chargers/<sn>/ev_charger_config` | `Authorization: Bearer <token>` overlay on top of session cookies / base EV headers | Runtime |
 | Charge mode preference | `GET/PUT` | `/service/evse_scheduler/api/v1/iqevc/charging-mode/<site_id>/<sn>/preference` | bearer token + session headers | Runtime |
-| BatteryConfig site settings | `GET` | `/service/batteryConfig/api/v1/siteSettings/<site_id>?userId=<user_id>` | official-web BatteryConfig shape: `Accept`, `Origin`, `Referer`, Chrome-style `User-Agent`, `Username`; suppress `Authorization`, `Cookie`, `X-CSRF-Token`, `X-Requested-With`; current client uses primary variant with `e-auth-token` + `requestid` and lean fallback without them | Runtime |
+| BatteryConfig site settings | `GET` | `/service/batteryConfig/api/v1/siteSettings/<site_id>?userId=<user_id>` | current web shape: fresh session `Cookie`, `Username`, `requestid`, battery-profile `Origin`/`Referer`, and no `Authorization` or `e-auth-token`; token-backed primary and lean fallbacks remain for compatibility | Runtime |
 | BatteryConfig MQTT authorizer bootstrap | `GET` | `/service/batteryConfig/api/v1/mqttSignedUrl/<site_id>` | official-web BatteryConfig shape: `Accept`, `Origin`, `Referer`, Chrome-style `User-Agent`, `Username`; suppress `Authorization`, `Cookie`, `X-CSRF-Token`, `X-Requested-With`; current client uses primary variant with `e-auth-token` + `requestid` and lean fallback without them | Browser capture only |
 | BatteryConfig third-party settings | `GET` | `/service/batteryConfig/api/v1/<site_id>/thirdPartyControlSettings` | official-web BatteryConfig shape: `Accept`, `Origin`, `Referer`, Chrome-style `User-Agent`, `Username`; suppress `Authorization`, `Cookie`, `X-CSRF-Token`, `X-Requested-With`; current client uses primary variant with `e-auth-token` + `requestid` and lean fallback without them | Browser capture only |
-| BatteryConfig schedules | `GET` | `/service/batteryConfig/api/v1/battery/sites/<site_id>/schedules` | official-web BatteryConfig read shape: `Accept`, `Origin`, `Referer`, Chrome-style `User-Agent`, `Username`; suppress `Authorization`, `Cookie`, `X-CSRF-Token`, `X-Requested-With`; current client uses primary variant with `e-auth-token` + `requestid` and lean fallback without them | Runtime |
+| BatteryConfig schedules | `GET` | `/service/batteryConfig/api/v1/battery/sites/<site_id>/schedules` | current web shape: fresh session `Cookie`, `Username`, `requestid`, battery-profile `Origin`/`Referer`, and no `Authorization` or `e-auth-token`; token-backed primary and lean fallbacks remain for compatibility | Runtime |
 | BatteryConfig schedule create | `POST` | `/service/batteryConfig/api/v1/battery/sites/<site_id>/schedules` | BatteryConfig write shape plus `X-XSRF-Token`; live verification on the affected site showed create should send explicit `isEnabled`; on affected sites the verified working shape is the raw-cookie browser request (`Cookie`, `e-auth-token`, `Username`, `X-XSRF-Token`, `X-Requested-With`) sent from a stateless client session so aiohttp does not merge cookie-jar state; current client falls back across cookie-backed, primary, lean, and mixed-auth variants | Runtime |
 | BatteryConfig schedule validation / XSRF bootstrap | `POST` | `/service/batteryConfig/api/v1/battery/sites/<site_id>/schedules/isValid` | explicit validation first acquires `X-XSRF-Token` from `GET /siteSettings/<site_id>?userId=<user_id>`, then uses the official-web BatteryConfig write shape with that token and without `Authorization`, `Cookie`, `X-CSRF-Token`, or `X-Requested-With`; success shape is `{"isValid": true}`; the internal XSRF-bootstrap helper also prefers `GET /siteSettings/<site_id>?userId=<user_id>` and falls back to this route where it may include the currently held `X-XSRF-Token` while harvesting a fresh token from the response header, `Set-Cookie`, response cookies, or the session cookie jar; when this route returns `4xx`, the client still checks error-response cookies/session cookies, then tries a final cookie-based `GET /siteSettings/<site_id>` bootstrap before keeping the existing token; current client uses primary variant with `e-auth-token` + `requestid` and lean fallback without them | Runtime |
 | BatteryConfig schedule update | `PUT` | `/service/batteryConfig/api/v1/battery/sites/<site_id>/schedules/<schedule_id>` | BatteryConfig write shape plus `X-XSRF-Token`; ordinary time/limit edits can omit `isEnabled`, while explicit schedule-entry toggle writes may include it; verified working update uses the raw-cookie browser request (`Cookie`, `e-auth-token`, `Username`, `X-XSRF-Token`, `X-Requested-With`) from a stateless client session; current client falls back across cookie-backed, primary, lean, and mixed-auth variants | Runtime |
@@ -174,7 +175,7 @@ Status labels:
 ### 1.5 Current Runtime Surface
 
 The integration currently implements these feature groups:
-- Auth and discovery: cookie login, MFA/resend handling, Entrez token bootstrap, site discovery, runtime auth refresh, and manual site-id fallback.
+- Auth and discovery: cookie login, MFA/resend handling, Enlighten session-token bootstrap, site discovery, runtime auth refresh, and manual site-id fallback.
 - EV charging: status, summary, firmware details, feature flags, daily/lifetime EVSE energy, start/stop controls, charge-level configuration, and scheduler preference writes.
 - Site energy and inventory: latest power, today snapshot, lifetime energy, battery backup/grid eligibility, device inventory, microinverter inventory, live-stream capability flags, tariff reads/writes, dry contacts, and system dashboard summary/tree/details.
 - HEMS: inventory, heat-pump runtime state, HEMS daily energy split metadata, HEMS lifetime merge, and heat-pump power derivation from site-today heat-pump deltas.
@@ -6021,15 +6022,10 @@ The server rotates `login_otp_nonce` via `Set-Cookie` but does not return `sessi
 The config flow sends one OTP automatically when entering the MFA step and locally throttles user-triggered resends for 30 seconds. An empty resend response is accepted as success, and existing cookies are reused if no updated cookie map is returned.
 
 ### 6.4 Token Retrieval Used by the Current Client
-Current implementation path:
+Current first-party implementation path:
 ```
-POST https://entrez.enphaseenergy.com/tokens
-Content-Type: application/json
-
-{
-  "session_id": "<session_id>",
-  "email": "<email>"
-}
+GET https://enlighten.enphaseenergy.com/users/self/token
+Accept: application/json, text/plain, */*
 ```
 
 Observed response:
@@ -6041,10 +6037,18 @@ Observed response:
 ```
 
 Observed behavior:
-- This is the token bootstrap path used by the integration today.
+- This is the token bootstrap path used by the current Enlighten web application and the integration.
+- The endpoint uses the authenticated Enlighten session cookie. A `client_id` query parameter is optional and is omitted by the integration.
+- Enlighten can rotate `_enlighten_4_session` during this request, so the client serializes and persists cookies after token minting.
 - The token is stored as both the access token and `e-auth-token` value for cookie-backed site discovery and many EV endpoints.
 - If `expires_at` is absent, the client decodes the JWT `exp` claim locally.
-- `401` and `403` from Entrez are treated as invalid credentials. Other failures, including `404`, `422`, `429`, auth unavailability, and generic client errors, are logged/debugged and cookie-only site discovery continues where possible.
+- `401` and `403` are treated as invalid credentials. Other failures, including `404`, `422`, `429`, auth unavailability, and generic client errors, are logged/debugged and cookie-only site discovery continues where possible.
+
+Retired path:
+```
+POST https://entrez.enphaseenergy.com/tokens
+```
+Enphase stopped honoring this token mint in July 2026 and returned HTTP 400 for otherwise valid authenticated sessions.
 
 Legacy/documented JWT retrieval paths from earlier captures:
 
@@ -6084,7 +6088,7 @@ Observed behavior:
 The current implementation does not use `https://entrez.enphaseenergy.com/access_token`.
 
 Instead:
-- the Entrez `POST /tokens` response is treated as the access/bearer token source;
+- the Enlighten `GET /users/self/token` response is treated as the access/bearer token source;
 - scheduler/control requests often prefer the JWT found in the `enlighten_manager_token_production` cookie when present;
 - timeseries requests derive `e-auth-token` from the JWT `session_id` claim rather than reusing the raw bearer token.
 
@@ -6105,13 +6109,13 @@ There is no single universal header set; the implementation varies headers by en
 | Endpoint family | Auth/header strategy in current client |
 | --- | --- |
 | Login + MFA | form POSTs plus cookie jar management; `X-CSRF-Token` added for MFA when an XSRF cookie is present |
-| Site discovery | authenticated cookies; `X-CSRF-Token`; add `Authorization` + `e-auth-token` when Entrez token retrieval succeeded |
+| Site discovery | authenticated cookies; `X-CSRF-Token`; add `Authorization` + `e-auth-token` when Enlighten session-token retrieval succeeded |
 | Basic Enlighten reads (`/app-api`, `/pv`, many EV reads) | authenticated cookies plus `e-auth-token` when available |
 | Scheduler + EV control overlays | base headers plus `Authorization: Bearer <jwt>` from manager-token cookie first, stored access token second |
 | Session history + EVSE timeseries | `Authorization: Bearer <jwt>`; `e-auth-token` set to JWT `session_id`; `username` set to JWT `user_id`; `requestid` UUID |
 | System dashboard reads | authenticated cookies; may also include bearer auth opportunistically |
 | HEMS | bearer-preferred auth plus cookies/base headers; `username` and `requestId` when available |
-| BatteryConfig reads | official-web BatteryConfig shape: `Accept`, `Username`, battery-profile `Origin`/`Referer`, Chrome-style `User-Agent`; suppress `Authorization`, `Cookie`, `X-CSRF-Token`, and `X-Requested-With`; current client prefers the `e-auth-token` + `requestid` variant and falls back to the lean variant if needed |
+| BatteryConfig reads | current web shape: fresh session `Cookie`, `Username`, `requestid`, battery-profile `Origin`/`Referer`, Chrome-style `User-Agent`, and no `Authorization` or `e-auth-token`; token-backed primary and lean variants remain as fallbacks |
 | BatteryConfig writes | acquire fresh XSRF by preferring `GET /service/batteryConfig/api/v1/siteSettings/<site_id>?userId=<user_id>` and its `x-csrf-token` response header, then falling back to `/battery/sites/<site_id>/schedules/isValid`; if that fallback returns `4xx`, still harvest `BP-XSRF-Token` from error response cookies or the session cookie jar, then try a final cookie-based `GET /siteSettings/<site_id>` bootstrap before giving up and keeping the existing token; writes then use an endpoint-specific compatibility planner; on affected sites the verified working shape is a stateless raw-cookie browser request (`Cookie`, `e-auth-token`, `Username`, `X-XSRF-Token`, `X-Requested-With`), with official-web primary, official-web lean, and mixed-auth fallbacks retained |
 
 - Base Enlighten reads:
@@ -6122,7 +6126,7 @@ There is no single universal header set; the implementation varies headers by en
 - Site discovery after login:
   - authenticated cookies
   - `X-CSRF-Token` when an XSRF cookie is present
-  - `Authorization: Bearer <token>` and `e-auth-token: <token>` when Entrez token retrieval succeeds
+  - `Authorization: Bearer <token>` and `e-auth-token: <token>` when Enlighten session-token retrieval succeeds
 - Scheduler / EV control overlays:
   - `Authorization: Bearer <jwt>` from `enlighten_manager_token_production` cookie when present, otherwise the stored access token
 - Session history / EVSE timeseries:

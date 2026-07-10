@@ -40,6 +40,7 @@ from .const import (
     LOGIN_URL,
     MFA_RESEND_URL,
     MFA_VALIDATE_URL,
+    SELF_TOKEN_URL,
     SITE_SEARCH_URL,
 )
 from . import api_parsers
@@ -67,6 +68,7 @@ _BATTERY_CONFIG_BROWSER_USER_AGENT = (
 )
 _BATTERY_CONFIG_VARIANT_PRIMARY = "official_web_primary"
 _BATTERY_CONFIG_VARIANT_LEAN = "official_web_lean"
+_BATTERY_CONFIG_VARIANT_SESSION_COOKIE = "official_web_session_cookie"
 _BATTERY_CONFIG_VARIANT_COOKIE_EAUTH = "cookie_eauth_compatible"
 _BATTERY_CONFIG_VARIANT_MIXED = "mixed_auth_compatible"
 _ENLIGHTEN_READ_CONCURRENCY_LIMIT = 2
@@ -1408,7 +1410,7 @@ def _normalize_chargers(payload: Any) -> list[ChargerInfo]:
 
 async def _build_tokens_and_sites(
     session: aiohttp.ClientSession,
-    email: str,
+    _email: str,
     session_id: str | None,
     *,
     timeout: int,
@@ -1424,17 +1426,23 @@ async def _build_tokens_and_sites(
         raw_cookies=cookie_map,
     )
 
-    # Attempt to obtain a bearer/e-auth token. If not available, proceed with cookie-only mode.
+    # Obtain the bearer/e-auth token from the same session-backed route used by
+    # the Enlighten web application. If it is temporarily unavailable, retain
+    # cookie-only mode so core site discovery can still proceed.
     token_payload: Any | None = None
-    if tokens.session_id:
+    if tokens.session_id or tokens.cookie:
         try:
             token_payload = await _request_json(
                 session,
-                "POST",
-                f"{ENTREZ_URL}/tokens",
+                "GET",
+                SELF_TOKEN_URL,
                 timeout=timeout,
-                headers={"Accept": "application/json"},
-                json_data={"session_id": tokens.session_id, "email": email},
+                headers={
+                    "Accept": "application/json, text/plain, */*",
+                    "Referer": f"{BASE_URL}/",
+                    "User-Agent": _ENLIGHTEN_BROWSER_USER_AGENT,
+                    "X-Requested-With": "XMLHttpRequest",
+                },
             )
         except aiohttp.ClientResponseError as err:  # noqa: BLE001
             if err.status in (401, 403):
@@ -1464,6 +1472,15 @@ async def _build_tokens_and_sites(
                 "Token endpoint client error: %s",
                 safe_error,
             )
+
+    # Enlighten may rotate the session cookie while minting the token. Persist
+    # the post-mint cookie jar and use it for site discovery rather than the
+    # snapshot captured immediately after login.
+    cookie_header, cookie_map = _serialize_cookie_jar(
+        session.cookie_jar, (BASE_URL, ENTREZ_URL)
+    )
+    tokens.cookie = cookie_header
+    tokens.raw_cookies = cookie_map
 
     if isinstance(token_payload, dict):
         token = (
@@ -2583,13 +2600,23 @@ class EnphaseEVClient:
             "X-CSRF-Token": None,
             "requestid": (
                 str(uuid.uuid4())
-                if variant == _BATTERY_CONFIG_VARIANT_PRIMARY
+                if variant
+                in {
+                    _BATTERY_CONFIG_VARIANT_PRIMARY,
+                    _BATTERY_CONFIG_VARIANT_SESSION_COOKIE,
+                }
                 else None
             ),
         }
         token, user_id = self._battery_config_auth_context()
         if variant == _BATTERY_CONFIG_VARIANT_PRIMARY:
             headers["e-auth-token"] = token
+        elif variant == _BATTERY_CONFIG_VARIANT_SESSION_COOKIE:
+            headers["Cookie"] = self._battery_config_cookie(
+                include_xsrf=include_xsrf,
+                preserve_existing_xsrf=True,
+            )
+            headers["e-auth-token"] = None
         else:
             headers["e-auth-token"] = None
         if user_id:
@@ -2657,7 +2684,12 @@ class EnphaseEVClient:
                 headers["X-XSRF-Token"] = None
         return headers
 
-    def _battery_config_cookie(self, *, include_xsrf: bool = False) -> str | None:
+    def _battery_config_cookie(
+        self,
+        *,
+        include_xsrf: bool = False,
+        preserve_existing_xsrf: bool = False,
+    ) -> str | None:
         """Return a normalized BatteryConfig cookie header value."""
 
         cookies: dict[str, str] = {}
@@ -2681,11 +2713,12 @@ class EnphaseEVClient:
             )
             cookies.update(jar_cookies)
 
-        cookies = {
-            name: value
-            for name, value in cookies.items()
-            if name.strip().lower() not in _XSRF_COOKIE_NAMES
-        }
+        if not preserve_existing_xsrf:
+            cookies = {
+                name: value
+                for name, value in cookies.items()
+                if name.strip().lower() not in _XSRF_COOKIE_NAMES
+            }
 
         if include_xsrf:
             xsrf = self._xsrf_token()
@@ -2822,8 +2855,10 @@ class EnphaseEVClient:
         """Return the ordered variants to try for a BatteryConfig family."""
 
         cached = self._battery_config_cached_variant(endpoint_family)
+        has_session_cookie = bool(self._battery_config_cookie())
         variants = [
             cached,
+            (_BATTERY_CONFIG_VARIANT_SESSION_COOKIE if has_session_cookie else None),
             _BATTERY_CONFIG_VARIANT_PRIMARY,
             _BATTERY_CONFIG_VARIANT_LEAN,
         ]
@@ -2831,7 +2866,15 @@ class EnphaseEVClient:
             variant
             for variant in dict.fromkeys(variants)
             if variant
-            in {_BATTERY_CONFIG_VARIANT_PRIMARY, _BATTERY_CONFIG_VARIANT_LEAN}
+            in {
+                _BATTERY_CONFIG_VARIANT_SESSION_COOKIE,
+                _BATTERY_CONFIG_VARIANT_PRIMARY,
+                _BATTERY_CONFIG_VARIANT_LEAN,
+            }
+            and not (
+                variant == _BATTERY_CONFIG_VARIANT_SESSION_COOKIE
+                and not has_session_cookie
+            )
         ]
 
     def _battery_config_write_attempt_cache_key(
@@ -3539,6 +3582,17 @@ class EnphaseEVClient:
                         params=params,
                         debug_auth_source=variant,
                     )
+                except EnphaseLoginWallUnauthorized:
+                    if index == len(variants) - 1:
+                        raise
+                    _LOGGER.debug(
+                        "Retrying BatteryConfig request for %s with %s variant "
+                        "after login wall (cached_variant=%s)",
+                        _request_label(method, url),
+                        variants[index + 1],
+                        self._battery_config_cached_variant(family),
+                    )
+                    continue
                 except aiohttp.ClientResponseError as err:
                     if err.status == HTTPStatus.UNAUTHORIZED:
                         raise
