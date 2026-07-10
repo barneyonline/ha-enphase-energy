@@ -930,6 +930,9 @@
       "schedule_end": {
         "name": "Ütemezés vége"
       },
+      "inverter_lifetime_energy": {
+        "name": "{serial} Élettartam energia"
+      },
       "lifetime_energy": {
         "name": "Élettartam energia",
         "state_attributes": {

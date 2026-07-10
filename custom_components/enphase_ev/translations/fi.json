@@ -930,6 +930,9 @@
       "schedule_end": {
         "name": "Aikataulu päättyy"
       },
+      "inverter_lifetime_energy": {
+        "name": "{serial} Elinikäinen energia"
+      },
       "lifetime_energy": {
         "name": "Elinikäinen energia",
         "state_attributes": {

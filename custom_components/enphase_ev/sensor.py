@@ -1020,12 +1020,9 @@ async def async_setup_entry(
 
 
 class _BaseEVSensor(EnphaseBaseEntity, SensorEntity):  # type: ignore[misc]
-    def __init__(
-        self, coord: EnphaseCoordinator, sn: str, name_suffix: str, key: str
-    ) -> None:
+    def __init__(self, coord: EnphaseCoordinator, sn: str, key: str) -> None:
         super().__init__(coord, sn)
         self._key = key
-        self._attr_name = name_suffix
         self._attr_unique_id = f"{DOMAIN}_{sn}_{key}"
 
     @property
@@ -1857,7 +1854,7 @@ class EnphaseConnectorStatusSensor(_BaseEVSensor):
     _attr_translation_key = "connector_status"
 
     def __init__(self, coord: EnphaseCoordinator, sn: str) -> None:
-        super().__init__(coord, sn, "Connector Status", "connector_status")
+        super().__init__(coord, sn, "connector_status")
 
     @property
     def icon(self) -> str | None:
@@ -3067,12 +3064,13 @@ class EnphaseInverterLifetimeEnergySensor(CoordinatorEntity, RestoreSensor):  # 
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
     _attr_suggested_display_precision = 2
+    _attr_translation_key = "inverter_lifetime_energy"
 
     def __init__(self, coord: EnphaseCoordinator, serial: str) -> None:
         super().__init__(coord)
         self._coord = coord
         self._sn = str(serial)
-        self._attr_name = f"{self._sn} Lifetime Energy"
+        self._attr_translation_placeholders = {"serial": self._sn}
         self._attr_unique_id = f"{DOMAIN}_inverter_{self._sn}_lifetime_energy"
         self._last_good_native_value: float | None = None
 

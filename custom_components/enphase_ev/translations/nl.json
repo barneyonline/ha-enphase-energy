@@ -930,6 +930,9 @@
       "schedule_end": {
         "name": "Einde schema"
       },
+      "inverter_lifetime_energy": {
+        "name": "{serial} Levensduurenergie"
+      },
       "lifetime_energy": {
         "name": "Levensduurenergie",
         "state_attributes": {

@@ -930,6 +930,9 @@
       "schedule_end": {
         "name": "Schema slut"
       },
+      "inverter_lifetime_energy": {
+        "name": "{serial} Livstidsenergi"
+      },
       "lifetime_energy": {
         "name": "Livstidsenergi",
         "state_attributes": {

@@ -1046,6 +1046,9 @@
       "schedule_end": {
         "name": "Schedule End"
       },
+      "inverter_lifetime_energy": {
+        "name": "{serial} Lifetime Energy"
+      },
       "lifetime_energy": {
         "name": "Lifetime Energy",
         "state_attributes": {

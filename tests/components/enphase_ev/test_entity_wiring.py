@@ -49,6 +49,55 @@ def test_entity_naming_and_availability():
     assert ent.unique_id.endswith(f"{RANDOM_SERIAL}_energy_today")
 
 
+def test_connector_status_uses_translated_entity_name():
+    """Connector status should not override its translated entity name."""
+    from custom_components.enphase_ev.sensor import EnphaseConnectorStatusSensor
+
+    coord = _with_inventory_view(
+        SimpleNamespace(
+            data={RANDOM_SERIAL: {"connector_status": "AVAILABLE"}},
+            serials={RANDOM_SERIAL},
+            site_id=RANDOM_SITE_ID,
+            last_update_success=True,
+        )
+    )
+
+    entity = EnphaseConnectorStatusSensor(coord, RANDOM_SERIAL)
+    translation_key = "component.enphase_ev.entity.sensor.connector_status.name"
+    entity.platform_data = SimpleNamespace(
+        platform_name="enphase_ev",
+        domain="sensor",
+        platform_translations={translation_key: "Translated connector status"},
+        component_translations={},
+    )
+
+    assert "_attr_name" not in entity.__dict__
+    assert entity.translation_key == "connector_status"
+    assert entity.name == "Translated connector status"
+
+
+def test_inverter_lifetime_energy_uses_translated_name_with_serial(
+    coordinator_factory,
+):
+    """Per-inverter names should use a translated serial placeholder."""
+    from custom_components.enphase_ev.sensor import EnphaseInverterLifetimeEnergySensor
+
+    coord = coordinator_factory(serials=[RANDOM_SERIAL])
+    entity = EnphaseInverterLifetimeEnergySensor(coord, "INV-A")
+    translation_key = "component.enphase_ev.entity.sensor.inverter_lifetime_energy.name"
+    entity.platform_data = SimpleNamespace(
+        platform_name="enphase_ev",
+        domain="sensor",
+        platform_translations={translation_key: "{serial} Translated lifetime energy"},
+        component_translations={},
+    )
+
+    assert "_attr_name" not in entity.__dict__
+    assert entity.translation_key == "inverter_lifetime_energy"
+    assert entity.translation_placeholders == {"serial": "INV-A"}
+    assert entity.name == "INV-A Translated lifetime energy"
+
+
 def test_device_info_includes_model_name_when_available():
     from custom_components.enphase_ev.sensor import EnphaseEnergyTodaySensor
 

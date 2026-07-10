@@ -930,6 +930,9 @@
       "schedule_end": {
         "name": "Λήξη προγράμματος"
       },
+      "inverter_lifetime_energy": {
+        "name": "{serial} Συνολική ενέργεια"
+      },
       "lifetime_energy": {
         "name": "Συνολική ενέργεια",
         "state_attributes": {

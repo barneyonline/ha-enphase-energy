@@ -930,6 +930,9 @@
       "schedule_end": {
         "name": "Край на графика"
       },
+      "inverter_lifetime_energy": {
+        "name": "{serial} Обща енергия"
+      },
       "lifetime_energy": {
         "name": "Обща енергия",
         "state_attributes": {

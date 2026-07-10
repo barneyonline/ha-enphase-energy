@@ -930,6 +930,9 @@
       "schedule_end": {
         "name": "Konec rozvrhu"
       },
+      "inverter_lifetime_energy": {
+        "name": "{serial} Celková energie"
+      },
       "lifetime_energy": {
         "name": "Celková energie",
         "state_attributes": {
