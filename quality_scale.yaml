@@ -1,3 +1,7 @@
+official_rule_catalog:
+  source: https://developers.home-assistant.io/docs/core/integration-quality-scale/rules/
+  reviewed_on: 2026-07-10
+
 levels:
   bronze:
     required:
@@ -9,6 +13,8 @@ levels:
       - config-flow
       - dependency-transparency
       - docs-actions
+      - docs-triggers
+      - docs-conditions
       - docs-high-level-description
       - docs-installation-instructions
       - docs-removal-instructions
@@ -142,6 +148,21 @@ rules:
         - tests/components/enphase_ev/test_service_translations.py
       docs:
         - README.md
+  docs-triggers:
+    status: done
+    references:
+      code:
+        - custom_components/enphase_ev/device_trigger.py
+      tests:
+        - tests/components/enphase_ev/test_device_trigger.py
+      docs:
+        - docs/device_automations.md
+  docs-conditions:
+    status: n/a
+    comment: The integration does not provide custom automation conditions; users can apply Home Assistant's standard device and entity state conditions to its entities.
+    references:
+      docs:
+        - docs/device_automations.md
   docs-high-level-description:
     status: done
     references:

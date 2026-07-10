@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+from datetime import date
 import json
 from pathlib import Path
 import sys
@@ -68,6 +69,174 @@ def test_repository_quality_scale_matches_manifest_claim() -> None:
     exit_code, messages = validate_quality_scale.validate_quality_scale(root)
 
     assert exit_code == 0, "\n".join(messages)
+
+
+def test_official_bronze_catalog_tracks_automation_documentation_rules() -> None:
+    bronze_rules = set(validate_quality_scale.OFFICIAL_REQUIRED_RULES["bronze"])
+
+    assert {"docs-triggers", "docs-conditions"} <= bronze_rules
+    assert "docs-conditions" in validate_quality_scale.NA_ALLOWED_RULES
+
+
+def test_rule_catalog_metadata_records_canonical_review() -> None:
+    valid = {
+        "official_rule_catalog": {
+            "source": validate_quality_scale.OFFICIAL_RULE_CATALOG_SOURCE,
+            "reviewed_on": date(2026, 7, 10),
+        }
+    }
+
+    assert validate_quality_scale._validate_rule_catalog_metadata(valid) == []
+    assert validate_quality_scale._validate_rule_catalog_metadata({}) == [
+        "official_rule_catalog metadata is missing"
+    ]
+
+    wrong_source = {
+        "official_rule_catalog": {
+            "source": "https://example.test/rules",
+            "reviewed_on": "not-a-date",
+        }
+    }
+    assert validate_quality_scale._validate_rule_catalog_metadata(wrong_source) == [
+        "official_rule_catalog.source must reference the canonical Home Assistant rule list",
+        "official_rule_catalog.reviewed_on must be an ISO date",
+    ]
+
+
+def test_trigger_documentation_must_name_every_implemented_trigger(
+    tmp_path: Path,
+) -> None:
+    integration_dir = tmp_path / "custom_components" / "enphase_ev"
+    integration_dir.mkdir(parents=True)
+    (integration_dir / "device_trigger.py").write_text(
+        "TRIGGER_MAP = {'charging_started': {}, 'charging_stopped': {}}\n"
+    )
+    _write_reference(tmp_path, "docs/device_automations.md")
+    (tmp_path / "docs" / "device_automations.md").write_text(
+        "The `charging_started` trigger starts an automation.\n"
+    )
+
+    messages = validate_quality_scale._validate_trigger_documentation(
+        tmp_path, ["docs/device_automations.md"]
+    )
+
+    assert messages == [
+        "docs-triggers references do not document trigger type charging_stopped"
+    ]
+
+
+def test_trigger_documentation_handles_missing_and_invalid_declarations(
+    tmp_path: Path,
+) -> None:
+    integration_dir = tmp_path / "custom_components" / "enphase_ev"
+    trigger_path = integration_dir / "device_trigger.py"
+
+    assert validate_quality_scale._device_trigger_types(tmp_path) == set()
+    assert validate_quality_scale._validate_trigger_documentation(tmp_path, []) == [
+        "docs-triggers could not find any declared device trigger types"
+    ]
+
+    integration_dir.mkdir(parents=True)
+    trigger_path.write_text("def broken(:\n")
+    assert validate_quality_scale._device_trigger_types(tmp_path) == set()
+
+    trigger_path.write_text("OTHER = {}\n")
+    assert validate_quality_scale._device_trigger_types(tmp_path) == set()
+
+    trigger_path.write_text("OTHER = {}\nTRIGGER_MAP = make_map()\n")
+    assert validate_quality_scale._device_trigger_types(tmp_path) == set()
+
+    trigger_path.write_text("TRIGGER_MAP: dict = {'valid': {}, 1: {}}\n")
+    assert validate_quality_scale._device_trigger_types(tmp_path) == {"valid"}
+
+
+def test_trigger_documentation_requires_yaml_fields(tmp_path: Path) -> None:
+    integration_dir = tmp_path / "custom_components" / "enphase_ev"
+    integration_dir.mkdir(parents=True)
+    (integration_dir / "device_trigger.py").write_text(
+        "TRIGGER_MAP = {'charging_started': {}}\n"
+    )
+    _write_reference(tmp_path, "docs/device_automations.md")
+    (tmp_path / "docs" / "device_automations.md").write_text(
+        "The charging_started trigger uses type: charging_started.\n"
+    )
+
+    messages = validate_quality_scale._validate_trigger_documentation(
+        tmp_path, ["docs/device_automations.md"]
+    )
+
+    assert messages == [
+        "docs-triggers references do not document YAML field platform: device",
+        "docs-triggers references do not document YAML field domain: enphase_ev",
+        "docs-triggers references do not document YAML field device_id:",
+        "docs-triggers references do not document YAML field entity_id:",
+    ]
+
+
+def test_documentation_rules_require_docs_references(
+    monkeypatch, tmp_path: Path
+) -> None:
+    _write_manifest(tmp_path, "bronze")
+    _write_reference(tmp_path, "custom_components/enphase_ev/device_trigger.py")
+    _write_quality_scale(
+        tmp_path,
+        """
+levels:
+  bronze:
+    required: [docs-triggers]
+rules:
+  docs-triggers:
+    status: done
+    references:
+      code: [custom_components/enphase_ev/device_trigger.py]
+""",
+    )
+    monkeypatch.setitem(
+        validate_quality_scale.OFFICIAL_REQUIRED_RULES,
+        "bronze",
+        ("docs-triggers",),
+    )
+
+    exit_code, messages = validate_quality_scale.validate_quality_scale(tmp_path)
+
+    assert exit_code == 1
+    assert "Documentation rules missing docs references" in "\n".join(messages)
+
+
+def test_validator_reports_incomplete_trigger_documentation(
+    monkeypatch, tmp_path: Path
+) -> None:
+    _write_manifest(tmp_path, "bronze")
+    _write_reference(tmp_path, "docs/device_automations.md")
+    integration_dir = tmp_path / "custom_components" / "enphase_ev"
+    (integration_dir / "device_trigger.py").write_text(
+        "TRIGGER_MAP = {'charging_started': {}}\n"
+    )
+    _write_quality_scale(
+        tmp_path,
+        """
+levels:
+  bronze:
+    required: [docs-triggers]
+rules:
+  docs-triggers:
+    status: done
+    references:
+      docs: [docs/device_automations.md]
+""",
+    )
+    monkeypatch.setitem(
+        validate_quality_scale.OFFICIAL_REQUIRED_RULES,
+        "bronze",
+        ("docs-triggers",),
+    )
+
+    exit_code, messages = validate_quality_scale.validate_quality_scale(tmp_path)
+
+    joined = "\n".join(messages)
+    assert exit_code == 1
+    assert "Incomplete rule documentation" in joined
+    assert "charging_started" in joined
 
 
 def test_gold_claim_requires_bronze_silver_and_gold_rules(tmp_path: Path) -> None:

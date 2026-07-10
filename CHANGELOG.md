@@ -19,7 +19,8 @@ All notable changes to this project will be documented in this file.
   integration objects.
 
 ### 🔧 Improvements
-- None
+- Documented the IQ EV Charger device automation triggers and the integration's
+  use of standard Home Assistant conditions.
 
 ### 🔄 Other changes
 - None
