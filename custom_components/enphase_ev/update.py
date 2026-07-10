@@ -793,7 +793,7 @@ def _async_prune_removed_charger_updates(
 
 
 def _gateway_installed_version(coord: EnphaseCoordinator) -> str | None:
-    return cast(str | None, _text(coord.inventory_view.type_device_sw_version("envoy")))
+    return _text(coord.inventory_view.type_device_sw_version("envoy"))
 
 
 def _charger_installed_version(coord: EnphaseCoordinator, serial: str) -> str | None:
@@ -811,9 +811,7 @@ def _charger_installed_version(coord: EnphaseCoordinator, serial: str) -> str | 
                 if version:
                     return cast(str | None, version)
 
-    return cast(
-        str | None, _text(coord.inventory_view.type_device_sw_version("iqevse"))
-    )
+    return _text(coord.inventory_view.type_device_sw_version("iqevse"))
 
 
 def _utc_now_iso() -> str:

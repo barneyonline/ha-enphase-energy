@@ -64,7 +64,7 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 def async_setup_services(
-    hass: HomeAssistant, *, supports_response: object = SupportsResponse
+    hass: HomeAssistant, *, supports_response: type[Any] = SupportsResponse
 ) -> None:
     """Register integration services without importing service schemas at module load."""
 
@@ -357,14 +357,14 @@ def _inventory_type_device_sw_version_for_registry(
         sw_version_getter = getattr(inventory_view, "type_device_sw_version", None)
         if not callable(sw_version_getter):
             return None
-        return cast(str | None, _clean_optional_text(sw_version_getter(type_key)))
-    sw_version = cast(str | None, _clean_optional_text(sw_version_getter(type_key)))
+        return _clean_optional_text(sw_version_getter(type_key))
+    sw_version = _clean_optional_text(sw_version_getter(type_key))
     if sw_version is not None:
         return sw_version
     single_version_getter = getattr(inventory_view, "type_device_sw_version", None)
     if not callable(single_version_getter):
         return None
-    return cast(str | None, _clean_optional_text(single_version_getter(type_key)))
+    return _clean_optional_text(single_version_getter(type_key))
 
 
 def _sync_charger_devices(

@@ -51,7 +51,7 @@ def _site_has_battery(coord: EnphaseCoordinator) -> bool:
         return True
     if has_encharge is False and has_enpower is False:
         return False
-    return cast(bool, _type_available(coord, "encharge"))
+    return _type_available(coord, "encharge")
 
 
 def _storm_guard_visible(coord: EnphaseCoordinator) -> bool:
@@ -60,7 +60,7 @@ def _storm_guard_visible(coord: EnphaseCoordinator) -> bool:
 
 
 def _retain_cancel_pending_profile_change(coord: EnphaseCoordinator) -> bool:
-    return cast(bool, _type_available(coord, "envoy"))
+    return _type_available(coord, "envoy")
 
 
 def _retain_request_grid_toggle_otp(coord: EnphaseCoordinator) -> bool:
@@ -388,7 +388,7 @@ class _BatteryScheduleButton(BatteryScheduleEditorEntity, ButtonEntity):  # type
 
     def _button_label(self, action: str) -> str:
         hass = getattr(self, "hass", None) or self._coord.hass
-        return cast(str, battery_schedule_button_label(action, hass=hass))
+        return battery_schedule_button_label(action, hass=hass)
 
     def _schedule_result_label(self) -> str | None:
         if self._editor is None:

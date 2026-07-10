@@ -158,7 +158,7 @@ def _ac_battery_status_fallback_serials_for_setup(
 
 
 def _type_label(coord: EnphaseCoordinator, type_key: str) -> str | None:
-    return cast(str | None, coord.inventory_view.type_label(type_key))
+    return coord.inventory_view.type_label(type_key)
 
 
 def _has_type(coord: EnphaseCoordinator, type_key: str) -> bool:
@@ -259,7 +259,7 @@ def _grid_control_site_applicable(coord: EnphaseCoordinator) -> bool:
         return True
     if has_encharge is False and has_enpower is False:
         return False
-    return cast(bool, _type_available(coord, "encharge"))
+    return _type_available(coord, "encharge")
 
 
 def _battery_schedule_inventory_supported(coord: EnphaseCoordinator) -> bool:
@@ -2009,13 +2009,10 @@ class EnphasePowerSensor(EnphaseBaseEntity, SensorEntity, RestoreEntity):  # typ
     def _is_actually_charging(data: dict[str, Any]) -> bool:
         if "actual_charging" in data:
             return bool(data.get("actual_charging"))
-        return cast(
-            bool,
-            evse_power_is_actively_charging(
-                data.get("connector_status"),
-                data.get("charging"),
-                suspended_by_evse=data.get("suspended_by_evse"),
-            ),
+        return evse_power_is_actively_charging(
+            data.get("connector_status"),
+            data.get("charging"),
+            suspended_by_evse=data.get("suspended_by_evse"),
         )
 
     def _resolve_max_throughput(
@@ -2339,7 +2336,7 @@ class EnphaseChargingLevelSensor(EnphaseBaseEntity, SensorEntity):  # type: igno
         min_amp = cls._coerce_amp(data.get("min_amp"))
         if min_amp is not None and min_amp > 0:
             return min_amp
-        return cast(int, SAFE_LIMIT_AMPS)
+        return SAFE_LIMIT_AMPS
 
     @property
     def extra_state_attributes(self) -> Any:
@@ -3023,7 +3020,7 @@ class EnphaseTypeInventorySensor(CoordinatorEntity, SensorEntity):  # type: igno
     def native_value(self) -> Any:
         bucket = self._coord.inventory_view.type_bucket(self._type_key) or {}
         try:
-            count = int(bucket.get("count", 0))
+            count = int(cast(Any, bucket.get("count", 0)))
         except Exception:
             count = 0
         return count or self._fallback_count()
@@ -3269,7 +3266,7 @@ class _EnphaseBatteryStorageBaseSensor(CoordinatorEntity, SensorEntity):  # type
 
     @staticmethod
     def _parse_timestamp(value: object) -> datetime | None:
-        return cast(datetime | None, _battery_parse_timestamp(value))
+        return _battery_parse_timestamp(value)
 
     @property
     def available(self) -> bool:
@@ -3492,10 +3489,7 @@ class _EnphaseAcBatteryStorageBaseSensor(CoordinatorEntity, SensorEntity):  # ty
         )
 
     def _snapshot(self) -> dict[str, object] | None:
-        return cast(
-            dict[str, object] | None,
-            ac_battery_storage_snapshot(self._coord, self._sn),
-        )
+        return ac_battery_storage_snapshot(self._coord, self._sn)
 
     @staticmethod
     def _as_int(value: object) -> int | None:
@@ -3913,7 +3907,7 @@ def _gateway_inventory_snapshot(coord: EnphaseCoordinator) -> dict[str, object]:
         members = [dict(dashboard_envoy)]
     ip_address = _gateway_summary_ip_address(members, dashboard_envoy)
     try:
-        total_devices = int(bucket.get("count", len(members)))
+        total_devices = int(cast(Any, bucket.get("count", len(members))))
     except Exception:  # noqa: BLE001
         total_devices = len(members)
     total_devices = max(total_devices, len(members))
@@ -4108,7 +4102,7 @@ def _microinverter_inventory_snapshot(coord: EnphaseCoordinator) -> dict[str, ob
                 status_counts[key] = 0
 
     try:
-        total_inverters = int(bucket.get("count", len(safe_members)) or 0)
+        total_inverters = int(cast(Any, bucket.get("count", len(safe_members)) or 0))
     except Exception:
         total_inverters = len(safe_members)
     if status_counts.get("total", 0) > 0:
@@ -4211,11 +4205,11 @@ def _heatpump_member_device_type(member: dict[str, object] | None) -> str | None
     text = _gateway_clean_text(value)
     if not text:
         return None
-    return cast(str | None, text.upper())
+    return text.upper()
 
 
 def _heatpump_member_status_text(member: dict[str, object] | None) -> str | None:
-    return cast(str | None, heatpump_status_text(member))
+    return heatpump_status_text(member)
 
 
 def _heatpump_status_counts(members: list[dict[str, object]]) -> dict[str, int]:
@@ -4296,7 +4290,7 @@ def _heatpump_snapshot(coord: EnphaseCoordinator) -> dict[str, object]:
         status_counts = _heatpump_status_counts(safe_members)
 
     try:
-        total_devices = int(bucket.get("count", len(safe_members)) or 0)
+        total_devices = int(cast(Any, bucket.get("count", len(safe_members)) or 0))
     except Exception:
         total_devices = len(safe_members)
     if total_devices <= 0:
@@ -4344,9 +4338,10 @@ def _heatpump_snapshot(coord: EnphaseCoordinator) -> dict[str, object]:
         overall_status_text = _heatpump_worst_status_text(status_counts)
 
     device_type_counts: dict[str, int]
-    if isinstance(bucket.get("device_type_counts"), dict):
+    device_type_counts_raw = bucket.get("device_type_counts")
+    if isinstance(device_type_counts_raw, dict):
         device_type_counts = {}
-        for key, value in bucket.get("device_type_counts", {}).items():
+        for key, value in device_type_counts_raw.items():
             if key is None:
                 continue
             try:
@@ -4485,7 +4480,7 @@ def _heatpump_runtime_device_uid(coord: EnphaseCoordinator) -> str | None:
     getter = getattr(coord, "_heatpump_runtime_device_uid", None)
     if callable(getter):
         try:
-            return cast(str | None, _gateway_clean_text(getter()))
+            return _gateway_clean_text(getter())
         except Exception:  # noqa: BLE001
             return None
     return None
@@ -4519,8 +4514,8 @@ def _heatpump_runtime_common_attrs(
             getattr(coord, "heatpump_runtime_state_using_stale", False)
         ),
         "last_success_utc": (
-            coord.heatpump_runtime_state_last_success_utc.isoformat()
-            if getattr(coord, "heatpump_runtime_state_last_success_utc", None)
+            last_success.isoformat()
+            if (last_success := coord.heatpump_runtime_state_last_success_utc)
             is not None
             else None
         ),
@@ -4553,8 +4548,8 @@ def _heatpump_daily_common_attrs(
             getattr(coord, "heatpump_daily_consumption_using_stale", False)
         ),
         "last_success_utc": (
-            coord.heatpump_daily_consumption_last_success_utc.isoformat()
-            if getattr(coord, "heatpump_daily_consumption_last_success_utc", None)
+            last_success.isoformat()
+            if (last_success := coord.heatpump_daily_consumption_last_success_utc)
             is not None
             else None
         ),
@@ -4563,9 +4558,7 @@ def _heatpump_daily_common_attrs(
 
 
 def _title_case_status(value: object, hass: object | None = None) -> str | None:
-    return cast(
-        str | None, status_label(value, hass=hass) or friendly_status_text(value)
-    )
+    return status_label(value, hass=hass) or friendly_status_text(value)
 
 
 def _gateway_channel_type_kind(value: object) -> str | None:
@@ -4819,16 +4812,16 @@ def _gateway_iq_energy_router_records(
                         continue
                     router_members.append(dict(member))
 
-    records: list[dict[str, object]] = []  # type: ignore[no-redef]
+    router_records: list[dict[str, object]] = []
     key_counts: dict[str, int] = {}
     for member in router_members:
-        index = len(records) + 1
+        index = len(router_records) + 1
         base_key = _gateway_iq_energy_router_member_key(member, fallback_index=index)
         key_counts[base_key] = key_counts.get(base_key, 0) + 1
         key = base_key
         if key_counts[base_key] > 1:
             key = f"{base_key}_{key_counts[base_key]}"
-        records.append(
+        router_records.append(
             {
                 "key": key,
                 "index": index,
@@ -4837,7 +4830,7 @@ def _gateway_iq_energy_router_records(
                 "member": dict(member),
             }
         )
-    return cast(list[dict[str, object]], records)
+    return router_records
 
 
 def _gateway_iq_energy_router_record(
@@ -4917,14 +4910,11 @@ def _gateway_meter_status_text(
         return None
     status_text = _gateway_clean_text(member.get("statusText"))
     if status_text:
-        return cast(str | None, status_label(status_text, hass=hass) or status_text)
+        return status_label(status_text, hass=hass) or status_text
     status_raw = _gateway_clean_text(member.get("status"))
     if not status_raw:
         return None
-    return cast(
-        str | None,
-        status_label(status_raw, hass=hass) or friendly_status_text(status_raw),
-    )
+    return status_label(status_raw, hass=hass) or friendly_status_text(status_raw)
 
 
 def _gateway_meter_last_reported(member: dict[str, object] | None) -> datetime | None:
@@ -4957,7 +4947,7 @@ def _gateway_system_controller_member(
 
 
 def _is_dry_contact_type_key(type_key: object) -> bool:
-    return cast(bool, is_dry_contact_type_key(type_key))
+    return is_dry_contact_type_key(type_key)
 
 
 def _gateway_member_is_dry_contact(member: object) -> bool:
@@ -6642,7 +6632,7 @@ class EnphaseSystemControllerInventorySensor(_SiteBaseEntity):
         last_reported = _gateway_meter_last_reported(member)
         terminal_values = _gateway_terminal_values(member)
         terminal_descriptions = _gateway_terminal_descriptions(member)
-        attrs = {
+        attrs: dict[str, object] = {
             "name": _gateway_clean_text(member.get("name")) or "System Controller",
             "status_text": _gateway_meter_status_text(
                 member, getattr(self, "hass", None) or self._coord.hass
@@ -7108,7 +7098,7 @@ class EnphaseGatewayIQEnergyRouterSensor(_SiteBaseEntity):
             else None
         )
         if member_name:
-            return cast(str | None, member_name)
+            return member_name
         # Prefer translated fallback names when this entity is platform-attached.
         if getattr(self, "platform", None) is not None:
             try:
@@ -7415,7 +7405,10 @@ class EnphaseMicroinverterReportingCountSensor(_SiteBaseEntity):
         )
         try:
             device_count = int(
-                bucket.get("count", snapshot.get("total_inverters", 0)) or 0
+                cast(
+                    Any,
+                    bucket.get("count", snapshot.get("total_inverters", 0)) or 0,
+                )
             )
         except Exception:
             device_count = int(snapshot.get("total_inverters", 0) or 0)  # type: ignore[call-overload]
@@ -7514,7 +7507,7 @@ class EnphaseHeatPumpStatusSensor(_SiteBaseEntity):
             except Exception:  # noqa: BLE001
                 return None
         uid = self._snapshot().get("device_uid")
-        return cast(str | None, _gateway_clean_text(uid))
+        return _gateway_clean_text(uid)
 
     @property
     def available(self) -> bool:
@@ -7689,7 +7682,7 @@ class EnphaseHeatPumpSgReadyModeSensor(_SiteBaseEntity):
             except Exception:  # noqa: BLE001
                 return None
         uid = self._snapshot().get("device_uid")
-        return cast(str | None, _gateway_clean_text(uid))
+        return _gateway_clean_text(uid)
 
     @property
     def available(self) -> bool:
@@ -7834,8 +7827,8 @@ class _EnphaseHeatPumpDailyEnergySensor(_SiteBaseEntity):
                 getattr(self._coord, "heatpump_daily_split_using_stale", False)
             )
             attrs["last_success_utc"] = (
-                self._coord.heatpump_daily_split_last_success_utc.isoformat()
-                if getattr(self._coord, "heatpump_daily_split_last_success_utc", None)
+                last_success.isoformat()
+                if (last_success := self._coord.heatpump_daily_split_last_success_utc)
                 is not None
                 else None
             )
@@ -7955,8 +7948,8 @@ class EnphaseHeatPumpPowerSensor(_SiteBaseEntity):
                 getattr(self._coord, "heatpump_power_using_stale", False)
             ),
             "last_success_utc": (
-                self._coord.heatpump_power_last_success_utc.isoformat()
-                if getattr(self._coord, "heatpump_power_last_success_utc", None)
+                last_success.isoformat()
+                if (last_success := self._coord.heatpump_power_last_success_utc)
                 is not None
                 else None
             ),
@@ -8114,7 +8107,7 @@ class EnphaseBatteryCfgScheduleStatusSensor(_SiteBaseEntity):
     def available(self) -> bool:
         if not super().available:
             return False
-        return cast(bool, self._coord.charge_from_grid_control_available)
+        return self._coord.charge_from_grid_control_available
 
     @property
     def native_value(self) -> Any:
@@ -8132,9 +8125,7 @@ class _BaseBatteryScheduleInventorySensor(_SiteBaseEntity):
         self._attr_translation_key = translation_key
 
     def _inventory(self) -> list[BatteryScheduleRecord]:
-        return cast(
-            list[BatteryScheduleRecord], battery_schedule_inventory(self._coord)
-        )
+        return battery_schedule_inventory(self._coord)
 
     @property
     def available(self) -> bool:
@@ -8204,7 +8195,7 @@ class EnphaseBatteryAvailableEnergySensor(_SiteBaseEntity):
         if value is None:
             return None
         try:
-            return round(float(value), 2)
+            return round(float(cast(Any, value)), 2)
         except Exception:  # noqa: BLE001
             return None
 
@@ -8245,7 +8236,7 @@ class EnphaseBatteryAvailablePowerSensor(_SiteBaseEntity):
         if value is None:
             return None
         try:
-            return round(float(value), 3)
+            return round(float(cast(Any, value)), 3)
         except Exception:  # noqa: BLE001
             return None
 
@@ -8427,7 +8418,7 @@ class EnphaseCurrentTariffRateSensor(_EnphaseTariffBaseSensor):
         super()._handle_coordinator_update()
         self._ensure_tariff_boundary_timer()
 
-    def _spec(self) -> Any:
+    def _spec(self) -> dict[str, object] | None:
         return current_tariff_rate_sensor_spec(
             getattr(self._coord, self._rate_attr, None),
             _tariff_now(self._coord, getattr(self, "hass", None)),
@@ -8438,7 +8429,8 @@ class EnphaseCurrentTariffRateSensor(_EnphaseTariffBaseSensor):
         for spec in tariff_rate_sensor_specs(
             getattr(self._coord, self._rate_attr, None)
         ):
-            attrs = spec.get("attributes") or {}
+            raw_attrs = spec.get("attributes")
+            attrs = raw_attrs if isinstance(raw_attrs, dict) else {}
             rate: dict[str, object] = {
                 key: value
                 for key, value in {
@@ -8494,7 +8486,8 @@ class EnphaseCurrentTariffRateSensor(_EnphaseTariffBaseSensor):
         spec = self._spec()
         if spec is None:
             return {}
-        attrs = dict(spec.get("attributes") or {})
+        raw_attrs = spec.get("attributes")
+        attrs = dict(raw_attrs) if isinstance(raw_attrs, dict) else {}
         attrs["active_rate_name"] = spec.get("name")
         attrs["configured_rates"] = self._configured_rates()
         attrs.update(self._last_refresh_attr())
@@ -8673,7 +8666,7 @@ class EnphaseAcBatteryPowerSensor(_SiteBaseEntity):
         if value is None:
             return None
         try:
-            return round(float(value), 3)
+            return round(float(cast(Any, value)), 3)
         except Exception:  # noqa: BLE001
             return None
 

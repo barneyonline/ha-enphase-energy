@@ -67,60 +67,46 @@ class EnphaseSensorRegistrySetup:
     def battery_sensor_unique_id(self, serial: str, suffix: str) -> str:
         """Return the unique ID for a per-storage-battery sensor."""
 
-        return cast(str, site_battery_entity_unique_id(self._site_id, serial, suffix))
+        return site_battery_entity_unique_id(self._site_id, serial, suffix)
 
     def battery_sensor_unique_ids(self, serial: str) -> tuple[str, ...]:
         """Return active unique IDs for a per-storage-battery sensor set."""
 
-        return cast(
-            tuple[str, ...],
-            site_battery_entity_unique_ids(
-                self._site_id, serial, BATTERY_ENTITY_UNIQUE_SUFFIXES
-            ),
+        return site_battery_entity_unique_ids(
+            self._site_id, serial, BATTERY_ENTITY_UNIQUE_SUFFIXES
         )
 
     def battery_retired_sensor_unique_ids(self, serial: str) -> tuple[str, ...]:
         """Return retired unique IDs for a per-storage-battery sensor set."""
 
-        return cast(
-            tuple[str, ...],
-            site_battery_entity_unique_ids(
-                self._site_id, serial, BATTERY_RETIRED_UNIQUE_SUFFIXES
-            ),
+        return site_battery_entity_unique_ids(
+            self._site_id, serial, BATTERY_RETIRED_UNIQUE_SUFFIXES
         )
 
     def ac_battery_sensor_unique_id(self, serial: str, suffix: str) -> str:
         """Return the unique ID for a per-AC-battery sensor."""
 
-        return cast(
-            str, site_ac_battery_entity_unique_id(self._site_id, serial, suffix)
-        )
+        return site_ac_battery_entity_unique_id(self._site_id, serial, suffix)
 
     def ac_battery_sensor_unique_ids(self, serial: str) -> tuple[str, ...]:
         """Return active unique IDs for a per-AC-battery sensor set."""
 
-        return cast(
-            tuple[str, ...],
-            site_ac_battery_entity_unique_ids(
-                self._site_id, serial, AC_BATTERY_ENTITY_UNIQUE_SUFFIXES
-            ),
+        return site_ac_battery_entity_unique_ids(
+            self._site_id, serial, AC_BATTERY_ENTITY_UNIQUE_SUFFIXES
         )
 
     def ac_battery_retired_sensor_unique_ids(self, serial: str) -> tuple[str, ...]:
         """Return retired unique IDs for a per-AC-battery sensor set."""
 
-        return cast(
-            tuple[str, ...],
-            site_ac_battery_entity_unique_ids(
-                self._site_id, serial, AC_BATTERY_RETIRED_UNIQUE_SUFFIXES
-            ),
+        return site_ac_battery_entity_unique_ids(
+            self._site_id, serial, AC_BATTERY_RETIRED_UNIQUE_SUFFIXES
         )
 
     @staticmethod
     def inverter_lifetime_sensor_unique_id(serial: str) -> str:
         """Return the unique ID for a microinverter lifetime energy sensor."""
 
-        return cast(str, inverter_entity_unique_id(serial))
+        return inverter_entity_unique_id(serial)
 
     def remove_site_sensor_entity(self, key: str) -> None:
         """Remove a site-level sensor entity by setup key."""
@@ -276,24 +262,18 @@ class EnphaseSensorRegistrySetup:
     def charger_sensor_unique_id(self, serial: str, suffix: str) -> str:
         """Return the unique ID for a per-charger sensor."""
 
-        return cast(str, charger_entity_unique_id(serial, suffix))
+        return charger_entity_unique_id(serial, suffix)
 
     def charger_sensor_unique_ids(self, serial: str) -> tuple[str, ...]:
         """Return active unique IDs for a per-charger sensor set."""
 
-        return cast(
-            tuple[str, ...],
-            charger_entity_unique_ids(serial, CHARGER_SENSOR_UNIQUE_SUFFIXES),
-        )
+        return charger_entity_unique_ids(serial, CHARGER_SENSOR_UNIQUE_SUFFIXES)
 
     def charger_serial_from_unique_id(self, unique_id: object) -> str | None:
         """Return a charger serial parsed from a known per-charger unique ID."""
 
-        return cast(
-            str | None,
-            charger_entity_serial_from_unique_id(
-                unique_id, CHARGER_SENSOR_UNIQUE_SUFFIXES
-            ),
+        return charger_entity_serial_from_unique_id(
+            unique_id, CHARGER_SENSOR_UNIQUE_SUFFIXES
         )
 
     def prune_removed_charger_sensor_entities(self, current_set: set[str]) -> None:
@@ -446,30 +426,24 @@ class EnphaseSensorRegistrySetup:
     def battery_serial_from_unique_id(self, unique_id: object) -> str | None:
         """Return a battery serial parsed from a known per-battery unique ID."""
 
-        return cast(
-            str | None,
-            battery_entity_serial_from_unique_id(
-                unique_id,
-                site_id=self._site_id,
-                suffixes=(
-                    *BATTERY_ENTITY_UNIQUE_SUFFIXES,
-                    *BATTERY_RETIRED_UNIQUE_SUFFIXES,
-                ),
+        return battery_entity_serial_from_unique_id(
+            unique_id,
+            site_id=self._site_id,
+            suffixes=(
+                *BATTERY_ENTITY_UNIQUE_SUFFIXES,
+                *BATTERY_RETIRED_UNIQUE_SUFFIXES,
             ),
         )
 
     def ac_battery_serial_from_unique_id(self, unique_id: object) -> str | None:
         """Return an AC battery serial parsed from a known unique ID."""
 
-        return cast(
-            str | None,
-            ac_battery_entity_serial_from_unique_id(
-                unique_id,
-                site_id=self._site_id,
-                suffixes=(
-                    *AC_BATTERY_ENTITY_UNIQUE_SUFFIXES,
-                    *AC_BATTERY_RETIRED_UNIQUE_SUFFIXES,
-                ),
+        return ac_battery_entity_serial_from_unique_id(
+            unique_id,
+            site_id=self._site_id,
+            suffixes=(
+                *AC_BATTERY_ENTITY_UNIQUE_SUFFIXES,
+                *AC_BATTERY_RETIRED_UNIQUE_SUFFIXES,
             ),
         )
 

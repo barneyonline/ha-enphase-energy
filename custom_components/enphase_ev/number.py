@@ -108,7 +108,12 @@ def _tariff_rate_number_entities(coord: EnphaseCoordinator) -> dict[str, NumberE
         (False, "tariff_export_rate"),
     ):
         for spec in tariff_rate_sensor_specs(getattr(coord, attr, None)):
-            locator = (spec.get("attributes") or {}).get("tariff_locator")
+            attributes = spec.get("attributes")
+            locator = (
+                attributes.get("tariff_locator")
+                if isinstance(attributes, dict)
+                else None
+            )
             if not isinstance(locator, dict):
                 continue
             unique_id = _tariff_rate_number_unique_id(coord, spec, is_import=is_import)
@@ -419,7 +424,7 @@ class ChargingAmpsNumber(EnphaseBaseEntity, NumberEntity):  # type: ignore[misc]
         min_amp = cls._coerce_amp(data.get("min_amp"))
         if min_amp is not None and min_amp > 0:
             return min_amp
-        return cast(int, SAFE_LIMIT_AMPS)
+        return SAFE_LIMIT_AMPS
 
     @property
     def native_value(self) -> float | None:

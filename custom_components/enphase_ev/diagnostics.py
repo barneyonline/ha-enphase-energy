@@ -711,7 +711,7 @@ async def async_get_device_diagnostics(
             else:
                 safe_devices = []
             try:
-                gateway_count = int(payload.get("count", 0) or 0)
+                gateway_count = int(cast(Any, payload.get("count", 0) or 0))
             except (TypeError, ValueError):
                 gateway_count = 0
             payload["gateway_summary"] = _gateway_summary(safe_devices, gateway_count)

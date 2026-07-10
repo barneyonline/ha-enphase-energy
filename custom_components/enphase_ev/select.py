@@ -20,7 +20,6 @@ from .api import SchedulerUnavailable
 from .battery_schedule_editor import (
     BatteryScheduleEditorEntity,
     NEW_SCHEDULE_OPTION,
-    battery_schedule_type_label,
     battery_schedule_type_options,
     battery_scheduler_enabled,
 )
@@ -45,6 +44,7 @@ from .labels import (
     CHARGE_MODE_LABELS,
     battery_profile_label,
     battery_schedule_create_label,
+    battery_schedule_type_label,
     charge_mode_label,
 )
 from .runtime_helpers import (
@@ -111,8 +111,12 @@ def _solar_mode(coord: EnphaseCoordinator, sn: str | None = None) -> tuple[str, 
     if _smart_charging_context(coord, sn):
         # The Enphase UI can present the same solar option as Smart Charging
         # when battery profile preferences are active.
-        return "SMART_CHARGING", charge_mode_label("SMART_CHARGING", hass=coord.hass)
-    return "GREEN_CHARGING", charge_mode_label("GREEN_CHARGING", hass=coord.hass)
+        return "SMART_CHARGING", cast(
+            str, charge_mode_label("SMART_CHARGING", hass=coord.hass)
+        )
+    return "GREEN_CHARGING", cast(
+        str, charge_mode_label("GREEN_CHARGING", hass=coord.hass)
+    )
 
 
 def _english_charge_mode_label(mode: str) -> str | None:
@@ -130,7 +134,7 @@ def _english_charge_mode_label(mode: str) -> str | None:
     normalized = aliases.get(key)
     if normalized is None:
         return None
-    return cast(str | None, CHARGE_MODE_LABELS.get(normalized))
+    return CHARGE_MODE_LABELS.get(normalized)
 
 
 def _site_has_battery(coord: EnphaseCoordinator) -> bool:
@@ -172,7 +176,7 @@ def _retain_system_profile(coord: EnphaseCoordinator) -> bool:
 
 
 def _retain_ac_battery_target_soc(coord: EnphaseCoordinator) -> bool:
-    return cast(bool, ac_battery_control_available(coord))
+    return ac_battery_control_available(coord)
 
 
 def _retain_battery_schedule_editor(
@@ -418,12 +422,9 @@ class SystemProfileSelect(CoordinatorEntity, SelectEntity):  # type: ignore[misc
         selected = self._coord.battery_selected_profile
         if not selected:
             return None
-        return cast(
-            str | None,
-            battery_profile_label(
-                selected,
-                hass=getattr(self, "hass", None) or self._coord.hass,
-            ),
+        return battery_profile_label(
+            selected,
+            hass=getattr(self, "hass", None) or self._coord.hass,
         )
 
     async def async_select_option(self, option: str) -> None:
@@ -439,6 +440,7 @@ class SystemProfileSelect(CoordinatorEntity, SelectEntity):  # type: ignore[misc
                 translation_key="selected_system_profile_unavailable",
                 message="Selected system profile is not available.",
             )
+            return
         try:
             await self._coord.battery_runtime.async_set_system_profile(selected_key)
         except ServiceValidationError:
@@ -544,15 +546,12 @@ class BatteryScheduleSelect(_BatteryScheduleEditorSelect):
             return None
         hass = getattr(self, "hass", None) or self._coord.hass
         if self._editor.current_selection == NEW_SCHEDULE_OPTION:
-            return cast(str | None, battery_schedule_create_label(hass=hass))
+            return battery_schedule_create_label(hass=hass)
         selected_schedule = self._editor.get_schedule(self._editor.current_selection)
         if selected_schedule is None:
             return None
-        return cast(
-            str | None,
-            self._editor.option_label_by_schedule_id(hass=hass).get(
-                selected_schedule.schedule_id
-            ),
+        return self._editor.option_label_by_schedule_id(hass=hass).get(
+            selected_schedule.schedule_id
         )
 
     async def async_select_option(self, option: str) -> None:
@@ -599,10 +598,7 @@ class BatteryNewScheduleTypeSelect(_BatteryScheduleEditorSelect):
         if self._editor is None:
             return None
         hass = getattr(self, "hass", None) or self._coord.hass
-        return cast(
-            str | None,
-            battery_schedule_type_label(self._editor.edit.schedule_type, hass=hass),
-        )
+        return battery_schedule_type_label(self._editor.edit.schedule_type, hass=hass)
 
     async def async_select_option(self, option: str) -> None:
         if self._editor is None or not self._editor.is_creating:
@@ -650,17 +646,14 @@ class EvseScheduleSelect(EvseScheduleEditorEntity, SelectEntity):  # type: ignor
             return None
         hass = getattr(self, "hass", None) or self._coord.hass
         if self._editor.current_selection(self._sn) == EVSE_NEW_SCHEDULE_OPTION:
-            return cast(str | None, evse_schedule_create_label(hass=hass))
+            return evse_schedule_create_label(hass=hass)
         selected_schedule = self._editor.get_schedule(
             self._sn, self._editor.current_selection(self._sn)
         )
         if selected_schedule is None:
             return None
-        return cast(
-            str | None,
-            self._editor.option_label_by_slot_id(self._sn).get(
-                selected_schedule.slot_id
-            ),
+        return self._editor.option_label_by_slot_id(self._sn).get(
+            selected_schedule.slot_id
         )
 
     async def async_select_option(self, option: str) -> None:
@@ -688,8 +681,8 @@ class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):  # type: ignore[misc]
         _solar_mode_key, solar_label = _solar_mode(self._coord, self._sn)
         hass = getattr(self, "hass", None) or self._coord.hass
         return [
-            charge_mode_label("MANUAL_CHARGING", hass=hass),
-            charge_mode_label("SCHEDULED_CHARGING", hass=hass),
+            cast(str, charge_mode_label("MANUAL_CHARGING", hass=hass)),
+            cast(str, charge_mode_label("SCHEDULED_CHARGING", hass=hass)),
             solar_label,
         ]
 
@@ -704,18 +697,12 @@ class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):  # type: ignore[misc]
         if not val:
             return None
         if val == "MANUAL_CHARGING":
-            return cast(
-                str | None,
-                charge_mode_label(
-                    val, hass=getattr(self, "hass", None) or self._coord.hass
-                ),
+            return charge_mode_label(
+                val, hass=getattr(self, "hass", None) or self._coord.hass
             )
         if val == "SCHEDULED_CHARGING":
-            return cast(
-                str | None,
-                charge_mode_label(
-                    val, hass=getattr(self, "hass", None) or self._coord.hass
-                ),
+            return charge_mode_label(
+                val, hass=getattr(self, "hass", None) or self._coord.hass
             )
         if val in {"GREEN_CHARGING", "SMART_CHARGING"}:
             return _solar_mode(self._coord, self._sn)[1]
@@ -811,13 +798,12 @@ class AcBatteryTargetStateOfChargeSelect(CoordinatorEntity, SelectEntity):  # ty
             return False
         if getattr(self._coord, "battery_has_acb", None) is not True:
             return False
-        return cast(bool, ac_battery_control_available(self._coord))
+        return ac_battery_control_available(self._coord)
 
     @property
     def current_option(self) -> str | None:
-        return cast(
-            str | None,
-            ac_battery_soc_option_label(self._coord.ac_battery_selected_sleep_min_soc),
+        return ac_battery_soc_option_label(
+            self._coord.ac_battery_selected_sleep_min_soc
         )
 
     @property
@@ -840,6 +826,7 @@ class AcBatteryTargetStateOfChargeSelect(CoordinatorEntity, SelectEntity):  # ty
                 ),
                 message="Selected AC Battery target state of charge is not available.",
             )
+            return
         await self._coord.async_set_ac_battery_target_soc(selected_value)
 
     @property

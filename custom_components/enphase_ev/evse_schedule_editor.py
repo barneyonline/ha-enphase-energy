@@ -110,7 +110,7 @@ def evse_scheduler_enabled(entry: EnphaseConfigEntry | None) -> bool:
 
 
 def evse_schedule_create_label(*, hass: object | None = None) -> str:
-    return cast(str, _evse_schedule_create_label(hass=hass))
+    return _evse_schedule_create_label(hass=hass)
 
 
 def evse_schedule_editor_active(
