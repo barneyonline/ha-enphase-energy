@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "Последна грешка в енергията на сайта",
       "site_energy_failures": "Енергийни повреди на сайта",
       "site_energy_backoff_active": "Енергийното забавяне на сайта е активно",
-      "site_energy_backoff_ends_utc": "Край на намаляването на енергията на сайта (UTC)"
+      "site_energy_backoff_ends_utc": "Край на намаляването на енергията на сайта (UTC)",
+      "tariff_available": "Налична тарифа",
+      "tariff_service_status": "Състояние на тарифната услуга",
+      "tariff_last_error": "Последна грешка на тарифата",
+      "tariff_failures": "Грешки на тарифата",
+      "tariff_backoff_active": "Отлагането на тарифата е активно",
+      "tariff_backoff_ends_utc": "Отлагането на тарифата приключва (UTC)",
+      "degraded_endpoint_families": "Семейства крайни точки с влошена работа",
+      "degraded_services": "Услуги с влошена работа",
+      "firmware_catalog_last_fetch_utc": "Последно извличане на каталога с фърмуер (UTC)",
+      "firmware_catalog_last_success_utc": "Последно успешно извличане на каталога с фърмуер (UTC)",
+      "firmware_catalog_last_error": "Последна грешка в каталога с фърмуер",
+      "firmware_catalog_using_stale": "Каталогът с фърмуер използва остарели данни",
+      "firmware_catalog_generated_at": "Каталогът с фърмуер е генериран на",
+      "firmware_catalog_source_age_seconds": "Възраст на източника на каталога с фърмуер (s)"
     }
   },
   "services": {

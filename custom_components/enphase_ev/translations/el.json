@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "Τελευταίο σφάλμα ενέργειας τοποθεσίας",
       "site_energy_failures": "Ενεργειακές βλάβες τοποθεσίας",
       "site_energy_backoff_active": "Η ενεργειακή επιστροφή ενέργειας τοποθεσίας είναι ενεργή",
-      "site_energy_backoff_ends_utc": "Τερματίζει η επιστροφή ενέργειας ιστότοπου (UTC)"
+      "site_energy_backoff_ends_utc": "Τερματίζει η επιστροφή ενέργειας ιστότοπου (UTC)",
+      "tariff_available": "Διαθέσιμο τιμολόγιο",
+      "tariff_service_status": "Κατάσταση υπηρεσίας τιμολογίου",
+      "tariff_last_error": "Τελευταίο σφάλμα τιμολογίου",
+      "tariff_failures": "Αποτυχίες τιμολογίου",
+      "tariff_backoff_active": "Η αναμονή τιμολογίου είναι ενεργή",
+      "tariff_backoff_ends_utc": "Η αναμονή τιμολογίου λήγει (UTC)",
+      "degraded_endpoint_families": "Οικογένειες υποβαθμισμένων τελικών σημείων",
+      "degraded_services": "Υποβαθμισμένες υπηρεσίες",
+      "firmware_catalog_last_fetch_utc": "Τελευταία ανάκτηση καταλόγου υλικολογισμικού (UTC)",
+      "firmware_catalog_last_success_utc": "Τελευταία επιτυχής ανάκτηση καταλόγου υλικολογισμικού (UTC)",
+      "firmware_catalog_last_error": "Τελευταίο σφάλμα καταλόγου υλικολογισμικού",
+      "firmware_catalog_using_stale": "Ο κατάλογος υλικολογισμικού χρησιμοποιεί παλιά δεδομένα",
+      "firmware_catalog_generated_at": "Ο κατάλογος υλικολογισμικού δημιουργήθηκε στις",
+      "firmware_catalog_source_age_seconds": "Ηλικία πηγής καταλόγου υλικολογισμικού (s)"
     }
   },
   "services": {

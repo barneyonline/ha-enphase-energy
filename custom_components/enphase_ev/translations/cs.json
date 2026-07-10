@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "Poslední chyba energie webu",
       "site_energy_failures": "Výpadky energie na místě",
       "site_energy_backoff_active": "Aktivní zpětné odpojení energie na místě",
-      "site_energy_backoff_ends_utc": "Konec energetického backoff webu (UTC)"
+      "site_energy_backoff_ends_utc": "Konec energetického backoff webu (UTC)",
+      "tariff_available": "Tarif k dispozici",
+      "tariff_service_status": "Stav tarifní služby",
+      "tariff_last_error": "Poslední chyba tarifu",
+      "tariff_failures": "Selhání tarifu",
+      "tariff_backoff_active": "Odklad tarifu je aktivní",
+      "tariff_backoff_ends_utc": "Odklad tarifu končí (UTC)",
+      "degraded_endpoint_families": "Skupiny koncových bodů se sníženou dostupností",
+      "degraded_services": "Služby se sníženou dostupností",
+      "firmware_catalog_last_fetch_utc": "Poslední načtení katalogu firmwaru (UTC)",
+      "firmware_catalog_last_success_utc": "Poslední úspěšné načtení katalogu firmwaru (UTC)",
+      "firmware_catalog_last_error": "Poslední chyba katalogu firmwaru",
+      "firmware_catalog_using_stale": "Katalog firmwaru používá zastaralá data",
+      "firmware_catalog_generated_at": "Katalog firmwaru vygenerován",
+      "firmware_catalog_source_age_seconds": "Stáří zdroje katalogu firmwaru (s)"
     }
   },
   "services": {

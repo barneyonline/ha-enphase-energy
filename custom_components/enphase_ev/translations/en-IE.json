@@ -2277,7 +2277,21 @@
       "last_failure_description": "Last failure description",
       "phase_timings": "Phase timings",
       "session_cache_ttl_s": "Session cache TTL (s)",
-      "sites": "Sites"
+      "sites": "Sites",
+      "tariff_available": "Tariff available",
+      "tariff_service_status": "Tariff service status",
+      "tariff_last_error": "Tariff last error",
+      "tariff_failures": "Tariff failures",
+      "tariff_backoff_active": "Tariff backoff active",
+      "tariff_backoff_ends_utc": "Tariff backoff ends (UTC)",
+      "degraded_endpoint_families": "Degraded endpoint families",
+      "degraded_services": "Degraded services",
+      "firmware_catalog_last_fetch_utc": "Firmware catalog last fetch (UTC)",
+      "firmware_catalog_last_success_utc": "Firmware catalog last success (UTC)",
+      "firmware_catalog_last_error": "Firmware catalog last error",
+      "firmware_catalog_using_stale": "Firmware catalog using stale data",
+      "firmware_catalog_generated_at": "Firmware catalog generated at",
+      "firmware_catalog_source_age_seconds": "Firmware catalog source age (s)"
     }
   },
   "services": {

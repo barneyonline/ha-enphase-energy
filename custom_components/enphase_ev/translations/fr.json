@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "Dernière erreur d'énergie du site",
       "site_energy_failures": "Pannes énergétiques du site",
       "site_energy_backoff_active": "Économie d'énergie du site active",
-      "site_energy_backoff_ends_utc": "Fin de l’économie d’énergie du site (UTC)"
+      "site_energy_backoff_ends_utc": "Fin de l’économie d’énergie du site (UTC)",
+      "tariff_available": "Tarif disponible",
+      "tariff_service_status": "État du service tarifaire",
+      "tariff_last_error": "Dernière erreur tarifaire",
+      "tariff_failures": "Échecs du service tarifaire",
+      "tariff_backoff_active": "Temporisation tarifaire active",
+      "tariff_backoff_ends_utc": "Fin de la temporisation tarifaire (UTC)",
+      "degraded_endpoint_families": "Familles de points de terminaison dégradées",
+      "degraded_services": "Services dégradés",
+      "firmware_catalog_last_fetch_utc": "Dernière récupération du catalogue des micrologiciels (UTC)",
+      "firmware_catalog_last_success_utc": "Dernière récupération réussie du catalogue des micrologiciels (UTC)",
+      "firmware_catalog_last_error": "Dernière erreur du catalogue des micrologiciels",
+      "firmware_catalog_using_stale": "Le catalogue des micrologiciels utilise des données obsolètes",
+      "firmware_catalog_generated_at": "Catalogue des micrologiciels généré le",
+      "firmware_catalog_source_age_seconds": "Âge de la source du catalogue des micrologiciels (s)"
     }
   },
   "services": {

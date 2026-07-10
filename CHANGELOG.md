@@ -30,6 +30,8 @@ All notable changes to this project will be documented in this file.
   use of standard Home Assistant conditions.
 - Reused a Home Assistant-managed stateless HTTP session for cookie-authenticated
   BatteryConfig writes instead of creating a new connection pool per request.
+- Added localized System Health labels for tariff status, degraded services,
+  and firmware catalog diagnostics in every supported language.
 
 ### 🔄 Other changes
 - None

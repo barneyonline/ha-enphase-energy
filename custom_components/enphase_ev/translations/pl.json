@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "Ostatni błąd dotyczący energii obiektu",
       "site_energy_failures": "Awarie energetyczne obiektu",
       "site_energy_backoff_active": "Aktywny zwrot energii w obiekcie",
-      "site_energy_backoff_ends_utc": "Koniec potrąceń energii w obiekcie (UTC)"
+      "site_energy_backoff_ends_utc": "Koniec potrąceń energii w obiekcie (UTC)",
+      "tariff_available": "Taryfa dostępna",
+      "tariff_service_status": "Stan usługi taryfowej",
+      "tariff_last_error": "Ostatni błąd taryfy",
+      "tariff_failures": "Błędy taryfy",
+      "tariff_backoff_active": "Wycofanie taryfy aktywne",
+      "tariff_backoff_ends_utc": "Wycofanie taryfy kończy się (UTC)",
+      "degraded_endpoint_families": "Rodziny punktów końcowych o obniżonej sprawności",
+      "degraded_services": "Usługi o obniżonej sprawności",
+      "firmware_catalog_last_fetch_utc": "Ostatnie pobranie katalogu oprogramowania układowego (UTC)",
+      "firmware_catalog_last_success_utc": "Ostatnie udane pobranie katalogu oprogramowania układowego (UTC)",
+      "firmware_catalog_last_error": "Ostatni błąd katalogu oprogramowania układowego",
+      "firmware_catalog_using_stale": "Katalog oprogramowania układowego używa nieaktualnych danych",
+      "firmware_catalog_generated_at": "Katalog oprogramowania układowego wygenerowano",
+      "firmware_catalog_source_age_seconds": "Wiek źródła katalogu oprogramowania układowego (s)"
     }
   },
   "services": {

@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "Nettstedsenergi siste feil",
       "site_energy_failures": "Energisvikt på stedet",
       "site_energy_backoff_active": "Site energy backoff aktiv",
-      "site_energy_backoff_ends_utc": "Backoff for nettstedenergi slutter (UTC)"
+      "site_energy_backoff_ends_utc": "Backoff for nettstedenergi slutter (UTC)",
+      "tariff_available": "Tariff tilgjengelig",
+      "tariff_service_status": "Status for tarifftjeneste",
+      "tariff_last_error": "Siste tarifffeil",
+      "tariff_failures": "Tarifffeil",
+      "tariff_backoff_active": "Tariffpause aktiv",
+      "tariff_backoff_ends_utc": "Tariffpause avsluttes (UTC)",
+      "degraded_endpoint_families": "Degraderte endepunktfamilier",
+      "degraded_services": "Degraderte tjenester",
+      "firmware_catalog_last_fetch_utc": "Siste henting av fastvarekatalog (UTC)",
+      "firmware_catalog_last_success_utc": "Siste vellykkede henting av fastvarekatalog (UTC)",
+      "firmware_catalog_last_error": "Siste feil i fastvarekatalogen",
+      "firmware_catalog_using_stale": "Fastvarekatalogen bruker utdaterte data",
+      "firmware_catalog_generated_at": "Fastvarekatalog generert",
+      "firmware_catalog_source_age_seconds": "Fastvarekatalogens kildealder (s)"
     }
   },
   "services": {

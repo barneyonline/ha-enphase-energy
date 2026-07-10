@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "Último error de energía del sitio",
       "site_energy_failures": "Fallas de energía del sitio",
       "site_energy_backoff_active": "Reducción de energía del sitio activa",
-      "site_energy_backoff_ends_utc": "Finaliza el retraso de energía del sitio (UTC)"
+      "site_energy_backoff_ends_utc": "Finaliza el retraso de energía del sitio (UTC)",
+      "tariff_available": "Tarifa disponible",
+      "tariff_service_status": "Estado del servicio de tarifas",
+      "tariff_last_error": "Último error de tarifa",
+      "tariff_failures": "Fallos de tarifa",
+      "tariff_backoff_active": "Espera de tarifa activa",
+      "tariff_backoff_ends_utc": "La espera de tarifa finaliza (UTC)",
+      "degraded_endpoint_families": "Familias de puntos de conexión degradadas",
+      "degraded_services": "Servicios degradados",
+      "firmware_catalog_last_fetch_utc": "Última consulta del catálogo de firmware (UTC)",
+      "firmware_catalog_last_success_utc": "Última consulta correcta del catálogo de firmware (UTC)",
+      "firmware_catalog_last_error": "Último error del catálogo de firmware",
+      "firmware_catalog_using_stale": "El catálogo de firmware usa datos obsoletos",
+      "firmware_catalog_generated_at": "Catálogo de firmware generado el",
+      "firmware_catalog_source_age_seconds": "Antigüedad de la fuente del catálogo de firmware (s)"
     }
   },
   "services": {
