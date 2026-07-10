@@ -41,6 +41,7 @@ from custom_components.enphase_ev.coordinator_refresh_metrics import (
     refresh_performance_history_summary,
     refresh_performance_summary,
 )
+from custom_components.enphase_ev.request_metrics import RequestMetrics
 from custom_components.enphase_ev.session_history import (
     SESSION_CACHE_STATE_UNAVAILABLE,
     SessionCacheEntry,
@@ -2150,8 +2151,8 @@ def test_refresh_pipeline_records_cloud_call_counts(hass, monkeypatch) -> None:
     coord.client = client
 
     context = coord._start_refresh_pipeline()  # noqa: SLF001
-    assert client.request_count == 0
-    client.request_count = 4
+    assert client.request_count == 99
+    context.request_metrics = RequestMetrics("core_refresh", attempts=4)
     coord._finish_refresh_pipeline(context)  # noqa: SLF001
     assert coord._last_refresh_cloud_calls == 4  # noqa: SLF001
     assert coord._last_steady_refresh_cloud_calls == 4  # noqa: SLF001
@@ -2161,7 +2162,7 @@ def test_refresh_pipeline_records_cloud_call_counts(hass, monkeypatch) -> None:
     context = coord._start_refresh_pipeline()  # noqa: SLF001
     context.fast_poll = True
     context.phase_timings["status_s"] = 0.2
-    client.request_count = 6
+    context.request_metrics = RequestMetrics("core_refresh", attempts=6)
     coord._finish_refresh_pipeline(context)  # noqa: SLF001
     assert coord._last_refresh_cloud_calls == 6  # noqa: SLF001
     assert coord._last_fast_refresh_cloud_calls == 6  # noqa: SLF001
@@ -4329,6 +4330,8 @@ async def test_discovery_snapshot_restore_save_and_metrics_edge_paths(
     assert coord._discovery_snapshot_pending is False  # noqa: SLF001
 
     coord.discovery_snapshot.capture = Mock(return_value={"serial_order": ["NEW"]})  # type: ignore[assignment]
+    coord._serial_order = ["NEW"]  # noqa: SLF001
+    coord.serials = {"NEW"}
     coord.discovery_snapshot.schedule_save()
     assert scheduled == []
     assert coord._discovery_snapshot_pending is True  # noqa: SLF001

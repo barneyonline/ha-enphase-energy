@@ -55,6 +55,13 @@ The coordinator distinguishes core failures from optional endpoint failures:
 - Rate limits and cloud outages enter bounded backoff and expose diagnostic sensors.
 - Optional endpoint failures mark that family stale, preserve recent useful data where safe, and report repairs when needed.
 
+Cloud request metrics are scoped to logical operations. Core refresh, startup
+warmup, session-history enrichment, and schedule sync use separate scopes, so
+the coordinator's rolling performance history reports only work performed for
+that refresh. Failed and cancelled refresh attempts are retained in the same
+bounded history. Request-layer queue, network, and parsing totals are included
+when the HTTP boundary supplies them.
+
 ## Cloud Client
 
 `api.py` is the HTTP boundary. It handles Enlighten login, MFA, credential refresh helpers, request headers, response parsing, invalid payload signatures, and endpoint-specific compatibility paths.
@@ -90,6 +97,12 @@ Entity platforms under `sensor.py`, `binary_sensor.py`, `button.py`, `number.py`
 2. Add charger or device entities for discovered serials/type members.
 3. Wait for inventory readiness before pruning managed entity registry entries.
 4. Use optimistic coordinator caches only when Enphase writes are known to settle asynchronously.
+
+`discovery_snapshot.py` persists only stable identity and capability metadata
+needed to restore entity discovery before live inventory arrives. It observes a
+lightweight discovery revision on refresh completion; unchanged telemetry does
+not deep-copy or JSON-serialize inverter and battery snapshots. Delayed writes
+coalesce revisions and reuse the already captured compact payload.
 
 ## Diagnostics, Redaction, And Repairs
 

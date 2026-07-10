@@ -33,6 +33,7 @@ from .const import (
     OPT_SCHEDULE_SYNC_ENABLED,
 )
 from .log_redaction import redact_identifier, redact_text
+from .request_metrics import request_metrics_scope
 from .schedule import normalize_slot_payload
 
 if TYPE_CHECKING:
@@ -499,6 +500,12 @@ class ScheduleSync:
 
     async def async_refresh(
         self, *, reason: str = "manual", serials: Iterable[str] | None = None
+    ) -> None:
+        with request_metrics_scope("schedule_sync"):
+            await self._async_refresh_impl(reason=reason, serials=serials)
+
+    async def _async_refresh_impl(
+        self, *, reason: str, serials: Iterable[str] | None
     ) -> None:
         if not self._sync_enabled():
             self._last_status = "disabled"

@@ -16,6 +16,7 @@ from homeassistant.util import dt as dt_util
 
 from .api import InvalidPayloadError, SessionHistoryUnavailable, Unauthorized
 from .log_redaction import redact_identifier, redact_text
+from .request_metrics import request_metrics_scope
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -409,6 +410,20 @@ class SessionHistoryManager:
         return updates
 
     async def _async_enrich_sessions(
+        self,
+        serials: Iterable[str],
+        *,
+        day_local: datetime,
+        max_cache_age: float | None = None,
+    ) -> dict[str, list[dict[str, Any]]]:
+        with request_metrics_scope("session_history"):
+            return await self._async_enrich_sessions_impl(
+                serials,
+                day_local=day_local,
+                max_cache_age=max_cache_age,
+            )
+
+    async def _async_enrich_sessions_impl(
         self,
         serials: Iterable[str],
         *,

@@ -23,6 +23,7 @@ from .api import (
 from .const import DOMAIN, DEFAULT_CHARGE_LEVEL_SETTING, PHASE_SWITCH_CONFIG_SETTING
 from .log_redaction import redact_site_id, redact_text
 from .refresh_plan import BoundRefreshCall, RefreshPlan, bind_refresh_plan, warmup_plan
+from .request_metrics import request_metrics_scope
 
 if TYPE_CHECKING:
     from .coordinator import EnphaseCoordinator
@@ -291,6 +292,10 @@ class RefreshRunner:
             )
 
     async def async_startup_warmup_runner(self) -> None:
+        with request_metrics_scope("startup_warmup"):
+            await self._async_startup_warmup_runner_impl()
+
+    async def _async_startup_warmup_runner_impl(self) -> None:
         coordinator = self._coordinator
         warmup_timings: dict[str, float] = {}
         coordinator._warmup_in_progress = True
