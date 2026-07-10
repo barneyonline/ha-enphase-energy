@@ -30,6 +30,8 @@ All notable changes to this project will be documented in this file.
   integration objects.
 - Fixed optional or concurrent cloud reads deadlocking credential refresh while
   the initiating request still held the shared Enlighten read limiter.
+- Preserved pending discovery snapshots when a storage write is cancelled so a
+  later refresh can retry persistence instead of losing the observed revision.
 
 ### 🔧 Improvements
 - Bound optional Enlighten request queueing and startup warmup stages, reserve

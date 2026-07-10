@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from datetime import datetime
@@ -603,6 +604,13 @@ class DiscoverySnapshotManager:
         self._save_in_progress = True
         try:
             await self._store.async_save(snapshot)
+        except asyncio.CancelledError:
+            if self._pending_snapshot is None:
+                self._pending_snapshot = snapshot
+                self._pending_signature = signature
+                self._pending_revision = revision
+            self.coordinator._discovery_snapshot_pending = True
+            raise
         except Exception:  # noqa: BLE001
             _LOGGER.debug(
                 "Failed to save discovery snapshot for site %s",

@@ -207,6 +207,57 @@ async def test_snapshot_save_coalesces_mutation_during_write(
     assert scheduled
 
 
+@pytest.mark.asyncio
+async def test_cancelled_snapshot_save_retains_pending_revision(
+    coordinator_factory, monkeypatch
+) -> None:
+    """Cancellation must not make an observed but unpersisted revision disappear."""
+
+    coord = coordinator_factory()
+    manager = coord.discovery_snapshot
+    coord._inverter_order = ["INV-1"]  # noqa: SLF001
+    coord._inverter_data = {  # noqa: SLF001
+        "INV-1": {"serial_number": "INV-1", "name": "Garage"}
+    }
+    coord.inventory_runtime._inverter_order = coord._inverter_order  # noqa: SLF001
+    coord.inventory_runtime._inverter_data = coord._inverter_data  # noqa: SLF001
+    coord._discovery_snapshot_save_cancel = lambda: None  # noqa: SLF001
+    manager.schedule_save()
+
+    save_started = asyncio.Event()
+    keep_saving = asyncio.Event()
+
+    async def _save(_snapshot) -> None:
+        save_started.set()
+        await keep_saving.wait()
+
+    coord._discovery_snapshot_save_cancel = None  # noqa: SLF001
+    manager._store = SimpleNamespace(  # noqa: SLF001
+        async_save=AsyncMock(side_effect=_save)
+    )
+    save_task = asyncio.create_task(manager.async_save())
+    await asyncio.wait_for(save_started.wait(), timeout=1)
+    save_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await save_task
+
+    assert coord._discovery_snapshot_pending is True  # noqa: SLF001
+    assert manager._pending_snapshot is not None  # noqa: SLF001
+
+    scheduled: list[object] = []
+
+    def _call_later(_hass, _delay, callback):
+        scheduled.append(callback)
+        return lambda: None
+
+    from custom_components.enphase_ev import discovery_snapshot as snapshot_module
+
+    monkeypatch.setattr(snapshot_module, "async_call_later", _call_later)
+    manager.schedule_save()
+
+    assert scheduled
+
+
 def test_unchanged_snapshot_revision_matches_persisted_payload(
     coordinator_factory,
 ) -> None:
