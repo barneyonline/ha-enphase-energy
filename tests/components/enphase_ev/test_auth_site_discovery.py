@@ -10,6 +10,7 @@ from custom_components.enphase_ev import api
 @pytest.mark.asyncio
 async def test_async_authenticate_populates_site_headers(monkeypatch):
     site_headers: list[dict[str, str]] = []
+    token_requests: list[tuple[str, dict[str, str]]] = []
 
     async def _fake_request_json(
         session: aiohttp.ClientSession,
@@ -30,7 +31,12 @@ async def test_async_authenticate_populates_site_headers(monkeypatch):
                 response_url=URL(api.BASE_URL),
             )
             return {"session_id": "sid123"}
-        if url == f"{api.ENTREZ_URL}/tokens":
+        if url == api.SELF_TOKEN_URL:
+            token_requests.append((method, headers or {}))
+            session.cookie_jar.update_cookies(
+                {"enlighten_session": "rotated-session"},
+                response_url=URL(api.BASE_URL),
+            )
             return {"token": "token123", "expires_at": 1700000000}
         if url == api.SITE_SEARCH_URL:
             site_headers.append(headers or {})
@@ -47,8 +53,20 @@ async def test_async_authenticate_populates_site_headers(monkeypatch):
     tokens, sites = await api.async_authenticate(session, "user@example.com", "secret")
 
     assert tokens.access_token == "token123"
+    assert tokens.cookie and "rotated-session" in tokens.cookie
     assert sites and sites[0].site_id == "7812456"
     assert site_headers, "Site discovery request headers were not captured"
+    assert token_requests == [
+        (
+            "GET",
+            {
+                "Accept": "application/json, text/plain, */*",
+                "Referer": f"{api.BASE_URL}/",
+                "User-Agent": api._ENLIGHTEN_BROWSER_USER_AGENT,
+                "X-Requested-With": "XMLHttpRequest",
+            },
+        )
+    ]
 
     captured = site_headers[0]
     assert captured["Accept"] == "*/*"
@@ -59,4 +77,4 @@ async def test_async_authenticate_populates_site_headers(monkeypatch):
     assert captured["Authorization"] == "Bearer token123"
     assert captured["e-auth-token"] == "token123"
     # Ensure the caller explicitly sets Cookie so the request works without relying on session defaults
-    assert "Cookie" in captured and "enlighten_session" in captured["Cookie"]
+    assert "Cookie" in captured and "rotated-session" in captured["Cookie"]

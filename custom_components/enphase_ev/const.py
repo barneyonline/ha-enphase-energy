@@ -62,6 +62,7 @@ ISSUE_BATTERY_PROFILE_PENDING = "battery_profile_pending"
 
 BASE_URL = "https://enlighten.enphaseenergy.com"
 ENTREZ_URL = "https://entrez.enphaseenergy.com"
+SELF_TOKEN_URL = f"{BASE_URL}/users/self/token"
 LOGIN_URL = f"{BASE_URL}/login/login.json"
 LOGIN_FORM_URL = f"{BASE_URL}/login/login"
 MFA_VALIDATE_URL = f"{BASE_URL}/app-api/validate_login_otp"

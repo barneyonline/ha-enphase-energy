@@ -14,6 +14,10 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- Fixed Enlighten authentication after Enphase retired the Entrez token mint by
+  using the first-party session token endpoint and retaining rotated session
+  cookies, and aligned BatteryConfig reads with the current cookie-session web
+  request shape. (#758)
 - Fixed Grid Mode so it reads the live-stream `meters.gridRelay` value and
   falls back to outage-context fields such as `show_grid_connect` only when the
   live relay state is unavailable.
