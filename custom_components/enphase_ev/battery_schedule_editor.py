@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import time as dt_time
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Callable, TypeVar, cast
 
-from homeassistant.core import CALLBACK_TYPE, callback
+from homeassistant.core import CALLBACK_TYPE, callback as ha_callback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
@@ -18,6 +18,29 @@ from .runtime_data import EnphaseConfigEntry, get_runtime_data
 
 if TYPE_CHECKING:  # pragma: no cover
     from .coordinator import EnphaseCoordinator
+
+    class _CoordinatorEntityBase:
+        """Typed view of the external coordinator entity base."""
+
+        def __init__(self, coordinator: object) -> None: ...
+
+        async def async_added_to_hass(self) -> None: ...
+
+        async def async_will_remove_from_hass(self) -> None: ...
+
+        def async_write_ha_state(self) -> None: ...
+
+else:
+    _CoordinatorEntityBase = CoordinatorEntity
+
+_CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
+
+
+def callback(func: _CallbackT) -> _CallbackT:
+    """Apply Home Assistant's callback marker with its identity type preserved."""
+
+    return cast(_CallbackT, ha_callback(func))
+
 
 DAY_ORDER: list[tuple[str, int]] = [
     ("mon", 1),
@@ -507,7 +530,7 @@ class BatteryScheduleEditorManager:
         selected = self.get_schedule(self.edit.selected_schedule_id)
         if selected is None:
             fallback = self._default_schedule_selection()
-            before = (
+            selection_before = (
                 self.edit.selected_schedule_id,
                 self.edit.create_mode,
                 self.edit.schedule_type,
@@ -516,11 +539,11 @@ class BatteryScheduleEditorManager:
                 self.edit.limit,
                 self.edit.days,
             )
-            if fallback == NEW_SCHEDULE_OPTION:
+            if fallback == NEW_SCHEDULE_OPTION or fallback is None:
                 self._set_create_mode_defaults(auto=True)
-            else:
+            elif isinstance(fallback, BatteryScheduleRecord):
                 self._apply_schedule_to_form(fallback)
-            after = (
+            selection_after = (
                 self.edit.selected_schedule_id,
                 self.edit.create_mode,
                 self.edit.schedule_type,
@@ -529,14 +552,14 @@ class BatteryScheduleEditorManager:
                 self.edit.limit,
                 self.edit.days,
             )
-            if schedules_changed or before != after:
+            if schedules_changed or selection_before != selection_after:
                 self._notify_listeners()
             return
 
         if not schedules_changed:
             return
 
-        before = (
+        schedule_before = (
             self.edit.schedule_type,
             self.edit.start_time,
             self.edit.end_time,
@@ -544,14 +567,14 @@ class BatteryScheduleEditorManager:
             self.edit.days,
         )
         self._apply_schedule_to_form(selected)
-        after = (
+        schedule_after = (
             self.edit.schedule_type,
             self.edit.start_time,
             self.edit.end_time,
             self.edit.limit,
             self.edit.days,
         )
-        if schedules_changed or before != after:
+        if schedules_changed or schedule_before != schedule_after:
             self._notify_listeners()
 
     def _apply_schedule_to_form(self, schedule: BatteryScheduleRecord) -> None:
@@ -635,7 +658,7 @@ class BatteryScheduleEditorManager:
         self._notify_listeners()
 
 
-class BatteryScheduleEditorEntity(CoordinatorEntity[Any]):
+class BatteryScheduleEditorEntity(_CoordinatorEntityBase):
     def __init__(self, coord: EnphaseCoordinator, entry: EnphaseConfigEntry) -> None:
         super().__init__(coord)
         self._coord = coord

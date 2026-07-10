@@ -6,10 +6,10 @@ import asyncio
 import json
 import logging
 import time
-from datetime import time as dt_time, timedelta
+from datetime import datetime, time as dt_time, timedelta
 from datetime import timezone as _tz
 from http import HTTPStatus
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from zoneinfo import ZoneInfo
 
 import aiohttp
@@ -18,6 +18,7 @@ from homeassistant.util import dt as dt_util
 
 from .ac_battery_runtime import AcBatteryRuntime
 from .battery_schedule_editor import (
+    BatteryScheduleRecord,
     battery_schedule_overlap_message,
     battery_schedule_overlap_placeholders,
     battery_schedule_overlap_record,
@@ -72,7 +73,7 @@ from .parsing_helpers import (
 )
 from .runtime_helpers import coerce_int, coerce_optional_int
 from .service_validation import raise_translated_service_validation
-from .state_models import BatteryControlCapability
+from .state_models import BatteryControlCapability, BatteryState
 
 if TYPE_CHECKING:  # pragma: no cover
     from .coordinator import EnphaseCoordinator
@@ -107,19 +108,22 @@ class BatteryRuntime:
         self._ac_battery_runtime = AcBatteryRuntime(self)
 
     @property
-    def battery_state(self) -> object:
+    def battery_state(self) -> BatteryState:
         """Return the explicit battery state bag when available."""
 
-        return getattr(self.coordinator, "battery_state", self.coordinator)
+        return cast(
+            BatteryState,
+            getattr(self.coordinator, "battery_state", self.coordinator),
+        )
 
     def _normalize_battery_sub_type(self, value: object) -> str | None:
         coord = self.coordinator
         func = getattr(coord, "normalize_battery_sub_type", None)
         if callable(func):
-            return func(value)
+            return cast(str | None, func(value))
         func = getattr(coord, "_normalize_battery_sub_type", None)
         if callable(func):
-            return func(value)
+            return cast(str | None, func(value))
         return None
 
     def _sync_battery_profile_pending_issue(self) -> None:
@@ -133,54 +137,54 @@ class BatteryRuntime:
             func()
 
     def _coerce_int(self, value: object, *, default: int = 0) -> int:
-        return coerce_int(value, default=default)
+        return cast(int, coerce_int(value, default=default))
 
     def _coerce_optional_bool(self, value: object) -> bool | None:
-        return coerce_optional_bool(value)
+        return cast(bool | None, coerce_optional_bool(value))
 
     def _coerce_optional_text(self, value: object) -> str | None:
-        return coerce_optional_text(value)
+        return cast(str | None, coerce_optional_text(value))
 
     def _coerce_optional_int(self, value: object) -> int | None:
-        return coerce_optional_int(value)
+        return cast(int | None, coerce_optional_int(value))
 
     def _coerce_optional_float(self, value: object) -> float | None:
-        return coerce_optional_float(value)
+        return cast(float | None, coerce_optional_float(value))
 
     def _coerce_optional_kwh(self, value: object) -> float | None:
         func = getattr(self.coordinator, "_coerce_optional_kwh", None)
         if callable(func):
-            return func(value)
+            return cast(float | None, func(value))
         return None
 
     def _parse_percent_value(self, value: object) -> float | None:
         func = getattr(self.coordinator, "_parse_percent_value", None)
         if callable(func):
-            return func(value)
+            return cast(float | None, func(value))
         return None
 
     def _normalize_battery_status_text(self, value: object) -> str | None:
         func = getattr(self.coordinator, "_normalize_battery_status_text", None)
         if callable(func):
-            return func(value)
+            return cast(str | None, func(value))
         return None
 
     def _battery_status_severity_value(self, status: str | None) -> int:
         func = getattr(self.coordinator, "_battery_status_severity_value", None)
         if callable(func):
-            return func(status)
+            return cast(int, func(status))
         return 0
 
     def _battery_storage_key(self, payload: dict[str, object]) -> str | None:
         func = getattr(self.coordinator, "_battery_storage_key", None)
         if callable(func):
-            return func(payload)
+            return cast(str | None, func(payload))
         return None
 
     def _normalize_battery_id(self, value: object) -> str | None:
         func = getattr(self.coordinator, "_normalize_battery_id", None)
         if callable(func):
-            return func(value)
+            return cast(str | None, func(value))
         return None
 
     def parse_ac_battery_devices_page(self, html_text: object) -> None:
@@ -222,13 +226,13 @@ class BatteryRuntime:
     def _normalize_battery_grid_mode(self, value: object) -> str | None:
         func = getattr(self.coordinator, "_normalize_battery_grid_mode", None)
         if callable(func):
-            return func(value)
+            return cast(str | None, func(value))
         return None
 
     def _normalize_minutes_of_day(self, value: object) -> int | None:
         func = getattr(self.coordinator, "_normalize_minutes_of_day", None)
         if callable(func):
-            return func(value)
+            return cast(int | None, func(value))
         return None
 
     def _copy_dry_contact_settings_entry(
@@ -331,10 +335,10 @@ class BatteryRuntime:
         coord = self.coordinator
         func = getattr(coord, "current_charge_from_grid_schedule_window", None)
         if callable(func):
-            return func()
+            return cast(tuple[int | None, int | None], func())
         func = getattr(coord, "_current_charge_from_grid_schedule_window", None)
         if callable(func):
-            return func()
+            return cast(tuple[int | None, int | None], func())
         return self.current_charge_from_grid_schedule_window()
 
     @staticmethod
@@ -370,14 +374,14 @@ class BatteryRuntime:
             for attr in ("_battery_pending_profile", "_battery_profile"):
                 candidate = getattr(self.battery_state, attr, None)
                 if candidate in {"cost_savings", "ai_optimisation"}:
-                    return candidate
+                    return cast(str, candidate)
         return profile or self.normalize_battery_profile_key(normalized)
 
     @staticmethod
     def battery_profile_label(
         profile: str | None, hass: object | None = None
     ) -> str | None:
-        return translated_battery_profile_label(profile, hass=hass)
+        return cast(str | None, translated_battery_profile_label(profile, hass=hass))
 
     @staticmethod
     def _normalize_pending_sub_type(
@@ -387,10 +391,10 @@ class BatteryRuntime:
             return None
         func = getattr(coordinator, "normalize_battery_sub_type", None)
         if callable(func):
-            return func(sub_type)
+            return cast(str | None, func(sub_type))
         func = getattr(coordinator, "_normalize_battery_sub_type", None)
         if callable(func):
-            return func(sub_type)
+            return cast(str | None, func(sub_type))
         return None
 
     def clear_battery_pending(self, *, clear_optimistic: bool = True) -> None:
@@ -447,7 +451,7 @@ class BatteryRuntime:
         if expired:
             self.clear_battery_optimistic_profile()
             return None
-        return profile
+        return cast(str, profile)
 
     def optimistic_battery_reserve(self) -> int | None:
         if self.optimistic_battery_profile() is None:
@@ -607,8 +611,8 @@ class BatteryRuntime:
             getattr(self.battery_state, "_battery_polling_interval_s", None)
         )
         if polling_interval is None or polling_interval <= 0:
-            return FAST_TOGGLE_POLL_HOLD_S
-        return max(int(polling_interval), FAST_TOGGLE_POLL_HOLD_S)
+            return cast(int, FAST_TOGGLE_POLL_HOLD_S)
+        return max(int(polling_interval), cast(int, FAST_TOGGLE_POLL_HOLD_S))
 
     def _battery_profile_refresh_cache_ttl_seconds(self, default_ttl: float) -> float:
         current_interval = None
@@ -647,7 +651,9 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "battery_status", None)
         if not callable(fetcher):
             return False
-        return coord._endpoint_family_should_run("battery_status", force=force)
+        return cast(
+            bool, coord._endpoint_family_should_run("battery_status", force=force)
+        )
 
     def battery_backup_history_refresh_due(self, *, force: bool = False) -> bool:
         coord = self.coordinator
@@ -659,7 +665,10 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "battery_backup_history", None)
         if not callable(fetcher):
             return False
-        return coord._endpoint_family_should_run("battery_backup_history", force=force)
+        return cast(
+            bool,
+            coord._endpoint_family_should_run("battery_backup_history", force=force),
+        )
 
     def battery_settings_refresh_due(self, *, force: bool = False) -> bool:
         coord = self.coordinator
@@ -672,9 +681,12 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "battery_settings_details", None)
         if not callable(fetcher):
             return False
-        return coord._endpoint_family_should_run(
-            "battery_settings",
-            force=force or bool(pending_profile),
+        return cast(
+            bool,
+            coord._endpoint_family_should_run(
+                "battery_settings",
+                force=force or bool(pending_profile),
+            ),
         )
 
     def battery_schedules_refresh_due(self, *, force: bool = False) -> bool:
@@ -682,7 +694,9 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "battery_schedules", None)
         if not callable(fetcher):
             return False
-        return coord._endpoint_family_should_run("battery_schedules", force=force)
+        return cast(
+            bool, coord._endpoint_family_should_run("battery_schedules", force=force)
+        )
 
     def battery_site_settings_refresh_due(self, *, force: bool = False) -> bool:
         coord = self.coordinator
@@ -694,7 +708,10 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "battery_site_settings", None)
         if not callable(fetcher):
             return False
-        return coord._endpoint_family_should_run("battery_site_settings", force=force)
+        return cast(
+            bool,
+            coord._endpoint_family_should_run("battery_site_settings", force=force),
+        )
 
     def grid_control_check_refresh_due(self, *, force: bool = False) -> bool:
         coord = self.coordinator
@@ -815,9 +832,12 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "storm_guard_profile", None)
         if not callable(fetcher):
             return False
-        return coord._endpoint_family_should_run(
-            "storm_guard",
-            force=force or bool(pending_profile),
+        return cast(
+            bool,
+            coord._endpoint_family_should_run(
+                "storm_guard",
+                force=force or bool(pending_profile),
+            ),
         )
 
     def storm_alert_refresh_due(self, *, force: bool = False) -> bool:
@@ -830,7 +850,7 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "storm_guard_alert", None)
         if not callable(fetcher):
             return False
-        return coord._endpoint_family_should_run("storm_alert", force=force)
+        return cast(bool, coord._endpoint_family_should_run("storm_alert", force=force))
 
     def ac_battery_devices_refresh_due(self, *, force: bool = False) -> bool:
         return self._ac_battery_runtime.ac_battery_devices_refresh_due(force=force)
@@ -917,9 +937,9 @@ class BatteryRuntime:
             getattr(state, "_battery_operation_mode_sub_type", None)
         )
         if pending_subtype == SAVINGS_OPERATION_MODE_SUBTYPE:
-            return effective_subtype == SAVINGS_OPERATION_MODE_SUBTYPE
+            return bool(effective_subtype == SAVINGS_OPERATION_MODE_SUBTYPE)
         if pending_subtype is None:
-            return effective_subtype != SAVINGS_OPERATION_MODE_SUBTYPE
+            return bool(effective_subtype != SAVINGS_OPERATION_MODE_SUBTYPE)
         return pending_subtype == effective_subtype
 
     def remember_battery_reserve(
@@ -952,7 +972,7 @@ class BatteryRuntime:
     def current_savings_sub_type(self) -> str | None:
         selected_subtype = self.coordinator.battery_selected_operation_mode_sub_type
         if selected_subtype == SAVINGS_OPERATION_MODE_SUBTYPE:
-            return SAVINGS_OPERATION_MODE_SUBTYPE
+            return cast(str, SAVINGS_OPERATION_MODE_SUBTYPE)
         return None
 
     def target_operation_mode_sub_type(self, profile: str) -> str | None:
@@ -973,27 +993,24 @@ class BatteryRuntime:
         return bounded
 
     def battery_min_soc_floor(self) -> int:
-        value = self._coerce_int(
-            getattr(self.battery_state, "_battery_very_low_soc_min", None),
-            default=None,
+        value = self._coerce_optional_int(
+            getattr(self.battery_state, "_battery_very_low_soc_min", None)
         )
         if value is None:
-            return BATTERY_MIN_SOC_FALLBACK
+            return cast(int, BATTERY_MIN_SOC_FALLBACK)
         return max(0, min(100, int(value)))
 
     def battery_reserve_min_bound(self) -> int:
-        value = self._coerce_int(
-            getattr(self.battery_state, "_battery_backup_percentage_min", None),
-            default=None,
+        value = self._coerce_optional_int(
+            getattr(self.battery_state, "_battery_backup_percentage_min", None)
         )
         if value is None:
             return self.battery_min_soc_floor()
         return max(0, min(100, int(value)))
 
     def battery_reserve_max_bound(self) -> int:
-        value = self._coerce_int(
-            getattr(self.battery_state, "_battery_backup_percentage_max", None),
-            default=None,
+        value = self._coerce_optional_int(
+            getattr(self.battery_state, "_battery_backup_percentage_max", None)
         )
         if value is None:
             return 100
@@ -1444,7 +1461,7 @@ class BatteryRuntime:
         if callable(normalize):
             normalized = normalize(value)
             if normalized is not None:
-                return normalized
+                return cast(int, normalized)
         if isinstance(value, str):
             text = value.strip()
             if ":" in text:
@@ -1502,8 +1519,8 @@ class BatteryRuntime:
     def battery_itc_disclaimer_value(self) -> str:
         current = getattr(self.battery_state, "_battery_accepted_itc_disclaimer", None)
         if current:
-            return current
-        return dt_util.utcnow().isoformat()
+            return cast(str, current)
+        return cast(str, dt_util.utcnow().isoformat())
 
     async def _async_validate_cfg_schedule_commit(self) -> None:
         """Best-effort mirror of the current CFG validation step."""
@@ -1649,7 +1666,7 @@ class BatteryRuntime:
         end_time: object,
         days: list[int],
         exclude_schedule_id: str | None = None,
-    ):
+    ) -> BatteryScheduleRecord | None:
         return battery_schedule_overlap_record(
             self.coordinator,
             start_time=start_time,
@@ -2106,6 +2123,7 @@ class BatteryRuntime:
                 "battery_profile_unavailable",
                 message="Battery profile is unavailable.",
             )
+        assert normalized_profile is not None
         await self.async_assert_battery_profile_write_allowed()
         normalized_reserve = self.normalize_battery_reserve_for_profile(
             normalized_profile, reserve
@@ -2184,6 +2202,7 @@ class BatteryRuntime:
                 "battery_profile_unavailable",
                 message="Battery profile is unavailable.",
             )
+        assert normalized_profile is not None
         normalized_reserve = self.normalize_battery_reserve_for_profile(
             normalized_profile, reserve
         )
@@ -2449,8 +2468,9 @@ class BatteryRuntime:
         for item in histories:
             if not isinstance(item, dict):
                 continue
+            duration_raw = item.get("duration")
             try:
-                duration = int(item.get("duration"))
+                duration = int(cast(str | bytes | bytearray, duration_raw))
             except (TypeError, ValueError):
                 continue
             if duration <= 0:
@@ -2477,7 +2497,7 @@ class BatteryRuntime:
                     "duration_seconds": duration,
                 }
             )
-        events.sort(key=lambda item: item["start"])
+        events.sort(key=lambda item: cast(datetime, item["start"]))
         if total_records >= 0 and total_records != len(events):
             _LOGGER.debug(
                 "Battery backup history total_records mismatch for site %s (payload=%s parsed=%s)",
@@ -2486,7 +2506,9 @@ class BatteryRuntime:
                 len(events),
             )
         if total_backup >= 0:
-            parsed_total_backup = sum(int(item["duration_seconds"]) for item in events)
+            parsed_total_backup = sum(
+                cast(int, item["duration_seconds"]) for item in events
+            )
             if total_backup != parsed_total_backup:
                 _LOGGER.debug(
                     "Battery backup history total_backup mismatch for site %s (payload=%s parsed=%s)",
@@ -2829,7 +2851,8 @@ class BatteryRuntime:
         }
         type_bucket = (
             inventory_view.type_bucket("ac_battery")
-            if callable(getattr(inventory_view, "type_bucket", None))
+            if inventory_view is not None
+            and callable(getattr(inventory_view, "type_bucket", None))
             else None
         )
         members = type_bucket.get("devices") if isinstance(type_bucket, dict) else None
@@ -3537,7 +3560,7 @@ class BatteryRuntime:
                 pass
         default_tz = getattr(dt_util, "DEFAULT_TIME_ZONE", None)
         if default_tz is not None:
-            return default_tz
+            return cast(_tz | ZoneInfo, default_tz)
         return _tz.utc
 
     async def async_refresh_battery_status(self, *, force: bool = False) -> None:
@@ -4038,7 +4061,7 @@ class BatteryRuntime:
         coord = self.coordinator
         explicit_active = coord.coerce_optional_bool(alert.get("active"))
         if explicit_active is not None:
-            return explicit_active
+            return cast(bool, explicit_active)
         status = coord.coerce_optional_text(alert.get("status"))
         if status:
             normalized_status = status.strip().lower().replace("_", "-")
@@ -4099,7 +4122,7 @@ class BatteryRuntime:
         state._storm_alerts = normalized_alerts
         critical_active = coord.coerce_optional_bool(payload.get("criticalAlertActive"))
         if derived_alert_active is None:
-            return critical_active
+            return cast(bool | None, critical_active)
         if critical_active is None:
             return derived_alert_active
         return critical_active or derived_alert_active
@@ -4186,6 +4209,7 @@ class BatteryRuntime:
                 "battery_profile_unavailable",
                 message="Battery profile is unavailable.",
             )
+        assert profile is not None
         if profile == "backup_only":
             self._raise_validation(
                 "full_backup_reserve_fixed",
@@ -4241,6 +4265,7 @@ class BatteryRuntime:
                 "battery_profile_unavailable",
                 message="Battery profile is unavailable.",
             )
+        assert profile is not None
         if profile not in coord.battery_profile_option_keys:
             self._raise_validation(
                 "battery_profile_unsupported",
@@ -4568,6 +4593,7 @@ class BatteryRuntime:
         async with state._battery_settings_write_lock:
             state._battery_settings_last_write_mono = time.monotonic()
             current_start, current_end = self.current_charge_from_grid_schedule_window()
+            assert current_start is not None and current_end is not None
             start_hhmm = f"{current_start // 60:02d}:{current_start % 60:02d}"
             end_hhmm = f"{current_end // 60:02d}:{current_end % 60:02d}"
             days = getattr(coord, "_battery_cfg_schedule_days", None) or [
@@ -4580,8 +4606,9 @@ class BatteryRuntime:
                 7,
             ]
             tz = getattr(coord, "_battery_cfg_schedule_timezone", None) or "UTC"
+            schedule_id = cast(str, getattr(coord, "_battery_cfg_schedule_id", None))
             await self.async_update_battery_schedule(
-                getattr(coord, "_battery_cfg_schedule_id", None),
+                schedule_id,
                 start_time=start_hhmm,
                 end_time=end_hhmm,
                 limit=limit,
@@ -4613,10 +4640,13 @@ class BatteryRuntime:
         normalized = str(schedule_type).lower()
         coord = self.coordinator
         if normalized == "dtg":
-            return coord.battery_dtg_control_enabled
+            return cast(bool | None, coord.battery_dtg_control_enabled)
         if normalized == "rbd":
-            return coord.battery_rbd_control_enabled
-        return getattr(coord, self._battery_schedule_enabled_attr(schedule_type), None)
+            return cast(bool | None, coord.battery_rbd_control_enabled)
+        return cast(
+            bool | None,
+            getattr(coord, self._battery_schedule_enabled_attr(schedule_type), None),
+        )
 
     def _schedule_family_toggle_validation_details(
         self,
@@ -4707,14 +4737,14 @@ class BatteryRuntime:
             None,
         )
         if normalized in {"dtg", "rbd"} and toggle_target is not None:
-            return toggle_target
+            return cast(bool, toggle_target)
 
         if normalized in {"dtg", "rbd"} and schedule_id is not None:
             if schedule_enabled is not None:
-                return schedule_enabled
+                return cast(bool, schedule_enabled)
 
         if schedule_enabled is not None:
-            return schedule_enabled
+            return cast(bool, schedule_enabled)
 
         if schedule_id is not None:
             return None
@@ -5054,7 +5084,7 @@ class BatteryRuntime:
                     current_start=current_start,
                     current_end=current_end,
                 )
-                payload = {control_key: control_payload}
+                payload: dict[str, object] = {control_key: control_payload}
                 primary_write_rejected = False
                 async with state._battery_settings_write_lock:
                     state._battery_settings_last_write_mono = time.monotonic()
@@ -5150,6 +5180,7 @@ class BatteryRuntime:
                     placeholders=self._schedule_label_placeholders(schedule_type),
                     message=f"{label} schedule time is invalid.",
                 )
+            assert default_window is not None
             default_start, default_end = default_window
             if next_start is None:
                 next_start = default_start
@@ -5218,6 +5249,7 @@ class BatteryRuntime:
                 placeholders=self._schedule_label_placeholders(schedule_type),
                 message=f"Current {label.lower()} schedule time is invalid.",
             )
+        assert current_start is not None and current_end is not None
         if not 5 <= int(limit) <= 100:
             self._raise_validation(
                 "schedule_limit_range",
@@ -5319,12 +5351,14 @@ class BatteryRuntime:
                 "charge_from_grid_schedule_missing",
                 message="No existing charge-from-grid schedule is available.",
             )
+        assert schedule_id is not None
         current_start, current_end = self._current_schedule_window_from_coordinator()
         if current_start is None or current_end is None:
             self._raise_validation(
                 "current_schedule_times_unavailable",
                 message="Current schedule times are not available.",
             )
+        assert current_start is not None and current_end is not None
         next_start = (
             coord.time_to_minutes_of_day(start) if start is not None else current_start
         )
@@ -5339,6 +5373,7 @@ class BatteryRuntime:
                 "charge_from_grid_schedule_time_invalid",
                 message="Charge-from-grid schedule time is invalid.",
             )
+        assert next_start is not None and next_end is not None
         if next_start == next_end:
             self._raise_validation(
                 "charge_from_grid_schedule_times_different",
@@ -5435,7 +5470,7 @@ class BatteryRuntime:
                 continue
             serial = self.coordinator.coerce_optional_text(device.get("serial_number"))
             if serial:
-                return serial
+                return cast(str, serial)
         return None
 
     async def async_assert_grid_toggle_allowed(self) -> None:
@@ -5458,6 +5493,7 @@ class BatteryRuntime:
         requester = getattr(coord.client, "request_grid_toggle_otp", None)
         if not callable(requester):
             self.raise_grid_validation("grid_control_unavailable")
+        assert callable(requester)
         try:
             await requester()
         except Exception as err:  # noqa: BLE001
@@ -5488,6 +5524,7 @@ class BatteryRuntime:
         validator = getattr(coord.client, "validate_grid_toggle_otp", None)
         if not callable(validator):
             self.raise_grid_validation("grid_control_unavailable")
+        assert callable(validator)
         try:
             valid = await validator(otp_text)
         except Exception as err:  # noqa: BLE001
@@ -5503,11 +5540,13 @@ class BatteryRuntime:
         envoy_serial = self.grid_envoy_serial()
         if envoy_serial is None:
             self.raise_grid_validation("grid_envoy_serial_missing")
+        assert envoy_serial is not None
 
         grid_state = 2 if normalized_mode == "on_grid" else 1
         setter = getattr(coord.client, "set_grid_state", None)
         if not callable(setter):
             self.raise_grid_validation("grid_control_unavailable")
+        assert callable(setter)
         try:
             await setter(envoy_serial, grid_state)
         except Exception as err:  # noqa: BLE001
@@ -5556,6 +5595,7 @@ class BatteryRuntime:
     ) -> None:
         if not otp:
             self.raise_grid_validation("grid_otp_required")
+        assert otp is not None
         mode = "on_grid" if bool(enabled) else "off_grid"
         await self.async_set_grid_mode(mode, otp)
 
@@ -5622,6 +5662,7 @@ class BatteryRuntime:
                 "storm_alert_opt_out_unavailable",
                 message="Storm Alert opt-out is unavailable.",
             )
+        assert callable(opt_out)
 
         failures: list[tuple[str, Exception]] = []
         for alert_id, name in actionable:
