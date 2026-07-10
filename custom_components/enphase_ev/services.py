@@ -98,7 +98,7 @@ def async_setup_services(
             translation_placeholders=placeholders,
             message=message,
         )
-        raise AssertionError("unreachable")
+        raise AssertionError("unreachable")  # pragma: no cover
 
     def _serial_from_device(dev: dr.DeviceEntry) -> str | None:
         for domain, sn in dev.identifiers:
@@ -285,7 +285,7 @@ def async_setup_services(
                 placeholders={"messages": ", ".join(sorted(OCPP_TRIGGER_MESSAGES))},
                 message=str(err),
             )
-        raise AssertionError("unreachable")
+        raise AssertionError("unreachable")  # pragma: no cover
 
     def _confirm_trigger_message(message: str, confirmed: object) -> None:
         if message not in OCPP_TRIGGER_MESSAGES_REQUIRING_CONFIRMATION:

@@ -232,3 +232,28 @@ def test_prune_managed_entities_skips_entries_without_entity_id() -> None:
         == 0
     )
     ent_reg.async_remove.assert_not_called()
+
+
+def test_prune_managed_entities_skips_registry_without_remove_method() -> None:
+    ent_reg = SimpleNamespace(
+        entities={
+            "switch.remove": SimpleNamespace(
+                entity_id="switch.remove",
+                unique_id="enphase_ev_remove",
+                domain="switch",
+                platform="enphase_ev",
+                config_entry_id="entry-1",
+            )
+        }
+    )
+
+    assert (
+        prune_managed_entities(
+            ent_reg,
+            "entry-1",
+            domain="switch",
+            active_unique_ids=set(),
+            is_managed=lambda unique_id: True,
+        )
+        == 0
+    )

@@ -278,7 +278,7 @@ class DiscoverySnapshotManager:
                     normalized_key = normalize_type_key(key)
                     if normalized_key:
                         ordered_keys.append(normalized_key)
-            else:
+            else:  # pragma: no cover - persisted snapshots always store a list
                 ordered_keys = list(normalized_grouped)
             if normalized_grouped:
                 self.coordinator.inventory_runtime._set_type_device_buckets(

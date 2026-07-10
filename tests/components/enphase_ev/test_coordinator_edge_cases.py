@@ -1691,6 +1691,7 @@ async def test_attempt_auto_refresh_requires_credentials(hass):
 
     result = await coord._attempt_auto_refresh()
     assert result is False
+    assert await coord.auth_refresh_runtime.async_run_auto_refresh() is False
 
 
 @pytest.mark.asyncio

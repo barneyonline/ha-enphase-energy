@@ -1175,7 +1175,7 @@ def _raise_tariff_validation(
         translation_placeholders=placeholders,
         message=message,
     )
-    raise RuntimeError(message or key)
+    raise RuntimeError(message or key)  # pragma: no cover
 
 
 def _index_item(items: object, index: int | None) -> dict[str, object] | None:
@@ -1518,7 +1518,7 @@ class TariffRuntime:
             if payload_update is not None:
                 update_payload = payload_update
             else:
-                if not callable(site_tariff):
+                if not callable(site_tariff):  # pragma: no cover - narrowed above
                     _raise_tariff_validation(
                         "tariff_rate_api_unavailable",
                         message="Tariff write API is unavailable.",
@@ -1541,7 +1541,7 @@ class TariffRuntime:
                 located_updates.append((target, field, rate))
             for target, field, rate in located_updates:
                 target[field] = rate
-            if not callable(site_tariff_update):
+            if not callable(site_tariff_update):  # pragma: no cover - narrowed above
                 _raise_tariff_validation(
                     "tariff_rate_api_unavailable",
                     message="Tariff write API is unavailable.",
@@ -1549,7 +1549,9 @@ class TariffRuntime:
             tariff_result = await site_tariff_update(update_payload)
 
         if billing_update is not None:
-            if not callable(site_tariff_billing_update):
+            if not callable(
+                site_tariff_billing_update
+            ):  # pragma: no cover - narrowed above
                 _raise_tariff_validation(
                     "tariff_billing_api_unavailable",
                     message="Tariff billing write API is unavailable.",

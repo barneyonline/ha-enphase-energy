@@ -440,7 +440,7 @@ class SystemProfileSelect(CoordinatorEntity, SelectEntity):  # type: ignore[misc
                 translation_key="selected_system_profile_unavailable",
                 message="Selected system profile is not available.",
             )
-            return
+            return  # pragma: no cover - validation helper always raises
         try:
             await self._coord.battery_runtime.async_set_system_profile(selected_key)
         except ServiceValidationError:
@@ -826,7 +826,7 @@ class AcBatteryTargetStateOfChargeSelect(CoordinatorEntity, SelectEntity):  # ty
                 ),
                 message="Selected AC Battery target state of charge is not available.",
             )
-            return
+            return  # pragma: no cover - validation helper always raises
         await self._coord.async_set_ac_battery_target_soc(selected_value)
 
     @property
