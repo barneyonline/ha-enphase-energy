@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
+from typing import TypeVar, cast
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant, callback as ha_callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -18,6 +20,9 @@ from .runtime_helpers import (
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
 
 PARALLEL_UPDATES = 0
+
+_CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
+callback = cast(Callable[[_CallbackT], _CallbackT], ha_callback)
 
 
 def _site_has_battery(coord: EnphaseCoordinator, *, strict: bool = False) -> bool:
@@ -54,7 +59,10 @@ async def async_setup_entry(
     _async_sync_site_entities()
 
 
-class BackupHistoryCalendarEntity(CoordinatorEntity, CalendarEntity):
+class BackupHistoryCalendarEntity(
+    CoordinatorEntity,  # type: ignore[misc]
+    CalendarEntity,  # type: ignore[misc]
+):
     _attr_has_entity_name = True
     _attr_translation_key = "backup_history"
 

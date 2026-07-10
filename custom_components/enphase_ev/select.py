@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 import json
+from typing import TypeVar, cast
 
 import aiohttp
 from homeassistant.components.select import SelectEntity
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant, callback as ha_callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
@@ -54,6 +56,9 @@ from .service_validation import raise_translated_service_validation
 
 PARALLEL_UPDATES = 0
 
+_CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
+callback = cast(Callable[[_CallbackT], _CallbackT], ha_callback)
+
 
 def _smart_charging_context(coord: EnphaseCoordinator, sn: str | None = None) -> bool:
     if sn is None:
@@ -80,7 +85,7 @@ def _smart_charging_context(coord: EnphaseCoordinator, sn: str | None = None) ->
     )
     if callable(battery_profile_pref):
         try:
-            return battery_profile_pref(sn) == "SMART_CHARGING"
+            return battery_profile_pref(sn) == "SMART_CHARGING"  # type: ignore[no-any-return]
         except Exception:
             return False
     return False
@@ -125,7 +130,7 @@ def _english_charge_mode_label(mode: str) -> str | None:
     normalized = aliases.get(key)
     if normalized is None:
         return None
-    return CHARGE_MODE_LABELS.get(normalized)
+    return cast(str | None, CHARGE_MODE_LABELS.get(normalized))
 
 
 def _site_has_battery(coord: EnphaseCoordinator) -> bool:
@@ -167,7 +172,7 @@ def _retain_system_profile(coord: EnphaseCoordinator) -> bool:
 
 
 def _retain_ac_battery_target_soc(coord: EnphaseCoordinator) -> bool:
-    return ac_battery_control_available(coord)
+    return cast(bool, ac_battery_control_available(coord))
 
 
 def _retain_battery_schedule_editor(
@@ -217,7 +222,7 @@ async def async_setup_entry(
     hass: HomeAssistant,
     entry: EnphaseConfigEntry,
     async_add_entities: AddEntitiesCallback,
-):
+) -> None:
     coord: EnphaseCoordinator = get_runtime_data(entry).coordinator
     ent_reg = er.async_get(hass)
     known_serials: set[str] = set()
@@ -370,7 +375,7 @@ async def async_setup_entry(
     _async_sync_chargers()
 
 
-class SystemProfileSelect(CoordinatorEntity, SelectEntity):
+class SystemProfileSelect(CoordinatorEntity, SelectEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "system_profile"
 
@@ -389,7 +394,7 @@ class SystemProfileSelect(CoordinatorEntity, SelectEntity):
         ]
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         if not super().available:
             return False
         if not _type_available(self._coord, "envoy"):
@@ -413,9 +418,12 @@ class SystemProfileSelect(CoordinatorEntity, SelectEntity):
         selected = self._coord.battery_selected_profile
         if not selected:
             return None
-        return battery_profile_label(
-            selected,
-            hass=getattr(self, "hass", None) or self._coord.hass,
+        return cast(
+            str | None,
+            battery_profile_label(
+                selected,
+                hass=getattr(self, "hass", None) or self._coord.hass,
+            ),
         )
 
     async def async_select_option(self, option: str) -> None:
@@ -483,7 +491,7 @@ class SystemProfileSelect(CoordinatorEntity, SelectEntity):
         )
 
 
-class _BatteryScheduleEditorSelect(BatteryScheduleEditorEntity, SelectEntity):
+class _BatteryScheduleEditorSelect(BatteryScheduleEditorEntity, SelectEntity):  # type: ignore[misc]
     _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, coord: EnphaseCoordinator, entry: EnphaseConfigEntry) -> None:
@@ -491,7 +499,7 @@ class _BatteryScheduleEditorSelect(BatteryScheduleEditorEntity, SelectEntity):
         self._attr_has_entity_name = True
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         return (
             super().available
             and battery_scheduler_enabled(self._entry)
@@ -536,12 +544,15 @@ class BatteryScheduleSelect(_BatteryScheduleEditorSelect):
             return None
         hass = getattr(self, "hass", None) or self._coord.hass
         if self._editor.current_selection == NEW_SCHEDULE_OPTION:
-            return battery_schedule_create_label(hass=hass)
+            return cast(str | None, battery_schedule_create_label(hass=hass))
         selected_schedule = self._editor.get_schedule(self._editor.current_selection)
         if selected_schedule is None:
             return None
-        return self._editor.option_label_by_schedule_id(hass=hass).get(
-            selected_schedule.schedule_id
+        return cast(
+            str | None,
+            self._editor.option_label_by_schedule_id(hass=hass).get(
+                selected_schedule.schedule_id
+            ),
         )
 
     async def async_select_option(self, option: str) -> None:
@@ -580,7 +591,7 @@ class BatteryNewScheduleTypeSelect(_BatteryScheduleEditorSelect):
         return [label for _key, label in battery_schedule_type_options(hass=hass)]
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         return super().available and self._editor is not None
 
     @property
@@ -588,7 +599,10 @@ class BatteryNewScheduleTypeSelect(_BatteryScheduleEditorSelect):
         if self._editor is None:
             return None
         hass = getattr(self, "hass", None) or self._coord.hass
-        return battery_schedule_type_label(self._editor.edit.schedule_type, hass=hass)
+        return cast(
+            str | None,
+            battery_schedule_type_label(self._editor.edit.schedule_type, hass=hass),
+        )
 
     async def async_select_option(self, option: str) -> None:
         if self._editor is None or not self._editor.is_creating:
@@ -600,7 +614,7 @@ class BatteryNewScheduleTypeSelect(_BatteryScheduleEditorSelect):
                 return
 
 
-class EvseScheduleSelect(EvseScheduleEditorEntity, SelectEntity):
+class EvseScheduleSelect(EvseScheduleEditorEntity, SelectEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "evse_schedule_selected"
     _attr_entity_category = EntityCategory.CONFIG
@@ -613,7 +627,7 @@ class EvseScheduleSelect(EvseScheduleEditorEntity, SelectEntity):
         self._attr_unique_id = f"{DOMAIN}_{sn}_schedule_selected"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         return (
             super().available
             and evse_schedule_editor_active(self._coord, self._entry)
@@ -636,14 +650,17 @@ class EvseScheduleSelect(EvseScheduleEditorEntity, SelectEntity):
             return None
         hass = getattr(self, "hass", None) or self._coord.hass
         if self._editor.current_selection(self._sn) == EVSE_NEW_SCHEDULE_OPTION:
-            return evse_schedule_create_label(hass=hass)
+            return cast(str | None, evse_schedule_create_label(hass=hass))
         selected_schedule = self._editor.get_schedule(
             self._sn, self._editor.current_selection(self._sn)
         )
         if selected_schedule is None:
             return None
-        return self._editor.option_label_by_slot_id(self._sn).get(
-            selected_schedule.slot_id
+        return cast(
+            str | None,
+            self._editor.option_label_by_slot_id(self._sn).get(
+                selected_schedule.slot_id
+            ),
         )
 
     async def async_select_option(self, option: str) -> None:
@@ -658,11 +675,11 @@ class EvseScheduleSelect(EvseScheduleEditorEntity, SelectEntity):
         self._editor.select_schedule(self._sn, selected)
 
 
-class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):
+class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "charge_mode"
 
-    def __init__(self, coord: EnphaseCoordinator, sn: str):
+    def __init__(self, coord: EnphaseCoordinator, sn: str) -> None:
         super().__init__(coord, sn)
         self._attr_unique_id = f"{DOMAIN}_{sn}_charge_mode_select"
 
@@ -677,7 +694,7 @@ class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):
         ]
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         return super().available and self._coord.scheduler_available
 
     @property
@@ -687,12 +704,18 @@ class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):
         if not val:
             return None
         if val == "MANUAL_CHARGING":
-            return charge_mode_label(
-                val, hass=getattr(self, "hass", None) or self._coord.hass
+            return cast(
+                str | None,
+                charge_mode_label(
+                    val, hass=getattr(self, "hass", None) or self._coord.hass
+                ),
             )
         if val == "SCHEDULED_CHARGING":
-            return charge_mode_label(
-                val, hass=getattr(self, "hass", None) or self._coord.hass
+            return cast(
+                str | None,
+                charge_mode_label(
+                    val, hass=getattr(self, "hass", None) or self._coord.hass
+                ),
             )
         if val in {"GREEN_CHARGING", "SMART_CHARGING"}:
             return _solar_mode(self._coord, self._sn)[1]
@@ -724,7 +747,7 @@ class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):
         ):
             if label:
                 option_map[label] = mode
-        mode = option_map.get(option)
+        mode = option_map.get(option)  # type: ignore[assignment]
         if mode is None:
             raise ServiceValidationError(
                 "Selected charging mode is not available.",
@@ -763,7 +786,7 @@ class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):
             raise
 
 
-class AcBatteryTargetStateOfChargeSelect(CoordinatorEntity, SelectEntity):
+class AcBatteryTargetStateOfChargeSelect(CoordinatorEntity, SelectEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "ac_battery_target_state_of_charge"
 
@@ -783,17 +806,18 @@ class AcBatteryTargetStateOfChargeSelect(CoordinatorEntity, SelectEntity):
         return [label for _value, label in AC_BATTERY_SOC_OPTIONS]
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         if not super().available:
             return False
         if getattr(self._coord, "battery_has_acb", None) is not True:
             return False
-        return ac_battery_control_available(self._coord)
+        return cast(bool, ac_battery_control_available(self._coord))
 
     @property
     def current_option(self) -> str | None:
-        return ac_battery_soc_option_label(
-            self._coord.ac_battery_selected_sleep_min_soc
+        return cast(
+            str | None,
+            ac_battery_soc_option_label(self._coord.ac_battery_selected_sleep_min_soc),
         )
 
     @property

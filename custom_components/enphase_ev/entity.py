@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import time as dt_time
-from typing import Any
+from typing import Any, TypeVar, cast
 
-from homeassistant.core import callback
+from homeassistant.core import callback as ha_callback
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -20,6 +21,9 @@ from .device_info_helpers import (
 from .log_redaction import redact_identifier, redact_text
 
 _LOGGER = logging.getLogger(__name__)
+
+_CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
+callback = cast(Callable[[_CallbackT], _CallbackT], ha_callback)
 
 
 def evse_resolved_charge_mode(coord: EnphaseCoordinator, serial: str) -> str | None:
@@ -90,7 +94,9 @@ def battery_schedule_extra_state_attributes(
     return attrs
 
 
-class EnphaseBaseEntity(CoordinatorEntity[EnphaseCoordinator]):
+class EnphaseBaseEntity(
+    CoordinatorEntity[EnphaseCoordinator],  # type: ignore[misc]
+):
     _attr_has_entity_name = True
 
     def __init__(self, coordinator: EnphaseCoordinator, serial: str) -> None:
@@ -109,7 +115,7 @@ class EnphaseBaseEntity(CoordinatorEntity[EnphaseCoordinator]):
                 self._ever_had_data = True
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         return super().available and self._has_data
 
     @property

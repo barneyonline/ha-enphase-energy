@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import time as dt_time
+from typing import TypeVar, cast
 
 from homeassistant.components.time import TimeEntity
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant, callback as ha_callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -23,6 +24,9 @@ from .evse_schedule_editor import (
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
 
 PARALLEL_UPDATES = 0
+
+_CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
+callback = cast(Callable[[_CallbackT], _CallbackT], ha_callback)
 
 
 def _site_has_battery(coord: EnphaseCoordinator) -> bool:
@@ -214,7 +218,10 @@ def _parse_editor_time(value: str | None) -> dt_time | None:
         return None
 
 
-class _BatteryScheduleEditorTimeEntity(BatteryScheduleEditorEntity, TimeEntity):
+class _BatteryScheduleEditorTimeEntity(
+    BatteryScheduleEditorEntity,  # type: ignore[misc, unused-ignore]
+    TimeEntity,  # type: ignore[misc, unused-ignore]
+):
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
 
@@ -233,7 +240,7 @@ class _BatteryScheduleEditorTimeEntity(BatteryScheduleEditorEntity, TimeEntity):
         self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_{unique_suffix}"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         client = getattr(self._coord, "client", None)
         return (
             super().available
@@ -294,7 +301,10 @@ class BatteryScheduleEditEndTimeEntity(_BatteryScheduleEditorTimeEntity):
             self._editor.set_edit_time("end_time", value)
 
 
-class _EvseScheduleEditorTimeEntity(EvseScheduleEditorEntity, TimeEntity):
+class _EvseScheduleEditorTimeEntity(
+    EvseScheduleEditorEntity,  # type: ignore[misc, unused-ignore]
+    TimeEntity,  # type: ignore[misc, unused-ignore]
+):
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
 
@@ -314,7 +324,7 @@ class _EvseScheduleEditorTimeEntity(EvseScheduleEditorEntity, TimeEntity):
         self._attr_unique_id = f"{DOMAIN}_{sn}_{unique_suffix}"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         return (
             super().available
             and evse_schedule_editor_active(self._coord, self._entry)
