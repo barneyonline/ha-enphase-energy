@@ -252,7 +252,7 @@ def test_electrical_phase_sensor_formats_state_and_attributes():
     assert attrs["dlb_active"] is None
 
 
-def test_last_reported_sensor_exposes_charger_config_attributes():
+def test_last_reported_sensor_exposes_only_compact_status_attributes():
     from custom_components.enphase_ev.sensor import EnphaseLastReportedSensor
 
     sn = RANDOM_SERIAL
@@ -262,6 +262,9 @@ def test_last_reported_sensor_exposes_charger_config_attributes():
             "sn": sn,
             "name": "Garage EV",
             "last_reported_at": "2025-09-09T09:00:00Z[UTC]",
+            "reporting_interval": "300",
+            "connection": "wifi",
+            "is_connected": True,
             "default_charge_level": "disabled",
             "phase_switch_config": "auto",
         },
@@ -270,8 +273,11 @@ def test_last_reported_sensor_exposes_charger_config_attributes():
     sensor = EnphaseLastReportedSensor(coord, sn)
     attrs = sensor.extra_state_attributes
 
-    assert attrs["default_charge_level"] == "disabled"
-    assert attrs["phase_switch_config"] == "auto"
+    assert attrs == {
+        "reporting_interval": 300,
+        "connection": "wifi",
+        "is_connected": True,
+    }
 
 
 def test_power_sensor_uses_lifetime_delta():
@@ -296,7 +302,12 @@ def test_power_sensor_uses_lifetime_delta():
     coord.data[sn]["last_reported_at"] = "2025-09-09T10:05:00Z[UTC]"
     val = sensor.native_value
     assert val == 7200
-    assert sensor.extra_state_attributes["last_window_seconds"] == pytest.approx(300)
+    assert sensor.extra_state_attributes == {
+        "sampled_at_utc": "2025-09-09T10:05:00+00:00",
+        "last_window_seconds": pytest.approx(300),
+        "method": "lifetime_energy_window",
+        "actual_charging": True,
+    }
 
     coord.data[sn]["lifetime_kwh"] = 10.6
     coord.data[sn]["last_reported_at"] = "2025-09-09T10:06:00Z[UTC]"
@@ -2283,9 +2294,8 @@ def test_last_session_restore_data_roundtrip():
     assert empty.session_key is None
 
 
-def test_last_reported_sensor_exposes_reporting_interval(monkeypatch):
+def test_last_reported_sensor_exposes_compact_connectivity_context():
     from custom_components.enphase_ev.sensor import EnphaseLastReportedSensor
-    from homeassistant.util import dt as dt_util
 
     sn = RANDOM_SERIAL
     coord = _mk_coord_with(
@@ -2345,36 +2355,17 @@ def test_last_reported_sensor_exposes_reporting_interval(monkeypatch):
             "charger_timezone": "Region/City",
         },
     )
-    monkeypatch.setattr(dt_util, "as_local", lambda dt: dt)
-
     sensor = EnphaseLastReportedSensor(coord, sn)
     assert sensor.entity_registry_enabled_default is True
     assert sensor.native_value is not None
     assert sensor.available is True
 
     attrs = sensor.extra_state_attributes
-    assert attrs["reporting_interval"] == 300
-    assert attrs["connection"] == "wifi"
-    assert attrs["ip_address"] == "192.0.2.10"
-    assert attrs["mac_address"] == "00:11:22:33:44:55"
-    assert attrs["network_interface_count"] == 2
-    assert attrs["operating_voltage"] == 240
-    assert attrs["is_connected"] is True
-    assert attrs["is_locally_connected"] is False
-    assert attrs["gateway_last_connection_at"] is not None
-    assert attrs["gateway_connectivity_details"] == [
-        {
-            "status": 0,
-            "failure_reason": 0,
-            "last_connection_at": "2024-05-01T07:53:20+00:00",
-        },
-        {
-            "status": 1,
-            "failure_reason": 7,
-            "last_connection_at": "2024-05-01T08:03:20+00:00",
-        },
-    ]
-    assert attrs["functional_validation_updated_at"] is not None
+    assert attrs == {
+        "reporting_interval": 300,
+        "connection": "wifi",
+        "is_connected": True,
+    }
 
     coord.data[sn]["reporting_interval"] = 150
     assert sensor.extra_state_attributes["reporting_interval"] == 150
@@ -2405,9 +2396,8 @@ def test_last_reported_sensor_handles_missing_and_invalid_values():
     assert sensor.available is False
 
 
-def test_last_reported_sensor_attribute_edge_cases(monkeypatch):
+def test_last_reported_sensor_attribute_edge_cases():
     from custom_components.enphase_ev.sensor import EnphaseLastReportedSensor
-    from homeassistant.util import dt as dt_util
 
     class BadStr:
         def __str__(self):
@@ -2421,6 +2411,7 @@ def test_last_reported_sensor_attribute_edge_cases(monkeypatch):
             "name": "Garage EV",
             "last_reported_at": "2025-09-07T11:38:31Z[UTC]",
             "reporting_interval": None,
+            "connection": BadStr(),
             "is_connected": "off",
             "is_locally_connected": None,
             "created_at": None,
@@ -2430,23 +2421,27 @@ def test_last_reported_sensor_attribute_edge_cases(monkeypatch):
             "wifi_config": BadStr(),
         },
     )
-    monkeypatch.setattr(dt_util, "as_local", lambda dt: dt)
-
     sensor = EnphaseLastReportedSensor(coord, sn)
     attrs = sensor.extra_state_attributes
-    assert attrs["reporting_interval"] is None
-    assert attrs["is_connected"] is False
-    assert attrs["is_locally_connected"] is None
-    assert attrs["created_at"] is None
-    assert attrs["warranty_start_date"] is None
-    assert attrs["warranty_due_date"] == "2025-01-01T00:00:00+00:00"
-    assert attrs["functional_validation_updated_at"] is None
-    assert attrs["wifi_config"] is None
+    assert attrs == {
+        "reporting_interval": None,
+        "connection": None,
+        "is_connected": False,
+    }
 
-    coord.data[sn]["created_at"] = "invalid"
-    assert sensor.extra_state_attributes["created_at"] is None
     coord.data[sn]["is_connected"] = "maybe"
     assert sensor.extra_state_attributes["is_connected"] is None
+
+    coord.data[sn]["connection"] = None
+    coord.data[sn]["is_connected"] = None
+    assert sensor.extra_state_attributes == {
+        "reporting_interval": None,
+        "connection": None,
+        "is_connected": None,
+    }
+
+    coord.data[sn]["is_connected"] = 1
+    assert sensor.extra_state_attributes["is_connected"] is True
 
 
 def test_power_sensor_caps_max_output():

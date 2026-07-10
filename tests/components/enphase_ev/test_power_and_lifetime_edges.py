@@ -100,7 +100,7 @@ def test_power_resolve_max_throughput_uses_nominal_fallback(coordinator_factory)
     assert unbounded == 1920
     assert topology == "unknown"
     assert phase_multiplier == pytest.approx(1.0)
-    assert sensor.extra_state_attributes["operating_v"] == pytest.approx(120.0)
+    assert sensor._max_throughput_voltage == pytest.approx(120.0)
 
     watts, source, amps, voltage, unbounded, topology, phase_multiplier = (
         sensor._resolve_max_throughput({"nominal_v": 230, "session_charge_level": 16})
@@ -188,7 +188,6 @@ def test_power_actual_charging_attribute_prefers_precomputed_flag(coordinator_fa
 
     assert sensor.native_value == 0
     attrs = sensor.extra_state_attributes
-    assert attrs["charging"] is False
     assert attrs["actual_charging"] is False
 
 
@@ -294,9 +293,7 @@ def test_power_snapshot_uses_nominal_voltage_fallback_when_missing(
     sensor = EnphasePowerSensor(coord, RANDOM_SERIAL)
 
     assert sensor.native_value == 0
-    assert sensor.extra_state_attributes["max_throughput_voltage"] == pytest.approx(
-        208.0
-    )
+    assert sensor._max_throughput_voltage == pytest.approx(208.0)
 
 
 def test_power_native_value_suspended_connector_resets_power(coordinator_factory):
@@ -338,7 +335,6 @@ def test_power_native_value_suspended_ev_resets_power(coordinator_factory):
     assert sensor.native_value == 0
     assert sensor._last_method == "idle"
     attrs = sensor.extra_state_attributes
-    assert attrs["charging"] is False
     assert attrs["actual_charging"] is False
 
 

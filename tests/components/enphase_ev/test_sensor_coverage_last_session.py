@@ -280,7 +280,11 @@ async def test_power_sensor_restore_parses_legacy_and_resets(monkeypatch):
     async def _fake_last_state():
         return _State()
 
+    async def _fake_last_extra_data():
+        return None
+
     monkeypatch.setattr(sensor, "async_get_last_state", _fake_last_state)
+    monkeypatch.setattr(sensor, "async_get_last_extra_data", _fake_last_extra_data)
     await sensor.async_added_to_hass()
 
     coord.data[RANDOM_SERIAL]["charging"] = False

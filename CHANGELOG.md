@@ -5,7 +5,10 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
-- None
+- Removed internal calculation and stable charger metadata attributes from the
+  frequently updated IQ EV Charger Power and Last Reported sensors to reduce
+  Recorder growth. Power restore baselines now use private Home Assistant
+  restore data.
 
 ### ✨ New features
 - None
