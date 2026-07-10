@@ -20,6 +20,7 @@ from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from datetime import date, datetime, timezone
 from http import HTTPStatus
+from time import monotonic
 from urllib.parse import unquote, urlencode
 import uuid
 from dataclasses import dataclass
@@ -52,7 +53,7 @@ from .api_models import (
     TextResponse as TextResponse,
 )
 from .log_redaction import redact_identifier, redact_site_id, redact_text
-from .request_metrics import record_request_attempt
+from .request_metrics import record_request_attempt, record_request_timings
 
 _LOGGER = logging.getLogger(__name__)
 _EMAIL_RE = re.compile(r"(?i)\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b")
@@ -1003,6 +1004,63 @@ async def _enlighten_read_request_guard(
         return
     async with _get_enlighten_read_semaphore():
         yield
+
+
+@asynccontextmanager
+async def _timed_enlighten_read_request_guard(
+    method: object, url: object
+) -> AsyncIterator[None]:
+    """Measure limiter queueing for one scoped client request."""
+
+    if not _should_limit_enlighten_read_request(method, url):
+        yield
+        return
+    started = monotonic()
+    acquired = False
+    try:
+        async with _enlighten_read_request_guard(method, url):
+            acquired = True
+            record_request_timings(queue_s=monotonic() - started)
+            yield
+    finally:
+        if not acquired:
+            record_request_timings(queue_s=monotonic() - started)
+
+
+@asynccontextmanager
+async def _timed_response_context(request_context: Any) -> AsyncIterator[Any]:
+    """Measure the wait until response headers arrive for one HTTP attempt."""
+
+    started = monotonic()
+    headers_received = False
+    try:
+        async with request_context as response:
+            headers_received = True
+            record_request_timings(network_s=monotonic() - started)
+            yield response
+    finally:
+        if not headers_received:
+            record_request_timings(network_s=monotonic() - started)
+
+
+async def _timed_response_json(response: Any) -> Any:
+    """Read and decode a JSON body while recording parsing time."""
+
+    started = monotonic()
+    try:
+        return await response.json()
+    finally:
+        record_request_timings(parsing_s=monotonic() - started)
+
+
+async def _timed_response_text(response: Any) -> str:
+    """Read a text body while recording parsing time."""
+
+    started = monotonic()
+    try:
+        return await response.text()
+    finally:
+        record_request_timings(parsing_s=monotonic() - started)
 
 
 def _seed_cookie_jar(session: aiohttp.ClientSession, cookies: dict[str, str]) -> None:
@@ -4369,14 +4427,16 @@ class EnphaseEVClient:
                 )
 
             async with asyncio.timeout(self._timeout):
-                async with _enlighten_read_request_guard(method, url):
+                async with _timed_enlighten_read_request_guard(method, url):
                     async with self._request_session(
                         cookie_header_only=use_cookie_header_only
                     ) as request_session:
                         self._request_count += 1
                         record_request_attempt()
-                        async with request_session.request(
-                            method, url, headers=base_headers, **kwargs
+                        async with _timed_response_context(
+                            request_session.request(
+                                method, url, headers=base_headers, **kwargs
+                            )
                         ) as r:
                             if r.status == 401:
                                 self._last_unauthorized_request = safe_request_label
@@ -4420,7 +4480,7 @@ class EnphaseEVClient:
                             if r.status >= 400:
                                 body_text: str | None = None
                                 try:
-                                    body_text = await r.text()
+                                    body_text = await _timed_response_text(r)
                                 except (
                                     Exception
                                 ):  # noqa: BLE001 - fall back to generic message
@@ -4549,7 +4609,7 @@ class EnphaseEVClient:
                                         )
                                 raise response_error
                             try:
-                                payload = await r.json()
+                                payload = await _timed_response_json(r)
                             except (aiohttp.ContentTypeError, ValueError) as err:
                                 status = int(getattr(r, "status", 0) or 0)
                                 content_type = ""
@@ -4562,7 +4622,7 @@ class EnphaseEVClient:
                                 ):  # noqa: BLE001 - defensive header parsing
                                     content_type = ""
                                 try:
-                                    body_text = await r.text()
+                                    body_text = await _timed_response_text(r)
                                 except Exception as text_err:  # noqa: BLE001
                                     body_text = (
                                         f"<unavailable:{text_err.__class__.__name__}>"
@@ -4660,9 +4720,11 @@ class EnphaseEVClient:
                         base_headers[header_key] = header_value
 
             async with asyncio.timeout(self._timeout):
-                async with _enlighten_read_request_guard(method, url):
-                    async with self._s.request(
-                        method, url, headers=base_headers, **kwargs
+                async with _timed_enlighten_read_request_guard(method, url):
+                    self._request_count += 1
+                    record_request_attempt()
+                    async with _timed_response_context(
+                        self._s.request(method, url, headers=base_headers, **kwargs)
                     ) as r:
                         if r.status == 401:
                             self._last_unauthorized_request = safe_request_label
@@ -4674,7 +4736,7 @@ class EnphaseEVClient:
                                     continue
                             raise Unauthorized()
                         if expected_statuses and r.status in expected_statuses:
-                            text = await r.text()
+                            text = await _timed_response_text(r)
                             if _is_enphase_login_wall(
                                 endpoint=endpoint or None, payload=text
                             ):
@@ -4698,7 +4760,7 @@ class EnphaseEVClient:
                         if r.status >= 400:
                             body_text: str | None = None
                             try:
-                                body_text = await r.text()
+                                body_text = await _timed_response_text(r)
                             except Exception:  # noqa: BLE001
                                 body_text = None
                             message = _safe_response_error_message(
@@ -4714,7 +4776,7 @@ class EnphaseEVClient:
                                 message=message,
                                 headers=r.headers,
                             )
-                        text = await r.text()
+                        text = await _timed_response_text(r)
                         if _is_enphase_login_wall(
                             endpoint=endpoint or None, payload=text
                         ):
