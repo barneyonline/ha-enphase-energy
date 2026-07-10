@@ -1017,6 +1017,7 @@ async def async_setup_entry(
             if isinstance(bucket_lengths, dict)
             else frozenset()
         )
+        gateway_meter_shape: tuple[bool | None, bool | None, bool | None]
         try:
             gateway_meter_shape = (
                 _gateway_meter_member(coord, "production") is not None,
