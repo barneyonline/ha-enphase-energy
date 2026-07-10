@@ -21,6 +21,8 @@ All notable changes to this project will be documented in this file.
 ### 🔧 Improvements
 - Documented the IQ EV Charger device automation triggers and the integration's
   use of standard Home Assistant conditions.
+- Reused a Home Assistant-managed stateless HTTP session for cookie-authenticated
+  BatteryConfig writes instead of creating a new connection pool per request.
 
 ### 🔄 Other changes
 - None

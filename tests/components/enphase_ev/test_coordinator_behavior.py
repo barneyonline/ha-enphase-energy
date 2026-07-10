@@ -98,6 +98,35 @@ def _client_response_error(status: int, *, message: str = "", headers=None):
 
 
 @pytest.mark.asyncio
+async def test_coordinator_injects_and_closes_stateless_cookie_session(
+    hass, mock_clientsession
+) -> None:
+    from custom_components.enphase_ev.coordinator import EnphaseCoordinator
+
+    config = {
+        CONF_SITE_ID: RANDOM_SITE_ID,
+        CONF_SERIALS: [RANDOM_SERIAL],
+        CONF_EAUTH: "EAUTH",
+        CONF_COOKIE: "COOKIE",
+    }
+
+    coordinator = EnphaseCoordinator(
+        hass,
+        config,
+        cookie_header_session=mock_clientsession.stateless,
+    )
+
+    assert coordinator.client._s is mock_clientsession.shared  # noqa: SLF001
+    assert (  # noqa: SLF001
+        coordinator.client._cookie_header_session is mock_clientsession.stateless
+    )
+
+    await coordinator.async_close()
+
+    assert mock_clientsession.stateless.closed is True
+
+
+@pytest.mark.asyncio
 async def test_coordinator_init_normalizes_serials_and_options(hass, monkeypatch):
     from custom_components.enphase_ev import coordinator as coord_mod
     from custom_components.enphase_ev.coordinator import EnphaseCoordinator

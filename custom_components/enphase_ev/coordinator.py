@@ -563,6 +563,8 @@ class EnphaseCoordinator(
         hass: HomeAssistant,
         config: Mapping[str, Any],
         config_entry: EnphaseConfigEntry | None = None,
+        *,
+        cookie_header_session: aiohttp.ClientSession | None = None,
     ) -> None:
         self.hass = hass
         self.config_entry = config_entry
@@ -680,6 +682,7 @@ class EnphaseCoordinator(
             self._tokens.access_token,
             self._tokens.cookie,
             timeout=timeout,
+            cookie_header_session=cookie_header_session,
         )
         set_reauth_cb = getattr(self.client, "set_reauth_callback", None)
         if callable(set_reauth_cb):
@@ -868,6 +871,11 @@ class EnphaseCoordinator(
         self.diagnostics = CoordinatorDiagnostics(self)
         self.refresh_runner = RefreshRunner(self)
         self._endpoint_family_policies = self._build_endpoint_family_policies()
+
+    async def async_close(self) -> None:
+        """Release config-entry-owned HTTP resources."""
+
+        await self.client.async_close()
 
     def __setattr__(self, name: str, value: object) -> None:
         if name == "_async_fetch_sessions_today" and hasattr(self, "session_history"):

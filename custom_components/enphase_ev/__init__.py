@@ -7,6 +7,7 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any, Coroutine, cast
 
+import aiohttp
 from homeassistant.config_entries import ConfigEntryState, OperationNotAllowed
 from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.helpers import (
@@ -14,6 +15,7 @@ from homeassistant.helpers import (
     device_registry as dr,
     entity_registry as er,
 )
+from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from .const import CONF_INCLUDE_INVERTERS, CONF_SELECTED_TYPE_KEYS, DOMAIN
 from .device_info_helpers import (
@@ -1504,7 +1506,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
     from .firmware_catalog import FirmwareCatalogManager
     from .labels import async_prime_label_translations
 
-    coord = EnphaseCoordinator(hass, entry.data, config_entry=entry)
+    coord = EnphaseCoordinator(
+        hass,
+        entry.data,
+        config_entry=entry,
+        cookie_header_session=async_create_clientsession(
+            hass,
+            auto_cleanup=True,
+            cookie_jar=aiohttp.DummyCookieJar(),
+        ),
+    )
     firmware_catalog = FirmwareCatalogManager(hass)
     evse_firmware_details = EvseFirmwareDetailsManager(lambda: coord.client)
     battery_schedule_editor = BatteryScheduleEditorManager(coord)
@@ -1627,6 +1638,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> 
             await coord.schedule_sync.async_stop()
         if coord is not None and hasattr(coord, "cleanup_runtime_state"):
             coord.cleanup_runtime_state()
+        if coord is not None and hasattr(coord, "async_close"):
+            await coord.async_close()
         entry.runtime_data = None
         loaded_state = getattr(ConfigEntryState, "LOADED", None)
         has_loaded_entries = any(
