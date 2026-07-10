@@ -930,6 +930,9 @@
       "schedule_end": {
         "name": "Ajakava lõpp"
       },
+      "inverter_lifetime_energy": {
+        "name": "{serial} Kogukulunud energia"
+      },
       "lifetime_energy": {
         "name": "Kogukulunud energia",
         "state_attributes": {

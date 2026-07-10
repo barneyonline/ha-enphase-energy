@@ -930,6 +930,9 @@
       "schedule_end": {
         "name": "Tvarkaraščio pabaiga"
       },
+      "inverter_lifetime_energy": {
+        "name": "{serial} Viso energijos"
+      },
       "lifetime_energy": {
         "name": "Viso energijos",
         "state_attributes": {

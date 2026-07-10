@@ -930,6 +930,9 @@
       "schedule_end": {
         "name": "Grafika beigas"
       },
+      "inverter_lifetime_energy": {
+        "name": "{serial} Mūža enerģija"
+      },
       "lifetime_energy": {
         "name": "Mūža enerģija",
         "state_attributes": {

@@ -930,6 +930,9 @@
       "schedule_end": {
         "name": "Fin de programación"
       },
+      "inverter_lifetime_energy": {
+        "name": "{serial} Energía acumulada"
+      },
       "lifetime_energy": {
         "name": "Energía acumulada",
         "state_attributes": {

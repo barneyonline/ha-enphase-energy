@@ -930,6 +930,9 @@
       "schedule_end": {
         "name": "Sfârșit program"
       },
+      "inverter_lifetime_energy": {
+        "name": "{serial} Energie totală"
+      },
       "lifetime_energy": {
         "name": "Energie totală",
         "state_attributes": {

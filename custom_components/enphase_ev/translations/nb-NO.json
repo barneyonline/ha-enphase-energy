@@ -930,6 +930,9 @@
       "schedule_end": {
         "name": "Tidsplan slutt"
       },
+      "inverter_lifetime_energy": {
+        "name": "{serial} Levetidsenergi"
+      },
       "lifetime_energy": {
         "name": "Levetidsenergi",
         "state_attributes": {

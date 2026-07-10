@@ -58,6 +58,23 @@ def test_service_display_text_lives_in_translations() -> None:
                 ].strip(), f"{service_key}.{nested_key}"
 
 
+def test_inverter_lifetime_energy_name_is_localized_for_all_locales() -> None:
+    """Ensure per-inverter names retain their placeholder in every locale."""
+    strings = json.loads((ROOT / "strings.json").read_text(encoding="utf-8"))
+    path = "entity.sensor.inverter_lifetime_energy.name"
+    catalog_name = _at_path(strings, path)
+    assert catalog_name == "{serial} Lifetime Energy"
+
+    translations_dir = ROOT / "translations"
+    english = json.loads((translations_dir / "en.json").read_text(encoding="utf-8"))
+    english_name = _at_path(english, path)
+    for locale in translations_dir.glob("*.json"):
+        name = _at_path(json.loads(locale.read_text(encoding="utf-8")), path)
+        assert "{serial}" in name, f"{locale.name} missing {{serial}} placeholder"
+        if locale.name != "en.json" and not locale.name.startswith("en-"):
+            assert name != english_name, f"{locale.name} should localize {path}"
+
+
 def test_try_reauth_now_strings_exist_for_all_locales() -> None:
     """Ensure manual reauth service and repair text are translated."""
 

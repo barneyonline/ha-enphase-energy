@@ -930,6 +930,9 @@
       "schedule_end": {
         "name": "Koniec harmonogramu"
       },
+      "inverter_lifetime_energy": {
+        "name": "{serial} Energia całkowita"
+      },
       "lifetime_energy": {
         "name": "Energia całkowita",
         "state_attributes": {
