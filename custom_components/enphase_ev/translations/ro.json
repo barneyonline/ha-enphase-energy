@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "Ultima eroare privind energia site-ului",
       "site_energy_failures": "Defecțiuni de energie ale șantierului",
       "site_energy_backoff_active": "Retragerea energiei pe amplasament este activă",
-      "site_energy_backoff_ends_utc": "Retragerea energiei site-ului se încheie (UTC)"
+      "site_energy_backoff_ends_utc": "Retragerea energiei site-ului se încheie (UTC)",
+      "tariff_available": "Tarif disponibil",
+      "tariff_service_status": "Starea serviciului de tarife",
+      "tariff_last_error": "Ultima eroare de tarif",
+      "tariff_failures": "Erori de tarif",
+      "tariff_backoff_active": "Amânarea tarifului este activă",
+      "tariff_backoff_ends_utc": "Amânarea tarifului se încheie (UTC)",
+      "degraded_endpoint_families": "Familii de puncte finale degradate",
+      "degraded_services": "Servicii degradate",
+      "firmware_catalog_last_fetch_utc": "Ultima preluare a catalogului de firmware (UTC)",
+      "firmware_catalog_last_success_utc": "Ultima preluare reușită a catalogului de firmware (UTC)",
+      "firmware_catalog_last_error": "Ultima eroare a catalogului de firmware",
+      "firmware_catalog_using_stale": "Catalogul de firmware folosește date învechite",
+      "firmware_catalog_generated_at": "Catalog de firmware generat la",
+      "firmware_catalog_source_age_seconds": "Vârsta sursei catalogului de firmware (s)"
     }
   },
   "services": {

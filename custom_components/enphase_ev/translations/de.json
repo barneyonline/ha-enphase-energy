@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "Letzter Fehler bei der Site-Energie",
       "site_energy_failures": "Energieausfälle am Standort",
       "site_energy_backoff_active": "Standort-Energie-Backoff aktiv",
-      "site_energy_backoff_ends_utc": "Ende des Energie-Backoffs am Standort (UTC)"
+      "site_energy_backoff_ends_utc": "Ende des Energie-Backoffs am Standort (UTC)",
+      "tariff_available": "Tarif verfügbar",
+      "tariff_service_status": "Status des Tarifdienstes",
+      "tariff_last_error": "Letzter Tariffehler",
+      "tariff_failures": "Tariffehler",
+      "tariff_backoff_active": "Tarif-Backoff aktiv",
+      "tariff_backoff_ends_utc": "Tarif-Backoff endet (UTC)",
+      "degraded_endpoint_families": "Beeinträchtigte Endpunktfamilien",
+      "degraded_services": "Beeinträchtigte Dienste",
+      "firmware_catalog_last_fetch_utc": "Letzter Abruf des Firmwarekatalogs (UTC)",
+      "firmware_catalog_last_success_utc": "Letzter erfolgreicher Abruf des Firmwarekatalogs (UTC)",
+      "firmware_catalog_last_error": "Letzter Fehler des Firmwarekatalogs",
+      "firmware_catalog_using_stale": "Firmwarekatalog verwendet veraltete Daten",
+      "firmware_catalog_generated_at": "Firmwarekatalog erstellt am",
+      "firmware_catalog_source_age_seconds": "Alter der Firmwarekatalogquelle (s)"
     }
   },
   "services": {

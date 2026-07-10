@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "Paskutinė svetainės energijos klaida",
       "site_energy_failures": "Svetainės energijos gedimai",
       "site_energy_backoff_active": "Svetainės energijos grąžinimas aktyvus",
-      "site_energy_backoff_ends_utc": "Svetainės energijos grąžinimo pabaiga (UTC)"
+      "site_energy_backoff_ends_utc": "Svetainės energijos grąžinimo pabaiga (UTC)",
+      "tariff_available": "Tarifas pasiekiamas",
+      "tariff_service_status": "Tarifų paslaugos būsena",
+      "tariff_last_error": "Paskutinė tarifo klaida",
+      "tariff_failures": "Tarifo triktys",
+      "tariff_backoff_active": "Tarifo laukimo režimas aktyvus",
+      "tariff_backoff_ends_utc": "Tarifo laukimo režimas baigiasi (UTC)",
+      "degraded_endpoint_families": "Sutrikusių galinių taškų grupės",
+      "degraded_services": "Sutrikusios paslaugos",
+      "firmware_catalog_last_fetch_utc": "Paskutinis programinės aparatinės įrangos katalogo gavimas (UTC)",
+      "firmware_catalog_last_success_utc": "Paskutinis sėkmingas programinės aparatinės įrangos katalogo gavimas (UTC)",
+      "firmware_catalog_last_error": "Paskutinė programinės aparatinės įrangos katalogo klaida",
+      "firmware_catalog_using_stale": "Programinės aparatinės įrangos katalogas naudoja pasenusius duomenis",
+      "firmware_catalog_generated_at": "Programinės aparatinės įrangos katalogas sugeneruotas",
+      "firmware_catalog_source_age_seconds": "Programinės aparatinės įrangos katalogo šaltinio amžius (s)"
     }
   },
   "services": {

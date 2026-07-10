@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "Sidste fejl på webstedets energi",
       "site_energy_failures": "Energisvigt på stedet",
       "site_energy_backoff_active": "Site energy backoff aktiv",
-      "site_energy_backoff_ends_utc": "Backoff for siteenergi slutter (UTC)"
+      "site_energy_backoff_ends_utc": "Backoff for siteenergi slutter (UTC)",
+      "tariff_available": "Tarif tilgængelig",
+      "tariff_service_status": "Status for tariftjeneste",
+      "tariff_last_error": "Seneste tariffejl",
+      "tariff_failures": "Tariffejl",
+      "tariff_backoff_active": "Tarifpause aktiv",
+      "tariff_backoff_ends_utc": "Tarifpause slutter (UTC)",
+      "degraded_endpoint_families": "Forringede slutpunktsfamilier",
+      "degraded_services": "Forringede tjenester",
+      "firmware_catalog_last_fetch_utc": "Seneste hentning af firmwarekatalog (UTC)",
+      "firmware_catalog_last_success_utc": "Seneste vellykkede hentning af firmwarekatalog (UTC)",
+      "firmware_catalog_last_error": "Seneste fejl i firmwarekatalog",
+      "firmware_catalog_using_stale": "Firmwarekatalog bruger forældede data",
+      "firmware_catalog_generated_at": "Firmwarekatalog genereret",
+      "firmware_catalog_source_age_seconds": "Firmwarekatalogets kildealder (s)"
     }
   },
   "services": {

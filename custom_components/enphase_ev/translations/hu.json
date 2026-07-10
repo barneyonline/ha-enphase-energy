@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "A webhely energia utolsó hibája",
       "site_energy_failures": "Telephelyi energiahiba",
       "site_energy_backoff_active": "A webhely energiavisszatartása aktív",
-      "site_energy_backoff_ends_utc": "A webhely energiahátrálásának vége (UTC)"
+      "site_energy_backoff_ends_utc": "A webhely energiahátrálásának vége (UTC)",
+      "tariff_available": "Tarifa elérhető",
+      "tariff_service_status": "Tarifaszolgáltatás állapota",
+      "tariff_last_error": "Tarifa utolsó hibája",
+      "tariff_failures": "Tarifahibák",
+      "tariff_backoff_active": "Tarifa-visszalépés aktív",
+      "tariff_backoff_ends_utc": "Tarifa-visszalépés vége (UTC)",
+      "degraded_endpoint_families": "Csökkentett működésű végpontcsaládok",
+      "degraded_services": "Csökkentett működésű szolgáltatások",
+      "firmware_catalog_last_fetch_utc": "Firmware-katalógus utolsó lekérése (UTC)",
+      "firmware_catalog_last_success_utc": "Firmware-katalógus utolsó sikeres lekérése (UTC)",
+      "firmware_catalog_last_error": "Firmware-katalógus utolsó hibája",
+      "firmware_catalog_using_stale": "A firmware-katalógus elavult adatokat használ",
+      "firmware_catalog_generated_at": "Firmware-katalógus létrehozva",
+      "firmware_catalog_source_age_seconds": "Firmware-katalógus forrásának kora (s)"
     }
   },
   "services": {

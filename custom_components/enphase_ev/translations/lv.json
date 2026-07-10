@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "Vietnes enerģijas pēdējā kļūda",
       "site_energy_failures": "Vietnes energoapgādes traucējumi",
       "site_energy_backoff_active": "Vietnes enerģijas atcelšana ir aktīva",
-      "site_energy_backoff_ends_utc": "Vietnes enerģijas atcelšanas beigas (UTC)"
+      "site_energy_backoff_ends_utc": "Vietnes enerģijas atcelšanas beigas (UTC)",
+      "tariff_available": "Tarifs pieejams",
+      "tariff_service_status": "Tarifu pakalpojuma statuss",
+      "tariff_last_error": "Pēdējā tarifa kļūda",
+      "tariff_failures": "Tarifa kļūmes",
+      "tariff_backoff_active": "Tarifa nogaidīšana aktīva",
+      "tariff_backoff_ends_utc": "Tarifa nogaidīšana beidzas (UTC)",
+      "degraded_endpoint_families": "Traucētu galapunktu saimes",
+      "degraded_services": "Traucēti pakalpojumi",
+      "firmware_catalog_last_fetch_utc": "Programmaparatūras kataloga pēdējā izgūšana (UTC)",
+      "firmware_catalog_last_success_utc": "Programmaparatūras kataloga pēdējā veiksmīgā izgūšana (UTC)",
+      "firmware_catalog_last_error": "Programmaparatūras kataloga pēdējā kļūda",
+      "firmware_catalog_using_stale": "Programmaparatūras katalogs izmanto novecojušus datus",
+      "firmware_catalog_generated_at": "Programmaparatūras katalogs ģenerēts",
+      "firmware_catalog_source_age_seconds": "Programmaparatūras kataloga avota vecums (s)"
     }
   },
   "services": {

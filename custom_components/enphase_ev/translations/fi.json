@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "Sivuston energian viimeinen virhe",
       "site_energy_failures": "Työpaikan energiahäiriöt",
       "site_energy_backoff_active": "Sivuston energian peruutus aktiivinen",
-      "site_energy_backoff_ends_utc": "Sivuston energian takaisku päättyy (UTC)"
+      "site_energy_backoff_ends_utc": "Sivuston energian takaisku päättyy (UTC)",
+      "tariff_available": "Tariffi saatavilla",
+      "tariff_service_status": "Tariffipalvelun tila",
+      "tariff_last_error": "Tariffin viimeisin virhe",
+      "tariff_failures": "Tariffivirheet",
+      "tariff_backoff_active": "Tariffin odotustila aktiivinen",
+      "tariff_backoff_ends_utc": "Tariffin odotustila päättyy (UTC)",
+      "degraded_endpoint_families": "Heikentyneet päätepisteperheet",
+      "degraded_services": "Heikentyneet palvelut",
+      "firmware_catalog_last_fetch_utc": "Laiteohjelmistoluettelon viimeisin haku (UTC)",
+      "firmware_catalog_last_success_utc": "Laiteohjelmistoluettelon viimeisin onnistunut haku (UTC)",
+      "firmware_catalog_last_error": "Laiteohjelmistoluettelon viimeisin virhe",
+      "firmware_catalog_using_stale": "Laiteohjelmistoluettelo käyttää vanhentuneita tietoja",
+      "firmware_catalog_generated_at": "Laiteohjelmistoluettelo luotu",
+      "firmware_catalog_source_age_seconds": "Laiteohjelmistoluettelon lähteen ikä (s)"
     }
   },
   "services": {

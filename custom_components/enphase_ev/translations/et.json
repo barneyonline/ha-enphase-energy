@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "Saidi energia viimane viga",
       "site_energy_failures": "Saidi energiatõrked",
       "site_energy_backoff_active": "Saidi energia tagastus aktiivne",
-      "site_energy_backoff_ends_utc": "Saidi energia tagastus lõpeb (UTC)"
+      "site_energy_backoff_ends_utc": "Saidi energia tagastus lõpeb (UTC)",
+      "tariff_available": "Tariif on saadaval",
+      "tariff_service_status": "Tariifiteenuse olek",
+      "tariff_last_error": "Tariifi viimane viga",
+      "tariff_failures": "Tariifi tõrked",
+      "tariff_backoff_active": "Tariifi ooteaeg on aktiivne",
+      "tariff_backoff_ends_utc": "Tariifi ooteaeg lõpeb (UTC)",
+      "degraded_endpoint_families": "Halvenenud lõpp-punktide rühmad",
+      "degraded_services": "Halvenenud teenused",
+      "firmware_catalog_last_fetch_utc": "Püsivarakataloogi viimane toomine (UTC)",
+      "firmware_catalog_last_success_utc": "Püsivarakataloogi viimane edukas toomine (UTC)",
+      "firmware_catalog_last_error": "Püsivarakataloogi viimane viga",
+      "firmware_catalog_using_stale": "Püsivarakataloog kasutab aegunud andmeid",
+      "firmware_catalog_generated_at": "Püsivarakataloog loodud",
+      "firmware_catalog_source_age_seconds": "Püsivarakataloogi allika vanus (s)"
     }
   },
   "services": {

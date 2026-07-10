@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "Laatste fout site-energie",
       "site_energy_failures": "Energiestoringen op locatie",
       "site_energy_backoff_active": "Energieterugtrekking locatie actief",
-      "site_energy_backoff_ends_utc": "Einde energie-uitstel locatie (UTC)"
+      "site_energy_backoff_ends_utc": "Einde energie-uitstel locatie (UTC)",
+      "tariff_available": "Tarief beschikbaar",
+      "tariff_service_status": "Status van tariefservice",
+      "tariff_last_error": "Laatste tarieffout",
+      "tariff_failures": "Tarieffouten",
+      "tariff_backoff_active": "Tariefwachttijd actief",
+      "tariff_backoff_ends_utc": "Tariefwachttijd eindigt (UTC)",
+      "degraded_endpoint_families": "Verslechterde eindpuntfamilies",
+      "degraded_services": "Verslechterde services",
+      "firmware_catalog_last_fetch_utc": "Laatste ophalen van firmwarecatalogus (UTC)",
+      "firmware_catalog_last_success_utc": "Laatste geslaagde ophalen van firmwarecatalogus (UTC)",
+      "firmware_catalog_last_error": "Laatste fout in firmwarecatalogus",
+      "firmware_catalog_using_stale": "Firmwarecatalogus gebruikt verouderde gegevens",
+      "firmware_catalog_generated_at": "Firmwarecatalogus gegenereerd op",
+      "firmware_catalog_source_age_seconds": "Leeftijd van firmwarecatalogusbron (s)"
     }
   },
   "services": {

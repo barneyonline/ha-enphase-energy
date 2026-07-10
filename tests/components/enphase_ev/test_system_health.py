@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -11,6 +13,10 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.enphase_ev import system_health
 from custom_components.enphase_ev.const import BASE_URL, DOMAIN
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
+
+INTEGRATION_ROOT = (
+    Path(__file__).resolve().parents[3] / "custom_components" / "enphase_ev"
+)
 
 
 @pytest.mark.asyncio
@@ -107,6 +113,29 @@ async def test_system_health_info_reports_state(
     assert info["tariff_backoff_ends_utc"] == "2026-04-26T01:00:00+00:00"
     assert info["degraded_endpoint_families"] == ["tariff"]
     assert info["degraded_services"] == ["tariff"]
+    assert set(info) == set(system_health.SYSTEM_HEALTH_INFO_KEYS)
+
+
+def test_system_health_keys_are_translated_for_every_locale() -> None:
+    """Every field returned by system health has a localized label."""
+    expected = set(system_health.SYSTEM_HEALTH_INFO_KEYS)
+    paths = [
+        INTEGRATION_ROOT / "strings.json",
+        *sorted((INTEGRATION_ROOT / "translations").glob("*.json")),
+    ]
+    english = json.loads(
+        (INTEGRATION_ROOT / "translations" / "en.json").read_text(encoding="utf-8")
+    )["system_health"]["info"]
+
+    for path in paths:
+        labels = json.loads(path.read_text(encoding="utf-8"))["system_health"]["info"]
+        assert set(labels) == expected, path.name
+        assert all(value.strip() for value in labels.values()), path.name
+        if path.name != "strings.json" and not path.name.startswith("en"):
+            for key in expected:
+                assert (
+                    labels[key] != english[key]
+                ), f"{path.name} should localize system_health.info.{key}"
 
 
 @pytest.mark.asyncio

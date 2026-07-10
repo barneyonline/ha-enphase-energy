@@ -2277,7 +2277,21 @@
       "site_energy_last_error": "Sista fel på webbplatsens energi",
       "site_energy_failures": "Webbplatsens energifel",
       "site_energy_backoff_active": "Webbplatsenergibackoff aktiv",
-      "site_energy_backoff_ends_utc": "Backoff för platsenergi slutar (UTC)"
+      "site_energy_backoff_ends_utc": "Backoff för platsenergi slutar (UTC)",
+      "tariff_available": "Tariff tillgänglig",
+      "tariff_service_status": "Status för tarifftjänst",
+      "tariff_last_error": "Senaste tarifffel",
+      "tariff_failures": "Tarifffel",
+      "tariff_backoff_active": "Tariffpaus aktiv",
+      "tariff_backoff_ends_utc": "Tariffpaus slutar (UTC)",
+      "degraded_endpoint_families": "Försämrade slutpunktsfamiljer",
+      "degraded_services": "Försämrade tjänster",
+      "firmware_catalog_last_fetch_utc": "Senaste hämtning av firmwarekatalog (UTC)",
+      "firmware_catalog_last_success_utc": "Senaste lyckade hämtning av firmwarekatalog (UTC)",
+      "firmware_catalog_last_error": "Senaste fel i firmwarekatalog",
+      "firmware_catalog_using_stale": "Firmwarekatalogen använder inaktuella data",
+      "firmware_catalog_generated_at": "Firmwarekatalog genererad",
+      "firmware_catalog_source_age_seconds": "Firmwarekatalogens källålder (s)"
     }
   },
   "services": {
