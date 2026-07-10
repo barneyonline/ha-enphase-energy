@@ -1058,7 +1058,7 @@ async def _timed_response_text(response: Any) -> str:
 
     started = monotonic()
     try:
-        return await response.text()
+        return str(await response.text())
     finally:
         record_request_timings(parsing_s=monotonic() - started)
 
