@@ -2017,9 +2017,11 @@ class EnphaseEVClient:
         cookie: str | None,
         timeout: int = 15,
         reauth_callback: Callable[[], Awaitable[bool]] | None = None,
+        cookie_header_session: aiohttp.ClientSession | None = None,
     ):
         self._timeout = int(timeout)
         self._s = session
+        self._cookie_header_session = cookie_header_session
         self._site = site_id
         # Cache working API variant indexes per action to avoid retries once discovered
         self._start_variant_idx: int | None = None
@@ -2054,6 +2056,14 @@ class EnphaseEVClient:
         """Register coroutine used to refresh credentials on 401."""
 
         self._reauth_cb = callback
+
+    async def async_close(self) -> None:
+        """Detach the private session while preserving Home Assistant's connector."""
+
+        session = self._cookie_header_session
+        self._cookie_header_session = None
+        if session is not None and not session.closed:
+            session.detach()
 
     @staticmethod
     def _is_hems_api_endpoint(endpoint: str | None) -> bool:
@@ -4488,17 +4498,25 @@ class EnphaseEVClient:
         """Yield the HTTP session to use for a request.
 
         Cookie-backed BatteryConfig writes need the explicit raw Cookie header to be
-        sent without any session-jar merging. A short-lived stateless session avoids
-        hidden cookie mutations from the shared client while preserving the normal
-        shared session for all other requests.
+        sent without any session-jar merging. The injected stateless session avoids
+        hidden cookie mutations from the shared client while preserving connection
+        reuse across writes.
         """
 
         if not cookie_header_only:
             yield self._s
             return
 
-        async with aiohttp.ClientSession(cookie_jar=aiohttp.DummyCookieJar()) as s:
-            yield s
+        session = self._cookie_header_session
+        if session is None and isinstance(
+            getattr(self._s, "cookie_jar", None), aiohttp.DummyCookieJar
+        ):
+            session = self._s
+        if session is None:
+            raise RuntimeError(
+                "Cookie-header-only requests require an injected stateless session"
+            )
+        yield session
 
     async def _text_response(
         self,

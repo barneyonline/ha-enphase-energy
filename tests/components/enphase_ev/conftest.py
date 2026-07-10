@@ -324,6 +324,15 @@ def mock_issue_registry(monkeypatch) -> SimpleNamespace:
 def mock_clientsession(monkeypatch):
     """Stub out aiohttp client session factory used by the integration."""
     session = object()
+
+    class StatelessSession:
+        closed = False
+
+        def detach(self) -> None:
+            self.closed = True
+
+    stateless_session = StatelessSession()
+    create_calls = []
     for target in (
         "custom_components.enphase_ev.coordinator.async_get_clientsession",
         "custom_components.enphase_ev.config_flow.async_get_clientsession",
@@ -333,7 +342,16 @@ def mock_clientsession(monkeypatch):
             lambda *args, **kwargs: session,
             raising=False,
         )
-    return session
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.async_create_clientsession",
+        lambda *args, **kwargs: create_calls.append((args, kwargs))
+        or stateless_session,
+    )
+    return SimpleNamespace(
+        shared=session,
+        stateless=stateless_session,
+        create_calls=create_calls,
+    )
 
 
 @pytest.fixture

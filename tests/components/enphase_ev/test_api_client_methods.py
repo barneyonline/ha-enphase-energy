@@ -5480,21 +5480,114 @@ async def test_battery_config_write_request_uses_cookie_header_only_for_cookie_a
 
 
 @pytest.mark.asyncio
-async def test_request_session_cookie_header_only_uses_ephemeral_client_session() -> (
-    None
-):
-    client = _make_client()
+async def test_request_session_reuses_injected_cookie_header_session() -> None:
+    shared_session = _DefaultSession()
+    stateless_session = _DefaultSession()
+    stateless_session.cookie_jar = aiohttp.DummyCookieJar()
+    client = api.EnphaseEVClient(
+        shared_session,
+        "SITE",
+        "EAUTH",
+        "COOKIE",
+        cookie_header_session=stateless_session,
+    )
 
     async with client._request_session(
         cookie_header_only=False
     ) as shared:  # noqa: SLF001
-        assert shared is client._s  # noqa: SLF001
+        assert shared is shared_session
 
     async with client._request_session(
         cookie_header_only=True
-    ) as isolated:  # noqa: SLF001
-        assert isinstance(isolated, aiohttp.ClientSession)
-        assert isolated is not client._s  # noqa: SLF001
+    ) as first:  # noqa: SLF001
+        assert first is stateless_session
+    async with client._request_session(
+        cookie_header_only=True
+    ) as second:  # noqa: SLF001
+        assert second is first
+
+
+@pytest.mark.asyncio
+async def test_request_session_accepts_stateless_primary_session() -> None:
+    stateless_session = _DefaultSession()
+    stateless_session.cookie_jar = aiohttp.DummyCookieJar()
+    client = api.EnphaseEVClient(stateless_session, "SITE", "EAUTH", "COOKIE")
+
+    async with client._request_session(  # noqa: SLF001
+        cookie_header_only=True
+    ) as request_session:
+        assert request_session is stateless_session
+
+
+@pytest.mark.asyncio
+async def test_cookie_header_only_request_preserves_raw_cookie_header() -> None:
+    shared_session = _DefaultSession()
+    shared_session.cookie_jar = SimpleNamespace(
+        filter_cookies=lambda _url: SimpleCookie("hidden=jar-cookie")
+    )
+    stateless_session = _FakeSession(
+        [
+            _FakeResponse(status=200, json_body={"attempt": 1}),
+            _FakeResponse(status=200, json_body={"attempt": 2}),
+        ]
+    )
+    stateless_session.cookie_jar = aiohttp.DummyCookieJar()
+    client = api.EnphaseEVClient(
+        shared_session,
+        "SITE",
+        None,
+        "session=raw; BP-XSRF-Token=raw-token",
+        cookie_header_session=stateless_session,
+    )
+
+    for expected_attempt in (1, 2):
+        payload = await client._json(  # noqa: SLF001
+            "PUT",
+            "https://example.test/battery-settings",
+            headers={"Cookie": "session=raw; BP-XSRF-Token=raw-token"},
+            use_cookie_header_only=True,
+        )
+        assert payload == {"attempt": expected_attempt}
+
+    assert len(stateless_session.calls) == 2
+    assert all(
+        kwargs["headers"]["Cookie"] == "session=raw; BP-XSRF-Token=raw-token"
+        for _method, _url, kwargs in stateless_session.calls
+    )
+    assert all(
+        "hidden=jar-cookie" not in kwargs["headers"]["Cookie"]
+        for _method, _url, kwargs in stateless_session.calls
+    )
+
+
+@pytest.mark.asyncio
+async def test_cookie_header_only_request_requires_stateless_session() -> None:
+    client = _make_client()
+
+    with pytest.raises(
+        RuntimeError,
+        match="require an injected stateless session",
+    ):
+        async with client._request_session(cookie_header_only=True):  # noqa: SLF001
+            pass
+
+
+@pytest.mark.asyncio
+async def test_async_close_detaches_private_session_once() -> None:
+    stateless_session = MagicMock(closed=False)
+    client = api.EnphaseEVClient(
+        _DefaultSession(),
+        "SITE",
+        "EAUTH",
+        "COOKIE",
+        cookie_header_session=stateless_session,
+    )
+
+    await client.async_close()
+    await client.async_close()
+
+    stateless_session.detach.assert_called_once_with()
+    assert client._cookie_header_session is None  # noqa: SLF001
 
 
 @pytest.mark.asyncio

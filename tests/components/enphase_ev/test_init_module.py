@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, Mock, call
 
+import aiohttp
 import pytest
 import voluptuous as vol
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -431,7 +432,7 @@ def test_migrate_orphaned_update_entities_to_type_devices_handles_edge_paths(
 
 @pytest.mark.asyncio
 async def test_async_setup_entry_updates_existing_device(
-    hass: HomeAssistant, config_entry, monkeypatch
+    hass: HomeAssistant, config_entry, monkeypatch, mock_clientsession
 ) -> None:
     """Ensure charger devices are refreshed when registry data drifts."""
     site_id = config_entry.data[CONF_SITE_ID]
@@ -496,13 +497,17 @@ async def test_async_setup_entry_updates_existing_device(
     dummy_coord = _with_inventory_view(DummyCoordinator())
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     forward = AsyncMock()
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", forward)
 
     assert await async_setup_entry(hass, config_entry)
     await hass.async_block_till_done()
+    args, kwargs = mock_clientsession.create_calls[-1]
+    assert args == (hass,)
+    assert kwargs["auto_cleanup"] is True
+    assert isinstance(kwargs["cookie_jar"], aiohttp.DummyCookieJar)
     dummy_coord.schedule_sync.async_start.assert_awaited_once()
     forward.assert_awaited_once()
 
@@ -591,7 +596,7 @@ async def test_async_setup_entry_restores_discovery_before_first_refresh(
     dummy_coord = _with_inventory_view(DummyCoordinator())
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", AsyncMock())
 
@@ -623,7 +628,7 @@ async def test_async_setup_entry_uses_background_task_for_schedule_sync_start(
     dummy_coord = _with_inventory_view(DummyCoordinator())
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     forward = AsyncMock()
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", forward)
@@ -678,7 +683,7 @@ async def test_async_setup_entry_registers_evse_schedule_editor_runtime(
     dummy_coord = _with_inventory_view(DummyCoordinator())
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     monkeypatch.setattr(
         "custom_components.enphase_ev.battery_schedule_editor.BatteryScheduleEditorManager",
@@ -727,7 +732,7 @@ async def test_async_setup_entry_uses_background_task_for_startup_warmup(
     dummy_coord = _with_inventory_view(DummyCoordinator())
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     forward = AsyncMock()
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", forward)
@@ -779,7 +784,7 @@ async def test_async_setup_entry_records_startup_migration_version(
     migrate_updates = MagicMock()
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     monkeypatch.setattr(
         "custom_components.enphase_ev._migrate_legacy_gateway_type_devices",
@@ -831,7 +836,7 @@ async def test_async_setup_entry_skips_startup_migrations_when_version_current(
     migrate_cloud = MagicMock()
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     monkeypatch.setattr(
         "custom_components.enphase_ev._migrate_legacy_gateway_type_devices",
@@ -895,7 +900,7 @@ async def test_async_setup_entry_removes_legacy_site_device_when_migration_curre
     dummy_coord = _with_inventory_view(DummyCoordinator())
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", AsyncMock())
 
@@ -1145,7 +1150,7 @@ async def test_async_setup_entry_schedule_sync_falls_back_to_hass_background_tas
     dummy_coord = _with_inventory_view(DummyCoordinator())
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", AsyncMock())
     monkeypatch.setattr(config_entry, "async_create_background_task", None)
@@ -1190,7 +1195,7 @@ async def test_async_setup_entry_schedule_sync_falls_back_to_hass_create_task(
     dummy_coord = _with_inventory_view(DummyCoordinator())
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", AsyncMock())
     monkeypatch.setattr(config_entry, "async_create_background_task", None)
@@ -1238,7 +1243,7 @@ async def test_async_setup_entry_updates_title_to_prefixed_site_id(
     dummy_coord = _with_inventory_view(DummyCoordinator())
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     forward = AsyncMock()
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", forward)
@@ -1289,7 +1294,7 @@ async def test_async_setup_entry_migrates_selected_type_keys_for_microinverters_
     dummy_coord = _with_inventory_view(DummyCoordinator())
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     forward = AsyncMock()
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", forward)
@@ -1347,7 +1352,7 @@ async def test_async_setup_entry_does_not_add_heatpump_without_gateway_selection
 
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: _with_inventory_view(
+        lambda hass_, entry_data, config_entry=None, **kwargs: _with_inventory_view(
             DummyCoordinator()
         ),
     )
@@ -1402,7 +1407,7 @@ async def test_async_setup_entry_model_display_variants(
     dummy_coord = _with_inventory_view(DummyCoordinator())
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     forward = AsyncMock()
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", forward)
@@ -1463,7 +1468,7 @@ async def test_async_setup_entry_uses_fallback_name_for_model(
     dummy_coord = _with_inventory_view(DummyCoordinator())
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     forward = AsyncMock()
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", forward)
@@ -1519,7 +1524,7 @@ async def test_async_setup_entry_registry_sync_listener_handles_exceptions(
     dummy_coord = _with_inventory_view(DummyCoordinator())
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     forward = AsyncMock()
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", forward)
@@ -1542,7 +1547,9 @@ async def test_async_unload_entry_stops_schedule_sync(
 ) -> None:
     schedule_sync = SimpleNamespace(async_stop=AsyncMock())
     coord = SimpleNamespace(
-        schedule_sync=schedule_sync, cleanup_runtime_state=MagicMock()
+        schedule_sync=schedule_sync,
+        cleanup_runtime_state=MagicMock(),
+        async_close=AsyncMock(),
     )
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
 
@@ -1552,6 +1559,7 @@ async def test_async_unload_entry_stops_schedule_sync(
     assert await async_unload_entry(hass, config_entry)
     schedule_sync.async_stop.assert_awaited_once()
     coord.cleanup_runtime_state.assert_called_once()
+    coord.async_close.assert_awaited_once()
     assert unload.await_count == len(PLATFORMS)
     assert config_entry.runtime_data is None
 
@@ -4962,7 +4970,7 @@ async def test_async_setup_entry_registry_sync_listener_only_resyncs_devices_on_
     dummy_coord = _with_inventory_view(DummyCoordinator())
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     forward = AsyncMock()
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", forward)
@@ -5055,7 +5063,7 @@ async def test_async_setup_entry_registry_sync_listener_swallows_sync_errors(
     dummy_coord = _with_inventory_view(DummyCoordinator())
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None: dummy_coord,
+        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", AsyncMock())
     monkeypatch.setattr(
