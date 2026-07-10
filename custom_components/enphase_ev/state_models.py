@@ -100,6 +100,7 @@ class RefreshHealthState:
     _cloud_issue_reported: bool = False
     _backoff_until: float | None = None
     _backoff_cancel: Any = None
+    _backoff_refresh_tasks: set[Any] = field(default_factory=set)
     _last_error: str | None = None
     _streaming: bool = False
     _streaming_until: float | None = None

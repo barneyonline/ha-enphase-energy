@@ -1578,6 +1578,9 @@ async def test_async_unload_entry_cancels_background_lifecycle_tasks(
     completed_amp_task = _RecordingTask(done=True)
     stream_stop_task = _RecordingTask()
     auth_refresh_task = _RecordingTask()
+    battery_restore_task = _RecordingTask()
+    backoff_refresh_task = _RecordingTask()
+    backoff_cancel = Mock()
     schedule_sync = SimpleNamespace(async_stop=AsyncMock())
     session_history = SimpleNamespace(_enrichment_tasks={session_task})
 
@@ -1601,6 +1604,11 @@ async def test_async_unload_entry_cancels_background_lifecycle_tasks(
             }
             self._streaming_stop_task = stream_stop_task
             self._auth_refresh_task = auth_refresh_task
+            self._battery_profile_recovery_restore_task = battery_restore_task
+            self._backoff_cancel = backoff_cancel
+            self._backoff_refresh_tasks = {backoff_refresh_task}
+            self._backoff_until = 123.0
+            self.backoff_ends_utc = datetime.now(timezone.utc)
             self.discovery_snapshot = SimpleNamespace(cancel_pending_save=Mock())
             self.session_history = session_history
             self._session_history_cache_shim = {("EV123", "2026-04-24"): (1.0, [])}
@@ -1609,6 +1617,9 @@ async def test_async_unload_entry_cancels_background_lifecycle_tasks(
             self.evse_runtime = SimpleNamespace(
                 prune_runtime_caches=Mock(),
             )
+
+        def _clear_backoff_timer(self) -> None:
+            EnphaseCoordinator._clear_backoff_timer(self)
 
         def _prune_runtime_caches(self, *, active_serials, keep_day_keys) -> None:
             self.evse_runtime.prune_runtime_caches(
@@ -1630,10 +1641,17 @@ async def test_async_unload_entry_cancels_background_lifecycle_tasks(
     assert not completed_amp_task.cancelled
     assert stream_stop_task.cancelled
     assert auth_refresh_task.cancelled
+    assert battery_restore_task.cancelled
+    assert backoff_refresh_task.cancelled
+    backoff_cancel.assert_called_once_with()
     assert coord._warmup_task is None
     assert coord._amp_restart_tasks == {}
     assert coord._streaming_stop_task is None
     assert coord._auth_refresh_task is None
+    assert coord._battery_profile_recovery_restore_task is None
+    assert coord._backoff_cancel is None
+    assert coord._backoff_refresh_tasks == set()
+    assert coord._backoff_until is None
     assert coord._session_history_cache_shim == {}
     assert coord._topology_listeners == []
     session_history.clear.assert_called_once_with()

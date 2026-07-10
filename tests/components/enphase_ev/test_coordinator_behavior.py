@@ -1810,11 +1810,51 @@ async def test_backoff_timer_requests_refresh(hass, monkeypatch):
     assert coord.backoff_ends_utc == now + timedelta(seconds=2.5)
     assert callable(coord._backoff_cancel)
 
-    await captured["callback"](now + timedelta(seconds=3))
+    captured["callback"](now + timedelta(seconds=3))
+    task = next(iter(coord._backoff_refresh_tasks))  # noqa: SLF001
+    await task
+    await asyncio.sleep(0)
 
     assert coord.async_request_refresh.await_count == 1
     assert coord.backoff_ends_utc is None
     assert coord._backoff_cancel is None
+    assert coord._backoff_refresh_tasks == set()  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_cleanup_cancels_fired_backoff_refresh(hass, monkeypatch) -> None:
+    from custom_components.enphase_ev import coordinator as coord_mod
+
+    coord = _make_coordinator(hass, monkeypatch)
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+    captured: dict[str, object] = {}
+
+    async def _refresh() -> None:
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    def _fake_call_later(_hass, _delay, action):
+        captured["callback"] = action
+        return lambda: None
+
+    coord.async_request_refresh = _refresh  # type: ignore[method-assign]
+    monkeypatch.setattr(coord_mod, "async_call_later", _fake_call_later)
+
+    coord._schedule_backoff_timer(1)  # noqa: SLF001
+    captured["callback"](dt_util.utcnow())
+    task = next(iter(coord._backoff_refresh_tasks))  # noqa: SLF001
+    await started.wait()
+
+    coord.cleanup_runtime_state()
+    await asyncio.gather(task, return_exceptions=True)
+
+    assert cancelled.is_set()
+    assert coord._backoff_refresh_tasks == set()  # noqa: SLF001
 
 
 @pytest.mark.asyncio
