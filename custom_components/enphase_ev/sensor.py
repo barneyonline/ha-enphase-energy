@@ -6411,6 +6411,7 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
             "source": source,
             "reported_units": units,
             "reported_precision": precision,
+            "using_stale": bool(self._coord.current_power_runtime.using_stale),
         }
 
     @property

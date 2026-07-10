@@ -28,8 +28,13 @@ All notable changes to this project will be documented in this file.
 - Fixed config-entry unload and entity removal leaving delayed backoff, schedule,
   battery-profile recovery, or firmware refresh work running against retired
   integration objects.
+- Fixed optional or concurrent cloud reads deadlocking credential refresh while
+  the initiating request still held the shared Enlighten read limiter.
 
 ### 🔧 Improvements
+- Bound optional Enlighten request queueing and startup warmup stages, reserve
+  cloud-read capacity for core status traffic, and retain the last current-power
+  sample with retry backoff when that optional endpoint is unavailable.
 - Documented the IQ EV Charger device automation triggers and the integration's
   use of standard Home Assistant conditions.
 - Reused a Home Assistant-managed stateless HTTP session for cookie-authenticated

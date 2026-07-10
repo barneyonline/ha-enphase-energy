@@ -18,6 +18,7 @@ from .api import (
     EnphaseLoginWallUnauthorized,
     InvalidPayloadError,
     OptionalEndpointUnavailable,
+    enlighten_optional_read_scope,
 )
 from .const import DOMAIN, DEFAULT_CHARGE_LEVEL_SETTING, PHASE_SWITCH_CONFIG_SETTING
 from .log_redaction import redact_site_id, redact_text
@@ -79,9 +80,10 @@ class RefreshRunner:
     ) -> tuple[str, float | None]:
         started = time.monotonic()
         try:
-            result = callback_factory()
-            if inspect.isawaitable(result):
-                await result
+            with enlighten_optional_read_scope():
+                result = callback_factory()
+                if inspect.isawaitable(result):
+                    await result
         except asyncio.CancelledError:
             raise
         except EnphaseLoginWallUnauthorized as err:
@@ -225,6 +227,7 @@ class RefreshRunner:
         ordered_calls: tuple[BoundRefreshCall, ...] = (),
         stage_key: str | None = None,
         defer_topology: bool = False,
+        deadline_s: float | None = None,
     ) -> None:
         if not parallel_calls and not ordered_calls:
             if stage_key is not None:
@@ -234,8 +237,7 @@ class RefreshRunner:
         if defer_topology:
             self._coordinator._begin_topology_refresh_batch()
 
-        group_started = time.monotonic()
-        try:
+        async def _async_run_stage() -> None:
             if parallel_calls:
                 await self.async_run_refresh_calls(
                     phase_timings,
@@ -246,6 +248,24 @@ class RefreshRunner:
                     phase_timings,
                     calls=ordered_calls,
                 )
+
+        group_started = time.monotonic()
+        try:
+            if deadline_s is None:
+                await _async_run_stage()
+            else:
+                try:
+                    async with asyncio.timeout(deadline_s):
+                        await _async_run_stage()
+                except TimeoutError:
+                    timeout_key = f"{stage_key or 'stage'}_deadline_exceeded"
+                    phase_timings[timeout_key] = 1.0
+                    _LOGGER.debug(
+                        "Stopped optional %s refresh stage for site %s after %.1f seconds",
+                        stage_key or "unnamed",
+                        redact_site_id(self._coordinator.site_id),
+                        deadline_s,
+                    )
         finally:
             if defer_topology:
                 self._coordinator._end_topology_refresh_batch()
@@ -267,6 +287,7 @@ class RefreshRunner:
                 defer_topology=stage.defer_topology,
                 parallel_calls=stage.parallel_calls,
                 ordered_calls=stage.ordered_calls,
+                deadline_s=stage.deadline_s,
             )
 
     async def async_startup_warmup_runner(self) -> None:

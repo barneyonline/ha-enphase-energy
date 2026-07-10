@@ -16,13 +16,14 @@ import hashlib
 import json
 import logging
 import re
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
+from contextvars import ContextVar
 from datetime import date, datetime, timezone
 from http import HTTPStatus
 from urllib.parse import unquote, urlencode
 import uuid
 from dataclasses import dataclass
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Any, Awaitable, Callable, Iterable, cast
 
 import aiohttp
@@ -72,6 +73,7 @@ _BATTERY_CONFIG_VARIANT_SESSION_COOKIE = "official_web_session_cookie"
 _BATTERY_CONFIG_VARIANT_COOKIE_EAUTH = "cookie_eauth_compatible"
 _BATTERY_CONFIG_VARIANT_MIXED = "mixed_auth_compatible"
 _ENLIGHTEN_READ_CONCURRENCY_LIMIT = 2
+_ENLIGHTEN_OPTIONAL_READ_CONCURRENCY_LIMIT = 1
 _LIVE_STATUS_GRID_RELAY_ENUM = {
     0: "OPER_RELAY_UNKNOWN",
     1: "OPER_RELAY_OPEN",
@@ -103,6 +105,13 @@ _OCPP_TRIGGER_MESSAGE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9]{0,63}$")
 # app. A module-level limiter keeps parallel refresh helpers from creating a
 # burst of browser-like reads during one Home Assistant update cycle.
 _enlighten_read_semaphore: asyncio.Semaphore | None = None
+_enlighten_optional_read_semaphore: asyncio.Semaphore | None = None
+_enlighten_optional_read: ContextVar[bool] = ContextVar(
+    "enphase_ev_enlighten_optional_read", default=False
+)
+_enlighten_read_limiter_bypass: ContextVar[bool] = ContextVar(
+    "enphase_ev_enlighten_read_limiter_bypass", default=False
+)
 JsonDict = dict[str, Any]
 
 
@@ -942,14 +951,54 @@ def _get_enlighten_read_semaphore() -> asyncio.Semaphore:
     return _enlighten_read_semaphore
 
 
+def _get_enlighten_optional_read_semaphore() -> asyncio.Semaphore:
+    """Return the limiter that reserves capacity for core Enlighten reads."""
+
+    global _enlighten_optional_read_semaphore
+    if _enlighten_optional_read_semaphore is None:
+        _enlighten_optional_read_semaphore = asyncio.Semaphore(
+            _ENLIGHTEN_OPTIONAL_READ_CONCURRENCY_LIMIT
+        )
+    return _enlighten_optional_read_semaphore
+
+
+@contextmanager
+def enlighten_optional_read_scope() -> Iterator[None]:
+    """Mark browser-host reads in this context as optional background work."""
+
+    token = _enlighten_optional_read.set(True)
+    try:
+        yield
+    finally:
+        _enlighten_optional_read.reset(token)
+
+
+@contextmanager
+def _enlighten_reauth_read_scope() -> Iterator[None]:
+    """Let nested credential refreshes escape a limiter held by their caller."""
+
+    token = _enlighten_read_limiter_bypass.set(True)
+    try:
+        yield
+    finally:
+        _enlighten_read_limiter_bypass.reset(token)
+
+
 @asynccontextmanager
 async def _enlighten_read_request_guard(
     method: object, url: object
 ) -> AsyncIterator[None]:
     """Limit concurrent GET/HEAD requests to the Enlighten web host."""
 
-    if not _should_limit_enlighten_read_request(method, url):
+    if _enlighten_read_limiter_bypass.get() or not _should_limit_enlighten_read_request(
+        method, url
+    ):
         yield
+        return
+    if _enlighten_optional_read.get():
+        async with _get_enlighten_optional_read_semaphore():
+            async with _get_enlighten_read_semaphore():
+                yield
         return
     async with _get_enlighten_read_semaphore():
         yield
@@ -1190,8 +1239,8 @@ async def _request_json(
     if json_data is not None:
         req_kwargs["json"] = json_data
 
-    async with _enlighten_read_request_guard(method, url):
-        async with asyncio.timeout(timeout):
+    async with asyncio.timeout(timeout):
+        async with _enlighten_read_request_guard(method, url):
             async with session.request(
                 method, url, allow_redirects=True, **req_kwargs
             ) as resp:
@@ -4318,8 +4367,8 @@ class EnphaseEVClient:
                     base_headers, attempt_headers
                 )
 
-            async with _enlighten_read_request_guard(method, url):
-                async with asyncio.timeout(self._timeout):
+            async with asyncio.timeout(self._timeout):
+                async with _enlighten_read_request_guard(method, url):
                     async with self._request_session(
                         cookie_header_only=use_cookie_header_only
                     ) as request_session:
@@ -4344,7 +4393,8 @@ class EnphaseEVClient:
                                         safe_request_label,
                                     )
                                     attempt += 1
-                                    reauth_ok = await self._reauth_cb()
+                                    with _enlighten_reauth_read_scope():
+                                        reauth_ok = await self._reauth_cb()
                                     if reauth_ok:
                                         _LOGGER.debug(
                                             "Stored-credential refresh succeeded for %s; retrying request",
@@ -4607,8 +4657,8 @@ class EnphaseEVClient:
                     else:
                         base_headers[header_key] = header_value
 
-            async with _enlighten_read_request_guard(method, url):
-                async with asyncio.timeout(self._timeout):
+            async with asyncio.timeout(self._timeout):
+                async with _enlighten_read_request_guard(method, url):
                     async with self._s.request(
                         method, url, headers=base_headers, **kwargs
                     ) as r:
@@ -4616,7 +4666,9 @@ class EnphaseEVClient:
                             self._last_unauthorized_request = safe_request_label
                             if self._reauth_cb and attempt == 0:
                                 attempt += 1
-                                if await self._reauth_cb():
+                                with _enlighten_reauth_read_scope():
+                                    reauth_ok = await self._reauth_cb()
+                                if reauth_ok:
                                     continue
                             raise Unauthorized()
                         if expected_statuses and r.status in expected_statuses:

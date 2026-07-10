@@ -954,6 +954,15 @@ class EnphaseCoordinator(
                 failure_backoff_schedule_s=(60.0, 120.0, 300.0, 600.0),
                 max_backoff_s=600.0,
             ),
+            "current_power": EndpointFamilyPolicy(
+                success_ttl_s=60.0,
+                stale_after_s=900.0,
+                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
+                max_backoff_s=3600.0,
+                optional=True,
+                suppress_after_failures=3,
+                support_state_on_success=True,
+            ),
             "battery_status": EndpointFamilyPolicy(
                 success_ttl_s=300.0,
                 stale_after_s=1800.0,

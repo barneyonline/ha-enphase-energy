@@ -61,6 +61,7 @@ def test_current_power_consumption_sensor_value_and_attributes():
         "source": "app-api:get_latest_power",
         "reported_units": "W",
         "reported_precision": 0,
+        "using_stale": False,
     }
 
 
@@ -148,6 +149,7 @@ def test_current_power_consumption_sensor_keeps_fresh_last_good_runtime_sample(
         "source": "app-api:get_latest_power",
         "reported_units": "W",
         "reported_precision": 0,
+        "using_stale": False,
     }
 
 
@@ -265,6 +267,7 @@ async def test_current_power_consumption_sensor_restores_last_good_state(
         "source": "app-api:get_latest_power",
         "reported_units": "W",
         "reported_precision": None,
+        "using_stale": False,
     }
 
 
@@ -348,6 +351,7 @@ async def test_current_power_consumption_sensor_restore_prefers_cached_at_freshn
         "source": "app-api:get_latest_power",
         "reported_units": "W",
         "reported_precision": 0,
+        "using_stale": False,
     }
 
 
