@@ -51,6 +51,8 @@ from .const import (
     FAST_TOGGLE_POLL_HOLD_S,
     GRID_CONTROL_CHECK_CACHE_TTL,
     GRID_CONTROL_CHECK_STALE_AFTER_S,
+    GRID_MODE_STATUS_CACHE_TTL,
+    GRID_MODE_STATUS_STALE_AFTER_S,
     GRID_OUTAGE_CONTEXT_CACHE_TTL,
     GRID_OUTAGE_CONTEXT_STALE_AFTER_S,
     SAVINGS_OPERATION_MODE_SUBTYPE,
@@ -716,6 +718,33 @@ class BatteryRuntime:
         if not callable(fetcher):
             return state_present
         family = "grid_control_check"
+        if coord._endpoint_family_should_run(family, force=force):
+            return True
+        return (
+            state_present
+            and coord._endpoint_family_state(family).cooldown_active
+            and not coord._endpoint_family_can_use_stale(family)
+        )
+
+    def grid_mode_status_refresh_due(self, *, force: bool = False) -> bool:
+        coord = self.coordinator
+        state = self.battery_state
+        now = time.monotonic()
+        if not force and state._grid_mode_status_cache_until:
+            if now < state._grid_mode_status_cache_until:
+                return False
+        state_present = any(
+            getattr(state, attr, None) is not None
+            for attr in (
+                "_grid_mode_status_supported",
+                "_grid_mode_status",
+                "_grid_mode_status_raw",
+            )
+        )
+        fetcher = getattr(coord.client, "site_livestream_payload", None)
+        if not callable(fetcher):
+            return state_present
+        family = "grid_mode_status"
         if coord._endpoint_family_should_run(family, force=force):
             return True
         return (
@@ -3395,6 +3424,71 @@ class BatteryRuntime:
             payload.get("userInitiatedGridToggle")
         )
 
+    def _normalize_grid_mode_status_value(self, value: object) -> str | None:
+        text = self._coerce_optional_text(value)
+        if text is None:
+            return None
+        token = text.strip().upper()
+        if token in {
+            "OPER_RELAY_OPEN",
+            "OPER_RELAY_OFFGRID_AC_GRID_PRESENT",
+            "OPER_RELAY_OFFGRID_READY_FOR_RESYNC_CMD",
+        }:
+            return "off_grid"
+        if token in {
+            "OPER_RELAY_CLOSED",
+            "OPER_RELAY_WAITING_TO_INITIALIZE_ON_GRID",
+        }:
+            return "on_grid"
+        return None
+
+    def _grid_relay_candidates(self, payload: object) -> list[object]:
+        if isinstance(payload, dict):
+            candidates: list[object] = []
+            for key in ("gridRelay", "grid_relay"):
+                if key in payload:
+                    candidates.append(payload.get(key))
+            meters = payload.get("meters")
+            if isinstance(meters, dict):
+                candidates.extend(self._grid_relay_candidates(meters))
+            elif isinstance(meters, list):
+                for item in meters:
+                    candidates.extend(self._grid_relay_candidates(item))
+            for key in ("data", "payload", "message"):
+                nested = payload.get(key)
+                if isinstance(nested, (dict, list)):
+                    candidates.extend(self._grid_relay_candidates(nested))
+            return candidates
+        if isinstance(payload, list):
+            candidates = []
+            for item in payload:
+                candidates.extend(self._grid_relay_candidates(item))
+            return candidates
+        return []
+
+    def parse_grid_mode_status_payload(self, payload: object) -> bool:
+        state = self.battery_state
+        if not isinstance(payload, dict):
+            state._grid_mode_status_supported = False
+            state._grid_mode_status = None
+            state._grid_mode_status_raw = None
+            return False
+
+        for value in self._grid_relay_candidates(payload):
+            raw = self._coerce_optional_text(value)
+            mode = self._normalize_grid_mode_status_value(raw)
+            if mode is None:
+                continue
+            state._grid_mode_status_supported = True
+            state._grid_mode_status = mode
+            state._grid_mode_status_raw = raw
+            return True
+
+        state._grid_mode_status_supported = False
+        state._grid_mode_status = None
+        state._grid_mode_status_raw = None
+        return False
+
     def parse_grid_outage_context_payload(self, payload: object) -> None:
         state = self.battery_state
         keys = (
@@ -3681,6 +3775,81 @@ class BatteryRuntime:
         state._grid_control_check_failures = 0
         state._grid_control_check_last_success_mono = now
         state._grid_control_check_cache_until = now + GRID_CONTROL_CHECK_CACHE_TTL
+        coord._note_endpoint_family_success(family)
+
+    async def async_refresh_grid_mode_status(self, *, force: bool = False) -> None:
+        coord = self.coordinator
+        state = self.battery_state
+        now = time.monotonic()
+        family = "grid_mode_status"
+        if not force and state._grid_mode_status_cache_until:
+            if now < state._grid_mode_status_cache_until:
+                return
+        if not coord._endpoint_family_should_run(family, force=force):
+            if state._grid_mode_status_supported is not None and (
+                coord._endpoint_family_state(family).cooldown_active
+                and not coord._endpoint_family_can_use_stale(family)
+            ):
+                state._grid_mode_status_supported = None
+                state._grid_mode_status = None
+                state._grid_mode_status_raw = None
+            return
+        envoy_serial = self.grid_envoy_serial()
+        fetcher = getattr(coord.client, "site_livestream_payload", None)
+        if envoy_serial is None or not callable(fetcher):
+            state._grid_mode_status_supported = None
+            state._grid_mode_status = None
+            state._grid_mode_status_raw = None
+            return
+        try:
+            payload = await fetcher(envoy_serial)
+        except Exception as err:  # noqa: BLE001
+            coord._note_endpoint_family_failure(family, err)
+            state._grid_mode_status_failures = max(
+                state._grid_mode_status_failures + 1,
+                coord._endpoint_family_state(family).consecutive_failures,
+            )
+            last_success = getattr(state, "_grid_mode_status_last_success_mono", None)
+            if (
+                not isinstance(last_success, (int, float))
+                or (now - float(last_success)) >= GRID_MODE_STATUS_STALE_AFTER_S
+            ):
+                state._grid_mode_status_supported = None
+                state._grid_mode_status = None
+                state._grid_mode_status_raw = None
+            state._grid_mode_status_cache_until = now + 15.0
+            return
+        redacted_payload = coord.redact_battery_payload(payload)
+        if isinstance(redacted_payload, dict):
+            state._grid_mode_status_payload = redacted_payload
+        else:
+            state._grid_mode_status_payload = {"value": redacted_payload}
+        previous_status_supported = state._grid_mode_status_supported
+        previous_status = state._grid_mode_status
+        previous_status_raw = state._grid_mode_status_raw
+        previous_last_success = state._grid_mode_status_last_success_mono
+        if not self.parse_grid_mode_status_payload(payload):
+            coord._note_endpoint_family_failure(
+                family,
+                ValueError("Live grid relay payload did not include meters.gridRelay"),
+            )
+            state._grid_mode_status_failures = max(
+                state._grid_mode_status_failures + 1,
+                coord._endpoint_family_state(family).consecutive_failures,
+            )
+            if (
+                isinstance(previous_last_success, (int, float))
+                and (now - float(previous_last_success))
+                < GRID_MODE_STATUS_STALE_AFTER_S
+            ):
+                state._grid_mode_status_supported = previous_status_supported
+                state._grid_mode_status = previous_status
+                state._grid_mode_status_raw = previous_status_raw
+            state._grid_mode_status_cache_until = now + 15.0
+            return
+        state._grid_mode_status_failures = 0
+        state._grid_mode_status_last_success_mono = now
+        state._grid_mode_status_cache_until = now + GRID_MODE_STATUS_CACHE_TTL
         coord._note_endpoint_family_success(family)
 
     async def async_refresh_grid_outage_context(self, *, force: bool = False) -> None:

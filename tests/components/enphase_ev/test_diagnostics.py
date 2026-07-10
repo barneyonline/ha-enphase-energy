@@ -311,6 +311,12 @@ class DummyCoordinator(SimpleNamespace):
             "disableGridControl": False,
             "activeDownload": False,
         }
+        self._grid_mode_status_payload = {
+            "meters": {
+                "gridRelay": "OPER_RELAY_CLOSED",
+                "serial_number": "[redacted]",
+            }
+        }
         self._grid_outage_context_payload = {
             "is_grid_outage": False,
             "show_grid_connect": True,
@@ -668,6 +674,7 @@ class DummyCoordinator(SimpleNamespace):
             "settings_payload": self._battery_settings_payload,
             "status_payload": self._battery_status_payload,
             "grid_control_check_payload": self._grid_control_check_payload,
+            "grid_mode_status_payload": self._grid_mode_status_payload,
             "grid_outage_context_payload": self._grid_outage_context_payload,
             "dry_contacts_payload": self._dry_contact_settings_payload,
             "backup_history_payload": self._battery_backup_history_payload,

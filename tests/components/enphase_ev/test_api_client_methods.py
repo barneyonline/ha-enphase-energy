@@ -8175,6 +8175,376 @@ async def test_show_livestream_returns_none_for_non_mapping_payload() -> None:
 
 
 @pytest.mark.asyncio
+async def test_site_livestream_authorizer_returns_payload() -> None:
+    client = _make_client()
+    client._json = AsyncMock(return_value={"live_stream_topic": "v1/live-stream/abc"})
+
+    payload = await client.site_livestream_authorizer("GW-1")
+
+    assert payload == {"live_stream_topic": "v1/live-stream/abc"}
+    client._json.assert_awaited_once_with(
+        "GET",
+        f"{api.BASE_URL}/pv/aws_sigv4/livestream.json?serial_num=GW-1",
+        headers={
+            **client._today_headers(),
+            "X-Requested-With": "XMLHttpRequest",
+        },
+        allow_reauth=True,
+    )
+
+    await client.site_livestream_authorizer("GW-1", live_debug=True)
+    assert "live_debug=true" in client._json.await_args.args[1]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "error",
+    [
+        api.Unauthorized(),
+        _make_optional_payload_error("/pv/aws_sigv4/livestream.json"),
+        _make_cre(404),
+    ],
+)
+async def test_site_livestream_authorizer_optional_errors_return_none(error) -> None:
+    client = _make_client()
+    client._json = AsyncMock(side_effect=error)
+
+    assert await client.site_livestream_authorizer("GW-1") is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", [api.Unauthorized(), _make_cre(403)])
+async def test_site_livestream_authorizer_auth_errors_reraise_when_disabled(
+    error,
+) -> None:
+    client = _make_client()
+    client._json = AsyncMock(side_effect=error)
+
+    with pytest.raises((api.Unauthorized, aiohttp.ClientResponseError)):
+        await client.site_livestream_authorizer("GW-1", allow_reauth=False)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "error",
+    [
+        api.InvalidPayloadError(
+            "bad json",
+            status=200,
+            content_type="application/json",
+            endpoint="/pv/aws_sigv4/livestream.json",
+        ),
+        _make_cre(500),
+    ],
+)
+async def test_site_livestream_authorizer_reraises_unexpected_errors(error) -> None:
+    client = _make_client()
+    client._json = AsyncMock(side_effect=error)
+
+    with pytest.raises((api.InvalidPayloadError, aiohttp.ClientResponseError)):
+        await client.site_livestream_authorizer("GW-1")
+
+
+@pytest.mark.asyncio
+async def test_site_livestream_payload_reads_json_mqtt_message() -> None:
+    client = _make_client()
+    client.site_livestream_authorizer = AsyncMock(
+        return_value={
+            "live_stream_topic": "v1/live-stream/abc",
+            "aws_iot_endpoint": "mqtt.example.test",
+            "aws_authorizer": "authorizer",
+            "aws_token_key": "enph_token",
+            "aws_token_value": "session",
+            "aws_digest": "sig+/=",
+        }
+    )
+    client._read_mqtt_websocket_payload = AsyncMock(
+        return_value=b'{"meters":{"gridRelay":"OPER_RELAY_OPEN"}}'
+    )
+
+    payload = await client.site_livestream_payload("GW-1", timeout_s=5)
+
+    assert payload == {"meters": {"gridRelay": "OPER_RELAY_OPEN"}}
+    client.site_livestream_authorizer.assert_awaited_once_with(
+        "GW-1",
+        live_debug=False,
+        allow_reauth=True,
+    )
+    args, kwargs = client._read_mqtt_websocket_payload.await_args
+    assert args[:2] == ("mqtt.example.test", "v1/live-stream/abc")
+    assert "x-amz-customauthorizer-name=authorizer" in args[2]
+    assert "enph_token=session" in args[2]
+    assert "x-amz-customauthorizer-signature=sig%2B%2F%3D" in args[2]
+    assert kwargs == {"timeout_s": 5}
+
+
+@pytest.mark.asyncio
+async def test_site_livestream_payload_reads_protobuf_mqtt_message() -> None:
+    client = _make_client()
+    client.site_livestream_authorizer = AsyncMock(
+        return_value={
+            "live_stream_topic": "v1/live-stream/abc",
+            "aws_iot_endpoint": "mqtt.example.test",
+            "aws_authorizer": "authorizer",
+            "aws_token_key": "enph_token",
+            "aws_token_value": "session",
+            "aws_digest": "sig",
+        }
+    )
+    # DataMsg.protocol_ver=1, DataMsg.meters.grid_relay=OPER_RELAY_OPEN.
+    client._read_mqtt_websocket_payload = AsyncMock(
+        return_value=b"\x08\x01\x1a\x02\x28\x01"
+    )
+
+    payload = await client.site_livestream_payload("GW-1")
+
+    assert payload == {"meters": {"gridRelay": "OPER_RELAY_OPEN"}}
+
+
+@pytest.mark.asyncio
+async def test_site_livestream_payload_returns_none_for_missing_authorizer_fields() -> (
+    None
+):
+    client = _make_client()
+    client.site_livestream_authorizer = AsyncMock(
+        side_effect=[
+            None,
+            {"live_stream_topic": "v1/live-stream/abc"},
+            {
+                "live_stream_topic": "v1/live-stream/abc",
+                "aws_iot_endpoint": "mqtt.example.test",
+                "aws_authorizer": "authorizer",
+                "aws_token_key": "enph_token",
+                "aws_token_value": "session",
+                "aws_digest": "sig",
+            },
+        ]
+    )
+    client._read_mqtt_websocket_payload = AsyncMock(return_value=b"not-json")
+
+    assert await client.site_livestream_payload("GW-1") is None
+    assert await client.site_livestream_payload("GW-1") is None
+    assert await client.site_livestream_payload("GW-1") is None
+
+
+def test_mqtt_packet_helpers_extract_publish_payload() -> None:
+    payload = b'{"meters":{"gridRelay":"OPER_RELAY_CLOSED"}}'
+    publish = api.EnphaseEVClient._mqtt_packet(
+        0x30,
+        api.EnphaseEVClient._mqtt_string("v1/live-stream/abc") + payload,
+    )
+
+    packets = list(api.EnphaseEVClient._mqtt_packets(publish))
+
+    assert packets == [
+        (
+            0x30,
+            api.EnphaseEVClient._mqtt_string("v1/live-stream/abc") + payload,
+        )
+    ]
+    assert api.EnphaseEVClient._mqtt_publish_payload(*packets[0]) == payload
+    assert api.EnphaseEVClient._decode_json_mqtt_payload(payload) == {
+        "meters": {"gridRelay": "OPER_RELAY_CLOSED"}
+    }
+    assert api.EnphaseEVClient._decode_json_mqtt_payload(b'xx {"ok": true} yy') == {
+        "ok": True
+    }
+    assert api.EnphaseEVClient._decode_json_mqtt_payload(b"not-json") is None
+    assert api.EnphaseEVClient._decode_json_mqtt_payload(b"xx {bad} yy") is None
+
+    large_packet = api.EnphaseEVClient._mqtt_packet(0x30, b"x" * 128)
+    assert len(large_packet) == 131
+    assert list(api.EnphaseEVClient._mqtt_packets(large_packet)) == [(0x30, b"x" * 128)]
+    assert list(api.EnphaseEVClient._mqtt_packets(b"\x30\x02\x00")) == []
+    assert api.EnphaseEVClient._mqtt_publish_payload(0x30, b"") == b""
+    qos_payload = api.EnphaseEVClient._mqtt_string("topic") + b"\x00\x01data"
+    assert api.EnphaseEVClient._mqtt_publish_payload(0x32, qos_payload) == b"data"
+
+
+def test_mqtt_validation_helpers_reject_incomplete_acks() -> None:
+    with pytest.raises(aiohttp.ClientConnectionError, match="CONNACK.*incomplete"):
+        api.EnphaseEVClient._validate_mqtt_connack(b"\x00")
+    with pytest.raises(aiohttp.ClientConnectionError, match="SUBACK.*incomplete"):
+        api.EnphaseEVClient._validate_mqtt_suback(b"\x00\x01")
+
+
+@pytest.mark.asyncio
+async def test_mqtt_wait_rejects_closed_socket_and_expired_deadline() -> None:
+    closed_ws = SimpleNamespace(
+        receive=AsyncMock(
+            side_effect=[
+                SimpleNamespace(type=aiohttp.WSMsgType.TEXT, data="ignored"),
+                SimpleNamespace(type=aiohttp.WSMsgType.CLOSED, data=None),
+            ]
+        )
+    )
+    deadline = asyncio.get_running_loop().time() + 5
+
+    with pytest.raises(aiohttp.ClientConnectionError, match="WebSocket closed"):
+        await api.EnphaseEVClient._wait_for_mqtt_packet(
+            closed_ws, {0x30}, deadline=deadline
+        )
+
+    with pytest.raises(asyncio.TimeoutError):
+        api.EnphaseEVClient._mqtt_remaining_timeout(
+            asyncio.get_running_loop().time() - 1
+        )
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (0, "OPER_RELAY_UNKNOWN"),
+        (1, "OPER_RELAY_OPEN"),
+        (2, "OPER_RELAY_CLOSED"),
+        (3, "OPER_RELAY_OFFGRID_AC_GRID_PRESENT"),
+        (4, "OPER_RELAY_OFFGRID_READY_FOR_RESYNC_CMD"),
+        (5, "OPER_RELAY_WAITING_TO_INITIALIZE_ON_GRID"),
+    ],
+)
+def test_decode_site_livestream_protobuf_grid_relay(value: int, expected: str) -> None:
+    # Include unknown fixed-width fields to verify they are skipped safely.
+    meters = b"\x09" + (b"\x00" * 8) + b"\x1d" + (b"\x00" * 4)
+    meters += b"\x28" + bytes([value])
+    payload = b"\x08\x01\x1a" + bytes([len(meters)]) + meters
+
+    assert api.EnphaseEVClient._decode_site_livestream_payload(payload) == {
+        "meters": {"gridRelay": expected}
+    }
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"",
+        b"\x00",
+        b"\x80" * 10,
+        b"\x08",
+        b"\x09\x00",
+        b"\x12\x80",
+        b"\x12\x02\x00",
+        b"\x1d\x00",
+        b"\x0b",
+        b"\x08\x01",
+        b"\x1a\x02\x28\x06",
+        b"\x1a\x01\x28",
+    ],
+)
+def test_decode_site_livestream_rejects_invalid_protobuf(payload: bytes) -> None:
+    assert api.EnphaseEVClient._decode_site_livestream_payload(payload) is None
+
+
+@pytest.mark.asyncio
+async def test_read_mqtt_websocket_payload_reads_publish_frame() -> None:
+    client = _make_client()
+    payload = b'{"meters":{"gridRelay":"OPER_RELAY_OPEN"}}'
+
+    class FakeWebSocket:
+        def __init__(self) -> None:
+            self.sent: list[bytes] = []
+            self.messages = [
+                SimpleNamespace(
+                    type=aiohttp.WSMsgType.BINARY, data=b"\x20\x02\x00\x00"
+                ),
+                SimpleNamespace(
+                    type=aiohttp.WSMsgType.BINARY, data=b"\x90\x03\x00\x01\x00"
+                ),
+                SimpleNamespace(
+                    type=aiohttp.WSMsgType.BINARY,
+                    data=api.EnphaseEVClient._mqtt_packet(
+                        0x30,
+                        api.EnphaseEVClient._mqtt_string("v1/live-stream/abc")
+                        + payload,
+                    ),
+                ),
+            ]
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def send_bytes(self, data):
+            self.sent.append(data)
+
+        async def receive(self, *, timeout):
+            return self.messages.pop(0)
+
+    fake_ws = FakeWebSocket()
+    client._s.ws_connect = MagicMock(return_value=fake_ws)
+
+    result = await client._read_mqtt_websocket_payload(
+        "mqtt.example.test",
+        "v1/live-stream/abc",
+        "?username",
+        timeout_s=5,
+    )
+
+    assert result == payload
+    assert len(fake_ws.sent) == 2
+    client._s.ws_connect.assert_called_once()
+    args, kwargs = client._s.ws_connect.call_args
+    assert args == ("wss://mqtt.example.test/mqtt",)
+    assert kwargs["protocols"] == ("mqtt",)
+    assert kwargs["headers"] == {"Origin": api.BASE_URL}
+    assert 0 < kwargs["timeout"] <= 5
+
+
+@pytest.mark.parametrize(
+    ("messages", "match", "sent_count"),
+    [
+        ([b"\x20\x02\x00\x05"], "CONNECT was rejected", 1),
+        (
+            [b"\x20\x02\x00\x00", b"\x90\x03\x00\x01\x80"],
+            "subscription was rejected",
+            2,
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_read_mqtt_websocket_payload_rejects_failed_handshake(
+    messages: list[bytes],
+    match: str,
+    sent_count: int,
+) -> None:
+    client = _make_client()
+
+    class FakeWebSocket:
+        def __init__(self) -> None:
+            self.sent: list[bytes] = []
+            self.messages = [
+                SimpleNamespace(type=aiohttp.WSMsgType.BINARY, data=data)
+                for data in messages
+            ]
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def send_bytes(self, data):
+            self.sent.append(data)
+
+        async def receive(self, *, timeout):
+            return self.messages.pop(0)
+
+    fake_ws = FakeWebSocket()
+    client._s.ws_connect = MagicMock(return_value=fake_ws)
+
+    with pytest.raises(aiohttp.ClientConnectionError, match=match):
+        await client._read_mqtt_websocket_payload(
+            "mqtt.example.test",
+            "v1/live-stream/abc",
+            "?username",
+            timeout_s=5,
+        )
+
+    assert len(fake_ws.sent) == sent_count
+
+
+@pytest.mark.asyncio
 async def test_heat_pump_events_json_returns_payload() -> None:
     client = _make_client()
     client._json = AsyncMock(return_value=[{"statusText": "Recommended"}])

@@ -8872,8 +8872,12 @@ class EnphaseGridModeSensor(_SiteBaseEntity):
     @property
     def extra_state_attributes(self):
         return {
-            "source": "grid_outage_context",
+            "source": getattr(self._coord, "grid_mode_source", None),
             "raw_states": getattr(self._coord, "grid_mode_raw_states", []),
+            "grid_mode_status_supported": getattr(
+                self._coord, "grid_mode_status_supported", None
+            ),
+            "grid_relay": getattr(self._coord, "grid_mode_status_raw", None),
             "grid_outage_context_supported": getattr(
                 self._coord, "grid_outage_context_supported", None
             ),

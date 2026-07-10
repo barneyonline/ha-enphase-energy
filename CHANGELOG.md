@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- Fixed Grid Mode so it reads the live-stream `meters.gridRelay` value and
+  falls back to outage-context fields such as `show_grid_connect` only when the
+  live relay state is unavailable.
 - Fixed config-entry unload and entity removal leaving delayed backoff, schedule,
   battery-profile recovery, or firmware refresh work running against retired
   integration objects.

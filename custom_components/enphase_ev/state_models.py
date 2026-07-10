@@ -323,6 +323,13 @@ class BatteryState:
     _grid_control_grid_outage_check: bool | None = None
     _grid_control_user_initiated_toggle: bool | None = None
     _grid_control_supported: bool | None = None
+    _grid_mode_status_cache_until: float | None = None
+    _grid_mode_status_last_success_mono: float | None = None
+    _grid_mode_status_failures: int = 0
+    _grid_mode_status_payload: PayloadMap | None = None
+    _grid_mode_status_supported: bool | None = None
+    _grid_mode_status: str | None = None
+    _grid_mode_status_raw: str | None = None
     _grid_outage_context_cache_until: float | None = None
     _grid_outage_context_last_success_mono: float | None = None
     _grid_outage_context_failures: int = 0

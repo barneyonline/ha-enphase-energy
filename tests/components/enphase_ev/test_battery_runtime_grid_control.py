@@ -215,6 +215,144 @@ async def test_refresh_grid_outage_context_caches_and_redacts(
 
 
 @pytest.mark.asyncio
+async def test_refresh_grid_mode_status_uses_livestream_grid_relay(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    envoy_serial = coord.battery_runtime.grid_envoy_serial()
+    assert envoy_serial is not None
+    coord.client.site_livestream_payload = AsyncMock(
+        return_value={
+            "meters": {
+                "gridRelay": "OPER_RELAY_CLOSED",
+                "serial_number": "secret-meter",
+            }
+        }
+    )
+
+    await coord.battery_runtime.async_refresh_grid_mode_status(force=True)
+
+    coord.client.site_livestream_payload.assert_awaited_once_with(envoy_serial)
+    assert coord.grid_mode_status_supported is True
+    assert coord.grid_mode_status_raw == "OPER_RELAY_CLOSED"
+    assert coord.grid_mode == "on_grid"
+    assert coord.grid_mode_source == "livestream_grid_relay"
+    assert coord._grid_mode_status_payload is not None  # noqa: SLF001
+    assert (
+        coord._grid_mode_status_payload["meters"]["serial_number"] == "[redacted]"
+    )  # noqa: SLF001
+
+    coord._grid_mode_status_cache_until = time.monotonic() + 300  # noqa: SLF001
+    coord.client.site_livestream_payload.reset_mock()
+    await coord.battery_runtime.async_refresh_grid_mode_status()
+    coord.client.site_livestream_payload.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_refresh_grid_mode_status_requires_gateway_serial(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord._grid_mode_status = "on_grid"  # noqa: SLF001
+    coord._grid_mode_status_raw = "OPER_RELAY_CLOSED"  # noqa: SLF001
+    coord.battery_runtime.grid_envoy_serial = lambda: None  # type: ignore[method-assign]
+    coord.client.site_livestream_payload = AsyncMock()
+
+    await coord.battery_runtime.async_refresh_grid_mode_status(force=True)
+
+    coord.client.site_livestream_payload.assert_not_called()
+    assert coord.grid_mode_status_supported is None
+    assert coord.grid_mode_status is None
+    assert coord.grid_mode_status_raw is None
+
+
+@pytest.mark.asyncio
+async def test_refresh_grid_mode_status_missing_relay_uses_failure_retry(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    envoy_serial = coord.battery_runtime.grid_envoy_serial()
+    assert envoy_serial is not None
+    coord.client.site_livestream_payload = AsyncMock(
+        return_value={"meters": {"serial_number": "secret-meter"}}
+    )
+
+    now = time.monotonic()
+    await coord.battery_runtime.async_refresh_grid_mode_status(force=True)
+
+    coord.client.site_livestream_payload.assert_awaited_once_with(envoy_serial)
+    assert coord.grid_mode_status_supported is False
+    assert coord.grid_mode_status is None
+    assert coord.grid_mode_status_raw is None
+    assert coord._grid_mode_status_failures == 1  # noqa: SLF001
+    assert coord._grid_mode_status_last_success_mono is None  # noqa: SLF001
+    assert (
+        now < coord._grid_mode_status_cache_until <= time.monotonic() + 15.0
+    )  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_refresh_grid_mode_status_missing_relay_keeps_recent_state(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    envoy_serial = coord.battery_runtime.grid_envoy_serial()
+    assert envoy_serial is not None
+    coord.battery_runtime.parse_grid_mode_status_payload(
+        {"meters": {"gridRelay": "OPER_RELAY_CLOSED"}}
+    )
+    coord._grid_mode_status_last_success_mono = time.monotonic()  # noqa: SLF001
+    coord.client.site_livestream_payload = AsyncMock(
+        return_value={"meters": {"serial_number": "secret-meter"}}
+    )
+
+    await coord.battery_runtime.async_refresh_grid_mode_status(force=True)
+
+    coord.client.site_livestream_payload.assert_awaited_once_with(envoy_serial)
+    assert coord.grid_mode_status_supported is True
+    assert coord.grid_mode_status == "on_grid"
+    assert coord.grid_mode_status_raw == "OPER_RELAY_CLOSED"
+    assert coord._grid_mode_status_failures == 1  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_refresh_grid_mode_status_clears_state_during_stale_cooldown(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    family_state = coord._endpoint_family_state("grid_mode_status")  # noqa: SLF001
+    family_state.cooldown_active = True
+    coord._endpoint_family_should_run = lambda *_args, **_kwargs: False  # type: ignore[method-assign]  # noqa: SLF001
+    coord._endpoint_family_can_use_stale = lambda *_args: False  # type: ignore[method-assign]  # noqa: SLF001
+
+    assert coord.battery_runtime.grid_mode_status_refresh_due() is False
+
+    coord._grid_mode_status_supported = True  # noqa: SLF001
+    coord._grid_mode_status = "on_grid"  # noqa: SLF001
+    coord._grid_mode_status_raw = "OPER_RELAY_CLOSED"  # noqa: SLF001
+    assert coord.battery_runtime.grid_mode_status_refresh_due() is True
+
+    await coord.battery_runtime.async_refresh_grid_mode_status()
+
+    assert coord._grid_mode_status_supported is None  # noqa: SLF001
+    assert coord._grid_mode_status is None  # noqa: SLF001
+    assert coord._grid_mode_status_raw is None  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_refresh_grid_mode_status_wraps_non_dict_payload(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord.client.site_livestream_payload = AsyncMock(return_value=None)
+
+    await coord.battery_runtime.async_refresh_grid_mode_status(force=True)
+
+    assert coord._grid_mode_status_payload == {"value": None}  # noqa: SLF001
+    assert coord.grid_mode_status_supported is False
+
+
+@pytest.mark.asyncio
 async def test_refresh_grid_outage_context_family_ttl_matches_cache(
     coordinator_factory,
 ) -> None:
@@ -235,7 +373,8 @@ async def test_refresh_grid_outage_context_family_ttl_matches_cache(
     assert family_state.next_retry_mono is not None
     assert (
         family_state.next_retry_mono - family_state.last_success_mono
-    ) == GRID_OUTAGE_CONTEXT_CACHE_TTL
+        == pytest.approx(GRID_OUTAGE_CONTEXT_CACHE_TTL)
+    )
 
 
 @pytest.mark.asyncio
@@ -287,7 +426,7 @@ async def test_refresh_grid_outage_context_keeps_recent_state_on_failure(
     await coord.battery_runtime.async_refresh_grid_outage_context(force=True)
 
     assert coord.grid_outage_context_supported is True
-    assert coord.grid_mode == "on_grid"
+    assert coord.grid_mode == "off_grid"
     assert coord._grid_outage_context_failures == 1  # noqa: SLF001
 
 
@@ -485,6 +624,26 @@ def test_collect_site_metrics_includes_grid_control_last_success_age(
     assert isinstance(metrics["grid_control_last_success_age_s"], float)
 
 
+def test_grid_mode_status_staleness_and_metrics(coordinator_factory) -> None:
+    coord = coordinator_factory()
+
+    assert coord._grid_mode_status_is_stale() is True  # noqa: SLF001
+
+    coord.battery_runtime.parse_grid_mode_status_payload(
+        {"meters": {"gridRelay": "OPER_RELAY_CLOSED"}}
+    )
+    coord._grid_mode_status_last_success_mono = time.monotonic() + 5  # noqa: SLF001
+    assert coord._grid_mode_status_is_stale() is False  # noqa: SLF001
+
+    coord._grid_mode_status_last_success_mono = time.monotonic() - 999  # noqa: SLF001
+    assert coord.grid_mode_status_supported is None
+
+    coord._grid_mode_status_last_success_mono = time.monotonic() - 1  # noqa: SLF001
+    metrics = coord.collect_site_metrics()
+    assert "grid_mode_status_last_success_age_s" in metrics
+    assert isinstance(metrics["grid_mode_status_last_success_age_s"], float)
+
+
 def test_grid_mode_uses_grid_outage_context(coordinator_factory) -> None:
     coord = coordinator_factory()
     assert coord._normalize_grid_mode_value(None) is None  # noqa: SLF001
@@ -497,8 +656,35 @@ def test_grid_mode_uses_grid_outage_context(coordinator_factory) -> None:
             "is_sunlight_backup": False,
         }
     )
+    assert coord.grid_mode_raw_states == [
+        "is_grid_outage:false",
+        "show_grid_connect:true",
+    ]
+    assert coord.grid_mode == "off_grid"
+    assert coord.grid_mode_source == "grid_outage_context"
+
+    coord.battery_runtime.parse_grid_outage_context_payload(
+        {
+            "is_grid_outage": False,
+            "has_battery": True,
+            "is_sunlight_backup": False,
+        }
+    )
     assert coord.grid_mode_raw_states == ["is_grid_outage:false"]
     assert coord.grid_mode == "on_grid"
+    assert coord.grid_mode_source == "grid_outage_context"
+
+    coord.battery_runtime.parse_grid_mode_status_payload(
+        {
+            "meters": {"gridRelay": "OPER_RELAY_CLOSED"},
+        }
+    )
+    assert coord.grid_mode_raw_states == [
+        "grid_relay:OPER_RELAY_CLOSED",
+        "is_grid_outage:false",
+    ]
+    assert coord.grid_mode == "on_grid"
+    assert coord.grid_mode_source == "livestream_grid_relay"
 
     coord.battery_runtime.parse_grid_outage_context_payload(
         {
@@ -510,8 +696,35 @@ def test_grid_mode_uses_grid_outage_context(coordinator_factory) -> None:
             }
         }
     )
-    assert coord.grid_mode_raw_states == ["is_grid_outage:true"]
+    assert coord.grid_mode_raw_states == [
+        "grid_relay:OPER_RELAY_CLOSED",
+        "is_grid_outage:true",
+        "show_grid_connect:false",
+    ]
+    assert coord.grid_mode == "on_grid"
+
+    coord.battery_runtime.parse_grid_mode_status_payload(
+        {"meters": {"gridRelay": "OPER_RELAY_OPEN"}}
+    )
     assert coord.grid_mode == "off_grid"
+    assert coord.grid_mode_source == "livestream_grid_relay"
+
+    coord.battery_runtime.parse_grid_mode_status_payload({})
+    assert coord.grid_mode_status_supported is False
+
+    coord.battery_runtime.parse_grid_outage_context_payload(
+        {
+            "is_grid_outage": False,
+            "show_grid_connect": False,
+            "has_battery": True,
+            "is_sunlight_backup": False,
+        }
+    )
+    assert coord.grid_mode_raw_states == [
+        "is_grid_outage:false",
+        "show_grid_connect:false",
+    ]
+    assert coord.grid_mode == "on_grid"
 
     coord.battery_runtime.parse_grid_outage_context_payload({})
     assert coord.grid_mode_raw_states == []
@@ -523,6 +736,81 @@ def test_grid_mode_uses_grid_outage_context(coordinator_factory) -> None:
     }
     assert coord.grid_mode is None
     assert coord.grid_mode_raw_states == []
+
+
+def test_grid_mode_keeps_live_relay_status_when_site_lacks_enpower_hint(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord.battery_runtime.parse_grid_mode_status_payload(
+        {"meters": {"gridRelay": "OPER_RELAY_CLOSED"}}
+    )
+    coord.battery_runtime.parse_grid_outage_context_payload(
+        {
+            "is_grid_outage": True,
+            "show_grid_connect": False,
+            "has_battery": True,
+            "is_sunlight_backup": False,
+        }
+    )
+
+    coord._battery_has_enpower = False  # noqa: SLF001
+
+    assert coord.grid_mode_status_supported is True
+    assert coord.grid_mode_status == "on_grid"
+    assert coord.grid_mode_status_raw == "OPER_RELAY_CLOSED"
+    assert coord.grid_mode_raw_states == [
+        "grid_relay:OPER_RELAY_CLOSED",
+        "is_grid_outage:true",
+        "show_grid_connect:false",
+    ]
+    assert coord.grid_mode == "on_grid"
+    assert coord.grid_mode_source == "livestream_grid_relay"
+
+
+@pytest.mark.parametrize(
+    ("relay", "expected"),
+    [
+        ("OPER_RELAY_OPEN", "off_grid"),
+        ("OPER_RELAY_OFFGRID_AC_GRID_PRESENT", "off_grid"),
+        ("OPER_RELAY_OFFGRID_READY_FOR_RESYNC_CMD", "off_grid"),
+        ("OPER_RELAY_CLOSED", "on_grid"),
+        ("OPER_RELAY_WAITING_TO_INITIALIZE_ON_GRID", "on_grid"),
+    ],
+)
+def test_grid_mode_maps_live_relay_enum(
+    coordinator_factory,
+    relay: str,
+    expected: str,
+) -> None:
+    coord = coordinator_factory()
+
+    assert coord.battery_runtime.parse_grid_mode_status_payload(
+        {"meters": {"gridRelay": relay}}
+    )
+    assert coord.grid_mode == expected
+
+
+def test_grid_mode_parser_handles_nested_relay_shapes(coordinator_factory) -> None:
+    coord = coordinator_factory()
+
+    assert coord.battery_runtime._grid_relay_candidates("invalid") == []  # noqa: SLF001
+    assert not coord.battery_runtime.parse_grid_mode_status_payload([])
+    assert coord.battery_runtime.parse_grid_mode_status_payload(
+        {
+            "meters": [{"gridRelay": None}, {"gridRelay": "unexpected"}],
+            "data": [
+                {
+                    "payload": {
+                        "message": [
+                            {"grid_relay": "OPER_RELAY_OFFGRID_AC_GRID_PRESENT"}
+                        ]
+                    }
+                }
+            ],
+        }
+    )
+    assert coord.grid_mode == "off_grid"
 
 
 def test_parse_grid_outage_context_payload_tracks_fields(coordinator_factory) -> None:
