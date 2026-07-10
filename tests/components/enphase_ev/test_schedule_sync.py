@@ -1166,6 +1166,26 @@ async def test_schedule_sync_callbacks_trigger_refresh(hass) -> None:
 
 
 @pytest.mark.asyncio
+async def test_schedule_sync_fresh_coordinator_update_does_not_create_task(
+    hass, monkeypatch
+) -> None:
+    payload = {
+        "meta": {"serverTimeStamp": "2025-01-01T00:00:00.000+00:00"},
+        "config": {},
+        "slots": [],
+    }
+    entry = MockConfigEntry(domain=DOMAIN, data={"site_id": RANDOM_SITE_ID}, options={})
+    sync, _client = await _setup_sync(hass, entry, payload)
+    create_task = MagicMock()
+    monkeypatch.setattr(hass, "async_create_task", create_task)
+    sync._last_sync = dt_util.utcnow()
+
+    sync._handle_coordinator_update()
+
+    create_task.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_schedule_sync_callbacks_fall_back_for_legacy_create_task(
     hass, monkeypatch
 ) -> None:

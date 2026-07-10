@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
   frequently updated IQ EV Charger Power and Last Reported sensors to reduce
   Recorder growth. Power restore baselines now use private Home Assistant
   restore data.
+- Removed high-cardinality device metadata from IQ Battery charge and
+  microinverter lifetime-energy state attributes. Use integration diagnostics
+  for the complete device payload; the remaining operational attributes are
+  excluded from recorder history.
 
 ### ✨ New features
 - None
@@ -32,6 +36,11 @@ All notable changes to this project will be documented in this file.
   BatteryConfig writes instead of creating a new connection pool per request.
 - Added localized System Health labels for tariff status, degraded services,
   and firmware catalog diagnostics in every supported language.
+- Reduced recorder and event-loop overhead on large sites by reconciling sensor
+  registries only when topology or entity capabilities change, caching per-update
+  battery and microinverter snapshots, and excluding diagnostic device metadata
+  from recorder history. Detailed inverter and battery metadata remains available
+  in integration diagnostics.
 
 ### 🔄 Other changes
 - None
