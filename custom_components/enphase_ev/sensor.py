@@ -322,7 +322,6 @@ async def async_setup_entry(
         registry_setup.prune_removed_gateway_iq_router_entities
     )
     _async_remove_site_sensor_entity = registry_setup.remove_site_sensor_entity
-    _async_remove_type_sensor_entity = registry_setup.remove_type_sensor_entity
     _site_sensor_entity_registered = registry_setup.site_sensor_entity_registered
     _async_remove_site_sensor_entities_with_prefix = (
         registry_setup.remove_site_sensor_entities_with_prefix
@@ -340,6 +339,7 @@ async def async_setup_entry(
     last_ac_battery_serial_set: set[str] | None = None
     last_charger_serial_set: set[str] | None = None
     last_inverter_serial_set: set[str] | None = None
+    last_entity_shape_signature: tuple[object, ...] | None = None
 
     @callback
     def _async_sync_site_entities() -> None:
@@ -464,15 +464,12 @@ async def async_setup_entry(
             "current_production_power",
             EnphaseCurrentPowerConsumptionSensor(coord),
         )
-        _async_remove_site_sensor_entity("current_power_consumption")
         if _site_lifetime_power_channel_present(
             "grid_import"
         ) or _site_lifetime_power_channel_present("grid_export"):
             _add_site_entity("grid_power", EnphaseGridPowerSensor(coord))
         else:
             _async_remove_site_sensor_entity("grid_power")
-        _async_remove_site_sensor_entity("grid_import_power")
-        _async_remove_site_sensor_entity("grid_export_power")
         _add_site_entity("site_last_error_code", EnphaseSiteLastErrorCodeSensor(coord))
         _add_site_entity(
             "site_service_status",
@@ -561,10 +558,6 @@ async def async_setup_entry(
                 current_import_rate_key,
                 EnphaseCurrentTariffRateSensor(coord, is_import=True),
             )
-        _async_remove_site_sensor_entity("tariff_import_rate")
-        _async_remove_site_sensor_entities_with_prefix(
-            "tariff_import_rate_",
-        )
         current_export_rate_key = "tariff_current_export_rate"
         if tariff_export_rate is not None:
             _add_site_entity(
@@ -580,10 +573,6 @@ async def async_setup_entry(
                 current_export_rate_key,
                 EnphaseCurrentTariffRateSensor(coord, is_import=False),
             )
-        _async_remove_site_sensor_entity("tariff_export_rate")
-        _async_remove_site_sensor_entities_with_prefix(
-            "tariff_export_rate_",
-        )
 
         for record in router_records:
             router_key = str(record.get("key", "")).strip()
@@ -800,12 +789,6 @@ async def async_setup_entry(
 
     @callback
     def _async_sync_type_inventory() -> None:
-        _async_prune_dry_contact_type_inventory_entities()
-        _async_prune_blocked_type_inventory_entities({"encharge"})
-        for type_key in list(known_type_keys):
-            if not _is_dry_contact_type_key(type_key):
-                continue
-            _async_remove_type_sensor_entity(type_key)
         keys = [
             key
             for key in coord.inventory_view.iter_type_keys()
@@ -968,6 +951,7 @@ async def async_setup_entry(
 
     @callback
     def _async_sync_topology() -> None:
+        nonlocal last_entity_shape_signature
         nonlocal last_type_key_set
         nonlocal last_battery_serial_set
         nonlocal last_ac_battery_serial_set
@@ -988,9 +972,13 @@ async def async_setup_entry(
             current_charger_serials = {sn for sn in coord.iter_serials() if sn}
         current_inverter_serials = active_inverter_serials_for_cleanup(coord)
 
+        # The dedicated topology signal also covers router membership, which is
+        # intentionally absent from the cheap coordinator-update signature.
         _async_sync_site_entities()
-        _async_sync_type_inventory()
-        last_type_key_set = current_type_keys
+        last_entity_shape_signature = _entity_shape_signature()
+        if current_type_keys != last_type_key_set:
+            _async_sync_type_inventory()
+            last_type_key_set = current_type_keys
         if current_battery_serials != last_battery_serial_set:
             _async_sync_batteries()
             _async_sync_chargers()
@@ -1005,6 +993,87 @@ async def async_setup_entry(
             _async_sync_inverters()
             last_inverter_serial_set = current_inverter_serials
 
+    def _entity_shape_signature() -> tuple[object, ...]:
+        """Return inexpensive state that controls site-level entity presence."""
+
+        energy = getattr(coord, "energy", None)
+        site_energy = (
+            getattr(energy, "site_energy", None)
+            if energy is not None
+            else getattr(coord, "site_energy", None)
+        )
+        site_energy_meta = (
+            getattr(energy, "site_energy_meta", None)
+            if energy is not None
+            else getattr(coord, "site_energy_meta", None)
+        )
+        bucket_lengths = (
+            site_energy_meta.get("bucket_lengths")
+            if isinstance(site_energy_meta, dict)
+            else None
+        )
+        populated_bucket_keys = (
+            frozenset(key for key, value in bucket_lengths.items() if value)
+            if isinstance(bucket_lengths, dict)
+            else frozenset()
+        )
+        try:
+            gateway_meter_shape = (
+                _gateway_meter_member(coord, "production") is not None,
+                _gateway_meter_member(coord, "consumption") is not None,
+                bool(_gateway_dry_contact_members(coord)),
+            )
+        except Exception:  # noqa: BLE001
+            gateway_meter_shape = (None, None, None)
+        known_channels: tuple[bool, ...] = ()
+        channel_known = getattr(
+            getattr(coord, "discovery_snapshot", None),
+            "site_energy_channel_known",
+            None,
+        )
+        if callable(channel_known):
+            values: list[bool] = []
+            for flow_key in SITE_LIFETIME_FLOW_BUCKET_LENGTH_KEYS:
+                try:
+                    values.append(bool(channel_known(flow_key)))
+                except Exception:  # noqa: BLE001
+                    values.append(False)
+            known_channels = tuple(values)
+        return (
+            bool(getattr(coord, "_devices_inventory_ready", False)),
+            _site_has_battery(coord),
+            getattr(coord, "battery_has_enpower", None),
+            bool(getattr(coord, "include_inverters", True)),
+            _type_available(coord, "envoy"),
+            _type_available(coord, "encharge"),
+            _type_available(coord, "ac_battery"),
+            _type_available(coord, "microinverter"),
+            _type_available(coord, "heatpump"),
+            _type_available(coord, "enpower"),
+            _heatpump_runtime_device_uid(coord),
+            _battery_schedule_inventory_supported(coord),
+            _grid_control_site_applicable(coord),
+            getattr(coord, "tariff_billing", None) is not None,
+            getattr(coord, "tariff_import_rate", None) is not None,
+            getattr(coord, "tariff_export_rate", None) is not None,
+            getattr(coord, "tariff_rates_last_refresh_utc", None) is not None,
+            frozenset(site_energy) if isinstance(site_energy, dict) else frozenset(),
+            populated_bucket_keys,
+            known_channels,
+            gateway_meter_shape,
+        )
+
+    @callback
+    def _async_sync_capabilities() -> None:
+        """Reconcile site entities only when their capability shape changes."""
+
+        nonlocal last_entity_shape_signature
+        signature = _entity_shape_signature()
+        if signature == last_entity_shape_signature:
+            return
+        _async_sync_site_entities()
+        last_entity_shape_signature = signature
+
     add_topology_listener = getattr(coord, "async_add_topology_listener", None)
     has_topology_listener = callable(add_topology_listener)
     if not has_topology_listener:
@@ -1013,7 +1082,18 @@ async def async_setup_entry(
         entry.async_on_unload(add_topology_listener(_async_sync_topology))
     add_coordinator_listener = getattr(coord, "async_add_listener", None)
     if has_topology_listener and callable(add_coordinator_listener):
-        entry.async_on_unload(add_coordinator_listener(_async_sync_topology))
+        entry.async_on_unload(add_coordinator_listener(_async_sync_capabilities))
+    # One-time migrations and retired-entity cleanup must not scan the registry on
+    # every coordinator update.
+    _async_prune_dry_contact_type_inventory_entities()
+    _async_prune_blocked_type_inventory_entities({"encharge"})
+    _async_remove_site_sensor_entity("current_power_consumption")
+    _async_remove_site_sensor_entity("grid_import_power")
+    _async_remove_site_sensor_entity("grid_export_power")
+    _async_remove_site_sensor_entity("tariff_import_rate")
+    _async_remove_site_sensor_entities_with_prefix("tariff_import_rate_")
+    _async_remove_site_sensor_entity("tariff_export_rate")
+    _async_remove_site_sensor_entities_with_prefix("tariff_export_rate_")
     registry_setup.prune_historical_charger_sensor_entities()
     registry_setup.prune_removed_site_entities()
     _async_sync_topology()
@@ -3065,6 +3145,9 @@ class EnphaseInverterLifetimeEnergySensor(CoordinatorEntity, RestoreSensor):  # 
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
     _attr_suggested_display_precision = 2
     _attr_translation_key = "inverter_lifetime_energy"
+    _unrecorded_attributes = frozenset(
+        {"sampled_at_utc", "status", "status_text", "rssi"}
+    )
 
     def __init__(self, coord: EnphaseCoordinator, serial: str) -> None:
         super().__init__(coord)
@@ -3073,6 +3156,8 @@ class EnphaseInverterLifetimeEnergySensor(CoordinatorEntity, RestoreSensor):  # 
         self._attr_translation_placeholders = {"serial": self._sn}
         self._attr_unique_id = f"{DOMAIN}_inverter_{self._sn}_lifetime_energy"
         self._last_good_native_value: float | None = None
+        self._snapshot_cache_token: tuple[int, int] | None = None
+        self._snapshot_cache: dict[str, object] | None = None
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -3106,12 +3191,24 @@ class EnphaseInverterLifetimeEnergySensor(CoordinatorEntity, RestoreSensor):  # 
             self._attr_native_value = restored
 
     def _snapshot(self) -> dict[str, object] | None:
+        coordinator_data = getattr(self._coord, "data", None)
+        inverter_data = getattr(self._coord, "_inverter_data", None)
+        cacheable = coordinator_data is not None or inverter_data is not None
+        token = (id(coordinator_data), id(inverter_data))
+        if cacheable and token == self._snapshot_cache_token:
+            return self._snapshot_cache
         getter = getattr(self._coord, "inverter_data", None)
         if not callable(getter):
             return None
         data = getter(self._sn)
         if isinstance(data, dict):
+            if cacheable:
+                self._snapshot_cache_token = token
+                self._snapshot_cache = data
             return data
+        if cacheable:
+            self._snapshot_cache_token = token
+            self._snapshot_cache = None
         return None
 
     @property
@@ -3152,29 +3249,9 @@ class EnphaseInverterLifetimeEnergySensor(CoordinatorEntity, RestoreSensor):  # 
             "sampled_at_utc": (
                 sampled_at.isoformat() if sampled_at is not None else None
             ),
-            "serial_number": data.get("serial_number"),
-            "inverter_id": data.get("inverter_id"),
-            "device_id": data.get("device_id"),
-            "inverter_type": data.get("inverter_type"),
-            "name": data.get("name"),
-            "array_name": data.get("array_name"),
-            "sku_id": data.get("sku_id"),
-            "part_num": data.get("part_num"),
-            "sku": data.get("sku"),
             "status": data.get("status"),
             "status_text": data.get("status_text"),
-            "status_code": data.get("status_code"),
-            "last_report": data.get("last_report"),
-            "fw1": data.get("fw1"),
-            "fw2": data.get("fw2"),
-            "warranty_end_date": data.get("warranty_end_date"),
-            "show_sig_str": data.get("show_sig_str"),
-            "emu_version": data.get("emu_version"),
-            "issi": data.get("issi"),
             "rssi": data.get("rssi"),
-            "lifetime_production_wh": data.get("lifetime_production_wh"),
-            "lifetime_query_start_date": data.get("lifetime_query_start_date"),
-            "lifetime_query_end_date": data.get("lifetime_query_end_date"),
         }
 
     @property
@@ -3193,6 +3270,9 @@ class EnphaseInverterLifetimeEnergySensor(CoordinatorEntity, RestoreSensor):  # 
 
 class _EnphaseBatteryStorageBaseSensor(CoordinatorEntity, SensorEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
+    _unrecorded_attributes = frozenset(
+        {"serial_number", "status", "sampled_at_utc", "state"}
+    )
 
     def __init__(
         self, coord: EnphaseCoordinator, serial: str, unique_suffix: str
@@ -3203,14 +3283,28 @@ class _EnphaseBatteryStorageBaseSensor(CoordinatorEntity, SensorEntity):  # type
         self._attr_unique_id = (
             f"{DOMAIN}_site_{coord.site_id}_battery_{self._sn}{unique_suffix}"
         )
+        self._snapshot_cache_token: tuple[int, int] | None = None
+        self._snapshot_cache: dict[str, object] | None = None
 
     def _snapshot(self) -> dict[str, object] | None:
+        coordinator_data = getattr(self._coord, "data", None)
+        battery_data = getattr(self._coord, "_battery_storage_data", None)
+        cacheable = coordinator_data is not None or battery_data is not None
+        token = (id(coordinator_data), id(battery_data))
+        if cacheable and token == self._snapshot_cache_token:
+            return self._snapshot_cache
         getter = getattr(self._coord, "battery_storage", None)
         if not callable(getter):
             return None
         payload = getter(self._sn)
         if isinstance(payload, dict):
+            if cacheable:
+                self._snapshot_cache_token = token
+                self._snapshot_cache = payload
             return payload
+        if cacheable:
+            self._snapshot_cache_token = token
+            self._snapshot_cache = None
         return None
 
     @staticmethod
@@ -3289,9 +3383,15 @@ class EnphaseBatteryStorageChargeSensor(_EnphaseBatteryStorageBaseSensor):
 
     @property
     def extra_state_attributes(self) -> Any:
-        attrs = dict(self._snapshot() or {})
-        attrs.pop("led_status", None)
-        return attrs
+        snapshot = self._snapshot() or {}
+        sampled_at = _battery_snapshot_last_reported(snapshot)
+        return {
+            "serial_number": snapshot.get("serial_number") or self._sn,
+            "status": snapshot.get("status"),
+            "sampled_at_utc": (
+                sampled_at.isoformat() if sampled_at is not None else None
+            ),
+        }
 
 
 class EnphaseBatteryStorageStatusSensor(_EnphaseBatteryStorageBaseSensor):
@@ -3435,6 +3535,19 @@ class EnphaseBatteryStorageLastReportedSensor(_EnphaseBatteryStorageBaseSensor):
 
 class _EnphaseAcBatteryStorageBaseSensor(CoordinatorEntity, SensorEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
+    _unrecorded_attributes = frozenset(
+        {
+            "battery_id",
+            "part_number",
+            "phase",
+            "status_text",
+            "sleep_state",
+            "sleep_control_class",
+            "sleep_control_label",
+            "operating_mode",
+            "last_reported_utc",
+        }
+    )
 
     def __init__(
         self, coord: EnphaseCoordinator, serial: str, unique_suffix: str
@@ -3445,9 +3558,21 @@ class _EnphaseAcBatteryStorageBaseSensor(CoordinatorEntity, SensorEntity):  # ty
         self._attr_unique_id = (
             f"{DOMAIN}_site_{coord.site_id}_ac_battery_{self._sn}{unique_suffix}"
         )
+        self._snapshot_cache_token: tuple[int, int] | None = None
+        self._snapshot_cache: dict[str, object] | None = None
 
     def _snapshot(self) -> dict[str, object] | None:
-        return ac_battery_storage_snapshot(self._coord, self._sn)
+        coordinator_data = getattr(self._coord, "data", None)
+        battery_data = getattr(self._coord, "_ac_battery_data", None)
+        cacheable = coordinator_data is not None or battery_data is not None
+        token = (id(coordinator_data), id(battery_data))
+        if cacheable and token == self._snapshot_cache_token:
+            return self._snapshot_cache
+        snapshot = ac_battery_storage_snapshot(self._coord, self._sn)
+        if cacheable:
+            self._snapshot_cache_token = token
+            self._snapshot_cache = snapshot
+        return snapshot
 
     @staticmethod
     def _as_int(value: object) -> int | None:

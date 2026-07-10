@@ -475,6 +475,10 @@ class ScheduleSync:
 
     @callback
     def _handle_coordinator_update(self) -> None:
+        if self._last_sync is not None:
+            age = dt_util.utcnow() - self._last_sync
+            if age < SYNC_INTERVAL:
+                return
         coro = self._refresh_if_stale()
         try:
             self.hass.async_create_task(

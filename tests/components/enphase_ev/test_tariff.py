@@ -3741,7 +3741,7 @@ async def test_tariff_setup_prunes_dynamic_export_for_summary_snapshot(
 
 
 @pytest.mark.asyncio
-async def test_tariff_rate_sensor_entities_resync_when_structure_changes(
+async def test_tariff_rate_structure_change_skips_retired_entity_rescan(
     hass, config_entry, coordinator_factory, monkeypatch
 ) -> None:
     from homeassistant.helpers import entity_registry as er
@@ -3832,4 +3832,4 @@ async def test_tariff_rate_sensor_entities_resync_when_structure_changes(
         f"{DOMAIN}_site_{coord.site_id}_tariff_import_rate_default_week_peak"
     )
     assert new_unique_id not in {entity.unique_id for entity in added}
-    assert ent_reg.async_get_entity_id("sensor", DOMAIN, old_unique_id) is None
+    assert ent_reg.async_get_entity_id("sensor", DOMAIN, old_unique_id) is not None
