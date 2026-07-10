@@ -22,7 +22,6 @@ from numbers import Real
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
     Callable,
     Coroutine,
     Iterable,
@@ -169,6 +168,7 @@ from .session_history import (
     SESSION_HISTORY_CACHE_DAY_RETENTION,
     SESSION_HISTORY_CONCURRENCY,
     SESSION_HISTORY_FAILURE_BACKOFF_S,
+    SessionFetchCallback,
     SessionHistoryManager,
 )
 from .coordinator_refresh_metrics import record_refresh_performance_sample
@@ -872,9 +872,7 @@ class EnphaseCoordinator(
     def __setattr__(self, name: str, value: object) -> None:
         if name == "_async_fetch_sessions_today" and hasattr(self, "session_history"):
             object.__setattr__(self, name, value)
-            self.session_history.set_fetch_override(
-                cast(Callable[..., Awaitable[list[dict[str, object]]]], value)
-            )
+            self.session_history.set_fetch_override(cast(SessionFetchCallback, value))
             return
         super().__setattr__(name, value)
 

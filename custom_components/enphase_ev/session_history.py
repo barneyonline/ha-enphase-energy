@@ -8,7 +8,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone as _tz
-from typing import Any, Awaitable, Callable, Iterable, cast
+from typing import Any, Awaitable, Callable, Iterable, Protocol, cast
 
 import aiohttp
 from homeassistant.core import HomeAssistant
@@ -23,6 +23,12 @@ MIN_SESSION_HISTORY_CACHE_TTL = 60  # seconds
 SESSION_HISTORY_FAILURE_BACKOFF_S = 15 * 60
 SESSION_HISTORY_CONCURRENCY = 3
 SESSION_HISTORY_CACHE_DAY_RETENTION = 3
+
+
+class SessionFetchCallback(Protocol):
+    async def __call__(
+        self, serial: str, *, day_local: datetime | None = None
+    ) -> list[dict[str, Any]]: ...
 
 
 @dataclass(slots=True)
@@ -91,9 +97,7 @@ class SessionHistoryManager:
         self._publish_callback = publish_callback
         self._site_id_getter = site_id_getter
         self._logger = logger or _LOGGER
-        self._fetch_override: (
-            Callable[[str, datetime | None], Awaitable[list[dict[str, Any]]]] | None
-        ) = None
+        self._fetch_override: SessionFetchCallback | None = None
         self._service_available = True
         self._service_failures = 0
         self._service_last_error: str | None = None
@@ -532,7 +536,7 @@ class SessionHistoryManager:
     ) -> list[dict[str, Any]]:
         """Return session history for the provided day, caching results."""
         if self._fetch_override is not None:
-            return await self._fetch_override(sn, day_local)
+            return await self._fetch_override(sn, day_local=day_local)
         if not sn:
             return []
         if day_local is None:
@@ -815,9 +819,7 @@ class SessionHistoryManager:
 
     def set_fetch_override(
         self,
-        callback: (
-            Callable[[str, datetime | None], Awaitable[list[dict[str, Any]]]] | None
-        ),
+        callback: SessionFetchCallback | None,
     ) -> None:
         """Allow callers to override the fetch implementation (legacy hook)."""
         self._fetch_override = callback
@@ -871,7 +873,7 @@ class SessionHistoryManager:
             if val is None:
                 return None
             try:
-                out = float(str(val))
+                out = float(cast(Any, val))
                 if precision is not None:
                     return round(out, precision)
                 return out
@@ -884,7 +886,7 @@ class SessionHistoryManager:
             if isinstance(val, bool):
                 return int(val)
             try:
-                return int(float(str(val)))
+                return int(float(cast(Any, val)))
             except Exception:  # noqa: BLE001
                 return None
 
