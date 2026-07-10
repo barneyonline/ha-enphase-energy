@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from typing import Any
+
 import voluptuous as vol
 from homeassistant.const import CONF_DEVICE_ID, CONF_TYPE
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Context, HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.typing import ConfigType
 
@@ -14,8 +16,10 @@ ACTION_STOP = "stop_charging"
 ## Removed set_charging_amps action since amps are read-only now
 
 
-async def async_get_actions(hass: HomeAssistant, device_id: str):
-    actions = []
+async def async_get_actions(
+    hass: HomeAssistant, device_id: str
+) -> list[dict[str, Any]]:
+    actions: list[dict[str, Any]] = []
     dev_reg = dr.async_get(hass)
     device = dev_reg.async_get(device_id)
     if not device:
@@ -34,8 +38,11 @@ async def async_get_actions(hass: HomeAssistant, device_id: str):
 
 
 async def async_call_action_from_config(
-    hass: HomeAssistant, config: ConfigType, variables, context
-):
+    hass: HomeAssistant,
+    config: ConfigType,
+    variables: dict[str, Any],
+    context: Context | None,
+) -> None:
     typ = config[CONF_TYPE]
     device_id = config[CONF_DEVICE_ID]
 
@@ -81,9 +88,11 @@ async def async_call_action_from_config(
     # Amps are read-only; no set action
 
 
-async def async_get_action_capabilities(hass: HomeAssistant, config: ConfigType):
+async def async_get_action_capabilities(
+    hass: HomeAssistant, config: ConfigType
+) -> dict[str, Any]:
     typ = config[CONF_TYPE]
-    fields = {}
+    fields: dict[object, object] = {}
     if typ in (ACTION_START,):
         fields[vol.Optional("charging_level", default=32)] = vol.All(
             int, vol.Range(min=6, max=40)

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import TypeVar, cast
+
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant, callback as ha_callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -34,6 +37,9 @@ from .sensor import (
 
 PARALLEL_UPDATES = 0
 
+_CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
+callback = cast(Callable[[_CallbackT], _CallbackT], ha_callback)
+
 
 def _charger_binary_sensor_unique_ids(serials: set[str]) -> set[str]:
     return {
@@ -58,7 +64,7 @@ async def async_setup_entry(
     hass: HomeAssistant,
     entry: EnphaseConfigEntry,
     async_add_entities: AddEntitiesCallback,
-):
+) -> None:
     coord: EnphaseCoordinator = get_runtime_data(entry).coordinator
     ent_reg = er.async_get(hass)
     site_entity_added = False
@@ -159,11 +165,11 @@ async def async_setup_entry(
     _async_sync_chargers()
 
 
-class _EVBoolSensor(EnphaseBaseEntity, BinarySensorEntity):
+class _EVBoolSensor(EnphaseBaseEntity, BinarySensorEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _translation_key: str | None = None
 
-    def __init__(self, coord: EnphaseCoordinator, sn: str, key: str, tkey: str):
+    def __init__(self, coord: EnphaseCoordinator, sn: str, key: str, tkey: str) -> None:
         super().__init__(coord, sn)
         self._key = key
         self._attr_unique_id = f"{DOMAIN}_{sn}_{key}"
@@ -180,14 +186,14 @@ class _EVBoolSensor(EnphaseBaseEntity, BinarySensorEntity):
 class PluggedInBinarySensor(_EVBoolSensor):
     _attr_device_class = BinarySensorDeviceClass.PLUG
 
-    def __init__(self, coord: EnphaseCoordinator, sn: str):
+    def __init__(self, coord: EnphaseCoordinator, sn: str) -> None:
         super().__init__(coord, sn, "plugged", "plugged_in")
 
 
 class ChargingBinarySensor(_EVBoolSensor):
     _attr_device_class = BinarySensorDeviceClass.BATTERY_CHARGING
 
-    def __init__(self, coord: EnphaseCoordinator, sn: str):
+    def __init__(self, coord: EnphaseCoordinator, sn: str) -> None:
         super().__init__(coord, sn, "charging", "charging")
 
     @property
@@ -197,13 +203,13 @@ class ChargingBinarySensor(_EVBoolSensor):
 
 
 class ConnectedBinarySensor(_EVBoolSensor):
-    def __init__(self, coord: EnphaseCoordinator, sn: str):
+    def __init__(self, coord: EnphaseCoordinator, sn: str) -> None:
         super().__init__(coord, sn, "connected", "connected")
         self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
-    def extra_state_attributes(self):
+    def extra_state_attributes(self) -> dict[str, object]:
         connection = self.data.get("connection")
         if isinstance(connection, str):
             connection = connection.strip() or None
@@ -216,11 +222,14 @@ class ConnectedBinarySensor(_EVBoolSensor):
         }
 
 
-class SiteCloudReachableBinarySensor(CoordinatorEntity, BinarySensorEntity):
+class SiteCloudReachableBinarySensor(
+    CoordinatorEntity,  # type: ignore[misc]
+    BinarySensorEntity,  # type: ignore[misc]
+):
     _attr_has_entity_name = True
     _attr_translation_key = "cloud_reachable"
 
-    def __init__(self, coord: EnphaseCoordinator):
+    def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(coord)
         self._coord = coord
         self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_cloud_reachable"
@@ -229,7 +238,7 @@ class SiteCloudReachableBinarySensor(CoordinatorEntity, BinarySensorEntity):
     def available(self) -> bool:
         if self._coord.last_success_utc is not None:
             return True
-        return super().available
+        return bool(super().available)
 
     @property
     def is_on(self) -> bool:
@@ -243,26 +252,29 @@ class SiteCloudReachableBinarySensor(CoordinatorEntity, BinarySensorEntity):
             else 30
         )
         threshold = interval * 2
-        return (now - last).total_seconds() <= threshold
+        return bool((now - last).total_seconds() <= threshold)
 
     @property
-    def extra_state_attributes(self):
+    def extra_state_attributes(self) -> dict[str, object]:
         return {}
 
     @property
-    def device_info(self):
+    def device_info(self) -> object:
         info = _type_device_info(self._coord, "cloud")
         if info is not None:
             return info
         return _cloud_device_info(self._coord.site_id)
 
 
-class HeatPumpSgReadyActiveBinarySensor(CoordinatorEntity, BinarySensorEntity):
+class HeatPumpSgReadyActiveBinarySensor(
+    CoordinatorEntity,  # type: ignore[misc]
+    BinarySensorEntity,  # type: ignore[misc]
+):
     _attr_has_entity_name = True
     _attr_translation_key = "heat_pump_sg_ready_active"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
-    def __init__(self, coord: EnphaseCoordinator):
+    def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(coord)
         self._coord = coord
         self._attr_unique_id = (
@@ -294,9 +306,9 @@ class HeatPumpSgReadyActiveBinarySensor(CoordinatorEntity, BinarySensorEntity):
         return bool(self._snapshot().get("sg_ready_active"))
 
     @property
-    def extra_state_attributes(self):
+    def extra_state_attributes(self) -> dict[str, object]:
         return {}
 
     @property
-    def device_info(self):
+    def device_info(self) -> object:
         return _type_device_info(self._coord, "heatpump")

@@ -11,6 +11,7 @@ from typing import Any
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
 from .log_redaction import redact_text
@@ -45,7 +46,7 @@ class FirmwareCatalogManager:
 
     def __init__(
         self,
-        hass,
+        hass: HomeAssistant,
         *,
         url: str | None = None,
         ttl_seconds: int = FIRMWARE_CATALOG_CACHE_TTL_SECONDS,
@@ -164,7 +165,7 @@ def _source_age_seconds(generated_at: str | None) -> float | None:
     age = (dt_util.utcnow() - parsed).total_seconds()
     if age < 0:
         return 0.0
-    return round(age, 1)
+    return float(round(age, 1))
 
 
 def _parse_iso_datetime(value: str) -> datetime | None:
@@ -204,7 +205,9 @@ def normalize_country(value: Any) -> str | None:
     return None
 
 
-def resolve_country_and_locale(coord, hass) -> tuple[str | None, str]:
+def resolve_country_and_locale(
+    coord: object, hass: HomeAssistant
+) -> tuple[str | None, str]:
     raw_battery_locale = getattr(coord, "battery_locale", None)
     raw_hass_locale = getattr(getattr(hass, "config", None), "language", None)
     battery_locale = (

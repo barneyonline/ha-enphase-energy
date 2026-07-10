@@ -19,7 +19,16 @@ from datetime import datetime, time as dt_time, timedelta
 from datetime import timezone as _tz
 from http import HTTPStatus
 from numbers import Real
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Mapping
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Coroutine,
+    Iterable,
+    Mapping,
+    TypeVar,
+    cast,
+)
 from zoneinfo import ZoneInfo
 
 import aiohttp
@@ -116,6 +125,7 @@ from .evse_runtime import (
     AMP_RESTART_DELAY_S,
     FAST_TOGGLE_POLL_HOLD_S,
     SUSPENDED_EVSE_STATUS,
+    ChargeModeResolution,
     ChargeModeStartPreferences,
     EvseRuntime,
     evse_power_is_actively_charging,
@@ -158,6 +168,7 @@ from .session_history import (
     SESSION_HISTORY_CACHE_DAY_RETENTION,
     SESSION_HISTORY_CONCURRENCY,
     SESSION_HISTORY_FAILURE_BACKOFF_S,
+    SessionFetchCallback,
     SessionHistoryManager,
 )
 from .coordinator_refresh_metrics import record_refresh_performance_sample
@@ -193,6 +204,15 @@ if TYPE_CHECKING:
     from .runtime_data import EnphaseConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
+_CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
+
+
+def _typed_callback(func: _CallbackT) -> _CallbackT:
+    """Apply Home Assistant's callback marker without losing callable typing."""
+
+    return cast(_CallbackT, callback(func))
+
+
 # Session history can arrive after real-time charging state changes. These
 # windows keep recent context available without letting old sessions override
 # live charger telemetry.
@@ -226,12 +246,12 @@ COORDINATOR_RUNTIME_CLASSES: dict[str, type] = {
 
 def _coerce_epoch_seconds(value: object) -> int | None:
     try:
-        timestamp = int(value)
+        timestamp = int(str(value))
     except Exception:
         return None
     if timestamp > 10**12:
         timestamp = timestamp // 1000
-    return timestamp
+    return int(timestamp)
 
 
 def _charger_sample_datetime(value: object) -> datetime | None:
@@ -265,7 +285,7 @@ def _charger_sample_datetime(value: object) -> datetime | None:
             return None
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=_tz.utc)
-        return parsed.astimezone(_tz.utc)
+        return cast(datetime, parsed.astimezone(_tz.utc))
     return None
 
 
@@ -276,7 +296,7 @@ def _extract_error_description(raw: str | None) -> str | None:
         return None
     text = str(raw).strip()
 
-    def _search(obj):
+    def _search(obj: object) -> str | None:
         if isinstance(obj, dict):
             for key in (
                 "description",
@@ -315,9 +335,9 @@ def _extract_error_description(raw: str | None) -> str | None:
             parsed = json.loads(candidate)
         except Exception:
             continue
-        description = _search(parsed)
+        description = _search(cast(object, parsed))
         if description:
-            return description
+            return str(description)
     return None
 
 
@@ -418,13 +438,13 @@ def _coerce_int_list(value: object) -> list[int] | None:
     return parsed or None
 
 
-def _mapping_or_empty(value: object) -> dict:
+def _mapping_or_empty(value: object) -> dict[str, Any]:
     """Return a mapping payload, or an empty mapping for malformed nested data."""
 
     return value if isinstance(value, dict) else {}
 
 
-def _first_mapping_or_empty(value: object) -> dict:
+def _first_mapping_or_empty(value: object) -> dict[str, Any]:
     """Return the first mapping from a nested list/dict payload."""
 
     if isinstance(value, dict):
@@ -438,7 +458,7 @@ def _first_mapping_or_empty(value: object) -> dict:
 
 def _power_as_float(raw: object) -> float | None:
     try:
-        return float(raw)
+        return float(str(raw))
     except (TypeError, ValueError):
         return None
 
@@ -476,7 +496,7 @@ class RefreshPipelineContext:
     started_mono: float
     refresh_started_utc: datetime
     phase_timings: dict[str, float]
-    fallback_data: dict[str, dict]
+    fallback_data: dict[str, dict[str, object]]
     first_refresh: bool
     first_refresh_followups_task: asyncio.Task[None] | None = None
     auth_refresh_rejected_count_at_start: int = 0
@@ -486,7 +506,58 @@ class RefreshPipelineContext:
     fast_poll: bool = False
 
 
-class EnphaseCoordinator(DataUpdateCoordinator[dict]):
+class EnphaseCoordinator(
+    DataUpdateCoordinator[dict[str, dict[str, object]]]  # type: ignore[misc, unused-ignore]
+):
+    data: dict[str, dict[str, object]]
+    update_interval: timedelta | None
+    last_update_success: bool
+    last_exception: Exception | None
+    last_failure_description: str | None
+    _phase_timings: dict[str, float]
+    _warmup_task: asyncio.Task[None] | None
+    _battery_profile_recovery_restore_task: asyncio.Task[None] | None
+    _streaming_stop_task: asyncio.Task[None] | None
+    _auth_refresh_task: asyncio.Task[bool] | None
+    _auth_refresh_rejected_until: float | None
+    _email: str | None
+    _stored_password: str | None
+    _gateway_inventory_summary_source: object
+    _microinverter_inventory_summary_source: object
+    _heatpump_inventory_summary_source: object
+    _heatpump_type_summaries_source: object
+    _status_payload_cache: dict[str, object] | None
+    _has_successful_refresh: bool
+    _backoff_cancel: Callable[[], None] | None
+    _auth_settings_failures: int
+    _auth_settings_available: bool | None
+    _endpoint_family_health: dict[str, EndpointFamilyHealth]
+    _session_history_cache_ttl_value: float | None
+    _last_error: str | None
+    _backoff_until: float | None
+    _status_charger_data_serials: list[str] | None
+    last_success_utc: datetime | None
+    last_failure_utc: datetime | None
+    last_failure_status: int | None
+    last_failure_response: str | None
+    last_failure_source: str | None
+    last_failure_endpoint: str | None
+    payload_failure_kind: str | None
+    payload_using_stale: bool
+    _hems_auth_manual_clear_until: float | None
+    _scheduler_last_error: str | None
+    _scheduler_last_failure_utc: datetime | None
+    _scheduler_backoff_until: float | None
+    _scheduler_backoff_ends_utc: datetime | None
+    _auth_settings_last_error: str | None
+    _auth_settings_last_failure_utc: datetime | None
+    _auth_settings_backoff_until: float | None
+    _auth_settings_backoff_ends_utc: datetime | None
+    backoff_ends_utc: datetime | None
+    _storm_guard_state: str | None
+    _storm_evse_enabled: bool | None
+    _storm_alert_active: bool | None
+
     def __init__(
         self,
         hass: HomeAssistant,
@@ -535,17 +606,17 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                 iterable = raw_selected_type_keys
                 selected_keys: set[str] = set()
                 for key in iterable:
-                    normalized = normalize_type_key(key)
-                    if normalized:
-                        selected_keys.add(normalized)
+                    selected_normalized = normalize_type_key(key)
+                    if selected_normalized:
+                        selected_keys.add(selected_normalized)
                 self._selected_type_keys = selected_keys
             elif isinstance(raw_selected_type_keys, str):
                 iterable = [raw_selected_type_keys]
                 selected_keys = set()
                 for key in iterable:
-                    normalized = normalize_type_key(key)
-                    if normalized:
-                        selected_keys.add(normalized)
+                    selected_normalized = normalize_type_key(key)
+                    if selected_normalized:
+                        selected_keys.add(selected_normalized)
                 if selected_keys:
                     self._selected_type_keys = selected_keys
 
@@ -614,12 +685,13 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         if callable(set_reauth_cb):
             result = set_reauth_cb(self._handle_client_unauthorized)
             if inspect.isawaitable(result):
+                callback_coro = cast(Coroutine[Any, Any, object], result)
                 try:
                     self.hass.async_create_task(
-                        result, name=f"{DOMAIN}_set_reauth_callback"
+                        callback_coro, name=f"{DOMAIN}_set_reauth_callback"
                     )
                 except TypeError:
-                    self.hass.async_create_task(result)
+                    self.hass.async_create_task(callback_coro)
         from .schedule_sync import ScheduleSync
 
         self.schedule_sync = ScheduleSync(hass, self, config_entry)
@@ -754,18 +826,23 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             MIN_SESSION_HISTORY_CACHE_TTL, self._session_history_interval_min * 60
         )
         self._session_history_day_retention = SESSION_HISTORY_CACHE_DAY_RETENTION
-        super_kwargs = {
-            "name": DOMAIN,
-            "update_interval": timedelta(seconds=self._configured_slow_poll_interval),
-            "always_update": self.site_only or not self.serials,
-        }
         if config_entry is not None:
-            super_kwargs["config_entry"] = config_entry
-        super().__init__(
-            hass,
-            _LOGGER,
-            **super_kwargs,
-        )
+            super().__init__(
+                hass,
+                _LOGGER,
+                name=DOMAIN,
+                update_interval=timedelta(seconds=self._configured_slow_poll_interval),
+                always_update=self.site_only or not self.serials,
+                config_entry=config_entry,
+            )
+        else:
+            super().__init__(
+                hass,
+                _LOGGER,
+                name=DOMAIN,
+                update_interval=timedelta(seconds=self._configured_slow_poll_interval),
+                always_update=self.site_only or not self.serials,
+            )
         self.config_entry = config_entry
         self.session_history = SessionHistoryManager(
             hass,
@@ -792,10 +869,10 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         self.refresh_runner = RefreshRunner(self)
         self._endpoint_family_policies = self._build_endpoint_family_policies()
 
-    def __setattr__(self, name, value):
+    def __setattr__(self, name: str, value: object) -> None:
         if name == "_async_fetch_sessions_today" and hasattr(self, "session_history"):
             object.__setattr__(self, name, value)
-            self.session_history.set_fetch_override(value)
+            self.session_history.set_fetch_override(cast(SessionFetchCallback, value))
             return
         super().__setattr__(name, value)
 
@@ -809,10 +886,10 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             self.__dict__[attr_name] = existing
         return existing
 
-    def __getattr__(self, name: str):
+    def __getattr__(self, name: str) -> Any:
         if name == "energy":
             energy = EnergyManager(
-                client_provider=lambda: getattr(self, "client", None),
+                client_provider=lambda: self.client,
                 site_id=str(getattr(self, "site_id", "")),
                 logger=_LOGGER,
                 summary_invalidator=getattr(
@@ -832,8 +909,9 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             self.__dict__["energy"] = energy
             return energy
         if name == "evse_timeseries":
+            hass = cast(HomeAssistant, self.__dict__.get("hass"))
             manager = EVSETimeseriesManager(
-                self.__dict__.get("hass"),
+                hass,
                 lambda: self.__dict__.get("client"),
                 site_id_getter=lambda: getattr(self, "site_id", None),
                 logger=_LOGGER,
@@ -1138,7 +1216,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             if retry_dt.tzinfo is None:
                 retry_dt = retry_dt.replace(tzinfo=_tz.utc)
             retry_dt = retry_dt.astimezone(_tz.utc)
-            return max(0.0, (retry_dt - dt_util.utcnow()).total_seconds())
+            return float(max(0.0, (retry_dt - dt_util.utcnow()).total_seconds()))
 
     def _endpoint_family_backoff_delay(
         self,
@@ -1318,7 +1396,9 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         return dict(getattr(self, "_warmup_phase_timings", {}) or {})
 
     @property
-    def _summary_cache(self) -> tuple[float, list[dict], float] | None:
+    def _summary_cache(
+        self,
+    ) -> tuple[float, list[dict[str, object]], float] | None:
         """Legacy access to the summary cache tuple."""
         summary = getattr(self, "summary", None)
         if summary is None:
@@ -1326,7 +1406,9 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         return getattr(summary, "_cache", None)
 
     @_summary_cache.setter
-    def _summary_cache(self, value: tuple[float, list[dict], float] | None) -> None:
+    def _summary_cache(
+        self, value: tuple[float, list[dict[str, object]], float] | None
+    ) -> None:
         summary = getattr(self, "summary", None)
         if summary is None:
             self.__dict__["_compat_summary_cache"] = value
@@ -1339,7 +1421,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         summary = getattr(self, "summary", None)
         if summary is None:
             return getattr(self, "_compat_summary_ttl", 0.0)
-        return summary.ttl
+        return float(summary.ttl)
 
     @_summary_ttl.setter
     def _summary_ttl(self, value: float) -> None:
@@ -1355,8 +1437,9 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         fallback = self.__dict__.get("_session_history_cache_ttl_value")
         session_history = self.__dict__.get("session_history")
         if session_history is None:
-            return fallback
-        return getattr(session_history, "cache_ttl", fallback)
+            return float(fallback) if isinstance(fallback, (int, float)) else None
+        value = getattr(session_history, "cache_ttl", fallback)
+        return float(value) if isinstance(value, (int, float)) else None
 
     @_session_history_cache_ttl.setter
     def _session_history_cache_ttl(self, value: float | None) -> None:
@@ -1429,7 +1512,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         *,
         in_background: bool,
         max_cache_age: float | None = None,
-    ) -> dict[str, list[dict]]:
+    ) -> dict[str, list[dict[str, object]]]:
         if max_cache_age is None:
             return await self.evse_runtime.async_enrich_sessions(
                 serials,
@@ -1443,14 +1526,16 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             max_cache_age=max_cache_age,
         )
 
-    def _sum_session_energy(self, sessions: list[dict]) -> float:
+    def _sum_session_energy(self, sessions: list[dict[str, object]]) -> float:
         return self.evse_runtime.sum_session_energy(sessions)
 
     @staticmethod
-    def _session_history_day(payload: dict, day_local_default: datetime) -> datetime:
+    def _session_history_day(
+        payload: dict[str, object], day_local_default: datetime
+    ) -> datetime:
         return EvseRuntime.session_history_day(payload, day_local_default)
 
-    def _session_history_soft_ttl(self, payload: dict) -> float:
+    def _session_history_soft_ttl(self, payload: dict[str, object]) -> float:
         cache_ttl = self._session_history_cache_ttl
         base_ttl = float(cache_ttl or DEFAULT_SESSION_HISTORY_INTERVAL_MIN * 60)
         if payload.get("actual_charging") or payload.get("charging"):
@@ -1469,7 +1554,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                 return min(base_ttl, SESSION_HISTORY_RECENT_STOP_SOFT_TTL_S)
         return base_ttl
 
-    def _session_history_hard_ttl(self, payload: dict) -> float:
+    def _session_history_hard_ttl(self, payload: dict[str, object]) -> float:
         cache_ttl = self._session_history_cache_ttl
         base_ttl = float(cache_ttl or DEFAULT_SESSION_HISTORY_INTERVAL_MIN * 60)
         soft_ttl = self._session_history_soft_ttl(payload)
@@ -1477,7 +1562,9 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             return base_ttl
         return max(base_ttl, soft_ttl + SESSION_HISTORY_IDLE_HARD_TTL_GRACE_S)
 
-    def _session_history_prioritize_inline_refresh(self, payload: dict) -> bool:
+    def _session_history_prioritize_inline_refresh(
+        self, payload: dict[str, object]
+    ) -> bool:
         cache_ttl = self._session_history_cache_ttl
         base_ttl = float(cache_ttl or DEFAULT_SESSION_HISTORY_INTERVAL_MIN * 60)
         return self._session_history_soft_ttl(payload) < base_ttl
@@ -1488,7 +1575,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         *,
         day_local: datetime | None = None,
         max_cache_age: float | None = None,
-    ) -> list[dict]:
+    ) -> list[dict[str, object]]:
         return await self.evse_runtime.async_fetch_sessions_today(
             sn,
             day_local=day_local,
@@ -1519,7 +1606,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         self,
         serial: str,
         day_key: str,
-        sessions: list[dict],
+        sessions: list[dict[str, object]],
     ) -> None:
         self.evse_runtime.set_session_history_cache_shim_entry(
             serial,
@@ -1584,14 +1671,14 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         self._prune_runtime_caches(active_serials=(), keep_day_keys=())
         self._topology_listeners.clear()
 
-    @callback
+    @_typed_callback
     def async_add_topology_listener(
         self, update_callback: Callable[[], None]
     ) -> Callable[[], None]:
         """Listen for topology-only changes."""
         self._topology_listeners.append(update_callback)
 
-        @callback
+        @_typed_callback
         def _remove_listener() -> None:
             if update_callback in self._topology_listeners:
                 self._topology_listeners.remove(update_callback)
@@ -1648,19 +1735,19 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
     def _current_topology_snapshot(self) -> CoordinatorTopologySnapshot:
         return self.inventory_runtime._current_topology_snapshot()
 
-    @callback
+    @_typed_callback
     def _notify_topology_listeners(self) -> None:
         self.inventory_runtime._notify_topology_listeners()
 
-    @callback
+    @_typed_callback
     def _refresh_cached_topology(self) -> bool:
         return self.inventory_runtime._refresh_cached_topology()
 
-    @callback
+    @_typed_callback
     def _begin_topology_refresh_batch(self) -> None:
         self.inventory_runtime._begin_topology_refresh_batch()
 
-    @callback
+    @_typed_callback
     def _end_topology_refresh_batch(self) -> bool:
         return self.inventory_runtime._end_topology_refresh_batch()
 
@@ -1897,7 +1984,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
     def _debug_system_dashboard_summary(  # pragma: no cover - compatibility shim
         self,
         tree_payload: dict[str, object] | None,
-        details_payloads: dict[str, dict[str, dict[str, object]]],
+        details_payloads: dict[str, dict[str, object]],
         type_summaries: dict[str, dict[str, object]],
         hierarchy_summary: dict[str, object],
     ) -> dict[str, object]:
@@ -1911,7 +1998,10 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
     def _debug_evse_feature_flag_summary(self) -> dict[str, object]:  # pragma: no cover
         """Return a sanitized summary of EVSE feature-flag discovery."""
 
-        return self.evse_feature_flags_runtime.debug_feature_flag_summary()
+        return cast(
+            dict[str, object],
+            self.evse_feature_flags_runtime.debug_feature_flag_summary(),
+        )
 
     def _debug_topology_summary(  # pragma: no cover - compatibility shim
         self, snapshot: CoordinatorTopologySnapshot
@@ -2346,7 +2436,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                 "lifetime_cache_age_seconds": None,
                 "lifetime_serial_count": 0,
             }
-        return manager.diagnostics()
+        return cast(dict[str, object], manager.diagnostics())
 
     def scheduler_diagnostics(self) -> dict[str, object]:
         """Return scheduler availability and failure diagnostics."""
@@ -2578,11 +2668,11 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         self,
         phase_timings: dict[str, float],
         *,
-        records: list[tuple[str, dict]],
+        records: list[tuple[str, dict[str, object]]],
         charge_mode_candidates: list[str],
         first_refresh: bool,
     ) -> tuple[
-        dict[str, str | None],
+        dict[str, ChargeModeResolution],
         dict[str, tuple[bool | None, bool]],
         dict[str, tuple[bool | None, bool | None, bool, bool]],
         dict[str, dict[str, object]],
@@ -2680,10 +2770,27 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             return charge_modes, green_settings, auth_settings, charger_config
         results = await asyncio.gather(*tasks.values())
         resolved = dict(zip(tasks.keys(), results, strict=False))
-        charge_modes.update(resolved.get("charge_modes", {}))
-        green_settings.update(resolved.get("green_settings", {}))
-        auth_settings.update(resolved.get("auth_settings", {}))
-        charger_config.update(resolved.get("charger_config", {}))
+        charge_modes.update(
+            cast(dict[str, ChargeModeResolution], resolved.get("charge_modes", {}))
+        )
+        green_settings.update(
+            cast(
+                dict[str, tuple[bool | None, bool]],
+                resolved.get("green_settings", {}),
+            )
+        )
+        auth_settings.update(
+            cast(
+                dict[str, tuple[bool | None, bool | None, bool, bool]],
+                resolved.get("auth_settings", {}),
+            )
+        )
+        charger_config.update(
+            cast(
+                dict[str, dict[str, object]],
+                resolved.get("charger_config", {}),
+            )
+        )
         return (
             charge_modes,
             green_settings,
@@ -2698,7 +2805,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         reset_request_count = getattr(self.client, "reset_request_count", None)
         if callable(reset_request_count):
             reset_request_count()
-        fallback_data: dict[str, dict] = {}
+        fallback_data: dict[str, dict[str, object]] = {}
         if isinstance(self.data, dict):
             try:
                 fallback_data = dict(self.data)
@@ -2718,7 +2825,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
     async def _async_run_site_only_refresh_pipeline(
         self,
         context: RefreshPipelineContext,
-    ) -> dict:
+    ) -> dict[str, dict[str, object]]:
         phase_timings = context.phase_timings
         self._status_charger_data_authoritative = False
         self._status_charger_data_serials = None
@@ -2818,7 +2925,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
     def _first_refresh_followup_calls(
         self,
     ) -> tuple[tuple[str, str, Callable[[], object], str | None], ...]:
-        calls = []
+        calls: list[tuple[str, str, Callable[[], object], str | None]] = []
         if self._first_refresh_storm_guard_followups_needed():
             calls.extend(
                 (
@@ -2915,7 +3022,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
     async def _async_run_post_session_refresh_pipeline(
         self,
         context: RefreshPipelineContext,
-        out: dict[str, dict],
+        out: dict[str, dict[str, object]],
         day_local_default: datetime,
     ) -> None:
         if context.first_refresh:
@@ -2952,7 +3059,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
     def _apply_refresh_polling_interval(self, polling_state: dict[str, object]) -> None:
         if self.config_entry is None:
             return
-        target = polling_state["target"]
+        target = float(str(polling_state["target"]))
         if (
             not self.update_interval
             or int(self.update_interval.total_seconds()) != target
@@ -3047,7 +3154,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         self._refresh_cached_topology()
         self.discovery_snapshot.schedule_save()
 
-    async def _async_update_data(self) -> dict:
+    async def _async_update_data(self) -> dict[str, dict[str, object]]:
         context = self._start_refresh_pipeline()
         t0 = context.started_mono
         refresh_started_utc = context.refresh_started_utc
@@ -3140,6 +3247,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                     using_stale=True,
                 )
                 phase_timings["status_s"] = round(time.monotonic() - status_start, 3)
+                assert self._status_payload_cache is not None
                 data = dict(self._status_payload_cache)
                 context.status_used_stale = True
             else:
@@ -3184,6 +3292,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                     using_stale=True,
                 )
                 phase_timings["status_s"] = round(time.monotonic() - status_start, 3)
+                assert self._status_payload_cache is not None
                 data = dict(self._status_payload_cache)
                 context.status_used_stale = True
                 self._payload_errors = 0
@@ -3312,6 +3421,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                     using_stale=True,
                 )
                 phase_timings["status_s"] = round(time.monotonic() - status_start, 3)
+                assert self._status_payload_cache is not None
                 data = dict(self._status_payload_cache)
                 context.status_used_stale = True
                 context.status_stale_network_failure = True
@@ -3359,7 +3469,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
 
         prev_data = self.data if isinstance(self.data, dict) else {}
         self._has_successful_refresh = True
-        out: dict[str, dict] = {}
+        out: dict[str, dict[str, object]] = {}
         raw_charger_data = data.get("evChargerData")
         arr = (
             [charger for charger in raw_charger_data if isinstance(charger, dict)]
@@ -3367,7 +3477,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             else []
         )
         data_ts = data.get("ts")
-        records: list[tuple[str, dict]] = []
+        records: list[tuple[str, dict[str, object]]] = []
         charge_mode_candidates: list[str] = []
         for obj in arr:
             sn = str(obj.get("sn") or "").strip()
@@ -3431,11 +3541,11 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             if raw_safe_limit is None:
                 raw_safe_limit = obj.get("safeLimitState")
             if isinstance(raw_safe_limit, bool):
-                safe_limit_state = int(raw_safe_limit)
+                safe_limit_state: int | None = int(raw_safe_limit)
             else:
                 safe_limit_state = _as_int(raw_safe_limit)
-            charging_level = None
-            charging_level_source = None
+            charging_level: int | None = None
+            charging_level_source: str | None = None
             for key in ("chargingLevel", "charging_level", "charginglevel"):
                 if key in obj and obj.get(key) is not None:
                     coerced_level = _as_int(obj.get(key))
@@ -3894,8 +4004,8 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         polling_state = self._determine_polling_state(out)
         context.fast_poll = bool(polling_state["want_fast"])
         summary_force = self.summary.prepare_refresh(
-            want_fast=polling_state["want_fast"],
-            target_interval=float(polling_state["target"]),
+            want_fast=bool(polling_state["want_fast"]),
+            target_interval=float(str(polling_state["target"])),
         )
         if not summary_force and self._summary_refresh_needed_for_amp_bounds(out):
             summary_force = True
@@ -3978,7 +4088,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                 ip_addr = None
                 mac_addr = None
                 interface_count = 0
-                entries: list = []
+                entries: list[object] = []
                 if isinstance(net_cfg, dict):
                     entries = [net_cfg]
                 elif isinstance(net_cfg, list):
@@ -3997,15 +4107,15 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                             if line:
                                 parsed.append(line)
                     entries = parsed if isinstance(parsed, list) else []
-                for entry in entries:
+                for network_entry in entries:
                     parts: dict[str, object] = {}
-                    if isinstance(entry, dict):
-                        parts = entry
-                    elif isinstance(entry, str):
-                        for piece in entry.split(","):
+                    if isinstance(network_entry, dict):
+                        parts = network_entry
+                    elif isinstance(network_entry, str):
+                        for piece in network_entry.split(","):
                             if "=" in piece:
-                                k, v = piece.split("=", 1)
-                                parts[k.strip()] = v.strip()
+                                network_key, network_value = piece.split("=", 1)
+                                parts[network_key.strip()] = network_value.strip()
                     if not parts:
                         continue
                     interface_count += 1
@@ -4312,7 +4422,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             day_key: str,
             max_cache_age: float | None,
             serials: list[str],
-        ) -> dict[str, list[dict]]:
+        ) -> dict[str, list[dict[str, object]]]:
             if max_cache_age is None:
                 return await self._async_enrich_sessions(
                     serials,
@@ -4326,6 +4436,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                 max_cache_age=max_cache_age,
             )
 
+        immediate_updates: tuple[dict[str, list[dict[str, object]]], ...]
         immediate_items = tuple(immediate_by_day.items())
         if len(immediate_items) == 1:
             (day_key, max_cache_age), serials = immediate_items[0]
@@ -4335,7 +4446,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
                 ),
             )
         elif immediate_items:
-            tasks: list[asyncio.Task[dict[str, list[dict]]]] = []
+            tasks: list[asyncio.Task[dict[str, list[dict[str, object]]]]] = []
             async with asyncio.TaskGroup() as task_group:
                 for (day_key, max_cache_age), serials in immediate_items:
                     task = task_group.create_task(
@@ -4351,11 +4462,13 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
 
         for updates in immediate_updates:
             for sn, sessions in updates.items():
-                cur = out.get(sn)
-                if cur is None:
+                session_entry = out.get(sn)
+                if session_entry is None:
                     continue
-                cur["energy_today_sessions"] = sessions
-                cur["energy_today_sessions_kwh"] = self._sum_session_energy(sessions)
+                session_entry["energy_today_sessions"] = sessions
+                session_entry["energy_today_sessions_kwh"] = self._sum_session_energy(
+                    sessions
+                )
         for (day_key, max_cache_age), serials in background_by_day.items():
             if max_cache_age is None:
                 self._schedule_session_enrichment(
@@ -4388,16 +4501,20 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
 
         return out
 
-    def _sync_desired_charging(self, data: dict[str, dict]) -> None:
+    def _sync_desired_charging(self, data: dict[str, dict[str, object]]) -> None:
         self.evse_runtime.sync_desired_charging(data)
 
-    async def _async_auto_resume(self, sn: str, snapshot: dict | None = None) -> None:
+    async def _async_auto_resume(
+        self, sn: str, snapshot: dict[str, object] | None = None
+    ) -> None:
         await self.evse_runtime.async_auto_resume(sn, snapshot)
 
-    def _determine_polling_state(self, data: dict[str, dict]) -> dict[str, object]:
+    def _determine_polling_state(
+        self, data: dict[str, dict[str, object]]
+    ) -> dict[str, object]:
         return self.evse_runtime.determine_polling_state(data)
 
-    def _has_embedded_charge_mode(self, obj: dict) -> bool:
+    def _has_embedded_charge_mode(self, obj: dict[str, object]) -> bool:
         """Check whether the status payload already exposes a charge mode."""
         if not isinstance(obj, dict):
             return False
@@ -4439,7 +4556,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             return None
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=_tz.utc)
-        return parsed.astimezone(_tz.utc)
+        return cast(datetime, parsed.astimezone(_tz.utc))
 
     @staticmethod
     def _format_auth_blocked_until(value: datetime | None) -> str | None:
@@ -4578,7 +4695,9 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
 
         config_entry = getattr(self, "config_entry", None)
         runtime_data = getattr(config_entry, "runtime_data", None)
-        if hasattr(runtime_data, "reload_suppression_count"):
+        if runtime_data is not None and hasattr(
+            runtime_data, "reload_suppression_count"
+        ):
             runtime_data.reload_suppression_count = (
                 int(getattr(runtime_data, "reload_suppression_count", 0)) + 1
             )
@@ -4588,7 +4707,9 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
 
         config_entry = getattr(self, "config_entry", None)
         runtime_data = getattr(config_entry, "runtime_data", None)
-        if hasattr(runtime_data, "reload_suppression_count"):
+        if runtime_data is not None and hasattr(
+            runtime_data, "reload_suppression_count"
+        ):
             runtime_data.reload_suppression_count = max(
                 0,
                 int(getattr(runtime_data, "reload_suppression_count", 0)) - 1,
@@ -4989,12 +5110,15 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         Implementation lives on :class:`~custom_components.enphase_ev.auth_refresh_runtime.AuthRefreshRuntime`.
         """
 
-        return await self.auth_refresh_runtime.attempt_auto_refresh()
+        return cast(bool, await self.auth_refresh_runtime.attempt_auto_refresh())
 
     async def async_try_reauth_now(self) -> ManualAuthRefreshResult:
         """Attempt one manual stored-credential reauthentication."""
 
-        return await self.auth_refresh_runtime.attempt_manual_refresh()
+        return cast(
+            ManualAuthRefreshResult,
+            await self.auth_refresh_runtime.attempt_manual_refresh(),
+        )
 
     def _clear_auth_refresh_task(self, task: asyncio.Task[bool]) -> None:
         """Clear the shared auth-refresh task once it completes (delegates to ``AuthRefreshRuntime``)."""
@@ -5004,7 +5128,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
     def _auth_refresh_rejected_active(self) -> bool:
         """Return True while stored-credential refresh is in cooldown (delegates to ``AuthRefreshRuntime``)."""
 
-        return self.auth_refresh_runtime.auth_refresh_rejected_active()
+        return cast(bool, self.auth_refresh_runtime.auth_refresh_rejected_active())
 
     def _note_auth_refresh_rejected(self, message: str) -> None:
         """Start a cooldown after stored credentials are rejected (delegates to ``AuthRefreshRuntime``)."""
@@ -5014,12 +5138,14 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
     def _auth_refresh_recent_success_active(self) -> bool:
         """Return True when a recent successful refresh can satisfy stale 401s (delegates to ``AuthRefreshRuntime``)."""
 
-        return self.auth_refresh_runtime.auth_refresh_recent_success_active()
+        return cast(
+            bool, self.auth_refresh_runtime.auth_refresh_recent_success_active()
+        )
 
     async def _async_run_auto_refresh(self) -> bool:
         """Run one stored-credential refresh attempt for all concurrent waiters (delegates to ``AuthRefreshRuntime``)."""
 
-        return await self.auth_refresh_runtime.async_run_auto_refresh()
+        return cast(bool, await self.auth_refresh_runtime.async_run_auto_refresh())
 
     async def _handle_client_unauthorized(self) -> bool:
         """Handle client Unauthorized responses and retry when possible."""
@@ -5199,7 +5325,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         # without hammering the optional scheduler service.
         slow_floor = float(self._slow_interval_floor())
         backoff_multiplier = 2 ** min(self._scheduler_failures - 1, 3)
-        return max(30.0, min(600.0, slow_floor * backoff_multiplier))
+        return float(max(30.0, min(600.0, slow_floor * backoff_multiplier)))
 
     @property
     def scheduler_available(self) -> bool:
@@ -5288,7 +5414,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         # unavailable.
         slow_floor = float(self._slow_interval_floor())
         backoff_multiplier = 2 ** min(self._auth_settings_failures - 1, 3)
-        return max(30.0, min(600.0, slow_floor * backoff_multiplier))
+        return float(max(30.0, min(600.0, slow_floor * backoff_multiplier)))
 
     @property
     def auth_settings_available(self) -> bool:
@@ -5604,7 +5730,8 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
     ) -> bool | None:
         if value is None:
             return None
-        return getattr(value, field_name)
+        field = getattr(value, field_name)
+        return field if isinstance(field, bool) else None
 
     @property
     def battery_site_status_code(self) -> str | None:
@@ -5961,7 +6088,9 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
     def charge_from_grid_force_schedule_available(self) -> bool:
         return self.charge_from_grid_force_schedule_supported
 
-    def _battery_schedule_control_available(self, control: object) -> bool:
+    def _battery_schedule_control_available(
+        self, control: BatteryControlCapability | None
+    ) -> bool:
         if getattr(self, "_battery_has_encharge", None) is False:
             return False
         if self.battery_system_task is True:
@@ -5978,7 +6107,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
 
     def _battery_schedule_supported(
         self,
-        control: object,
+        control: BatteryControlCapability | None,
         *,
         schedule_id: object,
         start_minutes: object,
@@ -6010,7 +6139,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
 
     def _battery_schedule_available(
         self,
-        control: object,
+        control: BatteryControlCapability | None,
         *,
         schedule_id: object,
         start_minutes: object,
@@ -6111,14 +6240,14 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         if control_enabled is False or schedule_enabled is False:
             return False
         if control_enabled is not None:
-            return control_enabled
+            return bool(control_enabled)
         if schedule_enabled is not None:
-            return schedule_enabled
+            return bool(schedule_enabled)
         toggle_target = getattr(
             self, f"_battery_{normalized}_toggle_target_enabled", None
         )
         if normalized in {"dtg", "rbd"} and toggle_target is not None:
-            return toggle_target
+            return bool(toggle_target)
         if schedule_id is not None:
             return None
         if (
@@ -6277,7 +6406,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             return None
         if self._grid_control_is_stale():
             return None
-        return raw_supported
+        return raw_supported if isinstance(raw_supported, bool) else None
 
     @property
     def grid_control_disable(self) -> bool | None:
@@ -6328,7 +6457,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             return None
         if self._grid_mode_status_is_stale():
             return None
-        return raw_supported
+        return raw_supported if isinstance(raw_supported, bool) else None
 
     @property
     def grid_mode_status(self) -> str | None:
@@ -6361,7 +6490,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             return None
         if self._grid_outage_context_is_stale():
             return None
-        return raw_supported
+        return raw_supported if isinstance(raw_supported, bool) else None
 
     @property
     def grid_outage_is_grid_outage(self) -> bool | None:
@@ -6443,7 +6572,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
             return None
         if self._dry_contact_settings_is_stale():
             return None
-        return raw_supported
+        return raw_supported if isinstance(raw_supported, bool) else None
 
     def dry_contact_settings_entries(self) -> list[dict[str, object]]:
         entries = getattr(self, "_dry_contact_settings_entries", [])
@@ -6919,7 +7048,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         except Exception:
             self.backoff_ends_utc = None
 
-        @callback
+        @_typed_callback
         def _resume(_now: datetime) -> None:
             # Home Assistant should recover from cloud throttling on its own;
             # the timer clears diagnostic state and triggers one refresh when
@@ -7005,7 +7134,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         if "count" not in bucket:
             return status_serials
         try:
-            count = int(bucket.get("count"))
+            count = int(str(bucket.get("count")))
         except (TypeError, ValueError):
             return status_serials
         if count == 0:
@@ -7115,7 +7244,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         self.evse_runtime.set_desired_charging(sn, desired)
 
     @staticmethod
-    def _coerce_amp(value) -> int | None:
+    def _coerce_amp(value: object) -> int | None:
         return EvseRuntime.coerce_amp(value)
 
     def _amp_limits(self, sn: str) -> tuple[int | None, int | None]:
@@ -7156,12 +7285,17 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
     def evse_feature_flag(self, key: str, sn: str | None = None) -> object | None:
         """Return a parsed EVSE feature flag for the site or charger."""
 
-        return self.evse_feature_flags_runtime.feature_flag(key, sn)
+        return cast(
+            object | None, self.evse_feature_flags_runtime.feature_flag(key, sn)
+        )
 
     def evse_feature_flag_enabled(self, key: str, sn: str | None = None) -> bool | None:
         """Return a feature flag coerced to a tri-state boolean."""
 
-        return self.evse_feature_flags_runtime.feature_flag_enabled(key, sn)
+        return cast(
+            bool | None,
+            self.evse_feature_flags_runtime.feature_flag_enabled(key, sn),
+        )
 
     @staticmethod
     def _coerce_evse_feature_flags_map(value: object) -> dict[str, object]:
@@ -7178,7 +7312,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         await self.evse_feature_flags_runtime.async_refresh(force=force)
 
     @staticmethod
-    def _coerce_optional_bool(value) -> bool | None:
+    def _coerce_optional_bool(value: object) -> bool | None:
         return coerce_optional_bool(value)
 
     @staticmethod
@@ -7293,7 +7427,7 @@ class EnphaseCoordinator(DataUpdateCoordinator[dict]):
         self.battery_runtime.parse_battery_status_payload(payload)
 
     @staticmethod
-    def _normalize_storm_guard_state(value) -> str | None:  # pragma: no cover
+    def _normalize_storm_guard_state(value: object) -> str | None:  # pragma: no cover
         return BatteryRuntime.normalize_storm_guard_state(value)
 
     def _clear_storm_guard_pending(self) -> None:  # pragma: no cover

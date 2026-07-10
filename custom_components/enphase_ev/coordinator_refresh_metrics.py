@@ -161,13 +161,13 @@ def refresh_performance_history_summary(
         if sample.get("manual_bypass"):
             manual_bypass_count += 1
         try:
-            total = float(sample["total_s"])
+            total = float(str(sample["total_s"]))
         except (KeyError, TypeError, ValueError):
             total = None
         if total is not None and total >= 0:
             total_values.append(total)
         try:
-            cloud_calls = float(sample["cloud_calls"])
+            cloud_calls = float(str(sample["cloud_calls"]))
         except (KeyError, TypeError, ValueError):
             cloud_calls = None
         if cloud_calls is not None and cloud_calls >= 0:

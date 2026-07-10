@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -26,7 +27,7 @@ class EvseFirmwareDetailsManager:
 
     def __init__(
         self,
-        client_getter,
+        client_getter: Callable[[], Any],
         *,
         ttl_seconds: int = EVSE_FIRMWARE_CACHE_TTL_SECONDS,
         retry_backoff_seconds: int = EVSE_FIRMWARE_RETRY_BACKOFF_SECONDS,

@@ -4,16 +4,41 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import time as dt_time
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
 import uuid
 
-from homeassistant.core import CALLBACK_TYPE, callback
+from homeassistant.core import CALLBACK_TYPE, callback as ha_callback
 
 from .const import DEFAULT_SCHEDULE_SYNC_ENABLED, OPT_SCHEDULE_SYNC_ENABLED
 from .coordinator import EnphaseCoordinator
 from .entity import EnphaseBaseEntity
 from .labels import evse_schedule_create_label as _evse_schedule_create_label
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
+
+if TYPE_CHECKING:  # pragma: no cover
+
+    class _EnphaseBaseEntity:
+        """Typed view of the external integration entity base."""
+
+        def __init__(self, coord: EnphaseCoordinator, sn: str) -> None: ...
+
+        async def async_added_to_hass(self) -> None: ...
+
+        async def async_will_remove_from_hass(self) -> None: ...
+
+        def async_write_ha_state(self) -> None: ...
+
+else:
+    _EnphaseBaseEntity = EnphaseBaseEntity
+
+_CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
+
+
+def callback(func: _CallbackT) -> _CallbackT:
+    """Apply Home Assistant's callback marker with its identity type preserved."""
+
+    return cast(_CallbackT, ha_callback(func))
+
 
 DAY_ORDER: list[tuple[str, int]] = [
     ("mon", 1),
@@ -119,7 +144,7 @@ def _slot_limit(slot: dict[str, Any], *, default: int = 32) -> int:
 
 
 def _editor_default_limit(coord: EnphaseCoordinator, sn: str) -> int:
-    data = {}
+    data: dict[str, object] = {}
     try:
         data = (coord.data or {}).get(sn) or {}
     except Exception:
@@ -350,7 +375,7 @@ class EvseScheduleEditorManager:
         selected = self.get_schedule(sn, form.selected_slot_id)
         if selected is None:
             fallback = self._default_schedule_selection(sn)
-            before = (
+            selection_before = (
                 form.selected_slot_id,
                 form.create_mode,
                 form.start_time,
@@ -358,11 +383,11 @@ class EvseScheduleEditorManager:
                 form.limit,
                 dict(form.days),
             )
-            if fallback == NEW_SCHEDULE_OPTION:
+            if fallback == NEW_SCHEDULE_OPTION or fallback is None:
                 self._set_create_mode_defaults(sn, auto=True)
-            else:
+            elif isinstance(fallback, EvseScheduleRecord):
                 self._apply_schedule_to_form(sn, fallback)
-            after = (
+            selection_after = (
                 form.selected_slot_id,
                 form.create_mode,
                 form.start_time,
@@ -370,25 +395,25 @@ class EvseScheduleEditorManager:
                 form.limit,
                 dict(form.days),
             )
-            return schedules_changed or before != after
+            return schedules_changed or selection_before != selection_after
 
         if not schedules_changed:
             return False
 
-        before = (
+        schedule_before = (
             form.start_time,
             form.end_time,
             form.limit,
             dict(form.days),
         )
         self._apply_schedule_to_form(sn, selected)
-        after = (
+        schedule_after = (
             form.start_time,
             form.end_time,
             form.limit,
             dict(form.days),
         )
-        return schedules_changed or before != after
+        return schedules_changed or schedule_before != schedule_after
 
     def _apply_schedule_to_form(self, sn: str, schedule: EvseScheduleRecord) -> None:
         form = self._form(sn)
@@ -493,7 +518,7 @@ class EvseScheduleEditorManager:
         return slot
 
 
-class EvseScheduleEditorEntity(EnphaseBaseEntity):
+class EvseScheduleEditorEntity(_EnphaseBaseEntity):
     def __init__(
         self,
         coord: EnphaseCoordinator,

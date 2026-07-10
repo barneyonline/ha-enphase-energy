@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import TypeVar, cast
+
 from homeassistant.components.button import ButtonEntity
 from homeassistant.components import persistent_notification
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant, callback as ha_callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
@@ -36,6 +39,9 @@ from .labels import battery_schedule_button_label
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
 
 PARALLEL_UPDATES = 0
+
+_CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
+callback = cast(Callable[[_CallbackT], _CallbackT], ha_callback)
 
 
 def _site_has_battery(coord: EnphaseCoordinator) -> bool:
@@ -94,7 +100,7 @@ async def async_setup_entry(
     hass: HomeAssistant,
     entry: EnphaseConfigEntry,
     async_add_entities: AddEntitiesCallback,
-):
+) -> None:
     coord: EnphaseCoordinator = get_runtime_data(entry).coordinator
     ent_reg = er.async_get(hass)
     known_serials: set[str] = set()
@@ -233,11 +239,11 @@ async def async_setup_entry(
     _async_sync_chargers()
 
 
-class CancelPendingProfileChangeButton(CoordinatorEntity, ButtonEntity):
+class CancelPendingProfileChangeButton(CoordinatorEntity, ButtonEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "cancel_pending_profile_change"
 
-    def __init__(self, coord: EnphaseCoordinator):
+    def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(coord)
         self._coord = coord
         self._attr_unique_id = (
@@ -245,11 +251,14 @@ class CancelPendingProfileChangeButton(CoordinatorEntity, ButtonEntity):
         )
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
-        return (
-            super().available
-            and _type_available(self._coord, "envoy")
-            and self._coord.battery_profile_pending
+    def available(self) -> bool:
+        return cast(
+            bool,
+            (
+                super().available
+                and _type_available(self._coord, "envoy")
+                and self._coord.battery_profile_pending
+            ),
         )
 
     async def async_press(self) -> None:
@@ -266,17 +275,17 @@ class CancelPendingProfileChangeButton(CoordinatorEntity, ButtonEntity):
         )
 
 
-class RequestGridToggleOtpButton(CoordinatorEntity, ButtonEntity):
+class RequestGridToggleOtpButton(CoordinatorEntity, ButtonEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "request_grid_toggle_otp"
 
-    def __init__(self, coord: EnphaseCoordinator):
+    def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(coord)
         self._coord = coord
         self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_request_grid_toggle_otp"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         if not super().available:
             return False
         if not _site_has_battery(self._coord):
@@ -306,17 +315,17 @@ class RequestGridToggleOtpButton(CoordinatorEntity, ButtonEntity):
         )
 
 
-class StormAlertOptOutButton(CoordinatorEntity, ButtonEntity):
+class StormAlertOptOutButton(CoordinatorEntity, ButtonEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "storm_alert_opt_out"
 
-    def __init__(self, coord: EnphaseCoordinator):
+    def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(coord)
         self._coord = coord
         self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_storm_alert_opt_out"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         return (
             super().available
             and _site_has_battery(self._coord)
@@ -338,7 +347,7 @@ class StormAlertOptOutButton(CoordinatorEntity, ButtonEntity):
         )
 
 
-class _BatteryScheduleButton(BatteryScheduleEditorEntity, ButtonEntity):
+class _BatteryScheduleButton(BatteryScheduleEditorEntity, ButtonEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
 
     def __init__(
@@ -356,7 +365,7 @@ class _BatteryScheduleButton(BatteryScheduleEditorEntity, ButtonEntity):
         self._attr_icon = icon
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         return (
             super().available
             and battery_scheduler_enabled(self._entry)
@@ -388,7 +397,9 @@ class _BatteryScheduleButton(BatteryScheduleEditorEntity, ButtonEntity):
         if not self._editor.is_creating and self._editor.edit.selected_schedule_id:
             schedule = self._editor.get_schedule(self._editor.edit.selected_schedule_id)
             if schedule is not None:
-                return battery_schedule_option_label(schedule, hass=hass)
+                return cast(
+                    str | None, battery_schedule_option_label(schedule, hass=hass)
+                )
         preview = BatteryScheduleRecord(
             schedule_id="preview",
             schedule_type=self._editor.edit.schedule_type,
@@ -403,7 +414,7 @@ class _BatteryScheduleButton(BatteryScheduleEditorEntity, ButtonEntity):
             enabled=True,
             schedule_status=None,
         )
-        return battery_schedule_option_label(preview, hass=hass)
+        return cast(str | None, battery_schedule_option_label(preview, hass=hass))
 
     def _show_success_notification(self, *, action: str, body: str | None) -> None:
         message = str(body).strip() if isinstance(body, str) else ""
@@ -449,7 +460,7 @@ class BatteryScheduleSaveButton(_BatteryScheduleButton):
         )
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         return (
             super().available
             and self._editor is not None
@@ -510,7 +521,7 @@ class BatteryScheduleDeleteButton(_BatteryScheduleButton):
         )
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         return super().available and bool(
             self._editor
             and _retain_battery_schedule_editor_buttons(self._coord)
@@ -542,14 +553,14 @@ class BatteryScheduleDeleteButton(_BatteryScheduleButton):
         self._show_success_notification(action="delete", body=success_label)
 
 
-class _BaseButton(EnphaseBaseEntity, ButtonEntity):
-    def __init__(self, coord: EnphaseCoordinator, sn: str, name_suffix: str):
+class _BaseButton(EnphaseBaseEntity, ButtonEntity):  # type: ignore[misc]
+    def __init__(self, coord: EnphaseCoordinator, sn: str, name_suffix: str) -> None:
         super().__init__(coord, sn)
         self._attr_unique_id = f"{DOMAIN}_{sn}_{name_suffix.replace(' ', '_').lower()}"
 
 
 class StartChargeButton(_BaseButton):
-    def __init__(self, coord, sn):
+    def __init__(self, coord: EnphaseCoordinator, sn: str) -> None:
         super().__init__(coord, sn, "Start Charging")
         self._attr_translation_key = "start_charging"
 
@@ -558,7 +569,7 @@ class StartChargeButton(_BaseButton):
 
 
 class StopChargeButton(_BaseButton):
-    def __init__(self, coord, sn):
+    def __init__(self, coord: EnphaseCoordinator, sn: str) -> None:
         super().__init__(coord, sn, "Stop Charging")
         self._attr_translation_key = "stop_charging"
 
@@ -566,7 +577,7 @@ class StopChargeButton(_BaseButton):
         await self._coord.async_stop_charging(self._sn)
 
 
-class _EvseScheduleButton(EvseScheduleEditorEntity, ButtonEntity):
+class _EvseScheduleButton(EvseScheduleEditorEntity, ButtonEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
 
@@ -586,7 +597,7 @@ class _EvseScheduleButton(EvseScheduleEditorEntity, ButtonEntity):
         self._attr_icon = icon
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         return (
             super().available
             and evse_schedule_editor_active(self._coord, self._entry)
@@ -671,7 +682,7 @@ class EvseScheduleDeleteButton(_EvseScheduleButton):
         )
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         return super().available and bool(
             self._editor
             and not self._editor.is_creating(self._sn)

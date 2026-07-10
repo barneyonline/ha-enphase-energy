@@ -26,7 +26,9 @@ def coerce_int(value: object, *, default: int = 0) -> int:
     if isinstance(value, bool):
         return int(value)
     try:
-        return int(value)
+        if isinstance(value, (str, bytes, bytearray, int, float)):
+            return int(value)
+        return int(str(value).strip())
     except (TypeError, ValueError):
         try:
             return int(float(str(value).strip()))
@@ -109,7 +111,9 @@ def normalize_evse_session_energy(
     if value is None:
         return None, None, None
     try:
-        numeric_value = float(value)
+        numeric_value = (
+            float(value) if isinstance(value, (int, float)) else float(str(value))
+        )
     except Exception:  # noqa: BLE001
         return None, None, None
 
@@ -272,7 +276,7 @@ def resolve_site_local_current_date(
             pass
 
     try:
-        return dt_util.now().date().isoformat()
+        return str(dt_util.now().date().isoformat())
     except Exception:  # noqa: BLE001
         return datetime.now(tz=_tz.utc).date().isoformat()
 

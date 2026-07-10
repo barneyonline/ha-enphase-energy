@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
@@ -173,7 +173,7 @@ def _redact_diagnostics_payload(
     """Return a redacted diagnostics payload safe for external sharing."""
 
     redacted = async_redact_data(payload, DIAGNOSTICS_REDACT_KEYS)
-    return _redact_embedded_diagnostics_text(redacted, site_ids)
+    return cast(dict[str, Any], _redact_embedded_diagnostics_text(redacted, site_ids))
 
 
 def _text(value: Any) -> str | None:
@@ -637,7 +637,11 @@ async def async_get_config_entry_diagnostics(
     return _redact_diagnostics_payload(diag, site_ids=site_ids)
 
 
-async def async_get_device_diagnostics(hass, entry, device):
+async def async_get_device_diagnostics(
+    hass: HomeAssistant,
+    entry: EnphaseConfigEntry,
+    device: dr.DeviceEntry,
+) -> dict[str, Any]:
     """Return diagnostics for a device."""
     site_ids = _normalize_site_ids([entry.data.get(CONF_SITE_ID)])
     dev_reg = dr.async_get(hass)
@@ -707,7 +711,7 @@ async def async_get_device_diagnostics(hass, entry, device):
             else:
                 safe_devices = []
             try:
-                gateway_count = int(payload.get("count", 0) or 0)
+                gateway_count = int(cast(Any, payload.get("count", 0) or 0))
             except (TypeError, ValueError):
                 gateway_count = 0
             payload["gateway_summary"] = _gateway_summary(safe_devices, gateway_count)

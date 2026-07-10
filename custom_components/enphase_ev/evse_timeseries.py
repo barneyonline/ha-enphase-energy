@@ -74,7 +74,7 @@ class EVSETimeseriesManager:
         return (site_id,) if site_id else ()
 
     def _redact_error(self, err: object) -> str:
-        return redact_text(err, site_ids=self._site_ids())
+        return str(redact_text(err, site_ids=self._site_ids()))
 
     @property
     def cache_ttl(self) -> float:
@@ -101,12 +101,13 @@ class EVSETimeseriesManager:
                 item[0].timestamp() if isinstance(item[0], datetime) else float("-inf")
             )
         )
-        return failures[-1][1]  # type: ignore[return-value]
+        latest_error = failures[-1][1]
+        return latest_error if isinstance(latest_error, str) else None
 
     @property
     def service_failures(self) -> int:
         return sum(
-            int(state.get("failures", 0) or 0)
+            int(str(state.get("failures", 0) or 0))
             for state in self._endpoint_state.values()
         )
 
@@ -116,22 +117,22 @@ class EVSETimeseriesManager:
 
     @property
     def service_backoff_ends_utc(self) -> datetime | None:
-        ends = [
-            state.get("backoff_ends_utc")
-            for state in self._endpoint_state.values()
-            if isinstance(state.get("backoff_ends_utc"), datetime)
-        ]
+        ends: list[datetime] = []
+        for state in self._endpoint_state.values():
+            value = state.get("backoff_ends_utc")
+            if isinstance(value, datetime):
+                ends.append(value)
         if not ends:
             return None
         return max(ends)
 
     @property
     def service_last_failure_utc(self) -> datetime | None:
-        failures = [
-            state.get("last_failure_utc")
-            for state in self._endpoint_state.values()
-            if isinstance(state.get("last_failure_utc"), datetime)
-        ]
+        failures: list[datetime] = []
+        for state in self._endpoint_state.values():
+            value = state.get("last_failure_utc")
+            if isinstance(value, datetime):
+                failures.append(value)
         if not failures:
             return None
         return max(failures)
@@ -198,7 +199,7 @@ class EVSETimeseriesManager:
     def _endpoint_backoff_active(self, endpoint: str) -> bool:
         state = self._endpoint_state_for(endpoint)
         backoff_until = state.get("backoff_until")
-        return bool(backoff_until and time.monotonic() < float(backoff_until))
+        return bool(backoff_until and time.monotonic() < float(str(backoff_until)))
 
     def _mark_endpoint_available(self, endpoint: str) -> None:
         state = self._endpoint_state_for(endpoint)
@@ -222,7 +223,7 @@ class EVSETimeseriesManager:
         reason = self._redact_error(err) if err else "EVSE timeseries unavailable"
         state["available"] = False
         state["using_stale"] = using_stale
-        state["failures"] = int(state.get("failures", 0) or 0) + 1
+        state["failures"] = int(str(state.get("failures", 0) or 0)) + 1
         state["last_error"] = reason
         state["last_failure_utc"] = dt_util.utcnow()
         state["last_payload_signature"] = (
@@ -392,7 +393,7 @@ class EVSETimeseriesManager:
 
     def merge_charger_payloads(
         self,
-        payloads: dict[str, dict],
+        payloads: dict[str, dict[str, object]],
         *,
         day_local: datetime,
     ) -> None:
@@ -429,20 +430,22 @@ class EVSETimeseriesManager:
     def diagnostics(self) -> dict[str, object]:
         endpoint_details: dict[str, dict[str, object]] = {}
         for key, state in self._endpoint_state.items():
+            last_failure = state.get("last_failure_utc")
+            backoff_ends = state.get("backoff_ends_utc")
             endpoint_details[key] = {
                 "available": bool(state.get("available", True)),
                 "using_stale": bool(state.get("using_stale", False)),
-                "failures": int(state.get("failures", 0) or 0),
+                "failures": int(str(state.get("failures", 0) or 0)),
                 "last_error": state.get("last_error"),
                 "last_failure_utc": (
-                    state.get("last_failure_utc").isoformat()
-                    if isinstance(state.get("last_failure_utc"), datetime)
+                    last_failure.isoformat()
+                    if isinstance(last_failure, datetime)
                     else None
                 ),
                 "backoff_until": state.get("backoff_until"),
                 "backoff_ends_utc": (
-                    state.get("backoff_ends_utc").isoformat()
-                    if isinstance(state.get("backoff_ends_utc"), datetime)
+                    backoff_ends.isoformat()
+                    if isinstance(backoff_ends, datetime)
                     else None
                 ),
                 "last_payload_signature": state.get("last_payload_signature"),

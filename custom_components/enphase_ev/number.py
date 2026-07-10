@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any, TypeVar, cast
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.const import PERCENTAGE, UnitOfElectricCurrent, UnitOfEnergy
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant, callback as ha_callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -28,6 +29,9 @@ from .runtime_data import EnphaseConfigEntry, get_runtime_data
 from .tariff import tariff_rate_sensor_specs
 
 PARALLEL_UPDATES = 0
+
+_CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
+callback = cast(Callable[[_CallbackT], _CallbackT], ha_callback)
 
 
 def _site_has_battery(coord: EnphaseCoordinator) -> bool:
@@ -91,7 +95,7 @@ def _retained_site_number_unique_ids(
 
 
 def _tariff_rate_number_unique_id(
-    coord: EnphaseCoordinator, spec: dict, *, is_import: bool
+    coord: EnphaseCoordinator, spec: dict, *, is_import: bool  # type: ignore[type-arg]
 ) -> str:
     prefix = "tariff_import_rate" if is_import else "tariff_export_rate"
     return f"{DOMAIN}_site_{coord.site_id}_{prefix}_{spec['key']}_number"
@@ -104,7 +108,12 @@ def _tariff_rate_number_entities(coord: EnphaseCoordinator) -> dict[str, NumberE
         (False, "tariff_export_rate"),
     ):
         for spec in tariff_rate_sensor_specs(getattr(coord, attr, None)):
-            locator = (spec.get("attributes") or {}).get("tariff_locator")
+            attributes = spec.get("attributes")
+            locator = (
+                attributes.get("tariff_locator")
+                if isinstance(attributes, dict)
+                else None
+            )
             if not isinstance(locator, dict):
                 continue
             unique_id = _tariff_rate_number_unique_id(coord, spec, is_import=is_import)
@@ -118,7 +127,7 @@ async def async_setup_entry(
     hass: HomeAssistant,
     entry: EnphaseConfigEntry,
     async_add_entities: AddEntitiesCallback,
-):
+) -> None:
     coord: EnphaseCoordinator = get_runtime_data(entry).coordinator
     ent_reg = er.async_get(hass)
     known_serials: set[str] = set()
@@ -310,7 +319,7 @@ async def async_setup_entry(
     _async_sync_chargers()
 
 
-class BatteryReserveNumber(CoordinatorEntity, NumberEntity):
+class BatteryReserveNumber(CoordinatorEntity, NumberEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "battery_reserve"
     _attr_native_min_value = 5.0
@@ -323,7 +332,7 @@ class BatteryReserveNumber(CoordinatorEntity, NumberEntity):
         self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_battery_reserve"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         if not super().available:
             return False
         return (
@@ -364,17 +373,17 @@ class BatteryReserveNumber(CoordinatorEntity, NumberEntity):
         )
 
 
-class ChargingAmpsNumber(EnphaseBaseEntity, NumberEntity):
+class ChargingAmpsNumber(EnphaseBaseEntity, NumberEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "charging_amps"
     _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
 
-    def __init__(self, coord: EnphaseCoordinator, sn: str):
+    def __init__(self, coord: EnphaseCoordinator, sn: str) -> None:
         super().__init__(coord, sn)
         self._attr_unique_id = f"{DOMAIN}_{sn}_amps_number"
 
     @staticmethod
-    def _safe_limit_active(value) -> bool:
+    def _safe_limit_active(value: object) -> bool:
         if value is None:
             return False
         if isinstance(value, bool):
@@ -385,7 +394,7 @@ class ChargingAmpsNumber(EnphaseBaseEntity, NumberEntity):
             return False
 
     @staticmethod
-    def _charging_active(value) -> bool:
+    def _charging_active(value: object) -> bool:
         if value is None:
             return False
         if isinstance(value, bool):
@@ -402,7 +411,7 @@ class ChargingAmpsNumber(EnphaseBaseEntity, NumberEntity):
         return False
 
     @staticmethod
-    def _coerce_amp(value) -> int | None:
+    def _coerce_amp(value: object) -> int | None:
         if value in (None, ""):
             return None
         try:
@@ -411,7 +420,7 @@ class ChargingAmpsNumber(EnphaseBaseEntity, NumberEntity):
             return None
 
     @classmethod
-    def _safe_limit_amps(cls, data) -> int:
+    def _safe_limit_amps(cls, data: dict[str, Any]) -> int:
         min_amp = cls._coerce_amp(data.get("min_amp"))
         if min_amp is not None and min_amp > 0:
             return min_amp
@@ -462,21 +471,21 @@ class ChargingAmpsNumber(EnphaseBaseEntity, NumberEntity):
             self._coord.schedule_amp_restart(self._sn)
 
 
-class DefaultChargeLevelNumber(EnphaseBaseEntity, NumberEntity):
+class DefaultChargeLevelNumber(EnphaseBaseEntity, NumberEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "default_charge_level"
     _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
 
-    def __init__(self, coord: EnphaseCoordinator, sn: str):
+    def __init__(self, coord: EnphaseCoordinator, sn: str) -> None:
         super().__init__(coord, sn)
         self._attr_unique_id = f"{DOMAIN}_{sn}_default_charge_level_number"
 
     @staticmethod
-    def _coerce_amp(value) -> int | None:
+    def _coerce_amp(value: object) -> int | None:
         return ChargingAmpsNumber._coerce_amp(value)
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         return (
             super().available
             and self.data.get("default_charge_level_supported") is True
@@ -522,7 +531,7 @@ class DefaultChargeLevelNumber(EnphaseBaseEntity, NumberEntity):
         )
 
 
-class BatteryShutdownLevelNumber(CoordinatorEntity, NumberEntity):
+class BatteryShutdownLevelNumber(CoordinatorEntity, NumberEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "battery_shutdown_level"
     _attr_native_min_value = 5.0
@@ -535,7 +544,7 @@ class BatteryShutdownLevelNumber(CoordinatorEntity, NumberEntity):
         self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_battery_shutdown_level"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         if not super().available:
             return False
         return (
@@ -576,7 +585,7 @@ class BatteryShutdownLevelNumber(CoordinatorEntity, NumberEntity):
         )
 
 
-class _BatteryScheduleEditorLimitNumber(BatteryScheduleEditorEntity, NumberEntity):
+class _BatteryScheduleEditorLimitNumber(BatteryScheduleEditorEntity, NumberEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
     _attr_native_min_value = 5.0
@@ -598,7 +607,7 @@ class _BatteryScheduleEditorLimitNumber(BatteryScheduleEditorEntity, NumberEntit
         self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_{unique_suffix}"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         client = getattr(self._coord, "client", None)
         return (
             super().available
@@ -643,7 +652,7 @@ class BatteryScheduleEditLimitNumber(_BatteryScheduleEditorLimitNumber):
             self._editor.set_edit_limit(int(value))
 
 
-class EnphaseTariffRateNumber(CoordinatorEntity, NumberEntity):
+class EnphaseTariffRateNumber(CoordinatorEntity, NumberEntity):  # type: ignore[misc]
     """Editable tariff rate value."""
 
     _attr_has_entity_name = True
@@ -652,7 +661,7 @@ class EnphaseTariffRateNumber(CoordinatorEntity, NumberEntity):
     _attr_native_step = 0.0001
     _attr_suggested_display_precision = 4
 
-    def __init__(self, coord: EnphaseCoordinator, spec: dict, *, is_import: bool):
+    def __init__(self, coord: EnphaseCoordinator, spec: dict, *, is_import: bool) -> None:  # type: ignore[type-arg]
         super().__init__(coord)
         self._coord = coord
         self._is_import = is_import
@@ -669,16 +678,16 @@ class EnphaseTariffRateNumber(CoordinatorEntity, NumberEntity):
         )
         self._attr_icon = "mdi:cash-minus" if is_import else "mdi:cash-plus"
 
-    def _spec(self) -> dict | None:
+    def _spec(self) -> dict | None:  # type: ignore[type-arg]
         for spec in tariff_rate_sensor_specs(
             getattr(self._coord, self._rate_attr, None)
         ):
             if spec.get("key") == self._detail_key:
-                return spec
+                return cast(dict[Any, Any], spec)
         return None
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         spec = self._spec()
         client = getattr(self._coord, "client", None)
         return (

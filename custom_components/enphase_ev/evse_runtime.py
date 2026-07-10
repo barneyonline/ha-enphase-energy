@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from datetime import timedelta
 from datetime import timezone as _tz
-from typing import TYPE_CHECKING, Awaitable, Iterable
+from collections.abc import Awaitable, Iterable, Mapping
+from typing import TYPE_CHECKING, TypeVar, cast
 
 import aiohttp
 
@@ -24,7 +25,7 @@ from .const import (
     DEFAULT_FAST_POLL_INTERVAL,
     DEFAULT_SLOW_POLL_INTERVAL,
     DOMAIN,
-    FAST_TOGGLE_POLL_HOLD_S,
+    FAST_TOGGLE_POLL_HOLD_S as FAST_TOGGLE_POLL_HOLD_S,
     GREEN_BATTERY_SETTING,
     MIN_FAST_POLL_INTERVAL,
     OPT_FAST_POLL_INTERVAL,
@@ -78,6 +79,7 @@ EVSE_INACTIVE_POWER_STATUSES: frozenset[str] = frozenset(
 )
 EVSE_ACTIVE_POWER_STATUSES: frozenset[str] = frozenset({"CHARGING", "FINISHING"})
 _MISSING_CHARGER_CONFIG_VALUE = object()
+_LookupValueT = TypeVar("_LookupValueT")
 
 
 @dataclass(slots=True)
@@ -132,18 +134,18 @@ class EvseRuntime:
         self._lookup_semaphore = asyncio.Semaphore(EVSE_LOOKUP_CONCURRENCY)
 
     def _instance_override(self, name: str) -> object | None:
-        return self.coordinator.__dict__.get(name)
+        return cast(object | None, self.coordinator.__dict__.get(name))
 
     async def _run_lookup_tasks(
         self,
-        pending: dict[str, Awaitable[object]],
-    ) -> dict[str, object]:
+        pending: Mapping[str, Awaitable[_LookupValueT]],
+    ) -> dict[str, _LookupValueT | BaseException]:
         """Execute per-serial lookups with a shared concurrency limit."""
 
         if not pending:
             return {}
 
-        async def _run(awaitable: Awaitable[object]) -> object:
+        async def _run(awaitable: Awaitable[_LookupValueT]) -> _LookupValueT:
             async with self._lookup_semaphore:
                 return await awaitable
 
@@ -182,20 +184,26 @@ class EvseRuntime:
         *,
         in_background: bool,
         max_cache_age: float | None = None,
-    ) -> dict[str, list[dict]]:
+    ) -> dict[str, list[dict[str, object]]]:
         manager = getattr(self.coordinator, "session_history", None)
         if manager is not None:
             if max_cache_age is None:
-                return await manager.async_enrich(
+                return cast(
+                    dict[str, list[dict[str, object]]],
+                    await manager.async_enrich(
+                        serials,
+                        day_local,
+                        in_background=in_background,
+                    ),
+                )
+            return cast(
+                dict[str, list[dict[str, object]]],
+                await manager.async_enrich(
                     serials,
                     day_local,
                     in_background=in_background,
-                )
-            return await manager.async_enrich(
-                serials,
-                day_local,
-                in_background=in_background,
-                max_cache_age=max_cache_age,
+                    max_cache_age=max_cache_age,
+                ),
             )
         return {}
 
@@ -203,10 +211,10 @@ class EvseRuntime:
     def _unique_serials(serials: Iterable[str]) -> list[str]:
         return [sn for sn in dict.fromkeys(serials) if sn]
 
-    def sum_session_energy(self, sessions: list[dict]) -> float:
+    def sum_session_energy(self, sessions: list[dict[str, object]]) -> float:
         manager = getattr(self.coordinator, "session_history", None)
         if manager is not None:
-            return manager.sum_energy(sessions)
+            return float(manager.sum_energy(sessions))
         total = 0.0
         for entry in sessions or []:
             val = entry.get("energy_kwh")
@@ -219,7 +227,7 @@ class EvseRuntime:
 
     @staticmethod
     def session_history_day(
-        payload: dict,
+        payload: dict[str, object],
         day_local_default: datetime,
     ) -> datetime:
         if payload.get("charging"):
@@ -229,7 +237,7 @@ class EvseRuntime:
             if ts_raw is None:
                 continue
             try:
-                ts_val = float(ts_raw)
+                ts_val = float(str(ts_raw))
             except Exception:
                 ts_val = None
             if ts_val is None:
@@ -239,7 +247,7 @@ class EvseRuntime:
             except Exception:
                 continue
             try:
-                return dt_util.as_local(dt_val)
+                return cast(datetime, dt_util.as_local(dt_val))
             except Exception:
                 return dt_val
         return day_local_default
@@ -250,7 +258,7 @@ class EvseRuntime:
         *,
         day_local: datetime | None = None,
         max_cache_age: float | None = None,
-    ) -> list[dict]:
+    ) -> list[dict[str, object]]:
         if not sn:
             return []
         day_ref = day_local or dt_util.now()
@@ -280,7 +288,7 @@ class EvseRuntime:
         if cached:
             cached_ts, cached_sessions = cached
             if time.monotonic() - cached_ts < ttl:
-                return cached_sessions
+                return cast(list[dict[str, object]], cached_sessions)
         manager = getattr(self.coordinator, "session_history", None)
         if manager is not None:
             if max_cache_age is None:
@@ -297,7 +305,7 @@ class EvseRuntime:
         else:
             sessions = []
         self.set_session_history_cache_shim_entry(str(sn), day_key, sessions)
-        return sessions
+        return cast(list[dict[str, object]], sessions)
 
     @staticmethod
     def normalize_serials(serials: Iterable[str] | None) -> set[str]:
@@ -358,7 +366,7 @@ class EvseRuntime:
         self,
         serial: str,
         day_key: str,
-        sessions: list[dict],
+        sessions: list[dict[str, object]],
     ) -> None:
         self.coordinator._session_history_cache_shim[(serial, day_key)] = (
             time.monotonic(),
@@ -432,7 +440,7 @@ class EvseRuntime:
         if manager is not None and hasattr(manager, "prune"):
             manager.prune(active_serials=keep_serials, keep_day_keys=keep_day_keys)
 
-    def sync_desired_charging(self, data: dict[str, dict]) -> None:
+    def sync_desired_charging(self, data: dict[str, dict[str, object]]) -> None:
         if not data:
             return
         coord = self.coordinator
@@ -488,7 +496,9 @@ class EvseRuntime:
             except TypeError:
                 coord.hass.async_create_task(self.async_auto_resume(sn_str, snapshot))
 
-    async def async_auto_resume(self, sn: str, snapshot: dict | None = None) -> None:
+    async def async_auto_resume(
+        self, sn: str, snapshot: dict[str, object] | None = None
+    ) -> None:
         coord = self.coordinator
         sn_str = str(sn)
         try:
@@ -540,7 +550,9 @@ class EvseRuntime:
         coord.kick_fast(120)
         await coord.async_request_refresh()
 
-    def determine_polling_state(self, data: dict[str, dict]) -> dict[str, object]:
+    def determine_polling_state(
+        self, data: dict[str, dict[str, object]]
+    ) -> dict[str, object]:
         coord = self.coordinator
         charging_now = any(v.get("charging") for v in data.values()) if data else False
         want_fast = charging_now
@@ -606,13 +618,13 @@ class EvseRuntime:
         self, serials: Iterable[str]
     ) -> dict[str, ChargeModeResolution]:
         results = self.resolve_cached_charge_modes(serials)
-        pending: dict[str, asyncio.Task[str | None]] = {}
+        pending: dict[str, Awaitable[str | None]] = {}
         for sn in self.charge_mode_lookup_candidates(serials):
             pending[sn] = self.async_get_charge_mode(sn)
         if pending:
             coord = self.coordinator
             for sn, response in (await self._run_lookup_tasks(pending)).items():
-                if isinstance(response, Exception):
+                if isinstance(response, BaseException):
                     _LOGGER.debug(
                         "Charge mode lookup failed for %s: %s",
                         redact_identifier(sn),
@@ -660,7 +672,7 @@ class EvseRuntime:
                 "Start charging requested for %s but session authentication is required; charging will begin after app/RFID auth completes.",
                 redact_identifier(display),
             )
-        fallback = fallback_amps if fallback_amps is not None else 32
+        fallback = int(fallback_amps) if fallback_amps is not None else 32
         amps = coord.pick_start_amps(sn_str, requested_amps, fallback=fallback)
         prefs = coord._charge_mode_start_preferences(sn_str)
         result = await self.async_issue_start_charging(
@@ -997,7 +1009,7 @@ class EvseRuntime:
             task = coord.hass.async_create_task(_runner())
         coord._streaming_stop_task = task
 
-        def _cleanup(task: asyncio.Task) -> None:
+        def _cleanup(task: asyncio.Task[None]) -> None:
             if coord._streaming_stop_task is task:
                 coord._streaming_stop_task = None
 
@@ -1061,7 +1073,7 @@ class EvseRuntime:
                 pass
         # Home Assistant's coordinator interval remains the lower bound for slow mode.
         _, slow_floor = normalize_poll_intervals(fast_floor, slow_floor)
-        return slow_floor
+        return int(slow_floor)
 
     def set_last_set_amps(self, sn: str, amps: int) -> None:
         safe = self.apply_amp_limits(str(sn), amps)
@@ -1110,7 +1122,8 @@ class EvseRuntime:
         return False
 
     def get_desired_charging(self, sn: str) -> bool | None:
-        return self.coordinator._desired_charging.get(str(sn))
+        desired = self.coordinator._desired_charging.get(str(sn))
+        return desired if isinstance(desired, bool) else None
 
     def set_desired_charging(self, sn: str, desired: bool | None) -> None:
         sn_str = str(sn)
@@ -1176,7 +1189,9 @@ class EvseRuntime:
         data = data or {}
         for key in ("charging_level", "session_charge_level"):
             if key in data:
-                candidates.append(data.get(key))
+                raw_candidate = data.get(key)
+                if isinstance(raw_candidate, (int, float, str)):
+                    candidates.append(raw_candidate)
         candidates.append(fallback)
         for candidate in candidates:
             coerced = self.coerce_amp(candidate)
@@ -1301,7 +1316,7 @@ class EvseRuntime:
             for item in settings:
                 if not isinstance(item, dict):
                     continue
-                key = item.get("key")
+                key: object = item.get("key")
                 raw = item.get("value")
                 if raw is None:
                     raw = item.get("reqValue")
@@ -1396,9 +1411,9 @@ class EvseRuntime:
             for item in settings:
                 if not isinstance(item, dict):
                     continue
-                key = item.get("key")
+                raw_key: object = item.get("key")
                 try:
-                    key_text = str(key).strip()
+                    key_text = str(raw_key).strip()
                 except Exception:
                     continue
                 if key_text not in seen:
@@ -1571,13 +1586,13 @@ class EvseRuntime:
         self, serials: Iterable[str]
     ) -> dict[str, tuple[bool | None, bool]]:
         results = self.resolve_cached_green_battery_settings(serials)
-        pending: dict[str, asyncio.Task[tuple[bool | None, bool] | None]] = {}
+        pending: dict[str, Awaitable[tuple[bool | None, bool] | None]] = {}
         for sn in self.green_battery_lookup_candidates(serials):
             pending[sn] = self.async_get_green_battery_setting(sn)
         if pending:
             coord = self.coordinator
             for sn, response in (await self._run_lookup_tasks(pending)).items():
-                if isinstance(response, Exception):
+                if isinstance(response, BaseException):
                     _LOGGER.debug(
                         "Green battery setting lookup failed for %s: %s",
                         redact_identifier(sn),
@@ -1605,14 +1620,14 @@ class EvseRuntime:
         results = self.resolve_cached_auth_settings(serials)
         pending: dict[
             str,
-            asyncio.Task[tuple[bool | None, bool | None, bool, bool] | None],
+            Awaitable[tuple[bool | None, bool | None, bool, bool] | None],
         ] = {}
         for sn in self.auth_settings_lookup_candidates(serials):
             pending[sn] = self.async_get_auth_settings(sn)
         if pending:
             coord = self.coordinator
             for sn, response in (await self._run_lookup_tasks(pending)).items():
-                if isinstance(response, Exception):
+                if isinstance(response, BaseException):
                     _LOGGER.debug(
                         "Auth settings lookup failed for %s: %s",
                         redact_identifier(sn),
@@ -1656,12 +1671,12 @@ class EvseRuntime:
             return {}
 
         results = self.resolve_cached_charger_config(serials, keys=requested)
-        pending: dict[str, asyncio.Task[dict[str, object] | None]] = {}
+        pending: dict[str, Awaitable[dict[str, object] | None]] = {}
         for sn in self.charger_config_lookup_candidates(serials, keys=requested):
             pending[sn] = self.async_get_charger_config(sn, keys=requested)
         if pending:
             for sn, response in (await self._run_lookup_tasks(pending)).items():
-                if isinstance(response, Exception):
+                if isinstance(response, BaseException):
                     _LOGGER.debug(
                         "Charger config lookup failed for %s: %s",
                         redact_identifier(sn),
@@ -1842,9 +1857,11 @@ class EvseRuntime:
         except Exception:
             data = None
         data = data or {}
+        raw_mode_pref = data.get("charge_mode_pref")
+        raw_mode = data.get("charge_mode")
         candidates: list[str | None] = [
-            data.get("charge_mode_pref"),
-            data.get("charge_mode"),
+            str(raw_mode_pref) if raw_mode_pref is not None else None,
+            str(raw_mode) if raw_mode is not None else None,
             self.schedule_type_charge_mode_preference(data.get("schedule_type")),
         ]
         cached = self.cached_charge_mode_preference(sn_str)

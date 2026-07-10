@@ -47,14 +47,14 @@ def _power_parse_timestamp(raw: object) -> float | None:
 
 def _power_as_float(raw: object) -> float | None:
     try:
-        return float(raw)
+        return float(str(raw))
     except (TypeError, ValueError):
         return None
 
 
 def _power_as_int(raw: object) -> int | None:
     try:
-        return int(float(raw))
+        return int(float(str(raw)))
     except (TypeError, ValueError):
         return None
 
@@ -107,7 +107,7 @@ def _resolve_max_throughput(
     if voltage is None or voltage <= 0:
         voltage = _power_as_float(entry.get("nominal_v"))
     if voltage is None or voltage <= 0:
-        voltage = float(nominal_voltage)
+        voltage = float(str(nominal_voltage))
     topology = _power_topology(entry)
     phase_multiplier = 1.0
     for source, raw in (
@@ -148,10 +148,12 @@ def _resolve_max_throughput(
 def _is_actually_charging(entry: Mapping[str, object]) -> bool:
     if "actual_charging" in entry:
         return bool(entry.get("actual_charging"))
-    return evse_power_is_actively_charging(
-        entry.get("connector_status"),
-        entry.get("charging"),
-        suspended_by_evse=entry.get("suspended_by_evse"),
+    return bool(
+        evse_power_is_actively_charging(
+            entry.get("connector_status"),
+            entry.get("charging"),
+            suspended_by_evse=entry.get("suspended_by_evse"),
+        )
     )
 
 

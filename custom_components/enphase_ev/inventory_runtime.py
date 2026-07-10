@@ -7,9 +7,10 @@ import inspect
 import logging
 import re
 import time
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar, cast
 from zoneinfo import ZoneInfo
 
 from homeassistant.core import callback
@@ -52,9 +53,18 @@ from .system_dashboard_helpers import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
+    from .api import EnphaseEVClient
     from .coordinator import EnphaseCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+_CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
+
+
+def _typed_callback(func: _CallbackT) -> _CallbackT:
+    """Apply Home Assistant's callback marker without losing the callable type."""
+
+    return cast(_CallbackT, callback(func))
+
 
 DEVICES_INVENTORY_CACHE_TTL = 600.0
 HEMS_INVENTORY_ENDPOINT_FAMILY = "hems_inventory"
@@ -86,6 +96,35 @@ class CoordinatorTopologySnapshot:
 class InventoryRuntime:
     """Inventory, topology, and system-dashboard runtime helpers."""
 
+    _debug_summary_log_cache: dict[str, object]
+    _topology_snapshot_cache: CoordinatorTopologySnapshot
+    _topology_listeners: list[Callable[[], object]]
+    _topology_refresh_suppressed: int
+    _topology_refresh_pending: bool
+    _gateway_inventory_summary_cache: dict[str, object]
+    _gateway_inventory_summary_source: object
+    _microinverter_inventory_summary_cache: dict[str, object]
+    _microinverter_inventory_summary_source: object
+    _heatpump_inventory_summary_cache: dict[str, object]
+    _heatpump_inventory_summary_source: object
+    _heatpump_type_summaries_cache: dict[str, dict[str, object]]
+    _heatpump_type_summaries_source: object
+    _gateway_iq_energy_router_records_cache: list[dict[str, object]]
+    _gateway_iq_energy_router_records_source: object
+    _gateway_iq_energy_router_records_by_key_cache: dict[str, dict[str, object]]
+    _devices_inventory_cache_until: float | None
+    _devices_inventory_ready: bool
+    _hems_inventory_ready: bool
+    _hems_devices_cache_until: float | None
+    _hems_devices_using_stale: bool
+    _system_dashboard_cache_until: float | None
+    _system_dashboard_type_summaries: dict[str, dict[str, object]]
+    _system_dashboard_hierarchy_summary: dict[str, object]
+    _system_dashboard_devices_tree_raw: dict[str, object] | None
+    _system_dashboard_devices_details_raw: dict[str, dict[str, object]]
+    _inverter_model_counts: dict[str, int]
+    _inverter_summary_counts: dict[str, int]
+
     def __init__(self, coordinator: EnphaseCoordinator) -> None:
         self.coordinator = coordinator
         self.discovery_state = coordinator.discovery_state
@@ -107,25 +146,25 @@ class InventoryRuntime:
         return getattr(self.coordinator, name, default)
 
     @property
-    def client(self):
+    def client(self) -> EnphaseEVClient:
         return self.coordinator.client
 
     @property
     def site_id(self) -> str:
-        return self.coordinator.site_id
+        return str(self.coordinator.site_id)
 
     @property
     def include_inverters(self) -> bool:
-        return self.coordinator.include_inverters
+        return bool(self.coordinator.include_inverters)
 
     def iter_serials(self) -> list[str]:
-        return self.coordinator.iter_serials()
+        return list(self.coordinator.iter_serials())
 
     def iter_battery_serials(self) -> list[str]:
-        return self.coordinator.iter_battery_serials()
+        return list(self.coordinator.iter_battery_serials())
 
     def iter_type_keys(self) -> list[str]:
-        return self.coordinator.inventory_view.iter_type_keys()
+        return list(self.coordinator.inventory_view.iter_type_keys())
 
     def gateway_iq_energy_router_records(self) -> list[dict[str, object]]:
         return self.coordinator.inventory_view.gateway_iq_energy_router_records()
@@ -134,7 +173,8 @@ class InventoryRuntime:
         return self.coordinator.inventory_view.type_bucket(type_key)
 
     def _type_member_text(self, member: dict[str, object], *keys: str) -> str | None:
-        return type_member_text(member, *keys)
+        value = type_member_text(member, *keys)
+        return str(value) if value is not None else None
 
     def _gateway_member_ip_address(self, member: dict[str, object]) -> str | None:
         return self._type_member_text(member, "ip", "ip_address", "ip-address")
@@ -179,24 +219,29 @@ class InventoryRuntime:
         return None
 
     def _coerce_optional_text(self, value: object) -> str | None:
-        return coerce_optional_text(value)
+        text = coerce_optional_text(value)
+        return str(text) if text is not None else None
 
     def _coerce_optional_bool(self, value: object) -> bool | None:
-        return coerce_optional_bool(value)
+        result = coerce_optional_bool(value)
+        return bool(result) if result is not None else None
 
     def _coerce_int(self, value: object, *, default: int = 0) -> int:
-        return coerce_int(value, default=default)
+        return int(coerce_int(value, default=default))
 
     def _copy_diagnostics_value(self, value: object) -> object:
         return copy_diagnostics_value(value)
 
     def _normalize_iso_date(self, value: object) -> str | None:
-        return normalize_iso_date(value)
+        result = normalize_iso_date(value)
+        return str(result) if result is not None else None
 
     def _site_local_current_date(self) -> str:
-        return resolve_site_local_current_date(
-            getattr(self, "_devices_inventory_payload", None),
-            getattr(self.coordinator, "_battery_timezone", None),
+        return str(
+            resolve_site_local_current_date(
+                getattr(self, "_devices_inventory_payload", None),
+                getattr(self.coordinator, "_battery_timezone", None),
+            )
         )
 
     def _seconds_until_next_site_local_day(self) -> float:
@@ -229,15 +274,15 @@ class InventoryRuntime:
 
     @staticmethod
     def _debug_sorted_keys(value: object) -> list[str]:
-        return debug_sorted_keys(value)
+        return list(debug_sorted_keys(value))
 
     @classmethod
     def _debug_field_keys(cls, members: object) -> list[str]:
-        return debug_field_keys(members)
+        return list(debug_field_keys(members))
 
     @staticmethod
     def _debug_render_summary(summary: object) -> str:
-        return debug_render_summary(summary)
+        return str(debug_render_summary(summary))
 
     def _debug_log_summary_if_changed(
         self, summary_key: str, log_label: str, summary: object
@@ -334,7 +379,7 @@ class InventoryRuntime:
     def _debug_system_dashboard_summary(
         self,
         tree_payload: dict[str, object] | None,
-        details_payloads: dict[str, dict[str, dict[str, object]]],
+        details_payloads: dict[str, dict[str, object]],
         type_summaries: dict[str, dict[str, object]],
         hierarchy_summary: dict[str, object],
     ) -> dict[str, object]:
@@ -411,7 +456,7 @@ class InventoryRuntime:
     def _build_system_dashboard_summaries(
         self,
         tree_payload: dict[str, object] | None,
-        details_payloads: dict[str, dict[str, dict[str, object]]],
+        details_payloads: dict[str, dict[str, object]],
     ) -> tuple[
         dict[str, dict[str, object]],
         dict[str, object],
@@ -420,7 +465,8 @@ class InventoryRuntime:
         return build_system_dashboard_summaries(tree_payload, details_payloads)
 
     def _system_dashboard_type_key(self, raw_type: object) -> str | None:
-        return system_dashboard_type_key(raw_type)
+        key = system_dashboard_type_key(raw_type)
+        return str(key) if key is not None else None
 
     def topology_snapshot(self) -> CoordinatorTopologySnapshot:
         """Return the latest cached topology snapshot."""
@@ -479,7 +525,7 @@ class InventoryRuntime:
             self._gateway_iq_energy_router_records_cache = records
             self._gateway_iq_energy_router_records_source = source
             self._gateway_iq_energy_router_records_by_key_cache = {
-                record["key"]: record
+                str(record["key"]): record
                 for record in records
                 if isinstance(record, dict) and isinstance(record.get("key"), str)
             }
@@ -535,7 +581,7 @@ class InventoryRuntime:
             ),
         )
 
-    @callback
+    @_typed_callback
     def _notify_topology_listeners(self) -> None:
         for listener in list(self._topology_listeners):
             try:
@@ -547,7 +593,7 @@ class InventoryRuntime:
                     exc_info=True,
                 )
 
-    @callback
+    @_typed_callback
     def _refresh_cached_topology(self) -> bool:
         if self._topology_refresh_suppressed > 0:
             # Batch refreshes coalesce Home Assistant entity-registry notifications.
@@ -574,11 +620,11 @@ class InventoryRuntime:
         self._notify_topology_listeners()
         return True
 
-    @callback
+    @_typed_callback
     def _begin_topology_refresh_batch(self) -> None:
         self._topology_refresh_suppressed += 1
 
-    @callback
+    @_typed_callback
     def _end_topology_refresh_batch(self) -> bool:
         if self._topology_refresh_suppressed > 0:
             self._topology_refresh_suppressed -= 1
@@ -608,7 +654,7 @@ class InventoryRuntime:
 
     @staticmethod
     async def _async_call_refreshable_fetcher(
-        fetcher, *, force: bool = False
+        fetcher: Callable[..., Awaitable[object]], *, force: bool = False
     ) -> object:
         if not force:
             return await fetcher()
@@ -628,6 +674,7 @@ class InventoryRuntime:
     def _parse_devices_inventory_payload(
         self, payload: object
     ) -> tuple[bool, dict[str, dict[str, object]], list[str]]:
+        result: object
         if isinstance(payload, list):
             result = payload
         elif isinstance(payload, dict):
@@ -652,7 +699,7 @@ class InventoryRuntime:
 
         def _dry_contact_member_dedupe_key(
             raw_type: object,
-            member: dict[str, object],
+            member: Mapping[str, object],
             member_index: int,
         ) -> str:
             source_type = _clean_text(raw_type)
@@ -694,10 +741,12 @@ class InventoryRuntime:
 
             fingerprint_parts: list[str] = []
             for key in sorted(member):
-                value = member.get(key)
-                if value is None or not isinstance(value, (str, int, float, bool)):
+                field_value = member.get(key)
+                if field_value is None or not isinstance(
+                    field_value, (str, int, float, bool)
+                ):
                     continue
-                fingerprint_parts.append(f"{key}:{value}")
+                fingerprint_parts.append(f"{key}:{field_value}")
             if fingerprint_parts:
                 fingerprint = "|".join(fingerprint_parts)
                 if source_type is not None:
@@ -733,7 +782,9 @@ class InventoryRuntime:
                 }
                 seen_per_type[type_key] = set()
                 ordered_keys.append(type_key)
-            members: list[dict[str, object]] = grouped[type_key]["devices"]  # type: ignore[assignment]
+            raw_members = grouped[type_key]["devices"]
+            assert isinstance(raw_members, list)
+            members: list[object] = raw_members
             seen_keys = seen_per_type[type_key]
             for member_index, member in enumerate(devices):
                 if not isinstance(member, dict):
@@ -743,13 +794,14 @@ class InventoryRuntime:
                 sanitized = sanitize_member(member)
                 if not sanitized:
                     continue
+                sanitized_member = sanitized
                 if type_key == "dry_contact":
                     dedupe_key = _dry_contact_member_dedupe_key(
-                        raw_type, sanitized, member_index
+                        raw_type, sanitized_member, member_index
                     )
                 else:
-                    serial = sanitized.get("serial_number")
-                    name = sanitized.get("name")
+                    serial = sanitized_member.get("serial_number")
+                    name = sanitized_member.get("name")
                     if isinstance(serial, str) and serial.strip():
                         dedupe_key = f"sn:{serial.strip()}"
                     elif isinstance(name, str) and name.strip():
@@ -759,19 +811,19 @@ class InventoryRuntime:
                 if dedupe_key in seen_keys:
                     continue
                 seen_keys.add(dedupe_key)
-                members.append(sanitized)
+                members.append(sanitized_member)
 
         valid = True
         for type_key, bucket in grouped.items():
-            members = bucket.get("devices")
-            count = len(members) if isinstance(members, list) else 0
+            bucket_members = bucket.get("devices")
+            count = len(bucket_members) if isinstance(bucket_members, list) else 0
             bucket["count"] = count
             bucket["type_label"] = bucket.get("type_label") or type_display_label(
                 type_key
             )
-            if type_key == "encharge" and isinstance(members, list):
+            if type_key == "encharge" and isinstance(bucket_members, list):
                 name_counts: dict[str, int] = {}
-                for member in members:
+                for member in bucket_members:
                     if not isinstance(member, dict):
                         continue
                     raw_name = member.get("name")
@@ -804,12 +856,12 @@ class InventoryRuntime:
             for key in ordered_keys
             if key in grouped
             and isinstance(grouped[key].get("devices"), list)
-            and int(grouped[key].get("count", 0)) > 0
+            and int(str(grouped[key].get("count", 0))) > 0
         ]
         buckets_out = {
             key: value
             for key, value in grouped.items()
-            if int(value.get("count", 0)) > 0
+            if int(str(value.get("count", 0))) > 0
         }
         self._set_shared_state_attr("_type_device_buckets", buckets_out)
         self._set_shared_state_attr("_type_device_order", normalized_order)
@@ -990,7 +1042,7 @@ class InventoryRuntime:
     def _hems_bucket_type(raw_type: object) -> str | None:
         normalized = normalize_type_key(raw_type)
         if normalized:
-            return normalized.replace("_", "")
+            return str(normalized).replace("_", "")
         try:
             text = str(raw_type).strip().lower()
         except Exception:
@@ -1001,7 +1053,8 @@ class InventoryRuntime:
 
     @staticmethod
     def _heatpump_member_device_type(member: dict[str, object] | None) -> str | None:
-        return heatpump_member_device_type(member)
+        device_type = heatpump_member_device_type(member)
+        return str(device_type) if device_type is not None else None
 
     @staticmethod
     def _heatpump_worst_status_text(status_counts: dict[str, int]) -> str | None:
@@ -1198,7 +1251,8 @@ class InventoryRuntime:
 
     @staticmethod
     def _heatpump_status_text(member: dict[str, object] | None) -> str | None:
-        return heatpump_status_text(member)
+        status = heatpump_status_text(member)
+        return str(status) if status is not None else None
 
     @classmethod
     def _gateway_iq_energy_router_summary_records(
@@ -1250,7 +1304,7 @@ class InventoryRuntime:
             members = [dict(dashboard_envoy)]
         ip_address = self._gateway_summary_ip_address(members, dashboard_envoy)
         try:
-            total_devices = int(bucket.get("count", len(members)) or 0)
+            total_devices = int(str(bucket.get("count", len(members)) or 0))
         except Exception:
             total_devices = len(members)
         total_devices = max(total_devices, len(members))
@@ -1417,7 +1471,7 @@ class InventoryRuntime:
                 except Exception:
                     status_counts[key] = 0
         try:
-            total_inverters = int(bucket.get("count", len(safe_members)) or 0)
+            total_inverters = int(str(bucket.get("count", len(safe_members)) or 0))
         except Exception:
             total_inverters = len(safe_members)
         if status_counts.get("total", 0) > 0:
@@ -1449,10 +1503,9 @@ class InventoryRuntime:
             if bucket.get("latest_reported_utc") is not None
             else bucket.get("latest_reported")
         )
+        latest_device_value = bucket.get("latest_reported_device")
         latest_reported_device = (
-            dict(bucket.get("latest_reported_device"))
-            if isinstance(bucket.get("latest_reported_device"), dict)
-            else None
+            dict(latest_device_value) if isinstance(latest_device_value, dict) else None
         )
         if latest_reported is None:
             for member in safe_members:
@@ -1485,13 +1538,13 @@ class InventoryRuntime:
             "firmware_summary": bucket.get("firmware_summary"),
             "array_summary": bucket.get("array_summary"),
             "panel_info": (
-                dict(bucket.get("panel_info"))
-                if isinstance(bucket.get("panel_info"), dict)
+                dict(panel_info)
+                if isinstance(panel_info := bucket.get("panel_info"), dict)
                 else None
             ),
             "status_type_counts": (
-                dict(bucket.get("status_type_counts"))
-                if isinstance(bucket.get("status_type_counts"), dict)
+                dict(status_types)
+                if isinstance(status_types := bucket.get("status_type_counts"), dict)
                 else None
             ),
             "latest_reported": latest_reported,
@@ -1558,7 +1611,7 @@ class InventoryRuntime:
                 )
                 status_counts[status_key] = int(status_counts.get(status_key, 0)) + 1
         try:
-            total_devices = int(bucket.get("count", len(safe_members)) or 0)
+            total_devices = int(str(bucket.get("count", len(safe_members)) or 0))
         except Exception:
             total_devices = len(safe_members)
         total_devices = max(total_devices, len(safe_members))
@@ -1570,10 +1623,9 @@ class InventoryRuntime:
             if bucket.get("latest_reported_utc") is not None
             else bucket.get("latest_reported")
         )
+        latest_device_value = bucket.get("latest_reported_device")
         latest_reported_device = (
-            dict(bucket.get("latest_reported_device"))
-            if isinstance(bucket.get("latest_reported_device"), dict)
-            else None
+            dict(latest_device_value) if isinstance(latest_device_value, dict) else None
         )
         without_last_report_count = 0
         if latest_reported is None:
@@ -1612,8 +1664,9 @@ class InventoryRuntime:
         if not overall_status_text:
             overall_status_text = self._heatpump_worst_status_text(status_counts)
         device_type_counts: dict[str, int] = {}
-        if isinstance(bucket.get("device_type_counts"), dict):
-            for key, value in bucket.get("device_type_counts", {}).items():
+        raw_device_type_counts = bucket.get("device_type_counts")
+        if isinstance(raw_device_type_counts, dict):
+            for key, value in raw_device_type_counts.items():
                 if key is None:
                     continue
                 try:
@@ -1666,17 +1719,19 @@ class InventoryRuntime:
 
     def _build_heatpump_type_summaries(self) -> dict[str, dict[str, object]]:
         snapshot = self._build_heatpump_inventory_summary()
-        members = [
-            member for member in snapshot.get("members", []) if isinstance(member, dict)
-        ]
+        raw_members = snapshot.get("members")
+        members = (
+            [member for member in raw_members if isinstance(member, dict)]
+            if isinstance(raw_members, list)
+            else []
+        )
         summaries: dict[str, dict[str, object]] = {}
-        for device_type in sorted(
-            {
-                self._heatpump_member_device_type(member)
-                for member in members
-                if self._heatpump_member_device_type(member)
-            }
-        ):
+        device_types: set[str] = set()
+        for member in members:
+            device_type = self._heatpump_member_device_type(member)
+            if device_type:
+                device_types.add(device_type)
+        for device_type in sorted(device_types):
             type_members = [
                 member
                 for member in members
@@ -1721,6 +1776,7 @@ class InventoryRuntime:
                         "status": status_text,
                     }
             unique_statuses = list(dict.fromkeys(status_texts))
+            native_status: str | None
             if len(unique_statuses) == 1:
                 native_status = unique_statuses[0]
             else:
@@ -1743,7 +1799,7 @@ class InventoryRuntime:
             }
         return summaries
 
-    @callback
+    @_typed_callback
     def _rebuild_inventory_summary_caches(self) -> None:
         gateway_source = self._gateway_inventory_summary_marker()
         micro_source = self._microinverter_inventory_summary_marker()
@@ -2114,13 +2170,14 @@ class InventoryRuntime:
 
     def _system_dashboard_detail_records(
         self,
-        payloads: dict[str, object],
+        payloads: Mapping[str, object],
         *source_types: str,
     ) -> list[dict[str, object]]:
-        return system_dashboard_detail_records(payloads, *source_types)
+        return system_dashboard_detail_records(dict(payloads), *source_types)
 
     def _system_dashboard_meter_kind(self, payload: dict[str, object]) -> str | None:
-        return system_dashboard_meter_kind(payload)
+        meter_kind = system_dashboard_meter_kind(payload)
+        return str(meter_kind) if meter_kind is not None else None
 
     def _system_dashboard_battery_detail_subset(
         self,
@@ -2187,13 +2244,13 @@ class InventoryRuntime:
                         )
                     )
             detail_results = [task.result() for task in detail_tasks]
-            for source_type, payload, err in detail_results:
-                if err is not None:
+            for source_type, payload, detail_error in detail_results:
+                if detail_error is not None:
                     if first_error is None:
-                        first_error = err
+                        first_error = detail_error
                     detail_failures[source_type] = (
-                        redact_text(err, site_ids=(self.site_id,))
-                        or err.__class__.__name__
+                        redact_text(detail_error, site_ids=(self.site_id,))
+                        or detail_error.__class__.__name__
                     )
                     continue
                 if payload is None:
@@ -2271,10 +2328,10 @@ class InventoryRuntime:
     def _inverter_start_date(self) -> str | None:
         energy = getattr(self.coordinator, "energy", None)
         site_energy_meta = getattr(energy, "_site_energy_meta", None)
-        return resolve_inverter_start_date(
-            site_energy_meta,
-            self._coordinator_backed_attr("_inverter_data"),
+        start_date = resolve_inverter_start_date(
+            site_energy_meta, self._coordinator_backed_attr("_inverter_data")
         )
+        return str(start_date) if start_date is not None else None
 
     @staticmethod
     def _format_inverter_model_summary(model_counts: dict[str, int]) -> str | None:
@@ -2753,14 +2810,14 @@ class InventoryRuntime:
             production_raw = {}
 
         status_by_serial: dict[str, dict[str, object]] = {}
-        for inverter_id, payload in status_payload.items():
+        for raw_inverter_id, payload in status_payload.items():
             if not isinstance(payload, dict):
                 continue
             serial = str(payload.get("serialNum") or "").strip()
             if not serial:
                 continue
             item = dict(payload)
-            item["inverter_id"] = str(inverter_id)
+            item["inverter_id"] = str(raw_inverter_id)
             status_by_serial[serial] = item
 
         previous_data = self._coordinator_backed_attr("_inverter_data")
@@ -3030,7 +3087,8 @@ class InventoryRuntime:
         data = self._coordinator_backed_attr("_inverter_data")
         if not isinstance(data, dict):
             return []
-        serials = [str(sn) for sn in order if sn in data]
+        order_values = order if isinstance(order, (list, tuple)) else []
+        serials = [str(sn) for sn in order_values if sn in data]
         serials.extend(str(sn) for sn in data.keys())
         return [sn for sn in dict.fromkeys(serials) if sn]
 
@@ -3218,7 +3276,7 @@ class InventoryRuntime:
 
     @staticmethod
     def member_is_retired(member: dict[str, object]) -> bool:
-        return device_member_is_retired(member)
+        return bool(device_member_is_retired(member))
 
 
 install_state_descriptors(InventoryRuntime)

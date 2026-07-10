@@ -8,7 +8,7 @@ from datetime import datetime, time as dt_time, timedelta
 import inspect
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Protocol, TypeVar, cast
 
 from homeassistant.components import websocket_api
 from homeassistant.components.schedule.const import (
@@ -17,7 +17,7 @@ from homeassistant.components.schedule.const import (
     CONF_TO,
     DOMAIN as SCHEDULE_DOMAIN,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant, callback as ha_callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import (
     async_call_later,
@@ -40,6 +40,23 @@ if TYPE_CHECKING:
     from .runtime_data import EnphaseConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
+
+_CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
+
+
+def callback(func: _CallbackT) -> _CallbackT:
+    """Apply Home Assistant's callback marker with its identity type preserved."""
+
+    return cast(_CallbackT, ha_callback(func))
+
+
+class ScheduleStorageCollection(Protocol):
+    """Storage operations used by the schedule sync cleanup path."""
+
+    data: dict[str, Any]
+
+    async def async_delete_item(self, item_id: str) -> None: ...
+
 
 SYNC_INTERVAL = timedelta(minutes=5)
 SYNC_REFRESH_CONCURRENCY = 3
@@ -64,9 +81,9 @@ class ScheduleSync:
         self._meta_cache: dict[str, str | None] = {}
         self._config_cache: dict[str, dict[str, Any]] = {}
         self._lock = asyncio.Lock()
-        self._storage_collection = None
-        self._unsub_interval = None
-        self._unsub_coordinator = None
+        self._storage_collection: ScheduleStorageCollection | None = None
+        self._unsub_interval: Callable[[], None] | None = None
+        self._unsub_coordinator: Callable[[], None] | None = None
         self._listeners: list[Callable[[], None]] = []
         self._disabled_cleanup_done = False
         self._storage_sanitize_done = False
@@ -163,7 +180,7 @@ class ScheduleSync:
         self._pending_patch_refresh.add(sn)
 
         @callback
-        def _run(_now) -> None:
+        def _run(_now: datetime) -> None:
             self._pending_patch_refresh_cancels.pop(sn, None)
             coro = self.async_refresh(reason="patch", serials=[sn])
             try:
@@ -402,9 +419,9 @@ class ScheduleSync:
             )
             return
         for cached_id, desired in slot_states.items():
-            cached_slot = self._slot_cache.get(sn, {}).get(cached_id)
-            if cached_slot is not None:
-                cached_slot["enabled"] = bool(desired)
+            updated_slot = self._slot_cache.get(sn, {}).get(cached_id)
+            if updated_slot is not None:
+                updated_slot["enabled"] = bool(desired)
         needs_refresh = True
         if isinstance(response, dict):
             meta = response.get("meta")
@@ -445,7 +462,7 @@ class ScheduleSync:
         self._notify_listeners()
 
     @callback
-    def _handle_interval(self, *_args) -> None:
+    def _handle_interval(self, *_args: object) -> None:
         coro = self.async_refresh(reason="interval")
         try:
             self.hass.async_create_task(
@@ -730,7 +747,7 @@ class ScheduleSync:
         self._notify_listeners()
 
     def _default_server_timestamp(self) -> str:
-        return dt_util.utcnow().isoformat(timespec="milliseconds")
+        return cast(str, dt_util.utcnow().isoformat(timespec="milliseconds"))
 
     async def async_replace_slots(self, sn: str, slots: list[dict[str, Any]]) -> None:
         if not self._sync_enabled():
@@ -865,7 +882,7 @@ class ScheduleSync:
         self._schedule_post_patch_refresh(sn)
         self._notify_listeners()
 
-    async def _ensure_storage_collection(self):
+    async def _ensure_storage_collection(self) -> ScheduleStorageCollection | None:
         if self._storage_collection is not None:
             return self._storage_collection
         if not self._storage_sanitize_done:
@@ -878,18 +895,19 @@ class ScheduleSync:
             return None
         handler = handler_entry[0]
         target = inspect.unwrap(handler)
-        self._storage_collection = getattr(
-            getattr(target, "__self__", None), "storage_collection", None
+        self._storage_collection = cast(
+            ScheduleStorageCollection | None,
+            getattr(getattr(target, "__self__", None), "storage_collection", None),
         )
         return self._storage_collection
 
     async def _sanitize_schedule_storage(self) -> bool:
         path = self.hass.config.path(".storage", SCHEDULE_DOMAIN)
 
-        def _load():
+        def _load() -> object:
             try:
                 with open(path, "r", encoding="utf-8") as handle:
-                    return json.load(handle)
+                    return cast(object, json.load(handle))
             except FileNotFoundError:
                 return None
             except Exception as err:  # noqa: BLE001
@@ -935,7 +953,7 @@ class ScheduleSync:
         if not changed:
             return False
 
-        def _save():
+        def _save() -> bool:
             try:
                 with open(path, "w", encoding="utf-8") as handle:
                     json.dump(raw, handle, ensure_ascii=False, indent=2)
@@ -950,7 +968,7 @@ class ScheduleSync:
         saved = await self.hass.async_add_executor_job(_save)
         if saved:
             _LOGGER.warning("Sanitized schedule storage times with microseconds")
-        return saved
+        return bool(saved)
 
     def _sync_enabled(self) -> bool:
         if not self._config_entry:

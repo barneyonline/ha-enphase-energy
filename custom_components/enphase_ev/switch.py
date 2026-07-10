@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import logging
 import re
 import time
+from typing import Any, TypeVar, cast
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import STATE_ON
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant, callback as ha_callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
@@ -48,6 +50,8 @@ from .service_validation import raise_translated_service_validation
 PARALLEL_UPDATES = 0
 _LOGGER = logging.getLogger(__name__)
 _AUTO_SUFFIX_RE = re.compile(r"^\d+$")
+_CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
+callback = cast(Callable[[_CallbackT], _CallbackT], ha_callback)
 
 
 def _write_state_if_available(entity: SwitchEntity) -> None:
@@ -295,7 +299,7 @@ async def async_setup_entry(
     hass: HomeAssistant,
     entry: EnphaseConfigEntry,
     async_add_entities: AddEntitiesCallback,
-):
+) -> None:
     coord: EnphaseCoordinator = get_runtime_data(entry).coordinator
     ent_reg = er.async_get(hass)
     rename_by_unique = _switch_entity_id_migrations(coord)
@@ -588,17 +592,17 @@ async def async_setup_entry(
     _async_sync_chargers()
 
 
-class StormGuardSwitch(CoordinatorEntity, SwitchEntity):
+class StormGuardSwitch(CoordinatorEntity, SwitchEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "storm_guard"
 
-    def __init__(self, coord: EnphaseCoordinator):
+    def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(coord)
         self._coord = coord
         self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_storm_guard"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         if not super().available:
             return False
         if _battery_write_access_explicitly_denied(self._coord):
@@ -613,13 +617,13 @@ class StormGuardSwitch(CoordinatorEntity, SwitchEntity):
     def is_on(self) -> bool:
         return _effective_storm_guard_state(self._coord) == "enabled"
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         await self._coord.async_set_storm_guard_enabled(True)
         _write_state_if_available(self)
         self._coord.kick_fast(FAST_TOGGLE_POLL_HOLD_S)
         await self._coord.async_request_refresh()
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         await self._coord.async_set_storm_guard_enabled(False)
         _write_state_if_available(self)
         self._coord.kick_fast(FAST_TOGGLE_POLL_HOLD_S)
@@ -636,11 +640,11 @@ class StormGuardSwitch(CoordinatorEntity, SwitchEntity):
         )
 
 
-class SavingsUseBatteryAfterPeakSwitch(CoordinatorEntity, SwitchEntity):
+class SavingsUseBatteryAfterPeakSwitch(CoordinatorEntity, SwitchEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "savings_use_battery_after_peak"
 
-    def __init__(self, coord: EnphaseCoordinator):
+    def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(coord)
         self._coord = coord
         self._attr_unique_id = (
@@ -648,7 +652,7 @@ class SavingsUseBatteryAfterPeakSwitch(CoordinatorEntity, SwitchEntity):
         )
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         if not super().available:
             return False
         return (
@@ -661,10 +665,10 @@ class SavingsUseBatteryAfterPeakSwitch(CoordinatorEntity, SwitchEntity):
     def is_on(self) -> bool:
         return bool(self._coord.savings_use_battery_after_peak)
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         await self._coord.async_set_savings_use_battery_after_peak(True)
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         await self._coord.async_set_savings_use_battery_after_peak(False)
 
     @property
@@ -678,17 +682,17 @@ class SavingsUseBatteryAfterPeakSwitch(CoordinatorEntity, SwitchEntity):
         )
 
 
-class ChargeFromGridSwitch(CoordinatorEntity, SwitchEntity):
+class ChargeFromGridSwitch(CoordinatorEntity, SwitchEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "charge_from_grid"
 
-    def __init__(self, coord: EnphaseCoordinator):
+    def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(coord)
         self._coord = coord
         self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_charge_from_grid"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         if not super().available:
             return False
         return (
@@ -705,10 +709,10 @@ class ChargeFromGridSwitch(CoordinatorEntity, SwitchEntity):
     def extra_state_attributes(self) -> dict[str, object]:
         return battery_schedule_extra_state_attributes(self._coord)
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         await self._coord.async_set_charge_from_grid(True)
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         await self._coord.async_set_charge_from_grid(False)
 
     @property
@@ -722,11 +726,11 @@ class ChargeFromGridSwitch(CoordinatorEntity, SwitchEntity):
         )
 
 
-class ChargeFromGridScheduleSwitch(CoordinatorEntity, SwitchEntity):
+class ChargeFromGridScheduleSwitch(CoordinatorEntity, SwitchEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "charge_from_grid_schedule"
 
-    def __init__(self, coord: EnphaseCoordinator):
+    def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(coord)
         self._coord = coord
         self._attr_unique_id = (
@@ -738,7 +742,7 @@ class ChargeFromGridScheduleSwitch(CoordinatorEntity, SwitchEntity):
         return "charge_from_grid_schedule"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         if not super().available:
             return False
         return (
@@ -763,10 +767,10 @@ class ChargeFromGridScheduleSwitch(CoordinatorEntity, SwitchEntity):
             schedule_limit=self._coord.battery_cfg_schedule_limit,
         )
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         await self._coord.async_set_charge_from_grid_schedule_enabled(True)
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         await self._coord.async_set_charge_from_grid_schedule_enabled(False)
 
     @property
@@ -780,7 +784,7 @@ class ChargeFromGridScheduleSwitch(CoordinatorEntity, SwitchEntity):
         )
 
 
-class _BaseBatteryScheduleSwitch(CoordinatorEntity, SwitchEntity):
+class _BaseBatteryScheduleSwitch(CoordinatorEntity, SwitchEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
 
     def __init__(
@@ -806,7 +810,7 @@ class _BaseBatteryScheduleSwitch(CoordinatorEntity, SwitchEntity):
         return self._suggested_object_id
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         if not super().available:
             return False
         return (
@@ -825,13 +829,14 @@ class _BaseBatteryScheduleSwitch(CoordinatorEntity, SwitchEntity):
     @property
     def extra_state_attributes(self) -> dict[str, object]:
         return battery_schedule_extra_state_attributes(
-            self._coord, **self._extra_schedule_state_attributes()
+            self._coord,
+            **self._extra_schedule_state_attributes(),  # type: ignore[arg-type]
         )
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         await getattr(self._coord, self._setter_name)(True)
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         await getattr(self._coord, self._setter_name)(False)
 
     @property
@@ -848,7 +853,7 @@ class _BaseBatteryScheduleSwitch(CoordinatorEntity, SwitchEntity):
 class DischargeToGridScheduleSwitch(_BaseBatteryScheduleSwitch):
     _attr_translation_key = "discharge_to_grid_schedule"
 
-    def __init__(self, coord: EnphaseCoordinator):
+    def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(
             coord,
             unique_suffix="discharge_to_grid_schedule",
@@ -872,7 +877,7 @@ class DischargeToGridScheduleSwitch(_BaseBatteryScheduleSwitch):
 class RestrictBatteryDischargeScheduleSwitch(_BaseBatteryScheduleSwitch):
     _attr_translation_key = "restrict_battery_discharge_schedule"
 
-    def __init__(self, coord: EnphaseCoordinator):
+    def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(
             coord,
             unique_suffix="restrict_battery_discharge_schedule",
@@ -893,11 +898,11 @@ class RestrictBatteryDischargeScheduleSwitch(_BaseBatteryScheduleSwitch):
         }
 
 
-class AcBatterySleepModeSwitch(CoordinatorEntity, SwitchEntity):
+class AcBatterySleepModeSwitch(CoordinatorEntity, SwitchEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "ac_battery_sleep_mode"
 
-    def __init__(self, coord: EnphaseCoordinator):
+    def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(coord)
         self._coord = coord
         self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_ac_battery_sleep_mode"
@@ -907,7 +912,7 @@ class AcBatterySleepModeSwitch(CoordinatorEntity, SwitchEntity):
         return "ac_battery_sleep_mode"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         if not super().available:
             return False
         if not ac_battery_control_available(self._coord):
@@ -926,10 +931,10 @@ class AcBatterySleepModeSwitch(CoordinatorEntity, SwitchEntity):
             "last_command": getattr(self._coord, "_ac_battery_last_command", None),
         }
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         await self._coord.async_set_ac_battery_sleep_mode(True)
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         await self._coord.async_set_ac_battery_sleep_mode(False)
 
     @property
@@ -937,13 +942,13 @@ class AcBatterySleepModeSwitch(CoordinatorEntity, SwitchEntity):
         return ac_battery_device_info(self._coord)
 
 
-class ChargingSwitch(EnphaseBaseEntity, RestoreEntity, SwitchEntity):
+class ChargingSwitch(EnphaseBaseEntity, RestoreEntity, SwitchEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "charging"
     # Main feature of the device; let entity name equal device name
     _attr_name = None
 
-    def __init__(self, coord: EnphaseCoordinator, sn: str):
+    def __init__(self, coord: EnphaseCoordinator, sn: str) -> None:
         super().__init__(coord, sn)
         self._attr_unique_id = f"{DOMAIN}_{sn}_charging_switch"
         self._restored_state: bool | None = None
@@ -976,7 +981,7 @@ class ChargingSwitch(EnphaseBaseEntity, RestoreEntity, SwitchEntity):
             return pending_state
         return bool(self.data.get("charging"))
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         try:
             result = await self._coord.async_start_charging(self._sn)
         except ServiceValidationError:
@@ -989,7 +994,7 @@ class ChargingSwitch(EnphaseBaseEntity, RestoreEntity, SwitchEntity):
             return
         _write_state_if_available(self)
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         await self._coord.async_stop_charging(self._sn)
         _write_state_if_available(self)
 
@@ -1017,16 +1022,16 @@ class ChargingSwitch(EnphaseBaseEntity, RestoreEntity, SwitchEntity):
         super()._handle_coordinator_update()
 
 
-class GreenBatterySwitch(EnphaseBaseEntity, SwitchEntity):
+class GreenBatterySwitch(EnphaseBaseEntity, SwitchEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "green_battery"
 
-    def __init__(self, coord: EnphaseCoordinator, sn: str):
+    def __init__(self, coord: EnphaseCoordinator, sn: str) -> None:
         super().__init__(coord, sn)
         self._attr_unique_id = f"{DOMAIN}_{sn}_green_battery"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         if not super().available:
             return False
         if not self._coord.scheduler_available:
@@ -1045,29 +1050,29 @@ class GreenBatterySwitch(EnphaseBaseEntity, SwitchEntity):
         )
         return bool(effective)
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         await self._coord.evse_runtime.async_set_green_battery_setting(
             self._sn, enabled=True
         )
         _write_state_if_available(self)
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         await self._coord.evse_runtime.async_set_green_battery_setting(
             self._sn, enabled=False
         )
         _write_state_if_available(self)
 
 
-class AppAuthenticationSwitch(EnphaseBaseEntity, SwitchEntity):
+class AppAuthenticationSwitch(EnphaseBaseEntity, SwitchEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "app_authentication"
 
-    def __init__(self, coord: EnphaseCoordinator, sn: str):
+    def __init__(self, coord: EnphaseCoordinator, sn: str) -> None:
         super().__init__(coord, sn)
         self._attr_unique_id = f"{DOMAIN}_{sn}_app_authentication"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         if not super().available:
             return False
         if not self._coord.auth_settings_available:
@@ -1084,7 +1089,7 @@ class AppAuthenticationSwitch(EnphaseBaseEntity, SwitchEntity):
         )
         return bool(effective)
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         try:
             await self._coord.evse_runtime.async_set_app_authentication(
                 self._sn, enabled=True
@@ -1100,7 +1105,7 @@ class AppAuthenticationSwitch(EnphaseBaseEntity, SwitchEntity):
             )
         _write_state_if_available(self)
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         try:
             await self._coord.evse_runtime.async_set_app_authentication(
                 self._sn, enabled=False
@@ -1117,16 +1122,16 @@ class AppAuthenticationSwitch(EnphaseBaseEntity, SwitchEntity):
         _write_state_if_available(self)
 
 
-class StormGuardEvseSwitch(EnphaseBaseEntity, SwitchEntity):
+class StormGuardEvseSwitch(EnphaseBaseEntity, SwitchEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "storm_guard_evse_charge"
 
-    def __init__(self, coord: EnphaseCoordinator, sn: str):
+    def __init__(self, coord: EnphaseCoordinator, sn: str) -> None:
         super().__init__(coord, sn)
         self._attr_unique_id = f"{DOMAIN}_{sn}_storm_guard_evse_charge"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         if not super().available:
             return False
         if not _battery_write_access_confirmed(self._coord):
@@ -1144,20 +1149,20 @@ class StormGuardEvseSwitch(EnphaseBaseEntity, SwitchEntity):
             value = self.data.get("storm_evse_enabled")
         return bool(value)
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         await self._coord.async_set_storm_evse_enabled(True)
         _write_state_if_available(self)
         self._coord.kick_fast(FAST_TOGGLE_POLL_HOLD_S)
         await self._coord.async_request_refresh()
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         await self._coord.async_set_storm_evse_enabled(False)
         _write_state_if_available(self)
         self._coord.kick_fast(FAST_TOGGLE_POLL_HOLD_S)
         await self._coord.async_request_refresh()
 
 
-class BatteryScheduleEditorDaySwitch(BatteryScheduleEditorEntity, SwitchEntity):
+class BatteryScheduleEditorDaySwitch(BatteryScheduleEditorEntity, SwitchEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
     _attr_entity_registry_enabled_default = True
@@ -1177,7 +1182,7 @@ class BatteryScheduleEditorDaySwitch(BatteryScheduleEditorEntity, SwitchEntity):
         self._attr_translation_key = f"battery_schedule_edit_{day_key}"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         client = getattr(self._coord, "client", None)
         return (
             super().available
@@ -1197,12 +1202,12 @@ class BatteryScheduleEditorDaySwitch(BatteryScheduleEditorEntity, SwitchEntity):
             return False
         return bool(self._editor.edit.days.get(self._day_key))
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         if self._editor is None:
             return
         self._editor.set_edit_day(self._day_key, True)
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         if self._editor is None:
             return
         self._editor.set_edit_day(self._day_key, False)
@@ -1218,7 +1223,7 @@ class BatteryScheduleEditorDaySwitch(BatteryScheduleEditorEntity, SwitchEntity):
         )
 
 
-class EvseScheduleEditorDaySwitch(EvseScheduleEditorEntity, SwitchEntity):
+class EvseScheduleEditorDaySwitch(EvseScheduleEditorEntity, SwitchEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
     _attr_entity_registry_enabled_default = True
@@ -1236,7 +1241,7 @@ class EvseScheduleEditorDaySwitch(EvseScheduleEditorEntity, SwitchEntity):
         self._attr_unique_id = f"{DOMAIN}_{sn}_schedule_edit_{day_key}"
 
     @property
-    def available(self) -> bool:  # type: ignore[override]
+    def available(self) -> bool:
         return (
             super().available
             and evse_schedule_editor_active(self._coord, self._entry)
@@ -1249,10 +1254,10 @@ class EvseScheduleEditorDaySwitch(EvseScheduleEditorEntity, SwitchEntity):
             return False
         return bool(self._editor.form_state(self._sn).days.get(self._day_key))
 
-    async def async_turn_on(self, **kwargs) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:
         if self._editor is not None:
             self._editor.set_edit_day(self._sn, self._day_key, True)
 
-    async def async_turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:
         if self._editor is not None:
             self._editor.set_edit_day(self._sn, self._day_key, False)

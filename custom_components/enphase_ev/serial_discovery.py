@@ -5,7 +5,7 @@ from __future__ import annotations
 from .device_types import normalize_type_key
 
 
-def inventory_type_available_for_cleanup(coord, type_key: str) -> bool | None:
+def inventory_type_available_for_cleanup(coord: object, type_key: str) -> bool | None:
     """Return inventory type availability, or None when the inventory view is unknown."""
 
     inventory_view = getattr(coord, "inventory_view", None)
@@ -18,7 +18,7 @@ def inventory_type_available_for_cleanup(coord, type_key: str) -> bool | None:
         return None
 
 
-def inventory_type_selected_for_cleanup(coord, type_key: str) -> bool:
+def inventory_type_selected_for_cleanup(coord: object, type_key: str) -> bool:
     """Return whether a device type is selected for this entry."""
 
     normalized = normalize_type_key(type_key)
@@ -33,7 +33,9 @@ def inventory_type_selected_for_cleanup(coord, type_key: str) -> bool:
         return True
 
 
-def inventory_type_bucket_for_cleanup(coord, type_key: str) -> dict[str, object] | None:
+def inventory_type_bucket_for_cleanup(
+    coord: object, type_key: str
+) -> dict[str, object] | None:
     """Return the inventory bucket when the devices inventory exposed it."""
 
     normalized = normalize_type_key(type_key)
@@ -55,7 +57,7 @@ def inventory_type_bucket_for_cleanup(coord, type_key: str) -> dict[str, object]
     return bucket if isinstance(bucket, dict) else None
 
 
-def inventory_type_bucket_empty_for_cleanup(coord, type_key: str) -> bool:
+def inventory_type_bucket_empty_for_cleanup(coord: object, type_key: str) -> bool:
     """Return True when inventory explicitly exposed an empty bucket."""
 
     bucket = inventory_type_bucket_for_cleanup(coord, type_key)
@@ -67,13 +69,13 @@ def inventory_type_bucket_empty_for_cleanup(coord, type_key: str) -> bool:
     if "count" not in bucket:
         return False
     try:
-        count = int(bucket.get("count"))
+        count = int(str(bucket.get("count")))
     except (TypeError, ValueError):
         return False
     return count == 0
 
 
-def inventory_type_known_absent_for_cleanup(coord, type_key: str) -> bool:
+def inventory_type_known_absent_for_cleanup(coord: object, type_key: str) -> bool:
     """Return True when non-status discovery can safely prove absence."""
 
     return not inventory_type_selected_for_cleanup(
@@ -81,7 +83,7 @@ def inventory_type_known_absent_for_cleanup(coord, type_key: str) -> bool:
     ) or inventory_type_bucket_empty_for_cleanup(coord, type_key)
 
 
-def serials_from_getter(getter) -> set[str] | None:
+def serials_from_getter(getter: object) -> set[str] | None:
     """Return cleaned serials from a callable getter, or None on failure."""
 
     if not callable(getter):
@@ -92,7 +94,7 @@ def serials_from_getter(getter) -> set[str] | None:
         return None
 
 
-def active_charger_serials_for_cleanup(coord) -> set[str] | None:
+def active_charger_serials_for_cleanup(coord: object) -> set[str] | None:
     """Return active EVSE serials when EVSE inventory is authoritative."""
 
     if not bool(getattr(coord, "_devices_inventory_ready", False)):
@@ -109,7 +111,7 @@ def active_charger_serials_for_cleanup(coord) -> set[str] | None:
     return serials_from_getter(getattr(coord, "iter_serials", None))
 
 
-def active_battery_serials_for_cleanup(coord) -> set[str] | None:
+def active_battery_serials_for_cleanup(coord: object) -> set[str] | None:
     """Return active storage battery serials when battery status is authoritative."""
 
     if not bool(getattr(coord, "_devices_inventory_ready", False)):
@@ -130,7 +132,7 @@ def active_battery_serials_for_cleanup(coord) -> set[str] | None:
     return serials_from_getter(getattr(coord, "iter_battery_serials", None))
 
 
-def active_ac_battery_serials_for_cleanup(coord) -> set[str] | None:
+def active_ac_battery_serials_for_cleanup(coord: object) -> set[str] | None:
     """Return active AC Battery serials when AC Battery discovery is authoritative."""
 
     if not bool(getattr(coord, "_devices_inventory_ready", False)):
@@ -154,7 +156,7 @@ def active_ac_battery_serials_for_cleanup(coord) -> set[str] | None:
     return serials_from_getter(getattr(coord, "iter_ac_battery_serials", None))
 
 
-def active_inverter_serials_for_cleanup(coord) -> set[str] | None:
+def active_inverter_serials_for_cleanup(coord: object) -> set[str] | None:
     """Return active inverter serials when inverter inventory is authoritative."""
 
     if not bool(getattr(coord, "_devices_inventory_ready", False)):
@@ -177,7 +179,9 @@ def active_inverter_serials_for_cleanup(coord) -> set[str] | None:
     return serials_from_getter(getattr(coord, "iter_inverter_serials", None))
 
 
-def active_serial_registry_identifiers(coord) -> dict[str, set[str] | None]:
+def active_serial_registry_identifiers(
+    coord: object,
+) -> dict[str, set[str] | None]:
     """Return active serial identifiers by serial-backed device family."""
 
     return {
@@ -188,7 +192,7 @@ def active_serial_registry_identifiers(coord) -> dict[str, set[str] | None]:
     }
 
 
-def all_active_serial_registry_identifiers(coord) -> set[str]:
+def all_active_serial_registry_identifiers(coord: object) -> set[str]:
     """Return active serial identifiers across supported serial device families."""
 
     active: set[str] = set()

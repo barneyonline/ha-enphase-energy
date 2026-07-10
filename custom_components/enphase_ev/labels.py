@@ -220,7 +220,7 @@ def battery_schedule_button_label(action: str, *, hass: Any | None = None) -> st
         "save": ("button", "battery_schedule_save", "Save Battery Schedule"),
         "delete": ("button", "battery_schedule_delete", "Delete Battery Schedule"),
     }
-    path = path_map.get(key)
+    path = path_map.get(key) if key is not None else None
     if path is None:
         return _friendly_label_text(action) or str(action)
     translated = _entity_translation_value(hass, path[0], path[1])

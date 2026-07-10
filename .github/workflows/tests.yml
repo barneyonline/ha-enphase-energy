@@ -106,11 +106,8 @@ jobs:
         run: python scripts/validate_quality_scale.py
       - name: Validate Home Assistant brands assets
         run: python scripts/validate_quality_scale.py --validate-remote-brands
-      - name: Validate typed runtime data contract
-        run: >
-          mypy --strict --ignore-missing-imports --follow-imports=skip
-          custom_components/enphase_ev/runtime_data.py
-          custom_components/enphase_ev/config_flow.py
+      - name: Validate strict typing for full integration package
+        run: mypy --strict --ignore-missing-imports --follow-imports=skip custom_components/enphase_ev
 
   python314-diagnostics:
     runs-on: ubuntu-latest

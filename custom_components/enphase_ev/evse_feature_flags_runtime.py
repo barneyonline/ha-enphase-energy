@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from .const import (
     EVSE_FEATURE_FLAGS_CACHE_TTL,
@@ -117,8 +117,9 @@ class EvseFeatureFlagsRuntime:
             serial_flags = getattr(coord, "_evse_feature_flags_by_serial", {}) or {}
             raw = serial_flags.get(str(sn), {}).get(key_text)
             if raw is not None:
-                return raw
-        return (getattr(coord, "_evse_site_feature_flags", {}) or {}).get(key_text)
+                return cast(object, raw)
+        site_flags = getattr(coord, "_evse_site_feature_flags", {}) or {}
+        return cast(object | None, site_flags.get(key_text))
 
     def feature_flag_enabled(self, key: str, sn: str | None = None) -> bool | None:
         """Return a feature flag coerced to a tri-state boolean."""

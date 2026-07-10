@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypeVar, cast
 
 from homeassistant.components import logbook
 from homeassistant.components.update import (
@@ -12,7 +12,7 @@ from homeassistant.components.update import (
     UpdateEntityDescription,
 )
 from homeassistant.const import STATE_OFF, STATE_ON
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant, callback as ha_callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
@@ -47,6 +47,9 @@ FIRMWARE_HISTORY_MAX_ENTRIES = 10
 FIRMWARE_HISTORY_SAVE_DELAY = 5
 
 _LOGGER = logging.getLogger(__name__)
+
+_CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
+callback = cast(Callable[[_CallbackT], _CallbackT], ha_callback)
 
 
 class FirmwareVersionHistoryStore:
@@ -266,7 +269,7 @@ async def async_setup_entry(
         entry.async_on_unload(unsubscribe)
 
 
-class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
+class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
 
     def __init__(
@@ -307,7 +310,10 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
 
     @property
     def available(self) -> bool:
-        return super().available and _type_available(self._coord, self._device_type)
+        return cast(
+            bool,
+            super().available and _type_available(self._coord, self._device_type),
+        )
 
     @property
     def device_info(self) -> DeviceInfo | None:
@@ -462,7 +468,7 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
         )
 
 
-class ChargerFirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
+class ChargerFirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):  # type: ignore[misc]
     _attr_has_entity_name = True
     _attr_translation_key = "charger_firmware"
 
@@ -522,10 +528,10 @@ class ChargerFirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateE
     def state(self) -> str | None:
         state = super().state
         if state != STATE_ON:
-            return state
+            return state  # type: ignore[no-any-return]
         if self._firmware_rollout_enabled is False:
-            return STATE_OFF
-        return state
+            return STATE_OFF  # type: ignore[no-any-return]
+        return state  # type: ignore[no-any-return]
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -753,7 +759,7 @@ def _charger_update_unique_id(serial: str) -> str:
 def _async_prune_removed_charger_updates(
     *,
     entry: EnphaseConfigEntry,
-    ent_reg,
+    ent_reg: Any,
     current_serials: set[str],
     known_serials: set[str],
     version_history: FirmwareVersionHistoryStore | None = None,
@@ -803,7 +809,7 @@ def _charger_installed_version(coord: EnphaseCoordinator, serial: str) -> str | 
             ):
                 version = _text(payload.get(key))
                 if version:
-                    return version
+                    return cast(str | None, version)
 
     return _text(coord.inventory_view.type_device_sw_version("iqevse"))
 
@@ -846,7 +852,7 @@ def _evse_firmware_rollout_enabled(
     if not callable(feature_flag_enabled):
         return None
     try:
-        return feature_flag_enabled("iqevse_itk_fw_upgrade_status", serial)
+        return feature_flag_enabled("iqevse_itk_fw_upgrade_status", serial)  # type: ignore[no-any-return]
     except Exception:  # noqa: BLE001
         return None
 

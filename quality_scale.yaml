@@ -526,12 +526,14 @@ rules:
         - tests/components/enphase_ev/test_coordinator_behavior.py
   strict-typing:
     status: done
-    comment: Runtime data uses a typed ConfigEntry alias without an Any fallback, the package is marked typed, and CI validates the strict config-entry contract with mypy.
+    comment: The package is marked typed, uses a typed ConfigEntry alias without an Any fallback, and CI runs pinned mypy strict mode over the complete integration package.
     references:
       code:
         - .strict-typing
+        - .github/workflows/tests.yml
         - custom_components/enphase_ev/runtime_data.py
         - custom_components/enphase_ev/py.typed
+        - devtools/docker/requirements-dev.txt
         - scripts/validate_quality_scale.py
       tests:
         - tests/components/enphase_ev/test_runtime_data.py

@@ -509,7 +509,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🔄 Other changes
 - Added Platinum quality-scale evidence validation, upstream brands validation, stricter runtime-data typing checks, import-time diagnostics, and CI coverage enforcement.
-- Added `.strict-typing`, `py.typed`, mypy coverage for runtime/config-flow typing contracts, and a minimum Home Assistant `2026.3.0` CI job.
+- Added `.strict-typing`, `py.typed`, a pinned full-package strict mypy gate, and a minimum Home Assistant `2026.3.0` CI job.
 - Added the Docker `ha-dev` Python `3.14` environment and a pinned minimum-Home-Assistant dependency set for release validation.
 - Added `scripts/importtime_profile.py` and expanded quality-scale validator coverage.
 - Updated GitHub Actions to Python `3.14`, refreshed workflow trigger paths, and bumped `stefanbuck/github-issue-parser` from `3.2.3` to `3.2.5`.

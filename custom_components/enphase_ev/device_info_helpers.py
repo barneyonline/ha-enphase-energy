@@ -4,6 +4,11 @@ from functools import lru_cache
 import json
 from pathlib import Path
 import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity import DeviceInfo
 
 from .const import DOMAIN
 from .runtime_helpers import coerce_optional_text as _clean_text
@@ -118,12 +123,12 @@ def _integration_version() -> str | None:
     return cleaned or None
 
 
-async def async_prime_integration_version(hass) -> None:
+async def async_prime_integration_version(hass: HomeAssistant) -> None:
     """Prime cached integration version off the event loop."""
     await hass.async_add_executor_job(_integration_version)
 
 
-def _cloud_device_info(site_id: object):
+def _cloud_device_info(site_id: object) -> DeviceInfo | dict[str, object]:
     """Return DeviceInfo for cloud-level connectivity entities."""
     try:
         site_text = str(site_id).strip()
@@ -131,7 +136,7 @@ def _cloud_device_info(site_id: object):
         site_text = ""
     if not site_text:
         site_text = "unknown"
-    payload = {
+    payload: dict[str, object] = {
         "identifiers": {(DOMAIN, f"type:{site_text}:cloud")},
         "manufacturer": "Enphase",
         "name": "Enphase Cloud",

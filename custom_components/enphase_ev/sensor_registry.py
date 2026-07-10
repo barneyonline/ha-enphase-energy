@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from typing import Any
+from collections.abc import Callable, Iterable
+from typing import Any, cast
 
 from .const import DOMAIN
 from .device_types import is_dry_contact_type_key
@@ -461,7 +461,7 @@ class EnphaseSensorRegistrySetup:
         entities = getattr(self._ent_reg, "entities", None)
         values = getattr(entities, "values", None)
         if callable(values):
-            return values()
+            return cast(Iterable[Any], values())
         return ()
 
     def _registry_entry_matches_sensor(self, reg_entry: Any) -> bool:
@@ -482,13 +482,13 @@ class EnphaseSensorRegistrySetup:
         get_entity_id = getattr(self._ent_reg, "async_get_entity_id", None)
         if not callable(get_entity_id):
             return None
-        return get_entity_id("sensor", DOMAIN, unique_id)
+        return cast(str | None, get_entity_id("sensor", DOMAIN, unique_id))
 
     def _remove_missing_serial_entities(
         self,
         known_serials: set[str],
         current_set: set[str],
-        unique_ids_for_serial,
+        unique_ids_for_serial: Callable[[str], Iterable[str]],
     ) -> None:
         """Remove entities for serials that disappeared from active discovery."""
 

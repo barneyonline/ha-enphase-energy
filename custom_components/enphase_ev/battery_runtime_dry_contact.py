@@ -451,9 +451,9 @@ def _normalize_dry_contact_settings_entry(
         ),
     )
     for target_key, source_keys in bool_fields:
-        value = coerce_bool(_first_present(entry, *source_keys))
-        if value is not None:
-            normalized[target_key] = value
+        bool_value = coerce_bool(_first_present(entry, *source_keys))
+        if bool_value is not None:
+            normalized[target_key] = bool_value
 
     int_fields: tuple[tuple[str, tuple[str, ...]], ...] = (
         (
@@ -498,9 +498,9 @@ def _normalize_dry_contact_settings_entry(
         ),
     )
     for target_key, source_keys in int_fields:
-        value = coerce_int(_first_present(entry, *source_keys))
-        if value is not None:
-            normalized[target_key] = value
+        int_value = coerce_int(_first_present(entry, *source_keys))
+        if int_value is not None:
+            normalized[target_key] = int_value
 
     schedule_windows = normalize_dry_contact_schedule_windows(
         _first_present(
@@ -538,6 +538,10 @@ def _normalize_dry_contact_settings_entry(
 def _dry_contact_settings_signature(
     normalized: dict[str, object],
 ) -> tuple[object, ...]:
+    raw_schedule_windows = normalized.get("schedule_windows")
+    schedule_windows = (
+        raw_schedule_windows if isinstance(raw_schedule_windows, list) else []
+    )
     return (
         normalized.get("serial_number"),
         normalized.get("device_uid"),
@@ -557,7 +561,7 @@ def _dry_contact_settings_signature(
                 window.get("start") if isinstance(window, dict) else None,
                 window.get("end") if isinstance(window, dict) else None,
             )
-            for window in normalized.get("schedule_windows", [])
+            for window in schedule_windows
             if isinstance(window, dict)
         ),
     )

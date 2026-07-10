@@ -11,7 +11,7 @@ from .log_redaction import redact_identifier, redact_text
 _LOGGER = logging.getLogger(__name__)
 
 
-def iter_entity_registry_entries(ent_reg) -> list[object]:
+def iter_entity_registry_entries(ent_reg: object) -> list[object]:
     """Best-effort iteration over entity registry entries."""
     entities = getattr(ent_reg, "entities", None)
     if entities is None:
@@ -27,7 +27,7 @@ def iter_entity_registry_entries(ent_reg) -> list[object]:
     return []
 
 
-def iter_device_registry_entries(dev_reg) -> list[object]:
+def iter_device_registry_entries(dev_reg: object) -> list[object]:
     """Best-effort iteration over device registry entries."""
     devices = getattr(dev_reg, "devices", None)
     if devices is None:
@@ -43,7 +43,7 @@ def iter_device_registry_entries(dev_reg) -> list[object]:
     return []
 
 
-def entries_for_device(ent_reg, device_id: str) -> list[object]:
+def entries_for_device(ent_reg: object, device_id: str) -> list[object]:
     """Return entity registry entries attached to the given device."""
     entries: list[object] = []
     seen_entity_ids: set[object] = set()
@@ -92,7 +92,7 @@ def is_owned_entity(
 
 
 def find_entity_id_by_unique_id(
-    ent_reg,
+    ent_reg: object,
     domain: str,
     unique_id: str,
     *,
@@ -106,7 +106,7 @@ def find_entity_id_by_unique_id(
             entity_id = get_entity_id(domain, DOMAIN, unique_id)
         except Exception:  # noqa: BLE001
             entity_id = None
-        if entity_id:
+        if isinstance(entity_id, str) and entity_id:
             if callable(get_entry):
                 reg_entry = get_entry(entity_id)
                 if reg_entry is not None and not is_owned_entity(
@@ -129,13 +129,13 @@ def find_entity_id_by_unique_id(
         if not is_owned_entity(reg_entry, entry_id, domain):
             continue
         entity_id = getattr(reg_entry, "entity_id", None)
-        if entity_id:
+        if isinstance(entity_id, str) and entity_id:
             return entity_id
     return None
 
 
 def prune_managed_entities(
-    ent_reg,
+    ent_reg: object,
     entry_id: str | None,
     *,
     domain: str,
@@ -156,8 +156,11 @@ def prune_managed_entities(
         entity_id = getattr(reg_entry, "entity_id", None)
         if not entity_id:
             continue
+        async_remove = getattr(ent_reg, "async_remove", None)
+        if not callable(async_remove):
+            continue
         try:
-            ent_reg.async_remove(entity_id)
+            async_remove(entity_id)
             removed += 1
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug(

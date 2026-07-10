@@ -41,6 +41,26 @@ def _write_quality_scale(root: Path, body: str) -> None:
     (root / "quality_scale.yaml").write_text(body)
 
 
+def _write_strict_mypy_gate(
+    root: Path,
+    *,
+    command: str = validate_quality_scale.STRICT_TYPING_COMMAND,
+    requirement: str = validate_quality_scale.PINNED_MYPY_REQUIREMENT,
+) -> None:
+    requirements = root / "devtools" / "docker" / "requirements-dev.txt"
+    requirements.parent.mkdir(parents=True, exist_ok=True)
+    requirements.write_text(f"{requirement}\n")
+    workflow = root / ".github" / "workflows" / "tests.yml"
+    workflow.parent.mkdir(parents=True, exist_ok=True)
+    workflow.write_text(
+        "jobs:\n"
+        "  quality-scale:\n"
+        "    steps:\n"
+        "      - name: Validate strict typing for full integration package\n"
+        f"        run: {command}\n"
+    )
+
+
 class _FakeUrlopenResponse:
     def __init__(
         self,
@@ -662,6 +682,7 @@ def test_strict_typing_contract_requires_strict_typing_entry(
 def test_strict_typing_contract_accepts_python314_type_alias(
     tmp_path: Path,
 ) -> None:
+    _write_strict_mypy_gate(tmp_path)
     (tmp_path / ".strict-typing").write_text("custom_components/enphase_ev\n")
     integration_dir = tmp_path / "custom_components" / "enphase_ev"
     integration_dir.mkdir(parents=True)
@@ -739,6 +760,7 @@ def test_strict_typing_contract_rejects_config_entries_config_entry_annotation(
 def test_strict_typing_contract_allows_marked_external_config_entry_annotation(
     tmp_path: Path,
 ) -> None:
+    _write_strict_mypy_gate(tmp_path)
     (tmp_path / ".strict-typing").write_text("custom_components/enphase_ev\n")
     integration_dir = tmp_path / "custom_components" / "enphase_ev"
     integration_dir.mkdir(parents=True)
@@ -756,6 +778,65 @@ def test_strict_typing_contract_allows_marked_external_config_entry_annotation(
     messages = validate_quality_scale._validate_strict_typing_contract(tmp_path)
 
     assert messages == []
+
+
+def test_strict_typing_contract_requires_pinned_mypy(tmp_path: Path) -> None:
+    _write_strict_mypy_gate(tmp_path, requirement="mypy")
+    integration_dir = tmp_path / "custom_components" / "enphase_ev"
+    integration_dir.mkdir(parents=True)
+    (tmp_path / ".strict-typing").write_text("custom_components/enphase_ev\n")
+    (integration_dir / "py.typed").write_text("")
+    (integration_dir / "runtime_data.py").write_text(
+        "type EnphaseConfigEntry = ConfigEntry[EnphaseRuntimeData]\n"
+    )
+
+    messages = validate_quality_scale._validate_strict_typing_contract(tmp_path)
+
+    assert "must pin mypy==2.2.0" in "\n".join(messages)
+
+
+def test_strict_typing_contract_rejects_partial_mypy_gate(tmp_path: Path) -> None:
+    _write_strict_mypy_gate(
+        tmp_path,
+        command=(
+            "mypy --strict --ignore-missing-imports --follow-imports=skip "
+            "custom_components/enphase_ev/runtime_data.py "
+            "custom_components/enphase_ev/config_flow.py"
+        ),
+    )
+    integration_dir = tmp_path / "custom_components" / "enphase_ev"
+    integration_dir.mkdir(parents=True)
+    (tmp_path / ".strict-typing").write_text("custom_components/enphase_ev\n")
+    (integration_dir / "py.typed").write_text("")
+    (integration_dir / "runtime_data.py").write_text(
+        "type EnphaseConfigEntry = ConfigEntry[EnphaseRuntimeData]\n"
+    )
+
+    messages = validate_quality_scale._validate_strict_typing_contract(tmp_path)
+
+    joined = "\n".join(messages)
+    assert "exact full-package strict typing command" in joined
+    assert validate_quality_scale.STRICT_TYPING_COMMAND in joined
+
+
+def test_strict_typing_contract_reports_invalid_workflow_yaml(tmp_path: Path) -> None:
+    _write_strict_mypy_gate(tmp_path)
+    (tmp_path / ".github" / "workflows" / "tests.yml").write_text("jobs: [\n")
+
+    messages = validate_quality_scale._validate_strict_typing_contract(tmp_path)
+
+    assert "tests.yml is invalid YAML" in "\n".join(messages)
+
+
+def test_strict_typing_contract_requires_quality_scale_steps(tmp_path: Path) -> None:
+    _write_strict_mypy_gate(tmp_path)
+    (tmp_path / ".github" / "workflows" / "tests.yml").write_text(
+        "jobs:\n  quality-scale:\n    steps: invalid\n"
+    )
+
+    messages = validate_quality_scale._validate_strict_typing_contract(tmp_path)
+
+    assert "exact full-package strict typing command" in "\n".join(messages)
 
 
 def test_strict_typing_contract_reports_syntax_errors(tmp_path: Path) -> None:

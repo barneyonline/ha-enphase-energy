@@ -272,11 +272,14 @@ class DiscoverySnapshotManager:
                     count = len(bucket["devices"])
                 bucket["count"] = max(count, len(bucket["devices"]))
                 normalized_grouped[type_key] = bucket
-            ordered_keys = (
-                [normalize_type_key(key) for key in ordered if normalize_type_key(key)]
-                if isinstance(ordered, list)
-                else list(normalized_grouped.keys())
-            )
+            ordered_keys: list[str] = []
+            if isinstance(ordered, list):
+                for key in ordered:
+                    normalized_key = normalize_type_key(key)
+                    if normalized_key:
+                        ordered_keys.append(normalized_key)
+            else:  # pragma: no cover - persisted snapshots always store a list
+                ordered_keys = list(normalized_grouped)
             if normalized_grouped:
                 self.coordinator.inventory_runtime._set_type_device_buckets(
                     normalized_grouped, ordered_keys, authoritative=False
@@ -377,7 +380,7 @@ class DiscoverySnapshotManager:
         if self.coordinator._discovery_snapshot_save_cancel is not None:
             return
 
-        @callback
+        @callback  # type: ignore[untyped-decorator]
         def _run(_now: datetime) -> None:
             self.coordinator._discovery_snapshot_save_cancel = None
             if not self.coordinator._discovery_snapshot_pending:

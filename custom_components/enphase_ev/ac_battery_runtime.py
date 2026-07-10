@@ -6,12 +6,18 @@ import re
 import time
 from datetime import datetime, timezone as _tz
 from html import unescape
+from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from .service_validation import raise_translated_service_validation
+from .state_models import BatteryState
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .battery_runtime import BatteryRuntime
+    from .coordinator import EnphaseCoordinator
 
 # Enphase exposes AC Battery controls through an HTML page rather than the JSON
 # endpoints used for most battery data.
@@ -49,15 +55,15 @@ _AC_BATTERY_TIMESTAMP_RE = re.compile(
 class AcBatteryRuntime:
     """Dedicated AC Battery parsing and control helper."""
 
-    def __init__(self, battery_runtime) -> None:
+    def __init__(self, battery_runtime: BatteryRuntime) -> None:
         self._battery_runtime = battery_runtime
 
     @property
-    def coordinator(self):
+    def coordinator(self) -> EnphaseCoordinator:
         return self._battery_runtime.coordinator
 
     @property
-    def battery_state(self):
+    def battery_state(self) -> BatteryState:
         return self._battery_runtime.battery_state
 
     def _ac_battery_text(self, value: object) -> str | None:
@@ -168,11 +174,11 @@ class AcBatteryRuntime:
         details["latest_reported_utc"] = None
         state._ac_battery_aggregate_status_details = details
         state._ac_battery_telemetry_cache_until = None
-        state._ac_battery_telemetry_payloads = None
+        setattr(state, "_ac_battery_telemetry_payloads", None)
 
     def _clear_ac_battery_events_state(self) -> None:
         state = self.battery_state
-        state._ac_battery_events_payloads = None
+        setattr(state, "_ac_battery_events_payloads", None)
 
     def _clear_ac_battery_device_state(self, *, refresh_topology: bool) -> None:
         state = self.battery_state
@@ -636,16 +642,13 @@ class AcBatteryRuntime:
                 if not battery_id:
                     continue
                 payload = await fetcher(battery_id)
+                payload_text = self._battery_runtime._coerce_optional_text(payload)
                 payloads.append(
                     {
                         "serial": serial,
                         "battery_id": battery_id,
                         "location": f"/systems/{coord.site_id}/ac_batteries/{battery_id}/events",
-                        "html_excerpt": (
-                            self._battery_runtime._coerce_optional_text(payload)[:512]
-                            if self._battery_runtime._coerce_optional_text(payload)
-                            else None
-                        ),
+                        "html_excerpt": (payload_text[:512] if payload_text else None),
                     }
                 )
         except Exception as err:  # noqa: BLE001
@@ -685,6 +688,7 @@ class AcBatteryRuntime:
             if not battery_id:
                 continue
             if enabled:
+                assert target_soc is not None
                 response = await coord.client.set_ac_battery_sleep(
                     battery_id, target_soc
                 )
