@@ -59,6 +59,11 @@ async def test_power_restore_continues_from_last_sample(monkeypatch):
     monkeypatch.setattr(
         EnphasePowerSensor, "async_get_last_state", _fake_get_last_state
     )
+    monkeypatch.setattr(
+        EnphasePowerSensor,
+        "async_get_last_extra_data",
+        lambda self: _async_none(),
+    )
     monkeypatch.setattr(CoordinatorEntity, "async_added_to_hass", _noop)
 
     await ent.async_added_to_hass()
@@ -69,3 +74,110 @@ async def test_power_restore_continues_from_last_sample(monkeypatch):
     coord.data[sn]["lifetime_kwh"] = 10.6
 
     assert ent.native_value == 6000
+
+
+async def _async_none():
+    return None
+
+
+def test_power_restore_data_rejects_invalid_values():
+    """Private restore payload parsing tolerates stale or corrupt data."""
+    from custom_components.enphase_ev.sensor import _PowerRestoreData
+
+    empty = _PowerRestoreData.from_dict(None)
+    assert empty.as_dict() == {
+        "last_lifetime_kwh": None,
+        "last_energy_ts": None,
+        "last_sample_ts": None,
+        "last_power_w": None,
+        "last_window_seconds": None,
+        "method": None,
+        "last_reset_at": None,
+    }
+
+    invalid = _PowerRestoreData.from_dict(
+        {
+            "last_lifetime_kwh": object(),
+            "last_energy_ts": object(),
+            "last_sample_ts": object(),
+            "last_power_w": object(),
+            "last_window_seconds": object(),
+            "method": "",
+            "last_reset_at": object(),
+        }
+    )
+    assert invalid == empty
+
+
+@pytest.mark.asyncio
+async def test_power_restore_uses_private_extra_data(monkeypatch):
+    """Derived power baselines survive restart without public attributes."""
+    from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+    from custom_components.enphase_ev.coordinator import EnphaseCoordinator
+    from custom_components.enphase_ev.sensor import EnphasePowerSensor
+
+    sn = "555555555555"
+    coord = EnphaseCoordinator.__new__(EnphaseCoordinator)
+    coord.data = {
+        sn: {
+            "sn": sn,
+            "name": "Garage EV",
+            "lifetime_kwh": 10.6,
+            "last_reported_at": "2025-09-09T10:01:00Z",
+            "charging": True,
+        }
+    }
+    coord.serials = {sn}
+    coord.site_id = "1234567"
+    coord.last_update_success = True
+
+    sensor = EnphasePowerSensor(coord, sn)
+
+    class _LastExtra:
+        def as_dict(self):
+            return {
+                "last_lifetime_kwh": 10.5,
+                "last_energy_ts": 1_757_412_000.0,
+                "last_sample_ts": 1_757_412_000.0,
+                "last_power_w": 3600,
+                "last_window_seconds": 300.0,
+                "method": "lifetime_energy_window",
+                "last_reset_at": None,
+            }
+
+    class _LastState:
+        state = "3600"
+        attributes = {}
+
+    async def _last_extra():
+        return _LastExtra()
+
+    async def _last_state():
+        return _LastState()
+
+    async def _noop(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(sensor, "async_get_last_extra_data", _last_extra)
+    monkeypatch.setattr(sensor, "async_get_last_state", _last_state)
+    monkeypatch.setattr(CoordinatorEntity, "async_added_to_hass", _noop)
+
+    await sensor.async_added_to_hass()
+
+    assert sensor.native_value == 6000
+    assert sensor.extra_state_attributes == {
+        "sampled_at_utc": "2025-09-09T10:01:00+00:00",
+        "last_window_seconds": pytest.approx(60.0),
+        "method": "lifetime_energy_window",
+        "actual_charging": True,
+    }
+    assert sensor.extra_restore_state_data.as_dict() == {
+        "last_lifetime_kwh": 10.6,
+        "last_energy_ts": 1_757_412_060.0,
+        "last_sample_ts": 1_757_412_060.0,
+        "last_power_w": 6000,
+        "last_window_seconds": 60.0,
+        "method": "lifetime_energy_window",
+        "last_reset_at": None,
+    }

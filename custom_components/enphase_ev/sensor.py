@@ -1192,6 +1192,58 @@ class _SiteLifetimePowerRestoreData(ExtraStoredData):  # type: ignore[misc]
         )
 
 
+@dataclass
+class _PowerRestoreData(ExtraStoredData):  # type: ignore[misc]
+    """Persist EV charger derived-power state without recorder attributes."""
+
+    last_lifetime_kwh: float | None
+    last_energy_ts: float | None
+    last_sample_ts: float | None
+    last_power_w: int | None
+    last_window_seconds: float | None
+    method: str | None
+    last_reset_at: float | None
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "last_lifetime_kwh": self.last_lifetime_kwh,
+            "last_energy_ts": self.last_energy_ts,
+            "last_sample_ts": self.last_sample_ts,
+            "last_power_w": self.last_power_w,
+            "last_window_seconds": self.last_window_seconds,
+            "method": self.method,
+            "last_reset_at": self.last_reset_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> "_PowerRestoreData":
+        if not isinstance(data, dict):
+            return cls(None, None, None, None, None, None, None)
+
+        def _as_float(value: object) -> float | None:
+            try:
+                return float(value) if value is not None else None  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return None
+
+        def _as_int(value: object) -> int | None:
+            try:
+                return int(float(value)) if value is not None else None  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return None
+
+        method = data.get("method")
+        return cls(
+            last_lifetime_kwh=_as_float(data.get("last_lifetime_kwh")),
+            last_energy_ts=_as_float(data.get("last_energy_ts")),
+            last_sample_ts=_as_float(data.get("last_sample_ts")),
+            last_power_w=_as_int(data.get("last_power_w")),
+            last_window_seconds=_as_float(data.get("last_window_seconds")),
+            method=str(method) if method not in (None, "") else None,
+            last_reset_at=_as_float(data.get("last_reset_at")),
+        )
+
+
 class EnphaseEnergyTodaySensor(EnphaseBaseEntity, SensorEntity, RestoreEntity):  # type: ignore[misc]
     """Expose the last charging session's energy as a sensor."""
 
@@ -1877,29 +1929,51 @@ class EnphasePowerSensor(EnphaseBaseEntity, SensorEntity, RestoreEntity):  # typ
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
+        last_extra = await self.async_get_last_extra_data()
+        restored = _PowerRestoreData.from_dict(
+            last_extra.as_dict() if last_extra is not None else None
+        )
+        self._last_lifetime_kwh = restored.last_lifetime_kwh
+        self._last_energy_ts = restored.last_energy_ts
+        self._last_sample_ts = restored.last_sample_ts
+        if restored.last_power_w is not None:
+            self._last_power_w = restored.last_power_w
+        self._last_window_s = restored.last_window_seconds
+        if restored.method is not None:
+            self._last_method = restored.method
+        self._last_reset_at = restored.last_reset_at
+
         last_state = await self.async_get_last_state()
         if not last_state:
             return
         attrs = last_state.attributes or {}
-        self._last_lifetime_kwh = _restore_optional_float_attribute(
-            attrs, "last_lifetime_kwh"
-        )
-        self._last_energy_ts = _restore_optional_float_attribute(
-            attrs, "last_energy_ts"
-        )
-        self._last_sample_ts = _restore_optional_float_attribute(
-            attrs, "last_sample_ts"
-        )
+        if self._last_lifetime_kwh is None:
+            self._last_lifetime_kwh = _restore_optional_float_attribute(
+                attrs, "last_lifetime_kwh"
+            )
+        if self._last_energy_ts is None:
+            self._last_energy_ts = _restore_optional_float_attribute(
+                attrs, "last_energy_ts"
+            )
+        if self._last_sample_ts is None:
+            self._last_sample_ts = _restore_optional_float_attribute(
+                attrs, "last_sample_ts"
+            )
         restored_power = _restore_optional_int_value(last_state.state)
         if restored_power is None:
             restored_power = _restore_optional_int_value(attrs.get("last_power_w"))
-        self._last_power_w = restored_power if restored_power is not None else 0
-        self._last_window_s = _restore_optional_float_attribute(
-            attrs, "last_window_seconds"
-        )
-        if attrs.get("method"):
+        if restored_power is not None:
+            self._last_power_w = restored_power
+        if self._last_window_s is None:
+            self._last_window_s = _restore_optional_float_attribute(
+                attrs, "last_window_seconds"
+            )
+        if restored.method is None and attrs.get("method"):
             self._last_method = str(attrs.get("method"))
-        self._last_reset_at = _restore_optional_float_attribute(attrs, "last_reset_at")
+        if self._last_reset_at is None:
+            self._last_reset_at = _restore_optional_float_attribute(
+                attrs, "last_reset_at"
+            )
 
         # Legacy restore support (pre-0.7.9 attributes)
         if self._last_lifetime_kwh is None:
@@ -2203,13 +2277,6 @@ class EnphasePowerSensor(EnphaseBaseEntity, SensorEntity, RestoreEntity):  # typ
     def extra_state_attributes(self) -> Any:
         data = self.data
         actual_charging = self._is_actually_charging(data)
-        operating_v = self._as_float(data.get("operating_v"))
-        if operating_v is None or operating_v <= 0:
-            operating_v = self._as_float(data.get("nominal_v"))
-        if operating_v is None or operating_v <= 0:
-            operating_v = float(
-                getattr(self._coord, "nominal_voltage", DEFAULT_NOMINAL_VOLTAGE)
-            )
         return {
             "sampled_at_utc": (
                 data.get("sampled_at_utc")
@@ -2222,28 +2289,22 @@ class EnphasePowerSensor(EnphaseBaseEntity, SensorEntity, RestoreEntity):  # typ
                     else None
                 )
             ),
-            "last_lifetime_kwh": self._last_lifetime_kwh,
-            "last_energy_ts": self._last_energy_ts,
-            "last_sample_ts": self._last_sample_ts,
-            "last_power_w": self._last_power_w,
             "last_window_seconds": self._last_window_s,
             "method": self._last_method,
-            "charging": actual_charging,
             "actual_charging": actual_charging,
-            "operating_v": operating_v,
-            "max_throughput_w": self._max_throughput_w,
-            "max_throughput_unbounded_w": self._max_throughput_unbounded_w,
-            "max_throughput_source": self._max_throughput_source,
-            "max_throughput_amps": self._max_throughput_amps,
-            "max_throughput_voltage": self._max_throughput_voltage,
-            "max_throughput_topology": getattr(
-                self, "_max_throughput_topology", "unknown"
-            ),
-            "max_throughput_phase_multiplier": getattr(
-                self, "_max_throughput_phase_multiplier", 1.0
-            ),
-            "last_reset_at": self._last_reset_at,
         }
+
+    @property
+    def extra_restore_state_data(self) -> ExtraStoredData | None:
+        return _PowerRestoreData(
+            last_lifetime_kwh=self._last_lifetime_kwh,
+            last_energy_ts=self._last_energy_ts,
+            last_sample_ts=self._last_sample_ts,
+            last_power_w=self._last_power_w,
+            last_window_seconds=self._last_window_s,
+            method=self._last_method,
+            last_reset_at=self._last_reset_at,
+        )
 
 
 class EnphaseChargingLevelSensor(EnphaseBaseEntity, SensorEntity):  # type: ignore[misc]
@@ -2423,112 +2484,11 @@ class EnphaseLastReportedSensor(EnphaseBaseEntity, SensorEntity):  # type: ignor
                 return None
             return text or None
 
-        def _localize(value: object) -> str | None:
-            if value in (None, ""):
-                return None
-            try:
-                if isinstance(value, (int, float)):
-                    dt = datetime.fromtimestamp(float(value), tz=timezone.utc)
-                elif isinstance(value, str):
-                    cleaned = value.strip()
-                    if not cleaned:
-                        return None
-                    if cleaned.endswith("[UTC]"):
-                        cleaned = cleaned[:-5]
-                    if cleaned.endswith("Z"):
-                        cleaned = cleaned[:-1] + "+00:00"
-                    dt = datetime.fromisoformat(cleaned)
-                else:
-                    return None
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-                return dt_util.as_local(dt).isoformat(timespec="seconds")  # type: ignore[no-any-return]
-            except Exception:  # noqa: BLE001
-                return None
-
-        interval_raw = self.data.get("reporting_interval")
-        attrs = {
-            "reporting_interval": _as_int(interval_raw),
+        return {
+            "reporting_interval": _as_int(self.data.get("reporting_interval")),
             "connection": _clean_text(self.data.get("connection")),
-            "ip_address": _clean_text(self.data.get("ip_address")),
-            "mac_address": _clean_text(self.data.get("mac_address")),
-            "network_interface_count": _as_int(
-                self.data.get("network_interface_count")
-            ),
-            "operating_voltage": _as_int(self.data.get("operating_v")),
-            "charger_timezone": _clean_text(self.data.get("charger_timezone")),
-            "firmware_version": _clean_text(self.data.get("firmware_version")),
-            "system_version": _clean_text(self.data.get("system_version")),
-            "application_version": _clean_text(self.data.get("application_version")),
-            "software_version": _clean_text(self.data.get("sw_version")),
-            "hardware_version": _clean_text(self.data.get("hw_version")),
-            "processor_board_version": _clean_text(
-                self.data.get("processor_board_version")
-            ),
-            "power_board_version": _clean_text(self.data.get("power_board_version")),
-            "kernel_version": _clean_text(self.data.get("kernel_version")),
-            "bootloader_version": _clean_text(self.data.get("bootloader_version")),
-            "default_route": _clean_text(self.data.get("default_route")),
-            "wifi_config": _clean_text(self.data.get("wifi_config")),
-            "cellular_config": _clean_text(self.data.get("cellular_config")),
-            "warranty_start_date": _localize(self.data.get("warranty_start_date")),
-            "warranty_due_date": _localize(self.data.get("warranty_due_date")),
-            "warranty_period_years": _as_int(self.data.get("warranty_period_years")),
-            "created_at": _localize(self.data.get("created_at")),
-            "breaker_rating": _as_int(self.data.get("breaker_rating")),
-            "rated_current": _as_int(self.data.get("rated_current")),
-            "grid_type": _as_int(self.data.get("grid_type")),
-            "phase_count": _as_int(self.data.get("phase_count")),
-            "phase_switch_config": _clean_text(self.data.get("phase_switch_config")),
-            "default_charge_level": _clean_text(self.data.get("default_charge_level")),
-            "commissioning_status": _as_int(self.data.get("commissioning_status")),
             "is_connected": _as_bool(self.data.get("is_connected")),
-            "is_locally_connected": _as_bool(self.data.get("is_locally_connected")),
-            "ho_control": _as_bool(self.data.get("ho_control")),
-            "gateway_connection_count": _as_int(
-                self.data.get("gateway_connection_count")
-            ),
-            "gateway_connected_count": _as_int(
-                self.data.get("gateway_connected_count")
-            ),
-            "gateway_last_connection_at": _localize(
-                self.data.get("gateway_last_connection_at")
-            ),
-            "functional_validation_state": _as_int(
-                self.data.get("functional_validation_state")
-            ),
-            "functional_validation_updated_at": _localize(
-                self.data.get("functional_validation_updated_at")
-            ),
         }
-        gateway_details = self.data.get("gateway_connectivity_details")
-        if isinstance(gateway_details, list):
-            attrs["gateway_connectivity_details"] = [  # type: ignore[assignment]
-                {
-                    **(
-                        {"status": _as_int(detail.get("status"))}
-                        if _as_int(detail.get("status")) is not None
-                        else {}
-                    ),
-                    **(
-                        {"failure_reason": _as_int(detail.get("failure_reason"))}
-                        if _as_int(detail.get("failure_reason")) is not None
-                        else {}
-                    ),
-                    **(
-                        {
-                            "last_connection_at": _localize(
-                                detail.get("last_connection_at")
-                            )
-                        }
-                        if _localize(detail.get("last_connection_at")) is not None
-                        else {}
-                    ),
-                }
-                for detail in gateway_details
-                if isinstance(detail, dict)
-            ]
-        return attrs
 
 
 class EnphaseChargeModeSensor(EnphaseBaseEntity, SensorEntity):  # type: ignore[misc]
