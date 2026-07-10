@@ -162,6 +162,44 @@ async def test_optional_enlighten_reads_reserve_capacity_for_core(monkeypatch) -
     assert second_optional_entered.is_set() is True
 
 
+@pytest.mark.asyncio
+async def test_optional_read_reauth_does_not_deadlock_on_held_limiter(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(api, "_enlighten_read_semaphore", asyncio.Semaphore(2))
+    monkeypatch.setattr(api, "_enlighten_optional_read_semaphore", asyncio.Semaphore(1))
+    session = FakeSession(
+        [
+            FakeResponse(status=401),
+            FakeResponse(json_body={"refreshed": True}),
+            FakeResponse(json_body={"ok": True}),
+        ]
+    )
+    client = api.EnphaseEVClient(session, "SITE", None, None, timeout=1)
+
+    async def _reauth() -> bool:
+        payload = await api._request_json(
+            session,
+            "GET",
+            f"{api.BASE_URL}/login/refresh",
+            timeout=0.2,
+        )
+        return payload == {"refreshed": True}
+
+    client.set_reauth_callback(_reauth)
+    with api.enlighten_optional_read_scope():
+        payload = await asyncio.wait_for(
+            client._json("GET", f"{api.BASE_URL}/service/optional"), timeout=0.5
+        )
+
+    assert payload == {"ok": True}
+    assert [call[1] for call in session.calls] == [
+        f"{api.BASE_URL}/service/optional",
+        f"{api.BASE_URL}/login/refresh",
+        f"{api.BASE_URL}/service/optional",
+    ]
+
+
 def test_cookie_header_from_map_empty() -> None:
     assert api._cookie_header_from_map(None) == ""
     assert api._cookie_header_from_map({}) == ""
