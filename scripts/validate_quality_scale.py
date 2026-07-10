@@ -87,6 +87,11 @@ STRICT_CONFIG_ENTRY_ALIASES = (
     "type EnphaseConfigEntry = ConfigEntry[EnphaseRuntimeData]",
 )
 EXTERNAL_CONFIG_ENTRY_MARKER = "quality-scale: external-config-entry"
+STRICT_TYPING_COMMAND = (
+    "mypy --strict --ignore-missing-imports --follow-imports=skip "
+    "custom_components/enphase_ev"
+)
+PINNED_MYPY_REQUIREMENT = "mypy==2.2.0"
 BRANDS_GITHUB_API_URL = (
     "https://api.github.com/repos/home-assistant/brands/contents/"
     "custom_integrations/{domain}"
@@ -233,6 +238,55 @@ def _validate_strict_typing_contract(root: Path) -> list[str]:
     integration_root = root / "custom_components" / "enphase_ev"
     runtime_data_path = integration_root / "runtime_data.py"
     messages: list[str] = []
+
+    requirements_path = root / "devtools" / "docker" / "requirements-dev.txt"
+    if not requirements_path.exists():
+        messages.append("ERROR: devtools/docker/requirements-dev.txt is missing")
+    else:
+        requirements = {
+            line.strip()
+            for line in requirements_path.read_text().splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+        if PINNED_MYPY_REQUIREMENT not in requirements:
+            messages.append(
+                f"ERROR: dev requirements must pin {PINNED_MYPY_REQUIREMENT}"
+            )
+
+    workflow_path = root / ".github" / "workflows" / "tests.yml"
+    if not workflow_path.exists():
+        messages.append("ERROR: .github/workflows/tests.yml is missing")
+    else:
+        try:
+            workflow = _load_yaml(workflow_path)
+        except yaml.YAMLError as err:
+            messages.append(
+                f"ERROR: .github/workflows/tests.yml is invalid YAML: {err}"
+            )
+        else:
+            jobs = workflow.get("jobs")
+            quality_scale_job = (
+                jobs.get("quality-scale") if isinstance(jobs, dict) else None
+            )
+            steps = (
+                quality_scale_job.get("steps")
+                if isinstance(quality_scale_job, dict)
+                else None
+            )
+            if not isinstance(steps, list):
+                steps = []
+            strict_commands = {
+                " ".join(run.split())
+                for step in steps
+                if isinstance(step, dict)
+                if isinstance((run := step.get("run")), str)
+                if run.lstrip().startswith("mypy ")
+            }
+            if STRICT_TYPING_COMMAND not in strict_commands:
+                messages.append(
+                    "ERROR: tests workflow must run the exact full-package strict "
+                    f"typing command: {STRICT_TYPING_COMMAND}"
+                )
 
     strict_typing_path = root / ".strict-typing"
     if not strict_typing_path.exists():

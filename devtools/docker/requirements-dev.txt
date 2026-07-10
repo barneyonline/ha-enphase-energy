@@ -4,7 +4,7 @@ pytest-asyncio
 pytest-homeassistant-custom-component
 pytest-cov
 PyYAML
-mypy
+mypy==2.2.0
 ruff
 black
 freezegun
