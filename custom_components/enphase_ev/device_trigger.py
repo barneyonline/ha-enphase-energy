@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Awaitable, Callable
+from typing import Any, cast
 
 try:
     from homeassistant.components.automation.triggers import state as state_trigger
 except ModuleNotFoundError:
     from homeassistant.components.homeassistant.triggers import state as state_trigger
 from homeassistant.const import STATE_OFF, STATE_ON
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN
@@ -54,9 +55,9 @@ async def async_get_triggers(
 async def async_attach_trigger(
     hass: HomeAssistant,
     config: dict[str, Any],
-    action,
+    action: Callable[[dict[str, Any]], Awaitable[None]],
     automation_info: dict[str, Any],
-):
+) -> CALLBACK_TYPE:
     """Attach a state trigger for the selected device trigger type."""
     ent_reg = er.async_get(hass)
     device_id = config["device_id"]
@@ -82,6 +83,9 @@ async def async_attach_trigger(
     if meta.get("from"):
         state_cfg["from"] = meta["from"]
 
-    return await state_trigger.async_attach_trigger(
-        hass, state_cfg, action, automation_info, platform_type="device"
+    return cast(
+        CALLBACK_TYPE,
+        await state_trigger.async_attach_trigger(
+            hass, state_cfg, action, automation_info, platform_type="device"
+        ),
     )

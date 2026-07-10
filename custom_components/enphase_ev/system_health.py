@@ -1,12 +1,22 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import TypeVar, cast
+
 from homeassistant.components import system_health
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant, callback as ha_callback
 
 from .const import BASE_URL, DOMAIN
 from .runtime_data import get_runtime_data
 
 HEALTH_CAPTURE_ERRORS = (RuntimeError, TypeError, ValueError, AttributeError)
+_CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
+
+
+def callback(func: _CallbackT) -> _CallbackT:
+    """Apply Home Assistant's callback marker with its identity type preserved."""
+
+    return cast(_CallbackT, ha_callback(func))
 
 
 @callback
@@ -16,7 +26,7 @@ def async_register(
     register.async_register_info(system_health_info)
 
 
-async def system_health_info(hass: HomeAssistant):
+async def system_health_info(hass: HomeAssistant) -> dict[str, object]:
     entries = hass.config_entries.async_entries(DOMAIN)
     site_infos: list[dict[str, object]] = []
 
@@ -31,7 +41,7 @@ async def system_health_info(hass: HomeAssistant):
             collect_site_metrics = getattr(coord, "collect_site_metrics", None)
             if callable(collect_site_metrics):
                 try:
-                    metrics = collect_site_metrics()
+                    metrics = cast(dict[str, object], collect_site_metrics())
                 except HEALTH_CAPTURE_ERRORS:
                     metrics = {"site_id": entry_site_id}
         if metrics.get("site_id") is None and entry_site_id is not None:
