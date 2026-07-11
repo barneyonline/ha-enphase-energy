@@ -484,6 +484,7 @@ async def test_reauth_allows_empty_device_selection(hass) -> None:
     chargers = [ChargerInfo(serial="EV123", name="Driveway Charger")]
 
     with (
+        patch.object(hass.config_entries, "async_reload", AsyncMock()) as mock_reload,
         patch(
             "custom_components.enphase_ev.config_flow.async_authenticate",
             AsyncMock(return_value=(tokens, sites)),
@@ -517,6 +518,7 @@ async def test_reauth_allows_empty_device_selection(hass) -> None:
 
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
+    mock_reload.assert_awaited_once_with(entry.entry_id)
 
 
 @pytest.mark.asyncio

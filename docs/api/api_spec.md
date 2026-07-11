@@ -56,9 +56,11 @@ Example response:
 
 - **Auth and discovery:** `1.1`, `6.1`-`6.6`
 - **Site/system inventory and telemetry:** `2.9`-`2.21`
+- **Enlighten Manager and installer diagnostics:** `2.24`-`2.29`
 - **EV charger telemetry and metadata:** `2.1`-`2.8`
 - **EV charger controls and scheduling:** `3.1`-`3.3`, `4.1`-`4.5`
 - **BatteryConfig controls:** `5.1`-`5.11`
+- **Activation grid profile controls:** `5A.1`-`5A.5`
 - **Cross-cutting references:** `7`, `8`, `9`
 
 ### 1.3 Table of Contents
@@ -70,9 +72,11 @@ Example response:
 - `2. Core Site and Device Endpoints`
 - `2.F HEMS (IQ Energy Router / Heat Pump Monitoring)`
 - `2.G Mobile/Web Shared Constants`
+- `2.H Remaining Enlighten Manager and Installer Read Endpoints`
 - `3. EV Charger Control Operations`
 - `4. EV Scheduler (Charge Mode) API`
 - `5. BatteryConfig APIs (System Profile and Battery Controls)`
+- `5A. Activation Grid Profile APIs (Installer-Level)`
 - `6. Authentication Flow (Shared Across Services)`
 - `7. Response Field Reference`
 - `8. Error Handling and Rate Limiting`
@@ -137,6 +141,17 @@ Status labels:
 | System dashboard device tree | `GET` | `/service/system_dashboard/api_internal/dashboard/sites/<site_id>/devices-tree` | dashboard-read headers: authenticated cookies, optional bearer | Runtime |
 | Standing alarms | `GET` | `/service/system_dashboard/api_internal/dashboard/sites/<site_id>/alarms` | dashboard-read headers: authenticated cookies, optional bearer | Browser capture only |
 | System dashboard device details | `GET` | `/service/system_dashboard/api_internal/dashboard/sites/<site_id>/devices_details?type=<type>` | dashboard-read headers: authenticated cookies, optional bearer | Runtime |
+| System configuration | `GET` | `/service/enlm_ms/api_internal/<site_id>/system_config` | dashboard-read headers: authenticated cookies, optional bearer, XSRF when present | Browser capture only |
+| Dashboard A/B feature catalog | `GET` | `/service/system_dashboard/api_internal/dashboard/ab_features?feature[email]=<email>&feature[company_id]=<company_id>&feature[site_id]=<site_id>` | authenticated session cookies; response and request contain sensitive account identifiers | Browser capture only |
+| Dashboard account profile | `GET` | `/service/system_dashboard/api_internal/ms/account` | authenticated session cookies; response contains a credential-bearing token | Browser capture only |
+| Enlighten shell account metadata | `GET` | `/service/enlm_ms/api_internal/account/data` | authenticated session cookies | Browser capture only |
+| Activation-log query | `POST` | `/service/system_dashboard/api_internal/dashboard/sites/<site_id>/activation_logs?range=<range>&type=table&page=<page>&per_page=<n>` | dashboard-read headers + JSON filter body; read-only despite `POST` | Browser capture only |
+| ITK raw-log query | `POST` | `/service/system_dashboard/api_internal/dashboard/sites/<site_id>/itk_raw_logs` | dashboard-read headers + JSON filter body; read-only despite `POST` | Browser capture only |
+| Enlighten-log inventory | `GET` | `/service/system_dashboard/api_internal/dashboard/sites/<site_id>/enho_logs?range=<range>&type=table&page=<page>&per_page=<n>` | dashboard-read headers | Browser capture only |
+| Diagnostic task definitions | `GET` | `/service/system_dashboard/api_internal/cs/sites/<site_id>/task_types` | dashboard-read headers | Browser capture only |
+| Diagnostic task history | `GET` | `/service/system_dashboard/api_internal/cs/sites/<site_id>/tasks?page=<page>&per_page=<n>` | dashboard-read headers | Browser capture only |
+| PLC FFT MQTT bootstrap | `GET` | `/service/system_dashboard/api_internal/dashboard/fft_scan?serial_number=<gateway_sn>&mode=<mode>` | dashboard-read headers; response contains short-lived AWS IoT credentials | Browser capture only |
+| Generator/live MQTT bootstrap | `GET` | `/admin/aws_sigv4/livestream?serial_num=<gateway_sn>` | authenticated session cookies; response contains short-lived AWS IoT credentials | Browser capture only |
 | Site lifetime energy | `GET` | `/pv/systems/<site_id>/lifetime_energy` | `e-auth-token` + cookies | Runtime |
 | Homeowner events | `GET` | `/service/events-platform-service/v1.0/<site_id>/events/homeowner` | `e-auth-token` + cookies | Not implemented |
 | Battery backup history | `GET` | `/app-api/<site_id>/battery_backup_history.json` | `e-auth-token` + cookies | Runtime |
@@ -145,6 +160,21 @@ Status labels:
 | Microinverter inventory | `GET` | `/app-api/<site_id>/inverters.json` | `e-auth-token` + cookies | Runtime |
 | Microinverter array layout | `GET` | `/systems/<site_id>/site_array_layout_x` | authenticated Enlighten session cookies | Browser capture only |
 | Microinverter jellyfish bootstrap | `GET` | `/systems/<site_id>/jellyfish_initializer?range=<range>&view=<view>` | authenticated Enlighten session cookies | Browser capture only |
+| EV supported-country catalog | `GET` | `/service/evse_management/api/v1/config/supported_countries` | authenticated session cookies | Browser capture only |
+| Manager site weather | `GET` | `/systems/<site_id>/weather.json?locale=<locale>` | authenticated session cookies + browser XHR headers | Browser capture only |
+| Manager site statistics fragment | `GET` | `/systems/<site_id>/show_stat_data` | authenticated session cookies + browser XHR headers | Browser capture only |
+| Manager date-range production | `GET` | `/systems/<site_id>/energy?start_date=<YYYY-MM-DD>&end_date=<YYYY-MM-DD>` | authenticated session cookies + browser XHR headers | Browser capture only |
+| Manager lifetime production | `GET` | `/systems/<site_id>/energy_lifetime?all_production_sources=true` | authenticated session cookies + browser XHR headers | Browser capture only |
+| Manager lifetime estimate | `GET` | `/systems/<site_id>/energy_lifetime_est` | authenticated session cookies + browser XHR headers | Browser capture only |
+| Manager lifetime consumption | `GET` | `/systems/<site_id>/consumption_lifetime` | authenticated session cookies + browser XHR headers | Browser capture only |
+| Manager lifetime EV consumption | `GET` | `/systems/<site_id>/evse_consumption_lifetime` | authenticated session cookies + browser XHR headers | Browser capture only |
+| Manager EV power timeseries | `GET` | `/systems/<site_id>/evse_power_timeseries?days=<days>&date=<YYYY-MM-DD>` | authenticated session cookies + browser XHR headers | Browser capture only |
+| Manager Microinverter DataTables feed | `GET` | `/systems/<site_id>/pcu_datatable.js?<datatable_query>` | authenticated session cookies + browser XHR headers | Browser capture only |
+| Manager event feeds | `GET` | `/systems/<site_id>/events.json?<datatable_query>` and device-scoped variants | authenticated session cookies + browser XHR headers | Browser capture only |
+| Manager Microinverter statistics | `GET` | `/systems/<site_id>/inverters/<inverter_id>/show_stat_data_x` | authenticated session cookies + browser XHR headers | Browser capture only |
+| Manager Microinverter multistat timeseries | `GET` | `/systems/<site_id>/inverters/<inverter_id>/time_series_x?date=<YYYY-MM-DD>&stat=<csv>` | authenticated session cookies + browser XHR headers | Browser capture only |
+| Array Builder block status | `GET` | `/service/array-builder/api/<site_id>/v1-block-status` | authenticated session cookies | Browser capture only |
+| Manager Settings fragments | `GET` | `/enlm_internal/site_photos?site_id=<site_id>`, `/systems/<site_id>/third_party_reporting_details`, `/systems/<site_id>/async_tariff_details` | authenticated session cookies; tariff fragment may embed short-lived session material | Browser capture only |
 | Battery status | `GET` | `/pv/settings/<site_id>/battery_status.json` | `e-auth-token` + cookies | Runtime |
 | AC Battery devices page | `GET` | `/systems/<site_id>/devices?status=active` | `e-auth-token` + cookies; browser-style HTML headers | Runtime |
 | AC Battery detail page | `GET` | `/systems/<site_id>/ac_batteries/<battery_id>` | `e-auth-token` + cookies; browser-style HTML headers | Runtime |
@@ -173,6 +203,11 @@ Status labels:
 | BatteryConfig schedule update | `PUT` | `/service/batteryConfig/api/v1/battery/sites/<site_id>/schedules/<schedule_id>` | BatteryConfig write shape plus `X-XSRF-Token`; ordinary time/limit edits can omit `isEnabled`, while explicit schedule-entry toggle writes may include it; verified working update uses the raw-cookie browser request (`Cookie`, `e-auth-token`, `Username`, `X-XSRF-Token`, `X-Requested-With`) from a stateless client session; current client falls back across cookie-backed, primary, lean, and mixed-auth variants | Runtime |
 | BatteryConfig schedule legacy delete alias | `POST` | `/service/batteryConfig/api/v1/battery/sites/<site_id>/schedules/<schedule_id>/delete` | same BatteryConfig write planner as schedule create/update; cookie-backed browser request is the verified working compatibility shape on affected sites | Runtime |
 | BatteryConfig disclaimer accept | `POST` | `/service/batteryConfig/api/v1/batterySettings/acceptDisclaimer/<site_id>` | same BatteryConfig write planner as other battery settings mutations | Runtime |
+| Activation reference data | `GET` | `/service/activation_service/api/details/reference_data` | Activation UI authenticated session cookies plus `enlm-token` / manager token context; browser capture did not include an explicit `Authorization` header | Runtime |
+| Activation record | `GET` | `/service/activation_backend/api/gateway/v4/activations/<site_id>?expand=owner,host` | Activation UI authenticated session cookies plus Activation bearer auth; requires account role with Activation access | Runtime |
+| Activation device list and grid-profile status | `GET` | `/service/activation_backend/api/gateway/v4/systems/<site_id>/devices/list` | Activation UI authenticated session cookies plus `Authorization: Bearer <activation_jwt>`; requires installer-level Activation access | Runtime |
+| Grid profile discovery | `POST` | `/service/activation_backend/api/gateway/v4/systems/<site_id>/grid_profiles_filtered` | Activation UI authenticated session cookies plus `Authorization: Bearer <activation_jwt>`; requires installer-level Activation access | Runtime |
+| Apply grid profile | `PUT` | `/service/activation_backend/api/gateway/v4/systems/<site_id>/envoys` | same Activation UI bearer/cookie shape as discovery; requires installer-level Activation access | Runtime |
 | PES in-app banner/status | `GET` | `/service/pes_management/systems/<site_id>/inapp?type=<type>` | authenticated session cookies | Browser capture only |
 | Login | `POST` | `/login/login.json` | credentials; session/XSRF cookies are established by the response rather than pre-required | Runtime |
 
@@ -4636,6 +4671,706 @@ Implementation notes:
 
 ---
 
+### 2.H Remaining Enlighten Manager and Installer Read Endpoints
+
+The contracts in `2.24`-`2.29` were captured on 2026-07-11 while navigating the authenticated installer System Dashboard and the legacy Enlighten Manager View, Graph, Reports, Devices, Events, Live Status, Summary, and Settings surfaces. They are documentation-only unless another section explicitly marks them as runtime endpoints.
+
+Privacy rules for this capture:
+
+- Site, account, company, user, gateway, device, channel, meter, task, and event identifiers are represented by placeholders.
+- Email addresses, phone numbers, site names, addresses, serial numbers, IP addresses, modem identifiers, tokens, cookies, MQTT topics, firmware paths, and authenticated download URLs are omitted or redacted.
+- Dynamic JSON keys can themselves be serial numbers or other identifiers and must be redacted before logging.
+- Account-profile and MQTT-bootstrap payloads must never be stored verbatim in diagnostics.
+
+Common System Dashboard request shape:
+
+```http
+Accept: application/json
+Content-Type: application/json
+Referer: https://enlighten.enphaseenergy.com/app/system_dashboard/sites/<site_id>/...
+Cookie: <authenticated_session_cookies>
+Authorization: Bearer <token>  # endpoint/session dependent
+X-XSRF-Token: <xsrf_token>    # endpoint/session dependent
+```
+
+Common legacy Manager XHR shape:
+
+```http
+Accept: application/json, text/javascript, */*; q=0.01
+X-Requested-With: XMLHttpRequest
+Referer: https://enlighten.enphaseenergy.com/systems/<site_id>/<manager_screen>
+Cookie: <authenticated_session_cookies>
+```
+
+#### 2.24 Dashboard account, configuration, and feature metadata
+
+##### 2.24.1 System configuration
+
+```http
+GET /service/enlm_ms/api_internal/<site_id>/system_config
+```
+
+Confirmed top-level groups:
+
+```json
+{
+  "battery_rating_info": {},
+  "site_pel_settings_config": {},
+  "pcs_settings_config": {},
+  "battery_pcs_settings_config": {},
+  "sspl_settings_config": {},
+  "phase_imbalance_info": {}
+}
+```
+
+Observed data covered grid voltage/country, production export limiting, PEL timing, storage power-control settings, battery current and fuse limits, import/generation limiting, per-phase breaker ratings, and phase-imbalance information. The exact groups are capability dependent.
+
+##### 2.24.2 Dashboard A/B feature catalog
+
+```http
+GET /service/system_dashboard/api_internal/dashboard/ab_features
+    ?feature[email]=<email>
+    &feature[company_id]=<company_id_or_null>
+    &feature[site_id]=<site_id>
+```
+
+```json
+[
+  {
+    "feature_id": "<feature_key>",
+    "feature_type": "<feature_type>",
+    "is_enabled": true
+  }
+]
+```
+
+The request itself contains private account identifiers. Do not log its query string without replacing the email, company ID, and site ID.
+
+##### 2.24.3 Dashboard account profile
+
+```http
+GET /service/system_dashboard/api_internal/ms/account
+```
+
+Sanitized shape excerpt:
+
+```json
+{
+  "user_id": "<user_id>",
+  "company_id": "<company_id>",
+  "company_name": "<company_name>",
+  "first_name": "<first_name>",
+  "last_name": "<last_name>",
+  "email": "<email>",
+  "phone": "<phone>",
+  "roles": ["<role>"],
+  "locale": "<locale>",
+  "country": "<country_code>",
+  "token": "<credential_redacted>"
+}
+```
+
+Other observed fields included account status, preferred metric, impersonation state, community URL, pending email, admin/consumer/self-installer flags, and company role metadata. The `token` field is a credential and must never enter diagnostics or logs.
+
+##### 2.24.4 Enlighten shell account metadata
+
+```http
+GET /service/enlm_ms/api_internal/account/data
+```
+
+```json
+{
+  "banner_notices": [],
+  "company_master_data": {},
+  "available_locales": [],
+  "footer_links": {},
+  "phone_country_codes": []
+}
+```
+
+This is account-shell metadata rather than site telemetry. Nested company and link records can contain private identifiers and should be summarized rather than retained verbatim.
+
+#### 2.25 Dashboard logs, diagnostic history, and MQTT bootstraps
+
+The two log endpoints below use `POST` only to submit read filters; no state change was observed.
+
+##### 2.25.1 Activation logs
+
+```http
+POST /service/system_dashboard/api_internal/dashboard/sites/<site_id>/activation_logs
+    ?range=<range>
+    &type=table
+    &page=<page>
+    &per_page=<n>
+```
+
+```json
+{
+  "serial_numbers": ["<site_id>", "<device_sn>"],
+  "filter_columns": [
+    "local_timestamp",
+    "created_at",
+    "severity",
+    "activity_name",
+    "source",
+    "user"
+  ]
+}
+```
+
+```json
+{
+  "activation_logs": [],
+  "page": "1",
+  "per_page": "200",
+  "total": 0,
+  "csv_link": "<authenticated_url_redacted>"
+}
+```
+
+The captured date contained no rows. Any returned user identities, device serials, and authenticated `csv_link` must be redacted.
+
+##### 2.25.2 ITK raw logs
+
+```http
+POST /service/system_dashboard/api_internal/dashboard/sites/<site_id>/itk_raw_logs
+```
+
+```json
+{
+  "range": "today",
+  "version": "2.0",
+  "type": "table",
+  "onChangeSerialNumber": false,
+  "filter_columns": ["user", "timestamp", "download_link"],
+  "serial_numbers": ["<site_id>", "<device_sn>"]
+}
+```
+
+```json
+{
+  "itk_raw_logs": [],
+  "page": 1,
+  "per_page": 200,
+  "total": 0
+}
+```
+
+Download links are authenticated and must be removed from shared captures.
+
+##### 2.25.3 Enlighten logs
+
+```http
+GET /service/system_dashboard/api_internal/dashboard/sites/<site_id>/enho_logs
+    ?range=<range>
+    &type=table
+    &page=<page>
+    &per_page=<n>
+```
+
+```json
+{
+  "enho_logs": [],
+  "page": "1",
+  "per_page": "200",
+  "total": 0
+}
+```
+
+The production bundle omits `serial_numbers` from this request even when the UI has a device selection. The captured date contained no rows, so the row schema remains unconfirmed.
+
+##### 2.25.4 Diagnostic task definitions
+
+```http
+GET /service/system_dashboard/api_internal/cs/sites/<site_id>/task_types
+```
+
+```json
+{
+  "all_tasks": [
+    {
+      "task_type_id": 0,
+      "task_name": "<display_name>",
+      "task_key": "<task_key>",
+      "task_description": "<description>",
+      "input_required": false
+    }
+  ],
+  "envoys": [
+    {
+      "id": "<device_id>",
+      "serial_number": "<gateway_sn>"
+    }
+  ]
+}
+```
+
+This endpoint is read-only. It must not be confused with the separate task-submission route.
+
+##### 2.25.5 Diagnostic task history
+
+```http
+GET /service/system_dashboard/api_internal/cs/sites/<site_id>/tasks
+    ?page=<page>
+    &per_page=<n>
+    &sort_by_created_date=<optional_sort>
+    &task_name=<optional_name>
+    &task_id=<optional_id>
+```
+
+Sanitized response shape:
+
+```json
+{
+  "tasks": [
+    {
+      "task_id": "<task_id>",
+      "created_date": "<timestamp>",
+      "task_name": "<task_name>",
+      "envoy": "<gateway_sn>",
+      "task_params": "<redacted>",
+      "created_by": "<user_redacted>",
+      "completed_date": "<timestamp_or_null>",
+      "result": "<result>",
+      "cancel": false,
+      "response": "<redacted>",
+      "request": "<redacted>",
+      "env_log_url": "<authenticated_url_redacted>"
+    }
+  ],
+  "page": 1,
+  "per_page": 10,
+  "iTotalRecords": 0
+}
+```
+
+Task request/response data, creator identity, gateway serial, parameters, and log URLs are sensitive.
+
+##### 2.25.6 PLC FFT MQTT bootstrap
+
+```http
+GET /service/system_dashboard/api_internal/dashboard/fft_scan
+    ?serial_number=<gateway_sn>
+    &mode=<mode>
+```
+
+```json
+{
+  "fft_scan_duration": 0,
+  "fft_scan_topic": "<mqtt_topic_redacted>",
+  "site_id": "<site_id>",
+  "env": "<environment>",
+  "aws_iot_endpoint": "<endpoint_redacted>",
+  "aws_authorizer": "<credential_redacted>",
+  "aws_token_key": "<credential_redacted>",
+  "aws_token_value": "<credential_redacted>",
+  "aws_digest": "<credential_redacted>"
+}
+```
+
+This `GET` only bootstraps the MQTT connection. The separate UI Generate action initiates a PLC scan and was not invoked.
+
+##### 2.25.7 Generator/live MQTT bootstrap
+
+```http
+GET /admin/aws_sigv4/livestream?serial_num=<gateway_sn>
+```
+
+Sanitized response fields:
+
+```text
+live_stream_duration
+live_stream_topic
+dr_event_mode
+has_load_controls
+timeout
+site_id
+env
+aws_iot_endpoint
+aws_authorizer
+aws_token_key
+aws_token_value
+aws_digest
+```
+
+The topic, endpoint, authorizer, token, and digest values are credentials or connection secrets and must never be persisted or logged verbatim.
+
+#### 2.26 Enlighten Manager site metadata and energy series
+
+##### 2.26.1 EV supported-country catalog
+
+```http
+GET /service/evse_management/api/v1/config/supported_countries
+```
+
+```json
+{
+  "meta": {
+    "serverTimeStamp": "<timestamp>",
+    "rowCount": 0
+  },
+  "data": [
+    {
+      "name": "<country_name>",
+      "code": "<country_code>",
+      "region": "<region>",
+      "zipCodePattern": "<regex>",
+      "learnMoreUrl": "<public_url>",
+      "faqUrl": "<public_url>"
+    }
+  ],
+  "error": {}
+}
+```
+
+This is global EV configuration metadata, not site-specific state.
+
+##### 2.26.2 Site weather and statistics fragments
+
+```http
+GET /systems/<site_id>/weather.json?locale=<locale>
+```
+
+```json
+{
+  "string": "<localized_condition>",
+  "code": "<condition_code>",
+  "temperature": {
+    "value": 0,
+    "min": 0,
+    "max": 0,
+    "display": "<localized_temperature>"
+  }
+}
+```
+
+```http
+GET /systems/<site_id>/show_stat_data
+```
+
+`show_stat_data` returns `text/html`. The fragment contains localized today, seven-day, month-to-date, and lifetime production/consumption values, peak/latest production, and Microinverter AC voltage. Treat it as presentation HTML rather than a stable JSON schema.
+
+##### 2.26.3 Date-range and lifetime production
+
+```http
+GET /systems/<site_id>/energy
+    ?start_date=<YYYY-MM-DD>
+    &end_date=<YYYY-MM-DD>
+```
+
+```json
+{
+  "production": 0,
+  "start_date": "<YYYY-MM-DD>",
+  "end_date": "<YYYY-MM-DD>",
+  "inverter_count": 0
+}
+```
+
+```http
+GET /systems/<site_id>/energy_lifetime?all_production_sources=true
+```
+
+```json
+{
+  "system_id": "<site_id>",
+  "start_date": "<YYYY-MM-DD>",
+  "production": {
+    "micros": [0],
+    "meter": [0]
+  },
+  "pending": null,
+  "deleted": [0]
+}
+```
+
+The production arrays are daily, positionally aligned series.
+
+```http
+GET /systems/<site_id>/energy_lifetime_est
+```
+
+The estimate route returned HTTP `200` with `{}` on the captured site. The Graph page still identifies it as the lifetime estimate source.
+
+##### 2.26.4 Lifetime site and EV consumption
+
+```http
+GET /systems/<site_id>/consumption_lifetime
+```
+
+```json
+{
+  "start_date": "<YYYY-MM-DD>",
+  "consumption": [0]
+}
+```
+
+```http
+GET /systems/<site_id>/evse_consumption_lifetime
+```
+
+```json
+{
+  "evse_start_date": "<YYYY-MM-DD>",
+  "evse_consumption": [0],
+  "evse_consumption_phase": {
+    "L1(A)": {"phase_name": "L1(A)", "timeseries": null},
+    "L2(B)": {"phase_name": "L2(B)", "timeseries": null},
+    "L3(C)": {"phase_name": "L3(C)", "timeseries": null}
+  }
+}
+```
+
+The aggregate EV array was populated in the capture; the per-phase lifetime series were `null`.
+
+##### 2.26.5 EV charging power timeseries
+
+```http
+GET /systems/<site_id>/evse_power_timeseries
+    ?days=<integer>
+    &date=<YYYY-MM-DD>
+```
+
+```json
+{
+  "evse_consumption": [0],
+  "evse_consumption_phase": {
+    "L1(A)": {"phase_name": "L1(A)", "timeseries": [0]},
+    "L2(B)": {"phase_name": "L2(B)", "timeseries": [0]},
+    "L3(C)": {"phase_name": "L3(C)", "timeseries": [0]}
+  },
+  "start_date": 0
+}
+```
+
+The Manager Graph page requests this alongside site `power_time_series` data.
+
+#### 2.27 Enlighten Manager device and event feeds
+
+##### 2.27.1 Microinverter DataTables inventory
+
+```http
+GET /systems/<site_id>/pcu_datatable.js?<datatable_query>
+```
+
+Observed DataTables 1.x parameters included:
+
+```text
+sEcho, iColumns, sColumns, iDisplayStart, iDisplayLength,
+mDataProp_<n>, sSearch, sSearch_<n>, bRegex, bRegex_<n>,
+bSearchable_<n>, iSortCol_0, sSortDir_0, iSortingCols,
+bSortable_<n>, in_mobile_view, visible_columns, sCompanies, eDeviceID
+```
+
+```json
+{
+  "iTotalRecords": 0,
+  "iTotalDisplayRecords": 0,
+  "sEcho": 1,
+  "aaData": [
+    ["<cell_html_or_value>"]
+  ]
+}
+```
+
+The observed column order covered serial/part identifiers, phase, AC/DC electrical values, temperature, power, lifetime energy, SKU/assembly data, last report, status, reporting gateway, device group, and warranty. Cells can contain HTML with identifiers and authenticated links; sanitize markup before reuse.
+
+##### 2.27.2 Site and device event DataTables feeds
+
+```http
+GET /systems/<site_id>/events.json?<datatable_query>
+GET /systems/<site_id>/envoys/<gateway_id>/events.json?<datatable_query>&eDeviceID=<gateway_id>
+GET /systems/<site_id>/envoys/<gateway_id>/modem_events.json?<datatable_query>&eDeviceID=<gateway_id>
+GET /systems/<site_id>/inverters/<inverter_id>/events.json?<datatable_query>&eDeviceID=<inverter_id>
+```
+
+The fixed columns are `status,severity,device,event_type,first_set`.
+
+```json
+{
+  "iTotalRecords": 0,
+  "iTotalDisplayRecords": 0,
+  "sEcho": 1,
+  "aaData": [],
+  "availablePages": {
+    "next_pointers": {},
+    "last_offset": 0
+  }
+}
+```
+
+The capture returned no matching rows, so the populated `aaData` cell schema remains unconfirmed.
+
+##### 2.27.3 Microinverter statistics and multistat telemetry
+
+```http
+GET /systems/<site_id>/inverters/<inverter_id>/show_stat_data_x
+```
+
+This route returns localized `text/html` containing today, seven-day, month-to-date, and lifetime energy plus AC voltage.
+
+```http
+GET /systems/<site_id>/inverters/<inverter_id>/time_series_x
+    ?date=<YYYY-MM-DD>
+    &stat=POWR,DCV,DCA,ACV,ACHZ,TMPI
+```
+
+```json
+{
+  "date": "<YYYY-MM-DD>",
+  "ch_id": "<channel_id>",
+  "POWR": [[0, 0, 0]],
+  "DCV": [[0, 0]],
+  "DCA": [[0, 0]],
+  "ACV": [[0, 0]],
+  "ACHZ": [[0, 0]],
+  "TMPI": [[0, 0]],
+  "stat_info": {
+    "POWR": {"name": "<label>", "format": {}, "range": {}},
+    "TMPI": {
+      "name": "<label>",
+      "format": {},
+      "range": {},
+      "preferred_temperature_unit": "<unit>"
+    }
+  }
+}
+```
+
+`stat_info` also supplies metadata for DC voltage/current, AC voltage/frequency, and temperature. The Graph screen made one request per day for a seven-day view.
+
+#### 2.28 Enlighten Manager Settings and server-rendered documents
+
+##### 2.28.1 Settings fragments
+
+```http
+GET /service/array-builder/api/<site_id>/v1-block-status
+```
+
+```json
+{
+  "blocked": false
+}
+```
+
+```http
+GET /enlm_internal/site_photos?site_id=<site_id>
+GET /systems/<site_id>/third_party_reporting_details
+GET /systems/<site_id>/async_tariff_details
+```
+
+- `site_photos` returns an HTML fragment; the captured response was effectively empty.
+- `third_party_reporting_details` returned HTTP `204 No Content` on the captured site.
+- `async_tariff_details` returns an HTML fragment linking to tariff, battery, system-profile, and optional optimization applications. It can embed user/site identifiers and short-lived session material, so only its structural presence should be logged.
+
+##### 2.28.2 Confirmed server-rendered Manager documents
+
+The legacy Manager transports substantial read-only state in authenticated HTML rather than JSON. These routes returned HTTP `200` during normal navigation:
+
+| Route | Data carried by the HTML response |
+| --- | --- |
+| `/systems/<site_id>/arrays` | View metadata, graph paths, date ranges, and playback options |
+| `/systems/<site_id>/graphs` | Graph metadata and source URLs |
+| `/systems/<site_id>/reports` | Site report types and generation form |
+| `/systems/<site_id>/devices` | Gateway, meter, Microinverter, battery, controller, EVSE, modem, firmware, status, energy, and warranty fields |
+| `/systems/<site_id>/events` | Event filters and DataTables setup |
+| `/systems/<site_id>/overview` | Summary tiles and chart source metadata |
+| `/systems/<site_id>/details` | Settings form state and embedded fragment URLs |
+| `/systems/<site_id>/envoys/<gateway_id>` | Gateway firmware/status, IEEE 2030.5 state, communications, PLC, device counts, report settings, and limiting state |
+| `/systems/<site_id>/envoys/<gateway_id>/events` | Gateway event table shell |
+| `/systems/<site_id>/envoys/<gateway_id>/modem` | Carrier/plan, ICCID/IMEI, SIM/APN, signal, firmware, heartbeat, and SINR metadata |
+| `/systems/<site_id>/envoys/<gateway_id>/modem_events` | Modem event table shell |
+| `/systems/<site_id>/meters/<meter_id>` | Meter type, phase, state, serial, polarity, lifetime offset, and start date |
+| `/systems/<site_id>/inverters/<inverter_id>/arrays` | Per-Microinverter View and energy sidebar |
+| `/systems/<site_id>/inverters/<inverter_id>/graphs` | Per-Microinverter Graph metadata |
+| `/systems/<site_id>/inverters/<inverter_id>/reports` | Per-Microinverter report form |
+| `/systems/<site_id>/inverters/<inverter_id>/events` | Per-Microinverter event table shell |
+
+Modem identifiers, site addresses, access lists, user details, device serials, firmware values, and embedded authenticity tokens are sensitive and are intentionally absent from this specification.
+
+##### 2.28.3 Embedded application shells
+
+```http
+GET /app/installer_evse/evse/sites/<site_id>/devices?locale=<locale>
+GET /app/system_dashboard/external/<site_id>/compliance?locale=<locale>
+```
+
+Both returned HTML application shells. A `200` shell response does not prove that the embedded application's subsequent data APIs loaded successfully.
+
+#### 2.29 Source-backed read candidates not invoked
+
+The following contracts were present in authenticated HTML or the production JavaScript bundle but were deliberately not invoked. They are not confirmed response contracts and must not be treated as runtime requirements.
+
+##### 2.29.1 Manager reports and export forms
+
+```http
+POST /systems/<site_id>/generate_rpt
+Content-Type: application/x-www-form-urlencoded
+```
+
+Common fields:
+
+```text
+authenticity_token=<csrf_token>
+report[title]=<localized_report_title>
+report[type]=<integer_code>
+commit=<submit_label>
+```
+
+Conditional fields cover date/week/month/year ranges, device selection, interval size, metadata inclusion, production/consumption/battery ranges, gateway/array reports, and EV daily/session reports. Observed report type codes included site production/power, per-module production, meter, grid profile, site consumption, battery, gateway/array production, and EV charging reports. The form was inspected but not submitted, so no response body was captured.
+
+```http
+POST /systems/<site_id>/inverters/<inverter_id>/generate_report
+Content-Type: application/x-www-form-urlencoded
+```
+
+The Microinverter form advertises energy-production and recent-power report types and requires a live CSRF token. It was not submitted.
+
+```http
+GET /systems/<site_id>/pcu_datatable.csv?<datatable_query>
+```
+
+The CSV link mirrors the Microinverter DataTables filters, sort, visible columns, company selector, and optional device ID. The download was not invoked.
+
+Captured CSRF tokens and generated download URLs must never be committed or replayed.
+
+##### 2.29.2 Manager conditional data sources
+
+```http
+GET /systems/<site_id>/energy_lifetime_filtered?<unverified_query>
+GET /systems/<site_id>/consumption_energy_lifetime_filtered?<unverified_query>
+GET /systems/<site_id>/power_time_series_filtered?<unverified_query>
+GET /systems/<site_id>/iq_air_data_timeseries?<unverified_query>
+GET /systems/<site_id>/inverters/<inverter_id>/energy_lifetime?<unverified_query>
+GET /systems/<site_id>/module_status/<channel_id>.json
+```
+
+These paths were advertised by Graph/View source metadata but were not requested by the captured site's default state.
+
+##### 2.29.3 System Dashboard conditional reads
+
+```http
+GET /service/system_dashboard/api_internal/{cs|dashboard}/sites/<site_id>/data/intervals?<normalized_query>
+GET /service/system_dashboard/api_internal/{cs|dashboard}/sites/<site_id>/data/meters-graph-data?<normalized_query>
+GET /service/system_dashboard/api_internal/cs/sites/<site_id>/events/get_event_change_details?event_date=<date>&event_key=<key>
+GET /service/system_dashboard/api_internal/cs/sites/<site_id>/events/get_event_change_details?event_id=<event_id>
+GET /service/system_dashboard/api_internal/cs/sites/<site_id>/alarms/details?alarm_id=<alarm_id>
+GET /service/device-state-ms/api/v1/systems/<site_id>/site-config-audit/active-profiles?from=<YYYY-MM-DD>&to=<YYYY-MM-DD>&timezone=<iana_timezone>
+GET /service/site_search/sites/search/autocomplete?term=<site_name>&type=ENSEMBLE&limit=10
+```
+
+Evidence limits:
+
+- A focused `data/intervals` request returned HTTP `200` with application status `422` because a device serial was required; no query grid was attempted.
+- `meters-graph-data` was bundle-backed but not invoked because no valid chart selection was available.
+- Event/alarm detail routes lacked a valid event key, event ID, or alarm ID on the captured site.
+- The active-profile route rejected ISO timestamps and disclosed that `from`/`to` require local dates; the corrected form was not retried.
+- Site autocomplete was not invoked because that would transmit the private site name solely for exploration.
+
+Potentially stateful diagnostic `GET` routes (such as meter CT verification) and all task, alarm-clear, tunnel, device-configuration, Settings, report-generation, download, and control actions were excluded from live probing.
+
+---
+
 ## 3. EV Charger Control Operations
 
 Observed request variants differ across regions. All payloads shown below are the canonical request.
@@ -6061,6 +6796,293 @@ Observed behavior:
 
 ---
 
+## 5A. Activation Grid Profile APIs (Installer-Level)
+
+The Activation UI exposes grid-profile discovery and assignment endpoints that are separate from BatteryConfig and the homeowner grid on/off controls. These calls were captured from the Enlighten Activation web UI on 2026-07-08 while inspecting Australian grid profiles.
+
+Operational constraints:
+- These endpoints require an account/session with installer-level Activation access. Homeowner/owner sessions should not be assumed to have access.
+- A successful apply response means the cloud accepted or queued the grid-profile update; it does not prove the Gateway has finished applying the profile.
+- Grid profile changes are safety- and compliance-sensitive. Any runtime control should require explicit opt-in, strong confirmation text, and should expose the pending/in-progress state rather than treating the write as instant.
+- Do not log raw Authorization headers, cookies, Activation URLs with user identifiers, site IDs, gateway serials, part numbers, JWTs, email addresses, or local Gateway IP addresses.
+
+### 5A.1 Reference Data
+```
+GET /service/activation_service/api/details/reference_data
+```
+Returns country and region/state reference data used by the Activation UI grid-profile filter modal. The `countryCode` and `regionCode` values from this endpoint are the valid `country` and `state` request values for `POST /grid_profiles_filtered`.
+
+Observed request headers:
+```http
+Accept: application/json, text/plain, */*
+Accept-Language: en-AU,en;q=0.9
+Cookie: <authenticated Enlighten session cookies>
+enlm-token: <manager_or_activation_token>
+Referer: https://enlighten.enphaseenergy.com/app/activation_ui/?...
+```
+
+Example response excerpt:
+```json
+{
+  "countries": [
+    {
+      "name": "Australia",
+      "code": "AU"
+    }
+  ],
+  "country_regions": {
+    "AU": [
+      {
+        "id": 14,
+        "countryCode": "AU",
+        "regionCode": "VIC",
+        "regionName": "Victoria"
+      }
+    ]
+  }
+}
+```
+
+Captured `country_regions.AU` values:
+```json
+[
+  {
+    "id": 2,
+    "countryCode": "AU",
+    "regionCode": "ACT",
+    "regionName": "Australian Capital Territory"
+  },
+  {
+    "id": 4,
+    "countryCode": "AU",
+    "regionCode": "NSW",
+    "regionName": "New South Wales"
+  },
+  {
+    "id": 6,
+    "countryCode": "AU",
+    "regionCode": "NT",
+    "regionName": "Northern Territory"
+  },
+  {
+    "id": 8,
+    "countryCode": "AU",
+    "regionCode": "QLD",
+    "regionName": "Queensland"
+  },
+  {
+    "id": 10,
+    "countryCode": "AU",
+    "regionCode": "SA",
+    "regionName": "South Australia"
+  },
+  {
+    "id": 12,
+    "countryCode": "AU",
+    "regionCode": "TAS",
+    "regionName": "Tasmania"
+  },
+  {
+    "id": 14,
+    "countryCode": "AU",
+    "regionCode": "VIC",
+    "regionName": "Victoria"
+  },
+  {
+    "id": 16,
+    "countryCode": "AU",
+    "regionCode": "WA",
+    "regionName": "Western Australia"
+  }
+]
+```
+
+Observed behavior:
+- The top-level `countries[]` list provides display names and country codes.
+- The `country_regions` object is keyed by country code. Earlier browser captures used the same shape under `regions`; clients should accept both keys.
+- The grid-profile filter request uses `countryCode` as `country` and `regionCode` as `state`. It does not use the numeric `id`.
+- The operational grid-profile list still comes from `POST /grid_profiles_filtered`; this reference endpoint supplies valid picker/filter values.
+- Preserve country and region/state codes as returned. Do not synthesize region mappings unless a later implementation needs a fallback.
+- Runtime UI should first derive the site/user country from Activation data or existing site metadata, then show only regions for that country. It should not show countries or profiles outside the user's country unless the user explicitly enters an advanced override.
+- Search should run within the country-scoped data set. Region search should match `regionCode`, `regionName`, and display labels such as `"VIC, AU"`; profile search should match profile `name` and `profile_id` after region filtering.
+
+### 5A.2 Grid Profiles Filtered
+```
+POST /service/activation_backend/api/gateway/v4/systems/<site_id>/grid_profiles_filtered
+```
+Returns grid profiles filtered by country, state, and whether the Activation UI is showing only commonly used profiles.
+
+Observed request headers:
+```http
+Accept: application/json, text/plain, */*
+Content-Type: application/json
+Authorization: Bearer <activation_jwt>
+Origin: https://enlighten.enphaseenergy.com
+Referer: https://enlighten.enphaseenergy.com/app/activation_ui/?...
+```
+
+Observed request body:
+```json
+{
+  "commonly_used": true,
+  "country": "AU",
+  "state": "VIC"
+}
+```
+
+Example response excerpt:
+```json
+{
+  "title": {
+    "country": "AU",
+    "state": "VIC",
+    "commonly_used": true
+  },
+  "grid_profiles": {
+    "VIC, AU": [
+      {
+        "name": "AS/NZS 4777.2: 2020 Australia A Region (1.3.12)",
+        "profile_id": "agf:68e72cd69638927c4f4beaa0",
+        "pel_enabled": false,
+        "is_277v_compatible": false
+      }
+    ]
+  },
+  "recommended_profile": {
+    "name": "AS/NZS 4777.2: 2020 Australia A Region (1.3.12)",
+    "profile_id": "agf:68e72cd69638927c4f4beaa0",
+    "pel_enabled": false,
+    "is_277v_compatible": false
+  }
+}
+```
+
+Observed behavior:
+- The 2026-07-08 browser capture showed `commonly_used: true` returning the common non-export-limited Australian Region A profile for ACT, NSW, QLD, SA, VIC, and NT.
+- A 2026-07-09 live response for `{"commonly_used": true, "country": "AU", "state": "VIC"}` returned `recommended_profile` as `AS/NZS 4777.2: 2020 Australia A Region (1.3.12)`, while the grouped `grid_profiles["VIC, AU"]` list contained `AS/NZS 4777.2: 2020 Australia A Region 0 kW Export (1.3.9)`.
+- For the common-profile UI, prefer the complete `recommended_profile` object when present. Fall back to the region-scoped `grid_profiles` list only when `recommended_profile` is absent or incomplete.
+- To discover export-limit profiles, request all profiles with `commonly_used: false`.
+- `grid_profiles` is grouped by a display key such as `"VIC, AU"`. Clients should flatten entries for selection but preserve the original grouping for diagnostics.
+- `recommended_profile` can duplicate one of the grouped entries, but can also be distinct from the grouped common response; use the API field rather than inferring from the profile name.
+- The Activation UI exposes a `Commonly used Grid Profiles` / `All Grid Profiles` filter and country/state dropdowns. It also includes a free-text search field above the grouped profile list.
+- Runtime profile discovery should use the user's country to filter available regions first, then call this endpoint only for selected or searched regions in that country.
+- Search should not cross country boundaries. For country-scoped search, match region code/name/group labels and profile names, then display grouped results such as `ACT, AU` and `NSW, AU`.
+
+Likely all-profiles request body:
+```json
+{
+  "commonly_used": false,
+  "country": "AU",
+  "state": "VIC"
+}
+```
+
+### 5A.3 Current Profile Device List
+```
+GET /service/activation_backend/api/gateway/v4/systems/<site_id>/devices/list
+```
+Returns the cloud Gateway inventory together with the selected and requested grid
+profile. This is the preferred cloud-only endpoint for checking whether an
+accepted profile change has taken effect.
+
+Sanitized response shape:
+```json
+[
+  {
+    "envoyCombiner": {
+      "IQ Gateway": ["GW0000000000"]
+    },
+    "envoyGridProfile": {
+      "selected_profile_id": "agf:6643fae616246153786f318b",
+      "requested_profile_id": null,
+      "selected_grid_profile_name": "AS/NZS 4777.2: 2020 Australia A Region 0 kW Export (1.3.9)"
+    },
+    "ensembleEnvoy": true
+  }
+]
+```
+
+Implementation notes:
+- Read the Gateway serial from `envoyCombiner` and the profile state from `envoyGridProfile`.
+- A null `requested_profile_id` indicates no cloud profile change is pending.
+- Use this `GET` endpoint for status polling. `/systems/<site_id>/envoys` is the observed `PUT` apply endpoint.
+
+### 5A.4 Profile ID Format
+
+Activation profile identifiers include an `agf:` prefix:
+```text
+agf:68e72cd69638927c4f4beaa0
+```
+
+Implementation notes:
+- Store and submit the cloud `profile_id` exactly as returned by Activation, including the `agf:` prefix.
+- Do not construct profile IDs from names or versions. Use the returned `profile_id`.
+- The v1 Home Assistant implementation is cloud-only and does not compare these IDs with local Gateway AGF endpoints.
+
+### 5A.5 Apply Grid Profile
+```
+PUT /service/activation_backend/api/gateway/v4/systems/<site_id>/envoys
+```
+Queues or initiates a grid-profile update for one or more Gateway/Envoy devices.
+
+Observed request headers match `5A.2`:
+```http
+Accept: application/json, text/plain, */*
+Content-Type: application/json
+Authorization: Bearer <activation_jwt>
+Origin: https://enlighten.enphaseenergy.com
+Referer: https://enlighten.enphaseenergy.com/app/activation_ui/?...
+```
+
+Observed request body for an Australian zero-export profile:
+```json
+[
+  {
+    "grid_profile_id": "agf:6643fae616246153786f318b",
+    "serial_num": "GW0000000000",
+    "part_num": "800-00555-r01",
+    "ensemble_envoy": true
+  }
+]
+```
+
+Observed selected profile:
+```text
+AS/NZS 4777.2: 2020 Australia A Region 0 kW Export (1.3.9)
+profile_id: agf:6643fae616246153786f318b
+pel_enabled: true
+```
+
+Observed response:
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+```
+
+Observed behavior:
+- No useful response body was captured.
+- The web UI showed the profile update as `in progress` after this request, so HTTP success should be interpreted as accepted/queued.
+- `grid_profile_id` is the cloud/Activation profile ID, including `agf:`.
+- `serial_num` is the Gateway/Envoy serial number.
+- `part_num` is the Gateway/Envoy part number reported to Activation.
+- A 2026-07-09 live PUT using the current already-requested profile omitted `part_num` and still returned `HTTP 200`. The response body included `serial_num`, `part_num`, `device_type`, `category`, `grid_profile.selected_profile_id`, and `grid_profile.requested_profile_id`. Runtime apply may omit `part_num` when Activation has not provided it.
+- `ensemble_envoy: true` indicates an Ensemble/IQ System Controller capable site in the observed capture. Preserve the boolean returned or inferred from Activation/Gateway data rather than assuming all sites use `true`.
+- A runtime implementation should send a single selected Gateway first unless a later capture confirms multi-Gateway semantics.
+
+### 5A.6 Activation Record and Pending Status
+```
+GET /service/activation_backend/api/gateway/v4/activations/<site_id>?expand=owner,host
+```
+Reads the cloud-side activation record, including currently recorded and requested grid-profile data. The detailed response shape still needs a redacted fixture before runtime parsing is designed.
+
+Implementation notes:
+- The v1 Home Assistant implementation is cloud-only. It must not call local Gateway `/installer/agf/*` endpoints, add local installer auth options, or expose local verification status.
+- A successful `PUT /envoys` means Activation accepted or queued the request. Runtime state should remain accepted/pending until Activation record fields show the requested profile has settled.
+- Apply must use Gateway serial and `ensemble_envoy` from the Activation record. Include the Gateway part number when Activation provides it, but the cloud endpoint has been observed accepting an omitted `part_num`. If Gateway serial/ensemble metadata are unavailable, expose browsing/status only.
+- Redact serials, part numbers, site IDs, profile IDs, raw URLs, cookies, JWTs, and Authorization headers in diagnostics.
+
+---
+
 ## 6. Authentication Flow (Shared Across Services)
 
 ### 6.1 Login (Enlighten Web)
@@ -6276,6 +7298,7 @@ There is no single universal header set; the implementation varies headers by en
 | HEMS | bearer-preferred auth plus cookies/base headers; `username` and `requestId` when available |
 | BatteryConfig reads | current web shape: fresh session `Cookie`, `Username`, `requestid`, battery-profile `Origin`/`Referer`, Chrome-style `User-Agent`, and no `Authorization` or `e-auth-token`; token-backed primary and lean variants remain as fallbacks |
 | BatteryConfig writes | acquire fresh XSRF by preferring `GET /service/batteryConfig/api/v1/siteSettings/<site_id>?userId=<user_id>` and its `x-csrf-token` response header, then falling back to `/battery/sites/<site_id>/schedules/isValid`; if that fallback returns `4xx`, still harvest `BP-XSRF-Token` from error response cookies or the session cookie jar, then try a final cookie-based `GET /siteSettings/<site_id>` bootstrap before giving up and keeping the existing token; writes then use an endpoint-specific compatibility planner; on affected sites the verified working shape is a stateless raw-cookie browser request (`Cookie`, `e-auth-token`, `Username`, `X-XSRF-Token`, `X-Requested-With`), with official-web primary, official-web lean, and mixed-auth fallbacks retained |
+| Activation reference data and grid profile reads/writes | Activation UI same-origin browser shape. Reference data was observed with authenticated Enlighten cookies plus `enlm-token`; profile discovery/apply were observed with authenticated cookies plus `Authorization: Bearer <activation_jwt>`, `Accept: application/json, text/plain, */*`, `Content-Type: application/json` for writes, `Origin: https://enlighten.enphaseenergy.com`, and an `/app/activation_ui/` referer; grid profile apply requires installer-level Activation permissions |
 
 - Base Enlighten reads:
   - `Cookie: <serialized cookie jar>`
@@ -6304,6 +7327,15 @@ There is no single universal header set; the implementation varies headers by en
   - official-web lean fallback omits `e-auth-token` and `requestid`
   - mixed-auth compatibility fallback restores `Authorization`, `Cookie`, and `X-CSRF-Token`
   - cookie-backed compatibility writes must use a stateless request session so aiohttp does not merge cookie-jar state into the raw `Cookie` header
+- Activation grid profile:
+  - `Accept: application/json, text/plain, */*`
+  - `enlm-token: <manager_or_activation_token>` for `GET /activation_service/api/details/reference_data` in the observed browser capture
+  - `Authorization: Bearer <activation_jwt>` for grid profile discovery/apply in the observed browser capture
+  - `Content-Type: application/json` for `POST`/`PUT`
+  - authenticated Enlighten session cookies
+  - `Origin: https://enlighten.enphaseenergy.com`
+  - `Referer: https://enlighten.enphaseenergy.com/app/activation_ui/?...`
+  - requires installer-level Activation access in the observed capture
 
 ---
 
@@ -6394,6 +7426,17 @@ There is no single universal header set; the implementation varies headers by en
 | `dtgControl` / `cfgControl` / `rbdControl` | Battery UI feature-capability blocks with visibility, lock, and schedule support flags; observed booleans so far include `show=true`, `showDaySchedule=true`, `enabled=false`, `locked=false`, `scheduleSupported=true` |
 | `systemTask` | Backend task/activity flag that may indicate settings are being managed asynchronously; observed value so far: `false` |
 | `devices.iqEvse.useBatteryFrSelfConsumption` | Indicates IQ EV charger battery participation support in self-consumption mode; observed value so far: `true` |
+| `grid_profiles` | Activation grid-profile discovery grouping keyed by display region such as `"VIC, AU"` |
+| `recommended_profile` | Activation-selected recommended grid profile; can duplicate one of the grouped `grid_profiles` entries |
+| `countries[]` | Activation reference-data country list with display `name` and ISO-like `code` |
+| `regions.<country>[]` | Activation reference-data region/state list scoped by country code |
+| `regionCode` | Region/state code used as `state` in `grid_profiles_filtered` requests |
+| `regionName` | Region/state display name used for search and UI labels |
+| `profile_id` (Activation grid profile) | Cloud grid-profile identifier, including `agf:` prefix; preserve exactly for apply requests |
+| `pel_enabled` | Grid-profile flag indicating power export limiting support; observed `true` for zero-export profiles and `false` for the common non-export-limited Australian Region A profile |
+| `is_277v_compatible` | Grid-profile compatibility flag returned by Activation discovery; observed value so far: `false` |
+| `grid_profile_id` | Apply-request field containing the selected Activation profile ID, including `agf:` |
+| `ensemble_envoy` | Apply-request Gateway capability flag observed as `true` for an Ensemble/IQ System Controller capable site |
 | `device-uid` | Stable HEMS device identifier |
 | `device-type` (HEMS) | HEMS device taxonomy values seen in captures: `IQ_ENERGY_ROUTER`, `IQ_GATEWAY`, `SG_READY_GATEWAY`, `ENERGY_METER`, `HEAT_PUMP` |
 | `status` / `statusText` (HEMS) | HEMS device health code + display label; observed pair so far: `normal` / `Normal` |
@@ -6466,6 +7509,7 @@ Endpoint-specific variations are documented in the affected sections so implemen
 
 Cross-cutting unresolved items:
 - Local LAN endpoints (`/ivp/pdm/*`, `/ivp/peb/*`) exist but require installer permissions; they are outside the current owner-account cloud runtime.
+- Activation grid-profile control requires installer-level access in the observed capture. The integration still needs a confirmed way to detect Activation role eligibility, obtain the same Activation bearer token reliably, and read a redacted activation-record payload before exposing runtime controls.
 - Real EVSE MQTT frames have not yet been captured, even though the broker accepts exact-topic subscriptions. The charger card's instantaneous voltage/current/power source remains the main open telemetry capture target.
 - Heat-pump write-path behavior remains unresolved; current HEMS captures cover inventory, runtime state, event diagnostics, timeseries, and stream toggles only.
 

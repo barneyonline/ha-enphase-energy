@@ -456,6 +456,27 @@
     },
     "firmware_advisory_only": {
       "message": "Gli aggiornamenti firmware sono solo informativi."
+    },
+    "grid_profile_installer_required": {
+      "message": "Il controllo del profilo di rete richiede l’accesso installatore a Enphase Activation."
+    },
+    "grid_profile_profile_invalid": {
+      "message": "Il profilo di rete selezionato non è disponibile per il paese e la regione di questo sito."
+    },
+    "grid_profile_gateway_required": {
+      "message": "L’applicazione del profilo di rete richiede un record Gateway di Cloud Activation."
+    },
+    "grid_profile_apply_failed": {
+      "message": "Applicazione del profilo di rete non riuscita."
+    },
+    "grid_profile_confirmation_required": {
+      "message": "È richiesta la conferma per applicare un profilo di rete."
+    },
+    "grid_profile_region_invalid": {
+      "message": "La regione del profilo di rete selezionata non è disponibile."
+    },
+    "grid_profile_unavailable": {
+      "message": "Il controllo del profilo di rete non è disponibile."
     }
   },
   "options": {
@@ -465,11 +486,13 @@
         "description": "Scegli cosa vuoi fare con questa voce dell'integrazione.",
         "menu_options": {
           "settings": "Impostazioni",
-          "migrate_envoy": "Migra cronologia Envoy"
+          "migrate_envoy": "Migra cronologia Envoy",
+          "advanced": "Avanzate"
         },
         "menu_option_descriptions": {
           "settings": "Regola polling e comportamento.",
-          "migrate_envoy": "Riassegna gli ID entità energia selezionati di Enphase Envoy in modo che la cronologia di Home Assistant Energy continui con questa integrazione."
+          "migrate_envoy": "Riassegna gli ID entità energia selezionati di Enphase Envoy in modo che la cronologia di Home Assistant Energy continui con questa integrazione.",
+          "advanced": "Controlli del profilo di rete riservati agli installatori."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -597,6 +620,46 @@
           "confirm_reassign": "Comprendo che gli ID entità sorgente selezionati verranno riassegnati",
           "disable_archived_envoy_sensors": "Disattiva i sensori sorgente archiviati dopo la migrazione"
         }
+      },
+      "advanced": {
+        "title": "Avanzate",
+        "description": "Azioni per installatore e manutenzione.",
+        "menu_options": {
+          "grid_profile": "Controllo profilo di rete"
+        },
+        "menu_option_descriptions": {
+          "grid_profile": "Sfoglia e applica profili di rete Activation riservati agli installatori."
+        }
+      },
+      "grid_profile": {
+        "title": "Controllo profilo di rete",
+        "description": "Filtra il catalogo dei profili di rete Activation per il paese di questo sito.",
+        "data": {
+          "grid_profile_region": "Regione",
+          "grid_profile_commonly_used": "Elenco profili"
+        },
+        "data_description": {
+          "grid_profile_region": "Sono disponibili solo le regioni del paese del sito.",
+          "grid_profile_commonly_used": "Scegli i profili usati di frequente o tutti i profili per la regione selezionata."
+        }
+      },
+      "grid_profile_select": {
+        "title": "Seleziona profilo di rete",
+        "description": "Scegli un profilo da preparare. Nulla viene applicato fino alla conferma.",
+        "data": {
+          "grid_profile_id": "Profilo di rete"
+        }
+      },
+      "grid_profile_confirm": {
+        "title": "Conferma profilo di rete",
+        "description": "Profilo attuale: **{current_profile}**\n\nProfilo selezionato: **{selected_profile}**\n\nID profilo: **{selected_profile_id}**\n\nPEL Enhanced: **{selected_profile_pel}**\n\nCompatibile 277 V: **{selected_profile_277v}**\n\nPaese: **{country}**\n\nRegione: **{region}**\n\nStato applicazione cloud: **{apply_status}**.",
+        "data": {
+          "confirm_apply": "Applica il profilo di rete selezionato"
+        }
+      },
+      "grid_profile_applied": {
+        "title": "Aggiornamento profilo rete accettato",
+        "description": "Enphase ha accettato l’aggiornamento del profilo rete per **{selected_profile}**.\n\nID profilo richiesto: **{requested_profile_id}**\n\nStato cloud: **{cloud_apply_status}**\n\nIl nuovo profilo può impiegare fino a **5 minuti** per comparire come corrente mentre il cloud e il Gateway completano l’elaborazione. Il sensore Grid Profile si aggiornerà quando il record Activation segnalerà il nuovo profilo corrente."
       }
     },
     "error": {
@@ -606,16 +669,45 @@
       "migration_no_selection": "Seleziona almeno un sensore di energia compatibile da migrare.",
       "migration_duplicate_selection": "La stessa entità sorgente non può essere usata più di una volta.",
       "envoy_entry_loaded": "L’integrazione Envoy non ha potuto essere scaricata temporaneamente per la migrazione.",
-      "incompatible_energy_total": "Le entità selezionate non sono totali energia compatibili."
+      "incompatible_energy_total": "Le entità selezionate non sono totali energia compatibili.",
+      "grid_profile_unavailable": "Il controllo del profilo di rete non è disponibile.",
+      "grid_profile_installer_required": "Il controllo del profilo di rete richiede accesso installatore a Enphase Activation.",
+      "grid_profile_no_regions": "Non sono disponibili regioni di profilo di rete per il paese di questo sito.",
+      "grid_profile_no_profiles": "Nessun profilo di rete corrisponde ai filtri selezionati.",
+      "grid_profile_region_invalid": "La regione del profilo di rete selezionata non è disponibile.",
+      "grid_profile_profile_invalid": "Il profilo di rete selezionato non è disponibile per il paese e la regione di questo sito.",
+      "grid_profile_gateway_required": "L’applicazione del profilo di rete richiede un record Gateway Activation nel cloud.",
+      "grid_profile_apply_failed": "Applicazione del profilo di rete non riuscita."
     },
     "abort": {
       "migration_no_envoy_sources": "Non sono disponibili sensori energia Enphase Envoy da migrare.",
       "migration_no_targets": "Non sono disponibili sensori Enphase Energy compatibili da migrare.",
-      "migration_partial_failure": "La migrazione si è fermata dopo un completamento parziale.\n\nAssociazioni completate:\n{completed_mappings}\n\nErrore durante l'elaborazione di `{failed_entity_id}`: {failure_reason}\n\nRipristina dal backup se il risultato non è accettabile."
+      "migration_partial_failure": "La migrazione si è fermata dopo un completamento parziale.\n\nAssociazioni completate:\n{completed_mappings}\n\nErrore durante l'elaborazione di `{failed_entity_id}`: {failure_reason}\n\nRipristina dal backup se il risultato non è accettabile.",
+      "grid_profile_unavailable": "Il controllo del profilo di rete non è disponibile.",
+      "grid_profile_installer_required": "Il controllo del profilo di rete richiede accesso installatore a Enphase Activation.",
+      "grid_profile_no_regions": "Non sono disponibili regioni di profilo di rete per il paese di questo sito."
     },
     "create_entry": {
       "migration_success": "Migrazione completata. Enphase Energy ora possiede gli ID entità sorgente selezionati. Verifica la dashboard Energy e Developer Tools > Statistics dopo il prossimo aggiornamento.",
       "migration_success_reload_needed": "Migrazione completata, ma una o più integrazioni non sono state ricaricate automaticamente. Ricarica manualmente Enphase Energy e Enphase Envoy se necessario, poi verifica la dashboard Energy e Developer Tools > Statistics."
+    }
+  },
+  "selector": {
+    "grid_profile_list_mode": {
+      "options": {
+        "commonly_used": "Usati comunemente",
+        "all_profiles": "Tutti i profili"
+      }
+    },
+    "grid_profile_status": {
+      "options": {
+        "yes": "Sì",
+        "no": "No",
+        "unknown": "Sconosciuto",
+        "available": "Disponibile",
+        "unavailable": "Non disponibile",
+        "accepted": "Accettato"
+      }
     }
   },
   "entity": {
@@ -1769,6 +1861,9 @@
       },
       "dry_contacts": {
         "name": "Contatti puliti"
+      },
+      "current_grid_profile": {
+        "name": "Profilo di rete"
       }
     },
     "number": {
@@ -2821,6 +2916,115 @@
         "site_id": {
           "name": "ID sito",
           "description": "Identificatore sito opzionale; rilevato automaticamente quando si seleziona un dispositivo."
+        }
+      }
+    },
+    "browse_grid_profiles": {
+      "name": "Sfoglia profili di rete",
+      "description": "Sfoglia i profili di rete Cloud Activation disponibili per il paese e la regione del sito selezionato.",
+      "sections": {
+        "advanced": {
+          "name": "Opzioni avanzate"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Codice regione",
+          "description": "Codice facoltativo di regione o stato, ad esempio VIC."
+        },
+        "commonly_used": {
+          "name": "Solo quelli usati di frequente",
+          "description": "Restituisce il catalogo dei profili usati di frequente quando abilitato."
+        },
+        "device_id": {
+          "name": "Dispositivi del sito",
+          "description": "Seleziona un dispositivo Enphase del sito."
+        },
+        "site_id": {
+          "name": "ID sito",
+          "description": "Identificatore facoltativo del sito; rilevato automaticamente quando si seleziona un dispositivo."
+        },
+        "config_entry_id": {
+          "name": "ID voce di configurazione",
+          "description": "Identificatore facoltativo della voce di configurazione per il sito di destinazione."
+        },
+        "query": {
+          "name": "Cerca",
+          "description": "Testo di ricerca facoltativo per regioni e profili del paese del sito."
+        }
+      }
+    },
+    "refresh_grid_profiles": {
+      "name": "Aggiorna profili di rete",
+      "description": "Aggiorna i dati di riferimento dei profili di rete Cloud Activation e il catalogo della regione selezionata.",
+      "sections": {
+        "advanced": {
+          "name": "Opzioni avanzate"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Codice regione",
+          "description": "Codice facoltativo di regione o stato, ad esempio VIC."
+        },
+        "commonly_used": {
+          "name": "Solo quelli usati di frequente",
+          "description": "Restituisce il catalogo dei profili usati di frequente quando abilitato."
+        },
+        "device_id": {
+          "name": "Dispositivi del sito",
+          "description": "Seleziona un dispositivo Enphase del sito."
+        },
+        "site_id": {
+          "name": "ID sito",
+          "description": "Identificatore facoltativo del sito; rilevato automaticamente quando si seleziona un dispositivo."
+        },
+        "config_entry_id": {
+          "name": "ID voce di configurazione",
+          "description": "Identificatore facoltativo della voce di configurazione per il sito di destinazione."
+        }
+      }
+    },
+    "set_grid_profile": {
+      "name": "Imposta profilo di rete",
+      "description": "Applica un profilo di rete Cloud Activation dopo una conferma esplicita.",
+      "sections": {
+        "advanced": {
+          "name": "Opzioni avanzate"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Codice regione",
+          "description": "Codice facoltativo di regione o stato, ad esempio VIC."
+        },
+        "commonly_used": {
+          "name": "Solo quelli usati di frequente",
+          "description": "Restituisce il catalogo dei profili usati di frequente quando abilitato."
+        },
+        "device_id": {
+          "name": "Dispositivi del sito",
+          "description": "Seleziona un dispositivo Enphase del sito."
+        },
+        "site_id": {
+          "name": "ID sito",
+          "description": "Identificatore facoltativo del sito; rilevato automaticamente quando si seleziona un dispositivo."
+        },
+        "config_entry_id": {
+          "name": "ID voce di configurazione",
+          "description": "Identificatore facoltativo della voce di configurazione per il sito di destinazione."
+        },
+        "profile_id": {
+          "name": "ID profilo",
+          "description": "ID profilo Cloud Activation, incluso il prefisso agf:."
+        },
+        "confirm": {
+          "name": "Conferma applicazione",
+          "description": "Deve essere abilitato per applicare il profilo di rete selezionato."
+        },
+        "gateway_serial": {
+          "name": "Numero di serie Gateway",
+          "description": "Numero di serie Gateway facoltativo quando il record Activation contiene più Gateway."
         }
       }
     }

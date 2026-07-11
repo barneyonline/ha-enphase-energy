@@ -456,6 +456,27 @@
     },
     "firmware_advisory_only": {
       "message": "Актуализациите на фърмуера са само с информативна цел."
+    },
+    "grid_profile_installer_required": {
+      "message": "Управлението на мрежов профил изисква installer достъп до Enphase Activation."
+    },
+    "grid_profile_profile_invalid": {
+      "message": "Избраният мрежов профил не е наличен за държавата и региона на този обект."
+    },
+    "grid_profile_gateway_required": {
+      "message": "Прилагането на мрежов профил изисква облачен Activation Gateway запис."
+    },
+    "grid_profile_apply_failed": {
+      "message": "Прилагането на мрежовия профил не бе успешно."
+    },
+    "grid_profile_confirmation_required": {
+      "message": "Изисква се потвърждение за прилагане на мрежов профил."
+    },
+    "grid_profile_region_invalid": {
+      "message": "Избраният регион за мрежов профил не е наличен."
+    },
+    "grid_profile_unavailable": {
+      "message": "Управлението на мрежов профил не е налично."
     }
   },
   "options": {
@@ -465,11 +486,13 @@
         "description": "Изберете какво да направите с този запис на интеграцията.",
         "menu_options": {
           "settings": "Настройки",
-          "migrate_envoy": "Мигриране на историята на Envoy"
+          "migrate_envoy": "Мигриране на историята на Envoy",
+          "advanced": "Разширени"
         },
         "menu_option_descriptions": {
           "settings": "Настройте опресняването и поведението.",
-          "migrate_envoy": "Поемете избрани идентификатори на енергийни обекти на Enphase Envoy, за да продължи историята в Home Assistant Energy под тази интеграция."
+          "migrate_envoy": "Поемете избрани идентификатори на енергийни обекти на Enphase Envoy, за да продължи историята в Home Assistant Energy под тази интеграция.",
+          "advanced": "Контроли за мрежов профил само за инсталатори."
         },
         "data": {
           "type_envoy": "Шлюз",
@@ -597,6 +620,46 @@
           "confirm_reassign": "Разбирам, че избраните идентификатори на изходните обекти ще бъдат преназначени",
           "disable_archived_envoy_sensors": "Деактивирай архивираните изходни сензори след миграцията"
         }
+      },
+      "advanced": {
+        "title": "Разширени",
+        "description": "Действия за инсталатор и поддръжка.",
+        "menu_options": {
+          "grid_profile": "Управление на мрежов профил"
+        },
+        "menu_option_descriptions": {
+          "grid_profile": "Преглед и прилагане на Activation мрежови профили само за инсталатори."
+        }
+      },
+      "grid_profile": {
+        "title": "Управление на мрежов профил",
+        "description": "Филтрира каталога с Activation мрежови профили за държавата на този обект.",
+        "data": {
+          "grid_profile_region": "Регион",
+          "grid_profile_commonly_used": "Списък с профили"
+        },
+        "data_description": {
+          "grid_profile_region": "Налични са само регионите за държавата на обекта.",
+          "grid_profile_commonly_used": "Изберете често използвани профили или всички профили за избрания регион."
+        }
+      },
+      "grid_profile_select": {
+        "title": "Избор на мрежов профил",
+        "description": "Изберете профил за подготовка. Нищо не се прилага до стъпката за потвърждение.",
+        "data": {
+          "grid_profile_id": "Мрежов профил"
+        }
+      },
+      "grid_profile_confirm": {
+        "title": "Потвърждаване на мрежов профил",
+        "description": "Текущ профил: **{current_profile}**\n\nИзбран профил: **{selected_profile}**\n\nИД на профил: **{selected_profile_id}**\n\nPEL Enhanced: **{selected_profile_pel}**\n\nСъвместим с 277 V: **{selected_profile_277v}**\n\nДържава: **{country}**\n\nРегион: **{region}**\n\nСъстояние на прилагане в облака: **{apply_status}**.",
+        "data": {
+          "confirm_apply": "Прилагане на избрания мрежов профил"
+        }
+      },
+      "grid_profile_applied": {
+        "title": "Актуализацията на мрежовия профил е приета",
+        "description": "Enphase прие актуализацията на мрежовия профил за **{selected_profile}**.\n\nЗаявен ИД на профил: **{requested_profile_id}**\n\nСъстояние в облака: **{cloud_apply_status}**\n\nМоже да отнеме до **5 минути**, докато новият профил се покаже като текущ, докато облакът и Gateway завършат обработката. Сензорът Grid Profile ще се актуализира, след като записът Activation отчете новия текущ профил."
       }
     },
     "error": {
@@ -606,16 +669,45 @@
       "migration_no_selection": "Изберете поне един съвместим енергиен сензор за мигриране.",
       "migration_duplicate_selection": "Един и същ изходен обект не може да се използва повече от веднъж.",
       "envoy_entry_loaded": "Интеграцията Envoy не можа да бъде временно разтоварена за миграцията.",
-      "incompatible_energy_total": "Избраните обекти не са съвместими натрупващи се енергийни стойности."
+      "incompatible_energy_total": "Избраните обекти не са съвместими натрупващи се енергийни стойности.",
+      "grid_profile_unavailable": "Управлението на мрежов профил не е налично.",
+      "grid_profile_installer_required": "Управлението на мрежов профил изисква инсталаторски достъп до Enphase Activation.",
+      "grid_profile_no_regions": "Няма налични региони за мрежов профил за държавата на този обект.",
+      "grid_profile_no_profiles": "Няма мрежови профили, които съответстват на избраните филтри.",
+      "grid_profile_region_invalid": "Избраният регион за мрежов профил не е наличен.",
+      "grid_profile_profile_invalid": "Избраният мрежов профил не е наличен за държавата и региона на този обект.",
+      "grid_profile_gateway_required": "Прилагането на мрежов профил изисква Gateway запис от облачната Activation услуга.",
+      "grid_profile_apply_failed": "Прилагането на мрежов профил бе неуспешно."
     },
     "abort": {
       "migration_no_envoy_sources": "Няма налични енергийни сензори на Enphase Envoy за миграция.",
       "migration_no_targets": "Няма налични съвместими сензори на Enphase Energy за миграция.",
-      "migration_partial_failure": "Миграцията спря след частично завършване.\n\nЗавършени съпоставяния:\n{completed_mappings}\n\nГрешка при обработка на `{failed_entity_id}`: {failure_reason}\n\nВъзстановете от резервно копие, ако резултатът не е приемлив."
+      "migration_partial_failure": "Миграцията спря след частично завършване.\n\nЗавършени съпоставяния:\n{completed_mappings}\n\nГрешка при обработка на `{failed_entity_id}`: {failure_reason}\n\nВъзстановете от резервно копие, ако резултатът не е приемлив.",
+      "grid_profile_unavailable": "Управлението на мрежов профил не е налично.",
+      "grid_profile_installer_required": "Управлението на мрежов профил изисква инсталаторски достъп до Enphase Activation.",
+      "grid_profile_no_regions": "Няма налични региони за мрежов профил за държавата на този обект."
     },
     "create_entry": {
       "migration_success": "Миграцията завърши. Enphase Energy вече притежава избраните идентификатори на изходните обекти. Проверете таблото Energy и Developer Tools > Statistics след следващото обновяване.",
       "migration_success_reload_needed": "Миграцията завърши, но една или повече интеграции не можаха да бъдат презаредени автоматично. Презаредете Enphase Energy и Enphase Envoy ръчно при нужда, след което проверете таблото Energy и Developer Tools > Statistics."
+    }
+  },
+  "selector": {
+    "grid_profile_list_mode": {
+      "options": {
+        "commonly_used": "Често използвани",
+        "all_profiles": "Всички профили"
+      }
+    },
+    "grid_profile_status": {
+      "options": {
+        "yes": "Да",
+        "no": "Не",
+        "unknown": "Неизвестно",
+        "available": "Налично",
+        "unavailable": "Недостъпно",
+        "accepted": "Прието"
+      }
     }
   },
   "entity": {
@@ -1769,6 +1861,9 @@
       },
       "dry_contacts": {
         "name": "Сухи контакти"
+      },
+      "current_grid_profile": {
+        "name": "Мрежов профил"
       }
     },
     "number": {
@@ -2821,6 +2916,115 @@
         "site_id": {
           "name": "ID на сайт",
           "description": "Незадължителен идентификатор на сайт; открива се автоматично при избрано устройство."
+        }
+      }
+    },
+    "browse_grid_profiles": {
+      "name": "Преглед на мрежови профили",
+      "description": "Преглед на облачните Activation мрежови профили за държавата и региона на избрания обект.",
+      "sections": {
+        "advanced": {
+          "name": "Разширени опции"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Код на регион",
+          "description": "Незадължителен код на регион/щат, например VIC."
+        },
+        "commonly_used": {
+          "name": "Само често използвани",
+          "description": "Връща каталога с често използвани профили, когато е включено."
+        },
+        "device_id": {
+          "name": "Устройства на обекта",
+          "description": "Изберете Enphase устройство на обекта."
+        },
+        "site_id": {
+          "name": "ID на обект",
+          "description": "Незадължителен идентификатор на обект; открива се автоматично при избрано устройство."
+        },
+        "config_entry_id": {
+          "name": "ID на конфигурационен запис",
+          "description": "Незадължителен идентификатор на конфигурационния запис за целевия обект."
+        },
+        "query": {
+          "name": "Търсене",
+          "description": "Незадължителен текст за търсене в региони и профили за държавата на обекта."
+        }
+      }
+    },
+    "refresh_grid_profiles": {
+      "name": "Обновяване на мрежови профили",
+      "description": "Принудително обновяване на справочните данни и каталога с мрежови профили от Activation.",
+      "sections": {
+        "advanced": {
+          "name": "Разширени опции"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Код на регион",
+          "description": "Незадължителен код на регион/щат, например VIC."
+        },
+        "commonly_used": {
+          "name": "Само често използвани",
+          "description": "Връща каталога с често използвани профили, когато е включено."
+        },
+        "device_id": {
+          "name": "Устройства на обекта",
+          "description": "Изберете Enphase устройство на обекта."
+        },
+        "site_id": {
+          "name": "ID на обект",
+          "description": "Незадължителен идентификатор на обект; открива се автоматично при избрано устройство."
+        },
+        "config_entry_id": {
+          "name": "ID на конфигурационен запис",
+          "description": "Незадължителен идентификатор на конфигурационния запис за целевия обект."
+        }
+      }
+    },
+    "set_grid_profile": {
+      "name": "Задаване на мрежов профил",
+      "description": "Прилага облачен Activation мрежов профил след изрично потвърждение.",
+      "sections": {
+        "advanced": {
+          "name": "Разширени опции"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Код на регион",
+          "description": "Незадължителен код на регион/щат, например VIC."
+        },
+        "commonly_used": {
+          "name": "Само често използвани",
+          "description": "Връща каталога с често използвани профили, когато е включено."
+        },
+        "device_id": {
+          "name": "Устройства на обекта",
+          "description": "Изберете Enphase устройство на обекта."
+        },
+        "site_id": {
+          "name": "ID на обект",
+          "description": "Незадължителен идентификатор на обект; открива се автоматично при избрано устройство."
+        },
+        "config_entry_id": {
+          "name": "ID на конфигурационен запис",
+          "description": "Незадължителен идентификатор на конфигурационния запис за целевия обект."
+        },
+        "profile_id": {
+          "name": "ID на профил",
+          "description": "Cloud Activation ID на профила, включително префикса agf:."
+        },
+        "confirm": {
+          "name": "Потвърди прилагане",
+          "description": "Трябва да е включено, за да се приложи избраният мрежов профил."
+        },
+        "gateway_serial": {
+          "name": "Сериен номер на Gateway",
+          "description": "Незадължителен сериен номер на Gateway, когато Activation записът съдържа няколко Gateway устройства."
         }
       }
     }

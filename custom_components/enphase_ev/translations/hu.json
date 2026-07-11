@@ -456,6 +456,27 @@
     },
     "firmware_advisory_only": {
       "message": "A firmware-frissítések csak tájékoztató jellegűek."
+    },
+    "grid_profile_installer_required": {
+      "message": "A hálózati profil vezérléséhez Enphase Activation telepítői hozzáférés szükséges."
+    },
+    "grid_profile_profile_invalid": {
+      "message": "A kiválasztott hálózati profil nem érhető el a helyszín országában és régiójában."
+    },
+    "grid_profile_gateway_required": {
+      "message": "A hálózati profil alkalmazásához Cloud Activation Gateway-rekord szükséges."
+    },
+    "grid_profile_apply_failed": {
+      "message": "A hálózati profil alkalmazása sikertelen."
+    },
+    "grid_profile_confirmation_required": {
+      "message": "A hálózati profil alkalmazásához megerősítés szükséges."
+    },
+    "grid_profile_region_invalid": {
+      "message": "A kiválasztott hálózati profil régiója nem érhető el."
+    },
+    "grid_profile_unavailable": {
+      "message": "A hálózati profil vezérlése nem érhető el."
     }
   },
   "options": {
@@ -465,11 +486,13 @@
         "description": "Válassza ki, mit szeretne tenni ezzel az integrációs bejegyzéssel.",
         "menu_options": {
           "settings": "Beállítások",
-          "migrate_envoy": "Envoy előzmények migrálása"
+          "migrate_envoy": "Envoy előzmények migrálása",
+          "advanced": "Speciális"
         },
         "menu_option_descriptions": {
           "settings": "Lekérdezés és működés finomhangolása.",
-          "migrate_envoy": "Vegye át a kiválasztott Enphase Envoy energiaentitás-azonosítókat, hogy a Home Assistant Energy előzményei ennél az integrációnál folytatódjanak."
+          "migrate_envoy": "Vegye át a kiválasztott Enphase Envoy energiaentitás-azonosítókat, hogy a Home Assistant Energy előzményei ennél az integrációnál folytatódjanak.",
+          "advanced": "Hálózati profil vezérlése csak telepítőknek."
         },
         "data": {
           "type_envoy": "Átjáró",
@@ -597,6 +620,46 @@
           "confirm_reassign": "Megértettem, hogy a kiválasztott forrásentitás-azonosítók újra lesznek rendelve",
           "disable_archived_envoy_sensors": "Az archivált forrásérzékelők letiltása a migráció után"
         }
+      },
+      "advanced": {
+        "title": "Speciális",
+        "description": "Telepítői és karbantartási műveletek.",
+        "menu_options": {
+          "grid_profile": "Hálózati profil vezérlése"
+        },
+        "menu_option_descriptions": {
+          "grid_profile": "Csak telepítőknek elérhető Activation hálózati profilok böngészése és alkalmazása."
+        }
+      },
+      "grid_profile": {
+        "title": "Hálózati profil vezérlése",
+        "description": "Az Activation hálózati profilkatalógust a helyszín országa szerint szűri.",
+        "data": {
+          "grid_profile_region": "Régió",
+          "grid_profile_commonly_used": "Profillista"
+        },
+        "data_description": {
+          "grid_profile_region": "Csak a helyszín országához tartozó régiók érhetők el.",
+          "grid_profile_commonly_used": "Válasszon gyakran használt profilokat vagy minden profilt a kiválasztott régióhoz."
+        }
+      },
+      "grid_profile_select": {
+        "title": "Hálózati profil kiválasztása",
+        "description": "Válasszon előkészítendő profilt. Semmi nem kerül alkalmazásra a megerősítésig.",
+        "data": {
+          "grid_profile_id": "Hálózati profil"
+        }
+      },
+      "grid_profile_confirm": {
+        "title": "Hálózati profil megerősítése",
+        "description": "Jelenlegi profil: **{current_profile}**\n\nKiválasztott profil: **{selected_profile}**\n\nProfilazonosító: **{selected_profile_id}**\n\nPEL Enhanced: **{selected_profile_pel}**\n\n277 V-kompatibilis: **{selected_profile_277v}**\n\nOrszág: **{country}**\n\nRégió: **{region}**\n\nFelhőbeli alkalmazás állapota: **{apply_status}**.",
+        "data": {
+          "confirm_apply": "A kiválasztott hálózati profil alkalmazása"
+        }
+      },
+      "grid_profile_applied": {
+        "title": "Hálózati profil frissítése elfogadva",
+        "description": "Az Enphase elfogadta a hálózati profil frissítését ehhez: **{selected_profile}**.\n\nKért profilazonosító: **{requested_profile_id}**\n\nFelhőállapot: **{cloud_apply_status}**\n\nAkár **5 percig** is eltarthat, amíg az új profil aktuálisként megjelenik, amíg a felhő és a Gateway befejezi a feldolgozást. A Grid Profile érzékelő akkor frissül, amikor az Activation rekord jelzi az új aktuális profilt."
       }
     },
     "error": {
@@ -606,16 +669,45 @@
       "migration_no_selection": "Válasszon ki legalább egy kompatibilis energiaérzékelőt a migrációhoz.",
       "migration_duplicate_selection": "Ugyanaz a forrásentitás nem használható fel többször.",
       "envoy_entry_loaded": "Az Envoy integrációt nem sikerült ideiglenesen leállítani a migrációhoz.",
-      "incompatible_energy_total": "A kiválasztott entitások nem kompatibilis halmozott energiaösszegek."
+      "incompatible_energy_total": "A kiválasztott entitások nem kompatibilis halmozott energiaösszegek.",
+      "grid_profile_unavailable": "A hálózati profil vezérlése nem érhető el.",
+      "grid_profile_installer_required": "A hálózati profil vezérléséhez telepítői hozzáférés szükséges az Enphase Activation szolgáltatáshoz.",
+      "grid_profile_no_regions": "Ehhez a helyszínországhoz nem érhető el hálózati profil régió.",
+      "grid_profile_no_profiles": "Nincs a kiválasztott szűrőknek megfelelő hálózati profil.",
+      "grid_profile_region_invalid": "A kiválasztott hálózati profil régió nem érhető el.",
+      "grid_profile_profile_invalid": "A kiválasztott hálózati profil nem érhető el ehhez a helyszínországhoz és régióhoz.",
+      "grid_profile_gateway_required": "A hálózati profil alkalmazásához felhőbeli Activation Gateway rekord szükséges.",
+      "grid_profile_apply_failed": "A hálózati profil alkalmazása sikertelen."
     },
     "abort": {
       "migration_no_envoy_sources": "Nincsenek elérhető Enphase Envoy energiaérzékelők a migrációhoz.",
       "migration_no_targets": "Nincsenek elérhető kompatibilis Enphase Energy érzékelők a migrációhoz.",
-      "migration_partial_failure": "A migráció részleges befejezés után leállt.\n\nBefejezett hozzárendelések:\n{completed_mappings}\n\nHiba a(z) `{failed_entity_id}` feldolgozásakor: {failure_reason}\n\nHa az eredmény nem elfogadható, állítsa vissza a biztonsági mentést."
+      "migration_partial_failure": "A migráció részleges befejezés után leállt.\n\nBefejezett hozzárendelések:\n{completed_mappings}\n\nHiba a(z) `{failed_entity_id}` feldolgozásakor: {failure_reason}\n\nHa az eredmény nem elfogadható, állítsa vissza a biztonsági mentést.",
+      "grid_profile_unavailable": "A hálózati profil vezérlése nem érhető el.",
+      "grid_profile_installer_required": "A hálózati profil vezérléséhez telepítői hozzáférés szükséges az Enphase Activation szolgáltatáshoz.",
+      "grid_profile_no_regions": "Ehhez a helyszínországhoz nem érhető el hálózati profil régió."
     },
     "create_entry": {
       "migration_success": "A migráció befejeződött. Az Enphase Energy most már a kiválasztott forrásentitás-azonosítókat használja. Ellenőrizze a következő frissítés után az Energy irányítópultot és a Developer Tools > Statistics oldalt.",
       "migration_success_reload_needed": "A migráció befejeződött, de egy vagy több integrációt nem sikerült automatikusan újratölteni. Szükség esetén töltse újra kézzel az Enphase Energy és az Enphase Envoy integrációt, majd ellenőrizze az Energy irányítópultot és a Developer Tools > Statistics oldalt."
+    }
+  },
+  "selector": {
+    "grid_profile_list_mode": {
+      "options": {
+        "commonly_used": "Gyakran használt",
+        "all_profiles": "Minden profil"
+      }
+    },
+    "grid_profile_status": {
+      "options": {
+        "yes": "Igen",
+        "no": "Nem",
+        "unknown": "Ismeretlen",
+        "available": "Elérhető",
+        "unavailable": "Nem érhető el",
+        "accepted": "Elfogadva"
+      }
     }
   },
   "entity": {
@@ -1769,6 +1861,9 @@
       },
       "dry_contacts": {
         "name": "Száraz kontaktusok"
+      },
+      "current_grid_profile": {
+        "name": "Hálózati profil"
       }
     },
     "number": {
@@ -2821,6 +2916,115 @@
         "site_id": {
           "name": "Helyazonosító",
           "description": "Opcionális helyazonosító; eszköz kiválasztásakor automatikusan felismerhető."
+        }
+      }
+    },
+    "browse_grid_profiles": {
+      "name": "Hálózati profilok tallózása",
+      "description": "A kiválasztott helyszín országához és régiójához elérhető Cloud Activation hálózati profilok tallózása.",
+      "sections": {
+        "advanced": {
+          "name": "Speciális beállítások"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Régiókód",
+          "description": "Opcionális régió- vagy államkód, például VIC."
+        },
+        "commonly_used": {
+          "name": "Csak gyakran használt",
+          "description": "Engedélyezve a gyakran használt profilok katalógusát adja vissza."
+        },
+        "device_id": {
+          "name": "Helyszíni eszközök",
+          "description": "Válasszon egy Enphase helyszíni eszközt."
+        },
+        "site_id": {
+          "name": "Helyszínazonosító",
+          "description": "Opcionális helyszínazonosító; eszköz kiválasztásakor automatikusan felismerhető."
+        },
+        "config_entry_id": {
+          "name": "Konfigurációs bejegyzés azonosítója",
+          "description": "A célhelyszín opcionális konfigurációsbejegyzés-azonosítója."
+        },
+        "query": {
+          "name": "Keresés",
+          "description": "Opcionális keresési szöveg a helyszín országának régióihoz és profiljaihoz."
+        }
+      }
+    },
+    "refresh_grid_profiles": {
+      "name": "Hálózati profilok frissítése",
+      "description": "A Cloud Activation hálózati profil referenciaadatainak és a kiválasztott régió katalógusának frissítése.",
+      "sections": {
+        "advanced": {
+          "name": "Speciális beállítások"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Régiókód",
+          "description": "Opcionális régió- vagy államkód, például VIC."
+        },
+        "commonly_used": {
+          "name": "Csak gyakran használt",
+          "description": "Engedélyezve a gyakran használt profilok katalógusát adja vissza."
+        },
+        "device_id": {
+          "name": "Helyszíni eszközök",
+          "description": "Válasszon egy Enphase helyszíni eszközt."
+        },
+        "site_id": {
+          "name": "Helyszínazonosító",
+          "description": "Opcionális helyszínazonosító; eszköz kiválasztásakor automatikusan felismerhető."
+        },
+        "config_entry_id": {
+          "name": "Konfigurációs bejegyzés azonosítója",
+          "description": "A célhelyszín opcionális konfigurációsbejegyzés-azonosítója."
+        }
+      }
+    },
+    "set_grid_profile": {
+      "name": "Hálózati profil beállítása",
+      "description": "Cloud Activation hálózati profil alkalmazása kifejezett megerősítés után.",
+      "sections": {
+        "advanced": {
+          "name": "Speciális beállítások"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Régiókód",
+          "description": "Opcionális régió- vagy államkód, például VIC."
+        },
+        "commonly_used": {
+          "name": "Csak gyakran használt",
+          "description": "Engedélyezve a gyakran használt profilok katalógusát adja vissza."
+        },
+        "device_id": {
+          "name": "Helyszíni eszközök",
+          "description": "Válasszon egy Enphase helyszíni eszközt."
+        },
+        "site_id": {
+          "name": "Helyszínazonosító",
+          "description": "Opcionális helyszínazonosító; eszköz kiválasztásakor automatikusan felismerhető."
+        },
+        "config_entry_id": {
+          "name": "Konfigurációs bejegyzés azonosítója",
+          "description": "A célhelyszín opcionális konfigurációsbejegyzés-azonosítója."
+        },
+        "profile_id": {
+          "name": "Profilazonosító",
+          "description": "Cloud Activation profilazonosító az agf: előtaggal együtt."
+        },
+        "confirm": {
+          "name": "Alkalmazás megerősítése",
+          "description": "A kiválasztott hálózati profil alkalmazásához engedélyezni kell."
+        },
+        "gateway_serial": {
+          "name": "Gateway sorozatszáma",
+          "description": "Opcionális Gateway-sorozatszám, ha az Activation rekord több Gatewayt tartalmaz."
         }
       }
     }

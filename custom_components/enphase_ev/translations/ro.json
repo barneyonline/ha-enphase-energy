@@ -456,6 +456,27 @@
     },
     "firmware_advisory_only": {
       "message": "Actualizările de firmware sunt doar informative."
+    },
+    "grid_profile_installer_required": {
+      "message": "Controlul profilului de rețea necesită acces de instalator la Enphase Activation."
+    },
+    "grid_profile_profile_invalid": {
+      "message": "Profilul de rețea selectat nu este disponibil pentru țara și regiunea acestei locații."
+    },
+    "grid_profile_gateway_required": {
+      "message": "Aplicarea profilului de rețea necesită o înregistrare Gateway Cloud Activation."
+    },
+    "grid_profile_apply_failed": {
+      "message": "Aplicarea profilului de rețea a eșuat."
+    },
+    "grid_profile_confirmation_required": {
+      "message": "Este necesară confirmarea pentru a aplica un profil de rețea."
+    },
+    "grid_profile_region_invalid": {
+      "message": "Regiunea selectată a profilului de rețea nu este disponibilă."
+    },
+    "grid_profile_unavailable": {
+      "message": "Controlul profilului de rețea nu este disponibil."
     }
   },
   "options": {
@@ -465,11 +486,13 @@
         "description": "Alegeți ce doriți să faceți cu această intrare de integrare.",
         "menu_options": {
           "settings": "Setări",
-          "migrate_envoy": "Migrare istoric Envoy"
+          "migrate_envoy": "Migrare istoric Envoy",
+          "advanced": "Avansat"
         },
         "menu_option_descriptions": {
           "settings": "Ajustați interogarea și comportamentul.",
-          "migrate_envoy": "Preluați ID-urile entităților de energie Enphase Envoy selectate pentru ca istoricul Home Assistant Energy să continue în această integrare."
+          "migrate_envoy": "Preluați ID-urile entităților de energie Enphase Envoy selectate pentru ca istoricul Home Assistant Energy să continue în această integrare.",
+          "advanced": "Controlul profilului de rețea este disponibil doar pentru instalatori."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -597,6 +620,46 @@
           "confirm_reassign": "Înțeleg că ID-urile entităților sursă selectate vor fi realocate",
           "disable_archived_envoy_sensors": "Dezactivează senzorii sursă arhivați după migrare"
         }
+      },
+      "advanced": {
+        "title": "Avansat",
+        "description": "Acțiuni pentru instalator și întreținere.",
+        "menu_options": {
+          "grid_profile": "Control profil rețea"
+        },
+        "menu_option_descriptions": {
+          "grid_profile": "Răsfoiește și aplică profiluri de rețea Activation disponibile doar pentru instalatori."
+        }
+      },
+      "grid_profile": {
+        "title": "Control profil rețea",
+        "description": "Filtrează catalogul de profiluri de rețea Activation pentru țara acestui amplasament.",
+        "data": {
+          "grid_profile_region": "Regiune",
+          "grid_profile_commonly_used": "Listă profiluri"
+        },
+        "data_description": {
+          "grid_profile_region": "Sunt disponibile doar regiunile pentru țara amplasamentului.",
+          "grid_profile_commonly_used": "Alege profilurile utilizate frecvent sau toate profilurile pentru regiunea selectată."
+        }
+      },
+      "grid_profile_select": {
+        "title": "Selectează profilul de rețea",
+        "description": "Alege un profil de pregătit. Nimic nu se aplică până la pasul de confirmare.",
+        "data": {
+          "grid_profile_id": "Profil rețea"
+        }
+      },
+      "grid_profile_confirm": {
+        "title": "Confirmă profilul de rețea",
+        "description": "Profil curent: **{current_profile}**\n\nProfil selectat: **{selected_profile}**\n\nID profil: **{selected_profile_id}**\n\nPEL Enhanced: **{selected_profile_pel}**\n\nCompatibil 277 V: **{selected_profile_277v}**\n\nȚară: **{country}**\n\nRegiune: **{region}**\n\nStare aplicare în cloud: **{apply_status}**.",
+        "data": {
+          "confirm_apply": "Aplică profilul de rețea selectat"
+        }
+      },
+      "grid_profile_applied": {
+        "title": "Actualizarea profilului de rețea a fost acceptată",
+        "description": "Enphase a acceptat actualizarea profilului de rețea pentru **{selected_profile}**.\n\nID profil solicitat: **{requested_profile_id}**\n\nStare cloud: **{cloud_apply_status}**\n\nPoate dura până la **5 minute** până când noul profil apare ca profil curent, în timp ce cloudul și Gateway finalizează procesarea. Senzorul Grid Profile se va actualiza după ce înregistrarea Activation raportează noul profil curent."
       }
     },
     "error": {
@@ -606,16 +669,45 @@
       "migration_no_selection": "Selectați cel puțin un senzor de energie compatibil pentru migrare.",
       "migration_duplicate_selection": "Aceeași entitate sursă nu poate fi folosită de mai multe ori.",
       "envoy_entry_loaded": "Integrarea Envoy nu a putut fi descărcată temporar pentru migrare.",
-      "incompatible_energy_total": "Entitățile selectate nu sunt totaluri cumulative de energie compatibile."
+      "incompatible_energy_total": "Entitățile selectate nu sunt totaluri cumulative de energie compatibile.",
+      "grid_profile_unavailable": "Controlul profilului de rețea nu este disponibil.",
+      "grid_profile_installer_required": "Controlul profilului de rețea necesită acces de instalator la Enphase Activation.",
+      "grid_profile_no_regions": "Nu există regiuni de profil de rețea disponibile pentru țara acestui amplasament.",
+      "grid_profile_no_profiles": "Niciun profil de rețea nu corespunde filtrelor selectate.",
+      "grid_profile_region_invalid": "Regiunea profilului de rețea selectată nu este disponibilă.",
+      "grid_profile_profile_invalid": "Profilul de rețea selectat nu este disponibil pentru țara și regiunea acestui amplasament.",
+      "grid_profile_gateway_required": "Aplicarea profilului de rețea necesită o înregistrare Gateway din Activation în cloud.",
+      "grid_profile_apply_failed": "Aplicarea profilului de rețea a eșuat."
     },
     "abort": {
       "migration_no_envoy_sources": "Nu există senzori de energie Enphase Envoy disponibili pentru migrare.",
       "migration_no_targets": "Nu există senzori Enphase Energy compatibili disponibili pentru migrare.",
-      "migration_partial_failure": "Migrarea s-a oprit după finalizare parțială.\n\nMapări finalizate:\n{completed_mappings}\n\nEroare la procesarea `{failed_entity_id}`: {failure_reason}\n\nRestaurați din backup dacă rezultatul nu este acceptabil."
+      "migration_partial_failure": "Migrarea s-a oprit după finalizare parțială.\n\nMapări finalizate:\n{completed_mappings}\n\nEroare la procesarea `{failed_entity_id}`: {failure_reason}\n\nRestaurați din backup dacă rezultatul nu este acceptabil.",
+      "grid_profile_unavailable": "Controlul profilului de rețea nu este disponibil.",
+      "grid_profile_installer_required": "Controlul profilului de rețea necesită acces de instalator la Enphase Activation.",
+      "grid_profile_no_regions": "Nu există regiuni de profil de rețea disponibile pentru țara acestui amplasament."
     },
     "create_entry": {
       "migration_success": "Migrare finalizată. Enphase Energy deține acum ID-urile entităților sursă selectate. Verificați tabloul Energy și Developer Tools > Statistics după următoarea actualizare.",
       "migration_success_reload_needed": "Migrarea s-a finalizat, dar una sau mai multe integrări nu au putut fi reîncărcate automat. Reîncărcați manual Enphase Energy și Enphase Envoy dacă este necesar, apoi verificați tabloul Energy și Developer Tools > Statistics."
+    }
+  },
+  "selector": {
+    "grid_profile_list_mode": {
+      "options": {
+        "commonly_used": "Utilizate frecvent",
+        "all_profiles": "Toate profilurile"
+      }
+    },
+    "grid_profile_status": {
+      "options": {
+        "yes": "Da",
+        "no": "Nu",
+        "unknown": "Necunoscut",
+        "available": "Disponibil",
+        "unavailable": "Indisponibil",
+        "accepted": "Acceptat"
+      }
     }
   },
   "entity": {
@@ -1769,6 +1861,9 @@
       },
       "dry_contacts": {
         "name": "Contacte uscate"
+      },
+      "current_grid_profile": {
+        "name": "Profil de rețea"
       }
     },
     "number": {
@@ -2821,6 +2916,115 @@
         "site_id": {
           "name": "ID site",
           "description": "Identificator opțional de site; detectat automat când este selectat un dispozitiv."
+        }
+      }
+    },
+    "browse_grid_profiles": {
+      "name": "Răsfoiește profilurile de rețea",
+      "description": "Răsfoiește profilurile de rețea Cloud Activation disponibile pentru țara și regiunea locației selectate.",
+      "sections": {
+        "advanced": {
+          "name": "Täiendavad valikud"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Cod regiune",
+          "description": "Cod opțional de regiune sau stat, cum ar fi VIC."
+        },
+        "commonly_used": {
+          "name": "Numai cele utilizate frecvent",
+          "description": "Returnează catalogul profilurilor utilizate frecvent când opțiunea este activată."
+        },
+        "device_id": {
+          "name": "Dispozitivele locației",
+          "description": "Selectează un dispozitiv Enphase al locației."
+        },
+        "site_id": {
+          "name": "ID locație",
+          "description": "Identificator opțional al locației; detectat automat la selectarea unui dispozitiv."
+        },
+        "config_entry_id": {
+          "name": "ID intrare de configurare",
+          "description": "Identificator opțional al intrării de configurare pentru locația țintă."
+        },
+        "query": {
+          "name": "Căutare",
+          "description": "Text de căutare opțional pentru regiunile și profilurile din țara locației."
+        }
+      }
+    },
+    "refresh_grid_profiles": {
+      "name": "Actualizează profilurile de rețea",
+      "description": "Actualizează datele de referință ale profilurilor de rețea Cloud Activation și catalogul regiunii selectate.",
+      "sections": {
+        "advanced": {
+          "name": "Täiendavad valikud"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Cod regiune",
+          "description": "Cod opțional de regiune sau stat, cum ar fi VIC."
+        },
+        "commonly_used": {
+          "name": "Numai cele utilizate frecvent",
+          "description": "Returnează catalogul profilurilor utilizate frecvent când opțiunea este activată."
+        },
+        "device_id": {
+          "name": "Dispozitivele locației",
+          "description": "Selectează un dispozitiv Enphase al locației."
+        },
+        "site_id": {
+          "name": "ID locație",
+          "description": "Identificator opțional al locației; detectat automat la selectarea unui dispozitiv."
+        },
+        "config_entry_id": {
+          "name": "ID intrare de configurare",
+          "description": "Identificator opțional al intrării de configurare pentru locația țintă."
+        }
+      }
+    },
+    "set_grid_profile": {
+      "name": "Setează profilul de rețea",
+      "description": "Aplică un profil de rețea Cloud Activation după confirmarea explicită.",
+      "sections": {
+        "advanced": {
+          "name": "Täiendavad valikud"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Cod regiune",
+          "description": "Cod opțional de regiune sau stat, cum ar fi VIC."
+        },
+        "commonly_used": {
+          "name": "Numai cele utilizate frecvent",
+          "description": "Returnează catalogul profilurilor utilizate frecvent când opțiunea este activată."
+        },
+        "device_id": {
+          "name": "Dispozitivele locației",
+          "description": "Selectează un dispozitiv Enphase al locației."
+        },
+        "site_id": {
+          "name": "ID locație",
+          "description": "Identificator opțional al locației; detectat automat la selectarea unui dispozitiv."
+        },
+        "config_entry_id": {
+          "name": "ID intrare de configurare",
+          "description": "Identificator opțional al intrării de configurare pentru locația țintă."
+        },
+        "profile_id": {
+          "name": "ID profil",
+          "description": "ID-ul profilului Cloud Activation, inclusiv prefixul agf:."
+        },
+        "confirm": {
+          "name": "Confirmă aplicarea",
+          "description": "Trebuie activat pentru a aplica profilul de rețea selectat."
+        },
+        "gateway_serial": {
+          "name": "Număr de serie Gateway",
+          "description": "Număr de serie Gateway opțional când înregistrarea Activation conține mai multe Gateway-uri."
         }
       }
     }

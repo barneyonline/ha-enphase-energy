@@ -30,6 +30,7 @@ All notable changes to this project will be documented in this file.
 - Added opt-in Enphase site weather on the Enphase Cloud device. The weather entity
   is created only after the authenticated weather endpoint returns a valid current
   reading.
+- Added installer-only, cloud-based Grid Profile Control with country-scoped region and profile selection, explicit apply confirmation, current profile monitoring, and follow-up cloud status refreshes.
 
 ### 🐛 Bug fixes
 - Fixed Enlighten authentication after Enphase retired the Entrez token mint by
@@ -70,6 +71,7 @@ All notable changes to this project will be documented in this file.
   background work no longer inflates coordinator refresh counts.
 - Added failed and cancelled refreshes plus request queue, network, and parsing
   timing totals to the rolling refresh performance diagnostics when available.
+- Added five-minute cloud metadata refreshes for the current Grid Profile sensor and preserved the entity during transient Activation service outages.
 
 ### 🔄 Other changes
 - None

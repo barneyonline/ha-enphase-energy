@@ -456,6 +456,27 @@
     },
     "firmware_advisory_only": {
       "message": "Les mises à jour du firmware sont fournies à titre indicatif uniquement."
+    },
+    "grid_profile_installer_required": {
+      "message": "Le contrôle du profil réseau nécessite un accès installateur Enphase Activation."
+    },
+    "grid_profile_profile_invalid": {
+      "message": "Le profil réseau sélectionné n’est pas disponible pour le pays et la région de ce site."
+    },
+    "grid_profile_gateway_required": {
+      "message": "L’application du profil réseau nécessite un enregistrement Cloud Activation Gateway."
+    },
+    "grid_profile_apply_failed": {
+      "message": "Échec de l’application du profil réseau."
+    },
+    "grid_profile_confirmation_required": {
+      "message": "Une confirmation est requise pour appliquer un profil réseau."
+    },
+    "grid_profile_region_invalid": {
+      "message": "La région du profil réseau sélectionnée n’est pas disponible."
+    },
+    "grid_profile_unavailable": {
+      "message": "Le contrôle du profil réseau est indisponible."
     }
   },
   "options": {
@@ -465,11 +486,13 @@
         "description": "Choisissez ce que vous voulez faire avec cette entrée d’intégration.",
         "menu_options": {
           "settings": "Paramètres",
-          "migrate_envoy": "Migrer l’historique Envoy"
+          "migrate_envoy": "Migrer l’historique Envoy",
+          "advanced": "Avancé"
         },
         "menu_option_descriptions": {
           "settings": "Ajuster la scrutation et le comportement.",
-          "migrate_envoy": "Récupérez les identifiants d’entité d’énergie Enphase Envoy sélectionnés afin que l’historique Home Assistant Energy continue sous cette intégration."
+          "migrate_envoy": "Récupérez les identifiants d’entité d’énergie Enphase Envoy sélectionnés afin que l’historique Home Assistant Energy continue sous cette intégration.",
+          "advanced": "Contrôles de profil réseau réservés aux installateurs."
         },
         "data": {
           "type_envoy": "Passerelle",
@@ -597,6 +620,46 @@
           "confirm_reassign": "Je comprends que les identifiants d’entité source sélectionnés seront réattribués",
           "disable_archived_envoy_sensors": "Désactiver les capteurs source archivés après la migration"
         }
+      },
+      "advanced": {
+        "title": "Avancé",
+        "description": "Actions installateur et maintenance.",
+        "menu_options": {
+          "grid_profile": "Contrôle du profil réseau"
+        },
+        "menu_option_descriptions": {
+          "grid_profile": "Parcourir et appliquer les profils réseau Activation réservés aux installateurs."
+        }
+      },
+      "grid_profile": {
+        "title": "Contrôle du profil réseau",
+        "description": "Filtre le catalogue des profils réseau Activation pour le pays de ce site.",
+        "data": {
+          "grid_profile_region": "Région",
+          "grid_profile_commonly_used": "Liste des profils"
+        },
+        "data_description": {
+          "grid_profile_region": "Seules les régions du pays du site sont disponibles.",
+          "grid_profile_commonly_used": "Choisissez les profils courants ou tous les profils pour la région sélectionnée."
+        }
+      },
+      "grid_profile_select": {
+        "title": "Sélectionner un profil réseau",
+        "description": "Choisissez un profil à préparer. Rien n'est appliqué avant l'étape de confirmation.",
+        "data": {
+          "grid_profile_id": "Profil réseau"
+        }
+      },
+      "grid_profile_confirm": {
+        "title": "Confirmer le profil réseau",
+        "description": "Profil actuel : **{current_profile}**\n\nProfil sélectionné : **{selected_profile}**\n\nID du profil : **{selected_profile_id}**\n\nPEL Enhanced : **{selected_profile_pel}**\n\nCompatible 277 V : **{selected_profile_277v}**\n\nPays : **{country}**\n\nRégion : **{region}**\n\nÉtat de l’application cloud : **{apply_status}**.",
+        "data": {
+          "confirm_apply": "Appliquer le profil réseau sélectionné"
+        }
+      },
+      "grid_profile_applied": {
+        "title": "Mise à jour du profil réseau acceptée",
+        "description": "Enphase a accepté la mise à jour du profil réseau pour **{selected_profile}**.\n\nID du profil demandé : **{requested_profile_id}**\n\nÉtat cloud : **{cloud_apply_status}**\n\nLe nouveau profil peut prendre jusqu’à **5 minutes** pour apparaître comme profil actuel pendant que le cloud et la Gateway terminent le traitement. Le capteur Grid Profile sera mis à jour lorsque l’enregistrement Activation indiquera le nouveau profil actuel."
       }
     },
     "error": {
@@ -606,16 +669,45 @@
       "migration_no_selection": "Sélectionnez au moins un capteur d’énergie compatible à migrer.",
       "migration_duplicate_selection": "La même entité source ne peut pas être utilisée plus d’une fois.",
       "envoy_entry_loaded": "L’intégration Envoy n’a pas pu être temporairement déchargée pour la migration.",
-      "incompatible_energy_total": "Les entités sélectionnées ne sont pas des totaux d’énergie compatibles."
+      "incompatible_energy_total": "Les entités sélectionnées ne sont pas des totaux d’énergie compatibles.",
+      "grid_profile_unavailable": "Le contrôle du profil réseau est indisponible.",
+      "grid_profile_installer_required": "Le contrôle du profil réseau nécessite un accès installateur à Enphase Activation.",
+      "grid_profile_no_regions": "Aucune région de profil réseau n'est disponible pour le pays de ce site.",
+      "grid_profile_no_profiles": "Aucun profil réseau ne correspond aux filtres sélectionnés.",
+      "grid_profile_region_invalid": "La région de profil réseau sélectionnée est indisponible.",
+      "grid_profile_profile_invalid": "Le profil réseau sélectionné n’est pas disponible pour le pays et la région de ce site.",
+      "grid_profile_gateway_required": "L’application du profil réseau nécessite un enregistrement Gateway Activation cloud.",
+      "grid_profile_apply_failed": "Échec de l’application du profil réseau."
     },
     "abort": {
       "migration_no_envoy_sources": "Aucun capteur d’énergie Enphase Envoy n’est disponible pour la migration.",
       "migration_no_targets": "Aucun capteur Enphase Energy compatible n’est disponible pour la migration.",
-      "migration_partial_failure": "La migration s’est arrêtée après une réalisation partielle.\n\nAssociations terminées :\n{completed_mappings}\n\nÉchec lors du traitement de `{failed_entity_id}` : {failure_reason}\n\nRestaurez la sauvegarde si le résultat n’est pas acceptable."
+      "migration_partial_failure": "La migration s’est arrêtée après une réalisation partielle.\n\nAssociations terminées :\n{completed_mappings}\n\nÉchec lors du traitement de `{failed_entity_id}` : {failure_reason}\n\nRestaurez la sauvegarde si le résultat n’est pas acceptable.",
+      "grid_profile_unavailable": "Le contrôle du profil réseau est indisponible.",
+      "grid_profile_installer_required": "Le contrôle du profil réseau nécessite un accès installateur à Enphase Activation.",
+      "grid_profile_no_regions": "Aucune région de profil réseau n'est disponible pour le pays de ce site."
     },
     "create_entry": {
       "migration_success": "Migration terminée. Enphase Energy possède maintenant les identifiants d’entité source sélectionnés. Vérifiez le tableau de bord Energy et Developer Tools > Statistics après la prochaine actualisation.",
       "migration_success_reload_needed": "La migration est terminée, mais une ou plusieurs intégrations n’ont pas pu être rechargées automatiquement. Rechargez manuellement Enphase Energy et Enphase Envoy si nécessaire, puis vérifiez le tableau de bord Energy et Developer Tools > Statistics."
+    }
+  },
+  "selector": {
+    "grid_profile_list_mode": {
+      "options": {
+        "commonly_used": "Couramment utilisés",
+        "all_profiles": "Tous les profils"
+      }
+    },
+    "grid_profile_status": {
+      "options": {
+        "yes": "Oui",
+        "no": "Non",
+        "unknown": "Inconnu",
+        "available": "Disponible",
+        "unavailable": "Indisponible",
+        "accepted": "Accepté"
+      }
     }
   },
   "entity": {
@@ -1769,6 +1861,9 @@
       },
       "dry_contacts": {
         "name": "Contacts secs"
+      },
+      "current_grid_profile": {
+        "name": "Profil réseau"
       }
     },
     "number": {
@@ -2821,6 +2916,115 @@
         "site_id": {
           "name": "ID du site",
           "description": "Identifiant de site facultatif ; détecté automatiquement lorsqu’un appareil de site est sélectionné."
+        }
+      }
+    },
+    "browse_grid_profiles": {
+      "name": "Parcourir les profil réseaus",
+      "description": "Parcourir les profils réseau Cloud Activation disponibles pour le pays et la région du site sélectionné.",
+      "sections": {
+        "advanced": {
+          "name": "Options avancées"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Code région",
+          "description": "Code de région ou d’état facultatif, par exemple VIC."
+        },
+        "commonly_used": {
+          "name": "Profils courants uniquement",
+          "description": "Renvoie le catalogue des profils couramment utilisés lorsque cette option est activée."
+        },
+        "device_id": {
+          "name": "Appareils du site",
+          "description": "Sélectionnez un appareil de site Enphase."
+        },
+        "site_id": {
+          "name": "ID du site",
+          "description": "Identifiant de site facultatif; détecté automatiquement lorsqu’un appareil de site est sélectionné."
+        },
+        "config_entry_id": {
+          "name": "ID d’entrée de configuration",
+          "description": "Identifiant facultatif de l’entrée de configuration du site cible."
+        },
+        "query": {
+          "name": "Recherche",
+          "description": "Texte de recherche facultatif dans les régions et profils du pays du site."
+        }
+      }
+    },
+    "refresh_grid_profiles": {
+      "name": "Actualiser les profil réseaus",
+      "description": "Forcer l’actualisation des données de référence des profils réseau Cloud Activation et du catalogue de la région sélectionnée.",
+      "sections": {
+        "advanced": {
+          "name": "Options avancées"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Code région",
+          "description": "Code de région ou d’état facultatif, par exemple VIC."
+        },
+        "commonly_used": {
+          "name": "Profils courants uniquement",
+          "description": "Renvoie le catalogue des profils couramment utilisés lorsque cette option est activée."
+        },
+        "device_id": {
+          "name": "Appareils du site",
+          "description": "Sélectionnez un appareil de site Enphase."
+        },
+        "site_id": {
+          "name": "ID du site",
+          "description": "Identifiant de site facultatif; détecté automatiquement lorsqu’un appareil de site est sélectionné."
+        },
+        "config_entry_id": {
+          "name": "ID d’entrée de configuration",
+          "description": "Identifiant facultatif de l’entrée de configuration du site cible."
+        }
+      }
+    },
+    "set_grid_profile": {
+      "name": "Définir le profil réseau",
+      "description": "Appliquer un profil réseau Cloud Activation après confirmation explicite.",
+      "sections": {
+        "advanced": {
+          "name": "Options avancées"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Code région",
+          "description": "Code de région ou d’état facultatif, par exemple VIC."
+        },
+        "commonly_used": {
+          "name": "Profils courants uniquement",
+          "description": "Renvoie le catalogue des profils couramment utilisés lorsque cette option est activée."
+        },
+        "device_id": {
+          "name": "Appareils du site",
+          "description": "Sélectionnez un appareil de site Enphase."
+        },
+        "site_id": {
+          "name": "ID du site",
+          "description": "Identifiant de site facultatif; détecté automatiquement lorsqu’un appareil de site est sélectionné."
+        },
+        "config_entry_id": {
+          "name": "ID d’entrée de configuration",
+          "description": "Identifiant facultatif de l’entrée de configuration du site cible."
+        },
+        "profile_id": {
+          "name": "ID du profil",
+          "description": "ID du profil Cloud Activation, y compris le préfixe agf:."
+        },
+        "confirm": {
+          "name": "Confirmer l’application",
+          "description": "Doit être activé pour appliquer le profil réseau sélectionné."
+        },
+        "gateway_serial": {
+          "name": "Numéro de série Gateway",
+          "description": "Numéro de série Gateway facultatif lorsque l’enregistrement Activation contient plusieurs Gateways."
         }
       }
     }

@@ -456,6 +456,27 @@
     },
     "firmware_advisory_only": {
       "message": "Aparātprogrammatūras atjauninājumi ir tikai informatīvi."
+    },
+    "grid_profile_installer_required": {
+      "message": "Tīkla profila vadībai nepieciešama Enphase Activation uzstādītāja piekļuve."
+    },
+    "grid_profile_profile_invalid": {
+      "message": "Atlasītais tīkla profils nav pieejams šīs vietnes valstij un reģionam."
+    },
+    "grid_profile_gateway_required": {
+      "message": "Lai lietotu tīkla profilu, ir nepieciešams Cloud Activation Gateway ieraksts."
+    },
+    "grid_profile_apply_failed": {
+      "message": "Tīkla profila lietošana neizdevās."
+    },
+    "grid_profile_confirmation_required": {
+      "message": "Lai lietotu tīkla profilu, nepieciešams apstiprinājums."
+    },
+    "grid_profile_region_invalid": {
+      "message": "Atlasītais tīkla profila reģions nav pieejams."
+    },
+    "grid_profile_unavailable": {
+      "message": "Tīkla profila vadība nav pieejama."
     }
   },
   "options": {
@@ -465,11 +486,13 @@
         "description": "Izvēlieties, ko darīt ar šo integrācijas ierakstu.",
         "menu_options": {
           "settings": "Iestatījumi",
-          "migrate_envoy": "Migrēt Envoy vēsturi"
+          "migrate_envoy": "Migrēt Envoy vēsturi",
+          "advanced": "Papildu"
         },
         "menu_option_descriptions": {
           "settings": "Pielāgojiet aptauju un darbību.",
-          "migrate_envoy": "Pārņemiet izvēlētos Enphase Envoy enerģijas entītiju ID, lai Home Assistant Energy vēsture turpinātos šajā integrācijā."
+          "migrate_envoy": "Pārņemiet izvēlētos Enphase Envoy enerģijas entītiju ID, lai Home Assistant Energy vēsture turpinātos šajā integrācijā.",
+          "advanced": "Tīkla profila vadība tikai uzstādītājiem."
         },
         "data": {
           "type_envoy": "Vārteja",
@@ -597,6 +620,46 @@
           "confirm_reassign": "Es saprotu, ka atlasītie avota entītiju ID tiks pārdalīti",
           "disable_archived_envoy_sensors": "Atspējot arhivētos avota sensorus pēc migrācijas"
         }
+      },
+      "advanced": {
+        "title": "Papildu",
+        "description": "Uzstādītāja un apkopes darbības.",
+        "menu_options": {
+          "grid_profile": "Tīkla profila vadība"
+        },
+        "menu_option_descriptions": {
+          "grid_profile": "Pārlūkot un lietot tikai uzstādītājiem paredzētus Activation tīkla profilus."
+        }
+      },
+      "grid_profile": {
+        "title": "Tīkla profila vadība",
+        "description": "Filtrē Activation tīkla profilu katalogu šīs vietas valstij.",
+        "data": {
+          "grid_profile_region": "Reģions",
+          "grid_profile_commonly_used": "Profilu saraksts"
+        },
+        "data_description": {
+          "grid_profile_region": "Pieejami tikai vietas valstij atbilstošie reģioni.",
+          "grid_profile_commonly_used": "Izvēlieties bieži lietotos profilus vai visus profilus atlasītajam reģionam."
+        }
+      },
+      "grid_profile_select": {
+        "title": "Atlasīt tīkla profilu",
+        "description": "Izvēlieties profilu sagatavošanai. Nekas netiks lietots līdz apstiprinājumam.",
+        "data": {
+          "grid_profile_id": "Tīkla profils"
+        }
+      },
+      "grid_profile_confirm": {
+        "title": "Apstiprināt tīkla profilu",
+        "description": "Pašreizējais profils: **{current_profile}**\n\nAtlasītais profils: **{selected_profile}**\n\nProfila ID: **{selected_profile_id}**\n\nPEL Enhanced: **{selected_profile_pel}**\n\nSaderīgs ar 277 V: **{selected_profile_277v}**\n\nValsts: **{country}**\n\nReģions: **{region}**\n\nMākoņa lietošanas statuss: **{apply_status}**.",
+        "data": {
+          "confirm_apply": "Lietot atlasīto tīkla profilu"
+        }
+      },
+      "grid_profile_applied": {
+        "title": "Tīkla profila atjauninājums pieņemts",
+        "description": "Enphase pieņēma tīkla profila atjauninājumu profilam **{selected_profile}**.\n\nPieprasītā profila ID: **{requested_profile_id}**\n\nMākoņa statuss: **{cloud_apply_status}**\n\nVar paiet līdz **5 minūtēm**, līdz jaunais profils tiek rādīts kā pašreizējais, kamēr mākonis un Gateway pabeidz apstrādi. Grid Profile sensors tiks atjaunināts, kad Activation ieraksts ziņos par jauno pašreizējo profilu."
       }
     },
     "error": {
@@ -606,16 +669,45 @@
       "migration_no_selection": "Atlasiet vismaz vienu saderīgu enerģijas sensoru migrācijai.",
       "migration_duplicate_selection": "Vienu un to pašu avota entītiju nevar izmantot vairāk nekā vienu reizi.",
       "envoy_entry_loaded": "Envoy integrāciju migrācijai nevarēja īslaicīgi izlādēt.",
-      "incompatible_energy_total": "Atlasītās entītijas nav saderīgi kumulatīvie enerģijas kopsummu sensori."
+      "incompatible_energy_total": "Atlasītās entītijas nav saderīgi kumulatīvie enerģijas kopsummu sensori.",
+      "grid_profile_unavailable": "Tīkla profila vadība nav pieejama.",
+      "grid_profile_installer_required": "Tīkla profila vadībai nepieciešama uzstādītāja piekļuve Enphase Activation.",
+      "grid_profile_no_regions": "Šīs vietas valstij nav pieejami tīkla profila reģioni.",
+      "grid_profile_no_profiles": "Neviens tīkla profils neatbilst atlasītajiem filtriem.",
+      "grid_profile_region_invalid": "Atlasītais tīkla profila reģions nav pieejams.",
+      "grid_profile_profile_invalid": "Atlasītais tīkla profils nav pieejams šīs vietas valstij un reģionam.",
+      "grid_profile_gateway_required": "Tīkla profila lietošanai nepieciešams mākoņa Activation Gateway ieraksts.",
+      "grid_profile_apply_failed": "Tīkla profila lietošana neizdevās."
     },
     "abort": {
       "migration_no_envoy_sources": "Migrācijai nav pieejami Enphase Envoy enerģijas sensori.",
       "migration_no_targets": "Migrācijai nav pieejami saderīgi Enphase Energy sensori.",
-      "migration_partial_failure": "Migrācija apstājās pēc daļējas pabeigšanas.\n\nPabeigtās sasaistes:\n{completed_mappings}\n\nKļūda, apstrādājot `{failed_entity_id}`: {failure_reason}\n\nJa rezultāts nav pieņemams, atjaunojiet no dublējuma."
+      "migration_partial_failure": "Migrācija apstājās pēc daļējas pabeigšanas.\n\nPabeigtās sasaistes:\n{completed_mappings}\n\nKļūda, apstrādājot `{failed_entity_id}`: {failure_reason}\n\nJa rezultāts nav pieņemams, atjaunojiet no dublējuma.",
+      "grid_profile_unavailable": "Tīkla profila vadība nav pieejama.",
+      "grid_profile_installer_required": "Tīkla profila vadībai nepieciešama uzstādītāja piekļuve Enphase Activation.",
+      "grid_profile_no_regions": "Šīs vietas valstij nav pieejami tīkla profila reģioni."
     },
     "create_entry": {
       "migration_success": "Migrācija pabeigta. Enphase Energy tagad izmanto atlasītos avota entītiju ID. Pēc nākamās atjaunināšanas pārbaudiet Energy informācijas paneli un Developer Tools > Statistics.",
       "migration_success_reload_needed": "Migrācija ir pabeigta, bet vienu vai vairākas integrācijas nevarēja automātiski pārlādēt. Ja nepieciešams, manuāli pārlādējiet Enphase Energy un Enphase Envoy, pēc tam pārbaudiet Energy informācijas paneli un Developer Tools > Statistics."
+    }
+  },
+  "selector": {
+    "grid_profile_list_mode": {
+      "options": {
+        "commonly_used": "Biežāk izmantotie",
+        "all_profiles": "Visi profili"
+      }
+    },
+    "grid_profile_status": {
+      "options": {
+        "yes": "Jā",
+        "no": "Nē",
+        "unknown": "Nezināms",
+        "available": "Pieejams",
+        "unavailable": "Nav pieejams",
+        "accepted": "Pieņemts"
+      }
     }
   },
   "entity": {
@@ -1769,6 +1861,9 @@
       },
       "dry_contacts": {
         "name": "Sausie kontakti"
+      },
+      "current_grid_profile": {
+        "name": "Tīkla profils"
       }
     },
     "number": {
@@ -2821,6 +2916,115 @@
         "site_id": {
           "name": "Vietnes ID",
           "description": "Neobligāts vietnes identifikators; tiek noteikts automātiski, izvēloties ierīci."
+        }
+      }
+    },
+    "browse_grid_profiles": {
+      "name": "Pārlūkot tīkla profilus",
+      "description": "Pārlūkojiet Cloud Activation tīkla profilus, kas pieejami atlasītās vietnes valstij un reģionam.",
+      "sections": {
+        "advanced": {
+          "name": "Täiendavad valikud"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Reģiona kods",
+          "description": "Neobligāts reģiona vai štata kods, piemēram, VIC."
+        },
+        "commonly_used": {
+          "name": "Tikai bieži izmantotie",
+          "description": "Ja iespējots, atgriež bieži izmantoto profilu katalogu."
+        },
+        "device_id": {
+          "name": "Vietnes ierīces",
+          "description": "Atlasiet vietnes Enphase ierīci."
+        },
+        "site_id": {
+          "name": "Vietnes ID",
+          "description": "Neobligāts vietnes identifikators; tiek automātiski noteikts, atlasot ierīci."
+        },
+        "config_entry_id": {
+          "name": "Konfigurācijas ieraksta ID",
+          "description": "Neobligāts mērķa vietnes konfigurācijas ieraksta identifikators."
+        },
+        "query": {
+          "name": "Meklēt",
+          "description": "Neobligāts meklēšanas teksts vietnes valsts reģioniem un profiliem."
+        }
+      }
+    },
+    "refresh_grid_profiles": {
+      "name": "Atjaunināt tīkla profilus",
+      "description": "Atjauniniet Cloud Activation tīkla profilu atsauces datus un atlasītā reģiona katalogu.",
+      "sections": {
+        "advanced": {
+          "name": "Täiendavad valikud"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Reģiona kods",
+          "description": "Neobligāts reģiona vai štata kods, piemēram, VIC."
+        },
+        "commonly_used": {
+          "name": "Tikai bieži izmantotie",
+          "description": "Ja iespējots, atgriež bieži izmantoto profilu katalogu."
+        },
+        "device_id": {
+          "name": "Vietnes ierīces",
+          "description": "Atlasiet vietnes Enphase ierīci."
+        },
+        "site_id": {
+          "name": "Vietnes ID",
+          "description": "Neobligāts vietnes identifikators; tiek automātiski noteikts, atlasot ierīci."
+        },
+        "config_entry_id": {
+          "name": "Konfigurācijas ieraksta ID",
+          "description": "Neobligāts mērķa vietnes konfigurācijas ieraksta identifikators."
+        }
+      }
+    },
+    "set_grid_profile": {
+      "name": "Iestatīt tīkla profilu",
+      "description": "Lietojiet Cloud Activation tīkla profilu pēc nepārprotamas apstiprināšanas.",
+      "sections": {
+        "advanced": {
+          "name": "Täiendavad valikud"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Reģiona kods",
+          "description": "Neobligāts reģiona vai štata kods, piemēram, VIC."
+        },
+        "commonly_used": {
+          "name": "Tikai bieži izmantotie",
+          "description": "Ja iespējots, atgriež bieži izmantoto profilu katalogu."
+        },
+        "device_id": {
+          "name": "Vietnes ierīces",
+          "description": "Atlasiet vietnes Enphase ierīci."
+        },
+        "site_id": {
+          "name": "Vietnes ID",
+          "description": "Neobligāts vietnes identifikators; tiek automātiski noteikts, atlasot ierīci."
+        },
+        "config_entry_id": {
+          "name": "Konfigurācijas ieraksta ID",
+          "description": "Neobligāts mērķa vietnes konfigurācijas ieraksta identifikators."
+        },
+        "profile_id": {
+          "name": "Profila ID",
+          "description": "Cloud Activation profila ID, ieskaitot prefiksu agf:."
+        },
+        "confirm": {
+          "name": "Apstiprināt lietošanu",
+          "description": "Jāiespējo, lai lietotu atlasīto tīkla profilu."
+        },
+        "gateway_serial": {
+          "name": "Gateway sērijas numurs",
+          "description": "Neobligāts Gateway sērijas numurs, ja Activation ierakstā ir vairāki Gateway."
         }
       }
     }

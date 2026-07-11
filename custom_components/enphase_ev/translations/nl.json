@@ -456,6 +456,27 @@
     },
     "firmware_advisory_only": {
       "message": "Firmware-updates zijn alleen ter informatie."
+    },
+    "grid_profile_installer_required": {
+      "message": "Netprofielbeheer vereist installateurstoegang tot Enphase Activation."
+    },
+    "grid_profile_profile_invalid": {
+      "message": "Het geselecteerde netprofiel is niet beschikbaar voor het land en de regio van deze locatie."
+    },
+    "grid_profile_gateway_required": {
+      "message": "Voor het toepassen van het netprofiel is een Cloud Activation Gateway-record vereist."
+    },
+    "grid_profile_apply_failed": {
+      "message": "Toepassen van het netprofiel is mislukt."
+    },
+    "grid_profile_confirmation_required": {
+      "message": "Bevestiging is vereist om een netprofiel toe te passen."
+    },
+    "grid_profile_region_invalid": {
+      "message": "De geselecteerde netprofielregio is niet beschikbaar."
+    },
+    "grid_profile_unavailable": {
+      "message": "Netprofielbeheer is niet beschikbaar."
     }
   },
   "options": {
@@ -465,11 +486,13 @@
         "description": "Kies wat je met deze integratie-invoer wilt doen.",
         "menu_options": {
           "settings": "Instellingen",
-          "migrate_envoy": "Envoy-geschiedenis migreren"
+          "migrate_envoy": "Envoy-geschiedenis migreren",
+          "advanced": "Geavanceerd"
         },
         "menu_option_descriptions": {
           "settings": "Pas polling en gedrag aan.",
-          "migrate_envoy": "Neem geselecteerde energie-entiteit-ID's van Enphase Envoy over zodat de Home Assistant Energy-geschiedenis onder deze integratie doorgaat."
+          "migrate_envoy": "Neem geselecteerde energie-entiteit-ID's van Enphase Envoy over zodat de Home Assistant Energy-geschiedenis onder deze integratie doorgaat.",
+          "advanced": "Netprofielbediening alleen voor installateurs."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -597,6 +620,46 @@
           "confirm_reassign": "Ik begrijp dat de geselecteerde bron-entiteits-ID's opnieuw worden toegewezen",
           "disable_archived_envoy_sensors": "Gearchiveerde bronsensoren uitschakelen na de migratie"
         }
+      },
+      "advanced": {
+        "title": "Geavanceerd",
+        "description": "Installateurs- en onderhoudsacties.",
+        "menu_options": {
+          "grid_profile": "Netprofielbeheer"
+        },
+        "menu_option_descriptions": {
+          "grid_profile": "Activation-netprofielen voor installateurs bekijken en toepassen."
+        }
+      },
+      "grid_profile": {
+        "title": "Netprofielbeheer",
+        "description": "Filtert de Activation-netprofielcatalogus voor het land van deze locatie.",
+        "data": {
+          "grid_profile_region": "Regio",
+          "grid_profile_commonly_used": "Profiellijst"
+        },
+        "data_description": {
+          "grid_profile_region": "Alleen regio’s voor het land van de locatie zijn beschikbaar.",
+          "grid_profile_commonly_used": "Kies vaak gebruikte profielen of alle profielen voor de geselecteerde regio."
+        }
+      },
+      "grid_profile_select": {
+        "title": "Netprofiel selecteren",
+        "description": "Kies een profiel om klaar te zetten. Er wordt niets toegepast tot de bevestiging.",
+        "data": {
+          "grid_profile_id": "Netprofiel"
+        }
+      },
+      "grid_profile_confirm": {
+        "title": "Netprofiel bevestigen",
+        "description": "Huidig profiel: **{current_profile}**\n\nGeselecteerd profiel: **{selected_profile}**\n\nProfiel-ID: **{selected_profile_id}**\n\nPEL Enhanced: **{selected_profile_pel}**\n\n277 V-compatibel: **{selected_profile_277v}**\n\nLand: **{country}**\n\nRegio: **{region}**\n\nCloud-toepassingsstatus: **{apply_status}**.",
+        "data": {
+          "confirm_apply": "Geselecteerd netprofiel toepassen"
+        }
+      },
+      "grid_profile_applied": {
+        "title": "Netprofielupdate geaccepteerd",
+        "description": "Enphase heeft de netprofielupdate voor **{selected_profile}** geaccepteerd.\n\nAangevraagde profiel-ID: **{requested_profile_id}**\n\nCloudstatus: **{cloud_apply_status}**\n\nHet kan tot **5 minuten** duren voordat het nieuwe profiel als huidig verschijnt terwijl de cloud en Gateway de verwerking afronden. De Grid Profile-sensor wordt bijgewerkt nadat het Activation-record het nieuwe huidige profiel meldt."
       }
     },
     "error": {
@@ -606,16 +669,45 @@
       "migration_no_selection": "Selecteer ten minste één compatibele energiesensor om te migreren.",
       "migration_duplicate_selection": "Dezelfde bron-entiteit kan niet meer dan één keer worden gebruikt.",
       "envoy_entry_loaded": "De Envoy-integratie kon niet tijdelijk worden ontladen voor de migratie.",
-      "incompatible_energy_total": "De geselecteerde entiteiten zijn geen compatibele cumulatieve energietotalen."
+      "incompatible_energy_total": "De geselecteerde entiteiten zijn geen compatibele cumulatieve energietotalen.",
+      "grid_profile_unavailable": "Netprofielbeheer is niet beschikbaar.",
+      "grid_profile_installer_required": "Netprofielbeheer vereist installateurstoegang tot Enphase Activation.",
+      "grid_profile_no_regions": "Er zijn geen netprofielregio’s beschikbaar voor het land van deze locatie.",
+      "grid_profile_no_profiles": "Geen netprofielen komen overeen met de geselecteerde filters.",
+      "grid_profile_region_invalid": "De geselecteerde netprofielregio is niet beschikbaar.",
+      "grid_profile_profile_invalid": "Het geselecteerde netprofiel is niet beschikbaar voor het land en de regio van deze locatie.",
+      "grid_profile_gateway_required": "Netprofiel toepassen vereist een cloud Activation Gateway-record.",
+      "grid_profile_apply_failed": "Netprofiel toepassen is mislukt."
     },
     "abort": {
       "migration_no_envoy_sources": "Er zijn geen Enphase Envoy-energiesensoren beschikbaar om te migreren.",
       "migration_no_targets": "Er zijn geen compatibele Enphase Energy-sensoren beschikbaar om te migreren.",
-      "migration_partial_failure": "De migratie is gestopt na gedeeltelijke voltooiing.\n\nVoltooide koppelingen:\n{completed_mappings}\n\nMislukt tijdens verwerken van `{failed_entity_id}`: {failure_reason}\n\nHerstel vanaf een back-up als het resultaat niet acceptabel is."
+      "migration_partial_failure": "De migratie is gestopt na gedeeltelijke voltooiing.\n\nVoltooide koppelingen:\n{completed_mappings}\n\nMislukt tijdens verwerken van `{failed_entity_id}`: {failure_reason}\n\nHerstel vanaf een back-up als het resultaat niet acceptabel is.",
+      "grid_profile_unavailable": "Netprofielbeheer is niet beschikbaar.",
+      "grid_profile_installer_required": "Netprofielbeheer vereist installateurstoegang tot Enphase Activation.",
+      "grid_profile_no_regions": "Er zijn geen netprofielregio’s beschikbaar voor het land van deze locatie."
     },
     "create_entry": {
       "migration_success": "Migratie voltooid. Enphase Energy bezit nu de geselecteerde bron-entiteits-ID's. Controleer het Energy-dashboard en Developer Tools > Statistics na de volgende vernieuwing.",
       "migration_success_reload_needed": "De migratie is voltooid, maar een of meer integraties konden niet automatisch opnieuw worden geladen. Laad Enphase Energy en Enphase Envoy indien nodig handmatig opnieuw en controleer daarna het Energy-dashboard en Developer Tools > Statistics."
+    }
+  },
+  "selector": {
+    "grid_profile_list_mode": {
+      "options": {
+        "commonly_used": "Veelgebruikt",
+        "all_profiles": "Alle profielen"
+      }
+    },
+    "grid_profile_status": {
+      "options": {
+        "yes": "Ja",
+        "no": "Nee",
+        "unknown": "Onbekend",
+        "available": "Beschikbaar",
+        "unavailable": "Niet beschikbaar",
+        "accepted": "Geaccepteerd"
+      }
     }
   },
   "entity": {
@@ -1769,6 +1861,9 @@
       },
       "dry_contacts": {
         "name": "Droge contacten"
+      },
+      "current_grid_profile": {
+        "name": "Netprofiel"
       }
     },
     "number": {
@@ -2821,6 +2916,115 @@
         "site_id": {
           "name": "Site-ID",
           "description": "Optionele site-id; automatisch gedetecteerd wanneer een apparaat is geselecteerd."
+        }
+      }
+    },
+    "browse_grid_profiles": {
+      "name": "Netprofiel doorbladeren",
+      "description": "Blader door Cloud Activation-netprofielen die beschikbaar zijn voor het land en de regio van de geselecteerde locatie.",
+      "sections": {
+        "advanced": {
+          "name": "Geavanceerde opties"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Regiocode",
+          "description": "Optionele regio- of provinciecode, zoals VIC."
+        },
+        "commonly_used": {
+          "name": "Alleen veelgebruikt",
+          "description": "Geeft de catalogus met veelgebruikte profielen terug wanneer ingeschakeld."
+        },
+        "device_id": {
+          "name": "Locatieapparaten",
+          "description": "Selecteer een Enphase-apparaat op de locatie."
+        },
+        "site_id": {
+          "name": "Locatie-ID",
+          "description": "Optionele locatie-identificatie; wordt automatisch gedetecteerd wanneer een apparaat is geselecteerd."
+        },
+        "config_entry_id": {
+          "name": "Configuratie-item-ID",
+          "description": "Optionele identificatie van het configuratie-item voor de doellocatie."
+        },
+        "query": {
+          "name": "Zoeken",
+          "description": "Optionele zoektekst voor regio's en profielen in het land van de locatie."
+        }
+      }
+    },
+    "refresh_grid_profiles": {
+      "name": "Netprofielen vernieuwen",
+      "description": "Werk de referentiegegevens voor Cloud Activation-netprofielen en de catalogus van de geselecteerde regio bij.",
+      "sections": {
+        "advanced": {
+          "name": "Geavanceerde opties"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Regiocode",
+          "description": "Optionele regio- of provinciecode, zoals VIC."
+        },
+        "commonly_used": {
+          "name": "Alleen veelgebruikt",
+          "description": "Geeft de catalogus met veelgebruikte profielen terug wanneer ingeschakeld."
+        },
+        "device_id": {
+          "name": "Locatieapparaten",
+          "description": "Selecteer een Enphase-apparaat op de locatie."
+        },
+        "site_id": {
+          "name": "Locatie-ID",
+          "description": "Optionele locatie-identificatie; wordt automatisch gedetecteerd wanneer een apparaat is geselecteerd."
+        },
+        "config_entry_id": {
+          "name": "Configuratie-item-ID",
+          "description": "Optionele identificatie van het configuratie-item voor de doellocatie."
+        }
+      }
+    },
+    "set_grid_profile": {
+      "name": "Netprofiel instellen",
+      "description": "Pas een Cloud Activation-netprofiel toe na uitdrukkelijke bevestiging.",
+      "sections": {
+        "advanced": {
+          "name": "Geavanceerde opties"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Regiocode",
+          "description": "Optionele regio- of provinciecode, zoals VIC."
+        },
+        "commonly_used": {
+          "name": "Alleen veelgebruikt",
+          "description": "Geeft de catalogus met veelgebruikte profielen terug wanneer ingeschakeld."
+        },
+        "device_id": {
+          "name": "Locatieapparaten",
+          "description": "Selecteer een Enphase-apparaat op de locatie."
+        },
+        "site_id": {
+          "name": "Locatie-ID",
+          "description": "Optionele locatie-identificatie; wordt automatisch gedetecteerd wanneer een apparaat is geselecteerd."
+        },
+        "config_entry_id": {
+          "name": "Configuratie-item-ID",
+          "description": "Optionele identificatie van het configuratie-item voor de doellocatie."
+        },
+        "profile_id": {
+          "name": "Profiel-ID",
+          "description": "Cloud Activation-profiel-ID, inclusief het voorvoegsel agf:."
+        },
+        "confirm": {
+          "name": "Toepassen bevestigen",
+          "description": "Moet zijn ingeschakeld om het geselecteerde netprofiel toe te passen."
+        },
+        "gateway_serial": {
+          "name": "Gateway-serienummer",
+          "description": "Optioneel Gateway-serienummer wanneer de Activation-record meerdere Gateways bevat."
         }
       }
     }

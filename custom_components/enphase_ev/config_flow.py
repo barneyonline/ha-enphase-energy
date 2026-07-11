@@ -14,8 +14,13 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import selector
+from homeassistant.helpers.translation import (
+    async_get_cached_translations,
+    async_get_translations,
+)
 
 from .api import (
     AuthTokens,
@@ -117,6 +122,13 @@ from .envoy_history import (
     suggest_mappings,
     validate_selected_mappings,
 )
+from .grid_profile_runtime import (
+    ALL_PROFILES_OPTION,
+    COMMONLY_USED_OPTION,
+    SUPPORT_DENIED,
+    GridProfile,
+    GridProfileRuntime,
+)
 from .runtime_data import EnphaseConfigEntry
 from .log_redaction import redact_site_id, redact_text
 from .runtime_helpers import normalize_poll_intervals
@@ -137,6 +149,12 @@ CONF_MIGRATION_SOURCE_ENTRY = "selected_envoy_source"
 CONF_MIGRATION_BACKUP_CONFIRMED = "backup_confirmed"
 CONF_MIGRATION_CONFIRM_REASSIGN = "confirm_reassign"
 CONF_MIGRATION_DISABLE_ARCHIVED = "disable_archived_envoy_sensors"
+CONF_GRID_PROFILE_REGION = "grid_profile_region"
+CONF_GRID_PROFILE_COMMONLY_USED = "grid_profile_commonly_used"
+CONF_GRID_PROFILE_ID = "grid_profile_id"
+CONF_GRID_PROFILE_CONFIRM_APPLY = "confirm_apply"
+
+_GRID_PROFILE_LABEL_PREFIX = f"component.{DOMAIN}.selector.grid_profile_status.options."
 
 _TYPE_FIELD_BY_KEY: dict[str, str] = {
     "envoy": CONF_TYPE_ENVOY,
@@ -1215,6 +1233,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         self._migration_extra_candidates: list[EnvoyHistoryCandidate] | None = None
         self._selected_migration_source_id: str | None = None
         self._migration_selection: dict[str, str] = {}
+        self._grid_profile_apply_result: dict[str, object] | None = None
 
     @staticmethod
     def _normalize_serials(value: Any) -> list[str]:
@@ -1613,14 +1632,367 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                     discovered.append(serial)
         return discovered
 
+    def _grid_profile_runtime(self) -> GridProfileRuntime | None:
+        runtime_data = getattr(self._entry, "runtime_data", None)
+        coordinator = getattr(runtime_data, "coordinator", None)
+        runtime = getattr(coordinator, "grid_profile_runtime", None)
+        return runtime if isinstance(runtime, GridProfileRuntime) else None
+
+    def _grid_profile_options_available(self) -> bool:
+        runtime = self._grid_profile_runtime()
+        return bool(
+            runtime is not None
+            and runtime.installer_access_confirmed
+            and runtime.regions
+        )
+
+    @staticmethod
+    def _grid_profile_unavailable_reason(runtime: GridProfileRuntime) -> str:
+        return (
+            "grid_profile_installer_required"
+            if runtime.support_state == SUPPORT_DENIED
+            else "grid_profile_unavailable"
+        )
+
+    async def _async_grid_profile_runtime_for_options(
+        self,
+    ) -> GridProfileRuntime | None:
+        runtime = self._grid_profile_runtime()
+        if runtime is None:
+            return None
+        if runtime.installer_access_confirmed and runtime.regions:
+            return runtime
+        await runtime.async_refresh(force=False, load_profiles=False)
+        return runtime
+
+    def _grid_profile_region_options(
+        self, runtime: GridProfileRuntime
+    ) -> list[dict[str, str]]:
+        return [
+            {"value": region.region_code, "label": region.label}
+            for region in runtime.regions
+        ]
+
+    def _grid_profile_options(
+        self, profiles: list[GridProfile]
+    ) -> list[dict[str, str]]:
+        return [
+            {"value": profile.profile_id, "label": profile.option_label}
+            for profile in profiles
+        ]
+
+    @staticmethod
+    def _grid_profile_commonly_used_from_input(value: object) -> bool:
+        if isinstance(value, bool):
+            return value
+        return bool(value != ALL_PROFILES_OPTION)
+
+    def _grid_profile_filter_schema(self, runtime: GridProfileRuntime) -> vol.Schema:
+        selected_region = runtime.staged_region_code
+        if selected_region is None and runtime.regions:
+            selected_region = runtime.regions[0].region_code
+        return vol.Schema(
+            {
+                vol.Required(
+                    CONF_GRID_PROFILE_REGION,
+                    default=selected_region,
+                ): selector(
+                    {
+                        "select": {
+                            "options": self._grid_profile_region_options(runtime),
+                            "mode": "dropdown",
+                        }
+                    }
+                ),
+                vol.Optional(
+                    CONF_GRID_PROFILE_COMMONLY_USED,
+                    default=runtime.list_mode_option,
+                ): selector(
+                    {
+                        "select": {
+                            "options": [COMMONLY_USED_OPTION, ALL_PROFILES_OPTION],
+                            "mode": "dropdown",
+                            "translation_key": "grid_profile_list_mode",
+                        }
+                    }
+                ),
+            }
+        )
+
+    def _grid_profile_select_schema(self, profiles: list[GridProfile]) -> vol.Schema:
+        return vol.Schema(
+            {
+                vol.Required(CONF_GRID_PROFILE_ID): selector(
+                    {
+                        "select": {
+                            "options": self._grid_profile_options(profiles),
+                            "mode": "dropdown",
+                        }
+                    }
+                )
+            }
+        )
+
+    def _grid_profile_confirm_schema(self, runtime: GridProfileRuntime) -> vol.Schema:
+        if not runtime.apply_available:
+            return vol.Schema({})
+        return vol.Schema(
+            {vol.Required(CONF_GRID_PROFILE_CONFIRM_APPLY, default=False): bool}
+        )
+
+    async def _async_prime_grid_profile_labels(self) -> None:
+        language = getattr(self.hass.config, "language", "en")
+        await async_get_translations(
+            self.hass,
+            language,
+            "selector",
+            [DOMAIN],
+        )
+
+    def _grid_profile_status_label(self, key: str) -> str:
+        language = getattr(self.hass.config, "language", "en")
+        path = f"{_GRID_PROFILE_LABEL_PREFIX}{key}"
+        for candidate_language in (language, "en"):
+            translated = async_get_cached_translations(
+                self.hass,
+                candidate_language,
+                "selector",
+                DOMAIN,
+            ).get(path)
+            if isinstance(translated, str) and translated.strip():
+                return translated
+        return key.replace("_", " ").capitalize()
+
+    def _grid_profile_flag_label(self, value: bool | None) -> str:
+        if value is True:
+            return self._grid_profile_status_label("yes")
+        if value is False:
+            return self._grid_profile_status_label("no")
+        return self._grid_profile_status_label("unknown")
+
+    def _grid_profile_confirm_placeholders(
+        self, runtime: GridProfileRuntime
+    ) -> dict[str, str]:
+        profile = runtime.profile_for_id_in_region(
+            runtime.staged_profile_id,
+            runtime.staged_region_code,
+        )
+        unknown = self._grid_profile_status_label("unknown")
+        return {
+            "country": runtime.country_code or unknown,
+            "region": runtime.staged_region_label
+            or runtime.staged_region_code
+            or unknown,
+            "current_profile": runtime.current_profile_display() or unknown,
+            "selected_profile": profile.option_label if profile else unknown,
+            "selected_profile_id": profile.profile_id if profile else unknown,
+            "selected_profile_pel": self._grid_profile_flag_label(
+                profile.pel_enabled if profile else None
+            ),
+            "selected_profile_277v": self._grid_profile_flag_label(
+                profile.is_277v_compatible if profile else None
+            ),
+            "apply_status": self._grid_profile_status_label(
+                "available" if runtime.apply_available else "unavailable"
+            ),
+        }
+
+    def _grid_profile_applied_placeholders(
+        self, runtime: GridProfileRuntime | None
+    ) -> dict[str, str]:
+        placeholders: dict[str, str] = {}
+        if runtime is not None:
+            placeholders.update(self._grid_profile_confirm_placeholders(runtime))
+
+        requested_profile_id = placeholders.get(
+            "selected_profile_id", self._grid_profile_status_label("unknown")
+        )
+        result = self._grid_profile_apply_result
+        cloud_apply_status = self._grid_profile_status_label("accepted")
+        if isinstance(result, dict):
+            requested = result.get("requested_profile_id")
+            if requested:
+                requested_profile_id = str(requested)
+            status = result.get("cloud_apply_status")
+            if status:
+                cloud_apply_status = self._grid_profile_status_label(str(status))
+
+        placeholders["requested_profile_id"] = requested_profile_id
+        placeholders["cloud_apply_status"] = cloud_apply_status
+        return placeholders
+
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         if user_input is not None:
             return await self.async_step_settings(user_input)
+        menu_options = ["settings"]
+        if self._grid_profile_options_available():
+            menu_options.append("advanced")
+        menu_options.append("migrate_envoy")
         return self.async_show_menu(
             step_id="init",
-            menu_options=["settings", "migrate_envoy"],
+            menu_options=menu_options,
+        )
+
+    async def async_step_advanced(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        runtime = self._grid_profile_runtime()
+        if runtime is None:
+            return self.async_abort(reason="grid_profile_unavailable")
+        if not self._grid_profile_options_available():
+            return self.async_abort(
+                reason=self._grid_profile_unavailable_reason(runtime)
+            )
+        return self.async_show_menu(
+            step_id="advanced",
+            menu_options=["grid_profile"],
+        )
+
+    async def async_step_grid_profile(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        runtime = await self._async_grid_profile_runtime_for_options()
+        if runtime is None:
+            return self.async_abort(reason="grid_profile_unavailable")
+        if not runtime.installer_access_confirmed:
+            return self.async_abort(
+                reason=self._grid_profile_unavailable_reason(runtime)
+            )
+        if not runtime.regions:
+            return self.async_abort(reason="grid_profile_no_regions")
+
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            region_code = str(user_input.get(CONF_GRID_PROFILE_REGION, "")).strip()
+            commonly_used = self._grid_profile_commonly_used_from_input(
+                user_input.get(CONF_GRID_PROFILE_COMMONLY_USED, COMMONLY_USED_OPTION)
+            )
+            if runtime.region_for_code(region_code) is None:
+                errors[CONF_GRID_PROFILE_REGION] = "grid_profile_region_invalid"
+            else:
+                runtime.set_region(region_code)
+                runtime.set_list_mode(
+                    COMMONLY_USED_OPTION if commonly_used else ALL_PROFILES_OPTION
+                )
+                runtime.set_search_query(None)
+                await runtime.async_load_profiles(
+                    region_code=region_code,
+                    commonly_used=commonly_used,
+                    force=True,
+                )
+                if not runtime.installer_access_confirmed:
+                    return self.async_abort(
+                        reason=self._grid_profile_unavailable_reason(runtime)
+                    )
+                if not runtime.filtered_profiles():
+                    errors["base"] = "grid_profile_no_profiles"
+                else:
+                    return await self.async_step_grid_profile_select()
+
+        return self.async_show_form(
+            step_id="grid_profile",
+            data_schema=self._grid_profile_filter_schema(runtime),
+            errors=errors,
+        )
+
+    async def async_step_grid_profile_select(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        runtime = self._grid_profile_runtime()
+        if runtime is None:
+            return self.async_abort(reason="grid_profile_unavailable")
+        if not runtime.installer_access_confirmed:
+            return self.async_abort(
+                reason=self._grid_profile_unavailable_reason(runtime)
+            )
+
+        profiles = runtime.filtered_profiles()
+        if not profiles:
+            return await self.async_step_grid_profile()
+
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            profile_id = str(user_input.get(CONF_GRID_PROFILE_ID, "")).strip()
+            if (
+                runtime.profile_for_id_in_region(
+                    profile_id,
+                    runtime.staged_region_code,
+                )
+                is None
+            ):
+                errors[CONF_GRID_PROFILE_ID] = "grid_profile_profile_invalid"
+            else:
+                runtime.set_staged_profile(profile_id)
+                return await self.async_step_grid_profile_confirm()
+
+        return self.async_show_form(
+            step_id="grid_profile_select",
+            data_schema=self._grid_profile_select_schema(profiles),
+            errors=errors,
+        )
+
+    async def async_step_grid_profile_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        runtime = self._grid_profile_runtime()
+        if runtime is None:
+            return self.async_abort(reason="grid_profile_unavailable")
+        if not runtime.installer_access_confirmed:
+            return self.async_abort(
+                reason=self._grid_profile_unavailable_reason(runtime)
+            )
+        if (
+            runtime.profile_for_id_in_region(
+                runtime.staged_profile_id,
+                runtime.staged_region_code,
+            )
+            is None
+        ):
+            return await self.async_step_grid_profile_select()
+
+        errors: dict[str, str] = {}
+        await self._async_prime_grid_profile_labels()
+        if user_input is not None:
+            if not runtime.apply_available:
+                errors["base"] = "grid_profile_gateway_required"
+            elif not user_input.get(CONF_GRID_PROFILE_CONFIRM_APPLY):
+                errors["base"] = "confirm_required"
+            else:
+                try:
+                    self._grid_profile_apply_result = await runtime.async_apply_staged()
+                except ServiceValidationError as err:
+                    errors["base"] = getattr(
+                        err, "translation_key", "grid_profile_apply_failed"
+                    )
+                else:
+                    return await self.async_step_grid_profile_applied()
+
+        return self.async_show_form(
+            step_id="grid_profile_confirm",
+            data_schema=self._grid_profile_confirm_schema(runtime),
+            description_placeholders=self._grid_profile_confirm_placeholders(runtime),
+            errors=errors,
+        )
+
+    async def async_step_grid_profile_applied(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        runtime = self._grid_profile_runtime()
+        await self._async_prime_grid_profile_labels()
+        if user_input is not None:
+            return self.async_create_entry(
+                title="",
+                data=dict(self._entry.options),
+            )
+        placeholders: dict[str, str] = {}
+        if runtime is not None:
+            placeholders = self._grid_profile_applied_placeholders(runtime)
+        return self.async_show_form(
+            step_id="grid_profile_applied",
+            data_schema=vol.Schema({}),
+            description_placeholders=placeholders,
         )
 
     async def async_step_settings(

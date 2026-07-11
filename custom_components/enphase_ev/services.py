@@ -38,6 +38,7 @@ from .const import (
 from .device_types import parse_type_identifier
 from .log_redaction import redact_site_id
 from .parsing_helpers import coerce_optional_bool
+from .grid_profile_runtime import SUPPORT_DENIED, GridProfileRuntime
 from .runtime_data import EnphaseRuntimeData, iter_coordinators
 from .service_validation import raise_translated_service_validation
 
@@ -63,6 +64,9 @@ REGISTERED_SERVICES = (
     "validate_schedule",
     "update_cfg_schedule",
     "update_tariff",
+    "browse_grid_profiles",
+    "refresh_grid_profiles",
+    "set_grid_profile",
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -339,6 +343,36 @@ def async_setup_services(
             vol.Optional("device_id"): DEVICE_ID_LIST,
             vol.Optional("site_id"): cv.string,
             vol.Optional("config_entry_id"): cv.string,
+        }
+    )
+    BROWSE_GRID_PROFILES_SCHEMA = vol.Schema(
+        {
+            **ENTRY_SCHEMA,
+            vol.Optional("device_id"): DEVICE_ID_LIST,
+            vol.Optional("site_id"): cv.string,
+            vol.Optional("region_code"): cv.string,
+            vol.Optional("query"): cv.string,
+            vol.Optional("commonly_used", default=True): cv.boolean,
+        }
+    )
+    REFRESH_GRID_PROFILES_SCHEMA = vol.Schema(
+        {
+            **ENTRY_SCHEMA,
+            vol.Optional("device_id"): DEVICE_ID_LIST,
+            vol.Optional("site_id"): cv.string,
+            vol.Optional("region_code"): cv.string,
+            vol.Optional("commonly_used", default=True): cv.boolean,
+        }
+    )
+    SET_GRID_PROFILE_SCHEMA = vol.Schema(
+        {
+            **ENTRY_SCHEMA,
+            vol.Optional("device_id"): DEVICE_ID_LIST,
+            vol.Optional("site_id"): cv.string,
+            vol.Optional("region_code"): cv.string,
+            vol.Optional("gateway_serial"): cv.string,
+            vol.Required("profile_id"): cv.string,
+            vol.Required("confirm"): cv.boolean,
         }
     )
     ADD_SCHEDULE_SCHEMA = vol.Schema(
@@ -1146,6 +1180,84 @@ def async_setup_services(
         coord = await _resolve_single_site_coordinator(call)
         await coord.async_request_refresh()
 
+    def _require_grid_profile_installer(runtime: object) -> None:
+        if getattr(runtime, "installer_access_confirmed", False):
+            return
+        if getattr(runtime, "support_state", None) != SUPPORT_DENIED:
+            _raise_service_validation(
+                "grid_profile_unavailable",
+                message="Grid profile control is unavailable.",
+            )
+        _raise_service_validation(
+            "grid_profile_installer_required",
+            message=(
+                "Grid profile control requires installer-level Enphase "
+                "Activation access."
+            ),
+        )
+
+    async def _svc_browse_grid_profiles(call: ServiceCall) -> dict[str, object]:
+        coord = await _resolve_single_site_coordinator(call)
+        runtime = cast(GridProfileRuntime, coord.grid_profile_runtime)
+        await runtime.async_refresh(force=False, load_profiles=False)
+        _require_grid_profile_installer(runtime)
+        await runtime.async_load_profiles(
+            region_code=call.data.get("region_code"),
+            commonly_used=call.data.get("commonly_used", True),
+            force=False,
+        )
+        _require_grid_profile_installer(runtime)
+        return runtime.browse_dict(
+            region_code=call.data.get("region_code"),
+            query=call.data.get("query"),
+            commonly_used=call.data.get("commonly_used", True),
+        )
+
+    async def _svc_refresh_grid_profiles(call: ServiceCall) -> dict[str, object]:
+        coord = await _resolve_single_site_coordinator(call)
+        runtime = cast(GridProfileRuntime, coord.grid_profile_runtime)
+        await runtime.async_refresh(force=True, load_profiles=False)
+        _require_grid_profile_installer(runtime)
+        await runtime.async_load_profiles(
+            region_code=call.data.get("region_code"),
+            commonly_used=call.data.get("commonly_used", True),
+            force=True,
+        )
+        _require_grid_profile_installer(runtime)
+        return runtime.browse_dict(
+            region_code=call.data.get("region_code"),
+            commonly_used=call.data.get("commonly_used", True),
+        )
+
+    async def _svc_set_grid_profile(call: ServiceCall) -> dict[str, object]:
+        if not call.data.get("confirm"):
+            _raise_service_validation(
+                "grid_profile_confirmation_required",
+                message="Confirmation is required to apply a grid profile.",
+            )
+        coord = await _resolve_single_site_coordinator(call)
+        runtime = cast(GridProfileRuntime, coord.grid_profile_runtime)
+        await runtime.async_refresh(force=False, load_profiles=False)
+        _require_grid_profile_installer(runtime)
+        region_code = call.data.get("region_code")
+        if region_code:
+            await runtime.async_load_profiles(
+                region_code=region_code,
+                commonly_used=True,
+                force=False,
+            )
+            if runtime.profile_for_id(call.data["profile_id"]) is None:
+                await runtime.async_load_profiles(
+                    region_code=region_code,
+                    commonly_used=False,
+                    force=False,
+                )
+        return await runtime.async_apply_grid_profile(
+            call.data["profile_id"],
+            region_code=region_code,
+            gateway_serial=call.data.get("gateway_serial"),
+        )
+
     async def _svc_start(call: ServiceCall) -> None:
         connector_id = int(call.data.get("connector_id", 1))
         for _device_id, sn, coord in await _resolve_charger_targets(call):
@@ -1642,6 +1754,36 @@ def async_setup_services(
 
     hass.services.async_register(
         DOMAIN, "force_refresh", _svc_force_refresh, schema=FORCE_REFRESH_SCHEMA
+    )
+    grid_profile_browse_kwargs: dict[str, object] = {
+        "schema": BROWSE_GRID_PROFILES_SCHEMA,
+        "supports_response": supports_response.OPTIONAL,
+    }
+    hass.services.async_register(
+        DOMAIN,
+        "browse_grid_profiles",
+        _svc_browse_grid_profiles,
+        **grid_profile_browse_kwargs,
+    )
+    grid_profile_refresh_kwargs: dict[str, object] = {
+        "schema": REFRESH_GRID_PROFILES_SCHEMA,
+        "supports_response": supports_response.OPTIONAL,
+    }
+    hass.services.async_register(
+        DOMAIN,
+        "refresh_grid_profiles",
+        _svc_refresh_grid_profiles,
+        **grid_profile_refresh_kwargs,
+    )
+    grid_profile_set_kwargs: dict[str, object] = {
+        "schema": SET_GRID_PROFILE_SCHEMA,
+        "supports_response": supports_response.OPTIONAL,
+    }
+    hass.services.async_register(
+        DOMAIN,
+        "set_grid_profile",
+        _svc_set_grid_profile,
+        **grid_profile_set_kwargs,
     )
     hass.services.async_register(
         DOMAIN, "start_charging", _svc_start, schema=START_SCHEMA

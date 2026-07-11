@@ -1228,6 +1228,30 @@ async def test_config_entry_diagnostics_handles_system_dashboard_capture_error(
 
 
 @pytest.mark.asyncio
+async def test_config_entry_diagnostics_captures_grid_profile_runtime(
+    hass, config_entry
+) -> None:
+    coord = DummyCoordinator()
+    coord.grid_profile_runtime = SimpleNamespace(
+        diagnostics=lambda: {"support_state": "installer_access_confirmed"}
+    )
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+
+    diag = await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
+
+    assert diag["coordinator"]["grid_profile"] == {
+        "support_state": "installer_access_confirmed"
+    }
+
+    coord.grid_profile_runtime.diagnostics = lambda: (_ for _ in ()).throw(
+        RuntimeError("grid profile")
+    )
+    diag = await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
+
+    assert diag["coordinator"]["grid_profile"] == {}
+
+
+@pytest.mark.asyncio
 async def test_config_entry_diagnostics_uses_cached_system_dashboard_only(
     hass, config_entry
 ) -> None:

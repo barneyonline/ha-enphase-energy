@@ -456,6 +456,27 @@
     },
     "firmware_advisory_only": {
       "message": "Firmwareopdateringer er kun vejledende."
+    },
+    "grid_profile_installer_required": {
+      "message": "Netprofilstyring kræver installer-adgang til Enphase Activation."
+    },
+    "grid_profile_profile_invalid": {
+      "message": "Den valgte netprofil er ikke tilgængelig for dette sites land og region."
+    },
+    "grid_profile_gateway_required": {
+      "message": "Anvendelse af netprofil kræver en cloudbaseret Activation Gateway-post."
+    },
+    "grid_profile_apply_failed": {
+      "message": "Anvendelse af netprofil mislykkedes."
+    },
+    "grid_profile_confirmation_required": {
+      "message": "Bekræftelse kræves for at anvende en netprofil."
+    },
+    "grid_profile_region_invalid": {
+      "message": "Den valgte netprofilregion er ikke tilgængelig."
+    },
+    "grid_profile_unavailable": {
+      "message": "Netprofilstyring er ikke tilgængelig."
     }
   },
   "options": {
@@ -465,11 +486,13 @@
         "description": "Vælg, hvad du vil gøre med denne integrationspost.",
         "menu_options": {
           "settings": "Indstillinger",
-          "migrate_envoy": "Migrer Envoy-historik"
+          "migrate_envoy": "Migrer Envoy-historik",
+          "advanced": "Avanceret"
         },
         "menu_option_descriptions": {
           "settings": "Juster polling og adfærd.",
-          "migrate_envoy": "Overtag valgte Enphase Envoy-energi-entitets-id'er, så Home Assistant Energy-historikken fortsætter under denne integration."
+          "migrate_envoy": "Overtag valgte Enphase Envoy-energi-entitets-id'er, så Home Assistant Energy-historikken fortsætter under denne integration.",
+          "advanced": "Netprofilstyring kun for installatører."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -597,6 +620,46 @@
           "confirm_reassign": "Jeg forstår, at de valgte kildeentitets-id'er bliver omfordelt",
           "disable_archived_envoy_sensors": "Deaktiver arkiverede kildesensorer efter migreringen"
         }
+      },
+      "advanced": {
+        "title": "Avanceret",
+        "description": "Installatør- og vedligeholdelseshandlinger.",
+        "menu_options": {
+          "grid_profile": "Netprofilstyring"
+        },
+        "menu_option_descriptions": {
+          "grid_profile": "Gennemse og anvend Activation-netprofiler kun for installatører."
+        }
+      },
+      "grid_profile": {
+        "title": "Netprofilstyring",
+        "description": "Filtrerer Activation-netprofilkataloget efter dette anlægs land.",
+        "data": {
+          "grid_profile_region": "Region",
+          "grid_profile_commonly_used": "Profilliste"
+        },
+        "data_description": {
+          "grid_profile_region": "Kun regioner for anlæggets land er tilgængelige.",
+          "grid_profile_commonly_used": "Vælg ofte brugte profiler eller alle profiler for den valgte region."
+        }
+      },
+      "grid_profile_select": {
+        "title": "Vælg netprofil",
+        "description": "Vælg en profil til klargøring. Intet anvendes før bekræftelsestrinnet.",
+        "data": {
+          "grid_profile_id": "Netprofil"
+        }
+      },
+      "grid_profile_confirm": {
+        "title": "Bekræft netprofil",
+        "description": "Aktuel profil: **{current_profile}**\n\nValgt profil: **{selected_profile}**\n\nProfil-id: **{selected_profile_id}**\n\nPEL Enhanced: **{selected_profile_pel}**\n\n277 V-kompatibel: **{selected_profile_277v}**\n\nLand: **{country}**\n\nRegion: **{region}**\n\nStatus for anvendelse i skyen: **{apply_status}**.",
+        "data": {
+          "confirm_apply": "Anvend den valgte netprofil"
+        }
+      },
+      "grid_profile_applied": {
+        "title": "Netprofilopdatering accepteret",
+        "description": "Enphase har accepteret netprofilopdateringen for **{selected_profile}**.\n\nAnmodet profil-id: **{requested_profile_id}**\n\nCloudstatus: **{cloud_apply_status}**\n\nDet kan tage op til **5 minutter**, før den nye profil vises som aktuel, mens skyen og Gateway færdiggør behandlingen. Grid Profile-sensoren opdateres, når Activation-posten rapporterer den nye aktuelle profil."
       }
     },
     "error": {
@@ -606,16 +669,45 @@
       "migration_no_selection": "Vælg mindst én kompatibel energisensor, der skal migreres.",
       "migration_duplicate_selection": "Den samme kildeentitet kan ikke bruges mere end én gang.",
       "envoy_entry_loaded": "Envoy-integrationen kunne ikke midlertidigt afindlæses til migreringen.",
-      "incompatible_energy_total": "De valgte entiteter er ikke kompatible kumulative energitotaler."
+      "incompatible_energy_total": "De valgte entiteter er ikke kompatible kumulative energitotaler.",
+      "grid_profile_unavailable": "Netprofilstyring er ikke tilgængelig.",
+      "grid_profile_installer_required": "Netprofilstyring kræver installatøradgang til Enphase Activation.",
+      "grid_profile_no_regions": "Der er ingen netprofilregioner tilgængelige for dette anlægs land.",
+      "grid_profile_no_profiles": "Ingen netprofiler matcher de valgte filtre.",
+      "grid_profile_region_invalid": "Den valgte netprofilregion er ikke tilgængelig.",
+      "grid_profile_profile_invalid": "Den valgte netprofil er ikke tilgængelig for dette anlægs land og region.",
+      "grid_profile_gateway_required": "Anvendelse af netprofil kræver en cloudbaseret Activation Gateway-post.",
+      "grid_profile_apply_failed": "Anvendelse af netprofil mislykkedes."
     },
     "abort": {
       "migration_no_envoy_sources": "Ingen Enphase Envoy-energisensorer er tilgængelige til migrering.",
       "migration_no_targets": "Ingen kompatible Enphase Energy-sensorer er tilgængelige til migrering.",
-      "migration_partial_failure": "Migreringen stoppede efter delvis gennemførelse.\n\nFuldførte kortlægninger:\n{completed_mappings}\n\nFejl ved behandling af `{failed_entity_id}`: {failure_reason}\n\nGendan fra backup, hvis resultatet ikke er acceptabelt."
+      "migration_partial_failure": "Migreringen stoppede efter delvis gennemførelse.\n\nFuldførte kortlægninger:\n{completed_mappings}\n\nFejl ved behandling af `{failed_entity_id}`: {failure_reason}\n\nGendan fra backup, hvis resultatet ikke er acceptabelt.",
+      "grid_profile_unavailable": "Netprofilstyring er ikke tilgængelig.",
+      "grid_profile_installer_required": "Netprofilstyring kræver installatøradgang til Enphase Activation.",
+      "grid_profile_no_regions": "Der er ingen netprofilregioner tilgængelige for dette anlægs land."
     },
     "create_entry": {
       "migration_success": "Migrering fuldført. Enphase Energy ejer nu de valgte kildeentitets-id'er. Kontrollér Energy-dashboardet og Developer Tools > Statistics efter næste opdatering.",
       "migration_success_reload_needed": "Migreringen er fuldført, men en eller flere integrationer kunne ikke genindlæses automatisk. Genindlæs Enphase Energy og Enphase Envoy manuelt efter behov, og kontrollér derefter Energy-dashboardet og Developer Tools > Statistics."
+    }
+  },
+  "selector": {
+    "grid_profile_list_mode": {
+      "options": {
+        "commonly_used": "Almindeligt anvendte",
+        "all_profiles": "Alle profiler"
+      }
+    },
+    "grid_profile_status": {
+      "options": {
+        "yes": "Ja",
+        "no": "Nej",
+        "unknown": "Ukendt",
+        "available": "Tilgængelig",
+        "unavailable": "Ikke tilgængelig",
+        "accepted": "Accepteret"
+      }
     }
   },
   "entity": {
@@ -1769,6 +1861,9 @@
       },
       "dry_contacts": {
         "name": "Potentialfrie kontakter"
+      },
+      "current_grid_profile": {
+        "name": "Netprofil"
       }
     },
     "number": {
@@ -2821,6 +2916,115 @@
         "site_id": {
           "name": "Site-id",
           "description": "Valgfrit site-id; registreres automatisk når en site-enhed vælges."
+        }
+      }
+    },
+    "browse_grid_profiles": {
+      "name": "Gennemse netprofiler",
+      "description": "Gennemse cloudbaserede Activation-netprofiler for det valgte sites land og region.",
+      "sections": {
+        "advanced": {
+          "name": "Avancerede indstillinger"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Regionskode",
+          "description": "Valgfri regions-/statskode, f.eks. VIC."
+        },
+        "commonly_used": {
+          "name": "Kun almindeligt anvendte",
+          "description": "Returnerer kataloget med almindeligt anvendte profiler, når aktiveret."
+        },
+        "device_id": {
+          "name": "Siteenheder",
+          "description": "Vælg en Enphase-siteenhed."
+        },
+        "site_id": {
+          "name": "Site-id",
+          "description": "Valgfrit site-id; registreres automatisk, når en siteenhed vælges."
+        },
+        "config_entry_id": {
+          "name": "Konfigurationspost-id",
+          "description": "Valgfrit konfigurationspost-id for målsitet."
+        },
+        "query": {
+          "name": "Søg",
+          "description": "Valgfri søgetekst for regioner og profiler i sitets land."
+        }
+      }
+    },
+    "refresh_grid_profiles": {
+      "name": "Opdater netprofiler",
+      "description": "Tving opdatering af Activation-referencedata og kataloget for den valgte region.",
+      "sections": {
+        "advanced": {
+          "name": "Avancerede indstillinger"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Regionskode",
+          "description": "Valgfri regions-/statskode, f.eks. VIC."
+        },
+        "commonly_used": {
+          "name": "Kun almindeligt anvendte",
+          "description": "Returnerer kataloget med almindeligt anvendte profiler, når aktiveret."
+        },
+        "device_id": {
+          "name": "Siteenheder",
+          "description": "Vælg en Enphase-siteenhed."
+        },
+        "site_id": {
+          "name": "Site-id",
+          "description": "Valgfrit site-id; registreres automatisk, når en siteenhed vælges."
+        },
+        "config_entry_id": {
+          "name": "Konfigurationspost-id",
+          "description": "Valgfrit konfigurationspost-id for målsitet."
+        }
+      }
+    },
+    "set_grid_profile": {
+      "name": "Indstil netprofil",
+      "description": "Anvender en cloudbaseret Activation-netprofil efter udtrykkelig bekræftelse.",
+      "sections": {
+        "advanced": {
+          "name": "Avancerede indstillinger"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Regionskode",
+          "description": "Valgfri regions-/statskode, f.eks. VIC."
+        },
+        "commonly_used": {
+          "name": "Kun almindeligt anvendte",
+          "description": "Returnerer kataloget med almindeligt anvendte profiler, når aktiveret."
+        },
+        "device_id": {
+          "name": "Siteenheder",
+          "description": "Vælg en Enphase-siteenhed."
+        },
+        "site_id": {
+          "name": "Site-id",
+          "description": "Valgfrit site-id; registreres automatisk, når en siteenhed vælges."
+        },
+        "config_entry_id": {
+          "name": "Konfigurationspost-id",
+          "description": "Valgfrit konfigurationspost-id for målsitet."
+        },
+        "profile_id": {
+          "name": "Profil-id",
+          "description": "Cloud Activation-profil-id inklusive agf:-præfikset."
+        },
+        "confirm": {
+          "name": "Bekræft anvendelse",
+          "description": "Skal være aktiveret for at anvende den valgte netprofil."
+        },
+        "gateway_serial": {
+          "name": "Gateway-serienummer",
+          "description": "Valgfrit Gateway-serienummer, når Activation-posten indeholder flere Gateways."
         }
       }
     }

@@ -456,6 +456,27 @@
     },
     "firmware_advisory_only": {
       "message": "Laiteohjelmistopäivitykset ovat vain tiedoksi."
+    },
+    "grid_profile_installer_required": {
+      "message": "Verkkoprofiilin hallinta edellyttää Enphase Activationin asentajaoikeuksia."
+    },
+    "grid_profile_profile_invalid": {
+      "message": "Valittu verkkoprofiili ei ole saatavilla tämän kohteen maassa ja alueella."
+    },
+    "grid_profile_gateway_required": {
+      "message": "Verkkoprofiilin käyttöönotto edellyttää Cloud Activation Gateway -tietuetta."
+    },
+    "grid_profile_apply_failed": {
+      "message": "Verkkoprofiilin käyttöönotto epäonnistui."
+    },
+    "grid_profile_confirmation_required": {
+      "message": "Verkkoprofiilin käyttöönotto edellyttää vahvistusta."
+    },
+    "grid_profile_region_invalid": {
+      "message": "Valittu verkkoprofiilin alue ei ole käytettävissä."
+    },
+    "grid_profile_unavailable": {
+      "message": "Verkkoprofiilin hallinta ei ole käytettävissä."
     }
   },
   "options": {
@@ -465,11 +486,13 @@
         "description": "Valitse, mitä haluat tehdä tälle integraatiomerkinnälle.",
         "menu_options": {
           "settings": "Asetukset",
-          "migrate_envoy": "Siirrä Envoy-historia"
+          "migrate_envoy": "Siirrä Envoy-historia",
+          "advanced": "Lisäasetukset"
         },
         "menu_option_descriptions": {
           "settings": "Säädä kyselyä ja toimintaa.",
-          "migrate_envoy": "Ota valitut Enphase Envoyn energiaentiteettien tunnukset käyttöön, jotta Home Assistant Energyn historia jatkuu tämän integraation alla."
+          "migrate_envoy": "Ota valitut Enphase Envoyn energiaentiteettien tunnukset käyttöön, jotta Home Assistant Energyn historia jatkuu tämän integraation alla.",
+          "advanced": "Verkkoprofiilin hallinta vain asentajille."
         },
         "data": {
           "type_envoy": "Yhdyskäytävä",
@@ -597,6 +620,46 @@
           "confirm_reassign": "Ymmärrän, että valitut lähde-entiteettien tunnukset määritetään uudelleen",
           "disable_archived_envoy_sensors": "Poista arkistoidut lähdetunnistimet käytöstä siirron jälkeen"
         }
+      },
+      "advanced": {
+        "title": "Lisäasetukset",
+        "description": "Asentajan ja huollon toiminnot.",
+        "menu_options": {
+          "grid_profile": "Verkkoprofiilin hallinta"
+        },
+        "menu_option_descriptions": {
+          "grid_profile": "Selaa ja ota käyttöön asentajille tarkoitettuja Activation-verkkoprofiileja."
+        }
+      },
+      "grid_profile": {
+        "title": "Verkkoprofiilin hallinta",
+        "description": "Suodattaa Activation-verkkoprofiilien luettelon tämän kohteen maan mukaan.",
+        "data": {
+          "grid_profile_region": "Alue",
+          "grid_profile_commonly_used": "Profiililuettelo"
+        },
+        "data_description": {
+          "grid_profile_region": "Vain kohteen maan alueet ovat käytettävissä.",
+          "grid_profile_commonly_used": "Valitse yleisesti käytetyt profiilit tai kaikki profiilit valitulle alueelle."
+        }
+      },
+      "grid_profile_select": {
+        "title": "Valitse verkkoprofiili",
+        "description": "Valitse valmisteltava profiili. Mitään ei oteta käyttöön ennen vahvistusvaihetta.",
+        "data": {
+          "grid_profile_id": "Verkkoprofiili"
+        }
+      },
+      "grid_profile_confirm": {
+        "title": "Vahvista verkkoprofiili",
+        "description": "Nykyinen profiili: **{current_profile}**\n\nValittu profiili: **{selected_profile}**\n\nProfiilin tunnus: **{selected_profile_id}**\n\nPEL Enhanced: **{selected_profile_pel}**\n\n277 V yhteensopiva: **{selected_profile_277v}**\n\nMaa: **{country}**\n\nAlue: **{region}**\n\nPilvikäyttöönoton tila: **{apply_status}**.",
+        "data": {
+          "confirm_apply": "Ota valittu verkkoprofiili käyttöön"
+        }
+      },
+      "grid_profile_applied": {
+        "title": "Verkkoprofiilin päivitys hyväksytty",
+        "description": "Enphase hyväksyi verkkoprofiilin päivityksen profiilille **{selected_profile}**.\n\nPyydetty profiilin tunnus: **{requested_profile_id}**\n\nPilvitila: **{cloud_apply_status}**\n\nUuden profiilin näkyminen nykyisenä voi kestää enintään **5 minuuttia**, kun pilvi ja Gateway viimeistelevät käsittelyn. Grid Profile -anturi päivittyy, kun Activation-tietue ilmoittaa uuden nykyisen profiilin."
       }
     },
     "error": {
@@ -606,16 +669,45 @@
       "migration_no_selection": "Valitse vähintään yksi yhteensopiva energiatunnistin siirrettäväksi.",
       "migration_duplicate_selection": "Samaa lähde-entiteettiä ei voi käyttää useammin kuin kerran.",
       "envoy_entry_loaded": "Envoy-integraatiota ei voitu poistaa tilapäisesti käytöstä siirtoa varten.",
-      "incompatible_energy_total": "Valitut entiteetit eivät ole yhteensopivia kumulatiivisia energiasummia."
+      "incompatible_energy_total": "Valitut entiteetit eivät ole yhteensopivia kumulatiivisia energiasummia.",
+      "grid_profile_unavailable": "Verkkoprofiilin hallinta ei ole käytettävissä.",
+      "grid_profile_installer_required": "Verkkoprofiilin hallinta edellyttää asentajan käyttöoikeutta Enphase Activationiin.",
+      "grid_profile_no_regions": "Tämän kohteen maalle ei ole käytettävissä verkkoprofiilin alueita.",
+      "grid_profile_no_profiles": "Mikään verkkoprofiili ei vastaa valittuja suodattimia.",
+      "grid_profile_region_invalid": "Valittu verkkoprofiilin alue ei ole käytettävissä.",
+      "grid_profile_profile_invalid": "Valittu verkkoprofiili ei ole käytettävissä tämän kohteen maalle ja alueelle.",
+      "grid_profile_gateway_required": "Verkkoprofiilin käyttöönotto edellyttää pilven Activation Gateway -tietuetta.",
+      "grid_profile_apply_failed": "Verkkoprofiilin käyttöönotto epäonnistui."
     },
     "abort": {
       "migration_no_envoy_sources": "Yhtään Enphase Envoy -energia-anturia ei ole saatavilla siirtoon.",
       "migration_no_targets": "Yhtään yhteensopivaa Enphase Energy -anturia ei ole saatavilla siirtoon.",
-      "migration_partial_failure": "Siirto pysähtyi osittaisen valmistumisen jälkeen.\n\nValmiit yhdistelmät:\n{completed_mappings}\n\nVirhe käsiteltäessä `{failed_entity_id}`: {failure_reason}\n\nPalauta varmuuskopiosta, jos tulos ei ole hyväksyttävä."
+      "migration_partial_failure": "Siirto pysähtyi osittaisen valmistumisen jälkeen.\n\nValmiit yhdistelmät:\n{completed_mappings}\n\nVirhe käsiteltäessä `{failed_entity_id}`: {failure_reason}\n\nPalauta varmuuskopiosta, jos tulos ei ole hyväksyttävä.",
+      "grid_profile_unavailable": "Verkkoprofiilin hallinta ei ole käytettävissä.",
+      "grid_profile_installer_required": "Verkkoprofiilin hallinta edellyttää asentajan käyttöoikeutta Enphase Activationiin.",
+      "grid_profile_no_regions": "Tämän kohteen maalle ei ole käytettävissä verkkoprofiilin alueita."
     },
     "create_entry": {
       "migration_success": "Siirto valmis. Enphase Energy omistaa nyt valitut lähde-entiteettien tunnukset. Tarkista seuraavan päivityksen jälkeen Energy-koontinäyttö ja Developer Tools > Statistics.",
       "migration_success_reload_needed": "Siirto valmistui, mutta yhtä tai useampaa integraatiota ei voitu ladata automaattisesti uudelleen. Lataa tarvittaessa Enphase Energy ja Enphase Envoy käsin uudelleen ja tarkista sitten Energy-koontinäyttö ja Developer Tools > Statistics."
+    }
+  },
+  "selector": {
+    "grid_profile_list_mode": {
+      "options": {
+        "commonly_used": "Yleisesti käytetyt",
+        "all_profiles": "Kaikki profiilit"
+      }
+    },
+    "grid_profile_status": {
+      "options": {
+        "yes": "Kyllä",
+        "no": "Ei",
+        "unknown": "Tuntematon",
+        "available": "Saatavilla",
+        "unavailable": "Ei saatavilla",
+        "accepted": "Hyväksytty"
+      }
     }
   },
   "entity": {
@@ -1769,6 +1861,9 @@
       },
       "dry_contacts": {
         "name": "Potentiaalivapaat koskettimet"
+      },
+      "current_grid_profile": {
+        "name": "Verkkoprofiili"
       }
     },
     "number": {
@@ -2821,6 +2916,115 @@
         "site_id": {
           "name": "Kohteen ID",
           "description": "Valinnainen kohteen tunniste; tunnistetaan automaattisesti, kun laite valitaan."
+        }
+      }
+    },
+    "browse_grid_profiles": {
+      "name": "Selaa verkkoprofiileja",
+      "description": "Selaa valitun kohteen maassa ja alueella saatavilla olevia Cloud Activation -verkkoprofiileja.",
+      "sections": {
+        "advanced": {
+          "name": "Lisäasetukset"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Aluekoodi",
+          "description": "Valinnainen alueen tai osavaltion koodi, kuten VIC."
+        },
+        "commonly_used": {
+          "name": "Vain yleisesti käytetyt",
+          "description": "Palauttaa yleisesti käytettyjen profiilien luettelon, kun asetus on käytössä."
+        },
+        "device_id": {
+          "name": "Kohteen laitteet",
+          "description": "Valitse kohteen Enphase-laite."
+        },
+        "site_id": {
+          "name": "Kohteen tunnus",
+          "description": "Valinnainen kohteen tunniste; tunnistetaan automaattisesti laitetta valittaessa."
+        },
+        "config_entry_id": {
+          "name": "Määrityskohteen tunnus",
+          "description": "Valinnainen kohdesivuston määrityskohteen tunniste."
+        },
+        "query": {
+          "name": "Haku",
+          "description": "Valinnainen hakuteksti kohteen maan alueille ja profiileille."
+        }
+      }
+    },
+    "refresh_grid_profiles": {
+      "name": "Päivitä verkkoprofiilit",
+      "description": "Päivitä Cloud Activation -verkkoprofiilien viitetiedot ja valitun alueen luettelo.",
+      "sections": {
+        "advanced": {
+          "name": "Lisäasetukset"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Aluekoodi",
+          "description": "Valinnainen alueen tai osavaltion koodi, kuten VIC."
+        },
+        "commonly_used": {
+          "name": "Vain yleisesti käytetyt",
+          "description": "Palauttaa yleisesti käytettyjen profiilien luettelon, kun asetus on käytössä."
+        },
+        "device_id": {
+          "name": "Kohteen laitteet",
+          "description": "Valitse kohteen Enphase-laite."
+        },
+        "site_id": {
+          "name": "Kohteen tunnus",
+          "description": "Valinnainen kohteen tunniste; tunnistetaan automaattisesti laitetta valittaessa."
+        },
+        "config_entry_id": {
+          "name": "Määrityskohteen tunnus",
+          "description": "Valinnainen kohdesivuston määrityskohteen tunniste."
+        }
+      }
+    },
+    "set_grid_profile": {
+      "name": "Aseta verkkoprofiili",
+      "description": "Ota Cloud Activation -verkkoprofiili käyttöön nimenomaisen vahvistuksen jälkeen.",
+      "sections": {
+        "advanced": {
+          "name": "Lisäasetukset"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Aluekoodi",
+          "description": "Valinnainen alueen tai osavaltion koodi, kuten VIC."
+        },
+        "commonly_used": {
+          "name": "Vain yleisesti käytetyt",
+          "description": "Palauttaa yleisesti käytettyjen profiilien luettelon, kun asetus on käytössä."
+        },
+        "device_id": {
+          "name": "Kohteen laitteet",
+          "description": "Valitse kohteen Enphase-laite."
+        },
+        "site_id": {
+          "name": "Kohteen tunnus",
+          "description": "Valinnainen kohteen tunniste; tunnistetaan automaattisesti laitetta valittaessa."
+        },
+        "config_entry_id": {
+          "name": "Määrityskohteen tunnus",
+          "description": "Valinnainen kohdesivuston määrityskohteen tunniste."
+        },
+        "profile_id": {
+          "name": "Profiilitunnus",
+          "description": "Cloud Activation -profiilitunnus, mukaan lukien agf:-etuliite."
+        },
+        "confirm": {
+          "name": "Vahvista käyttöönotto",
+          "description": "On otettava käyttöön valitun verkkoprofiilin käyttöönottoa varten."
+        },
+        "gateway_serial": {
+          "name": "Gateway-sarjanumero",
+          "description": "Valinnainen Gateway-sarjanumero, kun Activation-tietue sisältää useita Gateway-laitteita."
         }
       }
     }
