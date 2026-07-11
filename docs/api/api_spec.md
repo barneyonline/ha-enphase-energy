@@ -105,6 +105,7 @@ Status labels:
 | EV daily timeseries | `GET` | `/service/timeseries/evse/timeseries/daily_energy?site_id=<site_id>&source=evse&requestId=<uuid>&start_date=<YYYY-MM-DD>[&username=<user_id>]` | bearer token + session headers | Runtime |
 | EV lifetime timeseries | `GET` | `/service/timeseries/evse/timeseries/lifetime_energy?site_id=<site_id>&source=evse&requestId=<uuid>[&username=<user_id>]` | bearer token + session headers | Runtime |
 | Site inventory | `GET` | `/app-api/<site_id>/devices.json` | `e-auth-token` + cookies | Runtime |
+| Multi-gateway phase map | `GET` | `/app-api/<site_id>/phase_map_multiple_envoy` | authenticated session cookies + `e-auth-token` | Runtime |
 | Site bootstrap payload | `GET` | `/app-api/<site_id>/data.json?app=<id>&device_status=non_retired&is_mobile=<id>` | authenticated session cookies + `e-auth-token` | Browser capture only |
 | Filtered site-device inventory | `POST` | `/service/site-device/api/v2/devices/list` | `e-auth-token` + cookies | Browser capture only |
 | Site live-stream flags | `GET` | `/app-api/<site_id>/show_livestream` | authenticated session cookies | Runtime |
@@ -1486,7 +1487,54 @@ Notes:
 - The observed capture returned `value=-30`, confirming the field can go negative. Preserve negative samples rather than clamping to `0`; they likely represent net import or reverse power flow.
 - The normalized runtime field is `current_power_consumption_w` with source `app-api:get_latest_power`.
 
-### 2.9.3.a Site Bootstrap Payload
+### 2.9.3.a Multi-Gateway Phase Map
+
+```http
+GET /app-api/<site_id>/phase_map_multiple_envoy
+```
+
+Returns a map keyed by Gateway serial number. The integration uses it to select
+the primary/default Gateway on multi-Gateway sites and to expose compact phase
+and topology diagnostics.
+
+```json
+{
+  "<gateway_sn>": {
+    "connectedLoadControl": false,
+    "hasGenerator": false,
+    "hasIqBattery": true,
+    "hasAcb": false,
+    "isSplitPhase": false,
+    "isProductionOnly": false,
+    "isConsumptionOnly": false,
+    "showSmartMeterConsumption": false,
+    "totalPhase": 3,
+    "hasEnpower": true,
+    "hasEncharge": true,
+    "showStorage": true,
+    "isEnsemble": true,
+    "gatewayStatus": "normal",
+    "isDefaultGateway": true,
+    "isPrimaryGateway": true,
+    "phases": {"0": true, "1": true, "2": true},
+    "any": true,
+    "all": true
+  }
+}
+```
+
+Implementation notes:
+
+- The dynamic object keys are device serial numbers and must be redacted in
+  logs and diagnostics.
+- Prefer `isPrimaryGateway`, then `isDefaultGateway`, when selecting a Gateway
+  for site-level controls. A one-entry map is an unambiguous fallback.
+- The payload is topology metadata and is cached for six hours. Failures use a
+  one-hour retry backoff and preserve the last successful map.
+- The optional endpoint must not make the authoritative device inventory
+  unavailable.
+
+### 2.9.3.b Site Bootstrap Payload
 ```
 GET /app-api/<site_id>/data.json?app=1&device_status=non_retired&is_mobile=0
 ```
@@ -1533,7 +1581,7 @@ Observed notes:
 - Real captures contain personal data, support URLs, authenticity tokens, and signed links; those must be redacted before sharing.
 - This appears to be an app bootstrap/config payload rather than a stable telemetry endpoint.
 
-### 2.9.3.b Site Currency Conversion Settings
+### 2.9.3.c Site Currency Conversion Settings
 ```
 GET /app-api/<site_id>/get_currency_conversion.json
 ```
@@ -1556,7 +1604,7 @@ Observed notes:
 - `value_per_kwh` was observed as a string rather than a numeric JSON value.
 - `currency_symbol` is display-oriented text and should not be interpreted as a normalized ISO code.
 
-### 2.9.3.c Requested Battery Usage Hint
+### 2.9.3.d Requested Battery Usage Hint
 ```
 GET /app-api/<site_id>/get_requested_battery_usage
 ```
@@ -1573,7 +1621,7 @@ Observed notes:
 - The only observed value so far is `null`.
 - Semantics remain unclear; preserve future non-null values verbatim until more captures exist.
 
-### 2.9.3.d Site Performance Widget Flags
+### 2.9.3.e Site Performance Widget Flags
 ```
 GET /app-api/<site_id>/performance_widgets
 ```
@@ -1590,7 +1638,7 @@ Example response:
 }
 ```
 
-### 2.9.3.e PowerMatch UI Flags
+### 2.9.3.f PowerMatch UI Flags
 ```
 GET /app-api/<site_id>/powermatch_details
 ```
@@ -1607,7 +1655,7 @@ Example response:
 Observed notes:
 - The HAR does not establish backend semantics for `enabled` versus `show`; document them as UI flags only until more evidence exists.
 
-### 2.9.3.f Legacy Site Tariff Flags
+### 2.9.3.g Legacy Site Tariff Flags
 ```
 GET /app-api/<site_id>/tariff.json?country=<country>
 ```

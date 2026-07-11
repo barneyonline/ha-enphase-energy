@@ -68,6 +68,8 @@ def _typed_callback(func: _CallbackT) -> _CallbackT:
 
 
 DEVICES_INVENTORY_CACHE_TTL = 600.0
+GATEWAY_PHASE_MAP_CACHE_TTL = 21600.0
+GATEWAY_PHASE_MAP_FAILURE_BACKOFF_S = 3600.0
 HEMS_INVENTORY_ENDPOINT_FAMILY = "hems_inventory"
 HEMS_DEVICES_STALE_AFTER_S = 90.0
 HEMS_DEVICES_CACHE_TTL = 60.0
@@ -135,6 +137,9 @@ class InventoryRuntime:
     _gateway_iq_energy_router_records_cache: list[dict[str, object]]
     _gateway_iq_energy_router_records_source: object
     _gateway_iq_energy_router_records_by_key_cache: dict[str, dict[str, object]]
+    _gateway_phase_map: dict[str, dict[str, object]]
+    _gateway_phase_map_cache_until: float | None
+    _gateway_phase_map_failure_backoff_until: float | None
     _devices_inventory_cache_until: float | None
     _devices_inventory_ready: bool
     _hems_inventory_ready: bool
@@ -154,6 +159,11 @@ class InventoryRuntime:
         self.refresh_state = coordinator.refresh_state
         self.inventory_state = coordinator.inventory_state
         self.heatpump_state = coordinator.heatpump_state
+        self._update_shared_state(
+            _gateway_phase_map={},
+            _gateway_phase_map_cache_until=None,
+            _gateway_phase_map_failure_backoff_until=None,
+        )
 
     def _set_shared_state_attr(self, name: str, value: object) -> None:
         object.__setattr__(self, name, value)
@@ -194,6 +204,203 @@ class InventoryRuntime:
 
     def type_bucket(self, type_key: object) -> dict[str, object] | None:
         return self.coordinator.inventory_view.type_bucket(type_key)
+
+    @staticmethod
+    def _normalize_gateway_phase_map(
+        payload: object,
+    ) -> dict[str, dict[str, object]]:
+        """Normalize the dynamic gateway-keyed phase-map response."""
+
+        if not isinstance(payload, dict):
+            return {}
+        field_aliases = {
+            "connectedLoadControl": "connected_load_control",
+            "hasGenerator": "has_generator",
+            "hasIqBattery": "has_iq_battery",
+            "hasAcb": "has_acb",
+            "isSplitPhase": "is_split_phase",
+            "isProductionOnly": "is_production_only",
+            "isConsumptionOnly": "is_consumption_only",
+            "showSmartMeterConsumption": "show_smart_meter_consumption",
+            "hasEnpower": "has_enpower",
+            "hasEncharge": "has_encharge",
+            "showStorage": "show_storage",
+            "isEnsemble": "is_ensemble",
+            "isDefaultGateway": "is_default_gateway",
+            "isPrimaryGateway": "is_primary_gateway",
+            "any": "any_phase",
+            "all": "all_phases",
+        }
+        normalized: dict[str, dict[str, object]] = {}
+        for raw_serial, raw_details in payload.items():
+            serial = coerce_optional_text(raw_serial)
+            if serial is None or not isinstance(raw_details, dict):
+                continue
+            details: dict[str, object] = {}
+            for source_key, target_key in field_aliases.items():
+                value = coerce_optional_bool(raw_details.get(source_key))
+                if value is not None:
+                    details[target_key] = value
+            total_phase = coerce_int(raw_details.get("totalPhase"), default=0)
+            if total_phase > 0:
+                details["total_phase"] = total_phase
+            gateway_status = coerce_optional_text(raw_details.get("gatewayStatus"))
+            if gateway_status is not None:
+                details["gateway_status"] = gateway_status
+            phases_raw = raw_details.get("phases")
+            if isinstance(phases_raw, dict):
+                phases: dict[str, bool] = {}
+                for raw_phase, raw_enabled in phases_raw.items():
+                    phase = coerce_optional_text(raw_phase)
+                    enabled = coerce_optional_bool(raw_enabled)
+                    if phase is not None and enabled is not None:
+                        phases[phase] = enabled
+                if phases:
+                    details["phases"] = phases
+            normalized[serial] = details
+        return normalized
+
+    def gateway_phase_map(self) -> dict[str, dict[str, object]]:
+        """Return a defensive copy of normalized gateway topology metadata."""
+
+        raw = getattr(self, "_gateway_phase_map", None)
+        if not isinstance(raw, dict):
+            return {}
+        copied: dict[str, dict[str, object]] = {}
+        for serial, details in raw.items():
+            if not isinstance(details, dict):
+                continue
+            item = dict(details)
+            phases = item.get("phases")
+            if isinstance(phases, dict):
+                item["phases"] = dict(phases)
+            copied[str(serial)] = item
+        return copied
+
+    def gateway_phase_map_for_serial(self, serial: object) -> dict[str, object] | None:
+        """Return phase-map metadata for one gateway serial."""
+
+        serial_text = coerce_optional_text(serial)
+        if serial_text is None:
+            return None
+        details = self.gateway_phase_map().get(serial_text)
+        return dict(details) if isinstance(details, dict) else None
+
+    def gateway_phase_map_preferred_serial(self) -> str | None:
+        """Return the primary/default gateway serial advertised by the phase map."""
+
+        phase_map = self.gateway_phase_map()
+        for flag in ("is_primary_gateway", "is_default_gateway"):
+            for serial, details in phase_map.items():
+                if details.get(flag) is True:
+                    return serial
+        if len(phase_map) == 1:
+            return next(iter(phase_map))
+        return None
+
+    def gateway_phase_map_summary(self) -> dict[str, object]:
+        """Return a compact topology summary suitable for diagnostics/entities."""
+
+        phase_map = self.gateway_phase_map()
+        preferred = self.gateway_phase_map_preferred_serial()
+        primary = next(
+            (
+                serial
+                for serial, details in phase_map.items()
+                if details.get("is_primary_gateway") is True
+            ),
+            None,
+        )
+        default = next(
+            (
+                serial
+                for serial, details in phase_map.items()
+                if details.get("is_default_gateway") is True
+            ),
+            None,
+        )
+        preferred_details = phase_map.get(preferred or "", {})
+        return {
+            "gateway_count": len(phase_map),
+            "multi_gateway": len(phase_map) > 1,
+            "primary_gateway_serial": primary,
+            "default_gateway_serial": default,
+            "preferred_gateway_serial": preferred,
+            "preferred_gateway_phase_count": preferred_details.get("total_phase"),
+            "split_phase_gateway_count": sum(
+                details.get("is_split_phase") is True for details in phase_map.values()
+            ),
+            "three_phase_gateway_count": sum(
+                details.get("total_phase") == 3 for details in phase_map.values()
+            ),
+            "production_only_gateway_count": sum(
+                details.get("is_production_only") is True
+                for details in phase_map.values()
+            ),
+            "consumption_only_gateway_count": sum(
+                details.get("is_consumption_only") is True
+                for details in phase_map.values()
+            ),
+            "storage_gateway_count": sum(
+                details.get("show_storage") is True
+                or details.get("has_iq_battery") is True
+                or details.get("has_encharge") is True
+                for details in phase_map.values()
+            ),
+        }
+
+    def gateway_phase_map_refresh_due(self, *, force: bool = False) -> bool:
+        """Return whether the optional gateway phase map should be refreshed."""
+
+        fetcher = getattr(self.client, "phase_map_multiple_envoy", None)
+        if not callable(fetcher):
+            return False
+        if force:
+            return True
+        now = time.monotonic()
+        cache_until = getattr(self, "_gateway_phase_map_cache_until", None)
+        if isinstance(cache_until, (int, float)) and now < float(cache_until):
+            return False
+        backoff_until = getattr(self, "_gateway_phase_map_failure_backoff_until", None)
+        return not (
+            isinstance(backoff_until, (int, float)) and now < float(backoff_until)
+        )
+
+    async def _async_refresh_gateway_phase_map(self, *, force: bool = False) -> None:
+        """Refresh optional multi-gateway topology without failing inventory."""
+
+        if not self.gateway_phase_map_refresh_due(force=force):
+            return
+        fetcher = cast(
+            Callable[[], Awaitable[object]],
+            getattr(self.client, "phase_map_multiple_envoy"),
+        )
+        now = time.monotonic()
+        try:
+            payload = await fetcher()
+        except Exception as err:  # noqa: BLE001
+            self._set_shared_state_attr(
+                "_gateway_phase_map_failure_backoff_until",
+                now + GATEWAY_PHASE_MAP_FAILURE_BACKOFF_S,
+            )
+            _LOGGER.debug(
+                "Gateway phase-map refresh failed for site %s: %s",
+                redact_site_id(self.site_id),
+                redact_text(err, site_ids=(self.site_id,)),
+            )
+            return
+        if payload is not None and not isinstance(payload, dict):
+            self._set_shared_state_attr(
+                "_gateway_phase_map_failure_backoff_until",
+                now + GATEWAY_PHASE_MAP_FAILURE_BACKOFF_S,
+            )
+            return
+        normalized = self._normalize_gateway_phase_map(payload or {})
+        self._update_shared_state(
+            _gateway_phase_map=normalized,
+            _gateway_phase_map_cache_until=now + GATEWAY_PHASE_MAP_CACHE_TTL,
+            _gateway_phase_map_failure_backoff_until=None,
+        )
 
     def _type_member_text(self, member: dict[str, object], *keys: str) -> str | None:
         value = type_member_text(member, *keys)
@@ -1247,6 +1454,7 @@ class InventoryRuntime:
         return (
             id(self._summary_type_bucket_source("envoy")),
             id(dashboard_envoy),
+            id(getattr(self, "_gateway_phase_map", None)),
         )
 
     def _microinverter_inventory_summary_marker(self) -> tuple[object, ...]:
@@ -1467,6 +1675,7 @@ class InventoryRuntime:
             ),
             "latest_reported_device": latest_reported_device,
             "property_keys": sorted(property_keys),
+            **self.gateway_phase_map_summary(),
         }
 
     def _build_microinverter_inventory_summary(self) -> dict[str, object]:
@@ -1872,6 +2081,7 @@ class InventoryRuntime:
     async def _async_refresh_devices_inventory(self, *, force: bool = False) -> None:
         coord = self.coordinator
         now = time.monotonic()
+        await self._async_refresh_gateway_phase_map(force=force)
         family = "inventory_topology"
         if not coord._endpoint_family_should_run(family, force=force):
             return
@@ -1948,13 +2158,14 @@ class InventoryRuntime:
     def devices_inventory_refresh_due(self, *, force: bool = False) -> bool:
         coord = self.coordinator
         now = time.monotonic()
+        phase_map_due = self.gateway_phase_map_refresh_due(force=force)
         if not coord._endpoint_family_should_run("inventory_topology", force=force):
-            return False
+            return phase_map_due
         if not force and self._devices_inventory_cache_until:
             if now < self._devices_inventory_cache_until:
-                return False
+                return phase_map_due
         fetcher = getattr(self.client, "devices_inventory", None)
-        return callable(fetcher)
+        return phase_map_due or callable(fetcher)
 
     async def _async_refresh_hems_devices(self, *, force: bool = False) -> None:
         coord = self.coordinator

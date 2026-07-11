@@ -367,6 +367,17 @@ class InventoryView:
             return "consumption"
         return None
 
+    @staticmethod
+    def _envoy_member_serial(member: dict[str, object]) -> str | None:
+        return InventoryView._type_member_text(
+            member,
+            "serial_number",
+            "serialNumber",
+            "serial",
+            "device_sn",
+            "sn",
+        )
+
     def _envoy_system_controller_member(self) -> dict[str, object] | None:
         for member in self._type_bucket_members("envoy"):
             if self._envoy_member_kind(member) == "controller":
@@ -380,6 +391,15 @@ class InventoryView:
             "controller",
         ):
             return False
+        serial = self._envoy_member_serial(member)
+        phase_map_for_serial = getattr(
+            self.coordinator.inventory_runtime,
+            "gateway_phase_map_for_serial",
+            None,
+        )
+        if serial and callable(phase_map_for_serial):
+            if phase_map_for_serial(serial) is not None:
+                return True
         if any(
             member.get(key) is not None
             for key in (
@@ -396,10 +416,34 @@ class InventoryView:
         return "gateway" in name
 
     def _envoy_primary_gateway_member(self) -> dict[str, object] | None:
-        for member in self._type_bucket_members("envoy"):
-            if self._envoy_member_looks_like_gateway(member):
-                return member
+        members = [
+            member
+            for member in self._type_bucket_members("envoy")
+            if self._envoy_member_looks_like_gateway(member)
+        ]
+        preferred_serial_getter = getattr(
+            self.coordinator.inventory_runtime,
+            "gateway_phase_map_preferred_serial",
+            None,
+        )
+        preferred_serial = (
+            preferred_serial_getter() if callable(preferred_serial_getter) else None
+        )
+        if preferred_serial:
+            for member in members:
+                if self._envoy_member_serial(member) == preferred_serial:
+                    return member
+        if members:
+            return members[0]
         return None
+
+    def primary_gateway_serial(self) -> str | None:
+        """Return the phase-map-preferred active gateway serial."""
+
+        member = self._envoy_primary_gateway_member()
+        if member is None:
+            return None
+        return self._envoy_member_serial(member)
 
     def _envoy_preferred_member(self) -> dict[str, object] | None:
         gateway = self._envoy_primary_gateway_member()

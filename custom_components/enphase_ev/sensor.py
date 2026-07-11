@@ -7416,6 +7416,9 @@ class EnphaseGatewayConnectivityStatusSensor(_SiteBaseEntity):
             "latest_reported_utc",
             "latest_reported_device",
             "property_keys",
+            "primary_gateway_serial",
+            "default_gateway_serial",
+            "preferred_gateway_serial",
         }
     )
 
@@ -7459,6 +7462,23 @@ class EnphaseGatewayConnectivityStatusSensor(_SiteBaseEntity):
             "latest_reported_utc": snapshot.get("latest_reported_utc"),
             "latest_reported_device": snapshot.get("latest_reported_device"),
             "property_keys": snapshot.get("property_keys"),
+            "gateway_count": snapshot.get("gateway_count"),
+            "multi_gateway": snapshot.get("multi_gateway"),
+            "primary_gateway_serial": snapshot.get("primary_gateway_serial"),
+            "default_gateway_serial": snapshot.get("default_gateway_serial"),
+            "preferred_gateway_serial": snapshot.get("preferred_gateway_serial"),
+            "preferred_gateway_phase_count": snapshot.get(
+                "preferred_gateway_phase_count"
+            ),
+            "split_phase_gateway_count": snapshot.get("split_phase_gateway_count"),
+            "three_phase_gateway_count": snapshot.get("three_phase_gateway_count"),
+            "production_only_gateway_count": snapshot.get(
+                "production_only_gateway_count"
+            ),
+            "consumption_only_gateway_count": snapshot.get(
+                "consumption_only_gateway_count"
+            ),
+            "storage_gateway_count": snapshot.get("storage_gateway_count"),
         }
 
 
