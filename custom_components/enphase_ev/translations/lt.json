@@ -456,6 +456,27 @@
     },
     "firmware_advisory_only": {
       "message": "Programinės aparatinės įrangos naujiniai yra tik informaciniai."
+    },
+    "grid_profile_installer_required": {
+      "message": "Tinklo profilio valdymui reikalinga Enphase Activation montuotojo prieiga."
+    },
+    "grid_profile_profile_invalid": {
+      "message": "Pasirinktas tinklo profilis nepasiekiamas šios vietos šalyje ir regione."
+    },
+    "grid_profile_gateway_required": {
+      "message": "Norint taikyti tinklo profilį, reikalingas Cloud Activation Gateway įrašas."
+    },
+    "grid_profile_apply_failed": {
+      "message": "Nepavyko pritaikyti tinklo profilio."
+    },
+    "grid_profile_confirmation_required": {
+      "message": "Norint taikyti tinklo profilį, reikalingas patvirtinimas."
+    },
+    "grid_profile_region_invalid": {
+      "message": "Pasirinktas tinklo profilio regionas nepasiekiamas."
+    },
+    "grid_profile_unavailable": {
+      "message": "Tinklo profilio valdymas nepasiekiamas."
     }
   },
   "options": {
@@ -465,11 +486,13 @@
         "description": "Pasirinkite, ką norite daryti su šiuo integracijos įrašu.",
         "menu_options": {
           "settings": "Nustatymai",
-          "migrate_envoy": "Perkelti Envoy istoriją"
+          "migrate_envoy": "Perkelti Envoy istoriją",
+          "advanced": "Išplėstiniai"
         },
         "menu_option_descriptions": {
           "settings": "Reguliuokite apklausą ir veikimą.",
-          "migrate_envoy": "Perimkite pasirinktus Enphase Envoy energijos objektų ID, kad Home Assistant Energy istorija tęstųsi šioje integracijoje."
+          "migrate_envoy": "Perimkite pasirinktus Enphase Envoy energijos objektų ID, kad Home Assistant Energy istorija tęstųsi šioje integracijoje.",
+          "advanced": "Tinklo profilio valdymas tik diegėjams."
         },
         "data": {
           "type_envoy": "Šliuzas",
@@ -593,6 +616,46 @@
           "confirm_reassign": "Suprantu, kad pasirinkti šaltinio objektų identifikatoriai bus priskirti iš naujo",
           "disable_archived_envoy_sensors": "Išjungti archyvuotus šaltinio jutiklius po migracijos"
         }
+      },
+      "advanced": {
+        "title": "Išplėstiniai",
+        "description": "Diegėjo ir priežiūros veiksmai.",
+        "menu_options": {
+          "grid_profile": "Tinklo profilio valdymas"
+        },
+        "menu_option_descriptions": {
+          "grid_profile": "Naršykite ir taikykite tik diegėjams skirtus Activation tinklo profilius."
+        }
+      },
+      "grid_profile": {
+        "title": "Tinklo profilio valdymas",
+        "description": "Filtruoja Activation tinklo profilių katalogą pagal šios vietos šalį.",
+        "data": {
+          "grid_profile_region": "Regionas",
+          "grid_profile_commonly_used": "Profilių sąrašas"
+        },
+        "data_description": {
+          "grid_profile_region": "Galimi tik šios vietos šalies regionai.",
+          "grid_profile_commonly_used": "Pasirinkite dažnai naudojamus profilius arba visus profilius pasirinktame regione."
+        }
+      },
+      "grid_profile_select": {
+        "title": "Pasirinkti tinklo profilį",
+        "description": "Pasirinkite paruošiamą profilį. Nieko nebus taikoma iki patvirtinimo žingsnio.",
+        "data": {
+          "grid_profile_id": "Tinklo profilis"
+        }
+      },
+      "grid_profile_confirm": {
+        "title": "Patvirtinti tinklo profilį",
+        "description": "Dabartinis profilis: **{current_profile}**\n\nPasirinktas profilis: **{selected_profile}**\n\nProfilio ID: **{selected_profile_id}**\n\nPEL Enhanced: **{selected_profile_pel}**\n\nSuderinama su 277 V: **{selected_profile_277v}**\n\nŠalis: **{country}**\n\nRegionas: **{region}**\n\nTaikymo debesyje būsena: **{apply_status}**.",
+        "data": {
+          "confirm_apply": "Taikyti pasirinktą tinklo profilį"
+        }
+      },
+      "grid_profile_applied": {
+        "title": "Tinklo profilio naujinimas priimtas",
+        "description": "Enphase priėmė tinklo profilio naujinimą profiliui **{selected_profile}**.\n\nPrašomo profilio ID: **{requested_profile_id}**\n\nDebesies būsena: **{cloud_apply_status}**\n\nGali praeiti iki **5 minučių**, kol naujas profilis bus rodomas kaip dabartinis, kol debesis ir Gateway baigs apdorojimą. Grid Profile jutiklis bus atnaujintas, kai Activation įrašas praneš apie naują dabartinį profilį."
       }
     },
     "error": {
@@ -602,16 +665,45 @@
       "migration_no_selection": "Pasirinkite bent vieną suderinamą energijos jutiklį migracijai.",
       "migration_duplicate_selection": "Tas pats šaltinio objektas negali būti naudojamas daugiau nei vieną kartą.",
       "envoy_entry_loaded": "Envoy integracijos nepavyko laikinai iškrauti migracijai.",
-      "incompatible_energy_total": "Pasirinkti objektai nėra suderinami kaupiamosios energijos kiekiai."
+      "incompatible_energy_total": "Pasirinkti objektai nėra suderinami kaupiamosios energijos kiekiai.",
+      "grid_profile_unavailable": "Tinklo profilio valdymas nepasiekiamas.",
+      "grid_profile_installer_required": "Tinklo profilio valdymui reikia diegėjo prieigos prie Enphase Activation.",
+      "grid_profile_no_regions": "Šios vietos šaliai nėra tinklo profilio regionų.",
+      "grid_profile_no_profiles": "Nė vienas tinklo profilis neatitinka pasirinktų filtrų.",
+      "grid_profile_region_invalid": "Pasirinktas tinklo profilio regionas nepasiekiamas.",
+      "grid_profile_profile_invalid": "Pasirinktas tinklo profilis nepasiekiamas šios vietos šaliai ir regionui.",
+      "grid_profile_gateway_required": "Tinklo profilio taikymui reikia debesies Activation Gateway įrašo.",
+      "grid_profile_apply_failed": "Tinklo profilio taikyti nepavyko."
     },
     "abort": {
       "migration_no_envoy_sources": "Nėra Enphase Envoy energijos jutiklių, kuriuos būtų galima migruoti.",
       "migration_no_targets": "Nėra suderinamų Enphase Energy jutiklių, kuriuos būtų galima migruoti.",
-      "migration_partial_failure": "Migracija sustojo po dalinio užbaigimo.\n\nUžbaigti susiejimai:\n{completed_mappings}\n\nNepavyko apdoroti `{failed_entity_id}`: {failure_reason}\n\nJei rezultatas netenkina, atkurkite atsarginę kopiją."
+      "migration_partial_failure": "Migracija sustojo po dalinio užbaigimo.\n\nUžbaigti susiejimai:\n{completed_mappings}\n\nNepavyko apdoroti `{failed_entity_id}`: {failure_reason}\n\nJei rezultatas netenkina, atkurkite atsarginę kopiją.",
+      "grid_profile_unavailable": "Tinklo profilio valdymas nepasiekiamas.",
+      "grid_profile_installer_required": "Tinklo profilio valdymui reikia diegėjo prieigos prie Enphase Activation.",
+      "grid_profile_no_regions": "Šios vietos šaliai nėra tinklo profilio regionų."
     },
     "create_entry": {
       "migration_success": "Migracija baigta. Enphase Energy dabar naudoja pasirinktus šaltinio objektų identifikatorius. Po kito atnaujinimo patikrinkite Energy skydelį ir Developer Tools > Statistics.",
       "migration_success_reload_needed": "Migracija baigta, tačiau viena ar daugiau integracijų nebuvo automatiškai įkeltos iš naujo. Jei reikia, rankiniu būdu iš naujo įkelkite Enphase Energy ir Enphase Envoy, tada patikrinkite Energy skydelį ir Developer Tools > Statistics."
+    }
+  },
+  "selector": {
+    "grid_profile_list_mode": {
+      "options": {
+        "commonly_used": "Dažniausiai naudojami",
+        "all_profiles": "Visi profiliai"
+      }
+    },
+    "grid_profile_status": {
+      "options": {
+        "yes": "Taip",
+        "no": "Ne",
+        "unknown": "Nežinoma",
+        "available": "Pasiekiama",
+        "unavailable": "Nepasiekiama",
+        "accepted": "Priimta"
+      }
     }
   },
   "entity": {
@@ -1765,6 +1857,9 @@
       },
       "dry_contacts": {
         "name": "Sausieji kontaktai"
+      },
+      "current_grid_profile": {
+        "name": "Tinklo profilis"
       }
     },
     "number": {
@@ -2812,6 +2907,115 @@
         "site_id": {
           "name": "Svetainės ID",
           "description": "Pasirenkamas svetainės identifikatorius; aptinkamas automatiškai pasirinkus įrenginį."
+        }
+      }
+    },
+    "browse_grid_profiles": {
+      "name": "Naršyti tinklo profilius",
+      "description": "Naršykite pasirinktos vietos šaliai ir regionui prieinamus Cloud Activation tinklo profilius.",
+      "sections": {
+        "advanced": {
+          "name": "Täiendavad valikud"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Regiono kodas",
+          "description": "Pasirinktinis regiono arba valstijos kodas, pvz., VIC."
+        },
+        "commonly_used": {
+          "name": "Tik dažnai naudojami",
+          "description": "Kai įjungta, pateikiamas dažnai naudojamų profilių katalogas."
+        },
+        "device_id": {
+          "name": "Vietos įrenginiai",
+          "description": "Pasirinkite vietos Enphase įrenginį."
+        },
+        "site_id": {
+          "name": "Vietos ID",
+          "description": "Pasirinktinis vietos identifikatorius; aptinkamas automatiškai pasirinkus įrenginį."
+        },
+        "config_entry_id": {
+          "name": "Konfigūracijos įrašo ID",
+          "description": "Pasirinktinis tikslinės vietos konfigūracijos įrašo identifikatorius."
+        },
+        "query": {
+          "name": "Paieška",
+          "description": "Pasirinktinis vietos šalies regionų ir profilių paieškos tekstas."
+        }
+      }
+    },
+    "refresh_grid_profiles": {
+      "name": "Atnaujinti tinklo profilius",
+      "description": "Atnaujinkite Cloud Activation tinklo profilių informacinius duomenis ir pasirinkto regiono katalogą.",
+      "sections": {
+        "advanced": {
+          "name": "Täiendavad valikud"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Regiono kodas",
+          "description": "Pasirinktinis regiono arba valstijos kodas, pvz., VIC."
+        },
+        "commonly_used": {
+          "name": "Tik dažnai naudojami",
+          "description": "Kai įjungta, pateikiamas dažnai naudojamų profilių katalogas."
+        },
+        "device_id": {
+          "name": "Vietos įrenginiai",
+          "description": "Pasirinkite vietos Enphase įrenginį."
+        },
+        "site_id": {
+          "name": "Vietos ID",
+          "description": "Pasirinktinis vietos identifikatorius; aptinkamas automatiškai pasirinkus įrenginį."
+        },
+        "config_entry_id": {
+          "name": "Konfigūracijos įrašo ID",
+          "description": "Pasirinktinis tikslinės vietos konfigūracijos įrašo identifikatorius."
+        }
+      }
+    },
+    "set_grid_profile": {
+      "name": "Nustatyti tinklo profilį",
+      "description": "Taikykite Cloud Activation tinklo profilį po aiškaus patvirtinimo.",
+      "sections": {
+        "advanced": {
+          "name": "Täiendavad valikud"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Regiono kodas",
+          "description": "Pasirinktinis regiono arba valstijos kodas, pvz., VIC."
+        },
+        "commonly_used": {
+          "name": "Tik dažnai naudojami",
+          "description": "Kai įjungta, pateikiamas dažnai naudojamų profilių katalogas."
+        },
+        "device_id": {
+          "name": "Vietos įrenginiai",
+          "description": "Pasirinkite vietos Enphase įrenginį."
+        },
+        "site_id": {
+          "name": "Vietos ID",
+          "description": "Pasirinktinis vietos identifikatorius; aptinkamas automatiškai pasirinkus įrenginį."
+        },
+        "config_entry_id": {
+          "name": "Konfigūracijos įrašo ID",
+          "description": "Pasirinktinis tikslinės vietos konfigūracijos įrašo identifikatorius."
+        },
+        "profile_id": {
+          "name": "Profilio ID",
+          "description": "Cloud Activation profilio ID, įskaitant priešdėlį agf:."
+        },
+        "confirm": {
+          "name": "Patvirtinti taikymą",
+          "description": "Turi būti įjungta, kad būtų taikomas pasirinktas tinklo profilis."
+        },
+        "gateway_serial": {
+          "name": "Gateway serijos numeris",
+          "description": "Pasirinktinis Gateway serijos numeris, kai Activation įraše yra keli Gateway įrenginiai."
         }
       }
     }

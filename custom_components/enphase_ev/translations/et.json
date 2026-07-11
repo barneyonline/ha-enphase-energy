@@ -456,6 +456,27 @@
     },
     "firmware_advisory_only": {
       "message": "Püsivara värskendused on ainult informatiivsed."
+    },
+    "grid_profile_installer_required": {
+      "message": "Võrguprofiili juhtimiseks on vaja Enphase Activationi paigaldaja juurdepääsu."
+    },
+    "grid_profile_profile_invalid": {
+      "message": "Valitud võrguprofiil ei ole selle asukoha riigi ja piirkonna jaoks saadaval."
+    },
+    "grid_profile_gateway_required": {
+      "message": "Võrguprofiili rakendamiseks on vaja Cloud Activation Gateway kirjet."
+    },
+    "grid_profile_apply_failed": {
+      "message": "Võrguprofiili rakendamine nurjus."
+    },
+    "grid_profile_confirmation_required": {
+      "message": "Võrguprofiili rakendamiseks on vaja kinnitust."
+    },
+    "grid_profile_region_invalid": {
+      "message": "Valitud võrguprofiili piirkond pole saadaval."
+    },
+    "grid_profile_unavailable": {
+      "message": "Võrguprofiili juhtimine pole saadaval."
     }
   },
   "options": {
@@ -465,11 +486,13 @@
         "description": "Vali, mida selle integratsiooni kirjega teha.",
         "menu_options": {
           "settings": "Seaded",
-          "migrate_envoy": "Migreeri Envoy ajalugu"
+          "migrate_envoy": "Migreeri Envoy ajalugu",
+          "advanced": "Täpsem"
         },
         "menu_option_descriptions": {
           "settings": "Kohanda küsitlemist ja käitumist.",
-          "migrate_envoy": "Võta üle valitud Enphase Envoy energiaüksuste ID-d, et Home Assistant Energy ajalugu jätkuks selle integratsiooni all."
+          "migrate_envoy": "Võta üle valitud Enphase Envoy energiaüksuste ID-d, et Home Assistant Energy ajalugu jätkuks selle integratsiooni all.",
+          "advanced": "Võrguprofiili juhtelemendid ainult paigaldajatele."
         },
         "data": {
           "type_envoy": "Lüüs",
@@ -593,6 +616,46 @@
           "confirm_reassign": "Mõistan, et valitud lähteolemite ID-d määratakse ümber",
           "disable_archived_envoy_sensors": "Keela arhiveeritud lähteandurid pärast migratsiooni"
         }
+      },
+      "advanced": {
+        "title": "Täpsem",
+        "description": "Paigaldaja ja hoolduse toimingud.",
+        "menu_options": {
+          "grid_profile": "Võrguprofiili juhtimine"
+        },
+        "menu_option_descriptions": {
+          "grid_profile": "Sirvi ja rakenda Activationi võrguprofiile ainult paigaldajatele."
+        }
+      },
+      "grid_profile": {
+        "title": "Võrguprofiili juhtimine",
+        "description": "Filtreerib Activationi võrguprofiilide kataloogi selle saidi riigi järgi.",
+        "data": {
+          "grid_profile_region": "Piirkond",
+          "grid_profile_commonly_used": "Profiilide loend"
+        },
+        "data_description": {
+          "grid_profile_region": "Saadaval on ainult saidi riigi piirkonnad.",
+          "grid_profile_commonly_used": "Vali valitud piirkonna sageli kasutatavad profiilid või kõik profiilid."
+        }
+      },
+      "grid_profile_select": {
+        "title": "Vali võrguprofiil",
+        "description": "Vali profiil ettevalmistamiseks. Midagi ei rakendata enne kinnitusetappi.",
+        "data": {
+          "grid_profile_id": "Võrguprofiil"
+        }
+      },
+      "grid_profile_confirm": {
+        "title": "Kinnita võrguprofiil",
+        "description": "Praegune profiil: **{current_profile}**\n\nValitud profiil: **{selected_profile}**\n\nProfiili ID: **{selected_profile_id}**\n\nPEL Enhanced: **{selected_profile_pel}**\n\n277 V ühilduv: **{selected_profile_277v}**\n\nRiik: **{country}**\n\nPiirkond: **{region}**\n\nPilves rakendamise olek: **{apply_status}**.",
+        "data": {
+          "confirm_apply": "Rakenda valitud võrguprofiil"
+        }
+      },
+      "grid_profile_applied": {
+        "title": "Võrguprofiili uuendus aktsepteeritud",
+        "description": "Enphase aktsepteeris võrguprofiili uuenduse profiilile **{selected_profile}**.\n\nTaotletud profiili ID: **{requested_profile_id}**\n\nPilve olek: **{cloud_apply_status}**\n\nUue profiili kuvamine praegusena võib võtta kuni **5 minutit**, kuni pilv ja Gateway töötlemise lõpetavad. Grid Profile andur uueneb pärast seda, kui Activation kirje teatab uuest praegusest profiilist."
       }
     },
     "error": {
@@ -602,16 +665,45 @@
       "migration_no_selection": "Vali migreerimiseks vähemalt üks ühilduv energiaandur.",
       "migration_duplicate_selection": "Sama lähteolemit ei saa kasutada rohkem kui üks kord.",
       "envoy_entry_loaded": "Envoy integratsiooni ei saanud migreerimiseks ajutiselt maha laadida.",
-      "incompatible_energy_total": "Valitud üksused ei ole ühilduvad kumulatiivsed energiasummad."
+      "incompatible_energy_total": "Valitud üksused ei ole ühilduvad kumulatiivsed energiasummad.",
+      "grid_profile_unavailable": "Võrguprofiili juhtimine pole saadaval.",
+      "grid_profile_installer_required": "Võrguprofiili juhtimine nõuab paigaldaja juurdepääsu Enphase Activationile.",
+      "grid_profile_no_regions": "Selle saidi riigi jaoks pole võrguprofiili piirkondi saadaval.",
+      "grid_profile_no_profiles": "Ükski võrguprofiil ei vasta valitud filtritele.",
+      "grid_profile_region_invalid": "Valitud võrguprofiili piirkond pole saadaval.",
+      "grid_profile_profile_invalid": "Valitud võrguprofiil pole selle saidi riigi ja piirkonna jaoks saadaval.",
+      "grid_profile_gateway_required": "Võrguprofiili rakendamine nõuab pilve Activation Gateway kirjet.",
+      "grid_profile_apply_failed": "Võrguprofiili rakendamine nurjus."
     },
     "abort": {
       "migration_no_envoy_sources": "Ühtegi Enphase Envoy energiaandurit pole migratsiooniks saadaval.",
       "migration_no_targets": "Ühtegi ühilduvat Enphase Energy andurit pole migratsiooniks saadaval.",
-      "migration_partial_failure": "Migratsioon peatus pärast osalist lõpetamist.\n\nLõpetatud seosed:\n{completed_mappings}\n\nTõrge elemendi `{failed_entity_id}` töötlemisel: {failure_reason}\n\nKui tulemus ei sobi, taasta varukoopiast."
+      "migration_partial_failure": "Migratsioon peatus pärast osalist lõpetamist.\n\nLõpetatud seosed:\n{completed_mappings}\n\nTõrge elemendi `{failed_entity_id}` töötlemisel: {failure_reason}\n\nKui tulemus ei sobi, taasta varukoopiast.",
+      "grid_profile_unavailable": "Võrguprofiili juhtimine pole saadaval.",
+      "grid_profile_installer_required": "Võrguprofiili juhtimine nõuab paigaldaja juurdepääsu Enphase Activationile.",
+      "grid_profile_no_regions": "Selle saidi riigi jaoks pole võrguprofiili piirkondi saadaval."
     },
     "create_entry": {
       "migration_success": "Migratsioon on lõpule viidud. Enphase Energy omab nüüd valitud lähteolemite ID-sid. Kontrolli pärast järgmist värskendust Energy armatuurlauda ja Developer Tools > Statistics.",
       "migration_success_reload_needed": "Migratsioon viidi lõpule, kuid üht või mitut integratsiooni ei saanud automaatselt uuesti laadida. Laadi vajadusel käsitsi uuesti Enphase Energy ja Enphase Envoy ning kontrolli seejärel Energy armatuurlauda ja Developer Tools > Statistics."
+    }
+  },
+  "selector": {
+    "grid_profile_list_mode": {
+      "options": {
+        "commonly_used": "Tavaliselt kasutatavad",
+        "all_profiles": "Kõik profiilid"
+      }
+    },
+    "grid_profile_status": {
+      "options": {
+        "yes": "Jah",
+        "no": "Ei",
+        "unknown": "Teadmata",
+        "available": "Saadaval",
+        "unavailable": "Pole saadaval",
+        "accepted": "Aktsepteeritud"
+      }
     }
   },
   "entity": {
@@ -1765,6 +1857,9 @@
       },
       "dry_contacts": {
         "name": "Kuivkontaktid"
+      },
+      "current_grid_profile": {
+        "name": "Võrguprofiil"
       }
     },
     "number": {
@@ -2812,6 +2907,115 @@
         "site_id": {
           "name": "Saidi ID",
           "description": "Valikuline saidi identifikaator; tuvastatakse automaatselt seadme valimisel."
+        }
+      }
+    },
+    "browse_grid_profiles": {
+      "name": "Sirvi võrguprofiile",
+      "description": "Sirvi valitud asukoha riigi ja piirkonna jaoks saadaolevaid Cloud Activationi võrguprofiile.",
+      "sections": {
+        "advanced": {
+          "name": "Täiendavad valikud"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Piirkonna kood",
+          "description": "Valikuline piirkonna või osariigi kood, näiteks VIC."
+        },
+        "commonly_used": {
+          "name": "Ainult sagedasti kasutatavad",
+          "description": "Kui see on lubatud, tagastatakse sagedasti kasutatavate profiilide kataloog."
+        },
+        "device_id": {
+          "name": "Asukoha seadmed",
+          "description": "Valige asukoha Enphase'i seade."
+        },
+        "site_id": {
+          "name": "Asukoha ID",
+          "description": "Valikuline asukoha identifikaator; tuvastatakse seadme valimisel automaatselt."
+        },
+        "config_entry_id": {
+          "name": "Konfiguratsioonikirje ID",
+          "description": "Valikuline sihtasukoha konfiguratsioonikirje identifikaator."
+        },
+        "query": {
+          "name": "Otsi",
+          "description": "Valikuline otsingutekst asukoha riigi piirkondade ja profiilide jaoks."
+        }
+      }
+    },
+    "refresh_grid_profiles": {
+      "name": "Värskenda võrguprofiile",
+      "description": "Värskenda Cloud Activationi võrguprofiilide viiteandmeid ja valitud piirkonna kataloogi.",
+      "sections": {
+        "advanced": {
+          "name": "Täiendavad valikud"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Piirkonna kood",
+          "description": "Valikuline piirkonna või osariigi kood, näiteks VIC."
+        },
+        "commonly_used": {
+          "name": "Ainult sagedasti kasutatavad",
+          "description": "Kui see on lubatud, tagastatakse sagedasti kasutatavate profiilide kataloog."
+        },
+        "device_id": {
+          "name": "Asukoha seadmed",
+          "description": "Valige asukoha Enphase'i seade."
+        },
+        "site_id": {
+          "name": "Asukoha ID",
+          "description": "Valikuline asukoha identifikaator; tuvastatakse seadme valimisel automaatselt."
+        },
+        "config_entry_id": {
+          "name": "Konfiguratsioonikirje ID",
+          "description": "Valikuline sihtasukoha konfiguratsioonikirje identifikaator."
+        }
+      }
+    },
+    "set_grid_profile": {
+      "name": "Määra võrguprofiil",
+      "description": "Rakenda Cloud Activationi võrguprofiil pärast selgesõnalist kinnitamist.",
+      "sections": {
+        "advanced": {
+          "name": "Täiendavad valikud"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Piirkonna kood",
+          "description": "Valikuline piirkonna või osariigi kood, näiteks VIC."
+        },
+        "commonly_used": {
+          "name": "Ainult sagedasti kasutatavad",
+          "description": "Kui see on lubatud, tagastatakse sagedasti kasutatavate profiilide kataloog."
+        },
+        "device_id": {
+          "name": "Asukoha seadmed",
+          "description": "Valige asukoha Enphase'i seade."
+        },
+        "site_id": {
+          "name": "Asukoha ID",
+          "description": "Valikuline asukoha identifikaator; tuvastatakse seadme valimisel automaatselt."
+        },
+        "config_entry_id": {
+          "name": "Konfiguratsioonikirje ID",
+          "description": "Valikuline sihtasukoha konfiguratsioonikirje identifikaator."
+        },
+        "profile_id": {
+          "name": "Profiili ID",
+          "description": "Cloud Activationi profiili ID koos prefiksiga agf:."
+        },
+        "confirm": {
+          "name": "Kinnita rakendamine",
+          "description": "Valitud võrguprofiili rakendamiseks peab see olema lubatud."
+        },
+        "gateway_serial": {
+          "name": "Gateway seerianumber",
+          "description": "Valikuline Gateway seerianumber, kui Activationi kirje sisaldab mitut Gatewayd."
         }
       }
     }

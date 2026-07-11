@@ -62,6 +62,7 @@ from .entity import (
     evse_resolved_charge_mode,
 )
 from .labels import friendly_status_text, status_label
+from .grid_profile_runtime import SUPPORT_UNKNOWN, SUPPORT_UNAVAILABLE
 from .parsing_helpers import coerce_optional_float, heatpump_status_text
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
 from .runtime_helpers import (
@@ -118,6 +119,20 @@ SITE_LIFETIME_FLOW_BUCKET_LENGTH_KEYS: dict[str, tuple[str, ...]] = {
     "battery_charge": ("charge", "solar_battery", "grid_battery"),
     "battery_discharge": ("discharge", "battery_home", "battery_grid"),
 }
+
+
+def _retain_grid_profile_sensors(coord: EnphaseCoordinator) -> bool:
+    runtime = getattr(coord, "grid_profile_runtime", None)
+    if runtime is None:
+        return False
+    if getattr(runtime, "installer_access_confirmed", False):
+        return True
+    return bool(
+        getattr(runtime, "installer_access_ever_confirmed", False)
+        and getattr(runtime, "support_state", None) == SUPPORT_UNAVAILABLE
+    )
+
+
 BATTERY_LED_STATUS_STATE_MAP: dict[int, str] = {
     12: "charging",
     13: "discharging",
@@ -461,6 +476,17 @@ async def async_setup_entry(
 
         _add_site_entity("site_last_update", EnphaseSiteLastUpdateSensor(coord))
         _add_site_entity("site_cloud_latency", EnphaseCloudLatencySensor(coord))
+        if _retain_grid_profile_sensors(coord):
+            _add_site_entity(
+                "current_grid_profile",
+                EnphaseCurrentGridProfileSensor(coord),
+            )
+        elif getattr(
+            getattr(coord, "grid_profile_runtime", None), "support_state", None
+        ) not in {SUPPORT_UNKNOWN, SUPPORT_UNAVAILABLE}:
+            _async_remove_site_sensor_entity("current_grid_profile")
+        _async_remove_site_sensor_entity("grid_profile_status")
+        _async_remove_site_sensor_entity("requested_grid_profile")
         _add_site_entity(
             "current_production_power",
             EnphaseCurrentPowerConsumptionSensor(coord),
@@ -6339,6 +6365,35 @@ class EnphaseCloudLatencySensor(_SiteBaseEntity):
         if info is not None:
             return info
         return _cloud_device_info(self._coord.site_id)  # pragma: no cover
+
+
+class _GridProfileSensor(_SiteBaseEntity):
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coord: EnphaseCoordinator, key: str, name: str) -> None:
+        super().__init__(coord, key, name, type_key="envoy")
+
+    @property
+    def available(self) -> bool:
+        runtime = self._coord.grid_profile_runtime
+        return bool(super().available and runtime.installer_access_confirmed)
+
+
+class EnphaseCurrentGridProfileSensor(_GridProfileSensor):
+    _attr_entity_category = None
+    _attr_translation_key = "current_grid_profile"
+    _attr_icon = "mdi:transmission-tower-export"
+
+    def __init__(self, coord: EnphaseCoordinator) -> None:
+        super().__init__(coord, "current_grid_profile", "Grid Profile")
+
+    @property
+    def native_value(self):
+        return self._coord.grid_profile_runtime.current_profile_display()
+
+    @property
+    def extra_state_attributes(self):
+        return self._coord.grid_profile_runtime.current_profile_attributes()
 
 
 class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[misc]
