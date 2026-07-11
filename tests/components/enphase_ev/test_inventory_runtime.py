@@ -1525,7 +1525,7 @@ async def test_inventory_runtime_parameter_telemetry_edge_paths(
     ]
     coord._endpoint_family_state(  # noqa: SLF001
         "inverter_dashboard_inventory"
-    ).last_success_mono = 0.0
+    ).last_success_mono = (time.monotonic() - 86_401.0)
     assert await runtime._async_inverter_dashboard_inventory([]) == []  # noqa: SLF001
 
     coord._type_device_buckets["envoy"] = {  # noqa: SLF001

@@ -62,7 +62,7 @@ from .entity import (
     evse_resolved_charge_mode,
 )
 from .labels import friendly_status_text, status_label
-from .parsing_helpers import heatpump_status_text
+from .parsing_helpers import coerce_optional_float, heatpump_status_text
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
 from .runtime_helpers import (
     coerce_optional_text as _gateway_clean_text,
@@ -3198,11 +3198,7 @@ class EnphaseInverterTelemetrySensor(CoordinatorEntity, SensorEntity):  # type: 
 
     @property
     def native_value(self) -> Any:
-        value = self._telemetry().get("power")
-        try:
-            number = float(value) if value is not None else None
-        except (TypeError, ValueError):
-            return None
+        number = coerce_optional_float(self._telemetry().get("power"))
         return number if number is not None and math.isfinite(number) else None
 
     @property
