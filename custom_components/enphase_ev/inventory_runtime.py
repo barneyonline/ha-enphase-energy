@@ -2627,15 +2627,15 @@ class InventoryRuntime:
             first_error = next(
                 (result for result in results if isinstance(result, Exception)), None
             )
-            dashboard_by_serial: dict[str, dict[str, object]] = {}
-            response_seen = False
+            fresh_by_serial: dict[str, dict[str, object]] = {}
+            valid_response_count = 0
             for result in results:
                 if not isinstance(result, dict):
                     continue
-                response_seen = True
                 records = result.get("data")
                 if not isinstance(records, list):
                     continue
+                valid_response_count += 1
                 for record in records:
                     if not isinstance(record, dict):
                         continue
@@ -2643,7 +2643,7 @@ class InventoryRuntime:
                     if serial:
                         # Device/parent IDs are not needed by entities and must not
                         # be retained in inventory diagnostics.
-                        dashboard_by_serial[serial] = {
+                        fresh_by_serial[serial] = {
                             key: record[key]
                             for key in (
                                 "name",
@@ -2654,17 +2654,23 @@ class InventoryRuntime:
                             )
                             if record.get(key) is not None
                         }
-            if response_seen:
+            if valid_response_count == len(gateway_serials):
+                dashboard_by_serial = fresh_by_serial
                 self.coordinator._note_endpoint_family_success(family)
                 self._set_shared_state_attr(
                     "_inverter_dashboard_inventory", dashboard_by_serial
                 )
             else:
                 error = first_error or ValueError(
-                    "Dashboard inverter inventory was unavailable"
+                    "Dashboard inverter inventory was partially unavailable"
                 )
                 self.coordinator._note_endpoint_family_failure(family, error)
-                dashboard_by_serial = cached_by_serial
+                dashboard_by_serial = dict(cached_by_serial)
+                dashboard_by_serial.update(fresh_by_serial)
+                if valid_response_count:
+                    self._set_shared_state_attr(
+                        "_inverter_dashboard_inventory", dashboard_by_serial
+                    )
 
         merged_by_serial: dict[str, dict[str, object]] = {}
         order: list[str] = []
@@ -2762,6 +2768,16 @@ class InventoryRuntime:
                 if normalized is not None:
                     out[column_serial] = (normalized, sampled_at)
         return out
+
+    @staticmethod
+    def _inverter_parameter_payload_is_valid(payload: object) -> bool:
+        """Return whether a parameter response has an authoritative row list."""
+
+        if not isinstance(payload, dict):
+            return False
+        return isinstance(payload.get("intervals"), list) or isinstance(
+            payload.get("data"), list
+        )
 
     async def _async_refresh_inverter_parameter_telemetry(
         self, serials: list[str]
@@ -2871,21 +2887,43 @@ class InventoryRuntime:
             ),
             return_exceptions=True,
         )
-        successful_payload = False
+        valid_payload_count = 0
         first_error: Exception | None = None
         telemetry_by_serial = {
-            serial: dict(value)
+            serial: {
+                key: (
+                    dict(item)
+                    if key in {"parameter_ids", "sampled_at"} and isinstance(item, dict)
+                    else item
+                )
+                for key, item in value.items()
+            }
             for serial, value in cached_by_serial.items()
-            if isinstance(value, dict)
+            if serial in serials and isinstance(value, dict)
         }
         for parameter_id, result in zip(parameter_ids, results, strict=True):
             if isinstance(result, Exception):
                 first_error = first_error or result
                 continue
-            if not isinstance(result, dict):
+            if not self._inverter_parameter_payload_is_valid(result):
+                first_error = first_error or ValueError(
+                    f"Dashboard parameter response was invalid for {parameter_id}"
+                )
                 continue
-            successful_payload = True
+            assert isinstance(result, dict)
+            valid_payload_count += 1
             canonical = INVERTER_PARAMETER_ALIASES[parameter_id.lower()]
+            for serial, snapshot in list(telemetry_by_serial.items()):
+                snapshot.pop(canonical, None)
+                for metadata_key in ("parameter_ids", "sampled_at"):
+                    metadata = snapshot.get(metadata_key)
+                    if not isinstance(metadata, dict):
+                        continue
+                    metadata.pop(canonical, None)
+                    if not metadata:
+                        snapshot.pop(metadata_key, None)
+                if not snapshot:
+                    telemetry_by_serial.pop(serial, None)
             for serial, (value, sampled_at) in self._inverter_parameter_rows(
                 result, parameter_id
             ).items():
@@ -2896,17 +2934,18 @@ class InventoryRuntime:
                 snapshot.setdefault("parameter_ids", {})[canonical] = parameter_id
                 if sampled_at is not None:
                     snapshot.setdefault("sampled_at", {})[canonical] = sampled_at
-        if successful_payload:
+        if valid_payload_count:
             self._set_shared_state_attr(
                 "_inverter_parameter_telemetry", telemetry_by_serial
             )
+        if valid_payload_count == len(parameter_ids):
             coord._note_endpoint_family_success(telemetry_family)
             return telemetry_by_serial
         coord._note_endpoint_family_failure(
             telemetry_family,
             first_error or ValueError("Dashboard parameter readings were unavailable"),
         )
-        return cached_by_serial
+        return telemetry_by_serial if valid_payload_count else cached_by_serial
 
     async def _async_refresh_inverters(self) -> None:
         """Refresh inverter metadata/status/production and build serial snapshots."""

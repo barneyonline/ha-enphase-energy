@@ -1379,6 +1379,109 @@ async def test_inventory_runtime_bulk_parameter_telemetry(coordinator_factory) -
     assert coord.client.system_dashboard_parameter_view.await_count == 3
 
 
+@pytest.mark.asyncio
+async def test_inventory_runtime_empty_parameter_rows_clear_cached_value(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.inventory_runtime
+    runtime._set_shared_state_attr(  # noqa: SLF001
+        "_inverter_parameter_ids", ["power", "temperature"]
+    )
+    runtime._set_shared_state_attr(  # noqa: SLF001
+        "_inverter_parameter_telemetry",
+        {
+            "INV-A": {
+                "power": 250.0,
+                "temperature": 42.0,
+                "parameter_ids": {
+                    "power": "power",
+                    "temperature": "temperature",
+                },
+                "sampled_at": {
+                    "power": "2026-07-11T01:00:00Z",
+                    "temperature": "2026-07-11T01:00:00Z",
+                },
+            },
+            "INV-B": {"power": 20.0},
+            "INV-C": {
+                "power": 30.0,
+                "parameter_ids": {"power": "power"},
+                "sampled_at": {"power": "2026-07-11T01:00:00Z"},
+            },
+            "INV-RETIRED": {"power": 10.0},
+        },
+    )
+    monkeypatch.setattr(
+        coord,
+        "_endpoint_family_should_run",
+        lambda family, **_kwargs: family == "inverter_parameter_telemetry",
+    )
+    coord.client.system_dashboard_parameter_view = AsyncMock(
+        side_effect=[
+            {"intervals": []},
+            RuntimeError("temperature temporarily unavailable"),
+        ]
+    )
+
+    result = await runtime._async_refresh_inverter_parameter_telemetry(  # noqa: SLF001
+        ["INV-A", "INV-B", "INV-C"]
+    )
+
+    assert result == {
+        "INV-A": {
+            "temperature": 42.0,
+            "parameter_ids": {"temperature": "temperature"},
+            "sampled_at": {"temperature": "2026-07-11T01:00:00Z"},
+        }
+    }
+    assert (
+        coord._endpoint_family_state(  # noqa: SLF001
+            "inverter_parameter_telemetry"
+        ).consecutive_failures
+        == 1
+    )
+
+
+@pytest.mark.asyncio
+async def test_inventory_runtime_partial_gateway_inventory_preserves_cache(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.inventory_runtime
+    coord._type_device_buckets["envoy"] = {  # noqa: SLF001
+        "type_key": "envoy",
+        "count": 2,
+        "devices": [
+            {"serial_number": "GW-A"},
+            {"serial_number": "GW-B"},
+        ],
+    }
+    runtime._set_shared_state_attr(  # noqa: SLF001
+        "_inverter_dashboard_inventory",
+        {"INV-CACHED": {"serial_number": "INV-CACHED", "status": "normal"}},
+    )
+    coord.client.system_dashboard_envoy_inverters = AsyncMock(
+        side_effect=[
+            {"data": [{"serial_number": "INV-FRESH", "status": "warning"}]},
+            RuntimeError("second gateway unavailable"),
+        ]
+    )
+
+    result = await runtime._async_inverter_dashboard_inventory([])  # noqa: SLF001
+
+    assert result == [
+        {"serial_number": "INV-CACHED", "status": "normal"},
+        {"serial_number": "INV-FRESH", "status": "warning"},
+    ]
+    assert (
+        coord._endpoint_family_state(  # noqa: SLF001
+            "inverter_dashboard_inventory"
+        ).consecutive_failures
+        == 1
+    )
+
+
 def test_inventory_runtime_parameter_row_shapes_and_invalid_values() -> None:
     parser = InventoryRuntime._inverter_parameter_rows
     assert parser({"data": [{"serial_num": "INV-A", "power": "10.5"}]}, "power") == {
