@@ -62,7 +62,11 @@ from .entity import (
     evse_resolved_charge_mode,
 )
 from .labels import friendly_status_text, status_label
-from .grid_profile_runtime import SUPPORT_UNKNOWN, SUPPORT_UNAVAILABLE
+from .grid_profile_runtime import (
+    SUPPORT_UNKNOWN,
+    SUPPORT_UNAVAILABLE,
+    GridProfileRuntime,
+)
 from .parsing_helpers import coerce_optional_float, heatpump_status_text
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
 from .runtime_helpers import (
@@ -6388,12 +6392,14 @@ class EnphaseCurrentGridProfileSensor(_GridProfileSensor):
         super().__init__(coord, "current_grid_profile", "Grid Profile")
 
     @property
-    def native_value(self):
-        return self._coord.grid_profile_runtime.current_profile_display()
+    def native_value(self) -> str | None:
+        runtime = cast(GridProfileRuntime, self._coord.grid_profile_runtime)
+        return runtime.current_profile_display()
 
     @property
-    def extra_state_attributes(self):
-        return self._coord.grid_profile_runtime.current_profile_attributes()
+    def extra_state_attributes(self) -> dict[str, object]:
+        runtime = cast(GridProfileRuntime, self._coord.grid_profile_runtime)
+        return runtime.current_profile_attributes()
 
 
 class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[misc]

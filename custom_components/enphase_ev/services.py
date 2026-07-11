@@ -38,7 +38,7 @@ from .const import (
 from .device_types import parse_type_identifier
 from .log_redaction import redact_site_id
 from .parsing_helpers import coerce_optional_bool
-from .grid_profile_runtime import SUPPORT_DENIED
+from .grid_profile_runtime import SUPPORT_DENIED, GridProfileRuntime
 from .runtime_data import EnphaseRuntimeData, iter_coordinators
 from .service_validation import raise_translated_service_validation
 
@@ -1198,7 +1198,7 @@ def async_setup_services(
 
     async def _svc_browse_grid_profiles(call: ServiceCall) -> dict[str, object]:
         coord = await _resolve_single_site_coordinator(call)
-        runtime = coord.grid_profile_runtime
+        runtime = cast(GridProfileRuntime, coord.grid_profile_runtime)
         await runtime.async_refresh(force=False, load_profiles=False)
         _require_grid_profile_installer(runtime)
         await runtime.async_load_profiles(
@@ -1215,7 +1215,7 @@ def async_setup_services(
 
     async def _svc_refresh_grid_profiles(call: ServiceCall) -> dict[str, object]:
         coord = await _resolve_single_site_coordinator(call)
-        runtime = coord.grid_profile_runtime
+        runtime = cast(GridProfileRuntime, coord.grid_profile_runtime)
         await runtime.async_refresh(force=True, load_profiles=False)
         _require_grid_profile_installer(runtime)
         await runtime.async_load_profiles(
@@ -1236,7 +1236,7 @@ def async_setup_services(
                 message="Confirmation is required to apply a grid profile.",
             )
         coord = await _resolve_single_site_coordinator(call)
-        runtime = coord.grid_profile_runtime
+        runtime = cast(GridProfileRuntime, coord.grid_profile_runtime)
         await runtime.async_refresh(force=False, load_profiles=False)
         _require_grid_profile_installer(runtime)
         region_code = call.data.get("region_code")

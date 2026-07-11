@@ -533,9 +533,9 @@ class GridProfileRuntime:
                 "region",
                 "province",
             ):
-                region = self._find_region_code(value.get(key))
-                if region:
-                    return region
+                resolved_region = self._find_region_code(value.get(key))
+                if resolved_region:
+                    return resolved_region
             for key in (
                 "system",
                 "site",
@@ -544,14 +544,14 @@ class GridProfileRuntime:
                 "systemAddress",
                 "system_address",
             ):
-                region = self._find_region_code(value.get(key))
-                if region:
-                    return region
+                resolved_region = self._find_region_code(value.get(key))
+                if resolved_region:
+                    return resolved_region
         elif isinstance(value, list):
             for child in value:
-                region = self._find_region_code(child)
-                if region:
-                    return region
+                resolved_region = self._find_region_code(child)
+                if resolved_region:
+                    return resolved_region
         return None
 
     @staticmethod
@@ -614,8 +614,11 @@ class GridProfileRuntime:
                     continue
                 region_name = _clean_text(item.get("regionName")) or region_code
                 region_id = None
+                region_id_text = _clean_text(item.get("id"))
                 try:
-                    region_id = int(item.get("id"))
+                    region_id = (
+                        int(region_id_text) if region_id_text is not None else None
+                    )
                 except Exception:  # noqa: BLE001
                     region_id = None
                 regions.append(

@@ -2830,7 +2830,7 @@ class EnphaseEVClient:
         *,
         headers: dict[str, str | None],
         **kwargs: Any,
-    ) -> dict:
+    ) -> JsonDict:
         """Return Activation object JSON."""
 
         result = await self._activation_payload(
