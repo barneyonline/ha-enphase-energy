@@ -404,10 +404,10 @@ def _overall_percentage(
 ) -> float | None:
     if e3_progress is not None:
         return e3_progress
-    values = [
-        component["progress"]
+    values: list[float] = [
+        float(progress)
         for component in components
-        if isinstance(component.get("progress"), (int, float))
+        if isinstance((progress := component.get("progress")), (int, float))
     ]
     if not values:
         return None
@@ -435,7 +435,11 @@ def _update_in_progress(
     if current_state is not None:
         return current_state
     other_texts = [*device_statuses]
-    other_texts.extend(_text(component.get("status_text")) for component in components)
+    other_texts.extend(
+        text
+        for component in components
+        if (text := _text(component.get("status_text"))) is not None
+    )
     other_states = [
         state
         for text in other_texts
