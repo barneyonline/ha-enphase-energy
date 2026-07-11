@@ -488,7 +488,8 @@
           "type_heatpump": "Термопомпа",
           "type_ac_battery": "AC батерия",
           "battery_schedules_enabled": "Активирайте програмата за планиране на батерията",
-          "degraded_service_repair_issues": "Активиране на поправки за влошени услуги"
+          "degraded_service_repair_issues": "Активиране на поправки за влошени услуги",
+          "weather_enabled": "Активиране на времето"
         },
         "data_description": {
           "type_envoy": "Включва диагностика за свързаността на шлюза и електромерите.",
@@ -507,7 +508,8 @@
           "type_heatpump": "Включва сензори за състояние, диагностика и потребление на термопомпата.",
           "type_ac_battery": "Включва сензори за AC батерията и контроли за режим на заспиване, когато са налични.",
           "battery_schedules_enabled": "Управлявайте графици за IQ батерия",
-          "degraded_service_repair_issues": "Създава проблеми в Repairs, когато незадължителни услуги на Enphase са влошени."
+          "degraded_service_repair_issues": "Създава проблеми в Repairs, когато незадължителни услуги на Enphase са влошени.",
+          "weather_enabled": "Извлича текущото време за обекта от Enphase и създава метеорологичен обект само когато крайната точка е достъпна."
         }
       },
       "settings": {
@@ -530,7 +532,8 @@
           "type_heatpump": "Термопомпа",
           "type_ac_battery": "AC батерия",
           "battery_schedules_enabled": "Активирайте програмата за планиране на батерията",
-          "degraded_service_repair_issues": "Активиране на поправки за влошени услуги"
+          "degraded_service_repair_issues": "Активиране на поправки за влошени услуги",
+          "weather_enabled": "Активиране на времето"
         },
         "data_description": {
           "type_envoy": "Включва диагностика за свързаността на шлюза и електромерите.",
@@ -549,7 +552,8 @@
           "type_heatpump": "Включва сензори за състояние, диагностика и потребление на термопомпата.",
           "type_ac_battery": "Включва сензори за AC батерията и контроли за режим на заспиване, когато са налични.",
           "battery_schedules_enabled": "Управлявайте графици за IQ батерия",
-          "degraded_service_repair_issues": "Създава проблеми в Repairs, когато незадължителни услуги на Enphase са влошени."
+          "degraded_service_repair_issues": "Създава проблеми в Repairs, когато незадължителни услуги на Enphase са влошени.",
+          "weather_enabled": "Извлича текущото време за обекта от Enphase и създава метеорологичен обект само когато крайната точка е достъпна."
         }
       },
       "migrate_envoy_source": {
@@ -2194,6 +2198,11 @@
       },
       "charger_firmware": {
         "name": "Фърмуер"
+      }
+    },
+    "weather": {
+      "site_weather": {
+        "name": "Време"
       }
     }
   },

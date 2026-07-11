@@ -76,6 +76,7 @@ from custom_components.enphase_ev.const import (
     OPT_SESSION_HISTORY_INTERVAL,
     OPT_SLOW_POLL_INTERVAL,
     OPT_SCHEDULE_SYNC_ENABLED,
+    OPT_WEATHER_ENABLED,
 )
 from custom_components.enphase_ev.envoy_history import migration_target_unique_id
 from custom_components.enphase_ev.envoy_history import skip_option_value
@@ -2885,6 +2886,7 @@ async def test_options_flow_show_form_with_defaults(hass) -> None:
     assert validated[OPT_SCHEDULE_SYNC_ENABLED] is True
     assert validated[OPT_BATTERY_SCHEDULES_ENABLED] is True
     assert validated[OPT_DEGRADED_SERVICE_REPAIR_ISSUES] is True
+    assert validated[OPT_WEATHER_ENABLED] is False
 
 
 @pytest.mark.asyncio
@@ -2905,6 +2907,7 @@ async def test_options_flow_show_form_uses_existing_options(hass) -> None:
             OPT_SCHEDULE_SYNC_ENABLED: False,
             OPT_BATTERY_SCHEDULES_ENABLED: True,
             OPT_DEGRADED_SERVICE_REPAIR_ISSUES: False,
+            OPT_WEATHER_ENABLED: True,
             CONF_SITE_ONLY: True,
         },
     )
@@ -2930,6 +2933,7 @@ async def test_options_flow_show_form_uses_existing_options(hass) -> None:
     assert validated[OPT_SCHEDULE_SYNC_ENABLED] is False
     assert validated[OPT_BATTERY_SCHEDULES_ENABLED] is True
     assert validated[OPT_DEGRADED_SERVICE_REPAIR_ISSUES] is False
+    assert validated[OPT_WEATHER_ENABLED] is True
     assert CONF_SCAN_INTERVAL not in validated
     assert CONF_SITE_ONLY not in validated
 

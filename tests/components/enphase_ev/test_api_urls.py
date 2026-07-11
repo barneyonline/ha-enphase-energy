@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from custom_components.enphase_ev.api import EnphaseEVClient
+from custom_components.enphase_ev.api import EnphaseEVClient, InvalidPayloadError
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL, RANDOM_SITE_ID
 
 
@@ -35,6 +35,7 @@ async def test_api_builds_urls_correctly():
     await c.inverter_status()
     await c.inverter_production(start_date="2022-01-01", end_date="2026-01-01")
     await c.opt_out_storm_alert(alert_id="IDV21037", name="Severe Weather")
+    await c.weather(locale="en-AU")
     await c.start_charging(RANDOM_SERIAL, 32, connector_id=1)
     await c.stop_charging(RANDOM_SERIAL)
     await c.trigger_message(RANDOM_SERIAL, "MeterValues")
@@ -111,6 +112,17 @@ async def test_api_builds_urls_correctly():
     assert feature_flags_call[0] == "GET"
     assert f"site_id={RANDOM_SITE_ID}" in feature_flags_call[1]
     assert "country=DE" in feature_flags_call[1]
+    weather_call = next(
+        (
+            (method, url)
+            for method, url in methods_urls
+            if f"/systems/{RANDOM_SITE_ID}/weather.json" in url
+        ),
+        None,
+    )
+    assert weather_call is not None
+    assert weather_call[0] == "GET"
+    assert "locale=en-AU" in weather_call[1]
     # Final five calls should be start/stop/trigger/fwDetails/feature-flags in order.
     start_call = methods_urls[-5]
     stop_call = methods_urls[-4]
@@ -161,3 +173,16 @@ async def test_trigger_message_rejects_unsupported_requested_message():
         await c.trigger_message(RANDOM_SERIAL, "DataTransfer")
 
     assert c.calls == []
+
+
+@pytest.mark.asyncio
+async def test_weather_rejects_non_object_payload(monkeypatch):
+    c = StubClient(site_id=RANDOM_SITE_ID)
+
+    async def _list_payload(*_args, **_kwargs):
+        return []
+
+    monkeypatch.setattr(c, "_json", _list_payload)
+
+    with pytest.raises(InvalidPayloadError, match="Weather payload must be an object"):
+        await c.weather(locale="en-US")

@@ -488,7 +488,8 @@
           "type_heatpump": "Šilumos siurblys",
           "type_ac_battery": "AC baterija",
           "battery_schedules_enabled": "Įjungti baterijos planuoklį",
-          "degraded_service_repair_issues": "Įgalinti suprastėjusių paslaugų taisymus"
+          "degraded_service_repair_issues": "Įgalinti suprastėjusių paslaugų taisymus",
+          "weather_enabled": "Įjungti orus"
         },
         "data_description": {
           "type_envoy": "Apima šliuzo ryšio ir skaitiklių diagnostiką.",
@@ -507,7 +508,8 @@
           "type_heatpump": "Apima šilumos siurblio būsenos, diagnostikos ir vartojimo jutiklius.",
           "type_ac_battery": "Apima AC baterijos jutiklius ir miego režimo valdiklius, kai jie prieinami.",
           "battery_schedules_enabled": "Tvarkyti IQ baterijos tvarkaraščius",
-          "degraded_service_repair_issues": "Sukuria Repairs problemas, kai pasirenkamos Enphase paslaugos veikia suprastėjusiai."
+          "degraded_service_repair_issues": "Sukuria Repairs problemas, kai pasirenkamos Enphase paslaugos veikia suprastėjusiai.",
+          "weather_enabled": "Gauna dabartinius vietovės orus iš „Enphase“ ir sukuria orų objektą tik tada, kai galinis taškas pasiekiamas."
         }
       },
       "settings": {
@@ -530,7 +532,8 @@
           "type_heatpump": "Šilumos siurblys",
           "type_ac_battery": "AC baterija",
           "battery_schedules_enabled": "Įjungti baterijos planuoklį",
-          "degraded_service_repair_issues": "Įgalinti suprastėjusių paslaugų taisymus"
+          "degraded_service_repair_issues": "Įgalinti suprastėjusių paslaugų taisymus",
+          "weather_enabled": "Įjungti orus"
         },
         "data_description": {
           "type_envoy": "Apima šliuzo ryšio ir skaitiklių diagnostiką.",
@@ -549,7 +552,8 @@
           "type_heatpump": "Apima šilumos siurblio būsenos, diagnostikos ir vartojimo jutiklius.",
           "type_ac_battery": "Apima AC baterijos jutiklius ir miego režimo valdiklius, kai jie prieinami.",
           "battery_schedules_enabled": "Tvarkyti IQ baterijos tvarkaraščius",
-          "degraded_service_repair_issues": "Sukuria Repairs problemas, kai pasirenkamos Enphase paslaugos veikia suprastėjusiai."
+          "degraded_service_repair_issues": "Sukuria Repairs problemas, kai pasirenkamos Enphase paslaugos veikia suprastėjusiai.",
+          "weather_enabled": "Gauna dabartinius vietovės orus iš „Enphase“ ir sukuria orų objektą tik tada, kai galinis taškas pasiekiamas."
         }
       },
       "migrate_envoy_source": {
@@ -2194,6 +2198,11 @@
       },
       "charger_firmware": {
         "name": "Programinė aparatinė įranga"
+      }
+    },
+    "weather": {
+      "site_weather": {
+        "name": "Orai"
       }
     }
   },

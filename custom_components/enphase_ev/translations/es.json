@@ -488,7 +488,8 @@
           "type_heatpump": "Bomba de calor",
           "type_ac_battery": "Batería CA",
           "battery_schedules_enabled": "Activar programador de batería",
-          "degraded_service_repair_issues": "Activar reparaciones por servicios degradados"
+          "degraded_service_repair_issues": "Activar reparaciones por servicios degradados",
+          "weather_enabled": "Activar el tiempo"
         },
         "data_description": {
           "type_envoy": "Incluye conectividad de la puerta de enlace y diagnósticos de medidores.",
@@ -507,7 +508,8 @@
           "type_heatpump": "Incluye sensores de estado, diagnóstico y consumo de la bomba de calor.",
           "type_ac_battery": "Incluye sensores de batería CA y controles del modo de reposo cuando están disponibles.",
           "battery_schedules_enabled": "Gestionar horarios de batería IQ",
-          "degraded_service_repair_issues": "Crea problemas de Repairs cuando los servicios opcionales de Enphase están degradados."
+          "degraded_service_repair_issues": "Crea problemas de Repairs cuando los servicios opcionales de Enphase están degradados.",
+          "weather_enabled": "Obtiene el tiempo actual del sitio desde Enphase y crea una entidad meteorológica solo cuando el punto de conexión está disponible."
         }
       },
       "settings": {
@@ -530,7 +532,8 @@
           "type_heatpump": "Bomba de calor",
           "type_ac_battery": "Batería CA",
           "battery_schedules_enabled": "Activar programador de batería",
-          "degraded_service_repair_issues": "Activar reparaciones por servicios degradados"
+          "degraded_service_repair_issues": "Activar reparaciones por servicios degradados",
+          "weather_enabled": "Activar el tiempo"
         },
         "data_description": {
           "type_envoy": "Incluye conectividad de la puerta de enlace y diagnósticos de medidores.",
@@ -549,7 +552,8 @@
           "type_heatpump": "Incluye sensores de estado, diagnóstico y consumo de la bomba de calor.",
           "type_ac_battery": "Incluye sensores de batería CA y controles del modo de reposo cuando están disponibles.",
           "battery_schedules_enabled": "Gestionar horarios de batería IQ",
-          "degraded_service_repair_issues": "Crea problemas de Repairs cuando los servicios opcionales de Enphase están degradados."
+          "degraded_service_repair_issues": "Crea problemas de Repairs cuando los servicios opcionales de Enphase están degradados.",
+          "weather_enabled": "Obtiene el tiempo actual del sitio desde Enphase y crea una entidad meteorológica solo cuando el punto de conexión está disponible."
         }
       },
       "migrate_envoy_source": {
@@ -2194,6 +2198,11 @@
       },
       "charger_firmware": {
         "name": "Versión de firmware"
+      }
+    },
+    "weather": {
+      "site_weather": {
+        "name": "Tiempo"
       }
     }
   },

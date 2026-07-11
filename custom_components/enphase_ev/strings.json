@@ -488,7 +488,8 @@
           "battery_schedules_enabled": "Enable Battery Scheduler",
           "reauth": "Start reauthentication",
           "forget_password": "Forget stored password",
-          "degraded_service_repair_issues": "Enable degraded service repairs"
+          "degraded_service_repair_issues": "Enable degraded service repairs",
+          "weather_enabled": "Enable weather"
         },
         "data_description": {
           "type_envoy": "Includes gateway connectivity and meter diagnostics.",
@@ -507,7 +508,8 @@
           "battery_schedules_enabled": "Manage IQ Battery Schedules",
           "reauth": "Launch the login flow to refresh credentials without removing the integration.",
           "forget_password": "Removes the stored password. Automatic refresh will no longer be attempted.",
-          "degraded_service_repair_issues": "Raise Repairs issues when optional Enphase services are degraded."
+          "degraded_service_repair_issues": "Raise Repairs issues when optional Enphase services are degraded.",
+          "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available."
         }
       },
       "settings": {
@@ -530,7 +532,8 @@
           "battery_schedules_enabled": "Enable Battery Scheduler",
           "reauth": "Start reauthentication",
           "forget_password": "Forget stored password",
-          "degraded_service_repair_issues": "Enable degraded service repairs"
+          "degraded_service_repair_issues": "Enable degraded service repairs",
+          "weather_enabled": "Enable weather"
         },
         "data_description": {
           "type_envoy": "Includes gateway connectivity and meter diagnostics.",
@@ -549,7 +552,8 @@
           "battery_schedules_enabled": "Manage IQ Battery Schedules",
           "reauth": "Launch the login flow to refresh credentials without removing the integration.",
           "forget_password": "Removes the stored password. Automatic refresh will no longer be attempted.",
-          "degraded_service_repair_issues": "Raise Repairs issues when optional Enphase services are degraded."
+          "degraded_service_repair_issues": "Raise Repairs issues when optional Enphase services are degraded.",
+          "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available."
         }
       },
       "migrate_envoy_source": {
@@ -2194,6 +2198,11 @@
       },
       "charger_firmware": {
         "name": "Firmware"
+      }
+    },
+    "weather": {
+      "site_weather": {
+        "name": "Weather"
       }
     }
   },

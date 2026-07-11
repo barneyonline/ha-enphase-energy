@@ -488,7 +488,8 @@
           "type_heatpump": "Pompe à chaleur",
           "type_ac_battery": "Batterie AC",
           "battery_schedules_enabled": "Activer le planificateur de batterie",
-          "degraded_service_repair_issues": "Activer les réparations des services dégradés"
+          "degraded_service_repair_issues": "Activer les réparations des services dégradés",
+          "weather_enabled": "Activer la météo"
         },
         "data_description": {
           "type_envoy": "Inclut la connectivité de la passerelle et les diagnostics de compteurs.",
@@ -507,7 +508,8 @@
           "type_heatpump": "Inclut des capteurs d'état, de diagnostic et de consommation de la pompe à chaleur.",
           "type_ac_battery": "Inclut les capteurs de batterie AC et les commandes du mode veille lorsqu’ils sont disponibles.",
           "battery_schedules_enabled": "Gérer les programmes de batterie IQ",
-          "degraded_service_repair_issues": "Crée des problèmes Repairs lorsque des services Enphase facultatifs sont dégradés."
+          "degraded_service_repair_issues": "Crée des problèmes Repairs lorsque des services Enphase facultatifs sont dégradés.",
+          "weather_enabled": "Récupère la météo actuelle du site depuis Enphase et crée une entité météo uniquement lorsque le point de terminaison est disponible."
         }
       },
       "settings": {
@@ -530,7 +532,8 @@
           "type_heatpump": "Pompe à chaleur",
           "type_ac_battery": "Batterie AC",
           "battery_schedules_enabled": "Activer le planificateur de batterie",
-          "degraded_service_repair_issues": "Activer les réparations des services dégradés"
+          "degraded_service_repair_issues": "Activer les réparations des services dégradés",
+          "weather_enabled": "Activer la météo"
         },
         "data_description": {
           "type_envoy": "Inclut la connectivité de la passerelle et les diagnostics de compteurs.",
@@ -549,7 +552,8 @@
           "type_heatpump": "Inclut des capteurs d'état, de diagnostic et de consommation de la pompe à chaleur.",
           "type_ac_battery": "Inclut les capteurs de batterie AC et les commandes du mode veille lorsqu’ils sont disponibles.",
           "battery_schedules_enabled": "Gérer les programmes de batterie IQ",
-          "degraded_service_repair_issues": "Crée des problèmes Repairs lorsque des services Enphase facultatifs sont dégradés."
+          "degraded_service_repair_issues": "Crée des problèmes Repairs lorsque des services Enphase facultatifs sont dégradés.",
+          "weather_enabled": "Récupère la météo actuelle du site depuis Enphase et crée une entité météo uniquement lorsque le point de terminaison est disponible."
         }
       },
       "migrate_envoy_source": {
@@ -2194,6 +2198,11 @@
       },
       "charger_firmware": {
         "name": "Micrologiciel"
+      }
+    },
+    "weather": {
+      "site_weather": {
+        "name": "Météo"
       }
     }
   },

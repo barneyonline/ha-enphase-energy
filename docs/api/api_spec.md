@@ -112,6 +112,7 @@ Status labels:
 | Site live-status MQTT authorizer | `GET` | `/pv/aws_sigv4/livestream.json?serial_num=<gateway_sn>` | authenticated Enlighten session cookies + `e-auth-token`; browser capture used `Accept: */*`, `Referer: /web/<site_id>/today/graph/hours?v=3.4.0`, `X-Requested-With: XMLHttpRequest` | Runtime |
 | Site live-debug MQTT authorizer | `GET` | `/service/system_dashboard/api_internal/cs/sites/livestream?serial_num=<gateway_sn>&live_debug=true` | authenticated Enlighten session cookies + `e-auth-token`; browser XHR request | Runtime (gateway update progress) |
 | Site latest power | `GET` | `/app-api/<site_id>/get_latest_power` | `e-auth-token` + cookies | Runtime |
+| Site weather | `GET` | `/systems/<site_id>/weather.json?locale=<locale>` | authenticated session cookies + XHR headers; `e-auth-token` when available | Runtime (opt-in) |
 | Site currency conversion settings | `GET` | `/app-api/<site_id>/get_currency_conversion.json` | authenticated session cookies + `e-auth-token` | Browser capture only |
 | Requested battery usage hint | `GET` | `/app-api/<site_id>/get_requested_battery_usage` | authenticated session cookies + `e-auth-token` | Browser capture only |
 | Site performance widget flags | `GET` | `/app-api/<site_id>/performance_widgets` | authenticated session cookies + `e-auth-token` | Browser capture only |
@@ -1665,6 +1666,43 @@ Observed notes:
 - The HAR observed `country=us`.
 - The response body was not captured, so only the endpoint shape and query parameter are documented here.
 - This appears to be separate from the newer tariff microservice endpoint documented in `2.9.8.a`.
+
+### 2.9.3.g Site Weather
+
+```http
+GET /systems/<site_id>/weather.json?locale=<locale>
+Headers:
+  Accept: application/json
+  Cookie: <authenticated Enlighten session cookies>
+  e-auth-token: <token, when available>
+  X-Requested-With: XMLHttpRequest
+```
+
+Returns the current weather associated with the Enphase site. The integration
+calls this endpoint only when weather is enabled in integration options. It
+creates the Home Assistant weather entity only after a successful response with
+a usable current temperature; later failures remain isolated from the main site
+and charger refresh.
+
+Anonymized example response (identifier-free values are illustrative):
+
+```json
+{
+  "string": "MostlyCloudy",
+  "code": "cloudy",
+  "temperature": {
+    "value": 17,
+    "min": 15,
+    "max": 19,
+    "display": "17°C"
+  }
+}
+```
+
+Observed in an Enlighten web capture on 2026-07-11. The source capture was
+sanitized before documenting this endpoint: the site ID, account details,
+cookies, tokens, request identifiers, client network metadata, and exact
+temperature values are intentionally omitted or replaced.
 
 ### 2.9.4 System Dashboard Summary Flags
 ```

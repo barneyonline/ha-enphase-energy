@@ -488,7 +488,8 @@
           "type_heatpump": "Tepelné čerpadlo",
           "type_ac_battery": "AC baterie",
           "battery_schedules_enabled": "Povolit Plánovač baterie",
-          "degraded_service_repair_issues": "Povolit opravy zhoršených služeb"
+          "degraded_service_repair_issues": "Povolit opravy zhoršených služeb",
+          "weather_enabled": "Povolit počasí"
         },
         "data_description": {
           "type_envoy": "Zahrnuje diagnostiku konektivity brány a měřidel.",
@@ -507,7 +508,8 @@
           "type_heatpump": "Zahrnuje senzory stavu, diagnostiky a spotřeby tepelného čerpadla.",
           "type_ac_battery": "Zahrnuje senzory AC baterie a ovládání režimu spánku, pokud jsou k dispozici.",
           "battery_schedules_enabled": "Správa rozvrhů baterií IQ",
-          "degraded_service_repair_issues": "Vytváří problémy v Repairs, když jsou volitelné služby Enphase zhoršené."
+          "degraded_service_repair_issues": "Vytváří problémy v Repairs, když jsou volitelné služby Enphase zhoršené.",
+          "weather_enabled": "Načte aktuální počasí lokality ze služby Enphase a vytvoří entitu počasí pouze tehdy, když je koncový bod dostupný."
         }
       },
       "settings": {
@@ -530,7 +532,8 @@
           "type_heatpump": "Tepelné čerpadlo",
           "type_ac_battery": "AC baterie",
           "battery_schedules_enabled": "Povolit Plánovač baterie",
-          "degraded_service_repair_issues": "Povolit opravy zhoršených služeb"
+          "degraded_service_repair_issues": "Povolit opravy zhoršených služeb",
+          "weather_enabled": "Povolit počasí"
         },
         "data_description": {
           "type_envoy": "Zahrnuje diagnostiku konektivity brány a měřidel.",
@@ -549,7 +552,8 @@
           "type_heatpump": "Zahrnuje senzory stavu, diagnostiky a spotřeby tepelného čerpadla.",
           "type_ac_battery": "Zahrnuje senzory AC baterie a ovládání režimu spánku, pokud jsou k dispozici.",
           "battery_schedules_enabled": "Správa rozvrhů baterií IQ",
-          "degraded_service_repair_issues": "Vytváří problémy v Repairs, když jsou volitelné služby Enphase zhoršené."
+          "degraded_service_repair_issues": "Vytváří problémy v Repairs, když jsou volitelné služby Enphase zhoršené.",
+          "weather_enabled": "Načte aktuální počasí lokality ze služby Enphase a vytvoří entitu počasí pouze tehdy, když je koncový bod dostupný."
         }
       },
       "migrate_envoy_source": {
@@ -2194,6 +2198,11 @@
       },
       "charger_firmware": {
         "name": "Verze firmwaru"
+      }
+    },
+    "weather": {
+      "site_weather": {
+        "name": "Počasí"
       }
     }
   },

@@ -488,7 +488,8 @@
           "type_heatpump": "Lämpöpumppu",
           "type_ac_battery": "AC-akku",
           "battery_schedules_enabled": "Ota akun aikataulutus käyttöön",
-          "degraded_service_repair_issues": "Ota heikentyneiden palvelujen korjaukset käyttöön"
+          "degraded_service_repair_issues": "Ota heikentyneiden palvelujen korjaukset käyttöön",
+          "weather_enabled": "Ota sää käyttöön"
         },
         "data_description": {
           "type_envoy": "Sisältää yhdyskäytävän yhteys- ja mittaridiagnostiikan.",
@@ -507,7 +508,8 @@
           "type_heatpump": "Sisältää lämpöpumpun tila-, diagnostiikka- ja kulutusanturit.",
           "type_ac_battery": "Sisältää AC-akun anturit ja lepotilan ohjaukset, kun ne ovat saatavilla.",
           "battery_schedules_enabled": "Hallitse IQ-akun aikatauluja",
-          "degraded_service_repair_issues": "Luo Repairs-ongelmia, kun valinnaiset Enphase-palvelut ovat heikentyneet."
+          "degraded_service_repair_issues": "Luo Repairs-ongelmia, kun valinnaiset Enphase-palvelut ovat heikentyneet.",
+          "weather_enabled": "Hakee kohteen nykyisen sään Enphaselta ja luo sääentiteetin vain, kun päätepiste on käytettävissä."
         }
       },
       "settings": {
@@ -530,7 +532,8 @@
           "type_heatpump": "Lämpöpumppu",
           "type_ac_battery": "AC-akku",
           "battery_schedules_enabled": "Ota akun aikataulutus käyttöön",
-          "degraded_service_repair_issues": "Ota heikentyneiden palvelujen korjaukset käyttöön"
+          "degraded_service_repair_issues": "Ota heikentyneiden palvelujen korjaukset käyttöön",
+          "weather_enabled": "Ota sää käyttöön"
         },
         "data_description": {
           "type_envoy": "Sisältää yhdyskäytävän yhteys- ja mittaridiagnostiikan.",
@@ -549,7 +552,8 @@
           "type_heatpump": "Sisältää lämpöpumpun tila-, diagnostiikka- ja kulutusanturit.",
           "type_ac_battery": "Sisältää AC-akun anturit ja lepotilan ohjaukset, kun ne ovat saatavilla.",
           "battery_schedules_enabled": "Hallitse IQ-akun aikatauluja",
-          "degraded_service_repair_issues": "Luo Repairs-ongelmia, kun valinnaiset Enphase-palvelut ovat heikentyneet."
+          "degraded_service_repair_issues": "Luo Repairs-ongelmia, kun valinnaiset Enphase-palvelut ovat heikentyneet.",
+          "weather_enabled": "Hakee kohteen nykyisen sään Enphaselta ja luo sääentiteetin vain, kun päätepiste on käytettävissä."
         }
       },
       "migrate_envoy_source": {
@@ -2194,6 +2198,11 @@
       },
       "charger_firmware": {
         "name": "Laiteohjelmisto"
+      }
+    },
+    "weather": {
+      "site_weather": {
+        "name": "Sää"
       }
     }
   },

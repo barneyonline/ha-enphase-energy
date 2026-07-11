@@ -488,7 +488,8 @@
           "type_heatpump": "Pompa di calore",
           "type_ac_battery": "Batteria AC",
           "battery_schedules_enabled": "Attiva pianificatore batteria",
-          "degraded_service_repair_issues": "Abilita riparazioni per servizi degradati"
+          "degraded_service_repair_issues": "Abilita riparazioni per servizi degradati",
+          "weather_enabled": "Abilita meteo"
         },
         "data_description": {
           "type_envoy": "Include connettività del gateway e diagnostica dei contatori.",
@@ -507,7 +508,8 @@
           "type_heatpump": "Include sensori di stato, diagnostica e consumo della pompa di calore.",
           "type_ac_battery": "Include sensori della batteria AC e controlli della modalità sospensione quando disponibili.",
           "battery_schedules_enabled": "Gestisci le pianificazioni batteria IQ",
-          "degraded_service_repair_issues": "Crea problemi in Repairs quando i servizi Enphase opzionali sono degradati."
+          "degraded_service_repair_issues": "Crea problemi in Repairs quando i servizi Enphase opzionali sono degradati.",
+          "weather_enabled": "Recupera il meteo attuale del sito da Enphase e crea un’entità meteo solo quando l’endpoint è disponibile."
         }
       },
       "settings": {
@@ -530,7 +532,8 @@
           "type_heatpump": "Pompa di calore",
           "type_ac_battery": "Batteria AC",
           "battery_schedules_enabled": "Attiva pianificatore batteria",
-          "degraded_service_repair_issues": "Abilita riparazioni per servizi degradati"
+          "degraded_service_repair_issues": "Abilita riparazioni per servizi degradati",
+          "weather_enabled": "Abilita meteo"
         },
         "data_description": {
           "type_envoy": "Include connettività del gateway e diagnostica dei contatori.",
@@ -549,7 +552,8 @@
           "type_heatpump": "Include sensori di stato, diagnostica e consumo della pompa di calore.",
           "type_ac_battery": "Include sensori della batteria AC e controlli della modalità sospensione quando disponibili.",
           "battery_schedules_enabled": "Gestisci le pianificazioni batteria IQ",
-          "degraded_service_repair_issues": "Crea problemi in Repairs quando i servizi Enphase opzionali sono degradati."
+          "degraded_service_repair_issues": "Crea problemi in Repairs quando i servizi Enphase opzionali sono degradati.",
+          "weather_enabled": "Recupera il meteo attuale del sito da Enphase e crea un’entità meteo solo quando l’endpoint è disponibile."
         }
       },
       "migrate_envoy_source": {
@@ -2194,6 +2198,11 @@
       },
       "charger_firmware": {
         "name": "Versione firmware"
+      }
+    },
+    "weather": {
+      "site_weather": {
+        "name": "Meteo"
       }
     }
   },

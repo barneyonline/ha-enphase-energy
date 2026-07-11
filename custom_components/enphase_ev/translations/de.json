@@ -488,7 +488,8 @@
           "type_heatpump": "Wärmepumpe",
           "type_ac_battery": "AC-Batterie",
           "battery_schedules_enabled": "Aktivieren Sie den Batterieplaner",
-          "degraded_service_repair_issues": "Reparaturen für beeinträchtigte Dienste aktivieren"
+          "degraded_service_repair_issues": "Reparaturen für beeinträchtigte Dienste aktivieren",
+          "weather_enabled": "Wetter aktivieren"
         },
         "data_description": {
           "type_envoy": "Enthält Gateway-Konnektivitäts- und Zählerdiagnosen.",
@@ -507,7 +508,8 @@
           "type_heatpump": "Enthält Sensoren für Wärmepumpenstatus, Diagnose und Verbrauch.",
           "type_ac_battery": "Enthält AC-Batterie-Sensoren und Steuerelemente für den Schlafmodus, wenn verfügbar.",
           "battery_schedules_enabled": "IQ-Batteriepläne verwalten",
-          "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind."
+          "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind.",
+          "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist."
         }
       },
       "settings": {
@@ -530,7 +532,8 @@
           "type_heatpump": "Wärmepumpe",
           "type_ac_battery": "AC-Batterie",
           "battery_schedules_enabled": "Aktivieren Sie den Batterieplaner",
-          "degraded_service_repair_issues": "Reparaturen für beeinträchtigte Dienste aktivieren"
+          "degraded_service_repair_issues": "Reparaturen für beeinträchtigte Dienste aktivieren",
+          "weather_enabled": "Wetter aktivieren"
         },
         "data_description": {
           "type_envoy": "Enthält Gateway-Konnektivitäts- und Zählerdiagnosen.",
@@ -549,7 +552,8 @@
           "type_heatpump": "Enthält Sensoren für Wärmepumpenstatus, Diagnose und Verbrauch.",
           "type_ac_battery": "Enthält AC-Batterie-Sensoren und Steuerelemente für den Schlafmodus, wenn verfügbar.",
           "battery_schedules_enabled": "IQ-Batteriepläne verwalten",
-          "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind."
+          "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind.",
+          "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist."
         }
       },
       "migrate_envoy_source": {
@@ -2194,6 +2198,11 @@
       },
       "charger_firmware": {
         "name": "Firmware-Version"
+      }
+    },
+    "weather": {
+      "site_weather": {
+        "name": "Wetter"
       }
     }
   },
