@@ -292,11 +292,14 @@ class SiteActiveSystemEventsBinarySensor(
 
     @property
     def is_on(self) -> bool:
-        return self._coord.system_events_runtime.active_count > 0
+        return cast(int, self._coord.system_events_runtime.active_count) > 0
 
     @property
     def extra_state_attributes(self) -> dict[str, object]:
-        return self._coord.system_events_runtime.diagnostics()
+        return cast(
+            dict[str, object],
+            self._coord.system_events_runtime.diagnostics(),
+        )
 
     @property
     def device_info(self) -> object:
