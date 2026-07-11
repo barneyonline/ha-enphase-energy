@@ -394,6 +394,7 @@ async def test_gateway_update_entity_progress_task_lifecycle(hass, monkeypatch) 
     assert entity.in_progress is False
 
     await entity.async_will_remove_from_hass()
+    assert task.done()
     with pytest.raises(asyncio.CancelledError):
         await task
     assert entity._progress_refresh_task is None

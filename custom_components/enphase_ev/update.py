@@ -424,15 +424,23 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
         self._schedule_progress_refresh()
 
     async def async_will_remove_from_hass(self) -> None:
-        if self._refresh_task is not None and not self._refresh_task.done():
-            self._refresh_task.cancel()
+        refresh_task = self._refresh_task
         self._refresh_task = None
-        if (
-            self._progress_refresh_task is not None
-            and not self._progress_refresh_task.done()
-        ):
-            self._progress_refresh_task.cancel()
+        if refresh_task is not None and not refresh_task.done():
+            refresh_task.cancel()
+            try:
+                await refresh_task
+            except asyncio.CancelledError:
+                pass
+
+        progress_refresh_task = self._progress_refresh_task
         self._progress_refresh_task = None
+        if progress_refresh_task is not None and not progress_refresh_task.done():
+            progress_refresh_task.cancel()
+            try:
+                await progress_refresh_task
+            except asyncio.CancelledError:
+                pass
         await super().async_will_remove_from_hass()
 
     async def async_install(
