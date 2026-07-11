@@ -72,6 +72,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SCHEDULE_SYNC_ENABLED,
     DEFAULT_SLOW_POLL_INTERVAL,
+    DEFAULT_WEATHER_ENABLED,
     DOMAIN,
     MAX_API_TIMEOUT,
     MAX_POLL_INTERVAL,
@@ -88,6 +89,7 @@ from .const import (
     OPT_NOMINAL_VOLTAGE,
     OPT_SLOW_POLL_INTERVAL,
     OPT_SESSION_HISTORY_INTERVAL,
+    OPT_WEATHER_ENABLED,
     DEFAULT_SESSION_HISTORY_INTERVAL_MIN,
     OPT_SCHEDULE_SYNC_ENABLED,
 )
@@ -1459,6 +1461,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                     default=self._entry.options.get(
                         OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
                         DEFAULT_DEGRADED_SERVICE_REPAIR_ISSUES,
+                    ),
+                ): bool,
+                vol.Optional(
+                    OPT_WEATHER_ENABLED,
+                    default=self._entry.options.get(
+                        OPT_WEATHER_ENABLED,
+                        DEFAULT_WEATHER_ENABLED,
                     ),
                 ): bool,
                 vol.Optional("reauth", default=False): bool,

@@ -511,7 +511,8 @@
           "type_heatpump": "Soojuspump",
           "type_ac_battery": "AC-aku",
           "battery_schedules_enabled": "Luba aku ajastaja",
-          "degraded_service_repair_issues": "Luba halvenenud teenuste parandused"
+          "degraded_service_repair_issues": "Luba halvenenud teenuste parandused",
+          "weather_enabled": "Luba ilmateave"
         },
         "data_description": {
           "type_envoy": "Sisaldab lüüsi ühenduvuse ja arvestite diagnostikat.",
@@ -530,7 +531,8 @@
           "type_heatpump": "Sisaldab soojuspumba oleku-, diagnostika- ja tarbimisandureid.",
           "type_ac_battery": "Sisaldab AC-aku andureid ja unerežiimi juhtnuppe, kui need on saadaval.",
           "battery_schedules_enabled": "Halda IQ aku ajakavasid",
-          "degraded_service_repair_issues": "Loob Repairsi probleemid, kui valikulised Enphase teenused on halvenenud."
+          "degraded_service_repair_issues": "Loob Repairsi probleemid, kui valikulised Enphase teenused on halvenenud.",
+          "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval."
         }
       },
       "settings": {
@@ -553,7 +555,8 @@
           "type_heatpump": "Soojuspump",
           "type_ac_battery": "AC-aku",
           "battery_schedules_enabled": "Luba aku ajastaja",
-          "degraded_service_repair_issues": "Luba halvenenud teenuste parandused"
+          "degraded_service_repair_issues": "Luba halvenenud teenuste parandused",
+          "weather_enabled": "Luba ilmateave"
         },
         "data_description": {
           "type_envoy": "Sisaldab lüüsi ühenduvuse ja arvestite diagnostikat.",
@@ -572,7 +575,8 @@
           "type_heatpump": "Sisaldab soojuspumba oleku-, diagnostika- ja tarbimisandureid.",
           "type_ac_battery": "Sisaldab AC-aku andureid ja unerežiimi juhtnuppe, kui need on saadaval.",
           "battery_schedules_enabled": "Halda IQ aku ajakavasid",
-          "degraded_service_repair_issues": "Loob Repairsi probleemid, kui valikulised Enphase teenused on halvenenud."
+          "degraded_service_repair_issues": "Loob Repairsi probleemid, kui valikulised Enphase teenused on halvenenud.",
+          "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval."
         }
       },
       "migrate_envoy_source": {
@@ -2289,6 +2293,11 @@
       },
       "charger_firmware": {
         "name": "Püsivara"
+      }
+    },
+    "weather": {
+      "site_weather": {
+        "name": "Ilm"
       }
     }
   },

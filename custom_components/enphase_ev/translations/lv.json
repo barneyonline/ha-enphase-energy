@@ -511,7 +511,8 @@
           "type_heatpump": "Siltumsūknis",
           "type_ac_battery": "AC baterija",
           "battery_schedules_enabled": "Iespējot akumulatora plānotāju",
-          "degraded_service_repair_issues": "Iespējot degradētu pakalpojumu labojumus"
+          "degraded_service_repair_issues": "Iespējot degradētu pakalpojumu labojumus",
+          "weather_enabled": "Iespējot laikapstākļus"
         },
         "data_description": {
           "type_envoy": "Ietver vārtejas savienojamības un skaitītāju diagnostiku.",
@@ -530,7 +531,8 @@
           "type_heatpump": "Ietver siltumsūkņa statusa, diagnostikas un patēriņa sensorus.",
           "type_ac_battery": "Ietver AC baterijas sensorus un miega režīma vadīklas, kad tās ir pieejamas.",
           "battery_schedules_enabled": "Pārvaldīt IQ akumulatora grafikus",
-          "degraded_service_repair_issues": "Izveido Repairs problēmas, kad izvēles Enphase pakalpojumi darbojas pasliktināti."
+          "degraded_service_repair_issues": "Izveido Repairs problēmas, kad izvēles Enphase pakalpojumi darbojas pasliktināti.",
+          "weather_enabled": "Iegūst pašreizējos vietas laikapstākļus no Enphase un izveido laikapstākļu entītiju tikai tad, ja galapunkts ir pieejams."
         }
       },
       "settings": {
@@ -553,7 +555,8 @@
           "type_heatpump": "Siltumsūknis",
           "type_ac_battery": "AC baterija",
           "battery_schedules_enabled": "Iespējot akumulatora plānotāju",
-          "degraded_service_repair_issues": "Iespējot degradētu pakalpojumu labojumus"
+          "degraded_service_repair_issues": "Iespējot degradētu pakalpojumu labojumus",
+          "weather_enabled": "Iespējot laikapstākļus"
         },
         "data_description": {
           "type_envoy": "Ietver vārtejas savienojamības un skaitītāju diagnostiku.",
@@ -572,7 +575,8 @@
           "type_heatpump": "Ietver siltumsūkņa statusa, diagnostikas un patēriņa sensorus.",
           "type_ac_battery": "Ietver AC baterijas sensorus un miega režīma vadīklas, kad tās ir pieejamas.",
           "battery_schedules_enabled": "Pārvaldīt IQ akumulatora grafikus",
-          "degraded_service_repair_issues": "Izveido Repairs problēmas, kad izvēles Enphase pakalpojumi darbojas pasliktināti."
+          "degraded_service_repair_issues": "Izveido Repairs problēmas, kad izvēles Enphase pakalpojumi darbojas pasliktināti.",
+          "weather_enabled": "Iegūst pašreizējos vietas laikapstākļus no Enphase un izveido laikapstākļu entītiju tikai tad, ja galapunkts ir pieejams."
         }
       },
       "migrate_envoy_source": {
@@ -2289,6 +2293,11 @@
       },
       "charger_firmware": {
         "name": "Programmaparatūra"
+      }
+    },
+    "weather": {
+      "site_weather": {
+        "name": "Laikapstākļi"
       }
     }
   },

@@ -6473,6 +6473,28 @@ class EnphaseEVClient:
             raise
         return self._normalize_lifetime_energy_payload(data)
 
+    async def weather(self, *, locale: str) -> JsonDict:
+        """Return the current weather reported for the configured site.
+
+        GET /systems/<site_id>/weather.json?locale=<locale>
+        """
+
+        endpoint = f"/systems/{self._site}/weather.json"
+        url = URL(f"{BASE_URL}{endpoint}").with_query({"locale": str(locale)})
+        data = await self._json(
+            "GET",
+            str(url),
+            headers=self._systems_json_headers(),
+        )
+        if not isinstance(data, dict):
+            raise self._invalid_payload_error(
+                endpoint=endpoint,
+                summary="Weather payload must be an object",
+                failure_kind="shape",
+                payload=data,
+            )
+        return data
+
     @classmethod
     def _normalize_latest_power_payload(
         cls, payload: object

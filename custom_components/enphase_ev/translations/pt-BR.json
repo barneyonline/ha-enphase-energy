@@ -511,7 +511,8 @@
           "type_heatpump": "Bomba de calor",
           "type_ac_battery": "Bateria CA",
           "battery_schedules_enabled": "Ativar agendador da bateria",
-          "degraded_service_repair_issues": "Ativar reparos de serviços degradados"
+          "degraded_service_repair_issues": "Ativar reparos de serviços degradados",
+          "weather_enabled": "Ativar clima"
         },
         "data_description": {
           "type_envoy": "Inclui conectividade do gateway e diagnósticos dos medidores.",
@@ -530,7 +531,8 @@
           "type_heatpump": "Inclui sensores de status, diagnóstico e consumo da bomba de calor.",
           "type_ac_battery": "Inclui sensores da bateria CA e controles do modo de suspensão quando disponíveis.",
           "battery_schedules_enabled": "Gerenciar agendamentos de bateria IQ",
-          "degraded_service_repair_issues": "Cria problemas em Repairs quando serviços opcionais da Enphase estão degradados."
+          "degraded_service_repair_issues": "Cria problemas em Repairs quando serviços opcionais da Enphase estão degradados.",
+          "weather_enabled": "Obtém o clima atual do local pela Enphase e cria uma entidade de clima somente quando o endpoint está disponível."
         }
       },
       "settings": {
@@ -553,7 +555,8 @@
           "type_heatpump": "Bomba de calor",
           "type_ac_battery": "Bateria CA",
           "battery_schedules_enabled": "Ativar agendador da bateria",
-          "degraded_service_repair_issues": "Ativar reparos de serviços degradados"
+          "degraded_service_repair_issues": "Ativar reparos de serviços degradados",
+          "weather_enabled": "Ativar clima"
         },
         "data_description": {
           "type_envoy": "Inclui conectividade do gateway e diagnósticos dos medidores.",
@@ -572,7 +575,8 @@
           "type_heatpump": "Inclui sensores de status, diagnóstico e consumo da bomba de calor.",
           "type_ac_battery": "Inclui sensores da bateria CA e controles do modo de suspensão quando disponíveis.",
           "battery_schedules_enabled": "Gerenciar agendamentos de bateria IQ",
-          "degraded_service_repair_issues": "Cria problemas em Repairs quando serviços opcionais da Enphase estão degradados."
+          "degraded_service_repair_issues": "Cria problemas em Repairs quando serviços opcionais da Enphase estão degradados.",
+          "weather_enabled": "Obtém o clima atual do local pela Enphase e cria uma entidade de clima somente quando o endpoint está disponível."
         }
       },
       "migrate_envoy_source": {
@@ -2289,6 +2293,11 @@
       },
       "charger_firmware": {
         "name": "Versão do firmware"
+      }
+    },
+    "weather": {
+      "site_weather": {
+        "name": "Clima"
       }
     }
   },

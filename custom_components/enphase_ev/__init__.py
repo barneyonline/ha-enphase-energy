@@ -94,6 +94,7 @@ PLATFORMS: list[str] = [
     "time",
     "calendar",
     "update",
+    "weather",
 ]
 
 _LEGACY_GATEWAY_TYPE_KEYS: tuple[str, ...] = ("meter", "enpower")

@@ -511,7 +511,8 @@
           "type_heatpump": "Pompă de căldură",
           "type_ac_battery": "Baterie AC",
           "battery_schedules_enabled": "Activați planificatorul bateriei",
-          "degraded_service_repair_issues": "Activează reparațiile pentru servicii degradate"
+          "degraded_service_repair_issues": "Activează reparațiile pentru servicii degradate",
+          "weather_enabled": "Activează vremea"
         },
         "data_description": {
           "type_envoy": "Include conectivitatea gateway-ului și diagnosticul contoarelor.",
@@ -530,7 +531,8 @@
           "type_heatpump": "Include senzori pentru starea, diagnosticarea și consumul pompei de căldură.",
           "type_ac_battery": "Include senzori pentru bateria AC și controale pentru modul de repaus atunci când sunt disponibile.",
           "battery_schedules_enabled": "Gestionați programele bateriei IQ",
-          "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate."
+          "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate.",
+          "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil."
         }
       },
       "settings": {
@@ -553,7 +555,8 @@
           "type_heatpump": "Pompă de căldură",
           "type_ac_battery": "Baterie AC",
           "battery_schedules_enabled": "Activați planificatorul bateriei",
-          "degraded_service_repair_issues": "Activează reparațiile pentru servicii degradate"
+          "degraded_service_repair_issues": "Activează reparațiile pentru servicii degradate",
+          "weather_enabled": "Activează vremea"
         },
         "data_description": {
           "type_envoy": "Include conectivitatea gateway-ului și diagnosticul contoarelor.",
@@ -572,7 +575,8 @@
           "type_heatpump": "Include senzori pentru starea, diagnosticarea și consumul pompei de căldură.",
           "type_ac_battery": "Include senzori pentru bateria AC și controale pentru modul de repaus atunci când sunt disponibile.",
           "battery_schedules_enabled": "Gestionați programele bateriei IQ",
-          "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate."
+          "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate.",
+          "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil."
         }
       },
       "migrate_envoy_source": {
@@ -2289,6 +2293,11 @@
       },
       "charger_firmware": {
         "name": "Versiune firmware"
+      }
+    },
+    "weather": {
+      "site_weather": {
+        "name": "Vreme"
       }
     }
   },

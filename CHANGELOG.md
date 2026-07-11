@@ -27,6 +27,9 @@ All notable changes to this project will be documented in this file.
 - Added multi-gateway phase-map discovery so site controls prefer the primary or
   default IQ Gateway and Gateway Status reports phase/topology diagnostics only when
   authoritative phase-map data is available.
+- Added opt-in Enphase site weather on the Enphase Cloud device. The weather entity
+  is created only after the authenticated weather endpoint returns a valid current
+  reading.
 - Added installer-only, cloud-based Grid Profile Control with country-scoped region and profile selection, explicit apply confirmation, current profile monitoring, and follow-up cloud status refreshes.
 
 ### 🐛 Bug fixes

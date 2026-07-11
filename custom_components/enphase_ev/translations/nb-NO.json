@@ -511,7 +511,8 @@
           "type_heatpump": "Varmepumpe",
           "type_ac_battery": "AC-batteri",
           "battery_schedules_enabled": "Aktiver batteriplanlegger",
-          "degraded_service_repair_issues": "Aktiver reparasjoner for degraderte tjenester"
+          "degraded_service_repair_issues": "Aktiver reparasjoner for degraderte tjenester",
+          "weather_enabled": "Aktiver vær"
         },
         "data_description": {
           "type_envoy": "Inkluderer gateway-tilkobling og målerdiagnostikk.",
@@ -530,7 +531,8 @@
           "type_heatpump": "Inkluderer sensorer for varmepumpens status, diagnostikk og forbruk.",
           "type_ac_battery": "Inkluderer AC-batterisensorer og kontroller for hvilemodus når de er tilgjengelige.",
           "battery_schedules_enabled": "Administrer IQ-batteriplaner",
-          "degraded_service_repair_issues": "Oppretter Repairs-problemer når valgfrie Enphase-tjenester er degraderte."
+          "degraded_service_repair_issues": "Oppretter Repairs-problemer når valgfrie Enphase-tjenester er degraderte.",
+          "weather_enabled": "Henter gjeldende vær for anlegget fra Enphase og oppretter bare en værenhet når endepunktet er tilgjengelig."
         }
       },
       "settings": {
@@ -553,7 +555,8 @@
           "type_heatpump": "Varmepumpe",
           "type_ac_battery": "AC-batteri",
           "battery_schedules_enabled": "Aktiver batteriplanlegger",
-          "degraded_service_repair_issues": "Aktiver reparasjoner for degraderte tjenester"
+          "degraded_service_repair_issues": "Aktiver reparasjoner for degraderte tjenester",
+          "weather_enabled": "Aktiver vær"
         },
         "data_description": {
           "type_envoy": "Inkluderer gateway-tilkobling og målerdiagnostikk.",
@@ -572,7 +575,8 @@
           "type_heatpump": "Inkluderer sensorer for varmepumpens status, diagnostikk og forbruk.",
           "type_ac_battery": "Inkluderer AC-batterisensorer og kontroller for hvilemodus når de er tilgjengelige.",
           "battery_schedules_enabled": "Administrer IQ-batteriplaner",
-          "degraded_service_repair_issues": "Oppretter Repairs-problemer når valgfrie Enphase-tjenester er degraderte."
+          "degraded_service_repair_issues": "Oppretter Repairs-problemer når valgfrie Enphase-tjenester er degraderte.",
+          "weather_enabled": "Henter gjeldende vær for anlegget fra Enphase og oppretter bare en værenhet når endepunktet er tilgjengelig."
         }
       },
       "migrate_envoy_source": {
@@ -2289,6 +2293,11 @@
       },
       "charger_firmware": {
         "name": "Fastvare"
+      }
+    },
+    "weather": {
+      "site_weather": {
+        "name": "Vær"
       }
     }
   },

@@ -41,6 +41,7 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - Advisory firmware update entities for gateway and EV charger devices with locale-aware release-note links; the gateway entity also monitors read-only live update progress, percentage, timing, and sanitized component status when Enphase exposes it
 - Heat-pump runtime status, connectivity, SG-Ready mode, power, and current-day consumption details sourced from HEMS endpoints
 - Site and battery energy telemetry, including derived grid-import, grid-export, and battery power sensors for Home Assistant Energy Dashboard use
+- Optional current site weather on the Enphase Cloud device, created only when the authenticated Enphase weather endpoint is available
 - Site tariff visibility for next billing date, Energy-dashboard-ready current import/export price sensors, editable tariff rate number entities, and a service for billing-cycle, rate, and guided structural tariff updates when Enphase exposes tariff data
 - Installer-only Grid Profile Control through Enphase cloud Activation, with country-scoped region/profile selection under Options > Advanced and current profile monitoring on the IQ Gateway
 - Health diagnostics, service-availability tracking, and actionable repair issues

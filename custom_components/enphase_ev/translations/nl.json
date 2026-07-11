@@ -511,7 +511,8 @@
           "type_heatpump": "Warmtepomp",
           "type_ac_battery": "AC-batterij",
           "battery_schedules_enabled": "Schakel Batterijplanner in",
-          "degraded_service_repair_issues": "Reparaties voor verminderde diensten inschakelen"
+          "degraded_service_repair_issues": "Reparaties voor verminderde diensten inschakelen",
+          "weather_enabled": "Weer inschakelen"
         },
         "data_description": {
           "type_envoy": "Bevat gateway-connectiviteit en meterdiagnostiek.",
@@ -530,7 +531,8 @@
           "type_heatpump": "Bevat sensoren voor warmtepompstatus, diagnostiek en verbruik.",
           "type_ac_battery": "Bevat AC-batterijsensoren en slaapmodusbediening wanneer beschikbaar.",
           "battery_schedules_enabled": "Beheer IQ-batterijschema's",
-          "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken."
+          "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken.",
+          "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is."
         }
       },
       "settings": {
@@ -553,7 +555,8 @@
           "type_heatpump": "Warmtepomp",
           "type_ac_battery": "AC-batterij",
           "battery_schedules_enabled": "Schakel Batterijplanner in",
-          "degraded_service_repair_issues": "Reparaties voor verminderde diensten inschakelen"
+          "degraded_service_repair_issues": "Reparaties voor verminderde diensten inschakelen",
+          "weather_enabled": "Weer inschakelen"
         },
         "data_description": {
           "type_envoy": "Bevat gateway-connectiviteit en meterdiagnostiek.",
@@ -572,7 +575,8 @@
           "type_heatpump": "Bevat sensoren voor warmtepompstatus, diagnostiek en verbruik.",
           "type_ac_battery": "Bevat AC-batterijsensoren en slaapmodusbediening wanneer beschikbaar.",
           "battery_schedules_enabled": "Beheer IQ-batterijschema's",
-          "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken."
+          "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken.",
+          "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is."
         }
       },
       "migrate_envoy_source": {
@@ -2289,6 +2293,11 @@
       },
       "charger_firmware": {
         "name": "Firmwareversie"
+      }
+    },
+    "weather": {
+      "site_weather": {
+        "name": "Weer"
       }
     }
   },
