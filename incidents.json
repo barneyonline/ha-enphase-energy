@@ -1,6 +1,6 @@
 {
-  "current_status": "Fully Operational",
-  "generated_at": "2026-07-11T12:31:45.927228Z",
+  "current_status": "Down",
+  "generated_at": "2026-07-11T14:20:54.225214Z",
   "incidents": [
     {
       "active": false,
@@ -665,6 +665,17 @@
       "last_seen_at": "2026-07-09T17:01:02.563957Z",
       "started_at": "2026-07-09T17:01:02.563957Z",
       "status": "Degraded"
+    },
+    {
+      "active": true,
+      "duration_minutes": 0,
+      "ended_at": null,
+      "failed_checks": [
+        "auth"
+      ],
+      "last_seen_at": "2026-07-11T14:20:54.225214Z",
+      "started_at": "2026-07-11T14:20:54.225214Z",
+      "status": "Down"
     }
   ],
   "retention_days": 30
