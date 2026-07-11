@@ -8,7 +8,7 @@ entities that surface optional endpoint health without exposing credentials.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import math
 import re
@@ -63,6 +63,7 @@ from .entity import (
 )
 from .labels import friendly_status_text, status_label
 from .parsing_helpers import coerce_optional_float, heatpump_status_text
+from .power_validation import EXTREME_SITE_POWER_W, ExtremePowerValidator
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
 from .runtime_helpers import (
     coerce_optional_text as _gateway_clean_text,
@@ -1254,6 +1255,8 @@ class _SiteLifetimePowerRestoreData(ExtraStoredData):  # type: ignore[misc]
     previous_live_energy_ts: float | None
     previous_live_sample_ts: float | None
     last_live_interval_minutes: float | None
+    last_live_flow_sources: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    previous_live_flow_sources: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -1261,6 +1264,13 @@ class _SiteLifetimePowerRestoreData(ExtraStoredData):  # type: ignore[misc]
             "previous_live_energy_ts": self.previous_live_energy_ts,
             "previous_live_sample_ts": self.previous_live_sample_ts,
             "last_live_interval_minutes": self.last_live_interval_minutes,
+            "last_live_flow_sources": {
+                key: list(value) for key, value in self.last_live_flow_sources.items()
+            },
+            "previous_live_flow_sources": {
+                key: list(value)
+                for key, value in self.previous_live_flow_sources.items()
+            },
         }
 
     @classmethod
@@ -1288,6 +1298,29 @@ class _SiteLifetimePowerRestoreData(ExtraStoredData):  # type: ignore[misc]
             except Exception:
                 return None
 
+        def _source_map(key: str) -> dict[str, tuple[str, ...]]:
+            raw_map = data.get(key)
+            if not isinstance(raw_map, dict):
+                return {}
+            parsed: dict[str, tuple[str, ...]] = {}
+            for raw_flow_key, raw_sources in raw_map.items():
+                if not isinstance(raw_flow_key, str) or not isinstance(
+                    raw_sources, (list, tuple)
+                ):
+                    continue
+                sources = tuple(
+                    sorted(
+                        {
+                            str(source).strip()
+                            for source in raw_sources
+                            if str(source).strip()
+                        }
+                    )
+                )
+                if sources:
+                    parsed[raw_flow_key] = sources
+            return parsed
+
         return cls(
             previous_live_flow_kwh=previous_live_flow_kwh,
             previous_live_energy_ts=_as_float(data.get("previous_live_energy_ts")),
@@ -1295,6 +1328,8 @@ class _SiteLifetimePowerRestoreData(ExtraStoredData):  # type: ignore[misc]
             last_live_interval_minutes=_as_float(
                 data.get("last_live_interval_minutes")
             ),
+            last_live_flow_sources=_source_map("last_live_flow_sources"),
+            previous_live_flow_sources=_source_map("previous_live_flow_sources"),
         )
 
 
@@ -5674,6 +5709,9 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
         self._previous_live_energy_ts: float | None = None
         self._previous_live_sample_ts: float | None = None
         self._last_live_interval_minutes: float | None = None
+        self._last_live_flow_sources: dict[str, tuple[str, ...]] = {}
+        self._previous_live_flow_sources: dict[str, tuple[str, ...]] = {}
+        self._extreme_power_validator = ExtremePowerValidator()
         self._restored_method_explicit = False
 
     def _clear_restored_live_history(self, *, discard_power: bool = False) -> None:
@@ -5682,6 +5720,7 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
         self._previous_live_flow_kwh = {}
         self._previous_live_energy_ts = None
         self._previous_live_sample_ts = None
+        self._previous_live_flow_sources = {}
         if discard_power:
             self._restored_power_w = None
 
@@ -5692,6 +5731,8 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
         self._last_energy_ts = None
         self._last_sample_ts = None
         self._last_window_s = None
+        self._last_live_flow_sources = {}
+        self._extreme_power_validator.clear()
         self._last_method = "seeded"
 
     def _restored_flows_zeroed(self, flows: dict[str, float]) -> bool:
@@ -5757,6 +5798,16 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
         self._previous_live_energy_ts = extra_data.previous_live_energy_ts
         self._previous_live_sample_ts = extra_data.previous_live_sample_ts
         self._last_live_interval_minutes = extra_data.last_live_interval_minutes
+        self._last_live_flow_sources = {
+            flow_key: sources
+            for flow_key, sources in extra_data.last_live_flow_sources.items()
+            if flow_key in self._flow_signs
+        }
+        self._previous_live_flow_sources = {
+            flow_key: sources
+            for flow_key, sources in extra_data.previous_live_flow_sources.items()
+            if flow_key in self._flow_signs
+        }
         self._restore_live_history()
 
     def _restore_live_history(self) -> None:
@@ -5766,6 +5817,35 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
         restored_previous_zeroed = self._restored_flows_zeroed(
             self._previous_live_flow_kwh
         )
+
+        if (
+            self._last_flow_kwh
+            and self._previous_live_flow_kwh
+            and (
+                any(
+                    flow_key not in self._last_live_flow_sources
+                    for flow_key in self._last_flow_kwh
+                )
+                or any(
+                    flow_key not in self._previous_live_flow_sources
+                    for flow_key in self._previous_live_flow_kwh
+                )
+            )
+        ):
+            self._clear_restored_live_history(discard_power=True)
+            self._discard_restored_baseline()
+            return
+
+        if any(
+            self._last_live_flow_sources.get(flow_key)
+            != self._previous_live_flow_sources.get(flow_key)
+            for flow_key in self._flow_signs
+            if flow_key in self._last_flow_kwh
+            and flow_key in self._previous_live_flow_kwh
+        ):
+            self._clear_restored_live_history(discard_power=True)
+            self._discard_restored_baseline()
+            return
 
         if self._restored_method_explicit and self._last_method in {
             "seeded",
@@ -5848,6 +5928,10 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
                     signed_delta_kwh,
                     window_s=window_s,
                 )
+                if abs(restored_power_w) >= EXTREME_SITE_POWER_W:
+                    self._clear_restored_live_history(discard_power=True)
+                    self._discard_restored_baseline()
+                    return
                 if not self._power_sample_is_plausible(
                     power_w=restored_power_w,
                     signed_delta_kwh=signed_delta_kwh,
@@ -6015,6 +6099,51 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
                 synthetic_zero_flows.add(flow_key)
         return values, synthetic_zero_flows
 
+    def _current_flow_sources(
+        self, flows: dict[str, object], current_values: dict[str, float]
+    ) -> dict[str, tuple[str, ...]]:
+        """Return normalized cumulative-source signatures for live flows."""
+
+        signatures: dict[str, tuple[str, ...]] = {}
+        for flow_key in self._flow_signs:
+            if flow_key not in current_values:
+                continue
+            entry = flows.get(flow_key)
+            fields_used: object = None
+            if isinstance(entry, SiteEnergyFlow):
+                fields_used = entry.fields_used
+            elif isinstance(entry, dict):
+                fields_used = entry.get("fields_used")
+            if not isinstance(fields_used, (list, tuple)):
+                continue
+            normalized: set[str] = set()
+            for raw_field in fields_used:
+                try:
+                    field_text = str(raw_field).strip()
+                except Exception:
+                    continue
+                if field_text:
+                    normalized.add(field_text)
+            if normalized:
+                signatures[flow_key] = tuple(sorted(normalized))
+        return signatures
+
+    def _flow_source_changed(
+        self,
+        current_values: dict[str, float],
+        current_sources: dict[str, tuple[str, ...]],
+    ) -> bool:
+        """Return True when a contributing cumulative channel changed source."""
+
+        for flow_key in self._flow_signs:
+            if flow_key not in current_values or flow_key not in self._last_flow_kwh:
+                continue
+            previous = self._last_live_flow_sources.get(flow_key)
+            current = current_sources.get(flow_key)
+            if previous is not None and current is not None and previous != current:
+                return True
+        return False
+
     @staticmethod
     def _has_live_flow_values(
         current_values: dict[str, float], synthetic_zero_flows: set[str]
@@ -6023,7 +6152,9 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
 
         return any(flow_key not in synthetic_zero_flows for flow_key in current_values)
 
-    def _sample_timestamp(self, flows: dict[str, object]) -> tuple[float, str | None]:
+    def _source_sample_timestamp(self, flows: dict[str, object]) -> float | None:
+        """Return only a timestamp reported by the site-energy payload."""
+
         for flow_key in self._flow_signs:
             entry = flows.get(flow_key)
             raw_report_date = None
@@ -6033,11 +6164,13 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
                 raw_report_date = entry.get("last_report_date")
             parsed = self._parse_sample_timestamp(raw_report_date)
             if parsed is not None:
-                iso = datetime.fromtimestamp(parsed, tz=timezone.utc).isoformat()
-                return parsed, iso
+                return parsed
 
         meta_report_date = self._site_energy_meta().get("last_report_date")
-        parsed = self._parse_sample_timestamp(meta_report_date)
+        return self._parse_sample_timestamp(meta_report_date)
+
+    def _sample_timestamp(self, flows: dict[str, object]) -> tuple[float, str | None]:
+        parsed = self._source_sample_timestamp(flows)
         if parsed is not None:
             iso = datetime.fromtimestamp(parsed, tz=timezone.utc).isoformat()
             return parsed, iso
@@ -6106,6 +6239,7 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
             current_values, synthetic_zero_flows
         )
 
+        source_sample_ts = self._source_sample_timestamp(flows)
         sample_ts, sample_iso = self._sample_timestamp(flows)
         self._last_report_date_iso = sample_iso
         if self._last_sample_ts is not None and sample_ts == self._last_sample_ts:
@@ -6120,6 +6254,7 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
                 current_values[flow_key] = 0.0
                 synthetic_zero_flows.add(flow_key)
 
+        current_sources = self._current_flow_sources(flows, current_values)
         self._synthetic_zero_flows = synthetic_zero_flows
         if not current_values:
             return None
@@ -6128,6 +6263,7 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
                 self._last_flow_kwh.update(current_values)
                 self._last_energy_ts = sample_ts
                 self._last_sample_ts = sample_ts
+                self._last_live_flow_sources.update(current_sources)
                 self._last_power_w = 0
                 self._last_method = "no_live_data"
                 self._last_window_s = None
@@ -6142,7 +6278,9 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
             self._previous_live_flow_kwh = {}
             self._previous_live_energy_ts = None
             self._previous_live_sample_ts = None
+            self._previous_live_flow_sources = {}
             self._last_flow_kwh = dict(current_values)
+            self._last_live_flow_sources = dict(current_sources)
             self._last_energy_ts = sample_ts
             self._last_sample_ts = sample_ts
             self._last_power_w = 0
@@ -6155,7 +6293,9 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
             self._previous_live_flow_kwh = {}
             self._previous_live_energy_ts = None
             self._previous_live_sample_ts = None
+            self._previous_live_flow_sources = {}
             self._last_flow_kwh = dict(current_values)
+            self._last_live_flow_sources = dict(current_sources)
             self._last_energy_ts = sample_ts
             self._last_sample_ts = sample_ts
             self._last_power_w = 0
@@ -6166,11 +6306,27 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
         prior_last_power_w = self._last_power_w
         prior_live_sample_count = self._live_flow_sample_count
 
+        if self._flow_source_changed(current_values, current_sources):
+            self._previous_live_flow_kwh = dict(self._last_flow_kwh)
+            self._previous_live_energy_ts = self._last_energy_ts
+            self._previous_live_sample_ts = self._last_sample_ts
+            self._previous_live_flow_sources = dict(self._last_live_flow_sources)
+            self._last_flow_kwh = dict(current_values)
+            self._last_live_flow_sources = dict(current_sources)
+            self._last_energy_ts = sample_ts
+            self._last_sample_ts = sample_ts
+            self._last_window_s = None
+            self._last_method = "source_changed_reseed"
+            self._live_flow_sample_count += 1
+            self._extreme_power_validator.clear()
+            return prior_last_power_w if prior_live_sample_count >= 2 else None
+
         reset_detected = False
         signed_delta_kwh = 0.0
         previous_live_flow_kwh = dict(self._last_flow_kwh)
         previous_live_energy_ts = self._last_energy_ts
         previous_live_sample_ts = self._last_sample_ts
+        previous_live_flow_sources = dict(self._last_live_flow_sources)
         for flow_key, sign in self._flow_signs.items():
             current = current_values.get(flow_key)
             if current is None:
@@ -6194,7 +6350,9 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
         self._previous_live_flow_kwh = previous_live_flow_kwh
         self._previous_live_energy_ts = previous_live_energy_ts
         self._previous_live_sample_ts = previous_live_sample_ts
+        self._previous_live_flow_sources = previous_live_flow_sources
         self._last_flow_kwh = dict(current_values)
+        self._last_live_flow_sources = dict(current_sources)
         self._last_sample_ts = sample_ts
 
         if reset_detected:
@@ -6203,6 +6361,7 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
             self._last_method = "lifetime_reset"
             self._last_window_s = None
             self._last_reset_at = sample_ts
+            self._extreme_power_validator.clear()
             return 0
 
         window_s = _resolve_lifetime_power_window(
@@ -6223,12 +6382,24 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
         if abs(signed_delta_kwh) <= self._MIN_DELTA_KWH:
             self._last_power_w = 0
             self._last_method = "no_change"
+            self._extreme_power_validator.clear()
             return 0
 
         candidate_power_w = _energy_delta_to_power_w(
             signed_delta_kwh,
             window_s=window_s,
         )
+        extreme_validation = self._extreme_power_validator.evaluate(
+            candidate_power_w, sample_ts=source_sample_ts
+        )
+        if not extreme_validation.accepted:
+            self._last_power_w = prior_last_power_w
+            self._last_method = "extreme_pending"
+            return prior_last_power_w if prior_live_sample_count >= 2 else None
+        if extreme_validation.confirmed_extreme:
+            self._last_power_w = candidate_power_w
+            self._last_method = "extreme_confirmed"
+            return self._last_power_w
         if not self._power_sample_is_plausible(
             power_w=candidate_power_w,
             signed_delta_kwh=signed_delta_kwh,
@@ -6263,6 +6434,8 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
             previous_live_energy_ts=self._previous_live_energy_ts,
             previous_live_sample_ts=self._previous_live_sample_ts,
             last_live_interval_minutes=self._last_live_interval_minutes,
+            last_live_flow_sources=dict(self._last_live_flow_sources),
+            previous_live_flow_sources=dict(self._previous_live_flow_sources),
         )
 
 
@@ -6372,7 +6545,11 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
                 )
             except Exception:  # noqa: BLE001
                 restored = None
-            if restored is not None and math.isfinite(restored):
+            if (
+                restored is not None
+                and math.isfinite(restored)
+                and abs(restored) < EXTREME_SITE_POWER_W
+            ):
                 self._last_good_value = restored
 
         try:

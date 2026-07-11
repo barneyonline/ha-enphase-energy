@@ -1480,8 +1480,14 @@ Notes:
 - The current implementation may also attach `Authorization: Bearer <token>` to some dashboard-family GETs when a usable bearer is available, even though browser captures succeeded with cookies alone.
 - The implementation accepts the sample under `data`, `latest_power`, or at the top level.
 - Treat a missing, non-numeric, or non-finite `value` as no sample rather than coercing to `0`.
+- Normalize reported `W`, `kW`, and `mW` values to watts; payloads without a
+  unit retain the historical watts assumption, while unknown units are rejected.
 - Observed timestamps are epoch seconds, but the parser also accepts epoch milliseconds.
 - The observed capture returned `value=-30`, confirming the field can go negative. Preserve negative samples rather than clamping to `0`; they likely represent net import or reverse power flow.
+- Values at or above 1 MW are quarantined until a second comparable sample with
+  a newer source timestamp confirms sustained extreme power. Repeated payloads
+  with the same timestamp and timestamp-less extreme samples are not sufficient
+  confirmation.
 - The normalized runtime field is `current_power_consumption_w` with source `app-api:get_latest_power`.
 
 ### 2.9.3.a Site Bootstrap Payload

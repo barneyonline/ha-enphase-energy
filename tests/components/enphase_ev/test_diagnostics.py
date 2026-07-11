@@ -770,6 +770,18 @@ async def test_config_entry_diagnostics_includes_coordinator(
             "device_type_counts": {"IQ Gateway": 1},
         }
     )
+    coord.current_power_runtime = SimpleNamespace(
+        diagnostics=lambda: {
+            "accepted_value_w": 2452.0,
+            "last_observed_value": -12_000_000.0,
+            "last_observed_units": "W",
+            "last_normalized_value_w": -12_000_000.0,
+            "validation_state": "pending_extreme",
+            "validation_reason": "extreme_sample_requires_confirmation",
+            "pending_extreme_count": 1,
+            "using_stale": True,
+        }
+    )
     coord._scheduler_backoff_ends_utc = datetime(2025, 1, 1, tzinfo=timezone.utc)
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
 
@@ -786,6 +798,16 @@ async def test_config_entry_diagnostics_includes_coordinator(
     assert diag["coordinator"]["headers_info"]["has_scheduler_bearer"] is True
     assert diag["coordinator"]["last_scheduler_modes"] == {RANDOM_SERIAL: "FAST"}
     assert diag["coordinator"]["session_history"]["cache_keys"] == 1
+    assert diag["coordinator"]["current_power"] == {
+        "accepted_value_w": 2452.0,
+        "last_observed_value": -12_000_000.0,
+        "last_observed_units": "W",
+        "last_normalized_value_w": -12_000_000.0,
+        "validation_state": "pending_extreme",
+        "validation_reason": "extreme_sample_requires_confirmation",
+        "pending_extreme_count": 1,
+        "using_stale": True,
+    }
     assert diag["coordinator"]["site_metrics"]["payload_using_stale"] is True
     assert diag["coordinator"]["site_metrics"]["payload_failure_kind"] == "json_decode"
     assert diag["coordinator"]["session_history"]["using_stale"] is True
@@ -1153,6 +1175,9 @@ async def test_config_entry_diagnostics_handles_faulty_coordinator(
             self.update_interval = object()
             self._charge_mode_cache = None
             self.client = FaultyClient()
+            self.current_power_runtime = SimpleNamespace(
+                diagnostics=lambda: (_ for _ in ()).throw(RuntimeError("power"))
+            )
 
         def collect_site_metrics(self):
             raise RuntimeError("boom")
@@ -1166,6 +1191,7 @@ async def test_config_entry_diagnostics_handles_faulty_coordinator(
     assert coordinator["headers_info"]["base_header_names"] == []
     assert coordinator["headers_info"]["has_scheduler_bearer"] is False
     assert coordinator["last_scheduler_modes"] == {}
+    assert coordinator["current_power"] == {}
 
 
 @pytest.mark.asyncio
