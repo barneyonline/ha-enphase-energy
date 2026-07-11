@@ -8582,7 +8582,10 @@ async def test_site_livestream_authorizer_returns_payload() -> None:
     )
 
     await client.site_livestream_authorizer("GW-1", live_debug=True)
-    assert "live_debug=true" in client._json.await_args.args[1]
+    assert client._json.await_args.args[1] == (
+        f"{api.BASE_URL}/service/system_dashboard/api_internal/cs/sites/livestream"
+        "?serial_num=GW-1&live_debug=true"
+    )
 
 
 @pytest.mark.asyncio

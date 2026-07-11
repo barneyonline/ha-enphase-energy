@@ -109,7 +109,7 @@ Status labels:
 | Filtered site-device inventory | `POST` | `/service/site-device/api/v2/devices/list` | `e-auth-token` + cookies | Browser capture only |
 | Site live-stream flags | `GET` | `/app-api/<site_id>/show_livestream` | authenticated session cookies | Runtime |
 | Site live-status MQTT authorizer | `GET` | `/pv/aws_sigv4/livestream.json?serial_num=<gateway_sn>` | authenticated Enlighten session cookies + `e-auth-token`; browser capture used `Accept: */*`, `Referer: /web/<site_id>/today/graph/hours?v=3.4.0`, `X-Requested-With: XMLHttpRequest` | Runtime |
-| Site live-vitals MQTT authorizer | `GET` | `/pv/aws_sigv4/livestream.json?serial_num=<gateway_sn>&live_debug=true` | authenticated Enlighten session cookies + `e-auth-token`; same browser XHR shape as the live-status authorizer | Browser capture only |
+| Site live-debug MQTT authorizer | `GET` | `/service/system_dashboard/api_internal/cs/sites/livestream?serial_num=<gateway_sn>&live_debug=true` | authenticated Enlighten session cookies + `e-auth-token`; browser XHR request | Runtime (gateway update progress) |
 | Site latest power | `GET` | `/app-api/<site_id>/get_latest_power` | `e-auth-token` + cookies | Runtime |
 | Site currency conversion settings | `GET` | `/app-api/<site_id>/get_currency_conversion.json` | authenticated session cookies + `e-auth-token` | Browser capture only |
 | Requested battery usage hint | `GET` | `/app-api/<site_id>/get_requested_battery_usage` | authenticated session cookies + `e-auth-token` | Browser capture only |
@@ -1335,11 +1335,11 @@ Implementation notes:
 - Keep captures bounded and disconnect explicitly even when the server advertises a 15-minute duration.
 - The BatteryConfig MQTT authorizer at `5.1` returned a `v1/server/response-stream/<stream_id>` topic and emitted no passive telemetry in a 60-second local capture; do not conflate that response stream with this `v1/live-stream/<stream_id>` site telemetry stream.
 
-### 2.9.2.b Site Live-Vitals MQTT Authorizer
+### 2.9.2.b Site Live-Debug MQTT Authorizer
 ```
-GET /pv/aws_sigv4/livestream.json?serial_num=<gateway_sn>&live_debug=true
+GET /service/system_dashboard/api_internal/cs/sites/livestream?serial_num=<gateway_sn>&live_debug=true
 ```
-Returns an AWS IoT custom-authorizer payload for the Enlighten web-app **Live Vitals** view. This is a separate topic from the Live Status stream in `2.9.2.a`, even though both authorizers use the same base route.
+Returns an AWS IoT custom-authorizer payload used by the System Dashboard **Software Updates** page and Enlighten live-vitals surfaces. This is a separate topic from the Live Status stream in `2.9.2.a`. An older capture used `/pv/aws_sigv4/livestream.json?...&live_debug=true`; the runtime uses the newer confirmed System Dashboard route.
 
 Example response (anonymized):
 ```json
@@ -1370,6 +1370,8 @@ Observed payload format:
 - Captured frames were approximately 8-9 KB.
 - Top-level keys observed: `data_ingest_type`, `site`, `meters`, and `devices`.
 - Captured JSON contains account/site/device identifiers and exact serial numbers. Store only redacted fixtures or schema summaries.
+- Gateway update state is carried in `site[].site_update_info[]`, including numeric/string current and last statuses, estimated time left, total duration, and `Current essimg version`. The enclosing `site[].timestamp` identifies the source observation time.
+- Per-component progress is carried in `devices[].update_info`, including component name/type, status, progress, transfer speed, and `e3_progress`. The adjacent `fw_image` contains a gateway-local path and image hash and must not be retained in state, diagnostics, fixtures, or logs.
 - During an active charging capture, Live Vitals emitted one JSON message roughly every 5 seconds and still only exposed `enpower` and `encharge` device objects. No explicit EVSE/charger object was observed.
 
 Example payload shape (anonymized and abbreviated):

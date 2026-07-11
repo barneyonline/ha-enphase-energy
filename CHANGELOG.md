@@ -21,6 +21,9 @@ All notable changes to this project will be documented in this file.
   after Enphase returns a matching explicitly resolved event. The event entity is
   created only after the installer endpoint responds successfully, so owner-only
   accounts do not receive an unavailable installer-only entity.
+- Added read-only IQ Gateway software-update progress monitoring to the existing
+  advisory update entity, including Home Assistant in-progress/percentage state,
+  timing, installed image version, and sanitized component transfer details.
 
 ### 🐛 Bug fixes
 - Fixed Enlighten authentication after Enphase retired the Entrez token mint by
@@ -42,6 +45,9 @@ All notable changes to this project will be documented in this file.
 - Bound optional Enlighten request queueing and startup warmup stages, reserve
   cloud-read capacity for core status traffic, and retain the last current-power
   sample with retry backoff when that optional endpoint is unavailable.
+- Added bounded live-debug timeouts, active/idle cache intervals, failure backoff,
+  stale-state preservation, and cancellation-safe background refresh for gateway
+  software-update monitoring.
 - Documented the IQ EV Charger device automation triggers and the integration's
   use of standard Home Assistant conditions.
 - Reused a Home Assistant-managed stateless HTTP session for cookie-authenticated
