@@ -8,6 +8,9 @@ from unittest.mock import AsyncMock
 import pytest
 
 from custom_components.enphase_ev.gateway_software_update import (
+    GATEWAY_UPDATE_MAX_COMPONENTS,
+    GATEWAY_UPDATE_MAX_DEVICE_STATUSES,
+    GATEWAY_UPDATE_MAX_STATUS_TEXT,
     GatewaySoftwareUpdateManager,
     duration_seconds,
     normalize_gateway_software_update,
@@ -110,6 +113,38 @@ def test_normalize_gateway_software_update_active_payload_is_sanitized() -> None
     assert "serial_num" not in serialized
     assert "private" not in serialized
     assert "image-hash" not in serialized
+
+
+def test_normalize_gateway_software_update_redacts_and_bounds_free_text() -> None:
+    payload = _payload()
+    update_info = payload["site"][0]["site_update_info"][0]
+    update_info["Current_Status_str"] = "Installing GW-SERIAL " + ("x" * 300)
+    payload["devices"] = [
+        {
+            "update_info": [
+                *(f"GW-SERIAL status {index}" for index in range(40)),
+                [
+                    {
+                        "name": f"GW-SERIAL component {index}",
+                        "status_str": "Installing",
+                        "progress": index,
+                    }
+                    for index in range(40)
+                ],
+            ]
+        }
+    ]
+
+    status = normalize_gateway_software_update(
+        payload,
+        identifiers=("GW-SERIAL",),
+    )
+
+    assert status is not None
+    assert "GW-SERIAL" not in repr(status)
+    assert len(status["current_status_text"]) <= GATEWAY_UPDATE_MAX_STATUS_TEXT + 3
+    assert len(status["device_statuses"]) == GATEWAY_UPDATE_MAX_DEVICE_STATUSES
+    assert len(status["component_updates"]) == GATEWAY_UPDATE_MAX_COMPONENTS
 
 
 @pytest.mark.parametrize(
@@ -318,7 +353,7 @@ async def test_manager_uses_idle_ttl_and_stale_status_on_error() -> None:
     client = AsyncMock()
     client.site_livestream_payload.side_effect = [
         _payload(current_status=0, current_status_text="Software is up to date"),
-        RuntimeError("request failed for private gateway"),
+        RuntimeError("request failed for GW-SERIAL"),
     ]
     manager = GatewaySoftwareUpdateManager(
         lambda: client,
@@ -333,7 +368,7 @@ async def test_manager_uses_idle_ttl_and_stale_status_on_error() -> None:
     assert stale == status
     snapshot = manager.status_snapshot()
     assert snapshot["using_stale"] is True
-    assert snapshot["last_error"] == "request failed for private gateway"
+    assert snapshot["last_error"] == "request failed for GW-S...RIAL"
 
 
 @pytest.mark.asyncio

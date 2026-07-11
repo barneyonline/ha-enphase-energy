@@ -25,12 +25,16 @@ GATEWAY_UPDATE_IDLE_TTL_SECONDS = 15 * 60
 GATEWAY_UPDATE_ACTIVE_TTL_SECONDS = 30
 GATEWAY_UPDATE_RETRY_BACKOFF_SECONDS = 15 * 60
 GATEWAY_UPDATE_FETCH_TIMEOUT_SECONDS = 15
+GATEWAY_UPDATE_MAX_COMPONENTS = 32
+GATEWAY_UPDATE_MAX_DEVICE_STATUSES = 32
+GATEWAY_UPDATE_MAX_STATUS_TEXT = 160
 
 _ACTIVE_STATUS_WORDS = (
     "download",
     "install",
     "transfer",
-    "updat",
+    "update",
+    "updating",
     "upgrade",
     "in progress",
 )
@@ -103,6 +107,7 @@ class GatewaySoftwareUpdateManager:
                 return self._status
 
             self._last_fetch_utc = dt_util.utcnow()
+            serial: str | None = None
             try:
                 client = self._client_getter()
                 serial = _text(self._serial_getter())
@@ -118,11 +123,17 @@ class GatewaySoftwareUpdateManager:
                     ),
                     timeout=float(self._fetch_timeout_seconds + 2),
                 )
-                status = normalize_gateway_software_update(payload)
+                status = normalize_gateway_software_update(
+                    payload,
+                    identifiers=(serial,),
+                )
                 if status is None:
                     raise RuntimeError("software-update status unavailable")
             except Exception as err:  # noqa: BLE001
-                self._last_error = redact_text(err)
+                self._last_error = redact_text(
+                    err,
+                    identifiers=(serial,) if serial else (),
+                )
                 self._using_stale = self._status is not None
                 self._expires_mono = time.monotonic() + self._retry_backoff_seconds
                 _LOGGER.debug(
@@ -154,7 +165,11 @@ class GatewaySoftwareUpdateManager:
         }
 
 
-def normalize_gateway_software_update(payload: Any) -> dict[str, Any] | None:
+def normalize_gateway_software_update(
+    payload: Any,
+    *,
+    identifiers: tuple[object, ...] = (),
+) -> dict[str, Any] | None:
     """Extract sanitized software-update fields from a live-debug message."""
     if not isinstance(payload, Mapping):
         return None
@@ -164,27 +179,41 @@ def normalize_gateway_software_update(payload: Any) -> dict[str, Any] | None:
         return None
     update_info = _first_mapping(site.get("site_update_info"))
     components, device_statuses, e3_progress = _normalize_device_updates(
-        payload.get("devices")
+        payload.get("devices"), identifiers=identifiers
     )
     if update_info is None and not components and not device_statuses:
         return None
 
     current_status = _number_or_text(
-        update_info.get("Current_Status") if update_info else None
+        update_info.get("Current_Status") if update_info else None,
+        identifiers=identifiers,
     )
-    current_status_text = _text(
-        update_info.get("Current_Status_str") if update_info else None
+    current_status_text = _safe_text(
+        update_info.get("Current_Status_str") if update_info else None,
+        identifiers=identifiers,
     )
     last_status = _number_or_text(
-        update_info.get("Last_Status") if update_info else None
+        update_info.get("Last_Status") if update_info else None,
+        identifiers=identifiers,
     )
-    last_status_text = _text(
-        update_info.get("Last_Status_str") if update_info else None
+    last_status_text = _safe_text(
+        update_info.get("Last_Status_str") if update_info else None,
+        identifiers=identifiers,
     )
-    estimated = _text(update_info.get("Estimated Time Left") if update_info else None)
-    total = _text(update_info.get("Total Duration") if update_info else None)
-    installed_image_version = _text(
-        update_info.get("Current essimg version") if update_info else None
+    estimated = _safe_text(
+        update_info.get("Estimated Time Left") if update_info else None,
+        identifiers=identifiers,
+        max_length=80,
+    )
+    total = _safe_text(
+        update_info.get("Total Duration") if update_info else None,
+        identifiers=identifiers,
+        max_length=80,
+    )
+    installed_image_version = _safe_text(
+        update_info.get("Current essimg version") if update_info else None,
+        identifiers=identifiers,
+        max_length=80,
     )
     percentage = _overall_percentage(components, e3_progress)
     in_progress = _update_in_progress(
@@ -205,7 +234,9 @@ def normalize_gateway_software_update(payload: Any) -> dict[str, Any] | None:
         "total_duration": total,
         "total_duration_seconds": duration_seconds(total),
         "installed_image_version": installed_image_version,
-        "last_reported_at": _text(site.get("timestamp")),
+        "last_reported_at": _safe_text(
+            site.get("timestamp"), identifiers=identifiers, max_length=80
+        ),
         "device_statuses": device_statuses,
         "component_updates": components,
         "e3_progress": e3_progress,
@@ -265,16 +296,34 @@ def _mapping_list(value: Any) -> list[Mapping[str, Any]]:
     return []
 
 
-def _number_or_text(value: Any) -> int | float | str | None:
+def _safe_text(
+    value: Any,
+    *,
+    identifiers: tuple[object, ...] = (),
+    max_length: int = GATEWAY_UPDATE_MAX_STATUS_TEXT,
+) -> str | None:
+    text = _text(value)
+    if text is None:
+        return None
+    return redact_text(text, identifiers=identifiers, max_length=max_length) or None
+
+
+def _number_or_text(
+    value: Any,
+    *,
+    identifiers: tuple[object, ...] = (),
+) -> int | float | str | None:
     if isinstance(value, bool) or value is None:
         return None
     if isinstance(value, (int, float)):
         return value
-    return _text(value)
+    return _safe_text(value, identifiers=identifiers)
 
 
 def _normalize_device_updates(
     devices_value: Any,
+    *,
+    identifiers: tuple[object, ...] = (),
 ) -> tuple[list[dict[str, Any]], list[str], float | None]:
     components: list[dict[str, Any]] = []
     statuses: list[str] = []
@@ -284,12 +333,13 @@ def _normalize_device_updates(
         parts = update_info if isinstance(update_info, list) else [update_info]
         for part in parts:
             if isinstance(part, str):
-                status = _text(part)
-                if status:
+                status = _safe_text(part, identifiers=identifiers)
+                if status and len(statuses) < GATEWAY_UPDATE_MAX_DEVICE_STATUSES:
                     statuses.append(status)
                 continue
             if isinstance(part, list):
-                components.extend(_normalize_components(part))
+                components.extend(_normalize_components(part, identifiers=identifiers))
+                components = components[:GATEWAY_UPDATE_MAX_COMPONENTS]
                 continue
             if not isinstance(part, Mapping):
                 continue
@@ -297,25 +347,34 @@ def _normalize_device_updates(
             if progress is not None:
                 e3_values.append(progress)
             if any(key in part for key in ("name", "type", "status_str", "progress")):
-                components.extend(_normalize_components([part]))
+                components.extend(
+                    _normalize_components([part], identifiers=identifiers)
+                )
+                components = components[:GATEWAY_UPDATE_MAX_COMPONENTS]
     return components, statuses, max(e3_values) if e3_values else None
 
 
-def _normalize_components(values: list[Any]) -> list[dict[str, Any]]:
+def _normalize_components(
+    values: list[Any],
+    *,
+    identifiers: tuple[object, ...] = (),
+) -> list[dict[str, Any]]:
     components: list[dict[str, Any]] = []
     for value in values:
         if not isinstance(value, Mapping):
             continue
         component = {
-            "name": _text(value.get("name")),
-            "type": _text(value.get("type")),
-            "status": _number_or_text(value.get("status")),
-            "status_text": _text(value.get("status_str")),
+            "name": _safe_text(value.get("name"), identifiers=identifiers),
+            "type": _safe_text(value.get("type"), identifiers=identifiers),
+            "status": _number_or_text(value.get("status"), identifiers=identifiers),
+            "status_text": _safe_text(value.get("status_str"), identifiers=identifiers),
             "progress": _percentage(value.get("progress")),
             "latest_speed_bps": _non_negative_number(value.get("latest_speed_bps")),
         }
         if any(item is not None for item in component.values()):
             components.append(component)
+            if len(components) >= GATEWAY_UPDATE_MAX_COMPONENTS:
+                break
     return components
 
 
