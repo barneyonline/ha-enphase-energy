@@ -1633,7 +1633,7 @@ async def test_inventory_runtime_parameter_telemetry_edge_paths(
     coord._inverter_parameter_telemetry = {"INV-A": {"power": 1}}  # noqa: SLF001
     coord._endpoint_family_state(  # noqa: SLF001
         "inverter_parameter_telemetry"
-    ).last_success_mono = 0.0
+    ).last_success_mono = (time.monotonic() - 1_801.0)
     assert (
         await runtime._async_refresh_inverter_parameter_telemetry([]) == {}
     )  # noqa: SLF001
