@@ -301,6 +301,45 @@ async def test_current_power_consumption_sensor_restore_tolerates_last_state_err
 
 
 @pytest.mark.asyncio
+async def test_current_power_consumption_sensor_discards_extreme_restored_state(
+    monkeypatch,
+) -> None:
+    from custom_components.enphase_ev.sensor import EnphaseCurrentPowerConsumptionSensor
+    from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+    coord = _make_site_coord()
+    coord.last_success_utc = datetime(2026, 3, 11, 5, 41, tzinfo=timezone.utc)
+
+    async def _noop(self):
+        return None
+
+    monkeypatch.setattr(CoordinatorEntity, "async_added_to_hass", _noop)
+
+    sensor = EnphaseCurrentPowerConsumptionSensor(coord)
+    sensor.async_get_last_sensor_data = AsyncMock(  # type: ignore[method-assign]
+        return_value=type("LastSensorData", (), {"native_value": "-12000000"})()
+    )
+    sensor.async_get_last_state = AsyncMock(  # type: ignore[method-assign]
+        return_value=type(
+            "LastState",
+            (),
+            {
+                "attributes": {
+                    "sampled_at_utc": "2026-03-11T05:40:45+00:00",
+                    "cached_at_utc": "2026-03-11T05:40:45+00:00",
+                    "reported_units": "W",
+                }
+            },
+        )()
+    )
+
+    await sensor.async_added_to_hass()
+
+    assert sensor.available is False
+    assert sensor.native_value is None
+
+
+@pytest.mark.asyncio
 async def test_current_power_consumption_sensor_restore_prefers_cached_at_freshness(
     monkeypatch,
 ) -> None:

@@ -216,7 +216,7 @@ def test_refresh_due_suppresses_current_power_during_failure_backoff(
 
 
 @pytest.mark.asyncio
-async def test_async_refresh_units_str_failure(coordinator_factory) -> None:
+async def test_async_refresh_units_str_failure_is_rejected(coordinator_factory) -> None:
     coord = coordinator_factory()
 
     class _BadStr:
@@ -233,8 +233,10 @@ async def test_async_refresh_units_str_failure(coordinator_factory) -> None:
     )
 
     await coord.current_power_runtime.async_refresh()
-    assert coord._current_power_consumption_w == 1.0
-    assert coord._current_power_consumption_reported_units is None
+    assert coord._current_power_consumption_w is None
+    assert coord.current_power_runtime.diagnostics()["validation_state"] == (
+        "invalid_unit"
+    )
 
 
 @pytest.mark.asyncio
@@ -259,3 +261,140 @@ async def test_async_refresh_sample_time_invalid(coordinator_factory) -> None:
     await coord.current_power_runtime.async_refresh()
     assert coord._current_power_consumption_w == 3.0
     assert coord._current_power_consumption_sample_utc is None
+
+
+@pytest.mark.parametrize(
+    ("value", "units", "expected_w"),
+    [
+        (2500, "W", 2500.0),
+        (2.5, "kW", 2500.0),
+        (2_500_000, "mW", 2500.0),
+        (2500, None, 2500.0),
+        (2500, "", 2500.0),
+    ],
+)
+@pytest.mark.asyncio
+async def test_async_refresh_normalizes_supported_power_units(
+    coordinator_factory, value, units, expected_w
+) -> None:
+    coord = coordinator_factory()
+    coord.client = SimpleNamespace(
+        latest_power=AsyncMock(
+            return_value={
+                "value": value,
+                "units": units,
+                "time": 1_700_000_000,
+            }
+        )
+    )
+
+    await coord.current_power_runtime.async_refresh()
+
+    assert coord._current_power_consumption_w == expected_w
+    assert coord.current_power_runtime.diagnostics()["last_normalized_value_w"] == (
+        expected_w
+    )
+
+
+@pytest.mark.asyncio
+async def test_async_refresh_unknown_unit_preserves_last_good_sample(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord._current_power_consumption_w = 2500.0
+    coord.client = SimpleNamespace(
+        latest_power=AsyncMock(
+            return_value={"value": 2.5, "units": "MW", "time": 1_700_000_000}
+        )
+    )
+
+    await coord.current_power_runtime.async_refresh()
+
+    diagnostics = coord.current_power_runtime.diagnostics()
+    assert coord._current_power_consumption_w == 2500.0
+    assert diagnostics["validation_state"] == "invalid_unit"
+    assert diagnostics["validation_reason"] == "unsupported_power_unit"
+    assert diagnostics["using_stale"] is True
+
+
+@pytest.mark.asyncio
+async def test_async_refresh_extreme_requires_new_source_timestamp(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord._current_power_consumption_w = 2500.0
+    fetcher = AsyncMock(
+        side_effect=[
+            {"value": -12_000_000, "units": "W", "time": 1_700_000_000},
+            {"value": -13_000_000, "units": "W", "time": 1_700_000_000},
+            {"value": -15_000_000, "units": "W", "time": 1_700_000_060},
+        ]
+    )
+    coord.client = SimpleNamespace(latest_power=fetcher)
+
+    await coord.current_power_runtime.async_refresh()
+    assert coord._current_power_consumption_w == 2500.0
+    assert coord.current_power_runtime.using_stale is True
+    assert coord.current_power_runtime.diagnostics()["pending_extreme_count"] == 1
+
+    coord.current_power_runtime._cache_until_mono = None  # noqa: SLF001
+    coord._endpoint_family_state("current_power").next_retry_mono = None  # noqa: SLF001
+    await coord.current_power_runtime.async_refresh()
+    assert coord._current_power_consumption_w == 2500.0
+
+    coord.current_power_runtime._cache_until_mono = None  # noqa: SLF001
+    coord._endpoint_family_state("current_power").next_retry_mono = None  # noqa: SLF001
+    await coord.current_power_runtime.async_refresh()
+    diagnostics = coord.current_power_runtime.diagnostics()
+    assert coord._current_power_consumption_w == -15_000_000
+    assert diagnostics["validation_state"] == "confirmed_extreme"
+    assert diagnostics["pending_extreme_count"] == 0
+    assert diagnostics["using_stale"] is False
+
+
+@pytest.mark.asyncio
+async def test_async_refresh_normal_sample_clears_pending_extreme(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    fetcher = AsyncMock(
+        side_effect=[
+            {"value": 12_000_000, "units": "W", "time": 1_700_000_000},
+            {"value": 2500, "units": "W", "time": 1_700_000_060},
+        ]
+    )
+    coord.client = SimpleNamespace(latest_power=fetcher)
+
+    await coord.current_power_runtime.async_refresh()
+    coord.current_power_runtime._cache_until_mono = None  # noqa: SLF001
+    coord._endpoint_family_state("current_power").next_retry_mono = None  # noqa: SLF001
+    await coord.current_power_runtime.async_refresh()
+
+    diagnostics = coord.current_power_runtime.diagnostics()
+    assert coord._current_power_consumption_w == 2500
+    assert diagnostics["validation_state"] == "accepted"
+    assert diagnostics["pending_extreme_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_async_refresh_timestamp_less_extreme_remains_pending(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    fetcher = AsyncMock(
+        side_effect=[
+            {"value": 12_000_000, "units": "W"},
+            {"value": 13_000_000, "units": "W"},
+        ]
+    )
+    coord.client = SimpleNamespace(latest_power=fetcher)
+
+    await coord.current_power_runtime.async_refresh()
+    coord.current_power_runtime._cache_until_mono = None  # noqa: SLF001
+    coord._endpoint_family_state("current_power").next_retry_mono = None  # noqa: SLF001
+    await coord.current_power_runtime.async_refresh()
+
+    diagnostics = coord.current_power_runtime.diagnostics()
+    assert coord._current_power_consumption_w is None
+    assert diagnostics["validation_reason"] == "extreme_sample_missing_timestamp"
+    assert diagnostics["pending_extreme_count"] == 1

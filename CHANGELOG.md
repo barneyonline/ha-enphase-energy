@@ -33,6 +33,10 @@ All notable changes to this project will be documented in this file.
 - Added installer-only, cloud-based Grid Profile Control with country-scoped region and profile selection, explicit apply confirmation, current profile monitoring, and follow-up cloud status refreshes.
 
 ### 🐛 Bug fixes
+- Prevented multi-megawatt site power spikes during startup by reseeding derived
+  power baselines when lifetime-flow sources change, normalizing live-power
+  units, and requiring a newer comparable sample before publishing extreme
+  readings.
 - Fixed Enlighten authentication after Enphase retired the Entrez token mint by
   using the first-party session token endpoint and retaining rotated session
   cookies, and aligned BatteryConfig reads with the current cookie-session web

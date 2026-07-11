@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from .api import InvalidPayloadError
 from .log_redaction import redact_site_id, redact_text
+from .power_validation import ExtremePowerValidator
 
 if TYPE_CHECKING:
     from .coordinator import EnphaseCoordinator
@@ -45,13 +46,94 @@ class CurrentPowerRuntime:
         self.coordinator = coordinator
         self._cache_until_mono: float | None = None
         self.using_stale = False
+        self._extreme_validator = ExtremePowerValidator()
+        self._last_observed_value: float | None = None
+        self._last_observed_units: str | None = None
+        self._last_normalized_value_w: float | None = None
+        self._last_observed_sample_utc: datetime | None = None
+        self._validation_state = "unavailable"
+        self._validation_reason: str | None = None
 
     def clear(self) -> None:
         """Reset cached current power consumption samples."""
 
         self._cache_until_mono = None
         self.using_stale = False
+        self._extreme_validator.clear()
+        self._last_observed_value = None
+        self._last_observed_units = None
+        self._last_normalized_value_w = None
+        self._last_observed_sample_utc = None
+        self._validation_state = "unavailable"
+        self._validation_reason = None
         CurrentPowerSample().apply_to(self.coordinator)
+
+    @staticmethod
+    def _parse_sample_utc(sample_time: object) -> datetime | None:
+        if sample_time is None:
+            return None
+        try:
+            sample_seconds = float(str(sample_time))
+            if sample_seconds > 10**12:
+                # The app API has returned both seconds and milliseconds
+                # for this field across deployments.
+                sample_seconds /= 1000.0
+            return datetime.fromtimestamp(sample_seconds, tz=_tz.utc)
+        except Exception:  # noqa: BLE001
+            return None
+
+    @staticmethod
+    def _normalize_units(units: object) -> tuple[str | None, float | None]:
+        if units is None:
+            return None, 1.0
+        try:
+            units_text = str(units).strip()
+        except Exception:  # noqa: BLE001
+            return None, None
+        if not units_text:
+            return None, 1.0
+        if units_text in {"W", "w"}:
+            return units_text, 1.0
+        if units_text in {"kW", "kw", "KW"}:
+            return units_text, 1000.0
+        if units_text in {"mW", "mw"}:
+            return units_text, 0.001
+        return units_text, None
+
+    def diagnostics(self) -> dict[str, object]:
+        """Return a sanitized summary of current-power validation state."""
+
+        coord = self.coordinator
+        accepted_sample = getattr(coord, "_current_power_consumption_sample_utc", None)
+        return {
+            "accepted_value_w": getattr(coord, "_current_power_consumption_w", None),
+            "accepted_sample_utc": (
+                accepted_sample.isoformat()
+                if isinstance(accepted_sample, datetime)
+                else None
+            ),
+            "accepted_reported_units": getattr(
+                coord, "_current_power_consumption_reported_units", None
+            ),
+            "accepted_reported_precision": getattr(
+                coord, "_current_power_consumption_reported_precision", None
+            ),
+            "accepted_source": getattr(
+                coord, "_current_power_consumption_source", None
+            ),
+            "last_observed_value": self._last_observed_value,
+            "last_observed_units": self._last_observed_units,
+            "last_normalized_value_w": self._last_normalized_value_w,
+            "last_observed_sample_utc": (
+                self._last_observed_sample_utc.isoformat()
+                if self._last_observed_sample_utc is not None
+                else None
+            ),
+            "validation_state": self._validation_state,
+            "validation_reason": self._validation_reason,
+            "pending_extreme_count": self._extreme_validator.pending_count,
+            "using_stale": self.using_stale,
+        }
 
     def _cached_state_present(self) -> bool:
         coord = self.coordinator
@@ -110,6 +192,8 @@ class CurrentPowerRuntime:
             return
 
         if not isinstance(payload, dict):
+            self._validation_state = "invalid_payload"
+            self._validation_reason = "response_not_object"
             self._note_invalid_payload("Current-power response is not an object")
             return
 
@@ -117,33 +201,29 @@ class CurrentPowerRuntime:
         try:
             numeric = float(str(value))
         except Exception:  # noqa: BLE001
+            self._validation_state = "invalid_payload"
+            self._validation_reason = "value_not_numeric"
             self._note_invalid_payload("Current-power response has no numeric value")
             return
         if numeric != numeric or numeric in (float("inf"), float("-inf")):
+            self._validation_state = "invalid_payload"
+            self._validation_reason = "value_not_finite"
             self._note_invalid_payload("Current-power response value is not finite")
             return
 
-        sampled_at = None
-        sample_time = payload.get("time")
-        if sample_time is not None:
-            try:
-                sample_seconds = float(str(sample_time))
-                if sample_seconds > 10**12:
-                    # The app API has returned both seconds and milliseconds
-                    # for this field across deployments.
-                    sample_seconds /= 1000.0
-                sampled_at = datetime.fromtimestamp(sample_seconds, tz=_tz.utc)
-            except Exception:  # noqa: BLE001
-                sampled_at = None
-
-        units = payload.get("units")
-        if units is not None:
-            try:
-                units = str(units).strip()
-            except Exception:  # noqa: BLE001
-                units = None
-            if not units:
-                units = None
+        sampled_at = self._parse_sample_utc(payload.get("time"))
+        units, multiplier = self._normalize_units(payload.get("units"))
+        self._last_observed_value = numeric
+        self._last_observed_units = units
+        self._last_observed_sample_utc = sampled_at
+        if multiplier is None:
+            self._last_normalized_value_w = None
+            self._validation_state = "invalid_unit"
+            self._validation_reason = "unsupported_power_unit"
+            self._note_invalid_payload("Current-power response unit is unsupported")
+            return
+        normalized_w = numeric * multiplier
+        self._last_normalized_value_w = normalized_w
 
         precision_raw = payload.get("precision")
         precision = None
@@ -153,8 +233,20 @@ class CurrentPowerRuntime:
             except Exception:  # noqa: BLE001
                 precision = None
 
+        validation = self._extreme_validator.evaluate(
+            normalized_w,
+            sample_ts=(sampled_at.timestamp() if sampled_at is not None else None),
+        )
+        self._validation_state = validation.state
+        self._validation_reason = validation.reason
+        if not validation.accepted:
+            self._cache_until_mono = now + CURRENT_POWER_CACHE_TTL_S
+            self.using_stale = self._cached_state_present()
+            coord._note_endpoint_family_success(CURRENT_POWER_ENDPOINT_FAMILY)
+            return
+
         CurrentPowerSample(
-            w=numeric,
+            w=normalized_w,
             sample_utc=sampled_at,
             reported_units=units,
             reported_precision=precision,
@@ -167,6 +259,7 @@ class CurrentPowerRuntime:
     def _note_invalid_payload(self, summary: str) -> None:
         """Back off malformed responses while retaining the last valid sample."""
 
+        self._extreme_validator.clear()
         error = InvalidPayloadError(
             summary,
             endpoint="get_latest_power",

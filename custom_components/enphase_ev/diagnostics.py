@@ -531,6 +531,15 @@ async def async_get_config_entry_diagnostics(
     except DIAGNOSTIC_CAPTURE_ERRORS:
         heatpump_runtime = {}
 
+    current_power: dict[str, object] = {}
+    current_power_runtime = getattr(coord, "current_power_runtime", None)
+    current_power_diagnostics = getattr(current_power_runtime, "diagnostics", None)
+    if callable(current_power_diagnostics):
+        try:
+            current_power = current_power_diagnostics()
+        except DIAGNOSTIC_CAPTURE_ERRORS:
+            current_power = {}
+
     try:
         scheduler = coord.scheduler_diagnostics()
     except DIAGNOSTIC_CAPTURE_ERRORS:
@@ -596,6 +605,7 @@ async def async_get_config_entry_diagnostics(
         "system_dashboard": system_dashboard,
         "system_events": system_events,
         "heatpump_runtime": heatpump_runtime,
+        "current_power": current_power,
         "scheduler": scheduler,
         "tariff": tariff,
         "grid_profile": grid_profile,
