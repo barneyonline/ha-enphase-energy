@@ -48,6 +48,7 @@ async def test_async_setup_entry_syncs_binary_sensors(
             }
         }
     )
+    coord.system_events_runtime._last_success_utc = dt_util.utcnow()  # noqa: SLF001
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
 
     callbacks: list[Callable[[], None]] = []
@@ -127,6 +128,89 @@ async def test_async_setup_entry_syncs_binary_sensors(
 
     sync_cb()
     assert len(added) == 8
+
+
+@pytest.mark.asyncio
+async def test_system_events_entity_requires_successful_installer_response(
+    hass, config_entry, coordinator_factory, monkeypatch
+) -> None:
+    """Create the installer-only entity only after its endpoint succeeds."""
+    from homeassistant.helpers import entity_registry as er
+
+    coord = coordinator_factory(serials=[])
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+
+    topology_callbacks: list[Callable[[], None]] = []
+    update_callbacks: list[Callable[[], None]] = []
+
+    def _capture_topology_listener(
+        callback: Callable[[], None],
+    ) -> Callable[[], None]:
+        topology_callbacks.append(callback)
+        return _stub_listener()
+
+    def _capture_update_listener(
+        callback: Callable[[], None], *, context=None
+    ) -> Callable[[], None]:
+        update_callbacks.append(callback)
+        return _stub_listener()
+
+    monkeypatch.setattr(
+        coord, "async_add_topology_listener", _capture_topology_listener
+    )
+    monkeypatch.setattr(coord, "async_add_listener", _capture_update_listener)
+
+    ent_reg = er.async_get(hass)
+    stale = ent_reg.async_get_or_create(
+        "binary_sensor",
+        DOMAIN,
+        f"{DOMAIN}_site_{coord.site_id}_active_system_events",
+        config_entry=config_entry,
+    )
+    added: list[object] = []
+
+    await async_setup_entry(
+        hass,
+        config_entry,
+        lambda entities, update_before_add=False: added.extend(entities),
+    )
+
+    assert len(topology_callbacks) == 1
+    assert ent_reg.async_get(stale.entity_id) is None
+    assert (
+        len(
+            [
+                entity
+                for entity in added
+                if isinstance(entity, SiteCloudReachableBinarySensor)
+            ]
+        )
+        == 1
+    )
+    assert not any(
+        isinstance(entity, SiteActiveSystemEventsBinarySensor) for entity in added
+    )
+
+    coord.system_events_runtime._last_success_utc = dt_util.utcnow()  # noqa: SLF001
+    sync_events = next(
+        callback
+        for callback in update_callbacks
+        if callback.__name__ == "_async_sync_system_events"
+    )
+    sync_events()
+    sync_events()
+
+    assert (
+        len(
+            [
+                entity
+                for entity in added
+                if isinstance(entity, SiteActiveSystemEventsBinarySensor)
+            ]
+        )
+        == 1
+    )
 
 
 @pytest.mark.asyncio
@@ -682,7 +766,11 @@ async def test_async_setup_entry_prunes_heatpump_sg_ready_binary_sensor_when_typ
 
     fake_registry = SimpleNamespace(
         async_get_entity_id=MagicMock(
-            return_value="binary_sensor.heat_pump_sg_ready_active"
+            side_effect=lambda _domain, _platform, unique_id: (
+                "binary_sensor.heat_pump_sg_ready_active"
+                if unique_id.endswith("heat_pump_sg_ready_active")
+                else None
+            )
         ),
         async_remove=MagicMock(),
     )
@@ -772,7 +860,11 @@ async def test_async_setup_entry_prunes_heatpump_sg_ready_binary_sensor_when_ded
 
     fake_registry = SimpleNamespace(
         async_get_entity_id=MagicMock(
-            return_value="binary_sensor.heat_pump_sg_ready_active"
+            side_effect=lambda _domain, _platform, unique_id: (
+                "binary_sensor.heat_pump_sg_ready_active"
+                if unique_id.endswith("heat_pump_sg_ready_active")
+                else None
+            )
         ),
         async_remove=MagicMock(),
     )
