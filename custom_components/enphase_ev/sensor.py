@@ -7449,7 +7449,7 @@ class EnphaseGatewayConnectivityStatusSensor(_SiteBaseEntity):
     @property
     def extra_state_attributes(self) -> Any:
         snapshot = _gateway_inventory_snapshot(self._coord)
-        return {
+        attributes = {
             "total_devices": snapshot.get("total_devices"),
             "connected_devices": snapshot.get("connected_devices"),
             "disconnected_devices": snapshot.get("disconnected_devices"),
@@ -7462,24 +7462,24 @@ class EnphaseGatewayConnectivityStatusSensor(_SiteBaseEntity):
             "latest_reported_utc": snapshot.get("latest_reported_utc"),
             "latest_reported_device": snapshot.get("latest_reported_device"),
             "property_keys": snapshot.get("property_keys"),
-            "gateway_count": snapshot.get("gateway_count"),
-            "multi_gateway": snapshot.get("multi_gateway"),
-            "primary_gateway_serial": snapshot.get("primary_gateway_serial"),
-            "default_gateway_serial": snapshot.get("default_gateway_serial"),
-            "preferred_gateway_serial": snapshot.get("preferred_gateway_serial"),
-            "preferred_gateway_phase_count": snapshot.get(
-                "preferred_gateway_phase_count"
-            ),
-            "split_phase_gateway_count": snapshot.get("split_phase_gateway_count"),
-            "three_phase_gateway_count": snapshot.get("three_phase_gateway_count"),
-            "production_only_gateway_count": snapshot.get(
-                "production_only_gateway_count"
-            ),
-            "consumption_only_gateway_count": snapshot.get(
-                "consumption_only_gateway_count"
-            ),
-            "storage_gateway_count": snapshot.get("storage_gateway_count"),
         }
+        phase_map_keys = (
+            "gateway_count",
+            "multi_gateway",
+            "primary_gateway_serial",
+            "default_gateway_serial",
+            "preferred_gateway_serial",
+            "preferred_gateway_phase_count",
+            "split_phase_gateway_count",
+            "three_phase_gateway_count",
+            "production_only_gateway_count",
+            "consumption_only_gateway_count",
+            "storage_gateway_count",
+        )
+        attributes.update(
+            {key: snapshot[key] for key in phase_map_keys if key in snapshot}
+        )
+        return attributes
 
 
 class EnphaseGatewayLastReportedSensor(_SiteBaseEntity):

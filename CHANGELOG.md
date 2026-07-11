@@ -25,7 +25,8 @@ All notable changes to this project will be documented in this file.
   advisory update entity, including Home Assistant in-progress/percentage state,
   timing, installed image version, and sanitized component transfer details.
 - Added multi-gateway phase-map discovery so site controls prefer the primary or
-  default IQ Gateway and Gateway Status reports phase/topology diagnostics.
+  default IQ Gateway and Gateway Status reports phase/topology diagnostics only when
+  authoritative phase-map data is available.
 
 ### 🐛 Bug fixes
 - Fixed Enlighten authentication after Enphase retired the Entrez token mint by

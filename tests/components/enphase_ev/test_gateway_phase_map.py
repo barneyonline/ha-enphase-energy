@@ -177,6 +177,11 @@ def test_gateway_phase_map_accessors_return_defensive_copies(
     coordinator_factory,
 ) -> None:
     coord = coordinator_factory()
+    assert coord.inventory_runtime.gateway_phase_map_summary() == {}
+    assert (
+        "gateway_count"
+        not in EnphaseGatewayConnectivityStatusSensor(coord).extra_state_attributes
+    )
     coord.inventory_runtime._gateway_phase_map = {  # noqa: SLF001
         "GW-1": {"phases": {"0": True}}
     }
@@ -245,8 +250,11 @@ async def test_refresh_gateway_phase_map_invalid_payload_sets_backoff(
     coordinator_factory, monkeypatch
 ) -> None:
     coord = coordinator_factory()
+    coord.inventory_runtime._gateway_phase_map = {  # noqa: SLF001
+        "GW-OLD": {"is_default_gateway": True}
+    }
     coord.client = SimpleNamespace(
-        phase_map_multiple_envoy=AsyncMock(return_value=["bad"])
+        phase_map_multiple_envoy=AsyncMock(side_effect=[["bad"], None])
     )
     monkeypatch.setattr(
         "custom_components.enphase_ev.inventory_runtime.time.monotonic", lambda: 300.0
@@ -257,6 +265,12 @@ async def test_refresh_gateway_phase_map_invalid_payload_sets_backoff(
     assert coord._gateway_phase_map_failure_backoff_until == (  # noqa: SLF001
         300.0 + GATEWAY_PHASE_MAP_FAILURE_BACKOFF_S
     )
+    assert coord.inventory_runtime.gateway_phase_map_preferred_serial() == "GW-OLD"
+
+    await coord.inventory_runtime._async_refresh_gateway_phase_map(  # noqa: SLF001
+        force=True
+    )
+    assert coord.inventory_runtime.gateway_phase_map_preferred_serial() == "GW-OLD"
 
 
 @pytest.mark.asyncio

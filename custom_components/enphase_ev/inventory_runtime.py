@@ -302,6 +302,8 @@ class InventoryRuntime:
         """Return a compact topology summary suitable for diagnostics/entities."""
 
         phase_map = self.gateway_phase_map()
+        if not phase_map:
+            return {}
         preferred = self.gateway_phase_map_preferred_serial()
         primary = next(
             (
@@ -389,13 +391,13 @@ class InventoryRuntime:
                 redact_text(err, site_ids=(self.site_id,)),
             )
             return
-        if payload is not None and not isinstance(payload, dict):
+        if not isinstance(payload, dict):
             self._set_shared_state_attr(
                 "_gateway_phase_map_failure_backoff_until",
                 now + GATEWAY_PHASE_MAP_FAILURE_BACKOFF_S,
             )
             return
-        normalized = self._normalize_gateway_phase_map(payload or {})
+        normalized = self._normalize_gateway_phase_map(payload)
         self._update_shared_state(
             _gateway_phase_map=normalized,
             _gateway_phase_map_cache_until=now + GATEWAY_PHASE_MAP_CACHE_TTL,
