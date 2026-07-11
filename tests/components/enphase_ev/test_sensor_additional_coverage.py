@@ -1331,6 +1331,7 @@ async def test_async_setup_entry_adds_inverter_lifetime_sensors(
 ):
     from custom_components.enphase_ev.sensor import (
         EnphaseInverterLifetimeEnergySensor,
+        EnphaseInverterTelemetrySensor,
         async_setup_entry,
     )
 
@@ -1344,6 +1345,7 @@ async def test_async_setup_entry_adds_inverter_lifetime_sensors(
             "lifetime_production_wh": 1_500_000,
             "lifetime_query_start_date": "2022-08-10",
             "lifetime_query_end_date": "2026-02-09",
+            "telemetry": {"power": 220.0},
         }
     }
     coord._inverter_order = ["INV-A"]  # noqa: SLF001
@@ -1371,6 +1373,7 @@ async def test_async_setup_entry_adds_inverter_lifetime_sensors(
         ent for ent in added if isinstance(ent, EnphaseInverterLifetimeEnergySensor)
     ]
     assert len(inverter_entities) == 1
+    assert any(isinstance(ent, EnphaseInverterTelemetrySensor) for ent in added)
     entity = inverter_entities[0]
     assert entity.native_value == pytest.approx(1500.0)
     attrs = entity.extra_state_attributes
@@ -1383,6 +1386,51 @@ async def test_async_setup_entry_adds_inverter_lifetime_sensors(
     assert set(attrs) <= entity._unrecorded_attributes  # noqa: SLF001
 
     # Entity reports unavailable once the inverter snapshot is removed.
+    coord._inverter_data = {}  # noqa: SLF001
+    assert entity.available is False
+
+
+def test_inverter_telemetry_sensor(coordinator_factory) -> None:
+    from custom_components.enphase_ev.sensor import EnphaseInverterTelemetrySensor
+
+    coord = coordinator_factory()
+    coord._inverter_data = {  # noqa: SLF001
+        "INV-A": {
+            "telemetry": {
+                "power": 234.5,
+                "ac_voltage": 230.1,
+                "ac_frequency": 49.99,
+                "temperature": 42,
+                "sampled_at": {"power": "2026-07-11T01:00:00Z"},
+                "parameter_ids": {"power": "power"},
+            },
+            "fw1": "v1",
+            "fw2": "v2",
+            "rssi": {"sig_str": 72},
+        }
+    }
+    entity = EnphaseInverterTelemetrySensor(coord, "INV-A")
+
+    assert entity.available is True
+    assert entity.native_value == 234.5
+    assert entity.entity_registry_enabled_default is False
+    assert entity.extra_state_attributes == {
+        "power_w": 234.5,
+        "ac_voltage_v": 230.1,
+        "ac_frequency_hz": 49.99,
+        "temperature_c": 42,
+        "sampled_at": {"power": "2026-07-11T01:00:00Z"},
+        "parameter_ids": {"power": "power"},
+        "firmware_primary": "v1",
+        "firmware_secondary": "v2",
+        "signal_strength": {"sig_str": 72},
+    }
+    coord.inventory_view.type_device_info = lambda _type: {"name": "Shared"}
+    assert entity.device_info == {"name": "Shared"}
+    coord.inventory_view.type_device_info = lambda _type: None
+    assert entity.device_info["name"] == "IQ Microinverters"
+    coord._inverter_data["INV-A"]["telemetry"]["power"] = "bad"  # noqa: SLF001
+    assert entity.native_value is None
     coord._inverter_data = {}  # noqa: SLF001
     assert entity.available is False
 

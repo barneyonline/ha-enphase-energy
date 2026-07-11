@@ -81,6 +81,20 @@ def test_sensor_registry_get_entity_id_without_registry_method() -> None:
     assert helper._async_get_sensor_entity_id("unique-id") is None
 
 
+def test_sensor_registry_type_removal_and_entity_iteration_edge_paths() -> None:
+    helper = _helper(SimpleNamespace(entities=None))
+    helper.remove_type_sensor_entity("envoy")
+    assert helper._entity_registry_values() == ()  # noqa: SLF001
+
+    registry = SimpleNamespace(
+        async_get_entity_id=MagicMock(return_value=None),
+        async_remove=MagicMock(),
+    )
+    helper = _helper(registry)
+    helper.remove_type_sensor_entity("envoy")
+    registry.async_remove.assert_not_called()
+
+
 def test_sensor_registry_prunes_gateway_and_type_inventory_entities() -> None:
     registry = FakeRegistry(
         {

@@ -1133,6 +1133,33 @@ class EnphaseCoordinator(
                 suppress_after_failures=3,
                 support_state_on_success=True,
             ),
+            "inverter_dashboard_inventory": EndpointFamilyPolicy(
+                success_ttl_s=21600.0,
+                stale_after_s=86400.0,
+                failure_backoff_schedule_s=(1800.0, 3600.0, 7200.0, 21600.0),
+                max_backoff_s=21600.0,
+                optional=True,
+                suppress_after_failures=3,
+                support_state_on_success=True,
+            ),
+            "inverter_parameter_catalog": EndpointFamilyPolicy(
+                success_ttl_s=21600.0,
+                stale_after_s=86400.0,
+                failure_backoff_schedule_s=(1800.0, 3600.0, 7200.0, 21600.0),
+                max_backoff_s=21600.0,
+                optional=True,
+                suppress_after_failures=3,
+                support_state_on_success=True,
+            ),
+            "inverter_parameter_telemetry": EndpointFamilyPolicy(
+                success_ttl_s=300.0,
+                stale_after_s=1800.0,
+                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
+                max_backoff_s=3600.0,
+                optional=True,
+                suppress_after_failures=3,
+                support_state_on_success=True,
+            ),
         }
 
     async def async_request_refresh(self) -> None:

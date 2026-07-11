@@ -1459,6 +1459,9 @@
       "microinverter_reporting_count": {
         "name": "Microinverter attivi"
       },
+      "inverter_telemetry": {
+        "name": "Telemetria {serial_number}"
+      },
       "microinverter_last_reported": {
         "name": "Ultima segnalazione microinverter"
       },

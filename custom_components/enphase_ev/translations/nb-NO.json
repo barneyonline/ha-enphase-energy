@@ -1459,6 +1459,9 @@
       "microinverter_reporting_count": {
         "name": "Aktive mikrovekselrettere"
       },
+      "inverter_telemetry": {
+        "name": "Telemetri {serial_number}"
+      },
       "microinverter_last_reported": {
         "name": "Sist rapportert fra mikroinvertere"
       },

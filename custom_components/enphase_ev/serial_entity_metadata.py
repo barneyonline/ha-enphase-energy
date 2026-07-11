@@ -68,7 +68,10 @@ AC_BATTERY_ENTITY_UNIQUE_SUFFIXES: tuple[str, ...] = (
     "_last_reported",
 )
 AC_BATTERY_RETIRED_UNIQUE_SUFFIXES: tuple[str, ...] = ("_last_reported_at",)
-INVERTER_ENTITY_UNIQUE_SUFFIXES: tuple[str, ...] = ("_lifetime_energy",)
+INVERTER_ENTITY_UNIQUE_SUFFIXES: tuple[str, ...] = (
+    "_lifetime_energy",
+    "_telemetry",
+)
 
 
 def charger_entity_unique_id(serial: str, suffix: str) -> str:
@@ -122,10 +125,10 @@ def site_ac_battery_entity_unique_ids(
     )
 
 
-def inverter_entity_unique_id(serial: str) -> str:
+def inverter_entity_unique_id(serial: str, suffix: str = "_lifetime_energy") -> str:
     """Return a microinverter unique ID."""
 
-    return f"{DOMAIN}_inverter_{serial}_lifetime_energy"
+    return f"{DOMAIN}_inverter_{serial}{suffix}"
 
 
 def charger_entity_serial_from_unique_id(

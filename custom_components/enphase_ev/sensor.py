@@ -62,7 +62,7 @@ from .entity import (
     evse_resolved_charge_mode,
 )
 from .labels import friendly_status_text, status_label
-from .parsing_helpers import heatpump_status_text
+from .parsing_helpers import coerce_optional_float, heatpump_status_text
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
 from .runtime_helpers import (
     coerce_optional_text as _gateway_clean_text,
@@ -340,6 +340,7 @@ async def async_setup_entry(
     last_charger_serial_set: set[str] | None = None
     last_inverter_serial_set: set[str] | None = None
     last_entity_shape_signature: tuple[object, ...] | None = None
+    last_inverter_telemetry_set: set[str] | None = None
 
     @callback
     def _async_sync_site_entities() -> None:
@@ -948,6 +949,19 @@ async def async_setup_entry(
             ]
             async_add_entities(entities, update_before_add=False)
             registry_setup.known_inverter_serials.update(serials)
+        telemetry_serials = [
+            sn
+            for sn in current_serials
+            if sn not in registry_setup.known_inverter_telemetry_serials
+            and isinstance(coord.inverter_data(sn), dict)
+            and bool((coord.inverter_data(sn) or {}).get("telemetry"))
+        ]
+        if telemetry_serials:
+            async_add_entities(
+                [EnphaseInverterTelemetrySensor(coord, sn) for sn in telemetry_serials],
+                update_before_add=False,
+            )
+            registry_setup.known_inverter_telemetry_serials.update(telemetry_serials)
 
     @callback
     def _async_sync_topology() -> None:
@@ -957,6 +971,7 @@ async def async_setup_entry(
         nonlocal last_ac_battery_serial_set
         nonlocal last_charger_serial_set
         nonlocal last_inverter_serial_set
+        nonlocal last_inverter_telemetry_set
 
         current_type_keys = {
             key for key in coord.inventory_view.iter_type_keys() if key
@@ -971,6 +986,15 @@ async def async_setup_entry(
         if current_charger_serials is None:
             current_charger_serials = {sn for sn in coord.iter_serials() if sn}
         current_inverter_serials = active_inverter_serials_for_cleanup(coord)
+        current_inverter_telemetry = (
+            {
+                serial
+                for serial in current_inverter_serials
+                if bool((coord.inverter_data(serial) or {}).get("telemetry"))
+            }
+            if current_inverter_serials is not None
+            else None
+        )
 
         # The dedicated topology signal also covers router membership, which is
         # intentionally absent from the cheap coordinator-update signature.
@@ -989,9 +1013,13 @@ async def async_setup_entry(
         if current_charger_serials != last_charger_serial_set:
             _async_sync_chargers()
             last_charger_serial_set = current_charger_serials
-        if current_inverter_serials != last_inverter_serial_set:
+        if (
+            current_inverter_serials != last_inverter_serial_set
+            or current_inverter_telemetry != last_inverter_telemetry_set
+        ):
             _async_sync_inverters()
             last_inverter_serial_set = current_inverter_serials
+            last_inverter_telemetry_set = current_inverter_telemetry
 
     def _entity_shape_signature() -> tuple[object, ...]:
         """Return inexpensive state that controls site-level entity presence."""
@@ -3134,6 +3162,88 @@ class EnphaseTypeInventorySensor(CoordinatorEntity, SensorEntity):  # type: igno
         return DeviceInfo(
             identifiers={(DOMAIN, f"type:{self._coord.site_id}:{self._type_key}")},
             manufacturer="Enphase",
+        )
+
+
+class EnphaseInverterTelemetrySensor(CoordinatorEntity, SensorEntity):  # type: ignore[misc]
+    """Optional live parameter telemetry for one microinverter."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "inverter_telemetry"
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
+    _attr_suggested_display_precision = 1
+
+    def __init__(self, coord: EnphaseCoordinator, serial: str) -> None:
+        super().__init__(coord)
+        self._coord = coord
+        self._sn = str(serial)
+        self._attr_unique_id = f"{DOMAIN}_inverter_{self._sn}_telemetry"
+        self._attr_translation_placeholders = {"serial_number": self._sn}
+
+    def _snapshot(self) -> dict[str, object]:
+        payload = self._coord.inverter_data(self._sn)
+        return payload if isinstance(payload, dict) else {}
+
+    def _telemetry(self) -> dict[str, object]:
+        telemetry = self._snapshot().get("telemetry")
+        return dict(telemetry) if isinstance(telemetry, dict) else {}
+
+    @property
+    def available(self) -> bool:
+        return bool(super().available and self._telemetry())
+
+    @property
+    def native_value(self) -> Any:
+        number = coerce_optional_float(self._telemetry().get("power"))
+        return number if number is not None and math.isfinite(number) else None
+
+    @property
+    def extra_state_attributes(self) -> Any:
+        snapshot = self._snapshot()
+        telemetry = self._telemetry()
+        attrs: dict[str, object] = {}
+        attribute_names = {
+            "power": "power_w",
+            "ac_voltage": "ac_voltage_v",
+            "dc_voltage": "dc_voltage_v",
+            "ac_current": "ac_current_a",
+            "dc_current": "dc_current_a",
+            "ac_frequency": "ac_frequency_hz",
+            "temperature": "temperature_c",
+            "signal_strength": "signal_strength",
+            "firmware": "firmware",
+        }
+        for key, attribute_name in attribute_names.items():
+            value = telemetry.get(key)
+            if value is not None:
+                attrs[attribute_name] = value
+        for key in ("sampled_at", "parameter_ids"):
+            value = telemetry.get(key)
+            if isinstance(value, dict) and value:
+                attrs[key] = dict(value)
+        if snapshot.get("fw1") is not None:
+            attrs["firmware_primary"] = snapshot["fw1"]
+        if snapshot.get("fw2") is not None:
+            attrs["firmware_secondary"] = snapshot["fw2"]
+        if snapshot.get("rssi") is not None and "signal_strength" not in attrs:
+            attrs["signal_strength"] = snapshot["rssi"]
+        return attrs
+
+    @property
+    def device_info(self) -> Any:
+        from homeassistant.helpers.entity import DeviceInfo
+
+        info = _type_device_info(self._coord, "microinverter")
+        if info is not None:
+            return info
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"type:{self._coord.site_id}:microinverter")},
+            manufacturer="Enphase",
+            name="IQ Microinverters",
         )
 
 

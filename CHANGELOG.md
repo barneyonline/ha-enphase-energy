@@ -15,7 +15,7 @@ All notable changes to this project will be documented in this file.
   excluded from recorder history.
 
 ### ✨ New features
-- None
+- Added optional installer-level microinverter parameter telemetry with bulk device reads for power and available AC/DC voltage/current, frequency, temperature, signal, and firmware details. Empty authoritative reads clear old values, partial failures retain only bounded stale data, and the diagnostic entities are disabled by default.
 
 ### 🐛 Bug fixes
 - Fixed Enlighten authentication after Enphase retired the Entrez token mint by

@@ -2643,6 +2643,70 @@ async def test_devices_details_reraises_unexpected_http_error() -> None:
 
 
 @pytest.mark.asyncio
+async def test_system_dashboard_microinverter_parameter_endpoints() -> None:
+    client = _make_client()
+    client._json = AsyncMock(
+        side_effect=[
+            {"parameters": [{"id": "power"}]},
+            {"data": [{"serial_number": "INV-A"}]},
+            {"columns": [{"attribute_name": "value_1"}]},
+            {"intervals": []},
+        ]
+    )
+
+    assert await client.system_dashboard_master_data() == {
+        "parameters": [{"id": "power"}]
+    }
+    assert await client.system_dashboard_envoy_inverters(" GW-A ") == {
+        "data": [{"serial_number": "INV-A"}]
+    }
+    assert await client.system_dashboard_data_columns("GW-A") == {
+        "columns": [{"attribute_name": "value_1"}]
+    }
+    assert await client.system_dashboard_parameter_view(
+        ["INV-A", "INV-B", "INV-A"], "power"
+    ) == {"intervals": []}
+
+    urls = [call.args[1] for call in client._json.await_args_list]
+    assert urls[0].endswith("/cs/sites/SITE/data/master-data")
+    assert URL(urls[1]).query["serial_number"] == "GW-A"
+    assert URL(urls[2]).query == {
+        "serial_num": "GW-A",
+        "type": "device_level",
+    }
+    parameter_query = URL(urls[3]).query
+    assert parameter_query["serial_numbers"] == "INV-A,INV-B"
+    assert parameter_query["parameter_id"] == "power"
+    assert parameter_query["sort_by_date"] == "desc"
+    assert all(
+        call.kwargs["headers"] == client._system_dashboard_headers()
+        for call in client._json.await_args_list
+    )
+
+
+@pytest.mark.asyncio
+async def test_system_dashboard_microinverter_parameter_endpoint_guards() -> None:
+    client = _make_client()
+    client._json = AsyncMock(return_value=["bad"])
+
+    assert await client.system_dashboard_envoy_inverters("") is None
+    assert await client.system_dashboard_data_columns("") is None
+    assert await client.system_dashboard_parameter_view([], "power") is None
+    assert await client.system_dashboard_parameter_view(["INV-A"], "") is None
+    assert await client.system_dashboard_master_data() is None
+
+    client._json = AsyncMock(side_effect=_make_cre(404))
+    assert await client.system_dashboard_master_data() is None
+    assert await client.system_dashboard_envoy_inverters("GW-A") is None
+    assert await client.system_dashboard_data_columns("GW-A") is None
+    assert await client.system_dashboard_parameter_view(["INV-A"], "power") is None
+
+    client._json = AsyncMock(side_effect=_make_cre(500))
+    with pytest.raises(aiohttp.ClientResponseError):
+        await client.system_dashboard_parameter_view(["INV-A"], "power")
+
+
+@pytest.mark.asyncio
 async def test_grid_control_check_uses_grid_control_check_endpoint() -> None:
     client = _make_client()
     client._json = AsyncMock(return_value={"disableGridControl": False})

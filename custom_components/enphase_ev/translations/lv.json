@@ -1459,6 +1459,9 @@
       "microinverter_reporting_count": {
         "name": "Aktīvie mikroinvertori"
       },
+      "inverter_telemetry": {
+        "name": "{serial_number} telemetrija"
+      },
       "microinverter_last_reported": {
         "name": "Pēdējais mikroinvertoru ziņojums"
       },
