@@ -177,6 +177,133 @@ force_refresh:
             text:
               multiline: false
 
+browse_grid_profiles:
+  target:
+    entity:
+      integration: enphase_ev
+  fields:
+    region_code:
+      required: false
+      selector:
+        text:
+          multiline: false
+      example: "VIC"
+    query:
+      required: false
+      selector:
+        text:
+          multiline: false
+    commonly_used:
+      required: false
+      default: true
+      selector:
+        boolean:
+    advanced:
+      collapsed: true
+      fields:
+        device_id:
+          required: false
+          selector:
+            device:
+              integration: enphase_ev
+              multiple: true
+        site_id:
+          required: false
+          selector:
+            text:
+              multiline: false
+          example: "1234567"
+        config_entry_id:
+          required: false
+          selector:
+            text:
+              multiline: false
+
+refresh_grid_profiles:
+  target:
+    entity:
+      integration: enphase_ev
+  fields:
+    region_code:
+      required: false
+      selector:
+        text:
+          multiline: false
+      example: "VIC"
+    commonly_used:
+      required: false
+      default: true
+      selector:
+        boolean:
+    advanced:
+      collapsed: true
+      fields:
+        device_id:
+          required: false
+          selector:
+            device:
+              integration: enphase_ev
+              multiple: true
+        site_id:
+          required: false
+          selector:
+            text:
+              multiline: false
+          example: "1234567"
+        config_entry_id:
+          required: false
+          selector:
+            text:
+              multiline: false
+
+set_grid_profile:
+  target:
+    entity:
+      integration: enphase_ev
+  fields:
+    profile_id:
+      required: true
+      selector:
+        text:
+          multiline: false
+      example: "agf:6643fae616246153786f318b"
+    confirm:
+      required: true
+      selector:
+        boolean:
+      default: false
+    region_code:
+      required: false
+      selector:
+        text:
+          multiline: false
+      example: "VIC"
+    gateway_serial:
+      required: false
+      selector:
+        text:
+          multiline: false
+    advanced:
+      collapsed: true
+      fields:
+        device_id:
+          required: false
+          selector:
+            device:
+              integration: enphase_ev
+              multiple: true
+        site_id:
+          required: false
+          selector:
+            text:
+              multiline: false
+          example: "1234567"
+        config_entry_id:
+          required: false
+          selector:
+            text:
+              multiline: false
+
 update_tariff:
   target:
     entity:

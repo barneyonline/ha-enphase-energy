@@ -10,6 +10,7 @@ from voluptuous.schema_builder import Required as VolRequired
 from homeassistant import config_entries
 from homeassistant.const import UnitOfEnergy
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -37,6 +38,10 @@ from custom_components.enphase_ev.config_flow import (
     CONF_MIGRATION_BACKUP_CONFIRMED,
     CONF_MIGRATION_CONFIRM_REASSIGN,
     CONF_MIGRATION_DISABLE_ARCHIVED,
+    CONF_GRID_PROFILE_COMMONLY_USED,
+    CONF_GRID_PROFILE_CONFIRM_APPLY,
+    CONF_GRID_PROFILE_ID,
+    CONF_GRID_PROFILE_REGION,
     EnphaseEVConfigFlow,
     OptionsFlowHandler,
 )
@@ -82,6 +87,17 @@ from custom_components.enphase_ev.envoy_history import skip_option_value
 from custom_components.enphase_ev.envoy_history import EnvoyHistoryExecutionError
 from custom_components.enphase_ev.envoy_history import EnvoyHistoryMapping
 from custom_components.enphase_ev.envoy_history import EnvoyHistoryValidation
+from custom_components.enphase_ev.grid_profile_runtime import (
+    ALL_PROFILES_OPTION,
+    ActivationRegion,
+    COMMONLY_USED_OPTION,
+    GatewayGridProfileTarget,
+    GridProfile,
+    GridProfileRuntime,
+    SUPPORT_CONFIRMED,
+    SUPPORT_DENIED,
+    SUPPORT_UNAVAILABLE,
+)
 
 TOKENS = AuthTokens(
     cookie="jar=1",
@@ -928,6 +944,14 @@ async def test_devices_step_allows_empty_selection(hass) -> None:
             "custom_components.enphase_ev.config_flow.async_fetch_devices_inventory",
             AsyncMock(return_value={"result": []}),
         ),
+        patch(
+            "custom_components.enphase_ev.coordinator.EnphaseEVClient.async_get_activation_reference_data",
+            AsyncMock(return_value={}),
+        ),
+        patch(
+            "custom_components.enphase_ev.coordinator.EnphaseEVClient.async_get_activation_record",
+            AsyncMock(return_value={}),
+        ),
     ):
         result = await flow.async_step_devices(
             {CONF_TYPE_MICROINVERTER: False, CONF_SCAN_INTERVAL: 60}
@@ -1026,8 +1050,22 @@ async def test_devices_step_schema_has_type_fields_only(hass) -> None:
 @pytest.mark.filterwarnings(
     "ignore:It is recommended to use web.AppKey instances for keys\\.:aiohttp.web_exceptions.NotAppKeyWarning"
 )
-async def test_devices_step_allows_site_only_entry(hass) -> None:
+async def test_devices_step_allows_site_only_entry(hass, monkeypatch) -> None:
     site = SiteInfo(site_id="12345", name="Garage Site")
+
+    async def async_noop_grid_profile_refresh(
+        runtime: GridProfileRuntime,
+        *,
+        force: bool = False,
+        load_profiles: bool = True,
+    ):
+        return runtime.browse()
+
+    monkeypatch.setattr(
+        GridProfileRuntime,
+        "async_refresh",
+        async_noop_grid_profile_refresh,
+    )
 
     with (
         patch(
@@ -2826,6 +2864,534 @@ async def test_options_flow_init_shows_menu(hass) -> None:
     assert result["type"] is FlowResultType.MENU
     assert result["step_id"] == "init"
     assert result["menu_options"] == ["settings", "migrate_envoy"]
+
+
+@pytest.mark.asyncio
+async def test_options_flow_advanced_shows_grid_profile_menu(hass) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(
+            grid_profile_runtime=_options_flow_grid_profile_runtime()
+        )
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    init_result = await handler.async_step_init()
+    result = await handler.async_step_advanced()
+
+    assert init_result["menu_options"] == ["settings", "advanced", "migrate_envoy"]
+    assert result["type"] is FlowResultType.MENU
+    assert result["step_id"] == "advanced"
+    assert result["menu_options"] == ["grid_profile"]
+
+
+@pytest.mark.asyncio
+async def test_options_flow_hides_advanced_without_installer_access(hass) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(
+            grid_profile_runtime=_options_flow_grid_profile_runtime(
+                support_state=SUPPORT_DENIED
+            )
+        )
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_init()
+
+    assert result["menu_options"] == ["settings", "migrate_envoy"]
+    result = await handler.async_step_advanced()
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "grid_profile_installer_required"
+
+
+@pytest.mark.asyncio
+async def test_options_flow_hides_advanced_without_country_regions(hass) -> None:
+    runtime = _options_flow_grid_profile_runtime()
+    runtime.regions_by_country["AU"] = []
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(grid_profile_runtime=runtime)
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_init()
+
+    assert result["menu_options"] == ["settings", "migrate_envoy"]
+
+
+def _options_flow_grid_profile_runtime(
+    *,
+    support_state: str = SUPPORT_CONFIRMED,
+    with_profiles: bool = True,
+    with_gateway: bool = False,
+) -> GridProfileRuntime:
+    coordinator = SimpleNamespace(
+        client=SimpleNamespace(),
+        async_update_listeners=Mock(),
+    )
+    runtime = GridProfileRuntime(coordinator)
+    runtime.support_state = support_state
+    runtime.country_code = "AU"
+    runtime.regions_by_country = {
+        "AU": [ActivationRegion("AU", "ACT", "Australian Capital Territory")]
+    }
+    runtime.staged_region_code = "ACT"
+    if with_profiles:
+        runtime.catalog_cache[("AU", "ACT", True)] = (
+            9_999_999_999.0,
+            [
+                GridProfile(
+                    profile_id="agf:test",
+                    name="Test Grid Profile",
+                    group="ACT, AU",
+                    country="AU",
+                    state="ACT",
+                    pel_enabled=True,
+                    is_277v_compatible=False,
+                )
+            ],
+        )
+    runtime.async_refresh = AsyncMock(return_value=runtime.browse())  # type: ignore[method-assign]
+    runtime.async_load_profiles = AsyncMock(  # type: ignore[method-assign]
+        return_value=runtime.filtered_profiles()
+    )
+    if with_gateway:
+        runtime.gateway_targets = {
+            "122532006376": GatewayGridProfileTarget(
+                serial_num="122532006376",
+                part_num="800-00555-r01",
+                ensemble_envoy=True,
+            )
+        }
+    return runtime
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_profile_aborts_without_runtime(hass) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_advanced()
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "grid_profile_unavailable"
+
+    result = await handler.async_step_grid_profile()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "grid_profile_unavailable"
+
+    result = await handler.async_step_grid_profile_select()
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "grid_profile_unavailable"
+
+    result = await handler.async_step_grid_profile_confirm()
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "grid_profile_unavailable"
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_profile_aborts_without_installer_access(hass) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(
+            grid_profile_runtime=_options_flow_grid_profile_runtime(
+                support_state=SUPPORT_DENIED
+            )
+        )
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_grid_profile()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "grid_profile_installer_required"
+    entry.runtime_data.coordinator.grid_profile_runtime.async_refresh.assert_awaited_once_with(
+        force=False,
+        load_profiles=False,
+    )
+
+    result = await handler.async_step_grid_profile_select()
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "grid_profile_installer_required"
+
+    result = await handler.async_step_grid_profile_confirm()
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "grid_profile_installer_required"
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_profile_reports_activation_unavailable(hass) -> None:
+    runtime = _options_flow_grid_profile_runtime(
+        support_state=SUPPORT_UNAVAILABLE,
+        with_profiles=False,
+    )
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(grid_profile_runtime=runtime)
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    advanced = await handler.async_step_advanced()
+    grid_profile = await handler.async_step_grid_profile()
+    select = await handler.async_step_grid_profile_select()
+    confirm = await handler.async_step_grid_profile_confirm()
+
+    for result in (advanced, grid_profile, select, confirm):
+        assert result["type"] is FlowResultType.ABORT
+        assert result["reason"] == "grid_profile_unavailable"
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_profile_filter_guard_paths(hass) -> None:
+    runtime = _options_flow_grid_profile_runtime()
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(grid_profile_runtime=runtime)
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    assert handler._grid_profile_commonly_used_from_input(True) is True  # noqa: SLF001
+    assert handler._grid_profile_flag_label(None) == "Unknown"  # noqa: SLF001
+    runtime.staged_region_code = None
+    schema = handler._grid_profile_filter_schema(runtime)  # noqa: SLF001
+    region_marker = next(
+        marker for marker in schema.schema if marker.schema == CONF_GRID_PROFILE_REGION
+    )
+    assert region_marker.default() == "ACT"
+
+    runtime.staged_region_code = "ACT"
+    result = await handler.async_step_grid_profile(
+        {CONF_GRID_PROFILE_REGION: "INVALID"}
+    )
+    assert result["errors"] == {CONF_GRID_PROFILE_REGION: "grid_profile_region_invalid"}
+
+    runtime.regions_by_country["AU"] = []
+    result = await handler.async_step_grid_profile()
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "grid_profile_no_regions"
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_profile_localizes_status_labels(
+    hass, monkeypatch
+) -> None:
+    runtime = _options_flow_grid_profile_runtime()
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(grid_profile_runtime=runtime)
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+    monkeypatch.setattr(hass.config, "language", "de")
+
+    await handler._async_prime_grid_profile_labels()  # noqa: SLF001
+
+    assert handler._grid_profile_flag_label(True) == "Ja"  # noqa: SLF001
+    assert handler._grid_profile_flag_label(False) == "Nein"  # noqa: SLF001
+    assert handler._grid_profile_flag_label(None) == "Unbekannt"  # noqa: SLF001
+    assert (  # noqa: SLF001
+        handler._grid_profile_status_label("accepted") == "Akzeptiert"
+    )
+    assert (  # noqa: SLF001
+        handler._grid_profile_status_label("waiting_for_cloud") == "Waiting for cloud"
+    )
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_profile_empty_and_stale_selection_paths(hass) -> None:
+    runtime = _options_flow_grid_profile_runtime(with_profiles=False)
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(grid_profile_runtime=runtime)
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_grid_profile_select()
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "grid_profile"
+
+    runtime = _options_flow_grid_profile_runtime()
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(grid_profile_runtime=runtime)
+    )
+    result = await handler.async_step_grid_profile_confirm()
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "grid_profile_select"
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_profile_reports_translated_apply_failure(hass) -> None:
+    runtime = _options_flow_grid_profile_runtime(with_gateway=True)
+    runtime.set_staged_profile("agf:test")
+    runtime.async_apply_staged = AsyncMock(  # type: ignore[method-assign]
+        side_effect=ServiceValidationError(
+            "apply failed",
+            translation_key="grid_profile_apply_failed",
+        )
+    )
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(grid_profile_runtime=runtime)
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_grid_profile_confirm(
+        {CONF_GRID_PROFILE_CONFIRM_APPLY: True}
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "grid_profile_apply_failed"}
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_profile_form_does_not_fetch_profiles(hass) -> None:
+    runtime = _options_flow_grid_profile_runtime()
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(grid_profile_runtime=runtime)
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_grid_profile()
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "grid_profile"
+    runtime.async_refresh.assert_not_awaited()
+    runtime.async_load_profiles.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_profile_stages_profile_before_confirm(hass) -> None:
+    runtime = _options_flow_grid_profile_runtime()
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(grid_profile_runtime=runtime)
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_grid_profile(
+        {
+            CONF_GRID_PROFILE_REGION: "ACT",
+            CONF_GRID_PROFILE_COMMONLY_USED: COMMONLY_USED_OPTION,
+        }
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "grid_profile_select"
+    runtime.async_refresh.assert_not_awaited()
+    runtime.async_load_profiles.assert_awaited_once_with(
+        region_code="ACT",
+        commonly_used=True,
+        force=True,
+    )
+    assert runtime.staged_query == ""
+
+    result = await handler.async_step_grid_profile_select(
+        {CONF_GRID_PROFILE_ID: "agf:test"}
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "grid_profile_confirm"
+    assert runtime.staged_profile_id == "agf:test"
+    assert result["description_placeholders"]["selected_profile"] == (
+        "ACT, AU: Test Grid Profile"
+    )
+    assert result["description_placeholders"]["selected_profile_id"] == "agf:test"
+    assert result["description_placeholders"]["selected_profile_pel"] == "Yes"
+    assert result["description_placeholders"]["selected_profile_277v"] == "No"
+    assert result["data_schema"].schema == {}
+
+    result = await handler.async_step_grid_profile_confirm(
+        {CONF_GRID_PROFILE_CONFIRM_APPLY: True}
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "grid_profile_confirm"
+    assert result["errors"] == {"base": "grid_profile_gateway_required"}
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_profile_rejects_profile_from_cached_other_region(
+    hass,
+) -> None:
+    runtime = _options_flow_grid_profile_runtime()
+    runtime.regions_by_country["AU"].append(ActivationRegion("AU", "VIC", "Victoria"))
+    runtime.catalog_cache[("AU", "VIC", True)] = (
+        9_999_999_999.0,
+        [
+            GridProfile(
+                profile_id="agf:vic-only",
+                name="Victoria only",
+                group="VIC, AU",
+                country="AU",
+                state="VIC",
+            )
+        ],
+    )
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(grid_profile_runtime=runtime)
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_grid_profile_select(
+        {CONF_GRID_PROFILE_ID: "agf:vic-only"}
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "grid_profile_select"
+    assert result["errors"] == {CONF_GRID_PROFILE_ID: "grid_profile_profile_invalid"}
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_profile_available_apply_requires_confirmation(
+    hass,
+) -> None:
+    runtime = _options_flow_grid_profile_runtime(with_gateway=True)
+    runtime.async_apply_grid_profile = AsyncMock(  # type: ignore[method-assign]
+        return_value={
+            "success": True,
+            "profile_id": "agf:test",
+            "requested_profile_id": "agf:requested",
+            "cloud_apply_status": "accepted",
+        }
+    )
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(grid_profile_runtime=runtime)
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    await handler.async_step_grid_profile(
+        {
+            CONF_GRID_PROFILE_REGION: "ACT",
+            CONF_GRID_PROFILE_COMMONLY_USED: COMMONLY_USED_OPTION,
+        }
+    )
+    result = await handler.async_step_grid_profile_select(
+        {CONF_GRID_PROFILE_ID: "agf:test"}
+    )
+
+    assert CONF_GRID_PROFILE_CONFIRM_APPLY in {
+        key.schema for key in result["data_schema"].schema
+    }
+
+    result = await handler.async_step_grid_profile_confirm({})
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "confirm_required"}
+
+    result = await handler.async_step_grid_profile_confirm(
+        {CONF_GRID_PROFILE_CONFIRM_APPLY: True}
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "grid_profile_applied"
+    assert result["description_placeholders"]["selected_profile"] == (
+        "ACT, AU: Test Grid Profile"
+    )
+    assert result["description_placeholders"]["requested_profile_id"] == "agf:requested"
+    assert result["description_placeholders"]["cloud_apply_status"] == "Accepted"
+    runtime.async_apply_grid_profile.assert_awaited_once_with(
+        "agf:test",
+        region_code="ACT",
+    )
+
+    result = await handler.async_step_grid_profile_applied({})
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_profile_reports_empty_filter(hass) -> None:
+    runtime = _options_flow_grid_profile_runtime(with_profiles=False)
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(grid_profile_runtime=runtime)
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_grid_profile(
+        {
+            CONF_GRID_PROFILE_REGION: "ACT",
+            CONF_GRID_PROFILE_COMMONLY_USED: ALL_PROFILES_OPTION,
+        }
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "grid_profile"
+    assert result["errors"] == {"base": "grid_profile_no_profiles"}
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_profile_aborts_when_catalog_denies_access(
+    hass,
+) -> None:
+    runtime = _options_flow_grid_profile_runtime(with_profiles=False)
+
+    async def deny_catalog_access(**_kwargs: object) -> list[object]:
+        runtime.support_state = SUPPORT_DENIED
+        return []
+
+    runtime.async_load_profiles = AsyncMock(side_effect=deny_catalog_access)  # type: ignore[method-assign]
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(grid_profile_runtime=runtime)
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_grid_profile(
+        {
+            CONF_GRID_PROFILE_REGION: "ACT",
+            CONF_GRID_PROFILE_COMMONLY_USED: COMMONLY_USED_OPTION,
+        }
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "grid_profile_installer_required"
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_profile_reports_catalog_outage(hass) -> None:
+    runtime = _options_flow_grid_profile_runtime(with_profiles=False)
+
+    async def fail_catalog_access(**_kwargs: object) -> list[object]:
+        runtime.support_state = SUPPORT_UNAVAILABLE
+        return []
+
+    runtime.async_load_profiles = AsyncMock(side_effect=fail_catalog_access)  # type: ignore[method-assign]
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(grid_profile_runtime=runtime)
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_grid_profile(
+        {
+            CONF_GRID_PROFILE_REGION: "ACT",
+            CONF_GRID_PROFILE_COMMONLY_USED: COMMONLY_USED_OPTION,
+        }
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "grid_profile_unavailable"
 
 
 @pytest.mark.asyncio

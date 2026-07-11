@@ -3,6 +3,9 @@
     "add_schedule": {
       "service": "mdi:calendar-plus"
     },
+    "browse_grid_profiles": {
+      "service": "mdi:format-list-bulleted"
+    },
     "clear_hems_auth_backoff": {
       "service": "mdi:lock-open"
     },
@@ -15,11 +18,17 @@
     "force_refresh": {
       "service": "mdi:refresh"
     },
+    "refresh_grid_profiles": {
+      "service": "mdi:refresh"
+    },
     "request_grid_toggle_otp": {
       "service": "mdi:message-lock"
     },
     "set_grid_mode": {
       "service": "mdi:transmission-tower"
+    },
+    "set_grid_profile": {
+      "service": "mdi:transmission-tower-export"
     },
     "start_charging": {
       "service": "mdi:play"

@@ -27,6 +27,8 @@ TO_REDACT = [
     "session_auth_identifier",
     "session_auth_token",
     "enlighten_manager_token_production",
+    "enlm-token",
+    "authorization",
     "password",
     CONF_EMAIL,
 ]
@@ -45,6 +47,10 @@ DIAGNOSTIC_IDENTIFIER_KEYS = [
     "serialNumber",
     "serialNum",
     "sn",
+    "part_num",
+    "partNum",
+    "profile_id",
+    "grid_profile_id",
     "name",
     "device_name",
     "hostname",
@@ -557,6 +563,15 @@ async def async_get_config_entry_diagnostics(
         except DIAGNOSTIC_CAPTURE_ERRORS:
             system_events = {}
 
+    grid_profile: dict[str, Any] = {}
+    grid_profile_runtime = getattr(coord, "grid_profile_runtime", None)
+    grid_profile_diagnostics = getattr(grid_profile_runtime, "diagnostics", None)
+    if callable(grid_profile_diagnostics):
+        try:
+            grid_profile = grid_profile_diagnostics()
+        except DIAGNOSTIC_CAPTURE_ERRORS:
+            grid_profile = {}
+
     firmware_catalog: dict[str, Any] = {}
     firmware_catalog_manager = getattr(coord, "firmware_catalog_manager", None)
     status_snapshot = getattr(firmware_catalog_manager, "status_snapshot", None)
@@ -593,6 +608,7 @@ async def async_get_config_entry_diagnostics(
         "current_power": current_power,
         "scheduler": scheduler,
         "tariff": tariff,
+        "grid_profile": grid_profile,
         "firmware_catalog": firmware_catalog or None,
     }
 

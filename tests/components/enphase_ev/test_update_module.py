@@ -70,6 +70,22 @@ class DummyEvseFirmwareManager:
         return dict(self._status)
 
 
+class DummyGatewayUpdateManager:
+    def __init__(self, status=None):
+        self.cached_status = status
+        self.next_refresh_seconds = 60
+        self._status = {
+            "last_fetch_utc": "2026-07-11T05:06:08+00:00",
+            "last_success_utc": "2026-07-11T05:06:08+00:00",
+            "last_error": None,
+            "using_stale": False,
+        }
+        self.async_get_status = AsyncMock(return_value=status)
+
+    def status_snapshot(self):
+        return dict(self._status)
+
+
 class DummyCoordinator:
     def __init__(self) -> None:
         self.site_id = "12345"
@@ -234,6 +250,7 @@ async def test_async_setup_entry_adds_firmware_update_entities(
         coordinator=coord,
         firmware_catalog=catalog_manager,
         evse_firmware_details=evse_manager,
+        gateway_software_update=DummyGatewayUpdateManager(),
     )
 
     added = []
@@ -247,6 +264,145 @@ async def test_async_setup_entry_adds_firmware_update_entities(
     unique_ids = {entity.unique_id for entity in added}
     assert f"enphase_ev_site_{coord.site_id}_envoy_firmware" in unique_ids
     assert f"enphase_ev_{TEST_EVSE_SERIAL}_charger_firmware" in unique_ids
+    gateway = next(
+        entity for entity in added if isinstance(entity, FirmwareUpdateEntity)
+    )
+    assert (
+        gateway._progress_manager is config_entry.runtime_data.gateway_software_update
+    )
+
+
+@pytest.mark.asyncio
+async def test_gateway_update_entity_exposes_live_progress_and_sanitized_details(
+    hass, monkeypatch
+) -> None:
+    progress_status = {
+        "current_status": 2,
+        "current_status_text": "Installing",
+        "last_status": 0,
+        "last_status_text": "Completed",
+        "estimated_time_left": "1 min",
+        "estimated_time_left_seconds": 60,
+        "total_duration": "5 min",
+        "total_duration_seconds": 300,
+        "installed_image_version": "8.3.6000",
+        "last_reported_at": "2026-07-11T05:06:07Z",
+        "device_statuses": ["Gateway updating"],
+        "component_updates": [
+            {
+                "name": "Gateway OS",
+                "type": "essimg",
+                "status": 2,
+                "status_text": "Installing",
+                "progress": 55.0,
+                "latest_speed_bps": 1024,
+            }
+        ],
+        "e3_progress": 55.0,
+        "transfer_speed_bps": 1024,
+        "in_progress": True,
+        "update_percentage": 55.0,
+    }
+    progress_manager = DummyGatewayUpdateManager(progress_status)
+    entity = FirmwareUpdateEntity(
+        coordinator=DummyCoordinator(),
+        manager=DummyCatalogManager(_catalog_payload()),
+        device_type="envoy",
+        translation_key="gateway_firmware",
+        description=UpdateEntityDescription(key="gateway_firmware"),
+        installed_version_getter=_gateway_installed_version,
+        progress_manager=progress_manager,
+    )
+    entity.hass = hass
+    entity._apply_progress(progress_status)
+
+    assert entity.in_progress is True
+    assert entity.update_percentage == 55
+    attrs = entity.extra_state_attributes
+    assert attrs["software_update_current_status"] == "Installing"
+    assert attrs["software_update_current_status_code"] == 2
+    assert attrs["software_update_last_status"] == "Completed"
+    assert attrs["software_update_last_status_code"] == 0
+    assert attrs["estimated_time_left"] == "1 min"
+    assert attrs["estimated_time_left_seconds"] == 60
+    assert attrs["total_update_duration"] == "5 min"
+    assert attrs["total_update_duration_seconds"] == 300
+    assert attrs["installed_image_version"] == "8.3.6000"
+    assert attrs["software_update_last_reported_at"] == "2026-07-11T05:06:07Z"
+    assert attrs["software_update_device_statuses"] == ["Gateway updating"]
+    assert attrs["software_update_components"][0]["name"] == "Gateway OS"
+    assert attrs["software_update_e3_progress"] == 55
+    assert attrs["software_update_transfer_speed_bps"] == 1024
+    assert attrs["software_update_last_error"] is None
+    assert attrs["software_update_using_stale"] is False
+    assert "fw_image" not in repr(attrs)
+
+    refresh_started = asyncio.Event()
+
+    async def _get_status():
+        refresh_started.set()
+        return progress_status
+
+    progress_manager.async_get_status = AsyncMock(side_effect=_get_status)
+    write_state = MagicMock()
+    monkeypatch.setattr(entity, "async_write_ha_state", write_state)
+    refresh_task = hass.async_create_task(entity._async_refresh_progress_loop())
+    await refresh_started.wait()
+    await asyncio.sleep(0)
+    refresh_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await refresh_task
+    progress_manager.async_get_status.assert_awaited_once_with()
+    write_state.assert_called_once_with()
+
+    entity._apply_progress(None)
+    assert entity.in_progress is None
+    assert entity.update_percentage is None
+    assert "software_update_components" not in entity.extra_state_attributes
+
+
+@pytest.mark.asyncio
+async def test_gateway_update_entity_progress_task_lifecycle(hass, monkeypatch) -> None:
+    progress_manager = DummyGatewayUpdateManager(
+        {"in_progress": False, "update_percentage": None}
+    )
+    entity = FirmwareUpdateEntity(
+        coordinator=DummyCoordinator(),
+        manager=DummyCatalogManager(_catalog_payload()),
+        device_type="envoy",
+        translation_key="gateway_firmware",
+        description=UpdateEntityDescription(key="gateway_firmware"),
+        installed_version_getter=_gateway_installed_version,
+        progress_manager=progress_manager,
+    )
+    entity.hass = hass
+    monkeypatch.setattr(entity, "async_write_ha_state", lambda: None)
+    monkeypatch.setattr(
+        CoordinatorEntity, "_handle_coordinator_update", lambda self: None
+    )
+    remove = AsyncMock(return_value=None)
+    monkeypatch.setattr(CoordinatorEntity, "async_will_remove_from_hass", remove)
+
+    entity._schedule_progress_refresh()
+    task = entity._progress_refresh_task
+    assert task is not None
+    await asyncio.sleep(0)
+    entity._schedule_progress_refresh()
+    assert entity._progress_refresh_task is task
+
+    entity._handle_coordinator_update()
+    assert entity.in_progress is False
+
+    await entity.async_will_remove_from_hass()
+    assert task.done()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert entity._progress_refresh_task is None
+    remove.assert_awaited_once_with()
+
+    entity.hass = None
+    entity._schedule_progress_refresh()
+    assert entity._progress_refresh_task is None
 
 
 @pytest.mark.asyncio

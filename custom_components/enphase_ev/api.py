@@ -234,6 +234,10 @@ class OptionalEndpointUnavailable(Exception):
     """Raised when an optional endpoint is unavailable but diagnostically useful."""
 
 
+class ActivationAccessDenied(OptionalEndpointUnavailable):
+    """Raised when Activation explicitly denies installer-level access."""
+
+
 @dataclass(slots=True, frozen=True)
 class PayloadFailureSignature:
     """Structured metadata describing an invalid payload response."""
@@ -2163,6 +2167,7 @@ class EnphaseEVClient:
         self._cookie = cookie or ""
         self._eauth = eauth or None
         self._hems_site_supported: bool | None = None
+        self._system_dashboard_summary_payload: dict[str, object] | None = None
         self._reauth_cb: Callable[[], Awaitable[bool]] | None = reauth_callback
         self._last_unauthorized_request: str | None = None
         self._request_count = 0
@@ -2758,6 +2763,85 @@ class EnphaseEVClient:
             headers["Origin"] = BASE_URL
             headers["Referer"] = f"{BASE_URL}/"
         return headers
+
+    def _activation_reference_headers(self) -> dict[str, str | None]:
+        """Return headers for Activation reference-data calls."""
+
+        token = self._battery_config_single_auth_token()
+        return {
+            "Accept": "application/json, text/plain, */*",
+            "Cookie": self._cookie or None,
+            "enlm-token": token,
+            "Referer": f"{BASE_URL}/app/activation_ui/?system_id={self._site}",
+            "X-Requested-With": None,
+        }
+
+    def _activation_headers(self, *, write: bool = False) -> dict[str, str | None]:
+        """Return cloud Activation API headers."""
+
+        token = self._battery_config_single_auth_token()
+        headers: dict[str, str | None] = {
+            "Accept": "application/json, text/plain, */*",
+            "Authorization": f"Bearer {token}" if token else None,
+            "Cookie": self._cookie or None,
+            "Referer": f"{BASE_URL}/app/activation_ui/?system_id={self._site}",
+            "X-Requested-With": None,
+            "e-auth-token": None,
+        }
+        if write:
+            headers["Content-Type"] = "application/json"
+            headers["Origin"] = BASE_URL
+        return headers
+
+    async def _activation_payload(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: dict[str, str | None],
+        **kwargs: Any,
+    ) -> object:
+        """Return Activation JSON, mapping denied access to optional unavailable."""
+
+        try:
+            return await self._json(
+                method,
+                url,
+                headers=headers,
+                allow_reauth=False,
+                use_cookie_header_only=True,
+                **kwargs,
+            )
+        except EnphaseLoginWallUnauthorized as err:
+            raise ActivationAccessDenied("Activation login wall") from err
+        except Unauthorized as err:
+            raise ActivationAccessDenied("Activation access denied") from err
+        except InvalidPayloadError as err:
+            raise OptionalEndpointUnavailable("Activation payload unavailable") from err
+        except aiohttp.ClientResponseError as err:
+            if err.status in {401, 403, 404}:
+                raise ActivationAccessDenied("Activation access denied") from err
+            raise
+
+    async def _activation_json(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: dict[str, str | None],
+        **kwargs: Any,
+    ) -> JsonDict:
+        """Return Activation object JSON."""
+
+        result = await self._activation_payload(
+            method,
+            url,
+            headers=headers,
+            **kwargs,
+        )
+        if not isinstance(result, dict):
+            raise OptionalEndpointUnavailable("Activation payload was not an object")
+        return result
 
     def _battery_config_cookie_eauth_headers(
         self,
@@ -4098,6 +4182,7 @@ class EnphaseEVClient:
                 "cookie",
                 "authorization",
                 "e-auth-token",
+                "enlm-token",
                 "x-csrf-token",
                 "x-xsrf-token",
                 "username",
@@ -4395,6 +4480,8 @@ class EnphaseEVClient:
         as ``e-auth-token``.
         ``headers`` may also be a zero-argument callable so retries can rebuild
         auth-sensitive headers after a successful reauthentication callback.
+        ``allow_empty_success`` accepts an empty body after a successful status while
+        preserving normal JSON validation for non-empty responses.
         """
         extra_headers = kwargs.pop("headers", None)
         use_cookie_header_only = kwargs.pop("use_cookie_header_only", False)
@@ -4405,6 +4492,7 @@ class EnphaseEVClient:
             None,
         )
         allow_reauth = bool(kwargs.pop("allow_reauth", True))
+        allow_empty_success = bool(kwargs.pop("allow_empty_success", False))
         attempt = 0
         request_label = _request_label(method, url)
         safe_request_label = redact_text(
@@ -4639,6 +4727,10 @@ class EnphaseEVClient:
                                         content_type=content_type or None,
                                         payload=body_text,
                                     ) from err
+                                if allow_empty_success and not body_text.strip():
+                                    if mark_payload_success:
+                                        self._mark_payload_healthy(endpoint or None)
+                                    return {}
                                 failure_kind = (
                                     "content_type"
                                     if isinstance(err, aiohttp.ContentTypeError)
@@ -4653,6 +4745,8 @@ class EnphaseEVClient:
                                     payload=body_text,
                                     log_warning=log_invalid_payload,
                                 ) from err
+                            if allow_empty_success and payload is None:
+                                payload = {}
                             if mark_payload_success:
                                 self._mark_payload_healthy(endpoint or None)
                             return payload
@@ -5666,6 +5760,106 @@ class EnphaseEVClient:
             ),
         )
 
+    async def async_get_activation_reference_data(self) -> JsonDict:
+        """Return Activation country/region reference data."""
+
+        url = f"{BASE_URL}/service/activation_service/api/details/reference_data"
+        return await self._activation_json(
+            "GET",
+            url,
+            headers=self._activation_reference_headers(),
+        )
+
+    async def async_get_activation_record(self) -> JsonDict:
+        """Return the cloud Activation record for this site."""
+
+        url = (
+            f"{BASE_URL}/service/activation_backend/api/gateway/v4/"
+            f"activations/{self._site}"
+        )
+        return await self._activation_json(
+            "GET",
+            url,
+            params={"expand": "owner,host"},
+            headers=self._activation_headers(),
+        )
+
+    async def async_get_activation_device_list(self) -> JsonDict:
+        """Return Activation device inventory and current grid-profile status."""
+
+        url = (
+            f"{BASE_URL}/service/activation_backend/api/gateway/v4/"
+            f"systems/{self._site}/devices/list"
+        )
+        result = await self._activation_payload(
+            "GET",
+            url,
+            headers=self._activation_headers(),
+        )
+        if isinstance(result, dict):
+            return result
+        if isinstance(result, list):
+            return {"devices": result}
+        raise OptionalEndpointUnavailable("Activation payload was not an object")
+
+    async def async_get_grid_profiles_filtered(
+        self,
+        *,
+        country: str,
+        state: str,
+        commonly_used: bool = True,
+    ) -> JsonDict:
+        """Return grid profiles for a country/region from Activation."""
+
+        url = (
+            f"{BASE_URL}/service/activation_backend/api/gateway/v4/"
+            f"systems/{self._site}/grid_profiles_filtered"
+        )
+        return await self._activation_json(
+            "POST",
+            url,
+            json={
+                "commonly_used": bool(commonly_used),
+                "country": country,
+                "state": state,
+            },
+            headers=self._activation_headers(write=True),
+        )
+
+    async def async_apply_grid_profile(
+        self,
+        *,
+        gateway_serial: str,
+        part_num: str | None,
+        ensemble_envoy: bool,
+        profile_id: str,
+    ) -> JsonDict:
+        """Apply a cloud Activation grid profile to a Gateway."""
+
+        url = (
+            f"{BASE_URL}/service/activation_backend/api/gateway/v4/"
+            f"systems/{self._site}/envoys"
+        )
+        envoy_payload: dict[str, object] = {
+            "grid_profile_id": profile_id,
+            "serial_num": gateway_serial,
+            "ensemble_envoy": ensemble_envoy,
+        }
+        if part_num:
+            envoy_payload["part_num"] = part_num
+        result = await self._activation_payload(
+            "PUT",
+            url,
+            json=[envoy_payload],
+            headers=self._activation_headers(write=True),
+            allow_empty_success=True,
+        )
+        if isinstance(result, dict):
+            return result
+        if isinstance(result, list):
+            return {"envoys": result}
+        raise OptionalEndpointUnavailable("Activation payload was not an object")
+
     async def battery_profile_details(self, *, locale: str | None = None) -> JsonDict:
         """Return BatteryConfig profile details for system + EVSE settings."""
 
@@ -6367,7 +6561,12 @@ class EnphaseEVClient:
         query: dict[str, str] = {"serial_num": str(serial_num)}
         if live_debug:
             query["live_debug"] = "true"
-        url = URL(f"{BASE_URL}/pv/aws_sigv4/livestream.json").with_query(query)
+        endpoint = (
+            "/service/system_dashboard/api_internal/cs/sites/livestream"
+            if live_debug
+            else "/pv/aws_sigv4/livestream.json"
+        )
+        url = URL(f"{BASE_URL}{endpoint}").with_query(query)
         headers = self._today_headers()
         headers["X-Requested-With"] = "XMLHttpRequest"
         try:
@@ -7378,6 +7577,21 @@ class EnphaseEVClient:
             return data
         return {}
 
+    async def phase_map_multiple_envoy(self) -> JsonDict | None:
+        """Return per-gateway phase and topology metadata for the site.
+
+        GET /app-api/<site_id>/phase_map_multiple_envoy
+        """
+
+        url = f"{BASE_URL}/app-api/{self._site}/phase_map_multiple_envoy"
+        try:
+            data = await self._json("GET", url, headers=self._history_headers())
+        except InvalidPayloadError as err:
+            if _is_optional_non_json_payload(err) or _is_optional_html_payload(err):
+                raise OptionalEndpointUnavailable(err.summary) from err
+            raise
+        return data if isinstance(data, dict) else None
+
     async def devices_tree(self) -> JsonDict | None:
         """Return the system dashboard device hierarchy when available.
 
@@ -7428,6 +7642,7 @@ class EnphaseEVClient:
         if not isinstance(data, dict):
             return None
 
+        self._system_dashboard_summary_payload = dict(data)
         is_hems = data.get("is_hems")
         if isinstance(is_hems, bool):
             self._hems_site_supported = is_hems

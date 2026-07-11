@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -31,6 +32,7 @@ from .firmware_catalog import (
     resolve_country_and_locale,
     select_catalog_entry,
 )
+from .gateway_software_update import GatewaySoftwareUpdateManager
 from .log_redaction import redact_identifier, redact_text
 from .parsing_helpers import coerce_optional_text as _text
 from .runtime_helpers import (
@@ -187,6 +189,13 @@ async def async_setup_entry(
     evse_manager = runtime_data.evse_firmware_details or EvseFirmwareDetailsManager(
         lambda: coord.client
     )
+    gateway_update_manager = (
+        runtime_data.gateway_software_update
+        or GatewaySoftwareUpdateManager(
+            lambda: coord.client,
+            lambda: coord.inventory_view.type_device_serial_number("envoy"),
+        )
+    )
     version_history = FirmwareVersionHistoryStore(hass)
     await version_history.async_load()
     ent_reg = er.async_get(hass)
@@ -206,6 +215,7 @@ async def async_setup_entry(
                 ),
                 installed_version_getter=_gateway_installed_version,
                 version_history=version_history,
+                progress_manager=gateway_update_manager,
             )
         )
 
@@ -282,6 +292,7 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
         description: UpdateEntityDescription,
         installed_version_getter: Callable[[EnphaseCoordinator], str | None],
         version_history: FirmwareVersionHistoryStore | None = None,
+        progress_manager: GatewaySoftwareUpdateManager | None = None,
     ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
@@ -290,7 +301,9 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
         self._device_type = device_type
         self._installed_version_getter = installed_version_getter
         self._version_history = version_history
+        self._progress_manager = progress_manager
         self._refresh_task = None
+        self._progress_refresh_task = None
 
         self._attr_translation_key = translation_key
         self._attr_unique_id = (
@@ -305,6 +318,7 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
         self._raw_latest_version: str | None = None
         self._catalog_generated_at: str | None = None
         self._installed_version_history: list[dict[str, str | None]] = []
+        self._gateway_update_status: dict[str, Any] | None = None
 
         self._refresh_from_catalog(self._manager.cached_catalog)
 
@@ -330,21 +344,103 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         status = self._manager.status_snapshot()
-        return {
+        attributes = {
             "catalog_source_scope": self._source_scope,
             "catalog_generated_at": self._catalog_generated_at,
             "catalog_last_error": status.get("last_error"),
             "installed_version_history": self._installed_version_history,
         }
+        if self._progress_manager is None:
+            return attributes
+        progress_cache = self._progress_manager.status_snapshot()
+        attributes.update(
+            {
+                "software_update_last_fetch_utc": progress_cache.get("last_fetch_utc"),
+                "software_update_last_success_utc": progress_cache.get(
+                    "last_success_utc"
+                ),
+                "software_update_last_error": progress_cache.get("last_error"),
+                "software_update_using_stale": progress_cache.get("using_stale"),
+            }
+        )
+        if not isinstance(self._gateway_update_status, dict):
+            return attributes
+        progress_attributes = {
+            "software_update_current_status": _status_value(
+                self._gateway_update_status, "current_status_text"
+            ),
+            "software_update_current_status_code": _status_value(
+                self._gateway_update_status, "current_status"
+            ),
+            "software_update_last_status": _status_value(
+                self._gateway_update_status, "last_status_text"
+            ),
+            "software_update_last_status_code": _status_value(
+                self._gateway_update_status, "last_status"
+            ),
+            "estimated_time_left": _status_value(
+                self._gateway_update_status, "estimated_time_left"
+            ),
+            "estimated_time_left_seconds": _status_value(
+                self._gateway_update_status, "estimated_time_left_seconds"
+            ),
+            "total_update_duration": _status_value(
+                self._gateway_update_status, "total_duration"
+            ),
+            "total_update_duration_seconds": _status_value(
+                self._gateway_update_status, "total_duration_seconds"
+            ),
+            "installed_image_version": _status_value(
+                self._gateway_update_status, "installed_image_version"
+            ),
+            "software_update_last_reported_at": _status_value(
+                self._gateway_update_status, "last_reported_at"
+            ),
+            "software_update_device_statuses": _status_value(
+                self._gateway_update_status, "device_statuses"
+            ),
+            "software_update_components": _status_value(
+                self._gateway_update_status, "component_updates"
+            ),
+            "software_update_e3_progress": _status_value(
+                self._gateway_update_status, "e3_progress"
+            ),
+            "software_update_transfer_speed_bps": _status_value(
+                self._gateway_update_status, "transfer_speed_bps"
+            ),
+        }
+        attributes.update(
+            {
+                key: value
+                for key, value in progress_attributes.items()
+                if value is not None and value != []
+            }
+        )
+        return attributes
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         await self._async_refresh_catalog()
+        self._schedule_progress_refresh()
 
     async def async_will_remove_from_hass(self) -> None:
-        if self._refresh_task is not None and not self._refresh_task.done():
-            self._refresh_task.cancel()
+        refresh_task = self._refresh_task
         self._refresh_task = None
+        if refresh_task is not None and not refresh_task.done():
+            refresh_task.cancel()
+            try:
+                await refresh_task
+            except asyncio.CancelledError:
+                pass
+
+        progress_refresh_task = self._progress_refresh_task
+        self._progress_refresh_task = None
+        if progress_refresh_task is not None and not progress_refresh_task.done():
+            progress_refresh_task.cancel()
+            try:
+                await progress_refresh_task
+            except asyncio.CancelledError:
+                pass
         await super().async_will_remove_from_hass()
 
     async def async_install(
@@ -360,8 +456,39 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         self._refresh_from_catalog(self._manager.cached_catalog)
+        if self._progress_manager is not None:
+            self._apply_progress(self._progress_manager.cached_status)
         self._schedule_catalog_refresh()
+        self._schedule_progress_refresh()
         super()._handle_coordinator_update()
+
+    def _schedule_progress_refresh(self) -> None:
+        if self.hass is None or self._progress_manager is None:
+            return
+        if (
+            self._progress_refresh_task is not None
+            and not self._progress_refresh_task.done()
+        ):
+            return
+        self._progress_refresh_task = self.hass.async_create_task(
+            self._async_refresh_progress_loop(),
+            name=f"{DOMAIN}_gateway_software_update_progress",
+        )
+
+    async def _async_refresh_progress_loop(self) -> None:
+        assert self._progress_manager is not None
+        while True:
+            update_status = await self._progress_manager.async_get_status()
+            self._apply_progress(update_status)
+            self.async_write_ha_state()
+            await asyncio.sleep(self._progress_manager.next_refresh_seconds)
+
+    def _apply_progress(self, status: dict[str, Any] | None) -> None:
+        self._gateway_update_status = status
+        self._attr_in_progress = cast(bool | None, _status_value(status, "in_progress"))
+        self._attr_update_percentage = cast(
+            int | float | None, _status_value(status, "update_percentage")
+        )
 
     def _schedule_catalog_refresh(self) -> None:
         if self.hass is None:
@@ -794,6 +921,16 @@ def _async_prune_removed_charger_updates(
 
 def _gateway_installed_version(coord: EnphaseCoordinator) -> str | None:
     return _text(coord.inventory_view.type_device_sw_version("envoy"))
+
+
+def _status_value(
+    status: dict[str, Any] | None,
+    key: str,
+    default: Any = None,
+) -> Any:
+    if not isinstance(status, dict):
+        return default
+    return status.get(key, default)
 
 
 def _charger_installed_version(coord: EnphaseCoordinator, serial: str) -> str | None:

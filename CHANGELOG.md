@@ -21,6 +21,13 @@ All notable changes to this project will be documented in this file.
   after Enphase returns a matching explicitly resolved event. The event entity is
   created only after the installer endpoint responds successfully, so owner-only
   accounts do not receive an unavailable installer-only entity.
+- Added read-only IQ Gateway software-update progress monitoring to the existing
+  advisory update entity, including Home Assistant in-progress/percentage state,
+  timing, installed image version, and sanitized component transfer details.
+- Added multi-gateway phase-map discovery so site controls prefer the primary or
+  default IQ Gateway and Gateway Status reports phase/topology diagnostics only when
+  authoritative phase-map data is available.
+- Added installer-only, cloud-based Grid Profile Control with country-scoped region and profile selection, explicit apply confirmation, current profile monitoring, and follow-up cloud status refreshes.
 
 ### 🐛 Bug fixes
 - Prevented multi-megawatt site power spikes during startup by reseeding derived
@@ -46,6 +53,9 @@ All notable changes to this project will be documented in this file.
 - Bound optional Enlighten request queueing and startup warmup stages, reserve
   cloud-read capacity for core status traffic, and retain the last current-power
   sample with retry backoff when that optional endpoint is unavailable.
+- Added bounded live-debug timeouts, active/idle cache intervals, failure backoff,
+  stale-state preservation, and cancellation-safe background refresh for gateway
+  software-update monitoring.
 - Documented the IQ EV Charger device automation triggers and the integration's
   use of standard Home Assistant conditions.
 - Reused a Home Assistant-managed stateless HTTP session for cookie-authenticated
@@ -62,6 +72,7 @@ All notable changes to this project will be documented in this file.
   background work no longer inflates coordinator refresh counts.
 - Added failed and cancelled refreshes plus request queue, network, and parsing
   timing totals to the rolling refresh performance diagnostics when available.
+- Added five-minute cloud metadata refreshes for the current Grid Profile sensor and preserved the entity during transient Activation service outages.
 
 ### 🔄 Other changes
 - None

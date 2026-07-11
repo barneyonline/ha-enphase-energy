@@ -5448,6 +5448,9 @@ class BatteryRuntime:
         )
 
     def grid_envoy_serial(self) -> str | None:
+        preferred = self.coordinator.inventory_view.primary_gateway_serial()
+        if preferred:
+            return preferred
         bucket = self.coordinator.inventory_view.type_bucket("envoy")
         if not isinstance(bucket, dict):
             return None

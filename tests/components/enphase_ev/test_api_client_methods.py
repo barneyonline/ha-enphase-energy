@@ -458,6 +458,26 @@ async def test_text_response_returns_redirect_metadata() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("json_body", [None, ValueError("empty response")])
+async def test_json_accepts_empty_success_when_requested(json_body: object) -> None:
+    response = _FakeResponse(
+        status=200,
+        json_body=json_body,
+        text_body="",
+    )
+    response.headers["Content-Type"] = "application/json; charset=utf-8"
+    client = _make_client(_FakeSession([response]))
+
+    result = await client._json(  # noqa: SLF001
+        "PUT",
+        "https://example.test/service/activation/envoys",
+        allow_empty_success=True,
+    )
+
+    assert result == {}
+
+
+@pytest.mark.asyncio
 async def test_devices_tree_login_wall_raises_unauthorized() -> None:
     session = _FakeSession(
         [
@@ -2466,6 +2486,63 @@ async def test_devices_inventory_returns_empty_when_payload_not_dict() -> None:
     result = await client.devices_inventory()
 
     assert result == {}
+
+
+@pytest.mark.asyncio
+async def test_phase_map_multiple_envoy_uses_app_api_endpoint() -> None:
+    client = _make_client()
+    payload = {"GW-2": {"isDefaultGateway": True, "totalPhase": 3}}
+    client._json = AsyncMock(return_value=payload)
+
+    result = await client.phase_map_multiple_envoy()
+
+    assert result == payload
+    client._json.assert_awaited_once_with(
+        "GET",
+        f"{api.BASE_URL}/app-api/SITE/phase_map_multiple_envoy",
+        headers=client._history_headers(),
+    )
+
+
+@pytest.mark.asyncio
+async def test_phase_map_multiple_envoy_rejects_non_mapping_payload() -> None:
+    client = _make_client()
+    client._json = AsyncMock(return_value=[])
+
+    assert await client.phase_map_multiple_envoy() is None
+
+
+@pytest.mark.asyncio
+async def test_phase_map_multiple_envoy_wraps_optional_html_payload() -> None:
+    client = _make_client()
+    error = api.InvalidPayloadError(
+        "HTML response",
+        status=200,
+        content_type="text/html",
+        endpoint="/app-api/SITE/phase_map_multiple_envoy",
+        failure_kind="html",
+        body_preview_redacted="<html></html>",
+    )
+    client._json = AsyncMock(side_effect=error)
+
+    with pytest.raises(api.OptionalEndpointUnavailable):
+        await client.phase_map_multiple_envoy()
+
+
+@pytest.mark.asyncio
+async def test_phase_map_multiple_envoy_reraises_json_payload_error() -> None:
+    client = _make_client()
+    error = api.InvalidPayloadError(
+        "JSON response failed",
+        status=500,
+        content_type="application/json",
+        endpoint="/app-api/SITE/phase_map_multiple_envoy",
+        failure_kind="decode",
+    )
+    client._json = AsyncMock(side_effect=error)
+
+    with pytest.raises(api.InvalidPayloadError):
+        await client.phase_map_multiple_envoy()
 
 
 @pytest.mark.asyncio
@@ -8220,6 +8297,7 @@ async def test_system_dashboard_summary_sets_hems_support_hint() -> None:
 
     assert payload == {"is_hems": False, "geo": "APAC"}
     assert client.hems_site_supported is False
+    assert client._system_dashboard_summary_payload == payload  # noqa: SLF001
     args, kwargs = client._json.await_args
     assert args[0] == "GET"
     assert args[1].endswith(
@@ -8582,7 +8660,10 @@ async def test_site_livestream_authorizer_returns_payload() -> None:
     )
 
     await client.site_livestream_authorizer("GW-1", live_debug=True)
-    assert "live_debug=true" in client._json.await_args.args[1]
+    assert client._json.await_args.args[1] == (
+        f"{api.BASE_URL}/service/system_dashboard/api_internal/cs/sites/livestream"
+        "?serial_num=GW-1&live_debug=true"
+    )
 
 
 @pytest.mark.asyncio

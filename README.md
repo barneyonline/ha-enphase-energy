@@ -36,11 +36,13 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 
 - Guided onboarding for site selection and device-category enablement
 - Unified support for EV chargers, gateway, battery, and microinverter entities
+- Multi-gateway topology awareness for primary/default Gateway and phase selection
 - EV charging controls and session telemetry, including charge-mode aware behavior and persistent default charge-level controls when exposed by Enphase
-- Advisory firmware update entities for gateway and EV charger devices with locale-aware release-note links
+- Advisory firmware update entities for gateway and EV charger devices with locale-aware release-note links; the gateway entity also monitors read-only live update progress, percentage, timing, and sanitized component status when Enphase exposes it
 - Heat-pump runtime status, connectivity, SG-Ready mode, power, and current-day consumption details sourced from HEMS endpoints
 - Site and battery energy telemetry, including derived grid-import, grid-export, and battery power sensors for Home Assistant Energy Dashboard use
 - Site tariff visibility for next billing date, Energy-dashboard-ready current import/export price sensors, editable tariff rate number entities, and a service for billing-cycle, rate, and guided structural tariff updates when Enphase exposes tariff data
+- Installer-only Grid Profile Control through Enphase cloud Activation, with country-scoped region/profile selection under Options > Advanced and current profile monitoring on the IQ Gateway
 - Health diagnostics, service-availability tracking, and actionable repair issues
 - Read-only System Dashboard event monitoring, including a diagnostic active-event
   binary sensor and automatically clearing Repairs for high-impact active faults
@@ -114,6 +116,8 @@ Manual install steps: see the wiki Installation page.
 ## Authentication
 
 Sign in with your Enlighten credentials; MFA is supported. See the wiki for details.
+
+Grid Profile Control is available only when the signed-in Enphase account has installer-level Activation permissions. It uses Enphase cloud endpoints only; no local Gateway authentication or LAN access is required. Open the integration's Options flow and choose `Advanced` > `Grid Profile Control` to select a region, choose commonly used or all profiles, and confirm an apply request. Accepted changes can take up to five minutes to appear on the Grid Profile sensor.
 
 ## Documentation
 

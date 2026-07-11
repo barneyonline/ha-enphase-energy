@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
+
 from .const import DOMAIN
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -16,6 +17,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from .evse_schedule_editor import EvseScheduleEditorManager
     from .evse_firmware import EvseFirmwareDetailsManager
     from .firmware_catalog import FirmwareCatalogManager
+    from .gateway_software_update import GatewaySoftwareUpdateManager
 
 
 @dataclass(slots=True)
@@ -25,6 +27,7 @@ class EnphaseRuntimeData:
     coordinator: EnphaseCoordinator
     firmware_catalog: FirmwareCatalogManager | None = None
     evse_firmware_details: EvseFirmwareDetailsManager | None = None
+    gateway_software_update: GatewaySoftwareUpdateManager | None = None
     battery_schedule_editor: BatteryScheduleEditorManager | None = None
     evse_schedule_editor: EvseScheduleEditorManager | None = None
     reload_suppression_count: int = 0
