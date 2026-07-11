@@ -6367,7 +6367,12 @@ class EnphaseEVClient:
         query: dict[str, str] = {"serial_num": str(serial_num)}
         if live_debug:
             query["live_debug"] = "true"
-        url = URL(f"{BASE_URL}/pv/aws_sigv4/livestream.json").with_query(query)
+        endpoint = (
+            "/service/system_dashboard/api_internal/cs/sites/livestream"
+            if live_debug
+            else "/pv/aws_sigv4/livestream.json"
+        )
+        url = URL(f"{BASE_URL}{endpoint}").with_query(query)
         headers = self._today_headers()
         headers["X-Requested-With"] = "XMLHttpRequest"
         try:

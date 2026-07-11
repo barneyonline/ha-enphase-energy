@@ -1504,6 +1504,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
     from .evse_schedule_editor import EvseScheduleEditorManager
     from .evse_firmware import EvseFirmwareDetailsManager
     from .firmware_catalog import FirmwareCatalogManager
+    from .gateway_software_update import GatewaySoftwareUpdateManager
     from .labels import async_prime_label_translations
 
     coord = EnphaseCoordinator(
@@ -1518,6 +1519,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
     )
     firmware_catalog = FirmwareCatalogManager(hass)
     evse_firmware_details = EvseFirmwareDetailsManager(lambda: coord.client)
+    gateway_software_update = GatewaySoftwareUpdateManager(
+        lambda: coord.client,
+        lambda: coord.inventory_view.type_device_serial_number("envoy"),
+    )
     battery_schedule_editor = BatteryScheduleEditorManager(coord)
     evse_schedule_editor = EvseScheduleEditorManager(coord)
     setattr(coord, "firmware_catalog_manager", firmware_catalog)
@@ -1526,6 +1531,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
         coordinator=coord,
         firmware_catalog=firmware_catalog,
         evse_firmware_details=evse_firmware_details,
+        gateway_software_update=gateway_software_update,
         battery_schedule_editor=battery_schedule_editor,
         evse_schedule_editor=evse_schedule_editor,
     )
