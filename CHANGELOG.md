@@ -30,6 +30,8 @@ All notable changes to this project will be documented in this file.
   integration objects.
 - Fixed optional or concurrent cloud reads deadlocking credential refresh while
   the initiating request still held the shared Enlighten read limiter.
+- Preserved pending discovery snapshots when a storage write is cancelled so a
+  later refresh can retry persistence instead of losing the observed revision.
 
 ### 🔧 Improvements
 - Bound optional Enlighten request queueing and startup warmup stages, reserve
@@ -46,6 +48,11 @@ All notable changes to this project will be documented in this file.
   battery and microinverter snapshots, and excluding diagnostic device metadata
   from recorder history. Detailed inverter and battery metadata remains available
   in integration diagnostics.
+- Reduced refresh overhead by persisting compact discovery identity metadata only
+  when its revision changes, and made cloud-call diagnostics operation-scoped so
+  background work no longer inflates coordinator refresh counts.
+- Added failed and cancelled refreshes plus request queue, network, and parsing
+  timing totals to the rolling refresh performance diagnostics when available.
 
 ### 🔄 Other changes
 - None

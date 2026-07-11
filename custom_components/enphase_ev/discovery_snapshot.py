@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from datetime import datetime
@@ -20,6 +21,149 @@ _LOGGER = logging.getLogger(__name__)
 
 DISCOVERY_SNAPSHOT_STORE_VERSION = 1
 DISCOVERY_SNAPSHOT_SAVE_DELAY_S = 1.0
+
+_DISCOVERY_RECORD_KEYS = frozenset(
+    {
+        "array_name",
+        "battery_id",
+        "channel_type",
+        "channelType",
+        "application-version",
+        "applicationVersion",
+        "application_version",
+        "ap_mode",
+        "device-id",
+        "device-type",
+        "device-uid",
+        "device_id",
+        "device_sn",
+        "device_type",
+        "device_uid",
+        "fw1",
+        "fw2",
+        "firmware-version",
+        "firmwareVersion",
+        "firmware_version",
+        "hardware_sku",
+        "hardware-version",
+        "hardwareVersion",
+        "hardware_version",
+        "hems_device_facet_id",
+        "hems_device_id",
+        "id",
+        "identity",
+        "inverter_id",
+        "inverter_type",
+        "ip",
+        "ip_address",
+        "iqer_uid",
+        "manufacturer",
+        "model",
+        "model_name",
+        "modelId",
+        "model_id",
+        "name",
+        "part_num",
+        "part_number",
+        "parent",
+        "parentDeviceUid",
+        "parentId",
+        "parentUid",
+        "parent_device_uid",
+        "parent_id",
+        "parent_uid",
+        "phase",
+        "serial",
+        "serialNumber",
+        "serial_number",
+        "sku",
+        "sku_id",
+        "sn",
+        "software-version",
+        "softwareVersion",
+        "software_version",
+        "supportsEntrez",
+        "sw_version",
+        "system_version",
+        "type",
+        "type_label",
+        "uid",
+    }
+)
+
+
+def _is_discovery_record_key(key: object) -> bool:
+    key_text = str(key)
+    if key_text in _DISCOVERY_RECORD_KEYS:
+        return True
+    normalized = key_text.strip().lower().replace("-", "_")
+    return bool(
+        normalized.endswith(("_id", "_uid", "_version"))
+        or normalized.startswith(("has_", "supports_"))
+        or any(
+            token in normalized
+            for token in (
+                "capability",
+                "device_type",
+                "firmware",
+                "hardware_sku",
+                "model",
+                "parent",
+                "serial",
+            )
+        )
+    )
+
+
+def _compact_discovery_record(record: object) -> dict[str, object]:
+    """Return only stable identity and capability fields used for discovery."""
+
+    if not isinstance(record, dict):
+        return {}
+    return {
+        str(key): _snapshot_compatible_value(value)
+        for key, value in record.items()
+        if _is_discovery_record_key(key) and value is not None
+    }
+
+
+def _compact_type_buckets(value: object) -> dict[str, object]:
+    """Compact inventory buckets without persisting changing telemetry."""
+
+    if not isinstance(value, dict):
+        return {}
+    compact: dict[str, object] = {}
+    for raw_key, raw_bucket in value.items():
+        if not isinstance(raw_bucket, dict):
+            continue
+        bucket: dict[str, object] = {}
+        for key in ("count", "type_label", "model_counts", "model_summary"):
+            item = raw_bucket.get(key)
+            if item is not None:
+                bucket[key] = _snapshot_compatible_value(item)
+        members = raw_bucket.get("devices")
+        if isinstance(members, list):
+            bucket["devices"] = [
+                compact_member
+                for member in members
+                if (compact_member := _compact_discovery_record(member))
+            ]
+        else:
+            bucket["devices"] = []
+        compact[str(raw_key)] = bucket
+    return compact
+
+
+def _compact_keyed_records(value: object) -> dict[str, object]:
+    """Compact a serial-keyed discovery mapping."""
+
+    if not isinstance(value, dict):
+        return {}
+    return {
+        str(key): _compact_discovery_record(record)
+        for key, record in value.items()
+        if isinstance(record, dict)
+    }
 
 
 def _snapshot_compatible_value(value: object) -> object:
@@ -72,6 +216,13 @@ class DiscoverySnapshotManager:
             f"{DOMAIN}.discovery_snapshot.{entry_id}",
         )
         self._last_persisted_signature: str | None = None
+        self._revision = 0
+        self._persisted_revision = -1
+        self._last_observed_key: object | None = None
+        self._pending_snapshot: dict[str, object] | None = None
+        self._pending_signature: str | None = None
+        self._pending_revision: int | None = None
+        self._save_in_progress = False
 
     def _snapshot_signature(self, snapshot: object) -> str:
         compatible = _snapshot_compatible_value(snapshot)
@@ -88,6 +239,79 @@ class DiscoverySnapshotManager:
 
     def _mark_persisted(self, snapshot: object) -> None:
         self._last_persisted_signature = self._snapshot_signature(snapshot)
+
+    @staticmethod
+    def _record_key(record: object) -> tuple[tuple[str, str], ...]:
+        compact = _compact_discovery_record(record)
+        return tuple(sorted((key, repr(value)) for key, value in compact.items()))
+
+    def _discovery_key(self) -> tuple[object, ...]:
+        """Build a lightweight key for discovery-affecting coordinator state."""
+
+        type_buckets = getattr(self.coordinator, "_type_device_buckets", {}) or {}
+        type_key: list[object] = []
+        if isinstance(type_buckets, dict):
+            for raw_key, raw_bucket in type_buckets.items():
+                if not isinstance(raw_bucket, dict):
+                    continue
+                members = raw_bucket.get("devices")
+                member_keys = (
+                    tuple(self._record_key(member) for member in members)
+                    if isinstance(members, list)
+                    else ()
+                )
+                type_key.append(
+                    (
+                        str(raw_key),
+                        raw_bucket.get("count"),
+                        raw_bucket.get("type_label"),
+                        member_keys,
+                    )
+                )
+        battery_data = getattr(self.coordinator, "_battery_storage_data", {}) or {}
+        battery_key = (
+            tuple(
+                (str(key), self._record_key(record))
+                for key, record in battery_data.items()
+            )
+            if isinstance(battery_data, dict)
+            else ()
+        )
+        inverter_data = getattr(self.coordinator, "_inverter_data", {}) or {}
+        inverter_key = (
+            tuple(
+                (str(key), self._record_key(record))
+                for key, record in inverter_data.items()
+            )
+            if isinstance(inverter_data, dict)
+            else ()
+        )
+        return (
+            tuple(self.coordinator.iter_serials()),
+            tuple(getattr(self.coordinator, "_type_device_order", []) or []),
+            tuple(type_key),
+            tuple(getattr(self.coordinator, "_battery_storage_order", []) or []),
+            battery_key,
+            tuple(getattr(self.coordinator, "_inverter_order", []) or []),
+            inverter_key,
+            getattr(self.coordinator, "_battery_has_encharge", None),
+            getattr(self.coordinator, "_battery_has_enpower", None),
+            bool(getattr(self.coordinator, "_heatpump_known_present", False)),
+            bool(getattr(self.coordinator, "_site_energy_discovery_ready", False)),
+            tuple(sorted(self.live_site_energy_channels())),
+            tuple(
+                self._record_key(record)
+                for record in self.gateway_iq_energy_router_records()
+            ),
+        )
+
+    def _observe_revision(self) -> bool:
+        key = self._discovery_key()
+        if key == self._last_observed_key:
+            return False
+        self._last_observed_key = key
+        self._revision += 1
+        return True
 
     def live_site_energy_channels(self) -> set[str]:
         channels: set[str] = set()
@@ -190,20 +414,20 @@ class DiscoverySnapshotManager:
             "type_device_order": list(
                 getattr(self.coordinator, "_type_device_order", []) or []
             ),
-            "type_device_buckets": _snapshot_compatible_value(
-                dict(getattr(self.coordinator, "_type_device_buckets", {}) or {})
+            "type_device_buckets": _compact_type_buckets(
+                getattr(self.coordinator, "_type_device_buckets", {})
             ),
             "battery_storage_order": list(
                 getattr(self.coordinator, "_battery_storage_order", []) or []
             ),
-            "battery_storage_data": _snapshot_compatible_value(
-                dict(getattr(self.coordinator, "_battery_storage_data", {}) or {})
+            "battery_storage_data": _compact_keyed_records(
+                getattr(self.coordinator, "_battery_storage_data", {})
             ),
             "inverter_order": list(
                 getattr(self.coordinator, "_inverter_order", []) or []
             ),
-            "inverter_data": _snapshot_compatible_value(
-                dict(getattr(self.coordinator, "_inverter_data", {}) or {})
+            "inverter_data": _compact_keyed_records(
+                getattr(self.coordinator, "_inverter_data", {})
             ),
             "battery_has_encharge": getattr(
                 self.coordinator, "_battery_has_encharge", None
@@ -222,9 +446,11 @@ class DiscoverySnapshotManager:
                 )
             ),
             "site_energy_channels": sorted(site_energy_channels),
-            "gateway_iq_energy_router_records": _snapshot_compatible_value(
-                router_records
-            ),
+            "gateway_iq_energy_router_records": [
+                compact
+                for record in router_records
+                if (compact := _compact_discovery_record(record))
+            ],
         }
         return snapshot
 
@@ -335,7 +561,11 @@ class DiscoverySnapshotManager:
                 dict(item) for item in restored_router_records if isinstance(item, dict)
             ]
         self.coordinator._refresh_cached_topology()
+        # Normalize legacy/full snapshots to the compact representation once on
+        # restore so the next unchanged refresh does not rewrite storage.
         self._mark_persisted(self.capture())
+        self._last_observed_key = self._discovery_key()
+        self._persisted_revision = self._revision
 
     async def async_restore_state(self) -> None:
         if self.coordinator._discovery_snapshot_loaded:
@@ -356,28 +586,76 @@ class DiscoverySnapshotManager:
         self.apply(snapshot)
 
     async def async_save(self) -> None:
+        if self._pending_snapshot is None:
+            self._observe_revision()
+            snapshot, signature = self._capture_signature()
+            revision = self._revision
+        else:
+            snapshot = self._pending_snapshot
+            signature = self._pending_signature or self._snapshot_signature(snapshot)
+            revision = self._pending_revision or self._revision
+        self._pending_snapshot = None
+        self._pending_signature = None
+        self._pending_revision = None
         self.coordinator._discovery_snapshot_pending = False
-        snapshot, signature = self._capture_signature()
         if signature == self._last_persisted_signature:
+            self._persisted_revision = max(self._persisted_revision, revision)
             return
+        self._save_in_progress = True
         try:
             await self._store.async_save(snapshot)
+        except asyncio.CancelledError:
+            if self._pending_snapshot is None:
+                self._pending_snapshot = snapshot
+                self._pending_signature = signature
+                self._pending_revision = revision
+            self.coordinator._discovery_snapshot_pending = True
+            raise
         except Exception:  # noqa: BLE001
             _LOGGER.debug(
                 "Failed to save discovery snapshot for site %s",
                 redact_site_id(self.coordinator.site_id),
                 exc_info=True,
             )
+            if self._pending_snapshot is None:
+                self._pending_snapshot = snapshot
+                self._pending_signature = signature
+                self._pending_revision = revision
+                self.coordinator._discovery_snapshot_pending = True
             return
+        finally:
+            self._save_in_progress = False
         self._last_persisted_signature = signature
+        self._persisted_revision = max(self._persisted_revision, revision)
+        if self._pending_snapshot is not None:
+            self.coordinator._discovery_snapshot_pending = True
+            self._schedule_pending_save()
 
     def schedule_save(self) -> None:
-        _, signature = self._capture_signature()
-        if signature == self._last_persisted_signature:
+        changed = self._observe_revision()
+        if not changed and self._pending_snapshot is None:
             self.coordinator._discovery_snapshot_pending = False
             return
+        if changed or self._pending_snapshot is None:
+            snapshot, signature = self._capture_signature()
+            if signature == self._last_persisted_signature:
+                self._persisted_revision = self._revision
+                self._pending_snapshot = None
+                self._pending_signature = None
+                self._pending_revision = None
+                self.coordinator._discovery_snapshot_pending = False
+                return
+            self._pending_snapshot = snapshot
+            self._pending_signature = signature
+            self._pending_revision = self._revision
         self.coordinator._discovery_snapshot_pending = True
-        if self.coordinator._discovery_snapshot_save_cancel is not None:
+        self._schedule_pending_save()
+
+    def _schedule_pending_save(self) -> None:
+        if (
+            self._save_in_progress
+            or self.coordinator._discovery_snapshot_save_cancel is not None
+        ):
             return
 
         @callback  # type: ignore[untyped-decorator]

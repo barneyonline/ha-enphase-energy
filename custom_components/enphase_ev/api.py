@@ -52,6 +52,7 @@ from .api_models import (
     TextResponse as TextResponse,
 )
 from .log_redaction import redact_identifier, redact_site_id, redact_text
+from .request_metrics import record_request_attempt
 
 _LOGGER = logging.getLogger(__name__)
 _EMAIL_RE = re.compile(r"(?i)\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b")
@@ -4373,6 +4374,7 @@ class EnphaseEVClient:
                         cookie_header_only=use_cookie_header_only
                     ) as request_session:
                         self._request_count += 1
+                        record_request_attempt()
                         async with request_session.request(
                             method, url, headers=base_headers, **kwargs
                         ) as r:

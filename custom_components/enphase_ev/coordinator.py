@@ -172,6 +172,7 @@ from .session_history import (
     SessionHistoryManager,
 )
 from .coordinator_refresh_metrics import record_refresh_performance_sample
+from .request_metrics import RequestMetrics, request_metrics_scope
 from .summary import SummaryStore
 from . import system_dashboard_helpers as sd_helpers
 from .refresh_plan import (
@@ -504,6 +505,8 @@ class RefreshPipelineContext:
     status_stale_network_failure: bool = False
     status_stale_dns_failure: bool = False
     fast_poll: bool = False
+    request_metrics: RequestMetrics | None = None
+    performance_recorded: bool = False
 
 
 class EnphaseCoordinator(
@@ -2819,9 +2822,6 @@ class EnphaseCoordinator(
         refresh_started_utc = dt_util.utcnow()
         if refresh_started_utc.tzinfo is None:
             refresh_started_utc = refresh_started_utc.replace(tzinfo=_tz.utc)
-        reset_request_count = getattr(self.client, "reset_request_count", None)
-        if callable(reset_request_count):
-            reset_request_count()
         fallback_data: dict[str, dict[str, object]] = {}
         if isinstance(self.data, dict):
             try:
@@ -3138,22 +3138,30 @@ class EnphaseCoordinator(
                 return True
         return False
 
-    def _finish_refresh_pipeline(
+    def _record_refresh_pipeline_performance(
         self,
         context: RefreshPipelineContext,
+        *,
+        outcome: str,
     ) -> None:
+        if context.performance_recorded:
+            return
         phase_timings = context.phase_timings
+        if context.request_metrics is not None:
+            phase_timings.update(context.request_metrics.phase_timings())
         phase_timings["total_s"] = round(time.monotonic() - context.started_mono, 3)
         self._phase_timings = phase_timings.copy()
-        request_count = getattr(self.client, "request_count", None)
-        if isinstance(request_count, int):
+        request_count = (
+            context.request_metrics.attempts
+            if context.request_metrics is not None
+            else None
+        )
+        if request_count is not None:
             self._last_refresh_cloud_calls = request_count
             if context.fast_poll:
                 self._last_fast_refresh_cloud_calls = request_count
             else:
                 self._last_steady_refresh_cloud_calls = request_count
-        else:
-            request_count = None
         self._refresh_performance_history = record_refresh_performance_sample(
             getattr(self, "_refresh_performance_history", []),
             phase_timings,
@@ -3165,14 +3173,40 @@ class EnphaseCoordinator(
             payload_using_stale=getattr(context, "status_used_stale", False)
             or bool(getattr(self, "payload_using_stale", False)),
             manual_bypass=self.endpoint_manual_bypass_active(),
+            outcome=outcome,
         )
-        if context.first_refresh:
+        context.performance_recorded = True
+        if context.first_refresh and outcome == "success":
             self._bootstrap_phase_timings = phase_timings.copy()
+
+    def _finish_refresh_pipeline(
+        self,
+        context: RefreshPipelineContext,
+    ) -> None:
+        self._record_refresh_pipeline_performance(context, outcome="success")
         self._refresh_cached_topology()
         self.discovery_snapshot.schedule_save()
 
     async def _async_update_data(self) -> dict[str, dict[str, object]]:
-        context = self._start_refresh_pipeline()
+        with request_metrics_scope("core_refresh") as request_metrics:
+            context = self._start_refresh_pipeline()
+            context.request_metrics = request_metrics
+            outcome = "success"
+            try:
+                return await self._async_update_data_impl(context)
+            except asyncio.CancelledError:
+                outcome = "cancelled"
+                raise
+            except BaseException:
+                outcome = "failed"
+                raise
+            finally:
+                self._record_refresh_pipeline_performance(context, outcome=outcome)
+
+    async def _async_update_data_impl(
+        self,
+        context: RefreshPipelineContext,
+    ) -> dict[str, dict[str, object]]:
         t0 = context.started_mono
         refresh_started_utc = context.refresh_started_utc
         phase_timings = context.phase_timings

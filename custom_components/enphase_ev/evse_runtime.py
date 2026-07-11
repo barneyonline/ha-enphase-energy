@@ -33,6 +33,7 @@ from .const import (
     OPT_SLOW_POLL_INTERVAL,
 )
 from .log_redaction import redact_identifier, redact_text
+from .request_metrics import request_metrics_scope
 from .runtime_helpers import coerce_int, normalize_poll_intervals
 from .session_history import MIN_SESSION_HISTORY_CACHE_TTL
 
@@ -497,6 +498,12 @@ class EvseRuntime:
                 coord.hass.async_create_task(self.async_auto_resume(sn_str, snapshot))
 
     async def async_auto_resume(
+        self, sn: str, snapshot: dict[str, object] | None = None
+    ) -> None:
+        with request_metrics_scope("write_followup"):
+            await self._async_auto_resume_impl(sn, snapshot)
+
+    async def _async_auto_resume_impl(
         self, sn: str, snapshot: dict[str, object] | None = None
     ) -> None:
         coord = self.coordinator
