@@ -452,7 +452,7 @@ async def test_reauth_flow_manager_submit_routes_to_user_step(hass) -> None:
 @pytest.mark.filterwarnings(
     "ignore:It is recommended to use web.AppKey instances for keys\\.:aiohttp.web_exceptions.NotAppKeyWarning"
 )
-async def test_reauth_allows_empty_device_selection(hass) -> None:
+async def test_reauth_allows_empty_device_selection(hass, monkeypatch) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id="12345",
@@ -482,6 +482,8 @@ async def test_reauth_allows_empty_device_selection(hass) -> None:
     )
     sites = [SiteInfo(site_id="12345", name="Garage Site")]
     chargers = [ChargerInfo(serial="EV123", name="Driveway Charger")]
+    async_reload = AsyncMock(return_value=True)
+    monkeypatch.setattr(hass.config_entries, "async_reload", async_reload)
 
     with (
         patch(
@@ -517,6 +519,8 @@ async def test_reauth_allows_empty_device_selection(hass) -> None:
 
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
+    await hass.async_block_till_done()
+    async_reload.assert_awaited_once_with(entry.entry_id)
 
 
 @pytest.mark.asyncio
