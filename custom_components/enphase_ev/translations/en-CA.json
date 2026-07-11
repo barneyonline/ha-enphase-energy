@@ -456,6 +456,27 @@
     },
     "firmware_advisory_only": {
       "message": "Firmware updates are advisory only."
+    },
+    "grid_profile_installer_required": {
+      "message": "Grid profile control requires installer-level Enphase Activation access."
+    },
+    "grid_profile_profile_invalid": {
+      "message": "Selected grid profile is not available for this site country and region."
+    },
+    "grid_profile_gateway_required": {
+      "message": "Grid profile apply requires Activation gateway metadata."
+    },
+    "grid_profile_apply_failed": {
+      "message": "Grid profile apply failed."
+    },
+    "grid_profile_confirmation_required": {
+      "message": "Confirmation is required to apply a grid profile."
+    },
+    "grid_profile_region_invalid": {
+      "message": "Selected grid profile region is not available."
+    },
+    "grid_profile_unavailable": {
+      "message": "Grid profile control is unavailable."
     }
   },
   "options": {
@@ -465,11 +486,13 @@
         "description": "Choose what to do with this integration entry.",
         "menu_options": {
           "settings": "Settings",
-          "migrate_envoy": "Migrate Envoy history"
+          "migrate_envoy": "Migrate Envoy history",
+          "advanced": "Advanced"
         },
         "menu_option_descriptions": {
           "settings": "Tune polling and behavior.",
-          "migrate_envoy": "Take over selected Enphase Envoy energy entity IDs so Home Assistant Energy history continues under this integration."
+          "migrate_envoy": "Take over selected Enphase Envoy energy entity IDs so Home Assistant Energy history continues under this integration.",
+          "advanced": "Installer-only grid profile controls."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -593,6 +616,46 @@
           "confirm_reassign": "I understand the selected source entity IDs will be reassigned",
           "disable_archived_envoy_sensors": "Disable archived source sensors after migration"
         }
+      },
+      "advanced": {
+        "title": "Advanced",
+        "description": "Installer and maintenance actions.",
+        "menu_options": {
+          "grid_profile": "Grid profile control"
+        },
+        "menu_option_descriptions": {
+          "grid_profile": "Browse and apply installer-only Activation grid profiles."
+        }
+      },
+      "grid_profile": {
+        "title": "Grid Profile Control",
+        "description": "Filter the Activation grid profile catalog for this site's country.",
+        "data": {
+          "grid_profile_region": "Region",
+          "grid_profile_commonly_used": "Profile list"
+        },
+        "data_description": {
+          "grid_profile_region": "Only regions for the site's country are available.",
+          "grid_profile_commonly_used": "Choose commonly used profiles or all profiles for the selected region."
+        }
+      },
+      "grid_profile_select": {
+        "title": "Select Grid Profile",
+        "description": "Choose a profile to stage. Nothing is applied until the confirmation step.",
+        "data": {
+          "grid_profile_id": "Grid profile"
+        }
+      },
+      "grid_profile_confirm": {
+        "title": "Confirm Grid Profile",
+        "description": "Current profile: **{current_profile}**\n\nSelected profile: **{selected_profile}**\n\nProfile ID: **{selected_profile_id}**\n\nPEL Enhanced: **{selected_profile_pel}**\n\n277V Compatible: **{selected_profile_277v}**\n\nCountry: **{country}**\n\nRegion: **{region}**\n\nCloud apply status: **{apply_status}**.",
+        "data": {
+          "confirm_apply": "Apply the selected grid profile"
+        }
+      },
+      "grid_profile_applied": {
+        "title": "Grid profile update accepted",
+        "description": "Enphase accepted the grid profile update for **{selected_profile}**.\n\nRequested profile ID: **{requested_profile_id}**\n\nCloud status: **{cloud_apply_status}**\n\nThe new profile may take up to **5 minutes** to appear as current while the cloud and Gateway finish processing it. The Grid Profile sensor will update after the Activation record reports the new current profile."
       }
     },
     "error": {
@@ -602,16 +665,45 @@
       "migration_no_selection": "Select at least one compatible energy sensor to migrate.",
       "migration_duplicate_selection": "The same source entity cannot be used more than once.",
       "envoy_entry_loaded": "Envoy integration could not be temporarily unloaded for migration.",
-      "incompatible_energy_total": "Selected entities are not compatible energy totals."
+      "incompatible_energy_total": "Selected entities are not compatible energy totals.",
+      "grid_profile_unavailable": "Grid profile control is unavailable.",
+      "grid_profile_installer_required": "Grid profile control requires installer-level Enphase Activation access.",
+      "grid_profile_no_regions": "No grid profile regions are available for this site's country.",
+      "grid_profile_no_profiles": "No grid profiles match the selected filters.",
+      "grid_profile_region_invalid": "Selected grid profile region is not available.",
+      "grid_profile_profile_invalid": "Selected grid profile is not available for this site country and region.",
+      "grid_profile_gateway_required": "Grid profile apply requires Activation gateway metadata.",
+      "grid_profile_apply_failed": "Grid profile apply failed."
     },
     "abort": {
       "migration_no_envoy_sources": "No Enphase Envoy energy sensors are available to migrate.",
       "migration_no_targets": "No compatible Enphase Energy site sensors are available for migration.",
-      "migration_partial_failure": "The migration stopped after partial completion.\n\nCompleted mappings:\n{completed_mappings}\n\nFailed while processing `{failed_entity_id}`: {failure_reason}\n\nRestore from backup if the result is not acceptable."
+      "migration_partial_failure": "The migration stopped after partial completion.\n\nCompleted mappings:\n{completed_mappings}\n\nFailed while processing `{failed_entity_id}`: {failure_reason}\n\nRestore from backup if the result is not acceptable.",
+      "grid_profile_unavailable": "Grid profile control is unavailable.",
+      "grid_profile_installer_required": "Grid profile control requires installer-level Enphase Activation access.",
+      "grid_profile_no_regions": "No grid profile regions are available for this site's country."
     },
     "create_entry": {
       "migration_success": "Migration complete. Enphase Energy now owns the selected source entity IDs. Verify the Energy dashboard and Developer Tools > Statistics after the next refresh.",
       "migration_success_reload_needed": "Migration complete, but one or more integrations could not be reloaded automatically. Reload Enphase Energy and Enphase Envoy manually if needed, then verify the Energy dashboard and Developer Tools > Statistics."
+    }
+  },
+  "selector": {
+    "grid_profile_list_mode": {
+      "options": {
+        "commonly_used": "Commonly used",
+        "all_profiles": "All profiles"
+      }
+    },
+    "grid_profile_status": {
+      "options": {
+        "yes": "Yes",
+        "no": "No",
+        "unknown": "Unknown",
+        "available": "Available",
+        "unavailable": "Unavailable",
+        "accepted": "Accepted"
+      }
     }
   },
   "entity": {
@@ -1765,6 +1857,9 @@
       },
       "dry_contacts": {
         "name": "Dry Contacts"
+      },
+      "current_grid_profile": {
+        "name": "Grid Profile"
       }
     },
     "number": {
@@ -2812,6 +2907,111 @@
         "site_id": {
           "name": "Site ID",
           "description": "Optional site identifier; detected automatically when a site device is selected."
+        }
+      }
+    },
+    "browse_grid_profiles": {
+      "name": "Browse Grid Profiles",
+      "description": "Browse cloud Activation grid profiles available for the selected site country and region.",
+      "sections": {
+        "advanced": {
+          "name": "Advanced options"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Region code",
+          "description": "Optional country-scoped region/state code such as VIC."
+        },
+        "query": {
+          "name": "Search",
+          "description": "Optional search text matched against regions and profiles for the site country."
+        },
+        "commonly_used": {
+          "name": "Commonly used only",
+          "description": "Return the commonly used profile catalog when enabled."
+        },
+        "device_id": {
+          "name": "Site devices",
+          "description": "Select an Enphase site device to browse profiles for."
+        },
+        "site_id": {
+          "name": "Site ID",
+          "description": "Optional site identifier; detected automatically when a site device is selected."
+        },
+        "config_entry_id": {
+          "name": "Config entry ID",
+          "description": "Optional config entry identifier for the target site."
+        }
+      }
+    },
+    "refresh_grid_profiles": {
+      "name": "Refresh Grid Profiles",
+      "description": "Force refresh cloud Activation grid profile reference data and the selected region catalog.",
+      "sections": {
+        "advanced": {
+          "name": "Advanced options"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Region code",
+          "description": "Optional country-scoped region/state code such as VIC."
+        },
+        "commonly_used": {
+          "name": "Commonly used only",
+          "description": "Refresh the commonly used profile catalog when enabled."
+        },
+        "device_id": {
+          "name": "Site devices",
+          "description": "Select an Enphase site device to refresh profiles for."
+        },
+        "site_id": {
+          "name": "Site ID",
+          "description": "Optional site identifier; detected automatically when a site device is selected."
+        },
+        "config_entry_id": {
+          "name": "Config entry ID",
+          "description": "Optional config entry identifier for the target site."
+        }
+      }
+    },
+    "set_grid_profile": {
+      "name": "Set Grid Profile",
+      "description": "Apply a cloud Activation grid profile after explicit confirmation.",
+      "sections": {
+        "advanced": {
+          "name": "Advanced options"
+        }
+      },
+      "fields": {
+        "profile_id": {
+          "name": "Profile ID",
+          "description": "Cloud Activation profile ID, including the agf: prefix."
+        },
+        "confirm": {
+          "name": "Confirm apply",
+          "description": "Must be enabled to apply the selected grid profile."
+        },
+        "region_code": {
+          "name": "Region code",
+          "description": "Optional country-scoped region/state code used to validate the profile."
+        },
+        "gateway_serial": {
+          "name": "Gateway serial",
+          "description": "Optional Gateway serial when the Activation record contains multiple Gateways."
+        },
+        "device_id": {
+          "name": "Site devices",
+          "description": "Select an Enphase site device to apply the profile for."
+        },
+        "site_id": {
+          "name": "Site ID",
+          "description": "Optional site identifier; detected automatically when a site device is selected."
+        },
+        "config_entry_id": {
+          "name": "Config entry ID",
+          "description": "Optional config entry identifier for the target site."
         }
       }
     }

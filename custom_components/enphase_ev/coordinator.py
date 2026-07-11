@@ -131,6 +131,7 @@ from .evse_runtime import (
     evse_power_is_actively_charging,
 )
 from .evse_power import build_evse_power_snapshot
+from .grid_profile_runtime import SUPPORT_DENIED, SUPPORT_UNKNOWN, GridProfileRuntime
 from .heatpump_runtime import HeatpumpRuntime
 from .inventory_runtime import CoordinatorTopologySnapshot, InventoryRuntime
 from .inventory_view import InventoryView
@@ -242,6 +243,7 @@ COORDINATOR_RUNTIME_CLASSES: dict[str, type] = {
     "current_power_runtime": CurrentPowerRuntime,
     "auth_refresh_runtime": AuthRefreshRuntime,
     "evse_feature_flags_runtime": EvseFeatureFlagsRuntime,
+    "grid_profile_runtime": GridProfileRuntime,
     "tariff_runtime": TariffRuntime,
     "system_events_runtime": SystemEventsRuntime,
 }
@@ -869,6 +871,7 @@ class EnphaseCoordinator(
         self._ensure_coordinator_runtime("current_power_runtime")
         self._ensure_coordinator_runtime("auth_refresh_runtime")
         self._ensure_coordinator_runtime("evse_feature_flags_runtime")
+        self._ensure_coordinator_runtime("grid_profile_runtime")
         self._ensure_coordinator_runtime("tariff_runtime")
         self._ensure_coordinator_runtime("system_events_runtime")
         self.inventory_runtime = InventoryRuntime(self)
@@ -1033,6 +1036,15 @@ class EnphaseCoordinator(
             "grid_outage_context": EndpointFamilyPolicy(
                 success_ttl_s=GRID_OUTAGE_CONTEXT_CACHE_TTL,
                 stale_after_s=GRID_OUTAGE_CONTEXT_STALE_AFTER_S,
+                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
+                max_backoff_s=3600.0,
+                optional=True,
+                suppress_after_failures=3,
+                support_state_on_success=True,
+            ),
+            "activation_grid_profile": EndpointFamilyPolicy(
+                success_ttl_s=300.0,
+                stale_after_s=3600.0,
                 failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
                 max_backoff_s=3600.0,
                 optional=True,
@@ -1726,6 +1738,12 @@ class EnphaseCoordinator(
         session_manager = getattr(self, "session_history", None)
         if session_manager is not None and hasattr(session_manager, "clear"):
             session_manager.clear()
+        grid_profile_runtime = getattr(self, "grid_profile_runtime", None)
+        cancel_grid_profile_pending = getattr(
+            grid_profile_runtime, "cancel_pending_refresh", None
+        )
+        if callable(cancel_grid_profile_pending):
+            cancel_grid_profile_pending()
         self._session_history_cache_shim.clear()
         self._prune_runtime_caches(active_serials=(), keep_day_keys=())
         self._topology_listeners.clear()
@@ -2928,6 +2946,7 @@ class EnphaseCoordinator(
         self._sync_battery_profile_pending_issue()
         self.last_success_utc = dt_util.utcnow()
         self.latency_ms = int((time.monotonic() - context.started_mono) * 1000)
+        await self._async_refresh_grid_profile_metadata(context)
         self._finish_refresh_pipeline(context)
         return {}
 
@@ -3225,6 +3244,26 @@ class EnphaseCoordinator(
         self._record_refresh_pipeline_performance(context, outcome="success")
         self._refresh_cached_topology()
         self.discovery_snapshot.schedule_save()
+
+    async def _async_refresh_grid_profile_metadata(
+        self, context: RefreshPipelineContext
+    ) -> None:
+        """Refresh optional grid-profile status during steady coordinator polls."""
+
+        if context.first_refresh:
+            return
+        runtime = self.grid_profile_runtime
+        if getattr(runtime, "support_state", SUPPORT_UNKNOWN) in {
+            SUPPORT_UNKNOWN,
+            SUPPORT_DENIED,
+        }:
+            return
+        refresh = getattr(runtime, "async_refresh", None)
+        if not callable(refresh):
+            return
+        started = time.monotonic()
+        await refresh(force=False, load_profiles=False)
+        context.phase_timings["grid_profile_s"] = round(time.monotonic() - started, 3)
 
     async def _async_update_data(self) -> dict[str, dict[str, object]]:
         with request_metrics_scope("core_refresh") as request_metrics:
@@ -4581,6 +4620,7 @@ class EnphaseCoordinator(
         )
         self._apply_refresh_polling_interval(polling_state)
 
+        await self._async_refresh_grid_profile_metadata(context)
         self._finish_refresh_pipeline(context)
         if _LOGGER.isEnabledFor(logging.DEBUG):
             _LOGGER.debug(

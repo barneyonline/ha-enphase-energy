@@ -38,6 +38,7 @@ from custom_components.enphase_ev import (
     _registry_charger_metadata_signature,
     _registry_metadata_signature,
     _registry_type_metadata_signature,
+    _remove_retired_grid_profile_device_entities,
     _remove_evse_type_device_and_entities,
     _remove_legacy_inventory_entities,
     _remove_legacy_site_device,
@@ -98,6 +99,39 @@ def test_normalize_selected_type_keys_covers_string_and_fallback_paths() -> None
         "microinverter",
     ]
     assert _normalize_selected_type_keys(123) == []
+
+
+def test_remove_retired_grid_profile_entities_handles_current_sensor(
+    hass: HomeAssistant, config_entry, monkeypatch
+) -> None:
+    _remove_retired_grid_profile_device_entities(hass, config_entry, None)
+
+    site_id = config_entry.data[CONF_SITE_ID]
+    registry = er.async_get(hass)
+    current = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{DOMAIN}_site_{site_id}_current_grid_profile",
+        config_entry=config_entry,
+    )
+
+    _remove_retired_grid_profile_device_entities(
+        hass,
+        config_entry,
+        site_id,
+    )
+    assert registry.async_get(current.entity_id).entity_category is None
+
+    monkeypatch.setattr(
+        registry,
+        "async_update_entity",
+        Mock(side_effect=RuntimeError("registry unavailable")),
+    )
+    _remove_retired_grid_profile_device_entities(
+        hass,
+        config_entry,
+        site_id,
+    )
 
 
 def test_startup_migration_version_returns_zero_for_invalid_value(config_entry) -> None:
@@ -615,6 +649,7 @@ async def test_async_setup_entry_uses_background_task_for_schedule_sync_start(
         def __init__(self) -> None:
             self.site_id = site_id
             self.schedule_sync = SimpleNamespace(async_start=AsyncMock())
+            self.grid_profile_runtime = SimpleNamespace(async_refresh=AsyncMock())
 
         async def async_config_entry_first_refresh(self) -> None:
             return None
@@ -647,7 +682,15 @@ async def test_async_setup_entry_uses_background_task_for_schedule_sync_start(
 
     assert await async_setup_entry(hass, config_entry)
 
-    assert background_calls == [(hass, "enphase_ev_schedule_sync_start", True)]
+    assert background_calls == [
+        (hass, "enphase_ev_grid_profile_startup_probe", True),
+        (hass, "enphase_ev_schedule_sync_start", True),
+    ]
+    dummy_coord.grid_profile_runtime.async_refresh.assert_called_once_with(
+        force=True,
+        load_profiles=False,
+    )
+    dummy_coord.grid_profile_runtime.async_refresh.assert_not_awaited()
     dummy_coord.schedule_sync.async_start.assert_not_awaited()
     forward.assert_awaited_once()
 

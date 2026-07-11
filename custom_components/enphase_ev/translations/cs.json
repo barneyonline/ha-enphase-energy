@@ -456,6 +456,27 @@
     },
     "firmware_advisory_only": {
       "message": "Aktualizace firmwaru jsou pouze informativní."
+    },
+    "grid_profile_installer_required": {
+      "message": "Ovládání síťového profilu vyžaduje installer přístup k Enphase Activation."
+    },
+    "grid_profile_profile_invalid": {
+      "message": "Vybraný síťový profil není dostupný pro zemi a region tohoto místa."
+    },
+    "grid_profile_gateway_required": {
+      "message": "Použití síťového profilu vyžaduje cloudový záznam Activation Gateway."
+    },
+    "grid_profile_apply_failed": {
+      "message": "Použití síťového profilu selhalo."
+    },
+    "grid_profile_confirmation_required": {
+      "message": "Pro použití síťového profilu je vyžadováno potvrzení."
+    },
+    "grid_profile_region_invalid": {
+      "message": "Vybraný region síťového profilu není dostupný."
+    },
+    "grid_profile_unavailable": {
+      "message": "Ovládání síťového profilu není dostupné."
     }
   },
   "options": {
@@ -465,11 +486,13 @@
         "description": "Vyberte, co chcete s tímto záznamem integrace udělat.",
         "menu_options": {
           "settings": "Nastavení",
-          "migrate_envoy": "Migrovat historii Envoy"
+          "migrate_envoy": "Migrovat historii Envoy",
+          "advanced": "Pokročilé"
         },
         "menu_option_descriptions": {
           "settings": "Upravte intervaly a chování.",
-          "migrate_envoy": "Převezměte vybraná ID energetických entit Enphase Envoy, aby historie v Home Assistant Energy pokračovala pod touto integrací."
+          "migrate_envoy": "Převezměte vybraná ID energetických entit Enphase Envoy, aby historie v Home Assistant Energy pokračovala pod touto integrací.",
+          "advanced": "Ovládání síťových profilů pouze pro instalátory."
         },
         "data": {
           "type_envoy": "Brána",
@@ -593,6 +616,46 @@
           "confirm_reassign": "Rozumím, že vybraná ID zdrojových entit budou znovu přiřazena",
           "disable_archived_envoy_sensors": "Po migraci zakázat archivované zdrojové senzory"
         }
+      },
+      "advanced": {
+        "title": "Pokročilé",
+        "description": "Instalační a servisní akce.",
+        "menu_options": {
+          "grid_profile": "Ovládání síťového profilu"
+        },
+        "menu_option_descriptions": {
+          "grid_profile": "Procházení a použití síťových profilů Activation pouze pro instalátory."
+        }
+      },
+      "grid_profile": {
+        "title": "Ovládání síťového profilu",
+        "description": "Filtruje katalog síťových profilů Activation podle země tohoto místa.",
+        "data": {
+          "grid_profile_region": "Oblast",
+          "grid_profile_commonly_used": "Seznam profilů"
+        },
+        "data_description": {
+          "grid_profile_region": "K dispozici jsou pouze oblasti pro zemi tohoto místa.",
+          "grid_profile_commonly_used": "Vyberte běžně používané profily nebo všechny profily pro vybranou oblast."
+        }
+      },
+      "grid_profile_select": {
+        "title": "Vybrat síťový profil",
+        "description": "Vyberte profil k přípravě. Nic se nepoužije až do kroku potvrzení.",
+        "data": {
+          "grid_profile_id": "Síťový profil"
+        }
+      },
+      "grid_profile_confirm": {
+        "title": "Potvrdit síťový profil",
+        "description": "Aktuální profil: **{current_profile}**\n\nVybraný profil: **{selected_profile}**\n\nID profilu: **{selected_profile_id}**\n\nPEL Enhanced: **{selected_profile_pel}**\n\nKompatibilní s 277 V: **{selected_profile_277v}**\n\nZemě: **{country}**\n\nOblast: **{region}**\n\nStav použití v cloudu: **{apply_status}**.",
+        "data": {
+          "confirm_apply": "Použít vybraný síťový profil"
+        }
+      },
+      "grid_profile_applied": {
+        "title": "Aktualizace síťového profilu přijata",
+        "description": "Enphase přijal aktualizaci síťového profilu pro **{selected_profile}**.\n\nID požadovaného profilu: **{requested_profile_id}**\n\nStav cloudu: **{cloud_apply_status}**\n\nMůže trvat až **5 minut**, než se nový profil zobrazí jako aktuální, zatímco cloud a Gateway dokončí zpracování. Senzor Grid Profile se aktualizuje, jakmile záznam Activation nahlásí nový aktuální profil."
       }
     },
     "error": {
@@ -602,16 +665,45 @@
       "migration_no_selection": "Vyberte alespoň jeden kompatibilní energetický senzor k migraci.",
       "migration_duplicate_selection": "Stejnou zdrojovou entitu nelze použít více než jednou.",
       "envoy_entry_loaded": "Integraci Envoy se nepodařilo pro migraci dočasně odpojit.",
-      "incompatible_energy_total": "Vybrané entity nejsou kompatibilní kumulativní energetické hodnoty."
+      "incompatible_energy_total": "Vybrané entity nejsou kompatibilní kumulativní energetické hodnoty.",
+      "grid_profile_unavailable": "Ovládání síťového profilu není dostupné.",
+      "grid_profile_installer_required": "Ovládání síťového profilu vyžaduje instalační přístup k Enphase Activation.",
+      "grid_profile_no_regions": "Pro zemi tohoto místa nejsou dostupné žádné oblasti síťových profilů.",
+      "grid_profile_no_profiles": "Žádné síťové profily neodpovídají vybraným filtrům.",
+      "grid_profile_region_invalid": "Vybraná oblast síťového profilu není dostupná.",
+      "grid_profile_profile_invalid": "Vybraný síťový profil není dostupný pro zemi a oblast tohoto místa.",
+      "grid_profile_gateway_required": "Použití síťového profilu vyžaduje cloudový záznam Gateway v Activation.",
+      "grid_profile_apply_failed": "Použití síťového profilu se nezdařilo."
     },
     "abort": {
       "migration_no_envoy_sources": "Nejsou k dispozici žádné energetické senzory Enphase Envoy pro migraci.",
       "migration_no_targets": "Nejsou k dispozici žádné kompatibilní senzory Enphase Energy pro migraci.",
-      "migration_partial_failure": "Migrace se zastavila po částečném dokončení.\n\nDokončená mapování:\n{completed_mappings}\n\nSelhalo při zpracování `{failed_entity_id}`: {failure_reason}\n\nPokud výsledek nevyhovuje, obnovte zálohu."
+      "migration_partial_failure": "Migrace se zastavila po částečném dokončení.\n\nDokončená mapování:\n{completed_mappings}\n\nSelhalo při zpracování `{failed_entity_id}`: {failure_reason}\n\nPokud výsledek nevyhovuje, obnovte zálohu.",
+      "grid_profile_unavailable": "Ovládání síťového profilu není dostupné.",
+      "grid_profile_installer_required": "Ovládání síťového profilu vyžaduje instalační přístup k Enphase Activation.",
+      "grid_profile_no_regions": "Pro zemi tohoto místa nejsou dostupné žádné oblasti síťových profilů."
     },
     "create_entry": {
       "migration_success": "Migrace dokončena. Enphase Energy nyní vlastní vybraná ID zdrojových entit. Po příští aktualizaci zkontrolujte panel Energy a Developer Tools > Statistics.",
       "migration_success_reload_needed": "Migrace byla dokončena, ale jednu nebo více integrací se nepodařilo automaticky znovu načíst. V případě potřeby ručně znovu načtěte Enphase Energy a Enphase Envoy a poté zkontrolujte panel Energy a Developer Tools > Statistics."
+    }
+  },
+  "selector": {
+    "grid_profile_list_mode": {
+      "options": {
+        "commonly_used": "Běžně používané",
+        "all_profiles": "Všechny profily"
+      }
+    },
+    "grid_profile_status": {
+      "options": {
+        "yes": "Ano",
+        "no": "Ne",
+        "unknown": "Neznámé",
+        "available": "Dostupné",
+        "unavailable": "Nedostupné",
+        "accepted": "Přijato"
+      }
     }
   },
   "entity": {
@@ -1765,6 +1857,9 @@
       },
       "dry_contacts": {
         "name": "Suché kontakty"
+      },
+      "current_grid_profile": {
+        "name": "Síťový profil"
       }
     },
     "number": {
@@ -2812,6 +2907,115 @@
         "site_id": {
           "name": "ID lokality",
           "description": "Volitelný identifikátor lokality; zjistí se automaticky při výběru zařízení."
+        }
+      }
+    },
+    "browse_grid_profiles": {
+      "name": "Procházet síťové profily",
+      "description": "Procházení cloudových síťových profilů Activation dostupných pro zemi a region vybraného místa.",
+      "sections": {
+        "advanced": {
+          "name": "Pokročilé možnosti"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Kód regionu",
+          "description": "Volitelný kód regionu/státu, například VIC."
+        },
+        "commonly_used": {
+          "name": "Pouze běžně používané",
+          "description": "Při zapnutí vrátí katalog běžně používaných profilů."
+        },
+        "device_id": {
+          "name": "Zařízení místa",
+          "description": "Vyberte zařízení Enphase pro toto místo."
+        },
+        "site_id": {
+          "name": "ID místa",
+          "description": "Volitelný identifikátor místa; zjistí se automaticky při výběru zařízení."
+        },
+        "config_entry_id": {
+          "name": "ID konfigurační položky",
+          "description": "Volitelný identifikátor konfigurační položky cílového místa."
+        },
+        "query": {
+          "name": "Hledat",
+          "description": "Volitelný text hledaný v regionech a profilech země místa."
+        }
+      }
+    },
+    "refresh_grid_profiles": {
+      "name": "Obnovit síťové profily",
+      "description": "Vynutit obnovení referenčních dat Activation a katalogu vybraného regionu.",
+      "sections": {
+        "advanced": {
+          "name": "Pokročilé možnosti"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Kód regionu",
+          "description": "Volitelný kód regionu/státu, například VIC."
+        },
+        "commonly_used": {
+          "name": "Pouze běžně používané",
+          "description": "Při zapnutí vrátí katalog běžně používaných profilů."
+        },
+        "device_id": {
+          "name": "Zařízení místa",
+          "description": "Vyberte zařízení Enphase pro toto místo."
+        },
+        "site_id": {
+          "name": "ID místa",
+          "description": "Volitelný identifikátor místa; zjistí se automaticky při výběru zařízení."
+        },
+        "config_entry_id": {
+          "name": "ID konfigurační položky",
+          "description": "Volitelný identifikátor konfigurační položky cílového místa."
+        }
+      }
+    },
+    "set_grid_profile": {
+      "name": "Nastavit síťový profil",
+      "description": "Použije cloudový síťový profil Activation po výslovném potvrzení.",
+      "sections": {
+        "advanced": {
+          "name": "Pokročilé možnosti"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Kód regionu",
+          "description": "Volitelný kód regionu/státu, například VIC."
+        },
+        "commonly_used": {
+          "name": "Pouze běžně používané",
+          "description": "Při zapnutí vrátí katalog běžně používaných profilů."
+        },
+        "device_id": {
+          "name": "Zařízení místa",
+          "description": "Vyberte zařízení Enphase pro toto místo."
+        },
+        "site_id": {
+          "name": "ID místa",
+          "description": "Volitelný identifikátor místa; zjistí se automaticky při výběru zařízení."
+        },
+        "config_entry_id": {
+          "name": "ID konfigurační položky",
+          "description": "Volitelný identifikátor konfigurační položky cílového místa."
+        },
+        "profile_id": {
+          "name": "ID profilu",
+          "description": "ID profilu Cloud Activation včetně předpony agf:."
+        },
+        "confirm": {
+          "name": "Potvrdit použití",
+          "description": "Musí být zapnuto, aby se vybraný síťový profil použil."
+        },
+        "gateway_serial": {
+          "name": "Sériové číslo Gateway",
+          "description": "Volitelné sériové číslo Gateway, pokud Activation záznam obsahuje více Gateway."
         }
       }
     }

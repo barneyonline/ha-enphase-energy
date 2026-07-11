@@ -93,6 +93,15 @@ async def test_async_setup_entry_registers_entities(
             "charging_level": 32,
         }
     )
+    coord.grid_profile_runtime = SimpleNamespace(
+        installer_access_confirmed=True,
+        installer_access_ever_confirmed=True,
+        support_state="installer_access_confirmed",
+        current_profile_display=MagicMock(return_value="Australia A Region (1.3.12)"),
+        current_profile_attributes=MagicMock(
+            return_value={"profile_id": "agf:current"}
+        ),
+    )
     callbacks: list[Any] = []
 
     def fake_add_listener(cb):
@@ -113,6 +122,12 @@ async def test_async_setup_entry_registers_entities(
     assert any(ent.unique_id.endswith("_electrical_phase") for ent in added)
     assert any(ent.unique_id.endswith("_charger_authentication") for ent in added)
     assert len([ent for ent in added if hasattr(ent, "_sn")]) == 11
+    grid_profile = next(
+        ent for ent in added if ent.unique_id.endswith("_current_grid_profile")
+    )
+    assert grid_profile.available
+    assert grid_profile.native_value == "Australia A Region (1.3.12)"
+    assert grid_profile.extra_state_attributes == {"profile_id": "agf:current"}
 
     sync_topology_cb = next(
         cb for cb in callbacks if cb.__name__ == "_async_sync_topology"
@@ -300,6 +315,48 @@ def test_per_update_device_snapshots_are_reused(coordinator_factory) -> None:
     }
     coord.data = dict(coord.data)
     assert inverter.native_value == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("support_state", ["unknown", "activation_unavailable"])
+async def test_async_setup_preserves_grid_profile_registry_during_startup_probe(
+    hass, config_entry, coordinator_factory, support_state
+) -> None:
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.enphase_ev.const import DOMAIN
+    from custom_components.enphase_ev.sensor import async_setup_entry
+
+    coord = coordinator_factory(serials=[RANDOM_SERIAL])
+    coord.grid_profile_runtime = SimpleNamespace(
+        installer_access_confirmed=False,
+        installer_access_ever_confirmed=False,
+        support_state=support_state,
+    )
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    ent_reg = er.async_get(hass)
+    unique_id = f"{DOMAIN}_site_{coord.site_id}_current_grid_profile"
+    entity_id = ent_reg.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        unique_id,
+        suggested_object_id="grid_profile",
+    ).entity_id
+    ent_reg.async_update_entity(entity_id, name="Custom Grid Profile")
+    added: list[Any] = []
+
+    await async_setup_entry(
+        hass,
+        config_entry,
+        lambda entities, update_before_add=False: added.extend(entities),
+    )
+
+    preserved = ent_reg.async_get(entity_id)
+    assert preserved is not None
+    assert preserved.name == "Custom Grid Profile"
+    assert not any(
+        entity.unique_id.endswith("_current_grid_profile") for entity in added
+    )
 
 
 @pytest.mark.asyncio

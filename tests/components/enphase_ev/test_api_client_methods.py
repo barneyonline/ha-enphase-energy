@@ -458,6 +458,26 @@ async def test_text_response_returns_redirect_metadata() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("json_body", [None, ValueError("empty response")])
+async def test_json_accepts_empty_success_when_requested(json_body: object) -> None:
+    response = _FakeResponse(
+        status=200,
+        json_body=json_body,
+        text_body="",
+    )
+    response.headers["Content-Type"] = "application/json; charset=utf-8"
+    client = _make_client(_FakeSession([response]))
+
+    result = await client._json(  # noqa: SLF001
+        "PUT",
+        "https://example.test/service/activation/envoys",
+        allow_empty_success=True,
+    )
+
+    assert result == {}
+
+
+@pytest.mark.asyncio
 async def test_devices_tree_login_wall_raises_unauthorized() -> None:
     session = _FakeSession(
         [
@@ -8277,6 +8297,7 @@ async def test_system_dashboard_summary_sets_hems_support_hint() -> None:
 
     assert payload == {"is_hems": False, "geo": "APAC"}
     assert client.hems_site_supported is False
+    assert client._system_dashboard_summary_payload == payload  # noqa: SLF001
     args, kwargs = client._json.await_args
     assert args[0] == "GET"
     assert args[1].endswith(

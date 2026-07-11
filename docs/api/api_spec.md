@@ -60,6 +60,7 @@ Example response:
 - **EV charger telemetry and metadata:** `2.1`-`2.8`
 - **EV charger controls and scheduling:** `3.1`-`3.3`, `4.1`-`4.5`
 - **BatteryConfig controls:** `5.1`-`5.11`
+- **Activation grid profile controls:** `5A.1`-`5A.5`
 - **Cross-cutting references:** `7`, `8`, `9`
 
 ### 1.3 Table of Contents
@@ -75,6 +76,7 @@ Example response:
 - `3. EV Charger Control Operations`
 - `4. EV Scheduler (Charge Mode) API`
 - `5. BatteryConfig APIs (System Profile and Battery Controls)`
+- `5A. Activation Grid Profile APIs (Installer-Level)`
 - `6. Authentication Flow (Shared Across Services)`
 - `7. Response Field Reference`
 - `8. Error Handling and Rate Limiting`
@@ -200,6 +202,11 @@ Status labels:
 | BatteryConfig schedule update | `PUT` | `/service/batteryConfig/api/v1/battery/sites/<site_id>/schedules/<schedule_id>` | BatteryConfig write shape plus `X-XSRF-Token`; ordinary time/limit edits can omit `isEnabled`, while explicit schedule-entry toggle writes may include it; verified working update uses the raw-cookie browser request (`Cookie`, `e-auth-token`, `Username`, `X-XSRF-Token`, `X-Requested-With`) from a stateless client session; current client falls back across cookie-backed, primary, lean, and mixed-auth variants | Runtime |
 | BatteryConfig schedule legacy delete alias | `POST` | `/service/batteryConfig/api/v1/battery/sites/<site_id>/schedules/<schedule_id>/delete` | same BatteryConfig write planner as schedule create/update; cookie-backed browser request is the verified working compatibility shape on affected sites | Runtime |
 | BatteryConfig disclaimer accept | `POST` | `/service/batteryConfig/api/v1/batterySettings/acceptDisclaimer/<site_id>` | same BatteryConfig write planner as other battery settings mutations | Runtime |
+| Activation reference data | `GET` | `/service/activation_service/api/details/reference_data` | Activation UI authenticated session cookies plus `enlm-token` / manager token context; browser capture did not include an explicit `Authorization` header | Runtime |
+| Activation record | `GET` | `/service/activation_backend/api/gateway/v4/activations/<site_id>?expand=owner,host` | Activation UI authenticated session cookies plus Activation bearer auth; requires account role with Activation access | Runtime |
+| Activation device list and grid-profile status | `GET` | `/service/activation_backend/api/gateway/v4/systems/<site_id>/devices/list` | Activation UI authenticated session cookies plus `Authorization: Bearer <activation_jwt>`; requires installer-level Activation access | Runtime |
+| Grid profile discovery | `POST` | `/service/activation_backend/api/gateway/v4/systems/<site_id>/grid_profiles_filtered` | Activation UI authenticated session cookies plus `Authorization: Bearer <activation_jwt>`; requires installer-level Activation access | Runtime |
+| Apply grid profile | `PUT` | `/service/activation_backend/api/gateway/v4/systems/<site_id>/envoys` | same Activation UI bearer/cookie shape as discovery; requires installer-level Activation access | Runtime |
 | PES in-app banner/status | `GET` | `/service/pes_management/systems/<site_id>/inapp?type=<type>` | authenticated session cookies | Browser capture only |
 | Login | `POST` | `/login/login.json` | credentials; session/XSRF cookies are established by the response rather than pre-required | Runtime |
 
@@ -6751,6 +6758,293 @@ Observed behavior:
 
 ---
 
+## 5A. Activation Grid Profile APIs (Installer-Level)
+
+The Activation UI exposes grid-profile discovery and assignment endpoints that are separate from BatteryConfig and the homeowner grid on/off controls. These calls were captured from the Enlighten Activation web UI on 2026-07-08 while inspecting Australian grid profiles.
+
+Operational constraints:
+- These endpoints require an account/session with installer-level Activation access. Homeowner/owner sessions should not be assumed to have access.
+- A successful apply response means the cloud accepted or queued the grid-profile update; it does not prove the Gateway has finished applying the profile.
+- Grid profile changes are safety- and compliance-sensitive. Any runtime control should require explicit opt-in, strong confirmation text, and should expose the pending/in-progress state rather than treating the write as instant.
+- Do not log raw Authorization headers, cookies, Activation URLs with user identifiers, site IDs, gateway serials, part numbers, JWTs, email addresses, or local Gateway IP addresses.
+
+### 5A.1 Reference Data
+```
+GET /service/activation_service/api/details/reference_data
+```
+Returns country and region/state reference data used by the Activation UI grid-profile filter modal. The `countryCode` and `regionCode` values from this endpoint are the valid `country` and `state` request values for `POST /grid_profiles_filtered`.
+
+Observed request headers:
+```http
+Accept: application/json, text/plain, */*
+Accept-Language: en-AU,en;q=0.9
+Cookie: <authenticated Enlighten session cookies>
+enlm-token: <manager_or_activation_token>
+Referer: https://enlighten.enphaseenergy.com/app/activation_ui/?...
+```
+
+Example response excerpt:
+```json
+{
+  "countries": [
+    {
+      "name": "Australia",
+      "code": "AU"
+    }
+  ],
+  "country_regions": {
+    "AU": [
+      {
+        "id": 14,
+        "countryCode": "AU",
+        "regionCode": "VIC",
+        "regionName": "Victoria"
+      }
+    ]
+  }
+}
+```
+
+Captured `country_regions.AU` values:
+```json
+[
+  {
+    "id": 2,
+    "countryCode": "AU",
+    "regionCode": "ACT",
+    "regionName": "Australian Capital Territory"
+  },
+  {
+    "id": 4,
+    "countryCode": "AU",
+    "regionCode": "NSW",
+    "regionName": "New South Wales"
+  },
+  {
+    "id": 6,
+    "countryCode": "AU",
+    "regionCode": "NT",
+    "regionName": "Northern Territory"
+  },
+  {
+    "id": 8,
+    "countryCode": "AU",
+    "regionCode": "QLD",
+    "regionName": "Queensland"
+  },
+  {
+    "id": 10,
+    "countryCode": "AU",
+    "regionCode": "SA",
+    "regionName": "South Australia"
+  },
+  {
+    "id": 12,
+    "countryCode": "AU",
+    "regionCode": "TAS",
+    "regionName": "Tasmania"
+  },
+  {
+    "id": 14,
+    "countryCode": "AU",
+    "regionCode": "VIC",
+    "regionName": "Victoria"
+  },
+  {
+    "id": 16,
+    "countryCode": "AU",
+    "regionCode": "WA",
+    "regionName": "Western Australia"
+  }
+]
+```
+
+Observed behavior:
+- The top-level `countries[]` list provides display names and country codes.
+- The `country_regions` object is keyed by country code. Earlier browser captures used the same shape under `regions`; clients should accept both keys.
+- The grid-profile filter request uses `countryCode` as `country` and `regionCode` as `state`. It does not use the numeric `id`.
+- The operational grid-profile list still comes from `POST /grid_profiles_filtered`; this reference endpoint supplies valid picker/filter values.
+- Preserve country and region/state codes as returned. Do not synthesize region mappings unless a later implementation needs a fallback.
+- Runtime UI should first derive the site/user country from Activation data or existing site metadata, then show only regions for that country. It should not show countries or profiles outside the user's country unless the user explicitly enters an advanced override.
+- Search should run within the country-scoped data set. Region search should match `regionCode`, `regionName`, and display labels such as `"VIC, AU"`; profile search should match profile `name` and `profile_id` after region filtering.
+
+### 5A.2 Grid Profiles Filtered
+```
+POST /service/activation_backend/api/gateway/v4/systems/<site_id>/grid_profiles_filtered
+```
+Returns grid profiles filtered by country, state, and whether the Activation UI is showing only commonly used profiles.
+
+Observed request headers:
+```http
+Accept: application/json, text/plain, */*
+Content-Type: application/json
+Authorization: Bearer <activation_jwt>
+Origin: https://enlighten.enphaseenergy.com
+Referer: https://enlighten.enphaseenergy.com/app/activation_ui/?...
+```
+
+Observed request body:
+```json
+{
+  "commonly_used": true,
+  "country": "AU",
+  "state": "VIC"
+}
+```
+
+Example response excerpt:
+```json
+{
+  "title": {
+    "country": "AU",
+    "state": "VIC",
+    "commonly_used": true
+  },
+  "grid_profiles": {
+    "VIC, AU": [
+      {
+        "name": "AS/NZS 4777.2: 2020 Australia A Region (1.3.12)",
+        "profile_id": "agf:68e72cd69638927c4f4beaa0",
+        "pel_enabled": false,
+        "is_277v_compatible": false
+      }
+    ]
+  },
+  "recommended_profile": {
+    "name": "AS/NZS 4777.2: 2020 Australia A Region (1.3.12)",
+    "profile_id": "agf:68e72cd69638927c4f4beaa0",
+    "pel_enabled": false,
+    "is_277v_compatible": false
+  }
+}
+```
+
+Observed behavior:
+- The 2026-07-08 browser capture showed `commonly_used: true` returning the common non-export-limited Australian Region A profile for ACT, NSW, QLD, SA, VIC, and NT.
+- A 2026-07-09 live response for `{"commonly_used": true, "country": "AU", "state": "VIC"}` returned `recommended_profile` as `AS/NZS 4777.2: 2020 Australia A Region (1.3.12)`, while the grouped `grid_profiles["VIC, AU"]` list contained `AS/NZS 4777.2: 2020 Australia A Region 0 kW Export (1.3.9)`.
+- For the common-profile UI, prefer the complete `recommended_profile` object when present. Fall back to the region-scoped `grid_profiles` list only when `recommended_profile` is absent or incomplete.
+- To discover export-limit profiles, request all profiles with `commonly_used: false`.
+- `grid_profiles` is grouped by a display key such as `"VIC, AU"`. Clients should flatten entries for selection but preserve the original grouping for diagnostics.
+- `recommended_profile` can duplicate one of the grouped entries, but can also be distinct from the grouped common response; use the API field rather than inferring from the profile name.
+- The Activation UI exposes a `Commonly used Grid Profiles` / `All Grid Profiles` filter and country/state dropdowns. It also includes a free-text search field above the grouped profile list.
+- Runtime profile discovery should use the user's country to filter available regions first, then call this endpoint only for selected or searched regions in that country.
+- Search should not cross country boundaries. For country-scoped search, match region code/name/group labels and profile names, then display grouped results such as `ACT, AU` and `NSW, AU`.
+
+Likely all-profiles request body:
+```json
+{
+  "commonly_used": false,
+  "country": "AU",
+  "state": "VIC"
+}
+```
+
+### 5A.3 Current Profile Device List
+```
+GET /service/activation_backend/api/gateway/v4/systems/<site_id>/devices/list
+```
+Returns the cloud Gateway inventory together with the selected and requested grid
+profile. This is the preferred cloud-only endpoint for checking whether an
+accepted profile change has taken effect.
+
+Sanitized response shape:
+```json
+[
+  {
+    "envoyCombiner": {
+      "IQ Gateway": ["GW0000000000"]
+    },
+    "envoyGridProfile": {
+      "selected_profile_id": "agf:6643fae616246153786f318b",
+      "requested_profile_id": null,
+      "selected_grid_profile_name": "AS/NZS 4777.2: 2020 Australia A Region 0 kW Export (1.3.9)"
+    },
+    "ensembleEnvoy": true
+  }
+]
+```
+
+Implementation notes:
+- Read the Gateway serial from `envoyCombiner` and the profile state from `envoyGridProfile`.
+- A null `requested_profile_id` indicates no cloud profile change is pending.
+- Use this `GET` endpoint for status polling. `/systems/<site_id>/envoys` is the observed `PUT` apply endpoint.
+
+### 5A.4 Profile ID Format
+
+Activation profile identifiers include an `agf:` prefix:
+```text
+agf:68e72cd69638927c4f4beaa0
+```
+
+Implementation notes:
+- Store and submit the cloud `profile_id` exactly as returned by Activation, including the `agf:` prefix.
+- Do not construct profile IDs from names or versions. Use the returned `profile_id`.
+- The v1 Home Assistant implementation is cloud-only and does not compare these IDs with local Gateway AGF endpoints.
+
+### 5A.5 Apply Grid Profile
+```
+PUT /service/activation_backend/api/gateway/v4/systems/<site_id>/envoys
+```
+Queues or initiates a grid-profile update for one or more Gateway/Envoy devices.
+
+Observed request headers match `5A.2`:
+```http
+Accept: application/json, text/plain, */*
+Content-Type: application/json
+Authorization: Bearer <activation_jwt>
+Origin: https://enlighten.enphaseenergy.com
+Referer: https://enlighten.enphaseenergy.com/app/activation_ui/?...
+```
+
+Observed request body for an Australian zero-export profile:
+```json
+[
+  {
+    "grid_profile_id": "agf:6643fae616246153786f318b",
+    "serial_num": "GW0000000000",
+    "part_num": "800-00555-r01",
+    "ensemble_envoy": true
+  }
+]
+```
+
+Observed selected profile:
+```text
+AS/NZS 4777.2: 2020 Australia A Region 0 kW Export (1.3.9)
+profile_id: agf:6643fae616246153786f318b
+pel_enabled: true
+```
+
+Observed response:
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+```
+
+Observed behavior:
+- No useful response body was captured.
+- The web UI showed the profile update as `in progress` after this request, so HTTP success should be interpreted as accepted/queued.
+- `grid_profile_id` is the cloud/Activation profile ID, including `agf:`.
+- `serial_num` is the Gateway/Envoy serial number.
+- `part_num` is the Gateway/Envoy part number reported to Activation.
+- A 2026-07-09 live PUT using the current already-requested profile omitted `part_num` and still returned `HTTP 200`. The response body included `serial_num`, `part_num`, `device_type`, `category`, `grid_profile.selected_profile_id`, and `grid_profile.requested_profile_id`. Runtime apply may omit `part_num` when Activation has not provided it.
+- `ensemble_envoy: true` indicates an Ensemble/IQ System Controller capable site in the observed capture. Preserve the boolean returned or inferred from Activation/Gateway data rather than assuming all sites use `true`.
+- A runtime implementation should send a single selected Gateway first unless a later capture confirms multi-Gateway semantics.
+
+### 5A.6 Activation Record and Pending Status
+```
+GET /service/activation_backend/api/gateway/v4/activations/<site_id>?expand=owner,host
+```
+Reads the cloud-side activation record, including currently recorded and requested grid-profile data. The detailed response shape still needs a redacted fixture before runtime parsing is designed.
+
+Implementation notes:
+- The v1 Home Assistant implementation is cloud-only. It must not call local Gateway `/installer/agf/*` endpoints, add local installer auth options, or expose local verification status.
+- A successful `PUT /envoys` means Activation accepted or queued the request. Runtime state should remain accepted/pending until Activation record fields show the requested profile has settled.
+- Apply must use Gateway serial and `ensemble_envoy` from the Activation record. Include the Gateway part number when Activation provides it, but the cloud endpoint has been observed accepting an omitted `part_num`. If Gateway serial/ensemble metadata are unavailable, expose browsing/status only.
+- Redact serials, part numbers, site IDs, profile IDs, raw URLs, cookies, JWTs, and Authorization headers in diagnostics.
+
+---
+
 ## 6. Authentication Flow (Shared Across Services)
 
 ### 6.1 Login (Enlighten Web)
@@ -6966,6 +7260,7 @@ There is no single universal header set; the implementation varies headers by en
 | HEMS | bearer-preferred auth plus cookies/base headers; `username` and `requestId` when available |
 | BatteryConfig reads | current web shape: fresh session `Cookie`, `Username`, `requestid`, battery-profile `Origin`/`Referer`, Chrome-style `User-Agent`, and no `Authorization` or `e-auth-token`; token-backed primary and lean variants remain as fallbacks |
 | BatteryConfig writes | acquire fresh XSRF by preferring `GET /service/batteryConfig/api/v1/siteSettings/<site_id>?userId=<user_id>` and its `x-csrf-token` response header, then falling back to `/battery/sites/<site_id>/schedules/isValid`; if that fallback returns `4xx`, still harvest `BP-XSRF-Token` from error response cookies or the session cookie jar, then try a final cookie-based `GET /siteSettings/<site_id>` bootstrap before giving up and keeping the existing token; writes then use an endpoint-specific compatibility planner; on affected sites the verified working shape is a stateless raw-cookie browser request (`Cookie`, `e-auth-token`, `Username`, `X-XSRF-Token`, `X-Requested-With`), with official-web primary, official-web lean, and mixed-auth fallbacks retained |
+| Activation reference data and grid profile reads/writes | Activation UI same-origin browser shape. Reference data was observed with authenticated Enlighten cookies plus `enlm-token`; profile discovery/apply were observed with authenticated cookies plus `Authorization: Bearer <activation_jwt>`, `Accept: application/json, text/plain, */*`, `Content-Type: application/json` for writes, `Origin: https://enlighten.enphaseenergy.com`, and an `/app/activation_ui/` referer; grid profile apply requires installer-level Activation permissions |
 
 - Base Enlighten reads:
   - `Cookie: <serialized cookie jar>`
@@ -6994,6 +7289,15 @@ There is no single universal header set; the implementation varies headers by en
   - official-web lean fallback omits `e-auth-token` and `requestid`
   - mixed-auth compatibility fallback restores `Authorization`, `Cookie`, and `X-CSRF-Token`
   - cookie-backed compatibility writes must use a stateless request session so aiohttp does not merge cookie-jar state into the raw `Cookie` header
+- Activation grid profile:
+  - `Accept: application/json, text/plain, */*`
+  - `enlm-token: <manager_or_activation_token>` for `GET /activation_service/api/details/reference_data` in the observed browser capture
+  - `Authorization: Bearer <activation_jwt>` for grid profile discovery/apply in the observed browser capture
+  - `Content-Type: application/json` for `POST`/`PUT`
+  - authenticated Enlighten session cookies
+  - `Origin: https://enlighten.enphaseenergy.com`
+  - `Referer: https://enlighten.enphaseenergy.com/app/activation_ui/?...`
+  - requires installer-level Activation access in the observed capture
 
 ---
 
@@ -7084,6 +7388,17 @@ There is no single universal header set; the implementation varies headers by en
 | `dtgControl` / `cfgControl` / `rbdControl` | Battery UI feature-capability blocks with visibility, lock, and schedule support flags; observed booleans so far include `show=true`, `showDaySchedule=true`, `enabled=false`, `locked=false`, `scheduleSupported=true` |
 | `systemTask` | Backend task/activity flag that may indicate settings are being managed asynchronously; observed value so far: `false` |
 | `devices.iqEvse.useBatteryFrSelfConsumption` | Indicates IQ EV charger battery participation support in self-consumption mode; observed value so far: `true` |
+| `grid_profiles` | Activation grid-profile discovery grouping keyed by display region such as `"VIC, AU"` |
+| `recommended_profile` | Activation-selected recommended grid profile; can duplicate one of the grouped `grid_profiles` entries |
+| `countries[]` | Activation reference-data country list with display `name` and ISO-like `code` |
+| `regions.<country>[]` | Activation reference-data region/state list scoped by country code |
+| `regionCode` | Region/state code used as `state` in `grid_profiles_filtered` requests |
+| `regionName` | Region/state display name used for search and UI labels |
+| `profile_id` (Activation grid profile) | Cloud grid-profile identifier, including `agf:` prefix; preserve exactly for apply requests |
+| `pel_enabled` | Grid-profile flag indicating power export limiting support; observed `true` for zero-export profiles and `false` for the common non-export-limited Australian Region A profile |
+| `is_277v_compatible` | Grid-profile compatibility flag returned by Activation discovery; observed value so far: `false` |
+| `grid_profile_id` | Apply-request field containing the selected Activation profile ID, including `agf:` |
+| `ensemble_envoy` | Apply-request Gateway capability flag observed as `true` for an Ensemble/IQ System Controller capable site |
 | `device-uid` | Stable HEMS device identifier |
 | `device-type` (HEMS) | HEMS device taxonomy values seen in captures: `IQ_ENERGY_ROUTER`, `IQ_GATEWAY`, `SG_READY_GATEWAY`, `ENERGY_METER`, `HEAT_PUMP` |
 | `status` / `statusText` (HEMS) | HEMS device health code + display label; observed pair so far: `normal` / `Normal` |
@@ -7156,6 +7471,7 @@ Endpoint-specific variations are documented in the affected sections so implemen
 
 Cross-cutting unresolved items:
 - Local LAN endpoints (`/ivp/pdm/*`, `/ivp/peb/*`) exist but require installer permissions; they are outside the current owner-account cloud runtime.
+- Activation grid-profile control requires installer-level access in the observed capture. The integration still needs a confirmed way to detect Activation role eligibility, obtain the same Activation bearer token reliably, and read a redacted activation-record payload before exposing runtime controls.
 - Real EVSE MQTT frames have not yet been captured, even though the broker accepts exact-topic subscriptions. The charger card's instantaneous voltage/current/power source remains the main open telemetry capture target.
 - Heat-pump write-path behavior remains unresolved; current HEMS captures cover inventory, runtime state, event diagnostics, timeseries, and stream toggles only.
 

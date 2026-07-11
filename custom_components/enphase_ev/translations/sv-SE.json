@@ -456,6 +456,27 @@
     },
     "firmware_advisory_only": {
       "message": "Firmwareuppdateringar är endast rådgivande."
+    },
+    "grid_profile_installer_required": {
+      "message": "Styrning av nätprofil kräver installatörsåtkomst till Enphase Activation."
+    },
+    "grid_profile_profile_invalid": {
+      "message": "Den valda nätprofilen är inte tillgänglig för det här systemets land och region."
+    },
+    "grid_profile_gateway_required": {
+      "message": "För att använda nätprofilen krävs en Cloud Activation Gateway-post."
+    },
+    "grid_profile_apply_failed": {
+      "message": "Det gick inte att använda nätprofilen."
+    },
+    "grid_profile_confirmation_required": {
+      "message": "Bekräftelse krävs för att använda en nätprofil."
+    },
+    "grid_profile_region_invalid": {
+      "message": "Den valda nätprofilregionen är inte tillgänglig."
+    },
+    "grid_profile_unavailable": {
+      "message": "Nätprofilstyrning är inte tillgänglig."
     }
   },
   "options": {
@@ -465,11 +486,13 @@
         "description": "Välj vad du vill göra med den här integrationsposten.",
         "menu_options": {
           "settings": "Inställningar",
-          "migrate_envoy": "Migrera Envoy-historik"
+          "migrate_envoy": "Migrera Envoy-historik",
+          "advanced": "Avancerat"
         },
         "menu_option_descriptions": {
           "settings": "Justera polling och beteende.",
-          "migrate_envoy": "Ta över valda energi-entitets-ID:n från Enphase Envoy så att historiken i Home Assistant Energy fortsätter under denna integration."
+          "migrate_envoy": "Ta över valda energi-entitets-ID:n från Enphase Envoy så att historiken i Home Assistant Energy fortsätter under denna integration.",
+          "advanced": "Nätprofilstyrning endast för installatörer."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -593,6 +616,46 @@
           "confirm_reassign": "Jag förstår att de valda källentitets-ID:na kommer att tilldelas om",
           "disable_archived_envoy_sensors": "Inaktivera arkiverade källsensorer efter migreringen"
         }
+      },
+      "advanced": {
+        "title": "Avancerat",
+        "description": "Installatörs- och underhållsåtgärder.",
+        "menu_options": {
+          "grid_profile": "Nätprofilstyrning"
+        },
+        "menu_option_descriptions": {
+          "grid_profile": "Bläddra bland och tillämpa Activation-nätprofiler endast för installatörer."
+        }
+      },
+      "grid_profile": {
+        "title": "Nätprofilstyrning",
+        "description": "Filtrerar Activation-katalogen för nätprofiler efter platsens land.",
+        "data": {
+          "grid_profile_region": "Region",
+          "grid_profile_commonly_used": "Profillista"
+        },
+        "data_description": {
+          "grid_profile_region": "Endast regioner för platsens land är tillgängliga.",
+          "grid_profile_commonly_used": "Välj vanliga profiler eller alla profiler för den valda regionen."
+        }
+      },
+      "grid_profile_select": {
+        "title": "Välj nätprofil",
+        "description": "Välj en profil att förbereda. Inget tillämpas före bekräftelsen.",
+        "data": {
+          "grid_profile_id": "Nätprofil"
+        }
+      },
+      "grid_profile_confirm": {
+        "title": "Bekräfta nätprofil",
+        "description": "Aktuell profil: **{current_profile}**\n\nVald profil: **{selected_profile}**\n\nProfil-ID: **{selected_profile_id}**\n\nPEL Enhanced: **{selected_profile_pel}**\n\n277 V-kompatibel: **{selected_profile_277v}**\n\nLand: **{country}**\n\nRegion: **{region}**\n\nMolnstatus för tillämpning: **{apply_status}**.",
+        "data": {
+          "confirm_apply": "Tillämpa vald nätprofil"
+        }
+      },
+      "grid_profile_applied": {
+        "title": "Nätprofiluppdatering accepterad",
+        "description": "Enphase har accepterat nätprofiluppdateringen för **{selected_profile}**.\n\nBegärt profil-ID: **{requested_profile_id}**\n\nMolnstatus: **{cloud_apply_status}**\n\nDet kan ta upp till **5 minuter** innan den nya profilen visas som aktuell medan molnet och Gateway slutför behandlingen. Sensorn Grid Profile uppdateras när Activation-posten rapporterar den nya aktuella profilen."
       }
     },
     "error": {
@@ -602,16 +665,45 @@
       "migration_no_selection": "Välj minst en kompatibel energisensor att migrera.",
       "migration_duplicate_selection": "Samma källentitet kan inte användas mer än en gång.",
       "envoy_entry_loaded": "Envoy-integrationen kunde inte avlastas tillfälligt för migreringen.",
-      "incompatible_energy_total": "De valda entiteterna är inte kompatibla kumulativa energitotaler."
+      "incompatible_energy_total": "De valda entiteterna är inte kompatibla kumulativa energitotaler.",
+      "grid_profile_unavailable": "Nätprofilstyrning är inte tillgänglig.",
+      "grid_profile_installer_required": "Nätprofilstyrning kräver installatörsåtkomst till Enphase Activation.",
+      "grid_profile_no_regions": "Inga nätprofilregioner är tillgängliga för platsens land.",
+      "grid_profile_no_profiles": "Inga nätprofiler matchar valda filter.",
+      "grid_profile_region_invalid": "Vald nätprofilregion är inte tillgänglig.",
+      "grid_profile_profile_invalid": "Vald nätprofil är inte tillgänglig för platsens land och region.",
+      "grid_profile_gateway_required": "För att tillämpa nätprofil krävs en Gateway-post i molnets Activation-data.",
+      "grid_profile_apply_failed": "Det gick inte att tillämpa nätprofil."
     },
     "abort": {
       "migration_no_envoy_sources": "Inga Enphase Envoy-energisensorer är tillgängliga för migrering.",
       "migration_no_targets": "Inga kompatibla Enphase Energy-sensorer är tillgängliga för migrering.",
-      "migration_partial_failure": "Migreringen stoppade efter delvis slutförande.\n\nSlutförda mappningar:\n{completed_mappings}\n\nMisslyckades vid bearbetning av `{failed_entity_id}`: {failure_reason}\n\nÅterställ från säkerhetskopia om resultatet inte är acceptabelt."
+      "migration_partial_failure": "Migreringen stoppade efter delvis slutförande.\n\nSlutförda mappningar:\n{completed_mappings}\n\nMisslyckades vid bearbetning av `{failed_entity_id}`: {failure_reason}\n\nÅterställ från säkerhetskopia om resultatet inte är acceptabelt.",
+      "grid_profile_unavailable": "Nätprofilstyrning är inte tillgänglig.",
+      "grid_profile_installer_required": "Nätprofilstyrning kräver installatörsåtkomst till Enphase Activation.",
+      "grid_profile_no_regions": "Inga nätprofilregioner är tillgängliga för platsens land."
     },
     "create_entry": {
       "migration_success": "Migreringen är klar. Enphase Energy äger nu de valda källentitets-ID:na. Kontrollera Energy-instrumentpanelen och Developer Tools > Statistics efter nästa uppdatering.",
       "migration_success_reload_needed": "Migreringen är klar, men en eller flera integrationer kunde inte laddas om automatiskt. Ladda om Enphase Energy och Enphase Envoy manuellt vid behov och kontrollera sedan Energy-instrumentpanelen och Developer Tools > Statistics."
+    }
+  },
+  "selector": {
+    "grid_profile_list_mode": {
+      "options": {
+        "commonly_used": "Vanligt använda",
+        "all_profiles": "Alla profiler"
+      }
+    },
+    "grid_profile_status": {
+      "options": {
+        "yes": "Ja",
+        "no": "Nej",
+        "unknown": "Okänd",
+        "available": "Tillgänglig",
+        "unavailable": "Inte tillgänglig",
+        "accepted": "Accepterad"
+      }
     }
   },
   "entity": {
@@ -1765,6 +1857,9 @@
       },
       "dry_contacts": {
         "name": "Potentialfria kontakter"
+      },
+      "current_grid_profile": {
+        "name": "Nätprofil"
       }
     },
     "number": {
@@ -2812,6 +2907,115 @@
         "site_id": {
           "name": "Plats-ID",
           "description": "Valfri platsidentifierare; identifieras automatiskt när en enhet väljs."
+        }
+      }
+    },
+    "browse_grid_profiles": {
+      "name": "Bläddra bland nätprofiler",
+      "description": "Bläddra bland Cloud Activation-nätprofiler som är tillgängliga för det valda systemets land och region.",
+      "sections": {
+        "advanced": {
+          "name": "Avancerade alternativ"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Regioncode",
+          "description": "Valfri region- eller delstatskod, till exempel VIC."
+        },
+        "commonly_used": {
+          "name": "Endast vanliga",
+          "description": "Returnerar katalogen över vanliga profiler när detta är aktiverat."
+        },
+        "device_id": {
+          "name": "Systemenheter",
+          "description": "Välj en Enphase-enhet i systemet."
+        },
+        "site_id": {
+          "name": "System-ID",
+          "description": "Valfri systemidentifierare; identifieras automatiskt när en enhet väljs."
+        },
+        "config_entry_id": {
+          "name": "Konfigurationspost-ID",
+          "description": "Valfri identifierare för konfigurationsposten för målsystemet."
+        },
+        "query": {
+          "name": "Sök",
+          "description": "Valfri söktext för regioner och profiler i systemets land."
+        }
+      }
+    },
+    "refresh_grid_profiles": {
+      "name": "Uppdatera nätprofiler",
+      "description": "Uppdatera referensdata för Cloud Activation-nätprofiler och katalogen för den valda regionen.",
+      "sections": {
+        "advanced": {
+          "name": "Avancerade alternativ"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Regioncode",
+          "description": "Valfri region- eller delstatskod, till exempel VIC."
+        },
+        "commonly_used": {
+          "name": "Endast vanliga",
+          "description": "Returnerar katalogen över vanliga profiler när detta är aktiverat."
+        },
+        "device_id": {
+          "name": "Systemenheter",
+          "description": "Välj en Enphase-enhet i systemet."
+        },
+        "site_id": {
+          "name": "System-ID",
+          "description": "Valfri systemidentifierare; identifieras automatiskt när en enhet väljs."
+        },
+        "config_entry_id": {
+          "name": "Konfigurationspost-ID",
+          "description": "Valfri identifierare för konfigurationsposten för målsystemet."
+        }
+      }
+    },
+    "set_grid_profile": {
+      "name": "Ange nätprofil",
+      "description": "Använd en Cloud Activation-nätprofil efter uttrycklig bekräftelse.",
+      "sections": {
+        "advanced": {
+          "name": "Avancerade alternativ"
+        }
+      },
+      "fields": {
+        "region_code": {
+          "name": "Regioncode",
+          "description": "Valfri region- eller delstatskod, till exempel VIC."
+        },
+        "commonly_used": {
+          "name": "Endast vanliga",
+          "description": "Returnerar katalogen över vanliga profiler när detta är aktiverat."
+        },
+        "device_id": {
+          "name": "Systemenheter",
+          "description": "Välj en Enphase-enhet i systemet."
+        },
+        "site_id": {
+          "name": "System-ID",
+          "description": "Valfri systemidentifierare; identifieras automatiskt när en enhet väljs."
+        },
+        "config_entry_id": {
+          "name": "Konfigurationspost-ID",
+          "description": "Valfri identifierare för konfigurationsposten för målsystemet."
+        },
+        "profile_id": {
+          "name": "Profil-ID",
+          "description": "Cloud Activation-profil-ID, inklusive prefixet agf:."
+        },
+        "confirm": {
+          "name": "Bekräfta användning",
+          "description": "Måste vara aktiverat för att använda den valda nätprofilen."
+        },
+        "gateway_serial": {
+          "name": "Gateway-serienummer",
+          "description": "Valfritt Gateway-serienummer när Activation-posten innehåller flera Gateways."
         }
       }
     }

@@ -37,6 +37,7 @@ from .entity_cleanup import (
     is_owned_entity,
     iter_device_registry_entries,
     iter_entity_registry_entries,
+    prune_managed_entities,
 )
 from .log_redaction import redact_identifier, redact_site_id, redact_text
 from .runtime_data import EnphaseConfigEntry, EnphaseRuntimeData, get_runtime_data
@@ -1481,6 +1482,67 @@ def _complete_startup_migrations_if_ready(
         )
 
 
+def _remove_retired_grid_profile_device_entities(
+    hass: HomeAssistant,
+    entry: EnphaseConfigEntry,
+    site_id: object,
+) -> None:
+    """Remove grid-profile controls retired from the device page."""
+
+    site_id_text = str(site_id or "").strip()
+    if not site_id_text:
+        return
+    ent_reg = er.async_get(hass)
+    sensor_current_unique_id = f"{DOMAIN}_site_{site_id_text}_current_grid_profile"
+    current_entity_id = find_entity_id_by_unique_id(
+        ent_reg,
+        "sensor",
+        sensor_current_unique_id,
+        entry_id=entry.entry_id,
+    )
+    if current_entity_id:
+        try:
+            ent_reg.async_update_entity(current_entity_id, entity_category=None)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug(
+                "Failed clearing Grid Profile entity category for site %s: %s",
+                redact_site_id(site_id_text),
+                redact_text(err, site_ids=(site_id_text,)),
+            )
+    prune_managed_entities(
+        ent_reg,
+        entry.entry_id,
+        domain="sensor",
+        active_unique_ids={sensor_current_unique_id},
+        is_managed=lambda unique_id: unique_id
+        in {
+            f"{DOMAIN}_site_{site_id_text}_grid_profile_status",
+            sensor_current_unique_id,
+            f"{DOMAIN}_site_{site_id_text}_requested_grid_profile",
+        },
+    )
+    prune_managed_entities(
+        ent_reg,
+        entry.entry_id,
+        domain="button",
+        active_unique_ids=set(),
+        is_managed=lambda unique_id: unique_id
+        == f"{DOMAIN}_site_{site_id_text}_apply_staged_grid_profile",
+    )
+    prune_managed_entities(
+        ent_reg,
+        entry.entry_id,
+        domain="select",
+        active_unique_ids=set(),
+        is_managed=lambda unique_id: unique_id
+        in {
+            f"{DOMAIN}_site_{site_id_text}_grid_profile_region",
+            f"{DOMAIN}_site_{site_id_text}_grid_profile_list_mode",
+            f"{DOMAIN}_site_{site_id_text}_grid_profile_staged_profile",
+        },
+    )
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> bool:
     migrated_data = _migrate_selected_type_keys(entry)
     if migrated_data is not None:
@@ -1552,6 +1614,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
     _remove_evse_type_device_and_entities(hass, entry, dev_reg, site_id)
     _migrate_orphaned_update_entities_to_type_devices(hass, entry, site_id)
     _complete_startup_migrations_if_ready(hass, entry, coord, dev_reg, site_id)
+    _remove_retired_grid_profile_device_entities(hass, entry, site_id)
     last_registry_signature = _registry_metadata_signature(coord)
 
     def _sync_registry_on_update() -> None:
@@ -1571,6 +1634,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
                 )
             _remove_legacy_site_device(hass, entry, coord, dev_reg, site_id)
             _complete_startup_migrations_if_ready(hass, entry, coord, dev_reg, site_id)
+            _remove_retired_grid_profile_device_entities(hass, entry, site_id)
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug(
                 "Skipping registry sync for site %s after update: %s",
@@ -1614,6 +1678,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
 
     # Start background work only after entities have been forwarded so restored
     # topology can create entities first and warmup can fill in live state later.
+    grid_profile_runtime = getattr(coord, "grid_profile_runtime", None)
+    grid_profile_refresh = getattr(grid_profile_runtime, "async_refresh", None)
+    if callable(grid_profile_refresh):
+        _schedule_background_task(
+            grid_profile_refresh(force=True, load_profiles=False),
+            f"{DOMAIN}_grid_profile_startup_probe",
+        )
+
     schedule_sync = getattr(coord, "schedule_sync", None)
     if schedule_sync is not None and hasattr(schedule_sync, "async_start"):
         _schedule_background_task(
