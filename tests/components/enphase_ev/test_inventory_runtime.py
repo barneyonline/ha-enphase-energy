@@ -1092,6 +1092,7 @@ def test_inventory_runtime_devices_inventory_refresh_due_respects_cache(
     coord = coordinator_factory()
     runtime = coord.inventory_runtime
     runtime._devices_inventory_cache_until = 150.0  # noqa: SLF001
+    runtime._gateway_phase_map_cache_until = 150.0  # noqa: SLF001
     coord.client.devices_inventory = AsyncMock(side_effect=AssertionError("unused"))
     monkeypatch.setattr(inventory_runtime_mod.time, "monotonic", lambda: 100.0)
 

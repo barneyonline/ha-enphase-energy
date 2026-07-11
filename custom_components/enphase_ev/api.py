@@ -7383,6 +7383,21 @@ class EnphaseEVClient:
             return data
         return {}
 
+    async def phase_map_multiple_envoy(self) -> JsonDict | None:
+        """Return per-gateway phase and topology metadata for the site.
+
+        GET /app-api/<site_id>/phase_map_multiple_envoy
+        """
+
+        url = f"{BASE_URL}/app-api/{self._site}/phase_map_multiple_envoy"
+        try:
+            data = await self._json("GET", url, headers=self._history_headers())
+        except InvalidPayloadError as err:
+            if _is_optional_non_json_payload(err) or _is_optional_html_payload(err):
+                raise OptionalEndpointUnavailable(err.summary) from err
+            raise
+        return data if isinstance(data, dict) else None
+
     async def devices_tree(self) -> JsonDict | None:
         """Return the system dashboard device hierarchy when available.
 

@@ -7416,6 +7416,9 @@ class EnphaseGatewayConnectivityStatusSensor(_SiteBaseEntity):
             "latest_reported_utc",
             "latest_reported_device",
             "property_keys",
+            "primary_gateway_serial",
+            "default_gateway_serial",
+            "preferred_gateway_serial",
         }
     )
 
@@ -7446,7 +7449,7 @@ class EnphaseGatewayConnectivityStatusSensor(_SiteBaseEntity):
     @property
     def extra_state_attributes(self) -> Any:
         snapshot = _gateway_inventory_snapshot(self._coord)
-        return {
+        attributes = {
             "total_devices": snapshot.get("total_devices"),
             "connected_devices": snapshot.get("connected_devices"),
             "disconnected_devices": snapshot.get("disconnected_devices"),
@@ -7460,6 +7463,23 @@ class EnphaseGatewayConnectivityStatusSensor(_SiteBaseEntity):
             "latest_reported_device": snapshot.get("latest_reported_device"),
             "property_keys": snapshot.get("property_keys"),
         }
+        phase_map_keys = (
+            "gateway_count",
+            "multi_gateway",
+            "primary_gateway_serial",
+            "default_gateway_serial",
+            "preferred_gateway_serial",
+            "preferred_gateway_phase_count",
+            "split_phase_gateway_count",
+            "three_phase_gateway_count",
+            "production_only_gateway_count",
+            "consumption_only_gateway_count",
+            "storage_gateway_count",
+        )
+        attributes.update(
+            {key: snapshot[key] for key in phase_map_keys if key in snapshot}
+        )
+        return attributes
 
 
 class EnphaseGatewayLastReportedSensor(_SiteBaseEntity):
