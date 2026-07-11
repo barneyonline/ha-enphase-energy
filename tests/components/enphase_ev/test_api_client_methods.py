@@ -26,6 +26,7 @@ from custom_components.enphase_ev.const import (
     GREEN_BATTERY_SETTING,
     PHASE_SWITCH_CONFIG_SETTING,
 )
+from custom_components.enphase_ev.request_metrics import request_metrics_scope
 
 TEST_EVSE_SERIAL = "EVSE-SERIAL-0001"
 
@@ -549,28 +550,38 @@ async def test_async_fetch_battery_site_settings_defensive_branches(
 
 
 @pytest.mark.asyncio
-async def test_text_response_retries_unauthorized_with_header_callback() -> None:
+async def test_text_response_retries_unauthorized_with_header_callback(
+    monkeypatch,
+) -> None:
     class BadURL:
         def __str__(self) -> str:
-            return "https://example.test/path"
+            return f"{api.BASE_URL}/path"
 
     first = _FakeResponse(status=401, json_body={}, text_body="")
     second = _FakeResponse(status=200, json_body={}, text_body="ok")
     session = _FakeSession([first, second])
     client = _make_client(session)
     client._reauth_cb = AsyncMock(return_value=True)  # noqa: SLF001
+    ticks = iter((0.0, 0.1, 1.0, 1.2, 2.0, 2.3, 3.0, 3.4, 4.0, 4.5))
+    monkeypatch.setattr(api, "monotonic", lambda: next(ticks))
 
-    result = await client._text_response(  # noqa: SLF001
-        "GET",
-        BadURL(),
-        expected_statuses=(200,),
-        headers=lambda: {"Authorization": None, "X-Test": "1"},
-    )
+    with request_metrics_scope("text_retry") as metrics:
+        result = await client._text_response(  # noqa: SLF001
+            "GET",
+            BadURL(),
+            expected_statuses=(200,),
+            headers=lambda: {"Authorization": None, "X-Test": "1"},
+        )
 
     assert result.text == "ok"
     assert session.calls[0][2]["headers"]["X-Test"] == "1"
     assert "Authorization" not in session.calls[0][2]["headers"]
     client._reauth_cb.assert_awaited_once()  # noqa: SLF001
+    assert client.request_count == 2
+    assert metrics.attempts == 2
+    assert metrics.queue_s == pytest.approx(0.4)
+    assert metrics.network_s == pytest.approx(0.6)
+    assert metrics.parsing_s == pytest.approx(0.5)
 
 
 @pytest.mark.asyncio
@@ -1540,20 +1551,70 @@ def test_invalid_payload_error_defaults_summary_when_blank() -> None:
 
 
 @pytest.mark.asyncio
-async def test_json_merges_headers_and_returns_payload() -> None:
+async def test_json_merges_headers_and_returns_payload(monkeypatch) -> None:
     session = _FakeSession([_FakeResponse(status=200, json_body={"ok": True})])
     client = api.EnphaseEVClient(session, "SITE", None, "COOKIE")
-    payload = await client._json(
-        "GET",
-        "https://example.test",
-        headers={"Extra": "1"},
-        params={"q": "1"},
-    )
+    ticks = iter((10.0, 10.25, 20.0, 20.5, 30.0, 30.75))
+    monkeypatch.setattr(api, "monotonic", lambda: next(ticks))
+
+    with request_metrics_scope("json") as metrics:
+        payload = await client._json(
+            "GET",
+            f"{api.BASE_URL}/service/test",
+            headers={"Extra": "1"},
+            params={"q": "1"},
+        )
+
     assert payload == {"ok": True}
     method, url, kwargs = session.calls[0]
     assert method == "GET"
     assert kwargs["headers"]["Extra"] == "1"
     assert kwargs["headers"]["Cookie"] == "COOKIE"
+    assert metrics.attempts == 1
+    assert metrics.queue_s == pytest.approx(0.25)
+    assert metrics.network_s == pytest.approx(0.5)
+    assert metrics.parsing_s == pytest.approx(0.75)
+
+
+@pytest.mark.asyncio
+async def test_json_queue_timeout_records_wait_without_attempt(monkeypatch) -> None:
+    session = _FakeSession([_FakeResponse(status=200, json_body={"ok": True})])
+    client = api.EnphaseEVClient(session, "SITE", None, None, timeout=0.01)
+    monkeypatch.setattr(api, "_enlighten_read_semaphore", asyncio.Semaphore(0))
+    ticks = iter((10.0, 10.5))
+    monkeypatch.setattr(api, "monotonic", lambda: next(ticks))
+
+    with request_metrics_scope("queue_timeout") as metrics:
+        with pytest.raises(TimeoutError):
+            await client._json("GET", f"{api.BASE_URL}/service/test")
+
+    assert metrics.attempts == 0
+    assert metrics.queue_s == pytest.approx(0.5)
+    assert metrics.network_s == 0
+    assert metrics.parsing_s == 0
+
+
+@pytest.mark.asyncio
+async def test_json_network_failure_records_header_wait(monkeypatch) -> None:
+    class _EnterFailureResponse(_FakeResponse):
+        async def __aenter__(self):
+            raise RuntimeError("connection failed")
+
+    session = _FakeSession([_EnterFailureResponse(status=200, json_body={"ok": True})])
+    client = api.EnphaseEVClient(session, "SITE", None, None)
+    monkeypatch.setattr(api, "_enlighten_read_semaphore", asyncio.Semaphore(2))
+    ticks = iter((0.0, 0.1, 1.0, 1.3))
+    monkeypatch.setattr(api, "monotonic", lambda: next(ticks))
+
+    with request_metrics_scope("network_failure") as metrics:
+        with pytest.raises(RuntimeError, match="connection failed"):
+            await client._json("GET", f"{api.BASE_URL}/service/test")
+
+    assert client.request_count == 1
+    assert metrics.attempts == 1
+    assert metrics.queue_s == pytest.approx(0.1)
+    assert metrics.network_s == pytest.approx(0.3)
+    assert metrics.parsing_s == 0
 
 
 @pytest.mark.asyncio
