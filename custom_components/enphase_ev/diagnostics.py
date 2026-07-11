@@ -539,6 +539,15 @@ async def async_get_config_entry_diagnostics(
         except DIAGNOSTIC_CAPTURE_ERRORS:
             tariff = {}
 
+    system_events: dict[str, Any] = {}
+    system_events_runtime = getattr(coord, "system_events_runtime", None)
+    system_events_diagnostics = getattr(system_events_runtime, "diagnostics", None)
+    if callable(system_events_diagnostics):
+        try:
+            system_events = system_events_diagnostics()
+        except DIAGNOSTIC_CAPTURE_ERRORS:
+            system_events = {}
+
     firmware_catalog: dict[str, Any] = {}
     firmware_catalog_manager = getattr(coord, "firmware_catalog_manager", None)
     status_snapshot = getattr(firmware_catalog_manager, "status_snapshot", None)
@@ -570,6 +579,7 @@ async def async_get_config_entry_diagnostics(
         "inverters": inverters,
         "payload_health": payload_health,
         "system_dashboard": system_dashboard,
+        "system_events": system_events,
         "heatpump_runtime": heatpump_runtime,
         "scheduler": scheduler,
         "tariff": tariff,

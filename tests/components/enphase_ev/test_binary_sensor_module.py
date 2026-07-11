@@ -17,6 +17,7 @@ from custom_components.enphase_ev.binary_sensor import (
     ConnectedBinarySensor,
     HeatPumpSgReadyActiveBinarySensor,
     PluggedInBinarySensor,
+    SiteActiveSystemEventsBinarySensor,
     SiteCloudReachableBinarySensor,
     async_setup_entry,
 )
@@ -68,6 +69,16 @@ async def test_async_setup_entry_syncs_binary_sensors(
         len([ent for ent in added if isinstance(ent, SiteCloudReachableBinarySensor)])
         == 1
     )
+    assert (
+        len(
+            [
+                ent
+                for ent in added
+                if isinstance(ent, SiteActiveSystemEventsBinarySensor)
+            ]
+        )
+        == 1
+    )
     per_serial = [ent for ent in added if hasattr(ent, "_sn")]
     assert len(per_serial) == 3
     assert {type(ent) for ent in per_serial} == {
@@ -80,7 +91,7 @@ async def test_async_setup_entry_syncs_binary_sensors(
     sync_cb = next(cb for cb in callbacks if cb.__name__ == "_async_sync_chargers")
 
     sync_cb()
-    assert len(added) == 4
+    assert len(added) == 5
 
     new_serial = "EV0002"
     coord.data[new_serial] = {
@@ -108,14 +119,14 @@ async def test_async_setup_entry_syncs_binary_sensors(
     )
 
     sync_cb()
-    assert len(added) == 7
+    assert len(added) == 8
     assert {ent._sn for ent in added if hasattr(ent, "_sn")} == {
         RANDOM_SERIAL,
         new_serial,
     }
 
     sync_cb()
-    assert len(added) == 7
+    assert len(added) == 8
 
 
 @pytest.mark.asyncio
@@ -896,11 +907,63 @@ def test_site_cloud_reachable_binary_sensor_metadata(
     assert "last_success_utc" not in attrs
     assert attrs == {}
 
+    monkeypatch.setattr(
+        binary_sensor,
+        "_type_device_info",
+        lambda _coord, _type_key: None,
+    )
     info = sensor.device_info
     assert info["identifiers"] == {(DOMAIN, f"type:{coord.site_id}:cloud")}
     assert info["manufacturer"] == "Enphase"
     assert info["model"] == "Cloud Service"
     assert info["name"] == "Enphase Cloud"
+
+
+def test_site_active_system_events_binary_sensor_metadata(
+    coordinator_factory, monkeypatch
+) -> None:
+    """Expose only the sanitized cached event summary on the cloud device."""
+
+    coord = coordinator_factory(serials=[], data={})
+    runtime = coord.system_events_runtime
+    sensor = SiteActiveSystemEventsBinarySensor(coord)
+
+    assert sensor.translation_key == "active_system_events"
+    assert sensor.device_class == BinarySensorDeviceClass.PROBLEM
+    assert sensor.entity_category == EntityCategory.DIAGNOSTIC
+    assert sensor.available is False
+    assert sensor.is_on is False
+
+    runtime._last_success_utc = datetime.now(timezone.utc)  # noqa: SLF001
+    runtime._events = (  # noqa: SLF001
+        SimpleNamespace(
+            high_impact=True,
+            severity="critical",
+            device_type="IQ Gateway",
+        ),
+    )
+    attrs = sensor.extra_state_attributes
+    assert sensor.available is True
+    assert sensor.is_on is True
+    assert attrs["active_count"] == 1
+    assert attrs["high_impact_count"] == 1
+    assert attrs["severity_counts"] == {"critical": 1}
+    assert "serial_number" not in attrs
+
+    monkeypatch.setattr(
+        binary_sensor,
+        "_type_device_info",
+        lambda _coord, _type_key: None,
+    )
+    info = sensor.device_info
+    assert info["identifiers"] == {(DOMAIN, f"type:{coord.site_id}:cloud")}
+
+    monkeypatch.setattr(
+        binary_sensor,
+        "_type_device_info",
+        lambda _coord, _type_key: {"name": "Custom Cloud"},
+    )
+    assert sensor.device_info == {"name": "Custom Cloud"}
 
 
 def test_site_cloud_reachable_binary_sensor_metadata_includes_optional_failure_fields(

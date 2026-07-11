@@ -7434,6 +7434,44 @@ class EnphaseEVClient:
 
         return data
 
+    async def system_dashboard_events(self) -> JsonDict | None:
+        """Return current System Dashboard event rows and lookup catalogs.
+
+        GET /service/system_dashboard/api_internal/cs/sites/<site_id>/events
+        """
+
+        url = str(
+            URL(
+                f"{BASE_URL}/service/system_dashboard/api_internal/cs/sites/"
+                f"{self._site}/events"
+            ).update_query(
+                {
+                    "range": "today",
+                    "cassandra_toggle": "false",
+                    "filter_columns": (
+                        "serial_number,device_type,event_date,cleared_date,"
+                        "event_type,event_state,details,updated_at,alarm_id"
+                    ),
+                    "serial_numbers": "",
+                    "type": "table",
+                    "event_state": "default",
+                    "page": "1",
+                    "per_page": "200",
+                }
+            )
+        )
+        try:
+            data = await self._json(
+                "GET",
+                url,
+                headers=self._system_dashboard_headers(),
+            )
+        except Exception as err:  # noqa: BLE001
+            if self._system_dashboard_is_optional_error(err):
+                return None
+            raise
+        return data if isinstance(data, dict) else None
+
     async def devices_details(self, type_key: str) -> JsonDict | None:
         """Return system dashboard per-type device details when available.
 

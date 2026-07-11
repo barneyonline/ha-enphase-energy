@@ -295,6 +295,10 @@ class _RefreshOwner:
         self.evse_feature_flags_runtime = SimpleNamespace(
             refresh_due=lambda: True,
         )
+        self.system_events_runtime = SimpleNamespace(
+            refresh_due=lambda: True,
+            async_refresh=lambda: self._record("system_events"),
+        )
         self.battery_runtime = SimpleNamespace(
             async_refresh_grid_control_check=self._async_refresh_grid_control_check,
             async_refresh_grid_mode_status=self._async_refresh_grid_mode_status,
@@ -456,6 +460,7 @@ def test_followup_refresh_stage_binds_zero_arg_calls() -> None:
 
     assert bound.defer_topology is True
     assert [call[0] for call in bound.parallel_calls] == [
+        "system_events_s",
         "battery_site_settings_s",
         "battery_backup_history_s",
         "battery_settings_s",
@@ -476,9 +481,9 @@ def test_followup_refresh_stage_binds_zero_arg_calls() -> None:
         "hems_devices_s",
     ]
 
-    assert bound.parallel_calls[0][2]() == "site-settings"
+    assert bound.parallel_calls[1][2]() == "site-settings"
     assert bound.ordered_calls[-1][2]() == "hems-devices"
-    assert bound.parallel_calls[0][3] == "battery_site_settings"
+    assert bound.parallel_calls[1][3] == "battery_site_settings"
     assert bound.ordered_calls[-1][3] == "inventory_topology"
     assert owner.calls == ["battery_site_settings", "hems_devices"]
 
@@ -529,6 +534,7 @@ def test_dynamic_followup_plan_skips_up_to_date_tasks() -> None:
     owner.inventory_runtime.hems_devices_refresh_due = lambda: False
     owner.current_power_runtime.refresh_due = lambda: False
     owner.evse_feature_flags_runtime.refresh_due = lambda: False
+    owner.system_events_runtime.refresh_due = lambda: False
     owner.tariff_runtime.refresh_due = lambda: False
 
     assert build_followup_plan(owner).stages == ()
@@ -547,6 +553,7 @@ def test_dynamic_followup_plan_selects_due_subset() -> None:
     owner.inventory_runtime.devices_inventory_refresh_due = lambda: False
     owner.current_power_runtime.refresh_due = lambda: False
     owner.evse_feature_flags_runtime.refresh_due = lambda: False
+    owner.system_events_runtime.refresh_due = lambda: False
 
     plan = build_followup_plan(owner)
 
@@ -599,6 +606,7 @@ def test_dynamic_site_only_followup_plan_creates_inverter_stage_without_base_fol
     owner.inventory_runtime.hems_devices_refresh_due = lambda: False
     owner.current_power_runtime.refresh_due = lambda: False
     owner.evse_feature_flags_runtime.refresh_due = lambda: False
+    owner.system_events_runtime.refresh_due = lambda: False
     owner.tariff_runtime.refresh_due = lambda: False
     owner.inventory_runtime.inverters_refresh_due = lambda: True
     owner.heatpump_runtime.heatpump_runtime_state_refresh_due = lambda: False
@@ -631,6 +639,7 @@ def test_dynamic_followup_plan_includes_due_evse_feature_flags() -> None:
     owner.inventory_runtime.hems_devices_refresh_due = lambda: False
     owner.current_power_runtime.refresh_due = lambda: False
     owner.tariff_runtime.refresh_due = lambda: False
+    owner.system_events_runtime.refresh_due = lambda: False
 
     plan = build_followup_plan(owner)
 
@@ -769,7 +778,7 @@ async def test_coordinator_refresh_plan_runner_executes_each_stage(
     await coord.refresh_runner.async_run_refresh_plan({}, plan=FOLLOWUP_PLAN)
 
     assert seen == [
-        (None, True, 12, 4),
+        (None, True, 13, 4),
     ]
 
 

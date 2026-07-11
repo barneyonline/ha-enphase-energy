@@ -1958,6 +1958,32 @@
             "name": "IP-adres"
           }
         }
+      },
+      "active_system_events": {
+        "name": "Actieve systeemgebeurtenissen",
+        "state_attributes": {
+          "available": {
+            "name": "Gebeurtenisservice beschikbaar"
+          },
+          "active_count": {
+            "name": "Aantal actieve gebeurtenissen"
+          },
+          "high_impact_count": {
+            "name": "Aantal gebeurtenissen met hoge impact"
+          },
+          "severity_counts": {
+            "name": "Aantal per ernst"
+          },
+          "device_type_counts": {
+            "name": "Aantal per apparaattype"
+          },
+          "last_success_utc": {
+            "name": "Laatste gebeurtenisvernieuwing (UTC)"
+          },
+          "using_cached_data": {
+            "name": "Gebeurtenisgegevens uit cache worden gebruikt"
+          }
+        }
       }
     },
     "switch": {
@@ -2240,6 +2266,10 @@
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS tijdelijk gepauzeerd",
       "description": "Heat Pump/HEMS-polling voor site {site_id} is gepauzeerd tot {backoff_until} na {failure_count} auth-achtige fouten ({reason}). Wallbox, batterij, gateway en andere gegevens kunnen doorgaan. Schakel de Heat Pump-apparaatgroep uit of gebruik Clear HEMS Auth Backoff nadat Enphase is hersteld."
+    },
+    "active_system_event": {
+      "title": "Actieve Enphase-systeemgebeurtenis met hoge impact",
+      "description": "Locatie {site_id} heeft een actieve gebeurtenis met ernst {severity} die {device_type} beïnvloedt en voor het eerst is gemeld op {event_date}. Bekijk Enlighten voor details en de aanbevolen actie. Deze reparatie verdwijnt automatisch wanneer Enphase meldt dat de gebeurtenis is opgelost."
     }
   },
   "system_health": {

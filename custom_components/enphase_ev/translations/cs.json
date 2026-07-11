@@ -1958,6 +1958,32 @@
             "name": "IP adresa"
           }
         }
+      },
+      "active_system_events": {
+        "name": "Aktivní systémové události",
+        "state_attributes": {
+          "available": {
+            "name": "Služba událostí je dostupná"
+          },
+          "active_count": {
+            "name": "Počet aktivních událostí"
+          },
+          "high_impact_count": {
+            "name": "Počet událostí s vysokým dopadem"
+          },
+          "severity_counts": {
+            "name": "Počty podle závažnosti"
+          },
+          "device_type_counts": {
+            "name": "Počty podle typu zařízení"
+          },
+          "last_success_utc": {
+            "name": "Poslední aktualizace událostí (UTC)"
+          },
+          "using_cached_data": {
+            "name": "Používají se data událostí z mezipaměti"
+          }
+        }
       }
     },
     "switch": {
@@ -2240,6 +2266,10 @@
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS je dočasně pozastaveno",
       "description": "Dotazování Heat Pump/HEMS pro lokalitu {site_id} je pozastaveno do {backoff_until} po {failure_count} chybách podobných ověření ({reason}). Wallbox, baterie, brána a ostatní data mohou pokračovat. Vypněte skupinu Heat Pump, nebo použijte Clear HEMS Auth Backoff po obnově Enphase."
+    },
+    "active_system_event": {
+      "title": "Aktivní systémová událost Enphase s vysokým dopadem",
+      "description": "Lokalita {site_id} má aktivní událost {severity}, která ovlivňuje {device_type} a byla poprvé hlášena v {event_date}. Podrobnosti a doporučený postup najdete v Enlighten. Tato oprava se automaticky odstraní, jakmile Enphase označí událost za vyřešenou."
     }
   },
   "system_health": {

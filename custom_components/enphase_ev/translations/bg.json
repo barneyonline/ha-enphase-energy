@@ -1958,6 +1958,32 @@
             "name": "IP адрес"
           }
         }
+      },
+      "active_system_events": {
+        "name": "Активни системни събития",
+        "state_attributes": {
+          "available": {
+            "name": "Услугата за събития е достъпна"
+          },
+          "active_count": {
+            "name": "Брой активни събития"
+          },
+          "high_impact_count": {
+            "name": "Брой събития с голямо въздействие"
+          },
+          "severity_counts": {
+            "name": "Брой по тежест"
+          },
+          "device_type_counts": {
+            "name": "Брой по тип устройство"
+          },
+          "last_success_utc": {
+            "name": "Последно обновяване на събитията (UTC)"
+          },
+          "using_cached_data": {
+            "name": "Използват се кеширани данни за събития"
+          }
+        }
       }
     },
     "switch": {
@@ -2240,6 +2266,10 @@
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS е временно спрян",
       "description": "Запитванията Heat Pump/HEMS за сайт {site_id} са спрени до {backoff_until} след {failure_count} грешки, подобни на удостоверяване ({reason}). Wallbox, батерията, шлюзът и другите данни могат да продължат. Изключете групата Heat Pump, за да спрете HEMS, или използвайте Clear HEMS Auth Backoff след възстановяване на Enphase."
+    },
+    "active_system_event": {
+      "title": "Активно системно събитие на Enphase с голямо въздействие",
+      "description": "Сайт {site_id} има активно събитие {severity}, засягащо {device_type}, отчетено за първи път в {event_date}. Проверете Enlighten за подробности и препоръчано действие. Тази поправка се изчиства автоматично, когато Enphase отчете събитието като разрешено."
     }
   },
   "system_health": {

@@ -1958,6 +1958,32 @@
             "name": "IP Address"
           }
         }
+      },
+      "active_system_events": {
+        "name": "Active System Events",
+        "state_attributes": {
+          "available": {
+            "name": "Event Service Available"
+          },
+          "active_count": {
+            "name": "Active Event Count"
+          },
+          "high_impact_count": {
+            "name": "High-impact Event Count"
+          },
+          "severity_counts": {
+            "name": "Severity Counts"
+          },
+          "device_type_counts": {
+            "name": "Device Type Counts"
+          },
+          "last_success_utc": {
+            "name": "Last Event Refresh (UTC)"
+          },
+          "using_cached_data": {
+            "name": "Using Cached Event Data"
+          }
+        }
       }
     },
     "switch": {
@@ -2240,6 +2266,10 @@
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS temporarily paused",
       "description": "Heat Pump/HEMS polling for site {site_id} is paused until {backoff_until} after {failure_count} auth-like failures ({reason}). Wallbox, battery, gateway, and other data can continue. Disable the Heat Pump device group to stop HEMS polling, or use Clear HEMS Auth Backoff after Enphase recovers."
+    },
+    "active_system_event": {
+      "title": "High-impact Enphase system event active",
+      "description": "Site {site_id} has an active {severity} event affecting {device_type}, first reported at {event_date}. Check Enlighten for event details and recommended action. This repair clears automatically when Enphase reports the event resolved."
     }
   },
   "system_health": {

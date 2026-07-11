@@ -120,7 +120,11 @@ async def async_setup_entry(
         inventory_ready = bool(getattr(coord, "_devices_inventory_ready", False))
         if not site_entity_added:
             async_add_entities(
-                [SiteCloudReachableBinarySensor(coord)], update_before_add=False
+                [
+                    SiteCloudReachableBinarySensor(coord),
+                    SiteActiveSystemEventsBinarySensor(coord),
+                ],
+                update_before_add=False,
             )
             site_entity_added = True
         heatpump_runtime_available = _heatpump_runtime_device_uid(coord) is not None
@@ -257,6 +261,42 @@ class SiteCloudReachableBinarySensor(
     @property
     def extra_state_attributes(self) -> dict[str, object]:
         return {}
+
+    @property
+    def device_info(self) -> object:
+        info = _type_device_info(self._coord, "cloud")
+        if info is not None:
+            return info
+        return _cloud_device_info(self._coord.site_id)
+
+
+class SiteActiveSystemEventsBinarySensor(
+    CoordinatorEntity,  # type: ignore[misc]
+    BinarySensorEntity,  # type: ignore[misc]
+):
+    """Summarize active System Dashboard events without exposing identifiers."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "active_system_events"
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coord: EnphaseCoordinator) -> None:
+        super().__init__(coord)
+        self._coord = coord
+        self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_active_system_events"
+
+    @property
+    def available(self) -> bool:
+        return bool(self._coord.system_events_runtime.available)
+
+    @property
+    def is_on(self) -> bool:
+        return self._coord.system_events_runtime.active_count > 0
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        return self._coord.system_events_runtime.diagnostics()
 
     @property
     def device_info(self) -> object:

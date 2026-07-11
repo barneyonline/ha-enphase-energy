@@ -42,6 +42,8 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - Site and battery energy telemetry, including derived grid-import, grid-export, and battery power sensors for Home Assistant Energy Dashboard use
 - Site tariff visibility for next billing date, Energy-dashboard-ready current import/export price sensors, editable tariff rate number entities, and a service for billing-cycle, rate, and guided structural tariff updates when Enphase exposes tariff data
 - Health diagnostics, service-availability tracking, and actionable repair issues
+- Read-only System Dashboard event monitoring, including a diagnostic active-event
+  binary sensor and automatically clearing Repairs for high-impact active faults
 - Detailed diagnostic and inventory entities remain available but are disabled by default when they are mainly useful for troubleshooting
 - Rate-conscious microinverter telemetry batches all active devices per supported parameter and exposes power plus available AC/DC, frequency, temperature, signal, and firmware details in a disabled-by-default diagnostic entity
 - Broad localization support across all user-facing integration strings
