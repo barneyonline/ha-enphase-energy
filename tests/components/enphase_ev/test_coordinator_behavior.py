@@ -75,6 +75,7 @@ def _make_coordinator(hass, monkeypatch):
         lambda *_args, **_kwargs: (lambda: None),
     )
     coord = EnphaseCoordinator(hass, cfg)
+    coord.client.system_dashboard_events = AsyncMock(return_value={"events": []})
     coord.client.storm_guard_profile = AsyncMock(return_value={"data": {}})
     coord.client.storm_guard_alert = AsyncMock(
         return_value={"criticalAlertActive": False, "stormAlerts": []}

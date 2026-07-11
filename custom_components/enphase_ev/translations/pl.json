@@ -1958,6 +1958,32 @@
             "name": "Adres IP"
           }
         }
+      },
+      "active_system_events": {
+        "name": "Aktywne zdarzenia systemowe",
+        "state_attributes": {
+          "available": {
+            "name": "Usługa zdarzeń dostępna"
+          },
+          "active_count": {
+            "name": "Liczba aktywnych zdarzeń"
+          },
+          "high_impact_count": {
+            "name": "Liczba zdarzeń o dużym wpływie"
+          },
+          "severity_counts": {
+            "name": "Liczba według ważności"
+          },
+          "device_type_counts": {
+            "name": "Liczba według typu urządzenia"
+          },
+          "last_success_utc": {
+            "name": "Ostatnie odświeżenie zdarzeń (UTC)"
+          },
+          "using_cached_data": {
+            "name": "Używanie danych zdarzeń z pamięci podręcznej"
+          }
+        }
       }
     },
     "switch": {
@@ -2240,6 +2266,10 @@
     "hems_auth_degraded": {
       "title": "HEMS Enphase Energy tymczasowo wstrzymany",
       "description": "Odpytywanie Heat Pump/HEMS dla lokalizacji {site_id} jest wstrzymane do {backoff_until} po {failure_count} błędach podobnych do uwierzytelniania ({reason}). Wallbox, bateria, brama i inne dane mogą działać dalej. Wyłącz grupę Heat Pump albo użyj Clear HEMS Auth Backoff po przywróceniu Enphase."
+    },
+    "active_system_event": {
+      "title": "Aktywne zdarzenie systemowe Enphase o dużym wpływie",
+      "description": "W lokalizacji {site_id} występuje aktywne zdarzenie {severity} dotyczące {device_type}, zgłoszone po raz pierwszy {event_date}. Szczegóły i zalecane działanie znajdziesz w Enlighten. Ta naprawa zostanie automatycznie usunięta, gdy Enphase zgłosi rozwiązanie zdarzenia."
     }
   },
   "system_health": {

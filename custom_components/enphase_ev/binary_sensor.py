@@ -67,7 +67,8 @@ async def async_setup_entry(
 ) -> None:
     coord: EnphaseCoordinator = get_runtime_data(entry).coordinator
     ent_reg = er.async_get(hass)
-    site_entity_added = False
+    cloud_reachable_entity_added = False
+    system_events_entity_added = False
     heatpump_sg_ready_entity_added = False
     known_serials: set[str] = set()
 
@@ -103,7 +104,7 @@ async def async_setup_entry(
 
     @callback
     def _async_remove_site_binary_entity(key: str) -> None:
-        nonlocal heatpump_sg_ready_entity_added
+        nonlocal heatpump_sg_ready_entity_added, system_events_entity_added
         entity_id = ent_reg.async_get_entity_id(
             "binary_sensor",
             DOMAIN,
@@ -113,16 +114,32 @@ async def async_setup_entry(
             ent_reg.async_remove(entity_id)
         if key == "heat_pump_sg_ready_active":
             heatpump_sg_ready_entity_added = False
+        elif key == "active_system_events":
+            system_events_entity_added = False
+
+    @callback
+    def _async_sync_system_events() -> None:
+        nonlocal system_events_entity_added
+        if coord.system_events_runtime.available:
+            if not system_events_entity_added:
+                async_add_entities(
+                    [SiteActiveSystemEventsBinarySensor(coord)],
+                    update_before_add=False,
+                )
+                system_events_entity_added = True
+        elif bool(getattr(coord, "_devices_inventory_ready", False)):
+            _async_remove_site_binary_entity("active_system_events")
 
     @callback
     def _async_sync_chargers() -> None:
-        nonlocal site_entity_added, heatpump_sg_ready_entity_added
+        nonlocal cloud_reachable_entity_added, heatpump_sg_ready_entity_added
         inventory_ready = bool(getattr(coord, "_devices_inventory_ready", False))
-        if not site_entity_added:
+        if not cloud_reachable_entity_added:
             async_add_entities(
-                [SiteCloudReachableBinarySensor(coord)], update_before_add=False
+                [SiteCloudReachableBinarySensor(coord)],
+                update_before_add=False,
             )
-            site_entity_added = True
+            cloud_reachable_entity_added = True
         heatpump_runtime_available = _heatpump_runtime_device_uid(coord) is not None
         if heatpump_runtime_available and not heatpump_sg_ready_entity_added:
             async_add_entities(
@@ -156,13 +173,17 @@ async def async_setup_entry(
             async_add_entities(entities, update_before_add=False)
             known_serials.update(serials)
 
-    add_listener = getattr(coord, "async_add_topology_listener", None)
-    if not callable(add_listener):
-        add_listener = getattr(coord, "async_add_listener", None)
-    if callable(add_listener):
-        entry.async_on_unload(add_listener(_async_sync_chargers))
+    add_topology_listener = getattr(coord, "async_add_topology_listener", None)
+    add_update_listener = getattr(coord, "async_add_listener", None)
+    if callable(add_topology_listener):
+        entry.async_on_unload(add_topology_listener(_async_sync_chargers))
+    elif callable(add_update_listener):
+        entry.async_on_unload(add_update_listener(_async_sync_chargers))
+    if callable(add_update_listener):
+        entry.async_on_unload(add_update_listener(_async_sync_system_events))
     _async_prune_historical_charger_binary_sensor_entities()
     _async_sync_chargers()
+    _async_sync_system_events()
 
 
 class _EVBoolSensor(EnphaseBaseEntity, BinarySensorEntity):  # type: ignore[misc]
@@ -257,6 +278,45 @@ class SiteCloudReachableBinarySensor(
     @property
     def extra_state_attributes(self) -> dict[str, object]:
         return {}
+
+    @property
+    def device_info(self) -> object:
+        info = _type_device_info(self._coord, "cloud")
+        if info is not None:
+            return info
+        return _cloud_device_info(self._coord.site_id)
+
+
+class SiteActiveSystemEventsBinarySensor(
+    CoordinatorEntity,  # type: ignore[misc]
+    BinarySensorEntity,  # type: ignore[misc]
+):
+    """Summarize active System Dashboard events without exposing identifiers."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "active_system_events"
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coord: EnphaseCoordinator) -> None:
+        super().__init__(coord)
+        self._coord = coord
+        self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_active_system_events"
+
+    @property
+    def available(self) -> bool:
+        return bool(self._coord.system_events_runtime.available)
+
+    @property
+    def is_on(self) -> bool:
+        return cast(int, self._coord.system_events_runtime.active_count) > 0
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        return cast(
+            dict[str, object],
+            self._coord.system_events_runtime.diagnostics(),
+        )
 
     @property
     def device_info(self) -> object:

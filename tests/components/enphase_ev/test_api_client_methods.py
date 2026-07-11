@@ -8302,6 +8302,63 @@ async def test_system_dashboard_summary_returns_none_for_non_dict_payload() -> N
 
 
 @pytest.mark.asyncio
+async def test_system_dashboard_events_uses_observed_query_and_headers() -> None:
+    client = _make_client()
+    client.update_credentials(
+        cookie="enlighten_manager_token_production=BEAR; XSRF-TOKEN=xsrf",
+        eauth="EAUTH",
+    )
+    client._json = AsyncMock(return_value={"events": []})
+
+    assert await client.system_dashboard_events() == {"events": []}
+
+    args, kwargs = client._json.await_args
+    assert args[0] == "GET"
+    url = URL(args[1])
+    assert url.path.endswith(
+        "/service/system_dashboard/api_internal/cs/sites/SITE/events"
+    )
+    assert dict(url.query) == {
+        "range": "today",
+        "cassandra_toggle": "false",
+        "filter_columns": (
+            "serial_number,device_type,event_date,cleared_date,event_type,"
+            "event_state,details,updated_at,alarm_id"
+        ),
+        "serial_numbers": "",
+        "type": "table",
+        "event_state": "default",
+        "page": "1",
+        "per_page": "200",
+    }
+    assert kwargs["headers"]["Authorization"] == "Bearer BEAR"
+    assert kwargs["headers"]["e-auth-token"] == "EAUTH"
+    assert kwargs["headers"]["X-CSRF-Token"] == "xsrf"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", [api.Unauthorized(), _make_cre(404)])
+async def test_system_dashboard_events_optional_errors_return_none(error) -> None:
+    client = _make_client()
+    client._json = AsyncMock(side_effect=error)
+
+    assert await client.system_dashboard_events() is None
+
+
+@pytest.mark.asyncio
+async def test_system_dashboard_events_rejects_invalid_shapes_and_unexpected_errors() -> (
+    None
+):
+    client = _make_client()
+    client._json = AsyncMock(return_value=[])
+    assert await client.system_dashboard_events() is None
+
+    client._json = AsyncMock(side_effect=RuntimeError("boom"))
+    with pytest.raises(RuntimeError, match="boom"):
+        await client.system_dashboard_events()
+
+
+@pytest.mark.asyncio
 async def test_hems_devices_supports_refresh_data_query_flag() -> None:
     client = _make_client()
     client._json = AsyncMock(return_value={"data": {}})

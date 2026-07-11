@@ -1958,6 +1958,32 @@
             "name": "Διεύθυνση IP"
           }
         }
+      },
+      "active_system_events": {
+        "name": "Ενεργά συμβάντα συστήματος",
+        "state_attributes": {
+          "available": {
+            "name": "Η υπηρεσία συμβάντων είναι διαθέσιμη"
+          },
+          "active_count": {
+            "name": "Πλήθος ενεργών συμβάντων"
+          },
+          "high_impact_count": {
+            "name": "Πλήθος συμβάντων υψηλής επίπτωσης"
+          },
+          "severity_counts": {
+            "name": "Πλήθος ανά σοβαρότητα"
+          },
+          "device_type_counts": {
+            "name": "Πλήθος ανά τύπο συσκευής"
+          },
+          "last_success_utc": {
+            "name": "Τελευταία ανανέωση συμβάντων (UTC)"
+          },
+          "using_cached_data": {
+            "name": "Χρήση αποθηκευμένων δεδομένων συμβάντων"
+          }
+        }
       }
     },
     "switch": {
@@ -2240,6 +2266,10 @@
     "hems_auth_degraded": {
       "title": "Το Enphase Energy HEMS έχει παυθεί προσωρινά",
       "description": "Η ανάκτηση Heat Pump/HEMS για την εγκατάσταση {site_id} έχει παυθεί έως {backoff_until} μετά από {failure_count} σφάλματα τύπου πιστοποίησης ({reason}). Wallbox, μπαταρία, πύλη και άλλα δεδομένα μπορούν να συνεχίσουν. Απενεργοποιήστε την ομάδα Heat Pump ή χρησιμοποιήστε Clear HEMS Auth Backoff όταν ανακάμψει το Enphase."
+    },
+    "active_system_event": {
+      "title": "Ενεργό συμβάν συστήματος Enphase υψηλής επίπτωσης",
+      "description": "Η τοποθεσία {site_id} έχει ενεργό συμβάν {severity} που επηρεάζει το {device_type} και αναφέρθηκε πρώτη φορά στις {event_date}. Ελέγξτε το Enlighten για λεπτομέρειες και προτεινόμενη ενέργεια. Αυτή η επισκευή καταργείται αυτόματα όταν η Enphase αναφέρει ότι το συμβάν επιλύθηκε."
     }
   },
   "system_health": {

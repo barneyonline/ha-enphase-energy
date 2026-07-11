@@ -763,6 +763,13 @@ async def test_config_entry_diagnostics_includes_coordinator(
     """Validate coordinator diagnostics payload and redaction logic."""
     coord = DummyCoordinator()
     coord.schedule_sync = SimpleNamespace(diagnostics=lambda: {"enabled": True})
+    coord.system_events_runtime = SimpleNamespace(
+        diagnostics=lambda: {
+            "active_count": 1,
+            "high_impact_count": 1,
+            "device_type_counts": {"IQ Gateway": 1},
+        }
+    )
     coord._scheduler_backoff_ends_utc = datetime(2025, 1, 1, tzinfo=timezone.utc)
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
 
@@ -1019,6 +1026,26 @@ async def test_config_entry_diagnostics_includes_coordinator(
         "export_rate_available": False,
         "endpoint_family": {"support_state": "supported"},
     }
+    assert diag["coordinator"]["system_events"] == {
+        "active_count": 1,
+        "high_impact_count": 1,
+        "device_type_counts": {"IQ Gateway": 1},
+    }
+
+
+@pytest.mark.asyncio
+async def test_config_entry_diagnostics_handles_system_events_capture_error(
+    hass, config_entry
+) -> None:
+    coord = DummyCoordinator()
+    coord.system_events_runtime = SimpleNamespace(
+        diagnostics=lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+
+    diag = await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
+
+    assert diag["coordinator"]["system_events"] == {}
 
 
 @pytest.mark.asyncio

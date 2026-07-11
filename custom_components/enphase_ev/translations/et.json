@@ -1958,6 +1958,32 @@
             "name": "IP-aadress"
           }
         }
+      },
+      "active_system_events": {
+        "name": "Aktiivsed süsteemisündmused",
+        "state_attributes": {
+          "available": {
+            "name": "Sündmuste teenus on saadaval"
+          },
+          "active_count": {
+            "name": "Aktiivsete sündmuste arv"
+          },
+          "high_impact_count": {
+            "name": "Suure mõjuga sündmuste arv"
+          },
+          "severity_counts": {
+            "name": "Arv raskusastme järgi"
+          },
+          "device_type_counts": {
+            "name": "Arv seadmetüübi järgi"
+          },
+          "last_success_utc": {
+            "name": "Viimane sündmuste värskendus (UTC)"
+          },
+          "using_cached_data": {
+            "name": "Kasutatakse puhverdatud sündmuste andmeid"
+          }
+        }
       }
     },
     "switch": {
@@ -2240,6 +2266,10 @@
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS on ajutiselt peatatud",
       "description": "Heat Pump/HEMS päringud saidile {site_id} on peatatud kuni {backoff_until} pärast {failure_count} autentimislaadset tõrget ({reason}). Wallbox, aku, lüüs ja muud andmed võivad jätkata. Keela Heat Pump seadmerühm või kasuta Clear HEMS Auth Backoff pärast Enphase taastumist."
+    },
+    "active_system_event": {
+      "title": "Aktiivne suure mõjuga Enphase süsteemisündmus",
+      "description": "Saidil {site_id} on aktiivne {severity} sündmus, mis mõjutab seadet {device_type} ja millest teatati esimest korda {event_date}. Üksikasjade ja soovitatud toimingu jaoks vaadake Enlighteni. See parandus eemaldatakse automaatselt, kui Enphase märgib sündmuse lahendatuks."
     }
   },
   "system_health": {

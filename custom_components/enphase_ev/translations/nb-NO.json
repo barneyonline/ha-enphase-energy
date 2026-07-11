@@ -1958,6 +1958,32 @@
             "name": "IP-adresse"
           }
         }
+      },
+      "active_system_events": {
+        "name": "Aktive systemhendelser",
+        "state_attributes": {
+          "available": {
+            "name": "Hendelsestjeneste tilgjengelig"
+          },
+          "active_count": {
+            "name": "Antall aktive hendelser"
+          },
+          "high_impact_count": {
+            "name": "Antall hendelser med stor påvirkning"
+          },
+          "severity_counts": {
+            "name": "Antall etter alvorlighetsgrad"
+          },
+          "device_type_counts": {
+            "name": "Antall etter enhetstype"
+          },
+          "last_success_utc": {
+            "name": "Siste hendelsesoppdatering (UTC)"
+          },
+          "using_cached_data": {
+            "name": "Bruker bufrede hendelsesdata"
+          }
+        }
       }
     },
     "switch": {
@@ -2240,6 +2266,10 @@
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS er midlertidig satt på pause",
       "description": "Heat Pump/HEMS-spørring for sted {site_id} er satt på pause til {backoff_until} etter {failure_count} godkjenningslignende feil ({reason}). Wallbox, batteri, gateway og andre data kan fortsette. Deaktiver Heat Pump-enhetsgruppen eller bruk Clear HEMS Auth Backoff etter at Enphase er tilbake."
+    },
+    "active_system_event": {
+      "title": "Aktiv Enphase-systemhendelse med stor påvirkning",
+      "description": "Anlegg {site_id} har en aktiv {severity}-hendelse som påvirker {device_type}, først rapportert {event_date}. Se Enlighten for detaljer og anbefalt handling. Denne reparasjonen fjernes automatisk når Enphase rapporterer at hendelsen er løst."
     }
   },
   "system_health": {

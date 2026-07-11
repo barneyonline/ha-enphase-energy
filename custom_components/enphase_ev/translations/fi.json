@@ -1958,6 +1958,32 @@
             "name": "IP-osoite"
           }
         }
+      },
+      "active_system_events": {
+        "name": "Aktiiviset järjestelmätapahtumat",
+        "state_attributes": {
+          "available": {
+            "name": "Tapahtumapalvelu käytettävissä"
+          },
+          "active_count": {
+            "name": "Aktiivisten tapahtumien määrä"
+          },
+          "high_impact_count": {
+            "name": "Vakavien tapahtumien määrä"
+          },
+          "severity_counts": {
+            "name": "Määrät vakavuuden mukaan"
+          },
+          "device_type_counts": {
+            "name": "Määrät laitetyypin mukaan"
+          },
+          "last_success_utc": {
+            "name": "Viimeisin tapahtumapäivitys (UTC)"
+          },
+          "using_cached_data": {
+            "name": "Käytetään välimuistissa olevia tapahtumatietoja"
+          }
+        }
       }
     },
     "switch": {
@@ -2240,6 +2266,10 @@
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS on tilapäisesti keskeytetty",
       "description": "Heat Pump/HEMS-kysely kohteelle {site_id} on keskeytetty aikaan {backoff_until} asti {failure_count} todennusluonteisen virheen jälkeen ({reason}). Wallbox, akku, yhdyskäytävä ja muut tiedot voivat jatkua. Poista Heat Pump -laiteryhmä käytöstä tai käytä Clear HEMS Auth Backoff, kun Enphase on palautunut."
+    },
+    "active_system_event": {
+      "title": "Vakava Enphase-järjestelmätapahtuma aktiivinen",
+      "description": "Kohteessa {site_id} on aktiivinen {severity}-tapahtuma, joka vaikuttaa laitteeseen {device_type} ja ilmoitettiin ensimmäisen kerran {event_date}. Katso lisätiedot ja suositeltu toimi Enlightenista. Tämä korjaus poistuu automaattisesti, kun Enphase ilmoittaa tapahtuman ratkaistuksi."
     }
   },
   "system_health": {

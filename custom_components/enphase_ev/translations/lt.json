@@ -1958,6 +1958,32 @@
             "name": "IP adresas"
           }
         }
+      },
+      "active_system_events": {
+        "name": "Aktyvūs sistemos įvykiai",
+        "state_attributes": {
+          "available": {
+            "name": "Įvykių paslauga pasiekiama"
+          },
+          "active_count": {
+            "name": "Aktyvių įvykių skaičius"
+          },
+          "high_impact_count": {
+            "name": "Didelio poveikio įvykių skaičius"
+          },
+          "severity_counts": {
+            "name": "Skaičius pagal svarbą"
+          },
+          "device_type_counts": {
+            "name": "Skaičius pagal įrenginio tipą"
+          },
+          "last_success_utc": {
+            "name": "Paskutinis įvykių atnaujinimas (UTC)"
+          },
+          "using_cached_data": {
+            "name": "Naudojami talpykloje saugomi įvykių duomenys"
+          }
+        }
       }
     },
     "switch": {
@@ -2240,6 +2266,10 @@
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS laikinai pristabdyta",
       "description": "Heat Pump/HEMS apklausa svetainei {site_id} pristabdyta iki {backoff_until} po {failure_count} autentifikavimo tipo klaidų ({reason}). Wallbox, baterija, šliuzas ir kiti duomenys gali tęstis. Išjunkite Heat Pump įrenginių grupę arba naudokite Clear HEMS Auth Backoff, kai Enphase atsigaus."
+    },
+    "active_system_event": {
+      "title": "Aktyvus didelio poveikio Enphase sistemos įvykis",
+      "description": "Svetainėje {site_id} yra aktyvus {severity} įvykis, veikiantis {device_type}, pirmą kartą praneštas {event_date}. Išsamią informaciją ir rekomenduojamą veiksmą rasite Enlighten. Šis taisymas automatiškai pašalinamas, kai Enphase praneša, kad įvykis išspręstas."
     }
   },
   "system_health": {

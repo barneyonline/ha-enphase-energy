@@ -1958,6 +1958,32 @@
             "name": "IP-Adresse"
           }
         }
+      },
+      "active_system_events": {
+        "name": "Aktive Systemereignisse",
+        "state_attributes": {
+          "available": {
+            "name": "Ereignisdienst verfügbar"
+          },
+          "active_count": {
+            "name": "Anzahl aktiver Ereignisse"
+          },
+          "high_impact_count": {
+            "name": "Anzahl schwerwiegender Ereignisse"
+          },
+          "severity_counts": {
+            "name": "Anzahl nach Schweregrad"
+          },
+          "device_type_counts": {
+            "name": "Anzahl nach Gerätetyp"
+          },
+          "last_success_utc": {
+            "name": "Letzte Ereignisaktualisierung (UTC)"
+          },
+          "using_cached_data": {
+            "name": "Zwischengespeicherte Ereignisdaten werden verwendet"
+          }
+        }
       }
     },
     "switch": {
@@ -2240,6 +2266,10 @@
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS vorübergehend pausiert",
       "description": "Heat Pump/HEMS-Abfragen für Standort {site_id} sind bis {backoff_until} nach {failure_count} auth-ähnlichen Fehlern pausiert ({reason}). Wallbox, Batterie, Gateway und andere Daten können weiterlaufen. Deaktiviere die Heat Pump-Gerätegruppe oder nutze Clear HEMS Auth Backoff, nachdem Enphase wieder erreichbar ist."
+    },
+    "active_system_event": {
+      "title": "Schwerwiegendes Enphase-Systemereignis aktiv",
+      "description": "Standort {site_id} hat ein aktives Ereignis des Schweregrads {severity}, das {device_type} betrifft und erstmals um {event_date} gemeldet wurde. Details und empfohlene Maßnahmen finden Sie in Enlighten. Diese Reparatur wird automatisch entfernt, sobald Enphase das Ereignis als behoben meldet."
     }
   },
   "system_health": {

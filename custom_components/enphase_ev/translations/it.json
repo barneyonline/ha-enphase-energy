@@ -1958,6 +1958,32 @@
             "name": "Indirizzo IP"
           }
         }
+      },
+      "active_system_events": {
+        "name": "Eventi di sistema attivi",
+        "state_attributes": {
+          "available": {
+            "name": "Servizio eventi disponibile"
+          },
+          "active_count": {
+            "name": "Numero di eventi attivi"
+          },
+          "high_impact_count": {
+            "name": "Numero di eventi ad alto impatto"
+          },
+          "severity_counts": {
+            "name": "Conteggio per gravità"
+          },
+          "device_type_counts": {
+            "name": "Conteggio per tipo di dispositivo"
+          },
+          "last_success_utc": {
+            "name": "Ultimo aggiornamento eventi (UTC)"
+          },
+          "using_cached_data": {
+            "name": "Uso dei dati degli eventi memorizzati nella cache"
+          }
+        }
       }
     },
     "switch": {
@@ -2240,6 +2266,10 @@
     "hems_auth_degraded": {
       "title": "HEMS Enphase Energy temporaneamente in pausa",
       "description": "Il polling Heat Pump/HEMS del sito {site_id} è in pausa fino a {backoff_until} dopo {failure_count} errori simili ad autenticazione ({reason}). Wallbox, batteria, gateway e altri dati possono continuare. Disattiva il gruppo Heat Pump oppure usa Clear HEMS Auth Backoff dopo il ripristino di Enphase."
+    },
+    "active_system_event": {
+      "title": "Evento di sistema Enphase ad alto impatto attivo",
+      "description": "Il sito {site_id} presenta un evento {severity} attivo che interessa {device_type}, segnalato per la prima volta il {event_date}. Consulta Enlighten per i dettagli e la procedura consigliata. Questa riparazione viene rimossa automaticamente quando Enphase segnala che evento è risolto."
     }
   },
   "system_health": {

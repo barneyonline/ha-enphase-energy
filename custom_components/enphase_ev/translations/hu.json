@@ -1958,6 +1958,32 @@
             "name": "IP-cím"
           }
         }
+      },
+      "active_system_events": {
+        "name": "Aktív rendszeresemények",
+        "state_attributes": {
+          "available": {
+            "name": "Az eseményszolgáltatás elérhető"
+          },
+          "active_count": {
+            "name": "Aktív események száma"
+          },
+          "high_impact_count": {
+            "name": "Nagy hatású események száma"
+          },
+          "severity_counts": {
+            "name": "Darabszám súlyosság szerint"
+          },
+          "device_type_counts": {
+            "name": "Darabszám eszköztípus szerint"
+          },
+          "last_success_utc": {
+            "name": "Utolsó eseményfrissítés (UTC)"
+          },
+          "using_cached_data": {
+            "name": "Gyorsítótárazott eseményadatok használata"
+          }
+        }
       }
     },
     "switch": {
@@ -2240,6 +2266,10 @@
     "hems_auth_degraded": {
       "title": "Az Enphase Energy HEMS ideiglenesen szünetel",
       "description": "A Heat Pump/HEMS lekérdezés a(z) {site_id} helyen {backoff_until} időpontig szünetel {failure_count} hitelesítés jellegű hiba után ({reason}). A wallbox, akkumulátor, gateway és más adatok tovább működhetnek. Kapcsold ki a Heat Pump eszközcsoportot, vagy használd a Clear HEMS Auth Backoff műveletet az Enphase helyreállása után."
+    },
+    "active_system_event": {
+      "title": "Aktív, nagy hatású Enphase rendszeresemény",
+      "description": "A(z) {site_id} helyszínen aktív {severity} esemény érinti ezt: {device_type}; első jelentése: {event_date}. A részletekért és a javasolt műveletért tekintse meg az Enlightent. Ez a javítás automatikusan eltűnik, amikor az Enphase megoldottként jelenti az eseményt."
     }
   },
   "system_health": {

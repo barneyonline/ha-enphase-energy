@@ -1958,6 +1958,32 @@
             "name": "Adresă IP"
           }
         }
+      },
+      "active_system_events": {
+        "name": "Evenimente de sistem active",
+        "state_attributes": {
+          "available": {
+            "name": "Serviciul de evenimente este disponibil"
+          },
+          "active_count": {
+            "name": "Număr de evenimente active"
+          },
+          "high_impact_count": {
+            "name": "Număr de evenimente cu impact ridicat"
+          },
+          "severity_counts": {
+            "name": "Număr după severitate"
+          },
+          "device_type_counts": {
+            "name": "Număr după tipul dispozitivului"
+          },
+          "last_success_utc": {
+            "name": "Ultima actualizare a evenimentelor (UTC)"
+          },
+          "using_cached_data": {
+            "name": "Se folosesc date de evenimente din memoria cache"
+          }
+        }
       }
     },
     "switch": {
@@ -2240,6 +2266,10 @@
     "hems_auth_degraded": {
       "title": "HEMS Enphase Energy este pauzat temporar",
       "description": "Interogarea Heat Pump/HEMS pentru site-ul {site_id} este pauzată până la {backoff_until} după {failure_count} erori de tip autentificare ({reason}). Wallbox, bateria, gateway-ul și alte date pot continua. Dezactivează grupul Heat Pump sau folosește Clear HEMS Auth Backoff după revenirea Enphase."
+    },
+    "active_system_event": {
+      "title": "Eveniment de sistem Enphase cu impact ridicat activ",
+      "description": "Site-ul {site_id} are un eveniment {severity} activ care afectează {device_type}, raportat prima dată la {event_date}. Consultați Enlighten pentru detalii și acțiunea recomandată. Această reparație se elimină automat când Enphase raportează că evenimentul este rezolvat."
     }
   },
   "system_health": {

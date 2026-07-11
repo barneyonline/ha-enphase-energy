@@ -398,6 +398,10 @@ def coordinator_factory(hass, mock_clientsession, mock_issue_registry, monkeypat
         coord.last_set_amps = getattr(coord, "last_set_amps", {}) or {}
         if client is not None:
             coord.client = client
+        else:
+            coord.client.system_dashboard_events = AsyncMock(
+                return_value={"events": []}
+            )
         if not hasattr(coord.client, "storm_guard_profile"):
             coord.client.storm_guard_profile = AsyncMock(return_value={"data": {}})
         if not hasattr(coord.client, "storm_guard_alert"):

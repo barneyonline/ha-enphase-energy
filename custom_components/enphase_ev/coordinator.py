@@ -175,6 +175,7 @@ from .coordinator_refresh_metrics import record_refresh_performance_sample
 from .request_metrics import RequestMetrics, request_metrics_scope
 from .summary import SummaryStore
 from . import system_dashboard_helpers as sd_helpers
+from .system_events import SystemEventsRuntime
 from .refresh_plan import (
     build_followup_plan,
     build_heatpump_followup_plan,
@@ -242,6 +243,7 @@ COORDINATOR_RUNTIME_CLASSES: dict[str, type] = {
     "auth_refresh_runtime": AuthRefreshRuntime,
     "evse_feature_flags_runtime": EvseFeatureFlagsRuntime,
     "tariff_runtime": TariffRuntime,
+    "system_events_runtime": SystemEventsRuntime,
 }
 
 
@@ -868,6 +870,7 @@ class EnphaseCoordinator(
         self._ensure_coordinator_runtime("auth_refresh_runtime")
         self._ensure_coordinator_runtime("evse_feature_flags_runtime")
         self._ensure_coordinator_runtime("tariff_runtime")
+        self._ensure_coordinator_runtime("system_events_runtime")
         self.inventory_runtime = InventoryRuntime(self)
         self.discovery_snapshot = DiscoverySnapshotManager(self)
         self.inventory_view = InventoryView(self)
@@ -996,6 +999,15 @@ class EnphaseCoordinator(
                 stale_after_s=21600.0,
                 failure_backoff_schedule_s=(900.0, 1800.0, 3600.0, 7200.0),
                 max_backoff_s=7200.0,
+                optional=True,
+                suppress_after_failures=3,
+                support_state_on_success=True,
+            ),
+            "system_events": EndpointFamilyPolicy(
+                success_ttl_s=300.0,
+                stale_after_s=21600.0,
+                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
+                max_backoff_s=3600.0,
                 optional=True,
                 suppress_after_failures=3,
                 support_state_on_success=True,

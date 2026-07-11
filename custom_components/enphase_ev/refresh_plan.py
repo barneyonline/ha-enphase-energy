@@ -25,6 +25,7 @@ REFRESH_TASK_ENDPOINT_FAMILIES: dict[str, str] = {
     "devices_inventory_s": "inventory_topology",
     "hems_devices_s": "inventory_topology",
     "system_dashboard_s": "inventory_topology",
+    "system_events_s": "system_events",
     "inverters_s": "inverter_inventory",
     "current_power_s": "current_power",
 }
@@ -273,6 +274,12 @@ WARMUP_STATE_STAGE = RefreshStage(
 SITE_ONLY_FOLLOWUP_STAGE = RefreshStage(
     defer_topology=True,
     parallel_tasks=(
+        object_method_task(
+            "system_events_s",
+            "system events",
+            "system_events_runtime",
+            "async_refresh",
+        ),
         method_task(
             "battery_site_settings_s",
             "battery site settings",
@@ -571,6 +578,7 @@ def build_followup_plan(owner: object, *, force_full: bool = False) -> RefreshPl
     inventory = getattr(owner, "inventory_runtime")
     current_power = getattr(owner, "current_power_runtime")
     evse_feature_flags = getattr(owner, "evse_feature_flags_runtime")
+    system_events = getattr(owner, "system_events_runtime", None)
     parallel: list[RefreshTask] = []
     ordered: list[RefreshTask] = []
     if battery.battery_site_settings_refresh_due():
@@ -680,6 +688,15 @@ def build_followup_plan(owner: object, *, force_full: bool = False) -> RefreshPl
                 "evse_feature_flags_s",
                 "EVSE feature flags",
                 "_async_refresh_evse_feature_flags",
+            )
+        )
+    if system_events is not None and system_events.refresh_due():
+        parallel.append(
+            object_method_task(
+                "system_events_s",
+                "system events",
+                "system_events_runtime",
+                "async_refresh",
             )
         )
     if battery.battery_status_refresh_due():

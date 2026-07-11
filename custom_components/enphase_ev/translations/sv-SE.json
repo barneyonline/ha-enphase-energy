@@ -1958,6 +1958,32 @@
             "name": "IP-adress"
           }
         }
+      },
+      "active_system_events": {
+        "name": "Aktiva systemhändelser",
+        "state_attributes": {
+          "available": {
+            "name": "Händelsetjänsten är tillgänglig"
+          },
+          "active_count": {
+            "name": "Antal aktiva händelser"
+          },
+          "high_impact_count": {
+            "name": "Antal händelser med stor påverkan"
+          },
+          "severity_counts": {
+            "name": "Antal per allvarlighetsgrad"
+          },
+          "device_type_counts": {
+            "name": "Antal per enhetstyp"
+          },
+          "last_success_utc": {
+            "name": "Senaste händelseuppdatering (UTC)"
+          },
+          "using_cached_data": {
+            "name": "Använder cachelagrade händelsedata"
+          }
+        }
       }
     },
     "switch": {
@@ -2240,6 +2266,10 @@
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS är tillfälligt pausat",
       "description": "Heat Pump/HEMS-pollning för plats {site_id} är pausad till {backoff_until} efter {failure_count} auth-liknande fel ({reason}). Wallbox, batteri, gateway och andra data kan fortsätta. Inaktivera Heat Pump-enhetsgruppen eller använd Clear HEMS Auth Backoff när Enphase har återhämtat sig."
+    },
+    "active_system_event": {
+      "title": "Aktiv Enphase-systemhändelse med stor påverkan",
+      "description": "Anläggning {site_id} har en aktiv {severity}-händelse som påverkar {device_type}, först rapporterad {event_date}. Se Enlighten för information och rekommenderad åtgärd. Denna reparation tas bort automatiskt när Enphase rapporterar att händelsen är löst."
     }
   },
   "system_health": {

@@ -1958,6 +1958,32 @@
             "name": "IP adrese"
           }
         }
+      },
+      "active_system_events": {
+        "name": "Aktīvi sistēmas notikumi",
+        "state_attributes": {
+          "available": {
+            "name": "Notikumu pakalpojums pieejams"
+          },
+          "active_count": {
+            "name": "Aktīvo notikumu skaits"
+          },
+          "high_impact_count": {
+            "name": "Augstas ietekmes notikumu skaits"
+          },
+          "severity_counts": {
+            "name": "Skaits pēc nopietnības"
+          },
+          "device_type_counts": {
+            "name": "Skaits pēc ierīces tipa"
+          },
+          "last_success_utc": {
+            "name": "Pēdējā notikumu atsvaidzināšana (UTC)"
+          },
+          "using_cached_data": {
+            "name": "Tiek izmantoti kešatmiņā saglabāti notikumu dati"
+          }
+        }
       }
     },
     "switch": {
@@ -2240,6 +2266,10 @@
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS īslaicīgi apturēts",
       "description": "Heat Pump/HEMS aptauja vietnei {site_id} ir apturēta līdz {backoff_until} pēc {failure_count} autentifikācijai līdzīgām kļūdām ({reason}). Wallbox, akumulators, vārteja un citi dati var turpināties. Atspējojiet Heat Pump ierīču grupu vai izmantojiet Clear HEMS Auth Backoff pēc Enphase atjaunošanās."
+    },
+    "active_system_event": {
+      "title": "Aktīvs augstas ietekmes Enphase sistēmas notikums",
+      "description": "Vietnē {site_id} ir aktīvs {severity} notikums, kas ietekmē {device_type} un pirmoreiz ziņots {event_date}. Informāciju un ieteicamo rīcību skatiet Enlighten. Šis labojums tiek automātiski noņemts, kad Enphase ziņo, ka notikums ir atrisināts."
     }
   },
   "system_health": {

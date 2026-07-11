@@ -123,6 +123,7 @@ Status labels:
 | Tariff settings MQTT authorizer | `GET` | `/pv/aws_sigv4/tariff_settings_response_stream?serial_number=<gateway_sn>` | authenticated Enlighten session cookies + `e-auth-token` + `x-xsrf-token` | Browser capture only |
 | EVSE tariff-change notification | `PUT` | `/service/evse_scheduler/api/v1/siteConfig/<site_id>/tariff_change` | tariff web write headers + JSON `null` body | Runtime (best-effort) |
 | System dashboard summary | `GET` | `/service/system_dashboard/api_internal/cs/sites/<site_id>/summary` | session cookies + optional `Authorization: Bearer <token>` (current implementation adds bearer when available) | Runtime |
+| System dashboard events | `GET` | `/service/system_dashboard/api_internal/cs/sites/<site_id>/events?range=today&cassandra_toggle=false&filter_columns=<columns>&serial_numbers=&type=table&event_state=default&page=1&per_page=200` | dashboard-read headers: authenticated cookies, optional bearer | Runtime |
 | System dashboard master data | `GET` | `/service/system_dashboard/api_internal/cs/sites/<site_id>/data/master-data` | dashboard-read headers: authenticated cookies, optional bearer, XSRF when present | Runtime |
 | Per-gateway microinverter inventory | `GET` | `/service/system_dashboard/api_internal/dashboard/sites/<site_id>/envoy_inverters?serial_number=<gateway_sn>` | dashboard-read headers: authenticated cookies, optional bearer, XSRF when present | Runtime |
 | Device-level parameter columns | `GET` | `/service/system_dashboard/api_internal/cs/sites/<site_id>/data/columns?serial_num=<gateway_sn>&type=device_level` | dashboard-read headers: authenticated cookies, optional bearer, XSRF when present | Runtime |
@@ -3358,7 +3359,52 @@ Inference:
 - The event-history feed provides stable SG Ready transition keys even when the human-readable descriptions are localized, so it is useful for documenting `MODE_2` versus `MODE_3` semantics without relying on translated text.
 
 Implementation note:
-- The current integration does not fetch this homeowner event feed for entities. HEMS per-device event JSON routes in `2.20` are used for diagnostics instead.
+- The integration does not fetch this homeowner feed for entities. It uses the
+  cleaner System Dashboard event table described below and keeps the HEMS
+  per-device event JSON routes in `2.20` for diagnostics.
+
+### 2.10.1 System Dashboard Active Events
+
+```http
+GET /service/system_dashboard/api_internal/cs/sites/<site_id>/events
+    ?range=today
+    &cassandra_toggle=false
+    &filter_columns=serial_number,device_type,event_date,cleared_date,event_type,event_state,details,updated_at,alarm_id
+    &serial_numbers=
+    &type=table
+    &event_state=default
+    &page=1
+    &per_page=200
+```
+
+The runtime uses the authenticated System Dashboard read headers and treats the
+route as optional. Successful responses are cached for five minutes; endpoint
+failures retain the last valid event state and use bounded backoff.
+
+Top-level response fields:
+
+```text
+total, page, per_page, events, event_types, event_states,
+csv_link, event_severities, availablePages
+```
+
+Event rows may contain:
+
+```text
+id, serial_number, device_link, event_date, cleared_date,
+updated_at, device_type, event_type, event_state, alarm_id, details
+```
+
+Runtime safety rules:
+
+- Cleared/closed/resolved rows are not active.
+- Repairs are created only when the payload or lookup catalogs explicitly mark an
+  active row as `error`, `critical`, `fatal`, `emergency`, or `severe`.
+- Event IDs, alarm IDs, device serials, device links, details, and CSV links are
+  discarded. Repair IDs use a truncated SHA-256 fingerprint and expose no raw
+  identifier.
+- A successful response clears repairs for resolved events. A transient endpoint
+  failure never clears a last-known active repair.
 
 ### 2.11 Battery Backup History
 ```
