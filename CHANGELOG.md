@@ -17,8 +17,8 @@ All notable changes to this project will be documented in this file.
 ### ✨ New features
 - Added optional installer-level microinverter parameter telemetry with bulk device reads for power and available AC/DC voltage/current, frequency, temperature, signal, and firmware details. Empty authoritative reads clear old values, partial failures retain only bounded stale data, and the diagnostic entities are disabled by default.
 - Added read-only System Dashboard event monitoring with a diagnostic active-event
-  binary sensor and automatically clearing Repairs for active error and critical
-  events.
+  binary sensor and Repairs for active error and critical events. Repairs clear only
+  after Enphase returns a matching explicitly resolved event.
 
 ### 🐛 Bug fixes
 - Fixed Enlighten authentication after Enphase retired the Entrez token mint by

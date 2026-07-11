@@ -184,7 +184,7 @@ def _runtime_coordinator(
 
 
 @pytest.mark.asyncio
-async def test_runtime_refresh_creates_stable_repairs_and_clears_resolved(
+async def test_runtime_refresh_clears_repairs_only_for_explicit_resolution(
     hass, monkeypatch
 ) -> None:
     coordinator = _runtime_coordinator(hass, payload=_event_payload())
@@ -233,9 +233,15 @@ async def test_runtime_refresh_creates_stable_repairs_and_clears_resolved(
 
     coordinator.client.system_dashboard_events.return_value = {"events": []}
     await runtime.async_refresh()
-    assert deleted == [issue_id]
+    assert deleted == []
     assert runtime.active_count == 0
     assert runtime.high_impact_count == 0
+
+    resolved_row = dict(_event_payload()["events"][0])
+    resolved_row["cleared_date"] = "2026-07-11T02:00:00Z"
+    coordinator.client.system_dashboard_events.return_value = {"events": [resolved_row]}
+    await runtime.async_refresh()
+    assert deleted == [issue_id]
 
 
 @pytest.mark.asyncio
@@ -302,7 +308,7 @@ async def test_runtime_diagnostics_and_persisted_issue_cleanup(
     ).consecutive_failures = 1
     snapshot = runtime.diagnostics()
 
-    assert deleted == [stale_issue]
+    assert deleted == []
     assert snapshot["available"] is True
     assert snapshot["active_count"] == 1
     assert snapshot["high_impact_count"] == 0
@@ -316,7 +322,7 @@ async def test_runtime_diagnostics_and_persisted_issue_cleanup(
         "custom_components.enphase_ev.system_events.ir.async_get",
         lambda _hass: SimpleNamespace(issues=None),
     )
-    assert runtime._existing_issue_ids() == set()  # noqa: SLF001
+    assert runtime._existing_issue_ids() == {stale_issue}  # noqa: SLF001
 
     active_issue = f"{SYSTEM_EVENT_REPAIR_PREFIX}{fallback_suffix}_active"
     inactive_issue = f"{SYSTEM_EVENT_REPAIR_PREFIX}{fallback_suffix}_inactive"

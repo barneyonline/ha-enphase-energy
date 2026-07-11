@@ -154,11 +154,22 @@ def parse_active_system_events(
 ) -> tuple[SystemEvent, ...]:
     """Parse active events while discarding raw identifiers and message details."""
 
+    events, _resolved = _parse_system_event_snapshot(payload, site_id=site_id)
+    return events
+
+
+def _parse_system_event_snapshot(
+    payload: object,
+    *,
+    site_id: str,
+) -> tuple[tuple[SystemEvent, ...], frozenset[str]]:
+    """Return sanitized active rows and explicitly resolved fingerprints."""
+
     if not isinstance(payload, dict):
-        return ()
+        return (), frozenset()
     rows = payload.get("events")
     if not isinstance(rows, list):
-        return ()
+        return (), frozenset()
     states = _lookup_catalog(payload.get("event_states"))
     severities = _lookup_catalog(payload.get("event_severities"))
     event_types = _lookup_catalog(payload.get("event_types"))
@@ -169,14 +180,16 @@ def parse_active_system_events(
         and (serial := _text(row.get("serial_number"))) is not None
     ]
     events: list[SystemEvent] = []
+    resolved: set[str] = set()
     seen: set[str] = set()
     for row in rows:
         if not isinstance(row, dict):
             continue
         state = _catalog_label(row.get("event_state"), states) or "unknown"
-        if not _event_is_active(row, state):
-            continue
         fingerprint = _event_fingerprint(row)
+        if not _event_is_active(row, state):
+            resolved.add(fingerprint)
+            continue
         if fingerprint in seen:
             continue
         seen.add(fingerprint)
@@ -210,7 +223,7 @@ def parse_active_system_events(
                 high_impact=severity in _HIGH_IMPACT_SEVERITIES,
             )
         )
-    return tuple(events)
+    return tuple(events), frozenset(resolved)
 
 
 class SystemEventsRuntime:
@@ -221,6 +234,7 @@ class SystemEventsRuntime:
         self._events: tuple[SystemEvent, ...] = ()
         self._last_success_utc: datetime | None = None
         self._reported_issue_ids: set[str] = set()
+        self._active_reported_issue_ids: set[str] = set()
 
     @property
     def active_events(self) -> tuple[SystemEvent, ...]:
@@ -273,9 +287,14 @@ class SystemEventsRuntime:
         registry = ir.async_get(self.coordinator.hass)
         issues = getattr(registry, "issues", {})
         if not isinstance(issues, dict):
-            return set(self._reported_issue_ids)
+            return set(
+                self._active_reported_issue_ids
+                if active_only
+                else self._reported_issue_ids
+            )
         entry_prefix = f"{SYSTEM_EVENT_REPAIR_PREFIX}{self._entry_suffix()}_"
         existing: set[str] = set()
+        known: set[str] = set()
         for key, entry in issues.items():
             if (
                 not isinstance(key, tuple)
@@ -285,20 +304,31 @@ class SystemEventsRuntime:
                 or not key[1].startswith(entry_prefix)
             ):
                 continue
+            known.add(key[1])
             if active_only and getattr(entry, "active", True) is not True:
                 continue
             existing.add(key[1])
+        if active_only:
+            return existing | (self._active_reported_issue_ids - known)
         return existing | self._reported_issue_ids
 
-    def _sync_repairs(self) -> None:
-        """Create new high-impact repairs and clear resolved repairs."""
+    def _sync_repairs(self, resolved_fingerprints: frozenset[str]) -> None:
+        """Create high-impact repairs and clear only explicitly resolved rows."""
 
         active_high_impact = {
             self._issue_id(event): event for event in self._events if event.high_impact
         }
+        active_issue_ids = {self._issue_id(event) for event in self._events}
+        resolved_issue_ids = {
+            f"{SYSTEM_EVENT_REPAIR_PREFIX}{self._entry_suffix()}_{fingerprint}"
+            for fingerprint in resolved_fingerprints
+        }
         existing = self._existing_issue_ids()
         active_existing = self._existing_issue_ids(active_only=True)
-        for issue_id in existing - active_high_impact.keys():
+        delete_issue_ids = (existing & resolved_issue_ids) | (
+            (existing & active_issue_ids) - active_high_impact.keys()
+        )
+        for issue_id in delete_issue_ids:
             ir.async_delete_issue(self.coordinator.hass, DOMAIN, issue_id)
         for issue_id, event in active_high_impact.items():
             if issue_id in active_existing:
@@ -323,7 +353,10 @@ class SystemEventsRuntime:
                     "event_date": event.event_date,
                 },
             )
-        self._reported_issue_ids = set(active_high_impact)
+        self._reported_issue_ids = (
+            existing | set(active_high_impact)
+        ) - delete_issue_ids
+        self._active_reported_issue_ids = set(active_high_impact)
 
     async def async_refresh(self) -> None:
         """Refresh events, retaining cached state across optional failures."""
@@ -336,13 +369,13 @@ class SystemEventsRuntime:
         payload = await fetcher()
         if not isinstance(payload, dict):
             raise OptionalEndpointUnavailable("System events endpoint unavailable")
-        self._events = parse_active_system_events(
+        self._events, resolved_fingerprints = _parse_system_event_snapshot(
             payload,
             site_id=str(self.coordinator.site_id),
         )
         self._last_success_utc = dt_util.utcnow()
         self.coordinator._note_endpoint_family_success(SYSTEM_EVENTS_ENDPOINT_FAMILY)
-        self._sync_repairs()
+        self._sync_repairs(resolved_fingerprints)
         _LOGGER.debug(
             "System event summary refreshed for site [site]: active=%s high_impact=%s",
             self.active_count,
