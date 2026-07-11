@@ -123,7 +123,10 @@ Status labels:
 | Tariff settings MQTT authorizer | `GET` | `/pv/aws_sigv4/tariff_settings_response_stream?serial_number=<gateway_sn>` | authenticated Enlighten session cookies + `e-auth-token` + `x-xsrf-token` | Browser capture only |
 | EVSE tariff-change notification | `PUT` | `/service/evse_scheduler/api/v1/siteConfig/<site_id>/tariff_change` | tariff web write headers + JSON `null` body | Runtime (best-effort) |
 | System dashboard summary | `GET` | `/service/system_dashboard/api_internal/cs/sites/<site_id>/summary` | session cookies + optional `Authorization: Bearer <token>` (current implementation adds bearer when available) | Runtime |
-| System dashboard master data | `GET` | `/service/system_dashboard/api_internal/cs/sites/<site_id>/data/master-data` | dashboard-read headers: authenticated cookies, optional bearer, XSRF when present | Browser capture only |
+| System dashboard master data | `GET` | `/service/system_dashboard/api_internal/cs/sites/<site_id>/data/master-data` | dashboard-read headers: authenticated cookies, optional bearer, XSRF when present | Runtime |
+| Per-gateway microinverter inventory | `GET` | `/service/system_dashboard/api_internal/dashboard/sites/<site_id>/envoy_inverters?serial_number=<gateway_sn>` | dashboard-read headers: authenticated cookies, optional bearer, XSRF when present | Runtime |
+| Device-level parameter columns | `GET` | `/service/system_dashboard/api_internal/cs/sites/<site_id>/data/columns?serial_num=<gateway_sn>&type=device_level` | dashboard-read headers: authenticated cookies, optional bearer, XSRF when present | Runtime |
+| Bulk device parameter readings | `GET` | `/service/system_dashboard/api_internal/cs/sites/<site_id>/data/parameter-view?serial_numbers=<csv>&parameter_id=<id>&...` | dashboard-read headers: authenticated cookies, optional bearer, XSRF when present | Runtime |
 | Activation checklist | `GET` | `/service/system_dashboard/api_internal/cs/sites/<site_id>/updated_activation_checklist` | dashboard-read headers: authenticated cookies, optional bearer | Browser capture only |
 | System dashboard devices table | `GET` | `/service/system_dashboard/api_internal/cs/sites/<site_id>/devices?range=<range>&filter_columns=<...>&serial_numbers=<...>&type=table&page=<page>&per_page=<n>` | dashboard-read headers: authenticated cookies, optional bearer | Browser capture only |
 | System dashboard status | `GET` | `/service/system_dashboard/api_internal/dashboard/sites/<site_id>/status` | dashboard-read headers: authenticated cookies, optional bearer | Browser capture only |
@@ -1859,6 +1862,28 @@ Notes:
 - `activity_types.id` values are not normalized. The sample contained mixed casing, embedded spaces, and duplicate-looking variants, so clients should preserve the raw string rather than coercing it.
 - Meter `serial_num` values may derive from the gateway serial with suffixes such as `EIM1` and `EIM2`.
 - Because the payload is catalog-like and changed infrequently in the capture, it is a better candidate for caching than the live status endpoints.
+
+Runtime behavior:
+- The integration caches this catalog for six hours and only requests parameter IDs that the site advertises.
+- User and activity catalogs are not retained in runtime diagnostics. This avoids persisting email-address identifiers or unrelated commissioning history.
+
+### 2.9.4.b.1 Per-Gateway Microinverter Inventory
+```
+GET /service/system_dashboard/api_internal/dashboard/sites/<site_id>/envoy_inverters?serial_number=<gateway_sn>
+```
+Returns a flattened `data[]` list with `id`, `name`, `serial_number`, `status`, `sub_status`, `type`, and `parent_id`. The runtime batches one request per discovered gateway, caches the result for six hours, and uses it only to enrich or fill gaps in the legacy microinverter inventory. Failures preserve the last successful optional payload and do not fail the coordinator refresh.
+
+### 2.9.4.b.2 Device Parameter Columns
+```
+GET /service/system_dashboard/api_internal/cs/sites/<site_id>/data/columns?serial_num=<gateway_sn>&type=device_level
+```
+Returns `columns[]` metadata including `name`, `header`, `attribute_name`, visibility/sort flags, and filter type. Runtime retains only the non-sensitive column/attribute names; gateway and device identifiers are not copied into diagnostics.
+
+### 2.9.4.b.3 Bulk Device Parameter Readings
+```
+GET /service/system_dashboard/api_internal/cs/sites/<site_id>/data/parameter-view?serial_numbers=<csv>&per_page=500&page=1&range=today&parameter_id=<id>&start_date=&end_date=&sort_by_date=desc
+```
+Returns paginated device readings for one parameter. The response includes `intervals[]`, per-device `columns[]`, paging fields, and range metadata. The integration passes every active microinverter serial in one CSV request per supported parameter, uses the site master-data catalog to avoid unsupported probes, and caches successful readings for five minutes. Supported values are normalized to power, AC/DC voltage/current, AC frequency, temperature, signal strength, and firmware when advertised and present. Empty or malformed rows are ignored, and recent successful values remain usable for up to 30 minutes during optional endpoint failures.
 
 ### 2.9.4.c System Dashboard Devices Table
 ```

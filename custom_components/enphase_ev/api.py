@@ -7456,6 +7456,123 @@ class EnphaseEVClient:
         )
         return await self._system_dashboard_get(modern_url, legacy_url)
 
+    async def system_dashboard_master_data(self) -> JsonDict | None:
+        """Return the system-dashboard device and parameter catalogs.
+
+        GET /service/system_dashboard/api_internal/cs/sites/<site_id>/data/master-data
+        """
+
+        url = (
+            f"{BASE_URL}/service/system_dashboard/api_internal/cs/sites/"
+            f"{self._site}/data/master-data"
+        )
+        try:
+            data = await self._json(
+                "GET", url, headers=self._system_dashboard_headers()
+            )
+        except Exception as err:  # noqa: BLE001
+            if self._system_dashboard_is_optional_error(err):
+                return None
+            raise
+        return data if isinstance(data, dict) else None
+
+    async def system_dashboard_envoy_inverters(
+        self, gateway_serial: str
+    ) -> JsonDict | None:
+        """Return flattened microinverter inventory for one gateway."""
+
+        serial = str(gateway_serial).strip()
+        if not serial:
+            return None
+        url = str(
+            URL(
+                f"{BASE_URL}/service/system_dashboard/api_internal/dashboard/sites/"
+                f"{self._site}/envoy_inverters"
+            ).update_query({"serial_number": serial})
+        )
+        try:
+            data = await self._json(
+                "GET", url, headers=self._system_dashboard_headers()
+            )
+        except Exception as err:  # noqa: BLE001
+            if self._system_dashboard_is_optional_error(err):
+                return None
+            raise
+        return data if isinstance(data, dict) else None
+
+    async def system_dashboard_data_columns(
+        self, gateway_serial: str
+    ) -> JsonDict | None:
+        """Return device-level parameter column metadata for one gateway."""
+
+        serial = str(gateway_serial).strip()
+        if not serial:
+            return None
+        url = str(
+            URL(
+                f"{BASE_URL}/service/system_dashboard/api_internal/cs/sites/"
+                f"{self._site}/data/columns"
+            ).update_query({"serial_num": serial, "type": "device_level"})
+        )
+        try:
+            data = await self._json(
+                "GET", url, headers=self._system_dashboard_headers()
+            )
+        except Exception as err:  # noqa: BLE001
+            if self._system_dashboard_is_optional_error(err):
+                return None
+            raise
+        return data if isinstance(data, dict) else None
+
+    async def system_dashboard_parameter_view(
+        self,
+        serial_numbers: list[str] | tuple[str, ...],
+        parameter_id: str,
+        *,
+        per_page: int = 500,
+        page: int = 1,
+        range_name: str = "today",
+        start_date: str = "",
+        end_date: str = "",
+        sort_by_date: str = "desc",
+    ) -> JsonDict | None:
+        """Return one parameter for many devices in a single dashboard request."""
+
+        serials = tuple(
+            dict.fromkeys(
+                str(serial).strip() for serial in serial_numbers if str(serial).strip()
+            )
+        )
+        parameter = str(parameter_id).strip()
+        if not serials or not parameter:
+            return None
+        url = str(
+            URL(
+                f"{BASE_URL}/service/system_dashboard/api_internal/cs/sites/"
+                f"{self._site}/data/parameter-view"
+            ).update_query(
+                {
+                    "serial_numbers": ",".join(serials),
+                    "per_page": max(1, int(per_page)),
+                    "page": max(1, int(page)),
+                    "range": str(range_name),
+                    "parameter_id": parameter,
+                    "start_date": str(start_date),
+                    "end_date": str(end_date),
+                    "sort_by_date": str(sort_by_date),
+                }
+            )
+        )
+        try:
+            data = await self._json(
+                "GET", url, headers=self._system_dashboard_headers()
+            )
+        except Exception as err:  # noqa: BLE001
+            if self._system_dashboard_is_optional_error(err):
+                return None
+            raise
+        return data if isinstance(data, dict) else None
+
     async def hems_devices(self, *, refresh_data: bool = False) -> JsonDict | None:
         """Return dedicated HEMS device inventory when available.
 

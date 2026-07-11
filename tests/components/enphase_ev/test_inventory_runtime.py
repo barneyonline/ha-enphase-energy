@@ -1286,6 +1286,257 @@ async def test_inventory_runtime_refresh_inverters_paths(coordinator_factory) ->
 
 
 @pytest.mark.asyncio
+async def test_inventory_runtime_bulk_parameter_telemetry(coordinator_factory) -> None:
+    coord = coordinator_factory()
+    runtime = coord.inventory_runtime
+    coord._type_device_buckets["envoy"] = {  # noqa: SLF001
+        "type_key": "envoy",
+        "count": 1,
+        "devices": [{"serial_number": "GW-A"}],
+    }
+    coord.client.system_dashboard_envoy_inverters = AsyncMock(
+        return_value={
+            "data": [
+                {
+                    "serial_number": "INV-A",
+                    "id": "DEVICE-A",
+                    "name": "IQ8",
+                    "status": "normal",
+                }
+            ]
+        }
+    )
+    coord.client.system_dashboard_master_data = AsyncMock(
+        return_value={
+            "parameters": [
+                {"id": "power"},
+                {"id": "ac_frequency"},
+                {"id": "temperature"},
+                {"id": "unrelated"},
+            ]
+        }
+    )
+    coord.client.system_dashboard_data_columns = AsyncMock(
+        return_value={"columns": [{"attribute_name": "reading_1"}]}
+    )
+
+    async def _parameter_view(_serials, parameter_id):
+        if parameter_id == "power":
+            return {
+                "intervals": [{"timestamp": "2026-07-11T01:00:00Z", "reading_1": 212}],
+                "columns": [{"serial_number": "INV-A", "attribute_name": "reading_1"}],
+            }
+        return {
+            "intervals": [
+                {
+                    "serial_number": "INV-A",
+                    "timestamp": "2026-07-11T01:00:00Z",
+                    "value": 49.98 if parameter_id == "ac_frequency" else "41.5",
+                }
+            ]
+        }
+
+    coord.client.system_dashboard_parameter_view = AsyncMock(
+        side_effect=_parameter_view
+    )
+    coord.client.inverters_inventory = AsyncMock(return_value={"inverters": []})
+    coord.client.inverter_status = AsyncMock(return_value={})
+    coord.client.inverter_production = AsyncMock(return_value={})
+
+    await runtime._async_refresh_inverters()  # noqa: SLF001
+
+    snapshot = coord.inverter_data("INV-A")
+    assert snapshot is not None
+    assert snapshot["device_id"] is None
+    assert snapshot["telemetry"] == {
+        "power": 212.0,
+        "parameter_ids": {
+            "power": "power",
+            "ac_frequency": "ac_frequency",
+            "temperature": "temperature",
+        },
+        "sampled_at": {
+            "power": "2026-07-11T01:00:00Z",
+            "ac_frequency": "2026-07-11T01:00:00Z",
+            "temperature": "2026-07-11T01:00:00Z",
+        },
+        "ac_frequency": 49.98,
+        "temperature": 41.5,
+    }
+    assert coord._inverter_parameter_columns == ["reading_1"]  # noqa: SLF001
+    assert coord.client.system_dashboard_parameter_view.await_count == 3
+
+    for family in (
+        "inverter_dashboard_inventory",
+        "inverter_parameter_catalog",
+        "inverter_parameter_telemetry",
+    ):
+        assert (
+            coord._endpoint_family_state(family).consecutive_failures == 0
+        )  # noqa: SLF001
+
+    await runtime._async_refresh_inverters()  # noqa: SLF001
+    assert coord.client.system_dashboard_parameter_view.await_count == 3
+
+
+def test_inventory_runtime_parameter_row_shapes_and_invalid_values() -> None:
+    parser = InventoryRuntime._inverter_parameter_rows
+    assert parser({"data": [{"serial_num": "INV-A", "power": "10.5"}]}, "power") == {
+        "INV-A": (10.5, None)
+    }
+    assert parser(
+        {
+            "intervals": [
+                {"device_serial": "INV-A", "reading": "N/A"},
+                {"device_serial": "INV-B", "reading": float("inf")},
+                {"device_serial": "INV-C", "reading": "firmware-v1"},
+            ]
+        },
+        "firmware",
+    ) == {"INV-C": ("firmware-v1", None)}
+    assert parser({"intervals": "bad"}, "power") == {}
+
+
+@pytest.mark.asyncio
+async def test_inventory_runtime_parameter_telemetry_edge_paths(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.inventory_runtime
+    coord._inverter_dashboard_inventory = {  # noqa: SLF001
+        "INV-CACHED": {"serial_number": "INV-CACHED"}
+    }
+    coord._type_device_buckets["envoy"] = {  # noqa: SLF001
+        "type_key": "envoy",
+        "count": 0,
+        "devices": "bad",
+    }
+    original_type_bucket = runtime.type_bucket
+    monkeypatch.setattr(runtime, "type_bucket", lambda _type: {"devices": "bad"})
+    assert runtime._gateway_serials_for_inverter_telemetry() == []  # noqa: SLF001
+    monkeypatch.setattr(runtime, "type_bucket", lambda _type: {"devices": ["bad"]})
+    assert runtime._gateway_serials_for_inverter_telemetry() == []  # noqa: SLF001
+    monkeypatch.setattr(runtime, "type_bucket", original_type_bucket)
+    assert await runtime._async_inverter_dashboard_inventory([]) == [  # noqa: SLF001
+        {"serial_number": "INV-CACHED"}
+    ]
+    coord._endpoint_family_state(  # noqa: SLF001
+        "inverter_dashboard_inventory"
+    ).last_success_mono = 0.0
+    assert await runtime._async_inverter_dashboard_inventory([]) == []  # noqa: SLF001
+
+    coord._type_device_buckets["envoy"] = {  # noqa: SLF001
+        "type_key": "envoy",
+        "count": 1,
+        "devices": ["bad", {}, {"serial_num": "GW-A"}, {"serial_num": "GW-A"}],
+    }
+    assert runtime._gateway_serials_for_inverter_telemetry() == ["GW-A"]  # noqa: SLF001
+    monkeypatch.setattr(coord, "_endpoint_family_should_run", lambda *_args: False)
+    assert await runtime._async_inverter_dashboard_inventory(  # noqa: SLF001
+        [{"serial_number": "INV-CACHED", "name": "Legacy"}]
+    ) == [{"serial_number": "INV-CACHED", "name": "Legacy"}]
+
+    monkeypatch.setattr(coord, "_endpoint_family_should_run", lambda *_args: True)
+    coord.client.system_dashboard_envoy_inverters = AsyncMock(
+        return_value={"data": ["bad", {"serial_number": ""}]}
+    )
+    assert (
+        await runtime._async_inverter_dashboard_inventory(  # noqa: SLF001
+            [{"serial_number": ""}]
+        )
+        == []
+    )
+    coord.client.system_dashboard_envoy_inverters = AsyncMock(
+        return_value={"data": "bad"}
+    )
+    assert await runtime._async_inverter_dashboard_inventory([]) == []  # noqa: SLF001
+    coord.client.system_dashboard_envoy_inverters = AsyncMock(
+        side_effect=RuntimeError("optional")
+    )
+    assert await runtime._async_inverter_dashboard_inventory([]) == []  # noqa: SLF001
+
+    assert runtime._inverter_parameter_value(None) is None  # noqa: SLF001
+    assert runtime._inverter_parameter_value(True) is None  # noqa: SLF001
+    assert runtime._inverter_parameter_value({}) is None  # noqa: SLF001
+    assert runtime._inverter_parameter_rows(  # noqa: SLF001
+        {
+            "intervals": [
+                "bad",
+                {"serial_number": "INV-A", "value": 1},
+                {"INV-B": 2},
+            ],
+            "columns": [
+                "bad",
+                {"serial_number": ""},
+                {"serial_number": "INV-A", "attribute_name": "unused"},
+                {"serial_number": "INV-B"},
+            ],
+        },
+        "power",
+    ) == {"INV-A": (1.0, None), "INV-B": (2.0, None)}
+
+    coord.client.system_dashboard_master_data = AsyncMock(
+        return_value={
+            "parameters": [
+                "bad",
+                {"id": "power"},
+                {"id": "ac_power"},
+            ]
+        }
+    )
+    coord.client.system_dashboard_data_columns = AsyncMock(
+        side_effect=["bad", {"columns": "bad"}]
+    )
+    coord._type_device_buckets["envoy"]["devices"] = [  # noqa: SLF001
+        {"serial_num": "GW-A"},
+        {"serial_num": "GW-B"},
+    ]
+    coord.client.system_dashboard_parameter_view = AsyncMock(
+        side_effect=[RuntimeError("one parameter failed")]
+    )
+    assert (
+        await runtime._async_refresh_inverter_parameter_telemetry(  # noqa: SLF001
+            ["INV-A"]
+        )
+        == {}
+    )
+
+    coord.client.system_dashboard_master_data = AsyncMock(return_value=None)
+    coord.client.system_dashboard_data_columns = AsyncMock(
+        return_value={"columns": ["bad", {"name": "column-name"}]}
+    )
+    coord._inverter_parameter_ids = ["power", "temperature"]  # noqa: SLF001
+    coord.client.system_dashboard_parameter_view = AsyncMock(
+        side_effect=["bad", {"intervals": [{"serial_number": "OTHER", "value": 2}]}]
+    )
+    assert (
+        await runtime._async_refresh_inverter_parameter_telemetry(  # noqa: SLF001
+            ["INV-A"]
+        )
+        == {}
+    )
+    assert coord._inverter_parameter_columns == ["column-name"]  # noqa: SLF001
+
+    coord.client.system_dashboard_master_data = AsyncMock(
+        side_effect=RuntimeError("catalog failed")
+    )
+    coord._inverter_parameter_ids = []  # noqa: SLF001
+    assert (
+        await runtime._async_refresh_inverter_parameter_telemetry(  # noqa: SLF001
+            ["INV-A"]
+        )
+        == {}
+    )
+    coord._inverter_parameter_telemetry = {"INV-A": {"power": 1}}  # noqa: SLF001
+    coord._endpoint_family_state(  # noqa: SLF001
+        "inverter_parameter_telemetry"
+    ).last_success_mono = 0.0
+    assert (
+        await runtime._async_refresh_inverter_parameter_telemetry([]) == {}
+    )  # noqa: SLF001
+
+
+@pytest.mark.asyncio
 async def test_inventory_runtime_inverters_early_return_paths(
     coordinator_factory,
 ) -> None:

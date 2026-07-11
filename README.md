@@ -29,7 +29,7 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - IQ Gateway / System Controller entities and controls
 - IQ Battery telemetry and BatteryConfig controls (where supported)
 - IQ EV Charger controls and session telemetry
-- IQ Microinverter connectivity, inventory, and lifetime production telemetry
+- IQ Microinverter connectivity, inventory, lifetime production, and optional installer-level parameter telemetry
 - Site and cloud energy telemetry (including supported HEMS channels such as Heat Pump and Water Heater lifetime energy)
 
 ## Key features
@@ -43,6 +43,7 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - Site tariff visibility for next billing date, Energy-dashboard-ready current import/export price sensors, editable tariff rate number entities, and a service for billing-cycle, rate, and guided structural tariff updates when Enphase exposes tariff data
 - Health diagnostics, service-availability tracking, and actionable repair issues
 - Detailed diagnostic and inventory entities remain available but are disabled by default when they are mainly useful for troubleshooting
+- Rate-conscious microinverter telemetry batches all active devices per supported parameter and exposes power plus available AC/DC, frequency, temperature, signal, and firmware details in a disabled-by-default diagnostic entity
 - Broad localization support across all user-facing integration strings
 
 Localized strings cover English (default plus US, Canada, Australia, New Zealand, and Ireland variants), French, German, Spanish, Italian, Dutch, Swedish, Danish, Finnish, Norwegian Bokmal, Polish, Greek, Romanian, Czech, Hungarian, Bulgarian, Latvian, Lithuanian, Estonian, and Brazilian Portuguese.

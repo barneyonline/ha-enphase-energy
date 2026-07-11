@@ -15,12 +15,14 @@ from .serial_entity_metadata import (
     BATTERY_RETIRED_UNIQUE_SUFFIXES,
     CHARGER_SENSOR_UNIQUE_SUFFIXES,
     HISTORICAL_CHARGER_SENSOR_UNIQUE_SUFFIXES,
+    INVERTER_ENTITY_UNIQUE_SUFFIXES,
     ac_battery_entity_serial_from_unique_id,
     battery_entity_serial_from_unique_id,
     charger_entity_serial_from_unique_id,
     charger_entity_unique_id,
     charger_entity_unique_ids,
     inverter_entity_unique_id,
+    inverter_entity_serial_from_unique_id,
     site_ac_battery_entity_unique_id,
     site_ac_battery_entity_unique_ids,
     site_battery_entity_unique_id,
@@ -44,6 +46,7 @@ class EnphaseSensorRegistrySetup:
         self.known_battery_serials: set[str] = set()
         self.known_ac_battery_serials: set[str] = set()
         self.known_inverter_serials: set[str] = set()
+        self.known_inverter_telemetry_serials: set[str] = set()
         self.battery_registry_pruned = False
         self.ac_battery_registry_pruned = False
         self.inverter_registry_pruned = False
@@ -107,6 +110,12 @@ class EnphaseSensorRegistrySetup:
         """Return the unique ID for a microinverter lifetime energy sensor."""
 
         return inverter_entity_unique_id(serial)
+
+    @staticmethod
+    def inverter_telemetry_sensor_unique_id(serial: str) -> str:
+        """Return the unique ID for a microinverter telemetry sensor."""
+
+        return inverter_entity_unique_id(serial, "_telemetry")
 
     def remove_site_sensor_entity(self, key: str) -> None:
         """Remove a site-level sensor entity by setup key."""
@@ -396,7 +405,6 @@ class EnphaseSensorRegistrySetup:
         if self.inverter_registry_pruned:
             return
         unique_prefix = f"{DOMAIN}_inverter_"
-        unique_suffix = "_lifetime_energy"
         for reg_entry in list(self._entity_registry_values()):
             if not self._registry_entry_matches_sensor(reg_entry):
                 continue
@@ -404,14 +412,15 @@ class EnphaseSensorRegistrySetup:
             if not (
                 isinstance(unique_id, str)
                 and unique_id.startswith(unique_prefix)
-                and unique_id.endswith(unique_suffix)
+                and unique_id.endswith(INVERTER_ENTITY_UNIQUE_SUFFIXES)
             ):
                 continue
-            serial = unique_id[len(unique_prefix) : -len(unique_suffix)]
+            serial = inverter_entity_serial_from_unique_id(unique_id)
             if not serial or serial in current_set:
                 continue
             self._ent_reg.async_remove(reg_entry.entity_id)
             self.known_inverter_serials.discard(serial)
+            self.known_inverter_telemetry_serials.discard(serial)
         self.inverter_registry_pruned = True
 
     def remove_missing_inverter_entities(self, current_set: set[str]) -> None:
@@ -420,8 +429,12 @@ class EnphaseSensorRegistrySetup:
         self._remove_missing_serial_entities(
             self.known_inverter_serials,
             current_set,
-            lambda serial: (self.inverter_lifetime_sensor_unique_id(serial),),
+            lambda serial: (
+                self.inverter_lifetime_sensor_unique_id(serial),
+                self.inverter_telemetry_sensor_unique_id(serial),
+            ),
         )
+        self.known_inverter_telemetry_serials.intersection_update(current_set)
 
     def battery_serial_from_unique_id(self, unique_id: object) -> str | None:
         """Return a battery serial parsed from a known per-battery unique ID."""

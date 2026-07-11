@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+import math
 import re
 import time
 from collections.abc import Awaitable, Callable, Mapping
@@ -80,6 +81,28 @@ SYSTEM_DASHBOARD_DIAGNOSTIC_TYPES: tuple[str, ...] = (
     "modems",
     "inverters",
 )
+INVERTER_PARAMETER_ALIASES: dict[str, str] = {
+    "power": "power",
+    "ac_power": "power",
+    "ac_voltage": "ac_voltage",
+    "voltage": "ac_voltage",
+    "acv": "ac_voltage",
+    "dc_voltage": "dc_voltage",
+    "dcv": "dc_voltage",
+    "ac_current": "ac_current",
+    "current": "ac_current",
+    "dc_current": "dc_current",
+    "dca": "dc_current",
+    "ac_frequency": "ac_frequency",
+    "frequency": "ac_frequency",
+    "achz": "ac_frequency",
+    "temperature": "temperature",
+    "tmpi": "temperature",
+    "signal_strength": "signal_strength",
+    "rssi": "signal_strength",
+    "firmware": "firmware",
+    "sw_version": "firmware",
+}
 
 
 @dataclass(frozen=True)
@@ -2558,6 +2581,333 @@ class InventoryRuntime:
         if not ready_before:
             self._devices_inventory_ready = False
 
+    def _gateway_serials_for_inverter_telemetry(self) -> list[str]:
+        """Return gateway serials without retaining any identifiers in diagnostics."""
+
+        bucket = self.type_bucket("envoy") or {}
+        members = bucket.get("devices")
+        if not isinstance(members, list):
+            return []
+        serials: list[str] = []
+        for member in members:
+            if not isinstance(member, dict):
+                continue
+            serial = self._type_member_text(
+                member, "serial_number", "serial_num", "serialNumber", "serial"
+            )
+            if serial:
+                serials.append(serial)
+        return list(dict.fromkeys(serials))
+
+    async def _async_inverter_dashboard_inventory(
+        self, inverters: list[dict[str, object]]
+    ) -> list[dict[str, object]]:
+        """Merge optional per-gateway dashboard inventory into legacy inventory."""
+
+        family = "inverter_dashboard_inventory"
+        cached = getattr(self, "_inverter_dashboard_inventory", None)
+        cached_by_serial = dict(cached) if isinstance(cached, dict) else {}
+        dashboard_health = self.coordinator._endpoint_family_state(family)
+        if (
+            dashboard_health.last_success_mono is not None
+            and not self.coordinator._endpoint_family_can_use_stale(family)
+        ):
+            cached_by_serial = {}
+        fetcher = getattr(self.client, "system_dashboard_envoy_inverters", None)
+        gateway_serials = self._gateway_serials_for_inverter_telemetry()
+        if not callable(fetcher) or not gateway_serials:
+            dashboard_by_serial = cached_by_serial
+        elif not self.coordinator._endpoint_family_should_run(family):
+            dashboard_by_serial = cached_by_serial
+        else:
+            results = await asyncio.gather(
+                *(fetcher(serial) for serial in gateway_serials),
+                return_exceptions=True,
+            )
+            first_error = next(
+                (result for result in results if isinstance(result, Exception)), None
+            )
+            dashboard_by_serial: dict[str, dict[str, object]] = {}
+            response_seen = False
+            for result in results:
+                if not isinstance(result, dict):
+                    continue
+                response_seen = True
+                records = result.get("data")
+                if not isinstance(records, list):
+                    continue
+                for record in records:
+                    if not isinstance(record, dict):
+                        continue
+                    serial = str(record.get("serial_number") or "").strip()
+                    if serial:
+                        # Device/parent IDs are not needed by entities and must not
+                        # be retained in inventory diagnostics.
+                        dashboard_by_serial[serial] = {
+                            key: record[key]
+                            for key in (
+                                "name",
+                                "serial_number",
+                                "status",
+                                "sub_status",
+                                "type",
+                            )
+                            if record.get(key) is not None
+                        }
+            if response_seen:
+                self.coordinator._note_endpoint_family_success(family)
+                self._set_shared_state_attr(
+                    "_inverter_dashboard_inventory", dashboard_by_serial
+                )
+            else:
+                error = first_error or ValueError(
+                    "Dashboard inverter inventory was unavailable"
+                )
+                self.coordinator._note_endpoint_family_failure(family, error)
+                dashboard_by_serial = cached_by_serial
+
+        merged_by_serial: dict[str, dict[str, object]] = {}
+        order: list[str] = []
+        for item in inverters:
+            serial = str(item.get("serial_number") or "").strip()
+            if not serial:
+                continue
+            merged = dict(dashboard_by_serial.get(serial, {}))
+            merged.update(item)
+            merged_by_serial[serial] = merged
+            order.append(serial)
+        for serial, item in dashboard_by_serial.items():
+            if serial in merged_by_serial:
+                continue
+            merged_by_serial[serial] = dict(item)
+            order.append(serial)
+        return [merged_by_serial[serial] for serial in order]
+
+    @staticmethod
+    def _inverter_parameter_value(value: object) -> object | None:
+        """Normalize a dashboard reading without accepting containers or NaN."""
+
+        if value is None or isinstance(value, bool):
+            return None
+        if isinstance(value, (int, float)):
+            number = float(value)
+            return number if math.isfinite(number) else None
+        if isinstance(value, str):
+            text = value.strip()
+            if not text or text.lower() in {"n/a", "na", "none", "null", "-"}:
+                return None
+            try:
+                number = float(text)
+            except ValueError:
+                return text
+            return number if math.isfinite(number) else None
+        return None
+
+    @classmethod
+    def _inverter_parameter_rows(
+        cls, payload: dict[str, object], parameter_id: str
+    ) -> dict[str, tuple[object, object | None]]:
+        """Extract latest per-serial values from observed parameter-view shapes."""
+
+        rows = payload.get("intervals")
+        if not isinstance(rows, list):
+            rows = payload.get("data")
+        if not isinstance(rows, list):
+            return {}
+        columns = payload.get("columns")
+        column_records = (
+            [item for item in columns if isinstance(item, dict)]
+            if isinstance(columns, list)
+            else []
+        )
+        out: dict[str, tuple[object, object | None]] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            sampled_at = next(
+                (
+                    row.get(key)
+                    for key in ("timestamp", "date", "reported_at", "sampled_at")
+                    if row.get(key) is not None
+                ),
+                None,
+            )
+            serial = str(
+                row.get("serial_number")
+                or row.get("serial_num")
+                or row.get("device_serial")
+                or ""
+            ).strip()
+            if serial and serial not in out:
+                value = next(
+                    (
+                        row.get(key)
+                        for key in (parameter_id, "value", "reading")
+                        if row.get(key) is not None
+                    ),
+                    None,
+                )
+                normalized = cls._inverter_parameter_value(value)
+                if normalized is not None:
+                    out[serial] = (normalized, sampled_at)
+            for column in column_records:
+                column_serial = str(column.get("serial_number") or "").strip()
+                if not column_serial or column_serial in out:
+                    continue
+                attribute = str(column.get("attribute_name") or "").strip()
+                raw_value = row.get(attribute) if attribute else None
+                if raw_value is None:
+                    raw_value = row.get(column_serial)
+                normalized = cls._inverter_parameter_value(raw_value)
+                if normalized is not None:
+                    out[column_serial] = (normalized, sampled_at)
+        return out
+
+    async def _async_refresh_inverter_parameter_telemetry(
+        self, serials: list[str]
+    ) -> dict[str, dict[str, object]]:
+        """Refresh supported parameters in bulk, preserving stale optional data."""
+
+        coord = self.coordinator
+        cached = getattr(self, "_inverter_parameter_telemetry", None)
+        cached_by_serial = dict(cached) if isinstance(cached, dict) else {}
+        telemetry_family = "inverter_parameter_telemetry"
+        telemetry_health = coord._endpoint_family_state(telemetry_family)
+        if (
+            telemetry_health.last_success_mono is not None
+            and not coord._endpoint_family_can_use_stale(telemetry_family)
+        ):
+            cached_by_serial = {}
+        if not serials:
+            return cached_by_serial
+
+        master_fetcher = getattr(self.client, "system_dashboard_master_data", None)
+        columns_fetcher = getattr(self.client, "system_dashboard_data_columns", None)
+        parameter_ids = list(getattr(self, "_inverter_parameter_ids", None) or [])
+        catalog_family = "inverter_parameter_catalog"
+        if callable(master_fetcher) and coord._endpoint_family_should_run(
+            catalog_family
+        ):
+            try:
+                master_payload = await master_fetcher()
+            except Exception as err:  # noqa: BLE001
+                coord._note_endpoint_family_failure(catalog_family, err)
+                if not coord._endpoint_family_can_use_stale(catalog_family):
+                    parameter_ids = []
+                    self._set_shared_state_attr("_inverter_parameter_ids", [])
+            else:
+                parameters = (
+                    master_payload.get("parameters")
+                    if isinstance(master_payload, dict)
+                    else None
+                )
+                available: list[str] = []
+                if isinstance(parameters, list):
+                    for parameter in parameters:
+                        if not isinstance(parameter, dict):
+                            continue
+                        parameter_id = str(parameter.get("id") or "").strip()
+                        if parameter_id.lower() in INVERTER_PARAMETER_ALIASES:
+                            available.append(parameter_id)
+                if isinstance(master_payload, dict):
+                    selected: list[str] = []
+                    canonical_seen: set[str] = set()
+                    for parameter_id in available:
+                        canonical = INVERTER_PARAMETER_ALIASES[parameter_id.lower()]
+                        if canonical in canonical_seen:
+                            continue
+                        canonical_seen.add(canonical)
+                        selected.append(parameter_id)
+                    parameter_ids = selected
+                    self._set_shared_state_attr(
+                        "_inverter_parameter_ids", parameter_ids
+                    )
+                    coord._note_endpoint_family_success(catalog_family)
+                else:
+                    coord._note_endpoint_family_failure(
+                        catalog_family,
+                        ValueError("Dashboard parameter catalog was unavailable"),
+                    )
+
+            gateway_serials = self._gateway_serials_for_inverter_telemetry()
+            if callable(columns_fetcher) and gateway_serials:
+                column_results = await asyncio.gather(
+                    *(columns_fetcher(serial) for serial in gateway_serials),
+                    return_exceptions=True,
+                )
+                column_names: set[str] = set()
+                for result in column_results:
+                    if not isinstance(result, dict):
+                        continue
+                    columns = result.get("columns")
+                    if not isinstance(columns, list):
+                        continue
+                    for column in columns:
+                        if not isinstance(column, dict):
+                            continue
+                        name = str(
+                            column.get("attribute_name") or column.get("name") or ""
+                        ).strip()
+                        if name:
+                            column_names.add(name)
+                self._set_shared_state_attr(
+                    "_inverter_parameter_columns", sorted(column_names)
+                )
+
+        parameter_fetcher = getattr(
+            self.client, "system_dashboard_parameter_view", None
+        )
+        if (
+            not callable(parameter_fetcher)
+            or not parameter_ids
+            or not coord._endpoint_family_should_run(telemetry_family)
+        ):
+            return cached_by_serial
+
+        results = await asyncio.gather(
+            *(
+                parameter_fetcher(serials, parameter_id)
+                for parameter_id in parameter_ids
+            ),
+            return_exceptions=True,
+        )
+        successful_payload = False
+        first_error: Exception | None = None
+        telemetry_by_serial = {
+            serial: dict(value)
+            for serial, value in cached_by_serial.items()
+            if isinstance(value, dict)
+        }
+        for parameter_id, result in zip(parameter_ids, results, strict=True):
+            if isinstance(result, Exception):
+                first_error = first_error or result
+                continue
+            if not isinstance(result, dict):
+                continue
+            successful_payload = True
+            canonical = INVERTER_PARAMETER_ALIASES[parameter_id.lower()]
+            for serial, (value, sampled_at) in self._inverter_parameter_rows(
+                result, parameter_id
+            ).items():
+                if serial not in serials:
+                    continue
+                snapshot = telemetry_by_serial.setdefault(serial, {})
+                snapshot[canonical] = value
+                snapshot.setdefault("parameter_ids", {})[canonical] = parameter_id
+                if sampled_at is not None:
+                    snapshot.setdefault("sampled_at", {})[canonical] = sampled_at
+        if successful_payload:
+            self._set_shared_state_attr(
+                "_inverter_parameter_telemetry", telemetry_by_serial
+            )
+            coord._note_endpoint_family_success(telemetry_family)
+            return telemetry_by_serial
+        coord._note_endpoint_family_failure(
+            telemetry_family,
+            first_error or ValueError("Dashboard parameter readings were unavailable"),
+        )
+        return cached_by_serial
+
     async def _async_refresh_inverters(self) -> None:
         """Refresh inverter metadata/status/production and build serial snapshots."""
         coord = self.coordinator
@@ -2576,6 +2926,10 @@ class InventoryRuntime:
                 _inverter_status_type_counts={},
                 _inverter_model_counts={},
                 _inverter_production_cache_key=None,
+                _inverter_dashboard_inventory={},
+                _inverter_parameter_ids=[],
+                _inverter_parameter_columns=[],
+                _inverter_parameter_telemetry={},
                 _inverter_summary_counts={
                     "total": 0,
                     "normal": 0,
@@ -2684,6 +3038,16 @@ class InventoryRuntime:
             inventory_payload = dict(inventory_payload)
             inventory_payload["inverters"] = merged
             inverters_list = merged
+        inverters_list = await self._async_inverter_dashboard_inventory(inverters_list)
+        inventory_payload = dict(inventory_payload)
+        inventory_payload["inverters"] = inverters_list
+        telemetry_by_serial = await self._async_refresh_inverter_parameter_telemetry(
+            [
+                str(item.get("serial_number") or "").strip()
+                for item in inverters_list
+                if str(item.get("serial_number") or "").strip()
+            ]
+        )
         if fetch_inventory_now and inventory_payload is not cached_inventory_payload:
             coord._note_endpoint_family_success(inventory_family)
             self._set_shared_state_attr(
@@ -2839,7 +3203,7 @@ class InventoryRuntime:
                 continue
             serial = str(item.get("serial_number") or "").strip()
             if not serial:
-                continue
+                continue  # pragma: no cover - filtered by dashboard merge
             previous_item = previous_data.get(serial)
             if not isinstance(previous_item, dict):
                 previous_item = {}
@@ -2943,6 +3307,7 @@ class InventoryRuntime:
                 "lifetime_production_wh": production_wh,
                 "lifetime_query_start_date": query_start,
                 "lifetime_query_end_date": query_end,
+                "telemetry": dict(telemetry_by_serial.get(serial, {})),
             }
             inverter_order.append(serial)
 
@@ -3079,7 +3444,39 @@ class InventoryRuntime:
                 ) and coord._endpoint_family_should_run(
                     "inverter_production", force=force
                 )
-        return inventory_due or status_due or production_due
+        catalog_fetcher = getattr(self.client, "system_dashboard_master_data", None)
+        catalog_due = callable(catalog_fetcher) and coord._endpoint_family_should_run(
+            "inverter_parameter_catalog", force=force
+        )
+        parameter_ids = getattr(self, "_inverter_parameter_ids", None)
+        telemetry_fetcher = getattr(
+            self.client, "system_dashboard_parameter_view", None
+        )
+        telemetry_due = (
+            bool(parameter_ids)
+            and callable(telemetry_fetcher)
+            and coord._endpoint_family_should_run(
+                "inverter_parameter_telemetry", force=force
+            )
+        )
+        dashboard_fetcher = getattr(
+            self.client, "system_dashboard_envoy_inverters", None
+        )
+        dashboard_due = (
+            bool(self._gateway_serials_for_inverter_telemetry())
+            and callable(dashboard_fetcher)
+            and coord._endpoint_family_should_run(
+                "inverter_dashboard_inventory", force=force
+            )
+        )
+        return (
+            inventory_due
+            or status_due
+            or production_due
+            or catalog_due
+            or telemetry_due
+            or dashboard_due
+        )
 
     def iter_inverter_serials(self) -> list[str]:
         """Return currently active inverter serials in a stable order."""

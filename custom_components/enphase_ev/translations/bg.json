@@ -1459,6 +1459,9 @@
       "microinverter_reporting_count": {
         "name": "Активни микроинвертори"
       },
+      "inverter_telemetry": {
+        "name": "{serial_number} телеметрия"
+      },
       "microinverter_last_reported": {
         "name": "Последно отчитане на микроинвертори"
       },

@@ -1459,6 +1459,9 @@
       "microinverter_reporting_count": {
         "name": "Ενεργοί μικρομετατροπείς"
       },
+      "inverter_telemetry": {
+        "name": "{serial_number} Τηλεμετρία"
+      },
       "microinverter_last_reported": {
         "name": "Τελευταία αναφορά μικρομετατροπέων"
       },

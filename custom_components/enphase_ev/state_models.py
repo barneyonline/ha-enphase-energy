@@ -215,6 +215,10 @@ class InventoryState:
     _type_device_buckets: PayloadMapByKey = field(default_factory=dict)
     _type_device_order: list[str] = field(default_factory=list)
     _inverter_production_cache_key: tuple[str, str] | None = None
+    _inverter_dashboard_inventory: PayloadMapByKey = field(default_factory=dict)
+    _inverter_parameter_ids: list[str] = field(default_factory=list)
+    _inverter_parameter_columns: list[str] = field(default_factory=list)
+    _inverter_parameter_telemetry: PayloadMapByKey = field(default_factory=dict)
 
 
 @dataclass(slots=True)

@@ -1459,6 +1459,9 @@
       "microinverter_reporting_count": {
         "name": "Micro-onduleurs actifs"
       },
+      "inverter_telemetry": {
+        "name": "Télémétrie {serial_number}"
+      },
       "microinverter_last_reported": {
         "name": "Dernier rapport des micro-onduleurs"
       },
