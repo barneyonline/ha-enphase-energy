@@ -6,7 +6,7 @@ import hashlib
 import logging
 from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from homeassistant.helpers import issue_registry as ir
@@ -23,6 +23,8 @@ _LOGGER = logging.getLogger(__name__)
 
 SYSTEM_EVENTS_ENDPOINT_FAMILY = "system_events"
 SYSTEM_EVENT_REPAIR_PREFIX = "active_system_event_"
+SYSTEM_EVENT_REPAIR_MISSING_GRACE = timedelta(hours=6)
+SYSTEM_EVENT_REPAIR_CHECKPOINT_INTERVAL = timedelta(hours=1)
 _TERMINAL_STATES = frozenset(
     {"clear", "cleared", "close", "closed", "inactive", "normal", "resolved"}
 )
@@ -235,6 +237,9 @@ class SystemEventsRuntime:
         self._last_success_utc: datetime | None = None
         self._reported_issue_ids: set[str] = set()
         self._active_reported_issue_ids: set[str] = set()
+        self._repair_last_seen_utc: dict[str, datetime] = {}
+        self._repair_checkpoint_utc: dict[str, datetime] = {}
+        self._snapshot_truncated = False
 
     @property
     def active_events(self) -> tuple[SystemEvent, ...]:
@@ -281,20 +286,15 @@ class SystemEventsRuntime:
     def _issue_id(self, event: SystemEvent) -> str:
         return f"{SYSTEM_EVENT_REPAIR_PREFIX}{self._entry_suffix()}_{event.fingerprint}"
 
-    def _existing_issue_ids(self, *, active_only: bool = False) -> set[str]:
-        """Return event issue IDs already persisted by Home Assistant."""
+    def _registry_issue_entries(self) -> dict[str, object] | None:
+        """Return persisted event Repair entries for this config entry."""
 
         registry = ir.async_get(self.coordinator.hass)
         issues = getattr(registry, "issues", {})
         if not isinstance(issues, dict):
-            return set(
-                self._active_reported_issue_ids
-                if active_only
-                else self._reported_issue_ids
-            )
+            return None
         entry_prefix = f"{SYSTEM_EVENT_REPAIR_PREFIX}{self._entry_suffix()}_"
-        existing: set[str] = set()
-        known: set[str] = set()
+        entries: dict[str, object] = {}
         for key, entry in issues.items():
             if (
                 not isinstance(key, tuple)
@@ -304,16 +304,56 @@ class SystemEventsRuntime:
                 or not key[1].startswith(entry_prefix)
             ):
                 continue
-            known.add(key[1])
-            if active_only and getattr(entry, "active", True) is not True:
-                continue
-            existing.add(key[1])
+            entries[key[1]] = entry
+        return entries
+
+    def _existing_issue_ids(self, *, active_only: bool = False) -> set[str]:
+        """Return event issue IDs already persisted by Home Assistant."""
+
+        entries = self._registry_issue_entries()
+        if entries is None:
+            return set(
+                self._active_reported_issue_ids
+                if active_only
+                else self._reported_issue_ids
+            )
+        existing = {
+            issue_id
+            for issue_id, entry in entries.items()
+            if not active_only or getattr(entry, "active", True) is True
+        }
         if active_only:
-            return existing | (self._active_reported_issue_ids - known)
+            return existing | (self._active_reported_issue_ids - entries.keys())
         return existing | self._reported_issue_ids
 
-    def _sync_repairs(self, resolved_fingerprints: frozenset[str]) -> None:
-        """Create high-impact repairs and clear only explicitly resolved rows."""
+    def _restore_repair_last_seen(self) -> None:
+        """Restore persisted Repair checkpoints from issue-registry data."""
+
+        entries = self._registry_issue_entries()
+        if not entries:
+            return
+        for issue_id, entry in entries.items():
+            data = getattr(entry, "data", None)
+            if not isinstance(data, dict):
+                continue
+            raw_last_seen = data.get("last_seen_utc")
+            if not isinstance(raw_last_seen, str):
+                continue
+            last_seen = dt_util.parse_datetime(raw_last_seen)
+            if last_seen is None or last_seen.tzinfo is None:
+                continue
+            last_seen = dt_util.as_utc(last_seen)
+            self._repair_last_seen_utc.setdefault(issue_id, last_seen)
+            self._repair_checkpoint_utc.setdefault(issue_id, last_seen)
+
+    def _sync_repairs(
+        self,
+        resolved_fingerprints: frozenset[str],
+        *,
+        observed_at: datetime,
+        authoritative: bool,
+    ) -> None:
+        """Create Repairs and age missing rows only after a complete snapshot."""
 
         active_high_impact = {
             self._issue_id(event): event for event in self._events if event.high_impact
@@ -323,15 +363,34 @@ class SystemEventsRuntime:
             f"{SYSTEM_EVENT_REPAIR_PREFIX}{self._entry_suffix()}_{fingerprint}"
             for fingerprint in resolved_fingerprints
         }
+        self._restore_repair_last_seen()
         existing = self._existing_issue_ids()
         active_existing = self._existing_issue_ids(active_only=True)
-        delete_issue_ids = (existing & resolved_issue_ids) | (
-            (existing & active_issue_ids) - active_high_impact.keys()
+        for issue_id in active_high_impact:
+            self._repair_last_seen_utc[issue_id] = observed_at
+        missing_issue_ids = existing - active_issue_ids - resolved_issue_ids
+        stale_issue_ids: set[str] = set()
+        if authoritative:
+            for issue_id in missing_issue_ids:
+                last_seen = self._repair_last_seen_utc.setdefault(issue_id, observed_at)
+                if observed_at - last_seen >= SYSTEM_EVENT_REPAIR_MISSING_GRACE:
+                    stale_issue_ids.add(issue_id)
+        delete_issue_ids = (
+            (existing & resolved_issue_ids)
+            | ((existing & active_issue_ids) - active_high_impact.keys())
+            | stale_issue_ids
         )
         for issue_id in delete_issue_ids:
             ir.async_delete_issue(self.coordinator.hass, DOMAIN, issue_id)
+            self._repair_last_seen_utc.pop(issue_id, None)
+            self._repair_checkpoint_utc.pop(issue_id, None)
         for issue_id, event in active_high_impact.items():
-            if issue_id in active_existing:
+            checkpoint = self._repair_checkpoint_utc.get(issue_id)
+            if (
+                issue_id in active_existing
+                and checkpoint is not None
+                and observed_at - checkpoint < SYSTEM_EVENT_REPAIR_CHECKPOINT_INTERVAL
+            ):
                 continue
             ir.async_create_issue(
                 self.coordinator.hass,
@@ -351,8 +410,10 @@ class SystemEventsRuntime:
                     "severity": event.severity,
                     "device_type": event.device_type,
                     "event_date": event.event_date,
+                    "last_seen_utc": observed_at.isoformat(),
                 },
             )
+            self._repair_checkpoint_utc[issue_id] = observed_at
         self._reported_issue_ids = (
             existing | set(active_high_impact)
         ) - delete_issue_ids
@@ -373,9 +434,15 @@ class SystemEventsRuntime:
             payload,
             site_id=str(self.coordinator.site_id),
         )
-        self._last_success_utc = dt_util.utcnow()
+        observed_at = dt_util.utcnow()
+        self._snapshot_truncated = payload.get("_enphase_ev_truncated") is True
+        self._last_success_utc = observed_at
         self.coordinator._note_endpoint_family_success(SYSTEM_EVENTS_ENDPOINT_FAMILY)
-        self._sync_repairs(resolved_fingerprints)
+        self._sync_repairs(
+            resolved_fingerprints,
+            observed_at=observed_at,
+            authoritative=not self._snapshot_truncated,
+        )
         _LOGGER.debug(
             "System event summary refreshed for site [site]: active=%s high_impact=%s",
             self.active_count,
@@ -400,4 +467,5 @@ class SystemEventsRuntime:
             "using_cached_data": bool(
                 self.available and health.consecutive_failures > 0
             ),
+            "truncated": self._snapshot_truncated,
         }

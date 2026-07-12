@@ -47,6 +47,7 @@ FIRMWARE_HISTORY_STORAGE_KEY = f"{DOMAIN}_firmware_version_history"
 FIRMWARE_HISTORY_STORAGE_VERSION = 1
 FIRMWARE_HISTORY_MAX_ENTRIES = 10
 FIRMWARE_HISTORY_SAVE_DELAY = 5
+FIRMWARE_HISTORY_MANAGER_DATA_KEY = f"{DOMAIN}_firmware_version_history_manager"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,17 +72,21 @@ class FirmwareVersionHistoryStore:
         )
         self._history: dict[str, list[dict[str, str | None]]] = {}
         self._max_entries = max(1, max_entries)
+        self._load_lock = asyncio.Lock()
+        self._loaded = False
 
     async def async_load(self) -> None:
         """Load stored firmware history."""
         stored = await self._store.async_load()
         if not isinstance(stored, dict):
             self._history = {}
+            self._loaded = True
             return
 
         entries_by_id = stored.get("entries")
         if not isinstance(entries_by_id, dict):
             self._history = {}
+            self._loaded = True
             return
 
         history: dict[str, list[dict[str, str | None]]] = {}
@@ -90,6 +95,17 @@ class FirmwareVersionHistoryStore:
             if clean:
                 history[str(unique_id)] = clean
         self._history = history
+        self._loaded = True
+
+    async def async_ensure_loaded(self) -> None:
+        """Load history once across all concurrently setting-up config entries."""
+
+        if self._loaded:
+            return
+        async with self._load_lock:
+            if not self._loaded:
+                await self.async_load()
+                self._loaded = True
 
     def history_for(self, unique_id: str | None) -> list[dict[str, str | None]]:
         """Return a copy of the stored history for an update entity."""
@@ -178,6 +194,19 @@ class FirmwareVersionHistoryStore:
         return clean[-self._max_entries :]
 
 
+async def async_get_firmware_version_history_store(
+    hass: HomeAssistant,
+) -> FirmwareVersionHistoryStore:
+    """Return the Home Assistant-wide firmware history owner."""
+
+    store = hass.data.get(FIRMWARE_HISTORY_MANAGER_DATA_KEY)
+    if not isinstance(store, FirmwareVersionHistoryStore):
+        store = FirmwareVersionHistoryStore(hass)
+        hass.data[FIRMWARE_HISTORY_MANAGER_DATA_KEY] = store
+    await store.async_ensure_loaded()
+    return store
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: EnphaseConfigEntry,
@@ -196,8 +225,7 @@ async def async_setup_entry(
             lambda: coord.inventory_view.type_device_serial_number("envoy"),
         )
     )
-    version_history = FirmwareVersionHistoryStore(hass)
-    await version_history.async_load()
+    version_history = await async_get_firmware_version_history_store(hass)
     ent_reg = er.async_get(hass)
 
     entities: list[UpdateEntity] = []

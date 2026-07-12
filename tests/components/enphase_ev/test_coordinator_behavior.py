@@ -156,8 +156,11 @@ async def test_coordinator_init_normalizes_serials_and_options(hass, monkeypatch
     entry.add_to_hass(hass)
 
     captured_tasks: list = []
+    scheduled_task = asyncio.get_running_loop().create_future()
     monkeypatch.setattr(
-        hass, "async_create_task", lambda coro: captured_tasks.append(coro)
+        hass,
+        "async_create_task",
+        lambda coro: (captured_tasks.append(coro), scheduled_task)[1],
     )
     monkeypatch.setattr(
         coord_mod, "async_get_clientsession", lambda *args, **kwargs: object()
@@ -184,7 +187,11 @@ async def test_coordinator_init_normalizes_serials_and_options(hass, monkeypatch
     assert coord._session_history_interval_min == DEFAULT_SESSION_HISTORY_INTERVAL_MIN
     assert coord._session_history_cache_ttl == DEFAULT_SESSION_HISTORY_INTERVAL_MIN * 60
     assert captured_tasks, "set_reauth_callback coroutine should be scheduled"
+    assert scheduled_task in coord._entry_background_tasks  # noqa: SLF001
     await captured_tasks[0]
+    scheduled_task.set_result(None)
+    await asyncio.sleep(0)
+    assert scheduled_task not in coord._entry_background_tasks  # noqa: SLF001
 
 
 def test_coordinator_init_defaults_session_history_interval_on_helper_failure(
@@ -1878,14 +1885,69 @@ async def test_cleanup_cancels_fired_backoff_refresh(hass, monkeypatch) -> None:
 
     coord._schedule_backoff_timer(1)  # noqa: SLF001
     captured["callback"](dt_util.utcnow())
-    task = next(iter(coord._backoff_refresh_tasks))  # noqa: SLF001
+    grid_profile_task = asyncio.create_task(asyncio.sleep(60))
+    coord._grid_profile_metadata_task = grid_profile_task  # noqa: SLF001
+    amp_restart_task = asyncio.create_task(asyncio.sleep(60))
+    coord._amp_restart_tasks["EV123"] = amp_restart_task  # noqa: SLF001
+    snapshot_save_task = asyncio.create_task(asyncio.sleep(60))
+    coord.discovery_snapshot._save_task = snapshot_save_task  # noqa: SLF001
+    session_enrichment_task = asyncio.create_task(asyncio.sleep(60))
+    coord.session_history._enrichment_tasks.add(session_enrichment_task)  # noqa: SLF001
+    entry_background_task = asyncio.create_task(asyncio.sleep(60))
+    coord.track_entry_background_task(entry_background_task)
+    auto_resume_task = asyncio.create_task(asyncio.sleep(60))
+    coord._auto_resume_tasks["EV123"] = auto_resume_task  # noqa: SLF001
     await started.wait()
 
-    coord.cleanup_runtime_state()
-    await asyncio.gather(task, return_exceptions=True)
+    await coord.async_cleanup_runtime_state()
 
     assert cancelled.is_set()
+    assert grid_profile_task.cancelled()
+    assert amp_restart_task.cancelled()
+    assert snapshot_save_task.cancelled()
+    assert session_enrichment_task.cancelled()
+    assert entry_background_task.cancelled()
+    assert auto_resume_task.cancelled()
+    assert coord._grid_profile_metadata_task is None  # noqa: SLF001
     assert coord._backoff_refresh_tasks == set()  # noqa: SLF001
+    assert coord._entry_background_tasks == set()  # noqa: SLF001
+    assert coord._auto_resume_tasks == {}  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_runtime_cleanup_timeout_is_bounded(
+    coordinator_factory, monkeypatch, caplog
+) -> None:
+    from custom_components.enphase_ev import coordinator as coord_mod
+
+    coord = coordinator_factory()
+    task = asyncio.create_task(asyncio.sleep(60))
+    coord.track_entry_background_task(task)
+
+    async def _pending(tasks, *, timeout):
+        assert timeout == coord_mod.RUNTIME_CLEANUP_TIMEOUT_S
+        return set(), set(tasks)
+
+    monkeypatch.setattr(coord_mod.asyncio, "wait", _pending)
+    with caplog.at_level(logging.WARNING):
+        await coord.async_cleanup_runtime_state()
+    await asyncio.gather(task, return_exceptions=True)
+
+    assert "Timed out waiting for 1 Enphase runtime task" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_track_entry_background_task_ignores_invalid_or_completed(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    completed = asyncio.get_running_loop().create_future()
+    completed.set_result(None)
+
+    coord.track_entry_background_task(object())
+    coord.track_entry_background_task(completed)
+
+    assert coord._entry_background_tasks == set()  # noqa: SLF001
 
 
 @pytest.mark.asyncio
@@ -4309,10 +4371,13 @@ async def test_discovery_snapshot_restore_save_and_metrics_edge_paths(
 
     create_calls: list[object] = []
 
+    save_task = MagicMock()
+    save_task.done.return_value = False
+
     def _capture_create_task(coro, *, name=None):
         create_calls.append(coro)
         coro.close()
-        return None
+        return save_task
 
     object.__setattr__(coord.hass, "async_create_task", _capture_create_task)
     scheduled: list = []
@@ -4347,11 +4412,13 @@ async def test_discovery_snapshot_restore_save_and_metrics_edge_paths(
     coord._discovery_snapshot_pending = True  # noqa: SLF001
     scheduled[0](datetime.now(tz=timezone.utc))
     assert len(create_calls) == 1
+    save_task.add_done_callback.assert_called_once()
     cancelled: list[bool] = []
     coord._discovery_snapshot_save_cancel = lambda: cancelled.append(True)  # type: ignore[assignment]  # noqa: SLF001
-    coord.discovery_snapshot.cancel_pending_save()
+    assert coord.discovery_snapshot.cancel_pending_save() is save_task
     assert cancelled == [True]
     assert coord._discovery_snapshot_save_cancel is None  # noqa: SLF001
+    save_task.cancel.assert_called_once_with()
 
     coord.energy = None  # type: ignore[assignment]
     coord.discovery_snapshot.sync_site_energy_discovery_state()

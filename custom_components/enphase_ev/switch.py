@@ -1002,9 +1002,14 @@ class ChargingSwitch(EnphaseBaseEntity, RestoreEntity, SwitchEntity):  # type: i
         self._coord.kick_fast(FAST_TOGGLE_POLL_HOLD_S)
         if self.hass is None:
             return
-        self.hass.async_create_task(
+        task = self.hass.async_create_task(
             self._coord.async_request_refresh(), name=f"{DOMAIN}_switch_failure_refresh"
         )
+        track_background_task = getattr(
+            self._coord, "track_entry_background_task", None
+        )
+        if callable(track_background_task):
+            track_background_task(task)
 
     def _force_write_state(self) -> None:
         if self.hass is None or not self.entity_id:

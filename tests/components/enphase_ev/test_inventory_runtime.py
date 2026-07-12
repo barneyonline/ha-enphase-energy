@@ -1381,6 +1381,46 @@ async def test_inventory_runtime_bulk_parameter_telemetry(coordinator_factory) -
 
 
 @pytest.mark.asyncio
+async def test_inventory_runtime_optional_batch_is_serial_and_bounded(
+    coordinator_factory,
+) -> None:
+    runtime = coordinator_factory().inventory_runtime
+    active = 0
+    max_active = 0
+    order: list[str] = []
+
+    async def _request(label: str) -> str:
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
+        order.append(label)
+        await asyncio.sleep(0)
+        active -= 1
+        return label
+
+    results = await runtime._async_run_bounded_optional_batch(  # noqa: SLF001
+        [lambda: _request("first"), lambda: _request("second")]
+    )
+
+    assert results == ["first", "second"]
+    assert order == ["first", "second"]
+    assert max_active == 1
+
+    bounded = await runtime._async_run_bounded_optional_batch(  # noqa: SLF001
+        [lambda: _request("too-late")],
+        deadline_s=0.0,
+    )
+
+    assert isinstance(bounded[0], TimeoutError)
+
+    async def _failed() -> object:
+        raise RuntimeError("failed")
+
+    failed = await runtime._async_run_bounded_optional_batch([_failed])  # noqa: SLF001
+    assert isinstance(failed[0], RuntimeError)
+
+
+@pytest.mark.asyncio
 async def test_inventory_runtime_empty_parameter_rows_clear_cached_value(
     coordinator_factory, monkeypatch
 ) -> None:

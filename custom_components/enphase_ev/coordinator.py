@@ -50,6 +50,7 @@ from .api import (
     InvalidPayloadError,
     OptionalEndpointUnavailable,
     Unauthorized,
+    enlighten_optional_read_scope,
     is_scheduler_unavailable_error,
 )
 from .auth_refresh_runtime import AuthRefreshRuntime, ManualAuthRefreshResult
@@ -223,6 +224,8 @@ SESSION_HISTORY_ACTIVE_SOFT_TTL_S = 120.0
 SESSION_HISTORY_RECENT_STOP_SOFT_TTL_S = 300.0
 SESSION_HISTORY_IDLE_HARD_TTL_GRACE_S = 300.0
 SESSION_HISTORY_RECENT_STOP_WINDOW_S = 600.0
+GRID_PROFILE_METADATA_REFRESH_DEADLINE_S = 15.0
+RUNTIME_CLEANUP_TIMEOUT_S = 10.0
 BATTERY_GRID_MODE_PERMISSIONS = {
     "importexport": (True, True),
     "importonly": (True, False),
@@ -523,6 +526,10 @@ class EnphaseCoordinator(
     last_failure_description: str | None
     _phase_timings: dict[str, float]
     _warmup_task: asyncio.Task[None] | None
+    _grid_profile_metadata_task: asyncio.Task[None] | None
+    _grid_profile_metadata_refresh_lock: asyncio.Lock
+    _entry_background_tasks: set[asyncio.Future[Any]]
+    _auto_resume_tasks: dict[str, asyncio.Future[None]]
     _battery_profile_recovery_restore_task: asyncio.Task[None] | None
     _streaming_stop_task: asyncio.Task[None] | None
     _auth_refresh_task: asyncio.Task[bool] | None
@@ -683,6 +690,7 @@ class EnphaseCoordinator(
                 default=DEFAULT_API_TIMEOUT,
             )
         timeout = min(MAX_API_TIMEOUT, max(MIN_API_TIMEOUT, timeout))
+        self._entry_background_tasks = set()
         self.client = EnphaseEVClient(
             async_get_clientsession(hass),
             self.site_id,
@@ -697,11 +705,12 @@ class EnphaseCoordinator(
             if inspect.isawaitable(result):
                 callback_coro = cast(Coroutine[Any, Any, object], result)
                 try:
-                    self.hass.async_create_task(
+                    task = self.hass.async_create_task(
                         callback_coro, name=f"{DOMAIN}_set_reauth_callback"
                     )
                 except TypeError:
-                    self.hass.async_create_task(callback_coro)
+                    task = self.hass.async_create_task(callback_coro)
+                self.track_entry_background_task(task)
         from .schedule_sync import ScheduleSync
 
         self.schedule_sync = ScheduleSync(hass, self, config_entry)
@@ -733,6 +742,9 @@ class EnphaseCoordinator(
             ),
         )
         self._refresh_lock = asyncio.Lock()
+        self._grid_profile_metadata_task = None
+        self._grid_profile_metadata_refresh_lock = asyncio.Lock()
+        self._auto_resume_tasks = {}
         self._auth_refresh_suspended_until_utc = auth_refresh_suspended_until
         self._auth_blocked_until_utc = auth_blocked_until
         self._auth_block_reason = auth_block_reason
@@ -1699,45 +1711,87 @@ class EnphaseCoordinator(
             keep_day_keys=keep_day_keys,
         )
 
-    def cleanup_runtime_state(self) -> None:
-        """Release runtime caches/listeners to make unload deterministic."""
+    def cleanup_runtime_state(self) -> tuple[asyncio.Future[object], ...]:
+        """Cancel runtime work and release caches/listeners.
+
+        Return cancelled asyncio tasks so the async unload path can wait for
+        their cancellation handlers to finish before closing the client.
+        """
+
+        cancelled_tasks: list[asyncio.Future[object]] = []
 
         def _task_done(task: object) -> bool:
             done = getattr(task, "done", None)
             return callable(done) and done() is True
 
         if self._warmup_task is not None:
-            self._warmup_task.cancel()
+            if not _task_done(self._warmup_task):
+                self._warmup_task.cancel()
+                cancelled_tasks.append(self._warmup_task)
             self._warmup_task = None
+        entry_background_tasks = getattr(self, "_entry_background_tasks", None)
+        for task in tuple(entry_background_tasks or ()):
+            if not _task_done(task):
+                task.cancel()
+                cancelled_tasks.append(task)
+        if entry_background_tasks is not None:
+            entry_background_tasks.clear()
+        grid_profile_metadata_task = getattr(self, "_grid_profile_metadata_task", None)
+        if grid_profile_metadata_task is not None:
+            if not _task_done(grid_profile_metadata_task):
+                grid_profile_metadata_task.cancel()
+                if isinstance(grid_profile_metadata_task, asyncio.Future):
+                    cancelled_tasks.append(grid_profile_metadata_task)
+            self._grid_profile_metadata_task = None
         if self._battery_profile_recovery_restore_task is not None:
             if not _task_done(self._battery_profile_recovery_restore_task):
                 self._battery_profile_recovery_restore_task.cancel()
+                cancelled_tasks.append(self._battery_profile_recovery_restore_task)
             self._battery_profile_recovery_restore_task = None
         for task in list(self._amp_restart_tasks.values()):
             if task is not None and not _task_done(task):
                 task.cancel()
+                if isinstance(task, asyncio.Future):
+                    cancelled_tasks.append(task)
         self._amp_restart_tasks.clear()
+        auto_resume_tasks = getattr(self, "_auto_resume_tasks", None)
+        for task in tuple((auto_resume_tasks or {}).values()):
+            if not _task_done(task):
+                task.cancel()
+                cancelled_tasks.append(task)
+        if auto_resume_tasks is not None:
+            auto_resume_tasks.clear()
         if self._streaming_stop_task is not None:
             if not _task_done(self._streaming_stop_task):
                 self._streaming_stop_task.cancel()
+                cancelled_tasks.append(self._streaming_stop_task)
             self._streaming_stop_task = None
         if self._auth_refresh_task is not None:
             if not _task_done(self._auth_refresh_task):
                 self._auth_refresh_task.cancel()
+                cancelled_tasks.append(self._auth_refresh_task)
             self._auth_refresh_task = None
         self._clear_backoff_timer()
         for task in list(self._backoff_refresh_tasks):
             if not _task_done(task):
                 task.cancel()
+                if isinstance(task, asyncio.Future):
+                    cancelled_tasks.append(task)
         self._backoff_refresh_tasks.clear()
         self._backoff_until = None
         clear_streaming_state = getattr(self, "_clear_streaming_state", None)
         if callable(clear_streaming_state):
             clear_streaming_state()
-        self.discovery_snapshot.cancel_pending_save()
+        snapshot_save_task = self.discovery_snapshot.cancel_pending_save()
+        if isinstance(snapshot_save_task, asyncio.Future):
+            cancelled_tasks.append(snapshot_save_task)
         session_manager = getattr(self, "session_history", None)
         if session_manager is not None and hasattr(session_manager, "clear"):
+            enrichment_tasks = tuple(getattr(session_manager, "_enrichment_tasks", ()))
             session_manager.clear()
+            cancelled_tasks.extend(
+                task for task in enrichment_tasks if isinstance(task, asyncio.Future)
+            )
         grid_profile_runtime = getattr(self, "grid_profile_runtime", None)
         cancel_grid_profile_pending = getattr(
             grid_profile_runtime, "cancel_pending_refresh", None
@@ -1747,6 +1801,32 @@ class EnphaseCoordinator(
         self._session_history_cache_shim.clear()
         self._prune_runtime_caches(active_serials=(), keep_day_keys=())
         self._topology_listeners.clear()
+        return tuple(cancelled_tasks)
+
+    async def async_cleanup_runtime_state(self) -> None:
+        """Cancel and await entry-owned runtime work before client shutdown."""
+
+        cancelled_tasks = self.cleanup_runtime_state()
+        if cancelled_tasks:
+            done, pending = await asyncio.wait(
+                cancelled_tasks,
+                timeout=RUNTIME_CLEANUP_TIMEOUT_S,
+            )
+            if done:
+                await asyncio.gather(*done, return_exceptions=True)
+            if pending:
+                _LOGGER.warning(
+                    "Timed out waiting for %s Enphase runtime task(s) to stop",
+                    len(pending),
+                )
+
+    def track_entry_background_task(self, task: object) -> None:
+        """Track config-entry background work for pre-client-close cancellation."""
+
+        if not isinstance(task, asyncio.Future) or task.done():
+            return
+        self._entry_background_tasks.add(task)
+        task.add_done_callback(self._entry_background_tasks.discard)
 
     @_typed_callback
     def async_add_topology_listener(
@@ -2946,7 +3026,7 @@ class EnphaseCoordinator(
         self._sync_battery_profile_pending_issue()
         self.last_success_utc = dt_util.utcnow()
         self.latency_ms = int((time.monotonic() - context.started_mono) * 1000)
-        await self._async_refresh_grid_profile_metadata(context)
+        self._schedule_grid_profile_metadata_refresh(context)
         self._finish_refresh_pipeline(context)
         return {}
 
@@ -3245,10 +3325,36 @@ class EnphaseCoordinator(
         self._refresh_cached_topology()
         self.discovery_snapshot.schedule_save()
 
-    async def _async_refresh_grid_profile_metadata(
+    async def async_refresh_grid_profile_metadata(self, *, force: bool = False) -> None:
+        """Refresh optional grid-profile status outside the core pipeline."""
+
+        runtime = self.grid_profile_runtime
+        refresh = getattr(runtime, "async_refresh", None)
+        if not callable(refresh):
+            return
+        try:
+            async with asyncio.timeout(GRID_PROFILE_METADATA_REFRESH_DEADLINE_S):
+                async with self._grid_profile_metadata_refresh_lock:
+                    with request_metrics_scope("grid_profile_metadata"):
+                        with enlighten_optional_read_scope():
+                            await refresh(force=force, load_profiles=False)
+        except TimeoutError:
+            _LOGGER.debug(
+                "Stopped optional grid-profile metadata refresh for site %s after %.1f seconds",
+                redact_site_id(self.site_id),
+                GRID_PROFILE_METADATA_REFRESH_DEADLINE_S,
+            )
+
+    def _clear_grid_profile_metadata_task(self, task: asyncio.Task[None]) -> None:
+        """Clear the completed background grid-profile refresh task."""
+
+        if self._grid_profile_metadata_task is task:
+            self._grid_profile_metadata_task = None
+
+    def _schedule_grid_profile_metadata_refresh(
         self, context: RefreshPipelineContext
     ) -> None:
-        """Refresh optional grid-profile status during steady coordinator polls."""
+        """Schedule optional grid-profile status without delaying core state."""
 
         if context.first_refresh:
             return
@@ -3258,12 +3364,15 @@ class EnphaseCoordinator(
             SUPPORT_DENIED,
         }:
             return
-        refresh = getattr(runtime, "async_refresh", None)
-        if not callable(refresh):
+        task = self._grid_profile_metadata_task
+        if task is not None and not task.done():
             return
-        started = time.monotonic()
-        await refresh(force=False, load_profiles=False)
-        context.phase_timings["grid_profile_s"] = round(time.monotonic() - started, 3)
+        task = self.hass.async_create_task(
+            self.async_refresh_grid_profile_metadata(),
+            name=f"{DOMAIN}_grid_profile_metadata_refresh",
+        )
+        self._grid_profile_metadata_task = task
+        task.add_done_callback(self._clear_grid_profile_metadata_task)
 
     async def _async_update_data(self) -> dict[str, dict[str, object]]:
         with request_metrics_scope("core_refresh") as request_metrics:
@@ -4620,7 +4729,7 @@ class EnphaseCoordinator(
         )
         self._apply_refresh_polling_interval(polling_state)
 
-        await self._async_refresh_grid_profile_metadata(context)
+        self._schedule_grid_profile_metadata_refresh(context)
         self._finish_refresh_pipeline(context)
         if _LOGGER.isEnabledFor(logging.DEBUG):
             _LOGGER.debug(

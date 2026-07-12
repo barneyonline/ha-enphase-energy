@@ -1997,6 +1997,95 @@ async def test_schedule_sync_stop_cancels_fired_post_patch_refresh(
 
 
 @pytest.mark.asyncio
+async def test_schedule_sync_stop_cancels_all_regular_refresh_tasks(hass) -> None:
+    sync = ScheduleSync(hass, SimpleNamespace(), None)
+    interval_started = asyncio.Event()
+    coordinator_started = asyncio.Event()
+
+    async def _interval_refresh(*, reason, serials=None) -> None:  # noqa: ARG001
+        assert reason == "interval"
+        interval_started.set()
+        await asyncio.Event().wait()
+
+    async def _coordinator_refresh() -> None:
+        coordinator_started.set()
+        await asyncio.Event().wait()
+
+    sync.async_refresh = _interval_refresh
+    sync._refresh_if_stale = _coordinator_refresh
+    sync._handle_interval()
+    sync._handle_coordinator_update()
+    await interval_started.wait()
+    await coordinator_started.wait()
+    tasks = tuple(sync._refresh_tasks)  # noqa: SLF001
+
+    await sync.async_stop()
+
+    assert len(tasks) == 2
+    assert all(task.cancelled() for task in tasks)
+    assert sync._refresh_tasks == set()  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_schedule_sync_stop_timeout_is_bounded(hass, monkeypatch, caplog) -> None:
+    sync = ScheduleSync(hass, SimpleNamespace(), None)
+    task = asyncio.create_task(asyncio.sleep(60))
+    sync._refresh_tasks.add(task)  # noqa: SLF001
+
+    async def _pending(tasks, *, timeout):
+        assert timeout == schedule_sync_mod.SCHEDULE_SYNC_STOP_TIMEOUT_S
+        return set(), set(tasks)
+
+    monkeypatch.setattr(schedule_sync_mod.asyncio, "wait", _pending)
+    with caplog.at_level("WARNING"):
+        await sync.async_stop()
+    await asyncio.gather(task, return_exceptions=True)
+
+    assert "Timed out waiting for 1 Enphase schedule task" in caplog.text
+
+
+def test_schedule_sync_does_not_schedule_after_stop(hass) -> None:
+    sync = ScheduleSync(hass, SimpleNamespace(), None)
+    sync._stopping = True  # noqa: SLF001
+    create_task = MagicMock()
+    sync.hass.async_create_task = create_task
+
+    sync._handle_interval()
+
+    create_task.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_schedule_sync_start_aborts_if_stop_wins_race(hass) -> None:
+    sync = ScheduleSync(hass, SimpleNamespace(), None)
+    sync._sync_enabled = lambda: True
+
+    async def _remove_helpers() -> None:
+        sync._stopping = True  # noqa: SLF001
+
+    sync._remove_all_helpers = _remove_helpers
+
+    await sync.async_start()
+
+    assert sync._unsub_interval is None
+    assert sync._unsub_coordinator is None
+
+
+def test_schedule_sync_ignores_non_task_factory_result(hass) -> None:
+    sync = ScheduleSync(hass, SimpleNamespace(), None)
+
+    def _discard(coro, *, name=None):  # noqa: ARG001
+        coro.close()
+        return None
+
+    sync.hass.async_create_task = _discard
+
+    sync._handle_interval()
+
+    assert sync._refresh_tasks == set()  # noqa: SLF001
+
+
+@pytest.mark.asyncio
 async def test_schedule_sync_refresh_skips_when_locked(hass) -> None:
     slot_id = f"{RANDOM_SITE_ID}:{RANDOM_SERIAL}:slot-15"
     payload = {

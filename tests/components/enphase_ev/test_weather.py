@@ -125,7 +125,11 @@ async def test_setup_schedules_discovery_and_creates_cloud_weather_after_success
     hass, config_entry, monkeypatch
 ) -> None:
     client = SimpleNamespace(weather=AsyncMock(return_value=_payload()))
-    coordinator = SimpleNamespace(site_id=RANDOM_SITE_ID, client=client)
+    coordinator = SimpleNamespace(
+        site_id=RANDOM_SITE_ID,
+        client=client,
+        track_entry_background_task=MagicMock(),
+    )
     object.__setattr__(config_entry, "options", {OPT_WEATHER_ENABLED: True})
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coordinator)
     hass.config.language = "en-AU"
@@ -152,6 +156,7 @@ async def test_setup_schedules_discovery_and_creates_cloud_weather_after_success
     client.weather.assert_not_awaited()
     assert len(scheduled) == 1
     assert scheduled[0][1] == "enphase_ev_weather_discovery"
+    coordinator.track_entry_background_task.assert_called_once()
 
     await scheduled[0][0]
 

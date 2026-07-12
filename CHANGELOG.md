@@ -33,6 +33,14 @@ All notable changes to this project will be documented in this file.
 - Added installer-only, cloud-based Grid Profile Control with country-scoped region and profile selection, explicit apply confirmation, current profile monitoring, and follow-up cloud status refreshes.
 
 ### 🐛 Bug fixes
+- Serialized installer Grid Profile writes, expire unconfirmed pending state after
+  the follow-up window, and move steady metadata refreshes off the coordinator's
+  critical path.
+- Kept partial IQ Gateway firmware progress active when status text includes a
+  percentage followed by “complete”.
+- Paginated System Dashboard events so active high-impact events beyond the first
+  200 rows are included in sensors and Repairs, expose bounded-result truncation,
+  and expire missing prior-day Repairs only after a complete six-hour grace period.
 - Prevented multi-megawatt site power spikes during startup by reseeding derived
   power baselines when lifetime-flow sources change, normalizing live-power
   units, and requiring a newer comparable sample before publishing extreme
@@ -45,14 +53,26 @@ All notable changes to this project will be documented in this file.
   falls back to outage-context fields such as `show_grid_connect` only when the
   live relay state is unavailable.
 - Fixed config-entry unload and entity removal leaving delayed backoff, schedule,
-  battery-profile recovery, or firmware refresh work running against retired
-  integration objects.
+  battery-profile recovery, discovery persistence, or firmware refresh work running
+  against retired integration objects, and await task cancellation before closing
+  the API client.
+- Track scheduled refresh, startup, weather discovery, switch failure recovery,
+  reauthentication setup, and EVSE auto-resume work through unload, and bound
+  cancellation waits so a stuck task cannot block config-entry shutdown.
+- Shared firmware version history across config entries so concurrent delayed saves
+  cannot overwrite another site's transitions.
 - Fixed optional or concurrent cloud reads deadlocking credential refresh while
   the initiating request still held the shared Enlighten read limiter.
 - Preserved pending discovery snapshots when a storage write is cancelled so a
   later refresh can retry persistence instead of losing the observed revision.
 
 ### 🔧 Improvements
+- Run bulk microinverter parameter requests serially within an explicit operation
+  deadline so shared optional-read queueing cannot consume every request timeout.
+- Isolated the startup Grid Profile probe behind the optional-read limiter and the
+  same aggregate queue-and-request deadline used by steady metadata refreshes.
+- Persist hourly system-event Repair last-seen checkpoints so integration reloads
+  cannot restart the missing-event grace period.
 - Bound optional Enlighten request queueing and startup warmup stages, reserve
   cloud-read capacity for core status traffic, and retain the last current-power
   sample with retry backoff when that optional endpoint is unavailable.

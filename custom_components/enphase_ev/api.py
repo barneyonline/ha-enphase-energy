@@ -76,6 +76,8 @@ _BATTERY_CONFIG_VARIANT_COOKIE_EAUTH = "cookie_eauth_compatible"
 _BATTERY_CONFIG_VARIANT_MIXED = "mixed_auth_compatible"
 _ENLIGHTEN_READ_CONCURRENCY_LIMIT = 2
 _ENLIGHTEN_OPTIONAL_READ_CONCURRENCY_LIMIT = 1
+_SYSTEM_EVENTS_PAGE_SIZE = 200
+_SYSTEM_EVENTS_MAX_PAGES = 10
 _LIVE_STATUS_GRID_RELAY_ENUM = {
     0: "OPER_RELAY_UNKNOWN",
     1: "OPER_RELAY_OPEN",
@@ -7677,37 +7679,57 @@ class EnphaseEVClient:
         GET /service/system_dashboard/api_internal/cs/sites/<site_id>/events
         """
 
-        url = str(
-            URL(
-                f"{BASE_URL}/service/system_dashboard/api_internal/cs/sites/"
-                f"{self._site}/events"
-            ).update_query(
-                {
-                    "range": "today",
-                    "cassandra_toggle": "false",
-                    "filter_columns": (
-                        "serial_number,device_type,event_date,cleared_date,"
-                        "event_type,event_state,details,updated_at,alarm_id"
-                    ),
-                    "serial_numbers": "",
-                    "type": "table",
-                    "event_state": "default",
-                    "page": "1",
-                    "per_page": "200",
-                }
-            )
+        base_url = URL(
+            f"{BASE_URL}/service/system_dashboard/api_internal/cs/sites/"
+            f"{self._site}/events"
         )
-        try:
-            data = await self._json(
-                "GET",
-                url,
-                headers=self._system_dashboard_headers(),
-            )
-        except Exception as err:  # noqa: BLE001
-            if self._system_dashboard_is_optional_error(err):
+        query = {
+            "range": "today",
+            "cassandra_toggle": "false",
+            "filter_columns": (
+                "serial_number,device_type,event_date,cleared_date,"
+                "event_type,event_state,details,updated_at,alarm_id"
+            ),
+            "serial_numbers": "",
+            "type": "table",
+            "event_state": "default",
+            "per_page": str(_SYSTEM_EVENTS_PAGE_SIZE),
+        }
+        merged: JsonDict | None = None
+        merged_events: list[object] = []
+        for page in range(1, _SYSTEM_EVENTS_MAX_PAGES + 1):
+            url = str(base_url.update_query({**query, "page": str(page)}))
+            try:
+                data = await self._json(
+                    "GET",
+                    url,
+                    headers=self._system_dashboard_headers(),
+                )
+            except Exception as err:  # noqa: BLE001
+                if self._system_dashboard_is_optional_error(err):
+                    return None
+                raise
+            if not isinstance(data, dict):
                 return None
-            raise
-        return data if isinstance(data, dict) else None
+            events = data.get("events")
+            if not isinstance(events, list):
+                return None
+            if merged is None:
+                merged = dict(data)
+            else:
+                for key in ("event_types", "event_states", "event_severities"):
+                    if key not in merged and key in data:
+                        merged[key] = data[key]
+            merged_events.extend(events)
+            if len(events) < _SYSTEM_EVENTS_PAGE_SIZE:
+                break
+        if merged is None:  # pragma: no cover - loop always executes
+            return None
+        merged["events"] = merged_events
+        merged["_enphase_ev_truncated"] = (
+            page == _SYSTEM_EVENTS_MAX_PAGES and len(events) >= _SYSTEM_EVENTS_PAGE_SIZE
+        )
+        return merged
 
     async def devices_details(self, type_key: str) -> JsonDict | None:
         """Return system dashboard per-type device details when available.

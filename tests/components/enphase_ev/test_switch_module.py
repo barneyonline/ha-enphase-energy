@@ -1481,6 +1481,9 @@ async def test_async_turn_on_not_ready_clears_desired(
     coord.set_charging_expectation.reset_mock()
     coord.kick_fast.reset_mock()
     coord.async_request_refresh.reset_mock()
+    coord.track_entry_background_task = MagicMock(
+        wraps=coord.track_entry_background_task
+    )
 
     sw = ChargingSwitch(coord, RANDOM_SERIAL)
     sw.hass = hass
@@ -1495,6 +1498,7 @@ async def test_async_turn_on_not_ready_clears_desired(
     coord.set_charging_expectation.assert_not_called()
     coord.kick_fast.assert_called_once_with(FAST_TOGGLE_POLL_HOLD_S)
     assert coord.async_request_refresh.called
+    coord.track_entry_background_task.assert_called_once()
     await hass.async_block_till_done()
 
 

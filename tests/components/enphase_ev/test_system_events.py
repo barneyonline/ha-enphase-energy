@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -11,6 +12,8 @@ from custom_components.enphase_ev.api import OptionalEndpointUnavailable
 from custom_components.enphase_ev.const import DOMAIN
 from custom_components.enphase_ev.system_events import (
     SYSTEM_EVENTS_ENDPOINT_FAMILY,
+    SYSTEM_EVENT_REPAIR_CHECKPOINT_INTERVAL,
+    SYSTEM_EVENT_REPAIR_MISSING_GRACE,
     SYSTEM_EVENT_REPAIR_PREFIX,
     SystemEventsRuntime,
     _catalog_label,
@@ -222,6 +225,7 @@ async def test_runtime_refresh_clears_repairs_only_for_explicit_resolution(
         "severity": "critical",
         "device_type": "IQ Gateway SERI...TE-1",
         "event_date": "2026-07-11T01:02:03Z",
+        "last_seen_utc": runtime._last_success_utc.isoformat(),  # noqa: SLF001
     }
     coordinator._note_endpoint_family_success.assert_called_once_with(
         SYSTEM_EVENTS_ENDPOINT_FAMILY
@@ -316,6 +320,7 @@ async def test_runtime_diagnostics_and_persisted_issue_cleanup(
     assert snapshot["device_type_counts"] == {"IQ Battery": 1}
     assert snapshot["last_success_utc"].endswith("+00:00")
     assert snapshot["using_cached_data"] is True
+    assert snapshot["truncated"] is False
     assert runtime.active_events[0].event_type == "Warning"
 
     monkeypatch.setattr(
@@ -345,3 +350,161 @@ def test_runtime_unavailable_diagnostics(hass) -> None:
     snapshot = runtime.diagnostics()
     assert snapshot["last_success_utc"] is None
     assert snapshot["using_cached_data"] is False
+    assert snapshot["truncated"] is False
+
+
+def test_runtime_ignores_invalid_persisted_last_seen(hass, monkeypatch) -> None:
+    runtime = SystemEventsRuntime(_runtime_coordinator(hass))
+    prefix = f"{SYSTEM_EVENT_REPAIR_PREFIX}{runtime._entry_suffix()}_"  # noqa: SLF001
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_get",
+        lambda _hass: SimpleNamespace(
+            issues={
+                (DOMAIN, f"{prefix}wrong_type"): SimpleNamespace(
+                    data={"last_seen_utc": 123}
+                ),
+                (DOMAIN, f"{prefix}naive"): SimpleNamespace(
+                    data={"last_seen_utc": "2026-07-11T00:00:00"}
+                ),
+            }
+        ),
+    )
+
+    runtime._restore_repair_last_seen()  # noqa: SLF001
+
+    assert runtime._repair_last_seen_utc == {}  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_runtime_expires_missing_repair_after_complete_snapshot_grace(
+    hass, monkeypatch
+) -> None:
+    coordinator = _runtime_coordinator(hass, payload=_event_payload())
+    runtime = SystemEventsRuntime(coordinator)
+    created: list[str] = []
+    deleted: list[str] = []
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_get",
+        lambda _hass: SimpleNamespace(issues={}),
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_create_issue",
+        lambda _hass, _domain, issue_id, **_kwargs: created.append(issue_id),
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_delete_issue",
+        lambda _hass, _domain, issue_id: deleted.append(issue_id),
+    )
+    first_seen = datetime(2026, 7, 11, 23, 55, tzinfo=timezone.utc)
+    observed_times = iter(
+        (
+            first_seen,
+            first_seen + SYSTEM_EVENT_REPAIR_MISSING_GRACE - timedelta(seconds=1),
+            first_seen + SYSTEM_EVENT_REPAIR_MISSING_GRACE,
+        )
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.dt_util.utcnow",
+        lambda: next(observed_times),
+    )
+
+    await runtime.async_refresh()
+    coordinator.client.system_dashboard_events.return_value = {"events": []}
+    await runtime.async_refresh()
+    assert deleted == []
+
+    await runtime.async_refresh()
+    assert deleted == created
+
+
+@pytest.mark.asyncio
+async def test_runtime_does_not_expire_repairs_from_truncated_snapshot(
+    hass, monkeypatch
+) -> None:
+    coordinator = _runtime_coordinator(hass, payload=_event_payload())
+    runtime = SystemEventsRuntime(coordinator)
+    deleted: list[str] = []
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_get",
+        lambda _hass: SimpleNamespace(issues={}),
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_create_issue",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_delete_issue",
+        lambda _hass, _domain, issue_id: deleted.append(issue_id),
+    )
+    first_seen = datetime(2026, 7, 11, tzinfo=timezone.utc)
+    observed_times = iter(
+        (first_seen, first_seen + SYSTEM_EVENT_REPAIR_MISSING_GRACE * 2)
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.dt_util.utcnow",
+        lambda: next(observed_times),
+    )
+
+    await runtime.async_refresh()
+    coordinator.client.system_dashboard_events.return_value = {
+        "events": [],
+        "_enphase_ev_truncated": True,
+    }
+    await runtime.async_refresh()
+
+    assert deleted == []
+    assert runtime.diagnostics()["truncated"] is True
+
+
+@pytest.mark.asyncio
+async def test_runtime_persists_last_seen_checkpoint_across_reload(
+    hass, monkeypatch
+) -> None:
+    issues: dict[tuple[str, str], object] = {}
+    created: list[str] = []
+    deleted: list[str] = []
+
+    def _create(_hass, domain, issue_id, **kwargs) -> None:
+        created.append(issue_id)
+        issues[(domain, issue_id)] = SimpleNamespace(
+            active=True,
+            data=kwargs["data"],
+        )
+
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_get",
+        lambda _hass: SimpleNamespace(issues=issues),
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_create_issue",
+        _create,
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_delete_issue",
+        lambda _hass, _domain, issue_id: deleted.append(issue_id),
+    )
+    first_seen = datetime(2026, 7, 11, 23, 55, tzinfo=timezone.utc)
+    checkpoint = first_seen + SYSTEM_EVENT_REPAIR_CHECKPOINT_INTERVAL
+    observed_times = iter(
+        (
+            first_seen,
+            checkpoint,
+            checkpoint + SYSTEM_EVENT_REPAIR_MISSING_GRACE,
+        )
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.dt_util.utcnow",
+        lambda: next(observed_times),
+    )
+
+    runtime = SystemEventsRuntime(_runtime_coordinator(hass, payload=_event_payload()))
+    await runtime.async_refresh()
+    await runtime.async_refresh()
+    assert len(created) == 2
+    issue_id = created[-1]
+    assert issues[(DOMAIN, issue_id)].data["last_seen_utc"] == checkpoint.isoformat()
+
+    reloaded = SystemEventsRuntime(_runtime_coordinator(hass, payload={"events": []}))
+    await reloaded.async_refresh()
+
+    assert deleted == [issue_id]

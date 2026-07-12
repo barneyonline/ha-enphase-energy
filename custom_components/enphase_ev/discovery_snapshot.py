@@ -223,6 +223,7 @@ class DiscoverySnapshotManager:
         self._pending_signature: str | None = None
         self._pending_revision: int | None = None
         self._save_in_progress = False
+        self._save_task: asyncio.Task[None] | None = None
 
     def _snapshot_signature(self, snapshot: object) -> str:
         compatible = _snapshot_compatible_value(snapshot)
@@ -663,18 +664,34 @@ class DiscoverySnapshotManager:
             self.coordinator._discovery_snapshot_save_cancel = None
             if not self.coordinator._discovery_snapshot_pending:
                 return
-            self.coordinator.hass.async_create_task(
+            task = self.coordinator.hass.async_create_task(
                 self.async_save(), name=f"{DOMAIN}_discovery_snapshot_save"
             )
+            self._save_task = task
+            task.add_done_callback(self._clear_save_task)
 
         self.coordinator._discovery_snapshot_save_cancel = async_call_later(
             self.coordinator.hass, DISCOVERY_SNAPSHOT_SAVE_DELAY_S, _run
         )
 
-    def cancel_pending_save(self) -> None:
+    def _clear_save_task(self, task: asyncio.Task[None]) -> None:
+        """Clear a completed snapshot save task."""
+
+        if self._save_task is task:
+            self._save_task = None
+
+    def cancel_pending_save(self) -> asyncio.Task[None] | None:
+        """Cancel delayed and in-flight snapshot persistence."""
+
         if self.coordinator._discovery_snapshot_save_cancel is not None:
             self.coordinator._discovery_snapshot_save_cancel()
             self.coordinator._discovery_snapshot_save_cancel = None
+        task = self._save_task
+        if task is not None and not task.done():
+            task.cancel()
+            return task
+        self._save_task = None
+        return None
 
     def sync_site_energy_discovery_state(self) -> None:
         energy = getattr(self.coordinator, "energy", None)

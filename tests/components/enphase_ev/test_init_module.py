@@ -649,7 +649,8 @@ async def test_async_setup_entry_uses_background_task_for_schedule_sync_start(
         def __init__(self) -> None:
             self.site_id = site_id
             self.schedule_sync = SimpleNamespace(async_start=AsyncMock())
-            self.grid_profile_runtime = SimpleNamespace(async_refresh=AsyncMock())
+            self.async_refresh_grid_profile_metadata = AsyncMock()
+            self.track_entry_background_task = MagicMock()
 
         async def async_config_entry_first_refresh(self) -> None:
             return None
@@ -669,12 +670,16 @@ async def test_async_setup_entry_uses_background_task_for_schedule_sync_start(
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", forward)
 
     background_calls: list[tuple[HomeAssistant, str, bool]] = []
+    background_tasks: list[object] = []
 
     def _capture_background_task(
         hass_arg: HomeAssistant, target, name: str, eager_start: bool = True
-    ) -> None:
+    ) -> object:
         background_calls.append((hass_arg, name, eager_start))
         target.close()
+        task = object()
+        background_tasks.append(task)
+        return task
 
     monkeypatch.setattr(
         config_entry, "async_create_background_task", _capture_background_task
@@ -686,12 +691,12 @@ async def test_async_setup_entry_uses_background_task_for_schedule_sync_start(
         (hass, "enphase_ev_grid_profile_startup_probe", True),
         (hass, "enphase_ev_schedule_sync_start", True),
     ]
-    dummy_coord.grid_profile_runtime.async_refresh.assert_called_once_with(
-        force=True,
-        load_profiles=False,
-    )
-    dummy_coord.grid_profile_runtime.async_refresh.assert_not_awaited()
+    dummy_coord.async_refresh_grid_profile_metadata.assert_called_once_with(force=True)
+    dummy_coord.async_refresh_grid_profile_metadata.assert_not_awaited()
     dummy_coord.schedule_sync.async_start.assert_not_awaited()
+    assert [
+        call(task) for task in background_tasks
+    ] == dummy_coord.track_entry_background_task.call_args_list
     forward.assert_awaited_once()
 
 
@@ -1591,7 +1596,7 @@ async def test_async_unload_entry_stops_schedule_sync(
     schedule_sync = SimpleNamespace(async_stop=AsyncMock())
     coord = SimpleNamespace(
         schedule_sync=schedule_sync,
-        cleanup_runtime_state=MagicMock(),
+        async_cleanup_runtime_state=AsyncMock(),
         async_close=AsyncMock(),
     )
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
@@ -1601,7 +1606,7 @@ async def test_async_unload_entry_stops_schedule_sync(
 
     assert await async_unload_entry(hass, config_entry)
     schedule_sync.async_stop.assert_awaited_once()
-    coord.cleanup_runtime_state.assert_called_once()
+    coord.async_cleanup_runtime_state.assert_awaited_once()
     coord.async_close.assert_awaited_once()
     assert unload.await_count == len(PLATFORMS)
     assert config_entry.runtime_data is None

@@ -49,6 +49,15 @@ _TERMINAL_STATUS_WORDS = (
     "idle",
     "success",
 )
+_NON_PROGRESS_TERMINAL_STATUS_WORDS = (
+    "up to date",
+    "done",
+    "fail",
+    "error",
+    "cancel",
+    "idle",
+    "success",
+)
 _DURATION_PART_RE = re.compile(
     r"(?P<value>\d+(?:\.\d+)?)\s*(?P<unit>days?|d|hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)",
     re.IGNORECASE,
@@ -431,6 +440,11 @@ def _update_in_progress(
     components: list[dict[str, Any]],
     percentage: float | None,
 ) -> bool | None:
+    if percentage is not None and 0 < percentage < 100:
+        status_text = current_status_text.lower() if current_status_text else ""
+        if any(word in status_text for word in _NON_PROGRESS_TERMINAL_STATUS_WORDS):
+            return False
+        return True
     current_state = _classify_status_text(current_status_text)
     if current_state is not None:
         return current_state
@@ -449,8 +463,6 @@ def _update_in_progress(
         return True
     if other_states:
         return False
-    if percentage is not None and 0 < percentage < 100:
-        return True
     if current_status == 0 or percentage == 100:
         return False
     return None

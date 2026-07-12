@@ -424,6 +424,16 @@ class EvseRuntime:
                 key_sn = str(key).strip()
                 if key_sn not in keep_serials:
                     cache.pop(key, None)
+        auto_resume_tasks = getattr(coord, "_auto_resume_tasks", {})
+        if isinstance(auto_resume_tasks, dict):
+            for key in list(auto_resume_tasks):
+                if str(key).strip() in keep_serials:
+                    continue
+                task = auto_resume_tasks[key]
+                if task is None or task.done():
+                    auto_resume_tasks.pop(key, None)
+                    continue
+                task.cancel()
         return keep_serials
 
     def prune_runtime_caches(
@@ -489,13 +499,31 @@ class EvseRuntime:
                 status_norm or "unknown",
             )
             snapshot = dict(info)
-            task_name = f"enphase_ev_auto_resume_{sn_str}"
+            auto_resume_tasks = getattr(coord, "_auto_resume_tasks", None)
+            if not isinstance(auto_resume_tasks, dict):
+                auto_resume_tasks = {}
+                coord._auto_resume_tasks = auto_resume_tasks
+            existing_task = auto_resume_tasks.get(sn_str)
+            if existing_task is not None and not existing_task.done():
+                continue
+            task_name = f"enphase_ev_auto_resume_{redact_identifier(sn_str)}"
             try:
-                coord.hass.async_create_task(
+                task = coord.hass.async_create_task(
                     self.async_auto_resume(sn_str, snapshot), name=task_name
                 )
             except TypeError:
-                coord.hass.async_create_task(self.async_auto_resume(sn_str, snapshot))
+                task = coord.hass.async_create_task(
+                    self.async_auto_resume(sn_str, snapshot)
+                )
+            if not isinstance(task, asyncio.Future):
+                continue
+            auto_resume_tasks[sn_str] = task
+
+            def _clear(completed: asyncio.Future[None], serial: str = sn_str) -> None:
+                if auto_resume_tasks.get(serial) is completed:
+                    auto_resume_tasks.pop(serial, None)
+
+            task.add_done_callback(_clear)
 
     async def async_auto_resume(
         self, sn: str, snapshot: dict[str, object] | None = None

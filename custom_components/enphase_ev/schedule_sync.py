@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterable
+from collections.abc import Coroutine, Iterable
 from datetime import datetime, time as dt_time, timedelta
 import inspect
 import json
@@ -63,6 +63,7 @@ SYNC_INTERVAL = timedelta(minutes=5)
 SYNC_REFRESH_CONCURRENCY = 3
 # Scheduler writes often return before reads reflect the new slot state.
 PATCH_REFRESH_DELAY_S = 1.0
+SCHEDULE_SYNC_STOP_TIMEOUT_S = 10.0
 SYNC_CAPTURE_ERRORS = (RuntimeError, TypeError, ValueError, AttributeError)
 
 
@@ -94,6 +95,8 @@ class ScheduleSync:
         self._pending_patch_refresh: set[str] = set()
         self._pending_patch_refresh_cancels: dict[str, Callable[[], None]] = {}
         self._pending_patch_refresh_tasks: dict[str, asyncio.Future[None]] = {}
+        self._refresh_tasks: set[asyncio.Future[None]] = set()
+        self._stopping = False
 
     async def async_start(self) -> None:
         self._disabled_cleanup_done = False
@@ -101,6 +104,8 @@ class ScheduleSync:
             await self._disable_support()
             return
         await self._remove_all_helpers()
+        if self._stopping:
+            return
         self._unsub_interval = async_track_time_interval(
             self.hass, self._handle_interval, SYNC_INTERVAL
         )
@@ -113,6 +118,7 @@ class ScheduleSync:
         await self.async_refresh(reason="startup")
 
     async def async_stop(self) -> None:
+        self._stopping = True
         if self._unsub_interval is not None:
             self._unsub_interval()
             self._unsub_interval = None
@@ -122,13 +128,29 @@ class ScheduleSync:
         for cancel in self._pending_patch_refresh_cancels.values():
             cancel()
         self._pending_patch_refresh_cancels.clear()
-        tasks = tuple(self._pending_patch_refresh_tasks.values())
+        tasks = tuple(
+            {
+                *self._pending_patch_refresh_tasks.values(),
+                *self._refresh_tasks,
+            }
+        )
         for task in tasks:
             task.cancel()
         self._pending_patch_refresh_tasks.clear()
+        self._refresh_tasks.clear()
         self._pending_patch_refresh.clear()
         if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+            done, pending = await asyncio.wait(
+                tasks,
+                timeout=SCHEDULE_SYNC_STOP_TIMEOUT_S,
+            )
+            if done:
+                await asyncio.gather(*done, return_exceptions=True)
+            if pending:
+                _LOGGER.warning(
+                    "Timed out waiting for %s Enphase schedule task(s) to stop",
+                    len(pending),
+                )
 
     def diagnostics(self) -> dict[str, Any]:
         return {
@@ -464,15 +486,33 @@ class ScheduleSync:
 
     @callback
     def _handle_interval(self, *_args: object) -> None:
-        coro = self.async_refresh(reason="interval")
+        self._schedule_refresh_task(
+            self.async_refresh(reason="interval"),
+            f"{DOMAIN}_schedule_interval_refresh",
+            fallback=lambda: self.async_refresh(reason="interval"),
+        )
+
+    def _schedule_refresh_task(
+        self,
+        coro: Coroutine[Any, Any, None],
+        name: str,
+        *,
+        fallback: Callable[[], Coroutine[Any, Any, None]],
+    ) -> None:
+        """Schedule and retain a refresh for deterministic shutdown."""
+
+        if self._stopping:
+            coro.close()
+            return
         try:
-            self.hass.async_create_task(
-                coro,
-                name=f"{DOMAIN}_schedule_interval_refresh",
-            )
+            task = self.hass.async_create_task(coro, name=name)
         except TypeError:
             coro.close()
-            self.hass.async_create_task(self.async_refresh(reason="interval"))
+            task = self.hass.async_create_task(fallback())
+        if not isinstance(task, asyncio.Future):
+            return
+        self._refresh_tasks.add(task)
+        task.add_done_callback(self._refresh_tasks.discard)
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -480,15 +520,11 @@ class ScheduleSync:
             age = dt_util.utcnow() - self._last_sync
             if age < SYNC_INTERVAL:
                 return
-        coro = self._refresh_if_stale()
-        try:
-            self.hass.async_create_task(
-                coro,
-                name=f"{DOMAIN}_schedule_coordinator_refresh",
-            )
-        except TypeError:
-            coro.close()
-            self.hass.async_create_task(self._refresh_if_stale())
+        self._schedule_refresh_task(
+            self._refresh_if_stale(),
+            f"{DOMAIN}_schedule_coordinator_refresh",
+            fallback=self._refresh_if_stale,
+        )
 
     async def _refresh_if_stale(self) -> None:
         if not self._last_sync:

@@ -105,6 +105,7 @@ INVERTER_PARAMETER_ALIASES: dict[str, str] = {
     "firmware": "firmware",
     "sw_version": "firmware",
 }
+INVERTER_PARAMETER_BATCH_DEADLINE_S = 15.0
 
 
 @dataclass(frozen=True)
@@ -3060,9 +3061,11 @@ class InventoryRuntime:
 
             gateway_serials = self._gateway_serials_for_inverter_telemetry()
             if callable(columns_fetcher) and gateway_serials:
-                column_results = await asyncio.gather(
-                    *(columns_fetcher(serial) for serial in gateway_serials),
-                    return_exceptions=True,
+                column_results = await self._async_run_bounded_optional_batch(
+                    [
+                        lambda serial=serial: columns_fetcher(serial)
+                        for serial in gateway_serials
+                    ]
                 )
                 column_names: set[str] = set()
                 for result in column_results:
@@ -3093,12 +3096,13 @@ class InventoryRuntime:
         ):
             return cached_by_serial
 
-        results = await asyncio.gather(
-            *(
-                parameter_fetcher(serials, parameter_id)
+        results = await self._async_run_bounded_optional_batch(
+            [
+                lambda parameter_id=parameter_id: parameter_fetcher(
+                    serials, parameter_id
+                )
                 for parameter_id in parameter_ids
-            ),
-            return_exceptions=True,
+            ]
         )
         valid_payload_count = 0
         first_error: Exception | None = None
@@ -3159,6 +3163,28 @@ class InventoryRuntime:
             first_error or ValueError("Dashboard parameter readings were unavailable"),
         )
         return telemetry_by_serial if valid_payload_count else cached_by_serial
+
+    @staticmethod
+    async def _async_run_bounded_optional_batch(
+        factories: list[Callable[[], Awaitable[object]]],
+        *,
+        deadline_s: float = INVERTER_PARAMETER_BATCH_DEADLINE_S,
+    ) -> list[object]:
+        """Run optional requests serially within one explicit operation budget."""
+
+        deadline = time.monotonic() + max(0.0, deadline_s)
+        results: list[object] = []
+        for index, factory in enumerate(factories):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                results.extend(TimeoutError() for _ in factories[index:])
+                break
+            try:
+                async with asyncio.timeout(remaining):
+                    results.append(await factory())
+            except Exception as err:  # noqa: BLE001 - preserve partial optional data
+                results.append(err)
+        return results
 
     async def _async_refresh_inverters(self) -> None:
         """Refresh inverter metadata/status/production and build serial snapshots."""
