@@ -282,6 +282,56 @@ def test_normalize_gateway_software_update_prefers_active_component() -> None:
     assert completed_component["in_progress"] is False
 
 
+def test_normalize_gateway_software_update_partial_percentage_overrides_complete() -> (
+    None
+):
+    partial = normalize_gateway_software_update(
+        {
+            "site": {
+                "site_update_info": {
+                    "Current_Status_str": "Installing update - 50% complete"
+                }
+            },
+            "devices": {"update_info": [[{"name": "A", "progress": 50}]]},
+        }
+    )
+    assert partial is not None
+    assert partial["in_progress"] is True
+    assert partial["update_percentage"] == 50
+
+    failed = normalize_gateway_software_update(
+        {
+            "site": {
+                "site_update_info": {
+                    "Current_Status_str": "Installing update failed at 50%"
+                }
+            },
+            "devices": {"update_info": [[{"name": "A", "progress": 50}]]},
+        }
+    )
+    assert failed is not None
+    assert failed["in_progress"] is False
+    assert failed["update_percentage"] is None
+
+    active_text = normalize_gateway_software_update(
+        {
+            "site": {"site_update_info": {"Current_Status_str": "Installing update"}},
+            "devices": [],
+        }
+    )
+    assert active_text is not None
+    assert active_text["in_progress"] is True
+
+    active_device = normalize_gateway_software_update(
+        {
+            "site": {"site_update_info": {"Current_Status": "unknown"}},
+            "devices": {"update_info": ["Gateway updating"]},
+        }
+    )
+    assert active_device is not None
+    assert active_device["in_progress"] is True
+
+
 @pytest.mark.parametrize(
     "payload",
     [

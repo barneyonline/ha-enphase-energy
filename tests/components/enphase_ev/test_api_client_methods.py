@@ -8388,7 +8388,10 @@ async def test_system_dashboard_events_uses_observed_query_and_headers() -> None
     )
     client._json = AsyncMock(return_value={"events": []})
 
-    assert await client.system_dashboard_events() == {"events": []}
+    assert await client.system_dashboard_events() == {
+        "events": [],
+        "_enphase_ev_truncated": False,
+    }
 
     args, kwargs = client._json.await_args
     assert args[0] == "GET"
@@ -8412,6 +8415,61 @@ async def test_system_dashboard_events_uses_observed_query_and_headers() -> None
     assert kwargs["headers"]["Authorization"] == "Bearer BEAR"
     assert kwargs["headers"]["e-auth-token"] == "EAUTH"
     assert kwargs["headers"]["X-CSRF-Token"] == "xsrf"
+
+
+@pytest.mark.asyncio
+async def test_system_dashboard_events_paginates_and_merges_catalogs() -> None:
+    client = _make_client()
+    first_page = {"events": [{"id": str(index)} for index in range(200)]}
+    second_page = {
+        "events": [{"id": "last"}],
+        "event_types": [{"id": 1}],
+        "event_states": [{"id": 2}],
+        "event_severities": [{"id": 3}],
+    }
+    client._json = AsyncMock(side_effect=[first_page, second_page])
+
+    result = await client.system_dashboard_events()
+
+    assert result is not None
+    assert len(result["events"]) == 201
+    assert result["events"][-1] == {"id": "last"}
+    assert result["event_types"] == [{"id": 1}]
+    assert result["event_states"] == [{"id": 2}]
+    assert result["event_severities"] == [{"id": 3}]
+    assert result["_enphase_ev_truncated"] is False
+    assert client._json.await_count == 2
+    first_url = URL(client._json.await_args_list[0].args[1])
+    second_url = URL(client._json.await_args_list[1].args[1])
+    assert first_url.query["page"] == "1"
+    assert second_url.query["page"] == "2"
+
+
+@pytest.mark.asyncio
+async def test_system_dashboard_events_pagination_is_bounded() -> None:
+    client = _make_client()
+    full_page = {"events": [{"id": str(index)} for index in range(200)]}
+    client._json = AsyncMock(return_value=full_page)
+
+    result = await client.system_dashboard_events()
+
+    assert result is not None
+    assert len(result["events"]) == 2_000
+    assert result["_enphase_ev_truncated"] is True
+    assert client._json.await_count == 10
+
+
+@pytest.mark.asyncio
+async def test_system_dashboard_events_rejects_invalid_later_page() -> None:
+    client = _make_client()
+    client._json = AsyncMock(
+        side_effect=[
+            {"events": [{"id": str(index)} for index in range(200)]},
+            {"events": "invalid"},
+        ]
+    )
+
+    assert await client.system_dashboard_events() is None
 
 
 @pytest.mark.asyncio

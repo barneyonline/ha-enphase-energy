@@ -204,6 +204,7 @@ class GridProfileRuntime:
         self._pending_poll_interval_s = PENDING_PROFILE_POLL_INTERVAL_S
         self._pending_poll_window_s = PENDING_PROFILE_POLL_WINDOW_S
         self._lock = asyncio.Lock()
+        self._apply_lock = asyncio.Lock()
 
     @property
     def installer_access_confirmed(self) -> bool:
@@ -1322,6 +1323,18 @@ class GridProfileRuntime:
         except asyncio.CancelledError:
             raise
         finally:
+            pending_matches = (
+                self.pending_profile_id is not None
+                and _profile_id_for_compare(self.pending_profile_id)
+                == _profile_id_for_compare(profile_id)
+            )
+            if pending_matches and (
+                self.support_state == SUPPORT_DENIED or time.monotonic() >= deadline
+            ):
+                self.pending_profile_id = None
+                self.pending_gateway_serial = None
+                self.pending_started_mono = None
+                self.coordinator.async_update_listeners()
             if self._pending_refresh_task is asyncio.current_task():
                 self._pending_refresh_task = None
 
@@ -1345,6 +1358,22 @@ class GridProfileRuntime:
         )
 
     async def async_apply_grid_profile(
+        self,
+        profile_id: str | None,
+        *,
+        region_code: str | None = None,
+        gateway_serial: str | None = None,
+    ) -> dict[str, object]:
+        """Apply one grid profile while serializing writes for this site."""
+
+        async with self._apply_lock:
+            return await self._async_apply_grid_profile_locked(
+                profile_id,
+                region_code=region_code,
+                gateway_serial=gateway_serial,
+            )
+
+    async def _async_apply_grid_profile_locked(
         self,
         profile_id: str | None,
         *,

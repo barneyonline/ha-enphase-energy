@@ -14,6 +14,7 @@ from custom_components.enphase_ev import PLATFORMS
 from custom_components.enphase_ev.const import DOMAIN
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from custom_components.enphase_ev.update import (
+    FIRMWARE_HISTORY_MANAGER_DATA_KEY,
     ChargerFirmwareUpdateEntity,
     FirmwareVersionHistoryStore,
     FirmwareUpdateEntity,
@@ -27,6 +28,7 @@ from custom_components.enphase_ev.update import (
     _gateway_installed_version,
     _text,
     _type_available,
+    async_get_firmware_version_history_store,
     async_setup_entry,
 )
 
@@ -632,6 +634,49 @@ async def test_firmware_version_history_store_records_bounded_changes(
 
     store.remove("update-1")
     assert store.history_for("update-1") == []
+
+
+@pytest.mark.asyncio
+async def test_firmware_version_history_store_is_shared_across_entries(
+    hass, monkeypatch
+) -> None:
+    load = AsyncMock()
+    monkeypatch.setattr(FirmwareVersionHistoryStore, "async_load", load)
+
+    first, second = await asyncio.gather(
+        async_get_firmware_version_history_store(hass),
+        async_get_firmware_version_history_store(hass),
+    )
+
+    assert first is second
+    assert hass.data[FIRMWARE_HISTORY_MANAGER_DATA_KEY] is first
+    load.assert_awaited_once_with()
+
+    save_payloads = []
+    monkeypatch.setattr(
+        first._store,  # noqa: SLF001
+        "async_delay_save",
+        lambda data_func, _delay: save_payloads.append(data_func),
+    )
+    first.record_installed_version(
+        unique_id="entry-1-gateway",
+        version="1.0",
+        hass=None,
+        entity_id=None,
+        name=None,
+    )
+    second.record_installed_version(
+        unique_id="entry-2-gateway",
+        version="2.0",
+        hass=None,
+        entity_id=None,
+        name=None,
+    )
+
+    assert set(save_payloads[-1]()["entries"]) == {
+        "entry-1-gateway",
+        "entry-2-gateway",
+    }
 
 
 @pytest.mark.asyncio

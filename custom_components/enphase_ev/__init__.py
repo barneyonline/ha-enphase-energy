@@ -1667,11 +1667,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
         entry_create_background = getattr(entry, "async_create_background_task", None)
         hass_create_background = getattr(hass, "async_create_background_task", None)
         if callable(entry_create_background):
-            entry_create_background(hass, coro, name)
+            task = entry_create_background(hass, coro, name)
         elif callable(hass_create_background):
-            hass_create_background(coro, name)
+            task = hass_create_background(coro, name)
         else:
-            hass.async_create_task(coro, name=name)
+            task = hass.async_create_task(coro, name=name)
+        track_background_task = getattr(coord, "track_entry_background_task", None)
+        if callable(track_background_task):
+            track_background_task(task)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _prune_inactive_serial_entities(hass, entry, coord, site_id)
@@ -1679,11 +1682,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
 
     # Start background work only after entities have been forwarded so restored
     # topology can create entities first and warmup can fill in live state later.
-    grid_profile_runtime = getattr(coord, "grid_profile_runtime", None)
-    grid_profile_refresh = getattr(grid_profile_runtime, "async_refresh", None)
-    if callable(grid_profile_refresh):
+    grid_profile_startup_probe = getattr(
+        coord, "async_refresh_grid_profile_metadata", None
+    )
+    if callable(grid_profile_startup_probe):
         _schedule_background_task(
-            grid_profile_refresh(force=True, load_profiles=False),
+            grid_profile_startup_probe(force=True),
             f"{DOMAIN}_grid_profile_startup_probe",
         )
 
@@ -1715,7 +1719,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> 
     if unload_ok:
         if coord is not None and hasattr(coord, "schedule_sync"):
             await coord.schedule_sync.async_stop()
-        if coord is not None and hasattr(coord, "cleanup_runtime_state"):
+        async_cleanup_runtime_state = getattr(
+            coord, "async_cleanup_runtime_state", None
+        )
+        if callable(async_cleanup_runtime_state):
+            await async_cleanup_runtime_state()
+        elif coord is not None and hasattr(coord, "cleanup_runtime_state"):
             coord.cleanup_runtime_state()
         if coord is not None and hasattr(coord, "async_close"):
             await coord.async_close()

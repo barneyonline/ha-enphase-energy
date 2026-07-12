@@ -1272,6 +1272,17 @@ def test_prune_runtime_caches_removes_stale_serial_state(coordinator_factory):
         "EV2": [{"to_connector_status": "SUSPENDED_EVSE"}],
     }
     coord._desired_charging = {"EV1": True, "EV2": False}  # noqa: SLF001
+    keep_auto_resume = MagicMock()
+    keep_auto_resume.done.return_value = False
+    drop_auto_resume = MagicMock()
+    drop_auto_resume.done.return_value = False
+    completed_auto_resume = MagicMock()
+    completed_auto_resume.done.return_value = True
+    coord._auto_resume_tasks = {  # noqa: SLF001
+        "EV1": keep_auto_resume,
+        "EV2": drop_auto_resume,
+        "EV3": completed_auto_resume,
+    }
     coord._session_history_cache_shim = {  # noqa: SLF001
         ("EV1", "2020-01-02"): (1.0, [{"session_id": "keep"}]),
         ("EV2", "2020-01-02"): (1.0, [{"session_id": "drop-serial"}]),
@@ -1294,6 +1305,11 @@ def test_prune_runtime_caches_removes_stale_serial_state(coordinator_factory):
         "EV1": [{"to_connector_status": "CHARGING"}]
     }
     assert coord._desired_charging == {"EV1": True}  # noqa: SLF001
+    assert coord._auto_resume_tasks == {  # noqa: SLF001
+        "EV1": keep_auto_resume,
+        "EV2": drop_auto_resume,
+    }
+    drop_auto_resume.cancel.assert_called_once_with()
     assert coord._session_history_cache_shim == {  # noqa: SLF001
         ("EV1", "2020-01-02"): (1.0, [{"session_id": "keep"}])
     }
@@ -2088,6 +2104,7 @@ def test_sync_desired_charging_schedules_auto_resume(coordinator_factory, monkey
     now = coord_mod.time.monotonic()
     coord._desired_charging = {sn: True}
     coord._auto_resume_attempts = {}
+    del coord._auto_resume_tasks  # noqa: SLF001
     coord.data = {
         sn: {
             "sn": sn,
@@ -2108,9 +2125,48 @@ def test_sync_desired_charging_schedules_auto_resume(coordinator_factory, monkey
 
     assert len(created) == 1
     coro, name = created[0]
-    assert name == f"enphase_ev_auto_resume_{sn}"
+    assert name.startswith("enphase_ev_auto_resume_")
+    assert sn not in name
     coro.close()
     assert coord._auto_resume_attempts[sn] >= now
+
+
+@pytest.mark.asyncio
+async def test_sync_desired_charging_tracks_and_coalesces_auto_resume(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    sn = next(iter(coord.serials))
+    coord._desired_charging = {sn: True}
+    coord._auto_resume_attempts = {}
+    coord.data = {
+        sn: {
+            "sn": sn,
+            "charging": False,
+            "plugged": True,
+            "connector_status": coord_mod.SUSPENDED_EVSE_STATUS,
+        }
+    }
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def _auto_resume(_sn, _snapshot) -> None:
+        started.set()
+        await release.wait()
+
+    coord.evse_runtime.async_auto_resume = _auto_resume
+    coord._sync_desired_charging(coord.data)
+    await started.wait()
+    task = coord._auto_resume_tasks[sn]  # noqa: SLF001
+
+    coord._auto_resume_attempts.clear()  # noqa: SLF001
+    coord._sync_desired_charging(coord.data)
+    assert coord._auto_resume_tasks[sn] is task  # noqa: SLF001
+
+    release.set()
+    await task
+    await asyncio.sleep(0)
+    assert coord._auto_resume_tasks == {}  # noqa: SLF001
 
 
 @pytest.mark.asyncio

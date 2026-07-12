@@ -570,45 +570,132 @@ async def test_runtime_rejects_catalog_region_outside_site_country() -> None:
 
 async def test_coordinator_refreshes_grid_profile_metadata_after_first_poll() -> None:
     refresh = AsyncMock()
-    coordinator = SimpleNamespace(
-        grid_profile_runtime=SimpleNamespace(
-            async_refresh=refresh,
-            support_state=SUPPORT_CONFIRMED,
-        )
-    )
-    context = SimpleNamespace(first_refresh=True, phase_timings={})
+    created_tasks: list[asyncio.Task[None]] = []
 
-    await EnphaseCoordinator._async_refresh_grid_profile_metadata(  # noqa: SLF001
-        coordinator, context
-    )
+    class _Coordinator:
+        async_refresh_grid_profile_metadata = (
+            EnphaseCoordinator.async_refresh_grid_profile_metadata
+        )
+        _clear_grid_profile_metadata_task = (
+            EnphaseCoordinator._clear_grid_profile_metadata_task
+        )
+        _schedule_grid_profile_metadata_refresh = (
+            EnphaseCoordinator._schedule_grid_profile_metadata_refresh
+        )
+
+        def __init__(self) -> None:
+            self.site_id = "site"
+            self.grid_profile_runtime = SimpleNamespace(
+                async_refresh=refresh,
+                support_state=SUPPORT_CONFIRMED,
+            )
+            self._grid_profile_metadata_task = None
+            self._grid_profile_metadata_refresh_lock = asyncio.Lock()
+            self.hass = SimpleNamespace(async_create_task=self._create_task)
+
+        def _create_task(self, coro, *, name=None):
+            task = asyncio.create_task(coro, name=name)
+            created_tasks.append(task)
+            return task
+
+    coordinator = _Coordinator()
+    first_refresh = SimpleNamespace(first_refresh=True)
+    steady_refresh = SimpleNamespace(first_refresh=False)
+
+    coordinator._schedule_grid_profile_metadata_refresh(first_refresh)
     refresh.assert_not_awaited()
 
-    context.first_refresh = False
-    await EnphaseCoordinator._async_refresh_grid_profile_metadata(  # noqa: SLF001
-        coordinator, context
-    )
+    coordinator._schedule_grid_profile_metadata_refresh(steady_refresh)
+    task = coordinator._grid_profile_metadata_task
+    assert task is not None
+    coordinator._schedule_grid_profile_metadata_refresh(steady_refresh)
+    assert len(created_tasks) == 1
+    await task
 
     refresh.assert_awaited_once_with(force=False, load_profiles=False)
-    assert "grid_profile_s" in context.phase_timings
+    assert coordinator._grid_profile_metadata_task is None
 
     refresh.reset_mock()
-    coordinator.grid_profile_runtime.support_state = "unknown"
-    await EnphaseCoordinator._async_refresh_grid_profile_metadata(  # noqa: SLF001
-        coordinator, context
-    )
-    refresh.assert_not_awaited()
-
+    coordinator.grid_profile_runtime.support_state = SUPPORT_UNKNOWN
+    coordinator._schedule_grid_profile_metadata_refresh(steady_refresh)
     coordinator.grid_profile_runtime.support_state = SUPPORT_DENIED
-    await EnphaseCoordinator._async_refresh_grid_profile_metadata(  # noqa: SLF001
-        coordinator, context
-    )
+    coordinator._schedule_grid_profile_metadata_refresh(steady_refresh)
     refresh.assert_not_awaited()
 
     coordinator.grid_profile_runtime.support_state = SUPPORT_CONFIRMED
     coordinator.grid_profile_runtime.async_refresh = None
-    await EnphaseCoordinator._async_refresh_grid_profile_metadata(  # noqa: SLF001
-        coordinator, context
+    await coordinator.async_refresh_grid_profile_metadata()
+
+
+async def test_coordinator_grid_profile_metadata_refresh_has_deadline() -> None:
+    async def _never_finishes(**_kwargs) -> None:
+        await asyncio.sleep(60)
+
+    coordinator = SimpleNamespace(
+        site_id="site",
+        grid_profile_runtime=SimpleNamespace(async_refresh=_never_finishes),
+        _grid_profile_metadata_refresh_lock=asyncio.Lock(),
     )
+    with patch(
+        "custom_components.enphase_ev.coordinator.GRID_PROFILE_METADATA_REFRESH_DEADLINE_S",
+        0,
+    ):
+        await EnphaseCoordinator.async_refresh_grid_profile_metadata(
+            coordinator, force=True
+        )
+
+
+async def test_coordinator_grid_profile_deadline_includes_lock_wait() -> None:
+    refresh = AsyncMock()
+    lock = asyncio.Lock()
+    await lock.acquire()
+    coordinator = SimpleNamespace(
+        site_id="site",
+        grid_profile_runtime=SimpleNamespace(async_refresh=refresh),
+        _grid_profile_metadata_refresh_lock=lock,
+    )
+    with patch(
+        "custom_components.enphase_ev.coordinator.GRID_PROFILE_METADATA_REFRESH_DEADLINE_S",
+        0,
+    ):
+        await EnphaseCoordinator.async_refresh_grid_profile_metadata(coordinator)
+    lock.release()
+
+    refresh.assert_not_awaited()
+
+
+async def test_coordinator_serializes_startup_and_steady_grid_profile_refreshes() -> (
+    None
+):
+    first_started = asyncio.Event()
+    release_first = asyncio.Event()
+    calls: list[bool] = []
+
+    async def _refresh(*, force: bool, load_profiles: bool) -> None:
+        assert load_profiles is False
+        calls.append(force)
+        if force:
+            first_started.set()
+            await release_first.wait()
+
+    coordinator = SimpleNamespace(
+        site_id="site",
+        grid_profile_runtime=SimpleNamespace(async_refresh=_refresh),
+        _grid_profile_metadata_refresh_lock=asyncio.Lock(),
+    )
+    startup = asyncio.create_task(
+        EnphaseCoordinator.async_refresh_grid_profile_metadata(coordinator, force=True)
+    )
+    await first_started.wait()
+    steady = asyncio.create_task(
+        EnphaseCoordinator.async_refresh_grid_profile_metadata(coordinator)
+    )
+    await asyncio.sleep(0)
+    assert calls == [True]
+
+    release_first.set()
+    await asyncio.gather(startup, steady)
+    assert calls == [True, False]
 
 
 async def test_runtime_apply_rejects_profile_cached_for_another_region() -> None:
@@ -1282,6 +1369,61 @@ async def test_runtime_starts_and_cancels_pending_refresh_task() -> None:
 
     assert runtime._pending_refresh_task is None  # noqa: SLF001
     assert task.cancelled()
+
+
+async def test_runtime_serializes_grid_profile_writes() -> None:
+    client = _FakeGridProfileClient()
+    runtime = GridProfileRuntime(_FakeCoordinator(client))
+    await runtime.async_refresh(force=True)
+
+    first_started = asyncio.Event()
+    release_first = asyncio.Event()
+    active_writes = 0
+    max_active_writes = 0
+    write_count = 0
+
+    async def _apply(**_kwargs) -> dict[str, object]:
+        nonlocal active_writes, max_active_writes, write_count
+        write_count += 1
+        active_writes += 1
+        max_active_writes = max(max_active_writes, active_writes)
+        if write_count == 1:
+            first_started.set()
+            await release_first.wait()
+        active_writes -= 1
+        return {}
+
+    client.async_apply_grid_profile = _apply  # type: ignore[method-assign]
+    first = asyncio.create_task(runtime.async_apply_grid_profile("agf:common"))
+    await first_started.wait()
+    second = asyncio.create_task(runtime.async_apply_grid_profile("agf:common"))
+    await asyncio.sleep(0)
+
+    assert write_count == 1
+    release_first.set()
+    await asyncio.gather(first, second)
+
+    assert write_count == 2
+    assert max_active_writes == 1
+
+
+async def test_runtime_expires_unconfirmed_pending_profile() -> None:
+    coordinator = _FakeCoordinator(_FakeGridProfileClient())
+    runtime = GridProfileRuntime(coordinator)
+    runtime.support_state = SUPPORT_CONFIRMED
+    runtime.pending_profile_id = "agf:pending"
+    runtime.pending_gateway_serial = "gateway"
+    runtime.pending_started_mono = 1.0
+    runtime._pending_poll_window_s = 0  # noqa: SLF001
+    runtime._pending_refresh_task = asyncio.current_task()  # noqa: SLF001
+
+    await runtime._async_poll_pending_profile("agf:pending")  # noqa: SLF001
+
+    assert runtime.pending_profile_id is None
+    assert runtime.pending_gateway_serial is None
+    assert runtime.pending_started_mono is None
+    assert runtime._pending_refresh_task is None  # noqa: SLF001
+    assert coordinator.listener_updates == 1
 
 
 async def test_runtime_accepts_false_ensemble_envoy_metadata() -> None:

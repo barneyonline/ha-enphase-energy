@@ -288,7 +288,7 @@ async def async_setup_entry(
         main_coordinator.client,
         locale=locale,
     )
-    entry.async_create_background_task(
+    task = entry.async_create_background_task(
         hass,
         _async_discover_weather(
             coordinator,
@@ -297,3 +297,8 @@ async def async_setup_entry(
         ),
         f"{DOMAIN}_weather_discovery",
     )
+    track_background_task = getattr(
+        main_coordinator, "track_entry_background_task", None
+    )
+    if callable(track_background_task):
+        track_background_task(task)
