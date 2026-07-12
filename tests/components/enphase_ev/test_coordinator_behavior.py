@@ -4560,7 +4560,7 @@ async def test_startup_warmup_runner_and_task_edge_paths(
             raise TypeError("no name support")
         return "task"
 
-    object.__setattr__(coord.hass, "async_create_task", _create_task)
+    object.__setattr__(coord.hass, "async_create_background_task", _create_task)
     await coord.async_start_startup_warmup()
     assert create_calls == []
 

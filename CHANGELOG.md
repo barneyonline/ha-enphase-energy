@@ -33,6 +33,9 @@ All notable changes to this project will be documented in this file.
 - Added installer-only, cloud-based Grid Profile Control with country-scoped region and profile selection, explicit apply confirmation, current profile monitoring, and follow-up cloud status refreshes.
 
 ### 🐛 Bug fixes
+- Prevented Home Assistant startup from waiting indefinitely on Enphase warmup
+  and gateway firmware progress loops by registering long-running work as true
+  background tasks.
 - Serialized installer Grid Profile writes, expire unconfirmed pending state after
   the follow-up window, and move steady metadata refreshes off the coordinator's
   critical path.

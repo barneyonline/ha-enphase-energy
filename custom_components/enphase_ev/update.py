@@ -498,7 +498,7 @@ class FirmwareUpdateEntity(CoordinatorEntity[EnphaseCoordinator], UpdateEntity):
             and not self._progress_refresh_task.done()
         ):
             return
-        self._progress_refresh_task = self.hass.async_create_task(
+        self._progress_refresh_task = self.hass.async_create_background_task(
             self._async_refresh_progress_loop(),
             name=f"{DOMAIN}_gateway_software_update_progress",
         )
