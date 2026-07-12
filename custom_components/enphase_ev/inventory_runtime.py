@@ -11,6 +11,7 @@ import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from functools import partial
 from typing import TYPE_CHECKING, TypeVar, cast
 from zoneinfo import ZoneInfo
 
@@ -3061,9 +3062,12 @@ class InventoryRuntime:
 
             gateway_serials = self._gateway_serials_for_inverter_telemetry()
             if callable(columns_fetcher) and gateway_serials:
+                typed_columns_fetcher = cast(
+                    Callable[[str], Awaitable[object]], columns_fetcher
+                )
                 column_results = await self._async_run_bounded_optional_batch(
                     [
-                        lambda serial=serial: columns_fetcher(serial)
+                        partial(typed_columns_fetcher, serial)
                         for serial in gateway_serials
                     ]
                 )
@@ -3096,11 +3100,12 @@ class InventoryRuntime:
         ):
             return cached_by_serial
 
+        typed_parameter_fetcher = cast(
+            Callable[[list[str], str], Awaitable[object]], parameter_fetcher
+        )
         results = await self._async_run_bounded_optional_batch(
             [
-                lambda parameter_id=parameter_id: parameter_fetcher(
-                    serials, parameter_id
-                )
+                partial(typed_parameter_fetcher, serials, parameter_id)
                 for parameter_id in parameter_ids
             ]
         )

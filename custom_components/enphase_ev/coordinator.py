@@ -1711,14 +1711,14 @@ class EnphaseCoordinator(
             keep_day_keys=keep_day_keys,
         )
 
-    def cleanup_runtime_state(self) -> tuple[asyncio.Future[object], ...]:
+    def cleanup_runtime_state(self) -> tuple[asyncio.Future[Any], ...]:
         """Cancel runtime work and release caches/listeners.
 
         Return cancelled asyncio tasks so the async unload path can wait for
         their cancellation handlers to finish before closing the client.
         """
 
-        cancelled_tasks: list[asyncio.Future[object]] = []
+        cancelled_tasks: list[asyncio.Future[Any]] = []
 
         def _task_done(task: object) -> bool:
             done = getattr(task, "done", None)

@@ -7697,6 +7697,7 @@ class EnphaseEVClient:
         }
         merged: JsonDict | None = None
         merged_events: list[object] = []
+        last_page_full = False
         for page in range(1, _SYSTEM_EVENTS_MAX_PAGES + 1):
             url = str(base_url.update_query({**query, "page": str(page)}))
             try:
@@ -7721,13 +7722,14 @@ class EnphaseEVClient:
                     if key not in merged and key in data:
                         merged[key] = data[key]
             merged_events.extend(events)
-            if len(events) < _SYSTEM_EVENTS_PAGE_SIZE:
+            last_page_full = len(events) >= _SYSTEM_EVENTS_PAGE_SIZE
+            if not last_page_full:
                 break
         if merged is None:  # pragma: no cover - loop always executes
             return None
         merged["events"] = merged_events
         merged["_enphase_ev_truncated"] = (
-            page == _SYSTEM_EVENTS_MAX_PAGES and len(events) >= _SYSTEM_EVENTS_PAGE_SIZE
+            page == _SYSTEM_EVENTS_MAX_PAGES and last_page_full
         )
         return merged
 
