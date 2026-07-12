@@ -1666,10 +1666,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
     def _schedule_background_task(coro: Coroutine[Any, Any, Any], name: str) -> None:
         entry_create_background = getattr(entry, "async_create_background_task", None)
         hass_create_background = getattr(hass, "async_create_background_task", None)
-        if callable(entry_create_background):
-            task = entry_create_background(hass, coro, name)
-        elif callable(hass_create_background):
+        if callable(hass_create_background):
             task = hass_create_background(coro, name)
+        elif callable(entry_create_background):
+            task = entry_create_background(hass, coro, name)
         else:
             task = hass.async_create_task(coro, name=name)
         track_background_task = getattr(coord, "track_entry_background_task", None)

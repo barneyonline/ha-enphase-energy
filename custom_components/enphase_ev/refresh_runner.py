@@ -335,12 +335,12 @@ class RefreshRunner:
         if coordinator._warmup_task is not None and not coordinator._warmup_task.done():
             return
         try:
-            coordinator._warmup_task = coordinator.hass.async_create_task(
+            coordinator._warmup_task = coordinator.hass.async_create_background_task(
                 self.async_startup_warmup_runner(),
                 name=f"{DOMAIN}_warmup_site",
             )
         except TypeError:
-            coordinator._warmup_task = coordinator.hass.async_create_task(
+            coordinator._warmup_task = coordinator.hass.async_create_background_task(
                 self.async_startup_warmup_runner()
             )
 

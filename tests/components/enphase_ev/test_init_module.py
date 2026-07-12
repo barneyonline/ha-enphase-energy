@@ -669,27 +669,23 @@ async def test_async_setup_entry_uses_background_task_for_schedule_sync_start(
     forward = AsyncMock()
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", forward)
 
-    background_calls: list[tuple[HomeAssistant, str, bool]] = []
+    background_calls: list[tuple[str, bool]] = []
     background_tasks: list[object] = []
 
-    def _capture_background_task(
-        hass_arg: HomeAssistant, target, name: str, eager_start: bool = True
-    ) -> object:
-        background_calls.append((hass_arg, name, eager_start))
+    def _capture_background_task(target, name: str, eager_start: bool = True) -> object:
+        background_calls.append((name, eager_start))
         target.close()
         task = object()
         background_tasks.append(task)
         return task
 
-    monkeypatch.setattr(
-        config_entry, "async_create_background_task", _capture_background_task
-    )
+    monkeypatch.setattr(hass, "async_create_background_task", _capture_background_task)
 
     assert await async_setup_entry(hass, config_entry)
 
     assert background_calls == [
-        (hass, "enphase_ev_grid_profile_startup_probe", True),
-        (hass, "enphase_ev_schedule_sync_start", True),
+        ("enphase_ev_grid_profile_startup_probe", True),
+        ("enphase_ev_schedule_sync_start", True),
     ]
     dummy_coord.async_refresh_grid_profile_metadata.assert_called_once_with(force=True)
     dummy_coord.async_refresh_grid_profile_metadata.assert_not_awaited()
@@ -785,21 +781,17 @@ async def test_async_setup_entry_uses_background_task_for_startup_warmup(
     forward = AsyncMock()
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", forward)
 
-    background_calls: list[tuple[HomeAssistant, str, bool]] = []
+    background_calls: list[tuple[str, bool]] = []
 
-    def _capture_background_task(
-        hass_arg: HomeAssistant, target, name: str, eager_start: bool = True
-    ) -> None:
-        background_calls.append((hass_arg, name, eager_start))
+    def _capture_background_task(target, name: str, eager_start: bool = True) -> None:
+        background_calls.append((name, eager_start))
         target.close()
 
-    monkeypatch.setattr(
-        config_entry, "async_create_background_task", _capture_background_task
-    )
+    monkeypatch.setattr(hass, "async_create_background_task", _capture_background_task)
 
     assert await async_setup_entry(hass, config_entry)
 
-    assert background_calls == [(hass, "enphase_ev_startup_warmup", True)]
+    assert background_calls == [("enphase_ev_startup_warmup", True)]
     dummy_coord.refresh_runner.async_start_startup_warmup.assert_not_awaited()
     forward.assert_awaited_once()
 
@@ -1176,7 +1168,7 @@ def test_remove_legacy_site_device_handles_guard_paths(
 
 
 @pytest.mark.asyncio
-async def test_async_setup_entry_schedule_sync_falls_back_to_hass_background_task(
+async def test_async_setup_entry_schedule_sync_falls_back_to_entry_background_task(
     hass: HomeAssistant, config_entry, monkeypatch
 ) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
@@ -1201,22 +1193,24 @@ async def test_async_setup_entry_schedule_sync_falls_back_to_hass_background_tas
         lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", AsyncMock())
-    monkeypatch.setattr(config_entry, "async_create_background_task", None)
+    monkeypatch.setattr(hass, "async_create_background_task", None)
 
-    calls: list[tuple[str, bool]] = []
+    calls: list[tuple[HomeAssistant, str, bool]] = []
 
-    def _capture_hass_background_task(target, name: str, eager_start: bool = True):
-        calls.append((name, eager_start))
+    def _capture_entry_background_task(
+        hass_arg: HomeAssistant, target, name: str, eager_start: bool = True
+    ):
+        calls.append((hass_arg, name, eager_start))
         target.close()
         return None
 
     monkeypatch.setattr(
-        hass, "async_create_background_task", _capture_hass_background_task
+        config_entry, "async_create_background_task", _capture_entry_background_task
     )
 
     assert await async_setup_entry(hass, config_entry)
 
-    assert calls == [("enphase_ev_schedule_sync_start", True)]
+    assert calls == [(hass, "enphase_ev_schedule_sync_start", True)]
     dummy_coord.schedule_sync.async_start.assert_not_awaited()
 
 
