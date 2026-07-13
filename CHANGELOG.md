@@ -21,18 +21,18 @@ All notable changes to this project will be documented in this file.
 
 ## v4.0.0b1 - 2026-07-13
 
-- Fixed the Authentication options menu and form so their localized headings, descriptions, and field copy render instead of blank rows or raw schema keys.
-- Added an explicit uppercase warning to Grid Profile Control that applying an incorrect profile may cause the system to malfunction.
-- Moved degraded-service and system-event Repair controls into a dedicated Notifications options page.
-- Reconciled every locale with the complete canonical translation surface, localized previously English-only migration and authentication copy, corrected AC Battery status translations, and added permanent full-catalog coverage checks.
-- Removed redundant Devices and scheduler helper copy and made both Repair notification options default to off for entries that have not saved a preference.
-- Moved Pricing Edits and Weather from general Settings into the Devices page's Device Features section while preserving existing preferences and defaults.
-- Prioritized Enphase Cloud power refreshes during startup and published their results immediately, with current-power and site-energy requests attempted in parallel under a 55-second deadline.
-- Removed obsolete editable tariff entities as soon as refreshed tariff structure no longer contains them, published integration-initiated tariff writes immediately with bounded read-after-write retries, and reduced normal tariff refresh latency from 15 minutes to 5 minutes.
-- Documented the Enphase University training and Enphase Support request process for users seeking Installer Toolkit (ITK) / Self Installer access, including regional caveats and a support-request template.
-- Renamed the general Settings options page to Polling, restored scheduler helper descriptions, and moved the clearly labeled EV Charger nominal-voltage fallback into Devices > Device Features with an explanation of its power-estimation purpose.
-
 ### 🚧 Breaking changes
+- Changed degraded-service Repair notifications from implicit default-on to
+  default-off for entries without a saved preference. Existing degraded-service
+  Repair issues are cleared while this option is disabled; re-enable them under
+  Options > Notifications. System-event Repair notifications are also default-off.
+- Made manual Grid Mode controls explicitly opt-in under Options > Advanced > Grid
+  Mode. Grid Control Status, Request Grid Toggle OTP, control-check polling, and
+  the related service actions remain unavailable until enabled; the read-only Grid
+  Mode sensor remains available.
+- Removed the IQ Battery CFG, DTG, and RBD schedule sensors when Enable Battery
+  Scheduler is disabled. Users who had disabled the scheduler but retained these
+  sensors must re-enable it under Options > Devices > Device Features.
 - Removed internal calculation and stable charger metadata attributes from the
   frequently updated IQ EV Charger Power and Last Reported sensors to reduce
   Recorder growth. Power restore baselines now use private Home Assistant
@@ -61,6 +61,15 @@ All notable changes to this project will be documented in this file.
 - Added installer-only, cloud-based Grid Profile Control with country-scoped region and profile selection, explicit apply confirmation, current profile monitoring, and follow-up cloud status refreshes.
 
 ### 🐛 Bug fixes
+- Fixed the Authentication options menu and form so their localized headings,
+  descriptions, and field copy render instead of blank rows or raw schema keys.
+- Reconciled every locale with the complete canonical translation surface,
+  localized previously English-only migration and authentication copy, corrected
+  AC Battery status translations, and added permanent full-catalog coverage checks.
+- Removed obsolete editable tariff entities as soon as refreshed tariff structure
+  no longer contains them, published integration-initiated tariff writes
+  immediately with bounded read-after-write retries, and reduced normal tariff
+  refresh latency from 15 minutes to 5 minutes.
 - Restored localized Devices and Device Features headings, field labels, and
   descriptions by providing both native section translations and step-level
   compatibility aliases for Home Assistant frontends that resolve nested option
@@ -128,6 +137,23 @@ All notable changes to this project will be documented in this file.
   later refresh can retry persistence instead of losing the observed revision.
 
 ### 🔧 Improvements
+- Added an explicit uppercase warning to Grid Profile Control that applying an
+  incorrect profile may cause the system to malfunction.
+- Moved degraded-service and system-event Repair controls into a dedicated
+  Notifications options page.
+- Removed redundant Devices and scheduler helper copy.
+- Moved Pricing Edits and Weather from general Settings into the Devices page's
+  Device Features section while preserving existing preferences and defaults.
+- Prioritized Enphase Cloud power refreshes during startup and published their
+  results immediately, with current-power and site-energy requests attempted in
+  parallel under a 55-second deadline.
+- Documented the Enphase University training and Enphase Support request process
+  for users seeking Installer Toolkit (ITK) / Self Installer access, including
+  regional caveats and a support-request template.
+- Renamed the general Settings options page to Polling, restored scheduler helper
+  descriptions, and moved the clearly labeled EV Charger nominal-voltage fallback
+  into Devices > Device Features with an explanation of its power-estimation
+  purpose.
 - Added a default-off System Event Repair Notifications switch under Options >
   Notifications. Existing event Repairs are removed while disabled.
 - Added a dedicated Devices page to integration Options for Gateway, Battery, EV
