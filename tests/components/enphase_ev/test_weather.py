@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp
 import pytest
 from homeassistant.const import UnitOfTemperature
+from homeassistant.helpers import entity_registry as er
 
 from custom_components.enphase_ev.const import OPT_WEATHER_ENABLED
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
@@ -113,11 +114,19 @@ async def test_setup_skips_weather_when_option_disabled(hass, config_entry) -> N
     coordinator = SimpleNamespace(site_id=RANDOM_SITE_ID, client=client)
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coordinator)
     added: list[EnphaseSiteWeather] = []
+    ent_reg = er.async_get(hass)
+    stale_weather = ent_reg.async_get_or_create(
+        "weather",
+        "enphase_ev",
+        f"enphase_ev_site_{RANDOM_SITE_ID}_weather",
+        config_entry=config_entry,
+    )
 
     await async_setup_entry(hass, config_entry, added.extend)
 
     assert added == []
     client.weather.assert_not_awaited()
+    assert ent_reg.async_get(stale_weather.entity_id) is None
 
 
 @pytest.mark.asyncio
