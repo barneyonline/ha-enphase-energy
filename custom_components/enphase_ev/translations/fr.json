@@ -519,7 +519,9 @@
           "type_ac_battery": "Batterie AC",
           "battery_schedules_enabled": "Activer le planificateur de batterie",
           "degraded_service_repair_issues": "Activer les réparations des services dégradés",
-          "weather_enabled": "Activer la météo"
+          "weather_enabled": "Activer la météo",
+          "microinverter_lifetime_energy_enabled": "Activer l’énergie totale des micro-onduleurs",
+          "microinverter_power_enabled": "Activer la puissance des micro-onduleurs"
         },
         "data_description": {
           "type_envoy": "Inclut la connectivité de la passerelle et les diagnostics de compteurs.",
@@ -535,7 +537,9 @@
           "type_heatpump": "Inclut des capteurs d'état, de diagnostic et de consommation de la pompe à chaleur.",
           "type_ac_battery": "Inclut les capteurs de batterie AC et les commandes du mode veille lorsqu’ils sont disponibles.",
           "degraded_service_repair_issues": "Crée des problèmes Repairs lorsque des services Enphase facultatifs sont dégradés.",
-          "weather_enabled": "Récupère la météo actuelle du site depuis Enphase et crée une entité météo uniquement lorsque le point de terminaison est disponible."
+          "weather_enabled": "Récupère la météo actuelle du site depuis Enphase et crée une entité météo uniquement lorsque le point de terminaison est disponible.",
+          "microinverter_lifetime_energy_enabled": "Active tous les capteurs d’énergie totale par micro-onduleur.",
+          "microinverter_power_enabled": "Active tous les capteurs de puissance par micro-onduleur lorsque la télémétrie installateur est disponible."
         }
       },
       "settings": {
@@ -589,7 +593,9 @@
               "system_event_repair_issues": "Activer les notifications de réparation des événements système",
               "pricing_edits_enabled": "Activer la modification des tarifs",
               "weather_enabled": "Activer la météo",
-              "nominal_voltage": "Tension nominale du chargeur EV (V)"
+              "nominal_voltage": "Tension nominale du chargeur EV (V)",
+              "microinverter_lifetime_energy_enabled": "Activer l’énergie totale des micro-onduleurs",
+              "microinverter_power_enabled": "Activer la puissance des micro-onduleurs"
             },
             "data_description": {
               "system_event_repair_issues": "Crée des réparations Home Assistant pour les alarmes permanentes Enphase actives. Désactivé par défaut.",
@@ -597,7 +603,9 @@
               "weather_enabled": "Récupère la météo actuelle du site depuis Enphase et crée une entité météo uniquement lorsque le point de terminaison est disponible.",
               "nominal_voltage": "Tension d’alimentation CA habituelle utilisée pour estimer la puissance lorsque la tension en direct est indisponible.",
               "schedule_sync_enabled": "Gérer les plannings de l’IQ EV Charger.",
-              "battery_schedules_enabled": "Gérer les programmes de l’IQ Battery."
+              "battery_schedules_enabled": "Gérer les programmes de l’IQ Battery.",
+              "microinverter_lifetime_energy_enabled": "Active tous les capteurs d’énergie totale par micro-onduleur.",
+              "microinverter_power_enabled": "Active tous les capteurs de puissance par micro-onduleur lorsque la télémétrie installateur est disponible."
             }
           }
         },
@@ -615,7 +623,9 @@
           "system_event_repair_issues": "Activer les notifications de réparation des événements système",
           "pricing_edits_enabled": "Activer la modification des tarifs",
           "weather_enabled": "Activer la météo",
-          "nominal_voltage": "Tension nominale du chargeur EV (V)"
+          "nominal_voltage": "Tension nominale du chargeur EV (V)",
+          "microinverter_lifetime_energy_enabled": "Activer l’énergie totale des micro-onduleurs",
+          "microinverter_power_enabled": "Activer la puissance des micro-onduleurs"
         },
         "data_description": {
           "type_envoy": "Inclut la connectivité de la passerelle et les diagnostics de compteurs.",
@@ -629,7 +639,9 @@
           "weather_enabled": "Récupère la météo actuelle du site depuis Enphase et crée une entité météo uniquement lorsque le point de terminaison est disponible.",
           "nominal_voltage": "Tension d’alimentation CA habituelle utilisée pour estimer la puissance lorsque la tension en direct est indisponible.",
           "schedule_sync_enabled": "Gérer les plannings de l’IQ EV Charger.",
-          "battery_schedules_enabled": "Gérer les programmes de l’IQ Battery."
+          "battery_schedules_enabled": "Gérer les programmes de l’IQ Battery.",
+          "microinverter_lifetime_energy_enabled": "Active tous les capteurs d’énergie totale par micro-onduleur.",
+          "microinverter_power_enabled": "Active tous les capteurs de puissance par micro-onduleur lorsque la télémétrie installateur est disponible."
         }
       },
       "repair_notifications": {

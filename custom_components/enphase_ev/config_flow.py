@@ -70,6 +70,8 @@ from .const import (
     DEFAULT_DEGRADED_SERVICE_REPAIR_ISSUES,
     DEFAULT_FAST_POLL_INTERVAL,
     DEFAULT_GRID_TOGGLE_ENABLED,
+    DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+    DEFAULT_MICROINVERTER_POWER_ENABLED,
     DEFAULT_PRICING_EDITS_ENABLED,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SCHEDULE_SYNC_ENABLED,
@@ -90,6 +92,8 @@ from .const import (
     OPT_FAST_POLL_INTERVAL,
     OPT_FAST_WHILE_STREAMING,
     OPT_GRID_TOGGLE_ENABLED,
+    OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+    OPT_MICROINVERTER_POWER_ENABLED,
     OPT_PRICING_EDITS_ENABLED,
     OPT_NOMINAL_VOLTAGE,
     OPT_SLOW_POLL_INTERVAL,
@@ -1420,6 +1424,20 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 ),
             ): bool,
             vol.Optional(
+                OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+                default=self._entry.options.get(
+                    OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+                    DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+                ),
+            ): bool,
+            vol.Optional(
+                OPT_MICROINVERTER_POWER_ENABLED,
+                default=self._entry.options.get(
+                    OPT_MICROINVERTER_POWER_ENABLED,
+                    DEFAULT_MICROINVERTER_POWER_ENABLED,
+                ),
+            ): bool,
+            vol.Optional(
                 OPT_NOMINAL_VOLTAGE,
                 default=self._default_nominal_voltage(),
             ): int,
@@ -2116,6 +2134,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             option_data.pop(OPT_SYSTEM_EVENT_REPAIR_ISSUES, None)
             option_data.pop(OPT_PRICING_EDITS_ENABLED, None)
             option_data.pop(OPT_WEATHER_ENABLED, None)
+            option_data.pop(OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED, None)
+            option_data.pop(OPT_MICROINVERTER_POWER_ENABLED, None)
             option_data.pop(OPT_NOMINAL_VOLTAGE, None)
             option_data.pop(CONF_SCAN_INTERVAL, None)
             option_data.pop(CONF_SITE_ONLY, None)
@@ -2211,6 +2231,24 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 options.get(
                     OPT_WEATHER_ENABLED,
                     DEFAULT_WEATHER_ENABLED,
+                ),
+            )
+        )
+        options[OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED] = bool(
+            device_data.get(
+                OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+                options.get(
+                    OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+                    DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+                ),
+            )
+        )
+        options[OPT_MICROINVERTER_POWER_ENABLED] = bool(
+            device_data.get(
+                OPT_MICROINVERTER_POWER_ENABLED,
+                options.get(
+                    OPT_MICROINVERTER_POWER_ENABLED,
+                    DEFAULT_MICROINVERTER_POWER_ENABLED,
                 ),
             )
         )

@@ -519,7 +519,9 @@
           "type_ac_battery": "Bateria AC",
           "battery_schedules_enabled": "Włącz harmonogram baterii",
           "degraded_service_repair_issues": "Włącz naprawy usług zdegradowanych",
-          "weather_enabled": "Włącz pogodę"
+          "weather_enabled": "Włącz pogodę",
+          "microinverter_lifetime_energy_enabled": "Włącz energię całkowitą mikroinwerterów",
+          "microinverter_power_enabled": "Włącz moc mikroinwerterów"
         },
         "data_description": {
           "type_envoy": "Zawiera diagnostykę łączności bramy i liczników.",
@@ -535,7 +537,9 @@
           "type_heatpump": "Zawiera czujniki stanu, diagnostyki i zużycia pompy ciepła.",
           "type_ac_battery": "Obejmuje sensory baterii AC i sterowanie trybem uśpienia, gdy są dostępne.",
           "degraded_service_repair_issues": "Tworzy problemy w Repairs, gdy opcjonalne usługi Enphase są zdegradowane.",
-          "weather_enabled": "Pobiera bieżącą pogodę dla lokalizacji z Enphase i tworzy encję pogody tylko wtedy, gdy punkt końcowy jest dostępny."
+          "weather_enabled": "Pobiera bieżącą pogodę dla lokalizacji z Enphase i tworzy encję pogody tylko wtedy, gdy punkt końcowy jest dostępny.",
+          "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
+          "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna."
         }
       },
       "settings": {
@@ -589,7 +593,9 @@
               "system_event_repair_issues": "Włącz powiadomienia o naprawach zdarzeń systemowych",
               "pricing_edits_enabled": "Włącz edycję cen",
               "weather_enabled": "Włącz pogodę",
-              "nominal_voltage": "Napięcie znamionowe ładowarki EV (V)"
+              "nominal_voltage": "Napięcie znamionowe ładowarki EV (V)",
+              "microinverter_lifetime_energy_enabled": "Włącz energię całkowitą mikroinwerterów",
+              "microinverter_power_enabled": "Włącz moc mikroinwerterów"
             },
             "data_description": {
               "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone.",
@@ -597,7 +603,9 @@
               "weather_enabled": "Pobiera bieżącą pogodę dla lokalizacji z Enphase i tworzy encję pogody tylko wtedy, gdy punkt końcowy jest dostępny.",
               "nominal_voltage": "Typowe napięcie zasilania AC używane do szacowania mocy, gdy napięcie bieżące jest niedostępne.",
               "schedule_sync_enabled": "Zarządzaj harmonogramami IQ EV Charger.",
-              "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery."
+              "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery.",
+              "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
+              "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna."
             }
           }
         },
@@ -615,7 +623,9 @@
           "system_event_repair_issues": "Włącz powiadomienia o naprawach zdarzeń systemowych",
           "pricing_edits_enabled": "Włącz edycję cen",
           "weather_enabled": "Włącz pogodę",
-          "nominal_voltage": "Napięcie znamionowe ładowarki EV (V)"
+          "nominal_voltage": "Napięcie znamionowe ładowarki EV (V)",
+          "microinverter_lifetime_energy_enabled": "Włącz energię całkowitą mikroinwerterów",
+          "microinverter_power_enabled": "Włącz moc mikroinwerterów"
         },
         "data_description": {
           "type_envoy": "Zawiera diagnostykę łączności bramy i liczników.",
@@ -629,7 +639,9 @@
           "weather_enabled": "Pobiera bieżącą pogodę dla lokalizacji z Enphase i tworzy encję pogody tylko wtedy, gdy punkt końcowy jest dostępny.",
           "nominal_voltage": "Typowe napięcie zasilania AC używane do szacowania mocy, gdy napięcie bieżące jest niedostępne.",
           "schedule_sync_enabled": "Zarządzaj harmonogramami IQ EV Charger.",
-          "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery."
+          "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery.",
+          "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
+          "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna."
         }
       },
       "repair_notifications": {

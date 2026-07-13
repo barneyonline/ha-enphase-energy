@@ -4,6 +4,8 @@ from collections import Counter
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from homeassistant.helpers import entity_registry as er
+
 from custom_components.enphase_ev.const import DOMAIN
 from custom_components.enphase_ev.sensor_registry import EnphaseSensorRegistrySetup
 
@@ -15,6 +17,7 @@ class FakeRegistry:
     def __init__(self, entities: dict[str, SimpleNamespace] | None = None) -> None:
         self.entities = entities or {}
         self.removed: list[str] = []
+        self.updated: list[tuple[str, object]] = []
 
     def async_get_entity_id(
         self,
@@ -34,6 +37,14 @@ class FakeRegistry:
     def async_remove(self, entity_id: str) -> None:
         self.removed.append(entity_id)
 
+    def async_update_entity(
+        self, entity_id: str, *, disabled_by: object
+    ) -> SimpleNamespace:
+        entry = self.entities[entity_id]
+        entry.disabled_by = disabled_by
+        self.updated.append((entity_id, disabled_by))
+        return entry
+
 
 def _entry(
     entity_id: str,
@@ -42,6 +53,7 @@ def _entry(
     domain: str = "sensor",
     platform: str = DOMAIN,
     config_entry_id: str = ENTRY_ID,
+    disabled_by: object = None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         entity_id=entity_id,
@@ -49,6 +61,7 @@ def _entry(
         domain=domain,
         platform=platform,
         config_entry_id=config_entry_id,
+        disabled_by=disabled_by,
     )
 
 
@@ -73,6 +86,73 @@ def test_sensor_registry_serial_parsers_ignore_non_string_unique_ids() -> None:
     )
     assert helper.battery_serial_from_unique_id(None) is None
     assert helper.ac_battery_serial_from_unique_id(None) is None
+
+
+def test_sensor_registry_syncs_microinverter_sensor_options() -> None:
+    disabler = er.RegistryEntryDisabler
+    registry = FakeRegistry(
+        {
+            "sensor.lifetime": _entry(
+                "sensor.lifetime",
+                f"{DOMAIN}_inverter_INV1_lifetime_energy",
+                disabled_by=disabler.INTEGRATION,
+            ),
+            "sensor.power": _entry(
+                "sensor.power",
+                f"{DOMAIN}_inverter_INV1_telemetry",
+            ),
+            "sensor.user_disabled": _entry(
+                "sensor.user_disabled",
+                f"{DOMAIN}_inverter_INV2_lifetime_energy",
+                disabled_by=disabler.USER,
+            ),
+            "sensor.other_entry": _entry(
+                "sensor.other_entry",
+                f"{DOMAIN}_inverter_INV3_telemetry",
+                config_entry_id="other-entry",
+            ),
+            "sensor.unrelated": _entry(
+                "sensor.unrelated",
+                f"{DOMAIN}_site_{SITE_ID}_solar_production",
+            ),
+            "sensor.other_inverter_sensor": _entry(
+                "sensor.other_inverter_sensor",
+                f"{DOMAIN}_inverter_INV4_status",
+            ),
+        }
+    )
+    helper = _helper(registry)
+    assert helper._is_disabled_by_integration(None) is False  # noqa: SLF001
+
+    helper.sync_inverter_sensor_enabled_defaults(
+        lifetime_energy_enabled=None,
+        power_enabled=None,
+    )
+
+    assert registry.updated == []
+    assert registry.entities["sensor.lifetime"].disabled_by is disabler.INTEGRATION
+    assert registry.entities["sensor.power"].disabled_by is None
+
+    helper.sync_inverter_sensor_enabled_defaults(
+        lifetime_energy_enabled=True,
+        power_enabled=False,
+    )
+
+    assert registry.entities["sensor.lifetime"].disabled_by is None
+    assert registry.entities["sensor.power"].disabled_by is disabler.INTEGRATION
+    assert registry.entities["sensor.user_disabled"].disabled_by is disabler.USER
+    assert registry.entities["sensor.other_entry"].disabled_by is None
+    assert registry.entities["sensor.unrelated"].disabled_by is None
+    assert registry.entities["sensor.other_inverter_sensor"].disabled_by is None
+
+    helper.sync_inverter_sensor_enabled_defaults(
+        lifetime_energy_enabled=False,
+        power_enabled=True,
+    )
+
+    assert registry.entities["sensor.lifetime"].disabled_by is disabler.INTEGRATION
+    assert registry.entities["sensor.power"].disabled_by is None
+    assert registry.entities["sensor.user_disabled"].disabled_by is disabler.USER
 
 
 def test_sensor_registry_get_entity_id_without_registry_method() -> None:

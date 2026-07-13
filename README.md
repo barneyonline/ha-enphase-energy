@@ -43,6 +43,7 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - Site and battery energy telemetry, including derived grid-import, grid-export, and battery power sensors for Home Assistant Energy Dashboard use
 - Optional IQ Battery Scheduler controls and CFG, DTG, and RBD schedule sensors, exposed only when Enable Battery Scheduler is selected under integration Options > Devices
 - Optional current site weather on the Enphase Cloud device, created only when the authenticated Enphase weather endpoint is available
+- Independent Microinverter Lifetime Energy and Microinverter Power sensor groups under Options > Devices > Device Features; lifetime energy remains enabled by default, while installer-level power telemetry remains opt-in
 - Site tariff visibility for next billing date and Energy-dashboard-ready current import/export price sensors, plus default-on Pricing Edits under Options > Devices > Device Features for editable rate entities; the Update Tariff action remains available for billing, rate, and structural updates
 - Installer-only Grid Profile Control through Enphase cloud Activation, with country-scoped region/profile selection under Options > Advanced and current profile monitoring on the IQ Gateway
 - Optional manual Grid Mode controls under Options > Advanced; the read-only Grid
@@ -56,7 +57,7 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - Restored discovery data creates known entities early during startup; live power
   acquisition starts alongside the minimal setup refresh and is attempted within
   55 seconds, while optional feature data fills in incrementally afterward
-- Device-category selection is grouped under Devices, while EV charger and battery schedulers, Pricing Edits, Weather, and the EV charger nominal-voltage fallback are grouped under Device Features in Options > Devices; default-off degraded-service and system-event Repair controls have their own Notifications page, polling has its own Polling page, and credential actions have their own titled Authentication page
+- Device-category selection is grouped under Devices, while EV charger and battery schedulers, Pricing Edits, Weather, microinverter Lifetime Energy and Power groups, and the EV charger nominal-voltage fallback are grouped under Device Features in Options > Devices; default-off degraded-service and system-event Repair controls have their own Notifications page, polling has its own Polling page, and credential actions have their own titled Authentication page
 - Rate-conscious microinverter telemetry uses limited-concurrency bulk reads,
   preserves fresh partial results, and exposes power plus available AC/DC,
   frequency, temperature, signal, and firmware details in a disabled-by-default

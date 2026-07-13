@@ -13,6 +13,10 @@ from homeassistant.const import UnitOfEnergy
 from homeassistant.helpers.entity import EntityCategory
 
 from custom_components.enphase_ev import sensor as sensor_mod
+from custom_components.enphase_ev.const import (
+    OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+    OPT_MICROINVERTER_POWER_ENABLED,
+)
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from custom_components.enphase_ev.sensor_battery_helpers import (
     battery_last_reported_snapshot,
@@ -1418,6 +1422,14 @@ async def test_async_setup_entry_adds_inverter_lifetime_sensors(
         }
     }
     coord._type_device_order = ["microinverter"]  # noqa: SLF001
+    object.__setattr__(
+        config_entry,
+        "options",
+        {
+            OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED: False,
+            OPT_MICROINVERTER_POWER_ENABLED: True,
+        },
+    )
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
 
     added: list[Any] = []
@@ -1430,8 +1442,12 @@ async def test_async_setup_entry_adds_inverter_lifetime_sensors(
         ent for ent in added if isinstance(ent, EnphaseInverterLifetimeEnergySensor)
     ]
     assert len(inverter_entities) == 1
-    assert any(isinstance(ent, EnphaseInverterTelemetrySensor) for ent in added)
+    telemetry_entity = next(
+        ent for ent in added if isinstance(ent, EnphaseInverterTelemetrySensor)
+    )
     entity = inverter_entities[0]
+    assert entity.entity_registry_enabled_default is False
+    assert telemetry_entity.entity_registry_enabled_default is True
     assert entity.native_value == pytest.approx(1500.0)
     attrs = entity.extra_state_attributes
     assert attrs == {

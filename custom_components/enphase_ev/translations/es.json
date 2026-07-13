@@ -519,7 +519,9 @@
           "type_ac_battery": "Batería CA",
           "battery_schedules_enabled": "Activar programador de batería",
           "degraded_service_repair_issues": "Activar reparaciones por servicios degradados",
-          "weather_enabled": "Activar el tiempo"
+          "weather_enabled": "Activar el tiempo",
+          "microinverter_lifetime_energy_enabled": "Activar energía de por vida de los microinversores",
+          "microinverter_power_enabled": "Activar potencia de los microinversores"
         },
         "data_description": {
           "type_envoy": "Incluye conectividad de la puerta de enlace y diagnósticos de medidores.",
@@ -535,7 +537,9 @@
           "type_heatpump": "Incluye sensores de estado, diagnóstico y consumo de la bomba de calor.",
           "type_ac_battery": "Incluye sensores de batería CA y controles del modo de reposo cuando están disponibles.",
           "degraded_service_repair_issues": "Crea problemas de Repairs cuando los servicios opcionales de Enphase están degradados.",
-          "weather_enabled": "Obtiene el tiempo actual del sitio desde Enphase y crea una entidad meteorológica solo cuando el punto de conexión está disponible."
+          "weather_enabled": "Obtiene el tiempo actual del sitio desde Enphase y crea una entidad meteorológica solo cuando el punto de conexión está disponible.",
+          "microinverter_lifetime_energy_enabled": "Activa todos los sensores de energía de por vida de cada microinversor.",
+          "microinverter_power_enabled": "Activa todos los sensores de potencia de cada microinversor cuando la telemetría del instalador está disponible."
         }
       },
       "settings": {
@@ -589,7 +593,9 @@
               "system_event_repair_issues": "Activar notificaciones de reparación de eventos del sistema",
               "pricing_edits_enabled": "Activar la edición de precios",
               "weather_enabled": "Activar el tiempo",
-              "nominal_voltage": "Tensión nominal del cargador EV (V)"
+              "nominal_voltage": "Tensión nominal del cargador EV (V)",
+              "microinverter_lifetime_energy_enabled": "Activar energía de por vida de los microinversores",
+              "microinverter_power_enabled": "Activar potencia de los microinversores"
             },
             "data_description": {
               "system_event_repair_issues": "Crea reparaciones de Home Assistant para alarmas permanentes activas de Enphase. Desactivado de forma predeterminada.",
@@ -597,7 +603,9 @@
               "weather_enabled": "Obtiene el tiempo actual del sitio desde Enphase y crea una entidad meteorológica solo cuando el punto de conexión está disponible.",
               "nominal_voltage": "Tensión de alimentación de CA típica para estimar la potencia cuando no hay tensión en tiempo real.",
               "schedule_sync_enabled": "Gestiona los horarios del IQ EV Charger.",
-              "battery_schedules_enabled": "Gestiona los horarios de la IQ Battery."
+              "battery_schedules_enabled": "Gestiona los horarios de la IQ Battery.",
+              "microinverter_lifetime_energy_enabled": "Activa todos los sensores de energía de por vida de cada microinversor.",
+              "microinverter_power_enabled": "Activa todos los sensores de potencia de cada microinversor cuando la telemetría del instalador está disponible."
             }
           }
         },
@@ -615,7 +623,9 @@
           "system_event_repair_issues": "Activar notificaciones de reparación de eventos del sistema",
           "pricing_edits_enabled": "Activar la edición de precios",
           "weather_enabled": "Activar el tiempo",
-          "nominal_voltage": "Tensión nominal del cargador EV (V)"
+          "nominal_voltage": "Tensión nominal del cargador EV (V)",
+          "microinverter_lifetime_energy_enabled": "Activar energía de por vida de los microinversores",
+          "microinverter_power_enabled": "Activar potencia de los microinversores"
         },
         "data_description": {
           "type_envoy": "Incluye conectividad de la puerta de enlace y diagnósticos de medidores.",
@@ -629,7 +639,9 @@
           "weather_enabled": "Obtiene el tiempo actual del sitio desde Enphase y crea una entidad meteorológica solo cuando el punto de conexión está disponible.",
           "nominal_voltage": "Tensión de alimentación de CA típica para estimar la potencia cuando no hay tensión en tiempo real.",
           "schedule_sync_enabled": "Gestiona los horarios del IQ EV Charger.",
-          "battery_schedules_enabled": "Gestiona los horarios de la IQ Battery."
+          "battery_schedules_enabled": "Gestiona los horarios de la IQ Battery.",
+          "microinverter_lifetime_energy_enabled": "Activa todos los sensores de energía de por vida de cada microinversor.",
+          "microinverter_power_enabled": "Activa todos los sensores de potencia de cada microinversor cuando la telemetría del instalador está disponible."
         }
       },
       "repair_notifications": {

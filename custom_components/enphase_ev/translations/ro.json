@@ -519,7 +519,9 @@
           "type_ac_battery": "Baterie AC",
           "battery_schedules_enabled": "Activați planificatorul bateriei",
           "degraded_service_repair_issues": "Activează reparațiile pentru servicii degradate",
-          "weather_enabled": "Activează vremea"
+          "weather_enabled": "Activează vremea",
+          "microinverter_lifetime_energy_enabled": "Activează energia totală a microinvertoarelor",
+          "microinverter_power_enabled": "Activează puterea microinvertoarelor"
         },
         "data_description": {
           "type_envoy": "Include conectivitatea gateway-ului și diagnosticul contoarelor.",
@@ -535,7 +537,9 @@
           "type_heatpump": "Include senzori pentru starea, diagnosticarea și consumul pompei de căldură.",
           "type_ac_battery": "Include senzori pentru bateria AC și controale pentru modul de repaus atunci când sunt disponibile.",
           "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate.",
-          "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil."
+          "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil.",
+          "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor.",
+          "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă."
         }
       },
       "settings": {
@@ -589,7 +593,9 @@
               "system_event_repair_issues": "Activează notificările de reparație pentru evenimentele sistemului",
               "pricing_edits_enabled": "Activează editarea prețurilor",
               "weather_enabled": "Activează vremea",
-              "nominal_voltage": "Tensiunea nominală a încărcătorului EV (V)"
+              "nominal_voltage": "Tensiunea nominală a încărcătorului EV (V)",
+              "microinverter_lifetime_energy_enabled": "Activează energia totală a microinvertoarelor",
+              "microinverter_power_enabled": "Activează puterea microinvertoarelor"
             },
             "data_description": {
               "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit.",
@@ -597,7 +603,9 @@
               "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil.",
               "nominal_voltage": "Tensiunea tipică de alimentare CA folosită pentru estimarea puterii când tensiunea în timp real nu este disponibilă.",
               "schedule_sync_enabled": "Gestionați programele IQ EV Charger.",
-              "battery_schedules_enabled": "Gestionați programele IQ Battery."
+              "battery_schedules_enabled": "Gestionați programele IQ Battery.",
+              "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor.",
+              "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă."
             }
           }
         },
@@ -615,7 +623,9 @@
           "system_event_repair_issues": "Activează notificările de reparație pentru evenimentele sistemului",
           "pricing_edits_enabled": "Activează editarea prețurilor",
           "weather_enabled": "Activează vremea",
-          "nominal_voltage": "Tensiunea nominală a încărcătorului EV (V)"
+          "nominal_voltage": "Tensiunea nominală a încărcătorului EV (V)",
+          "microinverter_lifetime_energy_enabled": "Activează energia totală a microinvertoarelor",
+          "microinverter_power_enabled": "Activează puterea microinvertoarelor"
         },
         "data_description": {
           "type_envoy": "Include conectivitatea gateway-ului și diagnosticul contoarelor.",
@@ -629,7 +639,9 @@
           "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil.",
           "nominal_voltage": "Tensiunea tipică de alimentare CA folosită pentru estimarea puterii când tensiunea în timp real nu este disponibilă.",
           "schedule_sync_enabled": "Gestionați programele IQ EV Charger.",
-          "battery_schedules_enabled": "Gestionați programele IQ Battery."
+          "battery_schedules_enabled": "Gestionați programele IQ Battery.",
+          "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor.",
+          "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă."
         }
       },
       "repair_notifications": {

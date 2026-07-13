@@ -519,7 +519,9 @@
           "type_ac_battery": "AC-batteri",
           "battery_schedules_enabled": "Aktiver batteriplanlegger",
           "degraded_service_repair_issues": "Aktiver reparasjoner for degraderte tjenester",
-          "weather_enabled": "Aktiver vær"
+          "weather_enabled": "Aktiver vær",
+          "microinverter_lifetime_energy_enabled": "Aktiver mikroinverternes levetidsenergi",
+          "microinverter_power_enabled": "Aktiver mikroinvertereffekt"
         },
         "data_description": {
           "type_envoy": "Inkluderer gateway-tilkobling og målerdiagnostikk.",
@@ -535,7 +537,9 @@
           "type_heatpump": "Inkluderer sensorer for varmepumpens status, diagnostikk og forbruk.",
           "type_ac_battery": "Inkluderer AC-batterisensorer og kontroller for hvilemodus når de er tilgjengelige.",
           "degraded_service_repair_issues": "Oppretter Repairs-problemer når valgfrie Enphase-tjenester er degraderte.",
-          "weather_enabled": "Henter gjeldende vær for anlegget fra Enphase og oppretter bare en værenhet når endepunktet er tilgjengelig."
+          "weather_enabled": "Henter gjeldende vær for anlegget fra Enphase og oppretter bare en værenhet når endepunktet er tilgjengelig.",
+          "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter.",
+          "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig."
         }
       },
       "settings": {
@@ -589,7 +593,9 @@
               "system_event_repair_issues": "Aktiver reparasjonsvarsler for systemhendelser",
               "pricing_edits_enabled": "Aktiver prisredigering",
               "weather_enabled": "Aktiver vær",
-              "nominal_voltage": "EV-laderens nominelle spenning (V)"
+              "nominal_voltage": "EV-laderens nominelle spenning (V)",
+              "microinverter_lifetime_energy_enabled": "Aktiver mikroinverternes levetidsenergi",
+              "microinverter_power_enabled": "Aktiver mikroinvertereffekt"
             },
             "data_description": {
               "system_event_repair_issues": "Oppretter Home Assistant-reparasjoner for aktive stående Enphase-alarmer. Deaktivert som standard.",
@@ -597,7 +603,9 @@
               "weather_enabled": "Henter gjeldende vær for anlegget fra Enphase og oppretter bare en værenhet når endepunktet er tilgjengelig.",
               "nominal_voltage": "Typisk vekselspenning for å beregne effekten når sanntidsspenning ikke er tilgjengelig.",
               "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger.",
-              "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery."
+              "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery.",
+              "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter.",
+              "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig."
             }
           }
         },
@@ -615,7 +623,9 @@
           "system_event_repair_issues": "Aktiver reparasjonsvarsler for systemhendelser",
           "pricing_edits_enabled": "Aktiver prisredigering",
           "weather_enabled": "Aktiver vær",
-          "nominal_voltage": "EV-laderens nominelle spenning (V)"
+          "nominal_voltage": "EV-laderens nominelle spenning (V)",
+          "microinverter_lifetime_energy_enabled": "Aktiver mikroinverternes levetidsenergi",
+          "microinverter_power_enabled": "Aktiver mikroinvertereffekt"
         },
         "data_description": {
           "type_envoy": "Inkluderer gateway-tilkobling og målerdiagnostikk.",
@@ -629,7 +639,9 @@
           "weather_enabled": "Henter gjeldende vær for anlegget fra Enphase og oppretter bare en værenhet når endepunktet er tilgjengelig.",
           "nominal_voltage": "Typisk vekselspenning for å beregne effekten når sanntidsspenning ikke er tilgjengelig.",
           "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger.",
-          "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery."
+          "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery.",
+          "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter.",
+          "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig."
         }
       },
       "repair_notifications": {
