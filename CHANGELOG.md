@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v4.0.0b1 - 2026-07-13
+
 - Fixed the Authentication options menu and form so their localized headings, descriptions, and field copy render instead of blank rows or raw schema keys.
 - Added an explicit uppercase warning to Grid Profile Control that applying an incorrect profile may cause the system to malfunction.
 - Moved degraded-service and system-event Repair controls into a dedicated Notifications options page.
@@ -175,7 +192,7 @@ All notable changes to this project will be documented in this file.
 - Added five-minute cloud metadata refreshes for the current Grid Profile sensor and preserved the entity during transient Activation service outages.
 
 ### 🔄 Other changes
-- None
+- Bumped the integration manifest version to `4.0.0b1`.
 
 ## v3.2.2 - 2026-07-09
 
