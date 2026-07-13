@@ -11,7 +11,8 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Removed a previously created Enphase site weather entity automatically when
+  Enable weather is turned off.
 
 ### 🔧 Improvements
 - None

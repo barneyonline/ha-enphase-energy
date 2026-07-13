@@ -14,6 +14,7 @@ import aiohttp
 from homeassistant.components.weather import WeatherEntity
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
@@ -278,10 +279,18 @@ async def async_setup_entry(
 ) -> None:
     """Create weather only after an enabled endpoint probe succeeds."""
 
-    if not bool(entry.options.get(OPT_WEATHER_ENABLED, False)):
-        return
     main_coordinator = get_runtime_data(entry).coordinator
     site_id = str(main_coordinator.site_id)
+    if not bool(entry.options.get(OPT_WEATHER_ENABLED, False)):
+        ent_reg = er.async_get(hass)
+        entity_id = ent_reg.async_get_entity_id(
+            "weather",
+            DOMAIN,
+            f"{DOMAIN}_site_{site_id}_weather",
+        )
+        if entity_id is not None:
+            ent_reg.async_remove(entity_id)
+        return
     locale = str(getattr(hass.config, "language", "en") or "en")
     coordinator = EnphaseWeatherCoordinator(
         hass,
