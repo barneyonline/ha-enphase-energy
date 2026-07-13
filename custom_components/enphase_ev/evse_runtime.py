@@ -31,6 +31,7 @@ from .const import (
     OPT_FAST_POLL_INTERVAL,
     OPT_FAST_WHILE_STREAMING,
     OPT_SLOW_POLL_INTERVAL,
+    STORM_GUARD_CACHE_TTL,
 )
 from .log_redaction import redact_identifier, redact_text
 from .request_metrics import request_metrics_scope
@@ -1924,11 +1925,14 @@ class EvseRuntime:
             serials = self.normalize_serials(getattr(coord, "serials", ()))
             if len(serials) != 1 or sn_str not in serials:
                 return None
-        cache_until = getattr(coord, "_storm_guard_cache_until", None)
-        if cache_until is None:
+        last_success = getattr(
+            coord, "_battery_profile_devices_last_success_mono", None
+        )
+        if last_success is None:
             return None
         try:
-            if time.monotonic() >= float(cache_until):
+            age = time.monotonic() - float(last_success)
+            if age < 0 or age >= STORM_GUARD_CACHE_TTL:
                 return None
         except Exception:
             return None

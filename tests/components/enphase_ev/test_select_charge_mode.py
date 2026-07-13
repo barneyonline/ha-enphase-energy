@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -401,6 +402,7 @@ async def test_ac_battery_target_state_of_charge_select_rejects_invalid_option(
 
 
 def test_charge_mode_select_current_option_paths(coordinator_factory):
+    from custom_components.enphase_ev.const import STORM_GUARD_CACHE_TTL
     from custom_components.enphase_ev.select import ChargeModeSelect
 
     coord = coordinator_factory()
@@ -419,14 +421,16 @@ def test_charge_mode_select_current_option_paths(coordinator_factory):
     assert sel.current_option == "Scheduled"
 
     coord.data[RANDOM_SERIAL]["charge_mode"] = ""
-    coord._storm_guard_cache_until = 10.0**12  # noqa: SLF001
+    coord._battery_profile_devices_last_success_mono = time.monotonic()  # noqa: SLF001
     coord._battery_profile_devices = [  # noqa: SLF001
         {"uuid": "evse-1", "chargeMode": "GREEN", "enable": True}
     ]
     coord._charge_mode_cache.clear()  # noqa: SLF001
     assert sel.current_option == "Green"
 
-    coord._storm_guard_cache_until = 0.0  # noqa: SLF001
+    coord._battery_profile_devices_last_success_mono = (  # noqa: SLF001
+        time.monotonic() - STORM_GUARD_CACHE_TTL
+    )
     coord._charge_mode_cache.clear()  # noqa: SLF001
     assert sel.current_option is None
 
@@ -471,7 +475,7 @@ async def test_charge_mode_select_sets_smart_mode_for_single_evse_profile_contex
     from custom_components.enphase_ev.select import ChargeModeSelect
 
     coord = coordinator_factory()
-    coord._storm_guard_cache_until = 10.0**12  # noqa: SLF001
+    coord._battery_profile_devices_last_success_mono = time.monotonic()  # noqa: SLF001
     coord._battery_profile_devices = [  # noqa: SLF001
         {"uuid": RANDOM_SERIAL, "chargeMode": "SMART", "enable": False}
     ]
@@ -494,7 +498,7 @@ async def test_charge_mode_select_maps_legacy_green_alias_to_smart_mode(
     from custom_components.enphase_ev.select import ChargeModeSelect
 
     coord = coordinator_factory()
-    coord._storm_guard_cache_until = 10.0**12  # noqa: SLF001
+    coord._battery_profile_devices_last_success_mono = time.monotonic()  # noqa: SLF001
     coord._battery_profile_devices = [  # noqa: SLF001
         {"uuid": RANDOM_SERIAL, "chargeMode": "SMART", "enable": False}
     ]
@@ -520,7 +524,7 @@ async def test_charge_mode_select_maps_localized_green_alias_to_smart_mode(
     coord = coordinator_factory()
     coord.hass.config.language = "de"
     await async_prime_label_translations(coord.hass)
-    coord._storm_guard_cache_until = 10.0**12  # noqa: SLF001
+    coord._battery_profile_devices_last_success_mono = time.monotonic()  # noqa: SLF001
     coord._battery_profile_devices = [  # noqa: SLF001
         {"uuid": RANDOM_SERIAL, "chargeMode": "SMART", "enable": False}
     ]

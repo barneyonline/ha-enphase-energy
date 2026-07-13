@@ -36,6 +36,9 @@ All notable changes to this project will be documented in this file.
 - Prevented Home Assistant startup from waiting indefinitely on Enphase warmup
   and gateway firmware progress loops by registering long-running work as true
   background tasks.
+- Kept IQ EV Charger `preferred_mode` stable in Manual mode by separating the
+  numeric runtime mode from the scheduler preference and retaining fresh
+  battery-profile preference data between profile refreshes. (#774)
 - Serialized installer Grid Profile writes, expire unconfirmed pending state after
   the follow-up window, and move steady metadata refreshes off the coordinator's
   critical path.

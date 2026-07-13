@@ -2527,10 +2527,12 @@ class BatteryRuntime:
         self._apply_battery_capability_blocks(data)
         devices: list[dict[str, object]] = []
         profile_evse_device: dict[str, object] | None = None
+        profile_devices_authoritative = False
         raw_devices = data.get("devices")
         if isinstance(raw_devices, dict):
             iq_evse = raw_devices.get("iqEvse")
             if isinstance(iq_evse, list):
+                profile_devices_authoritative = True
                 for item in iq_evse:
                     if not isinstance(item, dict):
                         continue
@@ -2595,10 +2597,12 @@ class BatteryRuntime:
         self.sync_storm_guard_pending(storm_state)
         if evse_storm_enabled is not None:
             state._storm_evse_enabled = evse_storm_enabled
-        if devices:
+        if profile_devices_authoritative:
             state._battery_profile_devices = devices
+            state._battery_profile_devices_last_success_mono = time.monotonic()
         elif profile is not None:
             state._battery_profile_devices = []
+            state._battery_profile_devices_last_success_mono = time.monotonic()
         if profile_evse_device is not None:
             state._battery_profile_evse_device = profile_evse_device
         self.sync_backend_battery_profile_pending(data.get("isBatteryChangePending"))

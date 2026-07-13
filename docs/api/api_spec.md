@@ -334,6 +334,7 @@ Observed property values from the web capture:
 - `connectors[].connectorId=1`, `connectors[].connectorStatusType="AVAILABLE"`, `connectors[].connectorStatusInfo=""`, `connectors[].connectorStatusReason=""`, `connectors[].safeLimitState=1`, `connectors[].dlbActive=false`
 - The `api/v2` status alias was observed with `data.<charger_sn>.connected=true`, `pluggedIn=false`, `charging=false`, and `lst_rpt_at=<epoch_ms>`, matching the web-app charger card state "Not Plugged-in" and `0 kW`.
 - During an active charging capture, the original status endpoint returned `connected=true`, `pluggedIn=true`, `charging=true`, `faulted=false`, `mode=0`, `offGrid="ON_GRID"`, and `connectors[].connectorStatusType="CHARGING"` with `safeLimitState=0`.
+- The numeric status `mode` is the charger’s effective runtime mode; it is not a substitute for the stored scheduler preference returned by the charging-mode preference endpoint.
 - The `api/v2` status alias during the same active charging capture still only exposed the keyed charger booleans/timestamp shape (`connected`, `pluggedIn`, `charging`, `lst_rpt_at`); it did not include the instantaneous charger voltage/current/power rendered by the web UI.
 
 ### 2.2 Extended Summary (Metadata)
