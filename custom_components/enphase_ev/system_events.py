@@ -69,7 +69,7 @@ def _timestamp(value: object) -> str | None:
     parsed = dt_util.parse_datetime(text)
     if parsed is None or parsed.tzinfo is None:
         return None
-    return dt_util.as_utc(parsed).isoformat()
+    return str(dt_util.as_utc(parsed).isoformat())
 
 
 def _lookup_catalog(payload: object) -> dict[str, dict[str, object]]:

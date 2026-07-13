@@ -1612,7 +1612,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
     _record_phase("coordinator_init_s", coordinator_started)
     coord._setup_started_mono = setup_started
     coord._setup_phase_timings = setup_timings
-    coord._setup_milestones = {}
+    setup_milestones: dict[str, float] = {}
+    coord._setup_milestones = setup_milestones
 
     async def _prime_labels() -> None:
         started = _time.monotonic()
@@ -1654,9 +1655,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
         finally:
             coord._minimal_setup_refresh_active = False
             _record_phase("first_refresh_s", first_refresh_started)
-        coord._setup_milestones["core_ready"] = round(
-            _time.monotonic() - setup_started, 3
-        )
+        setup_milestones["core_ready"] = round(_time.monotonic() - setup_started, 3)
         await asyncio.gather(label_task, version_task)
     except BaseException:
         for task in (label_task, version_task):
@@ -1741,9 +1740,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
     platform_started = _time.monotonic()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _record_phase("platform_forward_s", platform_started)
-    coord._setup_milestones["entities_forwarded"] = round(
-        _time.monotonic() - setup_started, 3
-    )
+    setup_milestones["entities_forwarded"] = round(_time.monotonic() - setup_started, 3)
     # Start background work only after entities have been forwarded so restored
     # topology can create entities first and warmup can fill in live state later.
     # Schedule warmup first so the bounded startup power stage gets priority over
@@ -1774,7 +1771,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
 
     setup_timings["total_s"] = round(_time.monotonic() - setup_started, 3)
     coord._setup_phase_timings = dict(setup_timings)
-    coord._setup_milestones["setup_complete"] = setup_timings["total_s"]
+    setup_milestones["setup_complete"] = setup_timings["total_s"]
     return True
 
 
