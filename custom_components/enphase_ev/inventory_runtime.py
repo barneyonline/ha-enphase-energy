@@ -106,7 +106,8 @@ INVERTER_PARAMETER_ALIASES: dict[str, str] = {
     "firmware": "firmware",
     "sw_version": "firmware",
 }
-INVERTER_PARAMETER_BATCH_DEADLINE_S = 15.0
+INVERTER_PARAMETER_REQUEST_TIMEOUT_S = 15.0
+INVERTER_PARAMETER_BATCH_CONCURRENCY = 2
 
 
 @dataclass(frozen=True)
@@ -1743,26 +1744,30 @@ class InventoryRuntime:
         latest_reported_device = (
             dict(latest_device_value) if isinstance(latest_device_value, dict) else None
         )
-        if latest_reported is None:
-            for member in safe_members:
-                parsed_last = self._parse_inverter_last_report(
-                    member.get("last_report")
-                )
-                if parsed_last is None:
-                    continue
-                if latest_reported is None or parsed_last > latest_reported:
-                    latest_reported = parsed_last
-                    latest_reported_device = {
-                        "serial_number": self._summary_text(
-                            member.get("serial_number")
-                        ),
-                        "name": self._summary_text(member.get("name")),
-                        "status": self._summary_text(
-                            member.get("statusText")
-                            if member.get("statusText") is not None
-                            else member.get("status")
-                        ),
-                    }
+        for member in safe_members:
+            parsed_last = None
+            for key in (
+                "last_report",
+                "last_reported",
+                "last_reported_at",
+                "last-report",
+            ):
+                parsed_last = self._parse_inverter_last_report(member.get(key))
+                if parsed_last is not None:
+                    break
+            if parsed_last is None:
+                continue
+            if latest_reported is None or parsed_last > latest_reported:
+                latest_reported = parsed_last
+                latest_reported_device = {
+                    "serial_number": self._summary_text(member.get("serial_number")),
+                    "name": self._summary_text(member.get("name")),
+                    "status": self._summary_text(
+                        member.get("statusText")
+                        if member.get("statusText") is not None
+                        else member.get("status")
+                    ),
+                }
         snapshot: dict[str, object] = {
             "total_inverters": total_inverters,
             "reporting_inverters": reporting,
@@ -2994,6 +2999,34 @@ class InventoryRuntime:
             payload.get("data"), list
         )
 
+    @staticmethod
+    def _inverter_parameter_snapshot_has_values(snapshot: object) -> bool:
+        """Return whether a telemetry snapshot contains at least one reading."""
+
+        return isinstance(snapshot, dict) and any(
+            key not in {"parameter_ids", "sampled_at"} for key in snapshot
+        )
+
+    @classmethod
+    def _remove_inverter_parameter(
+        cls,
+        telemetry_by_serial: dict[str, dict[str, object]],
+        canonical: str,
+    ) -> None:
+        """Remove one canonical reading and its metadata from every inverter."""
+
+        for serial, snapshot in list(telemetry_by_serial.items()):
+            snapshot.pop(canonical, None)
+            for metadata_key in ("parameter_ids", "sampled_at"):
+                metadata = snapshot.get(metadata_key)
+                if not isinstance(metadata, dict):
+                    continue
+                metadata.pop(canonical, None)
+                if not metadata:
+                    snapshot.pop(metadata_key, None)
+            if not cls._inverter_parameter_snapshot_has_values(snapshot):
+                telemetry_by_serial.pop(serial, None)
+
     async def _async_refresh_inverter_parameter_telemetry(
         self, serials: list[str]
     ) -> dict[str, dict[str, object]]:
@@ -3001,14 +3034,61 @@ class InventoryRuntime:
 
         coord = self.coordinator
         cached = getattr(self, "_inverter_parameter_telemetry", None)
-        cached_by_serial = dict(cached) if isinstance(cached, dict) else {}
+        cached_items = cached.items() if isinstance(cached, dict) else ()
+        cached_by_serial = {
+            serial: {
+                key: (
+                    dict(item)
+                    if key in {"parameter_ids", "sampled_at"} and isinstance(item, dict)
+                    else item
+                )
+                for key, item in value.items()
+            }
+            for serial, value in cached_items
+            if isinstance(serial, str) and isinstance(value, dict)
+        }
         telemetry_family = "inverter_parameter_telemetry"
         telemetry_health = coord._endpoint_family_state(telemetry_family)
-        if (
-            telemetry_health.last_success_mono is not None
-            and not coord._endpoint_family_can_use_stale(telemetry_family)
-        ):
-            cached_by_serial = {}
+        freshness_raw = getattr(self, "_inverter_parameter_success_mono", None)
+        freshness_items = (
+            freshness_raw.items() if isinstance(freshness_raw, dict) else ()
+        )
+        freshness_by_parameter = {
+            str(key): float(value)
+            for key, value in freshness_items
+            if isinstance(key, str) and isinstance(value, (int, float))
+        }
+        policy = coord._endpoint_family_policy(telemetry_family)
+        stale_after_s = policy.stale_after_s if policy is not None else None
+        now_mono = time.monotonic()
+        cached_canonicals = {
+            key
+            for snapshot in cached_by_serial.values()
+            for key in snapshot
+            if key not in {"parameter_ids", "sampled_at"}
+        }
+        stale_canonicals: set[str] = set()
+        if isinstance(stale_after_s, (int, float)) and stale_after_s > 0:
+            for canonical in cached_canonicals:
+                last_success = freshness_by_parameter.get(
+                    canonical,
+                    telemetry_health.last_success_mono,
+                )
+                if last_success is not None and now_mono - last_success > float(
+                    stale_after_s
+                ):
+                    stale_canonicals.add(canonical)
+                    self._remove_inverter_parameter(cached_by_serial, canonical)
+                    freshness_by_parameter.pop(canonical, None)
+        if stale_canonicals:
+            self._update_shared_state(
+                _inverter_parameter_telemetry=cached_by_serial,
+                _inverter_parameter_success_mono=freshness_by_parameter,
+            )
+            if isinstance(telemetry_health.degraded, bool):
+                telemetry_health.degraded = True
+                telemetry_health.cache_stale = True
+                telemetry_health.using_cached_data = bool(cached_by_serial)
         if not serials:
             return cached_by_serial
 
@@ -3112,40 +3192,33 @@ class InventoryRuntime:
         valid_payload_count = 0
         first_error: Exception | None = None
         telemetry_by_serial = {
-            serial: {
-                key: (
-                    dict(item)
-                    if key in {"parameter_ids", "sampled_at"} and isinstance(item, dict)
-                    else item
-                )
-                for key, item in value.items()
-            }
+            serial: value
             for serial, value in cached_by_serial.items()
-            if serial in serials and isinstance(value, dict)
+            if serial in serials
         }
+        cached_canonicals = {
+            key
+            for snapshot in telemetry_by_serial.values()
+            for key in snapshot
+            if key not in {"parameter_ids", "sampled_at"}
+        }
+        failed_canonicals: set[str] = set()
         for parameter_id, result in zip(parameter_ids, results, strict=True):
+            canonical = INVERTER_PARAMETER_ALIASES[parameter_id.lower()]
             if isinstance(result, Exception):
                 first_error = first_error or result
+                failed_canonicals.add(canonical)
                 continue
             if not self._inverter_parameter_payload_is_valid(result):
                 first_error = first_error or ValueError(
                     f"Dashboard parameter response was invalid for {parameter_id}"
                 )
+                failed_canonicals.add(canonical)
                 continue
             assert isinstance(result, dict)
             valid_payload_count += 1
-            canonical = INVERTER_PARAMETER_ALIASES[parameter_id.lower()]
-            for serial, snapshot in list(telemetry_by_serial.items()):
-                snapshot.pop(canonical, None)
-                for metadata_key in ("parameter_ids", "sampled_at"):
-                    metadata = snapshot.get(metadata_key)
-                    if not isinstance(metadata, dict):
-                        continue
-                    metadata.pop(canonical, None)
-                    if not metadata:
-                        snapshot.pop(metadata_key, None)
-                if not snapshot:
-                    telemetry_by_serial.pop(serial, None)
+            freshness_by_parameter[canonical] = now_mono
+            self._remove_inverter_parameter(telemetry_by_serial, canonical)
             for serial, (value, sampled_at) in self._inverter_parameter_rows(
                 result, parameter_id
             ).items():
@@ -3157,39 +3230,87 @@ class InventoryRuntime:
                 if sampled_at is not None:
                     snapshot.setdefault("sampled_at", {})[canonical] = sampled_at
         if valid_payload_count:
-            self._set_shared_state_attr(
-                "_inverter_parameter_telemetry", telemetry_by_serial
+            self._update_shared_state(
+                _inverter_parameter_telemetry=telemetry_by_serial,
+                _inverter_parameter_success_mono=freshness_by_parameter,
             )
+        useful_telemetry = any(
+            self._inverter_parameter_snapshot_has_values(snapshot)
+            for snapshot in telemetry_by_serial.values()
+        )
+        current_canonicals = {
+            key
+            for snapshot in telemetry_by_serial.values()
+            for key in snapshot
+            if key not in {"parameter_ids", "sampled_at"}
+        }
+        using_cached_data = bool(
+            failed_canonicals & cached_canonicals & current_canonicals
+        )
+        failed_cache_stale = bool(failed_canonicals & stale_canonicals)
         if valid_payload_count == len(parameter_ids):
             coord._note_endpoint_family_success(telemetry_family)
+            telemetry_health.degraded = False
+            telemetry_health.partial_success = False
+            telemetry_health.successful_items = valid_payload_count
+            telemetry_health.total_items = len(parameter_ids)
+            telemetry_health.using_cached_data = False
+            telemetry_health.cache_stale = False
             return telemetry_by_serial
-        coord._note_endpoint_family_failure(
-            telemetry_family,
-            first_error or ValueError("Dashboard parameter readings were unavailable"),
+        batch_error = first_error or ValueError(
+            "Dashboard parameter readings were unavailable"
         )
+        safe_batch_error = redact_text(
+            batch_error,
+            site_ids=(coord.site_id,),
+            identifiers=serials,
+            max_length=160,
+        )
+        if valid_payload_count:
+            coord._note_endpoint_family_success(telemetry_family)
+            telemetry_health.last_error = safe_batch_error
+            telemetry_health.degraded = bool(failed_cache_stale or not useful_telemetry)
+            telemetry_health.partial_success = True
+        else:
+            coord._note_endpoint_family_failure(telemetry_family, batch_error)
+            telemetry_health.last_error = safe_batch_error
+            failure_threshold = (
+                int(policy.suppress_after_failures)
+                if policy is not None and policy.suppress_after_failures is not None
+                else 1
+            )
+            telemetry_health.degraded = bool(
+                failed_cache_stale
+                or not useful_telemetry
+                or telemetry_health.consecutive_failures >= failure_threshold
+            )
+            telemetry_health.partial_success = False
+        telemetry_health.successful_items = valid_payload_count
+        telemetry_health.total_items = len(parameter_ids)
+        telemetry_health.using_cached_data = using_cached_data
+        telemetry_health.cache_stale = failed_cache_stale
         return telemetry_by_serial if valid_payload_count else cached_by_serial
 
     @staticmethod
     async def _async_run_bounded_optional_batch(
         factories: list[Callable[[], Awaitable[object]]],
         *,
-        deadline_s: float = INVERTER_PARAMETER_BATCH_DEADLINE_S,
+        timeout_s: float = INVERTER_PARAMETER_REQUEST_TIMEOUT_S,
+        concurrency: int = INVERTER_PARAMETER_BATCH_CONCURRENCY,
     ) -> list[object]:
-        """Run optional requests serially within one explicit operation budget."""
+        """Run optional requests with bounded concurrency and per-request timeout."""
 
-        deadline = time.monotonic() + max(0.0, deadline_s)
-        results: list[object] = []
-        for index, factory in enumerate(factories):
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                results.extend(TimeoutError() for _ in factories[index:])
-                break
+        semaphore = asyncio.Semaphore(max(1, concurrency))
+
+        async def _run(factory: Callable[[], Awaitable[object]]) -> object:
             try:
-                async with asyncio.timeout(remaining):
-                    results.append(await factory())
+                async with semaphore:
+                    async with asyncio.timeout(max(0.0, timeout_s)):
+                        return await factory()
             except Exception as err:  # noqa: BLE001 - preserve partial optional data
-                results.append(err)
-        return results
+                return err
+
+        return list(await asyncio.gather(*(_run(factory) for factory in factories)))
 
     async def _async_refresh_inverters(self) -> None:
         """Refresh inverter metadata/status/production and build serial snapshots."""
@@ -3213,6 +3334,7 @@ class InventoryRuntime:
                 _inverter_parameter_ids=[],
                 _inverter_parameter_columns=[],
                 _inverter_parameter_telemetry={},
+                _inverter_parameter_success_mono={},
                 _inverter_summary_counts={
                     "total": 0,
                     "normal": 0,

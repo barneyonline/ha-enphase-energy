@@ -343,6 +343,61 @@ def test_inventory_runtime_summary_and_inverter_helper_paths(
     assert coord.inverter_data("") is None
 
 
+def test_microinverter_summary_uses_newest_valid_member_timestamp(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(serials=[])
+    runtime = coord.inventory_runtime
+    bucket = {
+        "count": 3,
+        "status_counts": {"total": 3, "normal": 3},
+        "latest_reported_utc": "2026-07-12T06:00:00Z",
+        "latest_reported_device": {
+            "serial_number": "TOPOLOGY",
+            "name": "Topology summary",
+            "status": "normal",
+        },
+        "devices": [
+            {
+                "serial_number": "INV-A",
+                "last_report": "not-a-timestamp",
+            },
+            {
+                "serial_number": "INV-B",
+                "name": "Roof B",
+                "statusText": "Normal",
+                "last_reported_at": "2026-07-12T10:00:00Z",
+            },
+            {
+                "serial_number": "INV-C",
+                "name": "Roof C",
+                "status": "normal",
+                "last-report": "2026-07-12T11:00:00Z",
+            },
+        ],
+    }
+    coord._type_device_buckets = {"microinverter": bucket}  # noqa: SLF001
+
+    snapshot = runtime._build_microinverter_inventory_summary()  # noqa: SLF001
+
+    assert snapshot["latest_reported_utc"] == "2026-07-12T11:00:00+00:00"
+    assert snapshot["latest_reported_device"] == {
+        "serial_number": "INV-C",
+        "name": "Roof C",
+        "status": "normal",
+    }
+
+    bucket["latest_reported_utc"] = "2026-07-12T12:00:00Z"
+    snapshot = runtime._build_microinverter_inventory_summary()  # noqa: SLF001
+
+    assert snapshot["latest_reported_utc"] == "2026-07-12T12:00:00+00:00"
+    assert snapshot["latest_reported_device"] == {
+        "serial_number": "TOPOLOGY",
+        "name": "Topology summary",
+        "status": "normal",
+    }
+
+
 @pytest.mark.asyncio
 async def test_inventory_runtime_refresh_inverters_preserves_previous_lifetime_on_regression(
     coordinator_factory,
@@ -1381,7 +1436,7 @@ async def test_inventory_runtime_bulk_parameter_telemetry(coordinator_factory) -
 
 
 @pytest.mark.asyncio
-async def test_inventory_runtime_optional_batch_is_serial_and_bounded(
+async def test_inventory_runtime_optional_batch_has_bounded_concurrency(
     coordinator_factory,
 ) -> None:
     runtime = coordinator_factory().inventory_runtime
@@ -1398,17 +1453,19 @@ async def test_inventory_runtime_optional_batch_is_serial_and_bounded(
         active -= 1
         return label
 
+    labels = ["first", "second", "third", "fourth", "fifth"]
     results = await runtime._async_run_bounded_optional_batch(  # noqa: SLF001
-        [lambda: _request("first"), lambda: _request("second")]
+        [lambda label=label: _request(label) for label in labels],
+        concurrency=2,
     )
 
-    assert results == ["first", "second"]
-    assert order == ["first", "second"]
-    assert max_active == 1
+    assert results == labels
+    assert order == labels
+    assert max_active == 2
 
     bounded = await runtime._async_run_bounded_optional_batch(  # noqa: SLF001
         [lambda: _request("too-late")],
-        deadline_s=0.0,
+        timeout_s=0.0,
     )
 
     assert isinstance(bounded[0], TimeoutError)
@@ -1476,12 +1533,158 @@ async def test_inventory_runtime_empty_parameter_rows_clear_cached_value(
             "sampled_at": {"temperature": "2026-07-11T01:00:00Z"},
         }
     }
-    assert (
-        coord._endpoint_family_state(  # noqa: SLF001
-            "inverter_parameter_telemetry"
-        ).consecutive_failures
-        == 1
+    health = coord._endpoint_family_state(  # noqa: SLF001
+        "inverter_parameter_telemetry"
     )
+    assert health.consecutive_failures == 0
+    assert health.degraded is False
+    assert health.partial_success is True
+    assert health.successful_items == 1
+    assert health.total_items == 2
+    assert health.using_cached_data is True
+    assert health.cache_stale is False
+    assert health.last_error == "temperature temporarily unavailable"
+    assert health.next_retry_utc is not None
+    metrics = coord.collect_site_metrics()
+    assert "inverter_parameter_telemetry" not in metrics["degraded_endpoint_families"]
+    assert (
+        metrics["endpoint_failure_details"]["inverter_parameter_telemetry"]["retry_utc"]
+        == health.next_retry_utc.isoformat()
+    )
+
+
+@pytest.mark.asyncio
+async def test_inventory_runtime_full_parameter_failures_degrade_at_threshold(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.inventory_runtime
+    now_mono = time.monotonic()
+    runtime._update_shared_state(  # noqa: SLF001
+        _inverter_parameter_ids=["power", "temperature"],
+        _inverter_parameter_telemetry={"INV-A": {"power": 250.0}},
+        _inverter_parameter_success_mono={"power": now_mono},
+    )
+    monkeypatch.setattr(
+        coord,
+        "_endpoint_family_should_run",
+        lambda family, **_kwargs: family == "inverter_parameter_telemetry",
+    )
+    coord.client.system_dashboard_parameter_view = AsyncMock(
+        side_effect=RuntimeError("site 9633674 inverter INV-A telemetry unavailable")
+    )
+
+    for failure_count in (1, 2, 3):
+        result = (
+            await runtime._async_refresh_inverter_parameter_telemetry(  # noqa: SLF001
+                ["INV-A"]
+            )
+        )
+        health = coord._endpoint_family_state(  # noqa: SLF001
+            "inverter_parameter_telemetry"
+        )
+        assert result == {"INV-A": {"power": 250.0}}
+        assert health.consecutive_failures == failure_count
+        assert health.degraded is (failure_count >= 3)
+        assert health.successful_items == 0
+        assert health.total_items == 2
+        assert health.using_cached_data is True
+        assert health.cache_stale is False
+        assert "9633674" not in (health.last_error or "")
+        assert "INV-A" not in (health.last_error or "")
+        assert health.next_retry_utc is not None
+        if failure_count < 3:
+            assert (
+                "inverter_parameter_telemetry"
+                not in coord.collect_site_metrics()["degraded_endpoint_families"]
+            )
+
+    metrics = coord.collect_site_metrics()
+    assert metrics["degraded_endpoint_families"] == ["inverter_parameter_telemetry"]
+    assert (
+        metrics["endpoint_failure_details"]["inverter_parameter_telemetry"]["reason"]
+        == health.last_error
+    )
+    endpoint_health = metrics["endpoint_family_health"]["inverter_parameter_telemetry"]
+    assert endpoint_health["degraded"] is True
+    assert endpoint_health["successful_items"] == 0
+    assert endpoint_health["using_cached_data"] is True
+
+
+@pytest.mark.asyncio
+async def test_inventory_runtime_full_failure_without_cache_degrades_immediately(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.inventory_runtime
+    runtime._set_shared_state_attr("_inverter_parameter_ids", ["power"])  # noqa: SLF001
+    monkeypatch.setattr(
+        coord,
+        "_endpoint_family_should_run",
+        lambda family, **_kwargs: family == "inverter_parameter_telemetry",
+    )
+    coord.client.system_dashboard_parameter_view = AsyncMock(
+        side_effect=TimeoutError("parameter request timed out")
+    )
+
+    assert (
+        await runtime._async_refresh_inverter_parameter_telemetry(  # noqa: SLF001
+            ["INV-A"]
+        )
+        == {}
+    )
+
+    health = coord._endpoint_family_state(  # noqa: SLF001
+        "inverter_parameter_telemetry"
+    )
+    assert health.consecutive_failures == 1
+    assert health.degraded is True
+    assert health.using_cached_data is False
+
+
+@pytest.mark.asyncio
+async def test_inventory_runtime_stale_parameter_cache_degrades_partial_result(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.inventory_runtime
+    runtime._update_shared_state(  # noqa: SLF001
+        _inverter_parameter_ids=["power", "temperature"],
+        _inverter_parameter_telemetry={"INV-A": {"power": 250.0, "temperature": 42.0}},
+        _inverter_parameter_success_mono={
+            "power": time.monotonic(),
+            "temperature": time.monotonic() - 1_801.0,
+        },
+    )
+    monkeypatch.setattr(
+        coord,
+        "_endpoint_family_should_run",
+        lambda family, **_kwargs: family == "inverter_parameter_telemetry",
+    )
+    coord.client.system_dashboard_parameter_view = AsyncMock(
+        side_effect=[
+            {"intervals": [{"serial_number": "INV-A", "value": 260.0}]},
+            RuntimeError("temperature unavailable"),
+        ]
+    )
+
+    result = await runtime._async_refresh_inverter_parameter_telemetry(  # noqa: SLF001
+        ["INV-A"]
+    )
+
+    assert result == {
+        "INV-A": {
+            "power": 260.0,
+            "parameter_ids": {"power": "power"},
+        }
+    }
+    health = coord._endpoint_family_state(  # noqa: SLF001
+        "inverter_parameter_telemetry"
+    )
+    assert health.degraded is True
+    assert health.partial_success is True
+    assert health.cache_stale is True
+    assert health.using_cached_data is False
 
 
 @pytest.mark.asyncio
@@ -2478,6 +2681,10 @@ def test_inventory_runtime_system_dashboard_and_microinverter_edge_paths(
     assert bucket["count"] == 1
     assert bucket["array_summary"] is None
     assert bucket["firmware_summary"] is None
+
+    runtime._devices_inventory_ready = False  # noqa: SLF001
+    runtime._merge_microinverter_type_bucket()  # noqa: SLF001
+    assert runtime._devices_inventory_ready is False  # noqa: SLF001
 
     runtime._system_dashboard_devices_details_raw = []  # type: ignore[assignment]  # noqa: SLF001
     assert runtime._system_dashboard_raw_payloads("envoy") == {}  # noqa: SLF001

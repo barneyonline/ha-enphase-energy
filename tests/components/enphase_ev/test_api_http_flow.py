@@ -127,11 +127,12 @@ async def test_enlighten_request_timeout_includes_limiter_queue(monkeypatch) -> 
 
 @pytest.mark.asyncio
 async def test_optional_enlighten_reads_reserve_capacity_for_core(monkeypatch) -> None:
-    monkeypatch.setattr(api, "_enlighten_read_semaphore", asyncio.Semaphore(2))
-    monkeypatch.setattr(api, "_enlighten_optional_read_semaphore", asyncio.Semaphore(1))
+    monkeypatch.setattr(api, "_enlighten_read_semaphore", asyncio.Semaphore(3))
+    monkeypatch.setattr(api, "_enlighten_optional_read_semaphore", asyncio.Semaphore(2))
     release = asyncio.Event()
     first_optional_entered = asyncio.Event()
     second_optional_entered = asyncio.Event()
+    third_optional_entered = asyncio.Event()
     core_entered = asyncio.Event()
 
     async def _optional(entered: asyncio.Event) -> None:
@@ -152,14 +153,16 @@ async def test_optional_enlighten_reads_reserve_capacity_for_core(monkeypatch) -
     first = asyncio.create_task(_optional(first_optional_entered))
     await asyncio.wait_for(first_optional_entered.wait(), timeout=1)
     second = asyncio.create_task(_optional(second_optional_entered))
+    await asyncio.wait_for(second_optional_entered.wait(), timeout=1)
+    third = asyncio.create_task(_optional(third_optional_entered))
     core = asyncio.create_task(_core())
     await asyncio.wait_for(core_entered.wait(), timeout=1)
 
-    assert second_optional_entered.is_set() is False
+    assert third_optional_entered.is_set() is False
 
     release.set()
-    await asyncio.gather(first, second, core)
-    assert second_optional_entered.is_set() is True
+    await asyncio.gather(first, second, third, core)
+    assert third_optional_entered.is_set() is True
 
 
 @pytest.mark.asyncio

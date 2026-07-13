@@ -34,6 +34,7 @@ from .sensor import (
     _heatpump_runtime_device_uid,
     _heatpump_runtime_snapshot,
 )
+from .system_events import SYSTEM_EVENTS_ENDPOINT_FAMILY
 
 PARALLEL_UPDATES = 0
 
@@ -120,7 +121,16 @@ async def async_setup_entry(
     @callback
     def _async_sync_system_events() -> None:
         nonlocal system_events_entity_added
-        if coord.system_events_runtime.available:
+        entity_id = ent_reg.async_get_entity_id(
+            "binary_sensor",
+            DOMAIN,
+            _site_binary_sensor_unique_id("active_system_events"),
+        )
+        endpoint_health = coord._endpoint_family_state(SYSTEM_EVENTS_ENDPOINT_FAMILY)
+        endpoint_suppressed = endpoint_health.support_state == "suppressed"
+        if coord.system_events_runtime.available or (
+            entity_id is not None and not endpoint_suppressed
+        ):
             if not system_events_entity_added:
                 async_add_entities(
                     [SiteActiveSystemEventsBinarySensor(coord)],
@@ -249,6 +259,7 @@ class SiteCloudReachableBinarySensor(
 ):
     _attr_has_entity_name = True
     _attr_translation_key = "cloud_reachable"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(coord)
@@ -297,6 +308,7 @@ class SiteActiveSystemEventsBinarySensor(
     _attr_translation_key = "active_system_events"
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _unrecorded_attributes = frozenset({"active_events"})
 
     def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(coord)
@@ -309,14 +321,18 @@ class SiteActiveSystemEventsBinarySensor(
 
     @property
     def is_on(self) -> bool:
-        return cast(int, self._coord.system_events_runtime.active_count) > 0
+        return bool(self._coord.system_events_runtime.problem_active)
 
     @property
     def extra_state_attributes(self) -> dict[str, object]:
-        return cast(
+        attributes = cast(
             dict[str, object],
             self._coord.system_events_runtime.diagnostics(),
         )
+        return {
+            **attributes,
+            "active_events": self._coord.system_events_runtime.active_event_attributes,
+        }
 
     @property
     def device_info(self) -> object:

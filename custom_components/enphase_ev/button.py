@@ -64,8 +64,10 @@ def _retain_cancel_pending_profile_change(coord: EnphaseCoordinator) -> bool:
 
 
 def _retain_request_grid_toggle_otp(coord: EnphaseCoordinator) -> bool:
-    return _site_has_battery(coord) and (
-        _type_available(coord, "enpower") or _type_available(coord, "envoy")
+    return (
+        bool(getattr(coord, "grid_toggle_enabled", False))
+        and _site_has_battery(coord)
+        and (_type_available(coord, "enpower") or _type_available(coord, "envoy"))
     )
 
 
@@ -113,6 +115,15 @@ async def async_setup_entry(
         return f"{DOMAIN}_{sn}_{action}"
 
     @callback
+    def _async_remove_site_button_entity(key: str) -> None:
+        entity_id = ent_reg.async_get_entity_id(
+            "button", DOMAIN, _site_button_unique_id(key)
+        )
+        if entity_id is not None:
+            ent_reg.async_remove(entity_id)
+        site_entity_keys.discard(key)
+
+    @callback
     def _async_sync_chargers() -> None:
         inventory_ready = bool(getattr(coord, "_devices_inventory_ready", False))
         site_entities: list[ButtonEntity] = []
@@ -125,15 +136,19 @@ async def async_setup_entry(
         ):
             site_entities.append(CancelPendingProfileChangeButton(coord))
             site_entity_keys.add("cancel_pending_profile_change")
+        grid_toggle_enabled = bool(getattr(coord, "grid_toggle_enabled", False))
         if _retain_request_grid_toggle_otp(coord):
             retain_site_entity_keys.add("request_grid_toggle_otp")
         if (
             "request_grid_toggle_otp" not in site_entity_keys
+            and grid_toggle_enabled
             and _site_has_battery(coord)
             and (_type_available(coord, "enpower") or _type_available(coord, "envoy"))
         ):
             site_entities.append(RequestGridToggleOtpButton(coord))
             site_entity_keys.add("request_grid_toggle_otp")
+        elif not grid_toggle_enabled:
+            _async_remove_site_button_entity("request_grid_toggle_otp")
         if _retain_storm_alert_opt_out(coord):
             retain_site_entity_keys.add("storm_alert_opt_out")
         if (
@@ -287,6 +302,8 @@ class RequestGridToggleOtpButton(CoordinatorEntity, ButtonEntity):  # type: igno
     @property
     def available(self) -> bool:
         if not super().available:
+            return False
+        if not bool(getattr(self._coord, "grid_toggle_enabled", False)):
             return False
         if not _site_has_battery(self._coord):
             return False

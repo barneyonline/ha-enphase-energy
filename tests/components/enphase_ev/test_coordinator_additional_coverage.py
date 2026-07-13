@@ -89,6 +89,18 @@ def _request_info() -> RequestInfo:
     )
 
 
+def _enable_degraded_service_repairs(mock_issue_registry, monkeypatch) -> None:
+    """Opt a diagnostics-focused test into optional Repair creation."""
+
+    monkeypatch.setattr(
+        coord_diag_mod.CoordinatorDiagnostics,
+        "degraded_service_repair_issues_enabled",
+        property(lambda _self: True),
+    )
+    mock_issue_registry.created.clear()
+    mock_issue_registry.deleted.clear()
+
+
 def _attach_evse_runtime(coord: EnphaseCoordinator) -> EnphaseCoordinator:
     coord.evse_runtime = EvseRuntime(coord)
     return coord
@@ -142,9 +154,10 @@ async def test_async_update_data_http_error_trimmed_json(
 
 @pytest.mark.asyncio
 async def test_async_update_data_scheduler_unavailable_returns_cached(
-    coordinator_factory, mock_issue_registry
+    coordinator_factory, mock_issue_registry, monkeypatch
 ):
     coord = coordinator_factory()
+    _enable_degraded_service_repairs(mock_issue_registry, monkeypatch)
     coord.data = {SERIAL_ONE: {"sn": SERIAL_ONE}}
     err = aiohttp.ClientResponseError(
         _request_info(),
@@ -600,6 +613,7 @@ def test_scheduler_note_default_reason_and_backoff_error(
     coordinator_factory, mock_issue_registry, monkeypatch
 ) -> None:
     coord = coordinator_factory()
+    _enable_degraded_service_repairs(mock_issue_registry, monkeypatch)
 
     calls = {"count": 0}
 
@@ -743,8 +757,11 @@ async def test_async_resolve_auth_settings_backoff_uses_cache(
     assert result == {SERIAL_ONE: (True, False, True, True)}
 
 
-def test_auth_settings_issue_tracking(coordinator_factory, mock_issue_registry) -> None:
+def test_auth_settings_issue_tracking(
+    coordinator_factory, mock_issue_registry, monkeypatch
+) -> None:
     coord = coordinator_factory()
+    _enable_degraded_service_repairs(mock_issue_registry, monkeypatch)
 
     coord._note_auth_settings_unavailable("auth down")  # noqa: SLF001
 
@@ -898,9 +915,10 @@ def test_degraded_service_repair_issue_init_clears_stale_legacy_static_issues(
 
 
 def test_sync_session_history_issue_creates_and_clears(
-    coordinator_factory, mock_issue_registry
+    coordinator_factory, mock_issue_registry, monkeypatch
 ) -> None:
     coord = coordinator_factory()
+    _enable_degraded_service_repairs(mock_issue_registry, monkeypatch)
     coord.session_history = SimpleNamespace(service_available=False)
 
     coord._sync_session_history_issue()  # noqa: SLF001
@@ -922,9 +940,10 @@ def test_sync_session_history_issue_creates_and_clears(
 
 
 def test_sync_session_history_issue_uses_current_day_unavailable_view(
-    coordinator_factory, mock_issue_registry
+    coordinator_factory, mock_issue_registry, monkeypatch
 ) -> None:
     coord = coordinator_factory()
+    _enable_degraded_service_repairs(mock_issue_registry, monkeypatch)
     coord.data = {SERIAL_ONE: {"display_name": "Garage EV"}}
     coord._session_history_day = lambda payload, default: default  # type: ignore[method-assign]  # noqa: SLF001
     coord.session_history = SimpleNamespace(
@@ -964,6 +983,7 @@ def test_sync_session_history_issue_handles_fallback_day_resolution(
     coordinator_factory, mock_issue_registry, monkeypatch
 ) -> None:
     coord = coordinator_factory()
+    _enable_degraded_service_repairs(mock_issue_registry, monkeypatch)
     coord.data = {
         "bad": "skip-me",
         SERIAL_ONE: {"display_name": "Garage EV"},
@@ -1024,9 +1044,10 @@ def test_sync_session_history_issue_ignores_startup_missing_cache(
 
 
 def test_sync_session_history_issue_reports_materialized_unavailable_cache(
-    coordinator_factory, mock_issue_registry
+    coordinator_factory, mock_issue_registry, monkeypatch
 ) -> None:
     coord = coordinator_factory()
+    _enable_degraded_service_repairs(mock_issue_registry, monkeypatch)
     coord.data = {SERIAL_ONE: {"display_name": "Garage EV"}}
     coord._session_history_day = lambda payload, default: default  # type: ignore[method-assign]  # noqa: SLF001
     coord.session_history = SimpleNamespace(
@@ -1049,9 +1070,10 @@ def test_sync_session_history_issue_reports_materialized_unavailable_cache(
 
 
 def test_sync_site_energy_issue_creates_and_clears(
-    coordinator_factory, mock_issue_registry
+    coordinator_factory, mock_issue_registry, monkeypatch
 ) -> None:
     coord = coordinator_factory()
+    _enable_degraded_service_repairs(mock_issue_registry, monkeypatch)
     coord.energy = SimpleNamespace(service_available=False)
 
     coord._sync_site_energy_issue()  # noqa: SLF001
@@ -3440,19 +3462,22 @@ async def test_get_auth_settings_coercion_paths(coordinator_factory):
         (True, True),
         (0, False),
         ("true", True),
+        ("on", True),
+        ("off", False),
         ("maybe", None),
     ]
     for raw, expected in cases:
         coord._auth_settings_cache.clear()
-        coord.client.charger_auth_settings = AsyncMock(
-            return_value=[{"key": AUTH_APP_SETTING, "value": raw}]
-        )
+        setting = {"key": AUTH_APP_SETTING}
+        if raw is not None:
+            setting["value"] = raw
+        coord.client.charger_auth_settings = AsyncMock(return_value=[setting])
         result = await coord._get_auth_settings("EV1")
         assert result == (expected, None, True, False)
 
 
 @pytest.mark.asyncio
-async def test_get_auth_settings_treats_null_values_as_unknown_supported(
+async def test_get_auth_settings_treats_present_null_values_as_disabled(
     coordinator_factory,
 ):
     coord = coordinator_factory(serials=["EV1"])
@@ -3466,7 +3491,7 @@ async def test_get_auth_settings_treats_null_values_as_unknown_supported(
 
     result = await coord._get_auth_settings("EV1")
 
-    assert result == (None, None, True, True)
+    assert result == (False, False, True, True)
 
 
 @pytest.mark.asyncio
@@ -3534,7 +3559,9 @@ async def test_async_update_data_includes_auth_settings(coordinator_factory):
 
 
 @pytest.mark.asyncio
-async def test_async_update_data_keeps_null_auth_settings_unknown(coordinator_factory):
+async def test_async_update_data_maps_present_null_auth_settings_to_off(
+    coordinator_factory,
+):
     coord = coordinator_factory(serials=[SERIAL_ONE])
     coord._has_successful_refresh = True  # noqa: SLF001
     payload = {
@@ -3569,9 +3596,9 @@ async def test_async_update_data_keeps_null_auth_settings_unknown(coordinator_fa
 
     assert result[SERIAL_ONE]["app_auth_supported"] is True
     assert result[SERIAL_ONE]["rfid_auth_supported"] is True
-    assert result[SERIAL_ONE]["app_auth_enabled"] is None
-    assert result[SERIAL_ONE]["rfid_auth_enabled"] is None
-    assert result[SERIAL_ONE]["auth_required"] is None
+    assert result[SERIAL_ONE]["app_auth_enabled"] is False
+    assert result[SERIAL_ONE]["rfid_auth_enabled"] is False
+    assert result[SERIAL_ONE]["auth_required"] is False
 
 
 @pytest.mark.asyncio
@@ -4636,8 +4663,10 @@ def test_persist_tokens_does_not_mark_reload_skip_for_noop_update(
 def test_hems_auth_circuit_is_coordinator_backed(
     coordinator_factory,
     mock_issue_registry,
+    monkeypatch,
 ):
     coord = coordinator_factory()
+    _enable_degraded_service_repairs(mock_issue_registry, monkeypatch)
     coord._selected_type_keys = {"heatpump"}  # noqa: SLF001
 
     assert coord._hems_auth_circuit_active() is False  # noqa: SLF001
@@ -4676,8 +4705,10 @@ def test_hems_auth_circuit_is_coordinator_backed(
 def test_hems_auth_circuit_suppresses_repair_without_heatpump_context(
     coordinator_factory,
     mock_issue_registry,
+    monkeypatch,
 ):
     coord = coordinator_factory()
+    _enable_degraded_service_repairs(mock_issue_registry, monkeypatch)
 
     assert coord._note_hems_auth_failure(  # noqa: SLF001
         coord_mod.Unauthorized(),

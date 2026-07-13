@@ -1334,7 +1334,15 @@ class EvseRuntime:
                 return value != 0
             if isinstance(value, str):
                 normalized = value.strip().lower()
-                if normalized in ("true", "1", "yes", "y", "enabled", "enable"):
+                if normalized in (
+                    "true",
+                    "1",
+                    "yes",
+                    "y",
+                    "enabled",
+                    "enable",
+                    "on",
+                ):
                     return True
                 if normalized in (
                     "false",
@@ -1343,6 +1351,7 @@ class EvseRuntime:
                     "n",
                     "disabled",
                     "disable",
+                    "off",
                     "",
                 ):
                     return False
@@ -1356,6 +1365,8 @@ class EvseRuntime:
                 raw = item.get("value")
                 if raw is None:
                     raw = item.get("reqValue")
+                if raw is None and ("value" in item or "reqValue" in item):
+                    raw = False
                 if key == AUTH_APP_SETTING:
                     app_supported = True
                     app_enabled = _coerce(raw)

@@ -759,7 +759,7 @@ Notes:
 - Implementation: the Default Charge Level entity uses the same discovered charger amp limits as Charging Amps, but writes this persistent config value instead of updating the immediate/session charging setpoint.
 - When either setting is enabled, charging sessions require user authentication before starting.
 - Observed: read responses use `status=1`; update responses use `status=2`. Authentication-setting update responses have shown `value` as the prior state and `reqValue` as the desired state, while `DefaultChargeLevel` returned the accepted target in `value` and left `reqValue` as `null`.
-- Observed: both `sessionAuthentication` and `rfidSessionAuthentication` can return `null` for both `value` and `reqValue`, which appears to represent a disabled or unset state.
+- Observed: both `sessionAuthentication` and `rfidSessionAuthentication` can return `null` for both `value` and `reqValue`. When the setting key is present, the Enphase app represents this state as Off, so the integration normalizes it to disabled. A missing setting key remains unknown/unsupported.
 - Observed web captures succeeded with session cookies, XSRF cookies, `e-auth-token`, and sometimes an `Authorization: Bearer <token>` overlay. Treat the auth requirements here as UI-path dependent.
 - Implementation: config reads first use normal today JSON headers plus the control `Authorization` overlay. If that returns `Unauthorized` or `403` while bearer auth was present, the client retries the same POST with both `Authorization` and `e-auth-token` explicitly suppressed.
 - Privacy: real captures include site IDs, charger serial numbers, cookies, JWTs, names, and email addresses. Redact all such values when preserving examples.
@@ -2014,7 +2014,22 @@ Returns `columns[]` metadata including `name`, `header`, `attribute_name`, visib
 ```
 GET /service/system_dashboard/api_internal/cs/sites/<site_id>/data/parameter-view?serial_numbers=<csv>&per_page=500&page=1&range=today&parameter_id=<id>&start_date=&end_date=&sort_by_date=desc
 ```
-Returns paginated device readings for one parameter. The response includes `intervals[]`, per-device `columns[]`, paging fields, and range metadata. The integration passes every active microinverter serial in one CSV request per supported parameter, uses the site master-data catalog to avoid unsupported probes, and caches successful readings for five minutes. Supported values are normalized to power, AC/DC voltage/current, AC frequency, temperature, signal strength, and firmware when advertised and present. Empty or malformed rows are ignored, and recent successful values remain usable for up to 30 minutes during optional endpoint failures.
+Returns paginated device readings for one parameter. The response includes
+`intervals[]`, per-device `columns[]`, paging fields, and range metadata. The
+integration passes every active microinverter serial in one CSV request per
+supported parameter, uses the site master-data catalog to avoid unsupported
+probes, and runs up to two parameter requests concurrently with an independent
+15-second timeout per request. Supported values are normalized to power, AC/DC
+voltage/current, AC frequency, temperature, signal strength, and firmware when
+advertised and present.
+
+Successful parameters retain independent freshness timestamps. Partial batches
+remain healthy while they publish useful telemetry and any reused parameter values
+are younger than 30 minutes. A batch is degraded when it has no usable current or
+cached result, when a reused parameter becomes stale, or after three consecutive
+full-batch failures. Sanitized failure reasons and UTC retry times remain visible
+through the Service Status diagnostic attributes even while a fresh-cache retry is
+classified as healthy.
 
 ### 2.9.4.c System Dashboard Devices Table
 ```
@@ -2431,6 +2446,15 @@ Observed structure:
 - `first_set` is already formatted as a site-local string rather than epoch time.
 - `serial_num` may contain a true serial number or aggregate text such as `"2 Devices"`.
 - `force_clearable` and `disable_force_clear` appear to indicate whether manual clear actions are allowed.
+
+Runtime use:
+- Standing alarms are the authoritative source for alarm severity and Home
+  Assistant Repairs.
+- The Problem entity is active when at least one standing alarm exists or the
+  event feed explicitly classifies an active event as high impact.
+- Alarm IDs, serials, links, descriptions, and CSV links are discarded. Repair
+  IDs use a truncated SHA-256 fingerprint, and missing alarms retain the existing
+  bounded grace period before their Repairs are removed.
 
 ### 2.9.8 System Dashboard Device Details by Type
 ```
@@ -3528,13 +3552,16 @@ updated_at, device_type, event_type, event_state, alarm_id, details
 Runtime safety rules:
 
 - Cleared/closed/resolved rows are not active.
-- Repairs are created only when the payload or lookup catalogs explicitly mark an
-  active row as `error`, `critical`, `fatal`, `emergency`, or `severe`.
+- Ordinary stateful rows do not set the Problem entity. Only standing alarms or
+  rows explicitly classified as `error`, `critical`, `fatal`, `emergency`, or
+  `severe` set Problem.
+- Up to 20 active rows are exposed as an identifier-free entity attribute with
+  event type, device type, state, event date, and update time. The attribute is
+  excluded from Recorder history.
 - Event IDs, alarm IDs, device serials, device links, details, and CSV links are
-  discarded. Repair IDs use a truncated SHA-256 fingerprint and expose no raw
-  identifier.
-- A successful response clears repairs for resolved events. A transient endpoint
-  failure never clears a last-known active repair.
+  discarded.
+- Repairs are synchronized from Standing Alarms rather than event-history rows. A
+  transient endpoint failure never clears a last-known active repair.
 
 ### 2.11 Battery Backup History
 ```
@@ -6427,9 +6454,16 @@ Body: {
 Opts out of a specific active Storm Guard alert.
 
 Implementation auth notes:
-- The current client treats this as an official-web-style BatteryConfig write: fresh XSRF acquisition first, then send the BatteryConfig `Accept`/`Username`/`Origin`/`Referer`/Chrome-`User-Agent` shape plus `X-XSRF-Token`.
-- Inherited `Authorization`, `Cookie`, `X-CSRF-Token`, and `X-Requested-With` are explicitly suppressed on this path.
-- The current client tries the primary first-party variant with `e-auth-token` + `requestid` first, then retries once with the lean first-party variant without those headers after a `403`.
+- The client routes this through the same compatibility pipeline as other
+  BatteryConfig writes. It acquires a fresh XSRF token before official-web
+  attempts and retries compatible authentication shapes after HTTP `403`.
+- When the stored browser-session cookie contains its matching XSRF token, the
+  cookie plus `e-auth-token` variant is preferred and reuses that pair without
+  replacing the token first.
+- Fallback attempts include the primary first-party `e-auth-token` + `requestid`
+  shape, the lean first-party shape, and mixed cookie/bearer compatibility where
+  the available credentials support them. Successful shapes are cached separately
+  for the Storm Alert endpoint family.
 
 Example response:
 ```json

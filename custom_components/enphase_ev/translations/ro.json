@@ -412,6 +412,9 @@
     "tariff_rate_api_unavailable": {
       "message": "API-ul de scriere a tarifelor nu este disponibil."
     },
+    "pricing_edits_disabled": {
+      "message": "Editarea prețurilor este dezactivată în opțiunile integrării."
+    },
     "tariff_rate_entity_required": {
       "message": "Selectați exact o entitate de tarif."
     },
@@ -485,14 +488,20 @@
         "title": "Opțiuni Enphase Energy",
         "description": "Alegeți ce doriți să faceți cu această intrare de integrare.",
         "menu_options": {
-          "settings": "Setări",
+          "settings": "Interogare",
+          "devices": "Selectați dispozitive",
+          "repair_notifications": "Notificări",
+          "authentication_settings": "Autentificare",
           "migrate_envoy": "Migrare istoric Envoy",
           "advanced": "Avansat"
         },
         "menu_option_descriptions": {
           "settings": "Ajustați interogarea și comportamentul.",
+          "devices": "Alegeți ce grupuri de dispozitive să adăugați. Toate selecțiile folosesc același interval de interogare.",
+          "repair_notifications": "Gestionează notificările de reparații Home Assistant.",
+          "authentication_settings": "Lansați fluxul de autentificare pentru a reîmprospăta credențialele fără a elimina integrarea.",
           "migrate_envoy": "Preluați ID-urile entităților de energie Enphase Envoy selectate pentru ca istoricul Home Assistant Energy să continue în această integrare.",
-          "advanced": "Controlul profilului de rețea este disponibil doar pentru instalatori."
+          "advanced": "Comenzi opționale pentru modul rețea și controale ale profilului numai pentru instalatori."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -503,11 +512,9 @@
           "slow_poll_interval": "Interval lent de interogare (s)",
           "fast_while_streaming": "Preferă interogarea rapidă când fluxul cloud este activ",
           "api_timeout": "Timeout API (s)",
-          "nominal_voltage": "Tensiune nominală (V)",
+          "nominal_voltage": "Tensiunea nominală a încărcătorului EV (V)",
           "session_history_interval": "Interval istoric sesiuni (min)",
           "schedule_sync_enabled": "Activați asistența pentru programator",
-          "reauth": "Pornește reautentificarea",
-          "forget_password": "Uită parola salvată",
           "type_heatpump": "Pompă de căldură",
           "type_ac_battery": "Baterie AC",
           "battery_schedules_enabled": "Activați planificatorul bateriei",
@@ -523,60 +530,130 @@
           "slow_poll_interval": "Interval de folosit când este inactiv.",
           "fast_while_streaming": "Când este activat, interogare rapidă în timpul fluxului cloud activ.",
           "api_timeout": "Secunde până la expirarea solicitărilor API.",
-          "nominal_voltage": "Tensiune de rezervă folosită pentru estimarea puterii încărcătorului.",
+          "nominal_voltage": "Tensiunea tipică de alimentare CA folosită pentru estimarea puterii când tensiunea în timp real nu este disponibilă.",
           "session_history_interval": "Minute de așteptare între preluările istoricului sesiunilor din cloud.",
-          "schedule_sync_enabled": "Gestionați gestionarea programului Enphase",
-          "reauth": "Lansați fluxul de autentificare pentru a reîmprospăta credențialele fără a elimina integrarea.",
-          "forget_password": "Elimină parola stocată. Reîmprospătarea automată nu va mai fi încercată.",
           "type_heatpump": "Include senzori pentru starea, diagnosticarea și consumul pompei de căldură.",
           "type_ac_battery": "Include senzori pentru bateria AC și controale pentru modul de repaus atunci când sunt disponibile.",
-          "battery_schedules_enabled": "Gestionați programele bateriei IQ",
           "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate.",
           "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil."
         }
       },
       "settings": {
-        "title": "Opțiuni Enphase Energy",
+        "title": "Interogare",
         "description": "Reglați interogarea și comportamentul.",
         "data": {
-          "type_envoy": "Gateway",
-          "type_encharge": "Baterie",
-          "type_iqevse": "Încărcătoare",
-          "type_microinverter": "Microinvertoare",
           "fast_poll_interval": "Interval rapid de interogare (s)",
           "slow_poll_interval": "Interval lent de interogare (s)",
           "fast_while_streaming": "Preferă interogarea rapidă când fluxul cloud este activ",
           "api_timeout": "Timeout API (s)",
-          "nominal_voltage": "Tensiune nominală (V)",
           "session_history_interval": "Interval istoric sesiuni (min)",
-          "schedule_sync_enabled": "Activați asistența pentru programator",
-          "reauth": "Pornește reautentificarea",
-          "forget_password": "Uită parola salvată",
-          "type_heatpump": "Pompă de căldură",
-          "type_ac_battery": "Baterie AC",
-          "battery_schedules_enabled": "Activați planificatorul bateriei",
-          "degraded_service_repair_issues": "Activează reparațiile pentru servicii degradate",
-          "weather_enabled": "Activează vremea"
+          "degraded_service_repair_issues": "Activează reparațiile pentru servicii degradate"
         },
         "data_description": {
-          "type_envoy": "Include conectivitatea gateway-ului și diagnosticul contoarelor.",
-          "type_encharge": "Include starea bateriei și entitățile de control când sunt disponibile.",
-          "type_iqevse": "Include entități și controale pentru încărcătoarele EV.",
-          "type_microinverter": "Include senzori pentru conectivitatea microinvertoarelor, numărul activ și producția pe durata de viață.",
           "fast_poll_interval": "Interval de folosit în timpul încărcării sau streamingului.",
           "slow_poll_interval": "Interval de folosit când este inactiv.",
           "fast_while_streaming": "Când este activat, interogare rapidă în timpul fluxului cloud activ.",
           "api_timeout": "Secunde până la expirarea solicitărilor API.",
-          "nominal_voltage": "Tensiune de rezervă folosită pentru estimarea puterii încărcătorului.",
           "session_history_interval": "Minute de așteptare între preluările istoricului sesiunilor din cloud.",
-          "schedule_sync_enabled": "Gestionați gestionarea programului Enphase",
-          "reauth": "Lansați fluxul de autentificare pentru a reîmprospăta credențialele fără a elimina integrarea.",
-          "forget_password": "Elimină parola stocată. Reîmprospătarea automată nu va mai fi încercată.",
-          "type_heatpump": "Include senzori pentru starea, diagnosticarea și consumul pompei de căldură.",
+          "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate."
+        }
+      },
+      "devices": {
+        "title": "Selectați dispozitive",
+        "description": "Alegeți ce grupuri de dispozitive să adăugați. Toate selecțiile folosesc același interval de interogare.",
+        "sections": {
+          "devices": {
+            "name": "Selectați dispozitive",
+            "data": {
+              "type_envoy": "Gateway",
+              "type_encharge": "Baterie",
+              "type_ac_battery": "Baterie AC",
+              "type_iqevse": "Încărcătoare",
+              "type_heatpump": "Pompă de căldură",
+              "type_microinverter": "Microinvertoare"
+            },
+            "data_description": {
+              "type_envoy": "Include conectivitatea gateway-ului și diagnosticul contoarelor.",
+              "type_encharge": "Include starea bateriei și entitățile de control când sunt disponibile.",
+              "type_ac_battery": "Include senzori pentru bateria AC și controale pentru modul de repaus atunci când sunt disponibile.",
+              "type_iqevse": "Include entități și controale pentru încărcătoarele EV.",
+              "type_heatpump": "Include senzori pentru starea, diagnosticarea și consumul pompei de căldură.",
+              "type_microinverter": "Include senzori pentru conectivitatea microinvertoarelor, numărul activ și producția pe durata de viață."
+            }
+          },
+          "device_features": {
+            "name": "Funcții ale dispozitivului",
+            "data": {
+              "schedule_sync_enabled": "Activați asistența pentru programator",
+              "battery_schedules_enabled": "Activați planificatorul bateriei",
+              "system_event_repair_issues": "Activează notificările de reparație pentru evenimentele sistemului",
+              "pricing_edits_enabled": "Activează editarea prețurilor",
+              "weather_enabled": "Activează vremea",
+              "nominal_voltage": "Tensiunea nominală a încărcătorului EV (V)"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit.",
+              "pricing_edits_enabled": "Gestionează tarifele de electricitate IQ Gateway",
+              "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil.",
+              "nominal_voltage": "Tensiunea tipică de alimentare CA folosită pentru estimarea puterii când tensiunea în timp real nu este disponibilă.",
+              "schedule_sync_enabled": "Gestionați programele IQ EV Charger.",
+              "battery_schedules_enabled": "Gestionați programele IQ Battery."
+            }
+          }
+        },
+        "data": {
+          "devices": "Selectați dispozitive",
+          "device_features": "Funcții ale dispozitivului",
+          "type_envoy": "Gateway",
+          "type_encharge": "Baterie",
+          "type_ac_battery": "Baterie AC",
+          "type_iqevse": "Încărcătoare",
+          "type_heatpump": "Pompă de căldură",
+          "type_microinverter": "Microinvertoare",
+          "schedule_sync_enabled": "Activați asistența pentru programator",
+          "battery_schedules_enabled": "Activați planificatorul bateriei",
+          "system_event_repair_issues": "Activează notificările de reparație pentru evenimentele sistemului",
+          "pricing_edits_enabled": "Activează editarea prețurilor",
+          "weather_enabled": "Activează vremea",
+          "nominal_voltage": "Tensiunea nominală a încărcătorului EV (V)"
+        },
+        "data_description": {
+          "type_envoy": "Include conectivitatea gateway-ului și diagnosticul contoarelor.",
+          "type_encharge": "Include starea bateriei și entitățile de control când sunt disponibile.",
           "type_ac_battery": "Include senzori pentru bateria AC și controale pentru modul de repaus atunci când sunt disponibile.",
-          "battery_schedules_enabled": "Gestionați programele bateriei IQ",
+          "type_iqevse": "Include entități și controale pentru încărcătoarele EV.",
+          "type_heatpump": "Include senzori pentru starea, diagnosticarea și consumul pompei de căldură.",
+          "type_microinverter": "Include senzori pentru conectivitatea microinvertoarelor, numărul activ și producția pe durata de viață.",
+          "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit.",
+          "pricing_edits_enabled": "Gestionează tarifele de electricitate IQ Gateway",
+          "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil.",
+          "nominal_voltage": "Tensiunea tipică de alimentare CA folosită pentru estimarea puterii când tensiunea în timp real nu este disponibilă.",
+          "schedule_sync_enabled": "Gestionați programele IQ EV Charger.",
+          "battery_schedules_enabled": "Gestionați programele IQ Battery."
+        }
+      },
+      "repair_notifications": {
+        "title": "Notificări",
+        "description": "Alege ce condiții Enphase creează reparații în Home Assistant.",
+        "data": {
+          "degraded_service_repair_issues": "Activează reparațiile pentru servicii degradate",
+          "system_event_repair_issues": "Activează notificările de reparație pentru evenimentele sistemului"
+        },
+        "data_description": {
           "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate.",
-          "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil."
+          "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit."
+        }
+      },
+      "authentication_settings": {
+        "title": "Autentificare",
+        "description": "Lansați fluxul de autentificare pentru a reîmprospăta credențialele fără a elimina integrarea.",
+        "data": {
+          "reauth": "Pornește reautentificarea",
+          "forget_password": "Uită parola salvată"
+        },
+        "data_description": {
+          "reauth": "Lansați fluxul de autentificare pentru a reîmprospăta credențialele fără a elimina integrarea.",
+          "forget_password": "Elimină parola stocată. Reîmprospătarea automată nu va mai fi încercată."
         }
       },
       "migrate_envoy_source": {
@@ -605,12 +682,12 @@
           "battery_discharge": "Descărcare baterie"
         },
         "data_description": {
-          "solar_production": "Assign a cumulative production total to the Enphase Energy Site Solar Production sensor. Do not choose daily energy or live power.",
-          "consumption": "Assign a cumulative consumption total to the Enphase Energy Site Consumption sensor. Do not choose daily energy or live power.",
-          "grid_import": "Assign a cumulative grid import total to the Enphase Energy Site Grid Import sensor. Do not choose daily energy or live power.",
-          "grid_export": "Assign a cumulative grid export total to the Enphase Energy Site Grid Export sensor. Do not choose daily energy or live power.",
-          "battery_charge": "Assign a cumulative battery charge total to the Enphase Energy Site Battery Charge sensor. Do not choose daily energy or live power.",
-          "battery_discharge": "Assign a cumulative battery discharge total to the Enphase Energy Site Battery Discharge sensor. Do not choose daily energy or live power."
+          "solar_production": "Atribuie o valoare totală cumulată senzorului Producție solară locație. Nu alege energia zilnică sau puterea instantanee.",
+          "consumption": "Atribuie o valoare totală cumulată senzorului Consum locație. Nu alege energia zilnică sau puterea instantanee.",
+          "grid_import": "Atribuie o valoare totală cumulată senzorului Import rețea locație. Nu alege energia zilnică sau puterea instantanee.",
+          "grid_export": "Atribuie o valoare totală cumulată senzorului Export rețea locație. Nu alege energia zilnică sau puterea instantanee.",
+          "battery_charge": "Atribuie o valoare totală cumulată senzorului Încărcare baterie locație. Nu alege energia zilnică sau puterea instantanee.",
+          "battery_discharge": "Atribuie o valoare totală cumulată senzorului Descărcare baterie locație. Nu alege energia zilnică sau puterea instantanee."
         }
       },
       "migrate_envoy_confirm": {
@@ -625,15 +702,27 @@
         "title": "Avansat",
         "description": "Acțiuni pentru instalator și întreținere.",
         "menu_options": {
+          "grid_toggle": "Mod rețea",
           "grid_profile": "Control profil rețea"
         },
         "menu_option_descriptions": {
+          "grid_toggle": "Configurează comenzile manuale pentru modul rețea.",
           "grid_profile": "Răsfoiește și aplică profiluri de rețea Activation disponibile doar pentru instalatori."
+        }
+      },
+      "grid_toggle": {
+        "title": "Mod rețea",
+        "description": "Monitorizarea modului rețea rămâne permanent disponibilă. Comutarea manuală este sensibilă pentru siguranță, astfel încât entitățile și acțiunile suplimentare necesită activare explicită.",
+        "data": {
+          "grid_toggle_enabled": "Activează comenzile pentru modul rețea"
+        },
+        "data_description": {
+          "grid_toggle_enabled": "Senzorul Mod rețea rămâne disponibil. Activarea creează Stare control rețea și Solicită OTP și permite acțiunile de serviciu."
         }
       },
       "grid_profile": {
         "title": "Control profil rețea",
-        "description": "Filtrează catalogul de profiluri de rețea Activation pentru țara acestui amplasament.",
+        "description": "Filtrează catalogul de profiluri de rețea Activation pentru țara acestui amplasament.\n\nAVERTISMENT: APLICAREA UNUI PROFIL DE REȚEA INCORECT POATE CAUZA FUNCȚIONAREA DEFECTUOASĂ A SISTEMULUI.",
         "data": {
           "grid_profile_region": "Regiune",
           "grid_profile_commonly_used": "Listă profiluri"
@@ -991,6 +1080,9 @@
           },
           "metrics_available": {
             "name": "Metrici disponibile"
+          },
+          "endpoint_failure_details": {
+            "name": "Detalii despre erorile punctelor finale"
           }
         }
       },
@@ -1556,7 +1648,7 @@
         "name": "Microinvertoare active"
       },
       "inverter_telemetry": {
-        "name": "Telemetrie {serial_number}"
+        "name": "Putere {serial_number}"
       },
       "microinverter_last_reported": {
         "name": "Ultima raportare microinvertoare"
@@ -1660,9 +1752,9 @@
       "ac_battery_overall_status": {
         "name": "Starea generală a bateriei AC",
         "state": {
-          "charging": "Încărcare",
-          "discharging": "Descărcare",
-          "idle": "Inactiv",
+          "normal": "Normal",
+          "warning": "Avertizare",
+          "error": "Eroare",
           "unknown": "Necunoscut"
         }
       },
@@ -1678,9 +1770,9 @@
       "ac_battery_storage_status": {
         "name": "Starea {serial}",
         "state": {
-          "charging": "Încărcare",
-          "discharging": "Descărcare",
-          "idle": "Inactiv",
+          "normal": "Normal",
+          "warning": "Avertizare",
+          "error": "Eroare",
           "unknown": "Necunoscut"
         }
       },
@@ -2070,6 +2162,12 @@
           "high_impact_count": {
             "name": "Număr de evenimente cu impact ridicat"
           },
+          "standing_alarm_count": {
+            "name": "Număr de alarme active"
+          },
+          "active_events": {
+            "name": "Evenimente active"
+          },
           "severity_counts": {
             "name": "Număr după severitate"
           },
@@ -2324,7 +2422,7 @@
       "description": "Locația {site_id} necesită antete de sesiune actualizate. Vă rugăm să vă reautentificați."
     },
     "auth_blocked": {
-      "title": "Enphase Energy authentication temporarily blocked",
+      "title": "Autentificarea Enphase Energy este blocată temporar",
       "description": "Enphase pare să blocheze temporar autentificarea pentru site-ul {site_id}. Încercările automate sunt întrerupte până la {blocked_until}. O reautentificare manuală reușită poate elimina blocarea mai devreme."
     },
     "too_many_active_sessions": {
@@ -2997,10 +3095,6 @@
         "region_code": {
           "name": "Cod regiune",
           "description": "Cod opțional de regiune sau stat, cum ar fi VIC."
-        },
-        "commonly_used": {
-          "name": "Numai cele utilizate frecvent",
-          "description": "Returnează catalogul profilurilor utilizate frecvent când opțiunea este activată."
         },
         "device_id": {
           "name": "Dispozitivele locației",

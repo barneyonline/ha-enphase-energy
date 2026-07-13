@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
@@ -13,7 +14,11 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
 
 from .api import OptionalEndpointUnavailable
-from .const import DOMAIN
+from .const import (
+    DEFAULT_SYSTEM_EVENT_REPAIR_ISSUES,
+    DOMAIN,
+    OPT_SYSTEM_EVENT_REPAIR_ISSUES,
+)
 from .log_redaction import redact_text
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -25,6 +30,7 @@ SYSTEM_EVENTS_ENDPOINT_FAMILY = "system_events"
 SYSTEM_EVENT_REPAIR_PREFIX = "active_system_event_"
 SYSTEM_EVENT_REPAIR_MISSING_GRACE = timedelta(hours=6)
 SYSTEM_EVENT_REPAIR_CHECKPOINT_INTERVAL = timedelta(hours=1)
+ACTIVE_EVENTS_ATTRIBUTE_LIMIT = 20
 _TERMINAL_STATES = frozenset(
     {"clear", "cleared", "close", "closed", "inactive", "normal", "resolved"}
 )
@@ -52,6 +58,18 @@ def _normalized(value: object) -> str:
     if not text:
         return ""
     return "_".join(text.casefold().replace("-", " ").split())
+
+
+def _timestamp(value: object) -> str | None:
+    """Return a bounded UTC timestamp or discard malformed event metadata."""
+
+    text = _text(value)
+    if text is None or len(text) > 64:
+        return None
+    parsed = dt_util.parse_datetime(text)
+    if parsed is None or parsed.tzinfo is None:
+        return None
+    return str(dt_util.as_utc(parsed).isoformat())
 
 
 def _lookup_catalog(payload: object) -> dict[str, dict[str, object]]:
@@ -149,6 +167,16 @@ class SystemEvent:
     high_impact: bool
 
 
+@dataclass(frozen=True, slots=True)
+class StandingAlarm:
+    """Sanitized normalized System Dashboard standing alarm."""
+
+    fingerprint: str
+    severity: str
+    device_type: str
+    first_set: str | None
+
+
 def parse_active_system_events(
     payload: object,
     *,
@@ -158,6 +186,70 @@ def parse_active_system_events(
 
     events, _resolved = _parse_system_event_snapshot(payload, site_id=site_id)
     return events
+
+
+def parse_standing_alarms(
+    payload: object,
+    *,
+    site_id: str,
+) -> tuple[StandingAlarm, ...]:
+    """Parse standing alarms while discarding identifiers and free-form details."""
+
+    if not isinstance(payload, dict):
+        return ()
+    rows = payload.get("alarms")
+    if not isinstance(rows, list):
+        return ()
+    serials = [
+        serial
+        for row in rows
+        if isinstance(row, dict)
+        and (serial := _text(row.get("serial_num"))) is not None
+    ]
+    alarms: list[StandingAlarm] = []
+    seen: set[str] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        fingerprint = _event_fingerprint(
+            {
+                "id": row.get("id"),
+                "serial_number": row.get("serial_num"),
+                "event_type": row.get("description"),
+                "event_date": row.get("first_set"),
+            }
+        )
+        if fingerprint in seen:
+            continue
+        seen.add(fingerprint)
+        severity_text = redact_text(
+            _text(row.get("severity")) or "",
+            site_ids=(site_id,),
+            identifiers=serials,
+            max_length=40,
+        )
+        severity = _normalized(severity_text) or "unknown"
+        device_type = redact_text(
+            _text(row.get("type")) or "unknown",
+            site_ids=(site_id,),
+            identifiers=serials,
+            max_length=80,
+        )
+        first_set = redact_text(
+            _text(row.get("first_set")) or "",
+            site_ids=(site_id,),
+            identifiers=serials,
+            max_length=80,
+        )
+        alarms.append(
+            StandingAlarm(
+                fingerprint=fingerprint,
+                severity=severity,
+                device_type=device_type or "unknown",
+                first_set=first_set or None,
+            )
+        )
+    return tuple(alarms)
 
 
 def _parse_system_event_snapshot(
@@ -220,8 +312,8 @@ def _parse_system_event_snapshot(
                 device_type=device_type or "unknown",
                 severity=severity,
                 state=_normalized(state) or "unknown",
-                event_date=_text(row.get("event_date")),
-                updated_at=_text(row.get("updated_at")),
+                event_date=_timestamp(row.get("event_date")),
+                updated_at=_timestamp(row.get("updated_at")),
                 high_impact=severity in _HIGH_IMPACT_SEVERITIES,
             )
         )
@@ -234,6 +326,7 @@ class SystemEventsRuntime:
     def __init__(self, coordinator: EnphaseCoordinator) -> None:
         self.coordinator = coordinator
         self._events: tuple[SystemEvent, ...] = ()
+        self._standing_alarms: tuple[StandingAlarm, ...] = ()
         self._last_success_utc: datetime | None = None
         self._reported_issue_ids: set[str] = set()
         self._active_reported_issue_ids: set[str] = set()
@@ -255,15 +348,54 @@ class SystemEventsRuntime:
 
     @property
     def active_count(self) -> int:
-        """Return the current number of active events."""
+        """Return the number of records that drive the Problem state."""
 
-        return len(self._events)
+        return self.standing_alarm_count + self.high_impact_count
+
+    @property
+    def standing_alarm_count(self) -> int:
+        """Return the number of authoritative standing alarms."""
+
+        return len(self._standing_alarms)
 
     @property
     def high_impact_count(self) -> int:
         """Return the number of active error/critical events."""
 
         return sum(event.high_impact for event in self._events)
+
+    @property
+    def problem_active(self) -> bool:
+        """Return whether alarms or explicitly high-impact events indicate a problem."""
+
+        return self.standing_alarm_count > 0 or self.high_impact_count > 0
+
+    @property
+    def active_event_attributes(self) -> tuple[dict[str, object], ...]:
+        """Return bounded identifier-free events that drive the Problem state."""
+
+        summaries: list[dict[str, object]] = [
+            {
+                "type": "Standing Alarm",
+                "device_type": alarm.device_type,
+                "state": "active",
+                "event_date": alarm.first_set,
+                "updated_at": None,
+            }
+            for alarm in self._standing_alarms
+        ]
+        summaries.extend(
+            {
+                "type": event.event_type,
+                "device_type": event.device_type,
+                "state": event.state,
+                "event_date": event.event_date,
+                "updated_at": event.updated_at,
+            }
+            for event in self._events
+            if event.high_impact
+        )
+        return tuple(summaries[:ACTIVE_EVENTS_ATTRIBUTE_LIMIT])
 
     def refresh_due(self) -> bool:
         """Return whether the optional event endpoint may be polled now."""
@@ -283,8 +415,23 @@ class SystemEventsRuntime:
             return normalized
         return hashlib.sha256(str(self.coordinator.site_id).encode()).hexdigest()[:12]
 
-    def _issue_id(self, event: SystemEvent) -> str:
-        return f"{SYSTEM_EVENT_REPAIR_PREFIX}{self._entry_suffix()}_{event.fingerprint}"
+    def _issue_id(self, alarm: StandingAlarm) -> str:
+        return f"{SYSTEM_EVENT_REPAIR_PREFIX}{self._entry_suffix()}_{alarm.fingerprint}"
+
+    @property
+    def repairs_enabled(self) -> bool:
+        """Return whether System Event Repair notifications are enabled."""
+
+        config_entry = getattr(self.coordinator, "config_entry", None)
+        options = getattr(config_entry, "options", {})
+        if not isinstance(options, Mapping):
+            return DEFAULT_SYSTEM_EVENT_REPAIR_ISSUES
+        return bool(
+            options.get(
+                OPT_SYSTEM_EVENT_REPAIR_ISSUES,
+                DEFAULT_SYSTEM_EVENT_REPAIR_ISSUES,
+            )
+        )
 
     def _registry_issue_entries(self) -> dict[str, object] | None:
         """Return persisted event Repair entries for this config entry."""
@@ -346,45 +493,57 @@ class SystemEventsRuntime:
             self._repair_last_seen_utc.setdefault(issue_id, last_seen)
             self._repair_checkpoint_utc.setdefault(issue_id, last_seen)
 
+    def _clear_repairs(self) -> None:
+        """Remove all persisted System Event Repairs for this config entry."""
+
+        for issue_id in self._existing_issue_ids():
+            ir.async_delete_issue(self.coordinator.hass, DOMAIN, issue_id)
+        self._reported_issue_ids.clear()
+        self._active_reported_issue_ids.clear()
+        self._repair_last_seen_utc.clear()
+        self._repair_checkpoint_utc.clear()
+
     def _sync_repairs(
         self,
-        resolved_fingerprints: frozenset[str],
         *,
         observed_at: datetime,
         authoritative: bool,
+        resolved_fingerprints: frozenset[str],
     ) -> None:
-        """Create Repairs and age missing rows only after a complete snapshot."""
+        """Synchronize Repairs from the authoritative standing-alarm snapshot."""
 
-        active_high_impact = {
-            self._issue_id(event): event for event in self._events if event.high_impact
+        if not self.repairs_enabled:
+            self._clear_repairs()
+            return
+
+        active_alarms = {
+            self._issue_id(alarm): alarm
+            for alarm in self._standing_alarms
+            if alarm.fingerprint not in resolved_fingerprints
         }
-        active_issue_ids = {self._issue_id(event) for event in self._events}
-        resolved_issue_ids = {
-            f"{SYSTEM_EVENT_REPAIR_PREFIX}{self._entry_suffix()}_{fingerprint}"
-            for fingerprint in resolved_fingerprints
-        }
+        active_issue_ids = set(active_alarms)
         self._restore_repair_last_seen()
         existing = self._existing_issue_ids()
         active_existing = self._existing_issue_ids(active_only=True)
-        for issue_id in active_high_impact:
+        for issue_id in active_alarms:
             self._repair_last_seen_utc[issue_id] = observed_at
-        missing_issue_ids = existing - active_issue_ids - resolved_issue_ids
+        missing_issue_ids = existing - active_issue_ids
         stale_issue_ids: set[str] = set()
         if authoritative:
             for issue_id in missing_issue_ids:
                 last_seen = self._repair_last_seen_utc.setdefault(issue_id, observed_at)
                 if observed_at - last_seen >= SYSTEM_EVENT_REPAIR_MISSING_GRACE:
                     stale_issue_ids.add(issue_id)
-        delete_issue_ids = (
-            (existing & resolved_issue_ids)
-            | ((existing & active_issue_ids) - active_high_impact.keys())
-            | stale_issue_ids
-        )
+        resolved_issue_ids = {
+            f"{SYSTEM_EVENT_REPAIR_PREFIX}{self._entry_suffix()}_{fingerprint}"
+            for fingerprint in resolved_fingerprints
+        }
+        delete_issue_ids = stale_issue_ids | (existing & resolved_issue_ids)
         for issue_id in delete_issue_ids:
             ir.async_delete_issue(self.coordinator.hass, DOMAIN, issue_id)
             self._repair_last_seen_utc.pop(issue_id, None)
             self._repair_checkpoint_utc.pop(issue_id, None)
-        for issue_id, event in active_high_impact.items():
+        for issue_id, alarm in active_alarms.items():
             checkpoint = self._repair_checkpoint_utc.get(issue_id)
             if (
                 issue_id in active_existing
@@ -402,63 +561,86 @@ class SystemEventsRuntime:
                 translation_key="active_system_event",
                 translation_placeholders={
                     "site_id": str(self.coordinator.site_id),
-                    "severity": event.severity,
-                    "device_type": event.device_type,
-                    "event_date": event.event_date or "unknown",
+                    "severity": alarm.severity,
+                    "device_type": alarm.device_type,
+                    "event_date": alarm.first_set or "unknown",
                 },
                 data={
-                    "severity": event.severity,
-                    "device_type": event.device_type,
-                    "event_date": event.event_date,
+                    "severity": alarm.severity,
+                    "device_type": alarm.device_type,
+                    "event_date": alarm.first_set,
                     "last_seen_utc": observed_at.isoformat(),
                 },
             )
             self._repair_checkpoint_utc[issue_id] = observed_at
-        self._reported_issue_ids = (
-            existing | set(active_high_impact)
-        ) - delete_issue_ids
-        self._active_reported_issue_ids = set(active_high_impact)
+        self._reported_issue_ids = (existing | set(active_alarms)) - delete_issue_ids
+        self._active_reported_issue_ids = set(active_alarms)
 
     async def async_refresh(self) -> None:
         """Refresh events, retaining cached state across optional failures."""
 
+        if not self.repairs_enabled:
+            self._clear_repairs()
         if not self.refresh_due():
             return
         fetcher = getattr(self.coordinator.client, "system_dashboard_events", None)
-        if not callable(fetcher):
+        alarm_fetcher = getattr(
+            self.coordinator.client,
+            "system_dashboard_standing_alarms",
+            None,
+        )
+        if not callable(fetcher) or not callable(alarm_fetcher):
             raise OptionalEndpointUnavailable("System events endpoint unavailable")
         payload = await fetcher()
-        if not isinstance(payload, dict):
+        alarm_payload = await alarm_fetcher()
+        if not isinstance(payload, dict) or not isinstance(alarm_payload, dict):
             raise OptionalEndpointUnavailable("System events endpoint unavailable")
         self._events, resolved_fingerprints = _parse_system_event_snapshot(
             payload,
             site_id=str(self.coordinator.site_id),
         )
+        self._standing_alarms = tuple(
+            alarm
+            for alarm in parse_standing_alarms(
+                alarm_payload,
+                site_id=str(self.coordinator.site_id),
+            )
+            if alarm.fingerprint not in resolved_fingerprints
+        )
         observed_at = dt_util.utcnow()
-        self._snapshot_truncated = payload.get("_enphase_ev_truncated") is True
+        self._snapshot_truncated = (
+            payload.get("_enphase_ev_truncated") is True
+            or alarm_payload.get("_enphase_ev_truncated") is True
+        )
         self._last_success_utc = observed_at
         self.coordinator._note_endpoint_family_success(SYSTEM_EVENTS_ENDPOINT_FAMILY)
         self._sync_repairs(
-            resolved_fingerprints,
             observed_at=observed_at,
             authoritative=not self._snapshot_truncated,
+            resolved_fingerprints=resolved_fingerprints,
         )
         _LOGGER.debug(
-            "System event summary refreshed for site [site]: active=%s high_impact=%s",
+            "System event summary refreshed for site [site]: active=%s "
+            "high_impact=%s standing_alarms=%s",
             self.active_count,
             self.high_impact_count,
+            self.standing_alarm_count,
         )
 
     def diagnostics(self) -> dict[str, object]:
         """Return an identifier-free diagnostic summary."""
 
-        severities = Counter(event.severity for event in self._events)
-        device_types = Counter(event.device_type for event in self._events)
+        severities = Counter(alarm.severity for alarm in self._standing_alarms)
+        device_types = Counter(alarm.device_type for alarm in self._standing_alarms)
+        device_types.update(
+            event.device_type for event in self._events if event.high_impact
+        )
         health = self.coordinator._endpoint_family_state(SYSTEM_EVENTS_ENDPOINT_FAMILY)
         return {
             "available": self.available,
             "active_count": self.active_count,
             "high_impact_count": self.high_impact_count,
+            "standing_alarm_count": self.standing_alarm_count,
             "severity_counts": dict(sorted(severities.items())),
             "device_type_counts": dict(sorted(device_types.items())),
             "last_success_utc": (
@@ -468,4 +650,5 @@ class SystemEventsRuntime:
                 self.available and health.consecutive_failures > 0
             ),
             "truncated": self._snapshot_truncated,
+            "repairs_enabled": self.repairs_enabled,
         }

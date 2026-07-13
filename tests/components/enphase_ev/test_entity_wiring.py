@@ -98,6 +98,29 @@ def test_inverter_lifetime_energy_uses_translated_name_with_serial(
     assert entity.name == "INV-A Translated lifetime energy"
 
 
+def test_inverter_power_uses_translated_name_without_changing_unique_id(
+    coordinator_factory,
+):
+    """Per-inverter power should be a standard sensor with a stable identity."""
+    from custom_components.enphase_ev.sensor import EnphaseInverterTelemetrySensor
+
+    coord = coordinator_factory(serials=[RANDOM_SERIAL])
+    entity = EnphaseInverterTelemetrySensor(coord, "INV-A")
+    translation_key = "component.enphase_ev.entity.sensor.inverter_telemetry.name"
+    entity.platform_data = SimpleNamespace(
+        platform_name="enphase_ev",
+        domain="sensor",
+        platform_translations={translation_key: "{serial_number} Power"},
+        component_translations={},
+    )
+
+    assert entity.translation_key == "inverter_telemetry"
+    assert entity.translation_placeholders == {"serial_number": "INV-A"}
+    assert entity.name == "INV-A Power"
+    assert entity.entity_category is None
+    assert entity.unique_id.endswith("_inverter_INV-A_telemetry")
+
+
 def test_device_info_includes_model_name_when_available():
     from custom_components.enphase_ev.sensor import EnphaseEnergyTodaySensor
 

@@ -703,6 +703,8 @@ class BatteryRuntime:
 
     def grid_control_check_refresh_due(self, *, force: bool = False) -> bool:
         coord = self.coordinator
+        if not coord.grid_toggle_enabled:
+            return False
         state = self.battery_state
         now = time.monotonic()
         if not force and state._grid_control_check_cache_until:
@@ -3733,6 +3735,8 @@ class BatteryRuntime:
 
     async def async_refresh_grid_control_check(self, *, force: bool = False) -> None:
         coord = self.coordinator
+        if not coord.grid_toggle_enabled:
+            return
         state = self.battery_state
         now = time.monotonic()
         family = "grid_control_check"
@@ -5471,6 +5475,8 @@ class BatteryRuntime:
 
     async def async_assert_grid_toggle_allowed(self) -> None:
         coord = self.coordinator
+        if not coord.grid_toggle_enabled:
+            self.raise_grid_validation("grid_control_unavailable")
         await self.async_refresh_grid_control_check(force=True)
         if coord.grid_control_supported is not True:
             self.raise_grid_validation("grid_control_unavailable")

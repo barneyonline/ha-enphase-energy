@@ -8,6 +8,347 @@ import re
 import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parents[3] / "custom_components" / "enphase_ev"
+PLACEHOLDER_RE = re.compile(r"{([A-Za-z_][A-Za-z0-9_]*)}")
+
+
+def _flatten_catalog(value: object, prefix: tuple[str, ...] = ()) -> dict[str, object]:
+    """Return every catalog leaf keyed by its dotted path."""
+
+    if isinstance(value, dict):
+        flattened: dict[str, object] = {}
+        for key, child in value.items():
+            flattened.update(_flatten_catalog(child, (*prefix, str(key))))
+        return flattened
+    if isinstance(value, list):
+        flattened = {}
+        for index, child in enumerate(value):
+            flattened.update(_flatten_catalog(child, (*prefix, str(index))))
+        return flattened
+    return {".".join(prefix): value}
+
+
+def _catalog_has_path(catalog: dict[str, object], path: str) -> bool:
+    value: object = catalog
+    for part in path.split("."):
+        if not isinstance(value, dict) or part not in value:
+            return False
+        value = value[part]
+    return True
+
+
+def _intentional_identical_translation(
+    locale: str,
+    path: str,
+    value: str,
+) -> bool:
+    """Return whether an English-identical value is valid in this locale."""
+
+    if path == "config.step.user.title" and value == "Enphase Energy":
+        return True
+    if (
+        locale == "fr"
+        and value == "Notifications"
+        and path
+        in {
+            "options.step.init.menu_options.repair_notifications",
+            "options.step.repair_notifications.title",
+        }
+    ):
+        return True
+    if (
+        locale == "fr"
+        and value == "Source"
+        and path.endswith(".state_attributes.source.name")
+    ):
+        return True
+    if locale == "de" and path == "entity.sensor.ac_battery_storage_status.name":
+        return value == "{serial} Status"
+
+    shared_state_locales = {
+        "Online": {"cs", "da", "de", "hu", "it", "nl", "pl", "pt-BR", "ro", "sv-SE"},
+        "Offline": {
+            "cs",
+            "da",
+            "de",
+            "fi",
+            "hu",
+            "it",
+            "nl",
+            "pl",
+            "pt-BR",
+            "ro",
+            "sv-SE",
+        },
+        "Smart": {"da", "de", "nb-NO", "sv-SE"},
+        "Manual": {"es", "pt-BR", "ro"},
+    }
+    if path in {
+        "entity.sensor.shared_labels.state.online",
+        "entity.sensor.shared_labels.state.offline",
+        "entity.sensor.shared_labels.state.smart_charging",
+        "entity.sensor.shared_labels.state.manual_charging",
+    }:
+        return locale in shared_state_locales.get(value, set())
+
+    gateway_paths = {
+        "config.step.devices.data.type_envoy",
+        "options.step.devices.data.type_envoy",
+        "options.step.devices.sections.devices.data.type_envoy",
+        "options.step.init.data.type_envoy",
+    }
+    if path in gateway_paths and value == "Gateway":
+        return locale in {"da", "de", "it", "nb-NO", "nl", "pt-BR", "ro", "sv-SE"}
+
+    normal_paths = {
+        "entity.sensor.ac_battery_overall_status.state.normal",
+        "entity.sensor.ac_battery_storage_status.state.normal",
+        "entity.sensor.battery_overall_status.state.normal",
+        "entity.sensor.shared_labels.state.normal",
+    }
+    if path in normal_paths and value == "Normal":
+        return locale in {"da", "de", "es", "fr", "nb-NO", "pt-BR", "ro", "sv-SE"}
+
+    error_paths = {
+        "entity.sensor.ac_battery_overall_status.state.error",
+        "entity.sensor.ac_battery_storage_status.state.error",
+        "entity.sensor.battery_overall_status.state.error",
+        "entity.sensor.shared_labels.state.error",
+    }
+    if path in error_paths and value == "Error":
+        return locale == "es"
+    if (
+        path == "options.step.grid_profile.data.grid_profile_region"
+        and value == "Region"
+    ):
+        return locale in {"da", "de", "nb-NO", "pl", "sv-SE"}
+    if path == "selector.grid_profile_status.options.no" and value == "No":
+        return locale in {"es", "it"}
+    return False
+
+
+def test_translation_catalogs_cover_every_canonical_leaf() -> None:
+    """Require complete, non-empty locale catalogs with matching placeholders."""
+
+    canonical = _flatten_catalog(
+        json.loads((ROOT / "strings.json").read_text(encoding="utf-8"))
+    )
+    assert all(isinstance(value, str) and value.strip() for value in canonical.values())
+
+    for locale_path in sorted((ROOT / "translations").glob("*.json")):
+        translated = _flatten_catalog(
+            json.loads(locale_path.read_text(encoding="utf-8"))
+        )
+        missing = sorted(set(canonical) - set(translated))
+        extra = sorted(set(translated) - set(canonical))
+        assert not missing, f"{locale_path.name} missing translation paths: {missing}"
+        assert not extra, f"{locale_path.name} has stale translation paths: {extra}"
+        for path, value in translated.items():
+            assert (
+                isinstance(value, str) and value.strip()
+            ), f"{locale_path.name} has an empty translation at {path}"
+            expected_placeholders = set(PLACEHOLDER_RE.findall(str(canonical[path])))
+            actual_placeholders = set(PLACEHOLDER_RE.findall(value))
+            assert actual_placeholders == expected_placeholders, (
+                f"{locale_path.name} placeholder mismatch at {path}: "
+                f"expected {sorted(expected_placeholders)}, "
+                f"got {sorted(actual_placeholders)}"
+            )
+
+
+def test_non_english_catalogs_have_no_unreviewed_english_fallbacks() -> None:
+    """Reject untranslated English copy while allowing valid cognates and brands."""
+
+    canonical = _flatten_catalog(
+        json.loads((ROOT / "strings.json").read_text(encoding="utf-8"))
+    )
+    unreviewed: list[str] = []
+    for locale_path in sorted((ROOT / "translations").glob("*.json")):
+        locale = locale_path.stem
+        if locale == "en" or locale.startswith("en-"):
+            continue
+        translated = _flatten_catalog(
+            json.loads(locale_path.read_text(encoding="utf-8"))
+        )
+        for path, value in translated.items():
+            if (
+                isinstance(value, str)
+                and value == canonical[path]
+                and not _intentional_identical_translation(locale, path, value)
+            ):
+                unreviewed.append(f"{locale_path.name}:{path}={value!r}")
+    assert not unreviewed, "Unreviewed English translation fallbacks:\n" + "\n".join(
+        unreviewed
+    )
+
+
+def test_literal_translation_references_exist_in_canonical_catalog() -> None:
+    """Verify literal entity, exception, repair, flow, and selector keys exist."""
+
+    catalog = json.loads((ROOT / "strings.json").read_text(encoding="utf-8"))
+    entity_modules = {
+        "binary_sensor.py": "binary_sensor",
+        "button.py": "button",
+        "calendar.py": "calendar",
+        "number.py": "number",
+        "select.py": "select",
+        "sensor.py": "sensor",
+        "switch.py": "switch",
+        "time.py": "time",
+        "update.py": "update",
+        "weather.py": "weather",
+    }
+    missing: list[str] = []
+    for filename, domain in entity_modules.items():
+        tree = ast.parse((ROOT / filename).read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Assign, ast.AnnAssign)):
+                targets = (
+                    node.targets if isinstance(node, ast.Assign) else [node.target]
+                )
+                if isinstance(node.value, ast.Constant) and isinstance(
+                    node.value.value, str
+                ):
+                    for target in targets:
+                        name = (
+                            target.id
+                            if isinstance(target, ast.Name)
+                            else (
+                                target.attr
+                                if isinstance(target, ast.Attribute)
+                                else None
+                            )
+                        )
+                        if name == "_attr_translation_key":
+                            key = node.value.value
+                            if not _catalog_has_path(catalog, f"entity.{domain}.{key}"):
+                                missing.append(
+                                    f"{filename}:{node.lineno} "
+                                    f"entity.{domain}.{key}"
+                                )
+            if not isinstance(node, ast.Call):
+                continue
+            call_name = (
+                node.func.id
+                if isinstance(node.func, ast.Name)
+                else node.func.attr if isinstance(node.func, ast.Attribute) else None
+            )
+            if call_name in {
+                "ServiceValidationError",
+                "HomeAssistantError",
+                "async_create_issue",
+                "raise_translated_service_validation",
+            }:
+                continue
+            keyword = next(
+                (item for item in node.keywords if item.arg == "translation_key"),
+                None,
+            )
+            if (
+                keyword is not None
+                and isinstance(keyword.value, ast.Constant)
+                and isinstance(keyword.value.value, str)
+            ):
+                key = keyword.value.value
+                if not _catalog_has_path(catalog, f"entity.{domain}.{key}"):
+                    missing.append(f"{filename}:{node.lineno} entity.{domain}.{key}")
+
+    for source_path in sorted(ROOT.glob("*.py")):
+        tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            call_name = (
+                node.func.id
+                if isinstance(node.func, ast.Name)
+                else node.func.attr if isinstance(node.func, ast.Attribute) else None
+            )
+            if call_name not in {
+                "ServiceValidationError",
+                "HomeAssistantError",
+                "async_create_issue",
+                "raise_translated_service_validation",
+            }:
+                continue
+            keyword = next(
+                (item for item in node.keywords if item.arg == "translation_key"),
+                None,
+            )
+            if (
+                keyword is None
+                or not isinstance(keyword.value, ast.Constant)
+                or not isinstance(keyword.value.value, str)
+            ):
+                continue
+            surface = "issues" if call_name == "async_create_issue" else "exceptions"
+            key = keyword.value.value
+            if not _catalog_has_path(catalog, f"{surface}.{key}"):
+                missing.append(f"{source_path.name}:{node.lineno} {surface}.{key}")
+
+    config_tree = ast.parse((ROOT / "config_flow.py").read_text(encoding="utf-8"))
+    for class_node in (
+        node for node in config_tree.body if isinstance(node, ast.ClassDef)
+    ):
+        surface = "options" if class_node.name == "OptionsFlowHandler" else "config"
+        for node in ast.walk(class_node):
+            if not isinstance(node, ast.Call):
+                continue
+            call_name = (
+                node.func.attr
+                if isinstance(node.func, ast.Attribute)
+                else node.func.id if isinstance(node.func, ast.Name) else None
+            )
+            if call_name in {"async_show_form", "async_show_menu"}:
+                keyword = next(
+                    (item for item in node.keywords if item.arg == "step_id"),
+                    None,
+                )
+                if (
+                    keyword is not None
+                    and isinstance(keyword.value, ast.Constant)
+                    and isinstance(keyword.value.value, str)
+                ):
+                    key = keyword.value.value
+                    if not _catalog_has_path(catalog, f"{surface}.step.{key}"):
+                        missing.append(
+                            f"config_flow.py:{node.lineno} {surface}.step.{key}"
+                        )
+            if call_name == "async_abort":
+                keyword = next(
+                    (item for item in node.keywords if item.arg == "reason"),
+                    None,
+                )
+                if (
+                    keyword is not None
+                    and isinstance(keyword.value, ast.Constant)
+                    and isinstance(keyword.value.value, str)
+                    and keyword.value.value != "unknown"
+                    and not _catalog_has_path(
+                        catalog, f"{surface}.abort.{keyword.value.value}"
+                    )
+                ):
+                    missing.append(
+                        f"config_flow.py:{node.lineno} "
+                        f"{surface}.abort.{keyword.value.value}"
+                    )
+
+    for node in ast.walk(config_tree):
+        if not isinstance(node, ast.Dict):
+            continue
+        for key_node, value_node in zip(node.keys, node.values):
+            if (
+                isinstance(key_node, ast.Constant)
+                and key_node.value == "translation_key"
+                and isinstance(value_node, ast.Constant)
+                and isinstance(value_node.value, str)
+                and not _catalog_has_path(catalog, f"selector.{value_node.value}")
+            ):
+                missing.append(
+                    f"config_flow.py:{node.lineno} selector.{value_node.value}"
+                )
+
+    assert not missing, "Missing canonical translation references:\n" + "\n".join(
+        missing
+    )
 
 
 def test_clear_reauth_issue_device_field_translated() -> None:
@@ -33,6 +374,7 @@ def test_service_display_text_lives_in_translations() -> None:
 
     services = yaml.safe_load((ROOT / "services.yaml").read_text(encoding="utf-8"))
     strings = json.loads((ROOT / "strings.json").read_text(encoding="utf-8"))
+    assert set(strings["services"]) == set(services)
 
     for service_key, service_data in services.items():
         assert "name" not in service_data, service_key
@@ -40,6 +382,19 @@ def test_service_display_text_lives_in_translations() -> None:
         service_strings = strings["services"][service_key]
         assert service_strings["name"].strip(), service_key
         assert service_strings["description"].strip(), service_key
+
+        expected_fields: set[str] = set()
+        expected_sections: set[str] = set()
+        for field_key, field_data in service_data.get("fields", {}).items():
+            if "fields" in field_data:
+                expected_sections.add(field_key)
+                expected_fields.update(field_data["fields"])
+            else:
+                expected_fields.add(field_key)
+        assert set(service_strings.get("fields", {})) == expected_fields, service_key
+        assert (
+            set(service_strings.get("sections", {})) == expected_sections
+        ), service_key
 
         for field_key, field_data in service_data.get("fields", {}).items():
             if "fields" in field_data:
@@ -71,6 +426,25 @@ def test_inverter_lifetime_energy_name_is_localized_for_all_locales() -> None:
     for locale in translations_dir.glob("*.json"):
         name = _at_path(json.loads(locale.read_text(encoding="utf-8")), path)
         assert "{serial}" in name, f"{locale.name} missing {{serial}} placeholder"
+        if locale.name != "en.json" and not locale.name.startswith("en-"):
+            assert name != english_name, f"{locale.name} should localize {path}"
+
+
+def test_inverter_power_name_is_localized_for_all_locales() -> None:
+    """Ensure per-inverter Power names retain their localized placeholder."""
+    strings = json.loads((ROOT / "strings.json").read_text(encoding="utf-8"))
+    path = "entity.sensor.inverter_telemetry.name"
+    catalog_name = _at_path(strings, path)
+    assert catalog_name == "{serial_number} Power"
+
+    translations_dir = ROOT / "translations"
+    english = json.loads((translations_dir / "en.json").read_text(encoding="utf-8"))
+    english_name = _at_path(english, path)
+    for locale in translations_dir.glob("*.json"):
+        name = _at_path(json.loads(locale.read_text(encoding="utf-8")), path)
+        assert (
+            "{serial_number}" in name
+        ), f"{locale.name} missing {{serial_number}} placeholder"
         if locale.name != "en.json" and not locale.name.startswith("en-"):
             assert name != english_name, f"{locale.name} should localize {path}"
 
@@ -309,10 +683,7 @@ def _battery_schedule_string_paths(data: dict) -> list[str]:
     paths = [
         "options.step.init.data.schedule_sync_enabled",
         "options.step.init.data.battery_schedules_enabled",
-        "options.step.init.data_description.schedule_sync_enabled",
-        "options.step.init.data_description.battery_schedules_enabled",
-        "options.step.settings.data.battery_schedules_enabled",
-        "options.step.settings.data_description.battery_schedules_enabled",
+        "options.step.devices.sections.device_features.data.battery_schedules_enabled",
     ]
 
     scheduler_entity_prefixes = (
@@ -1330,6 +1701,13 @@ def test_grid_control_strings_exist_for_all_locales() -> None:
         / "translations"
     )
     paths = [
+        "options.step.init.menu_option_descriptions.advanced",
+        "options.step.advanced.menu_options.grid_toggle",
+        "options.step.advanced.menu_option_descriptions.grid_toggle",
+        "options.step.grid_toggle.title",
+        "options.step.grid_toggle.description",
+        "options.step.grid_toggle.data.grid_toggle_enabled",
+        "options.step.grid_toggle.data_description.grid_toggle_enabled",
         "entity.button.request_grid_toggle_otp.name",
         "entity.sensor.grid_mode.name",
         "entity.sensor.grid_mode.state.on_grid",
@@ -1353,11 +1731,18 @@ def test_grid_control_strings_exist_for_all_locales() -> None:
         "exceptions.grid_site_required.message",
         "exceptions.grid_site_ambiguous.message",
     ]
+    english = json.loads((translations_dir / "en.json").read_text(encoding="utf-8"))
+    option_paths = paths[:7]
     for locale in translations_dir.glob("*.json"):
         data = json.loads(locale.read_text(encoding="utf-8"))
         for path in paths:
             value = _at_path(data, path)
             assert value.strip(), f"{locale.name} missing value for {path}"
+        if locale.name != "en.json" and not locale.name.startswith("en-"):
+            for path in option_paths:
+                assert _at_path(data, path) != _at_path(
+                    english, path
+                ), f"{locale.name} should localize {path}"
 
         blocked = _at_path(data, "exceptions.grid_control_blocked.message")
         ambiguous = _at_path(data, "exceptions.grid_site_ambiguous.message")
@@ -1367,6 +1752,46 @@ def test_grid_control_strings_exist_for_all_locales() -> None:
         assert (
             "{count}" in ambiguous
         ), f"{locale.name} missing {{count}} in grid_site_ambiguous message"
+
+
+def test_pricing_edit_strings_exist_for_all_locales() -> None:
+    """Ensure pricing-edit options and validation errors stay localized."""
+
+    translations_dir = (
+        pathlib.Path(__file__).resolve().parents[3]
+        / "custom_components"
+        / "enphase_ev"
+        / "translations"
+    )
+    paths = [
+        "options.step.devices.sections.device_features.data.pricing_edits_enabled",
+        "options.step.devices.sections.device_features.data_description.pricing_edits_enabled",
+        "exceptions.pricing_edits_disabled.message",
+    ]
+    english = json.loads((translations_dir / "en.json").read_text(encoding="utf-8"))
+    assert (
+        _at_path(
+            english,
+            "options.step.devices.sections.device_features.data.pricing_edits_enabled",
+        )
+        == "Enable Pricing Edits"
+    )
+    assert (
+        _at_path(
+            english,
+            "options.step.devices.sections.device_features.data_description.pricing_edits_enabled",
+        )
+        == "Manage IQ Gateway Electricity Rates"
+    )
+    for locale in translations_dir.glob("*.json"):
+        data = json.loads(locale.read_text(encoding="utf-8"))
+        for path in paths:
+            value = _at_path(data, path)
+            assert value.strip(), f"{locale.name} missing value for {path}"
+            if locale.name != "en.json" and not locale.name.startswith("en-"):
+                assert value != _at_path(
+                    english, path
+                ), f"{locale.name} should localize {path}"
 
 
 def test_options_device_category_strings_exist_for_all_locales() -> None:
@@ -1381,18 +1806,57 @@ def test_options_device_category_strings_exist_for_all_locales() -> None:
     paths = [
         "config.step.devices.data.type_heatpump",
         "config.step.devices.data_description.type_heatpump",
-        "options.step.init.data.type_envoy",
-        "options.step.init.data.type_encharge",
-        "options.step.init.data.type_iqevse",
-        "options.step.init.data.type_heatpump",
-        "options.step.init.data.type_microinverter",
+        "options.step.init.menu_options.devices",
+        "options.step.init.menu_option_descriptions.devices",
+        "options.step.init.menu_options.repair_notifications",
+        "options.step.init.menu_option_descriptions.repair_notifications",
+        "options.step.init.menu_options.authentication_settings",
+        "options.step.init.menu_option_descriptions.authentication_settings",
+        "options.step.devices.title",
+        "options.step.devices.description",
+        "options.step.devices.sections.devices.name",
+        "options.step.devices.sections.device_features.name",
+        "options.step.devices.data.devices",
+        "options.step.devices.data.device_features",
+        "options.step.devices.data.type_envoy",
+        "options.step.devices.data.schedule_sync_enabled",
+        "options.step.devices.data_description.type_envoy",
+        "options.step.devices.sections.devices.data.type_envoy",
+        "options.step.devices.sections.devices.data.type_encharge",
+        "options.step.devices.sections.devices.data.type_ac_battery",
+        "options.step.devices.sections.devices.data.type_iqevse",
+        "options.step.devices.sections.devices.data.type_heatpump",
+        "options.step.devices.sections.devices.data.type_microinverter",
+        "options.step.devices.sections.device_features.data.schedule_sync_enabled",
+        "options.step.devices.sections.device_features.data.battery_schedules_enabled",
+        "options.step.devices.sections.device_features.data.system_event_repair_issues",
+        "options.step.devices.sections.device_features.data.pricing_edits_enabled",
+        "options.step.devices.sections.device_features.data.weather_enabled",
         "options.step.init.data.api_timeout",
         "options.step.init.data.nominal_voltage",
-        "options.step.init.data_description.type_envoy",
-        "options.step.init.data_description.type_encharge",
-        "options.step.init.data_description.type_iqevse",
-        "options.step.init.data_description.type_heatpump",
-        "options.step.init.data_description.type_microinverter",
+        "options.step.devices.sections.devices.data_description.type_envoy",
+        "options.step.devices.sections.devices.data_description.type_encharge",
+        "options.step.devices.sections.devices.data_description.type_ac_battery",
+        "options.step.devices.sections.devices.data_description.type_iqevse",
+        "options.step.devices.sections.devices.data_description.type_heatpump",
+        "options.step.devices.sections.devices.data_description.type_microinverter",
+        "options.step.devices.sections.device_features.data_description.system_event_repair_issues",
+        "options.step.devices.sections.device_features.data_description.schedule_sync_enabled",
+        "options.step.devices.sections.device_features.data_description.battery_schedules_enabled",
+        "options.step.devices.sections.device_features.data_description.pricing_edits_enabled",
+        "options.step.devices.sections.device_features.data_description.weather_enabled",
+        "options.step.authentication_settings.title",
+        "options.step.authentication_settings.description",
+        "options.step.authentication_settings.data.reauth",
+        "options.step.authentication_settings.data.forget_password",
+        "options.step.authentication_settings.data_description.reauth",
+        "options.step.authentication_settings.data_description.forget_password",
+        "options.step.repair_notifications.title",
+        "options.step.repair_notifications.description",
+        "options.step.repair_notifications.data.degraded_service_repair_issues",
+        "options.step.repair_notifications.data.system_event_repair_issues",
+        "options.step.repair_notifications.data_description.degraded_service_repair_issues",
+        "options.step.repair_notifications.data_description.system_event_repair_issues",
         "options.step.init.data_description.api_timeout",
         "options.step.init.data_description.nominal_voltage",
         "options.error.serials_required",
@@ -1400,8 +1864,41 @@ def test_options_device_category_strings_exist_for_all_locales() -> None:
     non_english_must_differ = [
         "config.step.devices.data.type_heatpump",
         "config.step.devices.data_description.type_heatpump",
-        "options.step.init.data.type_heatpump",
-        "options.step.init.data_description.type_heatpump",
+        "options.step.init.menu_options.devices",
+        "options.step.init.menu_option_descriptions.devices",
+        "options.step.init.menu_option_descriptions.repair_notifications",
+        "options.step.init.menu_options.authentication_settings",
+        "options.step.init.menu_option_descriptions.authentication_settings",
+        "options.step.devices.title",
+        "options.step.devices.description",
+        "options.step.devices.sections.devices.name",
+        "options.step.devices.sections.device_features.name",
+        "options.step.devices.data.devices",
+        "options.step.devices.data.device_features",
+        "options.step.devices.data.schedule_sync_enabled",
+        "options.step.devices.sections.devices.data.type_heatpump",
+        "options.step.devices.sections.device_features.data.schedule_sync_enabled",
+        "options.step.devices.sections.device_features.data.battery_schedules_enabled",
+        "options.step.devices.sections.device_features.data.system_event_repair_issues",
+        "options.step.devices.sections.device_features.data.pricing_edits_enabled",
+        "options.step.devices.sections.device_features.data.weather_enabled",
+        "options.step.devices.sections.devices.data_description.type_heatpump",
+        "options.step.devices.sections.device_features.data_description.system_event_repair_issues",
+        "options.step.devices.sections.device_features.data_description.schedule_sync_enabled",
+        "options.step.devices.sections.device_features.data_description.battery_schedules_enabled",
+        "options.step.devices.sections.device_features.data_description.pricing_edits_enabled",
+        "options.step.devices.sections.device_features.data_description.weather_enabled",
+        "options.step.authentication_settings.title",
+        "options.step.authentication_settings.description",
+        "options.step.authentication_settings.data.reauth",
+        "options.step.authentication_settings.data.forget_password",
+        "options.step.authentication_settings.data_description.reauth",
+        "options.step.authentication_settings.data_description.forget_password",
+        "options.step.repair_notifications.description",
+        "options.step.repair_notifications.data.degraded_service_repair_issues",
+        "options.step.repair_notifications.data.system_event_repair_issues",
+        "options.step.repair_notifications.data_description.degraded_service_repair_issues",
+        "options.step.repair_notifications.data_description.system_event_repair_issues",
         "options.step.init.data.api_timeout",
         "options.step.init.data.nominal_voltage",
         "options.step.init.data_description.api_timeout",
@@ -1419,3 +1916,35 @@ def test_options_device_category_strings_exist_for_all_locales() -> None:
                 assert _at_path(data, path) != _at_path(
                     en_data, path
                 ), f"{name} should localize {path} (still matches English)"
+
+
+def test_grid_profile_description_warns_about_malfunction_for_all_locales() -> None:
+    """Ensure every Grid Profile Control form includes a localized warning."""
+
+    path = "options.step.grid_profile.description"
+    expected_english = (
+        "Filter the Activation grid profile catalog for this site's country.\n\n"
+        "WARNING: APPLYING AN INCORRECT GRID PROFILE MAY CAUSE THE SYSTEM TO "
+        "MALFUNCTION."
+    )
+    strings = json.loads((ROOT / "strings.json").read_text(encoding="utf-8"))
+    assert _at_path(strings, path) == expected_english
+
+    translations_dir = ROOT / "translations"
+    english = json.loads((translations_dir / "en.json").read_text(encoding="utf-8"))
+    assert _at_path(english, path) == expected_english
+    english_warning = expected_english.split("\n\n", 1)[1]
+
+    for locale in translations_dir.glob("*.json"):
+        value = _at_path(
+            json.loads(locale.read_text(encoding="utf-8")),
+            path,
+        )
+        introduction, warning = value.split("\n\n", 1)
+        assert introduction.strip(), f"{locale.name} missing Grid Profile introduction"
+        assert warning.strip(), f"{locale.name} missing Grid Profile warning"
+        assert warning.isupper(), f"{locale.name} Grid Profile warning is not uppercase"
+        if locale.name != "en.json" and not locale.name.startswith("en-"):
+            assert (
+                warning != english_warning
+            ), f"{locale.name} should localize the Grid Profile warning"

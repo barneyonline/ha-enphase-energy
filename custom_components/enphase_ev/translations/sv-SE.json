@@ -412,6 +412,9 @@
     "tariff_rate_api_unavailable": {
       "message": "API för tariffskrivning är inte tillgängligt."
     },
+    "pricing_edits_disabled": {
+      "message": "Prisredigering är inaktiverad i integrationsalternativen."
+    },
     "tariff_rate_entity_required": {
       "message": "Välj exakt en tariffprisentitet."
     },
@@ -485,14 +488,20 @@
         "title": "Enphase Energy-alternativ",
         "description": "Välj vad du vill göra med den här integrationsposten.",
         "menu_options": {
-          "settings": "Inställningar",
+          "settings": "Avläsning",
+          "devices": "Välj enheter",
+          "repair_notifications": "Aviseringar",
+          "authentication_settings": "Autentisering",
           "migrate_envoy": "Migrera Envoy-historik",
           "advanced": "Avancerat"
         },
         "menu_option_descriptions": {
           "settings": "Justera polling och beteende.",
+          "devices": "Välj vilka enhetsgrupper som ska läggas till. Alla val delar samma pollingintervall.",
+          "repair_notifications": "Hantera reparationsaviseringar i Home Assistant.",
+          "authentication_settings": "Starta inloggningsflödet för att uppdatera inloggningsuppgifter utan att ta bort integrationen.",
           "migrate_envoy": "Ta över valda energi-entitets-ID:n från Enphase Envoy så att historiken i Home Assistant Energy fortsätter under denna integration.",
-          "advanced": "Nätprofilstyrning endast för installatörer."
+          "advanced": "Valfria kontroller för nätläge och nätprofilkontroller endast för installatörer."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -503,11 +512,9 @@
           "slow_poll_interval": "Långsamt pollningsintervall (s)",
           "fast_while_streaming": "Föredra snabb pollning när molnströmmen är aktiv",
           "api_timeout": "API-timeout (s)",
-          "nominal_voltage": "Nominell spänning (V)",
+          "nominal_voltage": "EV-laddarens nominella spänning (V)",
           "session_history_interval": "Sessionshistorikintervall (min)",
           "schedule_sync_enabled": "Aktivera Scheduler Support",
-          "reauth": "Starta omautentisering",
-          "forget_password": "Glöm lagrat lösenord",
           "type_heatpump": "Värmepump",
           "type_ac_battery": "AC-batteri",
           "battery_schedules_enabled": "Aktivera batterischemaläggare",
@@ -523,60 +530,130 @@
           "slow_poll_interval": "Intervall att använda när inaktiv.",
           "fast_while_streaming": "När aktiverad, snabb pollning under aktiv molnströmning.",
           "api_timeout": "Sekunder innan API-begäranden får timeout.",
-          "nominal_voltage": "Reservspänning för uppskattning av laddarens effekt.",
+          "nominal_voltage": "Typisk växelspänning som används för att uppskatta effekten när aktuell spänning inte är tillgänglig.",
           "session_history_interval": "Minuter att vänta mellan hämtningar av moln-sessionshistorik.",
-          "schedule_sync_enabled": "Hantera Enphase schemahantering",
-          "reauth": "Starta inloggningsflödet för att uppdatera inloggningsuppgifter utan att ta bort integrationen.",
-          "forget_password": "Tar bort det lagrade lösenordet. Automatisk uppdatering försöks inte längre.",
           "type_heatpump": "Inkluderar sensorer för värmepumpens status, diagnostik och förbrukning.",
           "type_ac_battery": "Inkluderar AC-batterisensorer och vilolägeskontroller när de är tillgängliga.",
-          "battery_schedules_enabled": "Hantera IQ-batterischeman",
           "degraded_service_repair_issues": "Skapar Repairs-problem när valfria Enphase-tjänster är degraderade.",
           "weather_enabled": "Hämtar aktuellt väder för platsen från Enphase och skapar endast en väderentitet när slutpunkten är tillgänglig."
         }
       },
       "settings": {
-        "title": "Enphase Energy-alternativ",
+        "title": "Avläsning",
         "description": "Justera pollning och beteende.",
         "data": {
-          "type_envoy": "Gateway",
-          "type_encharge": "Batteri",
-          "type_iqevse": "Laddare",
-          "type_microinverter": "Mikroväxelriktare",
           "fast_poll_interval": "Snabbt pollningsintervall (s)",
           "slow_poll_interval": "Långsamt pollningsintervall (s)",
           "fast_while_streaming": "Föredra snabb pollning när molnströmmen är aktiv",
           "api_timeout": "API-timeout (s)",
-          "nominal_voltage": "Nominell spänning (V)",
           "session_history_interval": "Sessionshistorikintervall (min)",
-          "schedule_sync_enabled": "Aktivera Scheduler Support",
-          "reauth": "Starta omautentisering",
-          "forget_password": "Glöm lagrat lösenord",
-          "type_heatpump": "Värmepump",
-          "type_ac_battery": "AC-batteri",
-          "battery_schedules_enabled": "Aktivera batterischemaläggare",
-          "degraded_service_repair_issues": "Aktivera reparationer för degraderade tjänster",
-          "weather_enabled": "Aktivera väder"
+          "degraded_service_repair_issues": "Aktivera reparationer för degraderade tjänster"
         },
         "data_description": {
-          "type_envoy": "Inkluderar gateway-anslutning och mätardiagnostik.",
-          "type_encharge": "Inkluderar batteristatus och styrentiteter när de är tillgängliga.",
-          "type_iqevse": "Inkluderar EV-laddarentiteter och styrning.",
-          "type_microinverter": "Inkluderar sensorer för mikroväxelriktaranslutning, aktivt antal och livstidsproduktion.",
           "fast_poll_interval": "Intervall att använda under laddning eller strömning.",
           "slow_poll_interval": "Intervall att använda när inaktiv.",
           "fast_while_streaming": "När aktiverad, snabb pollning under aktiv molnströmning.",
           "api_timeout": "Sekunder innan API-begäranden får timeout.",
-          "nominal_voltage": "Reservspänning för uppskattning av laddarens effekt.",
           "session_history_interval": "Minuter att vänta mellan hämtningar av moln-sessionshistorik.",
-          "schedule_sync_enabled": "Hantera Enphase schemahantering",
-          "reauth": "Starta inloggningsflödet för att uppdatera inloggningsuppgifter utan att ta bort integrationen.",
-          "forget_password": "Tar bort det lagrade lösenordet. Automatisk uppdatering försöks inte längre.",
-          "type_heatpump": "Inkluderar sensorer för värmepumpens status, diagnostik och förbrukning.",
+          "degraded_service_repair_issues": "Skapar Repairs-problem när valfria Enphase-tjänster är degraderade."
+        }
+      },
+      "devices": {
+        "title": "Välj enheter",
+        "description": "Välj vilka enhetsgrupper som ska läggas till. Alla val delar samma pollingintervall.",
+        "sections": {
+          "devices": {
+            "name": "Välj enheter",
+            "data": {
+              "type_envoy": "Gateway",
+              "type_encharge": "Batteri",
+              "type_ac_battery": "AC-batteri",
+              "type_iqevse": "Laddare",
+              "type_heatpump": "Värmepump",
+              "type_microinverter": "Mikroväxelriktare"
+            },
+            "data_description": {
+              "type_envoy": "Inkluderar gateway-anslutning och mätardiagnostik.",
+              "type_encharge": "Inkluderar batteristatus och styrentiteter när de är tillgängliga.",
+              "type_ac_battery": "Inkluderar AC-batterisensorer och vilolägeskontroller när de är tillgängliga.",
+              "type_iqevse": "Inkluderar EV-laddarentiteter och styrning.",
+              "type_heatpump": "Inkluderar sensorer för värmepumpens status, diagnostik och förbrukning.",
+              "type_microinverter": "Inkluderar sensorer för mikroväxelriktaranslutning, aktivt antal och livstidsproduktion."
+            }
+          },
+          "device_features": {
+            "name": "Enhetsfunktioner",
+            "data": {
+              "schedule_sync_enabled": "Aktivera Scheduler Support",
+              "battery_schedules_enabled": "Aktivera batterischemaläggare",
+              "system_event_repair_issues": "Aktivera reparationsaviseringar för systemhändelser",
+              "pricing_edits_enabled": "Aktivera prisredigering",
+              "weather_enabled": "Aktivera väder",
+              "nominal_voltage": "EV-laddarens nominella spänning (V)"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Skapar Home Assistant-reparationer för aktiva stående Enphase-larm. Inaktiverat som standard.",
+              "pricing_edits_enabled": "Hantera elpriser för IQ Gateway",
+              "weather_enabled": "Hämtar aktuellt väder för platsen från Enphase och skapar endast en väderentitet när slutpunkten är tillgänglig.",
+              "nominal_voltage": "Typisk växelspänning som används för att uppskatta effekten när aktuell spänning inte är tillgänglig.",
+              "schedule_sync_enabled": "Hantera scheman för IQ EV Charger.",
+              "battery_schedules_enabled": "Hantera scheman för IQ Battery."
+            }
+          }
+        },
+        "data": {
+          "devices": "Välj enheter",
+          "device_features": "Enhetsfunktioner",
+          "type_envoy": "Gateway",
+          "type_encharge": "Batteri",
+          "type_ac_battery": "AC-batteri",
+          "type_iqevse": "Laddare",
+          "type_heatpump": "Värmepump",
+          "type_microinverter": "Mikroväxelriktare",
+          "schedule_sync_enabled": "Aktivera Scheduler Support",
+          "battery_schedules_enabled": "Aktivera batterischemaläggare",
+          "system_event_repair_issues": "Aktivera reparationsaviseringar för systemhändelser",
+          "pricing_edits_enabled": "Aktivera prisredigering",
+          "weather_enabled": "Aktivera väder",
+          "nominal_voltage": "EV-laddarens nominella spänning (V)"
+        },
+        "data_description": {
+          "type_envoy": "Inkluderar gateway-anslutning och mätardiagnostik.",
+          "type_encharge": "Inkluderar batteristatus och styrentiteter när de är tillgängliga.",
           "type_ac_battery": "Inkluderar AC-batterisensorer och vilolägeskontroller när de är tillgängliga.",
-          "battery_schedules_enabled": "Hantera IQ-batterischeman",
+          "type_iqevse": "Inkluderar EV-laddarentiteter och styrning.",
+          "type_heatpump": "Inkluderar sensorer för värmepumpens status, diagnostik och förbrukning.",
+          "type_microinverter": "Inkluderar sensorer för mikroväxelriktaranslutning, aktivt antal och livstidsproduktion.",
+          "system_event_repair_issues": "Skapar Home Assistant-reparationer för aktiva stående Enphase-larm. Inaktiverat som standard.",
+          "pricing_edits_enabled": "Hantera elpriser för IQ Gateway",
+          "weather_enabled": "Hämtar aktuellt väder för platsen från Enphase och skapar endast en väderentitet när slutpunkten är tillgänglig.",
+          "nominal_voltage": "Typisk växelspänning som används för att uppskatta effekten när aktuell spänning inte är tillgänglig.",
+          "schedule_sync_enabled": "Hantera scheman för IQ EV Charger.",
+          "battery_schedules_enabled": "Hantera scheman för IQ Battery."
+        }
+      },
+      "repair_notifications": {
+        "title": "Aviseringar",
+        "description": "Välj vilka Enphase-förhållanden som skapar reparationer i Home Assistant.",
+        "data": {
+          "degraded_service_repair_issues": "Aktivera reparationer för degraderade tjänster",
+          "system_event_repair_issues": "Aktivera reparationsaviseringar för systemhändelser"
+        },
+        "data_description": {
           "degraded_service_repair_issues": "Skapar Repairs-problem när valfria Enphase-tjänster är degraderade.",
-          "weather_enabled": "Hämtar aktuellt väder för platsen från Enphase och skapar endast en väderentitet när slutpunkten är tillgänglig."
+          "system_event_repair_issues": "Skapar Home Assistant-reparationer för aktiva stående Enphase-larm. Inaktiverat som standard."
+        }
+      },
+      "authentication_settings": {
+        "title": "Autentisering",
+        "description": "Starta inloggningsflödet för att uppdatera inloggningsuppgifter utan att ta bort integrationen.",
+        "data": {
+          "reauth": "Starta omautentisering",
+          "forget_password": "Glöm lagrat lösenord"
+        },
+        "data_description": {
+          "reauth": "Starta inloggningsflödet för att uppdatera inloggningsuppgifter utan att ta bort integrationen.",
+          "forget_password": "Tar bort det lagrade lösenordet. Automatisk uppdatering försöks inte längre."
         }
       },
       "migrate_envoy_source": {
@@ -605,12 +682,12 @@
           "battery_discharge": "Batteriurladdning"
         },
         "data_description": {
-          "solar_production": "Assign a cumulative production total to the Enphase Energy Site Solar Production sensor. Do not choose daily energy or live power.",
-          "consumption": "Assign a cumulative consumption total to the Enphase Energy Site Consumption sensor. Do not choose daily energy or live power.",
-          "grid_import": "Assign a cumulative grid import total to the Enphase Energy Site Grid Import sensor. Do not choose daily energy or live power.",
-          "grid_export": "Assign a cumulative grid export total to the Enphase Energy Site Grid Export sensor. Do not choose daily energy or live power.",
-          "battery_charge": "Assign a cumulative battery charge total to the Enphase Energy Site Battery Charge sensor. Do not choose daily energy or live power.",
-          "battery_discharge": "Assign a cumulative battery discharge total to the Enphase Energy Site Battery Discharge sensor. Do not choose daily energy or live power."
+          "solar_production": "Tilldela ett ackumulerat totalvärde till sensorn Plats solproduktion. Välj inte daglig energi eller momentan effekt.",
+          "consumption": "Tilldela ett ackumulerat totalvärde till sensorn Platsförbrukning. Välj inte daglig energi eller momentan effekt.",
+          "grid_import": "Tilldela ett ackumulerat totalvärde till sensorn Platsnät-import. Välj inte daglig energi eller momentan effekt.",
+          "grid_export": "Tilldela ett ackumulerat totalvärde till sensorn Platsnät-export. Välj inte daglig energi eller momentan effekt.",
+          "battery_charge": "Tilldela ett ackumulerat totalvärde till sensorn Platsbatteriladdning. Välj inte daglig energi eller momentan effekt.",
+          "battery_discharge": "Tilldela ett ackumulerat totalvärde till sensorn Platsbatteriurladdning. Välj inte daglig energi eller momentan effekt."
         }
       },
       "migrate_envoy_confirm": {
@@ -625,15 +702,27 @@
         "title": "Avancerat",
         "description": "Installatörs- och underhållsåtgärder.",
         "menu_options": {
+          "grid_toggle": "Nätläge",
           "grid_profile": "Nätprofilstyrning"
         },
         "menu_option_descriptions": {
+          "grid_toggle": "Konfigurera manuella kontroller för nätläge.",
           "grid_profile": "Bläddra bland och tillämpa Activation-nätprofiler endast för installatörer."
+        }
+      },
+      "grid_toggle": {
+        "title": "Nätläge",
+        "description": "Övervakning av nätläge förblir alltid tillgänglig. Manuell växling är säkerhetskritisk, så ytterligare entiteter och tjänsteåtgärder kräver uttrycklig aktivering.",
+        "data": {
+          "grid_toggle_enabled": "Aktivera kontroller för nätläge"
+        },
+        "data_description": {
+          "grid_toggle_enabled": "Sensorn Nätläge förblir tillgänglig. Aktivering skapar Nätstyrningsstatus och Begär OTP och tillåter tjänsteåtgärder."
         }
       },
       "grid_profile": {
         "title": "Nätprofilstyrning",
-        "description": "Filtrerar Activation-katalogen för nätprofiler efter platsens land.",
+        "description": "Filtrerar Activation-katalogen för nätprofiler efter platsens land.\n\nVARNING: OM EN FELAKTIG NÄTPROFIL TILLÄMPAS KAN SYSTEMET SLUTA FUNGERA KORREKT.",
         "data": {
           "grid_profile_region": "Region",
           "grid_profile_commonly_used": "Profillista"
@@ -991,6 +1080,9 @@
           },
           "metrics_available": {
             "name": "Mätvärden tillgängliga"
+          },
+          "endpoint_failure_details": {
+            "name": "Information om slutpunktsfel"
           }
         }
       },
@@ -1556,7 +1648,7 @@
         "name": "Aktiva mikroväxelriktare"
       },
       "inverter_telemetry": {
-        "name": "Telemetri {serial_number}"
+        "name": "Effekt {serial_number}"
       },
       "microinverter_last_reported": {
         "name": "Senaste rapport från mikroväxelriktare"
@@ -1660,9 +1752,9 @@
       "ac_battery_overall_status": {
         "name": "Övergripande status för AC-batteri",
         "state": {
-          "charging": "Laddar",
-          "discharging": "Urladdar",
-          "idle": "Inaktiv",
+          "normal": "Normal",
+          "warning": "Varning",
+          "error": "Fel",
           "unknown": "Okänd"
         }
       },
@@ -1678,9 +1770,9 @@
       "ac_battery_storage_status": {
         "name": "Status för {serial}",
         "state": {
-          "charging": "Laddar",
-          "discharging": "Urladdar",
-          "idle": "Inaktiv",
+          "normal": "Normal",
+          "warning": "Varning",
+          "error": "Fel",
           "unknown": "Okänd"
         }
       },
@@ -2070,6 +2162,12 @@
           "high_impact_count": {
             "name": "Antal händelser med stor påverkan"
           },
+          "standing_alarm_count": {
+            "name": "Antal aktiva larm"
+          },
+          "active_events": {
+            "name": "Aktiva händelser"
+          },
           "severity_counts": {
             "name": "Antal per allvarlighetsgrad"
           },
@@ -2324,7 +2422,7 @@
       "description": "Plats {site_id} kräver uppdaterade sessionshuvuden. Vänligen omautentisera."
     },
     "auth_blocked": {
-      "title": "Enphase Energy authentication temporarily blocked",
+      "title": "Enphase Energy-autentisering är tillfälligt blockerad",
       "description": "Enphase verkar tillfälligt blockera autentisering för plats {site_id}. Automatiska försök är pausade till {blocked_until}. En lyckad manuell återautentisering kan ta bort blockeringen tidigare."
     },
     "too_many_active_sessions": {
@@ -2997,10 +3095,6 @@
         "region_code": {
           "name": "Regioncode",
           "description": "Valfri region- eller delstatskod, till exempel VIC."
-        },
-        "commonly_used": {
-          "name": "Endast vanliga",
-          "description": "Returnerar katalogen över vanliga profiler när detta är aktiverat."
         },
         "device_id": {
           "name": "Systemenheter",

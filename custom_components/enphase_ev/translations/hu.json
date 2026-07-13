@@ -412,6 +412,9 @@
     "tariff_rate_api_unavailable": {
       "message": "A tarifaírási API nem érhető el."
     },
+    "pricing_edits_disabled": {
+      "message": "Az árak szerkesztése le van tiltva az integráció beállításaiban."
+    },
     "tariff_rate_entity_required": {
       "message": "Pontosan egy tarifadíj entitást válassz ki."
     },
@@ -485,14 +488,20 @@
         "title": "Enphase Energy beállítások",
         "description": "Válassza ki, mit szeretne tenni ezzel az integrációs bejegyzéssel.",
         "menu_options": {
-          "settings": "Beállítások",
+          "settings": "Lekérdezés",
+          "devices": "Eszközök kiválasztása",
+          "repair_notifications": "Értesítések",
+          "authentication_settings": "Hitelesítés",
           "migrate_envoy": "Envoy előzmények migrálása",
           "advanced": "Speciális"
         },
         "menu_option_descriptions": {
           "settings": "Lekérdezés és működés finomhangolása.",
+          "devices": "Válassza ki, mely eszközcsoportokat adja hozzá. Minden kiválasztás ugyanazt a lekérdezési időközt használja.",
+          "repair_notifications": "A Home Assistant javítási értesítéseinek kezelése.",
+          "authentication_settings": "Indítsa el a bejelentkezési folyamatot a hitelesítő adatok frissítéséhez az integráció eltávolítása nélkül.",
           "migrate_envoy": "Vegye át a kiválasztott Enphase Envoy energiaentitás-azonosítókat, hogy a Home Assistant Energy előzményei ennél az integrációnál folytatódjanak.",
-          "advanced": "Hálózati profil vezérlése csak telepítőknek."
+          "advanced": "Opcionális hálózati mód vezérlés és csak telepítőknek szánt hálózati profilvezérlés."
         },
         "data": {
           "type_envoy": "Átjáró",
@@ -503,11 +512,9 @@
           "slow_poll_interval": "Lassú lekérdezési intervallum (s)",
           "fast_while_streaming": "Gyors lekérdezés előnyben részesítése, ha a cloud stream aktív",
           "api_timeout": "API-időtúllépés (s)",
-          "nominal_voltage": "Névleges feszültség (V)",
+          "nominal_voltage": "EV-töltő névleges feszültsége (V)",
           "session_history_interval": "Munkamenet előzmény intervallum (min)",
           "schedule_sync_enabled": "Az EV Charger Scheduler engedélyezése",
-          "reauth": "Újrahitelesítés indítása",
-          "forget_password": "Mentett jelszó elfelejtése",
           "type_heatpump": "Hőszivattyú",
           "type_ac_battery": "AC akkumulátor",
           "battery_schedules_enabled": "Az akkumulátor ütemező engedélyezése",
@@ -523,60 +530,130 @@
           "slow_poll_interval": "Intervallum üresjárat esetén.",
           "fast_while_streaming": "Engedélyezve gyors lekérdezés aktív cloud stream közben.",
           "api_timeout": "Ennyi másodperc után jár le az API-kérések időkorlátja.",
-          "nominal_voltage": "Tartalék feszültség a töltő teljesítménybecsléséhez.",
+          "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat.",
           "session_history_interval": "Várakozási percek a felhő munkamenet-előzmények lekérései között.",
-          "schedule_sync_enabled": "Kezelje az IQ EV töltő ütemezését",
-          "reauth": "Indítsa el a bejelentkezési folyamatot a hitelesítő adatok frissítéséhez az integráció eltávolítása nélkül.",
-          "forget_password": "Eltávolítja a mentett jelszót. Automatikus frissítés többé nem lesz megkísérelve.",
           "type_heatpump": "A hőszivattyú állapot-, diagnosztikai és fogyasztási érzékelőit tartalmazza.",
           "type_ac_battery": "AC akkumulátor érzékelőket és alvó mód vezérlőket tartalmaz, ha elérhetők.",
-          "battery_schedules_enabled": "Kezelje az IQ akkumulátor-ütemezéseket",
           "degraded_service_repair_issues": "Repairs-problémákat hoz létre, amikor az opcionális Enphase-szolgáltatások csökkent működésűek.",
           "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető."
         }
       },
       "settings": {
-        "title": "Enphase Energy beállítások",
+        "title": "Lekérdezés",
         "description": "Lekérdezés és viselkedés hangolása.",
         "data": {
-          "type_envoy": "Átjáró",
-          "type_encharge": "Akkumulátor",
-          "type_iqevse": "Töltők",
-          "type_microinverter": "Mikroinverterek",
           "fast_poll_interval": "Gyors lekérdezési intervallum (s)",
           "slow_poll_interval": "Lassú lekérdezési intervallum (s)",
           "fast_while_streaming": "Gyors lekérdezés előnyben részesítése, ha a cloud stream aktív",
           "api_timeout": "API-időtúllépés (s)",
-          "nominal_voltage": "Névleges feszültség (V)",
           "session_history_interval": "Munkamenet előzmény intervallum (min)",
-          "schedule_sync_enabled": "Ütemező támogatás engedélyezése",
-          "reauth": "Újrahitelesítés indítása",
-          "forget_password": "Mentett jelszó elfelejtése",
-          "type_heatpump": "Hőszivattyú",
-          "type_ac_battery": "AC akkumulátor",
-          "battery_schedules_enabled": "Az akkumulátor ütemező engedélyezése",
-          "degraded_service_repair_issues": "Csökkent működésű szolgáltatások javításainak engedélyezése",
-          "weather_enabled": "Időjárás engedélyezése"
+          "degraded_service_repair_issues": "Csökkent működésű szolgáltatások javításainak engedélyezése"
         },
         "data_description": {
-          "type_envoy": "Tartalmazza az átjáró-kapcsolat és a mérők diagnosztikáját.",
-          "type_encharge": "Tartalmazza az akkumulátorok állapotát és vezérlő entitásokat, ha elérhetők.",
-          "type_iqevse": "Tartalmazza az EV töltők entitásait és vezérléseit.",
-          "type_microinverter": "Tartalmazza a mikroinverter-kapcsolati, aktív darabszám és élettartam-termelési érzékelőket.",
           "fast_poll_interval": "Intervallum töltés vagy streamelés közben.",
           "slow_poll_interval": "Intervallum üresjárat esetén.",
           "fast_while_streaming": "Engedélyezve gyors lekérdezés aktív cloud stream közben.",
           "api_timeout": "Ennyi másodperc után jár le az API-kérések időkorlátja.",
-          "nominal_voltage": "Tartalék feszültség a töltő teljesítménybecsléséhez.",
           "session_history_interval": "Várakozási percek a felhő munkamenet-előzmények lekérései között.",
-          "schedule_sync_enabled": "Az Enphase ütemezésének kezelése",
-          "reauth": "Indítsa el a bejelentkezési folyamatot a hitelesítő adatok frissítéséhez az integráció eltávolítása nélkül.",
-          "forget_password": "Eltávolítja a mentett jelszót. Automatikus frissítés többé nem lesz megkísérelve.",
-          "type_heatpump": "A hőszivattyú állapot-, diagnosztikai és fogyasztási érzékelőit tartalmazza.",
+          "degraded_service_repair_issues": "Repairs-problémákat hoz létre, amikor az opcionális Enphase-szolgáltatások csökkent működésűek."
+        }
+      },
+      "devices": {
+        "title": "Eszközök kiválasztása",
+        "description": "Válassza ki, mely eszközcsoportokat adja hozzá. Minden kiválasztás ugyanazt a lekérdezési időközt használja.",
+        "sections": {
+          "devices": {
+            "name": "Eszközök kiválasztása",
+            "data": {
+              "type_envoy": "Átjáró",
+              "type_encharge": "Akkumulátor",
+              "type_ac_battery": "AC akkumulátor",
+              "type_iqevse": "Töltők",
+              "type_heatpump": "Hőszivattyú",
+              "type_microinverter": "Mikroinverterek"
+            },
+            "data_description": {
+              "type_envoy": "Tartalmazza az átjáró-kapcsolat és a mérők diagnosztikáját.",
+              "type_encharge": "Tartalmazza az akkumulátorok állapotát és vezérlő entitásokat, ha elérhetők.",
+              "type_ac_battery": "AC akkumulátor érzékelőket és alvó mód vezérlőket tartalmaz, ha elérhetők.",
+              "type_iqevse": "Tartalmazza az EV töltők entitásait és vezérléseit.",
+              "type_heatpump": "A hőszivattyú állapot-, diagnosztikai és fogyasztási érzékelőit tartalmazza.",
+              "type_microinverter": "Tartalmazza a mikroinverter-kapcsolati, aktív darabszám és élettartam-termelési érzékelőket."
+            }
+          },
+          "device_features": {
+            "name": "Eszközfunkciók",
+            "data": {
+              "schedule_sync_enabled": "Ütemező támogatás engedélyezése",
+              "battery_schedules_enabled": "Az akkumulátor ütemező engedélyezése",
+              "system_event_repair_issues": "Rendszeresemény-javítási értesítések engedélyezése",
+              "pricing_edits_enabled": "Árak szerkesztésének engedélyezése",
+              "weather_enabled": "Időjárás engedélyezése",
+              "nominal_voltage": "EV-töltő névleges feszültsége (V)"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva.",
+              "pricing_edits_enabled": "Az IQ Gateway villamosenergia-díjainak kezelése",
+              "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető.",
+              "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat.",
+              "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése.",
+              "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése."
+            }
+          }
+        },
+        "data": {
+          "devices": "Eszközök kiválasztása",
+          "device_features": "Eszközfunkciók",
+          "type_envoy": "Átjáró",
+          "type_encharge": "Akkumulátor",
+          "type_ac_battery": "AC akkumulátor",
+          "type_iqevse": "Töltők",
+          "type_heatpump": "Hőszivattyú",
+          "type_microinverter": "Mikroinverterek",
+          "schedule_sync_enabled": "Ütemező támogatás engedélyezése",
+          "battery_schedules_enabled": "Az akkumulátor ütemező engedélyezése",
+          "system_event_repair_issues": "Rendszeresemény-javítási értesítések engedélyezése",
+          "pricing_edits_enabled": "Árak szerkesztésének engedélyezése",
+          "weather_enabled": "Időjárás engedélyezése",
+          "nominal_voltage": "EV-töltő névleges feszültsége (V)"
+        },
+        "data_description": {
+          "type_envoy": "Tartalmazza az átjáró-kapcsolat és a mérők diagnosztikáját.",
+          "type_encharge": "Tartalmazza az akkumulátorok állapotát és vezérlő entitásokat, ha elérhetők.",
           "type_ac_battery": "AC akkumulátor érzékelőket és alvó mód vezérlőket tartalmaz, ha elérhetők.",
-          "battery_schedules_enabled": "Kezelje az IQ akkumulátor-ütemezéseket",
+          "type_iqevse": "Tartalmazza az EV töltők entitásait és vezérléseit.",
+          "type_heatpump": "A hőszivattyú állapot-, diagnosztikai és fogyasztási érzékelőit tartalmazza.",
+          "type_microinverter": "Tartalmazza a mikroinverter-kapcsolati, aktív darabszám és élettartam-termelési érzékelőket.",
+          "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva.",
+          "pricing_edits_enabled": "Az IQ Gateway villamosenergia-díjainak kezelése",
+          "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető.",
+          "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat.",
+          "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése.",
+          "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése."
+        }
+      },
+      "repair_notifications": {
+        "title": "Értesítések",
+        "description": "Válassza ki, mely Enphase-állapotok hozzanak létre Home Assistant-javításokat.",
+        "data": {
+          "degraded_service_repair_issues": "Csökkent működésű szolgáltatások javításainak engedélyezése",
+          "system_event_repair_issues": "Rendszeresemény-javítási értesítések engedélyezése"
+        },
+        "data_description": {
           "degraded_service_repair_issues": "Repairs-problémákat hoz létre, amikor az opcionális Enphase-szolgáltatások csökkent működésűek.",
-          "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető."
+          "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva."
+        }
+      },
+      "authentication_settings": {
+        "title": "Hitelesítés",
+        "description": "Indítsa el a bejelentkezési folyamatot a hitelesítő adatok frissítéséhez az integráció eltávolítása nélkül.",
+        "data": {
+          "reauth": "Újrahitelesítés indítása",
+          "forget_password": "Mentett jelszó elfelejtése"
+        },
+        "data_description": {
+          "reauth": "Indítsa el a bejelentkezési folyamatot a hitelesítő adatok frissítéséhez az integráció eltávolítása nélkül.",
+          "forget_password": "Eltávolítja a mentett jelszót. Automatikus frissítés többé nem lesz megkísérelve."
         }
       },
       "migrate_envoy_source": {
@@ -605,12 +682,12 @@
           "battery_discharge": "Akkumulátor kisütés"
         },
         "data_description": {
-          "solar_production": "Assign a cumulative production total to the Enphase Energy Site Solar Production sensor. Do not choose daily energy or live power.",
-          "consumption": "Assign a cumulative consumption total to the Enphase Energy Site Consumption sensor. Do not choose daily energy or live power.",
-          "grid_import": "Assign a cumulative grid import total to the Enphase Energy Site Grid Import sensor. Do not choose daily energy or live power.",
-          "grid_export": "Assign a cumulative grid export total to the Enphase Energy Site Grid Export sensor. Do not choose daily energy or live power.",
-          "battery_charge": "Assign a cumulative battery charge total to the Enphase Energy Site Battery Charge sensor. Do not choose daily energy or live power.",
-          "battery_discharge": "Assign a cumulative battery discharge total to the Enphase Energy Site Battery Discharge sensor. Do not choose daily energy or live power."
+          "solar_production": "Rendeljen összesített értéket a(z) Helyszín napenergia-termelés érzékelőhöz. Ne válasszon napi energiát vagy pillanatnyi teljesítményt.",
+          "consumption": "Rendeljen összesített értéket a(z) Helyszín fogyasztás érzékelőhöz. Ne válasszon napi energiát vagy pillanatnyi teljesítményt.",
+          "grid_import": "Rendeljen összesített értéket a(z) Helyszín hálózati import érzékelőhöz. Ne válasszon napi energiát vagy pillanatnyi teljesítményt.",
+          "grid_export": "Rendeljen összesített értéket a(z) Helyszín hálózati export érzékelőhöz. Ne válasszon napi energiát vagy pillanatnyi teljesítményt.",
+          "battery_charge": "Rendeljen összesített értéket a(z) Helyszín akkumulátor töltés érzékelőhöz. Ne válasszon napi energiát vagy pillanatnyi teljesítményt.",
+          "battery_discharge": "Rendeljen összesített értéket a(z) Helyszín akkumulátor kisütés érzékelőhöz. Ne válasszon napi energiát vagy pillanatnyi teljesítményt."
         }
       },
       "migrate_envoy_confirm": {
@@ -625,15 +702,27 @@
         "title": "Speciális",
         "description": "Telepítői és karbantartási műveletek.",
         "menu_options": {
+          "grid_toggle": "Hálózati mód",
           "grid_profile": "Hálózati profil vezérlése"
         },
         "menu_option_descriptions": {
+          "grid_toggle": "A kézi hálózati mód vezérlésének beállítása.",
           "grid_profile": "Csak telepítőknek elérhető Activation hálózati profilok böngészése és alkalmazása."
+        }
+      },
+      "grid_toggle": {
+        "title": "Hálózati mód",
+        "description": "A hálózati mód figyelése mindig elérhető marad. A kézi átkapcsolás biztonságkritikus, ezért a további entitások és műveletek kifejezett engedélyezést igényelnek.",
+        "data": {
+          "grid_toggle_enabled": "Hálózati mód vezérlésének engedélyezése"
+        },
+        "data_description": {
+          "grid_toggle_enabled": "A Hálózati mód érzékelő elérhető marad. Az engedélyezés létrehozza a Hálózati vezérlés állapota és OTP kérése entitásokat, és engedélyezi a műveleteket."
         }
       },
       "grid_profile": {
         "title": "Hálózati profil vezérlése",
-        "description": "Az Activation hálózati profilkatalógust a helyszín országa szerint szűri.",
+        "description": "Az Activation hálózati profilkatalógust a helyszín országa szerint szűri.\n\nFIGYELMEZTETÉS: NEM MEGFELELŐ HÁLÓZATI PROFIL ALKALMAZÁSA A RENDSZER HIBÁS MŰKÖDÉSÉT OKOZHATJA.",
         "data": {
           "grid_profile_region": "Régió",
           "grid_profile_commonly_used": "Profillista"
@@ -991,6 +1080,9 @@
           },
           "metrics_available": {
             "name": "Mérőszámok elérhetők"
+          },
+          "endpoint_failure_details": {
+            "name": "Végponti hibák részletei"
           }
         }
       },
@@ -1287,7 +1379,7 @@
         }
       },
       "grid_mode": {
-        "name": "Rács mód",
+        "name": "Hálózati mód",
         "state": {
           "on_grid": "Hálózaton",
           "off_grid": "Hálózatról leválasztva",
@@ -1556,7 +1648,7 @@
         "name": "Aktív mikroinverterek"
       },
       "inverter_telemetry": {
-        "name": "{serial_number} telemetria"
+        "name": "{serial_number} teljesítmény"
       },
       "microinverter_last_reported": {
         "name": "Mikroinverterek utolsó jelentése"
@@ -1660,9 +1752,9 @@
       "ac_battery_overall_status": {
         "name": "AC akkumulátor összesített állapota",
         "state": {
-          "charging": "Töltés",
-          "discharging": "Kisütés",
-          "idle": "Tétlen",
+          "normal": "Normál",
+          "warning": "Figyelmeztetés",
+          "error": "Hiba",
           "unknown": "Ismeretlen"
         }
       },
@@ -1678,9 +1770,9 @@
       "ac_battery_storage_status": {
         "name": "{serial} állapota",
         "state": {
-          "charging": "Töltés",
-          "discharging": "Kisütés",
-          "idle": "Tétlen",
+          "normal": "Normál",
+          "warning": "Figyelmeztetés",
+          "error": "Hiba",
           "unknown": "Ismeretlen"
         }
       },
@@ -2070,6 +2162,12 @@
           "high_impact_count": {
             "name": "Nagy hatású események száma"
           },
+          "standing_alarm_count": {
+            "name": "Aktív riasztások száma"
+          },
+          "active_events": {
+            "name": "Aktív események"
+          },
           "severity_counts": {
             "name": "Darabszám súlyosság szerint"
           },
@@ -2324,7 +2422,7 @@
       "description": "A(z) {site_id} helyszín frissített munkamenet-fejléceket igényel. Kérjük, hitelesítsen újra."
     },
     "auth_blocked": {
-      "title": "Enphase Energy authentication temporarily blocked",
+      "title": "Az Enphase Energy hitelesítése ideiglenesen blokkolva",
       "description": "Úgy tűnik, az Enphase ideiglenesen blokkolja a(z) {site_id} hely hitelesítését. Az automatikus próbálkozások {blocked_until} időpontig szünetelnek. A sikeres kézi újrahitelesítés korábban is feloldhatja a blokkolást."
     },
     "too_many_active_sessions": {
@@ -2997,10 +3095,6 @@
         "region_code": {
           "name": "Régiókód",
           "description": "Opcionális régió- vagy államkód, például VIC."
-        },
-        "commonly_used": {
-          "name": "Csak gyakran használt",
-          "description": "Engedélyezve a gyakran használt profilok katalógusát adja vissza."
         },
         "device_id": {
           "name": "Helyszíni eszközök",

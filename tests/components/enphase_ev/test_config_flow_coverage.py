@@ -12,6 +12,7 @@ from homeassistant.const import UnitOfEnergy
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.translation import async_get_translations
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.enphase_ev import config_flow
@@ -27,6 +28,8 @@ from custom_components.enphase_ev.api import (
     SiteInfo,
 )
 from custom_components.enphase_ev.config_flow import (
+    CONF_DEVICE_CATEGORIES_SECTION,
+    CONF_DEVICE_FEATURES_SECTION,
     CONF_OTP,
     CONF_RESEND_CODE,
     CONF_TYPE_AC_BATTERY,
@@ -64,6 +67,8 @@ from custom_components.enphase_ev.const import (
     CONF_SITE_ONLY,
     CONF_ACCESS_TOKEN,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_PRICING_EDITS_ENABLED,
+    DEFAULT_WEATHER_ENABLED,
     DOMAIN,
     MAX_API_TIMEOUT,
     MAX_POLL_INTERVAL,
@@ -77,10 +82,13 @@ from custom_components.enphase_ev.const import (
     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
     OPT_FAST_POLL_INTERVAL,
     OPT_FAST_WHILE_STREAMING,
+    OPT_GRID_TOGGLE_ENABLED,
     OPT_NOMINAL_VOLTAGE,
+    OPT_PRICING_EDITS_ENABLED,
     OPT_SESSION_HISTORY_INTERVAL,
     OPT_SLOW_POLL_INTERVAL,
     OPT_SCHEDULE_SYNC_ENABLED,
+    OPT_SYSTEM_EVENT_REPAIR_ISSUES,
     OPT_WEATHER_ENABLED,
 )
 from custom_components.enphase_ev.envoy_history import migration_target_unique_id
@@ -2477,7 +2485,7 @@ def test_options_flow_stored_selected_type_keys_legacy_respects_site_only(hass) 
     ]
 
 
-def test_options_flow_build_schema_skips_missing_type_mapping(hass) -> None:
+def test_options_flow_build_devices_schema_skips_missing_type_mapping(hass) -> None:
     handler = OptionsFlowHandler(MockConfigEntry(domain=DOMAIN, data={}, options={}))
     handler.hass = hass
 
@@ -2486,9 +2494,14 @@ def test_options_flow_build_schema_skips_missing_type_mapping(hass) -> None:
         {"envoy": CONF_TYPE_ENVOY},
         clear=True,
     ):
-        schema = handler._build_schema()
+        schema = handler._build_devices_schema(["envoy", "iqevse"])
 
-    schema_keys = list(schema.schema.keys())
+    category_section = next(
+        value
+        for marker, value in schema.schema.items()
+        if marker.schema == CONF_DEVICE_CATEGORIES_SECTION
+    )
+    schema_keys = list(category_section.schema.schema.keys())
     assert any(
         isinstance(key, VolOptional) and key.schema == CONF_TYPE_ENVOY
         for key in schema_keys
@@ -2539,7 +2552,7 @@ def test_options_flow_schema_bounds_runtime_options(hass) -> None:
 
 
 @pytest.mark.asyncio
-async def test_options_flow_settings_hides_ac_battery_when_site_not_supported(
+async def test_options_flow_devices_hides_ac_battery_when_site_not_supported(
     hass, monkeypatch
 ) -> None:
     entry = MockConfigEntry(
@@ -2561,9 +2574,14 @@ async def test_options_flow_settings_hides_ac_battery_when_site_not_supported(
         AsyncMock(return_value={"data": {"hasAcb": False}}),
     )
 
-    result = await handler.async_step_settings()
+    result = await handler.async_step_devices()
 
-    schema_keys = list(result["data_schema"].schema.keys())
+    category_section = next(
+        value
+        for marker, value in result["data_schema"].schema.items()
+        if marker.schema == CONF_DEVICE_CATEGORIES_SECTION
+    )
+    schema_keys = list(category_section.schema.schema.keys())
     assert not any(
         isinstance(key, VolOptional) and key.schema == CONF_TYPE_AC_BATTERY
         for key in schema_keys
@@ -2571,7 +2589,7 @@ async def test_options_flow_settings_hides_ac_battery_when_site_not_supported(
 
 
 @pytest.mark.asyncio
-async def test_options_flow_settings_shows_ac_battery_when_site_supported(
+async def test_options_flow_devices_shows_ac_battery_when_site_supported(
     hass, monkeypatch
 ) -> None:
     entry = MockConfigEntry(
@@ -2593,9 +2611,14 @@ async def test_options_flow_settings_shows_ac_battery_when_site_supported(
         AsyncMock(return_value={"data": {"hasAcb": True}}),
     )
 
-    result = await handler.async_step_settings()
+    result = await handler.async_step_devices()
 
-    schema_keys = list(result["data_schema"].schema.keys())
+    category_section = next(
+        value
+        for marker, value in result["data_schema"].schema.items()
+        if marker.schema == CONF_DEVICE_CATEGORIES_SECTION
+    )
+    schema_keys = list(category_section.schema.schema.keys())
     assert any(
         isinstance(key, VolOptional) and key.schema == CONF_TYPE_AC_BATTERY
         for key in schema_keys
@@ -2640,7 +2663,7 @@ async def test_options_flow_ac_battery_supported_for_options_requires_tokens_and
 
 
 @pytest.mark.asyncio
-async def test_options_flow_settings_ignores_unknown_visible_type_keys(
+async def test_options_flow_devices_ignores_unknown_visible_type_keys(
     hass, monkeypatch
 ) -> None:
     entry = MockConfigEntry(
@@ -2664,7 +2687,7 @@ async def test_options_flow_settings_ignores_unknown_visible_type_keys(
         AsyncMock(return_value=["envoy", "unknown_type"]),
     )
 
-    result = await handler.async_step_settings({CONF_TYPE_ENVOY: True})
+    result = await handler.async_step_devices({CONF_TYPE_ENVOY: True})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert handler._entry.data[CONF_SELECTED_TYPE_KEYS] == ["envoy"]
@@ -2855,6 +2878,55 @@ async def test_options_flow_reauth_invokes_callback(hass) -> None:
 
 
 @pytest.mark.asyncio
+async def test_options_flow_authentication_has_heading_form(hass) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "12345"},
+        options={"existing": True},
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    form = await handler.async_step_authentication_settings()
+
+    assert form["type"] is FlowResultType.FORM
+    assert form["step_id"] == "authentication_settings"
+    assert form["data_schema"]({}) == {
+        "reauth": False,
+        "forget_password": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_options_flow_authentication_submit_runs_actions(
+    hass,
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_SITE_ID: "12345",
+            CONF_PASSWORD: "secret",
+            CONF_REMEMBER_PASSWORD: True,
+        },
+        options={OPT_GRID_TOGGLE_ENABLED: True},
+    )
+    entry.add_to_hass(hass)
+    entry.async_start_reauth = Mock()
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_authentication_settings(
+        {"reauth": True, "forget_password": True}
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][OPT_GRID_TOGGLE_ENABLED] is True
+    assert CONF_PASSWORD not in entry.data
+    assert entry.data[CONF_REMEMBER_PASSWORD] is False
+    entry.async_start_reauth.assert_called_once_with(hass, data=entry.data)
+
+
+@pytest.mark.asyncio
 async def test_options_flow_init_shows_menu(hass) -> None:
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
     handler = OptionsFlowHandler(entry)
@@ -2864,7 +2936,14 @@ async def test_options_flow_init_shows_menu(hass) -> None:
 
     assert result["type"] is FlowResultType.MENU
     assert result["step_id"] == "init"
-    assert result["menu_options"] == ["settings", "migrate_envoy"]
+    assert result["menu_options"] == [
+        "settings",
+        "devices",
+        "repair_notifications",
+        "authentication_settings",
+        "advanced",
+        "migrate_envoy",
+    ]
 
 
 @pytest.mark.asyncio
@@ -2881,14 +2960,24 @@ async def test_options_flow_advanced_shows_grid_profile_menu(hass) -> None:
     init_result = await handler.async_step_init()
     result = await handler.async_step_advanced()
 
-    assert init_result["menu_options"] == ["settings", "advanced", "migrate_envoy"]
+    assert init_result["menu_options"] == [
+        "settings",
+        "devices",
+        "repair_notifications",
+        "authentication_settings",
+        "advanced",
+        "migrate_envoy",
+    ]
     assert result["type"] is FlowResultType.MENU
     assert result["step_id"] == "advanced"
-    assert result["menu_options"] == ["grid_profile"]
+    assert result["menu_options"] == [
+        "grid_toggle",
+        "grid_profile",
+    ]
 
 
 @pytest.mark.asyncio
-async def test_options_flow_hides_advanced_without_installer_access(hass) -> None:
+async def test_options_flow_keeps_grid_toggle_without_installer_access(hass) -> None:
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
     entry.runtime_data = SimpleNamespace(
         coordinator=SimpleNamespace(
@@ -2902,14 +2991,21 @@ async def test_options_flow_hides_advanced_without_installer_access(hass) -> Non
 
     result = await handler.async_step_init()
 
-    assert result["menu_options"] == ["settings", "migrate_envoy"]
+    assert result["menu_options"] == [
+        "settings",
+        "devices",
+        "repair_notifications",
+        "authentication_settings",
+        "advanced",
+        "migrate_envoy",
+    ]
     result = await handler.async_step_advanced()
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "grid_profile_installer_required"
+    assert result["type"] is FlowResultType.MENU
+    assert result["menu_options"] == ["grid_toggle"]
 
 
 @pytest.mark.asyncio
-async def test_options_flow_hides_advanced_without_country_regions(hass) -> None:
+async def test_options_flow_keeps_grid_toggle_without_country_regions(hass) -> None:
     runtime = _options_flow_grid_profile_runtime()
     runtime.regions_by_country["AU"] = []
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
@@ -2921,7 +3017,42 @@ async def test_options_flow_hides_advanced_without_country_regions(hass) -> None
 
     result = await handler.async_step_init()
 
-    assert result["menu_options"] == ["settings", "migrate_envoy"]
+    assert result["menu_options"] == [
+        "settings",
+        "devices",
+        "repair_notifications",
+        "authentication_settings",
+        "advanced",
+        "migrate_envoy",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_toggle_defaults_off_and_preserves_options(
+    hass,
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "12345"},
+        options={"existing": True},
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    form = await handler.async_step_grid_toggle()
+    marker = next(
+        marker
+        for marker in form["data_schema"].schema
+        if marker.schema == OPT_GRID_TOGGLE_ENABLED
+    )
+    assert form["type"] is FlowResultType.FORM
+    assert form["step_id"] == "grid_toggle"
+    assert marker.default() is False
+
+    result = await handler.async_step_grid_toggle({OPT_GRID_TOGGLE_ENABLED: True})
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"] == {"existing": True, OPT_GRID_TOGGLE_ENABLED: True}
 
 
 def _options_flow_grid_profile_runtime(
@@ -2978,8 +3109,8 @@ async def test_options_flow_grid_profile_aborts_without_runtime(hass) -> None:
     handler.hass = hass
 
     result = await handler.async_step_advanced()
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "grid_profile_unavailable"
+    assert result["type"] is FlowResultType.MENU
+    assert result["menu_options"] == ["grid_toggle"]
 
     result = await handler.async_step_grid_profile()
 
@@ -3044,7 +3175,9 @@ async def test_options_flow_grid_profile_reports_activation_unavailable(hass) ->
     select = await handler.async_step_grid_profile_select()
     confirm = await handler.async_step_grid_profile_confirm()
 
-    for result in (advanced, grid_profile, select, confirm):
+    assert advanced["type"] is FlowResultType.MENU
+    assert advanced["menu_options"] == ["grid_toggle"]
+    for result in (grid_profile, select, confirm):
         assert result["type"] is FlowResultType.ABORT
         assert result["reason"] == "grid_profile_unavailable"
 
@@ -3396,7 +3529,7 @@ async def test_options_flow_grid_profile_reports_catalog_outage(hass) -> None:
 
 
 @pytest.mark.asyncio
-async def test_options_flow_show_form_with_defaults(hass) -> None:
+async def test_options_flow_devices_form_with_defaults(hass) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={
@@ -3409,54 +3542,212 @@ async def test_options_flow_show_form_with_defaults(hass) -> None:
     handler = OptionsFlowHandler(entry)
     handler.hass = hass
 
-    with patch.object(
-        handler,
-        "add_suggested_values_to_schema",
-        wraps=handler.add_suggested_values_to_schema,
-    ) as mock_add:
-        result = await handler.async_step_settings()
+    result = await handler.async_step_devices()
 
     assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "settings"
-    mock_add.assert_called_once()
+    assert result["step_id"] == "devices"
     schema_keys = list(result["data_schema"].schema.keys())
-    assert any(
-        isinstance(key, VolOptional) and key.schema == CONF_TYPE_ENVOY
-        for key in schema_keys
+    assert [key.schema for key in schema_keys] == [
+        CONF_DEVICE_CATEGORIES_SECTION,
+        CONF_DEVICE_FEATURES_SECTION,
+    ]
+    validated = result["data_schema"](
+        {
+            CONF_DEVICE_CATEGORIES_SECTION: {},
+            CONF_DEVICE_FEATURES_SECTION: {},
+        }
     )
-    assert any(
-        isinstance(key, VolOptional) and key.schema == CONF_TYPE_ENCHARGE
-        for key in schema_keys
-    )
-    assert any(
-        isinstance(key, VolOptional) and key.schema == CONF_TYPE_IQEVSE
-        for key in schema_keys
-    )
-    assert any(
-        isinstance(key, VolOptional) and key.schema == CONF_TYPE_HEATPUMP
-        for key in schema_keys
-    )
-    assert any(
-        isinstance(key, VolOptional) and key.schema == CONF_TYPE_MICROINVERTER
-        for key in schema_keys
-    )
-    assert not any(
-        isinstance(key, VolOptional) and key.schema == CONF_SCAN_INTERVAL
-        for key in schema_keys
-    )
-    assert not any(
-        isinstance(key, VolOptional) and key.schema == CONF_SITE_ONLY
-        for key in schema_keys
-    )
-    validated = result["data_schema"]({})
-    assert validated[OPT_SCHEDULE_SYNC_ENABLED] is True
-    assert validated[OPT_BATTERY_SCHEDULES_ENABLED] is True
-    assert validated[OPT_DEGRADED_SERVICE_REPAIR_ISSUES] is True
-    assert validated[OPT_WEATHER_ENABLED] is False
+    categories = validated[CONF_DEVICE_CATEGORIES_SECTION]
+    features = validated[CONF_DEVICE_FEATURES_SECTION]
+    assert categories[CONF_TYPE_ENVOY] is True
+    assert categories[CONF_TYPE_ENCHARGE] is False
+    assert categories[CONF_TYPE_IQEVSE] is True
+    assert categories[CONF_TYPE_HEATPUMP] is False
+    assert categories[CONF_TYPE_MICROINVERTER] is False
+    assert features[OPT_SCHEDULE_SYNC_ENABLED] is True
+    assert features[OPT_BATTERY_SCHEDULES_ENABLED] is True
+    assert features[OPT_PRICING_EDITS_ENABLED] is DEFAULT_PRICING_EDITS_ENABLED
+    assert features[OPT_WEATHER_ENABLED] is DEFAULT_WEATHER_ENABLED
+    assert features[OPT_NOMINAL_VOLTAGE] == handler._default_nominal_voltage()
+    assert OPT_SYSTEM_EVENT_REPAIR_ISSUES not in features
+    assert OPT_FAST_POLL_INTERVAL not in features
 
 
 @pytest.mark.asyncio
-async def test_options_flow_show_form_uses_existing_options(hass) -> None:
+async def test_options_flow_device_section_translations_load_at_runtime(hass) -> None:
+    translations = await async_get_translations(
+        hass,
+        "en",
+        "options",
+        {DOMAIN},
+        config_flow=True,
+    )
+
+    assert (
+        translations[f"component.{DOMAIN}.options.step.devices.sections.devices.name"]
+        == "Devices"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.devices.sections.devices.data.type_envoy"
+        ]
+        == "Gateway"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.devices.sections.devices.data_description.type_envoy"
+        ]
+        == "Includes gateway connectivity and meter diagnostics."
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.devices.sections.device_features.name"
+        ]
+        == "Device Features"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.devices.sections.device_features.data.schedule_sync_enabled"
+        ]
+        == "Enable EV Charger Scheduler"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.devices.sections.device_features.data_description.schedule_sync_enabled"
+        ]
+        == "Manage IQ EV Charger schedules."
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.devices.sections.device_features.data_description.battery_schedules_enabled"
+        ]
+        == "Manage IQ Battery schedules."
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.devices.sections.device_features.data.pricing_edits_enabled"
+        ]
+        == "Enable Pricing Edits"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.devices.sections.device_features.data_description.pricing_edits_enabled"
+        ]
+        == "Manage IQ Gateway Electricity Rates"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.devices.sections.device_features.data.weather_enabled"
+        ]
+        == "Enable weather"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.devices.sections.device_features.data.nominal_voltage"
+        ]
+        == "EV Charger nominal voltage (V)"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.devices.sections.device_features.data_description.nominal_voltage"
+        ]
+        == "Typical AC supply voltage used to estimate charger power when live voltage is unavailable."
+    )
+    for removed_path in (
+        "sections.devices.description",
+        "sections.device_features.description",
+        "data_description.devices",
+        "data_description.device_features",
+    ):
+        assert (
+            f"component.{DOMAIN}.options.step.devices.{removed_path}"
+            not in translations
+        )
+    assert (
+        translations[f"component.{DOMAIN}.options.step.devices.data.devices"]
+        == "Devices"
+    )
+    assert (
+        translations[f"component.{DOMAIN}.options.step.devices.data.type_envoy"]
+        == "Gateway"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.devices.data_description.type_envoy"
+        ]
+        == "Includes gateway connectivity and meter diagnostics."
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.init.menu_options.authentication_settings"
+        ]
+        == "Authentication"
+    )
+    assert (
+        translations[f"component.{DOMAIN}.options.step.init.menu_options.settings"]
+        == "Polling"
+    )
+    assert translations[f"component.{DOMAIN}.options.step.settings.title"] == "Polling"
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.init.menu_option_descriptions.authentication_settings"
+        ]
+        == "Manage stored credentials and start reauthentication."
+    )
+    assert (
+        translations[f"component.{DOMAIN}.options.step.authentication_settings.title"]
+        == "Authentication"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.authentication_settings.description"
+        ]
+        == "Manage stored credentials and start reauthentication."
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.authentication_settings.data.reauth"
+        ]
+        == "Start reauthentication"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.authentication_settings.data_description.reauth"
+        ]
+        == "Launch the login flow to refresh credentials without removing the integration."
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.init.menu_options.repair_notifications"
+        ]
+        == "Notifications"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.init.menu_option_descriptions.repair_notifications"
+        ]
+        == "Manage Home Assistant Repair notifications."
+    )
+    assert (
+        translations[f"component.{DOMAIN}.options.step.repair_notifications.title"]
+        == "Notifications"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.repair_notifications.data.degraded_service_repair_issues"
+        ]
+        == "Enable degraded service repairs"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.repair_notifications.data.system_event_repair_issues"
+        ]
+        == "Enable System Event Repair Notifications"
+    )
+
+
+@pytest.mark.asyncio
+async def test_options_flow_sections_use_existing_options(hass) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={
@@ -3472,6 +3763,8 @@ async def test_options_flow_show_form_uses_existing_options(hass) -> None:
             OPT_SESSION_HISTORY_INTERVAL: 30,
             OPT_SCHEDULE_SYNC_ENABLED: False,
             OPT_BATTERY_SCHEDULES_ENABLED: True,
+            OPT_SYSTEM_EVENT_REPAIR_ISSUES: True,
+            OPT_PRICING_EDITS_ENABLED: False,
             OPT_DEGRADED_SERVICE_REPAIR_ISSUES: False,
             OPT_WEATHER_ENABLED: True,
             CONF_SITE_ONLY: True,
@@ -3480,28 +3773,101 @@ async def test_options_flow_show_form_uses_existing_options(hass) -> None:
     handler = OptionsFlowHandler(entry)
     handler.hass = hass
 
-    result = await handler.async_step_settings()
+    settings_result = await handler.async_step_settings()
+    devices_result = await handler.async_step_devices()
+    notifications_result = await handler.async_step_repair_notifications()
+
+    assert settings_result["type"] is FlowResultType.FORM
+    settings = settings_result["data_schema"]({})
+    assert settings[OPT_FAST_POLL_INTERVAL] == MIN_FAST_POLL_INTERVAL
+    assert settings[OPT_SLOW_POLL_INTERVAL] == 120
+    assert settings[OPT_FAST_WHILE_STREAMING] is False
+    assert settings[OPT_API_TIMEOUT] == 25
+    assert OPT_NOMINAL_VOLTAGE not in settings
+    assert settings[OPT_SESSION_HISTORY_INTERVAL] == 30
+    assert OPT_PRICING_EDITS_ENABLED not in settings
+    assert OPT_DEGRADED_SERVICE_REPAIR_ISSUES not in settings
+    assert OPT_SYSTEM_EVENT_REPAIR_ISSUES not in settings
+    assert OPT_WEATHER_ENABLED not in settings
+    assert OPT_SCHEDULE_SYNC_ENABLED not in settings
+    assert OPT_BATTERY_SCHEDULES_ENABLED not in settings
+    assert CONF_TYPE_ENVOY not in settings
+    assert "reauth" not in settings
+    assert "forget_password" not in settings
+    assert CONF_SCAN_INTERVAL not in settings
+    assert CONF_SITE_ONLY not in settings
+
+    assert devices_result["type"] is FlowResultType.FORM
+    devices = devices_result["data_schema"](
+        {
+            CONF_DEVICE_CATEGORIES_SECTION: {},
+            CONF_DEVICE_FEATURES_SECTION: {},
+        }
+    )
+    categories = devices[CONF_DEVICE_CATEGORIES_SECTION]
+    features = devices[CONF_DEVICE_FEATURES_SECTION]
+    assert categories[CONF_TYPE_ENVOY] is True
+    assert categories[CONF_TYPE_ENCHARGE] is False
+    assert categories[CONF_TYPE_IQEVSE] is False
+    assert categories[CONF_TYPE_HEATPUMP] is False
+    assert categories[CONF_TYPE_MICROINVERTER] is True
+    assert features[OPT_SCHEDULE_SYNC_ENABLED] is False
+    assert features[OPT_BATTERY_SCHEDULES_ENABLED] is True
+    assert features[OPT_PRICING_EDITS_ENABLED] is False
+    assert features[OPT_WEATHER_ENABLED] is True
+    assert features[OPT_NOMINAL_VOLTAGE] == 230
+    assert OPT_SYSTEM_EVENT_REPAIR_ISSUES not in features
+    assert OPT_FAST_POLL_INTERVAL not in features
+
+    assert notifications_result["type"] is FlowResultType.FORM
+    notifications = notifications_result["data_schema"]({})
+    assert notifications[OPT_DEGRADED_SERVICE_REPAIR_ISSUES] is False
+    assert notifications[OPT_SYSTEM_EVENT_REPAIR_ISSUES] is True
+
+
+@pytest.mark.asyncio
+async def test_options_flow_updates_repair_notifications(hass) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "12345"},
+        options={
+            OPT_DEGRADED_SERVICE_REPAIR_ISSUES: True,
+            OPT_SYSTEM_EVENT_REPAIR_ISSUES: False,
+            OPT_WEATHER_ENABLED: True,
+        },
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_repair_notifications(
+        {
+            OPT_DEGRADED_SERVICE_REPAIR_ISSUES: False,
+            OPT_SYSTEM_EVENT_REPAIR_ISSUES: True,
+        }
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][OPT_DEGRADED_SERVICE_REPAIR_ISSUES] is False
+    assert result["data"][OPT_SYSTEM_EVENT_REPAIR_ISSUES] is True
+    assert result["data"][OPT_WEATHER_ENABLED] is True
+
+
+@pytest.mark.asyncio
+async def test_options_flow_repair_notifications_default_off(hass) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "12345"},
+        options={},
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_repair_notifications()
 
     assert result["type"] is FlowResultType.FORM
-    schema = result["data_schema"]
-    validated = schema({})
-    assert validated[CONF_TYPE_ENVOY] is True
-    assert validated[CONF_TYPE_ENCHARGE] is False
-    assert validated[CONF_TYPE_IQEVSE] is False
-    assert validated[CONF_TYPE_HEATPUMP] is False
-    assert validated[CONF_TYPE_MICROINVERTER] is True
-    assert validated[OPT_FAST_POLL_INTERVAL] == MIN_FAST_POLL_INTERVAL
-    assert validated[OPT_SLOW_POLL_INTERVAL] == 120
-    assert validated[OPT_FAST_WHILE_STREAMING] is False
-    assert validated[OPT_API_TIMEOUT] == 25
-    assert validated[OPT_NOMINAL_VOLTAGE] == 230
-    assert validated[OPT_SESSION_HISTORY_INTERVAL] == 30
-    assert validated[OPT_SCHEDULE_SYNC_ENABLED] is False
-    assert validated[OPT_BATTERY_SCHEDULES_ENABLED] is True
-    assert validated[OPT_DEGRADED_SERVICE_REPAIR_ISSUES] is False
-    assert validated[OPT_WEATHER_ENABLED] is True
-    assert CONF_SCAN_INTERVAL not in validated
-    assert CONF_SITE_ONLY not in validated
+    values = result["data_schema"]({})
+    assert values[OPT_DEGRADED_SERVICE_REPAIR_ISSUES] is False
+    assert values[OPT_SYSTEM_EVENT_REPAIR_ISSUES] is False
 
 
 @pytest.mark.asyncio
@@ -3571,9 +3937,9 @@ async def test_options_flow_legacy_site_only_not_flipped_by_unrelated_save(
     result = await handler.async_step_init({OPT_FAST_POLL_INTERVAL: 45})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert entry.data[CONF_SELECTED_TYPE_KEYS] == ["envoy", "encharge", "microinverter"]
+    assert CONF_SELECTED_TYPE_KEYS not in entry.data
     assert entry.data[CONF_SITE_ONLY] is True
-    assert entry.data[CONF_SERIALS] == []
+    assert entry.data[CONF_SERIALS] == ["EV-OLD"]
     assert result["data"][OPT_FAST_POLL_INTERVAL] == 45
 
 
@@ -3585,7 +3951,16 @@ async def test_options_flow_normalizes_poll_intervals_on_save(hass) -> None:
             CONF_SITE_ID: "12345",
             CONF_SELECTED_TYPE_KEYS: ["envoy", "microinverter"],
         },
-        options={},
+        options={
+            OPT_SCHEDULE_SYNC_ENABLED: False,
+            OPT_BATTERY_SCHEDULES_ENABLED: True,
+            OPT_GRID_TOGGLE_ENABLED: True,
+            OPT_DEGRADED_SERVICE_REPAIR_ISSUES: True,
+            OPT_SYSTEM_EVENT_REPAIR_ISSUES: True,
+            OPT_PRICING_EDITS_ENABLED: True,
+            OPT_WEATHER_ENABLED: False,
+            OPT_NOMINAL_VOLTAGE: 230,
+        },
     )
     entry.add_to_hass(hass)
     handler = OptionsFlowHandler(entry)
@@ -3603,11 +3978,14 @@ async def test_options_flow_normalizes_poll_intervals_on_save(hass) -> None:
             OPT_SLOW_POLL_INTERVAL: MIN_SLOW_POLL_INTERVAL,
             OPT_FAST_WHILE_STREAMING: True,
             OPT_API_TIMEOUT: 15.0,
-            OPT_NOMINAL_VOLTAGE: 230,
+            OPT_NOMINAL_VOLTAGE: 240,
             OPT_SESSION_HISTORY_INTERVAL: 10,
             OPT_SCHEDULE_SYNC_ENABLED: False,
             OPT_BATTERY_SCHEDULES_ENABLED: False,
+            OPT_PRICING_EDITS_ENABLED: False,
+            OPT_WEATHER_ENABLED: True,
             OPT_DEGRADED_SERVICE_REPAIR_ISSUES: False,
+            OPT_SYSTEM_EVENT_REPAIR_ISSUES: False,
             "reauth": False,
             "forget_password": False,
         }
@@ -3617,7 +3995,14 @@ async def test_options_flow_normalizes_poll_intervals_on_save(hass) -> None:
     assert result["data"][OPT_API_TIMEOUT] == 15
     assert result["data"][OPT_FAST_POLL_INTERVAL] == 45
     assert result["data"][OPT_SLOW_POLL_INTERVAL] == 60
-    assert result["data"][OPT_DEGRADED_SERVICE_REPAIR_ISSUES] is False
+    assert result["data"][OPT_DEGRADED_SERVICE_REPAIR_ISSUES] is True
+    assert result["data"][OPT_SYSTEM_EVENT_REPAIR_ISSUES] is True
+    assert result["data"][OPT_PRICING_EDITS_ENABLED] is True
+    assert result["data"][OPT_WEATHER_ENABLED] is False
+    assert result["data"][OPT_SCHEDULE_SYNC_ENABLED] is False
+    assert result["data"][OPT_BATTERY_SCHEDULES_ENABLED] is True
+    assert result["data"][OPT_GRID_TOGGLE_ENABLED] is True
+    assert result["data"][OPT_NOMINAL_VOLTAGE] == 230
 
 
 @pytest.mark.asyncio
@@ -3668,19 +4053,29 @@ async def test_options_flow_updates_selected_device_categories_in_data(hass) -> 
             CONF_SITE_ONLY: False,
             CONF_INCLUDE_INVERTERS: True,
         },
-        options={},
+        options={OPT_SYSTEM_EVENT_REPAIR_ISSUES: True},
     )
     entry.add_to_hass(hass)
 
     handler = OptionsFlowHandler(entry)
     handler.hass = hass
 
-    result = await handler.async_step_init(
+    result = await handler.async_step_devices(
         {
-            CONF_TYPE_ENVOY: True,
-            CONF_TYPE_ENCHARGE: True,
-            CONF_TYPE_IQEVSE: False,
-            CONF_TYPE_MICROINVERTER: False,
+            CONF_DEVICE_CATEGORIES_SECTION: {
+                CONF_TYPE_ENVOY: True,
+                CONF_TYPE_ENCHARGE: True,
+                CONF_TYPE_IQEVSE: False,
+                CONF_TYPE_MICROINVERTER: False,
+            },
+            CONF_DEVICE_FEATURES_SECTION: {
+                OPT_SCHEDULE_SYNC_ENABLED: False,
+                OPT_BATTERY_SCHEDULES_ENABLED: True,
+                OPT_SYSTEM_EVENT_REPAIR_ISSUES: False,
+                OPT_PRICING_EDITS_ENABLED: False,
+                OPT_WEATHER_ENABLED: True,
+                OPT_NOMINAL_VOLTAGE: 240,
+            },
         }
     )
 
@@ -3693,6 +4088,12 @@ async def test_options_flow_updates_selected_device_categories_in_data(hass) -> 
     assert CONF_TYPE_ENCHARGE not in result["data"]
     assert CONF_TYPE_IQEVSE not in result["data"]
     assert CONF_TYPE_MICROINVERTER not in result["data"]
+    assert result["data"][OPT_SCHEDULE_SYNC_ENABLED] is False
+    assert result["data"][OPT_BATTERY_SCHEDULES_ENABLED] is True
+    assert result["data"][OPT_PRICING_EDITS_ENABLED] is False
+    assert result["data"][OPT_WEATHER_ENABLED] is True
+    assert result["data"][OPT_NOMINAL_VOLTAGE] == 240
+    assert result["data"][OPT_SYSTEM_EVENT_REPAIR_ISSUES] is True
 
 
 @pytest.mark.asyncio
@@ -3725,7 +4126,7 @@ async def test_options_flow_enabling_iqevse_discovers_serials(hass) -> None:
             AsyncMock(return_value={"result": []}),
         ) as mock_inventory,
     ):
-        result = await handler.async_step_init(
+        result = await handler.async_step_devices(
             {
                 CONF_TYPE_ENVOY: True,
                 CONF_TYPE_ENCHARGE: True,
@@ -3769,7 +4170,7 @@ async def test_options_flow_iqevse_without_serials_shows_error(hass) -> None:
             AsyncMock(return_value={"result": []}),
         ),
     ):
-        result = await handler.async_step_init(
+        result = await handler.async_step_devices(
             {
                 CONF_TYPE_ENVOY: True,
                 CONF_TYPE_ENCHARGE: True,
@@ -3806,7 +4207,7 @@ async def test_options_flow_submit_skips_unmapped_type_fields(hass) -> None:
         {"iqevse": CONF_TYPE_IQEVSE},
         clear=True,
     ):
-        result = await handler.async_step_init({CONF_TYPE_IQEVSE: True})
+        result = await handler.async_step_devices({CONF_TYPE_IQEVSE: True})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.data[CONF_SELECTED_TYPE_KEYS] == ["iqevse"]
@@ -3828,7 +4229,7 @@ async def test_options_flow_preserves_unknown_selected_type_keys(hass) -> None:
     handler = OptionsFlowHandler(entry)
     handler.hass = hass
 
-    result = await handler.async_step_init(
+    result = await handler.async_step_devices(
         {
             CONF_TYPE_ENVOY: True,
             CONF_TYPE_ENCHARGE: False,
@@ -3870,15 +4271,7 @@ async def test_options_flow_reauth_not_blocked_by_missing_iqevse_serials(hass) -
             AsyncMock(return_value={"result": []}),
         ) as mock_inventory,
     ):
-        result = await handler.async_step_init(
-            {
-                CONF_TYPE_ENVOY: True,
-                CONF_TYPE_ENCHARGE: False,
-                CONF_TYPE_IQEVSE: True,
-                CONF_TYPE_MICROINVERTER: False,
-                "reauth": True,
-            }
-        )
+        result = await handler.async_step_authentication_settings({"reauth": True})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     entry.async_start_reauth.assert_called_once_with(hass, data=entry.data)
@@ -3887,7 +4280,7 @@ async def test_options_flow_reauth_not_blocked_by_missing_iqevse_serials(hass) -
 
 
 @pytest.mark.asyncio
-async def test_options_flow_reauth_updates_entry_before_starting_flow(hass) -> None:
+async def test_options_flow_reauth_preserves_device_selection(hass) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={
@@ -3912,11 +4305,6 @@ async def test_options_flow_reauth_updates_entry_before_starting_flow(hass) -> N
 
     result = await handler.async_step_init(
         {
-            CONF_TYPE_ENVOY: True,
-            CONF_TYPE_ENCHARGE: False,
-            CONF_TYPE_IQEVSE: False,
-            CONF_TYPE_MICROINVERTER: True,
-            CONF_TYPE_HEATPUMP: True,
             "reauth": True,
         }
     )
@@ -3925,12 +4313,8 @@ async def test_options_flow_reauth_updates_entry_before_starting_flow(hass) -> N
     assert captured["args"] == (hass,)
     assert captured["entry_data"] == entry.data
     assert captured["kwargs"]["data"] == entry.data
-    assert entry.data[CONF_SELECTED_TYPE_KEYS] == [
-        "envoy",
-        "heatpump",
-        "microinverter",
-    ]
-    assert entry.data[CONF_INCLUDE_INVERTERS] is True
+    assert entry.data[CONF_SELECTED_TYPE_KEYS] == ["envoy"]
+    assert entry.data[CONF_INCLUDE_INVERTERS] is False
 
 
 @pytest.mark.asyncio

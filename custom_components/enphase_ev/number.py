@@ -102,6 +102,8 @@ def _tariff_rate_number_unique_id(
 
 
 def _tariff_rate_number_entities(coord: EnphaseCoordinator) -> dict[str, NumberEntity]:
+    if not bool(getattr(coord, "pricing_edits_enabled", True)):
+        return {}
     entities: dict[str, NumberEntity] = {}
     for is_import, attr in (
         (True, "tariff_import_rate"),
@@ -133,6 +135,7 @@ async def async_setup_entry(
     known_serials: set[str] = set()
     added_default_charge_level_unique_ids: set[str] = set()
     added_site_number_unique_ids: set[str] = set()
+    live_tariff_entities: dict[str, EnphaseTariffRateNumber] = {}
 
     def _managed_site_number_unique_ids() -> set[str]:
         return {
@@ -204,11 +207,12 @@ async def async_setup_entry(
         site_entities: list[NumberEntity] = []
         tariff_entities = _tariff_rate_number_entities(coord)
         active_site_number_unique_ids |= set(tariff_entities)
-        site_entities.extend(
-            entity
+        new_tariff_entities = {
+            unique_id: entity
             for unique_id, entity in tariff_entities.items()
             if unique_id not in added_site_number_unique_ids
-        )
+        }
+        site_entities.extend(new_tariff_entities.values())
         if _site_has_battery(coord) and _type_available(coord, "encharge"):
             active_site_number_unique_ids |= (
                 retained_site_number_unique_ids & _core_site_number_unique_ids()
@@ -232,6 +236,19 @@ async def async_setup_entry(
                 for entity in site_entities
                 if isinstance(entity.unique_id, str)
             )
+            live_tariff_entities.update(new_tariff_entities)
+
+        stale_tariff_unique_ids = set(live_tariff_entities) - set(tariff_entities)
+        for unique_id in stale_tariff_unique_ids:
+            entity = live_tariff_entities.pop(unique_id)
+            added_site_number_unique_ids.discard(unique_id)
+            task = hass.async_create_task(
+                entity.async_remove(force_remove=True),
+                name=f"{DOMAIN}_remove_stale_tariff_number",
+            )
+            track_task = getattr(coord, "track_entry_background_task", None)
+            if callable(track_task):
+                track_task(task)
         serials = [sn for sn in current_serials if sn not in known_serials]
         if not serials:
             entities: list[NumberEntity] = []
@@ -259,6 +276,15 @@ async def async_setup_entry(
         known_serials.intersection_update(current_serials)
         known_serials.update(serials)
 
+        if not bool(getattr(coord, "pricing_edits_enabled", True)):
+            prune_managed_entities(
+                ent_reg,
+                entry.entry_id,
+                domain="number",
+                active_unique_ids=set(),
+                is_managed=_tariff_number_managed,
+            )
+
         if not inventory_ready:
             return
 
@@ -272,11 +298,6 @@ async def async_setup_entry(
             }
         else:
             loaded_site_number_unique_ids = set()
-        loaded_tariff_number_unique_ids = {
-            unique_id
-            for unique_id in added_site_number_unique_ids
-            if _tariff_number_managed(unique_id)
-        }
         active_charger_unique_ids = {
             _charger_number_unique_id(sn) for sn in current_serials
         }
@@ -298,7 +319,6 @@ async def async_setup_entry(
             active_unique_ids={
                 *active_site_number_unique_ids,
                 *loaded_site_number_unique_ids,
-                *loaded_tariff_number_unique_ids,
                 *active_charger_unique_ids,
             },
             is_managed=lambda unique_id: (
@@ -692,6 +712,7 @@ class EnphaseTariffRateNumber(CoordinatorEntity, NumberEntity):  # type: ignore[
         client = getattr(self._coord, "client", None)
         return (
             super().available
+            and bool(getattr(self._coord, "pricing_edits_enabled", True))
             and spec is not None
             and isinstance((spec.get("attributes") or {}).get("tariff_locator"), dict)
             and callable(getattr(client, "site_tariff", None))

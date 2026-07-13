@@ -26,7 +26,19 @@ flowchart TD
 
 `config_flow.py` handles user login, MFA, site selection, device-category selection, reconfigure, and reauth entry updates. It stores the tokens and cookies needed for refreshes in the config entry. The password is stored only when the user opts into remembered credentials so the integration can attempt automatic token refresh.
 
-`__init__.py` handles config entry setup and unload. It creates the coordinator, starts schedule sync and platform setup, registers services, and keeps the Home Assistant device and entity registries aligned with current inventory. Registry cleanup is intentionally conservative and waits for inventory readiness so transient cloud discovery failures do not remove user-customized entities.
+`__init__.py` handles config entry setup and unload. It creates the coordinator,
+restores compact discovery state, starts an independent power-acquisition task,
+and blocks only on the authoritative status refresh before forwarding platforms.
+Translation and integration-version priming run concurrently with that work.
+Optional endpoint families then warm up in feature-aware stages, publishing after
+each stage so one slow family does not hold back unrelated state. Schedule sync and
+other long-running work start in the background.
+
+Device and entity registry cleanup is intentionally conservative. Startup migrations
+run once per migration version, while normal reconciliation runs only when the
+coordinator reports a topology change—not for ordinary telemetry updates. Cleanup
+still waits for inventory readiness so transient cloud discovery failures do not
+remove user-customized entities.
 
 ## Coordinator And Refresh Flow
 
@@ -61,6 +73,11 @@ the coordinator's rolling performance history reports only work performed for
 that refresh. Failed and cancelled refresh attempts are retained in the same
 bounded history. Request-layer queue, network, and parsing totals are included
 when the HTTP boundary supplies them.
+
+Startup diagnostics separately expose config-entry phase durations and elapsed
+milestones for core readiness, entity forwarding, power readiness, setup completion,
+and warmup completion. Keep optional network work out of the config-entry critical
+path unless Home Assistant cannot safely create the integration without it.
 
 ## Cloud Client
 

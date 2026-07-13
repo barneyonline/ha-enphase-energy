@@ -412,6 +412,9 @@
     "tariff_rate_api_unavailable": {
       "message": "Tariff write API is unavailable."
     },
+    "pricing_edits_disabled": {
+      "message": "Pricing edits are disabled in the integration options."
+    },
     "tariff_rate_entity_required": {
       "message": "Select exactly one tariff rate entity."
     },
@@ -485,13 +488,19 @@
         "title": "Enphase Energy Options",
         "description": "Choose what to do with this integration entry.",
         "menu_options": {
-          "settings": "Settings",
+          "settings": "Polling",
+          "devices": "Devices",
+          "repair_notifications": "Notifications",
+          "authentication_settings": "Authentication",
           "advanced": "Advanced",
           "migrate_envoy": "Migrate Envoy history"
         },
         "menu_option_descriptions": {
           "settings": "Tune polling and behavior.",
-          "advanced": "Installer-only grid profile controls.",
+          "devices": "Choose device categories and scheduler features.",
+          "repair_notifications": "Manage Home Assistant Repair notifications.",
+          "authentication_settings": "Manage stored credentials and start reauthentication.",
+          "advanced": "Optional Grid Mode controls and installer-only grid profile controls.",
           "migrate_envoy": "Take over selected Enphase Envoy energy entity IDs so Home Assistant Energy history continues under this integration."
         },
         "data": {
@@ -505,12 +514,10 @@
           "slow_poll_interval": "Slow poll interval (s)",
           "fast_while_streaming": "Prefer fast polling while cloud stream active",
           "api_timeout": "API timeout (s)",
-          "nominal_voltage": "Nominal voltage (V)",
+          "nominal_voltage": "EV Charger nominal voltage (V)",
           "session_history_interval": "Session history interval (min)",
           "schedule_sync_enabled": "Enable EV Charger Scheduler",
           "battery_schedules_enabled": "Enable Battery Scheduler",
-          "reauth": "Start reauthentication",
-          "forget_password": "Forget stored password",
           "degraded_service_repair_issues": "Enable degraded service repairs",
           "weather_enabled": "Enable weather"
         },
@@ -525,38 +532,90 @@
           "slow_poll_interval": "Interval to use when idle.",
           "fast_while_streaming": "When enabled, fast poll during active cloud streaming.",
           "api_timeout": "Seconds before API requests time out.",
-          "nominal_voltage": "Fallback voltage used for charger power estimates.",
+          "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable.",
           "session_history_interval": "Minutes to wait between cloud session history fetches.",
-          "schedule_sync_enabled": "Manage IQ EV Charger Schedules",
-          "battery_schedules_enabled": "Manage IQ Battery Schedules",
-          "reauth": "Launch the login flow to refresh credentials without removing the integration.",
-          "forget_password": "Removes the stored password. Automatic refresh will no longer be attempted.",
           "degraded_service_repair_issues": "Raise Repairs issues when optional Enphase services are degraded.",
           "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available."
         }
       },
       "settings": {
-        "title": "Enphase Energy Options",
+        "title": "Polling",
         "description": "Tune polling and behavior.",
         "data": {
+          "fast_poll_interval": "Fast poll interval (s)",
+          "slow_poll_interval": "Slow poll interval (s)",
+          "fast_while_streaming": "Prefer fast polling while cloud stream active",
+          "api_timeout": "API timeout (s)",
+          "session_history_interval": "Session history interval (min)",
+          "degraded_service_repair_issues": "Enable degraded service repairs"
+        },
+        "data_description": {
+          "fast_poll_interval": "Interval to use while charging or streaming.",
+          "slow_poll_interval": "Interval to use when idle.",
+          "fast_while_streaming": "When enabled, fast poll during active cloud streaming.",
+          "api_timeout": "Seconds before API requests time out.",
+          "session_history_interval": "Minutes to wait between cloud session history fetches.",
+          "degraded_service_repair_issues": "Raise Repairs issues when optional Enphase services are degraded."
+        }
+      },
+      "devices": {
+        "title": "Devices",
+        "description": "Choose device categories and scheduler features.",
+        "sections": {
+          "devices": {
+            "name": "Devices",
+            "data": {
+              "type_envoy": "Gateway",
+              "type_encharge": "Battery",
+              "type_ac_battery": "AC Battery",
+              "type_iqevse": "EV Chargers",
+              "type_heatpump": "Heat Pump",
+              "type_microinverter": "Microinverters"
+            },
+            "data_description": {
+              "type_envoy": "Includes gateway connectivity and meter diagnostics.",
+              "type_encharge": "Includes battery status and control entities when available.",
+              "type_ac_battery": "Includes AC Battery sensors and sleep mode controls when available.",
+              "type_iqevse": "Includes EV charger entities and controls.",
+              "type_heatpump": "Includes heat pump status, diagnostics, and usage sensors.",
+              "type_microinverter": "Includes microinverter connectivity, active count, and lifetime production sensors."
+            }
+          },
+          "device_features": {
+            "name": "Device Features",
+            "data": {
+              "schedule_sync_enabled": "Enable EV Charger Scheduler",
+              "battery_schedules_enabled": "Enable Battery Scheduler",
+              "system_event_repair_issues": "Enable System Event Repair Notifications",
+              "pricing_edits_enabled": "Enable Pricing Edits",
+              "weather_enabled": "Enable weather",
+              "nominal_voltage": "EV Charger nominal voltage (V)"
+            },
+            "data_description": {
+              "schedule_sync_enabled": "Manage IQ EV Charger schedules.",
+              "battery_schedules_enabled": "Manage IQ Battery schedules.",
+              "system_event_repair_issues": "Create Home Assistant Repairs for active Enphase standing alarms. Disabled by default.",
+              "pricing_edits_enabled": "Manage IQ Gateway Electricity Rates",
+              "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
+              "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable."
+            }
+          }
+        },
+        "data": {
+          "devices": "Devices",
+          "device_features": "Device Features",
           "type_envoy": "Gateway",
           "type_encharge": "Battery",
           "type_ac_battery": "AC Battery",
           "type_iqevse": "EV Chargers",
           "type_heatpump": "Heat Pump",
           "type_microinverter": "Microinverters",
-          "fast_poll_interval": "Fast poll interval (s)",
-          "slow_poll_interval": "Slow poll interval (s)",
-          "fast_while_streaming": "Prefer fast polling while cloud stream active",
-          "api_timeout": "API timeout (s)",
-          "nominal_voltage": "Nominal voltage (V)",
-          "session_history_interval": "Session history interval (min)",
           "schedule_sync_enabled": "Enable EV Charger Scheduler",
           "battery_schedules_enabled": "Enable Battery Scheduler",
-          "reauth": "Start reauthentication",
-          "forget_password": "Forget stored password",
-          "degraded_service_repair_issues": "Enable degraded service repairs",
-          "weather_enabled": "Enable weather"
+          "system_event_repair_issues": "Enable System Event Repair Notifications",
+          "pricing_edits_enabled": "Enable Pricing Edits",
+          "weather_enabled": "Enable weather",
+          "nominal_voltage": "EV Charger nominal voltage (V)"
         },
         "data_description": {
           "type_envoy": "Includes gateway connectivity and meter diagnostics.",
@@ -565,33 +624,63 @@
           "type_iqevse": "Includes EV charger entities and controls.",
           "type_heatpump": "Includes heat pump status, diagnostics, and usage sensors.",
           "type_microinverter": "Includes microinverter connectivity, active count, and lifetime production sensors.",
-          "fast_poll_interval": "Interval to use while charging or streaming.",
-          "slow_poll_interval": "Interval to use when idle.",
-          "fast_while_streaming": "When enabled, fast poll during active cloud streaming.",
-          "api_timeout": "Seconds before API requests time out.",
-          "nominal_voltage": "Fallback voltage used for charger power estimates.",
-          "session_history_interval": "Minutes to wait between cloud session history fetches.",
-          "schedule_sync_enabled": "Manage IQ EV Charger Schedules",
-          "battery_schedules_enabled": "Manage IQ Battery Schedules",
-          "reauth": "Launch the login flow to refresh credentials without removing the integration.",
-          "forget_password": "Removes the stored password. Automatic refresh will no longer be attempted.",
+          "schedule_sync_enabled": "Manage IQ EV Charger schedules.",
+          "battery_schedules_enabled": "Manage IQ Battery schedules.",
+          "system_event_repair_issues": "Create Home Assistant Repairs for active Enphase standing alarms. Disabled by default.",
+          "pricing_edits_enabled": "Manage IQ Gateway Electricity Rates",
+          "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
+          "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable."
+        }
+      },
+      "repair_notifications": {
+        "title": "Notifications",
+        "description": "Choose which Enphase conditions create Home Assistant Repairs.",
+        "data": {
+          "degraded_service_repair_issues": "Enable degraded service repairs",
+          "system_event_repair_issues": "Enable System Event Repair Notifications"
+        },
+        "data_description": {
           "degraded_service_repair_issues": "Raise Repairs issues when optional Enphase services are degraded.",
-          "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available."
+          "system_event_repair_issues": "Create Home Assistant Repairs for active Enphase standing alarms. Disabled by default."
+        }
+      },
+      "authentication_settings": {
+        "title": "Authentication",
+        "description": "Manage stored credentials and start reauthentication.",
+        "data": {
+          "reauth": "Start reauthentication",
+          "forget_password": "Forget stored password"
+        },
+        "data_description": {
+          "reauth": "Launch the login flow to refresh credentials without removing the integration.",
+          "forget_password": "Removes the stored password. Automatic refresh will no longer be attempted."
         }
       },
       "advanced": {
         "title": "Advanced",
         "description": "Installer and maintenance actions.",
         "menu_options": {
+          "grid_toggle": "Grid Mode",
           "grid_profile": "Grid profile control"
         },
         "menu_option_descriptions": {
+          "grid_toggle": "Configure manual Grid Mode controls.",
           "grid_profile": "Browse and apply installer-only Activation grid profiles."
+        }
+      },
+      "grid_toggle": {
+        "title": "Grid Mode",
+        "description": "Grid Mode monitoring remains available at all times. Manual grid switching is safety-sensitive, so its additional entities and service actions are available only when explicitly enabled.",
+        "data": {
+          "grid_toggle_enabled": "Enable Grid Mode controls"
+        },
+        "data_description": {
+          "grid_toggle_enabled": "The Grid Mode sensor remains available. Enabling controls creates Grid Control Status and Request Grid Toggle OTP entities and allows grid-mode service actions."
         }
       },
       "grid_profile": {
         "title": "Grid Profile Control",
-        "description": "Filter the Activation grid profile catalog for this site's country.",
+        "description": "Filter the Activation grid profile catalog for this site's country.\n\nWARNING: APPLYING AN INCORRECT GRID PROFILE MAY CAUSE THE SYSTEM TO MALFUNCTION.",
         "data": {
           "grid_profile_region": "Region",
           "grid_profile_commonly_used": "Profile list"
@@ -994,6 +1083,9 @@
           },
           "metrics_available": {
             "name": "Metrics Available"
+          },
+          "endpoint_failure_details": {
+            "name": "Endpoint Failure Details"
           }
         }
       },
@@ -1595,7 +1687,7 @@
         "name": "Active Microinverters"
       },
       "inverter_telemetry": {
-        "name": "{serial_number} Telemetry"
+        "name": "{serial_number} Power"
       },
       "microinverter_last_reported": {
         "name": "Microinverter Last Reported"
@@ -2058,6 +2150,12 @@
           },
           "high_impact_count": {
             "name": "High-impact Event Count"
+          },
+          "standing_alarm_count": {
+            "name": "Standing Alarm Count"
+          },
+          "active_events": {
+            "name": "Active Events"
           },
           "severity_counts": {
             "name": "Severity Counts"

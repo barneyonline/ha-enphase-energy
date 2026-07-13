@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- Fixed the Authentication options menu and form so their localized headings, descriptions, and field copy render instead of blank rows or raw schema keys.
+- Added an explicit uppercase warning to Grid Profile Control that applying an incorrect profile may cause the system to malfunction.
+- Moved degraded-service and system-event Repair controls into a dedicated Notifications options page.
+- Reconciled every locale with the complete canonical translation surface, localized previously English-only migration and authentication copy, corrected AC Battery status translations, and added permanent full-catalog coverage checks.
+- Removed redundant Devices and scheduler helper copy and made both Repair notification options default to off for entries that have not saved a preference.
+- Moved Pricing Edits and Weather from general Settings into the Devices page's Device Features section while preserving existing preferences and defaults.
+- Prioritized Enphase Cloud power refreshes during startup and published their results immediately, with current-power and site-energy requests attempted in parallel under a 55-second deadline.
+- Removed obsolete editable tariff entities as soon as refreshed tariff structure no longer contains them, published integration-initiated tariff writes immediately with bounded read-after-write retries, and reduced normal tariff refresh latency from 15 minutes to 5 minutes.
+- Documented the Enphase University training and Enphase Support request process for users seeking Installer Toolkit (ITK) / Self Installer access, including regional caveats and a support-request template.
+- Renamed the general Settings options page to Polling, restored scheduler helper descriptions, and moved the clearly labeled EV Charger nominal-voltage fallback into Devices > Device Features with an explanation of its power-estimation purpose.
+
 ### 🚧 Breaking changes
 - Removed internal calculation and stable charger metadata attributes from the
   frequently updated IQ EV Charger Power and Last Reported sensors to reduce
@@ -15,10 +26,10 @@ All notable changes to this project will be documented in this file.
   excluded from recorder history.
 
 ### ✨ New features
-- Added optional installer-level microinverter parameter telemetry with bulk device reads for power and available AC/DC voltage/current, frequency, temperature, signal, and firmware details. Empty authoritative reads clear old values, partial failures retain only bounded stale data, and the diagnostic entities are disabled by default.
+- Added optional installer-level microinverter parameter telemetry with bulk device reads for power and available AC/DC voltage/current, frequency, temperature, signal, and firmware details. Empty authoritative reads clear old values, partial failures retain only bounded stale data, and the per-inverter entities are disabled by default.
 - Added read-only System Dashboard event monitoring with a diagnostic active-event
-  binary sensor and Repairs for active error and critical events. Repairs clear only
-  after Enphase returns a matching explicitly resolved event. The event entity is
+  binary sensor and optional Repairs for active standing alarms. Repairs clear when
+  Enphase returns a matching explicitly resolved event. The event entity is
   created only after the installer endpoint responds successfully, so owner-only
   accounts do not receive an unavailable installer-only entity.
 - Added read-only IQ Gateway software-update progress monitoring to the existing
@@ -33,20 +44,47 @@ All notable changes to this project will be documented in this file.
 - Added installer-only, cloud-based Grid Profile Control with country-scoped region and profile selection, explicit apply confirmation, current profile monitoring, and follow-up cloud status refreshes.
 
 ### 🐛 Bug fixes
+- Restored localized Devices and Device Features headings, field labels, and
+  descriptions by providing both native section translations and step-level
+  compatibility aliases for Home Assistant frontends that resolve nested option
+  controls through the parent step.
+- Cleared a System Event Repair immediately when the Events endpoint reports its
+  matching event resolved, even if the Standing Alarms endpoint briefly retains a
+  stale copy.
+- Reported Charger Authentication as Off when Enphase returns a present
+  authentication setting with null values, matching the Enphase app, and accept
+  literal on/off values from compatible payload variants.
+- Made the aggregate Microinverter Last Reported sensor choose the newest valid
+  timestamp across the topology summary and every current microinverter, so stale
+  summary data cannot override fresher per-device reports.
+- Refreshed System Dashboard events during the non-blocking startup warmup and
+  retained an existing Active System Events entity while that first reload fetch
+  is pending, avoiding an additional coordinator poll delay and entity churn.
+- Fixed Storm Alert opt-out returning HTTP 403 by routing the write through the
+  BatteryConfig XSRF bootstrap and regional authentication fallback pipeline,
+  including reuse of a matching browser-session cookie when available.
+- Prevented partial microinverter parameter responses from incorrectly degrading
+  Service Status while useful fresh telemetry remains available. Empty results now
+  degrade immediately without usable cache, or after repeated full-batch failures.
+- Prevented ordinary stateful System Dashboard event records from incorrectly
+  setting Active System Events to Problem. Standing alarms and explicitly
+  high-impact events now drive Problem and are the only records shown in its
+  active-events attribute or included in its active and device-type counts, while
+  Repairs and alarm severity come from the authoritative Standing Alarms endpoint.
 - Prevented Home Assistant startup from waiting indefinitely on Enphase warmup
   and gateway firmware progress loops by registering long-running work as true
   background tasks.
 - Kept IQ EV Charger `preferred_mode` stable in Manual mode by separating the
   numeric runtime mode from the scheduler preference and retaining fresh
   battery-profile preference data between profile refreshes. (#774)
-- Serialized installer Grid Profile writes, expire unconfirmed pending state after
-  the follow-up window, and move steady metadata refreshes off the coordinator's
+- Serialized installer Grid Profile writes, expired unconfirmed pending state after
+  the follow-up window, and moved steady metadata refreshes off the coordinator's
   critical path.
 - Kept partial IQ Gateway firmware progress active when status text includes a
   percentage followed by “complete”.
 - Paginated System Dashboard events so active high-impact events beyond the first
-  200 rows are included in sensors and Repairs, expose bounded-result truncation,
-  and expire missing prior-day Repairs only after a complete six-hour grace period.
+  200 rows are included in sensors and Repairs, exposed bounded-result truncation,
+  and expired missing prior-day Repairs only after a complete six-hour grace period.
 - Prevented multi-megawatt site power spikes during startup by reseeding derived
   power baselines when lifetime-flow sources change, normalizing live-power
   units, and requiring a newer comparable sample before publishing extreme
@@ -62,7 +100,7 @@ All notable changes to this project will be documented in this file.
   battery-profile recovery, discovery persistence, or firmware refresh work running
   against retired integration objects, and await task cancellation before closing
   the API client.
-- Track scheduled refresh, startup, weather discovery, switch failure recovery,
+- Tracked scheduled refresh, startup, weather discovery, switch failure recovery,
   reauthentication setup, and EVSE auto-resume work through unload, and bound
   cancellation waits so a stuck task cannot block config-entry shutdown.
 - Shared firmware version history across config entries so concurrent delayed saves
@@ -73,15 +111,48 @@ All notable changes to this project will be documented in this file.
   later refresh can retry persistence instead of losing the observed revision.
 
 ### 🔧 Improvements
-- Run bulk microinverter parameter requests serially within an explicit operation
-  deadline so shared optional-read queueing cannot consume every request timeout.
+- Added a default-off System Event Repair Notifications switch under Options >
+  Notifications. Existing event Repairs are removed while disabled.
+- Added a dedicated Devices page to integration Options for Gateway, Battery, EV
+  Charger, Heat Pump, and Microinverter category selection, with a separate Device
+  Features section for EV charger and battery schedulers, Pricing Edits, Weather,
+  and the EV charger nominal-voltage fallback. Saving Polling options now preserves
+  Devices, Notifications, Authentication, and Advanced choices.
+- Moved Start reauthentication and Forget stored password to a dedicated,
+  fully described Authentication page in integration Options.
+- Moved Cloud Reachable from the standard Sensors section to Diagnostic without
+  changing its entity identity or connectivity behavior.
+- Showed IQ Battery CFG, DTG, and RBD schedule sensors only when Enable Battery
+  Scheduler is selected, and removed existing schedule sensor registry entries when
+  the option is turned off.
+- Added a default-on Enable Pricing Edits checkbox under Options > Devices > Device
+  Features. Disabling it removes editable tariff rate entities while keeping
+  read-only pricing sensors and the Update Tariff action available.
+- Moved safety-sensitive manual Grid Mode controls under an explicit Advanced
+  integration option that defaults off. The read-only Grid Mode sensor and its
+  telemetry remain available, while Grid Control Status, Request Grid Toggle OTP,
+  control-check polling, and service actions require the user to opt in.
+- Renamed per-microinverter Telemetry entities to Power and moved them from the
+  Diagnostic category into the standard Sensors section without changing their
+  registry identities.
+- Added a bounded, identifier-free active-event summary to Active System Events and
+  excluded the attribute from Recorder history to avoid database growth.
+- Ran bulk microinverter parameter requests with a concurrency limit of two and
+  an independent timeout per request, retained per-parameter cache freshness, and
+  exposed sanitized endpoint failure reasons and retry times on Service Status.
 - Isolated the startup Grid Profile probe behind the optional-read limiter and the
   same aggregate queue-and-request deadline used by steady metadata refreshes.
-- Persist hourly system-event Repair last-seen checkpoints so integration reloads
+- Persisted hourly system-event Repair last-seen checkpoints so integration reloads
   cannot restart the missing-event grace period.
-- Bound optional Enlighten request queueing and startup warmup stages, reserve
-  cloud-read capacity for core status traffic, and retain the last current-power
+- Bound optional Enlighten request queueing and startup warmup stages, reserved
+  cloud-read capacity for core status traffic, and retained the last current-power
   sample with retry backoff when that optional endpoint is unavailable.
+- Shortened config-entry setup by limiting its blocking refresh to authoritative
+  charger status, starting power acquisition under a separate 55-second budget,
+  running translation/version priming concurrently, filtering warmup calls by
+  enabled device features, and publishing each completed warmup stage immediately.
+- Added setup, entity-forwarding, power-ready, and warmup timing milestones to
+  diagnostics, and stopped running registry cleanup on ordinary telemetry updates.
 - Added bounded live-debug timeouts, active/idle cache intervals, failure backoff,
   stale-state preservation, and cancellation-safe background refresh for gateway
   software-update monitoring.

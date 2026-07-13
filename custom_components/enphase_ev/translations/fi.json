@@ -412,6 +412,9 @@
     "tariff_rate_api_unavailable": {
       "message": "Tariffien kirjoitusrajapinta ei ole saatavilla."
     },
+    "pricing_edits_disabled": {
+      "message": "Hintojen muokkaus on poistettu käytöstä integraation asetuksissa."
+    },
     "tariff_rate_entity_required": {
       "message": "Valitse täsmälleen yksi tariffihintaentiteetti."
     },
@@ -485,14 +488,20 @@
         "title": "Enphase Energyn asetukset",
         "description": "Valitse, mitä haluat tehdä tälle integraatiomerkinnälle.",
         "menu_options": {
-          "settings": "Asetukset",
+          "settings": "Kysely",
+          "devices": "Valitse laitteet",
+          "repair_notifications": "Ilmoitukset",
+          "authentication_settings": "Todennus",
           "migrate_envoy": "Siirrä Envoy-historia",
           "advanced": "Lisäasetukset"
         },
         "menu_option_descriptions": {
           "settings": "Säädä kyselyä ja toimintaa.",
+          "devices": "Valitse lisättävät laitoryhmät. Kaikilla valinnoilla on sama kyselyväli.",
+          "repair_notifications": "Hallitse Home Assistantin korjausilmoituksia.",
+          "authentication_settings": "Käynnistä kirjautumiskulku päivittääksesi valtuustiedot poistamatta integraatiota.",
           "migrate_envoy": "Ota valitut Enphase Envoyn energiaentiteettien tunnukset käyttöön, jotta Home Assistant Energyn historia jatkuu tämän integraation alla.",
-          "advanced": "Verkkoprofiilin hallinta vain asentajille."
+          "advanced": "Valinnaiset verkkotilan ohjaimet ja vain asentajille tarkoitetut verkkoprofiilin ohjaimet."
         },
         "data": {
           "type_envoy": "Yhdyskäytävä",
@@ -503,11 +512,9 @@
           "slow_poll_interval": "Hidas kyselyväli (s)",
           "fast_while_streaming": "Valitse nopea kysely, kun pilvivirta on aktiivinen",
           "api_timeout": "API-aikakatkaisu (s)",
-          "nominal_voltage": "Nimellisjännite (V)",
+          "nominal_voltage": "EV-laturin nimellisjännite (V)",
           "session_history_interval": "Istuntohistorian väli (min)",
           "schedule_sync_enabled": "Ota ajoitustuki käyttöön",
-          "reauth": "Aloita uudelleentodennus",
-          "forget_password": "Unohda tallennettu salasana",
           "type_heatpump": "Lämpöpumppu",
           "type_ac_battery": "AC-akku",
           "battery_schedules_enabled": "Ota akun aikataulutus käyttöön",
@@ -523,60 +530,130 @@
           "slow_poll_interval": "Aikaväli, jota käytetään tyhjäkäynnillä.",
           "fast_while_streaming": "Kun tämä on käytössä, nopea kysely aktiivisen pilvisuoratoiston aikana.",
           "api_timeout": "Sekuntia ennen kuin API-pyynnöt aikakatkaistaan.",
-          "nominal_voltage": "Varajännite laturin tehoarvion laskentaan.",
+          "nominal_voltage": "Tyypillinen vaihtovirtasyöttöjännite tehon arviointiin, kun reaaliaikaista jännitettä ei ole saatavilla.",
           "session_history_interval": "Minuuttia odotettavana pilvikäyttöhistorian hakujen välillä.",
-          "schedule_sync_enabled": "Hallitse Enphase-aikataulujen hallintaa",
-          "reauth": "Käynnistä kirjautumiskulku päivittääksesi valtuustiedot poistamatta integraatiota.",
-          "forget_password": "Poistaa tallennetun salasanan. Automaattista päivitystä ei enää yritetä.",
           "type_heatpump": "Sisältää lämpöpumpun tila-, diagnostiikka- ja kulutusanturit.",
           "type_ac_battery": "Sisältää AC-akun anturit ja lepotilan ohjaukset, kun ne ovat saatavilla.",
-          "battery_schedules_enabled": "Hallitse IQ-akun aikatauluja",
           "degraded_service_repair_issues": "Luo Repairs-ongelmia, kun valinnaiset Enphase-palvelut ovat heikentyneet.",
           "weather_enabled": "Hakee kohteen nykyisen sään Enphaselta ja luo sääentiteetin vain, kun päätepiste on käytettävissä."
         }
       },
       "settings": {
-        "title": "Enphase Energy -asetukset",
+        "title": "Kysely",
         "description": "Säädä äänestystä ja käyttäytymistä.",
         "data": {
-          "type_envoy": "Yhdyskäytävä",
-          "type_encharge": "Akku",
-          "type_iqevse": "Laturit",
-          "type_microinverter": "Mikroinvertterit",
           "fast_poll_interval": "Nopea kyselyväli (s)",
           "slow_poll_interval": "Hidas kyselyväli (s)",
           "fast_while_streaming": "Valitse nopea kysely, kun pilvivirta on aktiivinen",
           "api_timeout": "API-aikakatkaisu (s)",
-          "nominal_voltage": "Nimellisjännite (V)",
           "session_history_interval": "Istuntohistorian väli (min)",
-          "schedule_sync_enabled": "Ota ajoitustuki käyttöön",
-          "reauth": "Aloita uudelleentodennus",
-          "forget_password": "Unohda tallennettu salasana",
-          "type_heatpump": "Lämpöpumppu",
-          "type_ac_battery": "AC-akku",
-          "battery_schedules_enabled": "Ota akun aikataulutus käyttöön",
-          "degraded_service_repair_issues": "Ota heikentyneiden palvelujen korjaukset käyttöön",
-          "weather_enabled": "Ota sää käyttöön"
+          "degraded_service_repair_issues": "Ota heikentyneiden palvelujen korjaukset käyttöön"
         },
         "data_description": {
-          "type_envoy": "Sisältää yhdyskäytävän yhteys- ja mittaridiagnostiikan.",
-          "type_encharge": "Sisältää akkujen tilan ja ohjausentiteetit, kun ne ovat saatavilla.",
-          "type_iqevse": "Sisältää EV-laturien entiteetit ja ohjaukset.",
-          "type_microinverter": "Sisältää mikroinvertterien yhteys-, aktiivinen määrä- ja elinkaarituotannon sensorit.",
           "fast_poll_interval": "Latauksen tai suoratoiston aikana käytettävä aikaväli.",
           "slow_poll_interval": "Aikaväli, jota käytetään tyhjäkäynnillä.",
           "fast_while_streaming": "Kun tämä on käytössä, nopea kysely aktiivisen pilvisuoratoiston aikana.",
           "api_timeout": "Sekuntia ennen kuin API-pyynnöt aikakatkaistaan.",
-          "nominal_voltage": "Varajännite laturin tehoarvion laskentaan.",
           "session_history_interval": "Minuuttia odotettavana pilvikäyttöhistorian hakujen välillä.",
-          "schedule_sync_enabled": "Hallitse Enphase-aikataulujen hallintaa",
-          "reauth": "Käynnistä kirjautumiskulku päivittääksesi valtuustiedot poistamatta integraatiota.",
-          "forget_password": "Poistaa tallennetun salasanan. Automaattista päivitystä ei enää yritetä.",
-          "type_heatpump": "Sisältää lämpöpumpun tila-, diagnostiikka- ja kulutusanturit.",
+          "degraded_service_repair_issues": "Luo Repairs-ongelmia, kun valinnaiset Enphase-palvelut ovat heikentyneet."
+        }
+      },
+      "devices": {
+        "title": "Valitse laitteet",
+        "description": "Valitse lisättävät laitoryhmät. Kaikilla valinnoilla on sama kyselyväli.",
+        "sections": {
+          "devices": {
+            "name": "Valitse laitteet",
+            "data": {
+              "type_envoy": "Yhdyskäytävä",
+              "type_encharge": "Akku",
+              "type_ac_battery": "AC-akku",
+              "type_iqevse": "Laturit",
+              "type_heatpump": "Lämpöpumppu",
+              "type_microinverter": "Mikroinvertterit"
+            },
+            "data_description": {
+              "type_envoy": "Sisältää yhdyskäytävän yhteys- ja mittaridiagnostiikan.",
+              "type_encharge": "Sisältää akkujen tilan ja ohjausentiteetit, kun ne ovat saatavilla.",
+              "type_ac_battery": "Sisältää AC-akun anturit ja lepotilan ohjaukset, kun ne ovat saatavilla.",
+              "type_iqevse": "Sisältää EV-laturien entiteetit ja ohjaukset.",
+              "type_heatpump": "Sisältää lämpöpumpun tila-, diagnostiikka- ja kulutusanturit.",
+              "type_microinverter": "Sisältää mikroinvertterien yhteys-, aktiivinen määrä- ja elinkaarituotannon sensorit."
+            }
+          },
+          "device_features": {
+            "name": "Laiteominaisuudet",
+            "data": {
+              "schedule_sync_enabled": "Ota ajoitustuki käyttöön",
+              "battery_schedules_enabled": "Ota akun aikataulutus käyttöön",
+              "system_event_repair_issues": "Ota järjestelmätapahtumien korjausilmoitukset käyttöön",
+              "pricing_edits_enabled": "Ota hintojen muokkaus käyttöön",
+              "weather_enabled": "Ota sää käyttöön",
+              "nominal_voltage": "EV-laturin nimellisjännite (V)"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Luo Home Assistant -korjauksia aktiivisille Enphasen pysyville hälytyksille. Oletuksena pois käytöstä.",
+              "pricing_edits_enabled": "Hallitse IQ Gatewayn sähkötariffeja",
+              "weather_enabled": "Hakee kohteen nykyisen sään Enphaselta ja luo sääentiteetin vain, kun päätepiste on käytettävissä.",
+              "nominal_voltage": "Tyypillinen vaihtovirtasyöttöjännite tehon arviointiin, kun reaaliaikaista jännitettä ei ole saatavilla.",
+              "schedule_sync_enabled": "Hallitse IQ EV Chargerin aikatauluja.",
+              "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja."
+            }
+          }
+        },
+        "data": {
+          "devices": "Valitse laitteet",
+          "device_features": "Laiteominaisuudet",
+          "type_envoy": "Yhdyskäytävä",
+          "type_encharge": "Akku",
+          "type_ac_battery": "AC-akku",
+          "type_iqevse": "Laturit",
+          "type_heatpump": "Lämpöpumppu",
+          "type_microinverter": "Mikroinvertterit",
+          "schedule_sync_enabled": "Ota ajoitustuki käyttöön",
+          "battery_schedules_enabled": "Ota akun aikataulutus käyttöön",
+          "system_event_repair_issues": "Ota järjestelmätapahtumien korjausilmoitukset käyttöön",
+          "pricing_edits_enabled": "Ota hintojen muokkaus käyttöön",
+          "weather_enabled": "Ota sää käyttöön",
+          "nominal_voltage": "EV-laturin nimellisjännite (V)"
+        },
+        "data_description": {
+          "type_envoy": "Sisältää yhdyskäytävän yhteys- ja mittaridiagnostiikan.",
+          "type_encharge": "Sisältää akkujen tilan ja ohjausentiteetit, kun ne ovat saatavilla.",
           "type_ac_battery": "Sisältää AC-akun anturit ja lepotilan ohjaukset, kun ne ovat saatavilla.",
-          "battery_schedules_enabled": "Hallitse IQ-akun aikatauluja",
+          "type_iqevse": "Sisältää EV-laturien entiteetit ja ohjaukset.",
+          "type_heatpump": "Sisältää lämpöpumpun tila-, diagnostiikka- ja kulutusanturit.",
+          "type_microinverter": "Sisältää mikroinvertterien yhteys-, aktiivinen määrä- ja elinkaarituotannon sensorit.",
+          "system_event_repair_issues": "Luo Home Assistant -korjauksia aktiivisille Enphasen pysyville hälytyksille. Oletuksena pois käytöstä.",
+          "pricing_edits_enabled": "Hallitse IQ Gatewayn sähkötariffeja",
+          "weather_enabled": "Hakee kohteen nykyisen sään Enphaselta ja luo sääentiteetin vain, kun päätepiste on käytettävissä.",
+          "nominal_voltage": "Tyypillinen vaihtovirtasyöttöjännite tehon arviointiin, kun reaaliaikaista jännitettä ei ole saatavilla.",
+          "schedule_sync_enabled": "Hallitse IQ EV Chargerin aikatauluja.",
+          "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja."
+        }
+      },
+      "repair_notifications": {
+        "title": "Ilmoitukset",
+        "description": "Valitse, mitkä Enphase-tilanteet luovat Home Assistant -korjauksia.",
+        "data": {
+          "degraded_service_repair_issues": "Ota heikentyneiden palvelujen korjaukset käyttöön",
+          "system_event_repair_issues": "Ota järjestelmätapahtumien korjausilmoitukset käyttöön"
+        },
+        "data_description": {
           "degraded_service_repair_issues": "Luo Repairs-ongelmia, kun valinnaiset Enphase-palvelut ovat heikentyneet.",
-          "weather_enabled": "Hakee kohteen nykyisen sään Enphaselta ja luo sääentiteetin vain, kun päätepiste on käytettävissä."
+          "system_event_repair_issues": "Luo Home Assistant -korjauksia aktiivisille Enphasen pysyville hälytyksille. Oletuksena pois käytöstä."
+        }
+      },
+      "authentication_settings": {
+        "title": "Todennus",
+        "description": "Käynnistä kirjautumiskulku päivittääksesi valtuustiedot poistamatta integraatiota.",
+        "data": {
+          "reauth": "Aloita uudelleentodennus",
+          "forget_password": "Unohda tallennettu salasana"
+        },
+        "data_description": {
+          "reauth": "Käynnistä kirjautumiskulku päivittääksesi valtuustiedot poistamatta integraatiota.",
+          "forget_password": "Poistaa tallennetun salasanan. Automaattista päivitystä ei enää yritetä."
         }
       },
       "migrate_envoy_source": {
@@ -605,12 +682,12 @@
           "battery_discharge": "Akun purku"
         },
         "data_description": {
-          "solar_production": "Assign a cumulative production total to the Enphase Energy Site Solar Production sensor. Do not choose daily energy or live power.",
-          "consumption": "Assign a cumulative consumption total to the Enphase Energy Site Consumption sensor. Do not choose daily energy or live power.",
-          "grid_import": "Assign a cumulative grid import total to the Enphase Energy Site Grid Import sensor. Do not choose daily energy or live power.",
-          "grid_export": "Assign a cumulative grid export total to the Enphase Energy Site Grid Export sensor. Do not choose daily energy or live power.",
-          "battery_charge": "Määritä kumulatiivinen akun latauksen kokonaismäärä Enphase Energy Site Battery Charge -anturille. Älä valitse päivittäistä energiaa tai reaaliaikaista tehoa.",
-          "battery_discharge": "Määritä kumulatiivinen akun purkauksen kokonaismäärä Enphase Energy Site Battery Discharge -anturille. Älä valitse päivittäistä energiaa tai reaaliaikaista tehoa."
+          "solar_production": "Määritä kumulatiivinen kokonaisarvo anturille Aurinkoenergian tuotantosivusto. Älä valitse päiväenergiaa tai hetkellistä tehoa.",
+          "consumption": "Määritä kumulatiivinen kokonaisarvo anturille Sivuston kulutus. Älä valitse päiväenergiaa tai hetkellistä tehoa.",
+          "grid_import": "Määritä kumulatiivinen kokonaisarvo anturille Sivustoruudukon tuonti. Älä valitse päiväenergiaa tai hetkellistä tehoa.",
+          "grid_export": "Määritä kumulatiivinen kokonaisarvo anturille Sivustoruudukon vienti. Älä valitse päiväenergiaa tai hetkellistä tehoa.",
+          "battery_charge": "Määritä kumulatiivinen kokonaisarvo anturille Sivuston akun lataus. Älä valitse päiväenergiaa tai hetkellistä tehoa.",
+          "battery_discharge": "Määritä kumulatiivinen kokonaisarvo anturille Sivuston akun purkautuminen. Älä valitse päiväenergiaa tai hetkellistä tehoa."
         }
       },
       "migrate_envoy_confirm": {
@@ -625,15 +702,27 @@
         "title": "Lisäasetukset",
         "description": "Asentajan ja huollon toiminnot.",
         "menu_options": {
+          "grid_toggle": "Verkkotila",
           "grid_profile": "Verkkoprofiilin hallinta"
         },
         "menu_option_descriptions": {
+          "grid_toggle": "Määritä verkkotilan manuaaliset ohjaimet.",
           "grid_profile": "Selaa ja ota käyttöön asentajille tarkoitettuja Activation-verkkoprofiileja."
+        }
+      },
+      "grid_toggle": {
+        "title": "Verkkotila",
+        "description": "Verkkotilan valvonta on aina käytettävissä. Manuaalinen kytkentä on turvallisuuskriittinen, joten lisäentiteetit ja palvelutoiminnot edellyttävät erillistä käyttöönottoa.",
+        "data": {
+          "grid_toggle_enabled": "Ota verkkotilan ohjaimet käyttöön"
+        },
+        "data_description": {
+          "grid_toggle_enabled": "Verkkotila-anturi pysyy käytettävissä. Käyttöönotto luo Verkon ohjauksen tila- ja Pyydä OTP -entiteetit sekä sallii palvelutoiminnot."
         }
       },
       "grid_profile": {
         "title": "Verkkoprofiilin hallinta",
-        "description": "Suodattaa Activation-verkkoprofiilien luettelon tämän kohteen maan mukaan.",
+        "description": "Suodattaa Activation-verkkoprofiilien luettelon tämän kohteen maan mukaan.\n\nVAROITUS: VIRHEELLISEN VERKKOPROFIILIN KÄYTTÖÖNOTTO VOI AIHEUTTAA JÄRJESTELMÄN TOIMINTAHÄIRIÖITÄ.",
         "data": {
           "grid_profile_region": "Alue",
           "grid_profile_commonly_used": "Profiililuettelo"
@@ -991,6 +1080,9 @@
           },
           "metrics_available": {
             "name": "Mittarit saatavilla"
+          },
+          "endpoint_failure_details": {
+            "name": "Päätepistevirheiden tiedot"
           }
         }
       },
@@ -1287,7 +1379,7 @@
         }
       },
       "grid_mode": {
-        "name": "Ruudukkotila",
+        "name": "Verkkotila",
         "state": {
           "on_grid": "Gridillä",
           "off_grid": "Pois ruudukosta",
@@ -1556,7 +1648,7 @@
         "name": "Aktiiviset mikroinvertterit"
       },
       "inverter_telemetry": {
-        "name": "{serial_number} telemetria"
+        "name": "{serial_number} teho"
       },
       "microinverter_last_reported": {
         "name": "Mikroinvertterien viimeisin raportti"
@@ -1660,9 +1752,9 @@
       "ac_battery_overall_status": {
         "name": "AC-akun kokonaistila",
         "state": {
-          "charging": "Lataa",
-          "discharging": "Purkaa",
-          "idle": "Joutokäynti",
+          "normal": "Normaali",
+          "warning": "Varoitus",
+          "error": "Virhe",
           "unknown": "Tuntematon"
         }
       },
@@ -1678,9 +1770,9 @@
       "ac_battery_storage_status": {
         "name": "{serial} tila",
         "state": {
-          "charging": "Lataa",
-          "discharging": "Purkaa",
-          "idle": "Joutokäynti",
+          "normal": "Normaali",
+          "warning": "Varoitus",
+          "error": "Virhe",
           "unknown": "Tuntematon"
         }
       },
@@ -2070,6 +2162,12 @@
           "high_impact_count": {
             "name": "Vakavien tapahtumien määrä"
           },
+          "standing_alarm_count": {
+            "name": "Aktiivisten hälytysten määrä"
+          },
+          "active_events": {
+            "name": "Aktiiviset tapahtumat"
+          },
           "severity_counts": {
             "name": "Määrät vakavuuden mukaan"
           },
@@ -2324,7 +2422,7 @@
       "description": "Sivusto {site_id} vaatii päivitetyt istunnon otsikot. Ole hyvä ja todenna uudelleen."
     },
     "auth_blocked": {
-      "title": "Enphase Energy authentication temporarily blocked",
+      "title": "Enphase Energy -todennus on tilapäisesti estetty",
       "description": "Enphase näyttää estävän sivuston {site_id} todennuksen tilapäisesti. Automaattiset yritykset on keskeytetty aikaan {blocked_until} asti. Onnistunut manuaalinen uudelleentodennus voi poistaa eston aiemmin."
     },
     "too_many_active_sessions": {
@@ -2997,10 +3095,6 @@
         "region_code": {
           "name": "Aluekoodi",
           "description": "Valinnainen alueen tai osavaltion koodi, kuten VIC."
-        },
-        "commonly_used": {
-          "name": "Vain yleisesti käytetyt",
-          "description": "Palauttaa yleisesti käytettyjen profiilien luettelon, kun asetus on käytössä."
         },
         "device_id": {
           "name": "Kohteen laitteet",

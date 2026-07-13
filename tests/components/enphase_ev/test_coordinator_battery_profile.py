@@ -1809,6 +1809,7 @@ def test_pending_profile_issue_noop_when_already_reported(
     from custom_components.enphase_ev.const import BATTERY_PROFILE_PENDING_TIMEOUT_S
 
     coord = coordinator_factory()
+    mock_issue_registry.deleted.clear()
     coord._battery_profile_issue_reported = True  # noqa: SLF001
     coord._battery_pending_profile = "cost_savings"  # noqa: SLF001
     coord._battery_pending_requested_at = datetime.now(
