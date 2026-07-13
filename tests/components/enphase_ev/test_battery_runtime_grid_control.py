@@ -19,6 +19,49 @@ def test_grid_control_supported_is_unknown_before_first_payload(
     assert coord.grid_toggle_blocked_reasons == []
 
 
+@pytest.mark.asyncio
+async def test_grid_toggle_disabled_keeps_mode_reads_and_blocks_actions(
+    coordinator_factory,
+) -> None:
+    from homeassistant.exceptions import ServiceValidationError
+
+    coord = coordinator_factory()
+    coord._grid_toggle_enabled = False  # noqa: SLF001
+    coord.client.grid_control_check = AsyncMock()
+    coord.client.site_livestream_payload = AsyncMock()
+    coord.client.off_grid_due_to_grid_outage = AsyncMock()
+    coord._grid_control_supported = True  # noqa: SLF001
+    coord._grid_control_user_initiated_toggle = True  # noqa: SLF001
+
+    assert coord.grid_toggle_enabled is False
+    assert coord.grid_toggle_pending is False
+    assert coord.grid_toggle_allowed is None
+    assert coord.grid_toggle_blocked_reasons == []
+    assert coord.battery_runtime.grid_control_check_refresh_due(force=True) is False
+    assert coord.battery_runtime.grid_mode_status_refresh_due(force=True) is True
+    assert coord.battery_runtime.grid_outage_context_refresh_due(force=True) is True
+
+    await coord.battery_runtime.async_refresh_grid_control_check(force=True)
+    await coord.battery_runtime.async_refresh_grid_mode_status(force=True)
+    await coord.battery_runtime.async_refresh_grid_outage_context(force=True)
+
+    coord.client.grid_control_check.assert_not_awaited()
+    coord.client.site_livestream_payload.assert_awaited_once()
+    coord.client.off_grid_due_to_grid_outage.assert_awaited_once()
+    with pytest.raises(ServiceValidationError):
+        await coord.async_request_grid_toggle_otp()
+
+    coord._grid_toggle_enabled = True  # noqa: SLF001
+    coord.client.grid_control_check = None
+    coord.client.site_livestream_payload = None
+    coord.client.off_grid_due_to_grid_outage = None
+    coord._grid_mode_status_supported = True  # noqa: SLF001
+    coord._grid_outage_context_supported = True  # noqa: SLF001
+    assert coord.battery_runtime.grid_control_check_refresh_due(force=True) is True
+    assert coord.battery_runtime.grid_mode_status_refresh_due(force=True) is True
+    assert coord.battery_runtime.grid_outage_context_refresh_due(force=True) is True
+
+
 def test_parse_grid_control_check_payload_maps_flags_and_allows(
     coordinator_factory,
 ) -> None:
@@ -595,6 +638,8 @@ def test_collect_site_metrics_includes_grid_control_fields(coordinator_factory) 
 
     metrics = coord.collect_site_metrics()
 
+    assert metrics["grid_toggle_enabled"] is True
+    assert metrics["pricing_edits_enabled"] is True
     assert metrics["grid_control_supported"] is True
     assert metrics["grid_toggle_allowed"] is False
     assert metrics["grid_toggle_pending"] is False

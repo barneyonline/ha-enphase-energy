@@ -74,10 +74,12 @@ _BATTERY_CONFIG_VARIANT_LEAN = "official_web_lean"
 _BATTERY_CONFIG_VARIANT_SESSION_COOKIE = "official_web_session_cookie"
 _BATTERY_CONFIG_VARIANT_COOKIE_EAUTH = "cookie_eauth_compatible"
 _BATTERY_CONFIG_VARIANT_MIXED = "mixed_auth_compatible"
-_ENLIGHTEN_READ_CONCURRENCY_LIMIT = 2
-_ENLIGHTEN_OPTIONAL_READ_CONCURRENCY_LIMIT = 1
+_ENLIGHTEN_READ_CONCURRENCY_LIMIT = 3
+_ENLIGHTEN_OPTIONAL_READ_CONCURRENCY_LIMIT = 2
 _SYSTEM_EVENTS_PAGE_SIZE = 200
 _SYSTEM_EVENTS_MAX_PAGES = 10
+_SYSTEM_ALARMS_PAGE_SIZE = 200
+_SYSTEM_ALARMS_MAX_PAGES = 10
 _LIVE_STATUS_GRID_RELAY_ENUM = {
     0: "OPER_RELAY_UNKNOWN",
     1: "OPER_RELAY_OPEN",
@@ -5585,7 +5587,11 @@ class EnphaseEVClient:
         GET /service/batteryConfig/api/v1/stormGuard/<site_id>/stormAlert
         """
         url = f"{BASE_URL}/service/batteryConfig/api/v1/stormGuard/{self._site}/stormAlert"
-        return await self._battery_config_request("GET", url)
+        return await self._battery_config_request(
+            "GET",
+            url,
+            endpoint_family="storm_alert",
+        )
 
     async def opt_out_storm_alert(self, *, alert_id: str, name: str) -> JsonDict:
         """Opt out of a specific Storm Guard alert.
@@ -5598,7 +5604,6 @@ class EnphaseEVClient:
         }
         """
         url = f"{BASE_URL}/service/batteryConfig/api/v1/stormGuard/{self._site}/stormAlert"
-        headers = self._battery_config_headers(include_xsrf=True)
         payload: JsonDict = {
             "stormAlerts": [
                 {
@@ -5608,8 +5613,12 @@ class EnphaseEVClient:
                 }
             ]
         }
-        return cast(
-            JsonDict, await self._json("PUT", url, json=payload, headers=headers)
+        return await self._battery_config_write_request(
+            "PUT",
+            url,
+            json_body=payload,
+            endpoint_family="storm_alert",
+            write_intent="storm_alert_opt_out",
         )
 
     async def storm_guard_profile(self, *, locale: str | None = None) -> JsonDict:
@@ -7730,6 +7739,56 @@ class EnphaseEVClient:
         merged["events"] = merged_events
         merged["_enphase_ev_truncated"] = (
             page == _SYSTEM_EVENTS_MAX_PAGES and last_page_full
+        )
+        return merged
+
+    async def system_dashboard_standing_alarms(self) -> JsonDict | None:
+        """Return current System Dashboard standing alarms.
+
+        GET /service/system_dashboard/api_internal/dashboard/sites/<site_id>/alarms
+        """
+
+        base_url = URL(
+            f"{BASE_URL}/service/system_dashboard/api_internal/dashboard/sites/"
+            f"{self._site}/alarms"
+        )
+        query = {
+            "range": "today",
+            "filter_columns": ("id,severity,type,serial_num,description,first_set"),
+            "type": "table",
+            "per_page": str(_SYSTEM_ALARMS_PAGE_SIZE),
+        }
+        merged: JsonDict | None = None
+        merged_alarms: list[object] = []
+        last_page_full = False
+        for page in range(1, _SYSTEM_ALARMS_MAX_PAGES + 1):
+            url = str(base_url.update_query({**query, "page": str(page)}))
+            try:
+                data = await self._json(
+                    "GET",
+                    url,
+                    headers=self._system_dashboard_headers(),
+                )
+            except Exception as err:  # noqa: BLE001
+                if self._system_dashboard_is_optional_error(err):
+                    return None
+                raise
+            if not isinstance(data, dict):
+                return None
+            alarms = data.get("alarms")
+            if not isinstance(alarms, list):
+                return None
+            if merged is None:
+                merged = dict(data)
+            merged_alarms.extend(alarms)
+            last_page_full = len(alarms) >= _SYSTEM_ALARMS_PAGE_SIZE
+            if not last_page_full:
+                break
+        if merged is None:  # pragma: no cover - loop always executes
+            return None
+        merged["alarms"] = merged_alarms
+        merged["_enphase_ev_truncated"] = (
+            page == _SYSTEM_ALARMS_MAX_PAGES and last_page_full
         )
         return merged
 

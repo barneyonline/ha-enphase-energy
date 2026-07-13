@@ -44,6 +44,7 @@ from custom_components.enphase_ev import (
     _remove_legacy_site_device,
     _startup_migration_version,
     _sync_charger_devices,
+    _sync_registry_devices,
     _sync_type_devices,
     async_setup,
     async_setup_entry,
@@ -254,6 +255,14 @@ def test_complete_startup_migrations_clears_reload_suppression_when_update_not_a
     )
     monkeypatch.setattr(
         "custom_components.enphase_ev._migrate_cloud_entities_to_cloud_device",
+        MagicMock(),
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev._remove_legacy_site_device",
+        MagicMock(),
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev._remove_retired_grid_profile_device_entities",
         MagicMock(),
     )
     update_entry = MagicMock()
@@ -614,9 +623,15 @@ async def test_async_setup_entry_restores_discovery_before_first_refresh(
             self.discovery_snapshot = SimpleNamespace(
                 async_restore_state=self._async_restore_state
             )
+            self.refresh_runner = SimpleNamespace(
+                async_start_startup_power=self._async_start_power
+            )
 
         async def _async_restore_state(self) -> None:
             calls.append("restore")
+
+        async def _async_start_power(self) -> None:
+            calls.append("power")
 
         async def async_config_entry_first_refresh(self) -> None:
             calls.append("refresh")
@@ -636,7 +651,23 @@ async def test_async_setup_entry_restores_discovery_before_first_refresh(
 
     assert await async_setup_entry(hass, config_entry)
 
-    assert calls == ["restore", "refresh"]
+    assert calls == ["restore", "power", "refresh"]
+    assert set(dummy_coord._setup_phase_timings) >= {
+        "coordinator_init_s",
+        "snapshot_restore_s",
+        "translations_s",
+        "integration_version_s",
+        "first_refresh_s",
+        "editor_sync_s",
+        "registry_reconcile_s",
+        "platform_forward_s",
+        "total_s",
+    }
+    assert set(dummy_coord._setup_milestones) == {
+        "core_ready",
+        "entities_forwarded",
+        "setup_complete",
+    }
 
 
 @pytest.mark.asyncio
@@ -649,6 +680,9 @@ async def test_async_setup_entry_uses_background_task_for_schedule_sync_start(
         def __init__(self) -> None:
             self.site_id = site_id
             self.schedule_sync = SimpleNamespace(async_start=AsyncMock())
+            self.refresh_runner = SimpleNamespace(
+                async_start_startup_warmup=AsyncMock()
+            )
             self.async_refresh_grid_profile_metadata = AsyncMock()
             self.track_entry_background_task = MagicMock()
 
@@ -684,9 +718,11 @@ async def test_async_setup_entry_uses_background_task_for_schedule_sync_start(
     assert await async_setup_entry(hass, config_entry)
 
     assert background_calls == [
+        ("enphase_ev_startup_warmup", True),
         ("enphase_ev_grid_profile_startup_probe", True),
         ("enphase_ev_schedule_sync_start", True),
     ]
+    dummy_coord.refresh_runner.async_start_startup_warmup.assert_not_awaited()
     dummy_coord.async_refresh_grid_profile_metadata.assert_called_once_with(force=True)
     dummy_coord.async_refresh_grid_profile_metadata.assert_not_awaited()
     dummy_coord.schedule_sync.async_start.assert_not_awaited()
@@ -843,9 +879,9 @@ async def test_async_setup_entry_records_startup_migration_version(
     assert await async_setup_entry(hass, config_entry)
 
     migrate_gateway.assert_called_once()
-    assert migrate_updates.call_count == 2
+    migrate_updates.assert_called_once()
     migrate_cloud.assert_called_once()
-    assert config_entry.data["startup_migration_version"] == 5
+    assert config_entry.data["startup_migration_version"] == 6
 
 
 @pytest.mark.asyncio
@@ -895,13 +931,13 @@ async def test_async_setup_entry_skips_startup_migrations_when_version_current(
 
 
 @pytest.mark.asyncio
-async def test_async_setup_entry_removes_legacy_site_device_when_migration_current(
+async def test_async_setup_entry_skips_legacy_cleanup_when_migration_current(
     hass: HomeAssistant, config_entry, monkeypatch
 ) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
     hass.config_entries.async_update_entry(
         config_entry,
-        data={**config_entry.data, "startup_migration_version": 5},
+        data={**config_entry.data, "startup_migration_version": 6},
     )
     dev_reg = dr.async_get(hass)
     legacy_site_device = dev_reg.async_get_or_create(
@@ -946,7 +982,7 @@ async def test_async_setup_entry_removes_legacy_site_device_when_migration_curre
 
     assert await async_setup_entry(hass, config_entry)
 
-    assert dev_reg.async_get(legacy_site_device.id) is None
+    assert dev_reg.async_get(legacy_site_device.id) is not None
     assert (
         dev_reg.async_get_device(identifiers={(DOMAIN, f"type:{site_id}:envoy")})
         is not None
@@ -1528,6 +1564,7 @@ async def test_async_setup_entry_registry_sync_listener_handles_exceptions(
 ) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
     topology_listeners: list = []
+    state_listeners: list = []
     state_listeners: list = []
 
     class DummyCoordinator:
@@ -2898,6 +2935,40 @@ def test_sync_type_devices_skips_invalid_and_updates_existing(config_entry) -> N
     assert updated.manufacturer == "Enphase"
     assert updated.name == "Gateway (1)"
     assert updated.model == "Gateway"
+
+
+def test_sync_registry_devices_runs_cleanup_when_requested(
+    config_entry, monkeypatch
+) -> None:
+    coord = SimpleNamespace()
+    dev_reg = SimpleNamespace()
+    hass = SimpleNamespace()
+    type_devices = {"envoy": object()}
+    sync_types = Mock(return_value=type_devices)
+    sync_chargers = Mock()
+    prune = Mock()
+    remove_empty = Mock()
+    monkeypatch.setattr(enphase_init, "_sync_type_devices", sync_types)
+    monkeypatch.setattr(enphase_init, "_sync_charger_devices", sync_chargers)
+    monkeypatch.setattr(enphase_init, "_prune_inactive_serial_entities", prune)
+    monkeypatch.setattr(
+        enphase_init, "_remove_empty_inactive_serial_devices", remove_empty
+    )
+
+    _sync_registry_devices(
+        config_entry,
+        coord,
+        dev_reg,
+        "site",
+        hass=hass,
+    )
+
+    sync_types.assert_called_once_with(config_entry, coord, dev_reg, "site")
+    sync_chargers.assert_called_once_with(
+        config_entry, coord, dev_reg, "site", type_devices
+    )
+    prune.assert_called_once_with(hass, config_entry, coord, "site")
+    remove_empty.assert_called_once_with(hass, config_entry, coord, dev_reg, "site")
 
 
 def test_sync_type_devices_deduplicates_merged_identifiers(config_entry) -> None:
@@ -4965,7 +5036,7 @@ async def test_migrate_legacy_gateway_type_devices_handles_remove_failure(
 
 
 @pytest.mark.asyncio
-async def test_async_setup_entry_registry_sync_listener_only_resyncs_devices_on_update(
+async def test_async_setup_entry_registry_sync_runs_only_for_topology_updates(
     hass: HomeAssistant, config_entry, monkeypatch
 ) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
@@ -5039,7 +5110,7 @@ async def test_async_setup_entry_registry_sync_listener_only_resyncs_devices_on_
     assert topology_listeners, "expected setup to register a topology listener"
     assert state_listeners, "expected setup to register a state listener"
     assert migrate.call_count == 0
-    assert migrate_updates.call_count == 1
+    assert migrate_updates.call_count == 0
     assert migrate_cloud.call_count == 0
     assert "startup_migration_version" not in config_entry.data
     assert sync_registry_devices.call_count == 1
@@ -5049,18 +5120,18 @@ async def test_async_setup_entry_registry_sync_listener_only_resyncs_devices_on_
 
     assert sync_registry_devices.call_count == 1
     assert migrate.call_count == 1
-    assert migrate_updates.call_count == 2
+    assert migrate_updates.call_count == 1
     assert migrate_cloud.call_count == 1
-    assert config_entry.data["startup_migration_version"] == 5
+    assert config_entry.data["startup_migration_version"] == 6
 
-    for listener in state_listeners[:-1]:
+    for listener in state_listeners:
         listener()
     assert sync_registry_devices.call_count == 1
 
     dummy_coord.data[RANDOM_SERIAL]["sw_version"] = "1.2.3"
-    state_listeners[-1]()
+    topology_listeners[0]()
     assert sync_registry_devices.call_count == 2
-    assert migrate_updates.call_count == 3
+    assert migrate_updates.call_count == 1
 
 
 @pytest.mark.asyncio
@@ -5068,6 +5139,7 @@ async def test_async_setup_entry_registry_sync_listener_swallows_sync_errors(
     hass: HomeAssistant, config_entry, monkeypatch
 ) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
+    topology_listeners: list = []
     state_listeners: list = []
 
     class DummyCoordinator:
@@ -5096,6 +5168,7 @@ async def test_async_setup_entry_registry_sync_listener_swallows_sync_errors(
             return "EV Chargers (1)"
 
         def async_add_topology_listener(self, callback):
+            topology_listeners.append(callback)
             return lambda: None
 
         def async_add_listener(self, callback):
@@ -5115,5 +5188,6 @@ async def test_async_setup_entry_registry_sync_listener_swallows_sync_errors(
 
     assert await async_setup_entry(hass, config_entry)
     assert state_listeners
+    assert topology_listeners
 
-    state_listeners[-1]()
+    topology_listeners[0]()

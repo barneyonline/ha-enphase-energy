@@ -412,6 +412,9 @@
     "tariff_rate_api_unavailable": {
       "message": "De API voor het schrijven van tarieven is niet beschikbaar."
     },
+    "pricing_edits_disabled": {
+      "message": "Prijsbewerkingen zijn uitgeschakeld in de integratieopties."
+    },
     "tariff_rate_entity_required": {
       "message": "Selecteer precies één tariefentiteit."
     },
@@ -485,14 +488,20 @@
         "title": "Enphase Energy-opties",
         "description": "Kies wat je met deze integratie-invoer wilt doen.",
         "menu_options": {
-          "settings": "Instellingen",
+          "settings": "Opvragen",
+          "devices": "Apparaten selecteren",
+          "repair_notifications": "Meldingen",
+          "authentication_settings": "Authenticatie",
           "migrate_envoy": "Envoy-geschiedenis migreren",
           "advanced": "Geavanceerd"
         },
         "menu_option_descriptions": {
           "settings": "Pas polling en gedrag aan.",
+          "devices": "Kies welke apparaatsgroepen je wilt toevoegen. Alle selecties delen hetzelfde polling-interval.",
+          "repair_notifications": "Beheer Home Assistant-reparatiemeldingen.",
+          "authentication_settings": "Start de login-flow om inloggegevens te vernieuwen zonder de integratie te verwijderen.",
           "migrate_envoy": "Neem geselecteerde energie-entiteit-ID's van Enphase Envoy over zodat de Home Assistant Energy-geschiedenis onder deze integratie doorgaat.",
-          "advanced": "Netprofielbediening alleen voor installateurs."
+          "advanced": "Optionele bediening voor netmodus en netprofielbediening alleen voor installateurs."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -503,11 +512,9 @@
           "slow_poll_interval": "Langzame polling-interval (s)",
           "fast_while_streaming": "Geef voorkeur aan snelle polling terwijl cloudstream actief is",
           "api_timeout": "API-time-out (s)",
-          "nominal_voltage": "Nominale spanning (V)",
+          "nominal_voltage": "Nominale spanning van EV-lader (V)",
           "session_history_interval": "Sessieverleden-interval (min)",
           "schedule_sync_enabled": "Schakel EV Charger Scheduler in",
-          "reauth": "Herautenticatie starten",
-          "forget_password": "Opgeslagen wachtwoord vergeten",
           "type_heatpump": "Warmtepomp",
           "type_ac_battery": "AC-batterij",
           "battery_schedules_enabled": "Schakel Batterijplanner in",
@@ -523,60 +530,130 @@
           "slow_poll_interval": "Interval voor gebruik bij inactiviteit.",
           "fast_while_streaming": "Wanneer ingeschakeld, snelle polling tijdens actieve cloudstreaming.",
           "api_timeout": "Seconden voordat API-aanvragen een time-out krijgen.",
-          "nominal_voltage": "Fallbackspanning voor het schatten van laadvermogen.",
+          "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is.",
           "session_history_interval": "Minuten om te wachten tussen het ophalen van cloudsessiegeschiedenis.",
-          "schedule_sync_enabled": "Beheer IQ EV-opladerschema's",
-          "reauth": "Start de login-flow om inloggegevens te vernieuwen zonder de integratie te verwijderen.",
-          "forget_password": "Verwijdert het opgeslagen wachtwoord. Automatisch vernieuwen wordt niet langer geprobeerd.",
           "type_heatpump": "Bevat sensoren voor warmtepompstatus, diagnostiek en verbruik.",
           "type_ac_battery": "Bevat AC-batterijsensoren en slaapmodusbediening wanneer beschikbaar.",
-          "battery_schedules_enabled": "Beheer IQ-batterijschema's",
           "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken.",
           "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is."
         }
       },
       "settings": {
-        "title": "Enphase Energy-opties",
+        "title": "Opvragen",
         "description": "Stem polling en gedrag af.",
         "data": {
-          "type_envoy": "Gateway",
-          "type_encharge": "Batterij",
-          "type_iqevse": "Laders",
-          "type_microinverter": "Micro-omvormers",
           "fast_poll_interval": "Snelle polling-interval (s)",
           "slow_poll_interval": "Langzame polling-interval (s)",
           "fast_while_streaming": "Geef voorkeur aan snelle polling terwijl cloudstream actief is",
           "api_timeout": "API-time-out (s)",
-          "nominal_voltage": "Nominale spanning (V)",
           "session_history_interval": "Sessieverleden-interval (min)",
-          "schedule_sync_enabled": "Schakel Scheduler-ondersteuning in",
-          "reauth": "Herautenticatie starten",
-          "forget_password": "Opgeslagen wachtwoord vergeten",
-          "type_heatpump": "Warmtepomp",
-          "type_ac_battery": "AC-batterij",
-          "battery_schedules_enabled": "Schakel Batterijplanner in",
-          "degraded_service_repair_issues": "Reparaties voor verminderde diensten inschakelen",
-          "weather_enabled": "Weer inschakelen"
+          "degraded_service_repair_issues": "Reparaties voor verminderde diensten inschakelen"
         },
         "data_description": {
-          "type_envoy": "Bevat gateway-connectiviteit en meterdiagnostiek.",
-          "type_encharge": "Bevat batterijstatus en bedieningsentiteiten wanneer beschikbaar.",
-          "type_iqevse": "Bevat EV-lader-entiteiten en bediening.",
-          "type_microinverter": "Bevat sensoren voor micro-omvormerconnectiviteit, actief aantal en levensduurproductie.",
           "fast_poll_interval": "Interval voor gebruik tijdens laden of streamen.",
           "slow_poll_interval": "Interval voor gebruik bij inactiviteit.",
           "fast_while_streaming": "Wanneer ingeschakeld, snelle polling tijdens actieve cloudstreaming.",
           "api_timeout": "Seconden voordat API-aanvragen een time-out krijgen.",
-          "nominal_voltage": "Fallbackspanning voor het schatten van laadvermogen.",
           "session_history_interval": "Minuten om te wachten tussen het ophalen van cloudsessiegeschiedenis.",
-          "schedule_sync_enabled": "Beheer het planningsbeheer van Enphase",
-          "reauth": "Start de login-flow om inloggegevens te vernieuwen zonder de integratie te verwijderen.",
-          "forget_password": "Verwijdert het opgeslagen wachtwoord. Automatisch vernieuwen wordt niet langer geprobeerd.",
-          "type_heatpump": "Bevat sensoren voor warmtepompstatus, diagnostiek en verbruik.",
+          "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken."
+        }
+      },
+      "devices": {
+        "title": "Apparaten selecteren",
+        "description": "Kies welke apparaatsgroepen je wilt toevoegen. Alle selecties delen hetzelfde polling-interval.",
+        "sections": {
+          "devices": {
+            "name": "Apparaten selecteren",
+            "data": {
+              "type_envoy": "Gateway",
+              "type_encharge": "Batterij",
+              "type_ac_battery": "AC-batterij",
+              "type_iqevse": "Laders",
+              "type_heatpump": "Warmtepomp",
+              "type_microinverter": "Micro-omvormers"
+            },
+            "data_description": {
+              "type_envoy": "Bevat gateway-connectiviteit en meterdiagnostiek.",
+              "type_encharge": "Bevat batterijstatus en bedieningsentiteiten wanneer beschikbaar.",
+              "type_ac_battery": "Bevat AC-batterijsensoren en slaapmodusbediening wanneer beschikbaar.",
+              "type_iqevse": "Bevat EV-lader-entiteiten en bediening.",
+              "type_heatpump": "Bevat sensoren voor warmtepompstatus, diagnostiek en verbruik.",
+              "type_microinverter": "Bevat sensoren voor micro-omvormerconnectiviteit, actief aantal en levensduurproductie."
+            }
+          },
+          "device_features": {
+            "name": "Apparaatfuncties",
+            "data": {
+              "schedule_sync_enabled": "Schakel Scheduler-ondersteuning in",
+              "battery_schedules_enabled": "Schakel Batterijplanner in",
+              "system_event_repair_issues": "Reparatiemeldingen voor systeemgebeurtenissen inschakelen",
+              "pricing_edits_enabled": "Prijsbewerkingen inschakelen",
+              "weather_enabled": "Weer inschakelen",
+              "nominal_voltage": "Nominale spanning van EV-lader (V)"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld.",
+              "pricing_edits_enabled": "Elektriciteitstarieven van IQ Gateway beheren",
+              "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is.",
+              "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is.",
+              "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger.",
+              "battery_schedules_enabled": "Beheer schema's voor de IQ Battery."
+            }
+          }
+        },
+        "data": {
+          "devices": "Apparaten selecteren",
+          "device_features": "Apparaatfuncties",
+          "type_envoy": "Gateway",
+          "type_encharge": "Batterij",
+          "type_ac_battery": "AC-batterij",
+          "type_iqevse": "Laders",
+          "type_heatpump": "Warmtepomp",
+          "type_microinverter": "Micro-omvormers",
+          "schedule_sync_enabled": "Schakel Scheduler-ondersteuning in",
+          "battery_schedules_enabled": "Schakel Batterijplanner in",
+          "system_event_repair_issues": "Reparatiemeldingen voor systeemgebeurtenissen inschakelen",
+          "pricing_edits_enabled": "Prijsbewerkingen inschakelen",
+          "weather_enabled": "Weer inschakelen",
+          "nominal_voltage": "Nominale spanning van EV-lader (V)"
+        },
+        "data_description": {
+          "type_envoy": "Bevat gateway-connectiviteit en meterdiagnostiek.",
+          "type_encharge": "Bevat batterijstatus en bedieningsentiteiten wanneer beschikbaar.",
           "type_ac_battery": "Bevat AC-batterijsensoren en slaapmodusbediening wanneer beschikbaar.",
-          "battery_schedules_enabled": "Beheer IQ-batterijschema's",
+          "type_iqevse": "Bevat EV-lader-entiteiten en bediening.",
+          "type_heatpump": "Bevat sensoren voor warmtepompstatus, diagnostiek en verbruik.",
+          "type_microinverter": "Bevat sensoren voor micro-omvormerconnectiviteit, actief aantal en levensduurproductie.",
+          "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld.",
+          "pricing_edits_enabled": "Elektriciteitstarieven van IQ Gateway beheren",
+          "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is.",
+          "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is.",
+          "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger.",
+          "battery_schedules_enabled": "Beheer schema's voor de IQ Battery."
+        }
+      },
+      "repair_notifications": {
+        "title": "Meldingen",
+        "description": "Kies welke Enphase-condities Home Assistant-reparaties aanmaken.",
+        "data": {
+          "degraded_service_repair_issues": "Reparaties voor verminderde diensten inschakelen",
+          "system_event_repair_issues": "Reparatiemeldingen voor systeemgebeurtenissen inschakelen"
+        },
+        "data_description": {
           "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken.",
-          "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is."
+          "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld."
+        }
+      },
+      "authentication_settings": {
+        "title": "Authenticatie",
+        "description": "Start de login-flow om inloggegevens te vernieuwen zonder de integratie te verwijderen.",
+        "data": {
+          "reauth": "Herautenticatie starten",
+          "forget_password": "Opgeslagen wachtwoord vergeten"
+        },
+        "data_description": {
+          "reauth": "Start de login-flow om inloggegevens te vernieuwen zonder de integratie te verwijderen.",
+          "forget_password": "Verwijdert het opgeslagen wachtwoord. Automatisch vernieuwen wordt niet langer geprobeerd."
         }
       },
       "migrate_envoy_source": {
@@ -605,12 +682,12 @@
           "battery_discharge": "Batterijontlading"
         },
         "data_description": {
-          "solar_production": "Assign a cumulative production total to the Enphase Energy Site Solar Production sensor. Do not choose daily energy or live power.",
-          "consumption": "Assign a cumulative consumption total to the Enphase Energy Site Consumption sensor. Do not choose daily energy or live power.",
-          "grid_import": "Assign a cumulative grid import total to the Enphase Energy Site Grid Import sensor. Do not choose daily energy or live power.",
-          "grid_export": "Assign a cumulative grid export total to the Enphase Energy Site Grid Export sensor. Do not choose daily energy or live power.",
-          "battery_charge": "Assign a cumulative battery charge total to the Enphase Energy Site Battery Charge sensor. Do not choose daily energy or live power.",
-          "battery_discharge": "Assign a cumulative battery discharge total to the Enphase Energy Site Battery Discharge sensor. Do not choose daily energy or live power."
+          "solar_production": "Wijs een cumulatief totaal toe aan de sensor Site-zonneproductie. Kies geen dagelijkse energie of actueel vermogen.",
+          "consumption": "Wijs een cumulatief totaal toe aan de sensor Siteverbruik. Kies geen dagelijkse energie of actueel vermogen.",
+          "grid_import": "Wijs een cumulatief totaal toe aan de sensor Site-netimport. Kies geen dagelijkse energie of actueel vermogen.",
+          "grid_export": "Wijs een cumulatief totaal toe aan de sensor Site-netexport. Kies geen dagelijkse energie of actueel vermogen.",
+          "battery_charge": "Wijs een cumulatief totaal toe aan de sensor Sitebatterij laden. Kies geen dagelijkse energie of actueel vermogen.",
+          "battery_discharge": "Wijs een cumulatief totaal toe aan de sensor Sitebatterij ontladen. Kies geen dagelijkse energie of actueel vermogen."
         }
       },
       "migrate_envoy_confirm": {
@@ -625,15 +702,27 @@
         "title": "Geavanceerd",
         "description": "Installateurs- en onderhoudsacties.",
         "menu_options": {
+          "grid_toggle": "Netmodus",
           "grid_profile": "Netprofielbeheer"
         },
         "menu_option_descriptions": {
+          "grid_toggle": "Configureer handmatige bediening voor de netmodus.",
           "grid_profile": "Activation-netprofielen voor installateurs bekijken en toepassen."
+        }
+      },
+      "grid_toggle": {
+        "title": "Netmodus",
+        "description": "Bewaking van de netmodus blijft altijd beschikbaar. Handmatige omschakeling is veiligheidsgevoelig; aanvullende entiteiten en serviceacties vereisen daarom expliciete inschakeling.",
+        "data": {
+          "grid_toggle_enabled": "Bediening voor netmodus inschakelen"
+        },
+        "data_description": {
+          "grid_toggle_enabled": "De sensor Netmodus blijft beschikbaar. Inschakelen maakt Status netbediening en OTP aanvragen en staat serviceacties toe."
         }
       },
       "grid_profile": {
         "title": "Netprofielbeheer",
-        "description": "Filtert de Activation-netprofielcatalogus voor het land van deze locatie.",
+        "description": "Filtert de Activation-netprofielcatalogus voor het land van deze locatie.\n\nWAARSCHUWING: HET TOEPASSEN VAN EEN ONJUIST NETPROFIEL KAN STORINGEN IN HET SYSTEEM VEROORZAKEN.",
         "data": {
           "grid_profile_region": "Regio",
           "grid_profile_commonly_used": "Profiellijst"
@@ -991,6 +1080,9 @@
           },
           "metrics_available": {
             "name": "Metrieken beschikbaar"
+          },
+          "endpoint_failure_details": {
+            "name": "Details van eindpuntfouten"
           }
         }
       },
@@ -1287,7 +1379,7 @@
         }
       },
       "grid_mode": {
-        "name": "Rastermodus",
+        "name": "Netmodus",
         "state": {
           "on_grid": "Op raster",
           "off_grid": "Buiten het raster",
@@ -1556,7 +1648,7 @@
         "name": "Actieve micro-omvormers"
       },
       "inverter_telemetry": {
-        "name": "Telemetrie {serial_number}"
+        "name": "Vermogen {serial_number}"
       },
       "microinverter_last_reported": {
         "name": "Laatst gemeld door micro-omvormers"
@@ -1660,9 +1752,9 @@
       "ac_battery_overall_status": {
         "name": "Algemene status van AC-batterij",
         "state": {
-          "charging": "Opladen",
-          "discharging": "Ontladen",
-          "idle": "Inactief",
+          "normal": "Normaal",
+          "warning": "Waarschuwing",
+          "error": "Fout",
           "unknown": "Onbekend"
         }
       },
@@ -1678,9 +1770,9 @@
       "ac_battery_storage_status": {
         "name": "Status van {serial}",
         "state": {
-          "charging": "Opladen",
-          "discharging": "Ontladen",
-          "idle": "Inactief",
+          "normal": "Normaal",
+          "warning": "Waarschuwing",
+          "error": "Fout",
           "unknown": "Onbekend"
         }
       },
@@ -2070,6 +2162,12 @@
           "high_impact_count": {
             "name": "Aantal gebeurtenissen met hoge impact"
           },
+          "standing_alarm_count": {
+            "name": "Aantal actieve alarmen"
+          },
+          "active_events": {
+            "name": "Actieve gebeurtenissen"
+          },
           "severity_counts": {
             "name": "Aantal per ernst"
           },
@@ -2324,7 +2422,7 @@
       "description": "Site {site_id} vereist bijgewerkte sessieheaders. Authenticeer opnieuw."
     },
     "auth_blocked": {
-      "title": "Enphase Energy authentication temporarily blocked",
+      "title": "Enphase Energy-authenticatie is tijdelijk geblokkeerd",
       "description": "Enphase lijkt de authenticatie voor site {site_id} tijdelijk te blokkeren. Automatische pogingen zijn gepauzeerd tot {blocked_until}. Een geslaagde handmatige herauthenticatie kan de blokkade eerder opheffen."
     },
     "too_many_active_sessions": {
@@ -2997,10 +3095,6 @@
         "region_code": {
           "name": "Regiocode",
           "description": "Optionele regio- of provinciecode, zoals VIC."
-        },
-        "commonly_used": {
-          "name": "Alleen veelgebruikt",
-          "description": "Geeft de catalogus met veelgebruikte profielen terug wanneer ingeschakeld."
         },
         "device_id": {
           "name": "Locatieapparaten",

@@ -18,6 +18,8 @@ class DiscoveryState:
     _discovery_snapshot_pending: bool = False
     _discovery_snapshot_save_cancel: Any = None
     _warmup_task: Any = None
+    _startup_power_task: Any = None
+    _startup_power_phase_timings: dict[str, float] = field(default_factory=dict)
     _warmup_in_progress: bool = False
     _warmup_last_error: str | None = None
     _restored_evse_serial_order: list[str] = field(default_factory=list)
@@ -75,6 +77,12 @@ class EndpointFamilyHealth:
     cooldown_active: bool = False
     support_state: str = "unknown"
     last_error: str | None = None
+    degraded: bool | None = None
+    partial_success: bool = False
+    successful_items: int | None = None
+    total_items: int | None = None
+    using_cached_data: bool = False
+    cache_stale: bool = False
 
 
 @dataclass(slots=True)
@@ -155,6 +163,9 @@ class RefreshHealthState:
     _phase_timings: dict[str, float] = field(default_factory=dict)
     _bootstrap_phase_timings: dict[str, float] = field(default_factory=dict)
     _warmup_phase_timings: dict[str, float] = field(default_factory=dict)
+    _setup_phase_timings: dict[str, float] = field(default_factory=dict)
+    _setup_milestones: dict[str, float] = field(default_factory=dict)
+    _setup_started_mono: float | None = None
     _refresh_performance_history: list[dict[str, object]] = field(default_factory=list)
     _has_successful_refresh: bool = False
     _status_charger_data_authoritative: bool = False
@@ -219,6 +230,7 @@ class InventoryState:
     _inverter_parameter_ids: list[str] = field(default_factory=list)
     _inverter_parameter_columns: list[str] = field(default_factory=list)
     _inverter_parameter_telemetry: PayloadMapByKey = field(default_factory=dict)
+    _inverter_parameter_success_mono: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import calendar
 import copy
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ from homeassistant.util import dt as dt_util
 
 from .api import InvalidPayloadError, OptionalEndpointUnavailable
 from .const import DOMAIN
+from .log_redaction import redact_text
 from .service_validation import raise_translated_service_validation
 
 if TYPE_CHECKING:
@@ -23,7 +25,8 @@ if TYPE_CHECKING:
 
 TARIFF_ENDPOINT_FAMILY = "tariff"
 TARIFF_DATED_RATES_ENDPOINT_FAMILY = "tariff_dated_rates"
-TARIFF_SUCCESS_TTL_S = 900.0
+TARIFF_SUCCESS_TTL_S = 300.0
+TARIFF_WRITE_RECONCILE_DELAYS_S = (5.0, 15.0, 30.0)
 TARIFF_BRANCH_KEYS = frozenset({"purchase", "buyback"})
 TARIFF_TYPE_IDS = frozenset({"flat", "tou", "tiered"})
 TARIFF_TYPE_KINDS = frozenset(
@@ -1304,6 +1307,76 @@ class TariffRuntime:
 
     def __init__(self, coordinator: EnphaseCoordinator) -> None:
         self.coordinator = coordinator
+        self._post_write_reconcile_task: asyncio.Task[None] | None = None
+
+    def _rate_signature(self) -> tuple[tuple[object, ...], ...]:
+        """Return the active editable-rate shape and values."""
+
+        coord = self.coordinator
+        signature: list[tuple[object, ...]] = []
+        for branch, attr in (
+            ("purchase", "tariff_import_rate"),
+            ("buyback", "tariff_export_rate"),
+        ):
+            for spec in tariff_rate_sensor_specs(getattr(coord, attr, None)):
+                signature.append((branch, spec.get("key"), spec.get("state")))
+        return tuple(signature)
+
+    def _publish_tariff_update(self) -> None:
+        """Notify coordinator entities after an out-of-band tariff refresh."""
+
+        coord = self.coordinator
+        publish = getattr(coord, "async_set_updated_data", None)
+        if not callable(publish):
+            return
+        data = dict(coord.data) if isinstance(coord.data, dict) else {}
+        publish(data)
+
+    def _clear_post_write_reconcile_task(self, task: asyncio.Task[None]) -> None:
+        if self._post_write_reconcile_task is task:
+            self._post_write_reconcile_task = None
+
+    async def _async_reconcile_after_write(
+        self,
+        previous_signature: tuple[tuple[object, ...], ...],
+    ) -> None:
+        """Retry lagging Enphase tariff reads for less than one minute."""
+
+        for delay in TARIFF_WRITE_RECONCILE_DELAYS_S:
+            await asyncio.sleep(delay)
+            try:
+                await self.async_refresh(force=True)
+            except asyncio.CancelledError:
+                raise
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug(
+                    "Post-write tariff reconciliation failed: %s",
+                    redact_text(err, site_ids=(self.coordinator.site_id,)),
+                )
+                return
+            self._publish_tariff_update()
+            if self._rate_signature() != previous_signature:
+                return
+
+    def _schedule_post_write_reconciliation(
+        self,
+        previous_signature: tuple[tuple[object, ...], ...],
+    ) -> None:
+        """Schedule bounded read-after-write reconciliation."""
+
+        existing = self._post_write_reconcile_task
+        if existing is not None and not existing.done():
+            existing.cancel()
+        coord = self.coordinator
+        task = coord.hass.async_create_task(
+            self._async_reconcile_after_write(previous_signature),
+            name=f"{DOMAIN}_tariff_post_write_reconcile",
+        )
+        self._post_write_reconcile_task = task
+        task.add_done_callback(self._clear_post_write_reconcile_task)
+        track_task = getattr(coord, "track_entry_background_task", None)
+        if callable(track_task):
+            track_task(task)
 
     def refresh_due(self) -> bool:
         """Return whether tariff data should be refreshed this cycle."""
@@ -1417,6 +1490,11 @@ class TariffRuntime:
     ) -> dict[str, object]:
         """Update one existing tariff rate value."""
 
+        if not bool(getattr(self.coordinator, "pricing_edits_enabled", True)):
+            _raise_tariff_validation(
+                "pricing_edits_disabled",
+                message="Pricing edits are disabled in the integration options.",
+            )
         result = await self.async_update_tariff(
             rate_updates=({"locator": locator, "rate": value},)
         )
@@ -1512,6 +1590,7 @@ class TariffRuntime:
                 message="Tariff billing write API is unavailable.",
             )
 
+        previous_rate_signature = self._rate_signature()
         tariff_result: dict[str, object] | None = None
         billing_result: dict[str, object] | None = None
         if tariff_write_requested:
@@ -1568,7 +1647,10 @@ class TariffRuntime:
                     getattr(coord, "site_id", None),
                     err,
                 )
-        await coord.tariff_runtime.async_refresh(force=True)
+        await self.async_refresh(force=True)
+        self._publish_tariff_update()
+        if tariff_write_requested and self._rate_signature() == previous_rate_signature:
+            self._schedule_post_write_reconciliation(previous_rate_signature)
         return {"tariff": tariff_result, "billing": billing_result}
 
     def _has_stale_data(self) -> bool:

@@ -17,6 +17,7 @@ from custom_components.enphase_ev import switch as switch_mod
 from custom_components.enphase_ev.api import AuthSettingsUnavailable
 from custom_components.enphase_ev.const import (
     OPT_BATTERY_SCHEDULES_ENABLED,
+    OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
     OPT_SCHEDULE_SYNC_ENABLED,
 )
 from custom_components.enphase_ev.coordinator import EnphaseCoordinator
@@ -1781,8 +1782,12 @@ async def test_app_auth_switch_turn_on_off(coordinator_factory) -> None:
 
 @pytest.mark.asyncio
 async def test_app_auth_switch_handles_auth_settings_unavailable(
-    coordinator_factory, mock_issue_registry
+    hass, config_entry, coordinator_factory, mock_issue_registry
 ) -> None:
+    hass.config_entries.async_update_entry(
+        config_entry,
+        options={OPT_DEGRADED_SERVICE_REPAIR_ISSUES: True},
+    )
     coord = coordinator_factory({"app_auth_supported": True, "app_auth_enabled": False})
     coord.client.set_app_authentication = AsyncMock(
         side_effect=AuthSettingsUnavailable("down")

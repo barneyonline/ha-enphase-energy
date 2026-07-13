@@ -395,6 +395,9 @@ class CoordinatorDiagnostics:
                 getattr(coord, "_refresh_performance_history", [])
             ),
             "bootstrap_phase_timings": coord.bootstrap_phase_timings,
+            "setup_phase_timings": coord.setup_phase_timings,
+            "setup_milestones": coord.setup_milestones,
+            "startup_power_phase_timings": coord.startup_power_phase_timings,
             "warmup_phase_timings": coord.warmup_phase_timings,
             "warmup_in_progress": getattr(coord, "_warmup_in_progress", False),
             "warmup_last_error": getattr(coord, "_warmup_last_error", None),
@@ -851,6 +854,8 @@ class CoordinatorDiagnostics:
             "evse_feature_flag_charger_count": len(
                 getattr(coord, "_evse_feature_flags_by_serial", {}) or {}
             ),
+            "grid_toggle_enabled": coord.grid_toggle_enabled,
+            "pricing_edits_enabled": coord.pricing_edits_enabled,
             "grid_control_supported": coord.grid_control_supported,
             "grid_toggle_allowed": coord.grid_toggle_allowed,
             "grid_toggle_pending": coord.grid_toggle_pending,
@@ -1036,6 +1041,9 @@ class CoordinatorDiagnostics:
         def _endpoint_family_degraded(state: object) -> bool:
             if not isinstance(state, dict):
                 return False
+            degraded = state.get("degraded")
+            if isinstance(degraded, bool):
+                return degraded
             try:
                 failures = int(state.get("consecutive_failures") or 0)
             except (TypeError, ValueError):
@@ -1052,6 +1060,16 @@ class CoordinatorDiagnostics:
             if _endpoint_family_degraded(state)
         ]
         metrics["degraded_endpoint_families"] = degraded_endpoint_families
+        metrics["endpoint_failure_details"] = {
+            family: {
+                "reason": state.get("last_error"),
+                "retry_utc": state.get("next_retry_utc"),
+            }
+            for family, state in endpoint_family_health.items()
+            if isinstance(state, dict)
+            and isinstance(state.get("last_error"), str)
+            and bool(state.get("last_error"))
+        }
 
         degraded_services = [
             service
@@ -1328,7 +1346,7 @@ class CoordinatorDiagnostics:
             if state is None:
                 continue
             support_state = getattr(state, "support_state", "unknown")
-            out[family] = {
+            family_health: dict[str, object] = {
                 "family": family,
                 "request_count": int(getattr(state, "request_count", 0) or 0),
                 "last_request_utc": _iso(getattr(state, "last_request_utc", None)),
@@ -1344,6 +1362,23 @@ class CoordinatorDiagnostics:
                 "suppressed": support_state == "suppressed",
                 "last_error": getattr(state, "last_error", None),
             }
+            degraded = getattr(state, "degraded", None)
+            if isinstance(degraded, bool):
+                family_health.update(
+                    {
+                        "degraded": degraded,
+                        "partial_success": bool(
+                            getattr(state, "partial_success", False)
+                        ),
+                        "successful_items": getattr(state, "successful_items", None),
+                        "total_items": getattr(state, "total_items", None),
+                        "using_cached_data": bool(
+                            getattr(state, "using_cached_data", False)
+                        ),
+                        "cache_stale": bool(getattr(state, "cache_stale", False)),
+                    }
+                )
+            out[family] = family_health
         return out
 
     def sync_session_history_issue(self) -> None:

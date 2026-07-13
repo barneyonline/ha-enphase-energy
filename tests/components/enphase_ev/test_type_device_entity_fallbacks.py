@@ -359,6 +359,7 @@ def test_grid_control_status_device_info_prefers_enpower_then_envoy() -> None:
         site_id="site-grid",
         last_success_utc=None,
         last_update_success=True,
+        grid_toggle_enabled=True,
         grid_control_supported=True,
         grid_toggle_pending=False,
         grid_toggle_allowed=True,

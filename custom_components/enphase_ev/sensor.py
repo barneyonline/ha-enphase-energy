@@ -45,7 +45,11 @@ from .ac_battery_support import (
     ac_battery_snapshot_last_reported,
     ac_battery_storage_snapshot,
 )
-from .battery_schedule_editor import BatteryScheduleRecord, battery_schedule_inventory
+from .battery_schedule_editor import (
+    BatteryScheduleRecord,
+    battery_schedule_inventory,
+    battery_scheduler_enabled,
+)
 from .const import (
     DEFAULT_NOMINAL_VOLTAGE,
     DOMAIN,
@@ -62,6 +66,7 @@ from .entity import (
     evse_resolved_charge_mode,
 )
 from .labels import friendly_status_text, status_label
+from .log_redaction import redact_text
 from .grid_profile_runtime import (
     SUPPORT_UNKNOWN,
     SUPPORT_UNAVAILABLE,
@@ -282,6 +287,10 @@ def _grid_control_site_applicable(coord: EnphaseCoordinator) -> bool:
     return _type_available(coord, "encharge")
 
 
+def _grid_toggle_enabled(coord: EnphaseCoordinator) -> bool:
+    return bool(getattr(coord, "grid_toggle_enabled", False))
+
+
 def _battery_schedule_inventory_supported(coord: EnphaseCoordinator) -> bool:
     client = getattr(coord, "client", None)
     if not (_site_has_battery(coord) and _type_available(coord, "encharge")):
@@ -370,6 +379,7 @@ async def async_setup_entry(
         battery_device_available = _type_available(coord, "encharge")
         ac_battery_device_available = ac_battery_entities_available(coord)
         inventory_ready = bool(getattr(coord, "_devices_inventory_ready", False))
+        battery_schedules_enabled = battery_scheduler_enabled(entry)
         current_router_keys: set[str] = set()
         router_records = _gateway_iq_energy_router_records(coord)
         heatpump_type_present = _has_type(coord, "heatpump")
@@ -423,6 +433,13 @@ async def async_setup_entry(
             "heat_pump_last_reported",
             "heat_pump_power",
             "heat_pump_sg_ready_gateway",
+        )
+        battery_schedule_sensor_keys: tuple[str, ...] = (
+            "battery_cfg_schedule_status",
+            "battery_schedule_summary",
+            "battery_cfg_schedules",
+            "battery_dtg_schedules",
+            "battery_rbd_schedules",
         )
         site_energy_specs: dict[str, tuple[str, str]] = {
             "solar_production": ("site_solar_production", "Site Solar Production"),
@@ -736,9 +753,15 @@ async def async_setup_entry(
             _type_available(coord, "enpower") or _type_available(coord, "envoy")
         ):
             _add_site_entity("grid_mode", EnphaseGridModeSensor(coord))
-            _add_site_entity(
-                "grid_control_status", EnphaseGridControlStatusSensor(coord)
-            )
+            if _grid_toggle_enabled(coord):
+                _add_site_entity(
+                    "grid_control_status", EnphaseGridControlStatusSensor(coord)
+                )
+            else:
+                _async_remove_site_sensor_entity("grid_control_status")
+        elif inventory_ready:
+            _async_remove_site_sensor_entity("grid_mode")
+            _async_remove_site_sensor_entity("grid_control_status")
         battery_power_supported = _site_lifetime_power_channel_present(
             "battery_charge"
         ) and _site_lifetime_power_channel_present("battery_discharge")
@@ -755,10 +778,6 @@ async def async_setup_entry(
                 "battery_overall_status", EnphaseBatteryOverallStatusSensor(coord)
             )
             _add_site_entity(
-                "battery_cfg_schedule_status",
-                EnphaseBatteryCfgScheduleStatusSensor(coord),
-            )
-            _add_site_entity(
                 "battery_available_energy", EnphaseBatteryAvailableEnergySensor(coord)
             )
             _add_site_entity(
@@ -768,7 +787,17 @@ async def async_setup_entry(
                 "battery_last_reported",
                 EnphaseBatteryLastReportedSensor(coord),
             )
-            if _battery_schedule_inventory_supported(coord):
+            if battery_schedules_enabled:
+                _add_site_entity(
+                    "battery_cfg_schedule_status",
+                    EnphaseBatteryCfgScheduleStatusSensor(coord),
+                )
+            else:
+                for entity_key in battery_schedule_sensor_keys:
+                    _async_remove_site_sensor_entity(entity_key)
+            if battery_schedules_enabled and _battery_schedule_inventory_supported(
+                coord
+            ):
                 _async_remove_site_sensor_entity("battery_schedule_summary")
                 _add_site_entity(
                     "battery_cfg_schedules",
@@ -782,7 +811,7 @@ async def async_setup_entry(
                     "battery_rbd_schedules",
                     EnphaseBatteryScheduleModeSensor(coord, "rbd"),
                 )
-            elif inventory_ready:
+            elif battery_schedules_enabled and inventory_ready:
                 for entity_key in (
                     "battery_schedule_summary",
                     "battery_cfg_schedules",
@@ -792,12 +821,7 @@ async def async_setup_entry(
                     _async_remove_site_sensor_entity(entity_key)
         else:
             _async_remove_site_sensor_entity("battery_power")
-            for entity_key in (
-                "battery_schedule_summary",
-                "battery_cfg_schedules",
-                "battery_dtg_schedules",
-                "battery_rbd_schedules",
-            ):
+            for entity_key in battery_schedule_sensor_keys:
                 _async_remove_site_sensor_entity(entity_key)
         if ac_battery_device_available:
             _add_site_entity(
@@ -1111,7 +1135,9 @@ async def async_setup_entry(
             _type_available(coord, "heatpump"),
             _type_available(coord, "enpower"),
             _heatpump_runtime_device_uid(coord),
+            battery_scheduler_enabled(entry),
             _battery_schedule_inventory_supported(coord),
+            _grid_toggle_enabled(coord),
             _grid_control_site_applicable(coord),
             getattr(coord, "tariff_billing", None) is not None,
             getattr(coord, "tariff_import_rate", None) is not None,
@@ -3238,7 +3264,6 @@ class EnphaseInverterTelemetrySensor(CoordinatorEntity, SensorEntity):  # type: 
     _attr_device_class = SensorDeviceClass.POWER
     _attr_native_unit_of_measurement = UnitOfPower.WATT
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_entity_registry_enabled_default = False
     _attr_suggested_display_precision = 1
 
@@ -4401,22 +4426,30 @@ def _microinverter_inventory_snapshot(coord: EnphaseCoordinator) -> dict[str, ob
         if isinstance(bucket.get("latest_reported_device"), dict)
         else None
     )
-    if latest_reported is None:
-        for member in safe_members:
-            parsed_last = _gateway_parse_timestamp(member.get("last_report"))
-            if parsed_last is None:
-                continue
-            if latest_reported is None or parsed_last > latest_reported:
-                latest_reported = parsed_last
-                latest_reported_device = {
-                    "serial_number": _gateway_clean_text(member.get("serial_number")),
-                    "name": _gateway_clean_text(member.get("name")),
-                    "status": _gateway_clean_text(
-                        member.get("statusText")
-                        if member.get("statusText") is not None
-                        else member.get("status")
-                    ),
-                }
+    for member in safe_members:
+        parsed_last = None
+        for key in (
+            "last_report",
+            "last_reported",
+            "last_reported_at",
+            "last-report",
+        ):
+            parsed_last = _gateway_parse_timestamp(member.get(key))
+            if parsed_last is not None:
+                break
+        if parsed_last is None:
+            continue
+        if latest_reported is None or parsed_last > latest_reported:
+            latest_reported = parsed_last
+            latest_reported_device = {
+                "serial_number": _gateway_clean_text(member.get("serial_number")),
+                "name": _gateway_clean_text(member.get("name")),
+                "status": _gateway_clean_text(
+                    member.get("statusText")
+                    if member.get("statusText") is not None
+                    else member.get("status")
+                ),
+            }
 
     snapshot: dict[str, object] = {  # type: ignore[no-redef]
         "total_inverters": total_inverters,
@@ -6857,6 +6890,7 @@ class EnphaseSiteServiceStatusSensor(_SiteBaseEntity):
         {
             "degraded_services",
             "degraded_endpoint_families",
+            "endpoint_failure_details",
         }
     )
 
@@ -6923,12 +6957,39 @@ class EnphaseSiteServiceStatusSensor(_SiteBaseEntity):
         degraded_endpoint_families = self._string_list(
             metrics.get("degraded_endpoint_families")
         )
+        failure_details: dict[str, dict[str, str | None]] = {}
+        raw_failure_details = metrics.get("endpoint_failure_details")
+        if isinstance(raw_failure_details, dict):
+            for raw_family, raw_detail in raw_failure_details.items():
+                family = _gateway_clean_text(raw_family)
+                if family is None or not isinstance(raw_detail, dict):
+                    continue
+                reason = _gateway_clean_text(raw_detail.get("reason"))
+                retry_utc = _gateway_clean_text(raw_detail.get("retry_utc"))
+                if reason is None:
+                    continue
+                parsed_retry = (
+                    dt_util.parse_datetime(retry_utc) if retry_utc is not None else None
+                )
+                if parsed_retry is not None and parsed_retry.tzinfo is not None:
+                    retry_utc = dt_util.as_utc(parsed_retry).isoformat()
+                else:
+                    retry_utc = None
+                failure_details[family] = {
+                    "reason": redact_text(
+                        reason,
+                        site_ids=(str(self._coord.site_id),),
+                        max_length=160,
+                    ),
+                    "retry_utc": retry_utc,
+                }
         attrs: dict[str, object] = {
             "degraded_services": degraded_services,
             "degraded_endpoint_families": degraded_endpoint_families,
             "degraded_service_count": len(degraded_services),
             "degraded_endpoint_family_count": len(degraded_endpoint_families),
             "metrics_available": metrics_available,
+            "endpoint_failure_details": failure_details,
         }
         attrs.update(self._cloud_diag_attrs())
         return attrs
@@ -9252,6 +9313,8 @@ class EnphaseGridControlStatusSensor(_SiteBaseEntity):
 
     @property
     def available(self) -> bool:
+        if not _grid_toggle_enabled(self._coord):
+            return False
         if not _grid_control_site_applicable(self._coord):
             return False
         if not (

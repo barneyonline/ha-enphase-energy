@@ -17,6 +17,8 @@ from custom_components.enphase_ev.refresh_plan import (
     FOLLOWUP_PLAN,
     HEATPUMP_FOLLOWUP_PLAN,
     SITE_ONLY_FOLLOWUP_PLAN,
+    STARTUP_POWER_DEADLINE_S,
+    STARTUP_POWER_PLAN,
     RefreshPlan,
     RefreshStage,
     callback_task,
@@ -339,6 +341,7 @@ class _RefreshOwner:
             client=SimpleNamespace(hems_site_supported=True),
         )
         self.refresh_runner = SimpleNamespace(
+            async_refresh_evse_summary_for_warmup=self.async_refresh_evse_summary_for_warmup,
             async_refresh_site_energy_for_warmup=self.async_refresh_site_energy_for_warmup,
             async_refresh_evse_timeseries_for_warmup=self.async_refresh_evse_timeseries_for_warmup,
             async_refresh_session_state_for_warmup=self.async_refresh_session_state_for_warmup,
@@ -429,6 +432,14 @@ class _RefreshOwner:
         self.calls.append("warmup_site_energy")
         return "warmup-site-energy"
 
+    def async_refresh_evse_summary_for_warmup(
+        self,
+        *,
+        working_data: dict[str, dict[str, object]],
+    ) -> str:
+        self.calls.append(f"warmup_summary:{sorted(working_data)}")
+        return "warmup-summary"
+
     def async_refresh_evse_timeseries_for_warmup(
         self,
         *,
@@ -492,14 +503,28 @@ def test_refresh_plans_bind_dynamic_followup_and_warmup_calls() -> None:
     owner = _RefreshOwner()
     working_data = {"SERIAL-1": {"ok": True}}
 
+    bound_startup_power = bind_refresh_plan(owner, STARTUP_POWER_PLAN)
+    assert [stage.stage_key for stage in bound_startup_power.stages] == ["power"]
+    assert bound_startup_power.stages[0].deadline_s == STARTUP_POWER_DEADLINE_S
+    assert STARTUP_POWER_DEADLINE_S < 60
+    assert [call[0] for call in bound_startup_power.stages[0].parallel_calls] == [
+        "current_power_s",
+        "site_energy_s",
+    ]
+    assert bound_startup_power.stages[0].parallel_calls[0][2]() == "current-power"
+    assert bound_startup_power.stages[0].parallel_calls[1][2]() == "warmup-site-energy"
+
     bound_warmup = bind_refresh_plan(owner, warmup_plan(working_data))
 
     assert [stage.stage_key for stage in bound_warmup.stages] == [
         "discovery",
         "state",
-        None,
+        "heatpump",
         "energy",
     ]
+    assert bound_warmup.stages[0].parallel_calls[0][2]() == "warmup-summary"
+    assert bound_warmup.stages[1].parallel_calls[0][0] == "system_events_s"
+    assert bound_warmup.stages[1].parallel_calls[0][2]() == "system_events"
     assert "tariff_s" in [call[0] for call in bound_warmup.stages[1].parallel_calls]
     assert bound_warmup.stages[2].ordered_calls[0][2]() == "heatpump-runtime"
     assert bound_warmup.stages[3].parallel_calls[0][2]() == "warmup-site-energy"
@@ -514,6 +539,59 @@ def test_refresh_plans_bind_dynamic_followup_and_warmup_calls() -> None:
     assert bound_post.stages[0].parallel_calls[0][2]() == "evse_timeseries:today"
     assert bound_post.stages[0].parallel_calls[1][2]() == "site_energy"
     assert bound_post.stages[0].parallel_calls[2][2]() == "inverters"
+
+
+def test_warmup_plan_filters_unselected_devices_and_disabled_features() -> None:
+    owner = _RefreshOwner()
+    owner._selected_type_keys = {"envoy", "iqevse"}
+    owner.include_inverters = False
+    owner.site_only = False
+    owner.config_entry = SimpleNamespace(options={})
+
+    plan = warmup_plan({"SERIAL-1": {}}, owner=owner)
+    keys = {
+        task.timing_key
+        for stage in plan.stages
+        for task in (*stage.parallel_tasks, *stage.ordered_tasks)
+    }
+
+    assert "evse_summary_s" in keys
+    assert "system_events_s" in keys
+    assert "tariff_s" in keys
+    assert "devices_inventory_s" in keys
+    assert "evse_timeseries_s" in keys
+    assert "battery_site_settings_s" not in keys
+    assert "battery_schedules_s" not in keys
+    assert "heatpump_power_s" not in keys
+    assert "inverters_s" not in keys
+    assert "current_power_s" not in keys
+    assert "site_energy_s" not in keys
+
+
+def test_warmup_plan_includes_battery_schedules_only_when_enabled() -> None:
+    owner = _RefreshOwner()
+    owner._selected_type_keys = {"encharge"}
+    owner.include_inverters = False
+    owner.site_only = True
+    owner.config_entry = SimpleNamespace(options={})
+
+    disabled = warmup_plan({}, owner=owner)
+    disabled_keys = {
+        task.timing_key
+        for stage in disabled.stages
+        for task in (*stage.parallel_tasks, *stage.ordered_tasks)
+    }
+    assert "battery_settings_s" in disabled_keys
+    assert "battery_schedules_s" not in disabled_keys
+
+    owner.config_entry.options["battery_schedules_enabled"] = True
+    enabled = warmup_plan({}, owner=owner)
+    enabled_keys = {
+        task.timing_key
+        for stage in enabled.stages
+        for task in (*stage.parallel_tasks, *stage.ordered_tasks)
+    }
+    assert "battery_schedules_s" in enabled_keys
 
 
 def test_dynamic_followup_plan_skips_up_to_date_tasks() -> None:

@@ -412,6 +412,9 @@
     "tariff_rate_api_unavailable": {
       "message": "API за запис на тарифи е недостъпен."
     },
+    "pricing_edits_disabled": {
+      "message": "Редактирането на цени е деактивирано в опциите на интеграцията."
+    },
     "tariff_rate_entity_required": {
       "message": "Изберете точно един обект за тарифна ставка."
     },
@@ -485,14 +488,20 @@
         "title": "Опции на Enphase Energy",
         "description": "Изберете какво да направите с този запис на интеграцията.",
         "menu_options": {
-          "settings": "Настройки",
+          "settings": "Опресняване",
+          "devices": "Избор на устройства",
+          "repair_notifications": "Известия",
+          "authentication_settings": "Удостоверяване",
           "migrate_envoy": "Мигриране на историята на Envoy",
           "advanced": "Разширени"
         },
         "menu_option_descriptions": {
           "settings": "Настройте опресняването и поведението.",
+          "devices": "Изберете кои групи устройства да добавите. Всички избори споделят един и същ интервал на опресняване.",
+          "repair_notifications": "Управление на известията за поправки в Home Assistant.",
+          "authentication_settings": "Стартирайте процеса на вход за обновяване на данните без да премахвате интеграцията.",
           "migrate_envoy": "Поемете избрани идентификатори на енергийни обекти на Enphase Envoy, за да продължи историята в Home Assistant Energy под тази интеграция.",
-          "advanced": "Контроли за мрежов профил само за инсталатори."
+          "advanced": "Допълнителни контроли за режим на мрежата и контроли за мрежов профил само за инсталатори."
         },
         "data": {
           "type_envoy": "Шлюз",
@@ -503,11 +512,9 @@
           "slow_poll_interval": "Бавен интервал на опресняване (s)",
           "fast_while_streaming": "Предпочитай бързо опресняване при активен cloud stream",
           "api_timeout": "Изчакване на API (s)",
-          "nominal_voltage": "Номинално напрежение (V)",
+          "nominal_voltage": "Номинално напрежение на EV зарядното (V)",
           "session_history_interval": "Интервал на историята на сесиите (min)",
           "schedule_sync_enabled": "Активиране на EV Charger Scheduler",
-          "reauth": "Стартиране на повторна автентикация",
-          "forget_password": "Забрави запазената парола",
           "type_heatpump": "Термопомпа",
           "type_ac_battery": "AC батерия",
           "battery_schedules_enabled": "Активирайте програмата за планиране на батерията",
@@ -523,60 +530,130 @@
           "slow_poll_interval": "Интервал при неактивност.",
           "fast_while_streaming": "Когато е включено, бързо опресняване по време на активен cloud стрийм.",
           "api_timeout": "Секунди преди заявките към API да изтекат.",
-          "nominal_voltage": "Резервно напрежение за оценка на мощността на зарядното.",
+          "nominal_voltage": "Типично захранващо AC напрежение за оценка на мощността, когато няма данни за текущото напрежение.",
           "session_history_interval": "Минути за изчакване между извличанията на историята на сесиите в облака.",
-          "schedule_sync_enabled": "Управлявайте графици за зарядно за IQ EV",
-          "reauth": "Стартирайте процеса на вход за обновяване на данните без да премахвате интеграцията.",
-          "forget_password": "Премахва запазената парола. Автоматичното обновяване вече няма да се опитва.",
           "type_heatpump": "Включва сензори за състояние, диагностика и потребление на термопомпата.",
           "type_ac_battery": "Включва сензори за AC батерията и контроли за режим на заспиване, когато са налични.",
-          "battery_schedules_enabled": "Управлявайте графици за IQ батерия",
           "degraded_service_repair_issues": "Създава проблеми в Repairs, когато незадължителни услуги на Enphase са влошени.",
           "weather_enabled": "Извлича текущото време за обекта от Enphase и създава метеорологичен обект само когато крайната точка е достъпна."
         }
       },
       "settings": {
-        "title": "Опции Enphase Energy",
+        "title": "Опресняване",
         "description": "Настройка на опресняване и поведение.",
         "data": {
-          "type_envoy": "Шлюз",
-          "type_encharge": "Батерия",
-          "type_iqevse": "Зарядни",
-          "type_microinverter": "Микроинвертори",
           "fast_poll_interval": "Бърз интервал на опресняване (s)",
           "slow_poll_interval": "Бавен интервал на опресняване (s)",
           "fast_while_streaming": "Предпочитай бързо опресняване при активен cloud stream",
           "api_timeout": "Изчакване на API (s)",
-          "nominal_voltage": "Номинално напрежение (V)",
           "session_history_interval": "Интервал на историята на сесиите (min)",
-          "schedule_sync_enabled": "Активирайте поддръжката на Scheduler",
-          "reauth": "Стартиране на повторна автентикация",
-          "forget_password": "Забрави запазената парола",
-          "type_heatpump": "Термопомпа",
-          "type_ac_battery": "AC батерия",
-          "battery_schedules_enabled": "Активирайте програмата за планиране на батерията",
-          "degraded_service_repair_issues": "Активиране на поправки за влошени услуги",
-          "weather_enabled": "Активиране на времето"
+          "degraded_service_repair_issues": "Активиране на поправки за влошени услуги"
         },
         "data_description": {
-          "type_envoy": "Включва диагностика за свързаността на шлюза и електромерите.",
-          "type_encharge": "Включва състояние и управляващи обекти за батериите, когато са налични.",
-          "type_iqevse": "Включва обекти и управления за EV зарядни.",
-          "type_microinverter": "Включва сензори за свързаност на микроинверторите, активен брой и произведена енергия за целия период.",
           "fast_poll_interval": "Интервал при зареждане или стрийминг.",
           "slow_poll_interval": "Интервал при неактивност.",
           "fast_while_streaming": "Когато е включено, бързо опресняване по време на активен cloud стрийм.",
           "api_timeout": "Секунди преди заявките към API да изтекат.",
-          "nominal_voltage": "Резервно напрежение за оценка на мощността на зарядното.",
           "session_history_interval": "Минути за изчакване между извличанията на историята на сесиите в облака.",
-          "schedule_sync_enabled": "Управление на управлението на графика на Enphase",
-          "reauth": "Стартирайте процеса на вход за обновяване на данните без да премахвате интеграцията.",
-          "forget_password": "Премахва запазената парола. Автоматичното обновяване вече няма да се опитва.",
-          "type_heatpump": "Включва сензори за състояние, диагностика и потребление на термопомпата.",
+          "degraded_service_repair_issues": "Създава проблеми в Repairs, когато незадължителни услуги на Enphase са влошени."
+        }
+      },
+      "devices": {
+        "title": "Избор на устройства",
+        "description": "Изберете кои групи устройства да добавите. Всички избори споделят един и същ интервал на опресняване.",
+        "sections": {
+          "devices": {
+            "name": "Избор на устройства",
+            "data": {
+              "type_envoy": "Шлюз",
+              "type_encharge": "Батерия",
+              "type_ac_battery": "AC батерия",
+              "type_iqevse": "Зарядни",
+              "type_heatpump": "Термопомпа",
+              "type_microinverter": "Микроинвертори"
+            },
+            "data_description": {
+              "type_envoy": "Включва диагностика за свързаността на шлюза и електромерите.",
+              "type_encharge": "Включва състояние и управляващи обекти за батериите, когато са налични.",
+              "type_ac_battery": "Включва сензори за AC батерията и контроли за режим на заспиване, когато са налични.",
+              "type_iqevse": "Включва обекти и управления за EV зарядни.",
+              "type_heatpump": "Включва сензори за състояние, диагностика и потребление на термопомпата.",
+              "type_microinverter": "Включва сензори за свързаност на микроинверторите, активен брой и произведена енергия за целия период."
+            }
+          },
+          "device_features": {
+            "name": "Функции на устройствата",
+            "data": {
+              "schedule_sync_enabled": "Активирайте поддръжката на Scheduler",
+              "battery_schedules_enabled": "Активирайте програмата за планиране на батерията",
+              "system_event_repair_issues": "Активиране на известията за поправки при системни събития",
+              "pricing_edits_enabled": "Активиране на редактирането на цени",
+              "weather_enabled": "Активиране на времето",
+              "nominal_voltage": "Номинално напрежение на EV зарядното (V)"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Създава поправки в Home Assistant за активни постоянни аларми на Enphase. По подразбиране е изключено.",
+              "pricing_edits_enabled": "Управление на тарифите за електроенергия на IQ Gateway",
+              "weather_enabled": "Извлича текущото време за обекта от Enphase и създава метеорологичен обект само когато крайната точка е достъпна.",
+              "nominal_voltage": "Типично захранващо AC напрежение за оценка на мощността, когато няма данни за текущото напрежение.",
+              "schedule_sync_enabled": "Управлявайте графиците на IQ EV Charger.",
+              "battery_schedules_enabled": "Управлявайте графиците на IQ Battery."
+            }
+          }
+        },
+        "data": {
+          "devices": "Избор на устройства",
+          "device_features": "Функции на устройствата",
+          "type_envoy": "Шлюз",
+          "type_encharge": "Батерия",
+          "type_ac_battery": "AC батерия",
+          "type_iqevse": "Зарядни",
+          "type_heatpump": "Термопомпа",
+          "type_microinverter": "Микроинвертори",
+          "schedule_sync_enabled": "Активирайте поддръжката на Scheduler",
+          "battery_schedules_enabled": "Активирайте програмата за планиране на батерията",
+          "system_event_repair_issues": "Активиране на известията за поправки при системни събития",
+          "pricing_edits_enabled": "Активиране на редактирането на цени",
+          "weather_enabled": "Активиране на времето",
+          "nominal_voltage": "Номинално напрежение на EV зарядното (V)"
+        },
+        "data_description": {
+          "type_envoy": "Включва диагностика за свързаността на шлюза и електромерите.",
+          "type_encharge": "Включва състояние и управляващи обекти за батериите, когато са налични.",
           "type_ac_battery": "Включва сензори за AC батерията и контроли за режим на заспиване, когато са налични.",
-          "battery_schedules_enabled": "Управлявайте графици за IQ батерия",
+          "type_iqevse": "Включва обекти и управления за EV зарядни.",
+          "type_heatpump": "Включва сензори за състояние, диагностика и потребление на термопомпата.",
+          "type_microinverter": "Включва сензори за свързаност на микроинверторите, активен брой и произведена енергия за целия период.",
+          "system_event_repair_issues": "Създава поправки в Home Assistant за активни постоянни аларми на Enphase. По подразбиране е изключено.",
+          "pricing_edits_enabled": "Управление на тарифите за електроенергия на IQ Gateway",
+          "weather_enabled": "Извлича текущото време за обекта от Enphase и създава метеорологичен обект само когато крайната точка е достъпна.",
+          "nominal_voltage": "Типично захранващо AC напрежение за оценка на мощността, когато няма данни за текущото напрежение.",
+          "schedule_sync_enabled": "Управлявайте графиците на IQ EV Charger.",
+          "battery_schedules_enabled": "Управлявайте графиците на IQ Battery."
+        }
+      },
+      "repair_notifications": {
+        "title": "Известия",
+        "description": "Изберете кои условия на Enphase да създават поправки в Home Assistant.",
+        "data": {
+          "degraded_service_repair_issues": "Активиране на поправки за влошени услуги",
+          "system_event_repair_issues": "Активиране на известията за поправки при системни събития"
+        },
+        "data_description": {
           "degraded_service_repair_issues": "Създава проблеми в Repairs, когато незадължителни услуги на Enphase са влошени.",
-          "weather_enabled": "Извлича текущото време за обекта от Enphase и създава метеорологичен обект само когато крайната точка е достъпна."
+          "system_event_repair_issues": "Създава поправки в Home Assistant за активни постоянни аларми на Enphase. По подразбиране е изключено."
+        }
+      },
+      "authentication_settings": {
+        "title": "Удостоверяване",
+        "description": "Стартирайте процеса на вход за обновяване на данните без да премахвате интеграцията.",
+        "data": {
+          "reauth": "Стартиране на повторна автентикация",
+          "forget_password": "Забрави запазената парола"
+        },
+        "data_description": {
+          "reauth": "Стартирайте процеса на вход за обновяване на данните без да премахвате интеграцията.",
+          "forget_password": "Премахва запазената парола. Автоматичното обновяване вече няма да се опитва."
         }
       },
       "migrate_envoy_source": {
@@ -605,12 +682,12 @@
           "battery_discharge": "Разреждане на батерията"
         },
         "data_description": {
-          "solar_production": "Assign a cumulative production total to the Enphase Energy Site Solar Production sensor. Do not choose daily energy or live power.",
-          "consumption": "Assign a cumulative consumption total to the Enphase Energy Site Consumption sensor. Do not choose daily energy or live power.",
-          "grid_import": "Assign a cumulative grid import total to the Enphase Energy Site Grid Import sensor. Do not choose daily energy or live power.",
-          "grid_export": "Assign a cumulative grid export total to the Enphase Energy Site Grid Export sensor. Do not choose daily energy or live power.",
-          "battery_charge": "Assign a cumulative battery charge total to the Enphase Energy Site Battery Charge sensor. Do not choose daily energy or live power.",
-          "battery_discharge": "Assign a cumulative battery discharge total to the Enphase Energy Site Battery Discharge sensor. Do not choose daily energy or live power."
+          "solar_production": "Задайте натрупана обща стойност на сензора Соларно производство на обекта. Не избирайте дневна енергия или моментна мощност.",
+          "consumption": "Задайте натрупана обща стойност на сензора Потребление на обекта. Не избирайте дневна енергия или моментна мощност.",
+          "grid_import": "Задайте натрупана обща стойност на сензора Внос от мрежата на обекта. Не избирайте дневна енергия или моментна мощност.",
+          "grid_export": "Задайте натрупана обща стойност на сензора Износ към мрежата на обекта. Не избирайте дневна енергия или моментна мощност.",
+          "battery_charge": "Задайте натрупана обща стойност на сензора Зареждане на батерията на обекта. Не избирайте дневна енергия или моментна мощност.",
+          "battery_discharge": "Задайте натрупана обща стойност на сензора Разреждане на батерията на обекта. Не избирайте дневна енергия или моментна мощност."
         }
       },
       "migrate_envoy_confirm": {
@@ -625,15 +702,27 @@
         "title": "Разширени",
         "description": "Действия за инсталатор и поддръжка.",
         "menu_options": {
+          "grid_toggle": "Режим на мрежата",
           "grid_profile": "Управление на мрежов профил"
         },
         "menu_option_descriptions": {
+          "grid_toggle": "Настройване на ръчните контроли за режим на мрежата.",
           "grid_profile": "Преглед и прилагане на Activation мрежови профили само за инсталатори."
+        }
+      },
+      "grid_toggle": {
+        "title": "Режим на мрежата",
+        "description": "Наблюдението на режима на мрежата остава винаги достъпно. Ръчното превключване е свързано с безопасността, затова допълнителните обекти и действия изискват изрично разрешаване.",
+        "data": {
+          "grid_toggle_enabled": "Разрешаване на контролите за режим на мрежата"
+        },
+        "data_description": {
+          "grid_toggle_enabled": "Сензорът Режим на мрежата остава достъпен. Разрешаването създава Състояние на управлението на мрежата и Заявка за OTP и позволява сервизни действия."
         }
       },
       "grid_profile": {
         "title": "Управление на мрежов профил",
-        "description": "Филтрира каталога с Activation мрежови профили за държавата на този обект.",
+        "description": "Филтрира каталога с Activation мрежови профили за държавата на този обект.\n\nПРЕДУПРЕЖДЕНИЕ: ПРИЛАГАНЕТО НА НЕПРАВИЛЕН МРЕЖОВ ПРОФИЛ МОЖЕ ДА ДОВЕДЕ ДО НЕПРАВИЛНА РАБОТА НА СИСТЕМАТА.",
         "data": {
           "grid_profile_region": "Регион",
           "grid_profile_commonly_used": "Списък с профили"
@@ -991,6 +1080,9 @@
           },
           "metrics_available": {
             "name": "Налични показатели"
+          },
+          "endpoint_failure_details": {
+            "name": "Подробности за грешки в крайните точки"
           }
         }
       },
@@ -1287,7 +1379,7 @@
         }
       },
       "grid_mode": {
-        "name": "Режим на решетка",
+        "name": "Режим на мрежата",
         "state": {
           "on_grid": "В решетка",
           "off_grid": "Извън мрежата",
@@ -1556,7 +1648,7 @@
         "name": "Активни микроинвертори"
       },
       "inverter_telemetry": {
-        "name": "{serial_number} телеметрия"
+        "name": "{serial_number} мощност"
       },
       "microinverter_last_reported": {
         "name": "Последно отчитане на микроинвертори"
@@ -1660,9 +1752,9 @@
       "ac_battery_overall_status": {
         "name": "Общо състояние на AC батерията",
         "state": {
-          "charging": "Зареждане",
-          "discharging": "Разреждане",
-          "idle": "Неактивен",
+          "normal": "нормално",
+          "warning": "Предупреждение",
+          "error": "Грешка",
           "unknown": "Неизвестен"
         }
       },
@@ -1678,9 +1770,9 @@
       "ac_battery_storage_status": {
         "name": "Състояние на {serial}",
         "state": {
-          "charging": "Зареждане",
-          "discharging": "Разреждане",
-          "idle": "Неактивен",
+          "normal": "нормално",
+          "warning": "Предупреждение",
+          "error": "Грешка",
           "unknown": "Неизвестен"
         }
       },
@@ -2070,6 +2162,12 @@
           "high_impact_count": {
             "name": "Брой събития с голямо въздействие"
           },
+          "standing_alarm_count": {
+            "name": "Брой активни аларми"
+          },
+          "active_events": {
+            "name": "Активни събития"
+          },
           "severity_counts": {
             "name": "Брой по тежест"
           },
@@ -2324,7 +2422,7 @@
       "description": "Обект {site_id} изисква обновени заглавки на сесията. Моля, автентикирайте се отново."
     },
     "auth_blocked": {
-      "title": "Enphase Energy authentication temporarily blocked",
+      "title": "Удостоверяването на Enphase Energy е временно блокирано",
       "description": "Enphase изглежда временно блокира удостоверяването за сайт {site_id}. Автоматичните опити са паузирани до {blocked_until}. Успешно ръчно повторно удостоверяване може да изчисти блока по-рано."
     },
     "too_many_active_sessions": {
@@ -2997,10 +3095,6 @@
         "region_code": {
           "name": "Код на регион",
           "description": "Незадължителен код на регион/щат, например VIC."
-        },
-        "commonly_used": {
-          "name": "Само често използвани",
-          "description": "Връща каталога с често използвани профили, когато е включено."
         },
         "device_id": {
           "name": "Устройства на обекта",

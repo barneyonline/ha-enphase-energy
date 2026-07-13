@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import partial
 from typing import Any, Callable
+
+from .const import OPT_BATTERY_SCHEDULES_ENABLED
 
 CallbackFactory = Callable[[Any], object]
 BoundRefreshCall = tuple[str, str, Callable[[], object], str | None]
@@ -31,6 +34,7 @@ REFRESH_TASK_ENDPOINT_FAMILIES: dict[str, str] = {
 }
 
 WARMUP_STAGE_DEADLINE_S = 60.0
+STARTUP_POWER_DEADLINE_S = 55.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,6 +209,12 @@ WARMUP_STATE_STAGE = RefreshStage(
     stage_key="state",
     deadline_s=WARMUP_STAGE_DEADLINE_S,
     parallel_tasks=(
+        object_method_task(
+            "system_events_s",
+            "system events",
+            "system_events_runtime",
+            "async_refresh",
+        ),
         method_task(
             "battery_backup_history_s",
             "battery backup history",
@@ -270,6 +280,42 @@ WARMUP_STATE_STAGE = RefreshStage(
         ),
     ),
 )
+
+
+STARTUP_POWER_STAGE = RefreshStage(
+    stage_key="power",
+    deadline_s=STARTUP_POWER_DEADLINE_S,
+    parallel_tasks=(
+        method_task(
+            "current_power_s",
+            "current power consumption",
+            "_async_refresh_current_power_consumption",
+        ),
+        object_method_task(
+            "site_energy_s",
+            "site energy",
+            "refresh_runner",
+            "async_refresh_site_energy_for_warmup",
+        ),
+    ),
+)
+
+
+STARTUP_POWER_PLAN = RefreshPlan(stages=(STARTUP_POWER_STAGE,))
+
+STARTUP_CURRENT_POWER_STAGE = RefreshStage(
+    stage_key="power",
+    deadline_s=STARTUP_POWER_DEADLINE_S,
+    parallel_tasks=(
+        method_task(
+            "current_power_s",
+            "current power consumption",
+            "_async_refresh_current_power_consumption",
+        ),
+    ),
+)
+
+STARTUP_CURRENT_POWER_PLAN = RefreshPlan(stages=(STARTUP_CURRENT_POWER_STAGE,))
 
 SITE_ONLY_FOLLOWUP_STAGE = RefreshStage(
     defer_topology=True,
@@ -466,19 +512,128 @@ def warmup_energy_stage(working_data: dict[str, dict[str, object]]) -> RefreshSt
     )
 
 
-def warmup_plan(working_data: dict[str, dict[str, object]]) -> RefreshPlan:
+def _warmup_task_enabled(owner: object, task: RefreshTask) -> bool:
+    """Return whether a cold-start task is relevant to configured features."""
+
+    raw_selected = getattr(owner, "_selected_type_keys", None)
+    selected = (
+        {str(value).strip().lower() for value in raw_selected if str(value).strip()}
+        if isinstance(raw_selected, (set, list, tuple))
+        else None
+    )
+
+    def _selected(type_key: str) -> bool:
+        return selected is None or type_key in selected
+
+    battery = _selected("encharge")
+    evse = _selected("iqevse") and not bool(getattr(owner, "site_only", False))
+    gateway = _selected("envoy")
+    heatpump = _selected("heatpump")
+    microinverter = _selected("microinverter") and bool(
+        getattr(owner, "include_inverters", True)
+    )
+    entry = getattr(owner, "config_entry", None)
+    options = getattr(entry, "options", {}) if entry is not None else {}
+    battery_schedules = bool(
+        options.get(OPT_BATTERY_SCHEDULES_ENABLED, False)
+        if isinstance(options, Mapping)
+        else False
+    )
+
+    key = task.timing_key
+    if key in {
+        "battery_site_settings_s",
+        "battery_status_s",
+        "ac_battery_devices_s",
+        "ac_battery_telemetry_s",
+        "battery_backup_history_s",
+        "battery_settings_s",
+        "storm_guard_s",
+        "storm_alert_s",
+        "grid_control_check_s",
+        "grid_mode_status_s",
+        "grid_outage_context_s",
+    }:
+        return battery
+    if key == "battery_schedules_s":
+        return battery and battery_schedules
+    if key in {
+        "hems_devices_s",
+        "heatpump_runtime_s",
+        "heatpump_daily_s",
+        "heatpump_power_s",
+    }:
+        return heatpump
+    if key == "inverters_s":
+        return microinverter
+    if key in {
+        "evse_summary_s",
+        "evse_feature_flags_s",
+        "evse_timeseries_s",
+        "sessions_s",
+        "secondary_evse_state_s",
+    }:
+        return evse
+    if key in {"system_events_s", "tariff_s", "dry_contact_settings_s"}:
+        return gateway
+    if key in {"current_power_s", "site_energy_s"}:
+        return False
+    return True
+
+
+def _filter_warmup_stage(owner: object, stage: RefreshStage) -> RefreshStage | None:
+    parallel = tuple(
+        task for task in stage.parallel_tasks if _warmup_task_enabled(owner, task)
+    )
+    ordered = tuple(
+        task for task in stage.ordered_tasks if _warmup_task_enabled(owner, task)
+    )
+    if not parallel and not ordered:
+        return None
+    return RefreshStage(
+        parallel_tasks=parallel,
+        ordered_tasks=ordered,
+        stage_key=stage.stage_key,
+        defer_topology=stage.defer_topology,
+        deadline_s=stage.deadline_s,
+    )
+
+
+def warmup_plan(
+    working_data: dict[str, dict[str, object]],
+    *,
+    owner: object | None = None,
+) -> RefreshPlan:
+    discovery_stage = RefreshStage(
+        stage_key=WARMUP_DISCOVERY_STAGE.stage_key,
+        defer_topology=WARMUP_DISCOVERY_STAGE.defer_topology,
+        deadline_s=WARMUP_DISCOVERY_STAGE.deadline_s,
+        parallel_tasks=(
+            callback_task(
+                "evse_summary_s",
+                "EVSE summary",
+                lambda inner_owner: inner_owner.refresh_runner.async_refresh_evse_summary_for_warmup(
+                    working_data=working_data
+                ),
+            ),
+            *WARMUP_DISCOVERY_STAGE.parallel_tasks,
+        ),
+        ordered_tasks=WARMUP_DISCOVERY_STAGE.ordered_tasks,
+    )
     warmup_heatpump_stage = RefreshStage(
+        stage_key="heatpump",
         ordered_tasks=HEATPUMP_FOLLOWUP_STAGE.ordered_tasks,
         deadline_s=WARMUP_STAGE_DEADLINE_S,
     )
-    return RefreshPlan(
-        stages=(
-            WARMUP_DISCOVERY_STAGE,
-            WARMUP_STATE_STAGE,
-            warmup_heatpump_stage,
-            warmup_energy_stage(working_data),
-        )
+    stages = (
+        discovery_stage,
+        WARMUP_STATE_STAGE,
+        warmup_heatpump_stage,
+        warmup_energy_stage(working_data),
     )
+    if owner is None:
+        return RefreshPlan(stages=stages)
+    return _plan_from_stages(*(_filter_warmup_stage(owner, stage) for stage in stages))
 
 
 def post_session_followup_stage(day_local_default: object) -> RefreshStage:

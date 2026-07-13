@@ -7027,21 +7027,57 @@ async def test_opt_out_storm_alert_passes_payload_and_xsrf() -> None:
     }
     assert kwargs["headers"]["X-XSRF-Token"] == "xsrf-token"
     assert kwargs["headers"]["e-auth-token"] == token
-    assert "requestid" in kwargs["headers"]
-    assert "params" not in kwargs
+    assert kwargs["headers"]["Cookie"] == "XSRF-TOKEN=xsrf-token; other=1"
+    assert kwargs["headers"]["requestid"] is None
+    assert kwargs["use_cookie_header_only"] is True
+    assert kwargs["debug_battery_attempt_id"] == "storm_alert_cookie_eauth"
+    assert kwargs["params"] is None
 
 
 @pytest.mark.asyncio
 async def test_opt_out_storm_alert_handles_missing_xsrf() -> None:
     client = _make_client()
     client.update_credentials(cookie="cookie=1")
+    client._acquire_xsrf_token = AsyncMock(return_value=None)  # noqa: SLF001
     client._json = AsyncMock(return_value={"message": "success"})
 
     await client.opt_out_storm_alert(alert_id="IDV21037", name="Severe Weather")
 
     _args, kwargs = client._json.await_args
-    assert "X-XSRF-Token" not in kwargs["headers"]
+    assert kwargs["headers"].get("X-XSRF-Token") is None
     assert kwargs["headers"]["requestid"]
+
+
+@pytest.mark.asyncio
+async def test_opt_out_storm_alert_retries_403_with_lean_auth() -> None:
+    token = _make_token({"user_id": "99"})
+    client = _make_client()
+    client.update_credentials(eauth=token, cookie="other=1")
+
+    async def _acquire(*_args, **_kwargs):
+        client._bp_xsrf_token = "fresh-xsrf"  # noqa: SLF001
+        return "fresh-xsrf"
+
+    client._acquire_xsrf_token = AsyncMock(side_effect=_acquire)  # noqa: SLF001
+    client._json = AsyncMock(
+        side_effect=[_make_cre(403, "Forbidden"), {"message": "success"}]
+    )
+
+    out = await client.opt_out_storm_alert(
+        alert_id="IDV21037",
+        name="Severe Weather",
+    )
+
+    assert out == {"message": "success"}
+    assert client._json.await_count == 2
+    primary, lean = client._json.await_args_list
+    assert primary.kwargs["debug_battery_attempt_id"] == "storm_alert_primary"
+    assert lean.kwargs["debug_battery_attempt_id"] == "storm_alert_lean"
+    assert primary.kwargs["headers"]["X-XSRF-Token"] == "fresh-xsrf"
+    assert lean.kwargs["headers"]["X-XSRF-Token"] == "fresh-xsrf"
+    assert primary.kwargs["headers"]["e-auth-token"] == token
+    assert lean.kwargs["headers"]["e-auth-token"] is None
+    assert client._acquire_xsrf_token.await_count == 2  # noqa: SLF001
 
 
 @pytest.mark.asyncio
@@ -8492,6 +8528,95 @@ async def test_system_dashboard_events_rejects_invalid_shapes_and_unexpected_err
     client._json = AsyncMock(side_effect=RuntimeError("boom"))
     with pytest.raises(RuntimeError, match="boom"):
         await client.system_dashboard_events()
+
+
+@pytest.mark.asyncio
+async def test_system_dashboard_standing_alarms_uses_observed_query_and_headers() -> (
+    None
+):
+    client = _make_client()
+    client.update_credentials(
+        cookie="enlighten_manager_token_production=BEAR; XSRF-TOKEN=xsrf",
+        eauth="EAUTH",
+    )
+    client._json = AsyncMock(return_value={"alarms": []})
+
+    assert await client.system_dashboard_standing_alarms() == {
+        "alarms": [],
+        "_enphase_ev_truncated": False,
+    }
+
+    args, kwargs = client._json.await_args
+    assert args[0] == "GET"
+    url = URL(args[1])
+    assert url.path.endswith(
+        "/service/system_dashboard/api_internal/dashboard/sites/SITE/alarms"
+    )
+    assert dict(url.query) == {
+        "range": "today",
+        "filter_columns": "id,severity,type,serial_num,description,first_set",
+        "type": "table",
+        "page": "1",
+        "per_page": "200",
+    }
+    assert kwargs["headers"]["Authorization"] == "Bearer BEAR"
+    assert kwargs["headers"]["e-auth-token"] == "EAUTH"
+    assert kwargs["headers"]["X-CSRF-Token"] == "xsrf"
+
+
+@pytest.mark.asyncio
+async def test_system_dashboard_standing_alarms_paginates_and_is_bounded() -> None:
+    client = _make_client()
+    full_page = {"alarms": [{"id": str(index)} for index in range(200)]}
+    last_page = {"alarms": [{"id": "last"}]}
+    client._json = AsyncMock(side_effect=[full_page, last_page])
+
+    result = await client.system_dashboard_standing_alarms()
+
+    assert result is not None
+    assert len(result["alarms"]) == 201
+    assert result["alarms"][-1] == {"id": "last"}
+    assert result["_enphase_ev_truncated"] is False
+
+    client._json = AsyncMock(return_value=full_page)
+    result = await client.system_dashboard_standing_alarms()
+    assert result is not None
+    assert len(result["alarms"]) == 2_000
+    assert result["_enphase_ev_truncated"] is True
+    assert client._json.await_count == 10
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", [api.Unauthorized(), _make_cre(404)])
+async def test_system_dashboard_standing_alarms_optional_errors_return_none(
+    error,
+) -> None:
+    client = _make_client()
+    client._json = AsyncMock(side_effect=error)
+
+    assert await client.system_dashboard_standing_alarms() is None
+
+
+@pytest.mark.asyncio
+async def test_system_dashboard_standing_alarms_rejects_invalid_payloads() -> None:
+    client = _make_client()
+    client._json = AsyncMock(return_value=[])
+    assert await client.system_dashboard_standing_alarms() is None
+
+    client._json = AsyncMock(return_value={"alarms": "invalid"})
+    assert await client.system_dashboard_standing_alarms() is None
+
+    client._json = AsyncMock(
+        side_effect=[
+            {"alarms": [{"id": str(index)} for index in range(200)]},
+            {"alarms": "invalid"},
+        ]
+    )
+    assert await client.system_dashboard_standing_alarms() is None
+
+    client._json = AsyncMock(side_effect=RuntimeError("boom"))
+    with pytest.raises(RuntimeError, match="boom"):
+        await client.system_dashboard_standing_alarms()
 
 
 @pytest.mark.asyncio

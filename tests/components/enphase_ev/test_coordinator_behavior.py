@@ -4,7 +4,7 @@ import copy
 import time
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
 from zoneinfo import ZoneInfo
 
 import aiohttp
@@ -76,6 +76,9 @@ def _make_coordinator(hass, monkeypatch):
     )
     coord = EnphaseCoordinator(hass, cfg)
     coord.client.system_dashboard_events = AsyncMock(return_value={"events": []})
+    coord.client.system_dashboard_standing_alarms = AsyncMock(
+        return_value={"alarms": []}
+    )
     coord.client.storm_guard_profile = AsyncMock(return_value={"data": {}})
     coord.client.storm_guard_alert = AsyncMock(
         return_value={"criticalAlertActive": False, "stormAlerts": []}
@@ -1744,7 +1747,7 @@ async def test_site_only_clears_issues_and_counters(
 
 
 @pytest.mark.asyncio
-async def test_site_only_first_refresh_cancels_startup_followups_when_energy_fails(
+async def test_site_only_first_refresh_does_not_start_optional_followups_when_energy_fails(
     coordinator_factory,
 ) -> None:
     coord = coordinator_factory()
@@ -1752,20 +1755,13 @@ async def test_site_only_first_refresh_cancels_startup_followups_when_energy_fai
     coord.serials = set()
     coord._serial_order = []  # noqa: SLF001
     coord._has_successful_refresh = False  # noqa: SLF001
-    followup_cancelled = asyncio.Event()
+    coord._minimal_setup_refresh_active = True  # noqa: SLF001
 
     async def _fail_site_energy() -> None:
         await asyncio.sleep(0)
         raise RuntimeError("site energy failed")
 
-    async def _run_first_refresh_followups(_phase_timings) -> None:
-        try:
-            await asyncio.Event().wait()
-        except asyncio.CancelledError:
-            followup_cancelled.set()
-            raise
-
-    coord._async_run_first_refresh_followups = _run_first_refresh_followups  # type: ignore[method-assign]  # noqa: SLF001
+    coord._async_run_first_refresh_followups = AsyncMock()  # type: ignore[method-assign]  # noqa: SLF001
     coord.energy._async_refresh_site_energy = AsyncMock(  # noqa: SLF001
         side_effect=_fail_site_energy
     )
@@ -1773,7 +1769,7 @@ async def test_site_only_first_refresh_cancels_startup_followups_when_energy_fai
     with pytest.raises(RuntimeError, match="site energy failed"):
         await coord._async_update_data()  # noqa: SLF001
 
-    assert followup_cancelled.is_set()
+    coord._async_run_first_refresh_followups.assert_not_awaited()  # type: ignore[attr-defined]  # noqa: SLF001
 
 
 @pytest.mark.asyncio
@@ -2164,6 +2160,9 @@ def test_collect_site_metrics_and_placeholders(hass, monkeypatch):
     coord._dns_failures = 0
     coord._last_error = "unauthorized"
     coord._phase_timings = {"status_s": 0.5}
+    coord._setup_phase_timings = {"total_s": 0.75}
+    coord._setup_milestones = {"core_ready": 0.5}
+    coord._startup_power_phase_timings = {"power_s": 0.25}
     coord._last_refresh_cloud_calls = 3
     coord._last_steady_refresh_cloud_calls = 3
     coord._last_fast_refresh_cloud_calls = 7
@@ -2178,6 +2177,9 @@ def test_collect_site_metrics_and_placeholders(hass, monkeypatch):
     assert metrics["last_success"] == now.isoformat()
     assert metrics["backoff_active"] is True
     assert metrics["phase_timings"] == {"status_s": 0.5}
+    assert metrics["setup_phase_timings"] == {"total_s": 0.75}
+    assert metrics["setup_milestones"] == {"core_ready": 0.5}
+    assert metrics["startup_power_phase_timings"] == {"power_s": 0.25}
     assert metrics["refresh_performance"] == {
         "total_s": 0.123,
         "total_budget_s": 30.0,
@@ -3911,7 +3913,7 @@ async def test_refresh_topology_uses_fresh_status_serial_cache_before_data_assig
 
 
 @pytest.mark.asyncio
-async def test_first_refresh_runs_storm_guard_startup_calls_and_defers_warmup_only_calls(
+async def test_first_refresh_defers_all_optional_startup_calls(
     hass, monkeypatch, config_entry
 ) -> None:
     from custom_components.enphase_ev.coordinator import EnphaseCoordinator
@@ -3956,6 +3958,7 @@ async def test_first_refresh_runs_storm_guard_startup_calls_and_defers_warmup_on
 
     coord = EnphaseCoordinator(hass, cfg, config_entry=config_entry)
     coord.client = DummyClient()
+    coord._minimal_setup_refresh_active = True  # noqa: SLF001
 
     deferred_methods = {
         "_async_refresh_battery_site_settings": AsyncMock(),
@@ -4004,14 +4007,7 @@ async def test_first_refresh_runs_storm_guard_startup_calls_and_defers_warmup_on
 
     await coord.async_refresh()
 
-    deferred_methods["_async_refresh_battery_site_settings"].assert_awaited_once()
-    deferred_methods["_async_refresh_storm_guard_profile"].assert_awaited_once()
-    for name, mock in deferred_methods.items():
-        if name in {
-            "_async_refresh_battery_site_settings",
-            "_async_refresh_storm_guard_profile",
-        }:
-            continue
+    for mock in deferred_methods.values():
         mock.assert_not_awaited()
     coord.energy._async_refresh_site_energy.assert_not_awaited()
     coord.evse_timeseries.async_refresh.assert_not_awaited()
@@ -4021,16 +4017,13 @@ async def test_first_refresh_runs_storm_guard_startup_calls_and_defers_warmup_on
 
 
 @pytest.mark.asyncio
-async def test_first_refresh_overlaps_startup_followups_with_status(
+async def test_first_refresh_does_not_run_optional_followups_or_summary(
     hass, monkeypatch
 ) -> None:
     coord = _make_coordinator(hass, monkeypatch)
-    status_started = asyncio.Event()
-    followup_started = asyncio.Event()
+    coord._minimal_setup_refresh_active = True  # noqa: SLF001
 
     async def _status():
-        status_started.set()
-        await followup_started.wait()
         return {
             "evChargerData": [
                 {
@@ -4045,31 +4038,24 @@ async def test_first_refresh_overlaps_startup_followups_with_status(
             "ts": 1_700_000_000,
         }
 
-    async def _run_first_refresh_calls(phase_timings, *, calls, **_kwargs) -> None:
-        followup_started.set()
-        await status_started.wait()
-        for timing_key, *_rest in calls:
-            phase_timings[timing_key] = 0.001
-
     coord.client.status = AsyncMock(side_effect=_status)
     coord.client.summary_v2 = AsyncMock(
         return_value=[{"serialNumber": RANDOM_SERIAL, "displayName": "Garage EV"}]
     )
-    coord.refresh_runner.async_run_refresh_calls = AsyncMock(
-        side_effect=_run_first_refresh_calls
-    )
+    coord.refresh_runner.async_run_refresh_calls = AsyncMock()
 
     await asyncio.wait_for(coord.async_refresh(), timeout=1)
 
-    assert followup_started.is_set()
-    assert coord.refresh_runner.async_run_refresh_calls.await_count == 1
+    coord.refresh_runner.async_run_refresh_calls.assert_not_awaited()
+    coord.client.summary_v2.assert_not_awaited()
     assert "status_s" in coord.bootstrap_phase_timings
-    assert "battery_site_settings_s" in coord.bootstrap_phase_timings
+    assert coord.bootstrap_phase_timings["summary_s"] == 0.0
+    assert "battery_site_settings_s" not in coord.bootstrap_phase_timings
     assert "tariff_s" not in coord.bootstrap_phase_timings
 
 
 @pytest.mark.asyncio
-async def test_first_refresh_populates_storm_guard_state_before_entities(
+async def test_startup_warmup_populates_storm_guard_state_after_first_refresh(
     hass, monkeypatch, config_entry
 ) -> None:
     from custom_components.enphase_ev import coordinator as coord_mod
@@ -4132,13 +4118,78 @@ async def test_first_refresh_populates_storm_guard_state_before_entities(
 
     coord = EnphaseCoordinator(hass, cfg, config_entry=config_entry)
     coord.client = DummyClient()
+    coord._minimal_setup_refresh_active = True  # noqa: SLF001
     coord.tariff_runtime.async_refresh = AsyncMock()
 
     await coord.async_refresh()
 
-    assert coord.data[RANDOM_SERIAL]["storm_guard_state"] == "enabled"
-    assert coord.data[RANDOM_SERIAL]["storm_evse_enabled"] is True
+    assert coord.storm_guard_state is None
+    await coord.refresh_runner.async_startup_warmup_runner()
+
+    assert coord.storm_guard_state == "enabled"
+    assert coord.storm_evse_enabled is True
     assert StormGuardSwitch(coord).available is True
+
+
+def test_apply_warmup_evse_summary_updates_startup_critical_fields(
+    hass, monkeypatch
+) -> None:
+    coord = _make_coordinator(hass, monkeypatch)
+    coord.data = {
+        RANDOM_SERIAL: {
+            "charging_level": 16,
+            "min_amp": 6,
+            "lifetime_kwh": 10.0,
+        }
+    }
+    target = {RANDOM_SERIAL: dict(coord.data[RANDOM_SERIAL])}
+
+    coord.apply_warmup_evse_summary(
+        [
+            {"serialNumber": ""},
+            {
+                "serialNumber": RANDOM_SERIAL,
+                "chargeLevelDetails": {
+                    "max": "32",
+                    "granularity": "1",
+                    "defaultChargeLevel": "20",
+                },
+                "maxCurrent": "40",
+                "operatingVoltage": "230",
+                "displayName": "Garage EV",
+                "lastReportedAt": "2026-07-13T00:00:00Z",
+                "firmwareVersion": "1.2.3",
+                "processorBoardVersion": "A1",
+                "modelId": "IQ-EVSE",
+                "modelName": "IQ EV Charger",
+                "lifeTimeConsumption": 11.5,
+            },
+            {
+                "serialNumber": "NEW-EVSE",
+                "chargeLevelDetails": {"max": "16"},
+            },
+        ],
+        target,
+    )
+
+    payload = target[RANDOM_SERIAL]
+    assert payload["min_amp"] == 6
+    assert payload["max_amp"] == 32
+    assert payload["amp_granularity"] == 1
+    assert payload["default_charge_level"] == 20
+    assert payload["max_current"] == 40
+    assert payload["operating_v"] == 230
+    assert payload["display_name"] == "Garage EV"
+    assert payload["firmware_version"] == "1.2.3"
+    assert payload["sw_version"] == "1.2.3"
+    assert payload["hw_version"] == "A1"
+    assert payload["model_id"] == "IQ-EVSE"
+    assert payload["model_name"] == "IQ EV Charger"
+    assert payload["lifetime_kwh"] == 11.5
+    assert payload["charging_amps_supported"] is True
+    assert payload["derived_power_max_throughput_w"] == 3680
+    assert payload["derived_power_max_throughput_source"] == "charging_level"
+    assert target["NEW-EVSE"]["max_amp"] == 16
 
 
 def test_snapshot_helpers_and_discovery_capture_edge_paths(hass, monkeypatch) -> None:
@@ -4448,11 +4499,56 @@ async def test_discovery_snapshot_restore_save_and_metrics_edge_paths(
 
 
 @pytest.mark.asyncio
+async def test_startup_warmup_publishes_power_before_discovery(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    order: list[str] = []
+
+    async def _refresh_current_power() -> None:
+        order.append("current_power")
+        coord._current_power_consumption_w = 123.0  # noqa: SLF001
+
+    async def _refresh_site_energy() -> None:
+        order.append("site_energy")
+        coord.energy.site_energy = {"production": []}
+
+    async def _refresh_discovery() -> None:
+        order.append("discovery")
+
+    def _publish(_data) -> None:
+        order.append("publish")
+
+    coord._async_refresh_current_power_consumption = AsyncMock(  # noqa: SLF001
+        side_effect=_refresh_current_power
+    )
+    coord.energy._async_refresh_site_energy = AsyncMock(  # noqa: SLF001
+        side_effect=_refresh_site_energy
+    )
+    coord._async_refresh_battery_site_settings = AsyncMock(  # noqa: SLF001
+        side_effect=_refresh_discovery
+    )
+    coord.async_set_updated_data = Mock(side_effect=_publish)  # type: ignore[assignment]
+
+    await coord.refresh_runner.async_startup_warmup_runner()
+
+    first_publish = order.index("publish")
+    assert order.index("current_power") < first_publish
+    assert order.index("site_energy") < first_publish
+    assert first_publish < order.index("discovery")
+    assert coord.async_set_updated_data.call_count == 5  # type: ignore[attr-defined]
+    assert "power_s" in coord._warmup_phase_timings  # noqa: SLF001
+
+
+@pytest.mark.asyncio
 async def test_startup_warmup_runner_and_task_edge_paths(
     coordinator_factory, monkeypatch
 ) -> None:
     coord = coordinator_factory()
-    coord.async_set_updated_data = Mock(side_effect=RuntimeError("publish"))  # type: ignore[assignment]
+    coord._current_power_consumption_w = 1.0  # noqa: SLF001
+    coord.async_set_updated_data = Mock(  # type: ignore[assignment]
+        side_effect=[None, RuntimeError("publish")]
+    )
     coord.discovery_snapshot.schedule_save = Mock()  # type: ignore[assignment]
     coord._async_refresh_battery_site_settings = AsyncMock(  # type: ignore[assignment]  # noqa: SLF001
         return_value=None
@@ -4506,12 +4602,35 @@ async def test_startup_warmup_runner_and_task_edge_paths(
 
     await coord.refresh_runner.async_startup_warmup_runner()
 
-    coord.async_set_updated_data.assert_called_once_with({})  # type: ignore[attr-defined]
+    assert coord.async_set_updated_data.call_args_list == [call({})] * 5  # type: ignore[attr-defined]
     coord.discovery_snapshot.schedule_save.assert_called_once()  # type: ignore[attr-defined]
 
     coord = coordinator_factory(data={})
     coord.data = {}
     coord.energy.site_energy = {"production": []}
+    assert coord.refresh_runner._warmup_site_state_available() is True  # noqa: SLF001
+
+    coord = coordinator_factory(data={})
+    coord.data = {}
+    coord._current_power_consumption_w = 123.0  # noqa: SLF001
+    assert coord.refresh_runner._warmup_site_state_available() is True  # noqa: SLF001
+    coord._current_power_consumption_w = None  # noqa: SLF001
+    coord.system_events_runtime._last_success_utc = datetime.now(  # noqa: SLF001
+        timezone.utc
+    )
+    assert coord.refresh_runner._warmup_site_state_available() is True  # noqa: SLF001
+    coord.system_events_runtime._last_success_utc = None  # noqa: SLF001
+    coord.energy.site_energy = None
+    for attr in (
+        "tariff_billing",
+        "tariff_import_rate",
+        "tariff_export_rate",
+        "tariff_last_refresh_utc",
+        "tariff_rates_last_refresh_utc",
+    ):
+        setattr(coord, attr, None)
+    assert coord.refresh_runner._warmup_site_state_available() is False  # noqa: SLF001
+    coord.tariff_billing = {}
     assert coord.refresh_runner._warmup_site_state_available() is True  # noqa: SLF001
 
     coord = coordinator_factory()
@@ -4569,6 +4688,42 @@ async def test_startup_warmup_runner_and_task_edge_paths(
     assert create_calls == [f"{DOMAIN}_warmup_site", None]
     assert coord.site_id not in str(create_calls[0])
     assert coord._warmup_task == "task"  # noqa: SLF001
+
+    coord = coordinator_factory()
+    power_create_calls: list[object] = []
+
+    async def _power_runner() -> None:
+        return None
+
+    coord.refresh_runner._async_startup_power_runner_impl = _power_runner  # type: ignore[method-assign]  # noqa: SLF001
+
+    def _create_power_task(coro, name=None):
+        power_create_calls.append(name)
+        coro.close()
+        if name is not None:
+            raise TypeError("no name support")
+        return "power-task"
+
+    object.__setattr__(coord.hass, "async_create_background_task", _create_power_task)
+    await coord.refresh_runner.async_start_startup_power()
+    assert power_create_calls == [f"{DOMAIN}_startup_power", None]
+    assert coord._startup_power_task == "power-task"  # noqa: SLF001
+
+    coord = coordinator_factory()
+    failed_power = asyncio.get_running_loop().create_future()
+    failed_power.set_exception(RuntimeError("power failed"))
+    coord._startup_power_task = failed_power  # noqa: SLF001
+    coord.discovery_snapshot.schedule_save = Mock()  # type: ignore[assignment]
+    await coord.refresh_runner.async_startup_warmup_runner()
+    assert coord._warmup_last_error == "power failed"  # noqa: SLF001
+
+    coord = coordinator_factory()
+    cancelled_power = asyncio.get_running_loop().create_future()
+    cancelled_power.cancel()
+    coord._startup_power_task = cancelled_power  # noqa: SLF001
+    coord.discovery_snapshot.schedule_save = Mock()  # type: ignore[assignment]
+    with pytest.raises(asyncio.CancelledError):
+        await coord.refresh_runner.async_startup_warmup_runner()
 
 
 @pytest.mark.asyncio
@@ -5445,8 +5600,10 @@ async def test_summary_refresh_speed_up_when_charging(hass, monkeypatch):
     stub = StubClient()
     coord.client = stub
 
+    coord._minimal_setup_refresh_active = True  # noqa: SLF001
     await coord._async_update_data()
-    assert stub.summary_calls == 1
+    coord._minimal_setup_refresh_active = False  # noqa: SLF001
+    assert stub.summary_calls == 0
 
     current["value"] += 15.0
     await coord._async_update_data()
@@ -5454,11 +5611,11 @@ async def test_summary_refresh_speed_up_when_charging(hass, monkeypatch):
 
     current["value"] += 15.0
     await coord._async_update_data()
-    assert stub.summary_calls == 2
+    assert stub.summary_calls == 1
 
     current["value"] += 70.0
     await coord._async_update_data()
-    assert stub.summary_calls == 3
+    assert stub.summary_calls == 2
 
 
 @pytest.mark.asyncio
@@ -6140,6 +6297,7 @@ async def test_timeout_backoff_issue_recovery(hass, monkeypatch):
         CONF_SITE_ID,
         DEFAULT_SCAN_INTERVAL,
         ISSUE_NETWORK_UNREACHABLE,
+        OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
     )
     from custom_components.enphase_ev import coordinator as coord_mod
     from custom_components.enphase_ev.coordinator import EnphaseCoordinator
@@ -6154,7 +6312,7 @@ async def test_timeout_backoff_issue_recovery(hass, monkeypatch):
 
     class DummyEntry:
         def __init__(self):
-            self.options = {}
+            self.options = {OPT_DEGRADED_SERVICE_REPAIR_ISSUES: True}
 
         def async_on_unload(self, cb):
             return None

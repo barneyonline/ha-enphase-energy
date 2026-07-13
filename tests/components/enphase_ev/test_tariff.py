@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import date, datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import aiohttp
 import pytest
@@ -1600,6 +1601,8 @@ async def test_tariff_runtime_updates_single_rate_and_preserves_payload(
     coord.client.site_tariff_update = AsyncMock(return_value={"message": "success"})
     coord.client.notify_tariff_change = AsyncMock(return_value={"data": "ok"})
     coord.tariff_runtime.async_refresh = AsyncMock()
+    coord.tariff_runtime._schedule_post_write_reconciliation = Mock()  # noqa: SLF001
+    coord.tariff_runtime._publish_tariff_update = Mock()  # noqa: SLF001
     locator = TariffRateLocator(
         branch="purchase",
         kind="period",
@@ -1612,7 +1615,7 @@ async def test_tariff_runtime_updates_single_rate_and_preserves_payload(
         period_type="peak",
     )
 
-    out = await TariffRuntime(coord).async_set_tariff_rate(locator, 0.42)
+    out = await coord.tariff_runtime.async_set_tariff_rate(locator, 0.42)
 
     assert out == {"message": "success"}
     update_payload = coord.client.site_tariff_update.await_args.args[0]
@@ -1628,6 +1631,213 @@ async def test_tariff_runtime_updates_single_rate_and_preserves_payload(
     )
     coord.client.notify_tariff_change.assert_awaited_once_with()
     coord.tariff_runtime.async_refresh.assert_awaited_once_with(force=True)
+    coord.tariff_runtime._publish_tariff_update.assert_called_once_with()  # noqa: SLF001
+    coord.tariff_runtime._schedule_post_write_reconciliation.assert_called_once_with(  # noqa: SLF001
+        ()
+    )
+
+
+@pytest.mark.asyncio
+async def test_tariff_runtime_blocks_number_write_when_pricing_edits_disabled(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord._pricing_edits_enabled = False  # noqa: SLF001
+    coord.client.site_tariff = AsyncMock()
+    coord.client.site_tariff_update = AsyncMock()
+    coord.client.site_tariff_billing_update = AsyncMock()
+
+    with pytest.raises(ServiceValidationError) as err:
+        await TariffRuntime(coord).async_set_tariff_rate({}, 0.2)
+
+    assert err.value.translation_key == "pricing_edits_disabled"
+    coord.client.site_tariff.assert_not_awaited()
+    coord.client.site_tariff_update.assert_not_awaited()
+    coord.client.site_tariff_billing_update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_tariff_update_action_works_when_pricing_edits_disabled(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord._pricing_edits_enabled = False  # noqa: SLF001
+    coord.client.site_tariff = AsyncMock(return_value={"unknown": {"kept": True}})
+    coord.client.site_tariff_update = AsyncMock(return_value={"message": "success"})
+    coord.client.notify_tariff_change = AsyncMock(return_value={"data": "ok"})
+    runtime = TariffRuntime(coord)
+    runtime.async_refresh = AsyncMock()
+    runtime._schedule_post_write_reconciliation = Mock()  # noqa: SLF001
+    coord.tariff_runtime = runtime
+    purchase = {
+        "typeKind": "single",
+        "typeId": "flat",
+        "seasons": [
+            {
+                "id": "default",
+                "days": [
+                    {
+                        "id": "all",
+                        "periods": [{"id": "flat", "rate": "0.20"}],
+                    }
+                ],
+            }
+        ],
+    }
+
+    result = await runtime.async_update_tariff(purchase_tariff=purchase)
+
+    assert result["tariff"] == {"message": "success"}
+    coord.client.site_tariff_update.assert_awaited_once_with(
+        {"unknown": {"kept": True}, "purchase": purchase}
+    )
+    coord.client.notify_tariff_change.assert_awaited_once_with()
+    runtime.async_refresh.assert_awaited_once_with(force=True)
+
+
+def test_tariff_runtime_rate_signature_publish_and_task_cleanup(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.tariff_runtime
+    coord.tariff_import_rate = parse_tariff_rate(
+        {
+            "purchase": {
+                "typeKind": "single",
+                "typeId": "flat",
+                "seasons": [
+                    {
+                        "id": "default",
+                        "days": [
+                            {
+                                "id": "week",
+                                "periods": [{"id": "off-peak", "rate": "0.18"}],
+                            }
+                        ],
+                    }
+                ],
+            }
+        },
+        "purchase",
+    )
+
+    signature = runtime._rate_signature()  # noqa: SLF001
+    assert signature == (("purchase", "default_week_off_peak", 0.18),)
+
+    publish = Mock()
+    coord.async_set_updated_data = publish  # type: ignore[assignment]
+    coord.data = None
+    runtime._publish_tariff_update()  # noqa: SLF001
+    publish.assert_called_once_with({})
+
+    coord.async_set_updated_data = None  # type: ignore[assignment]
+    runtime._publish_tariff_update()  # noqa: SLF001
+
+    current_task = MagicMock()
+    runtime._post_write_reconcile_task = current_task  # type: ignore[assignment]  # noqa: SLF001
+    runtime._clear_post_write_reconcile_task(MagicMock())  # type: ignore[arg-type]  # noqa: SLF001
+    assert runtime._post_write_reconcile_task is current_task  # noqa: SLF001
+    runtime._clear_post_write_reconcile_task(current_task)  # type: ignore[arg-type]  # noqa: SLF001
+    assert runtime._post_write_reconcile_task is None  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_tariff_runtime_reconciles_lagging_post_write_read(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.tariff_runtime
+    monkeypatch.setattr(
+        tariff_mod,
+        "TARIFF_WRITE_RECONCILE_DELAYS_S",
+        (0.0, 0.0, 0.0),
+    )
+    runtime.async_refresh = AsyncMock()
+    runtime._publish_tariff_update = Mock()  # noqa: SLF001
+
+    await runtime._async_reconcile_after_write(())  # noqa: SLF001
+
+    assert runtime.async_refresh.await_count == 3
+    assert runtime._publish_tariff_update.call_count == 3  # noqa: SLF001
+
+    async def _refresh_changed_rate(*, force: bool = False) -> None:
+        assert force is True
+        coord.tariff_import_rate = parse_tariff_rate(
+            {
+                "purchase": {
+                    "typeKind": "single",
+                    "typeId": "flat",
+                    "seasons": [
+                        {
+                            "id": "default",
+                            "days": [
+                                {
+                                    "id": "week",
+                                    "periods": [{"id": "peak", "rate": "0.42"}],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            },
+            "purchase",
+        )
+
+    runtime.async_refresh = AsyncMock(side_effect=_refresh_changed_rate)
+    runtime._publish_tariff_update.reset_mock()  # noqa: SLF001
+
+    await runtime._async_reconcile_after_write(())  # noqa: SLF001
+
+    runtime.async_refresh.assert_awaited_once_with(force=True)
+    runtime._publish_tariff_update.assert_called_once_with()  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_tariff_runtime_reconciliation_handles_failure_and_cancellation(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.tariff_runtime
+    monkeypatch.setattr(tariff_mod, "TARIFF_WRITE_RECONCILE_DELAYS_S", (0.0,))
+    runtime._publish_tariff_update = Mock()  # noqa: SLF001
+    runtime.async_refresh = AsyncMock(side_effect=RuntimeError("boom"))
+
+    await runtime._async_reconcile_after_write(())  # noqa: SLF001
+
+    runtime._publish_tariff_update.assert_not_called()  # noqa: SLF001
+
+    runtime.async_refresh = AsyncMock(side_effect=asyncio.CancelledError())
+    with pytest.raises(asyncio.CancelledError):
+        await runtime._async_reconcile_after_write(())  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_tariff_runtime_schedules_and_replaces_reconciliation(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.tariff_runtime
+    runtime._async_reconcile_after_write = AsyncMock()  # type: ignore[method-assign]
+    previous_task = MagicMock(done=Mock(return_value=False))
+    runtime._post_write_reconcile_task = previous_task  # type: ignore[assignment]  # noqa: SLF001
+    coord.track_entry_background_task = MagicMock(
+        wraps=coord.track_entry_background_task
+    )
+
+    runtime._schedule_post_write_reconciliation(())  # noqa: SLF001
+    scheduled_task = runtime._post_write_reconcile_task  # noqa: SLF001
+    assert scheduled_task is not None
+    previous_task.cancel.assert_called_once_with()
+    coord.track_entry_background_task.assert_called_once_with(scheduled_task)
+    await scheduled_task
+    await asyncio.sleep(0)
+    assert runtime._post_write_reconcile_task is None  # noqa: SLF001
+
+    coord.track_entry_background_task = None  # type: ignore[assignment]
+    runtime._schedule_post_write_reconciliation(())  # noqa: SLF001
+    untracked_task = runtime._post_write_reconcile_task  # noqa: SLF001
+    assert untracked_task is not None
+    await untracked_task
 
 
 @pytest.mark.asyncio
@@ -1673,8 +1883,9 @@ async def test_tariff_runtime_batches_rate_updates_with_one_tariff_put(
     coord.client.site_tariff_update = AsyncMock(return_value={"message": "success"})
     coord.client.notify_tariff_change = AsyncMock(return_value={"data": "ok"})
     coord.tariff_runtime.async_refresh = AsyncMock()
+    coord.tariff_runtime._schedule_post_write_reconciliation = Mock()  # noqa: SLF001
 
-    out = await TariffRuntime(coord).async_update_tariff(
+    out = await coord.tariff_runtime.async_update_tariff(
         rate_updates=[
             {
                 "locator": {
@@ -1729,8 +1940,9 @@ async def test_tariff_runtime_updates_billing_only(coordinator_factory) -> None:
     )
     coord.client.notify_tariff_change = AsyncMock(return_value={"data": "ok"})
     coord.tariff_runtime.async_refresh = AsyncMock()
+    coord.tariff_runtime._schedule_post_write_reconciliation = Mock()  # noqa: SLF001
 
-    out = await TariffRuntime(coord).async_update_tariff(
+    out = await coord.tariff_runtime.async_update_tariff(
         billing={
             "billing_start_date": "2026-04-01",
             "billing_frequency": "DAY",
@@ -1748,6 +1960,7 @@ async def test_tariff_runtime_updates_billing_only(coordinator_factory) -> None:
     )
     coord.client.notify_tariff_change.assert_awaited_once_with()
     coord.tariff_runtime.async_refresh.assert_awaited_once_with(force=True)
+    coord.tariff_runtime._schedule_post_write_reconciliation.assert_not_called()  # noqa: SLF001
 
 
 @pytest.mark.asyncio
@@ -1767,8 +1980,9 @@ async def test_tariff_runtime_updates_billing_and_rates(coordinator_factory) -> 
     )
     coord.client.notify_tariff_change = AsyncMock(return_value={"data": "ok"})
     coord.tariff_runtime.async_refresh = AsyncMock()
+    coord.tariff_runtime._schedule_post_write_reconciliation = Mock()  # noqa: SLF001
 
-    await TariffRuntime(coord).async_update_tariff(
+    await coord.tariff_runtime.async_update_tariff(
         billing={
             "billing_start_date": "2026-04-01",
             "billing_frequency": "MONTH",
@@ -1832,6 +2046,7 @@ async def test_tariff_runtime_updates_structural_branches(coordinator_factory) -
     coord.client.site_tariff_update = AsyncMock(return_value={"message": "success"})
     coord.client.notify_tariff_change = AsyncMock(return_value={"data": "ok"})
     coord.tariff_runtime.async_refresh = AsyncMock()
+    coord.tariff_runtime._schedule_post_write_reconciliation = Mock()  # noqa: SLF001
     purchase = {
         "typeKind": "seasonal-and-weekends",
         "typeId": "tou",
@@ -1884,7 +2099,7 @@ async def test_tariff_runtime_updates_structural_branches(coordinator_factory) -
         ],
     }
 
-    out = await TariffRuntime(coord).async_update_tariff(
+    out = await coord.tariff_runtime.async_update_tariff(
         purchase_tariff=purchase,
         buyback_tariff=buyback,
     )
@@ -1908,6 +2123,7 @@ async def test_tariff_runtime_updates_full_structural_payload_and_rates(
     coord.client.site_tariff_update = AsyncMock(return_value={"message": "success"})
     coord.client.notify_tariff_change = AsyncMock(return_value={"data": "ok"})
     coord.tariff_runtime.async_refresh = AsyncMock()
+    coord.tariff_runtime._schedule_post_write_reconciliation = Mock()  # noqa: SLF001
     payload = {
         "site_id": 123,
         "currency": "$",
@@ -1932,7 +2148,7 @@ async def test_tariff_runtime_updates_full_structural_payload_and_rates(
         },
     }
 
-    await TariffRuntime(coord).async_update_tariff(
+    await coord.tariff_runtime.async_update_tariff(
         tariff_payload=payload,
         rate_updates=[
             {
@@ -2269,8 +2485,9 @@ async def test_tariff_runtime_updates_tiered_off_peak_and_ignores_notify_failure
         side_effect=aiohttp.ClientError("boom")
     )
     coord.tariff_runtime.async_refresh = AsyncMock()
+    coord.tariff_runtime._schedule_post_write_reconciliation = Mock()  # noqa: SLF001
 
-    await TariffRuntime(coord).async_set_tariff_rate(
+    await coord.tariff_runtime.async_set_tariff_rate(
         {
             "branch": "purchase",
             "kind": "off_peak",

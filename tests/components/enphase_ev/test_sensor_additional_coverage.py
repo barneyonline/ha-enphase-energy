@@ -1470,6 +1470,9 @@ def test_inverter_telemetry_sensor(coordinator_factory) -> None:
 
     assert entity.available is True
     assert entity.native_value == 234.5
+    assert entity.translation_key == "inverter_telemetry"
+    assert entity.translation_placeholders == {"serial_number": "INV-A"}
+    assert entity.entity_category is None
     assert entity.entity_registry_enabled_default is False
     assert entity.extra_state_attributes == {
         "power_w": 234.5,
@@ -5213,12 +5216,12 @@ def test_microinverter_snapshot_fallback_covers_bad_counts_and_missing_status_co
         type_bucket=lambda _type_key: {
             "count": BadInt(),
             "devices": [
-                {"serial_number": "INV-A"},
+                {"serial_number": "INV-A", "last_report": "invalid"},
                 {
                     "serial_number": "INV-B",
                     "name": "Inverter B",
                     "status": "warning",
-                    "last_report": "2026-02-15T11:00:00Z",
+                    "last_reported_at": "2026-02-15T11:00:00Z",
                 },
             ],
             "status_counts": {
@@ -5229,7 +5232,12 @@ def test_microinverter_snapshot_fallback_covers_bad_counts_and_missing_status_co
                 "not_reporting": 1,
                 "unknown": 2,
             },
-            "latest_reported_device": "bad",
+            "latest_reported_utc": "2026-02-15T07:00:00Z",
+            "latest_reported_device": {
+                "serial_number": "TOPOLOGY",
+                "name": "Topology summary",
+                "status": "normal",
+            },
             "connectivity_state": " ",
         },
     )
@@ -5243,6 +5251,7 @@ def test_microinverter_snapshot_fallback_covers_bad_counts_and_missing_status_co
         "name": "Inverter B",
         "status": "warning",
     }
+    assert snapshot["latest_reported_utc"] == "2026-02-15T11:00:00+00:00"
     assert snapshot["connectivity_state"] == "offline"
 
     missing_status_counts_coord = SimpleNamespace(
@@ -6008,6 +6017,15 @@ def test_site_service_status_sensor_reports_degraded_services(
     coord.collect_site_metrics = lambda: {
         "degraded_services": ["site_energy", "battery_status"],
         "degraded_endpoint_families": ["battery_status"],
+        "endpoint_failure_details": {
+            "battery_status": {
+                "reason": f"Site {coord.site_id} temporarily unavailable",
+                "retry_utc": "2026-07-12T01:02:03Z",
+            },
+            "invalid": "bad",
+            None: {"reason": "ignored"},
+            "missing_reason": {"retry_utc": "bad"},
+        },
     }
     sensor = EnphaseSiteServiceStatusSensor(coord)
 
@@ -6020,6 +6038,13 @@ def test_site_service_status_sensor_reports_degraded_services(
     assert attrs["degraded_service_count"] == 2
     assert attrs["degraded_endpoint_family_count"] == 1
     assert attrs["metrics_available"] is True
+    assert attrs["endpoint_failure_details"] == {
+        "battery_status": {
+            "reason": "Site [site] temporarily unavailable",
+            "retry_utc": "2026-07-12T01:02:03+00:00",
+        }
+    }
+    assert "endpoint_failure_details" in sensor._unrecorded_attributes  # noqa: SLF001
 
 
 def test_site_service_status_sensor_reports_unknown_for_invalid_metrics(
@@ -6046,12 +6071,18 @@ def test_site_service_status_sensor_reports_ok_without_degraded_services(
     coord.collect_site_metrics = lambda: {
         "degraded_services": [],
         "degraded_endpoint_families": None,
+        "endpoint_failure_details": {
+            "retry_invalid": {"reason": "failed", "retry_utc": "bad"}
+        },
     }
     sensor = EnphaseSiteServiceStatusSensor(coord)
 
     assert sensor.native_value == "ok"
     assert sensor.icon == "mdi:cloud-check"
     assert sensor.extra_state_attributes["degraded_services"] == []
+    assert sensor.extra_state_attributes["endpoint_failure_details"] == {
+        "retry_invalid": {"reason": "failed", "retry_utc": None}
+    }
 
 
 def test_site_service_status_sensor_handles_metrics_errors(
@@ -6604,6 +6635,49 @@ async def test_async_setup_entry_prunes_stale_heatpump_site_entities_when_unavai
     await async_setup_entry(hass, config_entry, lambda *_args, **_kwargs: None)
 
     assert ent_reg.async_get(entity_id) is None
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_keeps_grid_mode_when_controls_disabled(
+    hass, config_entry, coordinator_factory
+) -> None:
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.enphase_ev.const import DOMAIN
+    from custom_components.enphase_ev.sensor import (
+        EnphaseGridControlStatusSensor,
+        EnphaseGridModeSensor,
+        async_setup_entry,
+    )
+
+    coord = coordinator_factory(serials=[])
+    coord._grid_toggle_enabled = False  # noqa: SLF001
+    coord._devices_inventory_ready = False  # noqa: SLF001
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    ent_reg = er.async_get(hass)
+    entity_ids = [
+        ent_reg.async_get_or_create(
+            "sensor",
+            DOMAIN,
+            f"{DOMAIN}_site_{coord.site_id}_{key}",
+            config_entry=config_entry,
+        ).entity_id
+        for key in ("grid_mode", "grid_control_status")
+    ]
+    added: list[Any] = []
+
+    await async_setup_entry(
+        hass,
+        config_entry,
+        lambda entities, update_before_add=False: added.extend(entities),
+    )
+
+    assert ent_reg.async_get(entity_ids[0]) is not None
+    assert ent_reg.async_get(entity_ids[1]) is None
+    assert any(isinstance(entity, EnphaseGridModeSensor) for entity in added)
+    assert not any(
+        isinstance(entity, EnphaseGridControlStatusSensor) for entity in added
+    )
 
 
 @pytest.mark.asyncio

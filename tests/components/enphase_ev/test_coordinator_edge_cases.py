@@ -2182,9 +2182,16 @@ async def test_async_update_data_login_wall_during_refresh_cooldown_blocks(
 async def test_handle_client_unauthorized_refreshes_tokens(monkeypatch, hass):
     from custom_components.enphase_ev import coordinator_diagnostics as diag_mod
     from custom_components.enphase_ev.coordinator import EnphaseCoordinator
+    from custom_components.enphase_ev.const import (
+        OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
+    )
 
     coord = _attach_evse_runtime(EnphaseCoordinator.__new__(EnphaseCoordinator))
     coord.hass = hass
+    coord.config_entry = SimpleNamespace(
+        entry_id=None,
+        options={OPT_DEGRADED_SERVICE_REPAIR_ISSUES: True},
+    )
     coord._unauth_errors = 0
     coord._last_error = None
     coord._attempt_auto_refresh = AsyncMock(return_value=True)

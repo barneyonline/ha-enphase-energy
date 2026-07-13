@@ -1604,6 +1604,7 @@ def test_grid_control_status_sensor_states_and_attributes():
         site_id="site",
         battery_has_encharge=True,
         has_type=lambda key: key in ("envoy", "enpower"),
+        grid_toggle_enabled=True,
         grid_control_supported=True,
         grid_toggle_pending=False,
         grid_toggle_allowed=True,
@@ -1652,6 +1653,8 @@ def test_grid_control_status_sensor_states_and_attributes():
     coord.grid_control_supported = False
     assert sensor.native_value is None
     assert sensor.icon == "mdi:transmission-tower"
+    coord.grid_toggle_enabled = False
+    assert sensor.available is False
 
 
 def test_grid_control_status_sensor_unavailable_when_no_system_or_gateway_type():
@@ -1663,6 +1666,7 @@ def test_grid_control_status_sensor_unavailable_when_no_system_or_gateway_type()
         site_id="site",
         battery_has_encharge=True,
         has_type=lambda _key: False,
+        grid_toggle_enabled=True,
         grid_control_supported=True,
         grid_toggle_pending=False,
         grid_toggle_allowed=True,
@@ -1688,6 +1692,7 @@ def test_grid_control_status_sensor_unavailable_when_site_not_battery_capable():
         battery_has_encharge=False,
         battery_has_enpower=False,
         has_type=lambda key: key == "envoy",
+        grid_toggle_enabled=True,
         grid_control_supported=True,
         grid_toggle_pending=False,
         grid_toggle_allowed=True,
@@ -1713,6 +1718,7 @@ def test_grid_control_status_sensor_unavailable_when_battery_unknown_gateway_onl
         battery_has_encharge=None,
         battery_has_enpower=None,
         has_type=lambda key: key == "envoy",
+        grid_toggle_enabled=True,
         grid_control_supported=True,
         grid_toggle_pending=False,
         grid_toggle_allowed=True,
@@ -1740,6 +1746,7 @@ def test_grid_control_status_sensor_available_when_inventory_readiness_unknown()
         battery_has_enpower=None,
         has_type=lambda _key: False,
         has_type_for_entities=lambda key: key in ("envoy", "enpower", "encharge"),
+        grid_toggle_enabled=True,
         grid_control_supported=True,
         grid_toggle_pending=False,
         grid_toggle_allowed=True,
@@ -1777,6 +1784,7 @@ def test_grid_mode_sensor_states_and_attributes():
         grid_outage_show_grid_connect=True,
         grid_outage_has_battery=True,
         grid_outage_is_sunlight_backup=False,
+        grid_toggle_enabled=True,
         grid_control_supported=True,
         grid_toggle_allowed=True,
         last_success_utc=None,
@@ -1810,6 +1818,8 @@ def test_grid_mode_sensor_states_and_attributes():
     coord.last_success_utc = datetime(2026, 2, 15, 5, 31, 33, tzinfo=timezone.utc)
     coord.last_update_success = False
     assert sensor.available is True
+    coord.grid_toggle_enabled = False
+    assert sensor.available is True
 
 
 def test_grid_mode_sensor_unavailable_without_supported_types():
@@ -1831,6 +1841,7 @@ def test_grid_mode_sensor_unavailable_without_supported_types():
         grid_outage_show_grid_connect=True,
         grid_outage_has_battery=True,
         grid_outage_is_sunlight_backup=False,
+        grid_toggle_enabled=True,
         grid_control_supported=True,
         grid_toggle_allowed=True,
         last_success_utc=None,
@@ -1859,6 +1870,7 @@ def test_grid_mode_sensor_unavailable_when_site_not_battery_capable():
         grid_outage_show_grid_connect=True,
         grid_outage_has_battery=True,
         grid_outage_is_sunlight_backup=False,
+        grid_toggle_enabled=True,
         grid_control_supported=True,
         grid_toggle_allowed=True,
         last_success_utc=None,

@@ -747,6 +747,65 @@ async def test_battery_schedule_platform_setup_adds_editor_entities(
 
 
 @pytest.mark.asyncio
+async def test_sensor_setup_removes_schedule_sensors_when_scheduler_disabled(
+    hass, config_entry, coordinator_factory
+) -> None:
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.enphase_ev.sensor import (
+        EnphaseBatteryCfgScheduleStatusSensor,
+        EnphaseBatteryScheduleModeSensor,
+        async_setup_entry,
+    )
+
+    coord = coordinator_factory()
+    _prepare_battery_schedule_coord(coord)
+    coord._devices_inventory_ready = False  # noqa: SLF001
+    object.__setattr__(
+        config_entry,
+        "options",
+        {OPT_BATTERY_SCHEDULES_ENABLED: False},
+    )
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    ent_reg = er.async_get(hass)
+    unique_ids = [
+        f"{DOMAIN}_site_{coord.site_id}_{key}"
+        for key in (
+            "battery_cfg_schedule_status",
+            "battery_schedule_summary",
+            "battery_cfg_schedules",
+            "battery_dtg_schedules",
+            "battery_rbd_schedules",
+        )
+    ]
+    entity_ids = [
+        ent_reg.async_get_or_create(
+            "sensor",
+            DOMAIN,
+            unique_id,
+            config_entry=config_entry,
+        ).entity_id
+        for unique_id in unique_ids
+    ]
+    added: list[object] = []
+
+    await async_setup_entry(
+        hass,
+        config_entry,
+        lambda entities, update_before_add=False: added.extend(entities),
+    )
+
+    assert all(ent_reg.async_get(entity_id) is None for entity_id in entity_ids)
+    assert not any(
+        isinstance(
+            entity,
+            (EnphaseBatteryCfgScheduleStatusSensor, EnphaseBatteryScheduleModeSensor),
+        )
+        for entity in added
+    )
+
+
+@pytest.mark.asyncio
 async def test_battery_schedule_platform_setup_skips_write_editor_when_crud_missing(
     hass, config_entry, coordinator_factory, monkeypatch
 ) -> None:

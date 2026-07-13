@@ -8,7 +8,10 @@ import pytest
 from custom_components.enphase_ev.battery_schedule_editor import (
     BatteryScheduleEditorManager,
 )
-from custom_components.enphase_ev.const import OPT_BATTERY_SCHEDULES_ENABLED
+from custom_components.enphase_ev.const import (
+    OPT_BATTERY_SCHEDULES_ENABLED,
+    OPT_PRICING_EDITS_ENABLED,
+)
 from custom_components.enphase_ev.number import (
     BatteryReserveNumber,
     BatteryScheduleEditLimitNumber,
@@ -987,7 +990,65 @@ async def test_tariff_rate_numbers_are_created_and_stale_entries_pruned(
 
 
 @pytest.mark.asyncio
-async def test_tariff_rate_number_registry_is_kept_when_loaded_spec_disappears(
+async def test_pricing_edits_disabled_removes_tariff_numbers_before_inventory_ready(
+    hass, config_entry
+) -> None:
+    from homeassistant.helpers import entity_registry as er
+
+    object.__setattr__(
+        config_entry,
+        "options",
+        {OPT_PRICING_EDITS_ENABLED: False},
+    )
+    coord = _make_coordinator(hass, config_entry, {})
+    coord._devices_inventory_ready = False  # noqa: SLF001
+    coord.tariff_import_rate = parse_tariff_rate(
+        {
+            "purchase": {
+                "typeKind": "single",
+                "typeId": "flat",
+                "seasons": [
+                    {
+                        "id": "default",
+                        "days": [
+                            {
+                                "id": "week",
+                                "periods": [{"id": "off-peak", "rate": "0.18"}],
+                            }
+                        ],
+                    }
+                ],
+            }
+        },
+        "purchase",
+    )
+    spec = tariff_rate_sensor_specs(coord.tariff_import_rate)[0]
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    ent_reg = er.async_get(hass)
+    unique_id = (
+        f"enphase_ev_site_{coord.site_id}"
+        "_tariff_import_rate_default_week_off_peak_number"
+    )
+    ent_reg.async_get_or_create(
+        "number",
+        "enphase_ev",
+        unique_id,
+        config_entry=config_entry,
+    )
+    added = []
+
+    await async_setup_entry(
+        hass, config_entry, lambda entities, **_: added.extend(entities)
+    )
+
+    assert coord.pricing_edits_enabled is False
+    assert not any(isinstance(entity, EnphaseTariffRateNumber) for entity in added)
+    assert ent_reg.async_get_entity_id("number", "enphase_ev", unique_id) is None
+    assert EnphaseTariffRateNumber(coord, spec, is_import=True).available is False
+
+
+@pytest.mark.asyncio
+async def test_tariff_rate_number_is_removed_when_loaded_spec_disappears(
     hass, config_entry, monkeypatch
 ) -> None:
     payload = {
@@ -1036,19 +1097,27 @@ async def test_tariff_rate_number_registry_is_kept_when_loaded_spec_disappears(
         isinstance(entity, EnphaseTariffRateNumber) and entity.unique_id == unique_id
         for entity in added
     )
+    loaded_entity = next(
+        entity
+        for entity in added
+        if isinstance(entity, EnphaseTariffRateNumber) and entity.unique_id == unique_id
+    )
+    loaded_entity.async_remove = AsyncMock()  # type: ignore[method-assign]
 
     added.clear()
     prune_spy.reset_mock()
     coord.tariff_import_rate = None
     listener_callbacks[0]()
+    await hass.async_block_till_done()
 
     active_unique_ids = prune_spy.call_args.kwargs["active_unique_ids"]
-    assert unique_id in active_unique_ids
+    assert unique_id not in active_unique_ids
+    loaded_entity.async_remove.assert_awaited_once_with(force_remove=True)  # type: ignore[attr-defined]
 
     prune_spy.reset_mock()
     coord.tariff_import_rate = parse_tariff_rate(payload, "purchase")
     listener_callbacks[0]()
 
-    assert not any(isinstance(entity, EnphaseTariffRateNumber) for entity in added)
+    assert any(isinstance(entity, EnphaseTariffRateNumber) for entity in added)
     active_unique_ids = prune_spy.call_args.kwargs["active_unique_ids"]
     assert unique_id in active_unique_ids

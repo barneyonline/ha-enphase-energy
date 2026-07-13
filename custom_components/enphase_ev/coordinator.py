@@ -85,6 +85,7 @@ from .const import (
     CONF_TOKEN_EXPIRES_AT,
     DEFAULT_API_TIMEOUT,
     DEFAULT_FAST_POLL_INTERVAL,
+    DEFAULT_PRICING_EDITS_ENABLED,
     DEFAULT_SCAN_INTERVAL,
     MAX_API_TIMEOUT,
     MAX_POLL_INTERVAL,
@@ -104,7 +105,9 @@ from .const import (
     HEMS_AUTH_MANUAL_CLEAR_COOLDOWN_S,
     OPT_API_TIMEOUT,
     OPT_FAST_POLL_INTERVAL,
+    OPT_GRID_TOGGLE_ENABLED,
     OPT_NOMINAL_VOLTAGE,
+    OPT_PRICING_EDITS_ENABLED,
     OPT_SLOW_POLL_INTERVAL,
     OPT_SESSION_HISTORY_INTERVAL,
     PHASE_SWITCH_CONFIG_SETTING,
@@ -506,6 +509,7 @@ class RefreshPipelineContext:
     phase_timings: dict[str, float]
     fallback_data: dict[str, dict[str, object]]
     first_refresh: bool
+    minimal_setup_refresh: bool = False
     first_refresh_followups_task: asyncio.Task[None] | None = None
     auth_refresh_rejected_count_at_start: int = 0
     status_used_stale: bool = False
@@ -582,6 +586,15 @@ class EnphaseCoordinator(
     ) -> None:
         self.hass = hass
         self.config_entry = config_entry
+        self._grid_toggle_enabled = bool(
+            config_entry and config_entry.options.get(OPT_GRID_TOGGLE_ENABLED, False)
+        )
+        self._pricing_edits_enabled = bool(
+            config_entry is None
+            or config_entry.options.get(
+                OPT_PRICING_EDITS_ENABLED, DEFAULT_PRICING_EDITS_ENABLED
+            )
+        )
         self.site_id = str(config[CONF_SITE_ID])
         raw_serials = config.get(CONF_SERIALS) or []
         self.serials: set[str] = set()
@@ -1479,6 +1492,21 @@ class EnphaseCoordinator(
         return dict(getattr(self, "_warmup_phase_timings", {}) or {})
 
     @property
+    def startup_power_phase_timings(self) -> dict[str, float]:
+        """Return startup power acquisition timings."""
+        return dict(getattr(self, "_startup_power_phase_timings", {}) or {})
+
+    @property
+    def setup_phase_timings(self) -> dict[str, float]:
+        """Return full config-entry setup phase timings."""
+        return dict(getattr(self, "_setup_phase_timings", {}) or {})
+
+    @property
+    def setup_milestones(self) -> dict[str, float]:
+        """Return elapsed startup milestone times."""
+        return dict(getattr(self, "_setup_milestones", {}) or {})
+
+    @property
     def _summary_cache(
         self,
     ) -> tuple[float, list[dict[str, object]], float] | None:
@@ -1736,6 +1764,7 @@ class EnphaseCoordinator(
                 cancelled_tasks.append(task)
         if entry_background_tasks is not None:
             entry_background_tasks.clear()
+        self._startup_power_task = None
         grid_profile_metadata_task = getattr(self, "_grid_profile_metadata_task", None)
         if grid_profile_metadata_task is not None:
             if not _task_done(grid_profile_metadata_task):
@@ -2971,6 +3000,9 @@ class EnphaseCoordinator(
             phase_timings={},
             fallback_data=fallback_data,
             first_refresh=not self._has_successful_refresh,
+            minimal_setup_refresh=bool(
+                getattr(self, "_minimal_setup_refresh_active", False)
+            ),
             auth_refresh_rejected_count_at_start=int(
                 getattr(self, "_auth_refresh_rejected_count", 0)
             ),
@@ -2998,7 +3030,7 @@ class EnphaseCoordinator(
         self._last_error = None
         self.backoff_ends_utc = None
         self._has_successful_refresh = True
-        if context.first_refresh:
+        if context.first_refresh and not context.minimal_setup_refresh:
             self._start_first_refresh_followups(context)
         site_energy_start = time.monotonic()
         try:
@@ -3009,9 +3041,9 @@ class EnphaseCoordinator(
         self.discovery_snapshot.sync_site_energy_discovery_state()
         self._sync_site_energy_issue()
         phase_timings["site_energy_s"] = round(time.monotonic() - site_energy_start, 3)
-        if context.first_refresh:
+        if context.first_refresh and not context.minimal_setup_refresh:
             await self._async_await_first_refresh_followups(context)
-        else:
+        elif not context.first_refresh:
             followup_plan = build_site_only_followup_plan(
                 self,
                 force_full=self.endpoint_manual_bypass_active(),
@@ -3063,9 +3095,9 @@ class EnphaseCoordinator(
         self,
         context: RefreshPipelineContext,
     ) -> None:
-        if context.first_refresh:
+        if context.first_refresh and not context.minimal_setup_refresh:
             await self._async_await_first_refresh_followups(context)
-        else:
+        elif not context.first_refresh:
             followup_plan = build_followup_plan(
                 self,
                 force_full=self.endpoint_manual_bypass_active(),
@@ -3276,6 +3308,90 @@ class EnphaseCoordinator(
                 return True
         return False
 
+    def apply_warmup_evse_summary(
+        self,
+        summary: list[dict[str, Any]],
+        target: dict[str, dict[str, object]],
+    ) -> None:
+        """Apply startup-critical summary fields without another status request."""
+
+        previous = self.data if isinstance(self.data, dict) else {}
+        for item in summary:
+            serial = str(item.get("serialNumber") or "").strip()
+            if not serial:
+                continue
+            self._ensure_serial_tracked(serial)
+            current = target.setdefault(serial, {})
+            previous_entry = previous.get(serial)
+            if not isinstance(previous_entry, dict):
+                previous_entry = None
+            charge_details = item.get("chargeLevelDetails")
+            if not isinstance(charge_details, dict):
+                charge_details = {}
+            for source, destination in (
+                ("min", "min_amp"),
+                ("max", "max_amp"),
+                ("granularity", "amp_granularity"),
+                ("defaultChargeLevel", "default_charge_level"),
+            ):
+                value = _coerce_intish(charge_details.get(source))
+                if value is None and previous_entry is not None:
+                    value = _coerce_intish(previous_entry.get(destination))
+                if value is not None:
+                    current[destination] = value
+            max_current = _coerce_intish(item.get("maxCurrent"))
+            if max_current is None and previous_entry is not None:
+                max_current = _coerce_intish(previous_entry.get("max_current"))
+            if max_current is not None:
+                current["max_current"] = max_current
+            if any(
+                current.get(key) is not None
+                for key in (
+                    "charging_level",
+                    "min_amp",
+                    "max_amp",
+                    "max_current",
+                    "amp_granularity",
+                )
+            ):
+                current["charging_amps_supported"] = True
+                current["charging_amps_supported_source"] = "runtime"
+            operating_voltage = _coerce_intish(item.get("operatingVoltage"))
+            if operating_voltage is not None:
+                self._operating_v[serial] = operating_voltage
+                current["operating_v"] = operating_voltage
+            for source, destination in (
+                ("displayName", "display_name"),
+                ("lastReportedAt", "last_reported_at"),
+                ("firmwareVersion", "firmware_version"),
+                ("firmwareVersion", "sw_version"),
+                ("processorBoardVersion", "hw_version"),
+                ("modelId", "model_id"),
+                ("modelName", "model_name"),
+            ):
+                value = item.get(source)
+                if value is not None:
+                    current[destination] = value
+            lifetime = item.get("lifeTimeConsumption")
+            if lifetime is not None:
+                filtered = self.energy._apply_lifetime_guard(
+                    serial,
+                    lifetime,
+                    previous_entry,
+                )
+                if filtered is not None:
+                    current["lifetime_kwh"] = filtered
+            current.setdefault("nominal_v", self._nominal_v)
+            snapshot = build_evse_power_snapshot(
+                current,
+                previous_entry,
+                self.evse_state._evse_power_snapshots.get(serial, {}),
+                self.nominal_voltage,
+            )
+            self.evse_state._evse_power_snapshots[serial] = snapshot
+            current.update(snapshot)
+        self._seed_nominal_voltage_option_from_api()
+
     def _record_refresh_pipeline_performance(
         self,
         context: RefreshPipelineContext,
@@ -3425,7 +3541,7 @@ class EnphaseCoordinator(
                 retry_after=retry_after,
             )
 
-        if first_refresh:
+        if first_refresh and not context.minimal_setup_refresh:
             self._start_first_refresh_followups(context)
         status_refresh_succeeded = False
         status_charger_data_authoritative = False
@@ -4241,17 +4357,23 @@ class EnphaseCoordinator(
 
         polling_state = self._determine_polling_state(out)
         context.fast_poll = bool(polling_state["want_fast"])
-        summary_force = self.summary.prepare_refresh(
-            want_fast=bool(polling_state["want_fast"]),
-            target_interval=float(str(polling_state["target"])),
-        )
-        if not summary_force and self._summary_refresh_needed_for_amp_bounds(out):
-            summary_force = True
 
-        # Enrich with summary v2 data
-        summary_start = time.monotonic()
-        summary = await self.summary.async_fetch(force=summary_force)
-        phase_timings["summary_s"] = round(time.monotonic() - summary_start, 3)
+        # Summary enrichment is optional on the first refresh. The startup warmup
+        # applies it after entities are forwarded, avoiding a second serial cloud
+        # request wave on the config-entry critical path.
+        if first_refresh and context.minimal_setup_refresh:
+            summary = []
+            phase_timings["summary_s"] = 0.0
+        else:
+            summary_force = self.summary.prepare_refresh(
+                want_fast=bool(polling_state["want_fast"]),
+                target_interval=float(str(polling_state["target"])),
+            )
+            if not summary_force and self._summary_refresh_needed_for_amp_bounds(out):
+                summary_force = True
+            summary_start = time.monotonic()
+            summary = await self.summary.async_fetch(force=summary_force)
+            phase_timings["summary_s"] = round(time.monotonic() - summary_start, 3)
         if summary:
             for item in summary:
                 sn = str(item.get("serialNumber") or "")
@@ -6777,10 +6899,26 @@ class EnphaseCoordinator(
 
     @property
     def grid_toggle_pending(self) -> bool:
-        return self.grid_control_user_initiated_toggle is True
+        return bool(
+            self.grid_toggle_enabled and self.grid_control_user_initiated_toggle is True
+        )
+
+    @property
+    def grid_toggle_enabled(self) -> bool:
+        """Return whether the safety-sensitive Grid Toggle feature is enabled."""
+
+        return bool(getattr(self, "_grid_toggle_enabled", False))
+
+    @property
+    def pricing_edits_enabled(self) -> bool:
+        """Return whether tariff editing controls and writes are enabled."""
+
+        return bool(getattr(self, "_pricing_edits_enabled", True))
 
     @property
     def grid_toggle_blocked_reasons(self) -> list[str]:
+        if not self.grid_toggle_enabled:
+            return []
         if self.grid_control_supported is not True:
             return []
         reasons: list[str] = []
@@ -6796,6 +6934,8 @@ class EnphaseCoordinator(
 
     @property
     def grid_toggle_allowed(self) -> bool | None:
+        if not self.grid_toggle_enabled:
+            return None
         if self.grid_control_supported is not True:
             return None
         if self.grid_toggle_pending:

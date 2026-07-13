@@ -13,7 +13,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.data_entry_flow import FlowResult, section
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import selector
@@ -69,8 +69,11 @@ from .const import (
     DEFAULT_API_TIMEOUT,
     DEFAULT_DEGRADED_SERVICE_REPAIR_ISSUES,
     DEFAULT_FAST_POLL_INTERVAL,
+    DEFAULT_GRID_TOGGLE_ENABLED,
+    DEFAULT_PRICING_EDITS_ENABLED,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SCHEDULE_SYNC_ENABLED,
+    DEFAULT_SYSTEM_EVENT_REPAIR_ISSUES,
     DEFAULT_SLOW_POLL_INTERVAL,
     DEFAULT_WEATHER_ENABLED,
     DOMAIN,
@@ -86,12 +89,15 @@ from .const import (
     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
     OPT_FAST_POLL_INTERVAL,
     OPT_FAST_WHILE_STREAMING,
+    OPT_GRID_TOGGLE_ENABLED,
+    OPT_PRICING_EDITS_ENABLED,
     OPT_NOMINAL_VOLTAGE,
     OPT_SLOW_POLL_INTERVAL,
     OPT_SESSION_HISTORY_INTERVAL,
     OPT_WEATHER_ENABLED,
     DEFAULT_SESSION_HISTORY_INTERVAL_MIN,
     OPT_SCHEDULE_SYNC_ENABLED,
+    OPT_SYSTEM_EVENT_REPAIR_ISSUES,
 )
 from .device_types import (
     ONBOARDING_SUPPORTED_TYPE_KEYS,
@@ -145,6 +151,8 @@ CONF_TYPE_AC_BATTERY = "type_ac_battery"
 CONF_TYPE_IQEVSE = "type_iqevse"
 CONF_TYPE_HEATPUMP = "type_heatpump"
 CONF_TYPE_MICROINVERTER = "type_microinverter"
+CONF_DEVICE_CATEGORIES_SECTION = "devices"
+CONF_DEVICE_FEATURES_SECTION = "device_features"
 CONF_MIGRATION_SOURCE_ENTRY = "selected_envoy_source"
 CONF_MIGRATION_BACKUP_CONFIRMED = "backup_confirmed"
 CONF_MIGRATION_CONFIRM_REASSIGN = "confirm_reassign"
@@ -1372,90 +1380,73 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 visible.append(type_key)
         return visible
 
-    def _build_settings_schema(
-        self, visible_type_keys: list[str] | None = None
-    ) -> vol.Schema:
+    def _build_devices_schema(self, visible_type_keys: list[str]) -> vol.Schema:
         default_selected_type_keys = self._default_selected_type_keys()
-        nominal_default = self._default_nominal_voltage()
-        fast_default, slow_default = normalize_poll_intervals(
-            self._entry.options.get(OPT_FAST_POLL_INTERVAL, DEFAULT_FAST_POLL_INTERVAL),
-            self._entry.options.get(OPT_SLOW_POLL_INTERVAL, DEFAULT_SLOW_POLL_INTERVAL),
-        )
-        schema_fields: dict[vol.Marker, object] = {}
-        for type_key in visible_type_keys or list(ONBOARDING_SUPPORTED_TYPE_KEYS):
+        category_fields: dict[vol.Marker, object] = {}
+        for type_key in visible_type_keys:
             field_key = _TYPE_FIELD_BY_KEY.get(type_key)
             if field_key is None:
                 continue
-            schema_fields[
+            category_fields[
                 vol.Optional(field_key, default=type_key in default_selected_type_keys)
             ] = bool
-        schema_fields.update(
-            {
-                vol.Optional(
-                    OPT_FAST_POLL_INTERVAL,
-                    default=fast_default,
-                ): vol.All(
-                    vol.Coerce(int),
-                    vol.Range(min=MIN_FAST_POLL_INTERVAL, max=MAX_POLL_INTERVAL),
-                ),
-                vol.Optional(
-                    OPT_SLOW_POLL_INTERVAL,
-                    default=slow_default,
-                ): vol.All(
-                    vol.Coerce(int),
-                    vol.Range(min=MIN_SLOW_POLL_INTERVAL, max=MAX_POLL_INTERVAL),
-                ),
-                vol.Optional(
-                    OPT_FAST_WHILE_STREAMING,
-                    default=self._entry.options.get(OPT_FAST_WHILE_STREAMING, True),
-                ): bool,
-                vol.Optional(
-                    OPT_API_TIMEOUT,
-                    default=self._entry.options.get(
-                        OPT_API_TIMEOUT, DEFAULT_API_TIMEOUT
-                    ),
-                ): selector(
-                    {
-                        "number": {
-                            "min": MIN_API_TIMEOUT,
-                            "max": MAX_API_TIMEOUT,
-                            "step": 1,
-                            "mode": "box",
-                            "unit_of_measurement": "s",
-                        }
-                    }
-                ),
-                vol.Optional(
-                    OPT_NOMINAL_VOLTAGE,
-                    default=nominal_default,
-                ): int,
-                vol.Optional(
-                    OPT_SESSION_HISTORY_INTERVAL,
-                    default=self._entry.options.get(
-                        OPT_SESSION_HISTORY_INTERVAL,
-                        DEFAULT_SESSION_HISTORY_INTERVAL_MIN,
-                    ),
-                ): vol.All(
-                    vol.Coerce(int),
-                    vol.Range(
-                        min=MIN_SESSION_HISTORY_INTERVAL_MIN,
-                        max=MAX_SESSION_HISTORY_INTERVAL_MIN,
-                    ),
-                ),
-                vol.Optional(
+        feature_fields: dict[vol.Marker, object] = {
+            vol.Optional(
+                OPT_SCHEDULE_SYNC_ENABLED,
+                default=self._entry.options.get(
                     OPT_SCHEDULE_SYNC_ENABLED,
-                    default=self._entry.options.get(
-                        OPT_SCHEDULE_SYNC_ENABLED,
-                        DEFAULT_SCHEDULE_SYNC_ENABLED,
-                    ),
-                ): bool,
-                vol.Optional(
+                    DEFAULT_SCHEDULE_SYNC_ENABLED,
+                ),
+            ): bool,
+            vol.Optional(
+                OPT_BATTERY_SCHEDULES_ENABLED,
+                default=self._entry.options.get(
                     OPT_BATTERY_SCHEDULES_ENABLED,
-                    default=self._entry.options.get(
-                        OPT_BATTERY_SCHEDULES_ENABLED,
-                        DEFAULT_BATTERY_SCHEDULES_ENABLED,
-                    ),
-                ): bool,
+                    DEFAULT_BATTERY_SCHEDULES_ENABLED,
+                ),
+            ): bool,
+            vol.Optional(
+                OPT_PRICING_EDITS_ENABLED,
+                default=self._entry.options.get(
+                    OPT_PRICING_EDITS_ENABLED,
+                    DEFAULT_PRICING_EDITS_ENABLED,
+                ),
+            ): bool,
+            vol.Optional(
+                OPT_WEATHER_ENABLED,
+                default=self._entry.options.get(
+                    OPT_WEATHER_ENABLED,
+                    DEFAULT_WEATHER_ENABLED,
+                ),
+            ): bool,
+            vol.Optional(
+                OPT_NOMINAL_VOLTAGE,
+                default=self._default_nominal_voltage(),
+            ): int,
+        }
+        return vol.Schema(
+            {
+                vol.Required(CONF_DEVICE_CATEGORIES_SECTION): section(
+                    vol.Schema(category_fields)
+                ),
+                vol.Required(CONF_DEVICE_FEATURES_SECTION): section(
+                    vol.Schema(feature_fields)
+                ),
+            }
+        )
+
+    @staticmethod
+    def _build_authentication_schema() -> vol.Schema:
+        return vol.Schema(
+            {
+                vol.Optional("reauth", default=False): bool,
+                vol.Optional("forget_password", default=False): bool,
+            }
+        )
+
+    def _build_repair_notifications_schema(self) -> vol.Schema:
+        return vol.Schema(
+            {
                 vol.Optional(
                     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
                     default=self._entry.options.get(
@@ -1464,23 +1455,77 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                     ),
                 ): bool,
                 vol.Optional(
-                    OPT_WEATHER_ENABLED,
+                    OPT_SYSTEM_EVENT_REPAIR_ISSUES,
                     default=self._entry.options.get(
-                        OPT_WEATHER_ENABLED,
-                        DEFAULT_WEATHER_ENABLED,
+                        OPT_SYSTEM_EVENT_REPAIR_ISSUES,
+                        DEFAULT_SYSTEM_EVENT_REPAIR_ISSUES,
                     ),
                 ): bool,
-                vol.Optional("reauth", default=False): bool,
-                vol.Optional("forget_password", default=False): bool,
             }
         )
+
+    def _build_general_settings_schema(self) -> vol.Schema:
+        fast_default, slow_default = normalize_poll_intervals(
+            self._entry.options.get(OPT_FAST_POLL_INTERVAL, DEFAULT_FAST_POLL_INTERVAL),
+            self._entry.options.get(OPT_SLOW_POLL_INTERVAL, DEFAULT_SLOW_POLL_INTERVAL),
+        )
+        schema_fields: dict[vol.Marker, object] = {
+            vol.Optional(
+                OPT_FAST_POLL_INTERVAL,
+                default=fast_default,
+            ): vol.All(
+                vol.Coerce(int),
+                vol.Range(min=MIN_FAST_POLL_INTERVAL, max=MAX_POLL_INTERVAL),
+            ),
+            vol.Optional(
+                OPT_SLOW_POLL_INTERVAL,
+                default=slow_default,
+            ): vol.All(
+                vol.Coerce(int),
+                vol.Range(min=MIN_SLOW_POLL_INTERVAL, max=MAX_POLL_INTERVAL),
+            ),
+            vol.Optional(
+                OPT_FAST_WHILE_STREAMING,
+                default=self._entry.options.get(OPT_FAST_WHILE_STREAMING, True),
+            ): bool,
+            vol.Optional(
+                OPT_API_TIMEOUT,
+                default=self._entry.options.get(OPT_API_TIMEOUT, DEFAULT_API_TIMEOUT),
+            ): selector(
+                {
+                    "number": {
+                        "min": MIN_API_TIMEOUT,
+                        "max": MAX_API_TIMEOUT,
+                        "step": 1,
+                        "mode": "box",
+                        "unit_of_measurement": "s",
+                    }
+                }
+            ),
+            vol.Optional(
+                OPT_SESSION_HISTORY_INTERVAL,
+                default=self._entry.options.get(
+                    OPT_SESSION_HISTORY_INTERVAL,
+                    DEFAULT_SESSION_HISTORY_INTERVAL_MIN,
+                ),
+            ): vol.All(
+                vol.Coerce(int),
+                vol.Range(
+                    min=MIN_SESSION_HISTORY_INTERVAL_MIN,
+                    max=MAX_SESSION_HISTORY_INTERVAL_MIN,
+                ),
+            ),
+        }
         base_schema = vol.Schema(schema_fields)
         return self.add_suggested_values_to_schema(base_schema, self._entry.options)
+
+    def _build_settings_schema(self) -> vol.Schema:
+        return self._build_general_settings_schema()
 
     def _build_schema(self) -> vol.Schema:
         """Backward-compatible alias for tests and legacy direct calls."""
 
-        return self._build_settings_schema()
+        return self._build_general_settings_schema()
 
     async def _load_migration_sources(self) -> list[EnvoyHistorySource]:
         if self._migration_sources is None:
@@ -1825,11 +1870,17 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         if user_input is not None:
+            if "reauth" in user_input or "forget_password" in user_input:
+                return await self.async_step_authentication_settings(user_input)
             return await self.async_step_settings(user_input)
-        menu_options = ["settings"]
-        if self._grid_profile_options_available():
-            menu_options.append("advanced")
-        menu_options.append("migrate_envoy")
+        menu_options = [
+            "settings",
+            "devices",
+            "repair_notifications",
+            "authentication_settings",
+            "advanced",
+            "migrate_envoy",
+        ]
         return self.async_show_menu(
             step_id="init",
             menu_options=menu_options,
@@ -1838,16 +1889,37 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
     async def async_step_advanced(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        runtime = self._grid_profile_runtime()
-        if runtime is None:
-            return self.async_abort(reason="grid_profile_unavailable")
-        if not self._grid_profile_options_available():
-            return self.async_abort(
-                reason=self._grid_profile_unavailable_reason(runtime)
-            )
+        del user_input
+        menu_options = ["grid_toggle"]
+        if self._grid_profile_options_available():
+            menu_options.append("grid_profile")
         return self.async_show_menu(
             step_id="advanced",
-            menu_options=["grid_profile"],
+            menu_options=menu_options,
+        )
+
+    async def async_step_grid_toggle(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        if user_input is not None:
+            options = dict(self._entry.options)
+            options[OPT_GRID_TOGGLE_ENABLED] = bool(
+                user_input.get(OPT_GRID_TOGGLE_ENABLED, DEFAULT_GRID_TOGGLE_ENABLED)
+            )
+            return self.async_create_entry(title="", data=options)
+        return self.async_show_form(
+            step_id="grid_toggle",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        OPT_GRID_TOGGLE_ENABLED,
+                        default=self._entry.options.get(
+                            OPT_GRID_TOGGLE_ENABLED,
+                            DEFAULT_GRID_TOGGLE_ENABLED,
+                        ),
+                    ): bool
+                }
+            ),
         )
 
     async def async_step_grid_profile(
@@ -1998,12 +2070,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
     async def async_step_settings(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        visible_type_keys = await self._settings_type_keys()
-        schema = self._build_settings_schema(visible_type_keys)
+        schema = self._build_settings_schema()
         if user_input is not None:
             option_data = dict(user_input)
-            forget_password = bool(option_data.pop("forget_password", False))
-            reauth = bool(option_data.pop("reauth", False))
+            option_data.pop("forget_password", None)
+            option_data.pop("reauth", None)
             errors: dict[str, str] = {}
             if OPT_API_TIMEOUT in option_data:
                 api_timeout = _bounded_int(
@@ -2037,61 +2108,171 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             )
             option_data[OPT_FAST_POLL_INTERVAL] = fast_poll
             option_data[OPT_SLOW_POLL_INTERVAL] = slow_poll
-            selected_type_keys: list[str] = []
-            default_selected_type_keys = self._default_selected_type_keys()
-            for type_key in visible_type_keys:
-                field_key = _TYPE_FIELD_BY_KEY.get(type_key)
-                if field_key is None:
-                    continue
-                if bool(
-                    option_data.pop(field_key, type_key in default_selected_type_keys)
-                ):
-                    selected_type_keys.append(type_key)
-
-            stored_selected_type_keys = self._stored_selected_type_keys()
-            for type_key in stored_selected_type_keys:
-                if (
-                    type_key not in ONBOARDING_SUPPORTED_TYPE_KEYS
-                    and type_key not in selected_type_keys
-                ):
-                    selected_type_keys.append(type_key)
-
-            serials = self._normalize_serials(self._entry.data.get(CONF_SERIALS, []))
-            site_only = "iqevse" not in selected_type_keys
-            include_inverters = "microinverter" in selected_type_keys
-            if site_only:
-                serials = []
-            elif not serials and not (forget_password or reauth):
-                serials = await self._discover_iqevse_serials()
-                if not serials:
-                    error_schema = self.add_suggested_values_to_schema(
-                        self._build_settings_schema(visible_type_keys), user_input
-                    )
-                    return self.async_show_form(
-                        step_id="settings",
-                        data_schema=error_schema,
-                        errors={"base": "serials_required"},
-                    )
-
-            new_data = dict(self._entry.data)
-            new_data[CONF_SELECTED_TYPE_KEYS] = selected_type_keys
-            new_data[CONF_SITE_ONLY] = site_only
-            new_data[CONF_INCLUDE_INVERTERS] = include_inverters
-            new_data[CONF_SERIALS] = serials
-
-            if forget_password:
-                new_data.pop(CONF_PASSWORD, None)
-                new_data[CONF_REMEMBER_PASSWORD] = False
-
+            for field_key in _TYPE_FIELD_BY_KEY.values():
+                option_data.pop(field_key, None)
+            option_data.pop(OPT_SCHEDULE_SYNC_ENABLED, None)
+            option_data.pop(OPT_BATTERY_SCHEDULES_ENABLED, None)
+            option_data.pop(OPT_DEGRADED_SERVICE_REPAIR_ISSUES, None)
+            option_data.pop(OPT_SYSTEM_EVENT_REPAIR_ISSUES, None)
+            option_data.pop(OPT_PRICING_EDITS_ENABLED, None)
+            option_data.pop(OPT_WEATHER_ENABLED, None)
+            option_data.pop(OPT_NOMINAL_VOLTAGE, None)
             option_data.pop(CONF_SCAN_INTERVAL, None)
             option_data.pop(CONF_SITE_ONLY, None)
 
-            self.hass.config_entries.async_update_entry(self._entry, data=new_data)
-            if reauth:
-                self._entry.async_start_reauth(self.hass, data=new_data)
-            return self.async_create_entry(data=option_data)
+            options = dict(self._entry.options)
+            options.update(option_data)
+            return self.async_create_entry(data=options)
 
         return self.async_show_form(step_id="settings", data_schema=schema)
+
+    async def async_step_devices(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        visible_type_keys = await self._settings_type_keys()
+        schema = self._build_devices_schema(visible_type_keys)
+        if user_input is None:
+            return self.async_show_form(step_id="devices", data_schema=schema)
+
+        submitted_data = dict(user_input)
+        category_data = submitted_data.pop(CONF_DEVICE_CATEGORIES_SECTION, None)
+        feature_data = submitted_data.pop(CONF_DEVICE_FEATURES_SECTION, None)
+        device_data = dict(category_data) if isinstance(category_data, dict) else {}
+        if isinstance(feature_data, dict):
+            device_data.update(feature_data)
+        device_data.update(submitted_data)
+        selected_type_keys: list[str] = []
+        default_selected_type_keys = self._default_selected_type_keys()
+        for type_key in visible_type_keys:
+            field_key = _TYPE_FIELD_BY_KEY.get(type_key)
+            if field_key is None:
+                continue
+            if bool(device_data.pop(field_key, type_key in default_selected_type_keys)):
+                selected_type_keys.append(type_key)
+
+        for type_key in self._stored_selected_type_keys():
+            if (
+                type_key not in ONBOARDING_SUPPORTED_TYPE_KEYS
+                and type_key not in selected_type_keys
+            ):
+                selected_type_keys.append(type_key)
+
+        serials = self._normalize_serials(self._entry.data.get(CONF_SERIALS, []))
+        site_only = "iqevse" not in selected_type_keys
+        if site_only:
+            serials = []
+        elif not serials:
+            serials = await self._discover_iqevse_serials()
+            if not serials:
+                return self.async_show_form(
+                    step_id="devices",
+                    data_schema=self.add_suggested_values_to_schema(schema, user_input),
+                    errors={"base": "serials_required"},
+                )
+
+        new_data = dict(self._entry.data)
+        new_data[CONF_SELECTED_TYPE_KEYS] = selected_type_keys
+        new_data[CONF_SITE_ONLY] = site_only
+        new_data[CONF_INCLUDE_INVERTERS] = "microinverter" in selected_type_keys
+        new_data[CONF_SERIALS] = serials
+        self.hass.config_entries.async_update_entry(self._entry, data=new_data)
+
+        options = dict(self._entry.options)
+        options[OPT_SCHEDULE_SYNC_ENABLED] = bool(
+            device_data.get(
+                OPT_SCHEDULE_SYNC_ENABLED,
+                options.get(
+                    OPT_SCHEDULE_SYNC_ENABLED,
+                    DEFAULT_SCHEDULE_SYNC_ENABLED,
+                ),
+            )
+        )
+        options[OPT_BATTERY_SCHEDULES_ENABLED] = bool(
+            device_data.get(
+                OPT_BATTERY_SCHEDULES_ENABLED,
+                options.get(
+                    OPT_BATTERY_SCHEDULES_ENABLED,
+                    DEFAULT_BATTERY_SCHEDULES_ENABLED,
+                ),
+            )
+        )
+        options[OPT_PRICING_EDITS_ENABLED] = bool(
+            device_data.get(
+                OPT_PRICING_EDITS_ENABLED,
+                options.get(
+                    OPT_PRICING_EDITS_ENABLED,
+                    DEFAULT_PRICING_EDITS_ENABLED,
+                ),
+            )
+        )
+        options[OPT_WEATHER_ENABLED] = bool(
+            device_data.get(
+                OPT_WEATHER_ENABLED,
+                options.get(
+                    OPT_WEATHER_ENABLED,
+                    DEFAULT_WEATHER_ENABLED,
+                ),
+            )
+        )
+        options[OPT_NOMINAL_VOLTAGE] = (
+            coerce_nominal_voltage(
+                device_data.get(
+                    OPT_NOMINAL_VOLTAGE,
+                    options.get(OPT_NOMINAL_VOLTAGE, self._default_nominal_voltage()),
+                )
+            )
+            or self._default_nominal_voltage()
+        )
+        return self.async_create_entry(title="", data=options)
+
+    async def async_step_repair_notifications(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        schema = self._build_repair_notifications_schema()
+        if user_input is None:
+            return self.async_show_form(
+                step_id="repair_notifications",
+                data_schema=schema,
+            )
+
+        options = dict(self._entry.options)
+        options[OPT_DEGRADED_SERVICE_REPAIR_ISSUES] = bool(
+            user_input.get(
+                OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
+                options.get(
+                    OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
+                    DEFAULT_DEGRADED_SERVICE_REPAIR_ISSUES,
+                ),
+            )
+        )
+        options[OPT_SYSTEM_EVENT_REPAIR_ISSUES] = bool(
+            user_input.get(
+                OPT_SYSTEM_EVENT_REPAIR_ISSUES,
+                options.get(
+                    OPT_SYSTEM_EVENT_REPAIR_ISSUES,
+                    DEFAULT_SYSTEM_EVENT_REPAIR_ISSUES,
+                ),
+            )
+        )
+        return self.async_create_entry(title="", data=options)
+
+    async def async_step_authentication_settings(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        if user_input is None:
+            return self.async_show_form(
+                step_id="authentication_settings",
+                data_schema=self._build_authentication_schema(),
+            )
+
+        new_data = dict(self._entry.data)
+        if bool(user_input.get("forget_password", False)):
+            new_data.pop(CONF_PASSWORD, None)
+            new_data[CONF_REMEMBER_PASSWORD] = False
+            self.hass.config_entries.async_update_entry(self._entry, data=new_data)
+        if bool(user_input.get("reauth", False)):
+            self._entry.async_start_reauth(self.hass, data=new_data)
+        return self.async_create_entry(title="", data=dict(self._entry.options))
 
     async def async_step_migrate_envoy(
         self, user_input: dict[str, Any] | None = None

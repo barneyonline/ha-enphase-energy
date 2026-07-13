@@ -131,10 +131,10 @@ async def test_async_setup_entry_syncs_binary_sensors(
 
 
 @pytest.mark.asyncio
-async def test_system_events_entity_requires_successful_installer_response(
+async def test_system_events_entity_is_retained_while_reload_fetch_is_pending(
     hass, config_entry, coordinator_factory, monkeypatch
 ) -> None:
-    """Create the installer-only entity only after its endpoint succeeds."""
+    """Retain the installer-only entity until the reload fetch completes."""
     from homeassistant.helpers import entity_registry as er
 
     coord = coordinator_factory(serials=[])
@@ -177,7 +177,7 @@ async def test_system_events_entity_requires_successful_installer_response(
     )
 
     assert len(topology_callbacks) == 1
-    assert ent_reg.async_get(stale.entity_id) is None
+    assert ent_reg.async_get(stale.entity_id) is not None
     assert (
         len(
             [
@@ -188,9 +188,13 @@ async def test_system_events_entity_requires_successful_installer_response(
         )
         == 1
     )
-    assert not any(
-        isinstance(entity, SiteActiveSystemEventsBinarySensor) for entity in added
-    )
+    event_entities = [
+        entity
+        for entity in added
+        if isinstance(entity, SiteActiveSystemEventsBinarySensor)
+    ]
+    assert len(event_entities) == 1
+    assert event_entities[0].available is False
 
     coord.system_events_runtime._last_success_utc = dt_util.utcnow()  # noqa: SLF001
     sync_events = next(
@@ -210,6 +214,75 @@ async def test_system_events_entity_requires_successful_installer_response(
             ]
         )
         == 1
+    )
+
+
+@pytest.mark.asyncio
+async def test_system_events_entity_is_removed_after_endpoint_suppression(
+    hass, config_entry, coordinator_factory, monkeypatch
+) -> None:
+    """Remove a retained entity only after the optional endpoint is suppressed."""
+    from homeassistant.helpers import entity_registry as er
+
+    coord = coordinator_factory(serials=[])
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    callbacks: list[Callable[[], None]] = []
+
+    monkeypatch.setattr(
+        coord, "async_add_topology_listener", lambda callback: _stub_listener()
+    )
+
+    def _capture_update_listener(
+        callback: Callable[[], None], *, context=None
+    ) -> Callable[[], None]:
+        callbacks.append(callback)
+        return _stub_listener()
+
+    monkeypatch.setattr(coord, "async_add_listener", _capture_update_listener)
+    ent_reg = er.async_get(hass)
+    stale = ent_reg.async_get_or_create(
+        "binary_sensor",
+        DOMAIN,
+        f"{DOMAIN}_site_{coord.site_id}_active_system_events",
+        config_entry=config_entry,
+    )
+
+    await async_setup_entry(hass, config_entry, lambda *_args, **_kwargs: None)
+
+    assert ent_reg.async_get(stale.entity_id) is not None
+    coord._endpoint_family_state("system_events").support_state = "suppressed"
+    sync_events = next(
+        callback
+        for callback in callbacks
+        if callback.__name__ == "_async_sync_system_events"
+    )
+    sync_events()
+
+    assert ent_reg.async_get(stale.entity_id) is None
+
+
+@pytest.mark.asyncio
+async def test_system_events_entity_waits_for_first_success_on_initial_setup(
+    hass, config_entry, coordinator_factory, monkeypatch
+) -> None:
+    """Do not create the installer-only entity before its first success."""
+    coord = coordinator_factory(serials=[])
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    monkeypatch.setattr(
+        coord, "async_add_topology_listener", lambda callback: _stub_listener()
+    )
+    added: list[object] = []
+
+    await async_setup_entry(
+        hass,
+        config_entry,
+        lambda entities, update_before_add=False: added.extend(entities),
+    )
+
+    assert not any(
+        isinstance(entity, SiteActiveSystemEventsBinarySensor) for entity in added
     )
 
 
@@ -970,6 +1043,7 @@ def test_site_cloud_reachable_binary_sensor_metadata(
 
     sensor = SiteCloudReachableBinarySensor(coord)
     assert sensor.translation_key == "cloud_reachable"
+    assert sensor.entity_category == EntityCategory.DIAGNOSTIC
 
     coord.last_success_utc = None
     coord.last_update_success = False
@@ -1032,6 +1106,10 @@ def test_site_active_system_events_binary_sensor_metadata(
             high_impact=True,
             severity="critical",
             device_type="IQ Gateway",
+            event_type="Gateway fault",
+            state="open",
+            event_date="2026-07-11T01:02:03Z",
+            updated_at="2026-07-11T01:03:03Z",
         ),
     )
     attrs = sensor.extra_state_attributes
@@ -1039,8 +1117,53 @@ def test_site_active_system_events_binary_sensor_metadata(
     assert sensor.is_on is True
     assert attrs["active_count"] == 1
     assert attrs["high_impact_count"] == 1
-    assert attrs["severity_counts"] == {"critical": 1}
+    assert attrs["standing_alarm_count"] == 0
+    assert attrs["severity_counts"] == {}
+    assert attrs["device_type_counts"] == {"IQ Gateway": 1}
+    assert attrs["active_events"] == (
+        {
+            "type": "Gateway fault",
+            "device_type": "IQ Gateway",
+            "state": "open",
+            "event_date": "2026-07-11T01:02:03Z",
+            "updated_at": "2026-07-11T01:03:03Z",
+        },
+    )
+    assert "active_events" in sensor._unrecorded_attributes  # noqa: SLF001
     assert "serial_number" not in attrs
+
+    runtime._events = (  # noqa: SLF001
+        SimpleNamespace(
+            high_impact=False,
+            severity="unknown",
+            device_type="IQ Gateway",
+            event_type="Routine state change",
+            state="open",
+            event_date=None,
+            updated_at=None,
+        ),
+    )
+    assert sensor.is_on is False
+    runtime._standing_alarms = (  # noqa: SLF001
+        SimpleNamespace(
+            severity="4",
+            device_type="Gateway",
+            first_set="2026-07-11T02:03:04Z",
+        ),
+    )
+    assert sensor.is_on is True
+    standing_attrs = sensor.extra_state_attributes
+    assert standing_attrs["active_count"] == 1
+    assert standing_attrs["device_type_counts"] == {"Gateway": 1}
+    assert standing_attrs["active_events"] == (
+        {
+            "type": "Standing Alarm",
+            "device_type": "Gateway",
+            "state": "active",
+            "event_date": "2026-07-11T02:03:04Z",
+            "updated_at": None,
+        },
+    )
 
     monkeypatch.setattr(
         binary_sensor,

@@ -656,6 +656,7 @@ async def test_request_grid_toggle_otp_button(hass, monkeypatch) -> None:
         },
         ["envoy", "encharge"],
     )
+    coord._grid_toggle_enabled = True  # noqa: SLF001
     coord.battery_runtime.parse_grid_control_check_payload(
         {
             "disableGridControl": False,
@@ -738,11 +739,17 @@ def test_request_grid_toggle_otp_button_availability_guards() -> None:
         battery_has_encharge=True,
         battery_has_enpower=True,
         has_type=lambda _key: True,
+        grid_toggle_enabled=True,
         grid_control_supported=True,
         grid_toggle_allowed=True,
     )
     button = RequestGridToggleOtpButton(coord)
     assert button.available is False
+
+    coord.grid_toggle_enabled = False
+    coord.last_update_success = True
+    assert button.available is False
+    coord.grid_toggle_enabled = True
 
     coord.last_update_success = True
     coord.battery_has_encharge = False
@@ -829,6 +836,7 @@ def test_request_grid_toggle_otp_button_device_info_prefers_enpower_then_envoy()
         last_update_success=True,
         battery_has_encharge=True,
         battery_has_enpower=True,
+        grid_toggle_enabled=True,
         grid_control_supported=True,
         grid_toggle_allowed=True,
         inventory_view=SimpleNamespace(
@@ -851,6 +859,7 @@ def test_request_grid_toggle_otp_button_device_info_falls_back_when_missing() ->
         last_update_success=True,
         battery_has_encharge=True,
         battery_has_enpower=True,
+        grid_toggle_enabled=True,
         grid_control_supported=True,
         grid_toggle_allowed=True,
         inventory_view=SimpleNamespace(
@@ -899,6 +908,41 @@ async def test_async_setup_entry_button_cleanup_waits_for_inventory_ready(
 
     remove_spy.assert_not_called()
     assert ent_reg.async_get(stale.entity_id) is not None
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_removes_grid_toggle_button_when_disabled(
+    hass, config_entry, coordinator_factory
+) -> None:
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.enphase_ev.button import (
+        RequestGridToggleOtpButton,
+        async_setup_entry,
+    )
+    from custom_components.enphase_ev.const import DOMAIN
+
+    coord = coordinator_factory(serials=[])
+    coord._grid_toggle_enabled = False  # noqa: SLF001
+    coord._devices_inventory_ready = False  # noqa: SLF001
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    ent_reg = er.async_get(hass)
+    stale = ent_reg.async_get_or_create(
+        "button",
+        DOMAIN,
+        f"{DOMAIN}_site_{coord.site_id}_request_grid_toggle_otp",
+        config_entry=config_entry,
+    )
+    added: list[object] = []
+
+    await async_setup_entry(
+        hass,
+        config_entry,
+        lambda entities, update_before_add=False: added.extend(entities),
+    )
+
+    assert ent_reg.async_get(stale.entity_id) is None
+    assert not any(isinstance(entity, RequestGridToggleOtpButton) for entity in added)
 
 
 def test_storm_alert_opt_out_button_device_info_prefers_type_info() -> None:

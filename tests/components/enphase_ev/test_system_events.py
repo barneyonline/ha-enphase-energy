@@ -9,8 +9,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from custom_components.enphase_ev.api import OptionalEndpointUnavailable
-from custom_components.enphase_ev.const import DOMAIN
+from custom_components.enphase_ev.const import DOMAIN, OPT_SYSTEM_EVENT_REPAIR_ISSUES
 from custom_components.enphase_ev.system_events import (
+    ACTIVE_EVENTS_ATTRIBUTE_LIMIT,
     SYSTEM_EVENTS_ENDPOINT_FAMILY,
     SYSTEM_EVENT_REPAIR_CHECKPOINT_INTERVAL,
     SYSTEM_EVENT_REPAIR_MISSING_GRACE,
@@ -22,7 +23,9 @@ from custom_components.enphase_ev.system_events import (
     _lookup_catalog,
     _normalized,
     _text,
+    _timestamp,
     parse_active_system_events,
+    parse_standing_alarms,
 )
 
 
@@ -76,6 +79,28 @@ def _event_payload() -> dict[str, object]:
     }
 
 
+def _standing_alarm_payload() -> dict[str, object]:
+    return {
+        "alarms": [
+            {
+                "id": "1234567.440.1770000000000",
+                "severity": 4,
+                "type": "Gateway SERIAL-PRIVATE-1",
+                "serial_num": "SERIAL-PRIVATE-1",
+                "device_link": "https://example.invalid/private-device",
+                "description": "Private diagnostic details",
+                "first_set": "2026/07/11 01:02:03 +0000 (UTC)",
+            },
+            {
+                "id": "1234567.440.1770000000000",
+                "severity": 4,
+                "type": "duplicate",
+            },
+            "not-an-alarm",
+        ]
+    }
+
+
 def test_event_parser_normalizes_redacts_and_filters() -> None:
     events = parse_active_system_events(_event_payload(), site_id="1234567")
 
@@ -87,8 +112,8 @@ def test_event_parser_normalizes_redacts_and_filters() -> None:
     assert event.severity == "critical"
     assert event.state == "open"
     assert event.high_impact is True
-    assert event.event_date == "2026-07-11T01:02:03Z"
-    assert event.updated_at == "2026-07-11T01:03:03Z"
+    assert event.event_date == "2026-07-11T01:02:03+00:00"
+    assert event.updated_at == "2026-07-11T01:03:03+00:00"
     assert "SERIAL-PRIVATE-1" not in repr(event)
 
 
@@ -144,6 +169,29 @@ def test_event_parser_handles_malformed_and_direct_severity_shapes() -> None:
     assert state_severity[0].high_impact is True
 
 
+def test_standing_alarm_parser_normalizes_redacts_and_deduplicates() -> None:
+    alarms = parse_standing_alarms(_standing_alarm_payload(), site_id="1234567")
+
+    assert len(alarms) == 1
+    alarm = alarms[0]
+    assert len(alarm.fingerprint) == 16
+    assert alarm.severity == "4"
+    assert alarm.device_type == "Gateway SERI...TE-1"
+    assert alarm.first_set == "2026/07/11 01:02:03 +0000 (UTC)"
+    assert "SERIAL-PRIVATE-1" not in repr(alarm)
+    assert "Private diagnostic details" not in repr(alarm)
+    assert parse_standing_alarms(None, site_id="1") == ()
+    assert parse_standing_alarms({"alarms": {}}, site_id="1") == ()
+
+    fallback = parse_standing_alarms(
+        {"alarms": [{"severity": None, "type": None}]},
+        site_id="1",
+    )
+    assert fallback[0].severity == "unknown"
+    assert fallback[0].device_type == "unknown"
+    assert fallback[0].first_set is None
+
+
 def test_event_helper_edge_cases() -> None:
     assert _text(None) is None
     assert _text([]) is None
@@ -151,6 +199,10 @@ def test_event_helper_edge_cases() -> None:
     assert _text("  hello\nworld ") == "hello world"
     assert _normalized(None) == ""
     assert _normalized("High-Impact Event") == "high_impact_event"
+    assert _timestamp("2026-07-11T01:02:03Z") == "2026-07-11T01:02:03+00:00"
+    assert _timestamp("2026-07-11T01:02:03") is None
+    assert _timestamp("not-a-timestamp") is None
+    assert _timestamp("x" * 65) is None
     assert _lookup_catalog({}) == {}
     assert _lookup_catalog([None, {"id": "", "name": "Open"}]) == {
         "open": {"id": "", "name": "Open"}
@@ -165,19 +217,36 @@ def test_event_helper_edge_cases() -> None:
     )
 
 
+_DEFAULT_ALARMS = object()
+
+
 def _runtime_coordinator(
     hass,
     *,
     payload: object = None,
+    alarm_payload: object = _DEFAULT_ALARMS,
     due: bool = True,
     entry_id: str | None = "Entry-ID",
+    repairs_enabled: bool = True,
 ) -> SimpleNamespace:
     health = SimpleNamespace(consecutive_failures=0)
+    if alarm_payload is _DEFAULT_ALARMS:
+        alarm_payload = _standing_alarm_payload()
     return SimpleNamespace(
         hass=hass,
         site_id="1234567",
-        config_entry=(SimpleNamespace(entry_id=entry_id) if entry_id else None),
-        client=SimpleNamespace(system_dashboard_events=AsyncMock(return_value=payload)),
+        config_entry=(
+            SimpleNamespace(
+                entry_id=entry_id,
+                options={OPT_SYSTEM_EVENT_REPAIR_ISSUES: repairs_enabled},
+            )
+            if entry_id is not None
+            else None
+        ),
+        client=SimpleNamespace(
+            system_dashboard_events=AsyncMock(return_value=payload),
+            system_dashboard_standing_alarms=AsyncMock(return_value=alarm_payload),
+        ),
         _endpoint_family_should_run=lambda family: (
             family == SYSTEM_EVENTS_ENDPOINT_FAMILY and due
         ),
@@ -187,7 +256,7 @@ def _runtime_coordinator(
 
 
 @pytest.mark.asyncio
-async def test_runtime_refresh_clears_repairs_only_for_explicit_resolution(
+async def test_runtime_refresh_uses_standing_alarms_for_repairs(
     hass, monkeypatch
 ) -> None:
     coordinator = _runtime_coordinator(hass, payload=_event_payload())
@@ -210,21 +279,21 @@ async def test_runtime_refresh_clears_repairs_only_for_explicit_resolution(
     await runtime.async_refresh()
 
     assert runtime.available is True
-    assert runtime.active_count == 1
+    assert runtime.active_count == 2
     assert runtime.high_impact_count == 1
+    assert runtime.standing_alarm_count == 1
+    assert runtime.problem_active is True
     assert len(created) == 1
     issue_id, issue = created[0]
     assert issue_id.startswith(f"{SYSTEM_EVENT_REPAIR_PREFIX}entry_id_")
     assert "SERIAL-PRIVATE" not in issue_id
     assert issue["translation_key"] == "active_system_event"
     assert issue["severity"].value == "error"
-    assert issue["translation_placeholders"]["device_type"] == (
-        "IQ Gateway SERI...TE-1"
-    )
+    assert issue["translation_placeholders"]["device_type"] == "Gateway SERI...TE-1"
     assert issue["data"] == {
-        "severity": "critical",
-        "device_type": "IQ Gateway SERI...TE-1",
-        "event_date": "2026-07-11T01:02:03Z",
+        "severity": "4",
+        "device_type": "Gateway SERI...TE-1",
+        "event_date": "2026/07/11 01:02:03 +0000 (UTC)",
         "last_seen_utc": runtime._last_success_utc.isoformat(),  # noqa: SLF001
     }
     coordinator._note_endpoint_family_success.assert_called_once_with(
@@ -238,14 +307,109 @@ async def test_runtime_refresh_clears_repairs_only_for_explicit_resolution(
     coordinator.client.system_dashboard_events.return_value = {"events": []}
     await runtime.async_refresh()
     assert deleted == []
-    assert runtime.active_count == 0
+    assert runtime.active_count == 1
     assert runtime.high_impact_count == 0
+    assert runtime.standing_alarm_count == 1
+    assert runtime.problem_active is True
 
-    resolved_row = dict(_event_payload()["events"][0])
-    resolved_row["cleared_date"] = "2026-07-11T02:00:00Z"
-    coordinator.client.system_dashboard_events.return_value = {"events": [resolved_row]}
+
+@pytest.mark.asyncio
+async def test_runtime_clears_repair_immediately_for_resolved_event(
+    hass, monkeypatch
+) -> None:
+    event_id = "matching-event"
+    coordinator = _runtime_coordinator(
+        hass,
+        payload={
+            "events": [
+                {
+                    "id": event_id,
+                    "event_type": "Gateway fault",
+                    "event_state": "open",
+                    "event_severity": "critical",
+                    "device_type": "Gateway",
+                }
+            ]
+        },
+        alarm_payload={
+            "alarms": [
+                {
+                    "id": event_id,
+                    "severity": "critical",
+                    "type": "Gateway",
+                    "first_set": "2026/07/12 19:48:55 +1000 (AEST)",
+                }
+            ]
+        },
+    )
+    runtime = SystemEventsRuntime(coordinator)
+    created: list[str] = []
+    deleted: list[str] = []
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_get",
+        lambda _hass: SimpleNamespace(issues={}),
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_create_issue",
+        lambda _hass, _domain, issue_id, **_kwargs: created.append(issue_id),
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_delete_issue",
+        lambda _hass, _domain, issue_id: deleted.append(issue_id),
+    )
+
     await runtime.async_refresh()
+    assert len(created) == 1
+
+    coordinator.client.system_dashboard_events.return_value = {
+        "events": [
+            {
+                "id": event_id,
+                "event_type": "Gateway fault",
+                "event_state": "resolved",
+                "event_severity": "critical",
+                "device_type": "Gateway",
+            }
+        ]
+    }
+    await runtime.async_refresh()
+
+    assert deleted == created
+    assert runtime.active_count == 0
+    assert runtime.problem_active is False
+
+
+@pytest.mark.asyncio
+async def test_runtime_repairs_default_off_and_clear_existing_issue(
+    hass, monkeypatch
+) -> None:
+    coordinator = _runtime_coordinator(
+        hass,
+        payload=_event_payload(),
+        due=False,
+        repairs_enabled=False,
+    )
+    coordinator.config_entry.options = None
+    runtime = SystemEventsRuntime(coordinator)
+    assert runtime.repairs_enabled is False
+    coordinator.config_entry.options = {}
+    issue_id = f"{SYSTEM_EVENT_REPAIR_PREFIX}{runtime._entry_suffix()}_persisted"  # noqa: SLF001
+    deleted: list[str] = []
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_get",
+        lambda _hass: SimpleNamespace(issues={(DOMAIN, issue_id): object()}),
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_delete_issue",
+        lambda _hass, _domain, deleted_issue_id: deleted.append(deleted_issue_id),
+    )
+
+    await runtime.async_refresh()
+
     assert deleted == [issue_id]
+    assert runtime.repairs_enabled is False
+    assert runtime.diagnostics()["repairs_enabled"] is False
+    coordinator.client.system_dashboard_events.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -262,6 +426,13 @@ async def test_runtime_skips_cooldown_and_keeps_cache_on_failures(hass) -> None:
         await runtime.async_refresh()
 
     coordinator.client.system_dashboard_events = AsyncMock(return_value=None)
+    coordinator.client.system_dashboard_standing_alarms = AsyncMock(
+        return_value={"alarms": []}
+    )
+    with pytest.raises(OptionalEndpointUnavailable):
+        await runtime.async_refresh()
+    coordinator.client.system_dashboard_events = AsyncMock(return_value={"events": []})
+    coordinator.client.system_dashboard_standing_alarms = AsyncMock(return_value=None)
     with pytest.raises(OptionalEndpointUnavailable):
         await runtime.async_refresh()
     assert runtime.available is False
@@ -284,7 +455,8 @@ async def test_runtime_diagnostics_and_persisted_issue_cleanup(
                 }
             ]
         },
-        entry_id=None,
+        alarm_payload={"alarms": []},
+        entry_id="",
     )
     runtime = SystemEventsRuntime(coordinator)
     fallback_suffix = runtime._entry_suffix()  # noqa: SLF001
@@ -314,14 +486,17 @@ async def test_runtime_diagnostics_and_persisted_issue_cleanup(
 
     assert deleted == []
     assert snapshot["available"] is True
-    assert snapshot["active_count"] == 1
+    assert snapshot["active_count"] == 0
     assert snapshot["high_impact_count"] == 0
-    assert snapshot["severity_counts"] == {"warning": 1}
-    assert snapshot["device_type_counts"] == {"IQ Battery": 1}
+    assert snapshot["standing_alarm_count"] == 0
+    assert snapshot["severity_counts"] == {}
+    assert snapshot["device_type_counts"] == {}
     assert snapshot["last_success_utc"].endswith("+00:00")
     assert snapshot["using_cached_data"] is True
     assert snapshot["truncated"] is False
     assert runtime.active_events[0].event_type == "Warning"
+    assert runtime.problem_active is False
+    assert runtime.active_event_attributes == ()
 
     monkeypatch.setattr(
         "custom_components.enphase_ev.system_events.ir.async_get",
@@ -345,12 +520,56 @@ async def test_runtime_diagnostics_and_persisted_issue_cleanup(
     }
 
 
+@pytest.mark.asyncio
+async def test_runtime_bounds_active_event_attributes(hass, monkeypatch) -> None:
+    rows = [
+        {
+            "id": f"event-{index}",
+            "event_type": f"Routine {index}",
+            "device_type": "IQ Gateway",
+            "severity": "error",
+            "event_state": "open",
+            "event_date": "2026-07-11T01:02:03Z",
+            "updated_at": "2026-07-11T01:03:03Z",
+        }
+        for index in range(ACTIVE_EVENTS_ATTRIBUTE_LIMIT + 5)
+    ]
+    runtime = SystemEventsRuntime(
+        _runtime_coordinator(
+            hass,
+            payload={"events": rows},
+            alarm_payload={"alarms": []},
+        )
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_get",
+        lambda _hass: SimpleNamespace(issues={}),
+    )
+
+    await runtime.async_refresh()
+
+    assert runtime.active_count == ACTIVE_EVENTS_ATTRIBUTE_LIMIT + 5
+    assert len(runtime.active_event_attributes) == ACTIVE_EVENTS_ATTRIBUTE_LIMIT
+    assert runtime.problem_active is True
+    assert set(runtime.active_event_attributes[0]) == {
+        "type",
+        "device_type",
+        "state",
+        "event_date",
+        "updated_at",
+    }
+    assert runtime.active_event_attributes[0]["event_date"] == (
+        "2026-07-11T01:02:03+00:00"
+    )
+
+
 def test_runtime_unavailable_diagnostics(hass) -> None:
     runtime = SystemEventsRuntime(_runtime_coordinator(hass))
     snapshot = runtime.diagnostics()
     assert snapshot["last_success_utc"] is None
     assert snapshot["using_cached_data"] is False
     assert snapshot["truncated"] is False
+    assert snapshot["standing_alarm_count"] == 0
 
 
 def test_runtime_ignores_invalid_persisted_last_seen(hass, monkeypatch) -> None:
@@ -409,7 +628,7 @@ async def test_runtime_expires_missing_repair_after_complete_snapshot_grace(
     )
 
     await runtime.async_refresh()
-    coordinator.client.system_dashboard_events.return_value = {"events": []}
+    coordinator.client.system_dashboard_standing_alarms.return_value = {"alarms": []}
     await runtime.async_refresh()
     assert deleted == []
 
@@ -446,8 +665,8 @@ async def test_runtime_does_not_expire_repairs_from_truncated_snapshot(
     )
 
     await runtime.async_refresh()
-    coordinator.client.system_dashboard_events.return_value = {
-        "events": [],
+    coordinator.client.system_dashboard_standing_alarms.return_value = {
+        "alarms": [],
         "_enphase_ev_truncated": True,
     }
     await runtime.async_refresh()
@@ -504,7 +723,13 @@ async def test_runtime_persists_last_seen_checkpoint_across_reload(
     issue_id = created[-1]
     assert issues[(DOMAIN, issue_id)].data["last_seen_utc"] == checkpoint.isoformat()
 
-    reloaded = SystemEventsRuntime(_runtime_coordinator(hass, payload={"events": []}))
+    reloaded = SystemEventsRuntime(
+        _runtime_coordinator(
+            hass,
+            payload={"events": []},
+            alarm_payload={"alarms": []},
+        )
+    )
     await reloaded.async_refresh()
 
     assert deleted == [issue_id]

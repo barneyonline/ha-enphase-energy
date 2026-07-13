@@ -17,6 +17,10 @@ class StubClient(EnphaseEVClient):
             return []
         return {"status": "ok"}
 
+    async def _acquire_xsrf_token(self, *_args, **_kwargs):
+        self._bp_xsrf_token = "xsrf-token"
+        return "xsrf-token"
+
 
 @pytest.mark.asyncio
 async def test_api_builds_urls_correctly():

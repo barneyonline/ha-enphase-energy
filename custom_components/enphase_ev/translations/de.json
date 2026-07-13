@@ -412,6 +412,9 @@
     "tariff_rate_api_unavailable": {
       "message": "Die API zum Schreiben von Tarifen ist nicht verfügbar."
     },
+    "pricing_edits_disabled": {
+      "message": "Preisänderungen sind in den Integrationsoptionen deaktiviert."
+    },
     "tariff_rate_entity_required": {
       "message": "Wähle genau eine Tarifsatz-Entität aus."
     },
@@ -485,14 +488,20 @@
         "title": "Enphase Energy Optionen",
         "description": "Wählen Sie aus, was Sie mit diesem Integrationseintrag tun möchten.",
         "menu_options": {
-          "settings": "Einstellungen",
+          "settings": "Abfrage",
+          "devices": "Geräte auswählen",
+          "repair_notifications": "Benachrichtigungen",
+          "authentication_settings": "Authentifizierung",
           "migrate_envoy": "Envoy-Verlauf migrieren",
           "advanced": "Erweitert"
         },
         "menu_option_descriptions": {
           "settings": "Abfrageintervalle und Verhalten anpassen.",
+          "devices": "Wählen Sie, welche Gerätegruppen hinzugefügt werden sollen. Alle Auswahlen teilen dasselbe Abfrageintervall.",
+          "repair_notifications": "Home Assistant-Reparaturbenachrichtigungen verwalten.",
+          "authentication_settings": "Startet den Login-Ablauf, um Zugangsdaten zu erneuern, ohne die Integration zu entfernen.",
           "migrate_envoy": "Übernehmen Sie ausgewählte Energie-Entitäts-IDs von Enphase Envoy, damit der Verlauf in Home Assistant Energy unter dieser Integration weiterläuft.",
-          "advanced": "Nur für Installateure verfügbare Netzprofil-Steuerung."
+          "advanced": "Optionale Netzmodus-Steuerung und Netzprofilsteuerung nur für Installateure."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -503,11 +512,9 @@
           "slow_poll_interval": "Langsames Abfrageintervall (s)",
           "fast_while_streaming": "Schnelle Abfrage während aktivem Cloud-Stream bevorzugen",
           "api_timeout": "API-Zeitlimit (s)",
-          "nominal_voltage": "Nennspannung (V)",
+          "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)",
           "session_history_interval": "Intervall für Sitzungsverlauf (min)",
           "schedule_sync_enabled": "Aktivieren Sie den EV-Ladeplaner",
-          "reauth": "Reauthentifizierung starten",
-          "forget_password": "Gespeichertes Passwort löschen",
           "type_heatpump": "Wärmepumpe",
           "type_ac_battery": "AC-Batterie",
           "battery_schedules_enabled": "Aktivieren Sie den Batterieplaner",
@@ -523,60 +530,130 @@
           "slow_poll_interval": "Intervall, wenn das Gerät im Leerlauf ist.",
           "fast_while_streaming": "Wenn aktiviert, wird während eines aktiven Cloud-Streams schnell abgefragt.",
           "api_timeout": "Sekunden, bevor API-Anfragen abbrechen.",
-          "nominal_voltage": "Ersatzspannung für die Leistungsberechnung des Ladegeräts.",
+          "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist.",
           "session_history_interval": "Minuten zwischen Abrufen des Cloud-Sitzungsverlaufs.",
-          "schedule_sync_enabled": "Verwalten Sie die Zeitpläne für IQ-Ladegeräte für Elektrofahrzeuge",
-          "reauth": "Startet den Login-Ablauf, um Zugangsdaten zu erneuern, ohne die Integration zu entfernen.",
-          "forget_password": "Entfernt das gespeicherte Passwort. Automatische Aktualisierung wird nicht mehr versucht.",
           "type_heatpump": "Enthält Sensoren für Wärmepumpenstatus, Diagnose und Verbrauch.",
           "type_ac_battery": "Enthält AC-Batterie-Sensoren und Steuerelemente für den Schlafmodus, wenn verfügbar.",
-          "battery_schedules_enabled": "IQ-Batteriepläne verwalten",
           "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind.",
           "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist."
         }
       },
       "settings": {
-        "title": "Enphase Energy-Optionen",
+        "title": "Abfrage",
         "description": "Abfrage und Verhalten anpassen.",
         "data": {
-          "type_envoy": "Gateway",
-          "type_encharge": "Batterie",
-          "type_iqevse": "Ladegeräte",
-          "type_microinverter": "Mikrowechselrichter",
           "fast_poll_interval": "Schnelles Abfrageintervall (s)",
           "slow_poll_interval": "Langsames Abfrageintervall (s)",
           "fast_while_streaming": "Schnelle Abfrage während aktivem Cloud-Stream bevorzugen",
           "api_timeout": "API-Zeitlimit (s)",
-          "nominal_voltage": "Nennspannung (V)",
           "session_history_interval": "Intervall für Sitzungsverlauf (min)",
-          "schedule_sync_enabled": "Aktivieren Sie die Scheduler-Unterstützung",
-          "reauth": "Reauthentifizierung starten",
-          "forget_password": "Gespeichertes Passwort löschen",
-          "type_heatpump": "Wärmepumpe",
-          "type_ac_battery": "AC-Batterie",
-          "battery_schedules_enabled": "Aktivieren Sie den Batterieplaner",
-          "degraded_service_repair_issues": "Reparaturen für beeinträchtigte Dienste aktivieren",
-          "weather_enabled": "Wetter aktivieren"
+          "degraded_service_repair_issues": "Reparaturen für beeinträchtigte Dienste aktivieren"
         },
         "data_description": {
-          "type_envoy": "Enthält Gateway-Konnektivitäts- und Zählerdiagnosen.",
-          "type_encharge": "Enthält Batterie-Status- und Steuerungs-Entitäten, wenn verfügbar.",
-          "type_iqevse": "Enthält EV-Ladegeräte-Entitäten und Steuerungen.",
-          "type_microinverter": "Enthält Sensoren für Mikrowechselrichter-Konnektivität, aktive Anzahl und Lebenszeit-Erzeugung.",
           "fast_poll_interval": "Intervall während des Ladevorgangs oder Streams.",
           "slow_poll_interval": "Intervall, wenn das Gerät im Leerlauf ist.",
           "fast_while_streaming": "Wenn aktiviert, wird während eines aktiven Cloud-Streams schnell abgefragt.",
           "api_timeout": "Sekunden, bevor API-Anfragen abbrechen.",
-          "nominal_voltage": "Ersatzspannung für die Leistungsberechnung des Ladegeräts.",
           "session_history_interval": "Minuten zwischen Abrufen des Cloud-Sitzungsverlaufs.",
-          "schedule_sync_enabled": "Verwalten Sie die Enphase-Zeitplanverwaltung",
-          "reauth": "Startet den Login-Ablauf, um Zugangsdaten zu erneuern, ohne die Integration zu entfernen.",
-          "forget_password": "Entfernt das gespeicherte Passwort. Automatische Aktualisierung wird nicht mehr versucht.",
-          "type_heatpump": "Enthält Sensoren für Wärmepumpenstatus, Diagnose und Verbrauch.",
+          "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind."
+        }
+      },
+      "devices": {
+        "title": "Geräte auswählen",
+        "description": "Wählen Sie, welche Gerätegruppen hinzugefügt werden sollen. Alle Auswahlen teilen dasselbe Abfrageintervall.",
+        "sections": {
+          "devices": {
+            "name": "Geräte auswählen",
+            "data": {
+              "type_envoy": "Gateway",
+              "type_encharge": "Batterie",
+              "type_ac_battery": "AC-Batterie",
+              "type_iqevse": "Ladegeräte",
+              "type_heatpump": "Wärmepumpe",
+              "type_microinverter": "Mikrowechselrichter"
+            },
+            "data_description": {
+              "type_envoy": "Enthält Gateway-Konnektivitäts- und Zählerdiagnosen.",
+              "type_encharge": "Enthält Batterie-Status- und Steuerungs-Entitäten, wenn verfügbar.",
+              "type_ac_battery": "Enthält AC-Batterie-Sensoren und Steuerelemente für den Schlafmodus, wenn verfügbar.",
+              "type_iqevse": "Enthält EV-Ladegeräte-Entitäten und Steuerungen.",
+              "type_heatpump": "Enthält Sensoren für Wärmepumpenstatus, Diagnose und Verbrauch.",
+              "type_microinverter": "Enthält Sensoren für Mikrowechselrichter-Konnektivität, aktive Anzahl und Lebenszeit-Erzeugung."
+            }
+          },
+          "device_features": {
+            "name": "Gerätefunktionen",
+            "data": {
+              "schedule_sync_enabled": "Aktivieren Sie die Scheduler-Unterstützung",
+              "battery_schedules_enabled": "Aktivieren Sie den Batterieplaner",
+              "system_event_repair_issues": "Reparaturmeldungen für Systemereignisse aktivieren",
+              "pricing_edits_enabled": "Preisänderungen aktivieren",
+              "weather_enabled": "Wetter aktivieren",
+              "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert.",
+              "pricing_edits_enabled": "Stromtarife des IQ Gateway verwalten",
+              "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist.",
+              "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist.",
+              "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten.",
+              "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten."
+            }
+          }
+        },
+        "data": {
+          "devices": "Geräte auswählen",
+          "device_features": "Gerätefunktionen",
+          "type_envoy": "Gateway",
+          "type_encharge": "Batterie",
+          "type_ac_battery": "AC-Batterie",
+          "type_iqevse": "Ladegeräte",
+          "type_heatpump": "Wärmepumpe",
+          "type_microinverter": "Mikrowechselrichter",
+          "schedule_sync_enabled": "Aktivieren Sie die Scheduler-Unterstützung",
+          "battery_schedules_enabled": "Aktivieren Sie den Batterieplaner",
+          "system_event_repair_issues": "Reparaturmeldungen für Systemereignisse aktivieren",
+          "pricing_edits_enabled": "Preisänderungen aktivieren",
+          "weather_enabled": "Wetter aktivieren",
+          "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)"
+        },
+        "data_description": {
+          "type_envoy": "Enthält Gateway-Konnektivitäts- und Zählerdiagnosen.",
+          "type_encharge": "Enthält Batterie-Status- und Steuerungs-Entitäten, wenn verfügbar.",
           "type_ac_battery": "Enthält AC-Batterie-Sensoren und Steuerelemente für den Schlafmodus, wenn verfügbar.",
-          "battery_schedules_enabled": "IQ-Batteriepläne verwalten",
+          "type_iqevse": "Enthält EV-Ladegeräte-Entitäten und Steuerungen.",
+          "type_heatpump": "Enthält Sensoren für Wärmepumpenstatus, Diagnose und Verbrauch.",
+          "type_microinverter": "Enthält Sensoren für Mikrowechselrichter-Konnektivität, aktive Anzahl und Lebenszeit-Erzeugung.",
+          "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert.",
+          "pricing_edits_enabled": "Stromtarife des IQ Gateway verwalten",
+          "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist.",
+          "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist.",
+          "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten.",
+          "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten."
+        }
+      },
+      "repair_notifications": {
+        "title": "Benachrichtigungen",
+        "description": "Wählen Sie aus, welche Enphase-Zustände Home Assistant-Reparaturen erstellen.",
+        "data": {
+          "degraded_service_repair_issues": "Reparaturen für beeinträchtigte Dienste aktivieren",
+          "system_event_repair_issues": "Reparaturmeldungen für Systemereignisse aktivieren"
+        },
+        "data_description": {
           "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind.",
-          "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist."
+          "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert."
+        }
+      },
+      "authentication_settings": {
+        "title": "Authentifizierung",
+        "description": "Startet den Login-Ablauf, um Zugangsdaten zu erneuern, ohne die Integration zu entfernen.",
+        "data": {
+          "reauth": "Reauthentifizierung starten",
+          "forget_password": "Gespeichertes Passwort löschen"
+        },
+        "data_description": {
+          "reauth": "Startet den Login-Ablauf, um Zugangsdaten zu erneuern, ohne die Integration zu entfernen.",
+          "forget_password": "Entfernt das gespeicherte Passwort. Automatische Aktualisierung wird nicht mehr versucht."
         }
       },
       "migrate_envoy_source": {
@@ -605,12 +682,12 @@
           "battery_discharge": "Batterieentladung"
         },
         "data_description": {
-          "solar_production": "Assign a cumulative production total to the Enphase Energy Site Solar Production sensor. Do not choose daily energy or live power.",
-          "consumption": "Assign a cumulative consumption total to the Enphase Energy Site Consumption sensor. Do not choose daily energy or live power.",
-          "grid_import": "Assign a cumulative grid import total to the Enphase Energy Site Grid Import sensor. Do not choose daily energy or live power.",
-          "grid_export": "Assign a cumulative grid export total to the Enphase Energy Site Grid Export sensor. Do not choose daily energy or live power.",
-          "battery_charge": "Assign a cumulative battery charge total to the Enphase Energy Site Battery Charge sensor. Do not choose daily energy or live power.",
-          "battery_discharge": "Assign a cumulative battery discharge total to the Enphase Energy Site Battery Discharge sensor. Do not choose daily energy or live power."
+          "solar_production": "Weisen Sie dem Sensor Standort Solarproduktion einen kumulierten Gesamtwert zu. Wählen Sie keine Tagesenergie oder momentane Leistung.",
+          "consumption": "Weisen Sie dem Sensor Standortverbrauch einen kumulierten Gesamtwert zu. Wählen Sie keine Tagesenergie oder momentane Leistung.",
+          "grid_import": "Weisen Sie dem Sensor Standort Netzbezug einen kumulierten Gesamtwert zu. Wählen Sie keine Tagesenergie oder momentane Leistung.",
+          "grid_export": "Weisen Sie dem Sensor Standort Netzeinspeisung einen kumulierten Gesamtwert zu. Wählen Sie keine Tagesenergie oder momentane Leistung.",
+          "battery_charge": "Weisen Sie dem Sensor Standort Batterieladung einen kumulierten Gesamtwert zu. Wählen Sie keine Tagesenergie oder momentane Leistung.",
+          "battery_discharge": "Weisen Sie dem Sensor Standort Batterientladung einen kumulierten Gesamtwert zu. Wählen Sie keine Tagesenergie oder momentane Leistung."
         }
       },
       "migrate_envoy_confirm": {
@@ -625,15 +702,27 @@
         "title": "Erweitert",
         "description": "Installateur- und Wartungsaktionen.",
         "menu_options": {
+          "grid_toggle": "Netzmodus",
           "grid_profile": "Netzprofil-Steuerung"
         },
         "menu_option_descriptions": {
+          "grid_toggle": "Manuelle Netzmodus-Steuerung konfigurieren.",
           "grid_profile": "Nur für Installateure verfügbare Activation-Netzprofile durchsuchen und anwenden."
+        }
+      },
+      "grid_toggle": {
+        "title": "Netzmodus",
+        "description": "Die Netzmodus-Überwachung bleibt jederzeit verfügbar. Die manuelle Umschaltung ist sicherheitsrelevant; zusätzliche Entitäten und Dienstaktionen erfordern daher eine ausdrückliche Aktivierung.",
+        "data": {
+          "grid_toggle_enabled": "Netzmodus-Steuerung aktivieren"
+        },
+        "data_description": {
+          "grid_toggle_enabled": "Der Sensor Netzmodus bleibt verfügbar. Die Aktivierung erstellt Netzsteuerungsstatus und OTP anfordern und erlaubt Dienstaktionen."
         }
       },
       "grid_profile": {
         "title": "Netzprofil-Steuerung",
-        "description": "Filtert den Activation-Netzprofilkatalog für das Land dieses Standorts.",
+        "description": "Filtert den Activation-Netzprofilkatalog für das Land dieses Standorts.\n\nWARNUNG: DAS ANWENDEN EINES FALSCHEN NETZPROFILS KANN ZU FEHLFUNKTIONEN DES SYSTEMS FÜHREN.",
         "data": {
           "grid_profile_region": "Region",
           "grid_profile_commonly_used": "Profilliste"
@@ -991,6 +1080,9 @@
           },
           "metrics_available": {
             "name": "Metriken verfügbar"
+          },
+          "endpoint_failure_details": {
+            "name": "Details zu Endpunktfehlern"
           }
         }
       },
@@ -1287,7 +1379,7 @@
         }
       },
       "grid_mode": {
-        "name": "Rastermodus",
+        "name": "Netzmodus",
         "state": {
           "on_grid": "Am Netz",
           "off_grid": "Vom Netz getrennt",
@@ -1556,7 +1648,7 @@
         "name": "Aktive Mikrowechselrichter"
       },
       "inverter_telemetry": {
-        "name": "{serial_number} Telemetrie"
+        "name": "{serial_number} Leistung"
       },
       "microinverter_last_reported": {
         "name": "Letzte Meldung der Mikrowechselrichter"
@@ -1660,9 +1752,9 @@
       "ac_battery_overall_status": {
         "name": "Gesamtstatus der AC-Batterie",
         "state": {
-          "charging": "Laden",
-          "discharging": "Entladen",
-          "idle": "Leerlauf",
+          "normal": "Normal",
+          "warning": "Warnung",
+          "error": "Fehler",
           "unknown": "Unbekannt"
         }
       },
@@ -1678,9 +1770,9 @@
       "ac_battery_storage_status": {
         "name": "{serial} Status",
         "state": {
-          "charging": "Laden",
-          "discharging": "Entladen",
-          "idle": "Leerlauf",
+          "normal": "Normal",
+          "warning": "Warnung",
+          "error": "Fehler",
           "unknown": "Unbekannt"
         }
       },
@@ -2070,6 +2162,12 @@
           "high_impact_count": {
             "name": "Anzahl schwerwiegender Ereignisse"
           },
+          "standing_alarm_count": {
+            "name": "Anzahl aktiver Alarme"
+          },
+          "active_events": {
+            "name": "Aktive Ereignisse"
+          },
           "severity_counts": {
             "name": "Anzahl nach Schweregrad"
           },
@@ -2324,7 +2422,7 @@
       "description": "Standort {site_id} benötigt aktualisierte Sitzungs-Header. Bitte erneut authentifizieren."
     },
     "auth_blocked": {
-      "title": "Enphase Energy authentication temporarily blocked",
+      "title": "Enphase Energy-Authentifizierung vorübergehend blockiert",
       "description": "Enphase scheint die Authentifizierung für Standort {site_id} vorübergehend zu blockieren. Automatische Versuche sind bis {blocked_until} pausiert. Eine erfolgreiche manuelle erneute Authentifizierung kann die Blockierung früher aufheben."
     },
     "too_many_active_sessions": {
@@ -2997,10 +3095,6 @@
         "region_code": {
           "name": "Regioncode",
           "description": "Optionaler Regions-/Bundeslandcode, z. B. VIC."
-        },
-        "commonly_used": {
-          "name": "Nur häufig verwendete",
-          "description": "Gibt den Katalog häufig verwendeter Profile zurück, wenn aktiviert."
         },
         "device_id": {
           "name": "Standortgeräte",
