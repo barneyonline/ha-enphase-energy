@@ -3723,7 +3723,7 @@ class EnphaseCoordinator(
                 continue
             self._ensure_serial_tracked(sn)
             records.append((sn, obj))
-            if not self._has_embedded_charge_mode(obj):
+            if not self._has_embedded_charge_mode_preference(obj):
                 charge_mode_candidates.append(sn)
 
         if (
@@ -4760,6 +4760,26 @@ class EnphaseCoordinator(
         for key in ("mode", "chargeMode", "chargingMode", "charge_mode"):
             val = obj.get(key)
             if val is not None:
+                return True
+        sch = obj.get("sch_d")
+        if isinstance(sch, dict):
+            if sch.get("mode") or sch.get("status"):
+                return True
+            info = sch.get("info")
+            if isinstance(info, list):
+                for entry in info:
+                    if isinstance(entry, dict) and (
+                        entry.get("type") or entry.get("mode") or entry.get("status")
+                    ):
+                        return True
+        return False
+
+    def _has_embedded_charge_mode_preference(self, obj: dict[str, object]) -> bool:
+        """Check whether status embeds a charge-mode preference."""
+        if not isinstance(obj, dict):
+            return False
+        for key in ("chargeMode", "chargingMode", "charge_mode"):
+            if obj.get(key) is not None:
                 return True
         sch = obj.get("sch_d")
         if isinstance(sch, dict):

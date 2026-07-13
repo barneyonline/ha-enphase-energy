@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, Mock, call
@@ -118,23 +119,34 @@ async def test_evse_runtime_green_battery_write_marks_scheduler_unavailable(
 
 
 def test_evse_runtime_battery_profile_charge_mode_preference_paths(
-    coordinator_factory,
+    coordinator_factory, monkeypatch
 ) -> None:
     coord = coordinator_factory(serials=["EV1"])
     runtime = coord.evse_runtime
+    clock = {"now": 1000.0}
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.evse_runtime.time.monotonic",
+        lambda: clock["now"],
+    )
 
     assert runtime.battery_profile_charge_mode_preference("EV1") is None
 
-    coord._storm_guard_cache_until = 10.0**12  # noqa: SLF001
+    coord._battery_profile_devices_last_success_mono = 1000.0  # noqa: SLF001
     coord._battery_profile_devices = [  # noqa: SLF001
         {"uuid": "evse-1", "chargeMode": "GREEN", "enable": True}
     ]
     assert runtime.battery_profile_charge_mode_preference("EV1") == "GREEN_CHARGING"
 
-    coord._storm_guard_cache_until = 0.0  # noqa: SLF001
+    clock["now"] = 1299.0
+    assert runtime.battery_profile_charge_mode_preference("EV1") == "GREEN_CHARGING"
+
+    clock["now"] = 1300.0
     assert runtime.battery_profile_charge_mode_preference("EV1") is None
 
-    coord._storm_guard_cache_until = 10.0**12  # noqa: SLF001
+    clock["now"] = 999.0
+    assert runtime.battery_profile_charge_mode_preference("EV1") is None
+
+    clock["now"] = 1000.0
     coord._battery_profile_devices = ["bad"]  # noqa: SLF001
     assert runtime.battery_profile_charge_mode_preference("EV1") is None
 
@@ -166,7 +178,7 @@ def test_evse_runtime_battery_profile_charge_mode_preference_error_paths() -> No
         SimpleNamespace(
             _configured_serials=set(),
             serials={"EV1", "EV2"},
-            _storm_guard_cache_until=10.0**12,
+            _battery_profile_devices_last_success_mono=time.monotonic(),
             _battery_profile_devices=[{"chargeMode": "GREEN"}],
         )
     )
@@ -176,7 +188,7 @@ def test_evse_runtime_battery_profile_charge_mode_preference_error_paths() -> No
         SimpleNamespace(
             _configured_serials={"EV1"},
             serials={"EV1"},
-            _storm_guard_cache_until="bad",
+            _battery_profile_devices_last_success_mono="bad",
             _battery_profile_devices=[{"chargeMode": "GREEN"}],
         )
     )
@@ -185,7 +197,7 @@ def test_evse_runtime_battery_profile_charge_mode_preference_error_paths() -> No
     class _BrokenDevices:
         _configured_serials = {"EV1"}
         serials = {"EV1"}
-        _storm_guard_cache_until = 10.0**12
+        _battery_profile_devices_last_success_mono = time.monotonic()
 
         @property
         def _battery_profile_devices(self):

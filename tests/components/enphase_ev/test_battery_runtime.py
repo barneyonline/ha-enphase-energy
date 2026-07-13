@@ -1526,6 +1526,15 @@ def test_battery_runtime_parse_profile_payload_branches_and_helpers(
     assert coord.battery_profile_evse_device is not None
     assert coord.battery_profile_evse_device["uuid"] == "evse-1"
     assert coord.battery_profile_evse_device["device_name"] == "IQ EV Charger"
+    profile_devices_success = (
+        coord._battery_profile_devices_last_success_mono
+    )  # noqa: SLF001
+    assert isinstance(profile_devices_success, float)
+
+    coord.battery_runtime.parse_battery_profile_payload({"unexpected": True})
+    assert (  # noqa: SLF001
+        coord._battery_profile_devices_last_success_mono == profile_devices_success
+    )
 
     coord.battery_runtime.parse_battery_profile_payload(
         {"profile": "backup_only", "batteryBackupPercentage": 80}
@@ -1533,6 +1542,15 @@ def test_battery_runtime_parse_profile_payload_branches_and_helpers(
     assert coord.battery_effective_backup_percentage == 100
     assert coord._battery_profile_devices == []  # noqa: SLF001
     assert coord.battery_profile_devices_payload() is None
+    assert (  # noqa: SLF001
+        coord._battery_profile_devices_last_success_mono >= profile_devices_success
+    )
+
+    coord._battery_profile_devices = [  # noqa: SLF001
+        {"uuid": "stale", "chargeMode": "MANUAL", "enable": True}
+    ]
+    coord.battery_runtime.parse_battery_profile_payload({"devices": {"iqEvse": []}})
+    assert coord._battery_profile_devices == []  # noqa: SLF001
 
     coord._battery_profile_devices = [  # noqa: SLF001
         {"chargeMode": "MANUAL", "enable": True},

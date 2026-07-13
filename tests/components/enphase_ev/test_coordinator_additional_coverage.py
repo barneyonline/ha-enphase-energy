@@ -2663,10 +2663,7 @@ async def test_async_update_data_uses_status_mode_for_effective_charge_mode(
     coord._has_successful_refresh = True  # noqa: SLF001
     coord._scheduler_available = False  # noqa: SLF001
     coord._scheduler_backoff_active = lambda: False  # type: ignore[assignment]  # noqa: SLF001
-    coord._charge_mode_cache["EV1"] = (
-        "GREEN_CHARGING",
-        coord_mod.time.monotonic(),
-    )
+    coord.client.charge_mode = AsyncMock(return_value="GREEN_CHARGING")
     coord.client.status = AsyncMock(
         return_value={
             "evChargerData": [
@@ -2680,7 +2677,7 @@ async def test_async_update_data_uses_status_mode_for_effective_charge_mode(
                             "connectorStatusReason": "INSUFFICIENT_SOLAR",
                         }
                     ],
-                    "sch_d": {"status": 1, "info": [{"type": "greencharging"}]},
+                    "sch_d": {"status": 0, "info": [{"type": 0}]},
                     "session_d": {},
                     "charging": False,
                     "pluggedIn": True,
@@ -2725,8 +2722,10 @@ async def test_async_update_data_uses_status_mode_for_effective_charge_mode(
     result = await coord._async_update_data()  # noqa: SLF001
 
     assert result["EV1"]["charge_mode_pref"] == "GREEN_CHARGING"
+    assert result["EV1"]["charge_mode_pref_source"] == "scheduler_endpoint"
     assert result["EV1"]["charge_mode"] == "MANUAL_CHARGING"
     assert result["EV1"]["charge_mode_source"] == "explicit_status"
+    coord.client.charge_mode.assert_awaited_once_with("EV1")
 
 
 @pytest.mark.asyncio
@@ -2811,7 +2810,7 @@ async def test_async_update_data_drops_expired_cached_charge_preference_when_sta
 
 
 @pytest.mark.asyncio
-async def test_async_update_data_uses_battery_profile_charge_mode_when_scheduler_pref_missing(
+async def test_async_update_data_keeps_manual_battery_profile_mode_after_refresh_cache_expires(
     coordinator_factory,
 ):
     coord = coordinator_factory(
@@ -2831,23 +2830,28 @@ async def test_async_update_data_uses_battery_profile_charge_mode_when_scheduler
         "GREEN_CHARGING",
         coord_mod.time.monotonic() - CHARGE_MODE_CACHE_TTL - 1,
     )
-    coord._storm_guard_cache_until = coord_mod.time.monotonic() + 300  # noqa: SLF001
+    coord._storm_guard_cache_until = 0.0  # noqa: SLF001
+    coord._battery_profile_devices_last_success_mono = (  # noqa: SLF001
+        coord_mod.time.monotonic()
+    )
     coord._battery_profile_devices = [  # noqa: SLF001
-        {"uuid": "evse-1", "chargeMode": "GREEN", "enable": True}
+        {"uuid": "evse-1", "chargeMode": "MANUAL", "enable": True}
     ]
+    coord.client.charge_mode = AsyncMock(return_value=None)
     coord.client.status = AsyncMock(
         return_value={
             "evChargerData": [
                 {
                     "sn": "EV1",
                     "name": "Garage EV",
+                    "mode": 0,
                     "connectors": [
                         {
                             "connectorStatusType": coord_mod.SUSPENDED_EVSE_STATUS,
                             "connectorStatusReason": "INSUFFICIENT_SOLAR",
                         }
                     ],
-                    "sch_d": {"status": 1, "info": [{"type": "CUSTOM"}]},
+                    "sch_d": {"status": 0, "info": [{"type": 0}]},
                     "session_d": {},
                     "charging": False,
                 }
@@ -2890,8 +2894,11 @@ async def test_async_update_data_uses_battery_profile_charge_mode_when_scheduler
 
     result = await coord._async_update_data()  # noqa: SLF001
 
-    assert result["EV1"]["charge_mode_pref"] == "GREEN_CHARGING"
-    assert result["EV1"]["charge_mode"] == "GREEN_CHARGING"
+    assert result["EV1"]["charge_mode_pref"] == "MANUAL_CHARGING"
+    assert result["EV1"]["charge_mode_pref_source"] == "battery_profile_fallback"
+    assert result["EV1"]["charge_mode"] == "MANUAL_CHARGING"
+    assert result["EV1"]["charge_mode_source"] == "explicit_status"
+    coord.client.charge_mode.assert_awaited_once_with("EV1")
 
 
 @pytest.mark.asyncio
@@ -3241,6 +3248,13 @@ def test_has_embedded_charge_mode_detects_nested():
     }
     assert coord._has_embedded_charge_mode(payload) is True
     assert coord._has_embedded_charge_mode({"foo": "bar"}) is False
+    assert coord._has_embedded_charge_mode({"mode": 0}) is True
+    assert coord._has_embedded_charge_mode_preference({"mode": 0}) is False
+    assert coord._has_embedded_charge_mode_preference(payload) is True
+    assert (
+        coord._has_embedded_charge_mode_preference({"chargeMode": "MANUAL_CHARGING"})
+        is True
+    )
 
 
 @pytest.mark.asyncio

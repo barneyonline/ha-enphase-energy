@@ -1551,6 +1551,7 @@ async def test_async_resolve_charge_modes_skips_empty_serials(coordinator_factor
 def test_has_embedded_charge_mode_for_non_dict(coordinator_factory):
     coord = coordinator_factory()
     assert coord._has_embedded_charge_mode([]) is False
+    assert coord._has_embedded_charge_mode_preference([]) is False
 
 
 def test_persist_tokens_handles_missing_entry(coordinator_factory):

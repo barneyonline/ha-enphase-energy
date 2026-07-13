@@ -399,6 +399,7 @@ class BatteryState:
     _battery_profile_evse_device: PayloadMap | None = None
     _battery_use_battery_for_self_consumption: bool | None = None
     _battery_profile_devices: PayloadRecords = field(default_factory=list)
+    _battery_profile_devices_last_success_mono: float | None = None
     _battery_pending_profile: str | None = None
     _battery_pending_reserve: int | None = None
     _battery_pending_sub_type: str | None = None
