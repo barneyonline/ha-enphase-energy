@@ -51,8 +51,12 @@ from .battery_schedule_editor import (
     battery_scheduler_enabled,
 )
 from .const import (
+    DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+    DEFAULT_MICROINVERTER_POWER_ENABLED,
     DEFAULT_NOMINAL_VOLTAGE,
     DOMAIN,
+    OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+    OPT_MICROINVERTER_POWER_ENABLED,
     PHASE_SWITCH_CONFIG_SETTING,
     SAFE_LIMIT_AMPS,
 )
@@ -342,6 +346,30 @@ async def async_setup_entry(
         ent_reg,
         config_entry_id=entry.entry_id,
         site_id=str(coord.site_id),
+    )
+    microinverter_lifetime_energy_enabled = bool(
+        entry.options.get(
+            OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+            DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+        )
+    )
+    microinverter_power_enabled = bool(
+        entry.options.get(
+            OPT_MICROINVERTER_POWER_ENABLED,
+            DEFAULT_MICROINVERTER_POWER_ENABLED,
+        )
+    )
+    registry_setup.sync_inverter_sensor_enabled_defaults(
+        lifetime_energy_enabled=(
+            microinverter_lifetime_energy_enabled
+            if OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED in entry.options
+            else None
+        ),
+        power_enabled=(
+            microinverter_power_enabled
+            if OPT_MICROINVERTER_POWER_ENABLED in entry.options
+            else None
+        ),
     )
     known_site_entity_keys = registry_setup.known_site_entity_keys
     known_type_keys = registry_setup.known_type_keys
@@ -1000,7 +1028,12 @@ async def async_setup_entry(
         ]
         if serials:
             entities = [
-                EnphaseInverterLifetimeEnergySensor(coord, sn) for sn in serials
+                EnphaseInverterLifetimeEnergySensor(
+                    coord,
+                    sn,
+                    enabled_default=microinverter_lifetime_energy_enabled,
+                )
+                for sn in serials
             ]
             async_add_entities(entities, update_before_add=False)
             registry_setup.known_inverter_serials.update(serials)
@@ -1013,7 +1046,14 @@ async def async_setup_entry(
         ]
         if telemetry_serials:
             async_add_entities(
-                [EnphaseInverterTelemetrySensor(coord, sn) for sn in telemetry_serials],
+                [
+                    EnphaseInverterTelemetrySensor(
+                        coord,
+                        sn,
+                        enabled_default=microinverter_power_enabled,
+                    )
+                    for sn in telemetry_serials
+                ],
                 update_before_add=False,
             )
             registry_setup.known_inverter_telemetry_serials.update(telemetry_serials)
@@ -3267,11 +3307,18 @@ class EnphaseInverterTelemetrySensor(CoordinatorEntity, SensorEntity):  # type: 
     _attr_entity_registry_enabled_default = False
     _attr_suggested_display_precision = 1
 
-    def __init__(self, coord: EnphaseCoordinator, serial: str) -> None:
+    def __init__(
+        self,
+        coord: EnphaseCoordinator,
+        serial: str,
+        *,
+        enabled_default: bool = False,
+    ) -> None:
         super().__init__(coord)
         self._coord = coord
         self._sn = str(serial)
         self._attr_unique_id = f"{DOMAIN}_inverter_{self._sn}_telemetry"
+        self._attr_entity_registry_enabled_default = enabled_default
         self._attr_translation_placeholders = {"serial_number": self._sn}
 
     def _snapshot(self) -> dict[str, object]:
@@ -3350,12 +3397,19 @@ class EnphaseInverterLifetimeEnergySensor(CoordinatorEntity, RestoreSensor):  # 
         {"sampled_at_utc", "status", "status_text", "rssi"}
     )
 
-    def __init__(self, coord: EnphaseCoordinator, serial: str) -> None:
+    def __init__(
+        self,
+        coord: EnphaseCoordinator,
+        serial: str,
+        *,
+        enabled_default: bool = True,
+    ) -> None:
         super().__init__(coord)
         self._coord = coord
         self._sn = str(serial)
         self._attr_translation_placeholders = {"serial": self._sn}
         self._attr_unique_id = f"{DOMAIN}_inverter_{self._sn}_lifetime_energy"
+        self._attr_entity_registry_enabled_default = enabled_default
         self._last_good_native_value: float | None = None
         self._snapshot_cache_token: tuple[int, int] | None = None
         self._snapshot_cache: dict[str, object] | None = None

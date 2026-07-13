@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from typing import Any, cast
 
+from homeassistant.helpers import entity_registry as er
+
 from .const import DOMAIN
 from .device_types import is_dry_contact_type_key
 from .runtime_helpers import coerce_optional_text as _clean_text
@@ -116,6 +118,42 @@ class EnphaseSensorRegistrySetup:
         """Return the unique ID for a microinverter telemetry sensor."""
 
         return inverter_entity_unique_id(serial, "_telemetry")
+
+    def sync_inverter_sensor_enabled_defaults(
+        self,
+        *,
+        lifetime_energy_enabled: bool | None,
+        power_enabled: bool | None,
+    ) -> None:
+        """Apply integration options to registered microinverter sensors."""
+
+        for reg_entry in list(self._entity_registry_values()):
+            if not self._registry_entry_matches_sensor(reg_entry):
+                continue
+            unique_id = _clean_text(getattr(reg_entry, "unique_id", None))
+            if not unique_id or not unique_id.startswith(f"{DOMAIN}_inverter_"):
+                continue
+            if unique_id.endswith("_lifetime_energy"):
+                enabled = lifetime_energy_enabled
+            elif unique_id.endswith("_telemetry"):
+                enabled = power_enabled
+            else:
+                continue
+            if enabled is None:
+                continue
+            disabled_by = getattr(reg_entry, "disabled_by", None)
+            if enabled:
+                if not self._is_disabled_by_integration(disabled_by):
+                    continue
+                new_disabled_by = None
+            else:
+                if disabled_by is not None:
+                    continue
+                new_disabled_by = er.RegistryEntryDisabler.INTEGRATION
+            self._ent_reg.async_update_entity(
+                reg_entry.entity_id,
+                disabled_by=new_disabled_by,
+            )
 
     def remove_site_sensor_entity(self, key: str) -> None:
         """Remove a site-level sensor entity by setup key."""
@@ -490,6 +528,12 @@ class EnphaseSensorRegistrySetup:
         return not (
             entry_config_id is not None and entry_config_id != self._config_entry_id
         )
+
+    @staticmethod
+    def _is_disabled_by_integration(disabled_by: object) -> bool:
+        if disabled_by is None:
+            return False
+        return getattr(disabled_by, "value", disabled_by) == "integration"
 
     def _async_get_sensor_entity_id(self, unique_id: str) -> str | None:
         get_entity_id = getattr(self._ent_reg, "async_get_entity_id", None)

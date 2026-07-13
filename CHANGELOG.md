@@ -8,7 +8,10 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
-- None
+- Added independent Device Features options to enable or disable all
+  per-microinverter Lifetime Energy sensors and all installer-level Power sensors.
+  Existing defaults are preserved: Lifetime Energy is enabled and Power is
+  disabled until opted in.
 
 ### 🐛 Bug fixes
 - Removed a previously created Enphase site weather entity automatically when

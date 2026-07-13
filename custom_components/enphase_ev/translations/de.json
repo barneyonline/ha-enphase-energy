@@ -519,7 +519,9 @@
           "type_ac_battery": "AC-Batterie",
           "battery_schedules_enabled": "Aktivieren Sie den Batterieplaner",
           "degraded_service_repair_issues": "Reparaturen für beeinträchtigte Dienste aktivieren",
-          "weather_enabled": "Wetter aktivieren"
+          "weather_enabled": "Wetter aktivieren",
+          "microinverter_lifetime_energy_enabled": "Lebensdauerenergie der Mikro-Wechselrichter aktivieren",
+          "microinverter_power_enabled": "Leistung der Mikro-Wechselrichter aktivieren"
         },
         "data_description": {
           "type_envoy": "Enthält Gateway-Konnektivitäts- und Zählerdiagnosen.",
@@ -535,7 +537,9 @@
           "type_heatpump": "Enthält Sensoren für Wärmepumpenstatus, Diagnose und Verbrauch.",
           "type_ac_battery": "Enthält AC-Batterie-Sensoren und Steuerelemente für den Schlafmodus, wenn verfügbar.",
           "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind.",
-          "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist."
+          "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist.",
+          "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
+          "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist."
         }
       },
       "settings": {
@@ -589,7 +593,9 @@
               "system_event_repair_issues": "Reparaturmeldungen für Systemereignisse aktivieren",
               "pricing_edits_enabled": "Preisänderungen aktivieren",
               "weather_enabled": "Wetter aktivieren",
-              "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)"
+              "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)",
+              "microinverter_lifetime_energy_enabled": "Lebensdauerenergie der Mikro-Wechselrichter aktivieren",
+              "microinverter_power_enabled": "Leistung der Mikro-Wechselrichter aktivieren"
             },
             "data_description": {
               "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert.",
@@ -597,7 +603,9 @@
               "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist.",
               "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist.",
               "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten.",
-              "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten."
+              "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten.",
+              "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
+              "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist."
             }
           }
         },
@@ -615,7 +623,9 @@
           "system_event_repair_issues": "Reparaturmeldungen für Systemereignisse aktivieren",
           "pricing_edits_enabled": "Preisänderungen aktivieren",
           "weather_enabled": "Wetter aktivieren",
-          "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)"
+          "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)",
+          "microinverter_lifetime_energy_enabled": "Lebensdauerenergie der Mikro-Wechselrichter aktivieren",
+          "microinverter_power_enabled": "Leistung der Mikro-Wechselrichter aktivieren"
         },
         "data_description": {
           "type_envoy": "Enthält Gateway-Konnektivitäts- und Zählerdiagnosen.",
@@ -629,7 +639,9 @@
           "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist.",
           "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist.",
           "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten.",
-          "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten."
+          "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten.",
+          "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
+          "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist."
         }
       },
       "repair_notifications": {

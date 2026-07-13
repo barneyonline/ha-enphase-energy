@@ -519,7 +519,9 @@
           "type_ac_battery": "AC baterija",
           "battery_schedules_enabled": "Iespējot akumulatora plānotāju",
           "degraded_service_repair_issues": "Iespējot degradētu pakalpojumu labojumus",
-          "weather_enabled": "Iespējot laikapstākļus"
+          "weather_enabled": "Iespējot laikapstākļus",
+          "microinverter_lifetime_energy_enabled": "Iespējot mikroinvertoru kopējo enerģiju",
+          "microinverter_power_enabled": "Iespējot mikroinvertoru jaudu"
         },
         "data_description": {
           "type_envoy": "Ietver vārtejas savienojamības un skaitītāju diagnostiku.",
@@ -535,7 +537,9 @@
           "type_heatpump": "Ietver siltumsūkņa statusa, diagnostikas un patēriņa sensorus.",
           "type_ac_battery": "Ietver AC baterijas sensorus un miega režīma vadīklas, kad tās ir pieejamas.",
           "degraded_service_repair_issues": "Izveido Repairs problēmas, kad izvēles Enphase pakalpojumi darbojas pasliktināti.",
-          "weather_enabled": "Iegūst pašreizējos vietas laikapstākļus no Enphase un izveido laikapstākļu entītiju tikai tad, ja galapunkts ir pieejams."
+          "weather_enabled": "Iegūst pašreizējos vietas laikapstākļus no Enphase un izveido laikapstākļu entītiju tikai tad, ja galapunkts ir pieejams.",
+          "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
+          "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija."
         }
       },
       "settings": {
@@ -589,7 +593,9 @@
               "system_event_repair_issues": "Iespējot sistēmas notikumu labošanas paziņojumus",
               "pricing_edits_enabled": "Iespējot cenu rediģēšanu",
               "weather_enabled": "Iespējot laikapstākļus",
-              "nominal_voltage": "EV lādētāja nominālais spriegums (V)"
+              "nominal_voltage": "EV lādētāja nominālais spriegums (V)",
+              "microinverter_lifetime_energy_enabled": "Iespējot mikroinvertoru kopējo enerģiju",
+              "microinverter_power_enabled": "Iespējot mikroinvertoru jaudu"
             },
             "data_description": {
               "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts.",
@@ -597,7 +603,9 @@
               "weather_enabled": "Iegūst pašreizējos vietas laikapstākļus no Enphase un izveido laikapstākļu entītiju tikai tad, ja galapunkts ir pieejams.",
               "nominal_voltage": "Tipisks maiņstrāvas padeves spriegums jaudas novērtēšanai, ja aktuālais spriegums nav pieejams.",
               "schedule_sync_enabled": "Pārvaldiet IQ EV Charger grafikus.",
-              "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus."
+              "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus.",
+              "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
+              "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija."
             }
           }
         },
@@ -615,7 +623,9 @@
           "system_event_repair_issues": "Iespējot sistēmas notikumu labošanas paziņojumus",
           "pricing_edits_enabled": "Iespējot cenu rediģēšanu",
           "weather_enabled": "Iespējot laikapstākļus",
-          "nominal_voltage": "EV lādētāja nominālais spriegums (V)"
+          "nominal_voltage": "EV lādētāja nominālais spriegums (V)",
+          "microinverter_lifetime_energy_enabled": "Iespējot mikroinvertoru kopējo enerģiju",
+          "microinverter_power_enabled": "Iespējot mikroinvertoru jaudu"
         },
         "data_description": {
           "type_envoy": "Ietver vārtejas savienojamības un skaitītāju diagnostiku.",
@@ -629,7 +639,9 @@
           "weather_enabled": "Iegūst pašreizējos vietas laikapstākļus no Enphase un izveido laikapstākļu entītiju tikai tad, ja galapunkts ir pieejams.",
           "nominal_voltage": "Tipisks maiņstrāvas padeves spriegums jaudas novērtēšanai, ja aktuālais spriegums nav pieejams.",
           "schedule_sync_enabled": "Pārvaldiet IQ EV Charger grafikus.",
-          "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus."
+          "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus.",
+          "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
+          "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija."
         }
       },
       "repair_notifications": {

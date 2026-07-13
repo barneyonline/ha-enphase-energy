@@ -519,7 +519,9 @@
           "type_ac_battery": "AC-batteri",
           "battery_schedules_enabled": "Aktivera batterischemaläggare",
           "degraded_service_repair_issues": "Aktivera reparationer för degraderade tjänster",
-          "weather_enabled": "Aktivera väder"
+          "weather_enabled": "Aktivera väder",
+          "microinverter_lifetime_energy_enabled": "Aktivera mikroväxelriktarnas livstidsenergi",
+          "microinverter_power_enabled": "Aktivera mikroväxelriktarnas effekt"
         },
         "data_description": {
           "type_envoy": "Inkluderar gateway-anslutning och mätardiagnostik.",
@@ -535,7 +537,9 @@
           "type_heatpump": "Inkluderar sensorer för värmepumpens status, diagnostik och förbrukning.",
           "type_ac_battery": "Inkluderar AC-batterisensorer och vilolägeskontroller när de är tillgängliga.",
           "degraded_service_repair_issues": "Skapar Repairs-problem när valfria Enphase-tjänster är degraderade.",
-          "weather_enabled": "Hämtar aktuellt väder för platsen från Enphase och skapar endast en väderentitet när slutpunkten är tillgänglig."
+          "weather_enabled": "Hämtar aktuellt väder för platsen från Enphase och skapar endast en väderentitet när slutpunkten är tillgänglig.",
+          "microinverter_lifetime_energy_enabled": "Aktiverar alla sensorer för livstidsenergi per mikroväxelriktare.",
+          "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig."
         }
       },
       "settings": {
@@ -589,7 +593,9 @@
               "system_event_repair_issues": "Aktivera reparationsaviseringar för systemhändelser",
               "pricing_edits_enabled": "Aktivera prisredigering",
               "weather_enabled": "Aktivera väder",
-              "nominal_voltage": "EV-laddarens nominella spänning (V)"
+              "nominal_voltage": "EV-laddarens nominella spänning (V)",
+              "microinverter_lifetime_energy_enabled": "Aktivera mikroväxelriktarnas livstidsenergi",
+              "microinverter_power_enabled": "Aktivera mikroväxelriktarnas effekt"
             },
             "data_description": {
               "system_event_repair_issues": "Skapar Home Assistant-reparationer för aktiva stående Enphase-larm. Inaktiverat som standard.",
@@ -597,7 +603,9 @@
               "weather_enabled": "Hämtar aktuellt väder för platsen från Enphase och skapar endast en väderentitet när slutpunkten är tillgänglig.",
               "nominal_voltage": "Typisk växelspänning som används för att uppskatta effekten när aktuell spänning inte är tillgänglig.",
               "schedule_sync_enabled": "Hantera scheman för IQ EV Charger.",
-              "battery_schedules_enabled": "Hantera scheman för IQ Battery."
+              "battery_schedules_enabled": "Hantera scheman för IQ Battery.",
+              "microinverter_lifetime_energy_enabled": "Aktiverar alla sensorer för livstidsenergi per mikroväxelriktare.",
+              "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig."
             }
           }
         },
@@ -615,7 +623,9 @@
           "system_event_repair_issues": "Aktivera reparationsaviseringar för systemhändelser",
           "pricing_edits_enabled": "Aktivera prisredigering",
           "weather_enabled": "Aktivera väder",
-          "nominal_voltage": "EV-laddarens nominella spänning (V)"
+          "nominal_voltage": "EV-laddarens nominella spänning (V)",
+          "microinverter_lifetime_energy_enabled": "Aktivera mikroväxelriktarnas livstidsenergi",
+          "microinverter_power_enabled": "Aktivera mikroväxelriktarnas effekt"
         },
         "data_description": {
           "type_envoy": "Inkluderar gateway-anslutning och mätardiagnostik.",
@@ -629,7 +639,9 @@
           "weather_enabled": "Hämtar aktuellt väder för platsen från Enphase och skapar endast en väderentitet när slutpunkten är tillgänglig.",
           "nominal_voltage": "Typisk växelspänning som används för att uppskatta effekten när aktuell spänning inte är tillgänglig.",
           "schedule_sync_enabled": "Hantera scheman för IQ EV Charger.",
-          "battery_schedules_enabled": "Hantera scheman för IQ Battery."
+          "battery_schedules_enabled": "Hantera scheman för IQ Battery.",
+          "microinverter_lifetime_energy_enabled": "Aktiverar alla sensorer för livstidsenergi per mikroväxelriktare.",
+          "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig."
         }
       },
       "repair_notifications": {

@@ -519,6 +519,8 @@
           "schedule_sync_enabled": "Enable EV Charger Scheduler",
           "battery_schedules_enabled": "Enable Battery Scheduler",
           "degraded_service_repair_issues": "Enable degraded service repairs",
+          "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
+          "microinverter_power_enabled": "Enable Microinverter Power",
           "weather_enabled": "Enable weather"
         },
         "data_description": {
@@ -535,6 +537,8 @@
           "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable.",
           "session_history_interval": "Minutes to wait between cloud session history fetches.",
           "degraded_service_repair_issues": "Raise Repairs issues when optional Enphase services are degraded.",
+          "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
+          "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available.",
           "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available."
         }
       },
@@ -588,6 +592,8 @@
               "battery_schedules_enabled": "Enable Battery Scheduler",
               "system_event_repair_issues": "Enable System Event Repair Notifications",
               "pricing_edits_enabled": "Enable Pricing Edits",
+              "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
+              "microinverter_power_enabled": "Enable Microinverter Power",
               "weather_enabled": "Enable weather",
               "nominal_voltage": "EV Charger nominal voltage (V)"
             },
@@ -596,6 +602,8 @@
               "battery_schedules_enabled": "Manage IQ Battery schedules.",
               "system_event_repair_issues": "Create Home Assistant Repairs for active Enphase standing alarms. Disabled by default.",
               "pricing_edits_enabled": "Manage IQ Gateway Electricity Rates",
+              "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
+              "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available.",
               "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
               "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable."
             }
@@ -614,6 +622,8 @@
           "battery_schedules_enabled": "Enable Battery Scheduler",
           "system_event_repair_issues": "Enable System Event Repair Notifications",
           "pricing_edits_enabled": "Enable Pricing Edits",
+          "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
+          "microinverter_power_enabled": "Enable Microinverter Power",
           "weather_enabled": "Enable weather",
           "nominal_voltage": "EV Charger nominal voltage (V)"
         },
@@ -628,6 +638,8 @@
           "battery_schedules_enabled": "Manage IQ Battery schedules.",
           "system_event_repair_issues": "Create Home Assistant Repairs for active Enphase standing alarms. Disabled by default.",
           "pricing_edits_enabled": "Manage IQ Gateway Electricity Rates",
+          "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
+          "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available.",
           "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
           "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable."
         }

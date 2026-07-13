@@ -519,7 +519,9 @@
           "type_ac_battery": "Bateria CA",
           "battery_schedules_enabled": "Ativar agendador da bateria",
           "degraded_service_repair_issues": "Ativar reparos de serviços degradados",
-          "weather_enabled": "Ativar clima"
+          "weather_enabled": "Ativar clima",
+          "microinverter_lifetime_energy_enabled": "Ativar energia vitalícia dos microinversores",
+          "microinverter_power_enabled": "Ativar potência dos microinversores"
         },
         "data_description": {
           "type_envoy": "Inclui conectividade do gateway e diagnósticos dos medidores.",
@@ -535,7 +537,9 @@
           "type_heatpump": "Inclui sensores de status, diagnóstico e consumo da bomba de calor.",
           "type_ac_battery": "Inclui sensores da bateria CA e controles do modo de suspensão quando disponíveis.",
           "degraded_service_repair_issues": "Cria problemas em Repairs quando serviços opcionais da Enphase estão degradados.",
-          "weather_enabled": "Obtém o clima atual do local pela Enphase e cria uma entidade de clima somente quando o endpoint está disponível."
+          "weather_enabled": "Obtém o clima atual do local pela Enphase e cria uma entidade de clima somente quando o endpoint está disponível.",
+          "microinverter_lifetime_energy_enabled": "Ativa todos os sensores de energia vitalícia de cada microinversor.",
+          "microinverter_power_enabled": "Ativa todos os sensores de potência de cada microinversor quando a telemetria do instalador está disponível."
         }
       },
       "settings": {
@@ -589,7 +593,9 @@
               "system_event_repair_issues": "Ativar notificações de reparo de eventos do sistema",
               "pricing_edits_enabled": "Ativar edição de preços",
               "weather_enabled": "Ativar clima",
-              "nominal_voltage": "Tensão nominal do carregador EV (V)"
+              "nominal_voltage": "Tensão nominal do carregador EV (V)",
+              "microinverter_lifetime_energy_enabled": "Ativar energia vitalícia dos microinversores",
+              "microinverter_power_enabled": "Ativar potência dos microinversores"
             },
             "data_description": {
               "system_event_repair_issues": "Cria reparos do Home Assistant para alarmes permanentes ativos da Enphase. Desativado por padrão.",
@@ -597,7 +603,9 @@
               "weather_enabled": "Obtém o clima atual do local pela Enphase e cria uma entidade de clima somente quando o endpoint está disponível.",
               "nominal_voltage": "Tensão de alimentação CA típica usada para estimar a potência quando a tensão em tempo real não está disponível.",
               "schedule_sync_enabled": "Gerencie os agendamentos do IQ EV Charger.",
-              "battery_schedules_enabled": "Gerencie os agendamentos da IQ Battery."
+              "battery_schedules_enabled": "Gerencie os agendamentos da IQ Battery.",
+              "microinverter_lifetime_energy_enabled": "Ativa todos os sensores de energia vitalícia de cada microinversor.",
+              "microinverter_power_enabled": "Ativa todos os sensores de potência de cada microinversor quando a telemetria do instalador está disponível."
             }
           }
         },
@@ -615,7 +623,9 @@
           "system_event_repair_issues": "Ativar notificações de reparo de eventos do sistema",
           "pricing_edits_enabled": "Ativar edição de preços",
           "weather_enabled": "Ativar clima",
-          "nominal_voltage": "Tensão nominal do carregador EV (V)"
+          "nominal_voltage": "Tensão nominal do carregador EV (V)",
+          "microinverter_lifetime_energy_enabled": "Ativar energia vitalícia dos microinversores",
+          "microinverter_power_enabled": "Ativar potência dos microinversores"
         },
         "data_description": {
           "type_envoy": "Inclui conectividade do gateway e diagnósticos dos medidores.",
@@ -629,7 +639,9 @@
           "weather_enabled": "Obtém o clima atual do local pela Enphase e cria uma entidade de clima somente quando o endpoint está disponível.",
           "nominal_voltage": "Tensão de alimentação CA típica usada para estimar a potência quando a tensão em tempo real não está disponível.",
           "schedule_sync_enabled": "Gerencie os agendamentos do IQ EV Charger.",
-          "battery_schedules_enabled": "Gerencie os agendamentos da IQ Battery."
+          "battery_schedules_enabled": "Gerencie os agendamentos da IQ Battery.",
+          "microinverter_lifetime_energy_enabled": "Ativa todos os sensores de energia vitalícia de cada microinversor.",
+          "microinverter_power_enabled": "Ativa todos os sensores de potência de cada microinversor quando a telemetria do instalador está disponível."
         }
       },
       "repair_notifications": {

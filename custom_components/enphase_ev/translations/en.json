@@ -519,7 +519,9 @@
           "battery_schedules_enabled": "Enable Battery Scheduler",
           "type_ac_battery": "AC Battery",
           "degraded_service_repair_issues": "Enable degraded service repairs",
-          "weather_enabled": "Enable weather"
+          "weather_enabled": "Enable weather",
+          "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
+          "microinverter_power_enabled": "Enable Microinverter Power"
         },
         "data_description": {
           "type_envoy": "Includes gateway connectivity and meter diagnostics.",
@@ -535,7 +537,9 @@
           "session_history_interval": "Minutes to wait between cloud session history fetches.",
           "type_ac_battery": "Includes AC Battery sensors and sleep mode controls when available.",
           "degraded_service_repair_issues": "Raise Repairs issues when optional Enphase services are degraded.",
-          "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available."
+          "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
+          "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
+          "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available."
         }
       },
       "settings": {
@@ -589,7 +593,9 @@
               "system_event_repair_issues": "Enable System Event Repair Notifications",
               "pricing_edits_enabled": "Enable Pricing Edits",
               "weather_enabled": "Enable weather",
-              "nominal_voltage": "EV Charger nominal voltage (V)"
+              "nominal_voltage": "EV Charger nominal voltage (V)",
+              "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
+              "microinverter_power_enabled": "Enable Microinverter Power"
             },
             "data_description": {
               "system_event_repair_issues": "Create Home Assistant Repairs for active Enphase standing alarms. Disabled by default.",
@@ -597,7 +603,9 @@
               "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
               "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable.",
               "schedule_sync_enabled": "Manage IQ EV Charger schedules.",
-              "battery_schedules_enabled": "Manage IQ Battery schedules."
+              "battery_schedules_enabled": "Manage IQ Battery schedules.",
+              "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
+              "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available."
             }
           }
         },
@@ -615,7 +623,9 @@
           "system_event_repair_issues": "Enable System Event Repair Notifications",
           "pricing_edits_enabled": "Enable Pricing Edits",
           "weather_enabled": "Enable weather",
-          "nominal_voltage": "EV Charger nominal voltage (V)"
+          "nominal_voltage": "EV Charger nominal voltage (V)",
+          "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
+          "microinverter_power_enabled": "Enable Microinverter Power"
         },
         "data_description": {
           "type_envoy": "Includes gateway connectivity and meter diagnostics.",
@@ -629,7 +639,9 @@
           "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
           "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable.",
           "schedule_sync_enabled": "Manage IQ EV Charger schedules.",
-          "battery_schedules_enabled": "Manage IQ Battery schedules."
+          "battery_schedules_enabled": "Manage IQ Battery schedules.",
+          "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
+          "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available."
         }
       },
       "repair_notifications": {

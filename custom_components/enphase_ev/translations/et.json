@@ -519,7 +519,9 @@
           "type_ac_battery": "AC-aku",
           "battery_schedules_enabled": "Luba aku ajastaja",
           "degraded_service_repair_issues": "Luba halvenenud teenuste parandused",
-          "weather_enabled": "Luba ilmateave"
+          "weather_enabled": "Luba ilmateave",
+          "microinverter_lifetime_energy_enabled": "Luba mikroinverterite koguenergia",
+          "microinverter_power_enabled": "Luba mikroinverterite võimsus"
         },
         "data_description": {
           "type_envoy": "Sisaldab lüüsi ühenduvuse ja arvestite diagnostikat.",
@@ -535,7 +537,9 @@
           "type_heatpump": "Sisaldab soojuspumba oleku-, diagnostika- ja tarbimisandureid.",
           "type_ac_battery": "Sisaldab AC-aku andureid ja unerežiimi juhtnuppe, kui need on saadaval.",
           "degraded_service_repair_issues": "Loob Repairsi probleemid, kui valikulised Enphase teenused on halvenenud.",
-          "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval."
+          "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval.",
+          "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
+          "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval."
         }
       },
       "settings": {
@@ -589,7 +593,9 @@
               "system_event_repair_issues": "Luba süsteemisündmuste parandusteavitused",
               "pricing_edits_enabled": "Luba hindade muutmine",
               "weather_enabled": "Luba ilmateave",
-              "nominal_voltage": "EV-laadija nimipinge (V)"
+              "nominal_voltage": "EV-laadija nimipinge (V)",
+              "microinverter_lifetime_energy_enabled": "Luba mikroinverterite koguenergia",
+              "microinverter_power_enabled": "Luba mikroinverterite võimsus"
             },
             "data_description": {
               "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud.",
@@ -597,7 +603,9 @@
               "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval.",
               "nominal_voltage": "Tüüpiline vahelduvvoolu toitepinge võimsuse hindamiseks, kui reaalajas pinge pole saadaval.",
               "schedule_sync_enabled": "Halda IQ EV Chargeri ajakavasid.",
-              "battery_schedules_enabled": "Halda IQ Battery ajakavasid."
+              "battery_schedules_enabled": "Halda IQ Battery ajakavasid.",
+              "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
+              "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval."
             }
           }
         },
@@ -615,7 +623,9 @@
           "system_event_repair_issues": "Luba süsteemisündmuste parandusteavitused",
           "pricing_edits_enabled": "Luba hindade muutmine",
           "weather_enabled": "Luba ilmateave",
-          "nominal_voltage": "EV-laadija nimipinge (V)"
+          "nominal_voltage": "EV-laadija nimipinge (V)",
+          "microinverter_lifetime_energy_enabled": "Luba mikroinverterite koguenergia",
+          "microinverter_power_enabled": "Luba mikroinverterite võimsus"
         },
         "data_description": {
           "type_envoy": "Sisaldab lüüsi ühenduvuse ja arvestite diagnostikat.",
@@ -629,7 +639,9 @@
           "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval.",
           "nominal_voltage": "Tüüpiline vahelduvvoolu toitepinge võimsuse hindamiseks, kui reaalajas pinge pole saadaval.",
           "schedule_sync_enabled": "Halda IQ EV Chargeri ajakavasid.",
-          "battery_schedules_enabled": "Halda IQ Battery ajakavasid."
+          "battery_schedules_enabled": "Halda IQ Battery ajakavasid.",
+          "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
+          "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval."
         }
       },
       "repair_notifications": {

@@ -519,7 +519,9 @@
           "type_ac_battery": "AC-batterij",
           "battery_schedules_enabled": "Schakel Batterijplanner in",
           "degraded_service_repair_issues": "Reparaties voor verminderde diensten inschakelen",
-          "weather_enabled": "Weer inschakelen"
+          "weather_enabled": "Weer inschakelen",
+          "microinverter_lifetime_energy_enabled": "Levensduurenergie van micro-omvormers inschakelen",
+          "microinverter_power_enabled": "Vermogen van micro-omvormers inschakelen"
         },
         "data_description": {
           "type_envoy": "Bevat gateway-connectiviteit en meterdiagnostiek.",
@@ -535,7 +537,9 @@
           "type_heatpump": "Bevat sensoren voor warmtepompstatus, diagnostiek en verbruik.",
           "type_ac_battery": "Bevat AC-batterijsensoren en slaapmodusbediening wanneer beschikbaar.",
           "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken.",
-          "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is."
+          "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is.",
+          "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in.",
+          "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is."
         }
       },
       "settings": {
@@ -589,7 +593,9 @@
               "system_event_repair_issues": "Reparatiemeldingen voor systeemgebeurtenissen inschakelen",
               "pricing_edits_enabled": "Prijsbewerkingen inschakelen",
               "weather_enabled": "Weer inschakelen",
-              "nominal_voltage": "Nominale spanning van EV-lader (V)"
+              "nominal_voltage": "Nominale spanning van EV-lader (V)",
+              "microinverter_lifetime_energy_enabled": "Levensduurenergie van micro-omvormers inschakelen",
+              "microinverter_power_enabled": "Vermogen van micro-omvormers inschakelen"
             },
             "data_description": {
               "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld.",
@@ -597,7 +603,9 @@
               "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is.",
               "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is.",
               "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger.",
-              "battery_schedules_enabled": "Beheer schema's voor de IQ Battery."
+              "battery_schedules_enabled": "Beheer schema's voor de IQ Battery.",
+              "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in.",
+              "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is."
             }
           }
         },
@@ -615,7 +623,9 @@
           "system_event_repair_issues": "Reparatiemeldingen voor systeemgebeurtenissen inschakelen",
           "pricing_edits_enabled": "Prijsbewerkingen inschakelen",
           "weather_enabled": "Weer inschakelen",
-          "nominal_voltage": "Nominale spanning van EV-lader (V)"
+          "nominal_voltage": "Nominale spanning van EV-lader (V)",
+          "microinverter_lifetime_energy_enabled": "Levensduurenergie van micro-omvormers inschakelen",
+          "microinverter_power_enabled": "Vermogen van micro-omvormers inschakelen"
         },
         "data_description": {
           "type_envoy": "Bevat gateway-connectiviteit en meterdiagnostiek.",
@@ -629,7 +639,9 @@
           "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is.",
           "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is.",
           "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger.",
-          "battery_schedules_enabled": "Beheer schema's voor de IQ Battery."
+          "battery_schedules_enabled": "Beheer schema's voor de IQ Battery.",
+          "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in.",
+          "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is."
         }
       },
       "repair_notifications": {

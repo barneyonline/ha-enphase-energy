@@ -67,6 +67,8 @@ from custom_components.enphase_ev.const import (
     CONF_SITE_ONLY,
     CONF_ACCESS_TOKEN,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+    DEFAULT_MICROINVERTER_POWER_ENABLED,
     DEFAULT_PRICING_EDITS_ENABLED,
     DEFAULT_WEATHER_ENABLED,
     DOMAIN,
@@ -83,6 +85,8 @@ from custom_components.enphase_ev.const import (
     OPT_FAST_POLL_INTERVAL,
     OPT_FAST_WHILE_STREAMING,
     OPT_GRID_TOGGLE_ENABLED,
+    OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+    OPT_MICROINVERTER_POWER_ENABLED,
     OPT_NOMINAL_VOLTAGE,
     OPT_PRICING_EDITS_ENABLED,
     OPT_SESSION_HISTORY_INTERVAL,
@@ -3568,6 +3572,13 @@ async def test_options_flow_devices_form_with_defaults(hass) -> None:
     assert features[OPT_BATTERY_SCHEDULES_ENABLED] is True
     assert features[OPT_PRICING_EDITS_ENABLED] is DEFAULT_PRICING_EDITS_ENABLED
     assert features[OPT_WEATHER_ENABLED] is DEFAULT_WEATHER_ENABLED
+    assert (
+        features[OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED]
+        is DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED
+    )
+    assert (
+        features[OPT_MICROINVERTER_POWER_ENABLED] is DEFAULT_MICROINVERTER_POWER_ENABLED
+    )
     assert features[OPT_NOMINAL_VOLTAGE] == handler._default_nominal_voltage()
     assert OPT_SYSTEM_EVENT_REPAIR_ISSUES not in features
     assert OPT_FAST_POLL_INTERVAL not in features
@@ -3640,6 +3651,18 @@ async def test_options_flow_device_section_translations_load_at_runtime(hass) ->
             f"component.{DOMAIN}.options.step.devices.sections.device_features.data.weather_enabled"
         ]
         == "Enable weather"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.devices.sections.device_features.data.microinverter_lifetime_energy_enabled"
+        ]
+        == "Enable Microinverter Lifetime Energy"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.devices.sections.device_features.data_description.microinverter_power_enabled"
+        ]
+        == "Enable all per-microinverter power sensors when installer telemetry is available."
     )
     assert (
         translations[
@@ -3767,6 +3790,8 @@ async def test_options_flow_sections_use_existing_options(hass) -> None:
             OPT_PRICING_EDITS_ENABLED: False,
             OPT_DEGRADED_SERVICE_REPAIR_ISSUES: False,
             OPT_WEATHER_ENABLED: True,
+            OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED: False,
+            OPT_MICROINVERTER_POWER_ENABLED: True,
             CONF_SITE_ONLY: True,
         },
     )
@@ -3789,6 +3814,8 @@ async def test_options_flow_sections_use_existing_options(hass) -> None:
     assert OPT_DEGRADED_SERVICE_REPAIR_ISSUES not in settings
     assert OPT_SYSTEM_EVENT_REPAIR_ISSUES not in settings
     assert OPT_WEATHER_ENABLED not in settings
+    assert OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED not in settings
+    assert OPT_MICROINVERTER_POWER_ENABLED not in settings
     assert OPT_SCHEDULE_SYNC_ENABLED not in settings
     assert OPT_BATTERY_SCHEDULES_ENABLED not in settings
     assert CONF_TYPE_ENVOY not in settings
@@ -3815,6 +3842,8 @@ async def test_options_flow_sections_use_existing_options(hass) -> None:
     assert features[OPT_BATTERY_SCHEDULES_ENABLED] is True
     assert features[OPT_PRICING_EDITS_ENABLED] is False
     assert features[OPT_WEATHER_ENABLED] is True
+    assert features[OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED] is False
+    assert features[OPT_MICROINVERTER_POWER_ENABLED] is True
     assert features[OPT_NOMINAL_VOLTAGE] == 230
     assert OPT_SYSTEM_EVENT_REPAIR_ISSUES not in features
     assert OPT_FAST_POLL_INTERVAL not in features
@@ -3959,6 +3988,8 @@ async def test_options_flow_normalizes_poll_intervals_on_save(hass) -> None:
             OPT_SYSTEM_EVENT_REPAIR_ISSUES: True,
             OPT_PRICING_EDITS_ENABLED: True,
             OPT_WEATHER_ENABLED: False,
+            OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED: True,
+            OPT_MICROINVERTER_POWER_ENABLED: False,
             OPT_NOMINAL_VOLTAGE: 230,
         },
     )
@@ -3984,6 +4015,8 @@ async def test_options_flow_normalizes_poll_intervals_on_save(hass) -> None:
             OPT_BATTERY_SCHEDULES_ENABLED: False,
             OPT_PRICING_EDITS_ENABLED: False,
             OPT_WEATHER_ENABLED: True,
+            OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED: False,
+            OPT_MICROINVERTER_POWER_ENABLED: True,
             OPT_DEGRADED_SERVICE_REPAIR_ISSUES: False,
             OPT_SYSTEM_EVENT_REPAIR_ISSUES: False,
             "reauth": False,
@@ -3999,6 +4032,8 @@ async def test_options_flow_normalizes_poll_intervals_on_save(hass) -> None:
     assert result["data"][OPT_SYSTEM_EVENT_REPAIR_ISSUES] is True
     assert result["data"][OPT_PRICING_EDITS_ENABLED] is True
     assert result["data"][OPT_WEATHER_ENABLED] is False
+    assert result["data"][OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED] is True
+    assert result["data"][OPT_MICROINVERTER_POWER_ENABLED] is False
     assert result["data"][OPT_SCHEDULE_SYNC_ENABLED] is False
     assert result["data"][OPT_BATTERY_SCHEDULES_ENABLED] is True
     assert result["data"][OPT_GRID_TOGGLE_ENABLED] is True
@@ -4074,6 +4109,8 @@ async def test_options_flow_updates_selected_device_categories_in_data(hass) -> 
                 OPT_SYSTEM_EVENT_REPAIR_ISSUES: False,
                 OPT_PRICING_EDITS_ENABLED: False,
                 OPT_WEATHER_ENABLED: True,
+                OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED: False,
+                OPT_MICROINVERTER_POWER_ENABLED: True,
                 OPT_NOMINAL_VOLTAGE: 240,
             },
         }
@@ -4092,6 +4129,8 @@ async def test_options_flow_updates_selected_device_categories_in_data(hass) -> 
     assert result["data"][OPT_BATTERY_SCHEDULES_ENABLED] is True
     assert result["data"][OPT_PRICING_EDITS_ENABLED] is False
     assert result["data"][OPT_WEATHER_ENABLED] is True
+    assert result["data"][OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED] is False
+    assert result["data"][OPT_MICROINVERTER_POWER_ENABLED] is True
     assert result["data"][OPT_NOMINAL_VOLTAGE] == 240
     assert result["data"][OPT_SYSTEM_EVENT_REPAIR_ISSUES] is True
 

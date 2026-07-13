@@ -519,7 +519,9 @@
           "type_ac_battery": "AC baterija",
           "battery_schedules_enabled": "Įjungti baterijos planuoklį",
           "degraded_service_repair_issues": "Įgalinti suprastėjusių paslaugų taisymus",
-          "weather_enabled": "Įjungti orus"
+          "weather_enabled": "Įjungti orus",
+          "microinverter_lifetime_energy_enabled": "Įjungti mikroinverterių viso veikimo energiją",
+          "microinverter_power_enabled": "Įjungti mikroinverterių galią"
         },
         "data_description": {
           "type_envoy": "Apima šliuzo ryšio ir skaitiklių diagnostiką.",
@@ -535,7 +537,9 @@
           "type_heatpump": "Apima šilumos siurblio būsenos, diagnostikos ir vartojimo jutiklius.",
           "type_ac_battery": "Apima AC baterijos jutiklius ir miego režimo valdiklius, kai jie prieinami.",
           "degraded_service_repair_issues": "Sukuria Repairs problemas, kai pasirenkamos Enphase paslaugos veikia suprastėjusiai.",
-          "weather_enabled": "Gauna dabartinius vietovės orus iš „Enphase“ ir sukuria orų objektą tik tada, kai galinis taškas pasiekiamas."
+          "weather_enabled": "Gauna dabartinius vietovės orus iš „Enphase“ ir sukuria orų objektą tik tada, kai galinis taškas pasiekiamas.",
+          "microinverter_lifetime_energy_enabled": "Įjungia visus kiekvieno mikroinverterio viso veikimo energijos jutiklius.",
+          "microinverter_power_enabled": "Įjungia visus kiekvieno mikroinverterio galios jutiklius, kai pasiekiama montuotojo telemetrija."
         }
       },
       "settings": {
@@ -589,7 +593,9 @@
               "system_event_repair_issues": "Įgalinti sistemos įvykių taisymo pranešimus",
               "pricing_edits_enabled": "Įjungti kainų redagavimą",
               "weather_enabled": "Įjungti orus",
-              "nominal_voltage": "EV įkroviklio vardinė įtampa (V)"
+              "nominal_voltage": "EV įkroviklio vardinė įtampa (V)",
+              "microinverter_lifetime_energy_enabled": "Įjungti mikroinverterių viso veikimo energiją",
+              "microinverter_power_enabled": "Įjungti mikroinverterių galią"
             },
             "data_description": {
               "system_event_repair_issues": "Kuria Home Assistant taisymus aktyviems nuolatiniams Enphase pavojaus signalams. Pagal numatytuosius išjungta.",
@@ -597,7 +603,9 @@
               "weather_enabled": "Gauna dabartinius vietovės orus iš „Enphase“ ir sukuria orų objektą tik tada, kai galinis taškas pasiekiamas.",
               "nominal_voltage": "Tipinė kintamosios srovės maitinimo įtampa galiai įvertinti, kai tiesioginės įtampos nėra.",
               "schedule_sync_enabled": "Tvarkykite „IQ EV Charger“ tvarkaraščius.",
-              "battery_schedules_enabled": "Tvarkykite „IQ Battery“ tvarkaraščius."
+              "battery_schedules_enabled": "Tvarkykite „IQ Battery“ tvarkaraščius.",
+              "microinverter_lifetime_energy_enabled": "Įjungia visus kiekvieno mikroinverterio viso veikimo energijos jutiklius.",
+              "microinverter_power_enabled": "Įjungia visus kiekvieno mikroinverterio galios jutiklius, kai pasiekiama montuotojo telemetrija."
             }
           }
         },
@@ -615,7 +623,9 @@
           "system_event_repair_issues": "Įgalinti sistemos įvykių taisymo pranešimus",
           "pricing_edits_enabled": "Įjungti kainų redagavimą",
           "weather_enabled": "Įjungti orus",
-          "nominal_voltage": "EV įkroviklio vardinė įtampa (V)"
+          "nominal_voltage": "EV įkroviklio vardinė įtampa (V)",
+          "microinverter_lifetime_energy_enabled": "Įjungti mikroinverterių viso veikimo energiją",
+          "microinverter_power_enabled": "Įjungti mikroinverterių galią"
         },
         "data_description": {
           "type_envoy": "Apima šliuzo ryšio ir skaitiklių diagnostiką.",
@@ -629,7 +639,9 @@
           "weather_enabled": "Gauna dabartinius vietovės orus iš „Enphase“ ir sukuria orų objektą tik tada, kai galinis taškas pasiekiamas.",
           "nominal_voltage": "Tipinė kintamosios srovės maitinimo įtampa galiai įvertinti, kai tiesioginės įtampos nėra.",
           "schedule_sync_enabled": "Tvarkykite „IQ EV Charger“ tvarkaraščius.",
-          "battery_schedules_enabled": "Tvarkykite „IQ Battery“ tvarkaraščius."
+          "battery_schedules_enabled": "Tvarkykite „IQ Battery“ tvarkaraščius.",
+          "microinverter_lifetime_energy_enabled": "Įjungia visus kiekvieno mikroinverterio viso veikimo energijos jutiklius.",
+          "microinverter_power_enabled": "Įjungia visus kiekvieno mikroinverterio galios jutiklius, kai pasiekiama montuotojo telemetrija."
         }
       },
       "repair_notifications": {

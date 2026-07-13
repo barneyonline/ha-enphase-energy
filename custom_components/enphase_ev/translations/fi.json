@@ -519,7 +519,9 @@
           "type_ac_battery": "AC-akku",
           "battery_schedules_enabled": "Ota akun aikataulutus käyttöön",
           "degraded_service_repair_issues": "Ota heikentyneiden palvelujen korjaukset käyttöön",
-          "weather_enabled": "Ota sää käyttöön"
+          "weather_enabled": "Ota sää käyttöön",
+          "microinverter_lifetime_energy_enabled": "Ota mikroinvertterien elinkaarienergia käyttöön",
+          "microinverter_power_enabled": "Ota mikroinvertterien teho käyttöön"
         },
         "data_description": {
           "type_envoy": "Sisältää yhdyskäytävän yhteys- ja mittaridiagnostiikan.",
@@ -535,7 +537,9 @@
           "type_heatpump": "Sisältää lämpöpumpun tila-, diagnostiikka- ja kulutusanturit.",
           "type_ac_battery": "Sisältää AC-akun anturit ja lepotilan ohjaukset, kun ne ovat saatavilla.",
           "degraded_service_repair_issues": "Luo Repairs-ongelmia, kun valinnaiset Enphase-palvelut ovat heikentyneet.",
-          "weather_enabled": "Hakee kohteen nykyisen sään Enphaselta ja luo sääentiteetin vain, kun päätepiste on käytettävissä."
+          "weather_enabled": "Hakee kohteen nykyisen sään Enphaselta ja luo sääentiteetin vain, kun päätepiste on käytettävissä.",
+          "microinverter_lifetime_energy_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset elinkaarienergia-anturit.",
+          "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla."
         }
       },
       "settings": {
@@ -589,7 +593,9 @@
               "system_event_repair_issues": "Ota järjestelmätapahtumien korjausilmoitukset käyttöön",
               "pricing_edits_enabled": "Ota hintojen muokkaus käyttöön",
               "weather_enabled": "Ota sää käyttöön",
-              "nominal_voltage": "EV-laturin nimellisjännite (V)"
+              "nominal_voltage": "EV-laturin nimellisjännite (V)",
+              "microinverter_lifetime_energy_enabled": "Ota mikroinvertterien elinkaarienergia käyttöön",
+              "microinverter_power_enabled": "Ota mikroinvertterien teho käyttöön"
             },
             "data_description": {
               "system_event_repair_issues": "Luo Home Assistant -korjauksia aktiivisille Enphasen pysyville hälytyksille. Oletuksena pois käytöstä.",
@@ -597,7 +603,9 @@
               "weather_enabled": "Hakee kohteen nykyisen sään Enphaselta ja luo sääentiteetin vain, kun päätepiste on käytettävissä.",
               "nominal_voltage": "Tyypillinen vaihtovirtasyöttöjännite tehon arviointiin, kun reaaliaikaista jännitettä ei ole saatavilla.",
               "schedule_sync_enabled": "Hallitse IQ EV Chargerin aikatauluja.",
-              "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja."
+              "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja.",
+              "microinverter_lifetime_energy_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset elinkaarienergia-anturit.",
+              "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla."
             }
           }
         },
@@ -615,7 +623,9 @@
           "system_event_repair_issues": "Ota järjestelmätapahtumien korjausilmoitukset käyttöön",
           "pricing_edits_enabled": "Ota hintojen muokkaus käyttöön",
           "weather_enabled": "Ota sää käyttöön",
-          "nominal_voltage": "EV-laturin nimellisjännite (V)"
+          "nominal_voltage": "EV-laturin nimellisjännite (V)",
+          "microinverter_lifetime_energy_enabled": "Ota mikroinvertterien elinkaarienergia käyttöön",
+          "microinverter_power_enabled": "Ota mikroinvertterien teho käyttöön"
         },
         "data_description": {
           "type_envoy": "Sisältää yhdyskäytävän yhteys- ja mittaridiagnostiikan.",
@@ -629,7 +639,9 @@
           "weather_enabled": "Hakee kohteen nykyisen sään Enphaselta ja luo sääentiteetin vain, kun päätepiste on käytettävissä.",
           "nominal_voltage": "Tyypillinen vaihtovirtasyöttöjännite tehon arviointiin, kun reaaliaikaista jännitettä ei ole saatavilla.",
           "schedule_sync_enabled": "Hallitse IQ EV Chargerin aikatauluja.",
-          "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja."
+          "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja.",
+          "microinverter_lifetime_energy_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset elinkaarienergia-anturit.",
+          "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla."
         }
       },
       "repair_notifications": {

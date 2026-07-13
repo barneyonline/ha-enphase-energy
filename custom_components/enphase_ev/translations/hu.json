@@ -519,7 +519,9 @@
           "type_ac_battery": "AC akkumulátor",
           "battery_schedules_enabled": "Az akkumulátor ütemező engedélyezése",
           "degraded_service_repair_issues": "Csökkent működésű szolgáltatások javításainak engedélyezése",
-          "weather_enabled": "Időjárás engedélyezése"
+          "weather_enabled": "Időjárás engedélyezése",
+          "microinverter_lifetime_energy_enabled": "Mikroinverterek teljes élettartam-energiájának engedélyezése",
+          "microinverter_power_enabled": "Mikroinverterek teljesítményének engedélyezése"
         },
         "data_description": {
           "type_envoy": "Tartalmazza az átjáró-kapcsolat és a mérők diagnosztikáját.",
@@ -535,7 +537,9 @@
           "type_heatpump": "A hőszivattyú állapot-, diagnosztikai és fogyasztási érzékelőit tartalmazza.",
           "type_ac_battery": "AC akkumulátor érzékelőket és alvó mód vezérlőket tartalmaz, ha elérhetők.",
           "degraded_service_repair_issues": "Repairs-problémákat hoz létre, amikor az opcionális Enphase-szolgáltatások csökkent működésűek.",
-          "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető."
+          "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető.",
+          "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
+          "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria."
         }
       },
       "settings": {
@@ -589,7 +593,9 @@
               "system_event_repair_issues": "Rendszeresemény-javítási értesítések engedélyezése",
               "pricing_edits_enabled": "Árak szerkesztésének engedélyezése",
               "weather_enabled": "Időjárás engedélyezése",
-              "nominal_voltage": "EV-töltő névleges feszültsége (V)"
+              "nominal_voltage": "EV-töltő névleges feszültsége (V)",
+              "microinverter_lifetime_energy_enabled": "Mikroinverterek teljes élettartam-energiájának engedélyezése",
+              "microinverter_power_enabled": "Mikroinverterek teljesítményének engedélyezése"
             },
             "data_description": {
               "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva.",
@@ -597,7 +603,9 @@
               "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető.",
               "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat.",
               "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése.",
-              "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése."
+              "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése.",
+              "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
+              "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria."
             }
           }
         },
@@ -615,7 +623,9 @@
           "system_event_repair_issues": "Rendszeresemény-javítási értesítések engedélyezése",
           "pricing_edits_enabled": "Árak szerkesztésének engedélyezése",
           "weather_enabled": "Időjárás engedélyezése",
-          "nominal_voltage": "EV-töltő névleges feszültsége (V)"
+          "nominal_voltage": "EV-töltő névleges feszültsége (V)",
+          "microinverter_lifetime_energy_enabled": "Mikroinverterek teljes élettartam-energiájának engedélyezése",
+          "microinverter_power_enabled": "Mikroinverterek teljesítményének engedélyezése"
         },
         "data_description": {
           "type_envoy": "Tartalmazza az átjáró-kapcsolat és a mérők diagnosztikáját.",
@@ -629,7 +639,9 @@
           "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető.",
           "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat.",
           "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése.",
-          "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése."
+          "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése.",
+          "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
+          "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria."
         }
       },
       "repair_notifications": {
