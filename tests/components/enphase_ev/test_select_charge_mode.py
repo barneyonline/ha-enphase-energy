@@ -402,6 +402,7 @@ async def test_ac_battery_target_state_of_charge_select_rejects_invalid_option(
 
 
 def test_charge_mode_select_current_option_paths(coordinator_factory):
+    from custom_components.enphase_ev.const import STORM_GUARD_CACHE_TTL
     from custom_components.enphase_ev.select import ChargeModeSelect
 
     coord = coordinator_factory()
@@ -427,7 +428,9 @@ def test_charge_mode_select_current_option_paths(coordinator_factory):
     coord._charge_mode_cache.clear()  # noqa: SLF001
     assert sel.current_option == "Green"
 
-    coord._battery_profile_devices_last_success_mono = 0.0  # noqa: SLF001
+    coord._battery_profile_devices_last_success_mono = (  # noqa: SLF001
+        time.monotonic() - STORM_GUARD_CACHE_TTL
+    )
     coord._charge_mode_cache.clear()  # noqa: SLF001
     assert sel.current_option is None
 
