@@ -266,11 +266,6 @@ class HeatpumpState:
     _heatpump_daily_split_last_success_mono: float | None = None
     _heatpump_daily_split_last_success_utc: datetime | None = None
     _heatpump_daily_split_using_stale: bool = False
-    _current_power_consumption_w: float | None = None
-    _current_power_consumption_sample_utc: datetime | None = None
-    _current_power_consumption_reported_units: str | None = None
-    _current_power_consumption_reported_precision: int | None = None
-    _current_power_consumption_source: str | None = None
     _heatpump_power_w: float | None = None
     _heatpump_power_sample_utc: datetime | None = None
     _heatpump_power_start_utc: datetime | None = None
@@ -305,10 +300,6 @@ class EVSEState:
         str, tuple[bool | None, bool | None, bool, bool, float]
     ] = field(default_factory=dict)
     _app_auth_pending: dict[str, tuple[bool, float]] = field(default_factory=dict)
-    _evse_feature_flags_cache_until: float | None = None
-    _evse_feature_flags_payload: PayloadMap | None = None
-    _evse_site_feature_flags: PayloadMap = field(default_factory=dict)
-    _evse_feature_flags_by_serial: PayloadMapByKey = field(default_factory=dict)
     _last_charging: dict[str, bool] = field(default_factory=dict)
     _last_actual_charging: dict[str, bool | None] = field(default_factory=dict)
     _pending_charging: dict[str, tuple[bool, float]] = field(default_factory=dict)
