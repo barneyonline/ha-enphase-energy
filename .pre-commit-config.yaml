@@ -17,3 +17,13 @@ repos:
         name: codespell docs, yaml, python, and user-facing strings
         args: [--ignore-words=.codespellignore]
         files: "^(.*\\.md|.*\\.ya?ml|(custom_components/enphase_ev|tests/components/enphase_ev|scripts|tests/scripts)/.*\\.py|custom_components/enphase_ev/(strings\\.json|translations/en.*\\.json))$"
+  - repo: local
+    hooks:
+      - id: mypy-enphase-ev
+        name: mypy full integration package
+        entry: mypy --strict --ignore-missing-imports --follow-imports=skip custom_components/enphase_ev
+        language: python
+        additional_dependencies:
+          - mypy==2.2.0
+        pass_filenames: false
+        always_run: true

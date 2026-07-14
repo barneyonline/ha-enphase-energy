@@ -156,13 +156,13 @@ rules:
       tests:
         - tests/components/enphase_ev/test_device_trigger.py
       docs:
-        - README.md
+        - docs/device_triggers.md
   docs-conditions:
     status: n/a
     comment: The integration does not provide custom automation conditions; users can apply Home Assistant's standard device and entity state conditions to its entities.
     references:
       docs:
-        - README.md
+        - docs/device_triggers.md
   docs-high-level-description:
     status: done
     references:
