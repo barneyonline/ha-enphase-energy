@@ -3593,8 +3593,10 @@ class EnphaseCoordinator(
                                 if isinstance(cached_status, dict)
                                 else None
                             )
-                            if isinstance(cached_charger_data, list) and bool(
-                                cached_charger_data
+                            if (
+                                isinstance(cached_status, dict)
+                                and isinstance(cached_charger_data, list)
+                                and bool(cached_charger_data)
                             ):
                                 data = dict(cached_status)
                                 self.payload_using_stale = True
