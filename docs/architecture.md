@@ -15,6 +15,8 @@ flowchart TD
     D --> F["Runtime managers"]
     D --> G["InventoryView"]
     D --> H["Entity platforms"]
+    H --> W["Weather child coordinator"]
+    W --> E
     E --> I["Enphase cloud endpoints"]
     F --> D
     G --> H
@@ -81,7 +83,20 @@ path unless Home Assistant cannot safely create the integration without it.
 
 ## Cloud Client
 
-`api.py` is the HTTP boundary. It handles Enlighten login, MFA, credential refresh helpers, request headers, response parsing, invalid payload signatures, and endpoint-specific compatibility paths.
+`api.py` is the stable public compatibility facade for the HTTP boundary. It
+retains `EnphaseEVClient` and the existing authentication/error imports used by
+the integration. Cohesive implementations live under `api_client/`:
+
+- `transport.py` owns injected-`ClientSession` authentication requests and response handling.
+- `auth.py` owns login, MFA, cookie, and XSRF request shaping.
+- `site_surface.py` owns site telemetry and livestream HTTP surface behavior.
+
+The facade remains intentionally thin for migrated slices. New cloud behavior
+should be added to a cohesive internal surface rather than growing `api.py`.
+Internal modules must accept the Home Assistant-provided `ClientSession` and
+must not create or own a session. This keeps the boundary suitable for eventual
+extraction into an independent async client library without adding a runtime
+dependency today.
 
 Several Enphase surfaces behave like browser-backed applications rather than stable public APIs:
 
@@ -90,7 +105,20 @@ Several Enphase surfaces behave like browser-backed applications rather than sta
 - Scheduler and EVSE control endpoints can accept writes before read endpoints reflect the new state.
 - Some optional endpoints return HTML, login pages, or non-JSON success responses.
 
-Keep new endpoint handling inside `api.py` or narrow parser/helper modules so coordinator and entity code remain normalized.
+Keep new endpoint handling inside `api_client/` or narrow parser modules so
+coordinator and entity code remain normalized. Preserve compatibility exports
+from `api.py` when moving existing behavior.
+
+### Weather child coordinator
+
+Weather is the deliberate exception to the one-main-coordinator polling model.
+It is optional, discovered independently, and uses a 15-minute cadence that
+should not affect core integration availability. The weather platform therefore
+owns an `EnphaseWeatherCoordinator` child. The config entry's typed runtime data
+tracks both the child and its discovery task, unload explicitly cancels/releases
+them, and config-entry diagnostics report discovery and update health. Entities
+must not create additional independent coordinators without documenting the
+lifecycle and diagnostics ownership here.
 
 ## Runtime Managers
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import contextmanager
 from collections.abc import Coroutine
 from types import SimpleNamespace
@@ -164,6 +165,8 @@ async def test_setup_schedules_discovery_and_creates_cloud_weather_after_success
     assert added == []
     client.weather.assert_not_awaited()
     assert len(scheduled) == 1
+    assert config_entry.runtime_data.weather_coordinator is not None
+    assert config_entry.runtime_data.weather_discovery_task is not None
     assert scheduled[0][1] == "enphase_ev_weather_discovery"
     coordinator.track_entry_background_task.assert_called_once()
 
@@ -186,6 +189,14 @@ async def test_setup_schedules_discovery_and_creates_cloud_weather_after_success
         ("enphase_ev", f"type:{RANDOM_SITE_ID}:cloud")
     }
     client.weather.assert_awaited_once_with(locale="en-AU")
+    assert config_entry.runtime_data.weather_coordinator.diagnostics() == {
+        "role": "child_coordinator",
+        "discovery_state": "available",
+        "discovery_failures": 0,
+        "last_update_success": True,
+        "last_error": None,
+        "update_interval_seconds": 900,
+    }
 
 
 @pytest.mark.asyncio
@@ -290,3 +301,36 @@ async def test_weather_coordinator_uses_optional_scope_and_retains_data_on_failu
 
     assert coordinator.last_update_success is False
     assert coordinator.data is original
+    assert coordinator.diagnostics()["last_error"] == "offline"
+
+
+@pytest.mark.asyncio
+async def test_runtime_data_explicitly_stops_weather_child_coordinator(hass) -> None:
+    """The entry runtime owns discovery cancellation and child release."""
+
+    coordinator = EnphaseWeatherCoordinator(
+        hass,
+        SimpleNamespace(weather=AsyncMock()),
+        locale="en",
+        site_id=RANDOM_SITE_ID,
+    )
+    started = asyncio.Event()
+
+    async def _pending() -> None:
+        started.set()
+        await asyncio.Event().wait()
+
+    task = hass.async_create_task(_pending())
+    await started.wait()
+    runtime_data = EnphaseRuntimeData(
+        coordinator=SimpleNamespace(),
+        weather_coordinator=coordinator,
+        weather_discovery_task=task,
+    )
+
+    await runtime_data.async_stop_weather()
+
+    assert task.cancelled()
+    assert runtime_data.weather_coordinator is None
+    assert runtime_data.weather_discovery_task is None
+    assert coordinator.diagnostics()["discovery_state"] == "stopped"
