@@ -21,9 +21,9 @@ CURRENT_POWER_CACHE_TTL_S = 60.0
 CURRENT_POWER_ENDPOINT_FAMILY = "current_power"
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class CurrentPowerSample:
-    """Typed snapshot of site current-power fields mirrored on the coordinator."""
+    """Immutable site current-power snapshot owned by the runtime."""
 
     w: float | None = None
     sample_utc: datetime | None = None
@@ -31,19 +31,13 @@ class CurrentPowerSample:
     reported_precision: int | None = None
     source: str | None = None
 
-    def apply_to(self, coord: EnphaseCoordinator) -> None:
-        coord._current_power_consumption_w = self.w
-        coord._current_power_consumption_sample_utc = self.sample_utc
-        coord._current_power_consumption_reported_units = self.reported_units
-        coord._current_power_consumption_reported_precision = self.reported_precision
-        coord._current_power_consumption_source = self.source
-
 
 class CurrentPowerRuntime:
     """Fetch and cache site current power consumption from the app API."""
 
     def __init__(self, coordinator: EnphaseCoordinator) -> None:
         self.coordinator = coordinator
+        self._sample = CurrentPowerSample()
         self._cache_until_mono: float | None = None
         self.using_stale = False
         self._extreme_validator = ExtremePowerValidator()
@@ -53,6 +47,43 @@ class CurrentPowerRuntime:
         self._last_observed_sample_utc: datetime | None = None
         self._validation_state = "unavailable"
         self._validation_reason: str | None = None
+
+    @property
+    def snapshot(self) -> CurrentPowerSample:
+        """Return the current immutable power sample."""
+
+        return self._sample
+
+    def replace_snapshot(self, **changes: object) -> None:
+        """Update one or more sample fields for legacy coordinator setters."""
+
+        values: dict[str, object] = {
+            "w": self._sample.w,
+            "sample_utc": self._sample.sample_utc,
+            "reported_units": self._sample.reported_units,
+            "reported_precision": self._sample.reported_precision,
+            "source": self._sample.source,
+        }
+        values.update(changes)
+        self._sample = CurrentPowerSample(
+            w=values["w"] if isinstance(values["w"], (float, int)) else None,
+            sample_utc=(
+                values["sample_utc"]
+                if isinstance(values["sample_utc"], datetime)
+                else None
+            ),
+            reported_units=(
+                values["reported_units"]
+                if isinstance(values["reported_units"], str)
+                else None
+            ),
+            reported_precision=(
+                values["reported_precision"]
+                if isinstance(values["reported_precision"], int)
+                else None
+            ),
+            source=values["source"] if isinstance(values["source"], str) else None,
+        )
 
     def clear(self) -> None:
         """Reset cached current power consumption samples."""
@@ -66,7 +97,7 @@ class CurrentPowerRuntime:
         self._last_observed_sample_utc = None
         self._validation_state = "unavailable"
         self._validation_reason = None
-        CurrentPowerSample().apply_to(self.coordinator)
+        self._sample = CurrentPowerSample()
 
     @staticmethod
     def _parse_sample_utc(sample_time: object) -> datetime | None:
@@ -103,24 +134,18 @@ class CurrentPowerRuntime:
     def diagnostics(self) -> dict[str, object]:
         """Return a sanitized summary of current-power validation state."""
 
-        coord = self.coordinator
-        accepted_sample = getattr(coord, "_current_power_consumption_sample_utc", None)
+        accepted = self._sample
+        accepted_sample = accepted.sample_utc
         return {
-            "accepted_value_w": getattr(coord, "_current_power_consumption_w", None),
+            "accepted_value_w": accepted.w,
             "accepted_sample_utc": (
                 accepted_sample.isoformat()
                 if isinstance(accepted_sample, datetime)
                 else None
             ),
-            "accepted_reported_units": getattr(
-                coord, "_current_power_consumption_reported_units", None
-            ),
-            "accepted_reported_precision": getattr(
-                coord, "_current_power_consumption_reported_precision", None
-            ),
-            "accepted_source": getattr(
-                coord, "_current_power_consumption_source", None
-            ),
+            "accepted_reported_units": accepted.reported_units,
+            "accepted_reported_precision": accepted.reported_precision,
+            "accepted_source": accepted.source,
             "last_observed_value": self._last_observed_value,
             "last_observed_units": self._last_observed_units,
             "last_normalized_value_w": self._last_normalized_value_w,
@@ -136,17 +161,7 @@ class CurrentPowerRuntime:
         }
 
     def _cached_state_present(self) -> bool:
-        coord = self.coordinator
-        return any(
-            getattr(coord, attr, None) is not None
-            for attr in (
-                "_current_power_consumption_w",
-                "_current_power_consumption_sample_utc",
-                "_current_power_consumption_reported_units",
-                "_current_power_consumption_reported_precision",
-                "_current_power_consumption_source",
-            )
-        )
+        return self._sample != CurrentPowerSample()
 
     def refresh_due(self) -> bool:
         """Return True when current-power data can be refreshed."""
@@ -245,13 +260,13 @@ class CurrentPowerRuntime:
             coord._note_endpoint_family_success(CURRENT_POWER_ENDPOINT_FAMILY)
             return
 
-        CurrentPowerSample(
+        self._sample = CurrentPowerSample(
             w=normalized_w,
             sample_utc=sampled_at,
             reported_units=units,
             reported_precision=precision,
             source="app-api:get_latest_power",
-        ).apply_to(coord)
+        )
         self._cache_until_mono = now + CURRENT_POWER_CACHE_TTL_S
         self.using_stale = False
         coord._note_endpoint_family_success(CURRENT_POWER_ENDPOINT_FAMILY)

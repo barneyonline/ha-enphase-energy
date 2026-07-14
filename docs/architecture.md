@@ -28,9 +28,11 @@ flowchart TD
 
 `config_flow.py` handles user login, MFA, site selection, device-category selection, reconfigure, and reauth entry updates. It stores the tokens and cookies needed for refreshes in the config entry. The password is stored only when the user opts into remembered credentials so the integration can attempt automatic token refresh.
 
-`__init__.py` handles config entry setup and unload. It creates the coordinator,
-restores compact discovery state, starts an independent power-acquisition task,
-and blocks only on the authoritative status refresh before forwarding platforms.
+`__init__.py` handles config entry setup and unload. It creates the coordinator
+and invokes its public bootstrap API. Coordinator-owned `_async_setup` restores
+compact discovery state and starts an independent power-acquisition task before
+the authoritative status refresh. Config-entry setup blocks only on that refresh
+before forwarding platforms.
 Translation and integration-version priming run concurrently with that work.
 Optional endpoint families then warm up in feature-aware stages, publishing after
 each stage so one slow family does not hold back unrelated state. Schedule sync and
@@ -131,6 +133,12 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
 - `current_power_runtime.py`, `evse_feature_flags_runtime.py`, `auth_refresh_runtime.py`, and `ac_battery_runtime.py` handle smaller endpoint families.
 
 These managers should own cache lifetimes, stale data decisions, and endpoint-specific parsing for their family. The coordinator should expose their normalized state through properties and helper methods.
+
+New manager state is published through immutable snapshots rather than projected
+private coordinator fields. The aggregate integration snapshot determines update
+equality while preserving the historical dictionary-shaped `coordinator.data`
+interface. See [ADR 0001](adr/0001-runtime-state-ownership.md) for dependency,
+ownership, and incremental migration rules.
 
 ## Inventory And Entity Gating
 
