@@ -41,14 +41,12 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - Advisory firmware update entities for gateway and EV charger devices with locale-aware release-note links; the gateway entity also monitors read-only live update progress, percentage, timing, and sanitized component status when Enphase exposes it
 - Heat-pump runtime status, connectivity, SG-Ready mode, power, and current-day consumption details sourced from HEMS endpoints
 - Site and battery energy telemetry, including derived grid-import, grid-export, and battery power sensors for Home Assistant Energy Dashboard use
-- Optional IQ Battery Scheduler controls and CFG, DTG, and RBD schedule sensors, exposed only when Enable Battery Scheduler is selected under integration Options > Devices
+- Optional IQ Battery Scheduler controls and CFG, DTG, and RBD schedule sensors
 - Optional current site weather on the Enphase Cloud device, created only when the authenticated Enphase weather endpoint is available
-- Independent Microinverter Lifetime Energy and Microinverter Power sensor groups under Options > Devices > Device Features; lifetime energy remains enabled by default, while installer-level power telemetry remains opt-in
-- Site tariff visibility for next billing date and Energy-dashboard-ready current import/export price sensors, plus default-on Pricing Edits under Options > Devices > Device Features for editable rate entities; the Update Tariff action remains available for billing, rate, and structural updates
-- Installer-only Grid Profile Control through Enphase cloud Activation, with country-scoped region/profile selection under Options > Advanced and current profile monitoring on the IQ Gateway
-- Optional manual Grid Mode controls under Options > Advanced; the read-only Grid
-  Mode sensor remains available while Grid Control Status, Request Grid Toggle OTP,
-  and related service actions remain disabled until explicitly enabled
+- Independent Microinverter Lifetime Energy and optional installer-level power telemetry
+- Site tariff visibility, editable rate entities, and tariff update actions
+- Installer-only Grid Profile Control through Enphase cloud Activation, with country-scoped profile selection and current profile monitoring
+- Optional manual Grid Mode controls with a read-only status sensor and guarded OTP actions
 - Health diagnostics, service-availability tracking, and actionable repair issues
 - Read-only System Dashboard event and standing-alarm monitoring, including a
   diagnostic Problem sensor with bounded sanitized event context and optional,
@@ -57,11 +55,9 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - Restored discovery data creates known entities early during startup; live power
   acquisition starts alongside the minimal setup refresh and is attempted within
   55 seconds, while optional feature data fills in incrementally afterward
-- Device-category selection is grouped under Devices, while EV charger and battery schedulers, Pricing Edits, Weather, microinverter Lifetime Energy and Power groups, and the EV charger nominal-voltage fallback are grouped under Device Features in Options > Devices; default-off degraded-service and system-event Repair controls have their own Notifications page, polling has its own Polling page, and credential actions have their own titled Authentication page
 - Rate-conscious microinverter telemetry uses limited-concurrency bulk reads,
   preserves fresh partial results, and exposes power plus available AC/DC,
-  frequency, temperature, signal, and firmware details in a disabled-by-default
-  sensor entity
+  frequency, temperature, signal, and firmware details when available
 - Broad localization support across all user-facing integration strings
 
 Localized strings cover English (default plus US, Canada, Australia, New Zealand, and Ireland variants), French, German, Spanish, Italian, Dutch, Swedish, Danish, Finnish, Norwegian Bokmal, Polish, Greek, Romanian, Czech, Hungarian, Bulgarian, Latvian, Lithuanian, Estonian, and Brazilian Portuguese.
@@ -125,34 +121,19 @@ Manual install steps: see the wiki Installation page.
 - Minimum supported Home Assistant version is `2026.6.0` (Python `3.14`+).
 - In v2.0.0, the integration display name changed to `Enphase Energy`.
 - The integration domain remains `enphase_ev`, so existing entity IDs, automations, and scripts do not require migration.
-- Users migrating from the core Enphase Envoy integration can optionally use the `Migrate Envoy history` assistant in the integration Options flow to take over compatible Energy-dashboard entity IDs. The assistant archives the migrated Envoy energy entities, swaps the entity IDs, and restores the remaining Envoy entities after the migration. Create a full Home Assistant backup first. Full steps: [Envoy History Migration](https://github.com/barneyonline/ha-enphase-energy/wiki/Envoy-History-Migration).
+- Users migrating from the core Enphase Envoy integration can preserve compatible Energy-dashboard history with the [Envoy History Migration](https://github.com/barneyonline/ha-enphase-energy/wiki/Envoy-History-Migration) assistant. Create a full Home Assistant backup first.
 
 ## Authentication
 
 Sign in with your Enlighten credentials; MFA is supported. See the wiki for details.
 
-Installer-only Enphase features require additional account permissions. If you own
-or are authorised to service the site, see
-[Requesting Enphase installer access](docs/installer_access.md) for the current
-training, certification, and Enphase Support request process. Enphase makes the
-final access decision, and requirements vary by region and product.
-
-Grid Profile Control is available only when the signed-in Enphase account has installer-level Activation permissions. It uses Enphase cloud endpoints only; no local Gateway authentication or LAN access is required. Open the integration's Options flow and choose `Advanced` > `Grid Profile Control` to select a region, choose commonly used or all profiles, and confirm an apply request. Accepted changes can take up to five minutes to appear on the Grid Profile sensor.
-
-Manual Grid Mode controls are disabled by default because they can intentionally
-connect or disconnect a supported system from the grid. The read-only Grid Mode
-sensor remains available. To expose Grid Control Status and Request Grid Toggle
-OTP—and allow the related service actions—open the integration's Options flow and
-choose `Advanced` > `Grid Mode`.
-
-Pricing Edits are enabled by default. To hide editable tariff rate entities and
-retain only read-only pricing sensors, open the integration's Options flow, choose
-`Devices`, and clear `Enable Pricing Edits` under `Device Features`. The `Update
-Tariff` action remains available when Pricing Edits are disabled.
-
 ## Documentation
 
-See [device automation triggers and conditions](docs/device_automations.md) for the
-automation features provided directly by the integration.
+Refer to the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki) for setup,
+configuration, and troubleshooting guidance.
 
-Refer to the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki), including [Envoy History Migration](https://github.com/barneyonline/ha-enphase-energy/wiki/Envoy-History-Migration) for preserving Energy dashboard history when migrating from Enphase Envoy.
+IQ EV Chargers provide `charging_started`, `charging_stopped`, `plugged_in`, and
+`unplugged` device triggers. Device-trigger YAML uses `platform: device`,
+`domain: enphase_ev`, `device_id:`, `entity_id:`, and `type:`. The integration
+does not provide custom automation conditions; use Home Assistant's standard
+device or entity-state conditions.
