@@ -49,9 +49,7 @@ class HeatPumpInventorySnapshot(TypedDict, total=False):
 
 
 def _title_case_status(value: object, hass: object | None = None) -> str | None:
-    return cast(
-        str | None, status_label(value, hass=hass) or friendly_status_text(value)
-    )
+    return status_label(value, hass=hass) or friendly_status_text(value)
 
 
 def _heatpump_member_device_type(member: dict[str, object] | None) -> str | None:
@@ -65,11 +63,11 @@ def _heatpump_member_device_type(member: dict[str, object] | None) -> str | None
     text = _gateway_clean_text(value)
     if not text:
         return None
-    return cast(str, text.upper())
+    return text.upper()
 
 
 def _heatpump_member_status_text(member: dict[str, object] | None) -> str | None:
-    return cast(str | None, heatpump_status_text(member))
+    return heatpump_status_text(member)
 
 
 def _heatpump_status_counts(members: list[dict[str, object]]) -> dict[str, int]:
@@ -239,8 +237,8 @@ def _heatpump_snapshot(coord: EnphaseCoordinator) -> HeatPumpInventorySnapshot:
         "status_counts": status_counts,
         "status_summary": status_summary,
         "device_type_counts": device_type_counts,
-        "model_summary": bucket.get("model_summary"),
-        "firmware_summary": bucket.get("firmware_summary"),
+        "model_summary": _gateway_clean_text(bucket.get("model_summary")),
+        "firmware_summary": _gateway_clean_text(bucket.get("firmware_summary")),
         "latest_reported": latest_reported,
         "latest_reported_utc": (
             latest_reported.isoformat() if latest_reported is not None else None
@@ -340,7 +338,7 @@ def _heatpump_runtime_device_uid(coord: EnphaseCoordinator) -> str | None:
     getter = getattr(coord, "_heatpump_runtime_device_uid", None)
     if callable(getter):
         try:
-            return cast(str | None, _gateway_clean_text(getter()))
+            return _gateway_clean_text(getter())
         except Exception:  # noqa: BLE001
             return None
     return None
@@ -467,9 +465,8 @@ class HeatPumpSensorModel:
     def runtime_device_uid(self) -> str | None:
         """Return the dedicated runtime-controller identity when available."""
 
-        return _heatpump_runtime_device_uid(self.coordinator) or cast(
-            str | None,
-            _gateway_clean_text(self.runtime_snapshot().get("device_uid")),
+        return _heatpump_runtime_device_uid(self.coordinator) or _gateway_clean_text(
+            self.runtime_snapshot().get("device_uid")
         )
 
 
@@ -494,7 +491,7 @@ class EnphaseHeatPumpStatusSensor(_SiteBaseEntity):
             except Exception:  # noqa: BLE001
                 return None
         uid = self._snapshot().get("device_uid")
-        return cast(str | None, _gateway_clean_text(uid))
+        return _gateway_clean_text(uid)
 
     @property
     def available(self) -> bool:
@@ -669,7 +666,7 @@ class EnphaseHeatPumpSgReadyModeSensor(_SiteBaseEntity):
             except Exception:  # noqa: BLE001
                 return None
         uid = self._snapshot().get("device_uid")
-        return cast(str | None, _gateway_clean_text(uid))
+        return _gateway_clean_text(uid)
 
     @property
     def available(self) -> bool:

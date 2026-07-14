@@ -108,7 +108,7 @@ from .sensor_heatpump import (
     _heatpump_member_device_type as _heatpump_member_device_type,
     _heatpump_member_last_reported as _heatpump_member_last_reported,
     _heatpump_member_status_text as _heatpump_member_status_text,
-    _heatpump_runtime_device_uid,
+    _heatpump_runtime_device_uid as _heatpump_runtime_device_uid,
     _heatpump_runtime_snapshot as _heatpump_runtime_snapshot,
     _heatpump_sg_ready_semantics as _heatpump_sg_ready_semantics,
     _heatpump_snapshot as _heatpump_snapshot,

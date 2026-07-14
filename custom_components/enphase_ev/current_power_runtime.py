@@ -55,7 +55,7 @@ class CurrentPowerRuntime:
         return self._sample
 
     def replace_snapshot(self, **changes: object) -> None:
-        """Update one or more sample fields for legacy coordinator setters."""
+        """Update one or more fields in the runtime-owned sample."""
 
         values: dict[str, object] = {
             "w": self._sample.w,
