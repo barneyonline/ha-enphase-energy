@@ -8,27 +8,51 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
-- Added independent Device Features options to enable or disable all
-  per-microinverter Lifetime Energy sensors and all installer-level Power sensors.
-  Existing defaults are preserved: Lifetime Energy is enabled and Power is
-  disabled until opted in.
-- Added a site-level `System Event History` calendar on the Enphase Cloud device,
-  backed by the localized homeowner event feed with bounded cursor pagination,
-  short-lived range caching, and identifier-safe summaries.
+- None
 
 ### 🐛 Bug fixes
-- Removed a previously created Enphase site weather entity automatically when
-  Enable weather is turned off.
-- Preserved IQ EV Charger entities and their last good state through isolated
-  empty status responses, requiring repeated absence and inventory confirmation
-  before removing the entities from Home Assistant.
+- None
 
 ### 🔧 Improvements
-- Excluded explicitly informational rows from Active System Events while
-  preserving its existing standing-alarm and high-impact Problem threshold.
+- None
 
 ### 🔄 Other changes
 - None
+
+## v4.0.0b2 - 2026-07-15
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- Added independent Device Features options to enable or disable all
+  per-microinverter Lifetime Energy sensors and all installer-level Power sensors.
+  Existing defaults are preserved: Lifetime Energy is enabled and Power is
+  disabled until opted in. (#779)
+- Added a site-level `System Event History` calendar on the Enphase Cloud device,
+  backed by the localized homeowner event feed with bounded cursor pagination,
+  short-lived range caching, and identifier-safe summaries. (#783)
+
+### 🐛 Bug fixes
+- Removed a previously created Enphase site weather entity automatically when
+  Enable weather is turned off. (#778)
+- Preserved IQ EV Charger entities and their last good state through isolated
+  empty status responses, requiring repeated absence and inventory confirmation
+  before removing the entities from Home Assistant. (#781)
+
+### 🔧 Improvements
+- Excluded explicitly informational rows from Active System Events while
+  preserving its existing standing-alarm and high-impact Problem threshold. (#783)
+
+### 🔄 Other changes
+- Simplified repository documentation by consolidating operational guidance in the
+  project wiki while retaining required device-trigger documentation. (#780)
+- Aligned local contributor validation with CI by applying strict full-package
+  mypy checks through the documented and pre-commit workflows. (#782)
+- Refactored coordinator state ownership, API boundaries, sensor modules, runtime
+  snapshots, and weather lifecycle handling without intended user-facing behavior
+  changes. (#784)
+- Bumped the integration manifest version to `4.0.0b2`.
 
 ## v4.0.0b1 - 2026-07-13
 
