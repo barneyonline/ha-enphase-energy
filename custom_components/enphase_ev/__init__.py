@@ -1610,10 +1610,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
         evse_schedule_editor=evse_schedule_editor,
     )
     _record_phase("coordinator_init_s", coordinator_started)
-    coord._setup_started_mono = setup_started
-    coord._setup_phase_timings = setup_timings
     setup_milestones: dict[str, float] = {}
-    coord._setup_milestones = setup_milestones
+    begin_setup_tracking = getattr(coord, "begin_setup_tracking", None)
+    if callable(begin_setup_tracking):
+        begin_setup_tracking(setup_started, setup_timings, setup_milestones)
+    else:
+        # Compatibility for lightweight coordinators supplied by downstream tests.
+        coord._setup_started_mono = setup_started
+        coord._setup_phase_timings = setup_timings
+        coord._setup_milestones = setup_milestones
 
     async def _prime_labels() -> None:
         started = _time.monotonic()
@@ -1635,40 +1640,51 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
     version_task = asyncio.create_task(
         _prime_version(), name=f"{DOMAIN}_startup_version"
     )
-    discovery_snapshot = getattr(coord, "discovery_snapshot", None)
-    restore_discovery_state = getattr(discovery_snapshot, "async_restore_state", None)
     try:
-        snapshot_started = _time.monotonic()
-        if callable(restore_discovery_state):
-            await restore_discovery_state()
-        _record_phase("snapshot_restore_s", snapshot_started)
+        bootstrap_first_refresh = getattr(coord, "async_bootstrap_first_refresh", None)
+        if callable(bootstrap_first_refresh):
+            await bootstrap_first_refresh()
+        else:
+            # Compatibility for lightweight coordinators supplied by downstream tests.
+            discovery_snapshot = getattr(coord, "discovery_snapshot", None)
+            restore_discovery_state = getattr(
+                discovery_snapshot, "async_restore_state", None
+            )
+            snapshot_started = _time.monotonic()
+            if callable(restore_discovery_state):
+                await restore_discovery_state()
+            _record_phase("snapshot_restore_s", snapshot_started)
 
-        refresh_runner = getattr(coord, "refresh_runner", None)
-        start_power = getattr(refresh_runner, "async_start_startup_power", None)
-        if callable(start_power):
-            await start_power()
+            refresh_runner = getattr(coord, "refresh_runner", None)
+            start_power = getattr(refresh_runner, "async_start_startup_power", None)
+            if callable(start_power):
+                await start_power()
 
-        first_refresh_started = _time.monotonic()
-        coord._minimal_setup_refresh_active = True
-        try:
+            first_refresh_started = _time.monotonic()
             await coord.async_config_entry_first_refresh()
-        finally:
-            coord._minimal_setup_refresh_active = False
             _record_phase("first_refresh_s", first_refresh_started)
-        setup_milestones["core_ready"] = round(_time.monotonic() - setup_started, 3)
+        mark_setup_milestone = getattr(coord, "mark_setup_milestone", None)
+        if callable(mark_setup_milestone):
+            mark_setup_milestone("core_ready")
+        else:
+            setup_milestones["core_ready"] = round(_time.monotonic() - setup_started, 3)
         await asyncio.gather(label_task, version_task)
     except BaseException:
         for task in (label_task, version_task):
             if not task.done():
                 task.cancel()
         await asyncio.gather(label_task, version_task, return_exceptions=True)
-        startup_power_task = getattr(coord, "_startup_power_task", None)
-        if (
-            isinstance(startup_power_task, asyncio.Future)
-            and not startup_power_task.done()
-        ):
-            startup_power_task.cancel()
-            await asyncio.gather(startup_power_task, return_exceptions=True)
+        cancel_startup_power = getattr(coord, "async_cancel_startup_power", None)
+        if callable(cancel_startup_power):
+            await cancel_startup_power()
+        else:  # pragma: no cover - lightweight downstream coordinator compatibility
+            startup_power_task = getattr(coord, "_startup_power_task", None)
+            if (
+                isinstance(startup_power_task, asyncio.Future)
+                and not startup_power_task.done()
+            ):
+                startup_power_task.cancel()
+                await asyncio.gather(startup_power_task, return_exceptions=True)
         raise
 
     editor_sync_started = _time.monotonic()
@@ -1740,13 +1756,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
     platform_started = _time.monotonic()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _record_phase("platform_forward_s", platform_started)
-    setup_milestones["entities_forwarded"] = round(_time.monotonic() - setup_started, 3)
+    mark_setup_milestone = getattr(coord, "mark_setup_milestone", None)
+    if callable(mark_setup_milestone):
+        mark_setup_milestone("entities_forwarded")
+    else:
+        setup_milestones["entities_forwarded"] = round(
+            _time.monotonic() - setup_started, 3
+        )
     # Start background work only after entities have been forwarded so restored
     # topology can create entities first and warmup can fill in live state later.
     # Schedule warmup first so the bounded startup power stage gets priority over
     # other optional background work competing for the shared read limiter.
-    refresh_runner = getattr(coord, "refresh_runner", None)
-    startup_warmup = getattr(refresh_runner, "async_start_startup_warmup", None)
+    startup_warmup = getattr(coord, "async_start_startup_warmup", None)
+    if not callable(startup_warmup):
+        refresh_runner = getattr(coord, "refresh_runner", None)
+        startup_warmup = getattr(refresh_runner, "async_start_startup_warmup", None)
     if callable(startup_warmup):
         _schedule_background_task(
             startup_warmup(),
@@ -1769,20 +1793,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
             f"{DOMAIN}_schedule_sync_start",
         )
 
-    setup_timings["total_s"] = round(_time.monotonic() - setup_started, 3)
-    coord._setup_phase_timings = dict(setup_timings)
-    setup_milestones["setup_complete"] = setup_timings["total_s"]
+    total_setup_seconds = _time.monotonic() - setup_started
+    finish_setup_tracking = getattr(coord, "finish_setup_tracking", None)
+    if callable(finish_setup_tracking):
+        finish_setup_tracking(total_setup_seconds)
+    else:
+        setup_timings["total_s"] = round(total_setup_seconds, 3)
+        coord._setup_phase_timings = dict(setup_timings)
+        setup_milestones["setup_complete"] = setup_timings["total_s"]
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> bool:
     coord = None
+    runtime_data = None
     try:
-        coord = get_runtime_data(entry).coordinator
+        runtime_data = get_runtime_data(entry)
+        coord = runtime_data.coordinator
     except RuntimeError:
         pass
     unload_ok = await _async_unload_platforms_safe(hass, entry)
     if unload_ok:
+        if runtime_data is not None:
+            await runtime_data.async_stop_weather()
         if coord is not None and hasattr(coord, "schedule_sync"):
             await coord.schedule_sync.async_stop()
         async_cleanup_runtime_state = getattr(

@@ -206,6 +206,16 @@ class GridProfileRuntime:
         self._lock = asyncio.Lock()
         self._apply_lock = asyncio.Lock()
 
+    def _publish_state_update(self) -> None:
+        """Publish a grid-profile transition through the coordinator boundary."""
+
+        publish = getattr(self.coordinator, "publish_runtime_state_update", None)
+        if callable(publish):
+            publish("grid_profile")
+            return
+        # Compatibility for the lightweight coordinator used by isolated tests.
+        self.coordinator.async_update_listeners()
+
     @property
     def installer_access_confirmed(self) -> bool:
         return self.support_state == SUPPORT_CONFIRMED
@@ -423,21 +433,21 @@ class GridProfileRuntime:
         if region is not None and self._derive_region_code() is None:
             self.site_region_code = region.region_code
         self.staged_profile_id = None
-        self.coordinator.async_update_listeners()
+        self._publish_state_update()
 
     def set_list_mode(self, option: str) -> None:
         self.staged_commonly_used = option != ALL_PROFILES_OPTION
         self.staged_profile_id = None
-        self.coordinator.async_update_listeners()
+        self._publish_state_update()
 
     def set_search_query(self, query: str | None) -> None:
         self.staged_query = _clean_text(query) or ""
-        self.coordinator.async_update_listeners()
+        self._publish_state_update()
 
     def set_staged_profile(self, profile_id: str | None) -> None:
         profile = self.profile_for_id(profile_id)
         self.staged_profile_id = profile.profile_id if profile is not None else None
-        self.coordinator.async_update_listeners()
+        self._publish_state_update()
 
     def _derive_country(self) -> str | None:
         for source in (
@@ -1002,12 +1012,12 @@ class GridProfileRuntime:
                 else:
                     self.support_state = SUPPORT_CONFIRMED
                     self.coordinator._note_endpoint_family_failure(family, err)
-                self.coordinator.async_update_listeners()
+                self._publish_state_update()
                 return self.browse()
             self.support_state = SUPPORT_CONFIRMED
             self.installer_access_ever_confirmed = True
             self.coordinator._note_endpoint_family_success(family, success_ttl_s=300.0)
-            self.coordinator.async_update_listeners()
+            self._publish_state_update()
             return self.browse()
 
     async def async_refresh(
@@ -1043,13 +1053,13 @@ class GridProfileRuntime:
             )
             if denied_error is not None:
                 self._mark_denied(denied_error)
-                self.coordinator.async_update_listeners()
+                self._publish_state_update()
                 return self.browse()
             if errors and (
                 successful_requests == 0 or not self.installer_access_ever_confirmed
             ):
                 self._mark_denied(errors[0])
-                self.coordinator.async_update_listeners()
+                self._publish_state_update()
                 return self.browse()
             self.country_code = await self._async_derive_country()
             derived_region_code = self._derive_region_code()
@@ -1118,7 +1128,7 @@ class GridProfileRuntime:
                         is not None
                     ):
                         break
-            self.coordinator.async_update_listeners()
+            self._publish_state_update()
             return self.browse()
 
     async def async_load_profiles(
@@ -1160,13 +1170,13 @@ class GridProfileRuntime:
             )
         except Exception as err:  # noqa: BLE001
             self._mark_denied(err)
-            self.coordinator.async_update_listeners()
+            self._publish_state_update()
             return []
         self.coordinator._note_endpoint_family_success(
             ACTIVATION_GRID_PROFILE_FAMILY,
             success_ttl_s=300.0,
         )
-        self.coordinator.async_update_listeners()
+        self._publish_state_update()
         return profiles
 
     def filtered_regions(self, query: str | None = None) -> list[ActivationRegion]:
@@ -1334,7 +1344,7 @@ class GridProfileRuntime:
                 self.pending_profile_id = None
                 self.pending_gateway_serial = None
                 self.pending_started_mono = None
-                self.coordinator.async_update_listeners()
+                self._publish_state_update()
             if self._pending_refresh_task is asyncio.current_task():
                 self._pending_refresh_task = None
 

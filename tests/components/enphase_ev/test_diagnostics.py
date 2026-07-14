@@ -789,7 +789,15 @@ async def test_config_entry_diagnostics_includes_coordinator(
         }
     )
     coord._scheduler_backoff_ends_utc = datetime(2025, 1, 1, tzinfo=timezone.utc)
-    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    config_entry.runtime_data = EnphaseRuntimeData(
+        coordinator=coord,
+        weather_coordinator=SimpleNamespace(
+            diagnostics=lambda: {
+                "role": "child_coordinator",
+                "discovery_state": "available",
+            }
+        ),
+    )
 
     diag = await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
 
@@ -802,6 +810,10 @@ async def test_config_entry_diagnostics_includes_coordinator(
         "X-Test",
     ]
     assert diag["coordinator"]["headers_info"]["has_scheduler_bearer"] is True
+    assert diag["coordinator"]["weather"] == {
+        "role": "child_coordinator",
+        "discovery_state": "available",
+    }
     assert diag["coordinator"]["last_scheduler_modes"] == {RANDOM_SERIAL: "FAST"}
     assert diag["coordinator"]["session_history"]["cache_keys"] == 1
     assert diag["coordinator"]["current_power"] == {
@@ -1075,11 +1087,17 @@ async def test_config_entry_diagnostics_handles_system_events_capture_error(
     coord.system_events_runtime = SimpleNamespace(
         diagnostics=lambda: (_ for _ in ()).throw(RuntimeError("boom"))
     )
-    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    config_entry.runtime_data = EnphaseRuntimeData(
+        coordinator=coord,
+        weather_coordinator=SimpleNamespace(
+            diagnostics=lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+        ),
+    )
 
     diag = await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
 
     assert diag["coordinator"]["system_events"] == {}
+    assert diag["coordinator"]["weather"] is None
 
 
 @pytest.mark.asyncio

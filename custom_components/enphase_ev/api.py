@@ -46,6 +46,9 @@ from .const import (
     SITE_SEARCH_URL,
 )
 from . import api_parsers
+from .api_client import auth as api_auth
+from .api_client import site_surface as api_site_surface
+from .api_client import transport as api_transport
 from .api_models import (
     AuthTokens as AuthTokens,
     ChargerInfo as ChargerInfo,
@@ -1306,56 +1309,21 @@ async def _request_json(
     json_data: Any | None = None,
 ) -> Any:
     """Perform an HTTP request returning JSON with timeout handling."""
-
-    req_kwargs: dict[str, Any] = {}
-    if headers is not None:
-        req_kwargs["headers"] = headers
-    if data is not None:
-        req_kwargs["data"] = data
-    if json_data is not None:
-        req_kwargs["json"] = json_data
-
-    async with asyncio.timeout(timeout):
-        async with _enlighten_read_request_guard(method, url):
-            async with session.request(
-                method, url, allow_redirects=True, **req_kwargs
-            ) as resp:
-                if resp.status >= 500:
-                    raise EnlightenAuthUnavailable(
-                        f"Server error {resp.status} at {_request_label(method, url)}"
-                    )
-                if resp.status >= 400:
-                    body_text = ""
-                    try:
-                        body_text = await resp.text()
-                    except Exception:  # noqa: BLE001 - best effort auth diagnostics
-                        body_text = ""
-                    if _is_too_many_active_sessions_response(body_text):
-                        raise EnlightenAuthTooManySessions(
-                            "Too many active Enlighten sessions"
-                        )
-                resp.raise_for_status()
-                ctype = resp.headers.get("Content-Type", "")
-                if "json" not in ctype:
-                    text = await resp.text()
-                    if _is_too_many_active_sessions_response(text):
-                        raise EnlightenAuthTooManySessions(
-                            "Too many active Enlighten sessions"
-                        )
-                    raise EnlightenAuthUnavailable(
-                        _safe_response_error_message(
-                            status=int(resp.status),
-                            reason="Unexpected non-JSON response",
-                            headers=resp.headers,
-                            body_text=text,
-                        )
-                    )
-                payload = await resp.json()
-                if _is_too_many_active_sessions_response(payload):
-                    raise EnlightenAuthTooManySessions(
-                        "Too many active Enlighten sessions"
-                    )
-                return payload
+    return await api_transport.request_json(
+        session,
+        method,
+        url,
+        timeout=timeout,
+        headers=headers,
+        data=data,
+        json_data=json_data,
+        request_guard=_enlighten_read_request_guard,
+        request_label=_request_label,
+        safe_error_message=_safe_response_error_message,
+        is_session_limit=_is_too_many_active_sessions_response,
+        unavailable_error=EnlightenAuthUnavailable,
+        session_limit_error=EnlightenAuthTooManySessions,
+    )
 
 
 async def _request_mfa_json(
@@ -1368,120 +1336,54 @@ async def _request_mfa_json(
     data: Any | None = None,
 ) -> Any:
     """Perform an MFA HTTP request with tolerant JSON parsing."""
-
-    req_kwargs: dict[str, Any] = {}
-    if headers is not None:
-        req_kwargs["headers"] = headers
-    if data is not None:
-        req_kwargs["data"] = data
-
-    async with asyncio.timeout(timeout):
-        async with session.request(
-            method, url, allow_redirects=True, **req_kwargs
-        ) as resp:
-            if resp.status >= 500:
-                raise EnlightenAuthUnavailable(
-                    f"Server error {resp.status} at {_request_label(method, url)}"
-                )
-            if resp.status in (204, 205):
-                return {}
-            if resp.status >= 400:
-                body_text = ""
-                try:
-                    body_text = await resp.text()
-                except Exception:  # noqa: BLE001 - best effort auth diagnostics
-                    body_text = ""
-                if _is_too_many_active_sessions_response(body_text):
-                    raise EnlightenAuthTooManySessions(
-                        "Too many active Enlighten sessions"
-                    )
-            resp.raise_for_status()
-            ctype = resp.headers.get("Content-Type", "")
-            if "json" in ctype:
-                payload = await resp.json()
-                if _is_too_many_active_sessions_response(payload):
-                    raise EnlightenAuthTooManySessions(
-                        "Too many active Enlighten sessions"
-                    )
-                return payload
-            text = await resp.text()
-            if _is_too_many_active_sessions_response(text):
-                raise EnlightenAuthTooManySessions("Too many active Enlighten sessions")
-            if not text.strip():
-                return {}
-            try:
-                payload = json.loads(text)
-            except json.JSONDecodeError as err:
-                raise EnlightenAuthUnavailable(
-                    _safe_response_error_message(
-                        status=int(resp.status),
-                        reason="Unexpected MFA response",
-                        headers=resp.headers,
-                        body_text=text,
-                    )
-                ) from err
-            if _is_too_many_active_sessions_response(payload):
-                raise EnlightenAuthTooManySessions("Too many active Enlighten sessions")
-            return payload
+    return await api_transport.request_mfa_json(
+        session,
+        method,
+        url,
+        timeout=timeout,
+        headers=headers,
+        data=data,
+        request_label=_request_label,
+        safe_error_message=_safe_response_error_message,
+        is_session_limit=_is_too_many_active_sessions_response,
+        unavailable_error=EnlightenAuthUnavailable,
+        session_limit_error=EnlightenAuthTooManySessions,
+    )
 
 
 def _mfa_headers(cookies: dict[str, str] | None) -> dict[str, str]:
     """Return headers for MFA endpoints with cookie/XSRF handling."""
-
-    headers = _login_headers()
-    headers["Accept"] = "application/json, text/plain, */*"
-    cookie_header = _cookie_header_from_map(cookies)
-    if cookie_header:
-        headers["Cookie"] = cookie_header
-    xsrf_token = _extract_xsrf_token(cookies)
-    if xsrf_token:
-        headers["X-CSRF-Token"] = xsrf_token
-    return headers
+    return api_auth.mfa_headers(
+        cookies,
+        base_headers=_login_headers(),
+        cookie_header=_cookie_header_from_map,
+        xsrf_token=_extract_xsrf_token,
+    )
 
 
 def _login_headers() -> dict[str, str]:
     """Return headers for the initial Enlighten login request."""
-
-    return {
-        "Accept": "*/*",
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        "Referer": f"{BASE_URL}/",
-        "User-Agent": _ENLIGHTEN_BROWSER_USER_AGENT,
-        "X-Requested-With": "XMLHttpRequest",
-    }
+    return api_auth.login_headers(
+        base_url=BASE_URL,
+        user_agent=_ENLIGHTEN_BROWSER_USER_AGENT,
+    )
 
 
 def _login_form_headers() -> dict[str, str]:
     """Return browser-style headers for the HTML form login flow."""
-
-    return {
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Origin": BASE_URL,
-        "Referer": f"{BASE_URL}/",
-        "User-Agent": _ENLIGHTEN_BROWSER_USER_AGENT,
-    }
+    return api_auth.login_form_headers(
+        base_url=BASE_URL,
+        user_agent=_ENLIGHTEN_BROWSER_USER_AGENT,
+    )
 
 
 def _extract_login_session_from_cookies(
     cookies: dict[str, str] | None,
 ) -> tuple[str | None, str | None]:
     """Extract session details from post-login cookies."""
-
-    if not cookies:
-        return None, None
-
-    session_id = (
-        cookies.get("_enlighten_4_session")
-        or cookies.get("enlighten_session")
-        or cookies.get("_enlighten_session")
-    )
-    manager_token = cookies.get("enlighten_manager_token_production")
-    if not session_id and manager_token:
-        session_id = _jwt_session_id(manager_token)
-    return (
-        str(session_id) if session_id else None,
-        str(manager_token) if manager_token else None,
+    return api_auth.login_session_from_cookies(
+        cookies,
+        jwt_session_id=_jwt_session_id,
     )
 
 
@@ -6508,21 +6410,7 @@ class EnphaseEVClient:
         GET /systems/<site_id>/weather.json?locale=<locale>
         """
 
-        endpoint = f"/systems/{self._site}/weather.json"
-        url = URL(f"{BASE_URL}{endpoint}").with_query({"locale": str(locale)})
-        data = await self._json(
-            "GET",
-            str(url),
-            headers=self._systems_json_headers(),
-        )
-        if not isinstance(data, dict):
-            raise self._invalid_payload_error(
-                endpoint=endpoint,
-                summary="Weather payload must be an object",
-                failure_kind="shape",
-                payload=data,
-            )
-        return data
+        return await api_site_surface.weather(self, base_url=BASE_URL, locale=locale)
 
     @classmethod
     def _normalize_latest_power_payload(
@@ -6530,10 +6418,7 @@ class EnphaseEVClient:
     ) -> dict[str, object] | None:
         """Normalize app-api latest power payloads into a common shape."""
 
-        return cast(
-            dict[str, object] | None,
-            api_parsers.normalize_latest_power_payload(payload),
-        )
+        return api_site_surface.normalize_latest_power(payload)
 
     async def latest_power(self) -> dict[str, object] | None:
         """Return the latest site power sample for the configured site.
@@ -6541,64 +6426,21 @@ class EnphaseEVClient:
         GET /app-api/<site_id>/get_latest_power
         """
 
-        url = f"{BASE_URL}/app-api/{self._site}/get_latest_power"
-        data = await self._json("GET", url, headers=self._history_headers())
-        normalized = self._normalize_latest_power_payload(data)
-        if normalized is not None:
-            return normalized
-
-        top_level_keys: list[str] = []
-        nested_keys: list[str] = []
-        payload_type = type(data).__name__
-        if isinstance(data, dict):
-            top_level_keys = sorted(str(key) for key in data.keys())
-            nested = data.get("latest_power")
-            if not isinstance(nested, dict):
-                candidate = data.get("data")
-                if isinstance(candidate, dict):
-                    nested = candidate.get("latest_power")
-                    if not isinstance(nested, dict):
-                        nested = candidate
-            if isinstance(nested, dict):
-                nested_keys = sorted(str(key) for key in nested.keys())
-
-        _LOGGER.debug(
-            "Invalid latest power payload for site %s (payload_type=%s, top_level_keys=%s, nested_keys=%s)",
-            redact_site_id(self._site),
-            payload_type,
-            top_level_keys,
-            nested_keys,
-        )
-        return None
+        return await api_site_surface.latest_power(self, base_url=BASE_URL)
 
     async def show_livestream(
         self, *, allow_reauth: bool = True
     ) -> dict[str, object] | None:
         """Return live-status/vitals capability flags when available."""
 
-        url = f"{BASE_URL}/app-api/{self._site}/show_livestream"
-        try:
-            data = await self._json(
-                "GET",
-                url,
-                headers=self._system_dashboard_headers(),
-                allow_reauth=allow_reauth,
-            )
-        except Unauthorized:
-            if not allow_reauth:
-                raise
-            return None
-        except InvalidPayloadError as err:
-            if _is_optional_non_json_payload(err):
-                return None
-            raise
-        except aiohttp.ClientResponseError as err:
-            if err.status in (401, 403, 404):
-                if not allow_reauth and err.status in (401, 403):
-                    raise
-                return None
-            raise
-        return data if isinstance(data, dict) else None
+        return await api_site_surface.show_livestream(
+            self,
+            base_url=BASE_URL,
+            allow_reauth=allow_reauth,
+            unauthorized_error=Unauthorized,
+            invalid_payload_error=InvalidPayloadError,
+            optional_non_json=_is_optional_non_json_payload,
+        )
 
     async def site_livestream_authorizer(
         self,
@@ -6609,39 +6451,16 @@ class EnphaseEVClient:
     ) -> dict[str, object] | None:
         """Return signed AWS IoT connection details for the site live stream."""
 
-        query: dict[str, str] = {"serial_num": str(serial_num)}
-        if live_debug:
-            query["live_debug"] = "true"
-        endpoint = (
-            "/service/system_dashboard/api_internal/cs/sites/livestream"
-            if live_debug
-            else "/pv/aws_sigv4/livestream.json"
+        return await api_site_surface.livestream_authorizer(
+            self,
+            serial_num,
+            base_url=BASE_URL,
+            live_debug=live_debug,
+            allow_reauth=allow_reauth,
+            unauthorized_error=Unauthorized,
+            invalid_payload_error=InvalidPayloadError,
+            optional_non_json=_is_optional_non_json_payload,
         )
-        url = URL(f"{BASE_URL}{endpoint}").with_query(query)
-        headers = self._today_headers()
-        headers["X-Requested-With"] = "XMLHttpRequest"
-        try:
-            data = await self._json(
-                "GET",
-                str(url),
-                headers=headers,
-                allow_reauth=allow_reauth,
-            )
-        except Unauthorized:
-            if not allow_reauth:
-                raise
-            return None
-        except InvalidPayloadError as err:
-            if _is_optional_non_json_payload(err):
-                return None
-            raise
-        except aiohttp.ClientResponseError as err:
-            if err.status in (401, 403, 404):
-                if not allow_reauth and err.status in (401, 403):
-                    raise
-                return None
-            raise
-        return data if isinstance(data, dict) else None
 
     async def site_livestream_payload(
         self,

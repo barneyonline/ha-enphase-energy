@@ -15,6 +15,8 @@ flowchart TD
     D --> F["Runtime managers"]
     D --> G["InventoryView"]
     D --> H["Entity platforms"]
+    H --> W["Weather child coordinator"]
+    W --> E
     E --> I["Enphase cloud endpoints"]
     F --> D
     G --> H
@@ -26,9 +28,11 @@ flowchart TD
 
 `config_flow.py` handles user login, MFA, site selection, device-category selection, reconfigure, and reauth entry updates. It stores the tokens and cookies needed for refreshes in the config entry. The password is stored only when the user opts into remembered credentials so the integration can attempt automatic token refresh.
 
-`__init__.py` handles config entry setup and unload. It creates the coordinator,
-restores compact discovery state, starts an independent power-acquisition task,
-and blocks only on the authoritative status refresh before forwarding platforms.
+`__init__.py` handles config entry setup and unload. It creates the coordinator
+and invokes its public bootstrap API. Coordinator-owned `_async_setup` restores
+compact discovery state and starts an independent power-acquisition task before
+the authoritative status refresh. Config-entry setup blocks only on that refresh
+before forwarding platforms.
 Translation and integration-version priming run concurrently with that work.
 Optional endpoint families then warm up in feature-aware stages, publishing after
 each stage so one slow family does not hold back unrelated state. Schedule sync and
@@ -81,7 +85,20 @@ path unless Home Assistant cannot safely create the integration without it.
 
 ## Cloud Client
 
-`api.py` is the HTTP boundary. It handles Enlighten login, MFA, credential refresh helpers, request headers, response parsing, invalid payload signatures, and endpoint-specific compatibility paths.
+`api.py` is the stable public compatibility facade for the HTTP boundary. It
+retains `EnphaseEVClient` and the existing authentication/error imports used by
+the integration. Cohesive implementations live under `api_client/`:
+
+- `transport.py` owns injected-`ClientSession` authentication requests and response handling.
+- `auth.py` owns login, MFA, cookie, and XSRF request shaping.
+- `site_surface.py` owns site telemetry and livestream HTTP surface behavior.
+
+The facade remains intentionally thin for migrated slices. New cloud behavior
+should be added to a cohesive internal surface rather than growing `api.py`.
+Internal modules must accept the Home Assistant-provided `ClientSession` and
+must not create or own a session. This keeps the boundary suitable for eventual
+extraction into an independent async client library without adding a runtime
+dependency today.
 
 Several Enphase surfaces behave like browser-backed applications rather than stable public APIs:
 
@@ -90,7 +107,20 @@ Several Enphase surfaces behave like browser-backed applications rather than sta
 - Scheduler and EVSE control endpoints can accept writes before read endpoints reflect the new state.
 - Some optional endpoints return HTML, login pages, or non-JSON success responses.
 
-Keep new endpoint handling inside `api.py` or narrow parser/helper modules so coordinator and entity code remain normalized.
+Keep new endpoint handling inside `api_client/` or narrow parser modules so
+coordinator and entity code remain normalized. Preserve compatibility exports
+from `api.py` when moving existing behavior.
+
+### Weather child coordinator
+
+Weather is the deliberate exception to the one-main-coordinator polling model.
+It is optional, discovered independently, and uses a 15-minute cadence that
+should not affect core integration availability. The weather platform therefore
+owns an `EnphaseWeatherCoordinator` child. The config entry's typed runtime data
+tracks both the child and its discovery task, unload explicitly cancels/releases
+them, and config-entry diagnostics report discovery and update health. Entities
+must not create additional independent coordinators without documenting the
+lifecycle and diagnostics ownership here.
 
 ## Runtime Managers
 
@@ -106,11 +136,17 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
 
 These managers should own cache lifetimes, stale data decisions, and endpoint-specific parsing for their family. The coordinator should expose their normalized state through properties and helper methods.
 
+New manager state is published through immutable snapshots rather than projected
+private coordinator fields. The aggregate integration snapshot determines update
+equality while preserving the historical dictionary-shaped `coordinator.data`
+interface. See [ADR 0001](adr/0001-runtime-state-ownership.md) for dependency,
+ownership, and incremental migration rules.
+
 ## Inventory And Entity Gating
 
 `inventory_runtime.py` builds type buckets from cloud inventory. `inventory_view.py` is the read-facing layer used by entity platforms to decide whether a type should exist or be available. `device_types.py` normalizes Enphase product labels into canonical type keys.
 
-Entity platforms under `sensor.py`, `binary_sensor.py`, `button.py`, `number.py`, `select.py`, `switch.py`, `time.py`, `calendar.py`, and `update.py` create Home Assistant entities from coordinator state. Platform setup usually follows this pattern:
+Entity platforms under `sensor.py`, `binary_sensor.py`, `button.py`, `number.py`, `select.py`, `switch.py`, `time.py`, `calendar.py`, and `update.py` create Home Assistant entities from coordinator state. `sensor.py` remains the sensor platform and discovery entry point; cohesive battery and heat-pump entity models live in `sensor_battery.py` and `sensor_heatpump.py`, with shared presentation and normalization boundaries in `sensor_base.py` and `sensor_snapshot_helpers.py`. New device families should follow that split instead of adding payload interpretation to the platform entry point. Platform setup usually follows this pattern:
 
 1. Add site-level entities that are supported by selected inventory types and permissions.
 2. Add charger or device entities for discovered serials/type members.

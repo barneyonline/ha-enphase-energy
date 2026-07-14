@@ -116,7 +116,7 @@ from .const import (
 )
 from .battery_runtime import BatteryRuntime
 from .coordinator_diagnostics import CoordinatorDiagnostics
-from .current_power_runtime import CurrentPowerRuntime
+from .current_power_runtime import CurrentPowerRuntime, CurrentPowerSample
 from .discovery_snapshot import DiscoverySnapshotManager
 from .device_types import (
     normalize_type_key,
@@ -124,7 +124,10 @@ from .device_types import (
 )
 from .energy import EnergyManager
 from .evse_timeseries import EVSETimeseriesManager
-from .evse_feature_flags_runtime import EvseFeatureFlagsRuntime
+from .evse_feature_flags_runtime import (
+    EvseFeatureFlagsRuntime,
+    EvseFeatureFlagsSnapshot,
+)
 from .evse_runtime import (
     AMP_RESTART_DELAY_S,
     FAST_TOGGLE_POLL_HOLD_S,
@@ -139,6 +142,11 @@ from .grid_profile_runtime import SUPPORT_DENIED, SUPPORT_UNKNOWN, GridProfileRu
 from .heatpump_runtime import HeatpumpRuntime
 from .inventory_runtime import CoordinatorTopologySnapshot, InventoryRuntime
 from .inventory_view import InventoryView
+from .integration_snapshot import (
+    CoordinatorData,
+    IntegrationSnapshot,
+    freeze_charger_data,
+)
 from .labels import (
     battery_grid_mode_label,
     battery_profile_label as translated_battery_profile_label,
@@ -578,6 +586,154 @@ class EnphaseCoordinator(
     _storm_evse_enabled: bool | None
     _storm_alert_active: bool | None
 
+    @property
+    def integration_snapshot(self) -> IntegrationSnapshot | None:
+        """Return the last immutable aggregate state published to listeners."""
+
+        return self._integration_snapshot
+
+    @property
+    def current_power_snapshot(self) -> CurrentPowerSample:
+        """Return the current-power runtime's immutable snapshot."""
+
+        return cast(CurrentPowerSample, self.current_power_runtime.snapshot)
+
+    @property
+    def evse_feature_flags_snapshot(self) -> EvseFeatureFlagsSnapshot:
+        """Return the EVSE feature-flag runtime's immutable snapshot."""
+
+        return cast(EvseFeatureFlagsSnapshot, self.evse_feature_flags_runtime.snapshot)
+
+    def _current_power_value(self, field: str) -> object:
+        runtime = self.__dict__.get("current_power_runtime")
+        if isinstance(runtime, CurrentPowerRuntime):
+            return getattr(runtime.snapshot, field)
+        return self.__dict__.get(f"_legacy_current_power_{field}")
+
+    def _set_current_power_value(self, field: str, value: object) -> None:
+        runtime = self.__dict__.get("current_power_runtime")
+        if isinstance(runtime, CurrentPowerRuntime):
+            runtime.replace_snapshot(**{field: value})
+            return
+        self.__dict__[f"_legacy_current_power_{field}"] = value
+
+    @property
+    def _current_power_consumption_w(self) -> float | None:
+        return cast(float | None, self._current_power_value("w"))
+
+    @_current_power_consumption_w.setter
+    def _current_power_consumption_w(self, value: float | None) -> None:
+        self._set_current_power_value("w", value)
+
+    @property
+    def _current_power_consumption_sample_utc(self) -> datetime | None:
+        return cast(datetime | None, self._current_power_value("sample_utc"))
+
+    @_current_power_consumption_sample_utc.setter
+    def _current_power_consumption_sample_utc(self, value: datetime | None) -> None:
+        self._set_current_power_value("sample_utc", value)
+
+    @property
+    def _current_power_consumption_reported_units(self) -> str | None:
+        return cast(str | None, self._current_power_value("reported_units"))
+
+    @_current_power_consumption_reported_units.setter
+    def _current_power_consumption_reported_units(self, value: str | None) -> None:
+        self._set_current_power_value("reported_units", value)
+
+    @property
+    def _current_power_consumption_reported_precision(self) -> int | None:
+        return cast(int | None, self._current_power_value("reported_precision"))
+
+    @_current_power_consumption_reported_precision.setter
+    def _current_power_consumption_reported_precision(self, value: int | None) -> None:
+        self._set_current_power_value("reported_precision", value)
+
+    @property
+    def _current_power_consumption_source(self) -> str | None:
+        return cast(str | None, self._current_power_value("source"))
+
+    @_current_power_consumption_source.setter
+    def _current_power_consumption_source(self, value: str | None) -> None:
+        self._set_current_power_value("source", value)
+
+    def _feature_flags_runtime(self) -> EvseFeatureFlagsRuntime | None:
+        runtime = self.__dict__.get("evse_feature_flags_runtime")
+        return runtime if isinstance(runtime, EvseFeatureFlagsRuntime) else None
+
+    @property
+    def _evse_feature_flags_cache_until(self) -> float | None:
+        runtime = self._feature_flags_runtime()
+        if runtime is not None:
+            return runtime.cache_until_mono
+        return cast(
+            float | None,
+            self.__dict__.get("_legacy_evse_feature_flags_cache_until"),
+        )
+
+    @_evse_feature_flags_cache_until.setter
+    def _evse_feature_flags_cache_until(self, value: float | None) -> None:
+        runtime = self._feature_flags_runtime()
+        if runtime is not None:
+            runtime.cache_until_mono = value
+            return
+        self.__dict__["_legacy_evse_feature_flags_cache_until"] = value
+
+    @property
+    def _evse_feature_flags_payload(self) -> dict[str, object] | None:
+        runtime = self._feature_flags_runtime()
+        if runtime is not None:
+            payload = runtime.snapshot.payload
+            return dict(payload) if payload is not None else None
+        return cast(
+            dict[str, object] | None,
+            self.__dict__.get("_legacy_evse_feature_flags_payload"),
+        )
+
+    @_evse_feature_flags_payload.setter
+    def _evse_feature_flags_payload(self, value: dict[str, object] | None) -> None:
+        runtime = self._feature_flags_runtime()
+        if runtime is not None:
+            runtime.replace_payload(value)
+            return
+        self.__dict__["_legacy_evse_feature_flags_payload"] = value
+
+    @property
+    def _evse_site_feature_flags(self) -> dict[str, object]:
+        runtime = self._feature_flags_runtime()
+        if runtime is not None:
+            return dict(runtime.snapshot.site_feature_flags)
+        value = self.__dict__.get("_legacy_evse_site_feature_flags", {})
+        return value if isinstance(value, dict) else {}
+
+    @_evse_site_feature_flags.setter
+    def _evse_site_feature_flags(self, value: dict[str, object]) -> None:
+        runtime = self._feature_flags_runtime()
+        if runtime is not None:
+            runtime.replace_site_feature_flags(value)
+            return
+        self.__dict__["_legacy_evse_site_feature_flags"] = value
+
+    @property
+    def _evse_feature_flags_by_serial(self) -> dict[str, object]:
+        runtime = self._feature_flags_runtime()
+        if runtime is not None:
+            snapshot = runtime.snapshot
+            return {
+                str(key): dict(value)
+                for key, value in snapshot.charger_feature_flags_by_serial.items()
+            }
+        value = self.__dict__.get("_legacy_evse_feature_flags_by_serial", {})
+        return value if isinstance(value, dict) else {}
+
+    @_evse_feature_flags_by_serial.setter
+    def _evse_feature_flags_by_serial(self, value: dict[str, object]) -> None:
+        runtime = self._feature_flags_runtime()
+        if runtime is not None:
+            runtime.replace_charger_feature_flags(value)
+            return
+        self.__dict__["_legacy_evse_feature_flags_by_serial"] = value
+
     def __init__(
         self,
         hass: HomeAssistant,
@@ -587,6 +743,9 @@ class EnphaseCoordinator(
         cookie_header_session: aiohttp.ClientSession | None = None,
     ) -> None:
         self.hass = hass
+        self._integration_snapshot: IntegrationSnapshot | None = None
+        self._publication_revision = 0
+        self._runtime_publication_revisions: dict[str, int] = {}
         self.config_entry = config_entry
         self._grid_toggle_enabled = bool(
             config_entry and config_entry.options.get(OPT_GRID_TOGGLE_ENABLED, False)
@@ -920,6 +1079,66 @@ class EnphaseCoordinator(
             return
         super().__setattr__(name, value)
 
+    def _build_integration_snapshot(
+        self, data: Mapping[str, Mapping[str, object]]
+    ) -> IntegrationSnapshot:
+        """Build and retain the aggregate state used for update equality."""
+
+        current_power_runtime = self.__dict__.get("current_power_runtime")
+        current_power = (
+            current_power_runtime.snapshot
+            if isinstance(current_power_runtime, CurrentPowerRuntime)
+            else CurrentPowerSample()
+        )
+        feature_flags_runtime = self.__dict__.get("evse_feature_flags_runtime")
+        feature_flags = (
+            feature_flags_runtime.snapshot
+            if isinstance(feature_flags_runtime, EvseFeatureFlagsRuntime)
+            else EvseFeatureFlagsSnapshot(
+                payload=None,
+                site_feature_flags={},
+                charger_feature_flags_by_serial={},
+                charger_serial_count=0,
+            )
+        )
+        candidate = IntegrationSnapshot(
+            chargers=freeze_charger_data(data),
+            evse_feature_flags=feature_flags,
+            current_power=current_power,
+            runtime_revisions=tuple(
+                sorted(self._runtime_publication_revisions.items())
+            ),
+            revision=self._publication_revision,
+        )
+        previous = self._integration_snapshot
+        if previous is None or candidate != previous:
+            self._publication_revision += 1
+            candidate = IntegrationSnapshot(
+                chargers=candidate.chargers,
+                evse_feature_flags=candidate.evse_feature_flags,
+                current_power=candidate.current_power,
+                runtime_revisions=candidate.runtime_revisions,
+                revision=self._publication_revision,
+            )
+        self._integration_snapshot = candidate
+        return candidate
+
+    def async_set_updated_data(self, data: dict[str, dict[str, object]]) -> None:
+        """Publish normalized data using aggregate integration equality."""
+
+        snapshot = self._build_integration_snapshot(data)
+        super().async_set_updated_data(CoordinatorData(data, snapshot))
+
+    def publish_runtime_state_update(self, source: str) -> None:
+        """Publish a manager-owned state transition with unchanged charger data."""
+
+        source_key = str(source).strip() or "runtime"
+        self._runtime_publication_revisions[source_key] = (
+            self._runtime_publication_revisions.get(source_key, 0) + 1
+        )
+        current = self.data if isinstance(self.data, dict) else {}
+        self.async_set_updated_data(dict(current))
+
     def _ensure_coordinator_runtime(self, attr_name: str) -> object:
         """Instantiate and cache a coordinator sub-runtime (single factory for __init__ / __getattr__)."""
 
@@ -979,8 +1198,69 @@ class EnphaseCoordinator(
         raise AttributeError(f"{type(self).__name__} has no attribute {name!r}")
 
     async def _async_setup(self) -> None:
-        """Prepare lightweight state before the first refresh."""
+        """Restore coordinator-owned state and start bounded bootstrap work."""
+
         self._phase_timings = {}
+        started = time.monotonic()
+        await self.discovery_snapshot.async_restore_state()
+        self.record_setup_phase("snapshot_restore_s", started)
+        await self.refresh_runner.async_start_startup_power()
+
+    def begin_setup_tracking(
+        self,
+        started_mono: float,
+        phase_timings: dict[str, float],
+        milestones: dict[str, float],
+    ) -> None:
+        """Attach config-entry setup timing collectors to this coordinator."""
+
+        self._setup_started_mono = started_mono
+        self._setup_phase_timings = phase_timings
+        self._setup_milestones = milestones
+
+    def record_setup_phase(self, key: str, started_mono: float) -> None:
+        """Record a setup phase when config-entry setup tracking is active."""
+
+        timings = getattr(self, "_setup_phase_timings", None)
+        if isinstance(timings, dict):
+            timings[key] = round(max(0.0, time.monotonic() - started_mono), 3)
+
+    def mark_setup_milestone(self, key: str) -> None:
+        """Record elapsed setup time for a named milestone."""
+
+        started = getattr(self, "_setup_started_mono", None)
+        milestones = getattr(self, "_setup_milestones", None)
+        if isinstance(started, (int, float)) and isinstance(milestones, dict):
+            milestones[key] = round(max(0.0, time.monotonic() - started), 3)
+
+    def finish_setup_tracking(self, total_seconds: float) -> None:
+        """Finalize setup timing and milestone state."""
+
+        timings = getattr(self, "_setup_phase_timings", None)
+        if isinstance(timings, dict):
+            timings["total_s"] = round(max(0.0, total_seconds), 3)
+        milestones = getattr(self, "_setup_milestones", None)
+        if isinstance(milestones, dict):
+            milestones["setup_complete"] = round(max(0.0, total_seconds), 3)
+
+    async def async_bootstrap_first_refresh(self) -> None:
+        """Run the minimal setup refresh without exposing private setup flags."""
+
+        started = time.monotonic()
+        self._minimal_setup_refresh_active = True
+        try:
+            await self.async_config_entry_first_refresh()
+        finally:
+            self._minimal_setup_refresh_active = False
+            self.record_setup_phase("first_refresh_s", started)
+
+    async def async_cancel_startup_power(self) -> None:
+        """Cancel and await the startup-power task after failed setup."""
+
+        task = getattr(self, "_startup_power_task", None)
+        if isinstance(task, asyncio.Future) and not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
 
     def _build_endpoint_family_policies(self) -> dict[str, EndpointFamilyPolicy]:
         """Return cooldown/cache policies for read-only endpoint families."""
@@ -2087,8 +2367,7 @@ class EnphaseCoordinator(
         return bool(getattr(self, "_devices_inventory_ready", False))
 
     def _publish_internal_state_update(self) -> None:
-        current = self.data if isinstance(self.data, dict) else {}
-        self.async_set_updated_data(dict(current))
+        self.publish_runtime_state_update("coordinator")
 
     async def async_ensure_system_dashboard_diagnostics(self) -> None:
         await self.inventory_runtime.async_ensure_system_dashboard_diagnostics()
@@ -3508,7 +3787,9 @@ class EnphaseCoordinator(
             context.request_metrics = request_metrics
             outcome = "success"
             try:
-                return await self._async_update_data_impl(context)
+                data = await self._async_update_data_impl(context)
+                snapshot = self._build_integration_snapshot(data)
+                return CoordinatorData(data, snapshot)
             except asyncio.CancelledError:
                 outcome = "cancelled"
                 raise
