@@ -450,7 +450,8 @@ async def async_get_config_entry_diagnostics(
     }
 
     try:
-        coord = get_runtime_data(entry).coordinator
+        runtime_data = get_runtime_data(entry)
+        coord = runtime_data.coordinator
     except RuntimeError:
         return _redact_diagnostics_payload(diag, site_ids=site_ids)
 
@@ -611,6 +612,18 @@ async def async_get_config_entry_diagnostics(
         "grid_profile": grid_profile,
         "firmware_catalog": firmware_catalog or None,
     }
+
+    weather_coordinator = runtime_data.weather_coordinator
+    if weather_coordinator is None:
+        diag["coordinator"]["weather"] = {
+            "role": "child_coordinator",
+            "discovery_state": "disabled",
+        }
+    else:
+        try:
+            diag["coordinator"]["weather"] = weather_coordinator.diagnostics()
+        except DIAGNOSTIC_CAPTURE_ERRORS:
+            diag["coordinator"]["weather"] = None
 
     schedule_sync = getattr(coord, "schedule_sync", None)
     if schedule_sync is not None and hasattr(schedule_sync, "diagnostics"):

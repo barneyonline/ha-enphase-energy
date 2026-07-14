@@ -1777,12 +1777,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
 
 async def async_unload_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> bool:
     coord = None
+    runtime_data = None
     try:
-        coord = get_runtime_data(entry).coordinator
+        runtime_data = get_runtime_data(entry)
+        coord = runtime_data.coordinator
     except RuntimeError:
         pass
     unload_ok = await _async_unload_platforms_safe(hass, entry)
     if unload_ok:
+        if runtime_data is not None:
+            await runtime_data.async_stop_weather()
         if coord is not None and hasattr(coord, "schedule_sync"):
             await coord.schedule_sync.async_stop()
         async_cleanup_runtime_state = getattr(
