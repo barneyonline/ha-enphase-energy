@@ -2334,6 +2334,9 @@
     "calendar": {
       "backup_history": {
         "name": "Backup History"
+      },
+      "system_event_history": {
+        "name": "System Event History"
       }
     },
     "select": {

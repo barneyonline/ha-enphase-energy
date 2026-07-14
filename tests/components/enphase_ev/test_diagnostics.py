@@ -768,7 +768,13 @@ async def test_config_entry_diagnostics_includes_coordinator(
             "active_count": 1,
             "high_impact_count": 1,
             "device_type_counts": {"IQ Gateway": 1},
-        }
+        },
+        history_diagnostics=lambda: {
+            "available": True,
+            "cached_range_count": 1,
+            "cached_event_count": 3,
+            "truncated": False,
+        },
     )
     coord.current_power_runtime = SimpleNamespace(
         diagnostics=lambda: {
@@ -1053,6 +1059,12 @@ async def test_config_entry_diagnostics_includes_coordinator(
         "high_impact_count": 1,
         "device_type_counts": {"IQ Gateway": 1},
     }
+    assert diag["coordinator"]["system_event_history"] == {
+        "available": True,
+        "cached_range_count": 1,
+        "cached_event_count": 3,
+        "truncated": False,
+    }
 
 
 @pytest.mark.asyncio
@@ -1068,6 +1080,22 @@ async def test_config_entry_diagnostics_handles_system_events_capture_error(
     diag = await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
 
     assert diag["coordinator"]["system_events"] == {}
+
+
+@pytest.mark.asyncio
+async def test_config_entry_diagnostics_handles_system_event_history_capture_error(
+    hass, config_entry
+) -> None:
+    coord = DummyCoordinator()
+    coord.system_events_runtime = SimpleNamespace(
+        diagnostics=lambda: {},
+        history_diagnostics=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+
+    diag = await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
+
+    assert diag["coordinator"]["system_event_history"] == {}
 
 
 @pytest.mark.asyncio

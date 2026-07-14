@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.enphase_ev.api import OptionalEndpointUnavailable
+from custom_components.enphase_ev.api import (
+    EnphaseLoginWallUnauthorized,
+    OptionalEndpointUnavailable,
+)
 from custom_components.enphase_ev.const import DOMAIN, OPT_SYSTEM_EVENT_REPAIR_ISSUES
 from custom_components.enphase_ev.system_events import (
     ACTIVE_EVENTS_ATTRIBUTE_LIMIT,
+    SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY,
     SYSTEM_EVENTS_ENDPOINT_FAMILY,
     SYSTEM_EVENT_REPAIR_CHECKPOINT_INTERVAL,
     SYSTEM_EVENT_REPAIR_MISSING_GRACE,
@@ -20,11 +25,14 @@ from custom_components.enphase_ev.system_events import (
     _catalog_label,
     _event_fingerprint,
     _event_is_active,
+    _event_is_informational,
+    _history_epoch,
     _lookup_catalog,
     _normalized,
     _text,
     _timestamp,
     parse_active_system_events,
+    parse_homeowner_event_history,
     parse_standing_alarms,
 )
 
@@ -169,6 +177,170 @@ def test_event_parser_handles_malformed_and_direct_severity_shapes() -> None:
     assert state_severity[0].high_impact is True
 
 
+def test_event_parser_excludes_explicit_informational_rows() -> None:
+    payload = {
+        "events": [
+            {
+                "id": "severity-info",
+                "event_type": "Routine update",
+                "event_state": "open",
+                "event_severity": 1,
+            },
+            {
+                "id": "type-info",
+                "event_type": "Informational",
+                "event_state": "open",
+            },
+            {
+                "id": "state-info",
+                "event_type": "Routine update",
+                "event_state": "Info",
+                "severity": "critical",
+            },
+            {
+                "id": "warning",
+                "event_type": "Warning",
+                "event_state": "open",
+                "severity": "warning",
+            },
+            {
+                "id": "critical",
+                "event_type": "Critical fault",
+                "event_state": "open",
+                "severity": "critical",
+            },
+        ],
+        "event_severities": [{"id": 1, "name": "Info"}],
+    }
+
+    events = parse_active_system_events(payload, site_id="1")
+
+    assert [event.event_type for event in events] == ["Warning", "Critical fault"]
+    assert [event.high_impact for event in events] == [False, True]
+    assert _event_is_informational(
+        {}, severity="informational", event_type="fault", state="open"
+    )
+    assert not _event_is_informational(
+        {}, severity="warning", event_type="Information unavailable", state="open"
+    )
+
+
+def test_homeowner_history_parser_normalizes_redacts_and_preserves_all_classes() -> (
+    None
+):
+    payload = {
+        "events": [
+            {
+                "id": "info-event",
+                "status": "Info",
+                "type": "IQ EV Charger",
+                "description": (
+                    "Charging started on IQ EV Charger "
+                    "(SNo. EV1234567890) at site 1234567."
+                ),
+                "event_start_date": 1770000100,
+                "event_clear_date": 1770000100,
+                "serial_num": "EV1234567890",
+                "devices_impacted": ["IQ EV Charger (SNo. EV1234567890)"],
+                "event_key": "evse_start_charging",
+                "recommended_action": "Check EV1234567890 if charging stops.",
+                "message_params": "private mode details",
+            },
+            {
+                "id": "warning-event",
+                "status": "Warning",
+                "type": "IQ Gateway",
+                "event_date": 1770000000,
+                "event_clear_date": 1770000060,
+                "event_key": "gateway_warning",
+            },
+            {
+                "id": "warning-event",
+                "event_date": 1770000000,
+                "description": "duplicate",
+            },
+            {"id": "invalid"},
+            "invalid-row",
+        ]
+    }
+
+    events = parse_homeowner_event_history(payload, site_id="1234567")
+
+    assert events is not None
+    assert len(events) == 2
+    assert [event.summary for event in events] == [
+        "IQ Gateway",
+        "Charging started on IQ EV Charger (SNo. EV12...7890) at site [site].",
+    ]
+    assert events[0].end - events[0].start == timedelta(minutes=1)
+    assert events[1].end - events[1].start == timedelta(minutes=1)
+    assert events[1].description == "Check EV12...7890 if charging stops."
+    assert "EV1234567890" not in repr(events)
+    assert "private mode details" not in repr(events)
+    assert parse_homeowner_event_history(None, site_id="1") is None
+    assert parse_homeowner_event_history({"events": {}}, site_id="1") is None
+    assert _history_epoch(True) is None
+    assert _history_epoch("not-a-time") is None
+    assert _history_epoch(1770000000000) == datetime.fromtimestamp(
+        1770000000, tz=timezone.utc
+    )
+
+    fallback = parse_homeowner_event_history(
+        {
+            "events": [
+                {
+                    "event_key": "fallback_event_key",
+                    "event_date": 1770000000,
+                    "serial_num": "SERIAL-1",
+                    "devices_impacted": [None, "IQ Device without serial"],
+                }
+            ]
+        },
+        site_id="1",
+    )
+    assert fallback is not None
+    assert fallback[0].summary == "Fallback event key"
+
+    no_summary = parse_homeowner_event_history(
+        {"events": [{"event_date": 1770000000}]},
+        site_id="1",
+    )
+    assert no_summary is not None
+    assert no_summary[0].summary is None
+
+    incomplete_metadata = parse_homeowner_event_history(
+        {
+            "events": [
+                {
+                    "event_date": 1770000000,
+                    "description": "Device (SNo. EV1234567890) reported an event.",
+                },
+                {
+                    "event_date": 1770000060,
+                    "type": "Serial: TYPE1234567890",
+                },
+                {
+                    "event_date": 1770000120,
+                    "recommended_action": (
+                        "Inspect serial number ACTION1234567890 before continuing."
+                    ),
+                },
+            ]
+        },
+        site_id="1",
+    )
+    assert incomplete_metadata is not None
+    assert len(incomplete_metadata) == 3
+    assert all(
+        identifier not in repr(incomplete_metadata)
+        for identifier in (
+            "EV1234567890",
+            "TYPE1234567890",
+            "ACTION1234567890",
+        )
+    )
+
+
 def test_standing_alarm_parser_normalizes_redacts_and_deduplicates() -> None:
     alarms = parse_standing_alarms(_standing_alarm_payload(), site_id="1234567")
 
@@ -225,6 +397,7 @@ def _runtime_coordinator(
     *,
     payload: object = None,
     alarm_payload: object = _DEFAULT_ALARMS,
+    history_payload: object | None = None,
     due: bool = True,
     entry_id: str | None = "Entry-ID",
     repairs_enabled: bool = True,
@@ -246,13 +419,383 @@ def _runtime_coordinator(
         client=SimpleNamespace(
             system_dashboard_events=AsyncMock(return_value=payload),
             system_dashboard_standing_alarms=AsyncMock(return_value=alarm_payload),
+            homeowner_events_page=AsyncMock(return_value=history_payload),
         ),
-        _endpoint_family_should_run=lambda family: (
-            family == SYSTEM_EVENTS_ENDPOINT_FAMILY and due
-        ),
+        _endpoint_family_should_run=lambda family: due,
+        _endpoint_family_wait_active=lambda family: False,
+        _endpoint_family_can_use_stale=lambda family: True,
         _endpoint_family_state=lambda family: health,
+        _note_endpoint_family_failure=MagicMock(),
         _note_endpoint_family_success=MagicMock(),
     )
+
+
+@pytest.mark.asyncio
+async def test_runtime_probes_homeowner_history_and_reports_safe_diagnostics(
+    hass,
+) -> None:
+    coordinator = _runtime_coordinator(
+        hass,
+        history_payload={
+            "events": [
+                {
+                    "id": "private-id",
+                    "event_date": 1770000000,
+                    "description": "Routine event",
+                }
+            ],
+            "next": "private-cursor",
+        },
+    )
+    runtime = SystemEventsRuntime(coordinator)
+
+    await runtime.async_refresh_history()
+
+    assert runtime.history_available is True
+    assert runtime.history_refresh_due() is True
+    coordinator.client.homeowner_events_page.assert_awaited_once_with(
+        next_cursor="start",
+        page_size=200,
+        locale=hass.config.language,
+    )
+    coordinator._note_endpoint_family_success.assert_called_once_with(
+        SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY
+    )
+    diagnostics = runtime.history_diagnostics()
+    assert diagnostics == {
+        "available": True,
+        "cached_range_count": 0,
+        "cached_event_count": 0,
+        "last_success_utc": runtime._history_last_success_utc.isoformat(),  # noqa: SLF001
+        "using_cached_data": False,
+        "truncated": False,
+    }
+    assert "private" not in repr(diagnostics)
+
+
+@pytest.mark.asyncio
+async def test_runtime_history_probe_handles_skip_and_optional_failures(hass) -> None:
+    coordinator = _runtime_coordinator(hass, due=False)
+    runtime = SystemEventsRuntime(coordinator)
+    await runtime.async_refresh_history()
+    coordinator.client.homeowner_events_page.assert_not_awaited()
+
+    coordinator._endpoint_family_should_run = lambda family: True
+    coordinator.client.homeowner_events_page = None
+    await runtime.async_refresh_history()
+
+    coordinator.client.homeowner_events_page = AsyncMock(
+        side_effect=RuntimeError("boom")
+    )
+    await runtime.async_refresh_history()
+    coordinator._note_endpoint_family_failure.assert_called_once()
+
+    coordinator.client.homeowner_events_page = AsyncMock(return_value=None)
+    await runtime.async_refresh_history()
+    assert coordinator._note_endpoint_family_failure.call_count == 2
+
+    coordinator.client.homeowner_events_page = AsyncMock(
+        side_effect=EnphaseLoginWallUnauthorized(
+            endpoint="/events/homeowner",
+            request_label="GET homeowner events",
+        )
+    )
+    with pytest.raises(EnphaseLoginWallUnauthorized):
+        await runtime.async_refresh_history()
+
+
+@pytest.mark.asyncio
+async def test_runtime_history_paginates_filters_and_caches_range(hass) -> None:
+    coordinator = _runtime_coordinator(hass)
+    coordinator.client.homeowner_events_page = AsyncMock(
+        side_effect=[
+            {
+                "events": [
+                    {
+                        "id": "newer",
+                        "event_date": 1770000300,
+                        "description": "Newer informational event",
+                    },
+                    {
+                        "id": "in-range",
+                        "event_date": 1770000200,
+                        "description": "In range warning event",
+                    },
+                ],
+                "next": "private-next-cursor",
+            },
+            {
+                "events": [
+                    {
+                        "id": "older",
+                        "event_date": 1770000000,
+                        "description": "Older event",
+                    }
+                ],
+                "next": None,
+            },
+        ]
+    )
+    runtime = SystemEventsRuntime(coordinator)
+    start = datetime.fromtimestamp(1770000100, tz=timezone.utc)
+    end = datetime.fromtimestamp(1770000400, tz=timezone.utc)
+
+    events = await runtime.async_history_events(start, end)
+    cached_events = await runtime.async_history_events(start, end)
+
+    assert [event.summary for event in events] == [
+        "In range warning event",
+        "Newer informational event",
+    ]
+    assert cached_events == events
+    assert coordinator.client.homeowner_events_page.await_count == 2
+    assert (
+        coordinator.client.homeowner_events_page.await_args_list[1].kwargs[
+            "next_cursor"
+        ]
+        == "private-next-cursor"
+    )
+    diagnostics = runtime.history_diagnostics()
+    assert diagnostics["cached_range_count"] == 1
+    assert diagnostics["cached_event_count"] == 2
+    assert diagnostics["truncated"] is False
+    assert "private-next-cursor" not in repr(
+        runtime._history_range_cache
+    )  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_runtime_history_marks_repeated_cursor_and_row_cap_truncated(
+    hass, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.SYSTEM_EVENT_HISTORY_ROW_LIMIT",
+        2,
+    )
+    coordinator = _runtime_coordinator(hass)
+    coordinator.client.homeowner_events_page = AsyncMock(
+        return_value={
+            "events": [
+                {"id": "1", "event_date": 1770000200},
+                {"id": "2", "event_date": 1770000100},
+            ],
+            "next": "more-private-data",
+        }
+    )
+    runtime = SystemEventsRuntime(coordinator)
+
+    events = await runtime.async_history_events(
+        datetime.fromtimestamp(1769990000, tz=timezone.utc),
+        datetime.fromtimestamp(1770010000, tz=timezone.utc),
+    )
+
+    assert len(events) == 2
+    assert runtime.history_diagnostics()["truncated"] is True
+    assert "more-private-data" not in repr(runtime.history_diagnostics())
+
+
+@pytest.mark.asyncio
+async def test_runtime_history_bounds_oversized_page(hass, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.SYSTEM_EVENT_HISTORY_ROW_LIMIT",
+        2,
+    )
+    coordinator = _runtime_coordinator(hass)
+    coordinator.client.homeowner_events_page = AsyncMock(
+        return_value={
+            "events": [
+                {"id": "1", "event_date": 1770000200},
+                {"id": "2", "event_date": 1770000100},
+                {"id": "3", "event_date": 1770000000},
+            ]
+        }
+    )
+    runtime = SystemEventsRuntime(coordinator)
+
+    events = await runtime.async_history_events(
+        datetime.fromtimestamp(1769990000, tz=timezone.utc),
+        datetime.fromtimestamp(1770010000, tz=timezone.utc),
+    )
+
+    assert len(events) == 2
+    assert runtime.history_diagnostics()["truncated"] is True
+
+
+@pytest.mark.asyncio
+async def test_runtime_history_rejects_non_list_rows(hass) -> None:
+    coordinator = _runtime_coordinator(hass, history_payload={"events": {}})
+    runtime = SystemEventsRuntime(coordinator)
+
+    assert (
+        await runtime.async_history_events(
+            datetime.fromtimestamp(1769990000, tz=timezone.utc),
+            datetime.fromtimestamp(1770010000, tz=timezone.utc),
+        )
+        == ()
+    )
+    coordinator._note_endpoint_family_failure.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_runtime_history_marks_page_cap_and_repeated_cursor_truncated(
+    hass, monkeypatch
+) -> None:
+    coordinator = _runtime_coordinator(hass)
+    runtime = SystemEventsRuntime(coordinator)
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.SYSTEM_EVENT_HISTORY_MAX_PAGES",
+        0,
+    )
+    await runtime.async_history_events(
+        datetime.fromtimestamp(1769990000, tz=timezone.utc),
+        datetime.fromtimestamp(1770010000, tz=timezone.utc),
+    )
+    assert runtime.history_diagnostics()["truncated"] is True
+
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.SYSTEM_EVENT_HISTORY_MAX_PAGES",
+        100,
+    )
+    runtime._history_range_cache.clear()  # noqa: SLF001
+    coordinator.client.homeowner_events_page = AsyncMock(
+        return_value={
+            "events": [{"id": "1", "event_date": 1770000200}],
+            "next": "start",
+        }
+    )
+    await runtime.async_history_events(
+        datetime.fromtimestamp(1770000000, tz=timezone.utc),
+        datetime.fromtimestamp(1770010000, tz=timezone.utc),
+    )
+    assert runtime.history_diagnostics()["truncated"] is True
+
+
+@pytest.mark.asyncio
+async def test_runtime_history_cache_eviction_inner_hit_cooldown_and_missing_fetcher(
+    hass, monkeypatch
+) -> None:
+    coordinator = _runtime_coordinator(hass)
+    runtime = SystemEventsRuntime(coordinator)
+    now = 1000.0
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.time.monotonic", lambda: now
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.SYSTEM_EVENT_HISTORY_CACHE_MAX_RANGES",
+        1,
+    )
+    first_start = datetime.fromtimestamp(1770000000, tz=timezone.utc)
+    first_end = datetime.fromtimestamp(1770000200, tz=timezone.utc)
+    first_key = runtime._history_cache_key(first_start, first_end, "en")  # noqa: SLF001
+    runtime._store_history_range(first_key, (), truncated=False)  # noqa: SLF001
+    second_key = runtime._history_cache_key(  # noqa: SLF001
+        first_start + timedelta(days=1),
+        first_end + timedelta(days=1),
+        "en",
+    )
+    runtime._store_history_range(second_key, (), truncated=False)  # noqa: SLF001
+    assert list(runtime._history_range_cache) == [second_key]  # noqa: SLF001
+
+    runtime._history_range_cache.clear()  # noqa: SLF001
+
+    class _PopulateCacheLock:
+        async def __aenter__(self):
+            runtime._store_history_range(first_key, (), truncated=True)  # noqa: SLF001
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    runtime._history_lock = _PopulateCacheLock()  # type: ignore[assignment]  # noqa: SLF001
+    assert await runtime.async_history_events(first_start, first_end) == ()
+    assert runtime.history_diagnostics()["truncated"] is True
+
+    runtime._history_lock = asyncio.Lock()  # noqa: SLF001
+    now += 901
+    coordinator._endpoint_family_state(
+        SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY
+    ).consecutive_failures = 1
+    coordinator._endpoint_family_wait_active = lambda family: True
+    runtime._history_truncated = False  # noqa: SLF001
+    assert await runtime.async_history_events(first_start, first_end) == ()
+    assert runtime.history_diagnostics()["using_cached_data"] is True
+    assert runtime.history_diagnostics()["truncated"] is True
+
+    coordinator._endpoint_family_can_use_stale = lambda family: False
+    runtime._history_last_success_utc = datetime.now(timezone.utc)  # noqa: SLF001
+    runtime._history_truncated = True  # noqa: SLF001
+    assert await runtime.async_history_events(first_start, first_end) == ()
+    assert runtime.history_diagnostics()["using_cached_data"] is False
+    assert runtime.history_diagnostics()["truncated"] is False
+
+    runtime._history_range_cache.clear()  # noqa: SLF001
+    coordinator._endpoint_family_state(
+        SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY
+    ).consecutive_failures = 0
+    coordinator.client.homeowner_events_page = None
+    assert await runtime.async_history_events(first_start, first_end) == ()
+
+    coordinator.client.homeowner_events_page = AsyncMock(return_value=None)
+    assert await runtime.async_history_events(first_start, first_end) == ()
+
+
+@pytest.mark.asyncio
+async def test_runtime_history_returns_expired_cache_after_failure(
+    hass, monkeypatch
+) -> None:
+    coordinator = _runtime_coordinator(hass)
+    coordinator.client.homeowner_events_page = AsyncMock(
+        return_value={
+            "events": [
+                {
+                    "id": "cached",
+                    "event_date": 1770000100,
+                    "description": "Cached event",
+                }
+            ]
+        }
+    )
+    runtime = SystemEventsRuntime(coordinator)
+    start = datetime.fromtimestamp(1770000000, tz=timezone.utc)
+    end = datetime.fromtimestamp(1770000200, tz=timezone.utc)
+    now = 1000.0
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.time.monotonic", lambda: now
+    )
+    expected = await runtime.async_history_events(start, end)
+    key = runtime._history_cache_key(start, end, "en")  # noqa: SLF001
+    runtime._store_history_range(key, expected, truncated=True)  # noqa: SLF001
+    runtime._history_truncated = False  # noqa: SLF001
+    now += 901.0
+    coordinator.client.homeowner_events_page.side_effect = RuntimeError("boom")
+
+    actual = await runtime.async_history_events(start, end)
+
+    assert actual == expected
+    assert runtime.history_diagnostics()["using_cached_data"] is True
+    assert runtime.history_diagnostics()["truncated"] is True
+    coordinator._note_endpoint_family_failure.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_runtime_history_preserves_login_wall_failure(hass) -> None:
+    coordinator = _runtime_coordinator(hass)
+    coordinator.client.homeowner_events_page = AsyncMock(
+        side_effect=EnphaseLoginWallUnauthorized(
+            endpoint="/events/homeowner",
+            request_label="GET homeowner events",
+            status=200,
+            content_type="text/html",
+        )
+    )
+    runtime = SystemEventsRuntime(coordinator)
+
+    with pytest.raises(EnphaseLoginWallUnauthorized):
+        await runtime.async_history_events(
+            datetime.fromtimestamp(1770000000, tz=timezone.utc),
+            datetime.fromtimestamp(1770000200, tz=timezone.utc),
+        )
+
+    coordinator._note_endpoint_family_failure.assert_not_called()
 
 
 @pytest.mark.asyncio

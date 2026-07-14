@@ -2395,6 +2395,9 @@
     "calendar": {
       "backup_history": {
         "name": "Historia zasilania rezerwowego"
+      },
+      "system_event_history": {
+        "name": "Historia zdarzeń systemowych"
       }
     },
     "update": {

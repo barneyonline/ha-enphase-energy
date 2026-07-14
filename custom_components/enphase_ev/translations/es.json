@@ -2395,6 +2395,9 @@
     "calendar": {
       "backup_history": {
         "name": "Historial de respaldo"
+      },
+      "system_event_history": {
+        "name": "Historial de eventos del sistema"
       }
     },
     "update": {

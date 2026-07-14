@@ -2395,6 +2395,9 @@
     "calendar": {
       "backup_history": {
         "name": "Historik för reservkraft"
+      },
+      "system_event_history": {
+        "name": "Historik över systemhändelser"
       }
     },
     "update": {

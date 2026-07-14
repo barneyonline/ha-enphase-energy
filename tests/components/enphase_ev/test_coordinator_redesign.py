@@ -300,6 +300,8 @@ class _RefreshOwner:
         self.system_events_runtime = SimpleNamespace(
             refresh_due=lambda: True,
             async_refresh=lambda: self._record("system_events"),
+            history_refresh_due=lambda: False,
+            async_refresh_history=lambda: self._record("system_event_history"),
         )
         self.battery_runtime = SimpleNamespace(
             async_refresh_grid_control_check=self._async_refresh_grid_control_check,
@@ -525,6 +527,8 @@ def test_refresh_plans_bind_dynamic_followup_and_warmup_calls() -> None:
     assert bound_warmup.stages[0].parallel_calls[0][2]() == "warmup-summary"
     assert bound_warmup.stages[1].parallel_calls[0][0] == "system_events_s"
     assert bound_warmup.stages[1].parallel_calls[0][2]() == "system_events"
+    assert bound_warmup.stages[1].parallel_calls[1][0] == "system_event_history_s"
+    assert bound_warmup.stages[1].parallel_calls[1][2]() == "system_event_history"
     assert "tariff_s" in [call[0] for call in bound_warmup.stages[1].parallel_calls]
     assert bound_warmup.stages[2].ordered_calls[0][2]() == "heatpump-runtime"
     assert bound_warmup.stages[3].parallel_calls[0][2]() == "warmup-site-energy"
@@ -557,6 +561,7 @@ def test_warmup_plan_filters_unselected_devices_and_disabled_features() -> None:
 
     assert "evse_summary_s" in keys
     assert "system_events_s" in keys
+    assert "system_event_history_s" in keys
     assert "tariff_s" in keys
     assert "devices_inventory_s" in keys
     assert "evse_timeseries_s" in keys
@@ -724,6 +729,38 @@ def test_dynamic_followup_plan_includes_due_evse_feature_flags() -> None:
     assert len(plan.stages) == 1
     assert [task.timing_key for task in plan.stages[0].parallel_tasks] == [
         "evse_feature_flags_s",
+    ]
+
+
+def test_dynamic_followup_plan_includes_due_system_event_history() -> None:
+    owner = _RefreshOwner()
+    owner.system_events_runtime.history_refresh_due = lambda: True
+    for method_name in (
+        "battery_site_settings_refresh_due",
+        "battery_backup_history_refresh_due",
+        "battery_settings_refresh_due",
+        "battery_schedules_refresh_due",
+        "storm_guard_refresh_due",
+        "storm_alert_refresh_due",
+        "grid_control_check_refresh_due",
+        "grid_mode_status_refresh_due",
+        "grid_outage_context_refresh_due",
+        "dry_contact_settings_refresh_due",
+        "battery_status_refresh_due",
+        "ac_battery_devices_refresh_due",
+    ):
+        setattr(owner.battery_runtime, method_name, lambda: False)
+    owner.inventory_runtime.devices_inventory_refresh_due = lambda: False
+    owner.inventory_runtime.hems_devices_refresh_due = lambda: False
+    owner.current_power_runtime.refresh_due = lambda: False
+    owner.evse_feature_flags_runtime.refresh_due = lambda: False
+    owner.system_events_runtime.refresh_due = lambda: False
+    owner.tariff_runtime.refresh_due = lambda: False
+
+    plan = build_followup_plan(owner)
+
+    assert [task.timing_key for task in plan.stages[0].parallel_tasks] == [
+        "system_event_history_s"
     ]
 
 

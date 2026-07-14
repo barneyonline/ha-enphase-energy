@@ -153,7 +153,7 @@ Status labels:
 | PLC FFT MQTT bootstrap | `GET` | `/service/system_dashboard/api_internal/dashboard/fft_scan?serial_number=<gateway_sn>&mode=<mode>` | dashboard-read headers; response contains short-lived AWS IoT credentials | Browser capture only |
 | Generator/live MQTT bootstrap | `GET` | `/admin/aws_sigv4/livestream?serial_num=<gateway_sn>` | authenticated session cookies; response contains short-lived AWS IoT credentials | Browser capture only |
 | Site lifetime energy | `GET` | `/pv/systems/<site_id>/lifetime_energy` | `e-auth-token` + cookies | Runtime |
-| Homeowner events | `GET` | `/service/events-platform-service/v1.0/<site_id>/events/homeowner` | `e-auth-token` + cookies | Not implemented |
+| Homeowner events | `GET` | `/service/events-platform-service/v1.0/<site_id>/events/homeowner` | `e-auth-token` + cookies | Runtime |
 | Battery backup history | `GET` | `/app-api/<site_id>/battery_backup_history.json` | `e-auth-token` + cookies | Runtime |
 | Grid eligibility | `GET` | `/app-api/<site_id>/grid_control_check.json` | `e-auth-token` + cookies | Runtime |
 | Dry contact settings | `GET` | `/pv/settings/<site_id>/dry_contacts` | `e-auth-token` + cookies | Runtime |
@@ -3513,9 +3513,13 @@ Inference:
 - The event-history feed provides stable SG Ready transition keys even when the human-readable descriptions are localized, so it is useful for documenting `MODE_2` versus `MODE_3` semantics without relying on translated text.
 
 Implementation note:
-- The integration does not fetch this homeowner feed for entities. It uses the
-  cleaner System Dashboard event table described below and keeps the HEMS
-  per-device event JSON routes in `2.20` for diagnostics.
+- The integration exposes this feed through the site-level `System Event History`
+  calendar on the Enphase Cloud device. Calendar range requests paginate from the
+  newest row until the requested start date or a 2,000-row safety bound is reached.
+  Raw IDs, serials, impacted-device lists, message parameters, CSV links, and
+  continuation cursors are discarded after descriptions and recommended actions
+  are sanitized. The separate System Dashboard table below remains authoritative
+  for Active System Events and standing-alarm monitoring.
 
 ### 2.10.1 System Dashboard Active Events
 

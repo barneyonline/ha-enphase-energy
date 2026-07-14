@@ -2395,6 +2395,9 @@
     "calendar": {
       "backup_history": {
         "name": "Ιστορικό εφεδρικής τροφοδοσίας"
+      },
+      "system_event_history": {
+        "name": "Ιστορικό συμβάντων συστήματος"
       }
     },
     "update": {

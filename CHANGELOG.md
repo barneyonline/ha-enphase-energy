@@ -12,6 +12,9 @@ All notable changes to this project will be documented in this file.
   per-microinverter Lifetime Energy sensors and all installer-level Power sensors.
   Existing defaults are preserved: Lifetime Energy is enabled and Power is
   disabled until opted in.
+- Added a site-level `System Event History` calendar on the Enphase Cloud device,
+  backed by the localized homeowner event feed with bounded cursor pagination,
+  short-lived range caching, and identifier-safe summaries.
 
 ### 🐛 Bug fixes
 - Removed a previously created Enphase site weather entity automatically when
@@ -21,7 +24,8 @@ All notable changes to this project will be documented in this file.
   before removing the entities from Home Assistant.
 
 ### 🔧 Improvements
-- None
+- Excluded explicitly informational rows from Active System Events while
+  preserving its existing standing-alarm and high-impact Problem threshold.
 
 ### 🔄 Other changes
 - None

@@ -2395,6 +2395,9 @@
     "calendar": {
       "backup_history": {
         "name": "Varutoite ajalugu"
+      },
+      "system_event_history": {
+        "name": "Süsteemisündmuste ajalugu"
       }
     },
     "update": {

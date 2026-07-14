@@ -699,8 +699,17 @@ def _request_label(method: object, url: object) -> str:
 
     if url_obj.path:
         path = url_obj.path
-    if url_obj.query_string:
-        path = f"{path}?{url_obj.query_string}" if path else f"?{url_obj.query_string}"
+    query_string = url_obj.query_string
+    query = getattr(url_obj, "query", None)
+    cursor_query = {
+        str(key): "[redacted]"
+        for key in query or ()
+        if str(key).strip().casefold() in {"cursor", "next"}
+    }
+    if cursor_query:
+        query_string = url_obj.update_query(cursor_query).query_string
+    if query_string:
+        path = f"{path}?{query_string}" if path else f"?{query_string}"
     if path:
         return f"{method_text} {path}"
     return method_text
@@ -2451,6 +2460,15 @@ class EnphaseEVClient:
         headers = dict(self._h)
         headers["Accept"] = "*/*"
         headers["Referer"] = self._site_web_referer("history")
+        return headers
+
+    def _homeowner_events_headers(self) -> dict[str, str]:
+        """Return browser-style headers for the homeowner event-history feed."""
+
+        headers = self._history_headers()
+        headers["Accept"] = "application/json"
+        headers["Content-Type"] = "application/json"
+        headers["X-Requested-With"] = "XMLHttpRequest"
         return headers
 
     def _today_headers(self) -> dict[str, str]:
@@ -7741,6 +7759,52 @@ class EnphaseEVClient:
             page == _SYSTEM_EVENTS_MAX_PAGES and last_page_full
         )
         return merged
+
+    async def homeowner_events_page(
+        self,
+        *,
+        next_cursor: str = "start",
+        page_size: int = 200,
+        locale: str = "en",
+    ) -> JsonDict | None:
+        """Return one cursor-paginated homeowner event-history page.
+
+        GET /service/events-platform-service/v1.0/<site_id>/events/homeowner
+        """
+
+        url = str(
+            URL(
+                f"{BASE_URL}/service/events-platform-service/v1.0/"
+                f"{self._site}/events/homeowner"
+            ).update_query(
+                {
+                    "next": str(next_cursor or "start"),
+                    "page_size": str(max(1, min(int(page_size), 200))),
+                    "locale": str(locale or "en"),
+                }
+            )
+        )
+        try:
+            data = await self._json(
+                "GET",
+                url,
+                headers=self._homeowner_events_headers(),
+            )
+        except Exception as err:  # noqa: BLE001
+            if self._system_dashboard_is_optional_error(err) or isinstance(
+                err, InvalidPayloadError
+            ):
+                return None
+            raise
+        if not isinstance(data, dict) or not isinstance(data.get("events"), list):
+            return None
+        cursor = data.get("next")
+        if cursor is not None and (
+            isinstance(cursor, (dict, list, tuple, set, bool))
+            or not str(cursor).strip()
+        ):
+            return None
+        return data
 
     async def system_dashboard_standing_alarms(self) -> JsonDict | None:
         """Return current System Dashboard standing alarms.

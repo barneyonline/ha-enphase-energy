@@ -20,7 +20,8 @@ def test_identifier_helpers_redact_values() -> None:
 def test_redact_text_scrubs_common_sensitive_values() -> None:
     text = (
         "site_id=12345&source=evse serialNumber=SERIAL-12345678 uid=DEVICE-UID-9999 "
-        "email=user@example.com ip=10.0.0.2 mac=AA:BB:CC:DD:EE:FF plain 12345"
+        "email=user@example.com ip=10.0.0.2 mac=AA:BB:CC:DD:EE:FF "
+        "next=private:cursor:795:-1 plain 12345"
     )
 
     redacted = redact_text(
@@ -35,10 +36,12 @@ def test_redact_text_scrubs_common_sensitive_values() -> None:
     assert "user@example.com" not in redacted
     assert "10.0.0.2" not in redacted
     assert "AA:BB:CC:DD:EE:FF" not in redacted
+    assert "private:cursor:795:-1" not in redacted
     assert "site_id=[site]" in redacted
     assert "source=evse" in redacted
     assert "serialNumber=SERI...5678" in redacted
     assert "uid=DEVI...9999" in redacted
+    assert "next=[redacted]" in redacted
     assert redacted.count("[redacted]") >= 3
 
 
