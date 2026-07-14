@@ -74,6 +74,8 @@ def _key_kind(key: object) -> str:
     if compact in {"entityid"}:
         # Entity IDs are user-visible Home Assistant names, not Enphase secrets.
         return "text"
+    if compact in {"cursor", "next"}:
+        return "redact"
     if any(
         token in compact
         for token in ("token", "auth", "cookie", "email", "user", "pass", "secret")

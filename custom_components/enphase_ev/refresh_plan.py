@@ -29,6 +29,7 @@ REFRESH_TASK_ENDPOINT_FAMILIES: dict[str, str] = {
     "hems_devices_s": "inventory_topology",
     "system_dashboard_s": "inventory_topology",
     "system_events_s": "system_events",
+    "system_event_history_s": "system_event_history",
     "inverters_s": "inverter_inventory",
     "current_power_s": "current_power",
 }
@@ -214,6 +215,12 @@ WARMUP_STATE_STAGE = RefreshStage(
             "system events",
             "system_events_runtime",
             "async_refresh",
+        ),
+        object_method_task(
+            "system_event_history_s",
+            "system event history",
+            "system_events_runtime",
+            "async_refresh_history",
         ),
         method_task(
             "battery_backup_history_s",
@@ -852,6 +859,16 @@ def build_followup_plan(owner: object, *, force_full: bool = False) -> RefreshPl
                 "system events",
                 "system_events_runtime",
                 "async_refresh",
+            )
+        )
+    history_refresh_due = getattr(system_events, "history_refresh_due", None)
+    if callable(history_refresh_due) and history_refresh_due():
+        parallel.append(
+            object_method_task(
+                "system_event_history_s",
+                "system event history",
+                "system_events_runtime",
+                "async_refresh_history",
             )
         )
     if battery.battery_status_refresh_due():

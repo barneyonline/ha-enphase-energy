@@ -51,6 +51,8 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - Read-only System Dashboard event and standing-alarm monitoring, including a
   diagnostic Problem sensor with bounded sanitized event context and optional,
   default-off Repair notifications sourced from authoritative standing alarms
+- A site-level System Event History calendar on the Enphase Cloud device, with
+  localized descriptions, bounded on-demand pagination, and identifier redaction
 - Detailed diagnostic and inventory entities remain available but are disabled by default when they are mainly useful for troubleshooting
 - Restored discovery data creates known entities early during startup; live power
   acquisition starts alongside the minimal setup refresh and is attempted within

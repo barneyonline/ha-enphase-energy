@@ -2395,6 +2395,9 @@
     "calendar": {
       "backup_history": {
         "name": "Historie záložního napájení"
+      },
+      "system_event_history": {
+        "name": "Historie systémových událostí"
       }
     },
     "update": {

@@ -2395,6 +2395,9 @@
     "calendar": {
       "backup_history": {
         "name": "Verlauf der Ersatzstromversorgung"
+      },
+      "system_event_history": {
+        "name": "Systemereignisverlauf"
       }
     },
     "update": {

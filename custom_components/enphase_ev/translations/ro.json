@@ -2395,6 +2395,9 @@
     "calendar": {
       "backup_history": {
         "name": "Istoric alimentare de rezervă"
+      },
+      "system_event_history": {
+        "name": "Istoricul evenimentelor de sistem"
       }
     },
     "update": {

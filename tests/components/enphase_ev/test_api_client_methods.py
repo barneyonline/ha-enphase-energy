@@ -1086,6 +1086,12 @@ def test_request_label_formats_path_and_query() -> None:
         api._request_label("get", "https://example.test/path?foo=1")
         == "GET /path?foo=1"
     )
+    label = api._request_label(
+        "get",
+        "https://example.test/path?next=private:cursor:795:-1&foo=1",
+    )
+    assert label == "GET /path?next=[redacted]&foo=1"
+    assert "private:cursor:795:-1" not in label
 
 
 def test_request_label_handles_bad_method_and_raw_url_fallback(monkeypatch) -> None:
@@ -8528,6 +8534,90 @@ async def test_system_dashboard_events_rejects_invalid_shapes_and_unexpected_err
     client._json = AsyncMock(side_effect=RuntimeError("boom"))
     with pytest.raises(RuntimeError, match="boom"):
         await client.system_dashboard_events()
+
+
+@pytest.mark.asyncio
+async def test_homeowner_events_page_uses_cursor_locale_and_history_headers() -> None:
+    client = _make_client()
+    client.update_credentials(
+        cookie="enlighten_manager_token_production=BEAR; XSRF-TOKEN=xsrf",
+        eauth="EAUTH",
+    )
+    client._json = AsyncMock(return_value={"events": [], "next": "private cursor"})
+
+    result = await client.homeowner_events_page(
+        next_cursor="private cursor",
+        page_size=500,
+        locale="en-AU",
+    )
+
+    assert result == {"events": [], "next": "private cursor"}
+    args, kwargs = client._json.await_args
+    assert args[0] == "GET"
+    url = URL(args[1])
+    assert url.path.endswith(
+        "/service/events-platform-service/v1.0/SITE/events/homeowner"
+    )
+    assert dict(url.query) == {
+        "next": "private cursor",
+        "page_size": "200",
+        "locale": "en-AU",
+    }
+    assert kwargs["headers"]["Accept"] == "application/json"
+    assert kwargs["headers"]["Content-Type"] == "application/json"
+    assert kwargs["headers"]["X-Requested-With"] == "XMLHttpRequest"
+    assert kwargs["headers"]["e-auth-token"] == "EAUTH"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "payload",
+    (
+        [],
+        {},
+        {"events": "invalid"},
+        {"events": [], "next": {}},
+        {"events": [], "next": ""},
+    ),
+)
+async def test_homeowner_events_page_rejects_invalid_shapes(payload) -> None:
+    client = _make_client()
+    client._json = AsyncMock(return_value=payload)
+
+    assert await client.homeowner_events_page() is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "error",
+    (
+        api.Unauthorized(),
+        _make_cre(403),
+        _make_cre(404),
+        api.InvalidPayloadError("invalid", status=200),
+    ),
+)
+async def test_homeowner_events_page_optional_errors_return_none(error) -> None:
+    client = _make_client()
+    client._json = AsyncMock(side_effect=error)
+
+    assert await client.homeowner_events_page() is None
+
+
+@pytest.mark.asyncio
+async def test_homeowner_events_page_preserves_login_wall_failure() -> None:
+    client = _make_client()
+    error = api.EnphaseLoginWallUnauthorized(
+        endpoint="/service/events-platform-service/v1.0/SITE/events/homeowner",
+        request_label="GET homeowner events",
+        status=401,
+        content_type="text/html",
+        body_preview_redacted="login",
+    )
+    client._json = AsyncMock(side_effect=error)
+
+    with pytest.raises(api.EnphaseLoginWallUnauthorized):
+        await client.homeowner_events_page()
 
 
 @pytest.mark.asyncio

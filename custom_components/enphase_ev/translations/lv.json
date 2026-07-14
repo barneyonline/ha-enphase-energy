@@ -2395,6 +2395,9 @@
     "calendar": {
       "backup_history": {
         "name": "Rezerves barošanas vēsture"
+      },
+      "system_event_history": {
+        "name": "Sistēmas notikumu vēsture"
       }
     },
     "update": {

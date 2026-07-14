@@ -872,6 +872,7 @@ def test_battery_settings_entity_strings_exist_for_all_locales() -> None:
         "entity.time.charge_from_grid_start_time.name",
         "entity.time.charge_from_grid_end_time.name",
         "entity.calendar.backup_history.name",
+        "entity.calendar.system_event_history.name",
     ]
     for locale in translations_dir.glob("*.json"):
         data = json.loads(locale.read_text(encoding="utf-8"))

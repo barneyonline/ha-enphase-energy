@@ -2395,6 +2395,9 @@
     "calendar": {
       "backup_history": {
         "name": "Atsarginio maitinimo istorija"
+      },
+      "system_event_history": {
+        "name": "Sistemos įvykių istorija"
       }
     },
     "update": {

@@ -563,6 +563,18 @@ async def async_get_config_entry_diagnostics(
         except DIAGNOSTIC_CAPTURE_ERRORS:
             system_events = {}
 
+    system_event_history: dict[str, Any] = {}
+    system_event_history_diagnostics = getattr(
+        system_events_runtime,
+        "history_diagnostics",
+        None,
+    )
+    if callable(system_event_history_diagnostics):
+        try:
+            system_event_history = system_event_history_diagnostics()
+        except DIAGNOSTIC_CAPTURE_ERRORS:
+            system_event_history = {}
+
     grid_profile: dict[str, Any] = {}
     grid_profile_runtime = getattr(coord, "grid_profile_runtime", None)
     grid_profile_diagnostics = getattr(grid_profile_runtime, "diagnostics", None)
@@ -604,6 +616,7 @@ async def async_get_config_entry_diagnostics(
         "payload_health": payload_health,
         "system_dashboard": system_dashboard,
         "system_events": system_events,
+        "system_event_history": system_event_history,
         "heatpump_runtime": heatpump_runtime,
         "current_power": current_power,
         "scheduler": scheduler,

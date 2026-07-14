@@ -1042,6 +1042,15 @@ class EnphaseCoordinator(
                 suppress_after_failures=3,
                 support_state_on_success=True,
             ),
+            "system_event_history": EndpointFamilyPolicy(
+                success_ttl_s=900.0,
+                stale_after_s=86400.0,
+                failure_backoff_schedule_s=(900.0, 1800.0, 3600.0, 7200.0),
+                max_backoff_s=7200.0,
+                optional=True,
+                suppress_after_failures=3,
+                support_state_on_success=True,
+            ),
             "grid_control_check": EndpointFamilyPolicy(
                 success_ttl_s=300.0,
                 stale_after_s=GRID_CONTROL_CHECK_STALE_AFTER_S,
