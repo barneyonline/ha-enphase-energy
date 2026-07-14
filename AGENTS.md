@@ -25,7 +25,7 @@
   - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "python scripts/validate_quality_scale.py"`
   - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "python scripts/validate_quality_scale.py --validate-remote-brands"`
   - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "python scripts/importtime_profile.py --strict-integration-warnings --output importtime-enphase-ev.log"`
-  - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "mypy --strict --ignore-missing-imports --follow-imports=skip custom_components/enphase_ev/runtime_data.py custom_components/enphase_ev/config_flow.py"`
+  - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "mypy --strict --ignore-missing-imports --follow-imports=skip custom_components/enphase_ev"`
   - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "pre-commit run --all-files"`
 - Keep changed Python modules at 100% targeted coverage:
   - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "COVERAGE_FILE=/tmp/enphase_ev.coverage python -m coverage erase && COVERAGE_FILE=/tmp/enphase_ev.coverage python -m coverage run -m pytest tests/components/enphase_ev -q && COVERAGE_FILE=/tmp/enphase_ev.coverage python -m coverage report -m --include=<comma-separated-paths> --fail-under=100"`
@@ -75,31 +75,46 @@
 ### PR Creation Workflow (Required)
 Follow this exact sequence to create a PR correctly:
 
-1. Ensure your branch is current and clean:
+1. Inspect the worktree and ensure the branch is current:
    - `git fetch origin`
-   - `git status --short` (must be clean before final push)
+   - `git status --short`
+   - `git rev-list --left-right --count origin/main...HEAD`
+   - Preserve unrelated worktree changes instead of staging or discarding them. Temporarily stash them when a clean worktree is required, and restore them after publishing.
+   - If the branch is behind `origin/main`, rebase it only after tracked and untracked work has been safely committed or stashed.
 2. Run quality gates in Docker and fix any failures before commit:
    - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "ruff check ."`
-   - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "black <changed-python-files>"` and include `tests/components/enphase_ev/...` for changed test files. This must be run before every push to `origin`.
+   - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "black <changed-python-files>"` and include `tests/components/enphase_ev/...` for changed test files.
    - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "python -m pre_commit run --all-files"`
+   - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "python scripts/validate_quality_scale.py"`
+   - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "python scripts/validate_quality_scale.py --validate-remote-brands"`
+   - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "python scripts/importtime_profile.py --strict-integration-warnings --output importtime-enphase-ev.log"`
+   - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "mypy --strict --ignore-missing-imports --follow-imports=skip custom_components/enphase_ev"`
+   - Rerun Black and full-package mypy after any subsequent Python edit and before every push to `origin`.
    - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "COVERAGE_FILE=/tmp/enphase_ev.coverage python -m coverage erase && COVERAGE_FILE=/tmp/enphase_ev.coverage python -m coverage run -m pytest tests/components/enphase_ev -q && COVERAGE_FILE=/tmp/enphase_ev.coverage python -m coverage report -m --include=<touched-module-paths-comma-separated> --fail-under=100"`
    - If `strings.json` changed: update every locale file under `custom_components/enphase_ev/translations/` and verify non-English values are localized (no English fallback for new keys).
    - If translations changed: `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "pytest tests/components/enphase_ev/test_service_translations.py -q"`
    - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "pytest tests/components/enphase_ev -q"`
    - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "pytest"`
 3. Commit with an imperative message and keep scope focused:
-   - `git add -A && git commit -m "<imperative summary>"`
+   - `git diff --name-only`
+   - `git add <scoped-files>`
+   - `git diff --cached --name-only`
+   - `git commit -m "<imperative summary>"`
 4. Push branch to origin:
+   - `git status --short` (must be clean before the final push; keep unrelated work safely stashed)
    - `git push -u origin <branch-name>`
-5. Create PR with `gh` using a body file (do not inline Markdown with backticks in shell):
+5. Check for an existing PR before creating one:
+   - `gh pr list --head <branch-name> --state open --json number,url,title,headRefName,baseRefName`
+6. Create or update the PR with `gh` using a body file (do not inline Markdown with backticks in shell):
    - `cat > /tmp/pr_body.md <<'EOF'`
    - Include `## Summary` and `## Testing` sections with exact commands run
    - `EOF`
-   - `gh pr create --base main --head <branch-name> --title "<PR title>" --body-file /tmp/pr_body.md`
-6. Verify the PR metadata after creation:
+   - If no PR exists: `gh pr create --base main --head <branch-name> --title "<PR title>" --body-file /tmp/pr_body.md`
+   - If a PR exists: `gh pr edit <number> --title "<updated title>" --body-file /tmp/pr_body.md`
+7. Verify the PR metadata and checks:
    - `gh pr view --json number,url,headRefName,baseRefName,title`
-7. If a PR already exists for the branch, update it instead of creating a duplicate:
-   - `gh pr edit --title "<updated title>" --body-file /tmp/pr_body.md`
+   - `gh pr checks <number>`
+8. Restore any unrelated worktree changes that were temporarily stashed.
 
 ## GitHub Push Workflow (gh)
 - If `git push` hangs, push the branch via the GitHub API using `gh`:
