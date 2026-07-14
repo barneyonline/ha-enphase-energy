@@ -444,7 +444,7 @@ async def test_async_update_data_handles_system_dashboard_refresh_error(
 
     result = await coord._async_update_data()
 
-    assert result == {}
+    assert set(result) == {SERIAL_ONE}
     refresh_dashboard.assert_not_awaited()
     assert "system_dashboard_s" not in coord.phase_timings
 

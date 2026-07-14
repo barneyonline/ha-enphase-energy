@@ -229,6 +229,7 @@ SESSION_HISTORY_IDLE_HARD_TTL_GRACE_S = 300.0
 SESSION_HISTORY_RECENT_STOP_WINDOW_S = 600.0
 GRID_PROFILE_METADATA_REFRESH_DEADLINE_S = 15.0
 RUNTIME_CLEANUP_TIMEOUT_S = 10.0
+EVSE_EMPTY_STATUS_CONFIRMATIONS = 3
 BATTERY_GRID_MODE_PERMISSIONS = {
     "importexport": (True, True),
     "importonly": (True, False),
@@ -554,6 +555,7 @@ class EnphaseCoordinator(
     _last_error: str | None
     _backoff_until: float | None
     _status_charger_data_serials: list[str] | None
+    _empty_status_charger_data_count: int
     last_success_utc: datetime | None
     last_failure_utc: datetime | None
     last_failure_status: int | None
@@ -3015,6 +3017,7 @@ class EnphaseCoordinator(
         phase_timings = context.phase_timings
         self._status_charger_data_authoritative = False
         self._status_charger_data_serials = None
+        self._empty_status_charger_data_count = 0
         self._backoff_until = None
         self._clear_backoff_timer()
         self._clear_auth_repair_issues_on_success()
@@ -3546,12 +3549,15 @@ class EnphaseCoordinator(
         status_refresh_succeeded = False
         status_charger_data_authoritative = False
         status_charger_data_serials: list[str] | None = None
+        status_empty_observed = False
+        status_empty_preserved = False
+        preserve_normalized_status = False
         try:
             status_start = time.monotonic()
             data = await self.client.status()
             phase_timings["status_s"] = round(time.monotonic() - status_start, 3)
             if isinstance(data, dict):
-                self._status_payload_cache = dict(data)
+                fresh_status_payload = dict(data)
                 raw_charger_data = data.get("evChargerData")
                 if isinstance(raw_charger_data, list):
                     status_charger_data_serials = []
@@ -3565,13 +3571,66 @@ class EnphaseCoordinator(
                             status_charger_data_authoritative = False
                             break
                         status_charger_data_serials.append(serial)
-            self._mark_payload_endpoint_success(
-                "status",
-                success_mono=time.monotonic(),
-                success_utc=dt_util.utcnow(),
-            )
+                    if (
+                        status_charger_data_authoritative
+                        and not status_charger_data_serials
+                    ):
+                        status_empty_observed = True
+                        self._empty_status_charger_data_count += 1
+                        inventory_serials = self._inventory_evse_serials()
+                        status_empty_preserved = (
+                            self._empty_status_charger_data_count
+                            < EVSE_EMPTY_STATUS_CONFIRMATIONS
+                            or inventory_serials is None
+                            or bool(inventory_serials)
+                        )
+                        if status_empty_preserved:
+                            status_charger_data_authoritative = False
+                            status_charger_data_serials = None
+                            cached_status = self._status_payload_cache
+                            cached_charger_data = (
+                                cached_status.get("evChargerData")
+                                if isinstance(cached_status, dict)
+                                else None
+                            )
+                            if (
+                                isinstance(cached_status, dict)
+                                and isinstance(cached_charger_data, list)
+                                and bool(cached_charger_data)
+                            ):
+                                data = dict(cached_status)
+                                self.payload_using_stale = True
+                            elif fallback_data:
+                                preserve_normalized_status = True
+                                self.payload_using_stale = True
+                            else:
+                                self.payload_using_stale = False
+                            context.status_used_stale = self.payload_using_stale
+                if not status_empty_preserved:
+                    self._status_payload_cache = fresh_status_payload
+            if status_empty_preserved:
+                confirmation_count = min(
+                    self._empty_status_charger_data_count,
+                    EVSE_EMPTY_STATUS_CONFIRMATIONS,
+                )
+                self._note_payload_endpoint_failure(
+                    "status",
+                    error=(
+                        "Empty EVSE status response awaiting confirmation "
+                        f"({confirmation_count}/"
+                        f"{EVSE_EMPTY_STATUS_CONFIRMATIONS})"
+                    ),
+                    using_stale=self.payload_using_stale,
+                )
+            else:
+                self._mark_payload_endpoint_success(
+                    "status",
+                    success_mono=time.monotonic(),
+                    success_utc=dt_util.utcnow(),
+                )
             self.last_failure_endpoint = None
-            self.payload_using_stale = False
+            if not status_empty_preserved:
+                self.payload_using_stale = False
             self.payload_failure_kind = None
             self._unauth_errors = 0
             self._clear_auth_repair_issues_on_success()
@@ -3805,6 +3864,8 @@ class EnphaseCoordinator(
                     retry_after=backoff,
                 )
         finally:
+            if not status_empty_observed:
+                self._empty_status_charger_data_count = 0
             self._status_charger_data_authoritative = (
                 status_charger_data_authoritative
                 and not bool(getattr(self, "payload_using_stale", False))
@@ -3823,7 +3884,15 @@ class EnphaseCoordinator(
 
         prev_data = self.data if isinstance(self.data, dict) else {}
         self._has_successful_refresh = True
-        out: dict[str, dict[str, object]] = {}
+        out: dict[str, dict[str, object]] = (
+            {
+                serial: dict(snapshot)
+                for serial, snapshot in fallback_data.items()
+                if isinstance(snapshot, dict)
+            }
+            if preserve_normalized_status
+            else {}
+        )
         raw_charger_data = data.get("evChargerData")
         arr = (
             [charger for charger in raw_charger_data if isinstance(charger, dict)]
@@ -7504,15 +7573,24 @@ class EnphaseCoordinator(
                 source = self.data if isinstance(self.data, dict) else {}
                 status_serials = [str(sn) for sn in source if sn]
             return status_serials
+        if 0 < self._empty_status_charger_data_count < EVSE_EMPTY_STATUS_CONFIRMATIONS:
+            return None
+        return self._inventory_evse_serials()
+
+    def _inventory_evse_serials(self) -> list[str] | None:
+        """Return EVSE serials from the device inventory when it is conclusive."""
+
+        if not bool(getattr(self, "_devices_inventory_ready", False)):
+            return None
         try:
             bucket = self.inventory_view.type_bucket("iqevse")
         except Exception:  # noqa: BLE001
-            return status_serials
+            return None
         if not isinstance(bucket, dict):
-            return status_serials
+            return None
         members = bucket.get("devices")
         if not isinstance(members, list):
-            return status_serials
+            return None
         serials: list[str] = []
         for member in members:
             if not isinstance(member, dict):
@@ -7531,14 +7609,14 @@ class EnphaseCoordinator(
         if serials:
             return [serial for serial in dict.fromkeys(serials) if serial]
         if "count" not in bucket:
-            return status_serials
+            return None
         try:
             count = int(str(bucket.get("count")))
         except (TypeError, ValueError):
-            return status_serials
+            return None
         if count == 0:
-            return status_serials or []
-        return status_serials
+            return []
+        return None
 
     def iter_battery_serials(self) -> list[str]:
         """Return active battery identities in a stable order."""

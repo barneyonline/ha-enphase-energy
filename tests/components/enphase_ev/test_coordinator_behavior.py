@@ -1686,7 +1686,8 @@ async def test_update_keeps_status_when_configured_evse_serials_are_pruned(
 
     assert result == {}
     coord.client.status.assert_awaited_once()
-    assert coord._status_charger_data_authoritative is True  # noqa: SLF001
+    assert coord._status_charger_data_authoritative is False  # noqa: SLF001
+    assert coord._empty_status_charger_data_count == 1  # noqa: SLF001
     assert coord.iter_serials() == []
 
 
@@ -3792,7 +3793,7 @@ async def test_refresh_malformed_nested_status_row_keeps_cleanup_authority(
 
 
 @pytest.mark.asyncio
-async def test_first_refresh_empty_evchargerdata_is_cleanup_authoritative(
+async def test_first_refresh_empty_evchargerdata_waits_for_confirmation(
     hass, monkeypatch
 ) -> None:
     coord = _make_coordinator(hass, monkeypatch)
@@ -3812,14 +3813,15 @@ async def test_first_refresh_empty_evchargerdata_is_cleanup_authoritative(
     coord.data = data
 
     assert data == {}
-    assert coord._status_charger_data_authoritative is True  # noqa: SLF001
-    assert coord._status_charger_data_serials == []  # noqa: SLF001
-    assert coord._active_inventory_evse_serials() == []  # noqa: SLF001
-    assert coord.iter_serials() == []
+    assert coord._status_charger_data_authoritative is False  # noqa: SLF001
+    assert coord._status_charger_data_serials is None  # noqa: SLF001
+    assert coord._empty_status_charger_data_count == 1  # noqa: SLF001
+    assert coord._active_inventory_evse_serials() is None  # noqa: SLF001
+    assert coord.iter_serials() == ["RESTORED"]
 
 
 @pytest.mark.asyncio
-async def test_empty_evchargerdata_keeps_status_refresh_after_serials_pruned(
+async def test_empty_evchargerdata_waits_for_inventory_to_confirm_removal(
     hass, monkeypatch
 ) -> None:
     coord = _make_coordinator(hass, monkeypatch)
@@ -3835,24 +3837,175 @@ async def test_empty_evchargerdata_keeps_status_refresh_after_serials_pruned(
     coord._type_device_order = ["iqevse"]  # noqa: SLF001
     coord.client.status = AsyncMock(return_value={"evChargerData": [], "ts": 0})
 
+    for _ in range(3):
+        data = await coord._async_update_data()  # noqa: SLF001
+        coord.data = data
+
+    assert data == {}
+    assert coord._empty_status_charger_data_count == 3  # noqa: SLF001
+    assert coord._status_charger_data_authoritative is False  # noqa: SLF001
+    assert coord._active_inventory_evse_serials() == ["RESTORED"]  # noqa: SLF001
+    assert coord.iter_serials() == ["RESTORED"]
+
+    coord._type_device_buckets = {"iqevse": {"count": 0, "devices": []}}  # noqa: SLF001
     data = await coord._async_update_data()  # noqa: SLF001
     coord.data = data
 
     assert data == {}
-    assert coord.serials == set()
-    assert coord.iter_serials() == []
-
-    coord.client.status.reset_mock()
-
-    data = await coord._async_update_data()  # noqa: SLF001
-    coord.data = data
-
-    assert data == {}
-    coord.client.status.assert_awaited_once()
+    assert coord.client.status.await_count == 4
     assert coord._status_charger_data_authoritative is True  # noqa: SLF001
     assert coord._status_charger_data_serials == []  # noqa: SLF001
     assert coord._active_inventory_evse_serials() == []  # noqa: SLF001
     assert coord.iter_serials() == []
+
+
+@pytest.mark.asyncio
+async def test_empty_evchargerdata_waits_when_inventory_is_already_empty(
+    hass, monkeypatch
+) -> None:
+    coord = _make_coordinator(hass, monkeypatch)
+    coord.discovery_snapshot.apply({"serial_order": ["RESTORED"]})
+    coord.discovery_snapshot.schedule_save = Mock()  # type: ignore[method-assign]
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord._type_device_buckets = {"iqevse": {"count": 0, "devices": []}}  # noqa: SLF001
+    coord._type_device_order = ["iqevse"]  # noqa: SLF001
+    coord._inventory_evse_serials = Mock(return_value=[])  # type: ignore[method-assign]  # noqa: SLF001
+    coord.client.status = AsyncMock(return_value={"evChargerData": [], "ts": 0})
+
+    for expected_count in range(1, 3):
+        data = await coord._async_update_data()  # noqa: SLF001
+        coord.data = data
+
+        assert coord._empty_status_charger_data_count == expected_count  # noqa: SLF001
+        assert coord._status_charger_data_authoritative is False  # noqa: SLF001
+        assert coord._active_inventory_evse_serials() is None  # noqa: SLF001
+        assert coord.iter_serials() == ["RESTORED"]
+
+    data = await coord._async_update_data()  # noqa: SLF001
+    coord.data = data
+
+    assert data == {}
+    assert coord._empty_status_charger_data_count == 3  # noqa: SLF001
+    assert coord._status_charger_data_authoritative is True  # noqa: SLF001
+    assert coord._status_charger_data_serials == []  # noqa: SLF001
+    assert coord._active_inventory_evse_serials() == []  # noqa: SLF001
+    assert coord.iter_serials() == []
+
+
+@pytest.mark.asyncio
+async def test_empty_evchargerdata_waits_when_inventory_has_different_serial(
+    hass, monkeypatch
+) -> None:
+    coord = _make_coordinator(hass, monkeypatch)
+    coord.discovery_snapshot.apply({"serial_order": ["RESTORED"]})
+    coord.discovery_snapshot.schedule_save = Mock()  # type: ignore[method-assign]
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord._inventory_evse_serials = Mock(return_value=["OTHER"])  # type: ignore[method-assign]  # noqa: SLF001
+    coord.client.status = AsyncMock(return_value={"evChargerData": [], "ts": 0})
+
+    for expected_count in range(1, 3):
+        data = await coord._async_update_data()  # noqa: SLF001
+        coord.data = data
+
+        assert coord._empty_status_charger_data_count == expected_count  # noqa: SLF001
+        assert coord._active_inventory_evse_serials() is None  # noqa: SLF001
+        assert coord.iter_serials() == ["RESTORED"]
+
+    data = await coord._async_update_data()  # noqa: SLF001
+    coord.data = data
+
+    assert coord._empty_status_charger_data_count == 3  # noqa: SLF001
+    assert coord._status_charger_data_authoritative is False  # noqa: SLF001
+    assert coord._active_inventory_evse_serials() == ["OTHER"]  # noqa: SLF001
+    assert coord.iter_serials() == ["OTHER"]
+
+
+@pytest.mark.asyncio
+async def test_empty_evchargerdata_preserves_status_without_conclusive_inventory(
+    hass, monkeypatch
+) -> None:
+    coord = _make_coordinator(hass, monkeypatch)
+    coord.discovery_snapshot.apply({"serial_order": ["RESTORED"]})
+    coord.discovery_snapshot.schedule_save = Mock()  # type: ignore[method-assign]
+    coord._devices_inventory_ready = False  # noqa: SLF001
+    coord.client.status = AsyncMock(return_value={"evChargerData": [], "ts": 0})
+
+    for _ in range(3):
+        data = await coord._async_update_data()  # noqa: SLF001
+        coord.data = data
+
+    assert data == {}
+    assert coord._empty_status_charger_data_count == 3  # noqa: SLF001
+    assert coord._status_charger_data_authoritative is False  # noqa: SLF001
+    assert coord._status_charger_data_serials is None  # noqa: SLF001
+    assert coord._active_inventory_evse_serials() is None  # noqa: SLF001
+    assert coord.iter_serials() == ["RESTORED"]
+
+
+@pytest.mark.asyncio
+async def test_transient_empty_evchargerdata_preserves_last_good_status(
+    hass, monkeypatch
+) -> None:
+    coord = _make_coordinator(hass, monkeypatch)
+    good_status = {
+        "evChargerData": [{"sn": "ACTIVE", "connectors": [{}]}],
+        "ts": 1,
+    }
+    coord.data = {"ACTIVE": {"sn": "ACTIVE", "charging": False}}
+    coord._has_successful_refresh = True  # noqa: SLF001
+    coord._status_payload_cache = dict(good_status)  # noqa: SLF001
+    coord.client.status = AsyncMock(
+        side_effect=[
+            {"evChargerData": [], "ts": 2},
+            good_status,
+        ]
+    )
+
+    preserved = await coord._async_update_data()  # noqa: SLF001
+    coord.data = preserved
+
+    from custom_components.enphase_ev.switch import ChargingSwitch
+
+    assert set(preserved) == {"ACTIVE"}
+    assert "ACTIVE" in coord.iter_serials()
+    assert ChargingSwitch(coord, "ACTIVE").available is True
+    assert coord.payload_using_stale is True
+    assert coord._status_charger_data_authoritative is False  # noqa: SLF001
+    assert coord._empty_status_charger_data_count == 1  # noqa: SLF001
+    assert coord._status_payload_cache == good_status  # noqa: SLF001
+    status_health = coord._payload_health_state("status")  # noqa: SLF001
+    assert status_health["using_stale"] is True
+    assert status_health["failures"] == 1
+
+    recovered = await coord._async_update_data()  # noqa: SLF001
+    coord.data = recovered
+
+    assert set(recovered) == {"ACTIVE"}
+    assert coord.payload_using_stale is False
+    assert coord._status_charger_data_authoritative is True  # noqa: SLF001
+    assert coord._status_charger_data_serials == ["ACTIVE"]  # noqa: SLF001
+    assert coord._empty_status_charger_data_count == 0  # noqa: SLF001
+    assert status_health["using_stale"] is False
+    assert status_health["failures"] == 0
+
+
+@pytest.mark.asyncio
+async def test_transient_empty_evchargerdata_preserves_normalized_fallback(
+    hass, monkeypatch
+) -> None:
+    coord = _make_coordinator(hass, monkeypatch)
+    coord.data = {"ACTIVE": {"sn": "ACTIVE", "charging": False}}
+    coord._has_successful_refresh = True  # noqa: SLF001
+    coord._status_payload_cache = None  # noqa: SLF001
+    coord.client.status = AsyncMock(return_value={"evChargerData": [], "ts": 2})
+
+    preserved = await coord._async_update_data()  # noqa: SLF001
+
+    assert set(preserved) == {"ACTIVE"}
+    assert preserved["ACTIVE"]["charging"] is False
+    assert coord.payload_using_stale is True
+    assert coord._status_charger_data_authoritative is False  # noqa: SLF001
+    assert coord._status_payload_cache is None  # noqa: SLF001
 
 
 @pytest.mark.asyncio

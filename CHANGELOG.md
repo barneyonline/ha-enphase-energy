@@ -16,6 +16,9 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug fixes
 - Removed a previously created Enphase site weather entity automatically when
   Enable weather is turned off.
+- Preserved IQ EV Charger entities and their last good state through isolated
+  empty status responses, requiring repeated absence and inventory confirmation
+  before removing the entities from Home Assistant.
 
 ### 🔧 Improvements
 - None
