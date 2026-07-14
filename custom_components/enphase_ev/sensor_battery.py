@@ -45,13 +45,31 @@ BATTERY_LED_STATUS_STATE_MAP: dict[int, str] = {
 class BatteryStorageSnapshot(TypedDict, total=False):
     """Normalized battery fields consumed by per-device sensors."""
 
+    battery_id: object
     serial_number: str
+    name: object
+    identity: object
     charge_level: float
+    current_charge_pct: object
+    led_status: object
     status: object
     status_text: object
+    status_normalized: object
     health: object
+    battery_soh: object
+    soh: object
+    state_of_health: object
+    stateOfHealth: object
+    battery_health: object
     cycle_count: object
     last_reported: object
+    part_number: object
+    phase: object
+    sleep_state: object
+    sleep_control_class: object
+    sleep_control_label: object
+    power_w: object
+    operating_mode: object
 
 
 @dataclass(slots=True)
@@ -138,7 +156,7 @@ class _EnphaseBatteryStorageBaseSensor(CoordinatorEntity, SensorEntity):  # type
 
     @staticmethod
     def _parse_timestamp(value: object) -> datetime | None:
-        return cast(datetime | None, _battery_parse_timestamp(value))
+        return _battery_parse_timestamp(value)
 
     @property
     def available(self) -> bool:
@@ -204,7 +222,7 @@ class EnphaseBatteryStorageChargeSensor(_EnphaseBatteryStorageBaseSensor):
     @property
     def extra_state_attributes(self) -> Any:
         snapshot = self._snapshot() or {}
-        sampled_at = _battery_snapshot_last_reported(snapshot)
+        sampled_at = _battery_snapshot_last_reported(dict(snapshot))
         return {
             "serial_number": snapshot.get("serial_number") or self._sn,
             "status": snapshot.get("status"),
@@ -350,7 +368,7 @@ class EnphaseBatteryStorageLastReportedSensor(_EnphaseBatteryStorageBaseSensor):
 
     @property
     def native_value(self) -> Any:
-        return _battery_snapshot_last_reported(self._snapshot() or {})
+        return _battery_snapshot_last_reported(dict(self._snapshot() or {}))
 
 
 class _EnphaseAcBatteryStorageBaseSensor(CoordinatorEntity, SensorEntity):  # type: ignore[misc]
@@ -516,7 +534,7 @@ class EnphaseAcBatteryStoragePowerSensor(_EnphaseAcBatteryStorageBaseSensor):
     @property
     def extra_state_attributes(self) -> Any:
         snapshot = self._snapshot() or {}
-        reported = ac_battery_snapshot_last_reported(snapshot)
+        reported = ac_battery_snapshot_last_reported(dict(snapshot))
         return {
             "operating_mode": snapshot.get("operating_mode"),
             "last_reported_utc": (
@@ -585,4 +603,4 @@ class EnphaseAcBatteryStorageLastReportedSensor(_EnphaseAcBatteryStorageBaseSens
 
     @property
     def native_value(self) -> Any:
-        return ac_battery_snapshot_last_reported(self._snapshot() or {})
+        return ac_battery_snapshot_last_reported(dict(self._snapshot() or {}))
