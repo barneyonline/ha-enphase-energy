@@ -87,8 +87,10 @@ def test_runtime_snapshots_drive_coordinator_publication(coordinator_factory) ->
     assert unchanged is not None
     assert unchanged.revision == 1
 
-    coord._current_power_consumption_w = 123.0  # noqa: SLF001
-    coord._current_power_consumption_sample_utc = datetime.now(UTC)  # noqa: SLF001
+    coord.current_power_runtime.replace_snapshot(
+        w=123.0,
+        sample_utc=datetime.now(UTC),
+    )
     coord.publish_runtime_state_update("current_power")
     changed = coord.integration_snapshot
     assert changed is not None
@@ -100,14 +102,13 @@ def test_runtime_snapshots_drive_coordinator_publication(coordinator_factory) ->
 
 def test_evse_feature_flag_runtime_snapshot_is_detached(coordinator_factory) -> None:
     coord = coordinator_factory()
-    coord._evse_feature_flags_payload = {"data": {}}  # noqa: SLF001
-    coord._evse_site_feature_flags = {"remote_start": True}  # noqa: SLF001
-    coord._evse_feature_flags_by_serial = {  # noqa: SLF001
-        "EVSE-1": {"plug_and_charge": False}
-    }
+    runtime = coord.evse_feature_flags_runtime
+    runtime.replace_payload({"data": {}})
+    runtime.replace_site_feature_flags({"remote_start": True})
+    runtime.replace_charger_feature_flags({"EVSE-1": {"plug_and_charge": False}})
 
     snapshot = coord.evse_feature_flags_snapshot
-    coord._evse_site_feature_flags = {}  # noqa: SLF001
+    runtime.replace_site_feature_flags({})
 
     assert snapshot.site_feature_flags == {"remote_start": True}
     with pytest.raises(TypeError):
