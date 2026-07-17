@@ -45,6 +45,8 @@ from custom_components.enphase_ev.config_flow import (
     CONF_GRID_PROFILE_CONFIRM_APPLY,
     CONF_GRID_PROFILE_ID,
     CONF_GRID_PROFILE_REGION,
+    CONF_GRID_MODE,
+    CONF_GRID_MODE_CONFIRM,
     EnphaseEVConfigFlow,
     OptionsFlowHandler,
 )
@@ -84,7 +86,6 @@ from custom_components.enphase_ev.const import (
     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
     OPT_FAST_POLL_INTERVAL,
     OPT_FAST_WHILE_STREAMING,
-    OPT_GRID_TOGGLE_ENABLED,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_MICROINVERTER_POWER_ENABLED,
     OPT_NOMINAL_VOLTAGE,
@@ -2912,7 +2913,7 @@ async def test_options_flow_authentication_submit_runs_actions(
             CONF_PASSWORD: "secret",
             CONF_REMEMBER_PASSWORD: True,
         },
-        options={OPT_GRID_TOGGLE_ENABLED: True},
+        options={"existing": True},
     )
     entry.add_to_hass(hass)
     entry.async_start_reauth = Mock()
@@ -2924,7 +2925,7 @@ async def test_options_flow_authentication_submit_runs_actions(
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"][OPT_GRID_TOGGLE_ENABLED] is True
+    assert result["data"]["existing"] is True
     assert CONF_PASSWORD not in entry.data
     assert entry.data[CONF_REMEMBER_PASSWORD] is False
     entry.async_start_reauth.assert_called_once_with(hass, data=entry.data)
@@ -3032,31 +3033,234 @@ async def test_options_flow_keeps_grid_toggle_without_country_regions(hass) -> N
 
 
 @pytest.mark.asyncio
-async def test_options_flow_grid_toggle_defaults_off_and_preserves_options(
-    hass,
-) -> None:
+async def test_options_flow_grid_toggle_completes_otp_workflow(hass) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={CONF_SITE_ID: "12345"},
         options={"existing": True},
     )
+    coordinator = SimpleNamespace(
+        site_id="12345",
+        grid_mode="off_grid",
+        grid_control_supported=True,
+        grid_toggle_allowed=True,
+        grid_toggle_blocked_reasons=[],
+        battery_runtime=SimpleNamespace(
+            async_refresh_grid_control_check=AsyncMock(return_value=True)
+        ),
+        async_request_grid_toggle_otp=AsyncMock(),
+        async_set_grid_mode=AsyncMock(),
+    )
+    entry.runtime_data = SimpleNamespace(coordinator=coordinator)
     handler = OptionsFlowHandler(entry)
     handler.hass = hass
 
     form = await handler.async_step_grid_toggle()
-    marker = next(
-        marker
-        for marker in form["data_schema"].schema
-        if marker.schema == OPT_GRID_TOGGLE_ENABLED
-    )
     assert form["type"] is FlowResultType.FORM
     assert form["step_id"] == "grid_toggle"
-    assert marker.default() is False
+    coordinator.battery_runtime.async_refresh_grid_control_check.assert_awaited_once_with(
+        force=True
+    )
 
-    result = await handler.async_step_grid_toggle({OPT_GRID_TOGGLE_ENABLED: True})
+    same_mode = await handler.async_step_grid_toggle({CONF_GRID_MODE: "off_grid"})
+    assert same_mode["errors"] == {CONF_GRID_MODE: "grid_mode_already_active"}
+    coordinator.async_request_grid_toggle_otp.assert_not_awaited()
+
+    otp_form = await handler.async_step_grid_toggle({CONF_GRID_MODE: "on_grid"})
+    assert otp_form["step_id"] == "grid_toggle_otp"
+    coordinator.async_request_grid_toggle_otp.assert_awaited_once()
+    assert coordinator.battery_runtime.async_refresh_grid_control_check.await_count == 1
+
+    missing_confirmation = await handler.async_step_grid_toggle_otp(
+        {CONF_OTP: "1234", CONF_GRID_MODE_CONFIRM: False}
+    )
+    assert missing_confirmation["errors"] == {"base": "grid_mode_confirm_required"}
+    coordinator.async_set_grid_mode.assert_not_awaited()
+
+    applied = await handler.async_step_grid_toggle_otp(
+        {CONF_OTP: "1234", CONF_GRID_MODE_CONFIRM: True}
+    )
+    assert applied["step_id"] == "grid_toggle_applied"
+    coordinator.async_set_grid_mode.assert_awaited_once_with("on_grid", "1234")
+
+    result = await handler.async_step_grid_toggle_applied({})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"] == {"existing": True, OPT_GRID_TOGGLE_ENABLED: True}
+    assert result["data"] == {"existing": True}
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_toggle_aborts_when_unavailable_or_blocked(
+    hass,
+) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_grid_toggle()
+    assert result["reason"] == "grid_mode_unavailable"
+
+    coordinator = SimpleNamespace(
+        site_id="12345",
+        grid_mode="on_grid",
+        grid_control_supported=True,
+        grid_toggle_allowed=True,
+        grid_toggle_blocked_reasons=[],
+        battery_runtime=SimpleNamespace(
+            async_refresh_grid_control_check=AsyncMock(return_value=False)
+        ),
+    )
+    entry.runtime_data = SimpleNamespace(coordinator=coordinator)
+    result = await handler.async_step_grid_toggle()
+    assert result["reason"] == "grid_mode_unavailable"
+
+    coordinator = SimpleNamespace(
+        site_id="12345",
+        grid_mode="on_grid",
+        grid_control_supported=True,
+        grid_toggle_allowed=False,
+        grid_toggle_blocked_reasons=["active_download"],
+        battery_runtime=SimpleNamespace(
+            async_refresh_grid_control_check=AsyncMock(return_value=True)
+        ),
+    )
+    entry.runtime_data = SimpleNamespace(coordinator=coordinator)
+    result = await handler.async_step_grid_toggle()
+    assert result["reason"] == "grid_mode_blocked"
+    assert result["description_placeholders"] == {
+        "reasons": "A system download is active."
+    }
+
+    coordinator.grid_toggle_blocked_reasons = []
+    result = await handler.async_step_grid_toggle()
+    assert result["reason"] == "grid_mode_blocked"
+    assert result["description_placeholders"] == {
+        "reasons": "A Grid Mode change is already pending."
+    }
+
+    coordinator.grid_toggle_blocked_reasons = ["future_reason"]
+    result = await handler.async_step_grid_toggle()
+    assert result["reason"] == "grid_mode_blocked"
+    assert result["description_placeholders"] == {
+        "reasons": "An unknown blocking condition is active."
+    }
+
+    coordinator.grid_control_supported = False
+    result = await handler.async_step_grid_toggle()
+    assert result["reason"] == "grid_mode_unavailable"
+
+    reopened = OptionsFlowHandler(entry)
+    reopened.hass = hass
+    result = await reopened.async_step_grid_toggle_otp()
+    assert result["reason"] == "grid_mode_unavailable"
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_toggle_rejects_invalid_mode_and_labels_fallback(
+    hass,
+) -> None:
+    coordinator = SimpleNamespace(
+        site_id="12345",
+        grid_mode="mystery_mode",
+        grid_control_supported=True,
+        grid_toggle_allowed=True,
+        grid_toggle_blocked_reasons=[],
+        battery_runtime=SimpleNamespace(
+            async_refresh_grid_control_check=AsyncMock(return_value=True)
+        ),
+        async_request_grid_toggle_otp=AsyncMock(),
+    )
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(coordinator=coordinator)
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_grid_toggle({CONF_GRID_MODE: "invalid"})
+
+    assert result["errors"] == {CONF_GRID_MODE: "grid_mode_invalid"}
+    assert result["description_placeholders"]["current_mode"] == "Mystery Mode"
+    coordinator.async_request_grid_toggle_otp.assert_not_awaited()
+
+    with patch.object(config_flow, "async_get_cached_translations", return_value={}):
+        assert (
+            handler._grid_control_block_reason_label("future_reason")
+            == "Unknown blocking condition"
+        )
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_toggle_reports_request_and_validation_errors(
+    hass,
+) -> None:
+    coordinator = SimpleNamespace(
+        site_id="12345",
+        grid_mode="off_grid",
+        grid_control_supported=True,
+        grid_toggle_allowed=True,
+        grid_toggle_blocked_reasons=[],
+        battery_runtime=SimpleNamespace(
+            async_refresh_grid_control_check=AsyncMock(return_value=True)
+        ),
+        async_request_grid_toggle_otp=AsyncMock(
+            side_effect=ServiceValidationError(
+                "request failed", translation_key="grid_control_unavailable"
+            )
+        ),
+        async_set_grid_mode=AsyncMock(),
+    )
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(coordinator=coordinator)
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    request_error = await handler.async_step_grid_toggle({CONF_GRID_MODE: "on_grid"})
+    assert request_error["errors"] == {"base": "grid_control_unavailable"}
+
+    coordinator.async_request_grid_toggle_otp = AsyncMock()
+    otp_form = await handler.async_step_grid_toggle({CONF_GRID_MODE: "on_grid"})
+    assert otp_form["step_id"] == "grid_toggle_otp"
+    coordinator.async_set_grid_mode.side_effect = ServiceValidationError(
+        "expired", translation_key="grid_otp_invalid"
+    )
+
+    invalid_otp = await handler.async_step_grid_toggle_otp(
+        {CONF_OTP: "1234", CONF_GRID_MODE_CONFIRM: True}
+    )
+
+    assert invalid_otp["errors"] == {"base": "grid_otp_invalid"}
+    coordinator.async_request_grid_toggle_otp.assert_awaited_once()
+    coordinator.async_set_grid_mode.assert_awaited_once_with("on_grid", "1234")
+
+    coordinator.async_set_grid_mode.reset_mock()
+    coordinator.async_set_grid_mode.side_effect = ServiceValidationError(
+        "eligibility changed", translation_key="grid_control_blocked"
+    )
+    blocked = await handler.async_step_grid_toggle_otp(
+        {CONF_OTP: "1234", CONF_GRID_MODE_CONFIRM: True}
+    )
+    assert blocked["errors"] == {"base": "grid_control_blocked"}
+    coordinator.async_request_grid_toggle_otp.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_options_flow_grid_toggle_aborts_when_refresh_fails(hass) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(
+            site_id="12345",
+            battery_runtime=SimpleNamespace(
+                async_refresh_grid_control_check=AsyncMock(
+                    side_effect=RuntimeError("boom")
+                )
+            ),
+        )
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+
+    result = await handler.async_step_grid_toggle()
+
+    assert result["reason"] == "grid_mode_unavailable"
 
 
 def _options_flow_grid_profile_runtime(
@@ -3983,7 +4187,6 @@ async def test_options_flow_normalizes_poll_intervals_on_save(hass) -> None:
         options={
             OPT_SCHEDULE_SYNC_ENABLED: False,
             OPT_BATTERY_SCHEDULES_ENABLED: True,
-            OPT_GRID_TOGGLE_ENABLED: True,
             OPT_DEGRADED_SERVICE_REPAIR_ISSUES: True,
             OPT_SYSTEM_EVENT_REPAIR_ISSUES: True,
             OPT_PRICING_EDITS_ENABLED: True,
@@ -4036,7 +4239,6 @@ async def test_options_flow_normalizes_poll_intervals_on_save(hass) -> None:
     assert result["data"][OPT_MICROINVERTER_POWER_ENABLED] is False
     assert result["data"][OPT_SCHEDULE_SYNC_ENABLED] is False
     assert result["data"][OPT_BATTERY_SCHEDULES_ENABLED] is True
-    assert result["data"][OPT_GRID_TOGGLE_ENABLED] is True
     assert result["data"][OPT_NOMINAL_VOLTAGE] == 230
 
 

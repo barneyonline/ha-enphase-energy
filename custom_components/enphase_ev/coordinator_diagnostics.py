@@ -854,7 +854,6 @@ class CoordinatorDiagnostics:
             "evse_feature_flag_charger_count": len(
                 getattr(coord, "_evse_feature_flags_by_serial", {}) or {}
             ),
-            "grid_toggle_enabled": coord.grid_toggle_enabled,
             "pricing_edits_enabled": coord.pricing_edits_enabled,
             "grid_control_supported": coord.grid_control_supported,
             "grid_toggle_allowed": coord.grid_toggle_allowed,

@@ -46,7 +46,7 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - Independent Microinverter Lifetime Energy and optional installer-level power telemetry
 - Site tariff visibility, editable rate entities, and tariff update actions
 - Installer-only Grid Profile Control through Enphase cloud Activation, with country-scoped profile selection and current profile monitoring
-- Optional manual Grid Mode controls with a read-only status sensor and guarded OTP actions
+- Read-only Grid Mode monitoring with a guided, OTP-confirmed control workflow under Configure > Advanced > Grid Mode and admin-only actions for scripts
 - Health diagnostics, service-availability tracking, and actionable repair issues
 - Read-only System Dashboard event and standing-alarm monitoring, including a
   diagnostic Problem sensor with bounded sanitized event context and optional,

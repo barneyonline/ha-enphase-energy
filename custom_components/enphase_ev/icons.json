@@ -797,14 +797,6 @@
       "system_profile_status": {
         "default": "mdi:tune-variant"
       },
-      "grid_control_status": {
-        "default": "mdi:transmission-tower",
-        "state": {
-          "pending": "mdi:progress-clock",
-          "ready": "mdi:check-circle",
-          "blocked": "mdi:alert-circle"
-        }
-      },
       "grid_mode": {
         "default": "mdi:transmission-tower",
         "state": {
@@ -839,9 +831,6 @@
       },
       "stop_charging": {
         "default": "mdi:stop"
-      },
-      "request_grid_toggle_otp": {
-        "default": "mdi:message-lock"
       },
       "storm_alert_opt_out": {
         "default": "mdi:shield-off-outline"

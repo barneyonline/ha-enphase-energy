@@ -95,7 +95,7 @@
       "message": "Le contrôle du réseau n'est pas disponible pour ce site."
     },
     "grid_control_blocked": {
-      "message": "Le contrôle du réseau est actuellement bloqué : {reasons}."
+      "message": "Le contrôle du réseau est actuellement bloqué."
     },
     "grid_mode_invalid": {
       "message": "Le mode réseau doit être on_grid ou off_grid."
@@ -724,12 +724,9 @@
       },
       "grid_toggle": {
         "title": "Mode réseau",
-        "description": "La surveillance du mode réseau reste toujours disponible. Le basculement manuel est sensible pour la sécurité ; les entités et actions supplémentaires nécessitent donc une activation explicite.",
+        "description": "Mode réseau actuel : **{current_mode}**.\n\nLe changement de mode réseau est sensible à la sécurité. Sélectionnez le mode demandé pour envoyer un code à usage unique à l'e-mail et au téléphone enregistrés.",
         "data": {
-          "grid_toggle_enabled": "Activer les commandes du mode réseau"
-        },
-        "data_description": {
-          "grid_toggle_enabled": "Le capteur Mode réseau reste disponible. L’activation crée État du contrôle réseau et Demander l’OTP, et autorise les actions de service."
+          "mode": "Mode grille demandé"
         }
       },
       "grid_profile": {
@@ -761,6 +758,18 @@
       "grid_profile_applied": {
         "title": "Mise à jour du profil réseau acceptée",
         "description": "Enphase a accepté la mise à jour du profil réseau pour **{selected_profile}**.\n\nID du profil demandé : **{requested_profile_id}**\n\nÉtat cloud : **{cloud_apply_status}**\n\nLe nouveau profil peut prendre jusqu’à **5 minutes** pour apparaître comme profil actuel pendant que le cloud et la Gateway terminent le traitement. Le capteur Grid Profile sera mis à jour lorsque l’enregistrement Activation indiquera le nouveau profil actuel."
+      },
+      "grid_toggle_otp": {
+        "title": "Confirmer le changement de mode réseau",
+        "description": "Mode réseau actuel : **{current_mode}**.\n\nMode grille demandé : **{target_mode}**.\n\nEntrez le code à usage unique à 4 chiffres et confirmez le changement sensible à la sécurité.",
+        "data": {
+          "otp": "Code à usage unique",
+          "confirm": "Confirmez le changement de mode réseau"
+        }
+      },
+      "grid_toggle_applied": {
+        "title": "Changement de mode réseau accepté",
+        "description": "Enphase a accepté la demande de changement du mode grille en **{target_mode}**.\n\nLe relais physique est peut-être encore en train de changer. Utilisez le capteur Grid Mode pour observer l’état résultant."
       }
     },
     "error": {
@@ -778,7 +787,16 @@
       "grid_profile_region_invalid": "La région de profil réseau sélectionnée est indisponible.",
       "grid_profile_profile_invalid": "Le profil réseau sélectionné n’est pas disponible pour le pays et la région de ce site.",
       "grid_profile_gateway_required": "L’application du profil réseau nécessite un enregistrement Gateway Activation cloud.",
-      "grid_profile_apply_failed": "Échec de l’application du profil réseau."
+      "grid_profile_apply_failed": "Échec de l’application du profil réseau.",
+      "grid_mode_invalid": "Sélectionnez Sur la grille ou Hors grille.",
+      "grid_mode_already_active": "Le site est déjà dans le mode Grille sélectionné.",
+      "grid_mode_confirm_required": "Confirmez le changement de mode réseau avant de continuer.",
+      "grid_control_unavailable": "Le contrôle du réseau n'est pas disponible pour ce site.",
+      "grid_control_blocked": "Le contrôle du réseau est actuellement bloqué.",
+      "grid_otp_required": "Entrez le code à usage unique.",
+      "grid_otp_invalid_format": "Le code à usage unique doit contenir exactement quatre chiffres.",
+      "grid_otp_invalid": "Le code à usage unique est invalide ou a expiré.",
+      "grid_envoy_serial_missing": "La passerelle de ce site n'a pas pu être déterminée."
     },
     "abort": {
       "migration_no_envoy_sources": "Aucun capteur d’énergie Enphase Envoy n’est disponible pour la migration.",
@@ -786,7 +804,9 @@
       "migration_partial_failure": "La migration s’est arrêtée après une réalisation partielle.\n\nAssociations terminées :\n{completed_mappings}\n\nÉchec lors du traitement de `{failed_entity_id}` : {failure_reason}\n\nRestaurez la sauvegarde si le résultat n’est pas acceptable.",
       "grid_profile_unavailable": "Le contrôle du profil réseau est indisponible.",
       "grid_profile_installer_required": "Le contrôle du profil réseau nécessite un accès installateur à Enphase Activation.",
-      "grid_profile_no_regions": "Aucune région de profil réseau n'est disponible pour le pays de ce site."
+      "grid_profile_no_regions": "Aucune région de profil réseau n'est disponible pour le pays de ce site.",
+      "grid_mode_unavailable": "Le contrôle du mode grille n’est pas disponible pour ce site.",
+      "grid_mode_blocked": "Le contrôle du mode grille est actuellement bloqué : {reasons}."
     },
     "create_entry": {
       "migration_success": "Migration terminée. Enphase Energy possède maintenant les identifiants d’entité source sélectionnés. Vérifiez le tableau de bord Energy et Developer Tools > Statistics après la prochaine actualisation.",
@@ -808,6 +828,23 @@
         "available": "Disponible",
         "unavailable": "Indisponible",
         "accepted": "Accepté"
+      }
+    },
+    "grid_mode": {
+      "options": {
+        "on_grid": "Sur le réseau",
+        "off_grid": "Hors réseau",
+        "unknown": "Inconnu"
+      }
+    },
+    "grid_control_block_reason": {
+      "options": {
+        "disable_grid_control": "Le contrôle du réseau est désactivé pour le site.",
+        "active_download": "Un téléchargement système est en cours.",
+        "sunlight_backup_system_check": "La vérification du système Sunlight Backup est en cours.",
+        "grid_outage_check": "La vérification de coupure du réseau est en cours.",
+        "pending": "Un changement de mode réseau est déjà en attente.",
+        "unknown": "Une condition de blocage inconnue est active."
       }
     }
   },
@@ -1380,14 +1417,6 @@
           "none": "Aucun",
           "pending": "En attente",
           "active": "Actif"
-        }
-      },
-      "grid_control_status": {
-        "name": "État du contrôle du réseau",
-        "state": {
-          "ready": "Prêt",
-          "blocked": "Bloqué",
-          "pending": "En attente"
         }
       },
       "grid_mode": {
@@ -2323,9 +2352,6 @@
       "cancel_pending_profile_change": {
         "name": "Annuler le changement de profil en attente"
       },
-      "request_grid_toggle_otp": {
-        "name": "Demander le code OTP de basculement réseau"
-      },
       "storm_alert_opt_out": {
         "name": "Se désinscrire de l'alerte de tempête"
       },
@@ -2648,26 +2674,16 @@
     "request_grid_toggle_otp": {
       "name": "Demander le code OTP de basculement réseau",
       "description": "Envoyez le code à usage unique requis avant de changer le mode réseau du site.",
-      "sections": {
-        "advanced": {
-          "name": "Options avancées"
-        }
-      },
       "fields": {
-        "site_id": {
-          "name": "ID du site",
-          "description": "Identifiant de site facultatif ; détecté automatiquement lorsqu’un appareil de site est sélectionné."
+        "config_entry_id": {
+          "name": "Entrée de configuration Enphase",
+          "description": "Sélectionnez le site Enphase qui doit recevoir le code à usage unique."
         }
       }
     },
     "set_grid_mode": {
       "name": "Définir le mode réseau",
       "description": "Changez le mode réseau du site après avoir validé le code à usage unique.",
-      "sections": {
-        "advanced": {
-          "name": "Options avancées"
-        }
-      },
       "fields": {
         "mode": {
           "name": "Mode réseau",
@@ -2677,9 +2693,9 @@
           "name": "Code à usage unique",
           "description": "Saisissez l'OTP à 4 chiffres envoyé à votre adresse e-mail et à votre téléphone enregistrés."
         },
-        "site_id": {
-          "name": "ID du site",
-          "description": "Identifiant de site facultatif ; détecté automatiquement lorsqu’un appareil de site est sélectionné."
+        "config_entry_id": {
+          "name": "Entrée de configuration Enphase",
+          "description": "Sélectionnez le site Enphase dont le mode réseau doit changer."
         }
       }
     },

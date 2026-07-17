@@ -95,7 +95,7 @@
       "message": "Ovládání mřížky není pro tento web k dispozici."
     },
     "grid_control_blocked": {
-      "message": "Ovládání mřížky je aktuálně blokováno: {reasons}."
+      "message": "Řízení sítě je aktuálně zablokováno."
     },
     "grid_mode_invalid": {
       "message": "Režim mřížky musí být on_grid nebo off_grid."
@@ -724,12 +724,9 @@
       },
       "grid_toggle": {
         "title": "Režim sítě",
-        "description": "Sledování režimu sítě zůstává vždy dostupné. Ruční přepínání je bezpečnostně citlivé, proto další entity a servisní akce vyžadují výslovné povolení.",
+        "description": "Aktuální režim mřížky: **{current_mode}**.\n\nZměna režimu mřížky je citlivá na bezpečnost. Vyberte požadovaný režim pro odeslání jednorázového kódu na registrovaný e-mail a telefon.",
         "data": {
-          "grid_toggle_enabled": "Povolit ovládání režimu sítě"
-        },
-        "data_description": {
-          "grid_toggle_enabled": "Senzor Režim sítě zůstává dostupný. Povolením se vytvoří Stav řízení sítě a Vyžádat OTP a povolí se servisní akce."
+          "mode": "Požadovaný režim mřížky"
         }
       },
       "grid_profile": {
@@ -761,6 +758,18 @@
       "grid_profile_applied": {
         "title": "Aktualizace síťového profilu přijata",
         "description": "Enphase přijal aktualizaci síťového profilu pro **{selected_profile}**.\n\nID požadovaného profilu: **{requested_profile_id}**\n\nStav cloudu: **{cloud_apply_status}**\n\nMůže trvat až **5 minut**, než se nový profil zobrazí jako aktuální, zatímco cloud a Gateway dokončí zpracování. Senzor Grid Profile se aktualizuje, jakmile záznam Activation nahlásí nový aktuální profil."
+      },
+      "grid_toggle_otp": {
+        "title": "Potvrďte změnu režimu mřížky",
+        "description": "Aktuální režim mřížky: **{current_mode}**.\n\nPožadovaný režim mřížky: **{target_mode}**.\n\nZadejte 4místný jednorázový kód a potvrďte bezpečnostně citlivou změnu.",
+        "data": {
+          "otp": "Jednorázový kód",
+          "confirm": "Potvrďte změnu režimu mřížky"
+        }
+      },
+      "grid_toggle_applied": {
+        "title": "Změna režimu mřížky přijata",
+        "description": "Společnost Enphase přijala požadavek na změnu režimu mřížky na **{target_mode}**.\n\nFyzické relé se může stále měnit. Pomocí senzoru Grid Mode pozorujte výsledný stav."
       }
     },
     "error": {
@@ -778,7 +787,16 @@
       "grid_profile_region_invalid": "Vybraná oblast síťového profilu není dostupná.",
       "grid_profile_profile_invalid": "Vybraný síťový profil není dostupný pro zemi a oblast tohoto místa.",
       "grid_profile_gateway_required": "Použití síťového profilu vyžaduje cloudový záznam Gateway v Activation.",
-      "grid_profile_apply_failed": "Použití síťového profilu se nezdařilo."
+      "grid_profile_apply_failed": "Použití síťového profilu se nezdařilo.",
+      "grid_mode_invalid": "Vyberte možnost Zapnuto nebo Vypnuto.",
+      "grid_mode_already_active": "Web je již ve vybraném režimu mřížky.",
+      "grid_mode_confirm_required": "Než budete pokračovat, potvrďte změnu režimu mřížky.",
+      "grid_control_unavailable": "Ovládání mřížky není pro tento web k dispozici.",
+      "grid_control_blocked": "Řízení sítě je aktuálně zablokováno.",
+      "grid_otp_required": "Zadejte jednorázový kód.",
+      "grid_otp_invalid_format": "Jednorázový kód musí obsahovat přesně čtyři číslice.",
+      "grid_otp_invalid": "Jednorázový kód je neplatný nebo jeho platnost vypršela.",
+      "grid_envoy_serial_missing": "Bránu pro tento web nelze určit."
     },
     "abort": {
       "migration_no_envoy_sources": "Nejsou k dispozici žádné energetické senzory Enphase Envoy pro migraci.",
@@ -786,7 +804,9 @@
       "migration_partial_failure": "Migrace se zastavila po částečném dokončení.\n\nDokončená mapování:\n{completed_mappings}\n\nSelhalo při zpracování `{failed_entity_id}`: {failure_reason}\n\nPokud výsledek nevyhovuje, obnovte zálohu.",
       "grid_profile_unavailable": "Ovládání síťového profilu není dostupné.",
       "grid_profile_installer_required": "Ovládání síťového profilu vyžaduje instalační přístup k Enphase Activation.",
-      "grid_profile_no_regions": "Pro zemi tohoto místa nejsou dostupné žádné oblasti síťových profilů."
+      "grid_profile_no_regions": "Pro zemi tohoto místa nejsou dostupné žádné oblasti síťových profilů.",
+      "grid_mode_unavailable": "Ovládání režimu mřížky není pro tento web k dispozici.",
+      "grid_mode_blocked": "Ovládání režimu mřížky je aktuálně zablokováno: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migrace dokončena. Enphase Energy nyní vlastní vybraná ID zdrojových entit. Po příští aktualizaci zkontrolujte panel Energy a Developer Tools > Statistics.",
@@ -808,6 +828,23 @@
         "available": "Dostupné",
         "unavailable": "Nedostupné",
         "accepted": "Přijato"
+      }
+    },
+    "grid_mode": {
+      "options": {
+        "on_grid": "V síti",
+        "off_grid": "Mimo síť",
+        "unknown": "Neznámý"
+      }
+    },
+    "grid_control_block_reason": {
+      "options": {
+        "disable_grid_control": "Ovládání sítě je pro lokalitu zakázáno.",
+        "active_download": "Probíhá stahování systému.",
+        "sunlight_backup_system_check": "Probíhá kontrola systému Sunlight Backup.",
+        "grid_outage_check": "Probíhá kontrola výpadku sítě.",
+        "pending": "Změna režimu sítě již čeká na dokončení.",
+        "unknown": "Je aktivní neznámá blokující podmínka."
       }
     }
   },
@@ -1380,14 +1417,6 @@
           "none": "Žádné",
           "pending": "Čeká",
           "active": "Aktivní"
-        }
-      },
-      "grid_control_status": {
-        "name": "Stav řízení sítě",
-        "state": {
-          "ready": "Připraveno",
-          "blocked": "Blokováno",
-          "pending": "Čeká"
         }
       },
       "grid_mode": {
@@ -2323,9 +2352,6 @@
       "cancel_pending_profile_change": {
         "name": "Zrušit čekající změnu profilu"
       },
-      "request_grid_toggle_otp": {
-        "name": "Požadavek na přepínání sítě OTP"
-      },
       "storm_alert_opt_out": {
         "name": "Odhlásit upozornění na bouři"
       },
@@ -2648,26 +2674,16 @@
     "request_grid_toggle_otp": {
       "name": "Požadavek na přepínání sítě OTP",
       "description": "Před změnou režimu mřížky webu odešlete požadovaný jednorázový kód.",
-      "sections": {
-        "advanced": {
-          "name": "Pokročilé možnosti"
-        }
-      },
       "fields": {
-        "site_id": {
-          "name": "ID lokality",
-          "description": "Volitelný identifikátor lokality; automaticky detekován při výběru zařízení lokality."
+        "config_entry_id": {
+          "name": "Enphase konfigurační záznam",
+          "description": "Vyberte web Enphase, který by měl obdržet jednorázový kód."
         }
       }
     },
     "set_grid_mode": {
       "name": "Nastavte režim mřížky",
       "description": "Po ověření jednorázového kódu změňte režim mřížky webu.",
-      "sections": {
-        "advanced": {
-          "name": "Pokročilé možnosti"
-        }
-      },
       "fields": {
         "mode": {
           "name": "Mřížkový režim",
@@ -2677,9 +2693,9 @@
           "name": "Jednorázový kód",
           "description": "Zadejte 4místné OTP zaslané na váš registrovaný e-mail a telefon."
         },
-        "site_id": {
-          "name": "ID lokality",
-          "description": "Volitelný identifikátor lokality; automaticky detekován při výběru zařízení lokality."
+        "config_entry_id": {
+          "name": "Enphase konfigurační záznam",
+          "description": "Vyberte web Enphase, jehož režim mřížky by se měl změnit."
         }
       }
     },

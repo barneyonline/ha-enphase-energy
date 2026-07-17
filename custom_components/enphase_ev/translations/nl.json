@@ -95,7 +95,7 @@
       "message": "Netbeheer is niet beschikbaar voor deze site."
     },
     "grid_control_blocked": {
-      "message": "Netbeheer is momenteel geblokkeerd: {reasons}."
+      "message": "Netbeheer is momenteel geblokkeerd."
     },
     "grid_mode_invalid": {
       "message": "De rastermodus moet on_grid of off_grid zijn."
@@ -724,12 +724,9 @@
       },
       "grid_toggle": {
         "title": "Netmodus",
-        "description": "Bewaking van de netmodus blijft altijd beschikbaar. Handmatige omschakeling is veiligheidsgevoelig; aanvullende entiteiten en serviceacties vereisen daarom expliciete inschakeling.",
+        "description": "Huidige rastermodus: **{current_mode}**.\n\nHet wijzigen van de rastermodus is veiligheidsgevoelig. Selecteer de gevraagde modus om een ​​eenmalige code naar de geregistreerde e-mail en telefoon te sturen.",
         "data": {
-          "grid_toggle_enabled": "Bediening voor netmodus inschakelen"
-        },
-        "data_description": {
-          "grid_toggle_enabled": "De sensor Netmodus blijft beschikbaar. Inschakelen maakt Status netbediening en OTP aanvragen en staat serviceacties toe."
+          "mode": "Gevraagde rastermodus"
         }
       },
       "grid_profile": {
@@ -761,6 +758,18 @@
       "grid_profile_applied": {
         "title": "Netprofielupdate geaccepteerd",
         "description": "Enphase heeft de netprofielupdate voor **{selected_profile}** geaccepteerd.\n\nAangevraagde profiel-ID: **{requested_profile_id}**\n\nCloudstatus: **{cloud_apply_status}**\n\nHet kan tot **5 minuten** duren voordat het nieuwe profiel als huidig verschijnt terwijl de cloud en Gateway de verwerking afronden. De Grid Profile-sensor wordt bijgewerkt nadat het Activation-record het nieuwe huidige profiel meldt."
+      },
+      "grid_toggle_otp": {
+        "title": "Bevestig de wijziging van de rastermodus",
+        "description": "Huidige rastermodus: **{current_mode}**.\n\nAangevraagde rastermodus: **{target_mode}**.\n\nVoer de 4-cijferige eenmalige code in en bevestig de veiligheidsgevoelige wijziging.",
+        "data": {
+          "otp": "Eenmalige code",
+          "confirm": "Bevestig de wijziging in de rastermodus"
+        }
+      },
+      "grid_toggle_applied": {
+        "title": "Wijziging rastermodus geaccepteerd",
+        "description": "Enphase accepteerde het verzoek om de rastermodus te wijzigen in **{target_mode}**.\n\nHet fysieke relais is mogelijk nog steeds aan het veranderen. Gebruik de Grid Mode-sensor om de resulterende status te observeren."
       }
     },
     "error": {
@@ -778,7 +787,16 @@
       "grid_profile_region_invalid": "De geselecteerde netprofielregio is niet beschikbaar.",
       "grid_profile_profile_invalid": "Het geselecteerde netprofiel is niet beschikbaar voor het land en de regio van deze locatie.",
       "grid_profile_gateway_required": "Netprofiel toepassen vereist een cloud Activation Gateway-record.",
-      "grid_profile_apply_failed": "Netprofiel toepassen is mislukt."
+      "grid_profile_apply_failed": "Netprofiel toepassen is mislukt.",
+      "grid_mode_invalid": "Selecteer Op raster of Buiten raster.",
+      "grid_mode_already_active": "De site bevindt zich al in de geselecteerde rastermodus.",
+      "grid_mode_confirm_required": "Bevestig de wijziging in de rastermodus voordat u doorgaat.",
+      "grid_control_unavailable": "Netbeheer is niet beschikbaar voor deze site.",
+      "grid_control_blocked": "Netbeheer is momenteel geblokkeerd.",
+      "grid_otp_required": "Voer de eenmalige code in.",
+      "grid_otp_invalid_format": "De eenmalige code moet exact vier cijfers bevatten.",
+      "grid_otp_invalid": "De eenmalige code is ongeldig of verlopen.",
+      "grid_envoy_serial_missing": "De gateway voor deze site kan niet worden bepaald."
     },
     "abort": {
       "migration_no_envoy_sources": "Er zijn geen Enphase Envoy-energiesensoren beschikbaar om te migreren.",
@@ -786,7 +804,9 @@
       "migration_partial_failure": "De migratie is gestopt na gedeeltelijke voltooiing.\n\nVoltooide koppelingen:\n{completed_mappings}\n\nMislukt tijdens verwerken van `{failed_entity_id}`: {failure_reason}\n\nHerstel vanaf een back-up als het resultaat niet acceptabel is.",
       "grid_profile_unavailable": "Netprofielbeheer is niet beschikbaar.",
       "grid_profile_installer_required": "Netprofielbeheer vereist installateurstoegang tot Enphase Activation.",
-      "grid_profile_no_regions": "Er zijn geen netprofielregio’s beschikbaar voor het land van deze locatie."
+      "grid_profile_no_regions": "Er zijn geen netprofielregio’s beschikbaar voor het land van deze locatie.",
+      "grid_mode_unavailable": "Beheer van de rastermodus is niet beschikbaar voor deze site.",
+      "grid_mode_blocked": "De rastermodusbesturing is momenteel geblokkeerd: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migratie voltooid. Enphase Energy bezit nu de geselecteerde bron-entiteits-ID's. Controleer het Energy-dashboard en Developer Tools > Statistics na de volgende vernieuwing.",
@@ -808,6 +828,23 @@
         "available": "Beschikbaar",
         "unavailable": "Niet beschikbaar",
         "accepted": "Geaccepteerd"
+      }
+    },
+    "grid_mode": {
+      "options": {
+        "on_grid": "Op raster",
+        "off_grid": "Buiten het raster",
+        "unknown": "Onbekend"
+      }
+    },
+    "grid_control_block_reason": {
+      "options": {
+        "disable_grid_control": "Netbeheer is uitgeschakeld voor de locatie.",
+        "active_download": "Er is een systeemdownload actief.",
+        "sunlight_backup_system_check": "De systeemcontrole voor Sunlight Backup is actief.",
+        "grid_outage_check": "De controle op netuitval is actief.",
+        "pending": "Er is al een wijziging van de netmodus in behandeling.",
+        "unknown": "Er is een onbekende blokkerende voorwaarde actief."
       }
     }
   },
@@ -1380,14 +1417,6 @@
           "none": "Geen",
           "pending": "In behandeling",
           "active": "Actief"
-        }
-      },
-      "grid_control_status": {
-        "name": "Status netregeling",
-        "state": {
-          "ready": "Gereed",
-          "blocked": "Geblokkeerd",
-          "pending": "In behandeling"
         }
       },
       "grid_mode": {
@@ -2323,9 +2352,6 @@
       "cancel_pending_profile_change": {
         "name": "Annuleer lopende profielwijziging"
       },
-      "request_grid_toggle_otp": {
-        "name": "Verzoek raster Toggle OTP"
-      },
       "storm_alert_opt_out": {
         "name": "Afmelden voor stormwaarschuwing"
       },
@@ -2648,26 +2674,16 @@
     "request_grid_toggle_otp": {
       "name": "Verzoek raster Toggle OTP",
       "description": "Verzend de eenmalige code die vereist is voordat u de siterastermodus wijzigt.",
-      "sections": {
-        "advanced": {
-          "name": "Geavanceerde opties"
-        }
-      },
       "fields": {
-        "site_id": {
-          "name": "Site-ID",
-          "description": "Optionele site-id; automatisch gedetecteerd wanneer een site-apparaat is geselecteerd."
+        "config_entry_id": {
+          "name": "Enphase-configuratie-invoer",
+          "description": "Selecteer de Enphase-site die de eenmalige code moet ontvangen."
         }
       }
     },
     "set_grid_mode": {
       "name": "Stel de rastermodus in",
       "description": "Wijzig de siterastermodus na het valideren van de eenmalige code.",
-      "sections": {
-        "advanced": {
-          "name": "Geavanceerde opties"
-        }
-      },
       "fields": {
         "mode": {
           "name": "Rastermodus",
@@ -2677,9 +2693,9 @@
           "name": "Eenmalige code",
           "description": "Voer de 4-cijferige OTP in die naar uw geregistreerde e-mailadres en telefoon is verzonden."
         },
-        "site_id": {
-          "name": "Site-ID",
-          "description": "Optionele site-id; automatisch gedetecteerd wanneer een site-apparaat is geselecteerd."
+        "config_entry_id": {
+          "name": "Enphase-configuratie-invoer",
+          "description": "Selecteer de Enphase-site waarvan de rastermodus moet veranderen."
         }
       }
     },

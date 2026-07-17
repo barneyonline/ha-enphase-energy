@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from custom_components.enphase_ev.binary_sensor import SiteCloudReachableBinarySensor
 from custom_components.enphase_ev.button import (
     CancelPendingProfileChangeButton,
-    RequestGridToggleOtpButton,
 )
 from custom_components.enphase_ev.entity import EnphaseBaseEntity
 from custom_components.enphase_ev.battery_schedule_editor import (
@@ -20,7 +19,6 @@ from custom_components.enphase_ev.select import SystemProfileSelect
 from custom_components.enphase_ev.sensor import (
     EnphaseCloudLatencySensor,
     EnphaseGridModeSensor,
-    EnphaseGridControlStatusSensor,
     EnphaseSiteLastUpdateSensor,
     EnphaseSystemProfileStatusSensor,
     EnphaseTypeInventorySensor,
@@ -100,9 +98,6 @@ def test_site_device_info_fallbacks_without_type_device_info_provider() -> None:
     assert CancelPendingProfileChangeButton(coord).device_info["identifiers"] == {
         ("enphase_ev", "type:site-1:envoy")
     }
-    assert RequestGridToggleOtpButton(coord).device_info["identifiers"] == {
-        ("enphase_ev", "type:site-1:envoy")
-    }
     assert BatteryReserveNumber(coord).device_info["identifiers"] == {
         ("enphase_ev", "type:site-1:encharge")
     }
@@ -135,9 +130,6 @@ def test_site_device_info_fallbacks_without_type_device_info_provider() -> None:
     assert BatteryScheduleEditStartTimeEntity(coord, entry).device_info[
         "identifiers"
     ] == {("enphase_ev", "type:site-1:encharge")}
-    assert EnphaseGridControlStatusSensor(coord).device_info["identifiers"] == {
-        ("enphase_ev", "type:site-1:envoy")
-    }
     assert EnphaseGridModeSensor(coord).device_info["identifiers"] == {
         ("enphase_ev", "type:site-1:envoy")
     }
@@ -262,7 +254,6 @@ def test_type_device_entities_use_provided_type_device_info() -> None:
 
     assert SiteCloudReachableBinarySensor(coord).device_info is provided
     assert CancelPendingProfileChangeButton(coord).device_info is provided
-    assert RequestGridToggleOtpButton(coord).device_info is provided
     assert BatteryReserveNumber(coord).device_info is provided
     assert BatteryShutdownLevelNumber(coord).device_info is provided
     assert SystemProfileSelect(coord).device_info is provided
@@ -279,7 +270,6 @@ def test_type_device_entities_use_provided_type_device_info() -> None:
         ),
     )
     assert BatteryScheduleEditStartTimeEntity(coord, entry).device_info is provided
-    assert EnphaseGridControlStatusSensor(coord).device_info is provided
     assert EnphaseGridModeSensor(coord).device_info is provided
     assert EnphaseTypeInventorySensor(coord, "envoy").device_info is provided
     assert EnphaseSiteLastUpdateSensor(coord).device_info is provided
@@ -350,38 +340,6 @@ def test_site_sensor_attributes_and_latency_attrs_paths() -> None:
     )
     assert EnphaseSiteLastUpdateSensor(coord).extra_state_attributes == {}
     assert EnphaseCloudLatencySensor(coord).extra_state_attributes == {}
-
-
-def test_grid_control_status_device_info_prefers_enpower_then_envoy() -> None:
-    enpower_info = {"identifiers": {("enphase_ev", "type:site-grid:enpower")}}
-    envoy_info = {"identifiers": {("enphase_ev", "type:site-grid:envoy")}}
-    coord = SimpleNamespace(
-        site_id="site-grid",
-        last_success_utc=None,
-        last_update_success=True,
-        grid_toggle_enabled=True,
-        grid_control_supported=True,
-        grid_toggle_pending=False,
-        grid_toggle_allowed=True,
-        grid_toggle_blocked_reasons=[],
-        grid_control_disable=False,
-        grid_control_active_download=False,
-        grid_control_sunlight_backup_system_check=False,
-        grid_control_grid_outage_check=False,
-        grid_control_user_initiated_toggle=False,
-        inventory_view=SimpleNamespace(
-            type_device_info=lambda key: (
-                enpower_info if key == "enpower" else envoy_info
-            )
-        ),
-    )
-    sensor = EnphaseGridControlStatusSensor(coord)
-    assert sensor.device_info is enpower_info
-
-    coord.inventory_view.type_device_info = lambda key: (
-        None if key == "enpower" else envoy_info
-    )
-    assert sensor.device_info is envoy_info
 
 
 def test_cloud_site_sensor_last_success_attrs_not_type_gated() -> None:

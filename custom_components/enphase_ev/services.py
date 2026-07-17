@@ -16,6 +16,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers import service as ha_service
 from homeassistant.helpers import target as ha_target
+from homeassistant.helpers.service import async_register_admin_service
 
 from .api import (
     OCPP_TRIGGER_MESSAGES,
@@ -323,13 +324,10 @@ def async_setup_services(
             vol.Optional("confirm_advanced", default=False): cv.boolean,
         }
     )
-    REQUEST_GRID_OTP_SCHEMA = vol.Schema(
-        {vol.Optional("device_id"): DEVICE_ID_LIST, vol.Optional("site_id"): cv.string}
-    )
+    REQUEST_GRID_OTP_SCHEMA = vol.Schema({vol.Required("config_entry_id"): cv.string})
     SET_GRID_MODE_SCHEMA = vol.Schema(
         {
-            vol.Optional("device_id"): DEVICE_ID_LIST,
-            vol.Optional("site_id"): cv.string,
+            vol.Required("config_entry_id"): cv.string,
             vol.Required("mode"): vol.In(("on_grid", "off_grid")),
             vol.Required("otp"): cv.string,
         }
@@ -1287,12 +1285,22 @@ def async_setup_services(
         return {"results": results}
 
     async def _svc_request_grid_otp(call: ServiceCall) -> None:
-        coord = await _resolve_single_site_coordinator(call)
+        coord = _get_coordinator_for_entry_id(call.data["config_entry_id"])
+        if coord is None:
+            _raise_service_validation(
+                "grid_control_unavailable",
+                message="Grid control is unavailable for this config entry.",
+            )
         await coord.async_request_grid_toggle_otp()
         await coord.async_request_refresh()
 
     async def _svc_set_grid_mode(call: ServiceCall) -> None:
-        coord = await _resolve_single_site_coordinator(call)
+        coord = _get_coordinator_for_entry_id(call.data["config_entry_id"])
+        if coord is None:
+            _raise_service_validation(
+                "grid_control_unavailable",
+                message="Grid control is unavailable for this config entry.",
+            )
         await coord.async_set_grid_mode(call.data["mode"], call.data["otp"])
 
     async def _svc_clear_issue(call: ServiceCall) -> None:
@@ -1798,14 +1806,19 @@ def async_setup_services(
         supports_response=supports_response.OPTIONAL,
     )
 
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         DOMAIN,
         "request_grid_toggle_otp",
         _svc_request_grid_otp,
-        schema=REQUEST_GRID_OTP_SCHEMA,
+        REQUEST_GRID_OTP_SCHEMA,
     )
-    hass.services.async_register(
-        DOMAIN, "set_grid_mode", _svc_set_grid_mode, schema=SET_GRID_MODE_SCHEMA
+    async_register_admin_service(
+        hass,
+        DOMAIN,
+        "set_grid_mode",
+        _svc_set_grid_mode,
+        SET_GRID_MODE_SCHEMA,
     )
     hass.services.async_register(
         DOMAIN, "clear_reauth_issue", _svc_clear_issue, schema=CLEAR_SCHEMA

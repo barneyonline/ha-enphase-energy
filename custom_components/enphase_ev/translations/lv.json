@@ -95,7 +95,7 @@
       "message": "Režģa vadība šai vietnei nav pieejama."
     },
     "grid_control_blocked": {
-      "message": "Režģa vadība pašlaik ir bloķēta: {reasons}."
+      "message": "Tīkla vadība pašlaik ir bloķēta."
     },
     "grid_mode_invalid": {
       "message": "Režģa režīmam jābūt on_grid vai off_grid."
@@ -724,12 +724,9 @@
       },
       "grid_toggle": {
         "title": "Tīkla režīms",
-        "description": "Tīkla režīma uzraudzība vienmēr paliek pieejama. Manuāla pārslēgšana ir drošībai svarīga, tāpēc papildu entītijām un darbībām nepieciešama nepārprotama iespējošana.",
+        "description": "Pašreizējais režģa režīms: **{current_mode}**.\n\nRežģa režīma maiņa ir jutīga pret drošību. Izvēlieties pieprasīto režīmu, lai nosūtītu vienreizēju kodu uz reģistrēto e-pastu un tālruni.",
         "data": {
-          "grid_toggle_enabled": "Iespējot tīkla režīma vadību"
-        },
-        "data_description": {
-          "grid_toggle_enabled": "Tīkla režīma sensors paliek pieejams. Iespējošana izveido Tīkla vadības statusa un OTP pieprasījuma entītijas un atļauj pakalpojumu darbības."
+          "mode": "Pieprasītais režģa režīms"
         }
       },
       "grid_profile": {
@@ -761,6 +758,18 @@
       "grid_profile_applied": {
         "title": "Tīkla profila atjauninājums pieņemts",
         "description": "Enphase pieņēma tīkla profila atjauninājumu profilam **{selected_profile}**.\n\nPieprasītā profila ID: **{requested_profile_id}**\n\nMākoņa statuss: **{cloud_apply_status}**\n\nVar paiet līdz **5 minūtēm**, līdz jaunais profils tiek rādīts kā pašreizējais, kamēr mākonis un Gateway pabeidz apstrādi. Grid Profile sensors tiks atjaunināts, kad Activation ieraksts ziņos par jauno pašreizējo profilu."
+      },
+      "grid_toggle_otp": {
+        "title": "Apstipriniet režģa režīma maiņu",
+        "description": "Pašreizējais režģa režīms: **{current_mode}**.\n\nPieprasītais režģa režīms: **{target_mode}**.\n\nIevadiet 4 ciparu vienreizējo kodu un apstipriniet ar drošību saistītās izmaiņas.",
+        "data": {
+          "otp": "Vienreizējs kods",
+          "confirm": "Apstipriniet režģa režīma maiņu"
+        }
+      },
+      "grid_toggle_applied": {
+        "title": "Režģa režīma izmaiņas pieņemtas",
+        "description": "Enphase pieņēma pieprasījumu mainīt režģa režīmu uz **{target_mode}**.\n\nFiziskais relejs joprojām var mainīties. Izmantojiet tīkla režīma sensoru, lai novērotu iegūto stāvokli."
       }
     },
     "error": {
@@ -778,7 +787,16 @@
       "grid_profile_region_invalid": "Atlasītais tīkla profila reģions nav pieejams.",
       "grid_profile_profile_invalid": "Atlasītais tīkla profils nav pieejams šīs vietas valstij un reģionam.",
       "grid_profile_gateway_required": "Tīkla profila lietošanai nepieciešams mākoņa Activation Gateway ieraksts.",
-      "grid_profile_apply_failed": "Tīkla profila lietošana neizdevās."
+      "grid_profile_apply_failed": "Tīkla profila lietošana neizdevās.",
+      "grid_mode_invalid": "Atlasiet On Grid vai Off Grid.",
+      "grid_mode_already_active": "Vietne jau atrodas atlasītajā režģa režīmā.",
+      "grid_mode_confirm_required": "Pirms turpināt, apstipriniet režģa režīma maiņu.",
+      "grid_control_unavailable": "Režģa vadība šai vietnei nav pieejama.",
+      "grid_control_blocked": "Tīkla vadība pašlaik ir bloķēta.",
+      "grid_otp_required": "Ievadiet vienreizējo kodu.",
+      "grid_otp_invalid_format": "Vienreizējam kodam jābūt precīzi četriem cipariem.",
+      "grid_otp_invalid": "Vienreizējais kods nav derīgs vai beidzies derīguma termiņš.",
+      "grid_envoy_serial_missing": "Šīs vietnes vārteju nevarēja noteikt."
     },
     "abort": {
       "migration_no_envoy_sources": "Migrācijai nav pieejami Enphase Envoy enerģijas sensori.",
@@ -786,7 +804,9 @@
       "migration_partial_failure": "Migrācija apstājās pēc daļējas pabeigšanas.\n\nPabeigtās sasaistes:\n{completed_mappings}\n\nKļūda, apstrādājot `{failed_entity_id}`: {failure_reason}\n\nJa rezultāts nav pieņemams, atjaunojiet no dublējuma.",
       "grid_profile_unavailable": "Tīkla profila vadība nav pieejama.",
       "grid_profile_installer_required": "Tīkla profila vadībai nepieciešama uzstādītāja piekļuve Enphase Activation.",
-      "grid_profile_no_regions": "Šīs vietas valstij nav pieejami tīkla profila reģioni."
+      "grid_profile_no_regions": "Šīs vietas valstij nav pieejami tīkla profila reģioni.",
+      "grid_mode_unavailable": "Režģa režīma vadība šai vietnei nav pieejama.",
+      "grid_mode_blocked": "Režģa režīma vadība pašlaik ir bloķēta: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migrācija pabeigta. Enphase Energy tagad izmanto atlasītos avota entītiju ID. Pēc nākamās atjaunināšanas pārbaudiet Energy informācijas paneli un Developer Tools > Statistics.",
@@ -808,6 +828,23 @@
         "available": "Pieejams",
         "unavailable": "Nav pieejams",
         "accepted": "Pieņemts"
+      }
+    },
+    "grid_mode": {
+      "options": {
+        "on_grid": "Uz režģa",
+        "off_grid": "Izslēgts no režģa",
+        "unknown": "Nezināms"
+      }
+    },
+    "grid_control_block_reason": {
+      "options": {
+        "disable_grid_control": "Tīkla vadība objektam ir atspējota.",
+        "active_download": "Notiek sistēmas lejupielāde.",
+        "sunlight_backup_system_check": "Sunlight Backup sistēmas pārbaude ir aktīva.",
+        "grid_outage_check": "Elektrotīkla pārtraukuma pārbaude ir aktīva.",
+        "pending": "Tīkla režīma maiņa jau gaida izpildi.",
+        "unknown": "Ir aktīvs nezināms bloķēšanas nosacījums."
       }
     }
   },
@@ -1380,14 +1417,6 @@
           "none": "Nav",
           "pending": "Gaida",
           "active": "Aktīvs"
-        }
-      },
-      "grid_control_status": {
-        "name": "Tīkla vadības statuss",
-        "state": {
-          "ready": "Gatavs",
-          "blocked": "Bloķēts",
-          "pending": "Gaida"
         }
       },
       "grid_mode": {
@@ -2323,9 +2352,6 @@
       "cancel_pending_profile_change": {
         "name": "Atcelt gaidošo profila maiņu"
       },
-      "request_grid_toggle_otp": {
-        "name": "Pieprasīt režģa pārslēgšanu OTP"
-      },
       "storm_alert_opt_out": {
         "name": "Atteikties no vētras brīdinājuma"
       },
@@ -2648,26 +2674,16 @@
     "request_grid_toggle_otp": {
       "name": "Pieprasīt režģa pārslēgšanu OTP",
       "description": "Pirms vietnes režģa režīma maiņas nosūtiet vienreizējo kodu.",
-      "sections": {
-        "advanced": {
-          "name": "Papildu opcijas"
-        }
-      },
       "fields": {
-        "site_id": {
-          "name": "Vietnes ID",
-          "description": "Izvēles vietnes identifikators; tiek noteikts automātiski, kad izvēlēta vietnes ierīce."
+        "config_entry_id": {
+          "name": "Enphase konfigurācijas ievade",
+          "description": "Atlasiet Enphase vietni, kurai jāsaņem vienreizējais kods."
         }
       }
     },
     "set_grid_mode": {
       "name": "Iestatiet režģa režīmu",
       "description": "Mainiet vietnes režģa režīmu pēc vienreizējā koda apstiprināšanas.",
-      "sections": {
-        "advanced": {
-          "name": "Papildu opcijas"
-        }
-      },
       "fields": {
         "mode": {
           "name": "Režģa režīms",
@@ -2677,9 +2693,9 @@
           "name": "Vienreizējs kods",
           "description": "Ievadiet 4 ciparu OTP, kas nosūtīts uz jūsu reģistrēto e-pastu un tālruni."
         },
-        "site_id": {
-          "name": "Vietnes ID",
-          "description": "Izvēles vietnes identifikators; tiek noteikts automātiski, kad izvēlēta vietnes ierīce."
+        "config_entry_id": {
+          "name": "Enphase konfigurācijas ievade",
+          "description": "Atlasiet Enphase vietni, kuras režģa režīms ir jāmaina."
         }
       }
     },
