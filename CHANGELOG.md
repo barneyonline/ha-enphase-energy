@@ -5,15 +5,32 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v4.0.0 - 2026-07-17
+
+### 🚧 Breaking changes
 - Replaced the optional Grid Control Status sensor and Request Grid Toggle OTP
   button with a guided workflow under Configure > Advanced > Grid Mode. Existing
   control entities and the retired enable option are removed automatically; the
-  read-only Grid Mode sensor remains available.
+  read-only Grid Mode sensor remains available. (#789)
 - Changed `request_grid_toggle_otp` and `set_grid_mode` to admin-only actions that
   require an explicit Enphase config entry. Entity, device, and site ID routing is
   no longer accepted; the bundled Grid Mode OTP blueprints now use config-entry
   selection, and the script blueprint exposes separate OTP-request and mode-apply
-  operations.
+  operations. (#789)
 
 ### ✨ New features
 - None
@@ -25,9 +42,10 @@ All notable changes to this project will be documented in this file.
 - Made Grid Mode eligibility checks on demand so the control endpoint is refreshed
   only while using the workflow or advanced actions. Successful changes are shown
   as accepted while the Grid Mode sensor continues observing the physical result.
+  (#789)
 
 ### 🔄 Other changes
-- None
+- Bumped the integration manifest version to `4.0.0`.
 
 ## v4.0.0b2 - 2026-07-15
 
