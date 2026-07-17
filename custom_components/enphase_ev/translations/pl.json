@@ -95,7 +95,7 @@
       "message": "Sterowanie siecią jest niedostępne dla tej witryny."
     },
     "grid_control_blocked": {
-      "message": "Sterowanie siecią jest obecnie zablokowane: {reasons}."
+      "message": "Sterowanie siecią jest obecnie zablokowane."
     },
     "grid_mode_invalid": {
       "message": "Tryb sieci musi być on_grid lub off_grid."
@@ -724,12 +724,9 @@
       },
       "grid_toggle": {
         "title": "Tryb sieci",
-        "description": "Monitorowanie trybu sieci pozostaje zawsze dostępne. Ręczne przełączanie ma znaczenie dla bezpieczeństwa, dlatego dodatkowe encje i akcje wymagają jawnego włączenia.",
+        "description": "Bieżący tryb sieci: **{current_mode}**.\n\nZmiana trybu sieci ma wpływ na bezpieczeństwo. Wybierz żądany tryb, aby wysłać jednorazowy kod na zarejestrowany adres e-mail i telefon.",
         "data": {
-          "grid_toggle_enabled": "Włącz sterowanie trybem sieci"
-        },
-        "data_description": {
-          "grid_toggle_enabled": "Czujnik Tryb sieci pozostaje dostępny. Włączenie tworzy encje Stan sterowania siecią i Zażądaj OTP oraz zezwala na akcje usług."
+          "mode": "Żądany tryb siatki"
         }
       },
       "grid_profile": {
@@ -761,6 +758,18 @@
       "grid_profile_applied": {
         "title": "Aktualizacja profilu sieci zaakceptowana",
         "description": "Enphase zaakceptował aktualizację profilu sieci dla **{selected_profile}**.\n\nŻądany identyfikator profilu: **{requested_profile_id}**\n\nStatus chmury: **{cloud_apply_status}**\n\nNowy profil może pojawić się jako bieżący dopiero po maksymalnie **5 minutach**, gdy chmura i Gateway zakończą przetwarzanie. Czujnik Grid Profile zaktualizuje się, gdy rekord Activation zgłosi nowy bieżący profil."
+      },
+      "grid_toggle_otp": {
+        "title": "Potwierdź zmianę trybu siatki",
+        "description": "Bieżący tryb sieci: **{current_mode}**.\n\nŻądany tryb siatki: **{target_mode}**.\n\nWprowadź 4-cyfrowy kod jednorazowy i potwierdź zmianę ze względów bezpieczeństwa.",
+        "data": {
+          "otp": "Kod jednorazowy",
+          "confirm": "Potwierdź zmianę trybu siatki"
+        }
+      },
+      "grid_toggle_applied": {
+        "title": "Zmiana trybu siatki została zaakceptowana",
+        "description": "Enphase zaakceptował żądanie zmiany trybu sieci na **{target_mode}**.\n\nPrzekaźnik fizyczny może wciąż się zmieniać. Użyj czujnika trybu siatki, aby obserwować wynikowy stan."
       }
     },
     "error": {
@@ -778,7 +787,16 @@
       "grid_profile_region_invalid": "Wybrany region profilu sieci jest niedostępny.",
       "grid_profile_profile_invalid": "Wybrany profil sieci jest niedostępny dla kraju i regionu tej instalacji.",
       "grid_profile_gateway_required": "Zastosowanie profilu sieci wymaga rekordu Gateway z chmurowej usługi Activation.",
-      "grid_profile_apply_failed": "Nie udało się zastosować profilu sieci."
+      "grid_profile_apply_failed": "Nie udało się zastosować profilu sieci.",
+      "grid_mode_invalid": "Wybierz opcję Na siatce lub Poza siecią.",
+      "grid_mode_already_active": "Witryna jest już w wybranym trybie siatki.",
+      "grid_mode_confirm_required": "Przed kontynuowaniem potwierdź zmianę trybu siatki.",
+      "grid_control_unavailable": "Sterowanie siecią jest niedostępne dla tej witryny.",
+      "grid_control_blocked": "Sterowanie siecią jest obecnie zablokowane.",
+      "grid_otp_required": "Wprowadź kod jednorazowy.",
+      "grid_otp_invalid_format": "Kod jednorazowy musi zawierać dokładnie cztery cyfry.",
+      "grid_otp_invalid": "Kod jednorazowy jest nieprawidłowy lub wygasł.",
+      "grid_envoy_serial_missing": "Nie można określić bramy dla tej witryny."
     },
     "abort": {
       "migration_no_envoy_sources": "Brak dostępnych sensorów energii Enphase Envoy do migracji.",
@@ -786,7 +804,9 @@
       "migration_partial_failure": "Migracja zatrzymała się po częściowym zakończeniu.\n\nZakończone mapowania:\n{completed_mappings}\n\nBłąd podczas przetwarzania `{failed_entity_id}`: {failure_reason}\n\nPrzywróć kopię zapasową, jeśli wynik jest nieakceptowalny.",
       "grid_profile_unavailable": "Sterowanie profilem sieci jest niedostępne.",
       "grid_profile_installer_required": "Sterowanie profilem sieci wymaga dostępu instalatora do Enphase Activation.",
-      "grid_profile_no_regions": "Dla kraju tej instalacji nie ma dostępnych regionów profilu sieci."
+      "grid_profile_no_regions": "Dla kraju tej instalacji nie ma dostępnych regionów profilu sieci.",
+      "grid_mode_unavailable": "Sterowanie trybem siatki jest niedostępne dla tej witryny.",
+      "grid_mode_blocked": "Kontrola trybu siatki jest obecnie zablokowana: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migracja zakończona. Enphase Energy przejęło teraz wybrane identyfikatory encji źródłowych. Sprawdź panel Energy i Developer Tools > Statistics po następnym odświeżeniu.",
@@ -808,6 +828,23 @@
         "available": "Dostępny",
         "unavailable": "Niedostępny",
         "accepted": "Zaakceptowano"
+      }
+    },
+    "grid_mode": {
+      "options": {
+        "on_grid": "Na siatce",
+        "off_grid": "Poza siecią",
+        "unknown": "Nieznany"
+      }
+    },
+    "grid_control_block_reason": {
+      "options": {
+        "disable_grid_control": "Sterowanie siecią jest wyłączone dla lokalizacji.",
+        "active_download": "Trwa pobieranie systemowe.",
+        "sunlight_backup_system_check": "Kontrola systemu Sunlight Backup jest aktywna.",
+        "grid_outage_check": "Kontrola awarii sieci jest aktywna.",
+        "pending": "Zmiana trybu sieci już oczekuje.",
+        "unknown": "Aktywny jest nieznany warunek blokujący."
       }
     }
   },
@@ -1380,14 +1417,6 @@
           "none": "Brak",
           "pending": "Oczekujące",
           "active": "Aktywny"
-        }
-      },
-      "grid_control_status": {
-        "name": "Stan sterowania siecią",
-        "state": {
-          "ready": "Gotowe",
-          "blocked": "Zablokowane",
-          "pending": "Oczekujące"
         }
       },
       "grid_mode": {
@@ -2323,9 +2352,6 @@
       "cancel_pending_profile_change": {
         "name": "Anuluj oczekującą zmianę profilu"
       },
-      "request_grid_toggle_otp": {
-        "name": "Żądanie przełączenia siatki OTP"
-      },
       "storm_alert_opt_out": {
         "name": "Zrezygnuj z alertu burzowego"
       },
@@ -2648,26 +2674,16 @@
     "request_grid_toggle_otp": {
       "name": "Żądanie przełączenia siatki OTP",
       "description": "Wyślij wymagany kod jednorazowy przed zmianą trybu siatki witryny.",
-      "sections": {
-        "advanced": {
-          "name": "Opcje zaawansowane"
-        }
-      },
       "fields": {
-        "site_id": {
-          "name": "ID lokalizacji",
-          "description": "Opcjonalny identyfikator lokalizacji; wykrywany automatycznie po wybraniu urządzenia lokalizacji."
+        "config_entry_id": {
+          "name": "Wpis konfiguracji Enphase",
+          "description": "Wybierz witrynę Enphase, która powinna otrzymać jednorazowy kod."
         }
       }
     },
     "set_grid_mode": {
       "name": "Ustaw tryb siatki",
       "description": "Zmień tryb siatki witryny po sprawdzeniu poprawności kodu jednorazowego.",
-      "sections": {
-        "advanced": {
-          "name": "Opcje zaawansowane"
-        }
-      },
       "fields": {
         "mode": {
           "name": "Tryb siatki",
@@ -2677,9 +2693,9 @@
           "name": "Kod jednorazowy",
           "description": "Wprowadź 4-cyfrowy kod jednorazowy wysłany na zarejestrowany adres e-mail i telefon."
         },
-        "site_id": {
-          "name": "ID lokalizacji",
-          "description": "Opcjonalny identyfikator lokalizacji; wykrywany automatycznie po wybraniu urządzenia lokalizacji."
+        "config_entry_id": {
+          "name": "Wpis konfiguracji Enphase",
+          "description": "Wybierz lokalizację Enphase, której tryb sieci powinien się zmienić."
         }
       }
     },

@@ -20,46 +20,41 @@ def test_grid_control_supported_is_unknown_before_first_payload(
 
 
 @pytest.mark.asyncio
-async def test_grid_toggle_disabled_keeps_mode_reads_and_blocks_actions(
+async def test_grid_control_eligibility_is_lazy_while_mode_reads_continue(
     coordinator_factory,
 ) -> None:
-    from homeassistant.exceptions import ServiceValidationError
-
     coord = coordinator_factory()
-    coord._grid_toggle_enabled = False  # noqa: SLF001
-    coord.client.grid_control_check = AsyncMock()
-    coord.client.site_livestream_payload = AsyncMock()
-    coord.client.off_grid_due_to_grid_outage = AsyncMock()
-    coord._grid_control_supported = True  # noqa: SLF001
-    coord._grid_control_user_initiated_toggle = True  # noqa: SLF001
+    coord.client.grid_control_check = AsyncMock(
+        return_value={
+            "disableGridControl": False,
+            "activeDownload": False,
+            "sunlightBackupSystemCheck": False,
+            "gridOutageCheck": False,
+            "userInitiatedGridToggle": False,
+        }
+    )
+    coord.client.site_livestream_payload = AsyncMock(return_value={})
+    coord.client.off_grid_due_to_grid_outage = AsyncMock(return_value={})
 
-    assert coord.grid_toggle_enabled is False
-    assert coord.grid_toggle_pending is False
-    assert coord.grid_toggle_allowed is None
-    assert coord.grid_toggle_blocked_reasons == []
-    assert coord.battery_runtime.grid_control_check_refresh_due(force=True) is False
-    assert coord.battery_runtime.grid_mode_status_refresh_due(force=True) is True
-    assert coord.battery_runtime.grid_outage_context_refresh_due(force=True) is True
-
-    await coord.battery_runtime.async_refresh_grid_control_check(force=True)
-    await coord.battery_runtime.async_refresh_grid_mode_status(force=True)
-    await coord.battery_runtime.async_refresh_grid_outage_context(force=True)
-
-    coord.client.grid_control_check.assert_not_awaited()
-    coord.client.site_livestream_payload.assert_awaited_once()
-    coord.client.off_grid_due_to_grid_outage.assert_awaited_once()
-    with pytest.raises(ServiceValidationError):
-        await coord.async_request_grid_toggle_otp()
-
-    coord._grid_toggle_enabled = True  # noqa: SLF001
-    coord.client.grid_control_check = None
-    coord.client.site_livestream_payload = None
-    coord.client.off_grid_due_to_grid_outage = None
-    coord._grid_mode_status_supported = True  # noqa: SLF001
-    coord._grid_outage_context_supported = True  # noqa: SLF001
+    assert coord.battery_runtime.grid_control_check_refresh_due() is False
     assert coord.battery_runtime.grid_control_check_refresh_due(force=True) is True
     assert coord.battery_runtime.grid_mode_status_refresh_due(force=True) is True
     assert coord.battery_runtime.grid_outage_context_refresh_due(force=True) is True
+
+    assert await coord.battery_runtime.async_refresh_grid_control_check() is False
+    coord.client.grid_control_check.assert_not_awaited()
+
+    assert (
+        await coord.battery_runtime.async_refresh_grid_control_check(force=True) is True
+    )
+    await coord.battery_runtime.async_refresh_grid_mode_status(force=True)
+    await coord.battery_runtime.async_refresh_grid_outage_context(force=True)
+
+    coord.client.grid_control_check.assert_awaited_once()
+    coord.client.site_livestream_payload.assert_awaited_once()
+    coord.client.off_grid_due_to_grid_outage.assert_awaited_once()
+    assert coord.grid_control_supported is True
+    assert coord.grid_toggle_allowed is True
 
 
 def test_parse_grid_control_check_payload_maps_flags_and_allows(
@@ -195,8 +190,9 @@ async def test_refresh_grid_control_check_caches_and_redacts(
         }
     )
 
-    await coord.battery_runtime.async_refresh_grid_control_check(force=True)
+    refreshed = await coord.battery_runtime.async_refresh_grid_control_check(force=True)
 
+    assert refreshed is True
     assert coord.grid_control_supported is True
     assert coord._grid_control_check_payload is not None  # noqa: SLF001
     assert coord._grid_control_check_payload["token"] == "[redacted]"  # noqa: SLF001
@@ -581,8 +577,9 @@ async def test_refresh_grid_control_check_failure_keeps_recent_state(
     coord._grid_control_check_last_success_mono = time.monotonic()  # noqa: SLF001
     coord.client.grid_control_check = AsyncMock(side_effect=RuntimeError("boom"))
 
-    await coord.battery_runtime.async_refresh_grid_control_check(force=True)
+    refreshed = await coord.battery_runtime.async_refresh_grid_control_check(force=True)
 
+    assert refreshed is False
     assert coord.grid_control_supported is True
     assert coord.grid_toggle_allowed is True
     assert coord._grid_control_check_failures == 1  # noqa: SLF001
@@ -638,7 +635,7 @@ def test_collect_site_metrics_includes_grid_control_fields(coordinator_factory) 
 
     metrics = coord.collect_site_metrics()
 
-    assert metrics["grid_toggle_enabled"] is True
+    assert "grid_toggle_enabled" not in metrics
     assert metrics["pricing_edits_enabled"] is True
     assert metrics["grid_control_supported"] is True
     assert metrics["grid_toggle_allowed"] is False
@@ -986,7 +983,7 @@ async def test_async_request_grid_toggle_otp_success(coordinator_factory) -> Non
     coord.client.request_grid_toggle_otp = AsyncMock(
         return_value={"success": "email sent successfully"}
     )
-    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock()  # type: ignore[method-assign]  # noqa: SLF001
+    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock(return_value=True)  # type: ignore[method-assign]  # noqa: SLF001
 
     await coord.battery_runtime.async_request_grid_toggle_otp()
 
@@ -1004,7 +1001,7 @@ async def test_async_request_grid_toggle_otp_blocked_or_unsupported(
 
     coord = coordinator_factory()
     coord._grid_control_supported = None  # noqa: SLF001
-    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock()  # type: ignore[method-assign]  # noqa: SLF001
+    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock(return_value=True)  # type: ignore[method-assign]  # noqa: SLF001
     with pytest.raises(ServiceValidationError):
         await coord.async_request_grid_toggle_otp()
 
@@ -1018,9 +1015,46 @@ async def test_async_request_grid_toggle_otp_blocked_or_unsupported(
             "userInitiatedGridToggle": False,
         }
     )
-    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock()  # type: ignore[method-assign]  # noqa: SLF001
-    with pytest.raises(ServiceValidationError):
+    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock(return_value=True)  # type: ignore[method-assign]  # noqa: SLF001
+    with pytest.raises(ServiceValidationError) as blocked:
         await coord.battery_runtime.async_request_grid_toggle_otp()
+    assert blocked.value.translation_key == "grid_control_blocked"
+    assert not blocked.value.translation_placeholders
+
+
+@pytest.mark.asyncio
+async def test_grid_toggle_actions_reject_stale_eligibility(
+    coordinator_factory,
+) -> None:
+    from custom_components.enphase_ev.coordinator import ServiceValidationError
+
+    coord = coordinator_factory()
+    coord.battery_runtime.parse_grid_control_check_payload(
+        {
+            "disableGridControl": False,
+            "activeDownload": False,
+            "sunlightBackupSystemCheck": False,
+            "gridOutageCheck": False,
+            "userInitiatedGridToggle": False,
+        }
+    )
+    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock(  # type: ignore[method-assign]  # noqa: SLF001
+        return_value=False
+    )
+    coord.client.request_grid_toggle_otp = AsyncMock()
+    coord.client.validate_grid_toggle_otp = AsyncMock(return_value=True)
+    coord.client.set_grid_state = AsyncMock()
+
+    with pytest.raises(ServiceValidationError) as otp_error:
+        await coord.battery_runtime.async_request_grid_toggle_otp()
+    assert otp_error.value.translation_key == "grid_control_unavailable"
+    coord.client.request_grid_toggle_otp.assert_not_awaited()
+
+    with pytest.raises(ServiceValidationError) as mode_error:
+        await coord.battery_runtime.async_set_grid_mode("off_grid", "1234")
+    assert mode_error.value.translation_key == "grid_control_unavailable"
+    coord.client.validate_grid_toggle_otp.assert_not_awaited()
+    coord.client.set_grid_state.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -1037,7 +1071,7 @@ async def test_async_request_grid_toggle_otp_client_paths(coordinator_factory) -
             "userInitiatedGridToggle": False,
         }
     )
-    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock()  # type: ignore[method-assign]  # noqa: SLF001
+    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock(return_value=True)  # type: ignore[method-assign]  # noqa: SLF001
 
     coord.client.request_grid_toggle_otp = None
     with pytest.raises(ServiceValidationError):
@@ -1073,7 +1107,7 @@ async def test_async_set_grid_mode_success_logs_and_refreshes(
     coord.client.validate_grid_toggle_otp = AsyncMock(return_value=True)
     coord.client.set_grid_state = AsyncMock(return_value={"request_id": "x"})
     coord.client.log_grid_change = AsyncMock(return_value={"status": "ok"})
-    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock()  # type: ignore[method-assign]  # noqa: SLF001
+    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock(return_value=True)  # type: ignore[method-assign]  # noqa: SLF001
     coord.async_request_refresh = AsyncMock()
 
     await coord.battery_runtime.async_set_grid_mode("off_grid", "1234")
@@ -1112,7 +1146,7 @@ async def test_async_set_grid_mode_best_effort_log_failure(coordinator_factory) 
     coord.client.validate_grid_toggle_otp = AsyncMock(return_value=True)
     coord.client.set_grid_state = AsyncMock(return_value={"request_id": "x"})
     coord.client.log_grid_change = AsyncMock(side_effect=RuntimeError("nope"))
-    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock()  # type: ignore[method-assign]  # noqa: SLF001
+    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock(return_value=True)  # type: ignore[method-assign]  # noqa: SLF001
     coord.async_request_refresh = AsyncMock()
 
     await coord.battery_runtime.async_set_grid_mode("on_grid", "1234")
@@ -1147,7 +1181,7 @@ async def test_async_set_grid_mode_setter_failure_raises_validation(
     coord._devices_inventory_ready = True  # noqa: SLF001
     coord.client.validate_grid_toggle_otp = AsyncMock(return_value=True)
     coord.client.set_grid_state = AsyncMock(side_effect=RuntimeError("setter down"))
-    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock()  # type: ignore[method-assign]  # noqa: SLF001
+    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock(return_value=True)  # type: ignore[method-assign]  # noqa: SLF001
     coord.async_request_refresh = AsyncMock()
 
     with pytest.raises(ServiceValidationError):
@@ -1176,7 +1210,7 @@ async def test_async_set_grid_mode_validation_paths(coordinator_factory) -> None
     coord.client.validate_grid_toggle_otp = AsyncMock(return_value=True)
     coord.client.set_grid_state = AsyncMock(return_value={"request_id": "x"})
     coord.client.log_grid_change = AsyncMock(return_value={"status": "ok"})
-    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock()  # type: ignore[method-assign]  # noqa: SLF001
+    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock(return_value=True)  # type: ignore[method-assign]  # noqa: SLF001
     coord.async_request_refresh = AsyncMock()
 
     with pytest.raises(ServiceValidationError):
@@ -1235,7 +1269,7 @@ async def test_async_set_grid_mode_additional_error_paths(coordinator_factory) -
     }
     coord._type_device_order = ["envoy"]  # noqa: SLF001
     coord._devices_inventory_ready = True  # noqa: SLF001
-    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock()  # type: ignore[method-assign]  # noqa: SLF001
+    coord.battery_runtime.async_refresh_grid_control_check = AsyncMock(return_value=True)  # type: ignore[method-assign]  # noqa: SLF001
 
     class _BadStr:
         def __str__(self):

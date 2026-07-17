@@ -95,7 +95,7 @@
       "message": "Il controllo della griglia non è disponibile per questo sito."
     },
     "grid_control_blocked": {
-      "message": "Il controllo della griglia è attualmente bloccato: {reasons}."
+      "message": "Il controllo della rete è attualmente bloccato."
     },
     "grid_mode_invalid": {
       "message": "La modalità griglia deve essere on_grid o off_grid."
@@ -724,12 +724,9 @@
       },
       "grid_toggle": {
         "title": "Modalità rete",
-        "description": "Il monitoraggio della modalità rete rimane sempre disponibile. La commutazione manuale è sensibile per la sicurezza, quindi le entità e le azioni aggiuntive richiedono un’abilitazione esplicita.",
+        "description": "Modalità griglia corrente: **{current_mode}**.\n\nLa modifica della modalità griglia è sensibile alla sicurezza. Seleziona la modalità richiesta per inviare un codice monouso all'e-mail e al telefono registrati.",
         "data": {
-          "grid_toggle_enabled": "Abilita i controlli della modalità rete"
-        },
-        "data_description": {
-          "grid_toggle_enabled": "Il sensore Modalità rete rimane disponibile. L’abilitazione crea Stato controllo rete e Richiedi OTP e consente le azioni di servizio."
+          "mode": "Modalità griglia richiesta"
         }
       },
       "grid_profile": {
@@ -761,6 +758,18 @@
       "grid_profile_applied": {
         "title": "Aggiornamento profilo rete accettato",
         "description": "Enphase ha accettato l’aggiornamento del profilo rete per **{selected_profile}**.\n\nID profilo richiesto: **{requested_profile_id}**\n\nStato cloud: **{cloud_apply_status}**\n\nIl nuovo profilo può impiegare fino a **5 minuti** per comparire come corrente mentre il cloud e il Gateway completano l’elaborazione. Il sensore Grid Profile si aggiornerà quando il record Activation segnalerà il nuovo profilo corrente."
+      },
+      "grid_toggle_otp": {
+        "title": "Conferma la modifica della modalità di rete",
+        "description": "Modalità griglia corrente: **{current_mode}**.\n\nModalità griglia richiesta: **{target_mode}**.\n\nImmettere il codice monouso a 4 cifre e confermare la modifica sensibile alla sicurezza.",
+        "data": {
+          "otp": "Codice monouso",
+          "confirm": "Conferma la modifica della modalità griglia"
+        }
+      },
+      "grid_toggle_applied": {
+        "title": "Modifica della modalità griglia accettata",
+        "description": "Enphase ha accettato la richiesta di modificare la modalità griglia in **{target_mode}**.\n\nIl relè fisico potrebbe ancora essere in fase di modifica. Utilizzare il sensore Grid Mode per osservare lo stato risultante."
       }
     },
     "error": {
@@ -778,7 +787,16 @@
       "grid_profile_region_invalid": "La regione del profilo di rete selezionata non è disponibile.",
       "grid_profile_profile_invalid": "Il profilo di rete selezionato non è disponibile per il paese e la regione di questo sito.",
       "grid_profile_gateway_required": "L’applicazione del profilo di rete richiede un record Gateway Activation nel cloud.",
-      "grid_profile_apply_failed": "Applicazione del profilo di rete non riuscita."
+      "grid_profile_apply_failed": "Applicazione del profilo di rete non riuscita.",
+      "grid_mode_invalid": "Selezionare Sulla griglia o Fuori dalla griglia.",
+      "grid_mode_already_active": "Il sito è già nella modalità Griglia selezionata.",
+      "grid_mode_confirm_required": "Confermare la modifica della modalità griglia prima di continuare.",
+      "grid_control_unavailable": "Il controllo della griglia non è disponibile per questo sito.",
+      "grid_control_blocked": "Il controllo della rete è attualmente bloccato.",
+      "grid_otp_required": "Inserisci il codice monouso.",
+      "grid_otp_invalid_format": "Il codice monouso deve contenere esattamente quattro cifre.",
+      "grid_otp_invalid": "Il codice monouso non è valido o è scaduto.",
+      "grid_envoy_serial_missing": "Impossibile determinare il gateway per questo sito."
     },
     "abort": {
       "migration_no_envoy_sources": "Non sono disponibili sensori energia Enphase Envoy da migrare.",
@@ -786,7 +804,9 @@
       "migration_partial_failure": "La migrazione si è fermata dopo un completamento parziale.\n\nAssociazioni completate:\n{completed_mappings}\n\nErrore durante l'elaborazione di `{failed_entity_id}`: {failure_reason}\n\nRipristina dal backup se il risultato non è accettabile.",
       "grid_profile_unavailable": "Il controllo del profilo di rete non è disponibile.",
       "grid_profile_installer_required": "Il controllo del profilo di rete richiede accesso installatore a Enphase Activation.",
-      "grid_profile_no_regions": "Non sono disponibili regioni di profilo di rete per il paese di questo sito."
+      "grid_profile_no_regions": "Non sono disponibili regioni di profilo di rete per il paese di questo sito.",
+      "grid_mode_unavailable": "Il controllo della modalità griglia non è disponibile per questo sito.",
+      "grid_mode_blocked": "Il controllo della modalità griglia è attualmente bloccato: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migrazione completata. Enphase Energy ora possiede gli ID entità sorgente selezionati. Verifica la dashboard Energy e Developer Tools > Statistics dopo il prossimo aggiornamento.",
@@ -808,6 +828,23 @@
         "available": "Disponibile",
         "unavailable": "Non disponibile",
         "accepted": "Accettato"
+      }
+    },
+    "grid_mode": {
+      "options": {
+        "on_grid": "Sulla griglia",
+        "off_grid": "Fuori dalla griglia",
+        "unknown": "Sconosciuto"
+      }
+    },
+    "grid_control_block_reason": {
+      "options": {
+        "disable_grid_control": "Il controllo della rete è disattivato per il sito.",
+        "active_download": "È attivo un download di sistema.",
+        "sunlight_backup_system_check": "Il controllo del sistema Sunlight Backup è attivo.",
+        "grid_outage_check": "Il controllo dell'interruzione di rete è attivo.",
+        "pending": "È già in sospeso una modifica della modalità di rete.",
+        "unknown": "È attiva una condizione di blocco sconosciuta."
       }
     }
   },
@@ -1380,14 +1417,6 @@
           "none": "Nessuno",
           "pending": "In sospeso",
           "active": "Attivo"
-        }
-      },
-      "grid_control_status": {
-        "name": "Stato controllo rete",
-        "state": {
-          "ready": "Pronto",
-          "blocked": "Bloccato",
-          "pending": "In sospeso"
         }
       },
       "grid_mode": {
@@ -2323,9 +2352,6 @@
       "cancel_pending_profile_change": {
         "name": "Annulla la modifica del profilo in sospeso"
       },
-      "request_grid_toggle_otp": {
-        "name": "Richiedi griglia Attiva/disattiva OTP"
-      },
       "storm_alert_opt_out": {
         "name": "Disattiva avviso tempesta"
       },
@@ -2648,26 +2674,16 @@
     "request_grid_toggle_otp": {
       "name": "Richiedi griglia Attiva/disattiva OTP",
       "description": "Invia il codice monouso richiesto prima di modificare la modalità griglia del sito.",
-      "sections": {
-        "advanced": {
-          "name": "Opzioni avanzate"
-        }
-      },
       "fields": {
-        "site_id": {
-          "name": "ID sito",
-          "description": "Identificatore sito facoltativo; rilevato automaticamente quando è selezionato un dispositivo sito."
+        "config_entry_id": {
+          "name": "Voce di configurazione Enphase",
+          "description": "Seleziona il sito Enphase che dovrà ricevere il codice monouso."
         }
       }
     },
     "set_grid_mode": {
       "name": "Imposta la modalità griglia",
       "description": "Modificare la modalità griglia del sito dopo aver convalidato il codice monouso.",
-      "sections": {
-        "advanced": {
-          "name": "Opzioni avanzate"
-        }
-      },
       "fields": {
         "mode": {
           "name": "Modalità griglia",
@@ -2677,9 +2693,9 @@
           "name": "Codice monouso",
           "description": "Inserisci l'OTP di 4 cifre inviato all'e-mail e al telefono registrati."
         },
-        "site_id": {
-          "name": "ID sito",
-          "description": "Identificatore sito facoltativo; rilevato automaticamente quando è selezionato un dispositivo sito."
+        "config_entry_id": {
+          "name": "Voce di configurazione Enphase",
+          "description": "Selezionare il sito Enphase di cui modificare la modalità griglia."
         }
       }
     },

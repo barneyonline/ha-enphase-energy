@@ -9,8 +9,9 @@ import voluptuous as vol
 import yaml
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.auth.const import GROUP_ID_ADMIN, GROUP_ID_USER
+from homeassistant.core import Context, HomeAssistant
+from homeassistant.exceptions import ServiceValidationError, Unauthorized
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
@@ -27,6 +28,61 @@ from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from custom_components.enphase_ev.services import async_setup_services
 
 SERVICES_YAML = Path(__file__).parents[3] / "custom_components/enphase_ev/services.yaml"
+GRID_MODE_BLUEPRINT = (
+    Path(__file__).parents[3]
+    / "blueprints"
+    / "script"
+    / "enphase_ev"
+    / "grid_mode_otp.yaml"
+)
+GRID_MODE_AUTOMATION_BLUEPRINT = (
+    Path(__file__).parents[3]
+    / "blueprints"
+    / "automation"
+    / "enphase_ev"
+    / "grid_mode_otp_helper.yaml"
+)
+
+
+class _BlueprintLoader(yaml.SafeLoader):
+    """Load blueprint input tags as their input names for structural tests."""
+
+
+_BlueprintLoader.add_constructor(
+    "!input", lambda loader, node: loader.construct_scalar(node)
+)
+
+
+@pytest.mark.asyncio
+async def test_grid_mode_services_require_admin(hass: HomeAssistant) -> None:
+    async_setup_services(hass)
+    await hass.auth.async_create_user("Owner", group_ids=[GROUP_ID_ADMIN])
+    user = await hass.auth.async_create_user(
+        "Grid Mode user", group_ids=[GROUP_ID_USER]
+    )
+    assert not user.is_admin
+    context = Context(user_id=user.id)
+
+    with pytest.raises(Unauthorized):
+        await hass.services.async_call(
+            DOMAIN,
+            "request_grid_toggle_otp",
+            {"config_entry_id": "entry-id"},
+            blocking=True,
+            context=context,
+        )
+    with pytest.raises(Unauthorized):
+        await hass.services.async_call(
+            DOMAIN,
+            "set_grid_mode",
+            {
+                "config_entry_id": "entry-id",
+                "mode": "off_grid",
+                "otp": "1234",
+            },
+            blocking=True,
+            context=context,
+        )
 
 
 def _register_service_handlers(
@@ -34,7 +90,7 @@ def _register_service_handlers(
 ) -> dict[tuple[str, str], object]:
     registered: dict[tuple[str, str], object] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(self, domain, service, handler, schema=None, *args, **kwargs):
         registered[(domain, service)] = handler
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
@@ -47,7 +103,7 @@ def _register_service_metadata(
 ) -> dict[tuple[str, str], dict[str, object]]:
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(self, domain, service, handler, schema=None, *args, **kwargs):
         registered[(domain, service)] = {
             "handler": handler,
             "schema": schema,
@@ -131,6 +187,56 @@ def test_trigger_message_service_options_match_allowlist() -> None:
 
     assert set(options) == OCPP_TRIGGER_MESSAGES
     assert OCPP_TRIGGER_MESSAGES_REQUIRING_CONFIRMATION < OCPP_TRIGGER_MESSAGES
+
+
+def test_grid_mode_blueprint_requests_otp_and_applies_mode() -> None:
+    """The script blueprint must support both halves of the OTP workflow."""
+
+    blueprint = yaml.load(GRID_MODE_BLUEPRINT.read_text(), Loader=_BlueprintLoader)
+    operation = blueprint["fields"]["operation"]
+    assert operation["default"] == "request_otp"
+    assert operation["required"] is True
+    assert blueprint["fields"]["otp"]["required"] is False
+
+    branches = blueprint["sequence"][1]["choose"]
+    assert [branch["sequence"][0]["service"] for branch in branches] == [
+        "enphase_ev.request_grid_toggle_otp",
+        "enphase_ev.set_grid_mode",
+    ]
+    assert branches[0]["sequence"][0]["data"] == {"config_entry_id": "config_entry_id"}
+    assert branches[1]["sequence"][0]["data"] == {
+        "config_entry_id": "config_entry_id",
+        "mode": "{{ input_mode }}",
+        "otp": "{{ runtime_otp }}",
+    }
+
+
+def test_grid_mode_automation_blueprint_uses_config_entry_routing() -> None:
+    """The automation blueprint must not use retired site or device routing."""
+
+    blueprint = yaml.load(
+        GRID_MODE_AUTOMATION_BLUEPRINT.read_text(), Loader=_BlueprintLoader
+    )
+    inputs = blueprint["blueprint"]["input"]
+    assert "config_entry_id" in inputs
+    assert "site_id" not in inputs
+    assert "target" not in inputs
+
+    actions = blueprint["action"]
+    request = actions[1]
+    assert request == {
+        "action": "enphase_ev.request_grid_toggle_otp",
+        "data": {"config_entry_id": "config_entry_id"},
+    }
+    apply_action = actions[5]["choose"][3]["sequence"][0]
+    assert apply_action == {
+        "action": "enphase_ev.set_grid_mode",
+        "data": {
+            "config_entry_id": "config_entry_id",
+            "mode": "{{ input_mode }}",
+            "otp": "{{ runtime_otp }}",
+        },
+    }
 
 
 @pytest.mark.asyncio

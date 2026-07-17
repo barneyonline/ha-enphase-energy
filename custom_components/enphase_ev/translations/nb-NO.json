@@ -95,7 +95,7 @@
       "message": "Rutenettkontroll er utilgjengelig for dette nettstedet."
     },
     "grid_control_blocked": {
-      "message": "Rutenettkontroll er for øyeblikket blokkert: {reasons}."
+      "message": "Nettkontroll er for øyeblikket blokkert."
     },
     "grid_mode_invalid": {
       "message": "Rutenettmodus må være on_grid eller off_grid."
@@ -724,12 +724,9 @@
       },
       "grid_toggle": {
         "title": "Nettmodus",
-        "description": "Overvåking av nettmodus forblir alltid tilgjengelig. Manuell kobling er sikkerhetskritisk, så ekstra enheter og tjenestehandlinger krever uttrykkelig aktivering.",
+        "description": "Gjeldende rutenettmodus: **{current_mode}**.\n\nEndring av rutenettmodus er sikkerhetssensitivt. Velg ønsket modus for å sende en engangskode til den registrerte e-posten og telefonen.",
         "data": {
-          "grid_toggle_enabled": "Aktiver kontroller for nettmodus"
-        },
-        "data_description": {
-          "grid_toggle_enabled": "Sensoren Nettmodus forblir tilgjengelig. Aktivering oppretter Nettstyringsstatus og Be om OTP og tillater tjenestehandlinger."
+          "mode": "Forespurt rutenettmodus"
         }
       },
       "grid_profile": {
@@ -761,6 +758,18 @@
       "grid_profile_applied": {
         "title": "Nettprofiloppdatering godtatt",
         "description": "Enphase har godtatt nettprofiloppdateringen for **{selected_profile}**.\n\nForespurt profil-ID: **{requested_profile_id}**\n\nSkystatus: **{cloud_apply_status}**\n\nDet kan ta opptil **5 minutter** før den nye profilen vises som gjeldende mens skyen og Gateway fullfører behandlingen. Grid Profile-sensoren oppdateres når Activation-posten rapporterer den nye gjeldende profilen."
+      },
+      "grid_toggle_otp": {
+        "title": "Bekreft endring av rutenettmodus",
+        "description": "Gjeldende rutenettmodus: **{current_mode}**.\n\nForespurt rutenettmodus: **{target_mode}**.\n\nTast inn den 4-sifrede engangskoden og bekreft den sikkerhetssensitive endringen.",
+        "data": {
+          "otp": "Engangskode",
+          "confirm": "Bekreft endringen av rutenettmodus"
+        }
+      },
+      "grid_toggle_applied": {
+        "title": "Endring av rutenettmodus akseptert",
+        "description": "Enphase godtok forespørselen om å endre rutenettmodus til **{target_mode}**.\n\nDet fysiske releet kan fortsatt være i endring. Bruk Grid Mode-sensoren for å observere den resulterende tilstanden."
       }
     },
     "error": {
@@ -778,7 +787,16 @@
       "grid_profile_region_invalid": "Valgt nettprofilregion er ikke tilgjengelig.",
       "grid_profile_profile_invalid": "Valgt nettprofil er ikke tilgjengelig for landet og regionen til dette anlegget.",
       "grid_profile_gateway_required": "Bruk av nettprofil krever en skybasert Activation Gateway-oppføring.",
-      "grid_profile_apply_failed": "Bruk av nettprofil mislyktes."
+      "grid_profile_apply_failed": "Bruk av nettprofil mislyktes.",
+      "grid_mode_invalid": "Velg On Grid eller Off Grid.",
+      "grid_mode_already_active": "Nettstedet er allerede i den valgte rutenettmodusen.",
+      "grid_mode_confirm_required": "Bekreft endringen av rutenettmodus før du fortsetter.",
+      "grid_control_unavailable": "Rutenettkontroll er utilgjengelig for dette nettstedet.",
+      "grid_control_blocked": "Nettkontroll er for øyeblikket blokkert.",
+      "grid_otp_required": "Skriv inn engangskoden.",
+      "grid_otp_invalid_format": "Engangskoden må inneholde nøyaktig fire sifre.",
+      "grid_otp_invalid": "Engangskoden er ugyldig eller utløpt.",
+      "grid_envoy_serial_missing": "Gatewayen for dette nettstedet kunne ikke bestemmes."
     },
     "abort": {
       "migration_no_envoy_sources": "Ingen Enphase Envoy-energisensorer er tilgjengelige for migrering.",
@@ -786,7 +804,9 @@
       "migration_partial_failure": "Migreringen stoppet etter delvis gjennomføring.\n\nFullførte koblinger:\n{completed_mappings}\n\nFeil ved behandling av `{failed_entity_id}`: {failure_reason}\n\nGjenopprett fra sikkerhetskopi hvis resultatet ikke er akseptabelt.",
       "grid_profile_unavailable": "Nettprofilstyring er ikke tilgjengelig.",
       "grid_profile_installer_required": "Nettprofilstyring krever installatørtilgang til Enphase Activation.",
-      "grid_profile_no_regions": "Ingen nettprofilregioner er tilgjengelige for landet til dette anlegget."
+      "grid_profile_no_regions": "Ingen nettprofilregioner er tilgjengelige for landet til dette anlegget.",
+      "grid_mode_unavailable": "Grid Mode-kontroll er utilgjengelig for dette nettstedet.",
+      "grid_mode_blocked": "Grid Mode-kontroll er for øyeblikket blokkert: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migreringen er fullført. Enphase Energy eier nå de valgte kildeentitets-ID-ene. Kontroller Energy-oversikten og Developer Tools > Statistics etter neste oppdatering.",
@@ -808,6 +828,23 @@
         "available": "Tilgjengelig",
         "unavailable": "Utilgjengelig",
         "accepted": "Godtatt"
+      }
+    },
+    "grid_mode": {
+      "options": {
+        "on_grid": "På nett",
+        "off_grid": "Frakoblet nettet",
+        "unknown": "Ukjent"
+      }
+    },
+    "grid_control_block_reason": {
+      "options": {
+        "disable_grid_control": "Nettstyring er deaktivert for anlegget.",
+        "active_download": "En systemnedlasting er aktiv.",
+        "sunlight_backup_system_check": "Systemkontrollen for Sunlight Backup er aktiv.",
+        "grid_outage_check": "Kontrollen for strømbrudd er aktiv.",
+        "pending": "En endring av nettmodus venter allerede.",
+        "unknown": "En ukjent blokkerende betingelse er aktiv."
       }
     }
   },
@@ -1380,14 +1417,6 @@
           "none": "Ingen",
           "pending": "Venter",
           "active": "Aktiv"
-        }
-      },
-      "grid_control_status": {
-        "name": "Status for nettkontroll",
-        "state": {
-          "ready": "Klar",
-          "blocked": "Blokkert",
-          "pending": "Venter"
         }
       },
       "grid_mode": {
@@ -2323,9 +2352,6 @@
       "cancel_pending_profile_change": {
         "name": "Avbryt ventende profilendring"
       },
-      "request_grid_toggle_otp": {
-        "name": "Be om Grid Toggle OTP"
-      },
       "storm_alert_opt_out": {
         "name": "Meld deg av stormvarsel"
       },
@@ -2648,26 +2674,16 @@
     "request_grid_toggle_otp": {
       "name": "Be om Grid Toggle OTP",
       "description": "Send engangskoden som kreves før du endrer rutenettmodus.",
-      "sections": {
-        "advanced": {
-          "name": "Avanserte alternativer"
-        }
-      },
       "fields": {
-        "site_id": {
-          "name": "Anleggs-ID",
-          "description": "Valgfri anleggs-ID; oppdages automatisk når en anleggsenhet er valgt."
+        "config_entry_id": {
+          "name": "Enphase konfigurasjonsoppføring",
+          "description": "Velg Enphase-nettstedet som skal motta engangskoden."
         }
       }
     },
     "set_grid_mode": {
       "name": "Angi rutenettmodus",
       "description": "Endre stedsnettmodus etter å ha validert engangskoden.",
-      "sections": {
-        "advanced": {
-          "name": "Avanserte alternativer"
-        }
-      },
       "fields": {
         "mode": {
           "name": "Rutenettmodus",
@@ -2677,9 +2693,9 @@
           "name": "Engangskode",
           "description": "Skriv inn den 4-sifrede OTP-en sendt til din registrerte e-post og telefon."
         },
-        "site_id": {
-          "name": "Anleggs-ID",
-          "description": "Valgfri anleggs-ID; oppdages automatisk når en anleggsenhet er valgt."
+        "config_entry_id": {
+          "name": "Enphase konfigurasjonsoppføring",
+          "description": "Velg Enphase-nettstedet hvis rutenettmodus skal endres."
         }
       }
     },

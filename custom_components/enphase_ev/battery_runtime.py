@@ -703,13 +703,9 @@ class BatteryRuntime:
 
     def grid_control_check_refresh_due(self, *, force: bool = False) -> bool:
         coord = self.coordinator
-        if not coord.grid_toggle_enabled:
+        if not force:
             return False
         state = self.battery_state
-        now = time.monotonic()
-        if not force and state._grid_control_check_cache_until:
-            if now < state._grid_control_check_cache_until:
-                return False
         state_present = any(
             getattr(state, attr, None) is not None
             for attr in (
@@ -3733,16 +3729,15 @@ class BatteryRuntime:
         state._battery_site_settings_cache_until = now + BATTERY_SITE_SETTINGS_CACHE_TTL
         coord._note_endpoint_family_success(family)
 
-    async def async_refresh_grid_control_check(self, *, force: bool = False) -> None:
+    async def async_refresh_grid_control_check(self, *, force: bool = False) -> bool:
+        """Refresh grid-control eligibility and report whether fresh data was loaded."""
+
         coord = self.coordinator
-        if not coord.grid_toggle_enabled:
-            return
+        if not force:
+            return False
         state = self.battery_state
         now = time.monotonic()
         family = "grid_control_check"
-        if not force and state._grid_control_check_cache_until:
-            if now < state._grid_control_check_cache_until:
-                return
         if not coord._endpoint_family_should_run(family, force=force):
             if state._grid_control_supported is not None and (
                 coord._endpoint_family_state(family).cooldown_active
@@ -3754,7 +3749,7 @@ class BatteryRuntime:
                 state._grid_control_sunlight_backup_system_check = None
                 state._grid_control_grid_outage_check = None
                 state._grid_control_user_initiated_toggle = None
-            return
+            return False
         fetcher = getattr(coord.client, "grid_control_check", None)
         if not callable(fetcher):
             state._grid_control_supported = None
@@ -3763,7 +3758,7 @@ class BatteryRuntime:
             state._grid_control_sunlight_backup_system_check = None
             state._grid_control_grid_outage_check = None
             state._grid_control_user_initiated_toggle = None
-            return
+            return False
         try:
             payload = await fetcher()
         except Exception as err:  # noqa: BLE001
@@ -3784,7 +3779,7 @@ class BatteryRuntime:
                 state._grid_control_grid_outage_check = None
                 state._grid_control_user_initiated_toggle = None
             state._grid_control_check_cache_until = now + 15.0
-            return
+            return False
         redacted_payload = coord.redact_battery_payload(payload)
         if isinstance(redacted_payload, dict):
             state._grid_control_check_payload = redacted_payload
@@ -3795,6 +3790,7 @@ class BatteryRuntime:
         state._grid_control_check_last_success_mono = now
         state._grid_control_check_cache_until = now + GRID_CONTROL_CHECK_CACHE_TTL
         coord._note_endpoint_family_success(family)
+        return True
 
     async def async_refresh_grid_mode_status(self, *, force: bool = False) -> None:
         coord = self.coordinator
@@ -5475,19 +5471,13 @@ class BatteryRuntime:
 
     async def async_assert_grid_toggle_allowed(self) -> None:
         coord = self.coordinator
-        if not coord.grid_toggle_enabled:
+        if not await self.async_refresh_grid_control_check(force=True):
             self.raise_grid_validation("grid_control_unavailable")
-        await self.async_refresh_grid_control_check(force=True)
         if coord.grid_control_supported is not True:
             self.raise_grid_validation("grid_control_unavailable")
         if coord.grid_toggle_allowed is True:
             return
-        reasons = coord.grid_toggle_blocked_reasons
-        reasons_text = ", ".join(reasons) if reasons else "unknown"
-        self.raise_grid_validation(
-            "grid_control_blocked",
-            placeholders={"reasons": reasons_text},
-        )
+        self.raise_grid_validation("grid_control_blocked")
 
     async def async_request_grid_toggle_otp(self) -> None:
         coord = self.coordinator

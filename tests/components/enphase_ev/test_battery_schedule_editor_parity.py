@@ -1566,7 +1566,7 @@ async def test_battery_schedule_services_support_crud_and_validation(
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(self, domain, service, handler, schema=None, *args, **kwargs):
         registered[(domain, service)] = {
             "handler": handler,
             "schema": schema,
@@ -1733,7 +1733,7 @@ async def test_battery_schedule_services_update_uses_inventory_schedule_family(
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(self, domain, service, handler, schema=None, *args, **kwargs):
         registered[(domain, service)] = {
             "handler": handler,
             "schema": schema,
@@ -1822,7 +1822,7 @@ async def test_battery_schedule_services_delete_uses_enabled_remaining_schedule(
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(self, domain, service, handler, schema=None, *args, **kwargs):
         registered[(domain, service)] = {"handler": handler}
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
@@ -1913,7 +1913,7 @@ async def test_battery_schedule_services_delete_prefers_selected_remaining_sched
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(self, domain, service, handler, schema=None, *args, **kwargs):
         registered[(domain, service)] = {"handler": handler}
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
@@ -1983,7 +1983,7 @@ async def test_battery_schedule_services_delete_falls_back_to_first_remaining_sc
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(self, domain, service, handler, schema=None, *args, **kwargs):
         registered[(domain, service)] = {"handler": handler}
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
@@ -2051,7 +2051,7 @@ async def test_battery_schedule_services_update_preserves_selected_family_window
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(self, domain, service, handler, schema=None, *args, **kwargs):
         registered[(domain, service)] = {"handler": handler}
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
@@ -2111,7 +2111,7 @@ async def test_battery_schedule_services_update_falls_back_when_selected_schedul
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(self, domain, service, handler, schema=None, *args, **kwargs):
         registered[(domain, service)] = {"handler": handler}
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
@@ -2161,7 +2161,7 @@ async def test_battery_schedule_services_reject_local_overlaps_before_client_cal
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(self, domain, service, handler, schema=None, *args, **kwargs):
         registered[(domain, service)] = {"handler": handler}
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
@@ -2250,7 +2250,7 @@ async def test_battery_schedule_services_cover_failure_paths(
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(self, domain, service, handler, schema=None, *args, **kwargs):
         registered[(domain, service)] = {
             "handler": handler,
             "schema": schema,
@@ -2641,7 +2641,7 @@ async def test_battery_schedule_service_handlers_reraise_client_errors_when_help
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(self, domain, service, handler, schema=None, *args, **kwargs):
         registered[(domain, service)] = {"handler": handler}
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)

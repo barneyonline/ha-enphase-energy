@@ -95,7 +95,7 @@
       "message": "Grid control is unavailable for this site."
     },
     "grid_control_blocked": {
-      "message": "Grid control is currently blocked: {reasons}."
+      "message": "Grid control is currently blocked."
     },
     "grid_mode_invalid": {
       "message": "Grid mode must be on_grid or off_grid."
@@ -724,12 +724,9 @@
       },
       "grid_toggle": {
         "title": "Grid Mode",
-        "description": "Grid Mode monitoring remains available at all times. Manual grid switching is safety-sensitive, so its additional entities and service actions are available only when explicitly enabled.",
+        "description": "Current Grid Mode: **{current_mode}**.\n\nChanging Grid Mode is safety-sensitive. Select the requested mode to send a one-time code to the registered email and phone.",
         "data": {
-          "grid_toggle_enabled": "Enable Grid Mode controls"
-        },
-        "data_description": {
-          "grid_toggle_enabled": "The Grid Mode sensor remains available. Enabling controls creates Grid Control Status and Request Grid Toggle OTP entities and allows grid-mode service actions."
+          "mode": "Requested Grid Mode"
         }
       },
       "grid_profile": {
@@ -761,6 +758,18 @@
       "grid_profile_applied": {
         "title": "Grid profile update accepted",
         "description": "Enphase accepted the grid profile update for **{selected_profile}**.\n\nRequested profile ID: **{requested_profile_id}**\n\nCloud status: **{cloud_apply_status}**\n\nThe new profile may take up to **5 minutes** to appear as current while the cloud and Gateway finish processing it. The Grid Profile sensor will update after the Activation record reports the new current profile."
+      },
+      "grid_toggle_otp": {
+        "title": "Confirm Grid Mode Change",
+        "description": "Current Grid Mode: **{current_mode}**.\n\nRequested Grid Mode: **{target_mode}**.\n\nEnter the 4-digit one-time code and confirm the safety-sensitive change.",
+        "data": {
+          "otp": "One-time code",
+          "confirm": "Confirm the Grid Mode change"
+        }
+      },
+      "grid_toggle_applied": {
+        "title": "Grid Mode change accepted",
+        "description": "Enphase accepted the request to change Grid Mode to **{target_mode}**.\n\nThe physical relay may still be changing. Use the Grid Mode sensor to observe the resulting state."
       }
     },
     "error": {
@@ -778,7 +787,16 @@
       "grid_profile_region_invalid": "Selected grid profile region is not available.",
       "grid_profile_profile_invalid": "Selected grid profile is not available for this site country and region.",
       "grid_profile_gateway_required": "Grid profile apply requires Activation gateway metadata.",
-      "grid_profile_apply_failed": "Grid profile apply failed."
+      "grid_profile_apply_failed": "Grid profile apply failed.",
+      "grid_mode_invalid": "Select On Grid or Off Grid.",
+      "grid_mode_already_active": "The site is already in the selected Grid Mode.",
+      "grid_mode_confirm_required": "Confirm the Grid Mode change before continuing.",
+      "grid_control_unavailable": "Grid control is unavailable for this site.",
+      "grid_control_blocked": "Grid control is currently blocked.",
+      "grid_otp_required": "Enter the one-time code.",
+      "grid_otp_invalid_format": "The one-time code must contain exactly four digits.",
+      "grid_otp_invalid": "The one-time code is invalid or expired.",
+      "grid_envoy_serial_missing": "The Gateway for this site could not be determined."
     },
     "abort": {
       "migration_no_envoy_sources": "No Enphase Envoy energy sensors are available to migrate.",
@@ -786,7 +804,9 @@
       "migration_partial_failure": "The migration stopped after partial completion.\n\nCompleted mappings:\n{completed_mappings}\n\nFailed while processing `{failed_entity_id}`: {failure_reason}\n\nRestore from backup if the result is not acceptable.",
       "grid_profile_unavailable": "Grid profile control is unavailable.",
       "grid_profile_installer_required": "Grid profile control requires installer-level Enphase Activation access.",
-      "grid_profile_no_regions": "No grid profile regions are available for this site's country."
+      "grid_profile_no_regions": "No grid profile regions are available for this site's country.",
+      "grid_mode_unavailable": "Grid Mode control is unavailable for this site.",
+      "grid_mode_blocked": "Grid Mode control is currently blocked: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migration complete. Enphase Energy now owns the selected source entity IDs. Verify the Energy dashboard and Developer Tools > Statistics after the next refresh.",
@@ -808,6 +828,23 @@
         "available": "Available",
         "unavailable": "Unavailable",
         "accepted": "Accepted"
+      }
+    },
+    "grid_mode": {
+      "options": {
+        "on_grid": "On Grid",
+        "off_grid": "Off Grid",
+        "unknown": "Unknown"
+      }
+    },
+    "grid_control_block_reason": {
+      "options": {
+        "disable_grid_control": "Grid control is disabled for the site.",
+        "active_download": "A system download is active.",
+        "sunlight_backup_system_check": "The Sunlight Backup system check is active.",
+        "grid_outage_check": "The grid outage check is active.",
+        "pending": "A Grid Mode change is already pending.",
+        "unknown": "An unknown blocking condition is active."
       }
     }
   },
@@ -1154,14 +1191,6 @@
           "discharge_to_grid_allowed": {
             "name": "Discharge To Grid Allowed"
           }
-        }
-      },
-      "grid_control_status": {
-        "name": "Grid Control Status",
-        "state": {
-          "ready": "Ready",
-          "blocked": "Blocked",
-          "pending": "Pending"
         }
       },
       "system_profile_status": {
@@ -2369,9 +2398,6 @@
       "stop_charging": {
         "name": "Stop Charging"
       },
-      "request_grid_toggle_otp": {
-        "name": "Request Grid Toggle OTP"
-      },
       "storm_alert_opt_out": {
         "name": "Storm Alert Opt Out"
       },
@@ -2648,26 +2674,16 @@
     "request_grid_toggle_otp": {
       "name": "Request Grid Toggle OTP",
       "description": "Send the one-time code required before changing site grid mode.",
-      "sections": {
-        "advanced": {
-          "name": "Advanced options"
-        }
-      },
       "fields": {
-        "site_id": {
-          "name": "Site ID",
-          "description": "Optional site identifier; detected automatically when a site device is selected."
+        "config_entry_id": {
+          "name": "Enphase config entry",
+          "description": "Select the Enphase site that should receive the one-time code."
         }
       }
     },
     "set_grid_mode": {
       "name": "Set Grid Mode",
       "description": "Change site grid mode after validating the one-time code.",
-      "sections": {
-        "advanced": {
-          "name": "Advanced options"
-        }
-      },
       "fields": {
         "mode": {
           "name": "Grid mode",
@@ -2677,9 +2693,9 @@
           "name": "One-time code",
           "description": "Enter the 4-digit OTP sent to your registered email and phone."
         },
-        "site_id": {
-          "name": "Site ID",
-          "description": "Optional site identifier; detected automatically when a site device is selected."
+        "config_entry_id": {
+          "name": "Enphase config entry",
+          "description": "Select the Enphase site whose Grid Mode should change."
         }
       }
     },

@@ -95,7 +95,7 @@
       "message": "A rácsvezérlés nem érhető el ezen a webhelyen."
     },
     "grid_control_blocked": {
-      "message": "A rácsvezérlés jelenleg le van tiltva: {reasons}."
+      "message": "A rácsvezérlés jelenleg le van tiltva."
     },
     "grid_mode_invalid": {
       "message": "A rács módnak on_grid vagy off_grid értékűnek kell lennie."
@@ -724,12 +724,9 @@
       },
       "grid_toggle": {
         "title": "Hálózati mód",
-        "description": "A hálózati mód figyelése mindig elérhető marad. A kézi átkapcsolás biztonságkritikus, ezért a további entitások és műveletek kifejezett engedélyezést igényelnek.",
+        "description": "Jelenlegi rács mód: **{current_mode}**.\n\nA rács mód váltása biztonsági szempontból érzékeny. Válassza ki a kért módot, hogy egyszeri kódot küldjön a regisztrált e-mailre és telefonra.",
         "data": {
-          "grid_toggle_enabled": "Hálózati mód vezérlésének engedélyezése"
-        },
-        "data_description": {
-          "grid_toggle_enabled": "A Hálózati mód érzékelő elérhető marad. Az engedélyezés létrehozza a Hálózati vezérlés állapota és OTP kérése entitásokat, és engedélyezi a műveleteket."
+          "mode": "Kért rács mód"
         }
       },
       "grid_profile": {
@@ -761,6 +758,18 @@
       "grid_profile_applied": {
         "title": "Hálózati profil frissítése elfogadva",
         "description": "Az Enphase elfogadta a hálózati profil frissítését ehhez: **{selected_profile}**.\n\nKért profilazonosító: **{requested_profile_id}**\n\nFelhőállapot: **{cloud_apply_status}**\n\nAkár **5 percig** is eltarthat, amíg az új profil aktuálisként megjelenik, amíg a felhő és a Gateway befejezi a feldolgozást. A Grid Profile érzékelő akkor frissül, amikor az Activation rekord jelzi az új aktuális profilt."
+      },
+      "grid_toggle_otp": {
+        "title": "Erősítse meg a rács mód megváltoztatását",
+        "description": "Jelenlegi rács mód: **{current_mode}**.\n\nKért rács mód: **{target_mode}**.\n\nÍrja be a 4 számjegyű egyszeri kódot, és erősítse meg a biztonságra érzékeny módosítást.",
+        "data": {
+          "otp": "Egyszeri kód",
+          "confirm": "Erősítse meg a rács mód módosítását"
+        }
+      },
+      "grid_toggle_applied": {
+        "title": "A rács mód módosítása elfogadva",
+        "description": "Az Enphase elfogadta a kérést, hogy módosítsa a Grid módot **{target_mode}**-ra.\n\nA fizikai relé még változhat. Használja a Grid Mode érzékelőt a kapott állapot megfigyeléséhez."
       }
     },
     "error": {
@@ -778,7 +787,16 @@
       "grid_profile_region_invalid": "A kiválasztott hálózati profil régió nem érhető el.",
       "grid_profile_profile_invalid": "A kiválasztott hálózati profil nem érhető el ehhez a helyszínországhoz és régióhoz.",
       "grid_profile_gateway_required": "A hálózati profil alkalmazásához felhőbeli Activation Gateway rekord szükséges.",
-      "grid_profile_apply_failed": "A hálózati profil alkalmazása sikertelen."
+      "grid_profile_apply_failed": "A hálózati profil alkalmazása sikertelen.",
+      "grid_mode_invalid": "Válassza az On Grid vagy Off Grid lehetőséget.",
+      "grid_mode_already_active": "A webhely már a kiválasztott rács módban van.",
+      "grid_mode_confirm_required": "A folytatás előtt erősítse meg a rács mód módosítását.",
+      "grid_control_unavailable": "A rácsvezérlés nem érhető el ezen a webhelyen.",
+      "grid_control_blocked": "A rácsvezérlés jelenleg le van tiltva.",
+      "grid_otp_required": "Írja be az egyszeri kódot.",
+      "grid_otp_invalid_format": "Az egyszeri kódnak pontosan négy számjegyből kell állnia.",
+      "grid_otp_invalid": "Az egyszeri kód érvénytelen vagy lejárt.",
+      "grid_envoy_serial_missing": "A webhely átjárója nem határozható meg."
     },
     "abort": {
       "migration_no_envoy_sources": "Nincsenek elérhető Enphase Envoy energiaérzékelők a migrációhoz.",
@@ -786,7 +804,9 @@
       "migration_partial_failure": "A migráció részleges befejezés után leállt.\n\nBefejezett hozzárendelések:\n{completed_mappings}\n\nHiba a(z) `{failed_entity_id}` feldolgozásakor: {failure_reason}\n\nHa az eredmény nem elfogadható, állítsa vissza a biztonsági mentést.",
       "grid_profile_unavailable": "A hálózati profil vezérlése nem érhető el.",
       "grid_profile_installer_required": "A hálózati profil vezérléséhez telepítői hozzáférés szükséges az Enphase Activation szolgáltatáshoz.",
-      "grid_profile_no_regions": "Ehhez a helyszínországhoz nem érhető el hálózati profil régió."
+      "grid_profile_no_regions": "Ehhez a helyszínországhoz nem érhető el hálózati profil régió.",
+      "grid_mode_unavailable": "A rács mód vezérlése nem érhető el ezen a webhelyen.",
+      "grid_mode_blocked": "A rács mód vezérlése jelenleg le van tiltva: {reasons}."
     },
     "create_entry": {
       "migration_success": "A migráció befejeződött. Az Enphase Energy most már a kiválasztott forrásentitás-azonosítókat használja. Ellenőrizze a következő frissítés után az Energy irányítópultot és a Developer Tools > Statistics oldalt.",
@@ -808,6 +828,23 @@
         "available": "Elérhető",
         "unavailable": "Nem érhető el",
         "accepted": "Elfogadva"
+      }
+    },
+    "grid_mode": {
+      "options": {
+        "on_grid": "Hálózaton",
+        "off_grid": "Hálózatról leválasztva",
+        "unknown": "Ismeretlen"
+      }
+    },
+    "grid_control_block_reason": {
+      "options": {
+        "disable_grid_control": "A hálózat vezérlése le van tiltva a helyszínen.",
+        "active_download": "Rendszerletöltés van folyamatban.",
+        "sunlight_backup_system_check": "A Sunlight Backup rendszerellenőrzése aktív.",
+        "grid_outage_check": "A hálózatkimaradás ellenőrzése aktív.",
+        "pending": "Egy hálózati módváltás már függőben van.",
+        "unknown": "Ismeretlen blokkoló feltétel aktív."
       }
     }
   },
@@ -1380,14 +1417,6 @@
           "none": "Nincs",
           "pending": "Függőben",
           "active": "Aktív"
-        }
-      },
-      "grid_control_status": {
-        "name": "Hálózatvezérlés állapota",
-        "state": {
-          "ready": "Kész",
-          "blocked": "Blokkolva",
-          "pending": "Függőben"
         }
       },
       "grid_mode": {
@@ -2323,9 +2352,6 @@
       "cancel_pending_profile_change": {
         "name": "A függőben lévő profilmódosítás visszavonása"
       },
-      "request_grid_toggle_otp": {
-        "name": "Rács váltás OTP kérése"
-      },
       "storm_alert_opt_out": {
         "name": "Viharriasztás letiltása"
       },
@@ -2648,26 +2674,16 @@
     "request_grid_toggle_otp": {
       "name": "Rács váltás OTP kérése",
       "description": "A webhelyrács mód megváltoztatása előtt küldje el a szükséges egyszeri kódot.",
-      "sections": {
-        "advanced": {
-          "name": "Speciális beállítások"
-        }
-      },
       "fields": {
-        "site_id": {
-          "name": "Helyszín ID",
-          "description": "Opcionális helyszín azonosító; automatikusan észlelve, ha helyszín eszköz van kiválasztva."
+        "config_entry_id": {
+          "name": "Enphase konfigurációs bejegyzés",
+          "description": "Válassza ki azt az Enphase webhelyet, amelyre meg kell kapnia az egyszeri kódot."
         }
       }
     },
     "set_grid_mode": {
       "name": "Állítsa be a rács módot",
       "description": "Az egyszeri kód érvényesítése után módosítsa a webhelyrács módot.",
-      "sections": {
-        "advanced": {
-          "name": "Speciális beállítások"
-        }
-      },
       "fields": {
         "mode": {
           "name": "Rács mód",
@@ -2677,9 +2693,9 @@
           "name": "Egyszeri kód",
           "description": "Adja meg a regisztrált e-mail címére és telefonjára küldött 4 számjegyű OTP-t."
         },
-        "site_id": {
-          "name": "Helyszín ID",
-          "description": "Opcionális helyszín azonosító; automatikusan észlelve, ha helyszín eszköz van kiválasztva."
+        "config_entry_id": {
+          "name": "Enphase konfigurációs bejegyzés",
+          "description": "Válassza ki azt az Enphase webhelyet, amelynek a rácsmódját módosítani kell."
         }
       }
     },

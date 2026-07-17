@@ -95,7 +95,7 @@
       "message": "Verkkoohjaus ei ole käytettävissä tälle sivustolle."
     },
     "grid_control_blocked": {
-      "message": "Verkon ohjaus on tällä hetkellä estetty: {reasons}."
+      "message": "Verkon ohjaus on tällä hetkellä estetty."
     },
     "grid_mode_invalid": {
       "message": "Ruudukkotilan on oltava on_grid tai off_grid."
@@ -724,12 +724,9 @@
       },
       "grid_toggle": {
         "title": "Verkkotila",
-        "description": "Verkkotilan valvonta on aina käytettävissä. Manuaalinen kytkentä on turvallisuuskriittinen, joten lisäentiteetit ja palvelutoiminnot edellyttävät erillistä käyttöönottoa.",
+        "description": "Nykyinen ruudukkotila: **{current_mode}**.\n\nGrid-tilan vaihtaminen on turvallisuusherkkä. Valitse pyydetty tila lähettääksesi kertakoodin rekisteröityyn sähköpostiin ja puhelimeen.",
         "data": {
-          "grid_toggle_enabled": "Ota verkkotilan ohjaimet käyttöön"
-        },
-        "data_description": {
-          "grid_toggle_enabled": "Verkkotila-anturi pysyy käytettävissä. Käyttöönotto luo Verkon ohjauksen tila- ja Pyydä OTP -entiteetit sekä sallii palvelutoiminnot."
+          "mode": "Pyydetty ruudukkotila"
         }
       },
       "grid_profile": {
@@ -761,6 +758,18 @@
       "grid_profile_applied": {
         "title": "Verkkoprofiilin päivitys hyväksytty",
         "description": "Enphase hyväksyi verkkoprofiilin päivityksen profiilille **{selected_profile}**.\n\nPyydetty profiilin tunnus: **{requested_profile_id}**\n\nPilvitila: **{cloud_apply_status}**\n\nUuden profiilin näkyminen nykyisenä voi kestää enintään **5 minuuttia**, kun pilvi ja Gateway viimeistelevät käsittelyn. Grid Profile -anturi päivittyy, kun Activation-tietue ilmoittaa uuden nykyisen profiilin."
+      },
+      "grid_toggle_otp": {
+        "title": "Vahvista ruudukkotilan muutos",
+        "description": "Nykyinen ruudukkotila: **{current_mode}**.\n\nPyydetty ruudukkotila: **{target_mode}**.\n\nSyötä 4-numeroinen kertakoodi ja vahvista turvallisuusherkkä muutos.",
+        "data": {
+          "otp": "Kertakäyttöinen koodi",
+          "confirm": "Vahvista ruudukkotilan muutos"
+        }
+      },
+      "grid_toggle_applied": {
+        "title": "Ruudukkotilan muutos hyväksytty",
+        "description": "Enphase hyväksyi pyynnön muuttaa ruudukkotilaksi **{target_mode}**.\n\nFyysinen rele saattaa vielä muuttua. Käytä Grid Mode -anturia seurataksesi tuloksena olevaa tilaa."
       }
     },
     "error": {
@@ -778,7 +787,16 @@
       "grid_profile_region_invalid": "Valittu verkkoprofiilin alue ei ole käytettävissä.",
       "grid_profile_profile_invalid": "Valittu verkkoprofiili ei ole käytettävissä tämän kohteen maalle ja alueelle.",
       "grid_profile_gateway_required": "Verkkoprofiilin käyttöönotto edellyttää pilven Activation Gateway -tietuetta.",
-      "grid_profile_apply_failed": "Verkkoprofiilin käyttöönotto epäonnistui."
+      "grid_profile_apply_failed": "Verkkoprofiilin käyttöönotto epäonnistui.",
+      "grid_mode_invalid": "Valitse On Grid tai Off Grid.",
+      "grid_mode_already_active": "Sivusto on jo valitussa ruudukkotilassa.",
+      "grid_mode_confirm_required": "Vahvista ruudukkotilan muutos ennen kuin jatkat.",
+      "grid_control_unavailable": "Verkkoohjaus ei ole käytettävissä tälle sivustolle.",
+      "grid_control_blocked": "Verkon ohjaus on tällä hetkellä estetty.",
+      "grid_otp_required": "Syötä kertakoodi.",
+      "grid_otp_invalid_format": "Kertakoodin tulee sisältää täsmälleen neljä numeroa.",
+      "grid_otp_invalid": "Kertakäyttöinen koodi on virheellinen tai vanhentunut.",
+      "grid_envoy_serial_missing": "Tämän sivuston yhdyskäytävää ei voitu määrittää."
     },
     "abort": {
       "migration_no_envoy_sources": "Yhtään Enphase Envoy -energia-anturia ei ole saatavilla siirtoon.",
@@ -786,7 +804,9 @@
       "migration_partial_failure": "Siirto pysähtyi osittaisen valmistumisen jälkeen.\n\nValmiit yhdistelmät:\n{completed_mappings}\n\nVirhe käsiteltäessä `{failed_entity_id}`: {failure_reason}\n\nPalauta varmuuskopiosta, jos tulos ei ole hyväksyttävä.",
       "grid_profile_unavailable": "Verkkoprofiilin hallinta ei ole käytettävissä.",
       "grid_profile_installer_required": "Verkkoprofiilin hallinta edellyttää asentajan käyttöoikeutta Enphase Activationiin.",
-      "grid_profile_no_regions": "Tämän kohteen maalle ei ole käytettävissä verkkoprofiilin alueita."
+      "grid_profile_no_regions": "Tämän kohteen maalle ei ole käytettävissä verkkoprofiilin alueita.",
+      "grid_mode_unavailable": "Grid Mode -ohjaus ei ole saatavilla tälle sivustolle.",
+      "grid_mode_blocked": "Grid Mode -ohjaus on tällä hetkellä estetty: {reasons}."
     },
     "create_entry": {
       "migration_success": "Siirto valmis. Enphase Energy omistaa nyt valitut lähde-entiteettien tunnukset. Tarkista seuraavan päivityksen jälkeen Energy-koontinäyttö ja Developer Tools > Statistics.",
@@ -808,6 +828,23 @@
         "available": "Saatavilla",
         "unavailable": "Ei saatavilla",
         "accepted": "Hyväksytty"
+      }
+    },
+    "grid_mode": {
+      "options": {
+        "on_grid": "Gridillä",
+        "off_grid": "Pois ruudukosta",
+        "unknown": "Tuntematon"
+      }
+    },
+    "grid_control_block_reason": {
+      "options": {
+        "disable_grid_control": "Verkon ohjaus on poistettu käytöstä kohteessa.",
+        "active_download": "Järjestelmälataus on käynnissä.",
+        "sunlight_backup_system_check": "Sunlight Backup -järjestelmän tarkistus on käynnissä.",
+        "grid_outage_check": "Sähkökatkon tarkistus on käynnissä.",
+        "pending": "Verkkotilan muutos odottaa jo valmistumista.",
+        "unknown": "Tuntematon estävä ehto on aktiivinen."
       }
     }
   },
@@ -1380,14 +1417,6 @@
           "none": "Ei mitään",
           "pending": "Odottaa",
           "active": "Aktiivinen"
-        }
-      },
-      "grid_control_status": {
-        "name": "Verkon ohjauksen tila",
-        "state": {
-          "ready": "Valmis",
-          "blocked": "Estetty",
-          "pending": "Odottaa"
         }
       },
       "grid_mode": {
@@ -2323,9 +2352,6 @@
       "cancel_pending_profile_change": {
         "name": "Peruuta odottava profiilimuutos"
       },
-      "request_grid_toggle_otp": {
-        "name": "Pyydä ruudukon OTP:tä"
-      },
       "storm_alert_opt_out": {
         "name": "Poista myrskyhälytys käytöstä"
       },
@@ -2648,26 +2674,16 @@
     "request_grid_toggle_otp": {
       "name": "Pyydä ruudukon OTP:tä",
       "description": "Lähetä tarvittava kertakoodi ennen sivustoruudukon tilan vaihtamista.",
-      "sections": {
-        "advanced": {
-          "name": "Lisäasetukset"
-        }
-      },
       "fields": {
-        "site_id": {
-          "name": "Sivuston tunnus",
-          "description": "Valinnainen sivuston tunniste; havaitaan automaattisesti, kun sivuston laite valitaan."
+        "config_entry_id": {
+          "name": "Enphase-asetusten syöttö",
+          "description": "Valitse Enphase-sivusto, jonka pitäisi saada kertaluonteinen koodi."
         }
       }
     },
     "set_grid_mode": {
       "name": "Aseta ruudukkotila",
       "description": "Vaihda sivuston ruudukkotilaa kertakoodin vahvistamisen jälkeen.",
-      "sections": {
-        "advanced": {
-          "name": "Lisäasetukset"
-        }
-      },
       "fields": {
         "mode": {
           "name": "Ruudukkotila",
@@ -2677,9 +2693,9 @@
           "name": "Kertakäyttöinen koodi",
           "description": "Syötä rekisteröityyn sähköpostiisi ja puhelimeesi lähetetty 4-numeroinen OTP."
         },
-        "site_id": {
-          "name": "Sivuston tunnus",
-          "description": "Valinnainen sivuston tunniste; havaitaan automaattisesti, kun sivuston laite valitaan."
+        "config_entry_id": {
+          "name": "Enphase-asetusten syöttö",
+          "description": "Valitse Enphase-sivusto, jonka ruudukkotilan tulee muuttua."
         }
       }
     },

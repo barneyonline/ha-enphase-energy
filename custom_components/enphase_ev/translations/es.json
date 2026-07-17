@@ -95,7 +95,7 @@
       "message": "El control de red no está disponible para este sitio."
     },
     "grid_control_blocked": {
-      "message": "El control de red está actualmente bloqueado: {reasons}."
+      "message": "El control de red está actualmente bloqueado."
     },
     "grid_mode_invalid": {
       "message": "El modo de cuadrícula debe ser on_grid o off_grid."
@@ -724,12 +724,9 @@
       },
       "grid_toggle": {
         "title": "Modo de red",
-        "description": "La supervisión del modo de red permanece siempre disponible. La conmutación manual afecta a la seguridad, por lo que las entidades y acciones adicionales requieren activación explícita.",
+        "description": "Modo de cuadrícula actual: **{current_mode}**.\n\nCambiar el modo de red es una cuestión de seguridad. Seleccione el modo solicitado para enviar un código de un solo uso al correo electrónico y al teléfono registrados.",
         "data": {
-          "grid_toggle_enabled": "Activar controles del modo de red"
-        },
-        "data_description": {
-          "grid_toggle_enabled": "El sensor Modo de red permanece disponible. La activación crea Estado del control de red y Solicitar OTP y permite acciones de servicio."
+          "mode": "Modo de cuadrícula solicitado"
         }
       },
       "grid_profile": {
@@ -761,6 +758,18 @@
       "grid_profile_applied": {
         "title": "Actualización del perfil de red aceptada",
         "description": "Enphase aceptó la actualización del perfil de red para **{selected_profile}**.\n\nID del perfil solicitado: **{requested_profile_id}**\n\nEstado en la nube: **{cloud_apply_status}**\n\nEl nuevo perfil puede tardar hasta **5 minutos** en aparecer como actual mientras la nube y el Gateway terminan de procesarlo. El sensor Grid Profile se actualizará cuando el registro de Activation informe el nuevo perfil actual."
+      },
+      "grid_toggle_otp": {
+        "title": "Confirmar cambio de modo de cuadrícula",
+        "description": "Modo de cuadrícula actual: **{current_mode}**.\n\nModo de cuadrícula solicitado: **{target_mode}**.\n\nIngrese el código único de 4 dígitos y confirme el cambio sensible a la seguridad.",
+        "data": {
+          "otp": "código de un solo uso",
+          "confirm": "Confirme el cambio de modo de cuadrícula"
+        }
+      },
+      "grid_toggle_applied": {
+        "title": "Cambio de modo de cuadrícula aceptado",
+        "description": "Enphase aceptó la solicitud para cambiar el modo de cuadrícula a **{target_mode}**.\n\nEs posible que el relé físico aún esté cambiando. Utilice el sensor de modo de cuadrícula para observar el estado resultante."
       }
     },
     "error": {
@@ -778,7 +787,16 @@
       "grid_profile_region_invalid": "La región de perfil de red seleccionada no está disponible.",
       "grid_profile_profile_invalid": "El perfil de red seleccionado no está disponible para el país y la región de este sitio.",
       "grid_profile_gateway_required": "Aplicar el perfil de red requiere un registro de Gateway de Activation en la nube.",
-      "grid_profile_apply_failed": "No se pudo aplicar el perfil de red."
+      "grid_profile_apply_failed": "No se pudo aplicar el perfil de red.",
+      "grid_mode_invalid": "Seleccione En la red o Fuera de la red.",
+      "grid_mode_already_active": "El sitio ya está en el modo de cuadrícula seleccionado.",
+      "grid_mode_confirm_required": "Confirme el cambio del modo de cuadrícula antes de continuar.",
+      "grid_control_unavailable": "El control de red no está disponible para este sitio.",
+      "grid_control_blocked": "El control de red está actualmente bloqueado.",
+      "grid_otp_required": "Ingrese el código de un solo uso.",
+      "grid_otp_invalid_format": "El código de un solo uso debe contener exactamente cuatro dígitos.",
+      "grid_otp_invalid": "El código de un solo uso no es válido o ha caducado.",
+      "grid_envoy_serial_missing": "No se pudo determinar la puerta de enlace para este sitio."
     },
     "abort": {
       "migration_no_envoy_sources": "No hay sensores de energía de Enphase Envoy disponibles para migrar.",
@@ -786,7 +804,9 @@
       "migration_partial_failure": "La migración se detuvo tras completarse parcialmente.\n\nAsignaciones completadas:\n{completed_mappings}\n\nFalló al procesar `{failed_entity_id}`: {failure_reason}\n\nRestaura desde la copia de seguridad si el resultado no es aceptable.",
       "grid_profile_unavailable": "El control de perfil de red no está disponible.",
       "grid_profile_installer_required": "El control de perfil de red requiere acceso de instalador a Enphase Activation.",
-      "grid_profile_no_regions": "No hay regiones de perfil de red disponibles para el país de este sitio."
+      "grid_profile_no_regions": "No hay regiones de perfil de red disponibles para el país de este sitio.",
+      "grid_mode_unavailable": "El control del modo de cuadrícula no está disponible para este sitio.",
+      "grid_mode_blocked": "El control del modo de cuadrícula está bloqueado actualmente: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migración completada. Enphase Energy ahora posee los identificadores de entidad de origen seleccionados. Verifica el panel de Energy y Developer Tools > Statistics después de la próxima actualización.",
@@ -808,6 +828,23 @@
         "available": "Disponible",
         "unavailable": "No disponible",
         "accepted": "Aceptado"
+      }
+    },
+    "grid_mode": {
+      "options": {
+        "on_grid": "En la cuadrícula",
+        "off_grid": "Fuera de la red",
+        "unknown": "Desconocido"
+      }
+    },
+    "grid_control_block_reason": {
+      "options": {
+        "disable_grid_control": "El control de red está desactivado para el sitio.",
+        "active_download": "Hay una descarga del sistema activa.",
+        "sunlight_backup_system_check": "La comprobación del sistema Sunlight Backup está activa.",
+        "grid_outage_check": "La comprobación de corte de red está activa.",
+        "pending": "Ya hay un cambio de modo de red pendiente.",
+        "unknown": "Hay una condición de bloqueo desconocida activa."
       }
     }
   },
@@ -1380,14 +1417,6 @@
           "none": "Ninguno",
           "pending": "Pendiente",
           "active": "Activo"
-        }
-      },
-      "grid_control_status": {
-        "name": "Estado del control de red",
-        "state": {
-          "ready": "Listo",
-          "blocked": "Bloqueado",
-          "pending": "Pendiente"
         }
       },
       "grid_mode": {
@@ -2323,9 +2352,6 @@
       "cancel_pending_profile_change": {
         "name": "Cancelar cambio de perfil pendiente"
       },
-      "request_grid_toggle_otp": {
-        "name": "Solicitar OTP de alternancia de cuadrícula"
-      },
       "storm_alert_opt_out": {
         "name": "Excluir alerta de tormenta"
       },
@@ -2648,26 +2674,16 @@
     "request_grid_toggle_otp": {
       "name": "Solicitar OTP de alternancia de cuadrícula",
       "description": "Envíe el código de un solo uso requerido antes de cambiar el modo de cuadrícula del sitio.",
-      "sections": {
-        "advanced": {
-          "name": "Opciones avanzadas"
-        }
-      },
       "fields": {
-        "site_id": {
-          "name": "ID del sitio",
-          "description": "Identificador de sitio opcional; se detecta automáticamente cuando se selecciona un dispositivo de sitio."
+        "config_entry_id": {
+          "name": "Entrada de configuración de Enphase",
+          "description": "Seleccione el sitio de Enphase que debería recibir el código de un solo uso."
         }
       }
     },
     "set_grid_mode": {
       "name": "Establecer modo de cuadrícula",
       "description": "Cambie el modo de cuadrícula del sitio después de validar el código de un solo uso.",
-      "sections": {
-        "advanced": {
-          "name": "Opciones avanzadas"
-        }
-      },
       "fields": {
         "mode": {
           "name": "Modo cuadrícula",
@@ -2677,9 +2693,9 @@
           "name": "código de un solo uso",
           "description": "Ingrese la OTP de 4 dígitos enviada a su correo electrónico y teléfono registrados."
         },
-        "site_id": {
-          "name": "ID del sitio",
-          "description": "Identificador de sitio opcional; se detecta automáticamente cuando se selecciona un dispositivo de sitio."
+        "config_entry_id": {
+          "name": "Entrada de configuración de Enphase",
+          "description": "Seleccione el sitio de Enphase cuyo modo de cuadrícula debería cambiar."
         }
       }
     },

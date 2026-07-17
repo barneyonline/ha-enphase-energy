@@ -133,6 +133,7 @@ _LEGACY_CLOUD_ENTITY_SUFFIX_ALIASES_BY_DOMAIN: dict[str, tuple[str, ...]] = {
 }
 _STARTUP_MIGRATION_VERSION = 6
 _STARTUP_MIGRATION_VERSION_KEY = "startup_migration_version"
+_LEGACY_GRID_TOGGLE_OPTION = "grid_toggle_enabled"
 
 _TYPE_DEVICE_KEYS_WITH_DIRECT_CHILD_DEVICES: tuple[str, ...] = ("iqevse",)
 
@@ -187,6 +188,47 @@ def _migrate_selected_type_keys(entry: EnphaseConfigEntry) -> dict[str, object] 
     updated = dict(entry.data)
     updated[CONF_SELECTED_TYPE_KEYS] = normalized_selected
     return updated
+
+
+def _remove_retired_grid_control_entities(
+    hass: HomeAssistant, entry: EnphaseConfigEntry
+) -> None:
+    """Remove Grid Mode control entities retired in config-entry minor version 2."""
+
+    site_id = str(entry.data.get("site_id", "") or "").strip()
+    if not site_id:
+        return
+    ent_reg = er.async_get(hass)
+    for domain, suffix in (
+        ("button", "request_grid_toggle_otp"),
+        ("sensor", "grid_control_status"),
+    ):
+        entity_id = find_entity_id_by_unique_id(
+            ent_reg,
+            domain,
+            f"{DOMAIN}_site_{site_id}_{suffix}",
+            entry_id=entry.entry_id,
+        )
+        if entity_id is not None:
+            ent_reg.async_remove(entity_id)
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> bool:
+    """Migrate Enphase config entries to the latest schema."""
+
+    if entry.version != 1:
+        return False
+    if entry.minor_version < 2:
+        options = dict(entry.options)
+        options.pop(_LEGACY_GRID_TOGGLE_OPTION, None)
+        _remove_retired_grid_control_entities(hass, entry)
+        hass.config_entries.async_update_entry(
+            entry,
+            options=options,
+            version=1,
+            minor_version=2,
+        )
+    return True
 
 
 def _is_disabled_by_integration(disabled_by: object) -> bool:

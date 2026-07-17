@@ -392,7 +392,6 @@ def coordinator_factory(hass, mock_clientsession, mock_issue_registry, monkeypat
         coord = EnphaseCoordinator(hass, cfg)
         # Most legacy coordinator tests exercise Grid Toggle behavior directly.
         # Individual opt-in tests override this to validate the production default.
-        coord._grid_toggle_enabled = True  # noqa: SLF001
         coord.serials = set(active_serials)
         coord.data = data or {
             sn: {"sn": sn, "name": f"Charger {sn}"} for sn in coord.serials

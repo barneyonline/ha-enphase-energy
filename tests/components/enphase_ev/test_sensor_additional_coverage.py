@@ -6654,32 +6654,27 @@ async def test_async_setup_entry_prunes_stale_heatpump_site_entities_when_unavai
 
 
 @pytest.mark.asyncio
-async def test_async_setup_entry_keeps_grid_mode_when_controls_disabled(
+async def test_async_setup_entry_keeps_grid_mode(
     hass, config_entry, coordinator_factory
 ) -> None:
     from homeassistant.helpers import entity_registry as er
 
     from custom_components.enphase_ev.const import DOMAIN
     from custom_components.enphase_ev.sensor import (
-        EnphaseGridControlStatusSensor,
         EnphaseGridModeSensor,
         async_setup_entry,
     )
 
     coord = coordinator_factory(serials=[])
-    coord._grid_toggle_enabled = False  # noqa: SLF001
     coord._devices_inventory_ready = False  # noqa: SLF001
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
     ent_reg = er.async_get(hass)
-    entity_ids = [
-        ent_reg.async_get_or_create(
-            "sensor",
-            DOMAIN,
-            f"{DOMAIN}_site_{coord.site_id}_{key}",
-            config_entry=config_entry,
-        ).entity_id
-        for key in ("grid_mode", "grid_control_status")
-    ]
+    entity_id = ent_reg.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{DOMAIN}_site_{coord.site_id}_grid_mode",
+        config_entry=config_entry,
+    ).entity_id
     added: list[Any] = []
 
     await async_setup_entry(
@@ -6688,12 +6683,8 @@ async def test_async_setup_entry_keeps_grid_mode_when_controls_disabled(
         lambda entities, update_before_add=False: added.extend(entities),
     )
 
-    assert ent_reg.async_get(entity_ids[0]) is not None
-    assert ent_reg.async_get(entity_ids[1]) is None
+    assert ent_reg.async_get(entity_id) is not None
     assert any(isinstance(entity, EnphaseGridModeSensor) for entity in added)
-    assert not any(
-        isinstance(entity, EnphaseGridControlStatusSensor) for entity in added
-    )
 
 
 @pytest.mark.asyncio

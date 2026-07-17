@@ -851,10 +851,6 @@ def test_battery_settings_entity_strings_exist_for_all_locales() -> None:
         "entity.sensor.battery_cfg_schedule_status.state.none",
         "entity.sensor.battery_cfg_schedule_status.state.pending",
         "entity.sensor.battery_cfg_schedule_status.state.active",
-        "entity.sensor.grid_control_status.name",
-        "entity.sensor.grid_control_status.state.ready",
-        "entity.sensor.grid_control_status.state.blocked",
-        "entity.sensor.grid_control_status.state.pending",
         "entity.sensor.battery_storage_charge.name",
         "entity.sensor.battery_storage_status.state.charging",
         "entity.sensor.battery_storage_status.state.discharging",
@@ -1707,17 +1703,38 @@ def test_grid_control_strings_exist_for_all_locales() -> None:
         "options.step.advanced.menu_option_descriptions.grid_toggle",
         "options.step.grid_toggle.title",
         "options.step.grid_toggle.description",
-        "options.step.grid_toggle.data.grid_toggle_enabled",
-        "options.step.grid_toggle.data_description.grid_toggle_enabled",
-        "entity.button.request_grid_toggle_otp.name",
+        "options.step.grid_toggle.data.mode",
+        "options.step.grid_toggle_otp.title",
+        "options.step.grid_toggle_otp.description",
+        "options.step.grid_toggle_otp.data.otp",
+        "options.step.grid_toggle_otp.data.confirm",
+        "options.step.grid_toggle_applied.title",
+        "options.step.grid_toggle_applied.description",
+        "options.error.grid_mode_already_active",
+        "options.error.grid_mode_confirm_required",
+        "options.abort.grid_mode_unavailable",
+        "options.abort.grid_mode_blocked",
+        "selector.grid_mode.options.on_grid",
+        "selector.grid_mode.options.off_grid",
+        "selector.grid_mode.options.unknown",
+        "selector.grid_control_block_reason.options.disable_grid_control",
+        "selector.grid_control_block_reason.options.active_download",
+        "selector.grid_control_block_reason.options.sunlight_backup_system_check",
+        "selector.grid_control_block_reason.options.grid_outage_check",
+        "selector.grid_control_block_reason.options.pending",
+        "selector.grid_control_block_reason.options.unknown",
         "entity.sensor.grid_mode.name",
         "entity.sensor.grid_mode.state.on_grid",
         "entity.sensor.grid_mode.state.off_grid",
         "entity.sensor.grid_mode.state.unknown",
         "services.request_grid_toggle_otp.name",
         "services.request_grid_toggle_otp.description",
+        "services.request_grid_toggle_otp.fields.config_entry_id.name",
+        "services.request_grid_toggle_otp.fields.config_entry_id.description",
         "services.set_grid_mode.name",
         "services.set_grid_mode.description",
+        "services.set_grid_mode.fields.config_entry_id.name",
+        "services.set_grid_mode.fields.config_entry_id.description",
         "services.set_grid_mode.fields.mode.name",
         "services.set_grid_mode.fields.mode.description",
         "services.set_grid_mode.fields.otp.name",
@@ -1733,7 +1750,7 @@ def test_grid_control_strings_exist_for_all_locales() -> None:
         "exceptions.grid_site_ambiguous.message",
     ]
     english = json.loads((translations_dir / "en.json").read_text(encoding="utf-8"))
-    option_paths = paths[:7]
+    option_paths = paths[:25]
     for locale in translations_dir.glob("*.json"):
         data = json.loads(locale.read_text(encoding="utf-8"))
         for path in paths:
@@ -1748,8 +1765,8 @@ def test_grid_control_strings_exist_for_all_locales() -> None:
         blocked = _at_path(data, "exceptions.grid_control_blocked.message")
         ambiguous = _at_path(data, "exceptions.grid_site_ambiguous.message")
         assert (
-            "{reasons}" in blocked
-        ), f"{locale.name} missing {{reasons}} in grid_control_blocked message"
+            "{reasons}" not in blocked
+        ), f"{locale.name} should not expose raw grid-control reasons"
         assert (
             "{count}" in ambiguous
         ), f"{locale.name} missing {{count}} in grid_site_ambiguous message"

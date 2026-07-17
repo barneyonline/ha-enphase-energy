@@ -808,25 +808,20 @@ validate_schedule:
               multiline: false
 
 request_grid_toggle_otp:
-  target:
-    entity:
-      integration: enphase_ev
   fields:
-    advanced:
-      collapsed: true
-      fields:
-        site_id:
-          required: false
-          selector:
-            text:
-              multiline: false
-          example: "1234567"
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: enphase_ev
 
 set_grid_mode:
-  target:
-    entity:
-      integration: enphase_ev
   fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: enphase_ev
     mode:
       required: true
       selector:
@@ -839,15 +834,6 @@ set_grid_mode:
       selector:
         text:
           multiline: false
-    advanced:
-      collapsed: true
-      fields:
-        site_id:
-          required: false
-          selector:
-            text:
-              multiline: false
-          example: "1234567"
 
 update_cfg_schedule:
   target:

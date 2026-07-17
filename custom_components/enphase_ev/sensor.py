@@ -332,10 +332,6 @@ def _grid_control_site_applicable(coord: EnphaseCoordinator) -> bool:
     return _type_available(coord, "encharge")
 
 
-def _grid_toggle_enabled(coord: EnphaseCoordinator) -> bool:
-    return bool(getattr(coord, "grid_toggle_enabled", False))
-
-
 def _battery_schedule_inventory_supported(coord: EnphaseCoordinator) -> bool:
     client = getattr(coord, "client", None)
     if not (_site_has_battery(coord) and _type_available(coord, "encharge")):
@@ -822,15 +818,8 @@ async def async_setup_entry(
             _type_available(coord, "enpower") or _type_available(coord, "envoy")
         ):
             _add_site_entity("grid_mode", EnphaseGridModeSensor(coord))
-            if _grid_toggle_enabled(coord):
-                _add_site_entity(
-                    "grid_control_status", EnphaseGridControlStatusSensor(coord)
-                )
-            else:
-                _async_remove_site_sensor_entity("grid_control_status")
         elif inventory_ready:
             _async_remove_site_sensor_entity("grid_mode")
-            _async_remove_site_sensor_entity("grid_control_status")
         battery_power_supported = _site_lifetime_power_channel_present(
             "battery_charge"
         ) and _site_lifetime_power_channel_present("battery_discharge")
@@ -1218,7 +1207,6 @@ async def async_setup_entry(
             _heatpump_runtime_device_uid(coord),
             battery_scheduler_enabled(entry),
             _battery_schedule_inventory_supported(coord),
-            _grid_toggle_enabled(coord),
             _grid_control_site_applicable(coord),
             getattr(coord, "tariff_billing", None) is not None,
             getattr(coord, "tariff_import_rate", None) is not None,
@@ -7845,82 +7833,6 @@ class EnphaseBatteryModeSensor(_SiteBaseEntity):
         }
 
 
-class EnphaseGridControlStatusSensor(_SiteBaseEntity):
-    _attr_translation_key = "grid_control_status"
-
-    def __init__(self, coord: EnphaseCoordinator) -> None:
-        super().__init__(
-            coord,
-            "grid_control_status",
-            "Grid Control Status",
-            type_key="enpower",
-        )
-
-    @property
-    def available(self) -> bool:
-        if not _grid_toggle_enabled(self._coord):
-            return False
-        if not _grid_control_site_applicable(self._coord):
-            return False
-        if not (
-            _type_available(self._coord, "enpower")
-            or _type_available(self._coord, "envoy")
-        ):
-            return False
-        if self._coord.last_success_utc is not None:
-            return True
-        return bool(getattr(self._coord, "last_update_success", False))
-
-    @property
-    def native_value(self) -> Any:
-        if not self._coord.grid_control_supported:
-            return None
-        if self._coord.grid_toggle_pending:
-            return "pending"
-        allowed = self._coord.grid_toggle_allowed
-        if allowed is True:
-            return "ready"
-        if allowed is False:
-            return "blocked"
-        return None
-
-    @property
-    def icon(self) -> str:
-        state = self.native_value
-        if state == "pending":
-            return "mdi:progress-clock"
-        if state == "ready":
-            return "mdi:check-circle"
-        if state == "blocked":
-            return "mdi:alert-circle"
-        return "mdi:transmission-tower"
-
-    @property
-    def extra_state_attributes(self) -> Any:
-        return {
-            "grid_toggle_pending": self._coord.grid_toggle_pending,
-            "blocked_reasons": self._coord.grid_toggle_blocked_reasons,
-            "disable_grid_control": self._coord.grid_control_disable,
-            "active_download": self._coord.grid_control_active_download,
-            "sunlight_backup_system_check": self._coord.grid_control_sunlight_backup_system_check,
-            "grid_outage_check": self._coord.grid_control_grid_outage_check,
-            "user_initiated_grid_toggle": self._coord.grid_control_user_initiated_toggle,
-        }
-
-    @property
-    def device_info(self) -> Any:
-        for type_key in ("enpower", "envoy"):
-            info = _type_device_info(self._coord, type_key)
-            if info is not None:
-                return info
-        from homeassistant.helpers.entity import DeviceInfo
-
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"type:{self._coord.site_id}:envoy")},
-            manufacturer="Enphase",
-        )
-
-
 class EnphaseGridModeSensor(_SiteBaseEntity):
     _attr_translation_key = "grid_mode"
 
@@ -7967,8 +7879,6 @@ class EnphaseGridModeSensor(_SiteBaseEntity):
             "is_sunlight_backup": getattr(
                 self._coord, "grid_outage_is_sunlight_backup", None
             ),
-            "grid_control_supported": self._coord.grid_control_supported,
-            "grid_toggle_allowed": self._coord.grid_toggle_allowed,
         }
 
     @property

@@ -453,7 +453,6 @@ async def test_button_platform_async_setup_entry_filters_known_serials(
         EvseScheduleDeleteButton,
         EvseScheduleRefreshButton,
         EvseScheduleSaveButton,
-        RequestGridToggleOtpButton,
         StormAlertOptOutButton,
         StartChargeButton,
         StopChargeButton,
@@ -481,8 +480,7 @@ async def test_button_platform_async_setup_entry_filters_known_serials(
     await async_setup_entry(hass, config_entry, capture_add)
     assert len(added) == 2
     assert isinstance(added[0][0], CancelPendingProfileChangeButton)
-    assert isinstance(added[0][1], RequestGridToggleOtpButton)
-    assert isinstance(added[0][2], StormAlertOptOutButton)
+    assert isinstance(added[0][1], StormAlertOptOutButton)
     assert any(isinstance(entity, BatteryForceRefreshButton) for entity in added[0])
     assert any(isinstance(entity, BatteryScheduleSaveButton) for entity in added[0])
     assert any(isinstance(entity, BatteryScheduleDeleteButton) for entity in added[0])
@@ -502,7 +500,6 @@ async def test_button_platform_async_setup_entry_filters_known_serials(
 
     added.clear()
     listeners[0]()
-    assert added == []
 
     coord._ensure_serial_tracked("6666")
     coord.data["6666"] = {"sn": "6666", "name": "Aux Charger"}
@@ -615,69 +612,6 @@ async def test_cancel_pending_profile_button(hass, monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_request_grid_toggle_otp_button(hass, monkeypatch) -> None:
-    from custom_components.enphase_ev.button import RequestGridToggleOtpButton
-    from custom_components.enphase_ev.coordinator import EnphaseCoordinator
-    from custom_components.enphase_ev.const import (
-        CONF_COOKIE,
-        CONF_EAUTH,
-        CONF_SCAN_INTERVAL,
-        CONF_SERIALS,
-        CONF_SITE_ID,
-    )
-
-    cfg = {
-        CONF_SITE_ID: RANDOM_SITE_ID,
-        CONF_SERIALS: [RANDOM_SERIAL],
-        CONF_EAUTH: "EAUTH",
-        CONF_COOKIE: "COOKIE",
-        CONF_SCAN_INTERVAL: 30,
-    }
-    from custom_components.enphase_ev import coordinator as coord_mod
-
-    monkeypatch.setattr(
-        coord_mod, "async_get_clientsession", lambda *args, **kwargs: object()
-    )
-    coord = EnphaseCoordinator(hass, cfg)
-    coord.inventory_runtime._set_type_device_buckets(  # noqa: SLF001
-        {
-            "envoy": {
-                "type_key": "envoy",
-                "type_label": "Gateway",
-                "count": 1,
-                "devices": [{"name": "IQ Gateway"}],
-            },
-            "encharge": {
-                "type_key": "encharge",
-                "type_label": "Battery",
-                "count": 1,
-                "devices": [{"name": "Battery"}],
-            },
-        },
-        ["envoy", "encharge"],
-    )
-    coord._grid_toggle_enabled = True  # noqa: SLF001
-    coord.battery_runtime.parse_grid_control_check_payload(
-        {
-            "disableGridControl": False,
-            "activeDownload": False,
-            "sunlightBackupSystemCheck": False,
-            "gridOutageCheck": False,
-            "userInitiatedGridToggle": False,
-        }
-    )
-    coord.async_request_grid_toggle_otp = AsyncMock()
-
-    button = RequestGridToggleOtpButton(coord)
-    assert button.available is True
-    await button.async_press()
-    coord.async_request_grid_toggle_otp.assert_awaited_once()
-
-    coord._grid_control_disable = True  # noqa: SLF001
-    assert button.available is False
-
-
-@pytest.mark.asyncio
 async def test_storm_alert_opt_out_button(hass, monkeypatch) -> None:
     from custom_components.enphase_ev.button import StormAlertOptOutButton
     from custom_components.enphase_ev.coordinator import EnphaseCoordinator
@@ -727,37 +661,6 @@ async def test_storm_alert_opt_out_button(hass, monkeypatch) -> None:
     coord.async_opt_out_all_storm_alerts.assert_awaited_once()
 
     coord._battery_show_storm_guard = False  # noqa: SLF001
-    assert button.available is False
-
-
-def test_request_grid_toggle_otp_button_availability_guards() -> None:
-    from custom_components.enphase_ev.button import RequestGridToggleOtpButton
-
-    coord = SimpleNamespace(
-        site_id="site",
-        last_update_success=False,
-        battery_has_encharge=True,
-        battery_has_enpower=True,
-        has_type=lambda _key: True,
-        grid_toggle_enabled=True,
-        grid_control_supported=True,
-        grid_toggle_allowed=True,
-    )
-    button = RequestGridToggleOtpButton(coord)
-    assert button.available is False
-
-    coord.grid_toggle_enabled = False
-    coord.last_update_success = True
-    assert button.available is False
-    coord.grid_toggle_enabled = True
-
-    coord.last_update_success = True
-    coord.battery_has_encharge = False
-    coord.battery_has_enpower = False
-    assert button.available is False
-
-    coord.battery_has_encharge = True
-    coord.inventory_view.has_type_for_entities = lambda _key: False
     assert button.available is False
 
 
@@ -826,52 +729,6 @@ def test_cancel_pending_profile_button_device_info_fallback_and_override() -> No
     assert button.device_info is expected
 
 
-def test_request_grid_toggle_otp_button_device_info_prefers_enpower_then_envoy() -> (
-    None
-):
-    from custom_components.enphase_ev.button import RequestGridToggleOtpButton
-
-    coord = SimpleNamespace(
-        site_id="site",
-        last_update_success=True,
-        battery_has_encharge=True,
-        battery_has_enpower=True,
-        grid_toggle_enabled=True,
-        grid_control_supported=True,
-        grid_toggle_allowed=True,
-        inventory_view=SimpleNamespace(
-            has_type_for_entities=lambda _key: True,
-            type_device_info=MagicMock(
-                side_effect=[None, {"identifiers": {("enphase_ev", "envoy")}}]
-            ),
-        ),
-    )
-    button = RequestGridToggleOtpButton(coord)
-
-    assert button.device_info == {"identifiers": {("enphase_ev", "envoy")}}
-
-
-def test_request_grid_toggle_otp_button_device_info_falls_back_when_missing() -> None:
-    from custom_components.enphase_ev.button import RequestGridToggleOtpButton
-
-    coord = SimpleNamespace(
-        site_id="site",
-        last_update_success=True,
-        battery_has_encharge=True,
-        battery_has_enpower=True,
-        grid_toggle_enabled=True,
-        grid_control_supported=True,
-        grid_toggle_allowed=True,
-        inventory_view=SimpleNamespace(
-            has_type_for_entities=lambda _key: True,
-            type_device_info=MagicMock(side_effect=[None, None]),
-        ),
-    )
-    button = RequestGridToggleOtpButton(coord)
-
-    assert button.device_info["identifiers"] == {("enphase_ev", "type:site:envoy")}
-
-
 @pytest.mark.asyncio
 async def test_async_setup_entry_button_cleanup_waits_for_inventory_ready(
     hass, config_entry, monkeypatch
@@ -908,41 +765,6 @@ async def test_async_setup_entry_button_cleanup_waits_for_inventory_ready(
 
     remove_spy.assert_not_called()
     assert ent_reg.async_get(stale.entity_id) is not None
-
-
-@pytest.mark.asyncio
-async def test_async_setup_entry_removes_grid_toggle_button_when_disabled(
-    hass, config_entry, coordinator_factory
-) -> None:
-    from homeassistant.helpers import entity_registry as er
-
-    from custom_components.enphase_ev.button import (
-        RequestGridToggleOtpButton,
-        async_setup_entry,
-    )
-    from custom_components.enphase_ev.const import DOMAIN
-
-    coord = coordinator_factory(serials=[])
-    coord._grid_toggle_enabled = False  # noqa: SLF001
-    coord._devices_inventory_ready = False  # noqa: SLF001
-    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
-    ent_reg = er.async_get(hass)
-    stale = ent_reg.async_get_or_create(
-        "button",
-        DOMAIN,
-        f"{DOMAIN}_site_{coord.site_id}_request_grid_toggle_otp",
-        config_entry=config_entry,
-    )
-    added: list[object] = []
-
-    await async_setup_entry(
-        hass,
-        config_entry,
-        lambda entities, update_before_add=False: added.extend(entities),
-    )
-
-    assert ent_reg.async_get(stale.entity_id) is None
-    assert not any(isinstance(entity, RequestGridToggleOtpButton) for entity in added)
 
 
 def test_storm_alert_opt_out_button_device_info_prefers_type_info() -> None:

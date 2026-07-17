@@ -6955,7 +6955,8 @@ async def test_update_data_normal_ignores_optional_refresh_failures(
     await coord._async_update_data()  # noqa: SLF001
 
     assert "battery_schedules_s" in coord.phase_timings
-    assert "grid_control_check_s" in coord.phase_timings
+    assert "grid_control_check_s" not in coord.phase_timings
+    coord.battery_runtime.async_refresh_grid_control_check.assert_not_awaited()
     assert "devices_inventory_s" in coord.phase_timings
     assert "dry_contact_settings_s" in coord.phase_timings
     assert "hems_devices_s" in coord.phase_timings

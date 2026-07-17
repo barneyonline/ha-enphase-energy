@@ -18,20 +18,12 @@ blueprint:
       description: Choose when this automation should run.
       selector:
         trigger:
-    target:
-      name: Enphase target
-      description: Optional Enphase device target used to resolve site_id automatically.
-      default: {}
+    config_entry_id:
+      name: Enphase config entry
+      description: Enphase site to control.
       selector:
-        target:
-          device:
-            integration: enphase_ev
-    site_id:
-      name: Site ID (optional)
-      description: Optional explicit site ID. Leave blank when targeting a single Enphase site device.
-      default: ""
-      selector:
-        text:
+        config_entry:
+          integration: enphase_ev
     mode:
       name: Grid mode
       description: Select the target grid mode.
@@ -63,25 +55,15 @@ condition: []
 
 action:
   - variables:
-      input_site_id: !input site_id
       input_mode: !input mode
       notify_service: !input notify_service
-      has_site_id: "{{ input_site_id | string | trim != '' }}"
       run_id: "{{ context.id if context is defined and context.id is defined else (now().timestamp() | int) }}"
       submit_action: "ENPHASE_GRID_OTP_SUBMIT_{{ run_id }}"
       cancel_action: "ENPHASE_GRID_OTP_CANCEL_{{ run_id }}"
       notification_tag: "enphase_grid_otp_{{ run_id }}"
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ has_site_id }}"
-        sequence:
-          - action: enphase_ev.request_grid_toggle_otp
-            data:
-              site_id: !input site_id
-    default:
-      - action: enphase_ev.request_grid_toggle_otp
-        target: !input target
+  - action: enphase_ev.request_grid_toggle_otp
+    data:
+      config_entry_id: !input config_entry_id
   - action: "{{ notify_service }}"
     data:
       title: Enphase Grid Mode OTP
@@ -142,22 +124,11 @@ action:
           - condition: template
             value_template: "{{ selected_action == submit_action and otp_valid }}"
         sequence:
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ has_site_id }}"
-                sequence:
-                  - action: enphase_ev.set_grid_mode
-                    data:
-                      site_id: !input site_id
-                      mode: "{{ input_mode }}"
-                      otp: "{{ runtime_otp }}"
-            default:
-              - action: enphase_ev.set_grid_mode
-                target: !input target
-                data:
-                  mode: "{{ input_mode }}"
-                  otp: "{{ runtime_otp }}"
+          - action: enphase_ev.set_grid_mode
+            data:
+              config_entry_id: !input config_entry_id
+              mode: "{{ input_mode }}"
+              otp: "{{ runtime_otp }}"
   - action: "{{ notify_service }}"
     data:
       message: clear_notification

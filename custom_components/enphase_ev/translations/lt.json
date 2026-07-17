@@ -95,7 +95,7 @@
       "message": "Šioje svetainėje tinklelio valdymas nepasiekiamas."
     },
     "grid_control_blocked": {
-      "message": "Šiuo metu tinklelio valdymas užblokuotas: {reasons}."
+      "message": "Šiuo metu tinklo valdymas užblokuotas."
     },
     "grid_mode_invalid": {
       "message": "Tinklelio režimas turi būti on_grid arba off_grid."
@@ -724,12 +724,9 @@
       },
       "grid_toggle": {
         "title": "Tinklo režimas",
-        "description": "Tinklo režimo stebėjimas visada lieka pasiekiamas. Rankinis perjungimas yra svarbus saugai, todėl papildomus objektus ir veiksmus reikia aiškiai įjungti.",
+        "description": "Dabartinis tinklelio režimas: **{current_mode}**.\n\nTinklelio režimo keitimas yra jautrus saugai. Pasirinkite pageidaujamą režimą, kad išsiųstumėte vienkartinį kodą į registruotą el. paštą ir telefoną.",
         "data": {
-          "grid_toggle_enabled": "Įjungti tinklo režimo valdiklius"
-        },
-        "data_description": {
-          "grid_toggle_enabled": "Tinklo režimo jutiklis lieka pasiekiamas. Įjungus sukuriami Tinklo valdymo būsenos ir OTP užklausos objektai bei leidžiami paslaugų veiksmai."
+          "mode": "Reikalingas tinklelio režimas"
         }
       },
       "grid_profile": {
@@ -761,6 +758,18 @@
       "grid_profile_applied": {
         "title": "Tinklo profilio naujinimas priimtas",
         "description": "Enphase priėmė tinklo profilio naujinimą profiliui **{selected_profile}**.\n\nPrašomo profilio ID: **{requested_profile_id}**\n\nDebesies būsena: **{cloud_apply_status}**\n\nGali praeiti iki **5 minučių**, kol naujas profilis bus rodomas kaip dabartinis, kol debesis ir Gateway baigs apdorojimą. Grid Profile jutiklis bus atnaujintas, kai Activation įrašas praneš apie naują dabartinį profilį."
+      },
+      "grid_toggle_otp": {
+        "title": "Patvirtinkite tinklelio režimo pakeitimą",
+        "description": "Dabartinis tinklelio režimas: **{current_mode}**.\n\nReikalingas tinklelio režimas: **{target_mode}**.\n\nĮveskite 4 skaitmenų vienkartinį kodą ir patvirtinkite saugos požiūriu jautrų pakeitimą.",
+        "data": {
+          "otp": "Vienkartinis kodas",
+          "confirm": "Patvirtinkite tinklelio režimo pakeitimą"
+        }
+      },
+      "grid_toggle_applied": {
+        "title": "Priimtas tinklelio režimo pakeitimas",
+        "description": "„Enphase“ priėmė užklausą pakeisti tinklelio režimą į **{target_mode}**.\n\nFizinė relė vis dar gali keistis. Norėdami stebėti gautą būseną, naudokite tinklelio režimo jutiklį."
       }
     },
     "error": {
@@ -778,7 +787,16 @@
       "grid_profile_region_invalid": "Pasirinktas tinklo profilio regionas nepasiekiamas.",
       "grid_profile_profile_invalid": "Pasirinktas tinklo profilis nepasiekiamas šios vietos šaliai ir regionui.",
       "grid_profile_gateway_required": "Tinklo profilio taikymui reikia debesies Activation Gateway įrašo.",
-      "grid_profile_apply_failed": "Tinklo profilio taikyti nepavyko."
+      "grid_profile_apply_failed": "Tinklo profilio taikyti nepavyko.",
+      "grid_mode_invalid": "Pasirinkite On Grid arba Off Grid.",
+      "grid_mode_already_active": "Svetainėje jau veikia pasirinktas tinklelio režimas.",
+      "grid_mode_confirm_required": "Prieš tęsdami patvirtinkite tinklelio režimo pakeitimą.",
+      "grid_control_unavailable": "Šioje svetainėje tinklelio valdymas nepasiekiamas.",
+      "grid_control_blocked": "Šiuo metu tinklo valdymas užblokuotas.",
+      "grid_otp_required": "Įveskite vienkartinį kodą.",
+      "grid_otp_invalid_format": "Vienkartinį kodą turi sudaryti tiksliai keturi skaitmenys.",
+      "grid_otp_invalid": "Vienkartinis kodas neteisingas arba pasibaigęs.",
+      "grid_envoy_serial_missing": "Nepavyko nustatyti šios svetainės vartų."
     },
     "abort": {
       "migration_no_envoy_sources": "Nėra Enphase Envoy energijos jutiklių, kuriuos būtų galima migruoti.",
@@ -786,7 +804,9 @@
       "migration_partial_failure": "Migracija sustojo po dalinio užbaigimo.\n\nUžbaigti susiejimai:\n{completed_mappings}\n\nNepavyko apdoroti `{failed_entity_id}`: {failure_reason}\n\nJei rezultatas netenkina, atkurkite atsarginę kopiją.",
       "grid_profile_unavailable": "Tinklo profilio valdymas nepasiekiamas.",
       "grid_profile_installer_required": "Tinklo profilio valdymui reikia diegėjo prieigos prie Enphase Activation.",
-      "grid_profile_no_regions": "Šios vietos šaliai nėra tinklo profilio regionų."
+      "grid_profile_no_regions": "Šios vietos šaliai nėra tinklo profilio regionų.",
+      "grid_mode_unavailable": "Šioje svetainėje tinklelio režimo valdymas nepasiekiamas.",
+      "grid_mode_blocked": "Tinklelio režimo valdymas šiuo metu užblokuotas: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migracija baigta. Enphase Energy dabar naudoja pasirinktus šaltinio objektų identifikatorius. Po kito atnaujinimo patikrinkite Energy skydelį ir Developer Tools > Statistics.",
@@ -808,6 +828,23 @@
         "available": "Pasiekiama",
         "unavailable": "Nepasiekiama",
         "accepted": "Priimta"
+      }
+    },
+    "grid_mode": {
+      "options": {
+        "on_grid": "Ant tinklelio",
+        "off_grid": "Išjungtas tinklelis",
+        "unknown": "Nežinoma"
+      }
+    },
+    "grid_control_block_reason": {
+      "options": {
+        "disable_grid_control": "Tinklo valdymas šioje vietoje išjungtas.",
+        "active_download": "Vykdomas sistemos atsisiuntimas.",
+        "sunlight_backup_system_check": "Vykdoma „Sunlight Backup“ sistemos patikra.",
+        "grid_outage_check": "Vykdoma tinklo dingimo patikra.",
+        "pending": "Tinklo režimo pakeitimas jau laukia.",
+        "unknown": "Aktyvi nežinoma blokavimo sąlyga."
       }
     }
   },
@@ -1380,14 +1417,6 @@
           "none": "Nėra",
           "pending": "Laukiama",
           "active": "Aktyvus"
-        }
-      },
-      "grid_control_status": {
-        "name": "Tinklo valdymo būsena",
-        "state": {
-          "ready": "Paruošta",
-          "blocked": "Užblokuota",
-          "pending": "Laukiama"
         }
       },
       "grid_mode": {
@@ -2323,9 +2352,6 @@
       "cancel_pending_profile_change": {
         "name": "Atšaukti laukiantį profilio pakeitimą"
       },
-      "request_grid_toggle_otp": {
-        "name": "Prašyti tinklelio perjungimo OTP"
-      },
       "storm_alert_opt_out": {
         "name": "Atsisakyti audros įspėjimo"
       },
@@ -2648,26 +2674,16 @@
     "request_grid_toggle_otp": {
       "name": "Prašyti tinklelio perjungimo OTP",
       "description": "Prieš keisdami svetainės tinklelio režimą, išsiųskite vienkartinį kodą.",
-      "sections": {
-        "advanced": {
-          "name": "Išplėstinės parinktys"
-        }
-      },
       "fields": {
-        "site_id": {
-          "name": "Vietos ID",
-          "description": "Pasirinktinis vietos identifikatorius; aptinkamas automatiškai pasirinkus vietos įrenginį."
+        "config_entry_id": {
+          "name": "Enphase konfigūracijos įrašas",
+          "description": "Pasirinkite „Enphase“ svetainę, kuri turėtų gauti vienkartinį kodą."
         }
       }
     },
     "set_grid_mode": {
       "name": "Nustatykite tinklelio režimą",
       "description": "Pakeiskite svetainės tinklelio režimą patvirtinę vienkartinį kodą.",
-      "sections": {
-        "advanced": {
-          "name": "Išplėstinės parinktys"
-        }
-      },
       "fields": {
         "mode": {
           "name": "Tinklelio režimas",
@@ -2677,9 +2693,9 @@
           "name": "Vienkartinis kodas",
           "description": "Įveskite 4 skaitmenų vienkartinį kodą, atsiųstą jūsų registruotu el. pašto adresu ir telefonu."
         },
-        "site_id": {
-          "name": "Vietos ID",
-          "description": "Pasirinktinis vietos identifikatorius; aptinkamas automatiškai pasirinkus vietos įrenginį."
+        "config_entry_id": {
+          "name": "Enphase konfigūracijos įrašas",
+          "description": "Pasirinkite Enphase svetainę, kurios tinklelio režimas turėtų pasikeisti."
         }
       }
     },

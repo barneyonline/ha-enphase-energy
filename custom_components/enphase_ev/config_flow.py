@@ -69,7 +69,6 @@ from .const import (
     DEFAULT_API_TIMEOUT,
     DEFAULT_DEGRADED_SERVICE_REPAIR_ISSUES,
     DEFAULT_FAST_POLL_INTERVAL,
-    DEFAULT_GRID_TOGGLE_ENABLED,
     DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     DEFAULT_MICROINVERTER_POWER_ENABLED,
     DEFAULT_PRICING_EDITS_ENABLED,
@@ -91,7 +90,6 @@ from .const import (
     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
     OPT_FAST_POLL_INTERVAL,
     OPT_FAST_WHILE_STREAMING,
-    OPT_GRID_TOGGLE_ENABLED,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_MICROINVERTER_POWER_ENABLED,
     OPT_PRICING_EDITS_ENABLED,
@@ -165,8 +163,14 @@ CONF_GRID_PROFILE_REGION = "grid_profile_region"
 CONF_GRID_PROFILE_COMMONLY_USED = "grid_profile_commonly_used"
 CONF_GRID_PROFILE_ID = "grid_profile_id"
 CONF_GRID_PROFILE_CONFIRM_APPLY = "confirm_apply"
+CONF_GRID_MODE = "mode"
+CONF_GRID_MODE_CONFIRM = "confirm"
 
 _GRID_PROFILE_LABEL_PREFIX = f"component.{DOMAIN}.selector.grid_profile_status.options."
+_GRID_MODE_LABEL_PREFIX = f"component.{DOMAIN}.selector.grid_mode.options."
+_GRID_CONTROL_BLOCK_REASON_LABEL_PREFIX = (
+    f"component.{DOMAIN}.selector.grid_control_block_reason.options."
+)
 
 _TYPE_FIELD_BY_KEY: dict[str, str] = {
     "envoy": CONF_TYPE_ENVOY,
@@ -292,7 +296,7 @@ def _legacy_microinverters_available(payload: object) -> bool:
 
 class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg,misc]
     VERSION = 1
-    MINOR_VERSION = 1
+    MINOR_VERSION = 2
 
     def __init__(self) -> None:
         self._auth_tokens: AuthTokens | None = None
@@ -1246,6 +1250,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         self._selected_migration_source_id: str | None = None
         self._migration_selection: dict[str, str] = {}
         self._grid_profile_apply_result: dict[str, object] | None = None
+        self._grid_mode_target: str | None = None
 
     @staticmethod
     def _normalize_serials(value: Any) -> list[str]:
@@ -1701,6 +1706,57 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         runtime = getattr(coordinator, "grid_profile_runtime", None)
         return runtime if isinstance(runtime, GridProfileRuntime) else None
 
+    def _grid_mode_coordinator(self) -> Any | None:
+        runtime_data = getattr(self._entry, "runtime_data", None)
+        return getattr(runtime_data, "coordinator", None)
+
+    async def _async_prime_grid_mode_labels(self) -> None:
+        language = getattr(self.hass.config, "language", "en")
+        await async_get_translations(self.hass, language, "selector", [DOMAIN])
+
+    def _grid_mode_label(self, mode: object) -> str:
+        key = str(mode or "unknown").strip().lower() or "unknown"
+        language = getattr(self.hass.config, "language", "en")
+        path = f"{_GRID_MODE_LABEL_PREFIX}{key}"
+        for candidate_language in (language, "en"):
+            translated = async_get_cached_translations(
+                self.hass,
+                candidate_language,
+                "selector",
+                DOMAIN,
+            ).get(path)
+            if isinstance(translated, str) and translated.strip():
+                return translated
+        return key.replace("_", " ").title()
+
+    def _grid_control_block_reason_label(self, reason: object) -> str:
+        key = str(reason or "unknown").strip().lower() or "unknown"
+        language = getattr(self.hass.config, "language", "en")
+        for reason_key in (key, "unknown"):
+            path = f"{_GRID_CONTROL_BLOCK_REASON_LABEL_PREFIX}{reason_key}"
+            for candidate_language in (language, "en"):
+                translated = async_get_cached_translations(
+                    self.hass,
+                    candidate_language,
+                    "selector",
+                    DOMAIN,
+                ).get(path)
+                if isinstance(translated, str) and translated.strip():
+                    return translated
+        return "Unknown blocking condition"
+
+    def _grid_mode_placeholders(self) -> dict[str, str]:
+        coordinator = self._grid_mode_coordinator()
+        current_mode = getattr(coordinator, "grid_mode", None)
+        return {
+            "current_mode": self._grid_mode_label(current_mode),
+            "target_mode": self._grid_mode_label(self._grid_mode_target),
+        }
+
+    @staticmethod
+    def _grid_mode_error(err: ServiceValidationError) -> str:
+        return str(getattr(err, "translation_key", None) or "grid_control_unavailable")
+
     def _grid_profile_options_available(self) -> bool:
         runtime = self._grid_profile_runtime()
         return bool(
@@ -1919,25 +1975,128 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
     async def async_step_grid_toggle(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        if user_input is not None:
-            options = dict(self._entry.options)
-            options[OPT_GRID_TOGGLE_ENABLED] = bool(
-                user_input.get(OPT_GRID_TOGGLE_ENABLED, DEFAULT_GRID_TOGGLE_ENABLED)
-            )
-            return self.async_create_entry(title="", data=options)
+        coordinator = self._grid_mode_coordinator()
+        if coordinator is None:
+            return self.async_abort(reason="grid_mode_unavailable")
+
+        errors: dict[str, str] = {}
+        await self._async_prime_grid_mode_labels()
+        if user_input is None:
+            try:
+                refreshed = (
+                    await coordinator.battery_runtime.async_refresh_grid_control_check(
+                        force=True
+                    )
+                )
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug(
+                    "Failed refreshing Grid Mode eligibility for site %s: %s",
+                    redact_site_id(getattr(coordinator, "site_id", "")),
+                    redact_text(
+                        err,
+                        site_ids=(str(getattr(coordinator, "site_id", "")),),
+                    ),
+                )
+                return self.async_abort(reason="grid_mode_unavailable")
+
+            if refreshed is not True:
+                return self.async_abort(reason="grid_mode_unavailable")
+            if getattr(coordinator, "grid_control_supported", None) is not True:
+                return self.async_abort(reason="grid_mode_unavailable")
+            if getattr(coordinator, "grid_toggle_allowed", None) is not True:
+                reasons = getattr(coordinator, "grid_toggle_blocked_reasons", [])
+                return self.async_abort(
+                    reason="grid_mode_blocked",
+                    description_placeholders={
+                        "reasons": ", ".join(
+                            self._grid_control_block_reason_label(reason)
+                            for reason in (reasons or ["pending"])
+                        )
+                    },
+                )
+        else:
+            target = str(user_input.get(CONF_GRID_MODE, "")).strip().lower()
+            current = str(getattr(coordinator, "grid_mode", "") or "").lower()
+            if target not in {"on_grid", "off_grid"}:
+                errors[CONF_GRID_MODE] = "grid_mode_invalid"
+            elif target == current:
+                errors[CONF_GRID_MODE] = "grid_mode_already_active"
+            else:
+                self._grid_mode_target = target
+                try:
+                    await coordinator.async_request_grid_toggle_otp()
+                except ServiceValidationError as err:
+                    errors["base"] = self._grid_mode_error(err)
+                else:
+                    return await self.async_step_grid_toggle_otp()
+
         return self.async_show_form(
             step_id="grid_toggle",
             data_schema=vol.Schema(
                 {
-                    vol.Optional(
-                        OPT_GRID_TOGGLE_ENABLED,
-                        default=self._entry.options.get(
-                            OPT_GRID_TOGGLE_ENABLED,
-                            DEFAULT_GRID_TOGGLE_ENABLED,
-                        ),
-                    ): bool
+                    vol.Required(CONF_GRID_MODE): selector(
+                        {
+                            "select": {
+                                "options": ["on_grid", "off_grid"],
+                                "mode": "dropdown",
+                                "translation_key": "grid_mode",
+                            }
+                        }
+                    )
                 }
             ),
+            description_placeholders=self._grid_mode_placeholders(),
+            errors=errors,
+        )
+
+    async def async_step_grid_toggle_otp(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        coordinator = self._grid_mode_coordinator()
+        if coordinator is None or self._grid_mode_target not in {
+            "on_grid",
+            "off_grid",
+        }:
+            return self.async_abort(reason="grid_mode_unavailable")
+
+        errors: dict[str, str] = {}
+        await self._async_prime_grid_mode_labels()
+        if user_input is not None:
+            if not user_input.get(CONF_GRID_MODE_CONFIRM):
+                errors["base"] = "grid_mode_confirm_required"
+            else:
+                try:
+                    await coordinator.async_set_grid_mode(
+                        self._grid_mode_target,
+                        user_input.get(CONF_OTP, ""),
+                    )
+                except ServiceValidationError as err:
+                    errors["base"] = self._grid_mode_error(err)
+                else:
+                    return await self.async_step_grid_toggle_applied()
+
+        return self.async_show_form(
+            step_id="grid_toggle_otp",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_OTP): selector({"text": {"type": "password"}}),
+                    vol.Required(CONF_GRID_MODE_CONFIRM, default=False): bool,
+                }
+            ),
+            description_placeholders=self._grid_mode_placeholders(),
+            errors=errors,
+        )
+
+    async def async_step_grid_toggle_applied(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        await self._async_prime_grid_mode_labels()
+        if user_input is not None:
+            return self.async_create_entry(title="", data=dict(self._entry.options))
+        return self.async_show_form(
+            step_id="grid_toggle_applied",
+            data_schema=vol.Schema({}),
+            description_placeholders=self._grid_mode_placeholders(),
         )
 
     async def async_step_grid_profile(

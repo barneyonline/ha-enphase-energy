@@ -95,7 +95,7 @@
       "message": "Controlul rețelei nu este disponibil pentru acest site."
     },
     "grid_control_blocked": {
-      "message": "Controlul rețelei este blocat momentan: {reasons}."
+      "message": "Controlul rețelei este blocat în prezent."
     },
     "grid_mode_invalid": {
       "message": "Modul rețelei trebuie să fie on_grid sau off_grid."
@@ -724,12 +724,9 @@
       },
       "grid_toggle": {
         "title": "Mod rețea",
-        "description": "Monitorizarea modului rețea rămâne permanent disponibilă. Comutarea manuală este sensibilă pentru siguranță, astfel încât entitățile și acțiunile suplimentare necesită activare explicită.",
+        "description": "Modul actual al rețelei: **{current_mode}**.\n\nSchimbarea modului Grid este sensibilă la siguranță. Selectați modul solicitat pentru a trimite un cod unic către e-mailul și telefonul înregistrat.",
         "data": {
-          "grid_toggle_enabled": "Activează comenzile pentru modul rețea"
-        },
-        "data_description": {
-          "grid_toggle_enabled": "Senzorul Mod rețea rămâne disponibil. Activarea creează Stare control rețea și Solicită OTP și permite acțiunile de serviciu."
+          "mode": "Modul grilă solicitat"
         }
       },
       "grid_profile": {
@@ -761,6 +758,18 @@
       "grid_profile_applied": {
         "title": "Actualizarea profilului de rețea a fost acceptată",
         "description": "Enphase a acceptat actualizarea profilului de rețea pentru **{selected_profile}**.\n\nID profil solicitat: **{requested_profile_id}**\n\nStare cloud: **{cloud_apply_status}**\n\nPoate dura până la **5 minute** până când noul profil apare ca profil curent, în timp ce cloudul și Gateway finalizează procesarea. Senzorul Grid Profile se va actualiza după ce înregistrarea Activation raportează noul profil curent."
+      },
+      "grid_toggle_otp": {
+        "title": "Confirmați schimbarea modului grilă",
+        "description": "Modul actual al rețelei: **{current_mode}**.\n\nModul grilă solicitat: **{target_mode}**.\n\nIntroduceți codul unic din 4 cifre și confirmați modificarea sensibilă la siguranță.",
+        "data": {
+          "otp": "Cod unic",
+          "confirm": "Confirmați modificarea modului Grid"
+        }
+      },
+      "grid_toggle_applied": {
+        "title": "Modificarea modului grilă a fost acceptată",
+        "description": "Enphase a acceptat solicitarea de a schimba modul Grid în **{target_mode}**.\n\nEste posibil ca releul fizic să se schimbe în continuare. Utilizați senzorul Grid Mode pentru a observa starea rezultată."
       }
     },
     "error": {
@@ -778,7 +787,16 @@
       "grid_profile_region_invalid": "Regiunea profilului de rețea selectată nu este disponibilă.",
       "grid_profile_profile_invalid": "Profilul de rețea selectat nu este disponibil pentru țara și regiunea acestui amplasament.",
       "grid_profile_gateway_required": "Aplicarea profilului de rețea necesită o înregistrare Gateway din Activation în cloud.",
-      "grid_profile_apply_failed": "Aplicarea profilului de rețea a eșuat."
+      "grid_profile_apply_failed": "Aplicarea profilului de rețea a eșuat.",
+      "grid_mode_invalid": "Selectați On Grid sau Off Grid.",
+      "grid_mode_already_active": "Site-ul este deja în modul Grid selectat.",
+      "grid_mode_confirm_required": "Confirmați schimbarea modului Grid înainte de a continua.",
+      "grid_control_unavailable": "Controlul grilei nu este disponibil pentru acest site.",
+      "grid_control_blocked": "Controlul rețelei este blocat în prezent.",
+      "grid_otp_required": "Introduceți codul unic.",
+      "grid_otp_invalid_format": "Codul unic trebuie să conțină exact patru cifre.",
+      "grid_otp_invalid": "Codul unic este invalid sau a expirat.",
+      "grid_envoy_serial_missing": "Gateway-ul pentru acest site nu a putut fi determinat."
     },
     "abort": {
       "migration_no_envoy_sources": "Nu există senzori de energie Enphase Envoy disponibili pentru migrare.",
@@ -786,7 +804,9 @@
       "migration_partial_failure": "Migrarea s-a oprit după finalizare parțială.\n\nMapări finalizate:\n{completed_mappings}\n\nEroare la procesarea `{failed_entity_id}`: {failure_reason}\n\nRestaurați din backup dacă rezultatul nu este acceptabil.",
       "grid_profile_unavailable": "Controlul profilului de rețea nu este disponibil.",
       "grid_profile_installer_required": "Controlul profilului de rețea necesită acces de instalator la Enphase Activation.",
-      "grid_profile_no_regions": "Nu există regiuni de profil de rețea disponibile pentru țara acestui amplasament."
+      "grid_profile_no_regions": "Nu există regiuni de profil de rețea disponibile pentru țara acestui amplasament.",
+      "grid_mode_unavailable": "Controlul modului grilă nu este disponibil pentru acest site.",
+      "grid_mode_blocked": "Controlul modului grilă este blocat în prezent: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migrare finalizată. Enphase Energy deține acum ID-urile entităților sursă selectate. Verificați tabloul Energy și Developer Tools > Statistics după următoarea actualizare.",
@@ -808,6 +828,23 @@
         "available": "Disponibil",
         "unavailable": "Indisponibil",
         "accepted": "Acceptat"
+      }
+    },
+    "grid_mode": {
+      "options": {
+        "on_grid": "Conectat la rețea",
+        "off_grid": "Deconectat de la rețea",
+        "unknown": "Necunoscut"
+      }
+    },
+    "grid_control_block_reason": {
+      "options": {
+        "disable_grid_control": "Controlul rețelei este dezactivat pentru locație.",
+        "active_download": "Este activă o descărcare de sistem.",
+        "sunlight_backup_system_check": "Verificarea sistemului Sunlight Backup este activă.",
+        "grid_outage_check": "Verificarea întreruperii rețelei este activă.",
+        "pending": "O modificare a modului de rețea este deja în așteptare.",
+        "unknown": "Este activă o condiție de blocare necunoscută."
       }
     }
   },
@@ -1380,14 +1417,6 @@
           "none": "Niciunul",
           "pending": "În așteptare",
           "active": "Activ"
-        }
-      },
-      "grid_control_status": {
-        "name": "Stare control rețea",
-        "state": {
-          "ready": "Pregătit",
-          "blocked": "Blocat",
-          "pending": "În așteptare"
         }
       },
       "grid_mode": {
@@ -2323,9 +2352,6 @@
       "cancel_pending_profile_change": {
         "name": "Anulați modificarea profilului în așteptare"
       },
-      "request_grid_toggle_otp": {
-        "name": "Solicită OTP pentru comutare rețea"
-      },
       "storm_alert_opt_out": {
         "name": "Renunță la alerta de furtună"
       },
@@ -2648,26 +2674,16 @@
     "request_grid_toggle_otp": {
       "name": "Solicită OTP pentru comutare rețea",
       "description": "Trimite codul unic necesar înainte de schimbarea modului rețelei site-ului.",
-      "sections": {
-        "advanced": {
-          "name": "Opțiuni avansate"
-        }
-      },
       "fields": {
-        "site_id": {
-          "name": "ID locație",
-          "description": "Identificator opțional al locației; detectat automat când este selectat un dispozitiv de locație."
+        "config_entry_id": {
+          "name": "Intrare de configurare Enphase",
+          "description": "Selectați site-ul Enphase care ar trebui să primească codul unic."
         }
       }
     },
     "set_grid_mode": {
       "name": "Setează modul rețea",
       "description": "Schimbă modul rețelei site-ului după validarea codului unic.",
-      "sections": {
-        "advanced": {
-          "name": "Opțiuni avansate"
-        }
-      },
       "fields": {
         "mode": {
           "name": "Mod rețea",
@@ -2677,9 +2693,9 @@
           "name": "Cod unic",
           "description": "Introduceți OTP-ul din 4 cifre trimis la email și telefon."
         },
-        "site_id": {
-          "name": "ID locație",
-          "description": "Identificator opțional al locației; detectat automat când este selectat un dispozitiv de locație."
+        "config_entry_id": {
+          "name": "Intrare de configurare Enphase",
+          "description": "Selectați site-ul Enphase al cărui mod Grid ar trebui să se schimbe."
         }
       }
     },

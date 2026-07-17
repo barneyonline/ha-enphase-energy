@@ -2600,7 +2600,7 @@ async def test_battery_runtime_optional_refreshes_respect_cooldown_and_clear_sta
     coord._grid_control_sunlight_backup_system_check = True  # noqa: SLF001
     coord._grid_control_grid_outage_check = True  # noqa: SLF001
     coord._grid_control_user_initiated_toggle = True  # noqa: SLF001
-    await coord.battery_runtime.async_refresh_grid_control_check()
+    await coord.battery_runtime.async_refresh_grid_control_check(force=True)
     assert coord._grid_control_supported is None  # noqa: SLF001
     assert coord._grid_control_disable is None  # noqa: SLF001
     assert coord._grid_control_active_download is None  # noqa: SLF001
@@ -2635,7 +2635,7 @@ async def test_battery_runtime_grid_control_refresh_keeps_recent_state_during_co
     coord._grid_control_grid_outage_check = False  # noqa: SLF001
     coord._grid_control_user_initiated_toggle = False  # noqa: SLF001
 
-    await coord.battery_runtime.async_refresh_grid_control_check()
+    await coord.battery_runtime.async_refresh_grid_control_check(force=True)
 
     assert coord._grid_control_supported is True  # noqa: SLF001
     assert coord._grid_control_disable is False  # noqa: SLF001
@@ -2654,7 +2654,42 @@ def test_battery_runtime_grid_control_refresh_due_requests_state_invalidation(
     coord._grid_control_supported = True  # noqa: SLF001
     coord.client.grid_control_check = AsyncMock(side_effect=AssertionError("unused"))
 
-    assert coord.battery_runtime.grid_control_check_refresh_due() is True
+    assert coord.battery_runtime.grid_control_check_refresh_due() is False
+    assert coord.battery_runtime.grid_control_check_refresh_due(force=True) is True
+
+    coord.client.grid_control_check = None
+    assert coord.battery_runtime.grid_control_check_refresh_due(force=True) is True
+
+    coord.client.grid_control_check = AsyncMock()
+    coord._endpoint_family_should_run = lambda *args, **kwargs: False  # type: ignore[method-assign]  # noqa: SLF001
+    coord._endpoint_family_can_use_stale = lambda *args, **kwargs: False  # type: ignore[method-assign]  # noqa: SLF001
+    assert coord.battery_runtime.grid_control_check_refresh_due(force=True) is True
+
+
+@pytest.mark.asyncio
+async def test_battery_runtime_forced_grid_control_refresh_clears_expired_state(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord._grid_control_supported = True  # noqa: SLF001
+    coord._grid_control_disable = False  # noqa: SLF001
+    coord._grid_control_active_download = True  # noqa: SLF001
+    coord._grid_control_sunlight_backup_system_check = True  # noqa: SLF001
+    coord._grid_control_grid_outage_check = True  # noqa: SLF001
+    coord._grid_control_user_initiated_toggle = True  # noqa: SLF001
+    health = coord._endpoint_family_state("grid_control_check")  # noqa: SLF001
+    health.cooldown_active = True
+    coord._endpoint_family_should_run = lambda *args, **kwargs: False  # type: ignore[method-assign]  # noqa: SLF001
+    coord._endpoint_family_can_use_stale = lambda *args, **kwargs: False  # type: ignore[method-assign]  # noqa: SLF001
+
+    await coord.battery_runtime.async_refresh_grid_control_check(force=True)
+
+    assert coord._grid_control_supported is None  # noqa: SLF001
+    assert coord._grid_control_disable is None  # noqa: SLF001
+    assert coord._grid_control_active_download is None  # noqa: SLF001
+    assert coord._grid_control_sunlight_backup_system_check is None  # noqa: SLF001
+    assert coord._grid_control_grid_outage_check is None  # noqa: SLF001
+    assert coord._grid_control_user_initiated_toggle is None  # noqa: SLF001
 
 
 def test_battery_runtime_dry_contact_refresh_due_requests_state_invalidation(
@@ -2767,7 +2802,7 @@ async def test_battery_runtime_optional_refreshes_handle_early_return_paths(
     coord._grid_control_grid_outage_check = True  # noqa: SLF001
     coord._grid_control_user_initiated_toggle = True  # noqa: SLF001
     coord.client.grid_control_check = None
-    await coord.battery_runtime.async_refresh_grid_control_check()
+    await coord.battery_runtime.async_refresh_grid_control_check(force=True)
     assert coord._grid_control_supported is None  # noqa: SLF001
     assert coord._grid_control_disable is None  # noqa: SLF001
     assert coord._grid_control_active_download is None  # noqa: SLF001

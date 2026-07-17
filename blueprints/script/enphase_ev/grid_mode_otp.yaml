@@ -2,25 +2,19 @@ blueprint:
   name: Enphase Energy Grid Mode (OTP)
   description: >
     Run an OTP-gated grid mode change for a single Enphase site.
-    Select mode when creating the script, then enter the OTP each time you run it.
+    Select an Enphase config entry and mode when creating the script. Run the
+    script once with Request OTP, then run it again with Apply Grid Mode and the
+    delivered code.
   domain: script
   author: barneyonline
   source_url: https://github.com/barneyonline/ha-enphase-energy
   input:
-    target:
-      name: Enphase target
-      description: Optional Enphase device target used to resolve site_id automatically.
-      default: {}
+    config_entry_id:
+      name: Enphase config entry
+      description: Enphase site to control.
       selector:
-        target:
-          device:
-            integration: enphase_ev
-    site_id:
-      name: Site ID (optional)
-      description: Optional explicit site ID. Leave blank when targeting a single Enphase site device.
-      default: ""
-      selector:
-        text:
+        config_entry:
+          integration: enphase_ev
     mode:
       name: Grid mode
       description: Select the target grid mode.
@@ -32,10 +26,22 @@ blueprint:
             - off_grid
 
 fields:
+  operation:
+    name: Operation
+    description: Request an OTP first, then apply Grid Mode with the delivered code.
+    required: true
+    default: request_otp
+    selector:
+      select:
+        options:
+          - label: Request OTP
+            value: request_otp
+          - label: Apply Grid Mode
+            value: set_mode
   otp:
     name: One-time code (OTP)
-    description: Enter the 4-digit OTP sent to the registered email and phone.
-    required: true
+    description: Enter the delivered 4-digit OTP when applying Grid Mode.
+    required: false
     selector:
       text:
 
@@ -43,23 +49,24 @@ mode: single
 
 sequence:
   - variables:
-      input_site_id: !input site_id
+      input_operation: >-
+        {{ operation | default('request_otp', true) | string | trim }}
       input_mode: !input mode
       runtime_otp: "{{ otp | default('', true) | string | trim }}"
-      has_site_id: "{{ input_site_id | string | trim != '' }}"
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ has_site_id }}"
+            value_template: "{{ input_operation == 'request_otp' }}"
+        sequence:
+          - service: enphase_ev.request_grid_toggle_otp
+            data:
+              config_entry_id: !input config_entry_id
+      - conditions:
+          - condition: template
+            value_template: "{{ input_operation == 'set_mode' }}"
         sequence:
           - service: enphase_ev.set_grid_mode
             data:
-              site_id: !input site_id
+              config_entry_id: !input config_entry_id
               mode: "{{ input_mode }}"
               otp: "{{ runtime_otp }}"
-    default:
-      - service: enphase_ev.set_grid_mode
-        target: !input target
-        data:
-          mode: "{{ input_mode }}"
-          otp: "{{ runtime_otp }}"

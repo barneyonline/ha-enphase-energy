@@ -105,7 +105,6 @@ from .const import (
     HEMS_AUTH_MANUAL_CLEAR_COOLDOWN_S,
     OPT_API_TIMEOUT,
     OPT_FAST_POLL_INTERVAL,
-    OPT_GRID_TOGGLE_ENABLED,
     OPT_NOMINAL_VOLTAGE,
     OPT_PRICING_EDITS_ENABLED,
     OPT_SLOW_POLL_INTERVAL,
@@ -747,9 +746,6 @@ class EnphaseCoordinator(
         self._publication_revision = 0
         self._runtime_publication_revisions: dict[str, int] = {}
         self.config_entry = config_entry
-        self._grid_toggle_enabled = bool(
-            config_entry and config_entry.options.get(OPT_GRID_TOGGLE_ENABLED, False)
-        )
         self._pricing_edits_enabled = bool(
             config_entry is None
             or config_entry.options.get(
@@ -7258,15 +7254,7 @@ class EnphaseCoordinator(
 
     @property
     def grid_toggle_pending(self) -> bool:
-        return bool(
-            self.grid_toggle_enabled and self.grid_control_user_initiated_toggle is True
-        )
-
-    @property
-    def grid_toggle_enabled(self) -> bool:
-        """Return whether the safety-sensitive Grid Toggle feature is enabled."""
-
-        return bool(getattr(self, "_grid_toggle_enabled", False))
+        return self.grid_control_user_initiated_toggle is True
 
     @property
     def pricing_edits_enabled(self) -> bool:
@@ -7276,8 +7264,6 @@ class EnphaseCoordinator(
 
     @property
     def grid_toggle_blocked_reasons(self) -> list[str]:
-        if not self.grid_toggle_enabled:
-            return []
         if self.grid_control_supported is not True:
             return []
         reasons: list[str] = []
@@ -7293,8 +7279,6 @@ class EnphaseCoordinator(
 
     @property
     def grid_toggle_allowed(self) -> bool | None:
-        if not self.grid_toggle_enabled:
-            return None
         if self.grid_control_supported is not True:
             return None
         if self.grid_toggle_pending:

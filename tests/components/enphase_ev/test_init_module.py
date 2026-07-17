@@ -48,6 +48,7 @@ from custom_components.enphase_ev import (
     _sync_type_devices,
     async_setup,
     async_setup_entry,
+    async_migrate_entry,
     async_unload_entry,
 )
 from custom_components.enphase_ev.const import (
@@ -138,6 +139,61 @@ def test_remove_retired_grid_profile_entities_handles_current_sensor(
 def test_startup_migration_version_returns_zero_for_invalid_value(config_entry) -> None:
     entry = SimpleNamespace(data={"startup_migration_version": "bad"})
     assert _startup_migration_version(entry) == 0
+
+
+@pytest.mark.asyncio
+async def test_config_entry_minor_migration_retires_grid_control_entities(
+    hass: HomeAssistant,
+) -> None:
+    unsupported = MockConfigEntry(domain=DOMAIN, data={}, version=2, minor_version=1)
+    assert await async_migrate_entry(hass, unsupported) is False
+
+    no_site = MockConfigEntry(
+        domain=DOMAIN,
+        data={},
+        options={"grid_toggle_enabled": True},
+        version=1,
+        minor_version=1,
+    )
+    no_site.add_to_hass(hass)
+    assert await async_migrate_entry(hass, no_site) is True
+    assert no_site.options == {}
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "12345"},
+        options={"grid_toggle_enabled": True, "existing": True},
+        version=1,
+        minor_version=1,
+    )
+    entry.add_to_hass(hass)
+    ent_reg = er.async_get(hass)
+    grid_mode = ent_reg.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{DOMAIN}_site_12345_grid_mode",
+        config_entry=entry,
+    )
+    retired = [
+        ent_reg.async_get_or_create(
+            domain,
+            DOMAIN,
+            f"{DOMAIN}_site_12345_{suffix}",
+            config_entry=entry,
+        )
+        for domain, suffix in (
+            ("button", "request_grid_toggle_otp"),
+            ("sensor", "grid_control_status"),
+        )
+    ]
+
+    assert await async_migrate_entry(hass, entry) is True
+
+    assert entry.version == 1
+    assert entry.minor_version == 2
+    assert entry.options == {"existing": True}
+    assert ent_reg.async_get(grid_mode.entity_id) is not None
+    assert all(ent_reg.async_get(item.entity_id) is None for item in retired)
 
 
 @pytest.mark.asyncio
@@ -1894,14 +1950,25 @@ async def test_registered_services_cover_branches(
     device_registry = dr.async_get(hass)
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(
+        self, domain, service, handler, schema=None, supports_response=None, **kwargs
+    ):
         registered[(domain, service)] = {
             "handler": handler,
             "schema": schema,
             "kwargs": kwargs,
+            "supports_response": supports_response,
         }
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
+
+    def fake_register_admin(hass_, domain, service, handler, schema, **kwargs):
+        hass_.services.async_register(domain, service, handler, schema=schema, **kwargs)
+
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.services.async_register_admin_service",
+        fake_register_admin,
+    )
 
     fake_ir_deletes: list[str] = []
     monkeypatch.setattr(
@@ -1923,6 +1990,14 @@ async def test_registered_services_cover_branches(
             if self.calls == 1:
                 raise RuntimeError("boom")
             return list(self.referenced_device_ids)
+
+        @staticmethod
+        def async_register_admin_service(
+            hass_, domain, service, handler, schema, **kwargs
+        ):
+            hass_.services.async_register(
+                domain, service, handler, schema=schema, **kwargs
+            )
 
     fake_service_helper = FakeHAService()
     monkeypatch.setattr(
@@ -2070,9 +2145,12 @@ async def test_registered_services_cover_branches(
     svc_clear = registered[(DOMAIN, "clear_reauth_issue")]["handler"]
     svc_start_stream = registered[(DOMAIN, "start_live_stream")]["handler"]
     svc_stop_stream = registered[(DOMAIN, "stop_live_stream")]["handler"]
+    svc_force_refresh = registered[(DOMAIN, "force_refresh")]["handler"]
     svc_sync = registered[(DOMAIN, "sync_schedules")]["handler"]
     svc_request_grid_otp = registered[(DOMAIN, "request_grid_toggle_otp")]["handler"]
     svc_set_grid_mode = registered[(DOMAIN, "set_grid_mode")]["handler"]
+    request_grid_otp_schema = registered[(DOMAIN, "request_grid_toggle_otp")]["schema"]
+    set_grid_mode_schema = registered[(DOMAIN, "set_grid_mode")]["schema"]
     svc_update_cfg = registered[(DOMAIN, "update_cfg_schedule")]["handler"]
     update_cfg_schema = registered[(DOMAIN, "update_cfg_schedule")]["schema"]
 
@@ -2082,6 +2160,10 @@ async def test_registered_services_cover_branches(
         await svc_start(SimpleNamespace(data={}))
     with pytest.raises(ServiceValidationError):
         await svc_stop(SimpleNamespace(data={}))
+    with pytest.raises(ServiceValidationError):
+        await svc_force_refresh(
+            SimpleNamespace(data={"device_id": [site_device.id, other_site_device.id]})
+        )
 
     fake_service_helper.calls = 0
     with pytest.raises(ServiceValidationError):
@@ -2120,12 +2202,20 @@ async def test_registered_services_cover_branches(
     fake_service_helper.referenced_device_ids = []
     with pytest.raises(ServiceValidationError):
         await svc_sync(SimpleNamespace(data={"device_id": [lonely_device.id]}))
-    await svc_request_grid_otp(SimpleNamespace(data={"site_id": site_id}))
+    await svc_request_grid_otp(
+        SimpleNamespace(data={"config_entry_id": entry_one.entry_id})
+    )
     coord_primary.async_request_grid_toggle_otp.assert_awaited_once()
     coord_primary.async_request_refresh.assert_awaited()
 
     await svc_set_grid_mode(
-        SimpleNamespace(data={"site_id": site_id, "mode": "off_grid", "otp": "1234"})
+        SimpleNamespace(
+            data={
+                "config_entry_id": entry_one.entry_id,
+                "mode": "off_grid",
+                "otp": "1234",
+            }
+        )
     )
     coord_primary.async_set_grid_mode.assert_awaited_once_with("off_grid", "1234")
     await svc_update_cfg(
@@ -2240,28 +2330,41 @@ async def test_registered_services_cover_branches(
     with pytest.raises(ServiceValidationError):
         await svc_stop_stream(SimpleNamespace(data={"site_id": "missing"}))
 
-    supports_response = registered[(DOMAIN, "trigger_message")]["kwargs"][
-        "supports_response"
-    ]
+    supports_response = registered[(DOMAIN, "trigger_message")]["supports_response"]
     from custom_components.enphase_ev.services import SupportsResponse
 
     assert supports_response is SupportsResponse.OPTIONAL
     assert fake_service_helper.calls >= 3
 
-    with pytest.raises(ServiceValidationError):
-        await svc_request_grid_otp(SimpleNamespace(data={}))
+    with pytest.raises(vol.Invalid):
+        request_grid_otp_schema({})
+    with pytest.raises(vol.Invalid):
+        request_grid_otp_schema({"site_id": site_id})
+    with pytest.raises(vol.Invalid):
+        set_grid_mode_schema({"mode": "off_grid", "otp": "1234"})
+    with pytest.raises(vol.Invalid):
+        set_grid_mode_schema(
+            {
+                "config_entry_id": entry_one.entry_id,
+                "site_id": site_id,
+                "mode": "off_grid",
+                "otp": "1234",
+            }
+        )
     with pytest.raises(ServiceValidationError):
         await svc_set_grid_mode(
             SimpleNamespace(
                 data={
-                    "device_id": [charger_one.id, other_site_device.id],
+                    "config_entry_id": "missing-entry",
                     "mode": "on_grid",
                     "otp": "1234",
                 }
             )
         )
     with pytest.raises(ServiceValidationError):
-        await svc_request_grid_otp(SimpleNamespace(data={"site_id": "missing-site"}))
+        await svc_request_grid_otp(
+            SimpleNamespace(data={"config_entry_id": "missing-entry"})
+        )
 
 
 @pytest.mark.asyncio
@@ -2270,7 +2373,9 @@ async def test_device_service_routing_prefers_owning_entry_over_empty_serial_fal
 ) -> None:
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(
+        self, domain, service, handler, schema=None, supports_response=None, **kwargs
+    ):
         registered[(domain, service)] = {
             "handler": handler,
             "schema": schema,
@@ -2350,7 +2455,9 @@ async def test_device_service_routing_prefers_global_exact_match_before_empty_en
 ) -> None:
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(
+        self, domain, service, handler, schema=None, supports_response=None, **kwargs
+    ):
         registered[(domain, service)] = {
             "handler": handler,
             "schema": schema,
@@ -2429,7 +2536,9 @@ async def test_device_service_routing_skips_ambiguous_empty_serial_fallback(
 ) -> None:
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(
+        self, domain, service, handler, schema=None, supports_response=None, **kwargs
+    ):
         registered[(domain, service)] = {
             "handler": handler,
             "schema": schema,
@@ -2507,7 +2616,9 @@ async def test_device_service_routing_allows_single_empty_serial_fallback(
 ) -> None:
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(
+        self, domain, service, handler, schema=None, supports_response=None, **kwargs
+    ):
         registered[(domain, service)] = {
             "handler": handler,
             "schema": schema,
@@ -2569,7 +2680,9 @@ async def test_device_service_routing_helper_guard_paths(
 ) -> None:
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(
+        self, domain, service, handler, schema=None, supports_response=None, **kwargs
+    ):
         registered[(domain, service)] = {
             "handler": handler,
             "schema": schema,
@@ -2748,7 +2861,9 @@ async def test_service_helper_resolve_functions_cover_none_branches(
     """Ensure resolve helpers handle missing identifiers gracefully."""
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
-    def fake_register(self, domain, service, handler, schema=None, **kwargs):
+    def fake_register(
+        self, domain, service, handler, schema=None, supports_response=None, **kwargs
+    ):
         registered[(domain, service)] = {
             "handler": handler,
             "schema": schema,

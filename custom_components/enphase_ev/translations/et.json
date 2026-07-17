@@ -95,7 +95,7 @@
       "message": "Võrgu juhtimine pole sellel saidil saadaval."
     },
     "grid_control_blocked": {
-      "message": "Võrgu juhtimine on praegu blokeeritud: {reasons}."
+      "message": "Võrgu juhtimine on praegu blokeeritud."
     },
     "grid_mode_invalid": {
       "message": "Ruudustiku režiim peab olema on_grid või off_grid."
@@ -724,12 +724,9 @@
       },
       "grid_toggle": {
         "title": "Võrgurežiim",
-        "description": "Võrgurežiimi jälgimine jääb alati kättesaadavaks. Käsitsi ümberlülitamine on ohutuskriitiline, seetõttu vajavad lisaolemid ja teenusetoimingud selgesõnalist lubamist.",
+        "description": "Praegune võrgurežiim: **{current_mode}**.\n\nVõrgurežiimi muutmine on ohutustundlik. Registreeritud meilile ja telefonile ühekordse koodi saatmiseks valige soovitud režiim.",
         "data": {
-          "grid_toggle_enabled": "Luba võrgurežiimi juhtelemendid"
-        },
-        "data_description": {
-          "grid_toggle_enabled": "Võrgurežiimi andur jääb kättesaadavaks. Lubamine loob olemid Võrgu juhtimise olek ja OTP taotlus ning lubab teenusetoimingud."
+          "mode": "Soovitud võrgurežiim"
         }
       },
       "grid_profile": {
@@ -761,6 +758,18 @@
       "grid_profile_applied": {
         "title": "Võrguprofiili uuendus aktsepteeritud",
         "description": "Enphase aktsepteeris võrguprofiili uuenduse profiilile **{selected_profile}**.\n\nTaotletud profiili ID: **{requested_profile_id}**\n\nPilve olek: **{cloud_apply_status}**\n\nUue profiili kuvamine praegusena võib võtta kuni **5 minutit**, kuni pilv ja Gateway töötlemise lõpetavad. Grid Profile andur uueneb pärast seda, kui Activation kirje teatab uuest praegusest profiilist."
+      },
+      "grid_toggle_otp": {
+        "title": "Kinnitage võrgurežiimi muutmine",
+        "description": "Praegune võrgurežiim: **{current_mode}**.\n\nSoovitud võrgurežiim: **{target_mode}**.\n\nSisestage 4-kohaline ühekordne kood ja kinnitage ohutustundlik muudatus.",
+        "data": {
+          "otp": "Ühekordne kood",
+          "confirm": "Kinnitage võrgurežiimi muutmine"
+        }
+      },
+      "grid_toggle_applied": {
+        "title": "Võrgurežiimi muudatus on vastu võetud",
+        "description": "Enphase võttis vastu taotluse muuta ruudustikurežiimiks **{target_mode}**.\n\nFüüsiline relee võib endiselt muutuda. Tulemuse oleku jälgimiseks kasutage võrgurežiimi andurit."
       }
     },
     "error": {
@@ -778,7 +787,16 @@
       "grid_profile_region_invalid": "Valitud võrguprofiili piirkond pole saadaval.",
       "grid_profile_profile_invalid": "Valitud võrguprofiil pole selle saidi riigi ja piirkonna jaoks saadaval.",
       "grid_profile_gateway_required": "Võrguprofiili rakendamine nõuab pilve Activation Gateway kirjet.",
-      "grid_profile_apply_failed": "Võrguprofiili rakendamine nurjus."
+      "grid_profile_apply_failed": "Võrguprofiili rakendamine nurjus.",
+      "grid_mode_invalid": "Valige On Grid või Off Grid.",
+      "grid_mode_already_active": "Sait on juba valitud ruudustikurežiimis.",
+      "grid_mode_confirm_required": "Enne jätkamist kinnitage võrgurežiimi muudatus.",
+      "grid_control_unavailable": "Võrgu juhtimine pole sellel saidil saadaval.",
+      "grid_control_blocked": "Võrgu juhtimine on praegu blokeeritud.",
+      "grid_otp_required": "Sisestage ühekordne kood.",
+      "grid_otp_invalid_format": "Ühekordne kood peab sisaldama täpselt nelja numbrit.",
+      "grid_otp_invalid": "Ühekordne kood on kehtetu või aegunud.",
+      "grid_envoy_serial_missing": "Selle saidi väravat ei õnnestunud määrata."
     },
     "abort": {
       "migration_no_envoy_sources": "Ühtegi Enphase Envoy energiaandurit pole migratsiooniks saadaval.",
@@ -786,7 +804,9 @@
       "migration_partial_failure": "Migratsioon peatus pärast osalist lõpetamist.\n\nLõpetatud seosed:\n{completed_mappings}\n\nTõrge elemendi `{failed_entity_id}` töötlemisel: {failure_reason}\n\nKui tulemus ei sobi, taasta varukoopiast.",
       "grid_profile_unavailable": "Võrguprofiili juhtimine pole saadaval.",
       "grid_profile_installer_required": "Võrguprofiili juhtimine nõuab paigaldaja juurdepääsu Enphase Activationile.",
-      "grid_profile_no_regions": "Selle saidi riigi jaoks pole võrguprofiili piirkondi saadaval."
+      "grid_profile_no_regions": "Selle saidi riigi jaoks pole võrguprofiili piirkondi saadaval.",
+      "grid_mode_unavailable": "Võrgurežiimi juhtimine pole sellel saidil saadaval.",
+      "grid_mode_blocked": "Võrgurežiimi juhtimine on praegu blokeeritud: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migratsioon on lõpule viidud. Enphase Energy omab nüüd valitud lähteolemite ID-sid. Kontrolli pärast järgmist värskendust Energy armatuurlauda ja Developer Tools > Statistics.",
@@ -808,6 +828,23 @@
         "available": "Saadaval",
         "unavailable": "Pole saadaval",
         "accepted": "Aktsepteeritud"
+      }
+    },
+    "grid_mode": {
+      "options": {
+        "on_grid": "Võrgustikus",
+        "off_grid": "Võrgust väljas",
+        "unknown": "Tundmatu"
+      }
+    },
+    "grid_control_block_reason": {
+      "options": {
+        "disable_grid_control": "Võrgu juhtimine on asukohas keelatud.",
+        "active_download": "Süsteemi allalaadimine on aktiivne.",
+        "sunlight_backup_system_check": "Sunlight Backupi süsteemikontroll on aktiivne.",
+        "grid_outage_check": "Võrgukatkestuse kontroll on aktiivne.",
+        "pending": "Võrgurežiimi muudatus on juba ootel.",
+        "unknown": "Tundmatu blokeeriv tingimus on aktiivne."
       }
     }
   },
@@ -1380,14 +1417,6 @@
           "none": "Puudub",
           "pending": "Ootel",
           "active": "Aktiivne"
-        }
-      },
-      "grid_control_status": {
-        "name": "Võrgu juhtimise olek",
-        "state": {
-          "ready": "Valmis",
-          "blocked": "Blokeeritud",
-          "pending": "Ootel"
         }
       },
       "grid_mode": {
@@ -2323,9 +2352,6 @@
       "cancel_pending_profile_change": {
         "name": "Tühista ootel profiilimuudatus"
       },
-      "request_grid_toggle_otp": {
-        "name": "Taotle ruudustiku sisselülitamise OTP-d"
-      },
       "storm_alert_opt_out": {
         "name": "Loobu tormihoiatusest"
       },
@@ -2648,26 +2674,16 @@
     "request_grid_toggle_otp": {
       "name": "Taotle ruudustiku sisselülitamise OTP-d",
       "description": "Enne saidi ruudustiku režiimi muutmist saatke nõutav ühekordne kood.",
-      "sections": {
-        "advanced": {
-          "name": "Täpsemad valikud"
-        }
-      },
       "fields": {
-        "site_id": {
-          "name": "Koha ID",
-          "description": "Valikuline koha identifikaator; tuvastatakse automaatselt, kui koha seade on valitud."
+        "config_entry_id": {
+          "name": "Enphase konfiguratsiooni sisestus",
+          "description": "Valige Enphase'i sait, mis peaks saama ühekordse koodi."
         }
       }
     },
     "set_grid_mode": {
       "name": "Määrake võrgurežiim",
       "description": "Muutke saidi ruudustiku režiimi pärast ühekordse koodi kinnitamist.",
-      "sections": {
-        "advanced": {
-          "name": "Täpsemad valikud"
-        }
-      },
       "fields": {
         "mode": {
           "name": "Võrgurežiim",
@@ -2677,9 +2693,9 @@
           "name": "Ühekordne kood",
           "description": "Sisestage teie registreeritud e-posti aadressile ja telefonile saadetud 4-kohaline OTP."
         },
-        "site_id": {
-          "name": "Koha ID",
-          "description": "Valikuline koha identifikaator; tuvastatakse automaatselt, kui koha seade on valitud."
+        "config_entry_id": {
+          "name": "Enphase konfiguratsiooni sisestus",
+          "description": "Valige Enphase'i sait, mille võrgurežiimi tuleks muuta."
         }
       }
     },

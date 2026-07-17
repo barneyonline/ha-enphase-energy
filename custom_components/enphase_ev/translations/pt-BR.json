@@ -95,7 +95,7 @@
       "message": "O controle de grade não está disponível para este site."
     },
     "grid_control_blocked": {
-      "message": "O controle da rede está bloqueado no momento: {reasons}."
+      "message": "O controle da rede está atualmente bloqueado."
     },
     "grid_mode_invalid": {
       "message": "O modo de grade deve ser on_grid ou off_grid."
@@ -724,12 +724,9 @@
       },
       "grid_toggle": {
         "title": "Modo de rede",
-        "description": "O monitoramento do modo de rede permanece sempre disponível. A alternância manual é sensível à segurança, portanto as entidades e ações adicionais exigem ativação explícita.",
+        "description": "Modo de grade atual: **{current_mode}**.\n\nAlterar o modo de rede é uma questão de segurança. Selecione o modo solicitado para enviar um código único para o e-mail e telefone cadastrados.",
         "data": {
-          "grid_toggle_enabled": "Ativar controles do modo de rede"
-        },
-        "data_description": {
-          "grid_toggle_enabled": "O sensor Modo de rede permanece disponível. A ativação cria Status do controle da rede e Solicitar OTP e permite ações de serviço."
+          "mode": "Modo de grade solicitado"
         }
       },
       "grid_profile": {
@@ -761,6 +758,18 @@
       "grid_profile_applied": {
         "title": "Atualização do perfil de rede aceita",
         "description": "A Enphase aceitou a atualização do perfil de rede para **{selected_profile}**.\n\nID do perfil solicitado: **{requested_profile_id}**\n\nStatus na nuvem: **{cloud_apply_status}**\n\nO novo perfil pode levar até **5 minutos** para aparecer como atual enquanto a nuvem e o Gateway concluem o processamento. O sensor Grid Profile será atualizado quando o registro Activation informar o novo perfil atual."
+      },
+      "grid_toggle_otp": {
+        "title": "Confirmar alteração do modo de grade",
+        "description": "Modo de grade atual: **{current_mode}**.\n\nModo de grade solicitado: **{target_mode}**.\n\nInsira o código único de 4 dígitos e confirme a alteração sensível à segurança.",
+        "data": {
+          "otp": "Código único",
+          "confirm": "Confirme a mudança do modo Grid"
+        }
+      },
+      "grid_toggle_applied": {
+        "title": "Alteração do modo de grade aceita",
+        "description": "A Enphase aceitou a solicitação para alterar o Grid Mode para **{target_mode}**.\n\nO relé físico ainda pode estar mudando. Use o sensor Grid Mode para observar o estado resultante."
       }
     },
     "error": {
@@ -778,7 +787,16 @@
       "grid_profile_region_invalid": "A região de perfil de rede selecionada não está disponível.",
       "grid_profile_profile_invalid": "O perfil de rede selecionado não está disponível para o país e a região deste local.",
       "grid_profile_gateway_required": "Aplicar o perfil de rede requer um registro de Gateway do Activation na nuvem.",
-      "grid_profile_apply_failed": "Falha ao aplicar o perfil de rede."
+      "grid_profile_apply_failed": "Falha ao aplicar o perfil de rede.",
+      "grid_mode_invalid": "Selecione Na rede ou Fora da rede.",
+      "grid_mode_already_active": "O site já está no Grid Mode selecionado.",
+      "grid_mode_confirm_required": "Confirme a alteração do modo Grid antes de continuar.",
+      "grid_control_unavailable": "O controle de grade não está disponível para este site.",
+      "grid_control_blocked": "O controle da rede está atualmente bloqueado.",
+      "grid_otp_required": "Digite o código único.",
+      "grid_otp_invalid_format": "O código único deve conter exatamente quatro dígitos.",
+      "grid_otp_invalid": "O código único é inválido ou expirou.",
+      "grid_envoy_serial_missing": "Não foi possível determinar o gateway deste site."
     },
     "abort": {
       "migration_no_envoy_sources": "Nenhum sensor de energia do Enphase Envoy está disponível para migração.",
@@ -786,7 +804,9 @@
       "migration_partial_failure": "A migração foi interrompida após conclusão parcial.\n\nMapeamentos concluídos:\n{completed_mappings}\n\nFalha ao processar `{failed_entity_id}`: {failure_reason}\n\nRestaure o backup se o resultado não for aceitável.",
       "grid_profile_unavailable": "O controle de perfil de rede não está disponível.",
       "grid_profile_installer_required": "O controle de perfil de rede requer acesso de instalador ao Enphase Activation.",
-      "grid_profile_no_regions": "Não há regiões de perfil de rede disponíveis para o país deste local."
+      "grid_profile_no_regions": "Não há regiões de perfil de rede disponíveis para o país deste local.",
+      "grid_mode_unavailable": "O controle do modo Grid não está disponível para este site.",
+      "grid_mode_blocked": "O controle do modo Grid está atualmente bloqueado: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migração concluída. O Enphase Energy agora possui os IDs das entidades de origem selecionadas. Verifique o painel Energy e Developer Tools > Statistics após a próxima atualização.",
@@ -808,6 +828,23 @@
         "available": "Disponível",
         "unavailable": "Indisponível",
         "accepted": "Aceito"
+      }
+    },
+    "grid_mode": {
+      "options": {
+        "on_grid": "Na grade",
+        "off_grid": "Fora da rede",
+        "unknown": "Desconhecido"
+      }
+    },
+    "grid_control_block_reason": {
+      "options": {
+        "disable_grid_control": "O controle da rede está desativado para o local.",
+        "active_download": "Há um download do sistema em andamento.",
+        "sunlight_backup_system_check": "A verificação do sistema Sunlight Backup está ativa.",
+        "grid_outage_check": "A verificação de falta de energia da rede está ativa.",
+        "pending": "Já há uma alteração do modo de rede pendente.",
+        "unknown": "Há uma condição de bloqueio desconhecida ativa."
       }
     }
   },
@@ -1380,14 +1417,6 @@
           "none": "Nenhum",
           "pending": "Pendente",
           "active": "Ativo"
-        }
-      },
-      "grid_control_status": {
-        "name": "Status do controle da rede",
-        "state": {
-          "ready": "Pronto",
-          "blocked": "Bloqueado",
-          "pending": "Pendente"
         }
       },
       "grid_mode": {
@@ -2323,9 +2352,6 @@
       "cancel_pending_profile_change": {
         "name": "Cancelar alteração de perfil pendente"
       },
-      "request_grid_toggle_otp": {
-        "name": "Solicitar alternância de grade OTP"
-      },
       "storm_alert_opt_out": {
         "name": "Desativar alerta de tempestade"
       },
@@ -2648,26 +2674,16 @@
     "request_grid_toggle_otp": {
       "name": "Solicitar alternância de grade OTP",
       "description": "Envie o código único necessário antes de alterar o modo de grade do site.",
-      "sections": {
-        "advanced": {
-          "name": "Opções avançadas"
-        }
-      },
       "fields": {
-        "site_id": {
-          "name": "ID do site",
-          "description": "Identificador de site opcional; detectado automaticamente quando um dispositivo de site é selecionado."
+        "config_entry_id": {
+          "name": "Enphase entrada de configuração",
+          "description": "Selecione o site da Enphase que deve receber o código único."
         }
       }
     },
     "set_grid_mode": {
       "name": "Definir modo de grade",
       "description": "Altere o modo de grade do site após validar o código único.",
-      "sections": {
-        "advanced": {
-          "name": "Opções avançadas"
-        }
-      },
       "fields": {
         "mode": {
           "name": "Modo grade",
@@ -2677,9 +2693,9 @@
           "name": "Código único",
           "description": "Digite o OTP de 4 dígitos enviado para seu e-mail e telefone registrados."
         },
-        "site_id": {
-          "name": "ID do site",
-          "description": "Identificador de site opcional; detectado automaticamente quando um dispositivo de site é selecionado."
+        "config_entry_id": {
+          "name": "Enphase entrada de configuração",
+          "description": "Selecione o site Enphase cujo modo Grid deve mudar."
         }
       }
     },
