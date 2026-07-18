@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry
 
@@ -36,6 +36,13 @@ class EnphaseRuntimeData:
     weather_coordinator: EnphaseWeatherCoordinator | None = None
     weather_discovery_task: asyncio.Task[None] | None = None
     reload_suppression_count: int = 0
+    applied_data: dict[str, Any] | None = None
+    applied_options: dict[str, Any] | None = None
+    preserve_for_reload: bool = False
+    update_listener_lock: asyncio.Lock = field(
+        default_factory=asyncio.Lock,
+        repr=False,
+    )
 
     async def async_stop_weather(self) -> None:
         """Stop and release the optional weather child coordinator."""

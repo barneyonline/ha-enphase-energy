@@ -950,6 +950,11 @@ class SystemEventsRuntime:
         self._repair_last_seen_utc.clear()
         self._repair_checkpoint_utc.clear()
 
+    def clear_repairs(self) -> None:
+        """Remove all System Event Repairs after the option is disabled."""
+
+        self._clear_repairs()
+
     def _sync_repairs(
         self,
         *,

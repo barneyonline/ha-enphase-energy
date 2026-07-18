@@ -619,6 +619,54 @@ async def test_schedule_sync_async_start_listener_error_when_enabled(hass) -> No
     assert sync._unsub_coordinator is None
 
 
+@pytest.mark.asyncio
+async def test_schedule_sync_serializes_overlapping_start_stop_start(
+    hass, monkeypatch
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"site_id": RANDOM_SITE_ID},
+        options={OPT_SCHEDULE_SYNC_ENABLED: True},
+    )
+    entry.add_to_hass(hass)
+    unsubscribe_interval = MagicMock()
+    unsubscribe_coordinator = MagicMock()
+    coordinator = SimpleNamespace(
+        async_add_listener=MagicMock(return_value=unsubscribe_coordinator)
+    )
+    sync = ScheduleSync(hass, coordinator, entry)
+    first_remove_started = asyncio.Event()
+    release_first_remove = asyncio.Event()
+    remove_calls = 0
+
+    async def _remove_helpers() -> None:
+        nonlocal remove_calls
+        remove_calls += 1
+        if remove_calls == 1:
+            first_remove_started.set()
+            await release_first_remove.wait()
+
+    sync._remove_all_helpers = _remove_helpers  # type: ignore[method-assign]
+    sync.async_refresh = AsyncMock()  # type: ignore[method-assign]
+    track_interval = MagicMock(return_value=unsubscribe_interval)
+    monkeypatch.setattr(schedule_sync_mod, "async_track_time_interval", track_interval)
+
+    first_start = asyncio.create_task(sync.async_start())
+    await first_remove_started.wait()
+    stop = asyncio.create_task(sync.async_stop())
+    await asyncio.sleep(0)
+    release_first_remove.set()
+    await asyncio.gather(first_start, stop)
+    await sync.async_start()
+
+    track_interval.assert_called_once()
+    coordinator.async_add_listener.assert_called_once()
+    sync.async_refresh.assert_awaited_once_with(reason="startup")
+    assert sync._unsub_interval is unsubscribe_interval
+    assert sync._unsub_coordinator is unsubscribe_coordinator
+    await sync.async_stop()
+
+
 def test_schedule_sync_notify_listeners_handles_exception(hass) -> None:
     sync = ScheduleSync(hass, SimpleNamespace(), None)
     calls: list[str] = []

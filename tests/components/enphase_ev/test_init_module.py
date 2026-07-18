@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import importlib
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -54,6 +55,7 @@ from custom_components.enphase_ev import (
 from custom_components.enphase_ev.const import (
     CONF_AUTH_BLOCK_REASON,
     CONF_AUTH_BLOCKED_UNTIL,
+    CONF_COOKIE,
     CONF_INCLUDE_INVERTERS,
     CONF_SERIALS,
     CONF_SELECTED_TYPE_KEYS,
@@ -61,6 +63,8 @@ from custom_components.enphase_ev.const import (
     CONF_SITE_ONLY,
     ISSUE_AUTH_BLOCKED,
     ISSUE_TOO_MANY_ACTIVE_SESSIONS,
+    OPT_API_TIMEOUT,
+    OPT_WEATHER_ENABLED,
 )
 from custom_components.enphase_ev.device_types import type_identifier
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
@@ -724,6 +728,100 @@ async def test_async_setup_entry_restores_discovery_before_first_refresh(
         "entities_forwarded",
         "setup_complete",
     }
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_reuses_handoff_without_blocking_refresh(
+    hass: HomeAssistant, config_entry, monkeypatch
+) -> None:
+    first_refresh = Mock()
+
+    async def _first_refresh(coord) -> None:
+        first_refresh()
+        coord._has_successful_refresh = True
+        coord.async_set_updated_data(
+            {RANDOM_SERIAL: {"sn": RANDOM_SERIAL, "status": "available"}}
+        )
+
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.coordinator.EnphaseCoordinator.async_config_entry_first_refresh",
+        _first_refresh,
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.coordinator.EnphaseCoordinator.async_start_startup_warmup",
+        AsyncMock(),
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.coordinator.EnphaseCoordinator.async_refresh_grid_profile_metadata",
+        AsyncMock(),
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.schedule_sync.ScheduleSync.async_start",
+        AsyncMock(),
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.schedule_sync.ScheduleSync.async_stop",
+        AsyncMock(),
+    )
+    monkeypatch.setattr(
+        hass.config_entries,
+        "async_forward_entry_setups",
+        AsyncMock(),
+    )
+    monkeypatch.setattr(
+        hass.config_entries,
+        "async_forward_entry_unload",
+        AsyncMock(return_value=True),
+    )
+
+    assert await async_setup_entry(hass, config_entry)
+    original_runtime = config_entry.runtime_data
+    original_runtime.coordinator.async_request_refresh = AsyncMock()
+    original_runtime.preserve_for_reload = True
+
+    assert await async_unload_entry(hass, config_entry)
+    assert config_entry.runtime_data is None
+    assert await async_setup_entry(hass, config_entry)
+    await hass.async_block_till_done()
+
+    assert config_entry.runtime_data is original_runtime
+    assert config_entry.runtime_data.coordinator.data[RANDOM_SERIAL]["status"] == (
+        "available"
+    )
+    assert first_refresh.call_count == 1
+    original_runtime.coordinator.async_request_refresh.assert_awaited_once_with()
+    assert (
+        config_entry.runtime_data.coordinator.setup_phase_timings["first_refresh_s"]
+        == 0.0
+    )
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_rejects_incomplete_runtime_handoff(
+    hass: HomeAssistant, config_entry, caplog
+) -> None:
+    coordinator = SimpleNamespace(
+        apply_config_entry_data=Mock(),
+        apply_auth_storage_config=Mock(),
+        async_apply_config_entry_options=AsyncMock(),
+        async_cleanup_runtime_state=AsyncMock(
+            side_effect=RuntimeError("cleanup failed")
+        ),
+        async_close=AsyncMock(),
+    )
+    hass.data[enphase_init._RUNTIME_HANDOFF_KEY] = {
+        config_entry.entry_id: EnphaseRuntimeData(coordinator=coordinator)
+    }
+
+    with pytest.raises(RuntimeError, match="Incomplete preserved Enphase runtime"):
+        await async_setup_entry(hass, config_entry)
+
+    coordinator.async_cleanup_runtime_state.assert_awaited_once_with()
+    coordinator.async_close.assert_awaited_once_with()
+    coordinator.apply_auth_storage_config.assert_called_once_with(config_entry.data)
+    assert "Failed cleaning up a preserved runtime" in caplog.text
+    assert config_entry.runtime_data is None
+    assert config_entry.entry_id not in hass.data[enphase_init._RUNTIME_HANDOFF_KEY]
 
 
 @pytest.mark.asyncio
@@ -1852,6 +1950,204 @@ async def test_update_listener_reloads_entry(
 
 
 @pytest.mark.asyncio
+async def test_update_listener_hot_applies_runtime_options(
+    hass: HomeAssistant, config_entry, monkeypatch
+) -> None:
+    coordinator = SimpleNamespace(
+        apply_auth_storage_config=Mock(),
+        async_apply_config_entry_options=AsyncMock(),
+    )
+    previous_options = {OPT_API_TIMEOUT: 10}
+    hass.config_entries.async_update_entry(
+        config_entry,
+        options={OPT_API_TIMEOUT: 20},
+    )
+    runtime_data = EnphaseRuntimeData(
+        coordinator=coordinator,
+        applied_data=dict(config_entry.data),
+        applied_options=previous_options,
+    )
+    config_entry.runtime_data = runtime_data
+    object.__setattr__(config_entry, "state", config_entries.ConfigEntryState.LOADED)
+    reload_entry = AsyncMock()
+    monkeypatch.setattr(hass.config_entries, "async_reload", reload_entry)
+
+    await _async_update_listener(hass, config_entry)
+
+    reload_entry.assert_not_awaited()
+    coordinator.apply_auth_storage_config.assert_called_once_with(config_entry.data)
+    coordinator.async_apply_config_entry_options.assert_awaited_once_with(
+        previous_options
+    )
+    assert runtime_data.applied_options == {OPT_API_TIMEOUT: 20}
+
+
+@pytest.mark.asyncio
+async def test_update_listener_serializes_concurrent_option_updates(
+    hass: HomeAssistant, config_entry, monkeypatch
+) -> None:
+    first_apply_started = asyncio.Event()
+    release_first_apply = asyncio.Event()
+    applied_timeouts: list[int] = []
+
+    async def _apply_options(_previous_options) -> None:
+        timeout = int(config_entry.options[OPT_API_TIMEOUT])
+        applied_timeouts.append(timeout)
+        if timeout == 20:
+            first_apply_started.set()
+            await release_first_apply.wait()
+
+    coordinator = SimpleNamespace(
+        apply_auth_storage_config=Mock(),
+        async_apply_config_entry_options=_apply_options,
+    )
+    runtime_data = EnphaseRuntimeData(
+        coordinator=coordinator,
+        applied_data=dict(config_entry.data),
+        applied_options={OPT_API_TIMEOUT: 10},
+    )
+    config_entry.runtime_data = runtime_data
+    object.__setattr__(config_entry, "state", config_entries.ConfigEntryState.LOADED)
+    monkeypatch.setattr(hass.config_entries, "async_reload", AsyncMock())
+
+    hass.config_entries.async_update_entry(
+        config_entry,
+        options={OPT_API_TIMEOUT: 20},
+    )
+    first_listener = asyncio.create_task(_async_update_listener(hass, config_entry))
+    await first_apply_started.wait()
+    hass.config_entries.async_update_entry(
+        config_entry,
+        options={OPT_API_TIMEOUT: 30},
+    )
+    second_listener = asyncio.create_task(_async_update_listener(hass, config_entry))
+    release_first_apply.set()
+    await asyncio.gather(first_listener, second_listener)
+
+    assert applied_timeouts == [20, 30]
+    assert runtime_data.applied_options == {OPT_API_TIMEOUT: 30}
+
+
+@pytest.mark.asyncio
+async def test_update_listener_ignores_runtime_replaced_while_waiting(
+    hass: HomeAssistant, config_entry, monkeypatch
+) -> None:
+    original_runtime = EnphaseRuntimeData(coordinator=SimpleNamespace())
+    replacement_runtime = EnphaseRuntimeData(coordinator=SimpleNamespace())
+    config_entry.runtime_data = original_runtime
+    await original_runtime.update_listener_lock.acquire()
+    reload_entry = AsyncMock()
+    monkeypatch.setattr(hass.config_entries, "async_reload", reload_entry)
+
+    listener = asyncio.create_task(_async_update_listener(hass, config_entry))
+    await asyncio.sleep(0)
+    config_entry.runtime_data = replacement_runtime
+    original_runtime.update_listener_lock.release()
+    await listener
+
+    reload_entry.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_update_listener_preserves_runtime_for_topology_reload(
+    hass: HomeAssistant, config_entry, monkeypatch
+) -> None:
+    hass.config_entries.async_update_entry(
+        config_entry,
+        options={OPT_WEATHER_ENABLED: True},
+    )
+    runtime_data = EnphaseRuntimeData(
+        coordinator=SimpleNamespace(),
+        applied_data=dict(config_entry.data),
+        applied_options={OPT_WEATHER_ENABLED: False},
+    )
+    config_entry.runtime_data = runtime_data
+    object.__setattr__(config_entry, "state", config_entries.ConfigEntryState.LOADED)
+    reload_entry = AsyncMock(return_value=True)
+    monkeypatch.setattr(hass.config_entries, "async_reload", reload_entry)
+
+    await _async_update_listener(hass, config_entry)
+
+    reload_entry.assert_awaited_once_with(config_entry.entry_id)
+    assert runtime_data.preserve_for_reload is True
+
+
+@pytest.mark.asyncio
+async def test_update_listener_does_not_preserve_runtime_for_credential_reload(
+    hass: HomeAssistant, config_entry, monkeypatch
+) -> None:
+    runtime_data = EnphaseRuntimeData(
+        coordinator=SimpleNamespace(),
+        applied_data={**config_entry.data, CONF_COOKIE: "old-cookie"},
+        applied_options=dict(config_entry.options),
+    )
+    config_entry.runtime_data = runtime_data
+    object.__setattr__(config_entry, "state", config_entries.ConfigEntryState.LOADED)
+    reload_entry = AsyncMock(return_value=True)
+    monkeypatch.setattr(hass.config_entries, "async_reload", reload_entry)
+
+    await _async_update_listener(hass, config_entry)
+
+    reload_entry.assert_awaited_once_with(config_entry.entry_id)
+    assert runtime_data.preserve_for_reload is False
+
+
+@pytest.mark.asyncio
+async def test_update_listener_falls_back_to_reload_when_hot_apply_fails(
+    hass: HomeAssistant, config_entry, monkeypatch
+) -> None:
+    coordinator = SimpleNamespace(
+        apply_auth_storage_config=Mock(),
+        async_apply_config_entry_options=AsyncMock(side_effect=RuntimeError("boom")),
+    )
+    runtime_data = EnphaseRuntimeData(
+        coordinator=coordinator,
+        applied_data=dict(config_entry.data),
+        applied_options={OPT_API_TIMEOUT: 10},
+    )
+    config_entry.runtime_data = runtime_data
+    hass.config_entries.async_update_entry(
+        config_entry,
+        options={OPT_API_TIMEOUT: 20},
+    )
+    object.__setattr__(config_entry, "state", config_entries.ConfigEntryState.LOADED)
+    reload_entry = AsyncMock(return_value=False)
+    monkeypatch.setattr(hass.config_entries, "async_reload", reload_entry)
+
+    await _async_update_listener(hass, config_entry)
+
+    reload_entry.assert_awaited_once_with(config_entry.entry_id)
+    assert runtime_data.preserve_for_reload is False
+
+
+@pytest.mark.asyncio
+async def test_update_listener_clears_handoff_flag_when_reload_raises(
+    hass: HomeAssistant, config_entry, monkeypatch
+) -> None:
+    runtime_data = EnphaseRuntimeData(
+        coordinator=SimpleNamespace(),
+        applied_data=dict(config_entry.data),
+        applied_options={OPT_WEATHER_ENABLED: False},
+    )
+    config_entry.runtime_data = runtime_data
+    hass.config_entries.async_update_entry(
+        config_entry,
+        options={OPT_WEATHER_ENABLED: True},
+    )
+    object.__setattr__(config_entry, "state", config_entries.ConfigEntryState.LOADED)
+    monkeypatch.setattr(
+        hass.config_entries,
+        "async_reload",
+        AsyncMock(side_effect=RuntimeError("reload failed")),
+    )
+
+    with pytest.raises(RuntimeError, match="reload failed"):
+        await _async_update_listener(hass, config_entry)
+
+    assert runtime_data.preserve_for_reload is False
+
+
+@pytest.mark.asyncio
 async def test_update_listener_skips_reload_for_disabled_entry(
     hass: HomeAssistant, config_entry, monkeypatch
 ) -> None:
@@ -1887,10 +2183,13 @@ async def test_update_listener_ignores_operation_not_allowed(
     reload = AsyncMock(side_effect=config_entries.OperationNotAllowed("race"))
     monkeypatch.setattr(hass.config_entries, "async_reload", reload)
     object.__setattr__(config_entry, "state", config_entries.ConfigEntryState.LOADED)
+    runtime_data = EnphaseRuntimeData(coordinator=SimpleNamespace())
+    config_entry.runtime_data = runtime_data
 
     await _async_update_listener(hass, config_entry)
 
     reload.assert_awaited_once_with(config_entry.entry_id)
+    assert runtime_data.preserve_for_reload is False
 
 
 @pytest.mark.asyncio
@@ -1914,6 +2213,75 @@ async def test_async_unload_entry_tolerates_platform_never_loaded(
 
     schedule_sync.async_stop.assert_awaited_once()
     coord.cleanup_runtime_state.assert_called_once()
+    assert config_entry.runtime_data is None
+
+
+@pytest.mark.asyncio
+async def test_async_unload_entry_hands_off_preserved_runtime(
+    hass: HomeAssistant, config_entry, monkeypatch
+) -> None:
+    schedule_sync = SimpleNamespace(async_stop=AsyncMock())
+    coord = SimpleNamespace(
+        schedule_sync=schedule_sync,
+        async_quiesce_for_reload=AsyncMock(return_value=True),
+        async_cleanup_runtime_state=AsyncMock(),
+        async_close=AsyncMock(),
+    )
+    runtime_data = EnphaseRuntimeData(
+        coordinator=coord,
+        preserve_for_reload=True,
+    )
+    config_entry.runtime_data = runtime_data
+    monkeypatch.setattr(
+        hass.config_entries,
+        "async_forward_entry_unload",
+        AsyncMock(return_value=True),
+    )
+
+    assert await async_unload_entry(hass, config_entry)
+
+    schedule_sync.async_stop.assert_awaited_once()
+    coord.async_quiesce_for_reload.assert_awaited_once_with()
+    coord.async_cleanup_runtime_state.assert_not_awaited()
+    coord.async_close.assert_not_awaited()
+    assert (
+        hass.data[enphase_init._RUNTIME_HANDOFF_KEY][config_entry.entry_id]
+        is runtime_data
+    )
+    assert config_entry.runtime_data is None
+
+
+@pytest.mark.asyncio
+async def test_async_unload_entry_discards_handoff_when_quiesce_times_out(
+    hass: HomeAssistant, config_entry, monkeypatch
+) -> None:
+    schedule_sync = SimpleNamespace(async_stop=AsyncMock())
+    coord = SimpleNamespace(
+        schedule_sync=schedule_sync,
+        async_quiesce_for_reload=AsyncMock(return_value=False),
+        async_cleanup_runtime_state=AsyncMock(),
+        async_close=AsyncMock(),
+    )
+    runtime_data = EnphaseRuntimeData(
+        coordinator=coord,
+        preserve_for_reload=True,
+    )
+    config_entry.runtime_data = runtime_data
+    monkeypatch.setattr(
+        hass.config_entries,
+        "async_forward_entry_unload",
+        AsyncMock(return_value=True),
+    )
+
+    assert await async_unload_entry(hass, config_entry)
+
+    coord.async_quiesce_for_reload.assert_awaited_once_with()
+    coord.async_cleanup_runtime_state.assert_awaited_once_with()
+    coord.async_close.assert_awaited_once_with()
+    assert runtime_data.preserve_for_reload is False
+    assert config_entry.entry_id not in hass.data.get(
+        enphase_init._RUNTIME_HANDOFF_KEY, {}
+    )
     assert config_entry.runtime_data is None
 
 

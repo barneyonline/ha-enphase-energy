@@ -84,9 +84,12 @@ from .const import (
     CONF_SITE_NAME,
     CONF_TOKEN_EXPIRES_AT,
     DEFAULT_API_TIMEOUT,
+    DEFAULT_DEGRADED_SERVICE_REPAIR_ISSUES,
     DEFAULT_FAST_POLL_INTERVAL,
     DEFAULT_PRICING_EDITS_ENABLED,
+    DEFAULT_SCHEDULE_SYNC_ENABLED,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_SYSTEM_EVENT_REPAIR_ISSUES,
     MAX_API_TIMEOUT,
     MAX_POLL_INTERVAL,
     MAX_SESSION_HISTORY_INTERVAL_MIN,
@@ -104,11 +107,14 @@ from .const import (
     HEMS_AUTH_BACKOFF_STEPS_S,
     HEMS_AUTH_MANUAL_CLEAR_COOLDOWN_S,
     OPT_API_TIMEOUT,
+    OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
     OPT_FAST_POLL_INTERVAL,
     OPT_NOMINAL_VOLTAGE,
     OPT_PRICING_EDITS_ENABLED,
+    OPT_SCHEDULE_SYNC_ENABLED,
     OPT_SLOW_POLL_INTERVAL,
     OPT_SESSION_HISTORY_INTERVAL,
+    OPT_SYSTEM_EVENT_REPAIR_ISSUES,
     PHASE_SWITCH_CONFIG_SETTING,
     SAVINGS_OPERATION_MODE_SUBTYPE,
     DEFAULT_SESSION_HISTORY_INTERVAL_MIN,
@@ -1250,6 +1256,150 @@ class EnphaseCoordinator(
             self._minimal_setup_refresh_active = False
             self.record_setup_phase("first_refresh_s", started)
 
+    def apply_config_entry_data(self, config: Mapping[str, Any]) -> None:
+        """Apply topology configuration when reusing a coordinator for reload."""
+
+        site_id = str(config[CONF_SITE_ID])
+        if site_id != self.site_id:
+            raise ValueError("Cannot reuse a coordinator for a different site")
+
+        raw_serials = config.get(CONF_SERIALS) or []
+        if isinstance(raw_serials, (list, tuple, set)):
+            serial_order = [
+                normalized
+                for item in raw_serials
+                if item is not None and (normalized := str(item).strip())
+            ]
+        else:
+            normalized = str(raw_serials).strip()
+            serial_order = [normalized] if normalized else []
+        self.serials = set(serial_order)
+        self._serial_order = list(dict.fromkeys(serial_order))
+        self._configured_serials = set(self.serials)
+        self.site_only = bool(config.get(CONF_SITE_ONLY, False))
+        self.include_inverters = bool(config.get(CONF_INCLUDE_INVERTERS, True))
+
+        raw_selected = config.get(CONF_SELECTED_TYPE_KEYS)
+        selected: set[str] | None = None
+        if isinstance(raw_selected, (list, tuple, set)):
+            selected = {
+                normalized_type
+                for item in raw_selected
+                if (normalized_type := normalize_type_key(item))
+            }
+        elif isinstance(raw_selected, str):
+            normalized_type = normalize_type_key(raw_selected)
+            selected = {normalized_type} if normalized_type else None
+        self._selected_type_keys = selected
+        self.site_name = config.get(CONF_SITE_NAME)
+
+        for serial in self._serial_order:
+            self._ensure_serial_tracked(serial)
+        self.always_update = self.site_only or not self.serials
+
+    def apply_auth_storage_config(self, config: Mapping[str, Any]) -> None:
+        """Apply credential-storage preferences that do not affect the session."""
+
+        self._email = config.get(CONF_EMAIL)
+        self._stored_password = config.get(CONF_PASSWORD)
+        self._remember_password = bool(config.get(CONF_REMEMBER_PASSWORD))
+
+    async def async_apply_config_entry_options(
+        self,
+        previous_options: Mapping[str, Any],
+    ) -> None:
+        """Apply non-topology config-entry options without reloading entities."""
+
+        config_entry = self.config_entry
+        if config_entry is None:
+            return
+        options = config_entry.options
+
+        timeout = helper_coerce_int(
+            options.get(OPT_API_TIMEOUT, DEFAULT_API_TIMEOUT),
+            default=DEFAULT_API_TIMEOUT,
+        )
+        self.client.set_timeout(min(MAX_API_TIMEOUT, max(MIN_API_TIMEOUT, timeout)))
+
+        _fast, slow = normalize_poll_intervals(
+            options.get(OPT_FAST_POLL_INTERVAL, DEFAULT_FAST_POLL_INTERVAL),
+            options.get(
+                OPT_SLOW_POLL_INTERVAL,
+                self._configured_slow_poll_interval,
+            ),
+        )
+        self._configured_slow_poll_interval = slow
+        current_data = self.data if isinstance(self.data, dict) else {}
+        try:
+            polling_state = self._determine_polling_state(current_data)
+        except (
+            Exception
+        ):  # noqa: BLE001 - retain the current interval on bad cache data
+            polling_state = {"target": slow}
+        self._apply_refresh_polling_interval(polling_state)
+
+        nominal = coerce_nominal_voltage(options.get(OPT_NOMINAL_VOLTAGE))
+        if nominal is None:
+            nominal = resolve_nominal_voltage_for_hass(self.hass)
+        self._nominal_v = nominal
+
+        history_interval = helper_coerce_int(
+            options.get(
+                OPT_SESSION_HISTORY_INTERVAL,
+                DEFAULT_SESSION_HISTORY_INTERVAL_MIN,
+            ),
+            default=DEFAULT_SESSION_HISTORY_INTERVAL_MIN,
+        )
+        self._session_history_interval_min = min(
+            MAX_SESSION_HISTORY_INTERVAL_MIN,
+            max(MIN_SESSION_HISTORY_INTERVAL_MIN, history_interval),
+        )
+        self._session_history_cache_ttl_value = max(
+            MIN_SESSION_HISTORY_CACHE_TTL,
+            self._session_history_interval_min * 60,
+        )
+        self.session_history.cache_ttl = self._session_history_cache_ttl_value
+        self._pricing_edits_enabled = bool(
+            options.get(OPT_PRICING_EDITS_ENABLED, DEFAULT_PRICING_EDITS_ENABLED)
+        )
+
+        if not bool(
+            options.get(
+                OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
+                DEFAULT_DEGRADED_SERVICE_REPAIR_ISSUES,
+            )
+        ):
+            self.diagnostics.clear_degraded_service_repair_issues()
+        if not bool(
+            options.get(
+                OPT_SYSTEM_EVENT_REPAIR_ISSUES,
+                DEFAULT_SYSTEM_EVENT_REPAIR_ISSUES,
+            )
+        ):
+            self.system_events_runtime.clear_repairs()
+
+        schedule_sync_changed = bool(
+            previous_options.get(
+                OPT_SCHEDULE_SYNC_ENABLED,
+                DEFAULT_SCHEDULE_SYNC_ENABLED,
+            )
+        ) != bool(
+            options.get(
+                OPT_SCHEDULE_SYNC_ENABLED,
+                DEFAULT_SCHEDULE_SYNC_ENABLED,
+            )
+        )
+        if schedule_sync_changed:
+            await self.schedule_sync.async_stop()
+            await self.schedule_sync.async_start()
+
+        published = {
+            serial: {**payload, "nominal_v": nominal}
+            for serial, payload in current_data.items()
+            if isinstance(payload, dict)
+        }
+        self.async_set_updated_data(published)
+
     async def async_cancel_startup_power(self) -> None:
         """Cancel and await the startup-power task after failed setup."""
 
@@ -2135,6 +2285,80 @@ class EnphaseCoordinator(
                     "Timed out waiting for %s Enphase runtime task(s) to stop",
                     len(pending),
                 )
+
+    async def async_quiesce_for_reload(self) -> bool:
+        """Stop entry background work while retaining cached runtime state."""
+
+        current_task = asyncio.current_task()
+        cancelled_tasks: set[asyncio.Future[Any]] = set()
+        quiesced = True
+
+        def _cancel(task: object) -> None:
+            if (
+                isinstance(task, asyncio.Future)
+                and task is not current_task
+                and not task.done()
+            ):
+                task.cancel()
+                cancelled_tasks.add(task)
+
+        reload_task_attrs = {
+            attr_name: getattr(self, attr_name, None)
+            for attr_name in (
+                "_warmup_task",
+                "_startup_power_task",
+                "_grid_profile_metadata_task",
+            )
+        }
+        for task in reload_task_attrs.values():
+            _cancel(task)
+
+        entry_background_tasks = getattr(self, "_entry_background_tasks", None)
+        for task in tuple(entry_background_tasks or ()):
+            _cancel(task)
+
+        session_manager = getattr(self, "session_history", None)
+        enrichment_tasks = getattr(session_manager, "_enrichment_tasks", None)
+        for task in tuple(enrichment_tasks or ()):
+            _cancel(task)
+
+        pending: set[asyncio.Future[Any]] = set()
+        if cancelled_tasks:
+            done, pending = await asyncio.wait(
+                cancelled_tasks,
+                timeout=RUNTIME_CLEANUP_TIMEOUT_S,
+            )
+            if done:
+                await asyncio.gather(*done, return_exceptions=True)
+            if pending:
+                quiesced = False
+                _LOGGER.warning(
+                    "Timed out waiting for %s Enphase reload task(s) to stop",
+                    len(pending),
+                )
+
+        for attr_name, task in reload_task_attrs.items():
+            if task not in pending and getattr(self, attr_name, None) is task:
+                setattr(self, attr_name, None)
+        if entry_background_tasks is not None:
+            entry_background_tasks.difference_update(
+                task for task in tuple(entry_background_tasks) if task not in pending
+            )
+        if enrichment_tasks is not None:
+            enrichment_tasks.difference_update(
+                task for task in tuple(enrichment_tasks) if task not in pending
+            )
+
+        try:
+            async with asyncio.timeout(RUNTIME_CLEANUP_TIMEOUT_S):
+                async with self._refresh_lock:
+                    pass
+        except TimeoutError:
+            quiesced = False
+            _LOGGER.warning(
+                "Timed out waiting for the active Enphase refresh to stop before reload"
+            )
+        return quiesced
 
     def track_entry_background_task(self, task: object) -> None:
         """Track config-entry background work for pre-client-close cancellation."""
@@ -3778,6 +4002,12 @@ class EnphaseCoordinator(
         task.add_done_callback(self._clear_grid_profile_metadata_task)
 
     async def _async_update_data(self) -> dict[str, dict[str, object]]:
+        async with self._refresh_lock:
+            return await self._async_update_data_locked()
+
+    async def _async_update_data_locked(self) -> dict[str, dict[str, object]]:
+        """Run one serialized coordinator refresh."""
+
         with request_metrics_scope("core_refresh") as request_metrics:
             context = self._start_refresh_pipeline()
             context.request_metrics = request_metrics

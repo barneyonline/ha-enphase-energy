@@ -83,6 +83,8 @@ class ScheduleSync:
         self._meta_cache: dict[str, str | None] = {}
         self._config_cache: dict[str, dict[str, Any]] = {}
         self._lock = asyncio.Lock()
+        self._lifecycle_lock = asyncio.Lock()
+        self._lifecycle_generation = 0
         self._storage_collection: ScheduleStorageCollection | None = None
         self._unsub_interval: Callable[[], None] | None = None
         self._unsub_coordinator: Callable[[], None] | None = None
@@ -99,26 +101,39 @@ class ScheduleSync:
         self._stopping = False
 
     async def async_start(self) -> None:
-        self._disabled_cleanup_done = False
-        if not self._sync_enabled():
-            await self._disable_support()
-            return
-        await self._remove_all_helpers()
-        if self._stopping:
-            return
-        self._unsub_interval = async_track_time_interval(
-            self.hass, self._handle_interval, SYNC_INTERVAL
-        )
-        try:
-            self._unsub_coordinator = self._coordinator.async_add_listener(
-                self._handle_coordinator_update
+        async with self._lifecycle_lock:
+            self._lifecycle_generation += 1
+            generation = self._lifecycle_generation
+            self._stopping = True
+            await self._async_stop_locked()
+            self._stopping = False
+            self._disabled_cleanup_done = False
+            if not self._sync_enabled():
+                await self._async_disable_support_locked()
+                return
+            await self._remove_all_helpers()
+            if self._stopping or generation != self._lifecycle_generation:
+                return
+            self._unsub_interval = async_track_time_interval(
+                self.hass, self._handle_interval, SYNC_INTERVAL
             )
-        except Exception:
-            self._unsub_coordinator = None
+            try:
+                self._unsub_coordinator = self._coordinator.async_add_listener(
+                    self._handle_coordinator_update
+                )
+            except Exception:
+                self._unsub_coordinator = None
         await self.async_refresh(reason="startup")
 
     async def async_stop(self) -> None:
         self._stopping = True
+        self._lifecycle_generation += 1
+        async with self._lifecycle_lock:
+            await self._async_stop_locked()
+
+    async def _async_stop_locked(self) -> None:
+        """Stop subscriptions and tasks while holding the lifecycle lock."""
+
         if self._unsub_interval is not None:
             self._unsub_interval()
             self._unsub_interval = None
@@ -268,10 +283,19 @@ class ScheduleSync:
             self._last_status = "auth_blocked"
 
     async def _disable_support(self) -> None:
+        self._stopping = True
+        self._lifecycle_generation += 1
+        async with self._lifecycle_lock:
+            await self._async_disable_support_locked()
+
+    async def _async_disable_support_locked(self) -> None:
+        """Disable schedule support while holding the lifecycle lock."""
+
+        self._stopping = True
         if self._disabled_cleanup_done:
             return
         self._disabled_cleanup_done = True
-        await self.async_stop()
+        await self._async_stop_locked()
         await self._remove_all_helpers()
         self._slot_cache.clear()
         self._meta_cache.clear()

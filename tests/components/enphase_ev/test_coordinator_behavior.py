@@ -19,7 +19,10 @@ from custom_components.enphase_ev.const import (
     BATTERY_BACKUP_HISTORY_FAILURE_CACHE_TTL,
     CONF_COOKIE,
     CONF_EAUTH,
+    CONF_EMAIL,
     CONF_INCLUDE_INVERTERS,
+    CONF_PASSWORD,
+    CONF_REMEMBER_PASSWORD,
     CONF_SCAN_INTERVAL,
     CONF_SELECTED_TYPE_KEYS,
     CONF_SERIALS,
@@ -28,8 +31,15 @@ from custom_components.enphase_ev.const import (
     DEFAULT_SESSION_HISTORY_INTERVAL_MIN,
     DOMAIN,
     ISSUE_DNS_RESOLUTION,
+    OPT_API_TIMEOUT,
+    OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
+    OPT_FAST_POLL_INTERVAL,
     OPT_NOMINAL_VOLTAGE,
+    OPT_PRICING_EDITS_ENABLED,
+    OPT_SCHEDULE_SYNC_ENABLED,
+    OPT_SLOW_POLL_INTERVAL,
     OPT_SESSION_HISTORY_INTERVAL,
+    OPT_SYSTEM_EVENT_REPAIR_ISSUES,
 )
 from custom_components.enphase_ev.evse_runtime import (
     FAST_TOGGLE_POLL_HOLD_S,
@@ -100,6 +110,128 @@ def _client_response_error(status: int, *, message: str = "", headers=None):
         message=message,
         headers=headers or {},
     )
+
+
+@pytest.mark.asyncio
+async def test_apply_config_entry_options_without_reload(
+    hass, coordinator_factory
+) -> None:
+    options = {
+        OPT_API_TIMEOUT: 20,
+        OPT_FAST_POLL_INTERVAL: 45,
+        OPT_SLOW_POLL_INTERVAL: 90,
+        OPT_NOMINAL_VOLTAGE: 240,
+        OPT_SESSION_HISTORY_INTERVAL: 2,
+        OPT_PRICING_EDITS_ENABLED: False,
+        OPT_DEGRADED_SERVICE_REPAIR_ISSUES: False,
+        OPT_SYSTEM_EVENT_REPAIR_ISSUES: False,
+        OPT_SCHEDULE_SYNC_ENABLED: True,
+    }
+    entry = MockConfigEntry(domain=DOMAIN, data={}, options=options)
+    entry.add_to_hass(hass)
+    coord = coordinator_factory(data={RANDOM_SERIAL: {"sn": RANDOM_SERIAL}})
+    coord.config_entry = entry
+    coord.diagnostics = SimpleNamespace(clear_degraded_service_repair_issues=Mock())
+    coord.system_events_runtime = SimpleNamespace(clear_repairs=Mock())
+    coord.schedule_sync = SimpleNamespace(
+        async_stop=AsyncMock(),
+        async_start=AsyncMock(),
+    )
+
+    await coord.async_apply_config_entry_options({OPT_SCHEDULE_SYNC_ENABLED: False})
+
+    assert coord.client._timeout == 20  # noqa: SLF001
+    assert coord._configured_slow_poll_interval == 90  # noqa: SLF001
+    assert coord.nominal_voltage == 240
+    assert coord._session_history_interval_min == 2  # noqa: SLF001
+    assert coord.session_history.cache_ttl == 120
+    assert coord.pricing_edits_enabled is False
+    assert coord.data[RANDOM_SERIAL]["nominal_v"] == 240
+    coord.diagnostics.clear_degraded_service_repair_issues.assert_called_once_with()
+    coord.system_events_runtime.clear_repairs.assert_called_once_with()
+    coord.schedule_sync.async_stop.assert_awaited_once_with()
+    coord.schedule_sync.async_start.assert_awaited_once_with()
+
+    coord._determine_polling_state = Mock(side_effect=RuntimeError("bad cache"))
+    await coord.async_apply_config_entry_options(options)
+    assert coord.update_interval == timedelta(seconds=90)
+
+    coord.config_entry = None
+    await coord.async_apply_config_entry_options(options)
+
+
+@pytest.mark.asyncio
+async def test_apply_config_entry_options_preserves_legacy_scan_interval(
+    hass, coordinator_factory
+) -> None:
+    config = {
+        CONF_SITE_ID: RANDOM_SITE_ID,
+        CONF_SERIALS: [RANDOM_SERIAL],
+        CONF_EAUTH: "EAUTH",
+        CONF_COOKIE: "COOKIE",
+        CONF_SCAN_INTERVAL: 300,
+        CONF_SITE_ONLY: False,
+    }
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data=config,
+        options={OPT_API_TIMEOUT: 20},
+    )
+    entry.add_to_hass(hass)
+    coord = coordinator_factory(config=config)
+    coord.config_entry = entry
+    coord.diagnostics = SimpleNamespace(clear_degraded_service_repair_issues=Mock())
+    coord.system_events_runtime = SimpleNamespace(clear_repairs=Mock())
+
+    await coord.async_apply_config_entry_options({OPT_API_TIMEOUT: 15})
+
+    assert coord._configured_slow_poll_interval == 300  # noqa: SLF001
+    assert coord.update_interval == timedelta(seconds=300)
+
+
+def test_apply_config_entry_data_and_auth_storage(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+
+    coord.apply_config_entry_data(
+        {
+            CONF_SITE_ID: coord.site_id,
+            CONF_SERIALS: " EV-NEW ",
+            CONF_SITE_ONLY: False,
+            CONF_INCLUDE_INVERTERS: False,
+            CONF_SELECTED_TYPE_KEYS: ["envoy", "iqevse"],
+        }
+    )
+    coord.apply_auth_storage_config(
+        {
+            CONF_EMAIL: "new@example.com",
+            CONF_PASSWORD: "stored",
+            CONF_REMEMBER_PASSWORD: True,
+        }
+    )
+
+    assert coord.serials == {"EV-NEW"}
+    assert coord._serial_order == ["EV-NEW"]  # noqa: SLF001
+    assert coord._selected_type_keys == {"envoy", "iqevse"}  # noqa: SLF001
+    assert coord.include_inverters is False
+    assert coord._email == "new@example.com"  # noqa: SLF001
+    assert coord._stored_password == "stored"  # noqa: SLF001
+    assert coord._remember_password is True  # noqa: SLF001
+
+    coord.apply_config_entry_data(
+        {
+            CONF_SITE_ID: coord.site_id,
+            CONF_SERIALS: [],
+            CONF_SITE_ONLY: True,
+            CONF_SELECTED_TYPE_KEYS: "envoy",
+        }
+    )
+    assert coord._selected_type_keys == {"envoy"}  # noqa: SLF001
+    assert coord.always_update is True
+
+    with pytest.raises(ValueError, match="different site"):
+        coord.apply_config_entry_data({CONF_SITE_ID: "other"})
 
 
 @pytest.mark.asyncio
@@ -1931,6 +2063,84 @@ async def test_runtime_cleanup_timeout_is_bounded(
     await asyncio.gather(task, return_exceptions=True)
 
     assert "Timed out waiting for 1 Enphase runtime task" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_reload_quiesce_cancels_background_work_without_clearing_state(
+    coordinator_factory,
+) -> None:
+    data = {RANDOM_SERIAL: {"sn": RANDOM_SERIAL, "status": "available"}}
+    coord = coordinator_factory(data=data)
+    topology_listener = Mock()
+    coord._topology_listeners.append(topology_listener)  # noqa: SLF001
+
+    warmup_task = asyncio.create_task(asyncio.sleep(60))
+    startup_power_task = asyncio.create_task(asyncio.sleep(60))
+    grid_profile_task = asyncio.create_task(asyncio.sleep(60))
+    entry_background_task = asyncio.create_task(asyncio.sleep(60))
+    enrichment_task = asyncio.create_task(asyncio.sleep(60))
+    coord._warmup_task = warmup_task  # noqa: SLF001
+    coord._startup_power_task = startup_power_task  # noqa: SLF001
+    coord._grid_profile_metadata_task = grid_profile_task  # noqa: SLF001
+    coord.track_entry_background_task(entry_background_task)
+    coord.session_history._enrichment_tasks.add(enrichment_task)  # noqa: SLF001
+
+    assert await coord.async_quiesce_for_reload() is True
+
+    assert warmup_task.cancelled()
+    assert startup_power_task.cancelled()
+    assert grid_profile_task.cancelled()
+    assert entry_background_task.cancelled()
+    assert enrichment_task.cancelled()
+    assert coord._warmup_task is None  # noqa: SLF001
+    assert coord._startup_power_task is None  # noqa: SLF001
+    assert coord._grid_profile_metadata_task is None  # noqa: SLF001
+    assert coord._entry_background_tasks == set()  # noqa: SLF001
+    assert coord.session_history._enrichment_tasks == set()  # noqa: SLF001
+    assert coord.data == data
+    assert coord._topology_listeners == [topology_listener]  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_reload_quiesce_timeout_is_bounded(
+    coordinator_factory, monkeypatch, caplog
+) -> None:
+    from custom_components.enphase_ev import coordinator as coord_mod
+
+    coord = coordinator_factory()
+    task = asyncio.create_task(asyncio.sleep(60))
+    coord.track_entry_background_task(task)
+
+    async def _pending(tasks, *, timeout):
+        assert timeout == coord_mod.RUNTIME_CLEANUP_TIMEOUT_S
+        return set(), set(tasks)
+
+    monkeypatch.setattr(coord_mod.asyncio, "wait", _pending)
+    with caplog.at_level(logging.WARNING):
+        assert await coord.async_quiesce_for_reload() is False
+    assert task in coord._entry_background_tasks  # noqa: SLF001
+    await asyncio.gather(task, return_exceptions=True)
+
+    assert "Timed out waiting for 1 Enphase reload task" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_reload_quiesce_timeout_waiting_for_active_refresh(
+    coordinator_factory, monkeypatch, caplog
+) -> None:
+    from custom_components.enphase_ev import coordinator as coord_mod
+
+    coord = coordinator_factory()
+    await coord._refresh_lock.acquire()  # noqa: SLF001
+    monkeypatch.setattr(coord_mod, "RUNTIME_CLEANUP_TIMEOUT_S", 0.001)
+
+    try:
+        with caplog.at_level(logging.WARNING):
+            assert await coord.async_quiesce_for_reload() is False
+    finally:
+        coord._refresh_lock.release()  # noqa: SLF001
+
+    assert "active Enphase refresh" in caplog.text
 
 
 @pytest.mark.asyncio

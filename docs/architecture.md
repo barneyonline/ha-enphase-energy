@@ -38,6 +38,14 @@ Optional endpoint families then warm up in feature-aware stages, publishing afte
 each stage so one slow family does not hold back unrelated state. Schedule sync and
 other long-running work start in the background.
 
+Config-entry update handling distinguishes live-applicable options from topology
+changes. Polling, timeout, history, voltage, scheduler, pricing, and notification
+options are applied to the existing coordinator and published without unloading
+entities. Changes that alter platform topology still reload the config entry, but
+the runtime is handed across that reload so platforms can recreate entities from
+the last published state immediately. The reused coordinator then refreshes in
+the background. Cold setup continues to require an authoritative first refresh.
+
 Device and entity registry cleanup is intentionally conservative. Startup migrations
 run once per migration version, while normal reconciliation runs only when the
 coordinator reports a topology change—not for ordinary telemetry updates. Cleanup

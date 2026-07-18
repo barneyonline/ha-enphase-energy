@@ -2078,6 +2078,7 @@ class EnphaseEVClient:
             tuple[str, str, str, str], str
         ] = {}
         self._battery_config_supports_mqtt: bool | None = None
+
         self._battery_config_write_bases: dict[str, dict[str, Any]] = {}
         self._cookie = cookie or ""
         self._eauth = eauth or None
@@ -2094,6 +2095,11 @@ class EnphaseEVClient:
             "User-Agent": _ENLIGHTEN_BROWSER_USER_AGENT,
         }
         self.update_credentials(eauth=eauth, cookie=cookie)
+
+    def set_timeout(self, timeout: int) -> None:
+        """Update the request timeout for subsequent API operations."""
+
+        self._timeout = int(timeout)
 
     def set_reauth_callback(
         self, callback: Callable[[], Awaitable[bool]] | None
