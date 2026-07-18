@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import re
 import time as _time
@@ -18,7 +19,20 @@ from homeassistant.helpers import (
 )
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
-from .const import CONF_INCLUDE_INVERTERS, CONF_SELECTED_TYPE_KEYS, DOMAIN
+from .const import (
+    CONF_EMAIL,
+    CONF_INCLUDE_INVERTERS,
+    CONF_PASSWORD,
+    CONF_REMEMBER_PASSWORD,
+    CONF_SELECTED_TYPE_KEYS,
+    CONF_SERIALS,
+    CONF_SITE_NAME,
+    CONF_SITE_ONLY,
+    DOMAIN,
+    OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+    OPT_MICROINVERTER_POWER_ENABLED,
+    OPT_WEATHER_ENABLED,
+)
 from .device_info_helpers import (
     _cloud_device_info,
     _compose_charger_model_display,
@@ -63,6 +77,25 @@ if TYPE_CHECKING:  # pragma: no cover
     from .coordinator import EnphaseCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+_RUNTIME_HANDOFF_KEY = f"{DOMAIN}_runtime_handoffs"
+_RELOAD_REQUIRED_OPTION_KEYS = frozenset(
+    {
+        OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
+        OPT_MICROINVERTER_POWER_ENABLED,
+        OPT_WEATHER_ENABLED,
+    }
+)
+_HOT_APPLY_DATA_KEYS = frozenset({CONF_EMAIL, CONF_PASSWORD, CONF_REMEMBER_PASSWORD})
+_RUNTIME_HANDOFF_DATA_KEYS = frozenset(
+    {
+        CONF_INCLUDE_INVERTERS,
+        CONF_SELECTED_TYPE_KEYS,
+        CONF_SERIALS,
+        CONF_SITE_NAME,
+        CONF_SITE_ONLY,
+    }
+)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -242,30 +275,94 @@ def _is_disabled_by_integration(disabled_by: object) -> bool:
     return text == "integration"
 
 
-async def _async_update_listener(
-    hass: HomeAssistant, entry: EnphaseConfigEntry
+async def _async_update_listener_locked(
+    hass: HomeAssistant,
+    entry: EnphaseConfigEntry,
+    runtime_data: EnphaseRuntimeData | None,
 ) -> None:
-    runtime_data = getattr(entry, "runtime_data", None)
+    target_data = dict(entry.data)
+    target_options = dict(entry.options)
     if isinstance(runtime_data, EnphaseRuntimeData):
         suppression_count = int(getattr(runtime_data, "reload_suppression_count", 0))
         if suppression_count > 0:
             # Coordinator-owned config-entry data updates persist tokens/cooldowns
             # and must not recreate the coordinator/client.
             runtime_data.reload_suppression_count = suppression_count - 1
+            runtime_data.applied_data = target_data
+            runtime_data.applied_options = target_options
             return
     if getattr(entry, "disabled_by", None) is not None:
         return
     loaded_state = getattr(ConfigEntryState, "LOADED", None)
     if loaded_state is not None and entry.state is not loaded_state:
         return
+    if isinstance(runtime_data, EnphaseRuntimeData):
+        previous_data = runtime_data.applied_data
+        previous_options = runtime_data.applied_options
+        preserve_runtime = False
+        if previous_data is not None and previous_options is not None:
+            changed_data_keys = {
+                key
+                for key in previous_data.keys() | target_data.keys()
+                if previous_data.get(key) != target_data.get(key)
+            }
+            changed_option_keys = {
+                key
+                for key in previous_options.keys() | target_options.keys()
+                if previous_options.get(key) != target_options.get(key)
+            }
+            reload_required = bool(
+                changed_data_keys - _HOT_APPLY_DATA_KEYS
+                or changed_option_keys & _RELOAD_REQUIRED_OPTION_KEYS
+            )
+            preserve_runtime = not bool(
+                changed_data_keys - _HOT_APPLY_DATA_KEYS - _RUNTIME_HANDOFF_DATA_KEYS
+            )
+            if not reload_required:
+                coord = runtime_data.coordinator
+                try:
+                    coord.apply_auth_storage_config(target_data)
+                    await coord.async_apply_config_entry_options(previous_options)
+                except Exception:  # noqa: BLE001 - fall back to the proven reload path
+                    _LOGGER.exception(
+                        "Failed to apply Enphase options live; reloading entry %s",
+                        entry.entry_id,
+                    )
+                else:
+                    runtime_data.applied_data = target_data
+                    runtime_data.applied_options = target_options
+                    return
+
+        runtime_data.preserve_for_reload = preserve_runtime
     try:
-        await hass.config_entries.async_reload(entry.entry_id)
+        reloaded = await hass.config_entries.async_reload(entry.entry_id)
+        if reloaded is False and isinstance(runtime_data, EnphaseRuntimeData):
+            runtime_data.preserve_for_reload = False
     except OperationNotAllowed as err:
+        if isinstance(runtime_data, EnphaseRuntimeData):
+            runtime_data.preserve_for_reload = False
         _LOGGER.debug(
             "Skipping reload for entry %s while state is changing: %s",
             entry.entry_id,
             err,
         )
+    except BaseException:
+        if isinstance(runtime_data, EnphaseRuntimeData):
+            runtime_data.preserve_for_reload = False
+        raise
+
+
+async def _async_update_listener(
+    hass: HomeAssistant, entry: EnphaseConfigEntry
+) -> None:
+    runtime_data = getattr(entry, "runtime_data", None)
+    if not isinstance(runtime_data, EnphaseRuntimeData):
+        await _async_update_listener_locked(hass, entry, None)
+        return
+    async with runtime_data.update_listener_lock:
+        if getattr(entry, "runtime_data", None) is not runtime_data:
+            return
+        await _async_update_listener_locked(hass, entry, runtime_data)
 
 
 async def _async_unload_platforms_safe(
@@ -1590,7 +1687,11 @@ def _remove_retired_grid_profile_device_entities(
     )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> bool:
+async def _async_setup_entry_impl(
+    hass: HomeAssistant,
+    entry: EnphaseConfigEntry,
+    preserved_runtime: EnphaseRuntimeData | None,
+) -> bool:
     setup_started = _time.monotonic()
     setup_timings: dict[str, float] = {}
 
@@ -1623,34 +1724,61 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
     from .labels import async_prime_label_translations
 
     coordinator_started = _time.monotonic()
-    coord = EnphaseCoordinator(
-        hass,
-        entry.data,
-        config_entry=entry,
-        cookie_header_session=async_create_clientsession(
+    reused_runtime = isinstance(preserved_runtime, EnphaseRuntimeData)
+    if reused_runtime:
+        assert isinstance(preserved_runtime, EnphaseRuntimeData)
+        entry.runtime_data = preserved_runtime
+        preserved_runtime.preserve_for_reload = False
+        coord = preserved_runtime.coordinator
+        coord.apply_config_entry_data(entry.data)
+        coord.apply_auth_storage_config(entry.data)
+        await coord.async_apply_config_entry_options(dict(entry.options))
+        firmware_catalog = preserved_runtime.firmware_catalog
+        evse_firmware_details = preserved_runtime.evse_firmware_details
+        gateway_software_update = preserved_runtime.gateway_software_update
+        battery_schedule_editor = preserved_runtime.battery_schedule_editor
+        evse_schedule_editor = preserved_runtime.evse_schedule_editor
+        if (
+            firmware_catalog is None
+            or evse_firmware_details is None
+            or gateway_software_update is None
+            or battery_schedule_editor is None
+            or evse_schedule_editor is None
+        ):
+            raise RuntimeError("Incomplete preserved Enphase runtime")
+        preserved_runtime.applied_data = dict(entry.data)
+        preserved_runtime.applied_options = dict(entry.options)
+    else:
+        coord = EnphaseCoordinator(
             hass,
-            auto_cleanup=True,
-            cookie_jar=aiohttp.DummyCookieJar(),
-        ),
-    )
-    firmware_catalog = FirmwareCatalogManager(hass)
-    evse_firmware_details = EvseFirmwareDetailsManager(lambda: coord.client)
-    gateway_software_update = GatewaySoftwareUpdateManager(
-        lambda: coord.client,
-        lambda: coord.inventory_view.type_device_serial_number("envoy"),
-    )
-    battery_schedule_editor = BatteryScheduleEditorManager(coord)
-    evse_schedule_editor = EvseScheduleEditorManager(coord)
-    setattr(coord, "firmware_catalog_manager", firmware_catalog)
-    setattr(coord, "evse_firmware_details_manager", evse_firmware_details)
-    entry.runtime_data = EnphaseRuntimeData(
-        coordinator=coord,
-        firmware_catalog=firmware_catalog,
-        evse_firmware_details=evse_firmware_details,
-        gateway_software_update=gateway_software_update,
-        battery_schedule_editor=battery_schedule_editor,
-        evse_schedule_editor=evse_schedule_editor,
-    )
+            entry.data,
+            config_entry=entry,
+            cookie_header_session=async_create_clientsession(
+                hass,
+                auto_cleanup=True,
+                cookie_jar=aiohttp.DummyCookieJar(),
+            ),
+        )
+        firmware_catalog = FirmwareCatalogManager(hass)
+        evse_firmware_details = EvseFirmwareDetailsManager(lambda: coord.client)
+        gateway_software_update = GatewaySoftwareUpdateManager(
+            lambda: coord.client,
+            lambda: coord.inventory_view.type_device_serial_number("envoy"),
+        )
+        battery_schedule_editor = BatteryScheduleEditorManager(coord)
+        evse_schedule_editor = EvseScheduleEditorManager(coord)
+        setattr(coord, "firmware_catalog_manager", firmware_catalog)
+        setattr(coord, "evse_firmware_details_manager", evse_firmware_details)
+        entry.runtime_data = EnphaseRuntimeData(
+            coordinator=coord,
+            firmware_catalog=firmware_catalog,
+            evse_firmware_details=evse_firmware_details,
+            gateway_software_update=gateway_software_update,
+            battery_schedule_editor=battery_schedule_editor,
+            evse_schedule_editor=evse_schedule_editor,
+            applied_data=dict(entry.data),
+            applied_options=dict(entry.options),
+        )
     _record_phase("coordinator_init_s", coordinator_started)
     setup_milestones: dict[str, float] = {}
     begin_setup_tracking = getattr(coord, "begin_setup_tracking", None)
@@ -1684,7 +1812,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
     )
     try:
         bootstrap_first_refresh = getattr(coord, "async_bootstrap_first_refresh", None)
-        if callable(bootstrap_first_refresh):
+        if reused_runtime:
+            setup_timings["first_refresh_s"] = 0.0
+        elif callable(bootstrap_first_refresh):
             await bootstrap_first_refresh()
         else:
             # Compatibility for lightweight coordinators supplied by downstream tests.
@@ -1819,6 +1949,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
             f"{DOMAIN}_startup_warmup",
         )
 
+    if reused_runtime:
+        _schedule_background_task(
+            coord.async_request_refresh(),
+            f"{DOMAIN}_reload_refresh",
+        )
+
     grid_profile_startup_probe = getattr(
         coord, "async_refresh_grid_profile_metadata", None
     )
@@ -1846,6 +1982,53 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
     return True
 
 
+async def _async_cleanup_failed_runtime_handoff(
+    entry: EnphaseConfigEntry,
+    runtime_data: EnphaseRuntimeData,
+) -> None:
+    """Release a claimed runtime when config-entry setup does not complete."""
+
+    coord = runtime_data.coordinator
+    cleanup_steps = (
+        runtime_data.async_stop_weather,
+        getattr(getattr(coord, "schedule_sync", None), "async_stop", None),
+        getattr(coord, "async_cleanup_runtime_state", None),
+        getattr(coord, "async_close", None),
+    )
+    for cleanup in cleanup_steps:
+        if not callable(cleanup):
+            continue
+        try:
+            result = cleanup()
+            if inspect.isawaitable(result):
+                await result
+        except Exception:  # noqa: BLE001 - continue releasing the remaining resources
+            _LOGGER.exception(
+                "Failed cleaning up a preserved runtime for entry %s",
+                entry.entry_id,
+            )
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> bool:
+    """Set up an Enphase config entry, reusing a handed-off runtime when safe."""
+
+    handoffs = hass.data.get(_RUNTIME_HANDOFF_KEY)
+    preserved_runtime = (
+        handoffs.pop(entry.entry_id, None) if isinstance(handoffs, dict) else None
+    )
+    claimed_runtime = (
+        preserved_runtime if isinstance(preserved_runtime, EnphaseRuntimeData) else None
+    )
+    try:
+        return await _async_setup_entry_impl(hass, entry, claimed_runtime)
+    except BaseException:
+        if claimed_runtime is not None:
+            await _async_cleanup_failed_runtime_handoff(entry, claimed_runtime)
+            if getattr(entry, "runtime_data", None) is claimed_runtime:
+                entry.runtime_data = None
+        raise
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> bool:
     coord = None
     runtime_data = None
@@ -1860,15 +2043,28 @@ async def async_unload_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> 
             await runtime_data.async_stop_weather()
         if coord is not None and hasattr(coord, "schedule_sync"):
             await coord.schedule_sync.async_stop()
-        async_cleanup_runtime_state = getattr(
-            coord, "async_cleanup_runtime_state", None
+        preserve_runtime = bool(
+            runtime_data is not None and runtime_data.preserve_for_reload
         )
-        if callable(async_cleanup_runtime_state):
-            await async_cleanup_runtime_state()
-        elif coord is not None and hasattr(coord, "cleanup_runtime_state"):
-            coord.cleanup_runtime_state()
-        if coord is not None and hasattr(coord, "async_close"):
-            await coord.async_close()
+        if preserve_runtime:
+            async_quiesce_for_reload = getattr(coord, "async_quiesce_for_reload", None)
+            if callable(async_quiesce_for_reload):
+                preserve_runtime = await async_quiesce_for_reload() is not False
+            if not preserve_runtime and runtime_data is not None:
+                runtime_data.preserve_for_reload = False
+        if preserve_runtime:
+            handoffs = hass.data.setdefault(_RUNTIME_HANDOFF_KEY, {})
+            handoffs[entry.entry_id] = runtime_data
+        else:
+            async_cleanup_runtime_state = getattr(
+                coord, "async_cleanup_runtime_state", None
+            )
+            if callable(async_cleanup_runtime_state):
+                await async_cleanup_runtime_state()
+            elif coord is not None and hasattr(coord, "cleanup_runtime_state"):
+                coord.cleanup_runtime_state()
+            if coord is not None and hasattr(coord, "async_close"):
+                await coord.async_close()
         entry.runtime_data = None
         loaded_state = getattr(ConfigEntryState, "LOADED", None)
         has_loaded_entries = any(

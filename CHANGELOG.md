@@ -16,7 +16,10 @@ All notable changes to this project will be documented in this file.
   profile catalog.
 
 ### 🔧 Improvements
-- None
+- Applied non-topology integration options without reloading the config entry, and
+  preserved the live coordinator and last known entity state across the remaining
+  device/topology reloads. This substantially reduces unavailable and unknown
+  entity states after saving integration settings.
 
 ### 🔄 Other changes
 - None

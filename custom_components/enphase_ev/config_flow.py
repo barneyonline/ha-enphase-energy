@@ -2354,8 +2354,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         new_data[CONF_SITE_ONLY] = site_only
         new_data[CONF_INCLUDE_INVERTERS] = "microinverter" in selected_type_keys
         new_data[CONF_SERIALS] = serials
-        self.hass.config_entries.async_update_entry(self._entry, data=new_data)
-
         options = dict(self._entry.options)
         options[OPT_SCHEDULE_SYNC_ENABLED] = bool(
             device_data.get(
@@ -2419,6 +2417,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 )
             )
             or self._default_nominal_voltage()
+        )
+        self.hass.config_entries.async_update_entry(
+            self._entry,
+            data=new_data,
+            options=options,
         )
         return self.async_create_entry(title="", data=options)
 
