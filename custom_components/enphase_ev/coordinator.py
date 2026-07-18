@@ -3740,7 +3740,7 @@ class EnphaseCoordinator(
                 async with self._grid_profile_metadata_refresh_lock:
                     with request_metrics_scope("grid_profile_metadata"):
                         with enlighten_optional_read_scope():
-                            await refresh(force=force, load_profiles=False)
+                            await refresh(force=force, load_profiles=True)
         except TimeoutError:
             _LOGGER.debug(
                 "Stopped optional grid-profile metadata refresh for site %s after %.1f seconds",
