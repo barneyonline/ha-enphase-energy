@@ -612,7 +612,7 @@ async def test_coordinator_refreshes_grid_profile_metadata_after_first_poll() ->
     assert len(created_tasks) == 1
     await task
 
-    refresh.assert_awaited_once_with(force=False, load_profiles=False)
+    refresh.assert_awaited_once_with(force=False, load_profiles=True)
     assert coordinator._grid_profile_metadata_task is None
 
     refresh.reset_mock()
@@ -672,7 +672,7 @@ async def test_coordinator_serializes_startup_and_steady_grid_profile_refreshes(
     calls: list[bool] = []
 
     async def _refresh(*, force: bool, load_profiles: bool) -> None:
-        assert load_profiles is False
+        assert load_profiles is True
         calls.append(force)
         if force:
             first_started.set()

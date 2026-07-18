@@ -11,7 +11,9 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Populated Grid Profile sensor metadata such as profile group, PEL support,
+  277 V compatibility, and recommendation status from the cached Activation
+  profile catalog.
 
 ### 🔧 Improvements
 - None
