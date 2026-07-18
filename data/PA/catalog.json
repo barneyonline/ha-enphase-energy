@@ -7,17 +7,15 @@
       "product_media_name_id": null
     }
   },
-  "generated_at": "2026-07-17T05:56:05.145539Z",
+  "generated_at": "2026-07-18T05:36:28.321614Z",
   "schema_version": 1,
   "source": {
     "apps_url": "https://enphase.com/installers/resources/documentation/communication",
     "crawl": {
       "envoy": {
         "bootstrap_error_targets": [],
-        "count": 220,
-        "crawl_error_targets": [
-          "https://enphase.com/|en-ca"
-        ],
+        "count": 226,
+        "crawl_error_targets": [],
         "empty_release_targets": [
           "https://enphase.com/en-lac/|en-lac",
           "https://enphase.com/en-my/|en-my",
@@ -27,8 +25,7 @@
           "https://enphase.com/fr-fot/|fr-fot",
           "https://enphase.com/fr-nc/|fr-nc",
           "https://enphase.com/ja-jp/|ja-jp",
-          "https://enphase.com/tr-cy/|tr-cy",
-          "https://enphase.com/|en-ca"
+          "https://enphase.com/tr-cy/|tr-cy"
         ],
         "missing_product_media_id_targets": [
           "https://enphase.com/bg-bg/|bg-bg",
@@ -795,9 +792,11 @@
           "https://enphase.com/|en-ca": {
             "apps_url": "https://enphase.com/installers/resources/documentation/communication",
             "bootstrap_error": null,
-            "count": 0,
-            "crawl_error": "The read operation timed out",
-            "pages": [],
+            "count": 6,
+            "crawl_error": null,
+            "pages": [
+              "https://enphase.com/installers/resources/documentation/communication?product_type=141&f%5B0%5D=document%3A217&search_api_language=en-ca&field_alternative_language=en-ca&page=0"
+            ],
             "product_media_name_id": null,
             "query_locale": "en-ca",
             "site_url": "https://enphase.com/",
