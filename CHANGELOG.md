@@ -11,21 +11,38 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v4.0.1 - 2026-07-22
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
 - Populated Grid Profile sensor metadata such as profile group, PEL support,
   277 V compatibility, and recommendation status from the cached Activation
-  profile catalog.
+  profile catalog. (#791)
 - Stopped background Heat Pump HEMS inventory polling when the Heat Pump device
   group is explicitly disabled, and downgraded defensive HEMS auth messages to
-  debug logging when no Heat Pump context exists.
+  debug logging when no Heat Pump context exists. (#793)
 
 ### 🔧 Improvements
 - Applied non-topology integration options without reloading the config entry, and
   preserved the live coordinator and last known entity state across the remaining
   device/topology reloads. This substantially reduces unavailable and unknown
-  entity states after saving integration settings.
+  entity states after saving integration settings. (#792)
 
 ### 🔄 Other changes
-- None
+- Bumped the integration manifest version to `4.0.1`.
 
 ## v4.0.0 - 2026-07-17
 
