@@ -450,6 +450,7 @@ class CoordinatorDiagnostics:
             "hems_auth_last_endpoint": getattr(coord, "_hems_auth_last_endpoint", None),
             "hems_auth_last_status": getattr(coord, "_hems_auth_last_status", None),
             "hems_auth_last_reason": getattr(coord, "_hems_auth_last_reason", None),
+            "hems_inventory_polling_enabled": coord._heatpump_hems_polling_enabled(),
             "auth_blocked_active": coord._auth_block_active(),
             "auth_blocked_until": _iso(getattr(coord, "_auth_blocked_until_utc", None)),
             "auth_block_reason": getattr(coord, "_auth_block_reason", None),

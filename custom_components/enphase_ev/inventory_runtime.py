@@ -1311,7 +1311,11 @@ class InventoryRuntime:
         ordered = list(getattr(self, "_type_device_order", []) or [])
         key = "heatpump"
 
-        members_out = self._hems_group_members("heat-pump", "heat_pump", "heatpump")
+        members_out = (
+            self._hems_group_members("heat-pump", "heat_pump", "heatpump")
+            if self.coordinator._heatpump_hems_polling_enabled()
+            else []
+        )
         if members_out:
             status_counts: dict[str, int] = {
                 "total": len(members_out),
@@ -2178,6 +2182,10 @@ class InventoryRuntime:
 
     async def _async_refresh_hems_devices(self, *, force: bool = False) -> None:
         coord = self.coordinator
+        if not coord._heatpump_hems_polling_enabled():
+            self._mark_hems_inventory_polling_disabled()
+            coord._clear_disabled_heatpump_hems_auth_state()
+            return
         now = time.monotonic()
         cache_ttl = self._hems_devices_cache_ttl_s()
         family = HEMS_INVENTORY_ENDPOINT_FAMILY
@@ -2395,8 +2403,23 @@ class InventoryRuntime:
             self._debug_hems_inventory_summary(),
         )
 
+    def _mark_hems_inventory_polling_disabled(self) -> None:
+        """Discard Heat Pump HEMS inventory state when its group is disabled."""
+
+        self._update_shared_state(
+            _hems_devices_payload=None,
+            _hems_devices_last_success_mono=None,
+            _hems_devices_last_success_utc=None,
+            _hems_devices_using_stale=False,
+            _hems_inventory_ready=True,
+            _hems_devices_cache_until=None,
+        )
+        self._merge_heatpump_type_bucket()
+
     def hems_devices_refresh_due(self, *, force: bool = False) -> bool:
         coord = self.coordinator
+        if not coord._heatpump_hems_polling_enabled():
+            return False
         now = time.monotonic()
         health = coord._endpoint_family_state(HEMS_INVENTORY_ENDPOINT_FAMILY)
         if health.cooldown_active and coord._endpoint_family_wait_active(

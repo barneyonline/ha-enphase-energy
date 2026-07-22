@@ -14,6 +14,9 @@ All notable changes to this project will be documented in this file.
 - Populated Grid Profile sensor metadata such as profile group, PEL support,
   277 V compatibility, and recommendation status from the cached Activation
   profile catalog.
+- Stopped background Heat Pump HEMS inventory polling when the Heat Pump device
+  group is explicitly disabled, and downgraded defensive HEMS auth messages to
+  debug logging when no Heat Pump context exists.
 
 ### 🔧 Improvements
 - Applied non-topology integration options without reloading the config entry, and
