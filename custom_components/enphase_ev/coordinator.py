@@ -225,6 +225,17 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
+_HEATPUMP_HEMS_AUTH_ENDPOINTS = frozenset(
+    {
+        "hems_devices",
+        "hems_support_preflight",
+        "show_livestream",
+        "heat_pump_events",
+        "iq_er_events",
+        "hems_heatpump_state",
+        "hems_energy_consumption",
+    }
+)
 
 
 def _typed_callback(func: _CallbackT) -> _CallbackT:
@@ -1205,6 +1216,9 @@ class EnphaseCoordinator(
         self._phase_timings = {}
         started = time.monotonic()
         await self.discovery_snapshot.async_restore_state()
+        if not self._heatpump_hems_polling_enabled():
+            self.inventory_runtime._mark_hems_inventory_polling_disabled()
+            self._clear_disabled_heatpump_hems_auth_state()
         self.record_setup_phase("snapshot_restore_s", started)
         await self.refresh_runner.async_start_startup_power()
 
@@ -5848,8 +5862,8 @@ class EnphaseCoordinator(
         """Return True when HEMS auth failures should be surfaced to the user."""
 
         selected = getattr(self, "_selected_type_keys", None)
-        if isinstance(selected, (set, list, tuple)) and selected:
-            return any(normalize_type_key(key) == "heatpump" for key in selected)
+        if selected is not None:
+            return self._heatpump_hems_polling_enabled()
         inventory_view = getattr(self, "inventory_view", None)
         has_type = getattr(inventory_view, "has_type", None)
         if callable(has_type):
@@ -5868,6 +5882,23 @@ class EnphaseCoordinator(
             except Exception:  # noqa: BLE001 - defensive diagnostics guard
                 return False
         return False
+
+    def _heatpump_hems_polling_enabled(self) -> bool:
+        """Return whether configured device groups require Heat Pump HEMS polling."""
+
+        selected = getattr(self, "_selected_type_keys", None)
+        if selected is None:
+            return True
+        return any(normalize_type_key(key) == "heatpump" for key in selected)
+
+    def _clear_disabled_heatpump_hems_auth_state(self) -> None:
+        """Clear auth state created only by disabled Heat Pump HEMS endpoints."""
+
+        if self._heatpump_hems_polling_enabled():
+            return
+        if self._hems_auth_last_endpoint not in _HEATPUMP_HEMS_AUTH_ENDPOINTS:
+            return
+        self._clear_hems_auth_circuit(persist=True, reset_failure_count=True)
 
     def _note_hems_auth_failure(
         self,
@@ -5898,12 +5929,13 @@ class EnphaseCoordinator(
         self._hems_auth_backoff_ends_utc = now + timedelta(seconds=delay)
         self._last_error = "hems_auth_degraded"
         self._persist_hems_auth_circuit_state()
+        repair_context_available = self._hems_auth_repair_context_available()
         diagnostics = getattr(self, "diagnostics", None)
         if diagnostics is not None:
             repairs_enabled = bool(
                 getattr(diagnostics, "degraded_service_repair_issues_enabled", True)
             )
-            if self._hems_auth_repair_context_available() or not repairs_enabled:
+            if repair_context_available or not repairs_enabled:
                 diagnostics.create_hems_auth_degraded_issue()
             else:
                 clear_issue = getattr(
@@ -5911,7 +5943,10 @@ class EnphaseCoordinator(
                 )
                 if callable(clear_issue):
                     clear_issue()
-        _LOGGER.warning(
+        log_hems_auth_failure = (
+            _LOGGER.warning if repair_context_available else _LOGGER.debug
+        )
+        log_hems_auth_failure(
             "Pausing optional HEMS polling for site %s after HEMS auth failure: endpoint=%s status=%s reason=%s failure_count=%s retry_at=%s",
             redact_site_id(self.site_id),
             self._hems_auth_last_endpoint,

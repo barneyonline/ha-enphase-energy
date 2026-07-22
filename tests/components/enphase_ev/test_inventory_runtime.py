@@ -2168,6 +2168,7 @@ async def test_inventory_runtime_refresh_hems_devices_uses_heatpump_runtime_pref
     coordinator_factory,
 ) -> None:
     coord = coordinator_factory()
+    coord._selected_type_keys = {"heatpump"}  # noqa: SLF001
     runtime = coord.inventory_runtime
 
     async def _mark_unsupported(*, force: bool = False) -> None:
@@ -2190,6 +2191,94 @@ async def test_inventory_runtime_refresh_hems_devices_uses_heatpump_runtime_pref
     runtime._merge_heatpump_type_bucket.assert_called_once_with()  # noqa: SLF001
     assert runtime._hems_inventory_ready is True  # noqa: SLF001
     assert runtime._hems_devices_payload is None  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_inventory_runtime_disables_hems_inventory_without_heatpump(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord._selected_type_keys = {"envoy", "iqevse"}  # noqa: SLF001
+    runtime = coord.inventory_runtime
+    runtime._hems_devices_payload = {"existing": True}  # noqa: SLF001
+    runtime._hems_devices_last_success_mono = time.monotonic()  # noqa: SLF001
+    runtime._hems_devices_last_success_utc = datetime.now(timezone.utc)  # noqa: SLF001
+    runtime._hems_devices_using_stale = True  # noqa: SLF001
+    runtime._devices_inventory_payload = {  # noqa: SLF001
+        "result": [
+            {
+                "type": "hemsDevices",
+                "devices": [
+                    {
+                        "heat-pump": [
+                            {
+                                "device-uid": "legacy-heat-pump",
+                                "device-type": "HEAT_PUMP",
+                            }
+                        ]
+                    }
+                ],
+            }
+        ]
+    }
+    coord._note_hems_auth_failure(  # noqa: SLF001
+        api.Unauthorized(), endpoint="hems_devices"
+    )
+    coord.heatpump_runtime.async_refresh_hems_support_preflight = AsyncMock(  # type: ignore[method-assign]
+        side_effect=AssertionError("unused")
+    )
+    coord.client.hems_devices = AsyncMock(side_effect=AssertionError("unused"))
+
+    await runtime._async_refresh_hems_devices(force=True)  # noqa: SLF001
+
+    coord.heatpump_runtime.async_refresh_hems_support_preflight.assert_not_awaited()
+    coord.client.hems_devices.assert_not_awaited()
+    assert runtime.hems_devices_refresh_due(force=True) is False
+    assert runtime._hems_devices_payload is None  # noqa: SLF001
+    assert runtime._hems_devices_last_success_mono is None  # noqa: SLF001
+    assert runtime._hems_devices_last_success_utc is None  # noqa: SLF001
+    assert runtime._hems_devices_using_stale is False  # noqa: SLF001
+    assert runtime._hems_inventory_ready is True  # noqa: SLF001
+    assert coord.inventory_view.has_type("heatpump") is False
+    assert "heatpump" not in coord.inventory_view.iter_type_keys()
+    assert coord._hems_auth_circuit_active() is False  # noqa: SLF001
+    assert coord.collect_site_metrics()["hems_inventory_polling_enabled"] is False
+
+
+@pytest.mark.asyncio
+async def test_inventory_runtime_preserves_non_heatpump_hems_auth_circuit(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord._selected_type_keys = set()  # noqa: SLF001
+    runtime = coord.inventory_runtime
+    coord._note_hems_auth_failure(  # noqa: SLF001
+        api.Unauthorized(), endpoint="hems_consumption_lifetime"
+    )
+    coord.heatpump_runtime.async_refresh_hems_support_preflight = AsyncMock(  # type: ignore[method-assign]
+        side_effect=AssertionError("unused")
+    )
+    coord.client.hems_devices = AsyncMock(side_effect=AssertionError("unused"))
+
+    await runtime._async_refresh_hems_devices(force=True)  # noqa: SLF001
+
+    coord.heatpump_runtime.async_refresh_hems_support_preflight.assert_not_awaited()
+    coord.client.hems_devices.assert_not_awaited()
+    assert coord._hems_auth_circuit_active() is True  # noqa: SLF001
+    assert coord._hems_auth_last_endpoint == "hems_consumption_lifetime"  # noqa: SLF001
+
+
+def test_inventory_runtime_hems_inventory_enabled_for_heatpump_and_legacy_entries(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.inventory_runtime
+
+    coord._selected_type_keys = None  # noqa: SLF001
+    assert runtime.hems_devices_refresh_due(force=True) is True
+
+    coord._selected_type_keys = {"heatpump"}  # noqa: SLF001
+    assert runtime.hems_devices_refresh_due(force=True) is True
 
 
 @pytest.mark.asyncio

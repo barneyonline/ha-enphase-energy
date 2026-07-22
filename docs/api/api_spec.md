@@ -7529,6 +7529,7 @@ Current implementation policy:
 - Keep ordinary slow coordinator polling at **60 seconds or slower** by default.
 - Keep temporary fast polling at **30 seconds or slower**, and reserve it for user actions or short-lived state transitions.
 - Do not poll low-volatility inventory/topology endpoints on every coordinator refresh. Current minimum cache windows include site-device inventory and system-dashboard detail fan-out at **600 seconds**, HEMS device inventory at **60 seconds**, heat-pump runtime state at **60 seconds**, and Storm Alert at **300 seconds**.
+- Run recurring HEMS device inventory and Heat Pump runtime polling only when the Heat Pump device group is selected. Setup and reconfiguration may still probe HEMS inventory so a newly installed Heat Pump can be discovered, and the separate HEMS lifetime-energy fallback remains available for EVSE or water-heater channels.
 - Derive heat-pump power from HEMS energy deltas on a slower cadence; current heat-pump power/daily energy refreshes use the HEMS daily-consumption cache window of **300 seconds**.
 - Endpoint failures must use stale data, endpoint-family cooldowns, or optional-service degradation before increasing polling pressure.
 - Optional HEMS/Heat Pump auth failures must not trigger global stored-password refresh. They are isolated behind the HEMS auth circuit and backoff so wallbox, battery, gateway, and other non-HEMS data can continue.
