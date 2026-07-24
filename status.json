@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-07-24T21:01:29.270799Z",
+  "checked_at": "2026-07-24T22:33:55.463993Z",
   "checks": [
     {
       "affects": true,
@@ -144,7 +144,7 @@
       ],
       "group": "degraded",
       "name": "system_dashboard",
-      "ok": false
+      "ok": true
     },
     {
       "affects": false,
@@ -334,7 +334,7 @@
       "name": "session_history_criteria",
       "ok": true,
       "status": 200,
-      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=787bac48-4945-4f47-abe3-a37ca92914ed&username=2999024"
+      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=7c03100c-7d05-4cd9-a35e-178db342f582&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -404,7 +404,7 @@
       "name": "evse_timeseries_daily_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=787bac48-4945-4f47-abe3-a37ca92914ed&start_date=2026-07-24&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=7c03100c-7d05-4cd9-a35e-178db342f582&start_date=2026-07-24&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -418,7 +418,7 @@
       "name": "evse_timeseries_lifetime_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=787bac48-4945-4f47-abe3-a37ca92914ed&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=7c03100c-7d05-4cd9-a35e-178db342f582&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -552,12 +552,12 @@
       "category": "system_dashboard",
       "check_group": "system_dashboard",
       "check_mode": "all",
-      "error": "The read operation timed out",
+      "error": null,
       "group": "degraded",
       "method": "GET",
       "name": "system_dashboard_summary",
-      "ok": false,
-      "status": null,
+      "ok": true,
+      "status": 200,
       "url": "/service/system_dashboard/api_internal/cs/sites/{site_id}/summary"
     },
     {
@@ -594,12 +594,12 @@
       "category": "system_dashboard",
       "check_group": "system_dashboard_details",
       "check_mode": "any",
-      "error": "The read operation timed out",
+      "error": null,
       "group": "degraded",
       "method": "GET",
       "name": "devices_details_modern",
-      "ok": false,
-      "status": null,
+      "ok": true,
+      "status": 200,
       "url": "/service/system_dashboard/api_internal/dashboard/sites/{site_id}/devices_details?type=inverters"
     },
     {
@@ -731,14 +731,14 @@
   ],
   "status": "Fully Operational",
   "summary": {
-    "checks_failed": 1,
+    "checks_failed": 0,
     "checks_failed_affecting": 0,
-    "checks_failed_broad_outage": 1,
-    "checks_failed_non_affecting": 1,
-    "checks_ok": 16,
+    "checks_failed_broad_outage": 0,
+    "checks_failed_non_affecting": 0,
+    "checks_ok": 17,
     "checks_total": 17,
-    "endpoints_failed": 2,
-    "endpoints_ok": 35,
+    "endpoints_failed": 0,
+    "endpoints_ok": 37,
     "endpoints_total": 37
   }
 }
