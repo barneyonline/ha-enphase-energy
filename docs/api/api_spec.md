@@ -203,11 +203,12 @@ Status labels:
 | BatteryConfig schedule update | `PUT` | `/service/batteryConfig/api/v1/battery/sites/<site_id>/schedules/<schedule_id>` | BatteryConfig write shape plus `X-XSRF-Token`; ordinary time/limit edits can omit `isEnabled`, while explicit schedule-entry toggle writes may include it; verified working update uses the raw-cookie browser request (`Cookie`, `e-auth-token`, `Username`, `X-XSRF-Token`, `X-Requested-With`) from a stateless client session; current client falls back across cookie-backed, primary, lean, and mixed-auth variants | Runtime |
 | BatteryConfig schedule legacy delete alias | `POST` | `/service/batteryConfig/api/v1/battery/sites/<site_id>/schedules/<schedule_id>/delete` | same BatteryConfig write planner as schedule create/update; cookie-backed browser request is the verified working compatibility shape on affected sites | Runtime |
 | BatteryConfig disclaimer accept | `POST` | `/service/batteryConfig/api/v1/batterySettings/acceptDisclaimer/<site_id>` | same BatteryConfig write planner as other battery settings mutations | Runtime |
-| Activation reference data | `GET` | `/service/activation_service/api/details/reference_data` | Activation UI authenticated session cookies plus `enlm-token` / manager token context; browser capture did not include an explicit `Authorization` header | Runtime |
-| Activation record | `GET` | `/service/activation_backend/api/gateway/v4/activations/<site_id>?expand=owner,host` | Activation UI authenticated session cookies plus Activation bearer auth; requires account role with Activation access | Runtime |
-| Activation device list and grid-profile status | `GET` | `/service/activation_backend/api/gateway/v4/systems/<site_id>/devices/list` | Activation UI authenticated session cookies plus `Authorization: Bearer <activation_jwt>`; requires installer-level Activation access | Runtime |
-| Grid profile discovery | `POST` | `/service/activation_backend/api/gateway/v4/systems/<site_id>/grid_profiles_filtered` | Activation UI authenticated session cookies plus `Authorization: Bearer <activation_jwt>`; requires installer-level Activation access | Runtime |
-| Apply grid profile | `PUT` | `/service/activation_backend/api/gateway/v4/systems/<site_id>/envoys` | same Activation UI bearer/cookie shape as discovery; requires installer-level Activation access | Runtime |
+| Activation auth bootstrap | `GET` | `/systems/<site_id>/details` | authenticated Enlighten Settings HTML embeds a same-origin `/app/activation_ui/` URL containing the short-lived Activation JWT and exact referer context; token and referer are retained in memory only | Runtime |
+| Activation reference data | `GET` | `/service/activation_service/api/details/reference_data` | authenticated session cookies with `enlighten_manager_token_production` synchronized to the bootstrapped Activation JWT, plus the JWT in `enlm-token`; browser capture did not include an explicit `Authorization` header | Runtime |
+| Activation record | `GET` | `/service/activation_backend/api/gateway/v4/activations/<site_id>?expand=owner,host` | synchronized Activation cookie, exact embedded Activation UI referer, and `Authorization: Bearer <activation_jwt>`; requires account role with Activation access | Runtime |
+| Activation device list and grid-profile status | `GET` | `/service/activation_backend/api/gateway/v4/systems/<site_id>/devices/list` | same synchronized Activation bearer/cookie/referer context; requires installer-level Activation access | Runtime |
+| Grid profile discovery | `POST` | `/service/activation_backend/api/gateway/v4/systems/<site_id>/grid_profiles_filtered` | same synchronized Activation bearer/cookie/referer context; requires installer-level Activation access | Runtime |
+| Apply grid profile | `PUT` | `/service/activation_backend/api/gateway/v4/systems/<site_id>/envoys` | same synchronized Activation bearer/cookie/referer context as discovery; requires installer-level Activation access | Runtime |
 | PES in-app banner/status | `GET` | `/service/pes_management/systems/<site_id>/inapp?type=<type>` | authenticated session cookies | Browser capture only |
 | Login | `POST` | `/login/login.json` | credentials; session/XSRF cookies are established by the response rather than pre-required | Runtime |
 
@@ -6843,13 +6844,38 @@ Observed behavior:
 
 ## 5A. Activation Grid Profile APIs (Installer-Level)
 
-The Activation UI exposes grid-profile discovery and assignment endpoints that are separate from BatteryConfig and the homeowner grid on/off controls. These calls were captured from the Enlighten Activation web UI on 2026-07-08 while inspecting Australian grid profiles.
+The Activation UI exposes grid-profile discovery and assignment endpoints that are separate from BatteryConfig and the homeowner grid on/off controls. These calls were captured from the Enlighten Activation web UI on 2026-07-08 while inspecting Australian grid profiles. A follow-up capture on 2026-07-22 confirmed that the classic Enlighten Settings page embeds the working Activation JWT and referer in its Activation UI iframe URL.
 
 Operational constraints:
 - These endpoints require an account/session with installer-level Activation access. Homeowner/owner sessions should not be assumed to have access.
 - A successful apply response means the cloud accepted or queued the grid-profile update; it does not prove the Gateway has finished applying the profile.
 - Grid profile changes are safety- and compliance-sensitive. Any runtime control should require explicit opt-in, strong confirmation text, and should expose the pending/in-progress state rather than treating the write as instant.
 - Do not log raw Authorization headers, cookies, Activation URLs with user identifiers, site IDs, gateway serials, part numbers, JWTs, email addresses, or local Gateway IP addresses.
+
+### 5A.0 Activation Authentication Bootstrap
+```http
+GET /systems/<site_id>/details
+```
+
+The authenticated classic Enlighten Settings HTML contains a same-origin iframe
+URL with this sanitized shape:
+```text
+https://enlighten.enphaseenergy.com/app/activation_ui/?locale=<locale>&token=<activation_jwt>&siteid=<site_id>&gridprofile=gridprofile&envoyserialnumber=<gateway_serial>
+```
+
+The 2026-07-22 browser capture confirmed that requests made by this iframe use
+the query-string JWT both as `Authorization: Bearer <activation_jwt>` and as the
+value of the `enlighten_manager_token_production` cookie. The full iframe URL is
+also sent as the request `Referer`.
+
+Current runtime behavior:
+- Fetch the Settings page with the authenticated Enlighten session before an Activation refresh, profile-list request, or profile write.
+- HTML-decode the embedded iframe URL and accept it only when its host is `enlighten.enphaseenergy.com` and its path is `/app/activation_ui/`.
+- Retain the extracted JWT and exact iframe referer in memory only. Do not persist either value to config-entry data or diagnostics.
+- Replace the `enlighten_manager_token_production` value in the outbound serialized cookie header with the extracted JWT so the cookie and bearer contexts agree, while preserving the other authenticated session cookies.
+- Treat a JWT as expired 60 seconds before its `exp` claim and reacquire it from the Settings page. A normal credential refresh also clears the cached Activation JWT and referer.
+- If the Settings page or embedded token is temporarily unavailable, preserve the original session cookies and fall back to the Manager JWT already present in the cookie, then to the stored Enlighten access token.
+- If an Activation backend request rejects a bootstrapped JWT with `401` or `403`, discard the cached JWT/referer, force one Settings-page bootstrap, rebuild the headers, and retry once. A second rejection is treated as an optional Activation permission failure rather than a core authentication failure.
 
 ### 5A.1 Reference Data
 ```
@@ -6861,9 +6887,9 @@ Observed request headers:
 ```http
 Accept: application/json, text/plain, */*
 Accept-Language: en-AU,en;q=0.9
-Cookie: <authenticated Enlighten session cookies>
-enlm-token: <manager_or_activation_token>
-Referer: https://enlighten.enphaseenergy.com/app/activation_ui/?...
+Cookie: enlighten_manager_token_production=<activation_jwt>; <other_session_cookies>
+enlm-token: <activation_jwt>
+Referer: <exact_bootstrapped_activation_ui_url>
 ```
 
 Example response excerpt:
@@ -6963,7 +6989,8 @@ Accept: application/json, text/plain, */*
 Content-Type: application/json
 Authorization: Bearer <activation_jwt>
 Origin: https://enlighten.enphaseenergy.com
-Referer: https://enlighten.enphaseenergy.com/app/activation_ui/?...
+Cookie: enlighten_manager_token_production=<activation_jwt>; <other_session_cookies>
+Referer: <exact_bootstrapped_activation_ui_url>
 ```
 
 Observed request body:
@@ -7076,7 +7103,8 @@ Accept: application/json, text/plain, */*
 Content-Type: application/json
 Authorization: Bearer <activation_jwt>
 Origin: https://enlighten.enphaseenergy.com
-Referer: https://enlighten.enphaseenergy.com/app/activation_ui/?...
+Cookie: enlighten_manager_token_production=<activation_jwt>; <other_session_cookies>
+Referer: <exact_bootstrapped_activation_ui_url>
 ```
 
 Observed request body for an Australian zero-export profile:
@@ -7343,7 +7371,7 @@ There is no single universal header set; the implementation varies headers by en
 | HEMS | bearer-preferred auth plus cookies/base headers; `username` and `requestId` when available |
 | BatteryConfig reads | current web shape: fresh session `Cookie`, `Username`, `requestid`, battery-profile `Origin`/`Referer`, Chrome-style `User-Agent`, and no `Authorization` or `e-auth-token`; token-backed primary and lean variants remain as fallbacks |
 | BatteryConfig writes | acquire fresh XSRF by preferring `GET /service/batteryConfig/api/v1/siteSettings/<site_id>?userId=<user_id>` and its `x-csrf-token` response header, then falling back to `/battery/sites/<site_id>/schedules/isValid`; if that fallback returns `4xx`, still harvest `BP-XSRF-Token` from error response cookies or the session cookie jar, then try a final cookie-based `GET /siteSettings/<site_id>` bootstrap before giving up and keeping the existing token; writes then use an endpoint-specific compatibility planner; on affected sites the verified working shape is a stateless raw-cookie browser request (`Cookie`, `e-auth-token`, `Username`, `X-XSRF-Token`, `X-Requested-With`), with official-web primary, official-web lean, and mixed-auth fallbacks retained |
-| Activation reference data and grid profile reads/writes | Activation UI same-origin browser shape. Reference data was observed with authenticated Enlighten cookies plus `enlm-token`; profile discovery/apply were observed with authenticated cookies plus `Authorization: Bearer <activation_jwt>`, `Accept: application/json, text/plain, */*`, `Content-Type: application/json` for writes, `Origin: https://enlighten.enphaseenergy.com`, and an `/app/activation_ui/` referer; grid profile apply requires installer-level Activation permissions |
+| Activation reference data and grid profile reads/writes | Bootstrap the short-lived JWT and exact referer from the same-origin `/app/activation_ui/` URL embedded by authenticated `GET /systems/<site_id>/details`; keep both in memory, synchronize the JWT into `enlighten_manager_token_production`, use it as `enlm-token` for reference data and as `Authorization: Bearer` for Activation backend reads/writes, and retain stored Manager/access-token fallback; grid profile apply requires installer-level Activation permissions |
 
 - Base Enlighten reads:
   - `Cookie: <serialized cookie jar>`
@@ -7373,13 +7401,18 @@ There is no single universal header set; the implementation varies headers by en
   - mixed-auth compatibility fallback restores `Authorization`, `Cookie`, and `X-CSRF-Token`
   - cookie-backed compatibility writes must use a stateless request session so aiohttp does not merge cookie-jar state into the raw `Cookie` header
 - Activation grid profile:
+  - bootstrap with authenticated `GET /systems/<site_id>/details`
+  - extract the JWT and exact referer from the same-origin `/app/activation_ui/` iframe URL; reject non-Enlighten hosts
+  - retain the bootstrap context in memory only, refresh it before JWT expiry, and clear it when normal credentials change
   - `Accept: application/json, text/plain, */*`
-  - `enlm-token: <manager_or_activation_token>` for `GET /activation_service/api/details/reference_data` in the observed browser capture
-  - `Authorization: Bearer <activation_jwt>` for grid profile discovery/apply in the observed browser capture
+  - synchronize `enlighten_manager_token_production=<activation_jwt>` into the authenticated cookie header while preserving the remaining session cookies
+  - `enlm-token: <activation_jwt>` for `GET /activation_service/api/details/reference_data`
+  - `Authorization: Bearer <activation_jwt>` for Activation record/device reads and grid profile discovery/apply
   - `Content-Type: application/json` for `POST`/`PUT`
-  - authenticated Enlighten session cookies
   - `Origin: https://enlighten.enphaseenergy.com`
-  - `Referer: https://enlighten.enphaseenergy.com/app/activation_ui/?...`
+  - `Referer: <exact_bootstrapped_activation_ui_url>`
+  - preserve the original cookies and fall back to the stored Manager-cookie JWT, then the stored Enlighten access token, if bootstrap is temporarily unavailable
+  - on `401`/`403` for a bootstrapped JWT, clear the cached context, force one bootstrap, rebuild the request headers, and retry once
   - requires installer-level Activation access in the observed capture
 
 ---
@@ -7555,7 +7588,7 @@ Endpoint-specific variations are documented in the affected sections so implemen
 
 Cross-cutting unresolved items:
 - Local LAN endpoints (`/ivp/pdm/*`, `/ivp/peb/*`) exist but require installer permissions; they are outside the current owner-account cloud runtime.
-- Activation grid-profile control requires installer-level access in the observed capture. The integration still needs a confirmed way to detect Activation role eligibility, obtain the same Activation bearer token reliably, and read a redacted activation-record payload before exposing runtime controls.
+- Activation grid-profile control requires installer-level access in the observed capture. The runtime now obtains the same Activation bearer/cookie/referer context as the Enlighten UI; the remaining open question is whether Enphase exposes an explicit role/capability flag that can avoid probing the optional Activation endpoints to confirm eligibility.
 - Real EVSE MQTT frames have not yet been captured, even though the broker accepts exact-topic subscriptions. The charger card's instantaneous voltage/current/power source remains the main open telemetry capture target.
 - Heat-pump write-path behavior remains unresolved; current HEMS captures cover inventory, runtime state, event diagnostics, timeseries, and stream toggles only.
 

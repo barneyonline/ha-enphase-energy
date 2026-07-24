@@ -23,6 +23,14 @@ No local Gateway endpoints are used in v1.
 ## Runtime Design
 
 - Add an optional `activation_grid_profile` endpoint family with cooldown/backoff and suppressed non-installer failures.
+- Bootstrap the short-lived Activation JWT from the authenticated
+  `/systems/<site_id>/details` page that embeds `/app/activation_ui/`, keep it
+  in memory only, and synchronize it into both the bearer header and
+  `enlighten_manager_token_production` cookie used by the working Enlighten UI.
+- Preserve the original cookie header for stored-token fallback, and force one
+  bootstrap/header rebuild when an Activation backend rejects a cached JWT.
+- Keep Activation access failures visible in endpoint diagnostics and backoff,
+  but do not roll this optional installer capability into overall degraded service.
 - Derive country from Activation/site metadata first, then BatteryConfig country, then system-dashboard country.
 - Expose `regions[user_country]` only.
 - Cache profile catalogs by `(country, region_code, commonly_used)`.

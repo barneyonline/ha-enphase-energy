@@ -13,6 +13,7 @@ import base64
 from builtins import ExceptionGroup
 import copy
 import hashlib
+from html import unescape
 import json
 import logging
 import re
@@ -77,6 +78,10 @@ _BATTERY_CONFIG_VARIANT_LEAN = "official_web_lean"
 _BATTERY_CONFIG_VARIANT_SESSION_COOKIE = "official_web_session_cookie"
 _BATTERY_CONFIG_VARIANT_COOKIE_EAUTH = "cookie_eauth_compatible"
 _BATTERY_CONFIG_VARIANT_MIXED = "mixed_auth_compatible"
+_ACTIVATION_UI_URL_RE = re.compile(
+    r"(?:(?:https?:)?//[^\"'<>\s]+)?/app/activation_ui/\?[^\"'<>\s]+",
+    re.IGNORECASE,
+)
 _ENLIGHTEN_READ_CONCURRENCY_LIMIT = 3
 _ENLIGHTEN_OPTIONAL_READ_CONCURRENCY_LIMIT = 2
 _SYSTEM_EVENTS_PAGE_SIZE = 200
@@ -762,6 +767,30 @@ def _decode_jwt_exp(token: str) -> int | None:
     exp = payload.get("exp")
     if isinstance(exp, (int, float)):
         return int(exp)
+    return None
+
+
+def _activation_context_from_settings_html(
+    payload: str,
+) -> tuple[str, str] | None:
+    """Extract the Activation UI JWT and referer embedded by Enlighten settings."""
+
+    normalized = unescape(payload).replace(r"\u0026", "&").replace(r"\/", "/")
+    for match in _ACTIVATION_UI_URL_RE.finditer(normalized):
+        candidate = match.group(0)
+        if candidate.startswith("//"):
+            candidate = f"https:{candidate}"
+        elif candidate.startswith("/"):
+            candidate = f"{BASE_URL}{candidate}"
+        try:
+            activation_url = URL(candidate)
+        except Exception:  # noqa: BLE001 - malformed unrelated page content
+            continue
+        if activation_url.host != URL(BASE_URL).host:
+            continue
+        token = activation_url.query.get("token")
+        if token and token.count(".") >= 2:
+            return str(token), str(activation_url)
     return None
 
 
@@ -2082,6 +2111,8 @@ class EnphaseEVClient:
         self._battery_config_write_bases: dict[str, dict[str, Any]] = {}
         self._cookie = cookie or ""
         self._eauth = eauth or None
+        self._activation_token: str | None = None
+        self._activation_referer: str | None = None
         self._hems_site_supported: bool | None = None
         self._system_dashboard_summary_payload: dict[str, object] | None = None
         self._reauth_cb: Callable[[], Awaitable[bool]] | None = reauth_callback
@@ -2147,10 +2178,16 @@ class EnphaseEVClient:
     ) -> None:
         """Update headers when auth credentials change."""
 
+        credentials_changed = bool(
+            (eauth is not None and (eauth or None) != self._eauth)
+            or (cookie is not None and (cookie or "") != self._cookie)
+        )
         if eauth is not None:
             self._eauth = eauth or None
         if cookie is not None:
             self._cookie = cookie or ""
+        if credentials_changed:
+            self._clear_activation_auth_context()
 
         if self._cookie:
             self._h["Cookie"] = self._cookie
@@ -2697,24 +2734,26 @@ class EnphaseEVClient:
     def _activation_reference_headers(self) -> dict[str, str | None]:
         """Return headers for Activation reference-data calls."""
 
-        token = self._battery_config_single_auth_token()
+        token = self._activation_auth_token()
         return {
             "Accept": "application/json, text/plain, */*",
-            "Cookie": self._cookie or None,
+            "Cookie": self._activation_cookie(token),
             "enlm-token": token,
-            "Referer": f"{BASE_URL}/app/activation_ui/?system_id={self._site}",
+            "Referer": self._activation_referer
+            or f"{BASE_URL}/app/activation_ui/?system_id={self._site}",
             "X-Requested-With": None,
         }
 
     def _activation_headers(self, *, write: bool = False) -> dict[str, str | None]:
         """Return cloud Activation API headers."""
 
-        token = self._battery_config_single_auth_token()
+        token = self._activation_auth_token()
         headers: dict[str, str | None] = {
             "Accept": "application/json, text/plain, */*",
             "Authorization": f"Bearer {token}" if token else None,
-            "Cookie": self._cookie or None,
-            "Referer": f"{BASE_URL}/app/activation_ui/?system_id={self._site}",
+            "Cookie": self._activation_cookie(token),
+            "Referer": self._activation_referer
+            or f"{BASE_URL}/app/activation_ui/?system_id={self._site}",
             "X-Requested-With": None,
             "e-auth-token": None,
         }
@@ -2723,42 +2762,131 @@ class EnphaseEVClient:
             headers["Origin"] = BASE_URL
         return headers
 
+    def _activation_auth_token(self) -> str | None:
+        """Return the settings-page Activation token, with stored-auth fallback."""
+
+        token = self._activation_token
+        if token:
+            expires_at = _decode_jwt_exp(token)
+            if (
+                expires_at is None
+                or expires_at > int(datetime.now(timezone.utc).timestamp()) + 60
+            ):
+                return token
+            self._clear_activation_auth_context()
+        return self._battery_config_single_auth_token()
+
+    def _clear_activation_auth_context(self) -> None:
+        """Discard the in-memory Activation JWT and its matching referer."""
+
+        self._activation_token = None
+        self._activation_referer = None
+
+    def _activation_cookie(self, token: str | None) -> str | None:
+        """Return session cookies with the Activation Manager token synchronized."""
+
+        cookies = _cookie_map_from_header(self._cookie)
+        if token and token == self._activation_token:
+            cookies["enlighten_manager_token_production"] = token
+        return _cookie_header_from_map(cookies) or None
+
+    async def async_prepare_activation_auth(self, *, force: bool = False) -> bool:
+        """Bootstrap the same Activation JWT embedded by the Enlighten settings UI."""
+
+        if (
+            not force
+            and self._activation_token
+            and self._activation_auth_token() == self._activation_token
+        ):
+            return True
+        url = f"{BASE_URL}/systems/{self._site}/details"
+        try:
+            payload = await self._text(
+                "GET",
+                url,
+                headers={
+                    "Accept": "text/html,application/xhtml+xml",
+                    "Referer": f"{BASE_URL}/systems/{self._site}",
+                    "X-Requested-With": None,
+                },
+            )
+        except (
+            aiohttp.ClientError,
+            asyncio.TimeoutError,
+            EnphaseLoginWallUnauthorized,
+            Unauthorized,
+        ) as err:
+            _LOGGER.debug(
+                "Activation auth bootstrap unavailable for site %s: %s",
+                redact_site_id(self._site),
+                redact_text(err, site_ids=(self._site,)),
+            )
+            return False
+        context = _activation_context_from_settings_html(payload)
+        if context is None:
+            _LOGGER.debug(
+                "Activation UI token was not present in settings for site %s",
+                redact_site_id(self._site),
+            )
+            return False
+        self._activation_token, self._activation_referer = context
+        return True
+
     async def _activation_payload(
         self,
         method: str,
         url: str,
         *,
-        headers: dict[str, str | None],
+        headers: dict[str, str | None] | Callable[[], dict[str, str | None]],
         **kwargs: Any,
     ) -> object:
         """Return Activation JSON, mapping denied access to optional unavailable."""
 
-        try:
-            return await self._json(
-                method,
-                url,
-                headers=headers,
-                allow_reauth=False,
-                use_cookie_header_only=True,
-                **kwargs,
-            )
-        except EnphaseLoginWallUnauthorized as err:
-            raise ActivationAccessDenied("Activation login wall") from err
-        except Unauthorized as err:
-            raise ActivationAccessDenied("Activation access denied") from err
-        except InvalidPayloadError as err:
-            raise OptionalEndpointUnavailable("Activation payload unavailable") from err
-        except aiohttp.ClientResponseError as err:
-            if err.status in {401, 403, 404}:
+        auth_retry_attempted = False
+        while True:
+            request_headers = headers() if callable(headers) else headers
+            try:
+                return await self._json(
+                    method,
+                    url,
+                    headers=request_headers,
+                    allow_reauth=False,
+                    use_cookie_header_only=True,
+                    **kwargs,
+                )
+            except EnphaseLoginWallUnauthorized as err:
+                raise ActivationAccessDenied("Activation login wall") from err
+            except Unauthorized as err:
+                if not auth_retry_attempted and self._activation_token is not None:
+                    auth_retry_attempted = True
+                    self._clear_activation_auth_context()
+                    await self.async_prepare_activation_auth(force=True)
+                    continue
                 raise ActivationAccessDenied("Activation access denied") from err
-            raise
+            except InvalidPayloadError as err:
+                raise OptionalEndpointUnavailable(
+                    "Activation payload unavailable"
+                ) from err
+            except aiohttp.ClientResponseError as err:
+                if (
+                    err.status in {401, 403}
+                    and not auth_retry_attempted
+                    and self._activation_token is not None
+                ):
+                    auth_retry_attempted = True
+                    self._clear_activation_auth_context()
+                    await self.async_prepare_activation_auth(force=True)
+                    continue
+                if err.status in {401, 403, 404}:
+                    raise ActivationAccessDenied("Activation access denied") from err
+                raise
 
     async def _activation_json(
         self,
         method: str,
         url: str,
         *,
-        headers: dict[str, str | None],
+        headers: dict[str, str | None] | Callable[[], dict[str, str | None]],
         **kwargs: Any,
     ) -> JsonDict:
         """Return Activation object JSON."""
@@ -5704,7 +5832,7 @@ class EnphaseEVClient:
         return await self._activation_json(
             "GET",
             url,
-            headers=self._activation_reference_headers(),
+            headers=self._activation_reference_headers,
         )
 
     async def async_get_activation_record(self) -> JsonDict:
@@ -5718,7 +5846,7 @@ class EnphaseEVClient:
             "GET",
             url,
             params={"expand": "owner,host"},
-            headers=self._activation_headers(),
+            headers=self._activation_headers,
         )
 
     async def async_get_activation_device_list(self) -> JsonDict:
@@ -5731,7 +5859,7 @@ class EnphaseEVClient:
         result = await self._activation_payload(
             "GET",
             url,
-            headers=self._activation_headers(),
+            headers=self._activation_headers,
         )
         if isinstance(result, dict):
             return result
@@ -5760,7 +5888,7 @@ class EnphaseEVClient:
                 "country": country,
                 "state": state,
             },
-            headers=self._activation_headers(write=True),
+            headers=lambda: self._activation_headers(write=True),
         )
 
     async def async_apply_grid_profile(
@@ -5788,7 +5916,7 @@ class EnphaseEVClient:
             "PUT",
             url,
             json=[envoy_payload],
-            headers=self._activation_headers(write=True),
+            headers=lambda: self._activation_headers(write=True),
             allow_empty_success=True,
         )
         if isinstance(result, dict):

@@ -981,6 +981,13 @@ class GridProfileRuntime:
             ACTIVATION_GRID_PROFILE_FAMILY, err
         )
 
+    async def _async_prepare_activation_auth(self) -> None:
+        """Allow the client to acquire the settings-page Activation JWT."""
+
+        prepare = getattr(self.client, "async_prepare_activation_auth", None)
+        if callable(prepare):
+            await prepare()
+
     @staticmethod
     def _is_access_denied(err: Exception) -> bool:
         if isinstance(err, aiohttp.ClientResponseError) and err.status in {
@@ -1001,6 +1008,7 @@ class GridProfileRuntime:
             if not self.coordinator._endpoint_family_should_run(family, force=force):
                 return self.browse()
             try:
+                await self._async_prepare_activation_auth()
                 devices = await self.client.async_get_activation_device_list()
                 self._parse_activation_devices(devices)
             except Exception as err:  # noqa: BLE001
@@ -1029,6 +1037,7 @@ class GridProfileRuntime:
                 return self.browse()
             errors: list[Exception] = []
             successful_requests = 0
+            await self._async_prepare_activation_auth()
             if force or self.reference_payload is None:
                 try:
                     reference = await self.client.async_get_activation_reference_data()
@@ -1160,6 +1169,7 @@ class GridProfileRuntime:
         if force:
             self.catalog_cache.pop(key, None)
         try:
+            await self._async_prepare_activation_auth()
             payload = await self.client.async_get_grid_profiles_filtered(
                 country=country,
                 state=state,
@@ -1439,6 +1449,7 @@ class GridProfileRuntime:
         assert profile is not None
         assert target is not None
         try:
+            await self._async_prepare_activation_auth()
             await self.client.async_apply_grid_profile(
                 gateway_serial=target.serial_num,
                 part_num=target.part_num,
