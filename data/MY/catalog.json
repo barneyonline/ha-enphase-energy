@@ -3,11 +3,25 @@
   "devices": {
     "envoy": {
       "document_topic_id": 217,
-      "latest": null,
+      "latest": {
+        "countries_text": "United States of America Puerto Rico Serial no",
+        "document_topic_id": 217,
+        "media_id": "29875",
+        "product_media_name_id": null,
+        "product_type": "141",
+        "release_date": "2026-06-24",
+        "summary": "The IQ Gateway software version 8.3.4041 introduces support for IQ9N Microinverters in systems with IQ Combiner 6C, IQ Battery 10C, or both. This release also includes efficiency improvements and bug fixes for: Grid-tied systems (without backup and backup-ready) Grid-forming systems (with backup) using IQ Combiner 6C, IQ Battery 10C, and IQ Meter Collar Supported countries : United States of America Puerto Rico Serial no. Feature classification Feature Description 1 New product Support for IQ...",
+        "title": "IQ Gateway software release notes (8.3.4041)",
+        "urls_by_locale": {
+          "en": "https://enphase.com/installers/resources/documentation/communication?product_type=141&f%5B0%5D=document%3A217&search_api_language=en&field_alternative_language=en",
+          "en-my": "https://enphase.com/installers/resources/documentation/communication?product_type=141&f%5B0%5D=document%3A217&search_api_language=en&field_alternative_language=en"
+        },
+        "version": "8.3.4041"
+      },
       "product_media_name_id": null
     }
   },
-  "generated_at": "2026-07-18T05:36:28.321614Z",
+  "generated_at": "2026-07-24T06:04:30.286522Z",
   "schema_version": 1,
   "source": {
     "apps_url": "https://enphase.com/installers/resources/documentation/communication",
