@@ -69,6 +69,10 @@ def test_parse_battery_settings_payload_maps_mode_and_controls(
                     "enabled": True,
                     "locked": False,
                 },
+                "powerMatchControl": {
+                    "show": True,
+                    "enabled": "true",
+                },
                 "devices": {
                     "iqEvse": {
                         "useBatteryFrSelfConsumption": True,
@@ -122,8 +126,82 @@ def test_parse_battery_settings_payload_maps_mode_and_controls(
         "force_schedule_supported": None,
         "force_schedule_opted": None,
     }
+    assert coord.battery_power_match_control == {
+        "show": True,
+        "enabled": True,
+        "locked": None,
+        "show_day_schedule": None,
+        "schedule_supported": None,
+        "force_schedule_supported": None,
+        "force_schedule_opted": None,
+    }
+    assert coord.battery_power_match_enabled is True
+    assert coord.power_match_control_available is True
     assert coord.battery_system_task is False
     assert coord.battery_use_battery_for_self_consumption is True
+
+
+def test_power_match_capability_requires_authoritative_usable_control(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.battery_runtime
+    coord._battery_has_encharge = True  # noqa: SLF001
+    coord._battery_user_is_owner = True  # noqa: SLF001
+
+    runtime.parse_battery_settings_payload(
+        {"data": {"powerMatchControl": {"show": True, "enabled": False}}},
+        clear_missing_controls=True,
+    )
+    assert coord.battery_power_match_enabled is False
+    assert coord.power_match_control_available is True
+
+    runtime.parse_battery_settings_payload({"data": {"chargeFromGrid": True}})
+    assert coord.battery_power_match_enabled is False
+
+    runtime.parse_battery_settings_payload(
+        {"data": {"powerMatchControl": {"enabled": True}}}
+    )
+    assert coord.battery_power_match_enabled is True
+    assert coord.battery_power_match_control["show"] is True
+    assert coord.power_match_control_available is True
+
+    runtime.parse_battery_settings_payload(
+        {"data": {"powerMatchControl": {"show": False, "enabled": True}}},
+        clear_missing_controls=True,
+    )
+    assert coord.power_match_control_available is False
+
+    runtime.parse_battery_settings_payload(
+        {
+            "data": {
+                "powerMatchControl": {"show": True, "enabled": True, "locked": True}
+            }
+        },
+        clear_missing_controls=True,
+    )
+    assert coord.power_match_control_available is False
+
+    runtime.parse_battery_settings_payload(
+        {"data": {"powerMatchControl": {"show": True, "enabled": "unknown"}}},
+        clear_missing_controls=True,
+    )
+    assert coord.battery_power_match_enabled is None
+    assert coord.power_match_control_available is False
+
+    runtime.parse_battery_settings_payload(
+        {"data": {"powerMatchControl": 42}}, clear_missing_controls=True
+    )
+    assert coord.battery_power_match_control is None
+
+    runtime.parse_battery_settings_payload(
+        {"data": {"powerMatchControl": {"show": True, "enabled": True}}},
+        clear_missing_controls=True,
+    )
+    runtime.parse_battery_settings_payload(
+        {"data": {"chargeFromGrid": False}}, clear_missing_controls=True
+    )
+    assert coord.battery_power_match_control is None
 
 
 def test_dtg_and_rbd_control_enabled_are_distinct_from_schedule_enabled(
@@ -975,6 +1053,190 @@ async def test_set_charge_from_grid_disable_omits_disclaimer(
     coord.client.accept_battery_settings_disclaimer.assert_not_awaited()
     coord.client.validate_battery_schedule.assert_awaited_once_with("cfg")
     coord.async_request_refresh.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_set_power_match_uses_fresh_merged_settings_and_confirms(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord._battery_has_encharge = True  # noqa: SLF001
+    coord._battery_user_is_owner = True  # noqa: SLF001
+    coord._battery_user_is_installer = False  # noqa: SLF001
+    coord.client.battery_settings_details = AsyncMock(
+        side_effect=[
+            {
+                "data": {
+                    "powerMatchControl": {"show": True, "enabled": False},
+                    "systemTask": False,
+                }
+            },
+            {
+                "data": {
+                    "powerMatchControl": {"show": True, "enabled": True},
+                    "systemTask": False,
+                }
+            },
+        ]
+    )
+    coord.client.set_battery_settings_compat = AsyncMock(
+        return_value={"message": "success"}
+    )
+    coord.async_request_refresh = AsyncMock()
+    coord.kick_fast = MagicMock()
+    coord.publish_runtime_state_update = MagicMock()
+
+    await coord.battery_runtime.async_set_power_match(True)
+
+    coord.client.set_battery_settings_compat.assert_awaited_once_with(
+        {"powerMatchControl": {"enabled": True}},
+        schedule_type="cfg",
+        include_source=True,
+        merged_payload=True,
+        strip_devices=True,
+    )
+    assert coord.client.battery_settings_details.await_count == 2
+    assert coord.battery_power_match_enabled is True
+    assert coord.battery_settings_write_pending is False
+    coord.async_request_refresh.assert_not_awaited()
+    coord.publish_runtime_state_update.assert_called_once_with("power_match")
+
+
+@pytest.mark.asyncio
+async def test_set_power_match_noops_when_fresh_state_matches(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord._battery_has_encharge = True  # noqa: SLF001
+    coord._battery_user_is_owner = None  # noqa: SLF001
+    coord._battery_user_is_installer = None  # noqa: SLF001
+    coord.client.battery_settings_details = AsyncMock(
+        return_value={
+            "data": {
+                "powerMatchControl": {"show": True, "enabled": True},
+                "systemTask": False,
+            }
+        }
+    )
+    coord.client.battery_site_settings = AsyncMock(
+        return_value={"data": {"userDetails": {"isOwner": True, "isInstaller": False}}}
+    )
+    coord.client.set_battery_settings_compat = AsyncMock()
+    coord.publish_runtime_state_update = MagicMock()
+
+    await coord.battery_runtime.async_set_power_match(True)
+
+    coord.client.battery_site_settings.assert_awaited_once_with()
+    assert coord.battery_write_access_confirmed is True
+    coord.client.set_battery_settings_compat.assert_not_awaited()
+    coord.publish_runtime_state_update.assert_called_once_with("power_match")
+
+
+@pytest.mark.asyncio
+async def test_set_power_match_rejects_failed_or_unusable_preflight(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord._battery_has_encharge = True  # noqa: SLF001
+    coord._battery_user_is_owner = True  # noqa: SLF001
+    coord.client.battery_settings_details = AsyncMock(side_effect=RuntimeError("boom"))
+
+    with pytest.raises(ServiceValidationError, match="PowerMatch setting"):
+        await coord.battery_runtime.async_set_power_match(True)
+
+    coord.client.battery_settings_details = AsyncMock(
+        return_value={"data": {"powerMatchControl": {"show": False, "enabled": False}}}
+    )
+    with pytest.raises(ServiceValidationError, match="PowerMatch setting"):
+        await coord.battery_runtime.async_set_power_match(True)
+
+
+@pytest.mark.asyncio
+async def test_set_power_match_rejects_unconfirmed_server_state(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    coord._battery_has_encharge = True  # noqa: SLF001
+    coord._battery_user_is_owner = True  # noqa: SLF001
+    stale = {
+        "data": {
+            "powerMatchControl": {"show": True, "enabled": False},
+            "systemTask": False,
+        }
+    }
+    coord.client.battery_settings_details = AsyncMock(return_value=stale)
+    coord.client.set_battery_settings_compat = AsyncMock(
+        return_value={"message": "success"}
+    )
+    coord.async_request_refresh = AsyncMock()
+    coord.kick_fast = MagicMock()
+    coord.publish_runtime_state_update = MagicMock()
+    sleep = AsyncMock()
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.battery_runtime.asyncio.sleep", sleep
+    )
+
+    with pytest.raises(ServiceValidationError, match="was not applied"):
+        await coord.battery_runtime.async_set_power_match(True)
+
+    assert coord.client.battery_settings_details.await_count == 5
+    assert sleep.await_count == 3
+    assert coord.battery_power_match_enabled is False
+    assert coord.battery_settings_write_pending is False
+    coord.publish_runtime_state_update.assert_called_once_with("power_match")
+
+
+@pytest.mark.asyncio
+async def test_set_power_match_restores_authoritative_state_when_confirmation_fails(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    coord._battery_has_encharge = True  # noqa: SLF001
+    coord._battery_user_is_owner = True  # noqa: SLF001
+    coord.client.battery_settings_details = AsyncMock(
+        side_effect=[
+            {
+                "data": {
+                    "powerMatchControl": {
+                        "show": True,
+                        "enabled": False,
+                        "locked": False,
+                    },
+                    "systemTask": False,
+                }
+            },
+            RuntimeError("confirmation unavailable"),
+            RuntimeError("confirmation unavailable"),
+            RuntimeError("confirmation unavailable"),
+            RuntimeError("confirmation unavailable"),
+        ]
+    )
+    coord.client.set_battery_settings_compat = AsyncMock(
+        return_value={"message": "success"}
+    )
+    coord.async_request_refresh = AsyncMock()
+    coord.kick_fast = MagicMock()
+    coord.publish_runtime_state_update = MagicMock()
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.battery_runtime.asyncio.sleep", AsyncMock()
+    )
+
+    with pytest.raises(ServiceValidationError, match="was not applied"):
+        await coord.battery_runtime.async_set_power_match(True)
+
+    assert coord.battery_power_match_enabled is False
+    assert coord.battery_power_match_control == {
+        "show": True,
+        "enabled": False,
+        "locked": False,
+        "show_day_schedule": None,
+        "schedule_supported": None,
+        "force_schedule_supported": None,
+        "force_schedule_opted": None,
+    }
+    assert coord.battery_settings_write_pending is False
+    coord.async_request_refresh.assert_not_awaited()
+    coord.publish_runtime_state_update.assert_called_once_with("power_match")
 
 
 @pytest.mark.asyncio

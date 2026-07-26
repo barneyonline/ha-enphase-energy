@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
-- None
+- Add capability-gated PowerMatch cloud control for supported IQ Battery sites
 
 ### 🐛 Bug fixes
 - None

@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "De schakelaar Laden vanaf het net is niet toegepast door Enphase."
     },
+    "power_match_unavailable": {
+      "message": "De PowerMatch-instelling is niet beschikbaar."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "De PowerMatch-schakeling is niet toegepast door Enphase."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "Het laden-vanaf-het-net-schema is niet beschikbaar."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Batterij laden vanaf net"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Laadschema vanaf net"

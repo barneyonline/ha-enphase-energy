@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Charge from grid toggle applicerades inte av Enphase."
     },
+    "power_match_unavailable": {
+      "message": "PowerMatch-inställningen är inte tillgänglig."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "PowerMatch-växlingen tillämpades inte av Enphase."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "Debitering från nätschema är inte tillgänglig."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Ladda batteriet från nätet"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Schema för laddning från nätet"

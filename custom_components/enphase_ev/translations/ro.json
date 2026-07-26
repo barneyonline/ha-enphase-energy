@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Încărcarea de la comutatorul de rețea nu a fost aplicată de Enphase."
     },
+    "power_match_unavailable": {
+      "message": "Setarea PowerMatch nu este disponibilă."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "Comutarea PowerMatch nu a fost aplicată de Enphase."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "Încărcarea din programul rețelei nu este disponibilă."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Încarcă bateria din rețea"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Program de încărcare din rețea"

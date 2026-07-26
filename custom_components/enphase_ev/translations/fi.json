@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Enphase ei ottanut verkosta lataamisen kytkintä käyttöön."
     },
+    "power_match_unavailable": {
+      "message": "PowerMatch-asetus ei ole käytettävissä."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "Enphase ei ottanut PowerMatch-kytkentää käyttöön."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "Verkosta lataamisen aikataulu ei ole käytettävissä."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Lataa akkua sähköverkosta"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Sähköverkkolatauksen aikataulu"

@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Η εναλλαγή φόρτισης από το δίκτυο δεν εφαρμόστηκε από το Enphase."
     },
+    "power_match_unavailable": {
+      "message": "Η ρύθμιση PowerMatch δεν είναι διαθέσιμη."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "Η εναλλαγή του PowerMatch δεν εφαρμόστηκε από την Enphase."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "Το χρονοδιάγραμμα φόρτισης από το δίκτυο δεν είναι διαθέσιμο."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Φόρτιση μπαταρίας από το δίκτυο"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Πρόγραμμα φόρτισης από το δίκτυο"

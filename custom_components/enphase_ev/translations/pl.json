@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Przełącznik ładowania z sieci nie został zastosowany przez Enphase."
     },
+    "power_match_unavailable": {
+      "message": "Ustawienie PowerMatch jest niedostępne."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "Przełączenie PowerMatch nie zostało zastosowane przez Enphase."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "Harmonogram ładowania z sieci jest niedostępny."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Ładowanie baterii z sieci"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Harmonogram ładowania z sieci"

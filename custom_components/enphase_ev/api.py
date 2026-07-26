@@ -24,7 +24,7 @@ from http import HTTPStatus
 from time import monotonic
 from urllib.parse import unquote, urlencode
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from collections.abc import AsyncIterator, Iterator
 from typing import Any, Awaitable, Callable, Iterable, cast
 
@@ -3710,6 +3710,7 @@ class EnphaseEVClient:
                 "dtgControl",
                 "cfgControl",
                 "rbdControl",
+                "powerMatchControl",
                 "evseStormEnabled",
                 "devices",
             }
@@ -3877,6 +3878,7 @@ class EnphaseEVClient:
         endpoint_family: str | None = None,
         write_intent: str = "generic",
         supports_mqtt: bool | None = None,
+        strip_devices: bool = False,
     ) -> JsonDict:
         """Issue a BatteryConfig write using endpoint-specific compatibility attempts."""
 
@@ -3888,6 +3890,8 @@ class EnphaseEVClient:
             params=params,
             json_body=json_body,
         )
+        if strip_devices:
+            attempts = [replace(attempt, strip_devices=True) for attempt in attempts]
         last_error: aiohttp.ClientResponseError | None = None
         seen_signatures: set[str] = set()
 
@@ -6024,6 +6028,7 @@ class EnphaseEVClient:
             endpoint_family="battery_settings",
             write_intent="battery_settings_update",
             supports_mqtt=self._battery_config_supports_mqtt,
+            strip_devices=strip_devices,
         )
 
     async def set_battery_profile(

@@ -1000,33 +1000,52 @@ class BatteryRuntime:
         return max(0, min(100, int(value)))
 
     def _parse_battery_control_capability(
-        self, raw_control: object
+        self,
+        raw_control: object,
+        *,
+        fallback: BatteryControlCapability | None = None,
     ) -> BatteryControlCapability | None:
         if not isinstance(raw_control, dict):
             return None
+
+        def _field(raw_key: str, field_name: str) -> bool | None:
+            if raw_key in raw_control:
+                return self._coerce_optional_bool(raw_control.get(raw_key))
+            if fallback is None:
+                return None
+            fallback_value = getattr(fallback, field_name)
+            return fallback_value if isinstance(fallback_value, bool) else None
+
         return BatteryControlCapability(
-            show=self._coerce_optional_bool(raw_control.get("show")),
-            enabled=self._coerce_optional_bool(raw_control.get("enabled")),
-            locked=self._coerce_optional_bool(raw_control.get("locked")),
-            show_day_schedule=self._coerce_optional_bool(
-                raw_control.get("showDaySchedule")
+            show=_field("show", "show"),
+            enabled=_field("enabled", "enabled"),
+            locked=_field("locked", "locked"),
+            show_day_schedule=_field("showDaySchedule", "show_day_schedule"),
+            schedule_supported=_field("scheduleSupported", "schedule_supported"),
+            force_schedule_supported=_field(
+                "forceScheduleSupported", "force_schedule_supported"
             ),
-            schedule_supported=self._coerce_optional_bool(
-                raw_control.get("scheduleSupported")
-            ),
-            force_schedule_supported=self._coerce_optional_bool(
-                raw_control.get("forceScheduleSupported")
-            ),
-            force_schedule_opted=self._coerce_optional_bool(
-                raw_control.get("forceScheduleOpted")
-            ),
+            force_schedule_opted=_field("forceScheduleOpted", "force_schedule_opted"),
         )
 
     def _apply_battery_control_state(
-        self, attr_name: str, raw_control: object
+        self,
+        attr_name: str,
+        raw_control: object,
+        *,
+        preserve_missing: bool = False,
     ) -> BatteryControlCapability | None:
         state = self.battery_state
-        control = self._parse_battery_control_capability(raw_control)
+        previous = getattr(state, attr_name, None)
+        fallback = (
+            previous
+            if preserve_missing and isinstance(previous, BatteryControlCapability)
+            else None
+        )
+        control = self._parse_battery_control_capability(
+            raw_control,
+            fallback=fallback,
+        )
         setattr(state, attr_name, control)
         if attr_name == "_battery_cfg_control":
             if control is None:
@@ -1089,6 +1108,12 @@ class BatteryRuntime:
         if "rbdControl" in data or clear_missing_controls:
             self._apply_battery_control_state(
                 "_battery_rbd_control", data.get("rbdControl")
+            )
+        if "powerMatchControl" in data or clear_missing_controls:
+            self._apply_battery_control_state(
+                "_battery_power_match_control",
+                data.get("powerMatchControl"),
+                preserve_missing=not clear_missing_controls,
             )
         if "systemTask" in data:
             state._battery_system_task = self._coerce_optional_bool(
@@ -2302,6 +2327,7 @@ class BatteryRuntime:
         include_source: bool = True,
         merged_payload: bool = False,
         strip_devices: bool = False,
+        request_refresh: bool = True,
     ) -> None:
         coord = self.coordinator
         state = self.battery_state
@@ -2347,7 +2373,8 @@ class BatteryRuntime:
         self.set_cfg_settings_pending_from_payload(payload)
         state._battery_settings_cache_until = None
         coord.kick_fast(FAST_TOGGLE_POLL_HOLD_S)
-        await coord.async_request_refresh()
+        if request_refresh:
+            await coord.async_request_refresh()
 
     def _profile_recovery_reserve_nudge(self, profile: str, reserve: int) -> int | None:
         normalized_profile = self.normalize_battery_profile_key(profile)
@@ -3631,7 +3658,7 @@ class BatteryRuntime:
         )
         coord._note_endpoint_family_success(family)
 
-    async def async_refresh_battery_settings(self, *, force: bool = False) -> None:
+    async def async_refresh_battery_settings(self, *, force: bool = False) -> bool:
         coord = self.coordinator
         state = self.battery_state
         now = time.monotonic()
@@ -3639,20 +3666,20 @@ class BatteryRuntime:
         pending_profile = getattr(state, "_battery_pending_profile", None)
         if not force and not pending_profile and state._battery_settings_cache_until:
             if now < state._battery_settings_cache_until:
-                return
+                return True
         if not coord._endpoint_family_should_run(
             family,
             force=force or bool(pending_profile),
         ):
-            return
+            return False
         fetcher = getattr(coord.client, "battery_settings_details", None)
         if not callable(fetcher):
-            return
+            return False
         try:
             payload = await fetcher()
         except Exception as err:  # noqa: BLE001
             coord._note_endpoint_family_failure(family, err)
-            return
+            return False
         redacted_payload = coord.redact_battery_payload(payload)
         if isinstance(redacted_payload, dict):
             state._battery_settings_payload = redacted_payload
@@ -3669,6 +3696,7 @@ class BatteryRuntime:
         )
         state._battery_settings_cache_until = now + success_ttl
         coord._note_endpoint_family_success(family, success_ttl_s=success_ttl)
+        return True
 
     async def async_refresh_battery_schedules(self, *, force: bool = False) -> None:
         coord = self.coordinator
@@ -4337,6 +4365,62 @@ class BatteryRuntime:
         self._raise_validation(
             "charge_from_grid_toggle_not_applied",
             message="Charge from grid toggle was not applied by Enphase.",
+        )
+
+    async def async_set_power_match(self, enabled: bool) -> None:
+        coord = self.coordinator
+        state = self.battery_state
+        refreshed = await self.async_refresh_battery_settings(force=True)
+        if not refreshed:
+            self._raise_validation(
+                "power_match_unavailable",
+                message="PowerMatch setting is unavailable.",
+            )
+        self._assert_battery_settings_feature_writable(
+            "PowerMatch setting is unavailable.",
+            unavailable_key="power_match_unavailable",
+        )
+        if not coord.power_match_control_available:
+            self._raise_validation(
+                "power_match_unavailable",
+                message="PowerMatch setting is unavailable.",
+            )
+        await self.async_assert_battery_settings_write_allowed()
+        target = bool(enabled)
+        if coord.battery_power_match_enabled is target:
+            coord.publish_runtime_state_update("power_match")
+            return
+        previous_control = state._battery_power_match_control
+
+        await self.async_apply_battery_settings_compat(
+            {"powerMatchControl": {"enabled": target}},
+            merged_payload=True,
+            strip_devices=True,
+            request_refresh=False,
+        )
+
+        authoritative_refresh_observed = False
+        for attempt in range(4):
+            refreshed = await self.async_refresh_battery_settings(force=True)
+            authoritative_refresh_observed |= refreshed
+            if (
+                refreshed
+                and coord.power_match_control_available
+                and coord.battery_power_match_enabled is target
+            ):
+                self.clear_battery_settings_write_pending()
+                coord.publish_runtime_state_update("power_match")
+                return
+            if attempt < 3:
+                await asyncio.sleep(0.75)
+
+        if not authoritative_refresh_observed:
+            state._battery_power_match_control = previous_control
+        self.clear_battery_settings_write_pending()
+        coord.publish_runtime_state_update("power_match")
+        self._raise_validation(
+            "power_match_toggle_not_applied",
+            message="PowerMatch toggle was not applied by Enphase.",
         )
 
     async def async_set_charge_from_grid_schedule_enabled(self, enabled: bool) -> None:

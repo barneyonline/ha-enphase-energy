@@ -251,6 +251,17 @@ def _charge_from_grid_schedule_retained(coord: EnphaseCoordinator) -> bool:
     return force_supported is not False
 
 
+def _power_match_retained(coord: EnphaseCoordinator) -> bool:
+    control = getattr(coord, "battery_power_match_control", None)
+    if not isinstance(control, dict):
+        return False
+    return (
+        control.get("show") is True
+        and isinstance(control.get("enabled"), bool)
+        and control.get("locked") is not True
+    )
+
+
 def _retained_site_switch_keys(
     coord: EnphaseCoordinator, entry: EnphaseConfigEntry | None = None
 ) -> set[str]:
@@ -270,6 +281,8 @@ def _retained_site_switch_keys(
             retained.add("savings_use_battery_after_peak")
         if _charge_from_grid_retained(coord):
             retained.add("charge_from_grid")
+        if _power_match_retained(coord):
+            retained.add("power_match")
         if _charge_from_grid_schedule_retained(coord):
             retained.add("charge_from_grid_schedule")
         if getattr(coord, "discharge_to_grid_schedule_available", None) is not False:
@@ -342,6 +355,17 @@ async def async_setup_entry(
         inventory_ready = bool(getattr(coord, "_devices_inventory_ready", False))
         site_entities: list[SwitchEntity] = []
         retain_site_entity_keys = _retained_site_switch_keys(coord, entry)
+        power_match_unique_id = f"{DOMAIN}_site_{coord.site_id}_power_match"
+        registered_power_match_entity_id = ent_reg.async_get_entity_id(
+            "switch", DOMAIN, power_match_unique_id
+        )
+        if (
+            isinstance(registered_power_match_entity_id, str)
+            and registered_power_match_entity_id
+            and _site_has_battery(coord)
+            and _type_available(coord, "encharge")
+        ):
+            retain_site_entity_keys.add("power_match")
         if (
             "storm_guard" in retain_site_entity_keys
             and "storm_guard" not in site_entity_keys
@@ -363,6 +387,12 @@ async def async_setup_entry(
             ):
                 site_entities.append(ChargeFromGridSwitch(coord))
                 site_entity_keys.add("charge_from_grid")
+            if (
+                "power_match" in retain_site_entity_keys
+                and "power_match" not in site_entity_keys
+            ):
+                site_entities.append(PowerMatchSwitch(coord))
+                site_entity_keys.add("power_match")
             if (
                 "charge_from_grid_schedule" in retain_site_entity_keys
                 and "charge_from_grid_schedule" not in site_entity_keys
@@ -412,6 +442,7 @@ async def async_setup_entry(
                     "storm_guard",
                     "savings_use_battery_after_peak",
                     "charge_from_grid",
+                    "power_match",
                     "charge_from_grid_schedule",
                     "discharge_to_grid_schedule",
                     "restrict_battery_discharge_schedule",
@@ -423,6 +454,7 @@ async def async_setup_entry(
                 {
                     "savings_use_battery_after_peak",
                     "charge_from_grid",
+                    "power_match",
                     "charge_from_grid_schedule",
                     "discharge_to_grid_schedule",
                     "restrict_battery_discharge_schedule",
@@ -447,6 +479,7 @@ async def async_setup_entry(
                 f"{DOMAIN}_site_{coord.site_id}_storm_guard",
                 f"{DOMAIN}_site_{coord.site_id}_savings_use_battery_after_peak",
                 f"{DOMAIN}_site_{coord.site_id}_charge_from_grid",
+                f"{DOMAIN}_site_{coord.site_id}_power_match",
                 f"{DOMAIN}_site_{coord.site_id}_charge_from_grid_schedule",
                 f"{DOMAIN}_site_{coord.site_id}_discharge_to_grid_schedule",
                 f"{DOMAIN}_site_{coord.site_id}_restrict_battery_discharge_schedule",
@@ -714,6 +747,50 @@ class ChargeFromGridSwitch(CoordinatorEntity, SwitchEntity):  # type: ignore[mis
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self._coord.async_set_charge_from_grid(False)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        info = _type_device_info(self._coord, "encharge")
+        if info is not None:
+            return info
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"type:{self._coord.site_id}:encharge")},
+            manufacturer="Enphase",
+        )
+
+
+class PowerMatchSwitch(CoordinatorEntity, SwitchEntity):  # type: ignore[misc]
+    _attr_has_entity_name = True
+    _attr_translation_key = "power_match"
+
+    def __init__(self, coord: EnphaseCoordinator) -> None:
+        super().__init__(coord)
+        self._coord = coord
+        self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_power_match"
+
+    @property
+    def available(self) -> bool:
+        if not super().available:
+            return False
+        return (
+            _type_available(self._coord, "encharge")
+            and not _battery_write_access_explicitly_denied(self._coord)
+            and self._coord.power_match_control_available
+        )
+
+    @property
+    def is_on(self) -> bool:
+        return self._coord.battery_power_match_enabled is True
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        return battery_schedule_extra_state_attributes(self._coord)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self._coord.async_set_power_match(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self._coord.async_set_power_match(False)
 
     @property
     def device_info(self) -> DeviceInfo:

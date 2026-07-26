@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Enphase no aplicó el conmutador de carga desde la red."
     },
+    "power_match_unavailable": {
+      "message": "La configuración de PowerMatch no está disponible."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "Enphase no aplicó el cambio de PowerMatch."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "El horario de carga desde la red no está disponible."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Cargar batería desde la red"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Horario de carga desde la red"

@@ -7042,6 +7042,23 @@ class EnphaseCoordinator(
         return begin is not None and end is not None
 
     @property
+    def power_match_control_available(self) -> bool:
+        if getattr(self, "_battery_has_encharge", None) is False:
+            return False
+        if self.battery_system_task is True:
+            return False
+        control = getattr(self, "_battery_power_match_control", None)
+        if not isinstance(control, BatteryControlCapability):
+            return False
+        if control.show is not True or control.enabled is None:
+            return False
+        if control.locked is True:
+            return False
+        owner = self.battery_user_is_owner
+        installer = self.battery_user_is_installer
+        return not (owner is False and installer is False)
+
+    @property
     def battery_charge_from_grid_enabled(self) -> bool | None:
         return getattr(self, "_battery_charge_from_grid", None)
 
@@ -7910,6 +7927,16 @@ class EnphaseCoordinator(
         return self._battery_control_to_dict(value)
 
     @property
+    def battery_power_match_control(self) -> dict[str, bool | None] | None:
+        value = getattr(self, "_battery_power_match_control", None)
+        return self._battery_control_to_dict(value)
+
+    @property
+    def battery_power_match_enabled(self) -> bool | None:
+        value = getattr(self, "_battery_power_match_control", None)
+        return self._battery_control_field(value, "enabled")
+
+    @property
     def battery_cfg_control_show(self) -> bool | None:
         value = getattr(self, "_battery_cfg_control", None)
         field = self._battery_control_field(value, "show")
@@ -8645,6 +8672,9 @@ class EnphaseCoordinator(
 
     async def async_set_charge_from_grid(self, enabled: bool) -> None:
         await self.battery_runtime.async_set_charge_from_grid(enabled)
+
+    async def async_set_power_match(self, enabled: bool) -> None:
+        await self.battery_runtime.async_set_power_match(enabled)
 
     async def async_set_charge_from_grid_schedule_enabled(self, enabled: bool) -> None:
         await self.battery_runtime.async_set_charge_from_grid_schedule_enabled(enabled)

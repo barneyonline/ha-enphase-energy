@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Enphase nepiemēroja uzlādes no tīkla slēdzi."
     },
+    "power_match_unavailable": {
+      "message": "PowerMatch iestatījums nav pieejams."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "Enphase nepiemēroja PowerMatch pārslēgšanu."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "Uzlādes no tīkla grafiks nav pieejams."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Uzlādēt akumulatoru no tīkla"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Uzlādes no tīkla grafiks"

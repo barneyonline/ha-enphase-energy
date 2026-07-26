@@ -42,6 +42,7 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - Heat-pump runtime status, connectivity, SG-Ready mode, power, and current-day consumption details sourced from HEMS endpoints
 - Site and battery energy telemetry, including derived grid-import, grid-export, and battery power sensors for Home Assistant Energy Dashboard use
 - Optional IQ Battery Scheduler controls and CFG, DTG, and RBD schedule sensors
+- Capability-gated PowerMatch cloud control for supported IQ Battery sites with permitted BatteryConfig write access
 - Optional current site weather on the Enphase Cloud device, created only when the authenticated Enphase weather endpoint is available
 - Independent Microinverter Lifetime Energy and optional installer-level power telemetry
 - Site tariff visibility, editable rate entities, and tariff update actions

@@ -45,6 +45,8 @@ def _intentional_identical_translation(
 
     if path == "config.step.user.title" and value == "Enphase Energy":
         return True
+    if path == "entity.switch.power_match.name" and value == "PowerMatch":
+        return True
     if (
         locale == "fr"
         and value == "Notifications"
@@ -864,7 +866,10 @@ def test_battery_settings_entity_strings_exist_for_all_locales() -> None:
         "entity.sensor.battery_overall_status.state.unknown",
         "entity.number.battery_shutdown_level.name",
         "entity.switch.charge_from_grid.name",
+        "entity.switch.power_match.name",
         "entity.switch.charge_from_grid_schedule.name",
+        "exceptions.power_match_unavailable.message",
+        "exceptions.power_match_toggle_not_applied.message",
         "entity.time.charge_from_grid_start_time.name",
         "entity.time.charge_from_grid_end_time.name",
         "entity.calendar.backup_history.name",
@@ -875,6 +880,18 @@ def test_battery_settings_entity_strings_exist_for_all_locales() -> None:
         for path in paths:
             value = _at_path(data, path)
             assert value.strip(), f"{locale.name} missing value for {path}"
+
+    en_data = json.loads((translations_dir / "en.json").read_text(encoding="utf-8"))
+    exception_paths = [
+        "exceptions.power_match_unavailable.message",
+        "exceptions.power_match_toggle_not_applied.message",
+    ]
+    for locale in translations_dir.glob("*.json"):
+        if locale.name == "en.json" or locale.name.startswith("en-"):
+            continue
+        data = json.loads(locale.read_text(encoding="utf-8"))
+        for path in exception_paths:
+            assert _at_path(data, path) != _at_path(en_data, path)
 
 
 def test_tariff_entity_strings_exist_for_all_locales() -> None:

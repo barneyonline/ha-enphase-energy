@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Зареждането от превключване на мрежата не е приложено от Enphase."
     },
+    "power_match_unavailable": {
+      "message": "Настройката PowerMatch не е налична."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "Превключването на PowerMatch не беше приложено от Enphase."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "Таксуването от графика на мрежата не е налично."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Зареждане на батерията от мрежата"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "График за зареждане от мрежата"
