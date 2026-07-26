@@ -49,6 +49,7 @@ _DEGRADED_SERVICE_REPAIR_ISSUES: tuple[tuple[str, str], ...] = (
 _DEGRADED_SERVICE_REPAIR_ISSUE_IDS = frozenset(
     issue_id for _flag_attr, issue_id in _DEGRADED_SERVICE_REPAIR_ISSUES
 )
+_NON_DEGRADING_OPTIONAL_ENDPOINT_FAMILIES = frozenset({"activation_grid_profile"})
 
 
 class CoordinatorDiagnostics:
@@ -1057,7 +1058,8 @@ class CoordinatorDiagnostics:
         degraded_endpoint_families = [
             family
             for family, state in endpoint_family_health.items()
-            if _endpoint_family_degraded(state)
+            if family not in _NON_DEGRADING_OPTIONAL_ENDPOINT_FAMILIES
+            and _endpoint_family_degraded(state)
         ]
         metrics["degraded_endpoint_families"] = degraded_endpoint_families
         metrics["endpoint_failure_details"] = {

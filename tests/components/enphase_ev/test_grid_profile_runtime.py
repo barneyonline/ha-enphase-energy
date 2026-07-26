@@ -45,6 +45,142 @@ def _make_api_client() -> api.EnphaseEVClient:
     return api.EnphaseEVClient(_DefaultSession(), "3381244", "TOKEN", "COOKIE")
 
 
+async def test_activation_auth_bootstraps_embedded_settings_token() -> None:
+    client = _make_api_client()
+    client.update_credentials(
+        cookie="session=current; enlighten_manager_token_production=stale"
+    )
+    token = "header.payload.signature"
+    client._text = AsyncMock(  # noqa: SLF001
+        return_value=(
+            '<iframe src="/app/activation_ui/?locale=en-AU&amp;token='
+            f'{token}&amp;siteid=3381244&amp;gridprofile=gridprofile"></iframe>'
+        )
+    )
+
+    assert await client.async_prepare_activation_auth() is True
+    assert await client.async_prepare_activation_auth() is True
+
+    headers = client._activation_headers()  # noqa: SLF001
+    assert headers["Authorization"] == f"Bearer {token}"
+    assert headers["Referer"] == (
+        "https://enlighten.enphaseenergy.com/app/activation_ui/"
+        f"?locale=en-AU&token={token}&siteid=3381244&gridprofile=gridprofile"
+    )
+    assert headers["Cookie"] == (
+        f"session=current; enlighten_manager_token_production={token}"
+    )
+    client._text.assert_awaited_once()  # type: ignore[attr-defined]
+
+
+def test_activation_auth_parser_handles_protocol_relative_and_malformed_urls() -> None:
+    token = "header.payload.signature"
+    assert api._activation_context_from_settings_html(  # noqa: SLF001
+        "//enlighten.enphaseenergy.com/app/activation_ui/"
+        f"?locale=en-AU&token={token}&siteid=3381244"
+    ) == (
+        token,
+        "https://enlighten.enphaseenergy.com/app/activation_ui/"
+        f"?locale=en-AU&token={token}&siteid=3381244",
+    )
+    assert (
+        api._activation_context_from_settings_html(  # noqa: SLF001
+            f"https://example.com/app/activation_ui/?token={token}"
+        )
+        is None
+    )
+    with patch.object(api, "URL", side_effect=ValueError):
+        assert (
+            api._activation_context_from_settings_html(  # noqa: SLF001
+                f"/app/activation_ui/?token={token}"
+            )
+            is None
+        )
+
+
+def test_activation_auth_expired_cached_token_uses_stored_fallback() -> None:
+    client = _make_api_client()
+    client._activation_token = "header.eyJleHAiOjF9.signature"  # noqa: SLF001
+
+    assert client._activation_auth_token() == "TOKEN"  # noqa: SLF001
+    assert client._activation_token is None  # noqa: SLF001
+    assert client._activation_referer is None  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "<html>No Activation UI</html>",
+        '<iframe src="/app/activation_ui/?token=not-a-jwt"></iframe>',
+    ],
+)
+async def test_activation_auth_bootstrap_preserves_fallback_without_valid_token(
+    payload: str,
+) -> None:
+    client = _make_api_client()
+    client.update_credentials(eauth="access-token", cookie="session=current")
+    client._text = AsyncMock(return_value=payload)  # noqa: SLF001
+
+    assert await client.async_prepare_activation_auth() is False
+    headers = client._activation_headers()  # noqa: SLF001
+    assert headers["Authorization"] == "Bearer access-token"
+    assert headers["Cookie"] == "session=current"
+
+
+@pytest.mark.parametrize(
+    "rejection",
+    [
+        Unauthorized("expired"),
+        aiohttp.ClientResponseError(None, (), status=403),
+    ],
+)
+async def test_activation_request_rebootstraps_rejected_cached_token(
+    rejection: Exception,
+) -> None:
+    client = _make_api_client()
+    client.update_credentials(eauth="fallback", cookie="session=current")
+    client._activation_token = "old.header.signature"  # noqa: SLF001
+    client._activation_referer = (
+        "https://enlighten.enphaseenergy.com/old"  # noqa: SLF001
+    )
+    new_token = "new.header.signature"
+    client._text = AsyncMock(  # noqa: SLF001
+        return_value=(
+            '<iframe src="/app/activation_ui/?token='
+            f'{new_token}&amp;siteid=3381244"></iframe>'
+        )
+    )
+    client._json = AsyncMock(  # noqa: SLF001
+        side_effect=[rejection, {"activation": "available"}]
+    )
+
+    assert await client.async_get_activation_record() == {"activation": "available"}
+
+    assert client._json.await_count == 2  # type: ignore[attr-defined]
+    first_headers = client._json.await_args_list[0].kwargs[  # type: ignore[attr-defined]
+        "headers"
+    ]
+    second_headers = client._json.await_args_list[1].kwargs[  # type: ignore[attr-defined]
+        "headers"
+    ]
+    assert first_headers["Authorization"] == "Bearer old.header.signature"
+    assert second_headers["Authorization"] == f"Bearer {new_token}"
+    assert second_headers["Cookie"] == (
+        f"session=current; enlighten_manager_token_production={new_token}"
+    )
+    client._text.assert_awaited_once()  # type: ignore[attr-defined]
+
+
+async def test_activation_auth_bootstrap_soft_fails_when_settings_unavailable() -> None:
+    client = _make_api_client()
+    client._text = AsyncMock(side_effect=Unauthorized())  # noqa: SLF001
+
+    assert await client.async_prepare_activation_auth() is False
+    assert (
+        client._activation_headers()["Authorization"] == "Bearer TOKEN"
+    )  # noqa: SLF001
+
+
 async def test_activation_api_helpers_use_cloud_payloads() -> None:
     client = _make_api_client()
     calls: list[tuple[str, str, dict[str, Any]]] = []
@@ -272,6 +408,7 @@ async def test_activation_api_validates_response_shapes() -> None:
 
 class _FakeGridProfileClient:
     def __init__(self) -> None:
+        self.activation_auth_prepare_requests = 0
         self.profile_requests: list[tuple[str, str, bool]] = []
         self.apply_requests: list[dict[str, object]] = []
         self.reference_payload: dict[str, object] = {
@@ -367,6 +504,10 @@ class _FakeGridProfileClient:
         self.reference_requests = 0
         self.activation_record_requests = 0
         self.activation_device_requests = 0
+
+    async def async_prepare_activation_auth(self) -> bool:
+        self.activation_auth_prepare_requests += 1
+        return True
 
     async def async_get_activation_reference_data(self) -> dict[str, object]:
         self.reference_requests += 1
@@ -468,6 +609,7 @@ async def test_runtime_scopes_regions_profiles_and_applies_exact_payload() -> No
     assert runtime.country_code == "AU"
     assert runtime.site_region_code == "VIC"
     assert runtime.region_options == ["VIC, AU - Victoria"]
+    assert client.activation_auth_prepare_requests >= 1
     assert runtime.filtered_regions("Wellington") == []
     assert [region.region_code for region in runtime.filtered_regions("VIC")] == ["VIC"]
     assert client.profile_requests == [("AU", "VIC", True)]

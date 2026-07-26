@@ -309,6 +309,29 @@ def test_battery_endpoint_family_failure_reports_degraded_service(
     assert "battery_status" in metrics["degraded_services"]
 
 
+def test_grid_profile_failure_does_not_degrade_service(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    monkeypatch.setattr(coord_mod.random, "uniform", lambda _a, _b: 1.0)
+
+    err = OptionalEndpointUnavailable("Activation access denied")
+    assert (
+        coord._note_endpoint_family_failure("activation_grid_profile", err) is True
+    )  # noqa: SLF001
+
+    metrics = coord.collect_site_metrics()
+    assert (
+        metrics["endpoint_family_health"]["activation_grid_profile"][
+            "consecutive_failures"
+        ]
+        == 1
+    )
+    assert metrics["degraded_endpoint_families"] == []
+    assert "activation_grid_profile" not in metrics["degraded_services"]
+    assert "activation_grid_profile" in metrics["endpoint_failure_details"]
+
+
 def test_degraded_endpoint_family_rollup_tolerates_unexpected_health(
     coordinator_factory, monkeypatch
 ) -> None:
