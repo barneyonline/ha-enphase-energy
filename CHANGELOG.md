@@ -11,17 +11,35 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- Bootstrapped Grid Profile access with the short-lived Activation token embedded
-  by the authenticated Enlighten Settings page, matching the working web UI
-  bearer and Manager-cookie request shape.
-- Stopped unavailable Grid Profile access from marking the overall Enphase site
-  service as degraded; the optional endpoint health remains visible in diagnostics.
+- None
 
 ### 🔧 Improvements
 - None
 
 ### 🔄 Other changes
 - None
+
+## v4.0.2 - 2026-07-26
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Bootstrapped Grid Profile access with the short-lived Activation token embedded
+  by the authenticated Enlighten Settings page, matching the working web UI
+  bearer and Manager-cookie request shape. (#795)
+- Stopped unavailable Grid Profile access from marking the overall Enphase site
+  service as degraded; the optional endpoint health remains visible in diagnostics.
+  (#795)
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Bumped the integration manifest version to `4.0.2`.
 
 ## v4.0.1 - 2026-07-22
 
