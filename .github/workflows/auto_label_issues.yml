@@ -68,7 +68,7 @@ jobs:
           template-path: ${{ steps.form.outputs.template_path }}
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         env:
           PRIMARY_AREA: ${{ steps.issue_parser.outputs.issueparser_primary_area }}
           FEATURE_AREA: ${{ steps.issue_parser.outputs.issueparser_area }}
