@@ -39,6 +39,7 @@ from custom_components.enphase_ev.switch import (
     DischargeToGridScheduleSwitch,
     EvseScheduleEditorDaySwitch,
     GreenBatterySwitch,
+    PowerMatchSwitch,
     RestrictBatteryDischargeScheduleSwitch,
     SavingsUseBatteryAfterPeakSwitch,
     StormGuardEvseSwitch,
@@ -618,6 +619,11 @@ async def test_async_setup_entry_keeps_cfg_switches_while_permission_unknown(
     coord._storm_evse_enabled = None  # noqa: SLF001
     coord._battery_charge_from_grid = True  # noqa: SLF001
     coord._battery_charge_from_grid_schedule_enabled = True  # noqa: SLF001
+    coord._battery_power_match_control = (  # noqa: SLF001
+        coord.battery_runtime._parse_battery_control_capability(  # noqa: SLF001
+            {"show": True, "enabled": False}
+        )
+    )
     coord._battery_charge_begin_time = 120  # noqa: SLF001
     coord._battery_charge_end_time = 300  # noqa: SLF001
     listener_callbacks = []
@@ -682,6 +688,11 @@ async def test_async_setup_entry_adds_supported_battery_site_switches_and_prunes
     coord._battery_charge_begin_time = 120  # noqa: SLF001
     coord._battery_charge_end_time = 300  # noqa: SLF001
     coord._battery_charge_from_grid_schedule_enabled = True  # noqa: SLF001
+    coord._battery_power_match_control = (  # noqa: SLF001
+        coord.battery_runtime._parse_battery_control_capability(  # noqa: SLF001
+            {"show": True, "enabled": False}
+        )
+    )
     coord._battery_dtg_control = (
         coord.battery_runtime._parse_battery_control_capability(  # noqa: SLF001
             {"show": True, "showDaySchedule": True, "scheduleSupported": True}
@@ -725,6 +736,7 @@ async def test_async_setup_entry_adds_supported_battery_site_switches_and_prunes
 
     assert any(isinstance(entity, StormGuardSwitch) for entity in added)
     assert any(isinstance(entity, SavingsUseBatteryAfterPeakSwitch) for entity in added)
+    assert any(isinstance(entity, PowerMatchSwitch) for entity in added)
     assert any(isinstance(entity, DischargeToGridScheduleSwitch) for entity in added)
     assert any(
         isinstance(entity, RestrictBatteryDischargeScheduleSwitch) for entity in added
@@ -743,6 +755,7 @@ async def test_async_setup_entry_adds_supported_battery_site_switches_and_prunes
         not in active_unique_ids
     )
     assert f"enphase_ev_site_{coord.site_id}_charge_from_grid" not in active_unique_ids
+    assert f"enphase_ev_site_{coord.site_id}_power_match" not in active_unique_ids
 
 
 @pytest.mark.asyncio
@@ -755,6 +768,11 @@ async def test_async_setup_entry_keeps_loaded_site_switches_when_support_disprov
     coord._battery_user_is_owner = None  # noqa: SLF001
     coord._battery_user_is_installer = None  # noqa: SLF001
     coord._battery_show_storm_guard = True  # noqa: SLF001
+    coord._battery_power_match_control = (  # noqa: SLF001
+        coord.battery_runtime._parse_battery_control_capability(  # noqa: SLF001
+            {"show": True, "enabled": False}
+        )
+    )
     listener_callbacks = []
     original_add_listener = coord.async_add_listener
 
@@ -779,6 +797,7 @@ async def test_async_setup_entry_keeps_loaded_site_switches_when_support_disprov
     assert any(isinstance(entity, StormGuardSwitch) for entity in added)
     assert any(isinstance(entity, ChargeFromGridSwitch) for entity in added)
     assert any(isinstance(entity, ChargeFromGridScheduleSwitch) for entity in added)
+    assert any(isinstance(entity, PowerMatchSwitch) for entity in added)
 
     prune_spy.reset_mock()
     coord._battery_show_storm_guard = False  # noqa: SLF001
@@ -791,16 +810,21 @@ async def test_async_setup_entry_keeps_loaded_site_switches_when_support_disprov
             }
         )
     )
+    coord._battery_power_match_control = (  # noqa: SLF001
+        coord.battery_runtime._parse_battery_control_capability(  # noqa: SLF001
+            {"show": False, "enabled": False}
+        )
+    )
     listener_callbacks[0]()
 
     active_unique_ids = prune_spy.call_args_list[0].kwargs["active_unique_ids"]
     assert f"enphase_ev_site_{coord.site_id}_storm_guard" in active_unique_ids
     assert f"enphase_ev_site_{coord.site_id}_charge_from_grid" in active_unique_ids
+    assert f"enphase_ev_site_{coord.site_id}_power_match" in active_unique_ids
     assert (
         f"enphase_ev_site_{coord.site_id}_charge_from_grid_schedule"
         in active_unique_ids
     )
-
     added.clear()
     prune_spy.reset_mock()
     coord._battery_show_storm_guard = True  # noqa: SLF001
@@ -818,13 +842,54 @@ async def test_async_setup_entry_keeps_loaded_site_switches_when_support_disprov
     assert not any(isinstance(entity, StormGuardSwitch) for entity in added)
     assert not any(isinstance(entity, ChargeFromGridSwitch) for entity in added)
     assert not any(isinstance(entity, ChargeFromGridScheduleSwitch) for entity in added)
+    assert not any(isinstance(entity, PowerMatchSwitch) for entity in added)
     active_unique_ids = prune_spy.call_args_list[0].kwargs["active_unique_ids"]
     assert f"enphase_ev_site_{coord.site_id}_storm_guard" in active_unique_ids
     assert f"enphase_ev_site_{coord.site_id}_charge_from_grid" in active_unique_ids
+    assert f"enphase_ev_site_{coord.site_id}_power_match" in active_unique_ids
     assert (
         f"enphase_ev_site_{coord.site_id}_charge_from_grid_schedule"
         in active_unique_ids
     )
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_retains_registered_power_match_while_unknown(
+    hass, config_entry, coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord._battery_has_encharge = True  # noqa: SLF001
+    coord._battery_user_is_owner = None  # noqa: SLF001
+    coord._battery_user_is_installer = None  # noqa: SLF001
+    coord._battery_power_match_control = None  # noqa: SLF001
+    coord.inventory_view.has_type_for_entities = lambda type_key: type_key == "encharge"
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+
+    ent_reg = er.async_get(hass)
+    unique_id = f"enphase_ev_site_{coord.site_id}_power_match"
+    registered = ent_reg.async_get_or_create(
+        "switch",
+        "enphase_ev",
+        unique_id,
+        config_entry=config_entry,
+    )
+    remove_spy = MagicMock(wraps=ent_reg.async_remove)
+    monkeypatch.setattr(ent_reg, "async_remove", remove_spy)
+    added = []
+
+    await async_setup_entry(
+        hass,
+        config_entry,
+        lambda entities, update_before_add=False: added.extend(entities),
+    )
+
+    power_match = next(
+        entity for entity in added if isinstance(entity, PowerMatchSwitch)
+    )
+    assert power_match.available is False
+    assert ent_reg.async_get(registered.entity_id) is not None
+    remove_spy.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -2064,6 +2129,56 @@ def test_charge_from_grid_switch_exposes_schedule_attributes(
     assert attrs == {"write_pending": False, "write_age_seconds": None}
 
 
+def test_power_match_switch_availability_and_state(coordinator_factory) -> None:
+    coord = coordinator_factory()
+    coord._battery_has_encharge = True  # noqa: SLF001
+    coord._battery_user_is_owner = True  # noqa: SLF001
+    coord._battery_user_is_installer = False  # noqa: SLF001
+    coord._battery_power_match_control = (  # noqa: SLF001
+        coord.battery_runtime._parse_battery_control_capability(  # noqa: SLF001
+            {"show": True, "enabled": False}
+        )
+    )
+    switch = PowerMatchSwitch(coord)
+
+    assert switch.unique_id == f"enphase_ev_site_{coord.site_id}_power_match"
+    assert switch.available is True
+    assert switch.is_on is False
+    assert switch.extra_state_attributes == {
+        "write_pending": False,
+        "write_age_seconds": None,
+    }
+
+    coord._battery_system_task = True  # noqa: SLF001
+    assert switch.available is False
+    coord._battery_system_task = False  # noqa: SLF001
+
+    coord._battery_power_match_control = (  # noqa: SLF001
+        coord.battery_runtime._parse_battery_control_capability(  # noqa: SLF001
+            {"show": True, "enabled": True, "locked": True}
+        )
+    )
+    assert switch.is_on is True
+    assert switch.available is False
+
+    coord._battery_power_match_control = None  # noqa: SLF001
+    assert switch.is_on is False
+    assert switch.available is False
+
+
+@pytest.mark.asyncio
+async def test_power_match_switch_turn_on_off(coordinator_factory) -> None:
+    coord = coordinator_factory()
+    coord.async_set_power_match = AsyncMock()
+    switch = PowerMatchSwitch(coord)
+
+    await switch.async_turn_on()
+    coord.async_set_power_match.assert_awaited_once_with(True)
+
+    await switch.async_turn_off()
+    coord.async_set_power_match.assert_awaited_with(False)
+
+
 @pytest.mark.asyncio
 async def test_charge_from_grid_switch_turn_on_off(coordinator_factory) -> None:
     coord = coordinator_factory()
@@ -2436,6 +2551,9 @@ def test_site_switch_device_info_fallbacks(coordinator_factory) -> None:
     assert ChargeFromGridSwitch(coord).device_info["identifiers"] == {
         ("enphase_ev", f"type:{coord.site_id}:encharge")
     }
+    assert PowerMatchSwitch(coord).device_info["identifiers"] == {
+        ("enphase_ev", f"type:{coord.site_id}:encharge")
+    }
     assert ChargeFromGridScheduleSwitch(coord).device_info["identifiers"] == {
         ("enphase_ev", f"type:{coord.site_id}:encharge")
     }
@@ -2453,12 +2571,14 @@ def test_site_switch_device_info_prefers_type_info_and_storm_guard_envoy_gate(
             expected_encharge,
             expected_encharge,
             expected_encharge,
+            expected_encharge,
         ]
     )
 
     assert StormGuardSwitch(coord).device_info is expected_envoy
     assert SavingsUseBatteryAfterPeakSwitch(coord).device_info is expected_encharge
     assert ChargeFromGridSwitch(coord).device_info is expected_encharge
+    assert PowerMatchSwitch(coord).device_info is expected_encharge
     assert ChargeFromGridScheduleSwitch(coord).device_info is expected_encharge
 
     coord.inventory_view.type_device_info = lambda _type_key: None
@@ -2483,6 +2603,7 @@ def test_charge_from_grid_switches_unavailable_when_coordinator_unavailable(
 
     assert ChargeFromGridSwitch(coord).available is False
     assert ChargeFromGridScheduleSwitch(coord).available is False
+    assert PowerMatchSwitch(coord).available is False
 
 
 @pytest.mark.asyncio

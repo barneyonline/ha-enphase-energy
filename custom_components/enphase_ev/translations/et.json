@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Enphase ei rakendanud võrgust laadimise lülitit."
     },
+    "power_match_unavailable": {
+      "message": "PowerMatchi seade pole saadaval."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "Enphase ei rakendanud PowerMatchi lülitust."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "Võrgust laadimise ajakava pole saadaval."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Laadi akut võrgust"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Võrgust laadimise ajakava"

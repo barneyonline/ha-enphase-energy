@@ -159,6 +159,7 @@ async def test_coordinator_public_runtime_commands_delegate(
     coord = coordinator_factory()
     battery_runtime = MagicMock()
     battery_runtime.async_set_charge_from_grid = AsyncMock()
+    battery_runtime.async_set_power_match = AsyncMock()
     battery_runtime.async_refresh_grid_control_check = AsyncMock()
     battery_runtime.async_refresh_storm_guard_profile = AsyncMock()
     battery_runtime.async_refresh_storm_alert = AsyncMock()
@@ -175,6 +176,7 @@ async def test_coordinator_public_runtime_commands_delegate(
     coord.inventory_runtime = inventory_runtime
 
     await coord.async_set_charge_from_grid(True)
+    await coord.async_set_power_match(False)
     await coord.battery_runtime.async_refresh_grid_control_check(force=True)
     await coord.async_refresh_storm_guard_profile(force=True)
     await coord.async_refresh_storm_alert(force=False)
@@ -188,6 +190,7 @@ async def test_coordinator_public_runtime_commands_delegate(
     await coord.async_ensure_system_dashboard_diagnostics()
 
     battery_runtime.async_set_charge_from_grid.assert_awaited_once_with(True)
+    battery_runtime.async_set_power_match.assert_awaited_once_with(False)
     battery_runtime.async_refresh_grid_control_check.assert_awaited_once_with(
         force=True
     )

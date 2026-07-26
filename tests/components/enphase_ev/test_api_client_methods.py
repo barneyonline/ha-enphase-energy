@@ -5637,6 +5637,12 @@ def test_battery_config_write_payload_helpers_cover_merge_and_base_fallbacks() -
         {
             "data": {
                 "dtgControl": {"enabled": False, "startTime": "00:00"},
+                "powerMatchControl": {
+                    "show": True,
+                    "enabled": False,
+                    "locked": False,
+                    "futureField": {"value": 1},
+                },
                 "devices": {"iqEvse": {"enabled": True}},
                 "ignored": 1,
             }
@@ -5644,6 +5650,12 @@ def test_battery_config_write_payload_helpers_cover_merge_and_base_fallbacks() -
     )
     assert client._battery_config_write_bases["battery_settings"] == {  # noqa: SLF001
         "dtgControl": {"enabled": False, "startTime": "00:00"},
+        "powerMatchControl": {
+            "show": True,
+            "enabled": False,
+            "locked": False,
+            "futureField": {"value": 1},
+        },
         "devices": {"iqEvse": {"enabled": True}},
     }
 
@@ -5657,9 +5669,19 @@ def test_battery_config_write_payload_helpers_cover_merge_and_base_fallbacks() -
     }
     assert client._battery_config_merged_write_payload(  # noqa: SLF001
         "battery_settings",
-        {"dtgControl": {"enabled": True}, "chargeFromGrid": True},
+        {
+            "dtgControl": {"enabled": True},
+            "powerMatchControl": {"enabled": True},
+            "chargeFromGrid": True,
+        },
     ) == {
         "dtgControl": {"enabled": True, "startTime": "00:00"},
+        "powerMatchControl": {
+            "show": True,
+            "enabled": True,
+            "locked": False,
+            "futureField": {"value": 1},
+        },
         "devices": {"iqEvse": {"enabled": True}},
         "chargeFromGrid": True,
     }
@@ -5679,6 +5701,12 @@ def test_battery_config_write_payload_helpers_cover_merge_and_base_fallbacks() -
         attempt,
     ) == {
         "dtgControl": {"enabled": True, "startTime": "00:00"},
+        "powerMatchControl": {
+            "show": True,
+            "enabled": False,
+            "locked": False,
+            "futureField": {"value": 1},
+        },
         "devices": {"iqEvse": {"enabled": True}},
     }
     assert (  # noqa: SLF001
@@ -6955,6 +6983,49 @@ async def test_set_battery_settings_compat_builds_merged_payload_without_devices
         "chargeFromGrid": True
     }
     assert client._battery_config_write_request.await_args.kwargs["params"] == {}
+    assert (
+        client._battery_config_write_request.await_args.kwargs["strip_devices"] is True
+    )
+
+
+@pytest.mark.asyncio
+async def test_battery_config_write_request_strips_devices_from_stateful_attempt() -> (
+    None
+):
+    client = _make_client()
+    client._remember_battery_config_write_base(  # noqa: SLF001
+        "battery_settings",
+        {
+            "data": {
+                "powerMatchControl": {"show": True, "enabled": False},
+                "devices": {"iqEvse": {"enabled": True}},
+            }
+        },
+    )
+    client._battery_config_write_attempts = MagicMock(  # noqa: SLF001
+        return_value=[
+            api._BatteryConfigWriteAttempt(  # noqa: SLF001
+                attempt_id="stateful",
+                auth_mode=api._BATTERY_CONFIG_VARIANT_PRIMARY,  # noqa: SLF001
+                merged_payload=True,
+            )
+        ]
+    )
+    client._acquire_xsrf_token = AsyncMock(return_value="token")  # noqa: SLF001
+    client._battery_config_attempt_headers = MagicMock(return_value={})  # noqa: SLF001
+    client._json = AsyncMock(return_value={"message": "success"})  # noqa: SLF001
+
+    await client._battery_config_write_request(  # noqa: SLF001
+        "PUT",
+        "https://example.test/batterySettings/SITE",
+        json_body={"powerMatchControl": {"enabled": True}},
+        endpoint_family="battery_settings",
+        write_intent="battery_settings_update",
+        strip_devices=True,
+    )
+
+    sent = client._json.await_args.kwargs["json"]  # noqa: SLF001
+    assert sent == {"powerMatchControl": {"show": True, "enabled": True}}
 
 
 @pytest.mark.asyncio

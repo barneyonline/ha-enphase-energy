@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Bryteren for lading fra nettet ble ikke brukt av Enphase."
     },
+    "power_match_unavailable": {
+      "message": "PowerMatch-innstillingen er ikke tilgjengelig."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "PowerMatch-bryteren ble ikke aktivert av Enphase."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "Planen for lading fra nettet er ikke tilgjengelig."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Lad batteri fra strømnettet"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Tidsplan for lading fra strømnettet"

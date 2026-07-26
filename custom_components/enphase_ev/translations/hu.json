@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Az Enphase nem alkalmazta a hálózatról töltés kapcsolóállapotát."
     },
+    "power_match_unavailable": {
+      "message": "A PowerMatch beállítás nem érhető el."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "Az Enphase nem alkalmazta a PowerMatch kapcsolását."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "A hálózatról töltési ütemezés nem érhető el."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Akkumulátor töltése hálózatról"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Hálózatról töltés ütemezése"

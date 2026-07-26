@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "A cobrança da alternância de rede não foi aplicada pela Enphase."
     },
+    "power_match_unavailable": {
+      "message": "A configuração do PowerMatch não está disponível."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "A alteração do PowerMatch não foi aplicada pela Enphase."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "A cobrança da programação da rede não está disponível."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Carregar bateria da rede"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Agenda de carga da rede"

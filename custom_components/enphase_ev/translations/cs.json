@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Enphase nepoužilo nabíjení z přepínače mřížky."
     },
+    "power_match_unavailable": {
+      "message": "Nastavení PowerMatch není k dispozici."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "Přepnutí PowerMatch nebylo společností Enphase použito."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "Poplatek ze sítě není k dispozici."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Nabíjet baterii ze sítě"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Plán nabíjení ze sítě"

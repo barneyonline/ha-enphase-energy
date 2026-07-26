@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Die Ladung durch Netzumschaltung wurde von Enphase nicht angewendet."
     },
+    "power_match_unavailable": {
+      "message": "Die PowerMatch-Einstellung ist nicht verfügbar."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "Die PowerMatch-Umschaltung wurde von Enphase nicht angewendet."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "Der Zeitplan für die Ladung aus dem Netz ist nicht verfügbar."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Batterie aus dem Netz laden"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Zeitplan für Laden aus dem Netz"

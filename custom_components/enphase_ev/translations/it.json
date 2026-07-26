@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Enphase non ha applicato l'attivazione o disattivazione della ricarica dalla rete."
     },
+    "power_match_unavailable": {
+      "message": "L'impostazione PowerMatch non è disponibile."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "L'attivazione di PowerMatch non è stata applicata da Enphase."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "La pianificazione di ricarica dalla rete non è disponibile."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Carica batteria dalla rete"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Programma carica da rete"

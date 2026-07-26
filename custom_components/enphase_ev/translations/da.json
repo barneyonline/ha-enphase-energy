@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Charge from grid toggle blev ikke anvendt af Enphase."
     },
+    "power_match_unavailable": {
+      "message": "PowerMatch-indstillingen er ikke tilgængelig."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "PowerMatch-skiftet blev ikke anvendt af Enphase."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "Opkrævning fra netplan er ikke tilgængelig."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Oplad batteri fra elnet"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Tidsplan for opladning fra elnet"

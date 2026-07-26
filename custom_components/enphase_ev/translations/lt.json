@@ -235,6 +235,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Enphase nepritaikė įkrovimo iš tinklo perjungimo."
     },
+    "power_match_unavailable": {
+      "message": "„PowerMatch“ nustatymas nepasiekiamas."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "„Enphase“ nepritaikė „PowerMatch“ perjungimo."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "Įkrovimo iš tinklo tvarkaraštis nepasiekiamas."
     },
@@ -2245,6 +2251,9 @@
       },
       "charge_from_grid": {
         "name": "Įkrauti bateriją iš tinklo"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Įkrovimo iš tinklo tvarkaraštis"

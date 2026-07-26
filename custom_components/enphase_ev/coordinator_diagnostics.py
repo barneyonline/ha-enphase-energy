@@ -562,6 +562,7 @@ class CoordinatorDiagnostics:
             "charge_from_grid_control_available": (
                 coord.charge_from_grid_control_available
             ),
+            "power_match_control_available": coord.power_match_control_available,
             "charge_from_grid_schedule_supported": (
                 coord.charge_from_grid_schedule_supported
             ),
@@ -773,6 +774,7 @@ class CoordinatorDiagnostics:
             "battery_dtg_control": coord.battery_dtg_control,
             "battery_cfg_control": coord.battery_cfg_control,
             "battery_rbd_control": coord.battery_rbd_control,
+            "battery_power_match_control": coord.battery_power_match_control,
             "battery_system_task": coord.battery_system_task,
             "battery_grid_mode": getattr(coord, "_battery_grid_mode", None),
             "battery_mode_display": coord.battery_mode_display,

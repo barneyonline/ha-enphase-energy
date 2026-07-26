@@ -238,6 +238,12 @@
     "charge_from_grid_toggle_not_applied": {
       "message": "Charge from grid toggle was not applied by Enphase."
     },
+    "power_match_unavailable": {
+      "message": "PowerMatch setting is unavailable."
+    },
+    "power_match_toggle_not_applied": {
+      "message": "PowerMatch toggle was not applied by Enphase."
+    },
     "charge_from_grid_schedule_unavailable": {
       "message": "Charge from grid schedule is unavailable."
     },
@@ -2239,6 +2245,9 @@
       },
       "charge_from_grid": {
         "name": "Charge Battery From Grid"
+      },
+      "power_match": {
+        "name": "PowerMatch"
       },
       "charge_from_grid_schedule": {
         "name": "Charge From Grid Schedule"

@@ -306,6 +306,16 @@ class DummyCoordinator(SimpleNamespace):
             "force_schedule_supported": None,
             "force_schedule_opted": None,
         }
+        self.battery_power_match_control = {
+            "show": True,
+            "enabled": False,
+            "locked": False,
+            "show_day_schedule": None,
+            "schedule_supported": None,
+            "force_schedule_supported": None,
+            "force_schedule_opted": None,
+        }
+        self.power_match_control_available = True
         self.battery_system_task = False
         self._grid_control_check_payload = {
             "disableGridControl": False,
@@ -627,6 +637,8 @@ class DummyCoordinator(SimpleNamespace):
             "battery_dtg_control": self.battery_dtg_control,
             "battery_cfg_control": self.battery_cfg_control,
             "battery_rbd_control": self.battery_rbd_control,
+            "battery_power_match_control": self.battery_power_match_control,
+            "power_match_control_available": self.power_match_control_available,
             "battery_system_task": self.battery_system_task,
         }
 
@@ -895,6 +907,11 @@ async def test_config_entry_diagnostics_includes_coordinator(
         == 1
     )
     assert diag["coordinator"]["site_metrics"]["battery_cfg_control"]["locked"] is False
+    assert (
+        diag["coordinator"]["site_metrics"]["battery_power_match_control"]
+        == coord.battery_power_match_control
+    )
+    assert diag["coordinator"]["site_metrics"]["power_match_control_available"] is True
     assert diag["coordinator"]["site_metrics"]["battery_dtg_control"]["locked"] is True
     assert diag["coordinator"]["site_metrics"]["battery_system_task"] is False
     assert (
