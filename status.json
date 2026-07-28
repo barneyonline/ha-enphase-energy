@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-07-28T11:34:55.307353Z",
+  "checked_at": "2026-07-28T14:02:54.514124Z",
   "checks": [
     {
       "affects": true,
@@ -144,7 +144,7 @@
       ],
       "group": "degraded",
       "name": "system_dashboard",
-      "ok": true
+      "ok": false
     },
     {
       "affects": false,
@@ -334,7 +334,7 @@
       "name": "session_history_criteria",
       "ok": true,
       "status": 200,
-      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=9dac4767-11f4-4b0c-91dc-b6730ada5f49&username=2999024"
+      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=5a9d5e7b-db94-46a5-9ee7-7b8b83d28204&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -404,7 +404,7 @@
       "name": "evse_timeseries_daily_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=9dac4767-11f4-4b0c-91dc-b6730ada5f49&start_date=2026-07-28&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=5a9d5e7b-db94-46a5-9ee7-7b8b83d28204&start_date=2026-07-28&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -418,7 +418,7 @@
       "name": "evse_timeseries_lifetime_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=9dac4767-11f4-4b0c-91dc-b6730ada5f49&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=5a9d5e7b-db94-46a5-9ee7-7b8b83d28204&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -552,12 +552,12 @@
       "category": "system_dashboard",
       "check_group": "system_dashboard",
       "check_mode": "all",
-      "error": null,
+      "error": "The read operation timed out",
       "group": "degraded",
       "method": "GET",
       "name": "system_dashboard_summary",
-      "ok": true,
-      "status": 200,
+      "ok": false,
+      "status": null,
       "url": "/service/system_dashboard/api_internal/cs/sites/{site_id}/summary"
     },
     {
@@ -731,14 +731,14 @@
   ],
   "status": "Fully Operational",
   "summary": {
-    "checks_failed": 0,
+    "checks_failed": 1,
     "checks_failed_affecting": 0,
-    "checks_failed_broad_outage": 0,
-    "checks_failed_non_affecting": 0,
-    "checks_ok": 17,
+    "checks_failed_broad_outage": 1,
+    "checks_failed_non_affecting": 1,
+    "checks_ok": 16,
     "checks_total": 17,
-    "endpoints_failed": 0,
-    "endpoints_ok": 37,
+    "endpoints_failed": 1,
+    "endpoints_ok": 36,
     "endpoints_total": 37
   }
 }
