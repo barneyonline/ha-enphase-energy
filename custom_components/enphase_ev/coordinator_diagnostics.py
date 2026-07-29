@@ -62,8 +62,12 @@ class CoordinatorDiagnostics:
         if not self.degraded_service_repair_issues_enabled:
             self.clear_degraded_service_repair_issues()
 
-    def _delete_issue(self, issue_id: str) -> None:
+    def _delete_issue(self, issue_id: str, *, preserve_ignored: bool = False) -> None:
         coord = self.coordinator
+        if preserve_ignored:
+            issue = ir.async_get(coord.hass).async_get_issue(DOMAIN, issue_id)
+            if issue is not None and issue.dismissed_version is not None:
+                return
         ir.async_delete_issue(coord.hass, DOMAIN, issue_id)
 
     def _entry_issue_suffix(self) -> str | None:
@@ -84,11 +88,27 @@ class CoordinatorDiagnostics:
             return issue_id
         return f"{issue_id}_{suffix}"
 
-    def _delete_reported_issue(self, issue_id: str) -> None:
+    def _delete_reported_issue(
+        self, issue_id: str, *, preserve_ignored: bool = False
+    ) -> None:
         registry_issue_id = self._repair_issue_id(issue_id)
-        self._delete_issue(registry_issue_id)
+        self._delete_issue(
+            registry_issue_id,
+            preserve_ignored=preserve_ignored,
+        )
         if registry_issue_id != issue_id:
-            self._delete_issue(issue_id)
+            self._delete_issue(issue_id, preserve_ignored=preserve_ignored)
+
+    def _reported_issue_is_active(self, issue_id: str) -> bool:
+        registry_issue_id = self._repair_issue_id(issue_id)
+        issue_registry = ir.async_get(self.coordinator.hass)
+        issue = issue_registry.async_get_issue(DOMAIN, registry_issue_id)
+        if issue is not None and issue.active:
+            return True
+        if registry_issue_id == issue_id:
+            return False
+        legacy_issue = issue_registry.async_get_issue(DOMAIN, issue_id)
+        return legacy_issue is not None and legacy_issue.active
 
     def clear_legacy_degraded_service_repair_issues(self) -> None:
         """Clear pre-scoped degraded-service repair issues after upgrade."""
@@ -149,9 +169,11 @@ class CoordinatorDiagnostics:
 
     def _clear_reported_issue(self, flag_attr: str, issue_id: str) -> None:
         coord = self.coordinator
-        if not getattr(coord, flag_attr, False):
+        if not getattr(coord, flag_attr, False) and not self._reported_issue_is_active(
+            issue_id
+        ):
             return
-        self._delete_reported_issue(issue_id)
+        self._delete_reported_issue(issue_id, preserve_ignored=True)
         setattr(coord, flag_attr, False)
 
     @property

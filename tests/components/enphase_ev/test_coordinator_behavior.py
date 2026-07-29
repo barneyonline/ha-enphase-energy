@@ -2216,6 +2216,69 @@ async def test_http_error_issue(hass, monkeypatch):
     assert any(issue_id == ISSUE_CLOUD_ERRORS for _, issue_id in deleted)
 
 
+def test_ignored_battery_profile_issue_survives_clear_and_recurrence(
+    hass, monkeypatch
+) -> None:
+    from homeassistant.helpers import issue_registry as ir
+
+    from custom_components.enphase_ev.const import (
+        BATTERY_PROFILE_PENDING_TIMEOUT_S,
+        ISSUE_BATTERY_PROFILE_PENDING,
+    )
+    from custom_components.enphase_ev.coordinator_diagnostics import (
+        CoordinatorDiagnostics,
+    )
+
+    coord = _make_coordinator(hass, monkeypatch)
+    coord._battery_pending_profile = "cost_savings"  # noqa: SLF001
+    coord._battery_pending_requested_at = datetime.now(
+        timezone.utc
+    ) - timedelta(  # noqa: SLF001
+        seconds=BATTERY_PROFILE_PENDING_TIMEOUT_S + 30
+    )
+
+    coord._sync_battery_profile_pending_issue()  # noqa: SLF001
+
+    issue_registry = ir.async_get(hass)
+    issue = issue_registry.async_get_issue(DOMAIN, ISSUE_BATTERY_PROFILE_PENDING)
+    assert issue is not None
+    ir.async_ignore_issue(hass, DOMAIN, ISSUE_BATTERY_PROFILE_PENDING, True)
+    ignored_version = issue_registry.async_get_issue(
+        DOMAIN, ISSUE_BATTERY_PROFILE_PENDING
+    ).dismissed_version
+    assert ignored_version is not None
+
+    coord._battery_pending_requested_at = datetime.now(timezone.utc)  # noqa: SLF001
+    coord._sync_battery_profile_pending_issue()  # noqa: SLF001
+
+    preserved = issue_registry.async_get_issue(DOMAIN, ISSUE_BATTERY_PROFILE_PENDING)
+    assert preserved is not None
+    assert preserved.dismissed_version == ignored_version
+    assert coord._battery_profile_issue_reported is False  # noqa: SLF001
+
+    coord._battery_pending_requested_at = datetime.now(
+        timezone.utc
+    ) - timedelta(  # noqa: SLF001
+        seconds=BATTERY_PROFILE_PENDING_TIMEOUT_S + 30
+    )
+    coord._sync_battery_profile_pending_issue()  # noqa: SLF001
+    recurring = issue_registry.async_get_issue(DOMAIN, ISSUE_BATTERY_PROFILE_PENDING)
+    assert recurring is not None
+    assert recurring.dismissed_version == ignored_version
+    assert coord._battery_profile_issue_reported is True  # noqa: SLF001
+
+    coord._battery_pending_requested_at = datetime.now(timezone.utc)  # noqa: SLF001
+    coord._sync_battery_profile_pending_issue()  # noqa: SLF001
+    assert coord._battery_profile_issue_reported is False  # noqa: SLF001
+
+    coord.diagnostics = CoordinatorDiagnostics(coord)
+    ir.async_ignore_issue(hass, DOMAIN, ISSUE_BATTERY_PROFILE_PENDING, False)
+    coord._sync_battery_profile_pending_issue()  # noqa: SLF001
+
+    assert issue_registry.async_get_issue(DOMAIN, ISSUE_BATTERY_PROFILE_PENDING) is None
+    assert coord._battery_profile_issue_reported is False  # noqa: SLF001
+
+
 @pytest.mark.asyncio
 async def test_network_issue_includes_metrics(hass, monkeypatch):
     from homeassistant.helpers.update_coordinator import UpdateFailed
