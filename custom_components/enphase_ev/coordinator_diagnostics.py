@@ -96,6 +96,28 @@ class CoordinatorDiagnostics:
         for issue_id in _DEGRADED_SERVICE_REPAIR_ISSUE_IDS:
             self._delete_issue(issue_id)
 
+    @staticmethod
+    def _repair_issue_metrics(
+        issue_id: str, metrics: dict[str, object]
+    ) -> dict[str, object]:
+        """Return diagnostic context relevant to a specific repair issue."""
+
+        if issue_id == ISSUE_HEMS_AUTH_DEGRADED:
+            return metrics
+        filtered = {
+            key: value
+            for key, value in metrics.items()
+            if not key.startswith("hems_auth_")
+        }
+        if filtered.get("last_error") == "hems_auth_degraded":
+            filtered.pop("last_error")
+        degraded_services = filtered.get("degraded_services")
+        if isinstance(degraded_services, list):
+            filtered["degraded_services"] = [
+                service for service in degraded_services if service != "hems_auth"
+            ]
+        return filtered
+
     def _create_site_metrics_issue(
         self,
         issue_id: str,
@@ -105,7 +127,8 @@ class CoordinatorDiagnostics:
     ) -> None:
         coord = self.coordinator
         registry_issue_id = self._repair_issue_id(issue_id)
-        metrics, base_placeholders = self.issue_context()
+        metrics = self._repair_issue_metrics(issue_id, self.collect_site_metrics())
+        base_placeholders = self.issue_translation_placeholders(metrics)
         # Repair issues store the current diagnostic snapshot so users can share
         # actionable context without enabling debug logging first.
         issue_placeholders = dict(base_placeholders)

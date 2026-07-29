@@ -14,6 +14,9 @@ All notable changes to this project will be documented in this file.
 - Confirmed pending IQ Battery profile changes when either the configured profile
   or live hardware profile matches, preventing false long-running repair issues
   when Enlighten leaves the configured profile stale. (#799)
+- Kept optional HEMS authentication diagnostics out of unrelated repair issues,
+  preventing battery and other repairs from presenting irrelevant HEMS failures.
+  (#799)
 
 ### 🔧 Improvements
 - None
