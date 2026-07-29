@@ -280,6 +280,17 @@ def test_pending_profile_timeout_issue_lifecycle(
     ) - timedelta(  # noqa: SLF001
         seconds=BATTERY_PROFILE_PENDING_TIMEOUT_S + 30
     )
+    coord._hems_auth_failure_count = 25  # noqa: SLF001
+    coord._hems_auth_last_endpoint = "hems_consumption_lifetime"  # noqa: SLF001
+    coord._hems_auth_last_status = 200  # noqa: SLF001
+    coord._hems_auth_last_reason = "login_wall"  # noqa: SLF001
+    coord._hems_auth_backoff_until = time.monotonic() + 3600  # noqa: SLF001
+    coord._hems_auth_backoff_ends_utc = datetime.now(
+        timezone.utc
+    ) + timedelta(  # noqa: SLF001
+        hours=1
+    )
+    coord._last_error = "hems_auth_degraded"  # noqa: SLF001
 
     coord._sync_battery_profile_pending_issue()  # noqa: SLF001
 
@@ -287,7 +298,14 @@ def test_pending_profile_timeout_issue_lifecycle(
     domain, issue_id, payload = mock_issue_registry.created[-1]
     assert domain == DOMAIN
     assert issue_id == ISSUE_BATTERY_PROFILE_PENDING
-    assert payload["translation_placeholders"]["pending_timeout_minutes"] == "15"
+    placeholders = payload["translation_placeholders"]
+    assert placeholders["pending_timeout_minutes"] == "15"
+    assert not {key for key in placeholders if key.startswith("hems_")}
+    assert {"failure_count", "reason"}.isdisjoint(placeholders)
+    metrics = payload["data"]["site_metrics"]
+    assert not {key for key in metrics if key.startswith("hems_auth_")}
+    assert metrics.get("last_error") != "hems_auth_degraded"
+    assert "hems_auth" not in metrics["degraded_services"]
 
     coord._battery_pending_requested_at = datetime.now(timezone.utc)  # noqa: SLF001
     coord._sync_battery_profile_pending_issue()  # noqa: SLF001

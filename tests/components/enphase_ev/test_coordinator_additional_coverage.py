@@ -4689,6 +4689,10 @@ def test_hems_auth_circuit_is_coordinator_backed(
     first_issue = mock_issue_registry.created[-1]
     assert first_issue[1] == "hems_auth_degraded"
     assert first_issue[2]["translation_placeholders"]["failure_count"] == "1"
+    issue_metrics = first_issue[2]["data"]["site_metrics"]
+    assert issue_metrics["hems_auth_failure_count"] == 1
+    assert issue_metrics["hems_auth_last_endpoint"] == "hems_devices"
+    assert "hems_auth" in issue_metrics["degraded_services"]
 
     assert coord._note_hems_auth_failure(  # noqa: SLF001
         coord_mod.Unauthorized(),
