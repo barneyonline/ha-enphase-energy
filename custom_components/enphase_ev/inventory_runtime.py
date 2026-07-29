@@ -108,6 +108,11 @@ INVERTER_PARAMETER_ALIASES: dict[str, str] = {
 }
 INVERTER_PARAMETER_REQUEST_TIMEOUT_S = 15.0
 INVERTER_PARAMETER_BATCH_CONCURRENCY = 2
+INVERTER_PARAMETER_MIN_PAGE_SIZE = 50
+INVERTER_PARAMETER_MAX_PAGE_SIZE = 500
+INVERTER_PARAMETER_MAX_PAGES = (
+    INVERTER_PARAMETER_MAX_PAGE_SIZE // INVERTER_PARAMETER_MIN_PAGE_SIZE
+)
 
 
 @dataclass(frozen=True)
@@ -119,6 +124,16 @@ class CoordinatorTopologySnapshot:
     active_type_keys: tuple[str, ...]
     gateway_iq_router_keys: tuple[str, ...]
     inventory_ready: bool
+    inverter_telemetry_serials: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class InverterParameterFetchResult:
+    """Per-parameter readings plus the serials they can update authoritatively."""
+
+    readings: dict[str, tuple[object, object | None]]
+    authoritative_serials: frozenset[str]
+    error: Exception | None = None
 
 
 class InventoryRuntime:
@@ -681,6 +696,7 @@ class InventoryRuntime:
             "battery_count": len(snapshot.battery_serials),
             "ac_battery_count": len(snapshot.ac_battery_serials),
             "inverter_count": len(snapshot.inverter_serials),
+            "inverter_telemetry_count": len(snapshot.inverter_telemetry_serials),
             "active_type_keys": list(snapshot.active_type_keys),
             "gateway_iq_router_count": len(snapshot.gateway_iq_router_keys),
             "site_energy_channels": sorted(
@@ -801,18 +817,24 @@ class InventoryRuntime:
             for key in (self._router_record_key(record) for record in router_records)
             if key
         )
+        inverter_serials = tuple(self.iter_inverter_serials())
         return CoordinatorTopologySnapshot(
             charger_serials=tuple(self.iter_serials()),
             battery_serials=tuple(self.iter_battery_serials()),
             ac_battery_serials=tuple(
                 getattr(self.coordinator, "iter_ac_battery_serials", lambda: [])()
             ),
-            inverter_serials=tuple(self.iter_inverter_serials()),
+            inverter_serials=inverter_serials,
             active_type_keys=tuple(self.iter_type_keys()),
             gateway_iq_router_keys=router_keys,
             inventory_ready=bool(
                 getattr(self, "_devices_inventory_ready", False)
                 or getattr(self, "_hems_inventory_ready", False)
+            ),
+            inverter_telemetry_serials=tuple(
+                serial
+                for serial in inverter_serials
+                if bool((self.inverter_data(serial) or {}).get("telemetry"))
             ),
         )
 
@@ -3023,6 +3045,151 @@ class InventoryRuntime:
         )
 
     @staticmethod
+    def _inverter_parameter_has_more_pages(
+        payload: dict[str, object], current_page: int
+    ) -> bool | None:
+        """Return explicit paging state, or ``None`` when the payload omits it."""
+
+        metadata_records: list[Mapping[str, object]] = []
+        for key in ("pagination", "paging", "meta"):
+            metadata = payload.get(key)
+            if isinstance(metadata, dict):
+                metadata_records.append(metadata)
+        metadata_records.append(payload)
+
+        def _positive_int(value: object) -> int | None:
+            if isinstance(value, int) and not isinstance(value, bool):
+                return value if value > 0 else None
+            if isinstance(value, str) and value.strip().isdigit():
+                parsed = int(value.strip())
+                return parsed if parsed > 0 else None
+            return None
+
+        def _first_positive_int(
+            metadata: Mapping[str, object], keys: tuple[str, ...]
+        ) -> int | None:
+            for key in keys:
+                parsed = _positive_int(metadata.get(key))
+                if parsed is not None:
+                    return parsed
+            return None
+
+        for metadata in metadata_records:
+            for key in ("has_next", "has_next_page", "hasNext", "hasNextPage"):
+                has_next = metadata.get(key)
+                if isinstance(has_next, bool):
+                    return has_next
+            for key in ("next_page", "nextPage"):
+                if key not in metadata:
+                    continue
+                next_page = metadata.get(key)
+                if next_page in (None, False, ""):
+                    return False
+                parsed_next_page = _positive_int(next_page)
+                if parsed_next_page is not None:
+                    return parsed_next_page > current_page
+            for key in (
+                "total_pages",
+                "totalPages",
+                "last_page",
+                "lastPage",
+                "page_count",
+                "pageCount",
+            ):
+                total_pages = _positive_int(metadata.get(key))
+                if total_pages is not None:
+                    return current_page < total_pages
+            total = _first_positive_int(
+                metadata,
+                (
+                    "total",
+                    "total_count",
+                    "totalCount",
+                    "total_records",
+                    "totalRecords",
+                ),
+            )
+            per_page = _first_positive_int(
+                metadata,
+                ("per_page", "perPage", "page_size", "pageSize"),
+            )
+            response_page = _first_positive_int(
+                metadata,
+                ("page", "current_page", "currentPage"),
+            )
+            if total is not None and per_page is not None:
+                page = response_page or current_page
+                return page * per_page < total
+        return None
+
+    async def _async_fetch_complete_inverter_parameter(
+        self,
+        fetcher: Callable[..., Awaitable[object]],
+        serials: list[str],
+        parameter_id: str,
+        *,
+        per_page: int,
+    ) -> InverterParameterFetchResult:
+        """Fetch pages without discarding readings resolved before a failure."""
+
+        requested_serials = set(serials)
+        readings: dict[str, tuple[object, object | None]] = {}
+        deadline = time.monotonic() + INVERTER_PARAMETER_REQUEST_TIMEOUT_S
+        for page in range(1, INVERTER_PARAMETER_MAX_PAGES + 1):
+            try:
+                async with asyncio.timeout(max(0.0, deadline - time.monotonic())):
+                    payload = await fetcher(
+                        serials,
+                        parameter_id,
+                        per_page=per_page,
+                        page=page,
+                    )
+            except Exception as err:  # noqa: BLE001 - retain completed serials
+                if not readings:
+                    raise
+                return InverterParameterFetchResult(
+                    readings,
+                    frozenset(readings),
+                    err,
+                )
+            if not self._inverter_parameter_payload_is_valid(payload):
+                return InverterParameterFetchResult(
+                    readings,
+                    frozenset(readings),
+                    ValueError(
+                        f"Dashboard parameter response was invalid for {parameter_id}"
+                    ),
+                )
+            assert isinstance(payload, dict)
+            raw_rows = payload.get("intervals")
+            if not isinstance(raw_rows, list):
+                raw_rows = payload.get("data")
+            assert isinstance(raw_rows, list)
+            for serial, reading in self._inverter_parameter_rows(
+                payload, parameter_id
+            ).items():
+                if serial in requested_serials:
+                    # Pages are newest-first, so retain the first reading seen.
+                    readings.setdefault(serial, reading)
+            has_more_pages = self._inverter_parameter_has_more_pages(payload, page)
+            if (
+                requested_serials.issubset(readings)
+                or has_more_pages is False
+                or (has_more_pages is None and not raw_rows)
+            ):
+                return InverterParameterFetchResult(
+                    readings,
+                    frozenset(requested_serials),
+                )
+        return InverterParameterFetchResult(
+            readings,
+            frozenset(readings),
+            ValueError(
+                f"Dashboard parameter pagination limit reached for {parameter_id}"
+            ),
+        )
+
+    @staticmethod
     def _inverter_parameter_snapshot_has_values(snapshot: object) -> bool:
         """Return whether a telemetry snapshot contains at least one reading."""
 
@@ -3035,10 +3202,14 @@ class InventoryRuntime:
         cls,
         telemetry_by_serial: dict[str, dict[str, object]],
         canonical: str,
+        *,
+        serials: frozenset[str] | None = None,
     ) -> None:
         """Remove one canonical reading and its metadata from every inverter."""
 
         for serial, snapshot in list(telemetry_by_serial.items()):
+            if serials is not None and serial not in serials:
+                continue
             snapshot.pop(canonical, None)
             for metadata_key in ("parameter_ids", "sampled_at"):
                 metadata = snapshot.get(metadata_key)
@@ -3073,40 +3244,61 @@ class InventoryRuntime:
         telemetry_family = "inverter_parameter_telemetry"
         telemetry_health = coord._endpoint_family_state(telemetry_family)
         freshness_raw = getattr(self, "_inverter_parameter_success_mono", None)
-        freshness_items = (
-            freshness_raw.items() if isinstance(freshness_raw, dict) else ()
-        )
-        freshness_by_parameter = {
-            str(key): float(value)
-            for key, value in freshness_items
-            if isinstance(key, str) and isinstance(value, (int, float))
-        }
+        freshness_by_serial: dict[str, dict[str, float]] = {}
+        if isinstance(freshness_raw, dict):
+            for key, value in freshness_raw.items():
+                if isinstance(key, str) and isinstance(value, dict):
+                    parsed_freshness = {
+                        str(canonical): float(timestamp)
+                        for canonical, timestamp in value.items()
+                        if isinstance(canonical, str)
+                        and isinstance(timestamp, (int, float))
+                    }
+                    if key in cached_by_serial and parsed_freshness:
+                        freshness_by_serial[key] = parsed_freshness
+                    continue
+                # Accept the pre-4.1.1 parameter-wide shape during a live reload.
+                if isinstance(key, str) and isinstance(value, (int, float)):
+                    for serial, snapshot in cached_by_serial.items():
+                        if key in snapshot:
+                            freshness_by_serial.setdefault(serial, {})[key] = float(
+                                value
+                            )
         policy = coord._endpoint_family_policy(telemetry_family)
         stale_after_s = policy.stale_after_s if policy is not None else None
         now_mono = time.monotonic()
-        cached_canonicals = {
-            key
-            for snapshot in cached_by_serial.values()
-            for key in snapshot
-            if key not in {"parameter_ids", "sampled_at"}
+        cached_pairs = {
+            (serial, canonical)
+            for serial, snapshot in cached_by_serial.items()
+            for canonical in snapshot
+            if canonical not in {"parameter_ids", "sampled_at"}
         }
-        stale_canonicals: set[str] = set()
+        stale_pairs: set[tuple[str, str]] = set()
         if isinstance(stale_after_s, (int, float)) and stale_after_s > 0:
-            for canonical in cached_canonicals:
-                last_success = freshness_by_parameter.get(
+            for serial, canonical in cached_pairs:
+                last_success = freshness_by_serial.get(serial, {}).get(
                     canonical,
                     telemetry_health.last_success_mono,
                 )
                 if last_success is not None and now_mono - last_success > float(
                     stale_after_s
                 ):
-                    stale_canonicals.add(canonical)
-                    self._remove_inverter_parameter(cached_by_serial, canonical)
-                    freshness_by_parameter.pop(canonical, None)
-        if stale_canonicals:
+                    stale_pairs.add((serial, canonical))
+            for serial, canonical in stale_pairs:
+                self._remove_inverter_parameter(
+                    cached_by_serial,
+                    canonical,
+                    serials=frozenset({serial}),
+                )
+                freshness_for_serial = freshness_by_serial.get(serial)
+                if freshness_for_serial is not None:
+                    freshness_for_serial.pop(canonical, None)
+                    if not freshness_for_serial:
+                        freshness_by_serial.pop(serial, None)
+        if stale_pairs:
             self._update_shared_state(
                 _inverter_parameter_telemetry=cached_by_serial,
-                _inverter_parameter_success_mono=freshness_by_parameter,
+                _inverter_parameter_success_mono=freshness_by_serial,
             )
             if isinstance(telemetry_health.degraded, bool):
                 telemetry_health.degraded = True
@@ -3204,78 +3396,97 @@ class InventoryRuntime:
             return cached_by_serial
 
         typed_parameter_fetcher = cast(
-            Callable[[list[str], str], Awaitable[object]], parameter_fetcher
+            Callable[..., Awaitable[object]], parameter_fetcher
+        )
+        # Keep each response small enough for high-rate power queries, but follow
+        # explicit paging metadata (or an empty metadata-free page) until every
+        # requested inverter is resolved. This avoids treating a truncated first
+        # page as an authoritative parameter snapshot.
+        parameter_page_size = min(
+            INVERTER_PARAMETER_MAX_PAGE_SIZE,
+            max(INVERTER_PARAMETER_MIN_PAGE_SIZE, len(serials) * 2),
         )
         results = await self._async_run_bounded_optional_batch(
             [
-                partial(typed_parameter_fetcher, serials, parameter_id)
+                partial(
+                    self._async_fetch_complete_inverter_parameter,
+                    typed_parameter_fetcher,
+                    serials,
+                    parameter_id,
+                    per_page=parameter_page_size,
+                )
                 for parameter_id in parameter_ids
-            ]
+            ],
+            timeout_s=None,
         )
-        valid_payload_count = 0
+        successful_parameter_count = 0
+        updated_parameter_count = 0
         first_error: Exception | None = None
         telemetry_by_serial = {
             serial: value
             for serial, value in cached_by_serial.items()
             if serial in serials
         }
-        cached_canonicals = {
-            key
-            for snapshot in telemetry_by_serial.values()
-            for key in snapshot
-            if key not in {"parameter_ids", "sampled_at"}
-        }
-        failed_canonicals: set[str] = set()
+        retained_cached_pairs = set(cached_pairs - stale_pairs)
+        failed_pairs: set[tuple[str, str]] = set()
         for parameter_id, result in zip(parameter_ids, results, strict=True):
             canonical = INVERTER_PARAMETER_ALIASES[parameter_id.lower()]
             if isinstance(result, Exception):
                 first_error = first_error or result
-                failed_canonicals.add(canonical)
+                failed_pairs.update((serial, canonical) for serial in serials)
                 continue
-            if not self._inverter_parameter_payload_is_valid(result):
-                first_error = first_error or ValueError(
-                    f"Dashboard parameter response was invalid for {parameter_id}"
+            assert isinstance(result, InverterParameterFetchResult)
+            if result.error is None:
+                successful_parameter_count += 1
+            else:
+                first_error = first_error or result.error
+                failed_pairs.update(
+                    (serial, canonical)
+                    for serial in set(serials) - result.authoritative_serials
                 )
-                failed_canonicals.add(canonical)
-                continue
-            assert isinstance(result, dict)
-            valid_payload_count += 1
-            freshness_by_parameter[canonical] = now_mono
-            self._remove_inverter_parameter(telemetry_by_serial, canonical)
-            for serial, (value, sampled_at) in self._inverter_parameter_rows(
-                result, parameter_id
-            ).items():
-                if serial not in serials:
-                    continue
+            if result.authoritative_serials:
+                updated_parameter_count += 1
+            for serial in result.authoritative_serials:
+                retained_cached_pairs.discard((serial, canonical))
+                freshness_for_serial = freshness_by_serial.get(serial)
+                if freshness_for_serial is not None:
+                    freshness_for_serial.pop(canonical, None)
+                    if not freshness_for_serial:
+                        freshness_by_serial.pop(serial, None)
+            self._remove_inverter_parameter(
+                telemetry_by_serial,
+                canonical,
+                serials=result.authoritative_serials,
+            )
+            for serial, (value, sampled_at) in result.readings.items():
                 snapshot = telemetry_by_serial.setdefault(serial, {})
                 snapshot[canonical] = value
                 snapshot.setdefault("parameter_ids", {})[canonical] = parameter_id
+                freshness_by_serial.setdefault(serial, {})[canonical] = now_mono
                 if sampled_at is not None:
                     snapshot.setdefault("sampled_at", {})[canonical] = sampled_at
-        if valid_payload_count:
+        if updated_parameter_count:
             self._update_shared_state(
                 _inverter_parameter_telemetry=telemetry_by_serial,
-                _inverter_parameter_success_mono=freshness_by_parameter,
+                _inverter_parameter_success_mono=freshness_by_serial,
             )
         useful_telemetry = any(
             self._inverter_parameter_snapshot_has_values(snapshot)
             for snapshot in telemetry_by_serial.values()
         )
-        current_canonicals = {
-            key
-            for snapshot in telemetry_by_serial.values()
-            for key in snapshot
-            if key not in {"parameter_ids", "sampled_at"}
+        current_pairs = {
+            (serial, canonical)
+            for serial, snapshot in telemetry_by_serial.items()
+            for canonical in snapshot
+            if canonical not in {"parameter_ids", "sampled_at"}
         }
-        using_cached_data = bool(
-            failed_canonicals & cached_canonicals & current_canonicals
-        )
-        failed_cache_stale = bool(failed_canonicals & stale_canonicals)
-        if valid_payload_count == len(parameter_ids):
+        using_cached_data = bool(retained_cached_pairs & current_pairs & failed_pairs)
+        failed_cache_stale = bool(failed_pairs & stale_pairs)
+        if successful_parameter_count == len(parameter_ids):
             coord._note_endpoint_family_success(telemetry_family)
             telemetry_health.degraded = False
             telemetry_health.partial_success = False
-            telemetry_health.successful_items = valid_payload_count
+            telemetry_health.successful_items = successful_parameter_count
             telemetry_health.total_items = len(parameter_ids)
             telemetry_health.using_cached_data = False
             telemetry_health.cache_stale = False
@@ -3289,7 +3500,7 @@ class InventoryRuntime:
             identifiers=serials,
             max_length=160,
         )
-        if valid_payload_count:
+        if updated_parameter_count:
             coord._note_endpoint_family_success(telemetry_family)
             telemetry_health.last_error = safe_batch_error
             telemetry_health.degraded = bool(failed_cache_stale or not useful_telemetry)
@@ -3308,17 +3519,17 @@ class InventoryRuntime:
                 or telemetry_health.consecutive_failures >= failure_threshold
             )
             telemetry_health.partial_success = False
-        telemetry_health.successful_items = valid_payload_count
+        telemetry_health.successful_items = successful_parameter_count
         telemetry_health.total_items = len(parameter_ids)
         telemetry_health.using_cached_data = using_cached_data
         telemetry_health.cache_stale = failed_cache_stale
-        return telemetry_by_serial if valid_payload_count else cached_by_serial
+        return telemetry_by_serial if updated_parameter_count else cached_by_serial
 
     @staticmethod
     async def _async_run_bounded_optional_batch(
         factories: list[Callable[[], Awaitable[object]]],
         *,
-        timeout_s: float = INVERTER_PARAMETER_REQUEST_TIMEOUT_S,
+        timeout_s: float | None = INVERTER_PARAMETER_REQUEST_TIMEOUT_S,
         concurrency: int = INVERTER_PARAMETER_BATCH_CONCURRENCY,
     ) -> list[object]:
         """Run optional requests with bounded concurrency and per-request timeout."""
@@ -3328,6 +3539,8 @@ class InventoryRuntime:
         async def _run(factory: Callable[[], Awaitable[object]]) -> object:
             try:
                 async with semaphore:
+                    if timeout_s is None:
+                        return await factory()
                     async with asyncio.timeout(max(0.0, timeout_s)):
                         return await factory()
             except Exception as err:  # noqa: BLE001 - preserve partial optional data
@@ -3368,6 +3581,7 @@ class InventoryRuntime:
             )
             self._merge_microinverter_type_bucket()
             self._merge_heatpump_type_bucket()
+            self._refresh_cached_topology()
             return
 
         fetch_inventory = getattr(self.client, "inverters_inventory", None)
@@ -3815,6 +4029,7 @@ class InventoryRuntime:
         )
         self._merge_microinverter_type_bucket()
         self._merge_heatpump_type_bucket()
+        self._refresh_cached_topology()
 
     def inverters_refresh_due(self, *, force: bool = False) -> bool:
         coord = self.coordinator

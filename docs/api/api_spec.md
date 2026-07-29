@@ -2013,24 +2013,29 @@ Returns `columns[]` metadata including `name`, `header`, `attribute_name`, visib
 
 ### 2.9.4.b.3 Bulk Device Parameter Readings
 ```
-GET /service/system_dashboard/api_internal/cs/sites/<site_id>/data/parameter-view?serial_numbers=<csv>&per_page=500&page=1&range=today&parameter_id=<id>&start_date=&end_date=&sort_by_date=desc
+GET /service/system_dashboard/api_internal/cs/sites/<site_id>/data/parameter-view?serial_numbers=<csv>&per_page=<n>&page=<page>&range=today&parameter_id=<id>&start_date=&end_date=&sort_by_date=desc
 ```
 Returns paginated device readings for one parameter. The response includes
 `intervals[]`, per-device `columns[]`, paging fields, and range metadata. The
 integration passes every active microinverter serial in one CSV request per
 supported parameter, uses the site master-data catalog to avoid unsupported
 probes, and runs up to two parameter requests concurrently with an independent
-15-second timeout per request. Supported values are normalized to power, AC/DC
+15-second timeout per parameter. It requests at least 50 rows per page and follows
+up to 10 pages until every requested inverter has a reading, explicit paging
+metadata reports the final page, or an empty metadata-free page proves exhaustion.
+When the safety limit or a later-page failure leaves some devices unresolved,
+fresh readings already collected are published while only unresolved devices keep
+their bounded cached values. Supported values are normalized to power, AC/DC
 voltage/current, AC frequency, temperature, signal strength, and firmware when
 advertised and present.
 
-Successful parameters retain independent freshness timestamps. Partial batches
-remain healthy while they publish useful telemetry and any reused parameter values
-are younger than 30 minutes. A batch is degraded when it has no usable current or
-cached result, when a reused parameter becomes stale, or after three consecutive
-full-batch failures. Sanitized failure reasons and UTC retry times remain visible
-through the Service Status diagnostic attributes even while a fresh-cache retry is
-classified as healthy.
+Each device/parameter reading retains an independent freshness timestamp. Partial
+batches remain healthy while they publish useful telemetry and any reused device
+values are younger than 30 minutes. A batch is degraded when it has no usable
+current or cached result, when a reused reading becomes stale, or after three
+consecutive full-batch failures. Sanitized failure reasons and UTC retry times
+remain visible through the Service Status diagnostic attributes even while a
+fresh-cache retry is classified as healthy.
 
 ### 2.9.4.c System Dashboard Devices Table
 ```

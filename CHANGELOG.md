@@ -19,6 +19,28 @@ All notable changes to this project will be documented in this file.
 ### 🔄 Other changes
 - None
 
+## v4.1.1 - 2026-07-29
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Refreshed per-battery charge, status, health, and cycle-count entities after
+  delayed battery warmup instead of retaining a cached unavailable snapshot.
+- Published delayed per-microinverter telemetry capability changes and reduced
+  paginated dashboard response sizes so power entities load and update reliably
+  without accepting a truncated first page as complete telemetry or discarding
+  completed device readings when another inverter is unresolved.
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Bumped the integration manifest version to `4.1.1`.
+
 ## v4.1.0 - 2026-07-29
 
 ### 🚧 Breaking changes

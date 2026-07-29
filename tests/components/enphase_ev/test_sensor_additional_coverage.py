@@ -321,6 +321,90 @@ def test_per_update_device_snapshots_are_reused(coordinator_factory) -> None:
     assert inverter.native_value == 1
 
 
+def test_battery_snapshot_cache_retains_source_identity(
+    coordinator_factory, monkeypatch
+) -> None:
+    """A replaced warmup map must not alias a cached missing snapshot."""
+
+    from custom_components.enphase_ev import sensor_battery
+    from custom_components.enphase_ev.sensor import EnphaseBatteryStorageChargeSensor
+
+    coord = coordinator_factory(serials=[RANDOM_SERIAL])
+    coord._battery_storage_data = {}  # noqa: SLF001
+    entity = EnphaseBatteryStorageChargeSensor(coord, "BAT-1")
+
+    # Reproduce the old integer-ID cache collision deterministically. The fixed
+    # model compares retained source objects by identity and does not call id().
+    monkeypatch.setattr(sensor_battery, "id", lambda _value: 1, raising=False)
+    assert entity.native_value is None
+
+    coord._battery_storage_data = {  # noqa: SLF001
+        "BAT-1": {"serial_number": "BAT-1", "current_charge_pct": 42}
+    }
+    coord.data = dict(coord.data)
+
+    assert entity.available is True
+    assert entity.native_value == 42
+
+
+@pytest.mark.asyncio
+async def test_inverter_power_entity_is_added_after_delayed_telemetry(
+    hass, config_entry, coordinator_factory
+) -> None:
+    """A warmup telemetry capability change must load its registered entity."""
+
+    from custom_components.enphase_ev.sensor import (
+        EnphaseInverterTelemetrySensor,
+        async_setup_entry,
+    )
+
+    coord = coordinator_factory(serials=[RANDOM_SERIAL])
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    coord._inverters_inventory_payload = {}  # noqa: SLF001
+    coord.inventory_runtime._set_shared_state_attr(  # noqa: SLF001
+        "_inverter_data",
+        {"INV-A": {"serial_number": "INV-A", "telemetry": {}}},
+    )
+    coord.inventory_runtime._set_shared_state_attr(  # noqa: SLF001
+        "_inverter_order", ["INV-A"]
+    )
+    coord.inventory_runtime._set_type_device_buckets(  # noqa: SLF001
+        {
+            "microinverter": {
+                "type_key": "microinverter",
+                "type_label": "Microinverters",
+                "count": 1,
+                "devices": [{"serial_number": "INV-A"}],
+            }
+        },
+        ["microinverter"],
+    )
+    coord.inventory_runtime._refresh_cached_topology()  # noqa: SLF001
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    added: list[Any] = []
+
+    await async_setup_entry(
+        hass,
+        config_entry,
+        lambda entities, update_before_add=False: added.extend(entities),
+    )
+
+    assert not any(
+        isinstance(entity, EnphaseInverterTelemetrySensor) for entity in added
+    )
+
+    coord.inventory_runtime._set_shared_state_attr(  # noqa: SLF001
+        "_inverter_data",
+        {"INV-A": {"serial_number": "INV-A", "telemetry": {"power": 234.5}}},
+    )
+    coord.inventory_runtime._refresh_cached_topology()  # noqa: SLF001
+
+    power_entity = next(
+        entity for entity in added if isinstance(entity, EnphaseInverterTelemetrySensor)
+    )
+    assert power_entity.native_value == 234.5
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("support_state", ["unknown", "activation_unavailable"])
 async def test_async_setup_preserves_grid_profile_registry_during_startup_probe(

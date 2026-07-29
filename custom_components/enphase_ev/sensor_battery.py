@@ -79,7 +79,7 @@ class BatterySensorModel:
     coordinator: EnphaseCoordinator
     serial: str
     ac_battery: bool = False
-    _cache_token: tuple[int, int] | None = field(default=None, init=False)
+    _cache_sources: tuple[object, object] | None = field(default=None, init=False)
     _cache: BatteryStorageSnapshot | None = field(default=None, init=False)
 
     def snapshot(self) -> BatteryStorageSnapshot | None:
@@ -92,8 +92,12 @@ class BatterySensorModel:
             None,
         )
         cacheable = coordinator_data is not None or family_data is not None
-        token = (id(coordinator_data), id(family_data))
-        if cacheable and token == self._cache_token:
+        if (
+            cacheable
+            and self._cache_sources is not None
+            and coordinator_data is self._cache_sources[0]
+            and family_data is self._cache_sources[1]
+        ):
             return self._cache
 
         if self.ac_battery:
@@ -105,7 +109,10 @@ class BatterySensorModel:
             cast(BatteryStorageSnapshot, payload) if isinstance(payload, dict) else None
         )
         if cacheable:
-            self._cache_token = token
+            # Retain the source objects themselves. Caching only their integer IDs
+            # lets CPython reuse both IDs when empty startup maps are replaced,
+            # which can preserve a cached missing snapshot after warmup completes.
+            self._cache_sources = (coordinator_data, family_data)
             self._cache = snapshot
         return snapshot
 
