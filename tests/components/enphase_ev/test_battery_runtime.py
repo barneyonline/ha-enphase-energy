@@ -86,12 +86,15 @@ def test_battery_runtime_optimistic_profile_guard_branches(
     assert runtime._profile_authoritative_read_is_fresh() is False  # noqa: SLF001
 
     coord._battery_pending_authoritative_confirmation_required = True  # noqa: SLF001
+    coord._battery_pending_profile = "backup_only"  # noqa: SLF001
+    coord._battery_profile = "backup_only"  # noqa: SLF001
     coord._battery_pending_requested_mono = BadSeen()  # noqa: SLF001
     coord._battery_profile_authoritative_seen_mono = time.monotonic()  # noqa: SLF001
     assert (  # noqa: SLF001
         runtime._pending_authoritative_confirmation_received() is False
     )
     coord._battery_pending_authoritative_confirmation_required = False  # noqa: SLF001
+    coord._battery_pending_profile = None  # noqa: SLF001
 
     runtime.set_battery_optimistic_profile("backup_only", 100, None)
     runtime._note_authoritative_profile_read("backup_only")  # noqa: SLF001
@@ -605,6 +608,64 @@ def test_backend_pending_false_clears_when_effective_state_matches(
 
     assert coord.battery_profile_pending is False
     assert coord._battery_backend_profile_update_pending is None  # noqa: SLF001
+
+
+def test_fresh_live_profile_sample_clears_pending_with_stale_configured_profile(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    runtime = BatteryRuntime(coord)
+    coord._battery_profile = "self-consumption"  # noqa: SLF001
+    runtime.set_battery_pending(
+        profile="backup_only",
+        reserve=100,
+        sub_type=None,
+        require_exact_settings=False,
+    )
+
+    runtime.parse_battery_status_payload(
+        {
+            "storages": [
+                {
+                    "id": "123",
+                    "battery_mode": "Full Backup",
+                    "current_charge": "75%",
+                }
+            ]
+        }
+    )
+
+    assert coord.battery_profile_pending is False
+    assert coord.battery_profile == "backup_only"
+    assert coord._battery_backend_profile_update_pending is None  # noqa: SLF001
+
+
+def test_stale_live_profile_sample_does_not_confirm_pending(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    runtime = BatteryRuntime(coord)
+    coord._battery_profile = "self-consumption"  # noqa: SLF001
+    runtime.set_battery_pending(
+        profile="backup_only",
+        reserve=100,
+        sub_type=None,
+        require_exact_settings=False,
+    )
+    requested_at = coord._battery_pending_requested_at  # noqa: SLF001
+    assert requested_at is not None
+    coord._battery_live_profile = "backup_only"  # noqa: SLF001
+    coord._battery_live_profile_sample_utc = requested_at - timedelta(  # noqa: SLF001
+        seconds=1
+    )
+    coord._battery_profile_authoritative_seen_mono = (  # noqa: SLF001
+        coord._battery_pending_requested_mono + 1
+    )
+
+    runtime.sync_backend_battery_profile_pending(False)
+
+    assert coord.battery_profile_pending is True
+    assert coord._battery_backend_profile_update_pending is False  # noqa: SLF001
 
 
 def test_backend_pending_false_keeps_pending_when_age_unavailable(

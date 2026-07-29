@@ -1450,6 +1450,7 @@ def test_battery_status_payload_tracks_live_profile_without_clearing_pending(
     coord._battery_pending_profile = "backup_only"  # noqa: SLF001
     coord._battery_pending_reserve = 100  # noqa: SLF001
     coord._battery_pending_require_exact_settings = False  # noqa: SLF001
+    coord._battery_pending_authoritative_confirmation_required = True  # noqa: SLF001
 
     coord.battery_runtime.parse_battery_status_payload(
         {
@@ -1511,7 +1512,7 @@ def test_battery_status_payload_clears_pending_when_no_profile_endpoint_value(
     assert coord.battery_effective_profile == "backup_only"
 
 
-def test_configured_profile_confirms_pending_with_stale_live_profile(
+def test_either_configured_or_live_profile_confirms_pending(
     coordinator_factory,
 ) -> None:
     coord = coordinator_factory()
@@ -1526,7 +1527,7 @@ def test_configured_profile_confirms_pending_with_stale_live_profile(
 
     coord._battery_profile = "backup_only"  # noqa: SLF001
     coord._battery_live_profile = "self-consumption"  # noqa: SLF001
-    assert coord._effective_profile_matches_pending() is False  # noqa: SLF001
+    assert coord._effective_profile_matches_pending() is True  # noqa: SLF001
 
 
 def test_configured_profile_wins_over_stale_live_profile(

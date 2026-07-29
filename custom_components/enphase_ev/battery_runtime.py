@@ -528,6 +528,21 @@ class BatteryRuntime:
         if not self._pending_requires_authoritative_confirmation():
             return True
         state = self.battery_state
+        pending_profile = getattr(state, "_battery_pending_profile", None)
+        pending_requested_at = getattr(state, "_battery_pending_requested_at", None)
+        live_sample_utc = getattr(state, "_battery_live_profile_sample_utc", None)
+        if (
+            pending_profile
+            and getattr(state, "_battery_live_profile", None) == pending_profile
+            and isinstance(pending_requested_at, datetime)
+            and isinstance(live_sample_utc, datetime)
+            and pending_requested_at.tzinfo is not None
+            and live_sample_utc.tzinfo is not None
+            and live_sample_utc >= pending_requested_at
+        ):
+            return True
+        if getattr(state, "_battery_profile", None) != pending_profile:
+            return False
         pending_requested_mono = getattr(state, "_battery_pending_requested_mono", None)
         authoritative_seen_mono = getattr(
             state, "_battery_profile_authoritative_seen_mono", None
@@ -898,10 +913,9 @@ class BatteryRuntime:
         pending_profile = getattr(state, "_battery_pending_profile", None)
         if not pending_profile:
             return False
-        effective_profile = getattr(state, "_battery_profile", None)
-        if effective_profile is None:
-            effective_profile = getattr(state, "_battery_live_profile", None)
-        if effective_profile != pending_profile:
+        configured_profile = getattr(state, "_battery_profile", None)
+        live_profile = getattr(state, "_battery_live_profile", None)
+        if pending_profile not in (configured_profile, live_profile):
             return False
         if not getattr(state, "_battery_pending_require_exact_settings", True):
             return True
