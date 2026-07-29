@@ -8,22 +8,41 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
-- Add capability-gated PowerMatch cloud control for supported IQ Battery sites
+- None
 
 ### 🐛 Bug fixes
-- Confirmed pending IQ Battery profile changes when either the configured profile
-  or live hardware profile matches, preventing false long-running repair issues
-  when Enlighten leaves the configured profile stale. (#799)
-- Kept optional HEMS authentication diagnostics out of unrelated repair issues,
-  preventing battery and other repairs from presenting irrelevant HEMS failures.
-  (#799)
-- Preserved ignored repair state when transient issues clear and recur. (#799)
+- None
 
 ### 🔧 Improvements
 - None
 
 ### 🔄 Other changes
 - None
+
+## v4.1.0 - 2026-07-29
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- Added capability-gated PowerMatch cloud control for supported IQ Battery sites.
+  (#797)
+
+### 🐛 Bug fixes
+- Confirmed pending IQ Battery profile changes when either the configured profile
+  or live hardware profile matches, preventing false long-running repair issues
+  when Enlighten leaves the configured profile stale. (#800)
+- Kept optional HEMS authentication diagnostics out of unrelated repair issues,
+  preventing battery and other repairs from presenting irrelevant HEMS failures.
+  (#801)
+- Preserved ignored repair state when transient issues clear and recur. (#802)
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Bumped `actions/setup-python` from `6` to `7` in GitHub Actions. (#798)
+- Bumped the integration manifest version to `4.1.0`.
 
 ## v4.0.2 - 2026-07-26
 
