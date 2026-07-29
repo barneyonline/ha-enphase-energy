@@ -231,7 +231,9 @@ class InventoryState:
     _inverter_parameter_ids: list[str] = field(default_factory=list)
     _inverter_parameter_columns: list[str] = field(default_factory=list)
     _inverter_parameter_telemetry: PayloadMapByKey = field(default_factory=dict)
-    _inverter_parameter_success_mono: dict[str, float] = field(default_factory=dict)
+    _inverter_parameter_success_mono: dict[str, dict[str, float]] = field(
+        default_factory=dict
+    )
 
 
 @dataclass(slots=True)

@@ -83,6 +83,7 @@ def test_inventory_runtime_helper_paths(coordinator_factory) -> None:
         "battery_count": 0,
         "ac_battery_count": 0,
         "inverter_count": 0,
+        "inverter_telemetry_count": 0,
         "active_type_keys": [],
         "gateway_iq_router_count": 0,
         "site_energy_channels": [],
@@ -1376,7 +1377,9 @@ async def test_inventory_runtime_bulk_parameter_telemetry(coordinator_factory) -
         return_value={"columns": [{"attribute_name": "reading_1"}]}
     )
 
-    async def _parameter_view(_serials, parameter_id):
+    async def _parameter_view(_serials, parameter_id, *, per_page, page):
+        assert per_page == 50
+        assert page == 1
         if parameter_id == "power":
             return {
                 "intervals": [{"timestamp": "2026-07-11T01:00:00Z", "reading_1": 212}],
@@ -1420,7 +1423,14 @@ async def test_inventory_runtime_bulk_parameter_telemetry(coordinator_factory) -
         "temperature": 41.5,
     }
     assert coord._inverter_parameter_columns == ["reading_1"]  # noqa: SLF001
+    assert coord.inventory_runtime.topology_snapshot().inverter_telemetry_serials == (
+        "INV-A",
+    )
     assert coord.client.system_dashboard_parameter_view.await_count == 3
+    assert all(
+        call.kwargs["per_page"] == 50
+        for call in coord.client.system_dashboard_parameter_view.await_args_list
+    )
 
     for family in (
         "inverter_dashboard_inventory",
@@ -1433,6 +1443,140 @@ async def test_inventory_runtime_bulk_parameter_telemetry(coordinator_factory) -
 
     await runtime._async_refresh_inverters()  # noqa: SLF001
     assert coord.client.system_dashboard_parameter_view.await_count == 3
+
+
+@pytest.mark.asyncio
+async def test_inventory_runtime_parameter_telemetry_follows_pagination(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.inventory_runtime
+    runtime._set_shared_state_attr("_inverter_parameter_ids", ["power"])  # noqa: SLF001
+    monkeypatch.setattr(
+        coord,
+        "_endpoint_family_should_run",
+        lambda family, **_kwargs: family == "inverter_parameter_telemetry",
+    )
+
+    async def _parameter_view(_serials, _parameter_id, *, per_page, page):
+        assert per_page == 50
+        if page == 1:
+            return {
+                "intervals": [{"serial_number": "INV-A", "value": 250}],
+                "pagination": {"page": 1, "total_pages": 2},
+            }
+        assert page == 2
+        return {
+            "data": [{"serial_number": "INV-B", "value": 175}],
+            "pagination": {"page": 2, "total_pages": 2},
+        }
+
+    coord.client.system_dashboard_parameter_view = AsyncMock(
+        side_effect=_parameter_view
+    )
+
+    result = await runtime._async_refresh_inverter_parameter_telemetry(  # noqa: SLF001
+        ["INV-A", "INV-B"]
+    )
+
+    assert result == {
+        "INV-A": {"power": 250.0, "parameter_ids": {"power": "power"}},
+        "INV-B": {"power": 175.0, "parameter_ids": {"power": "power"}},
+    }
+    assert [
+        call.kwargs["page"]
+        for call in coord.client.system_dashboard_parameter_view.await_args_list
+    ] == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_inventory_runtime_parameter_pagination_limit_is_not_authoritative(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.inventory_runtime
+    current_time = [1_000.0]
+    monkeypatch.setattr(
+        inventory_runtime_mod,
+        "time",
+        SimpleNamespace(monotonic=lambda: current_time[0]),
+    )
+    runtime._update_shared_state(  # noqa: SLF001
+        _inverter_parameter_ids=["power"],
+        _inverter_parameter_telemetry={
+            "INV-A": {
+                "power": 100.0,
+                "parameter_ids": {"power": "power"},
+            },
+            "INV-B": {
+                "power": 200.0,
+                "parameter_ids": {"power": "power"},
+            },
+        },
+        _inverter_parameter_success_mono={
+            "INV-A": {"power": 0.0},
+            "INV-B": {"power": 0.0},
+        },
+    )
+    monkeypatch.setattr(
+        coord,
+        "_endpoint_family_should_run",
+        lambda family, **_kwargs: family == "inverter_parameter_telemetry",
+    )
+    coord.client.system_dashboard_parameter_view = AsyncMock(
+        return_value={
+            "intervals": [
+                {"serial_number": "INV-A", "value": 275 - index} for index in range(50)
+            ]
+        }
+    )
+    monkeypatch.setattr(inventory_runtime_mod, "INVERTER_PARAMETER_MAX_PAGES", 1)
+
+    result = await runtime._async_refresh_inverter_parameter_telemetry(  # noqa: SLF001
+        ["INV-A", "INV-B"]
+    )
+
+    assert result == {
+        "INV-A": {"power": 275.0, "parameter_ids": {"power": "power"}},
+        "INV-B": {"power": 200.0, "parameter_ids": {"power": "power"}},
+    }
+    assert coord._inverter_parameter_success_mono == {  # noqa: SLF001
+        "INV-A": {"power": 1_000.0},
+        "INV-B": {"power": 0.0},
+    }
+    health = coord._endpoint_family_state(  # noqa: SLF001
+        "inverter_parameter_telemetry"
+    )
+    assert health.partial_success is True
+    assert health.successful_items == 0
+    assert health.total_items == 1
+    assert health.using_cached_data is True
+    assert health.last_error == "Dashboard parameter pagination limit reached for power"
+
+    current_time[0] = 1_901.0
+    monkeypatch.setattr(coord, "_endpoint_family_should_run", lambda *_args: False)
+    assert await runtime._async_refresh_inverter_parameter_telemetry(  # noqa: SLF001
+        ["INV-A", "INV-B"]
+    ) == {"INV-A": {"power": 275.0, "parameter_ids": {"power": "power"}}}
+    assert coord._inverter_parameter_success_mono == {  # noqa: SLF001
+        "INV-A": {"power": 1_000.0}
+    }
+
+    current_time[0] = 2_000.0
+    monkeypatch.setattr(
+        coord,
+        "_endpoint_family_should_run",
+        lambda family, **_kwargs: family == "inverter_parameter_telemetry",
+    )
+    await runtime._async_refresh_inverter_parameter_telemetry(  # noqa: SLF001
+        ["INV-A", "INV-B"]
+    )
+    assert (
+        coord._endpoint_family_state(  # noqa: SLF001
+            "inverter_parameter_telemetry"
+        ).using_cached_data
+        is False
+    )
 
 
 @pytest.mark.asyncio
@@ -1742,6 +1886,54 @@ def test_inventory_runtime_parameter_row_shapes_and_invalid_values() -> None:
         "firmware",
     ) == {"INV-C": ("firmware-v1", None)}
     assert parser({"intervals": "bad"}, "power") == {}
+
+
+def test_inventory_runtime_parameter_paging_metadata() -> None:
+    has_more = InventoryRuntime._inverter_parameter_has_more_pages
+
+    assert has_more({"has_next": True}, 1) is True
+    assert has_more({"next_page": None}, 1) is False
+    assert has_more({"nextPage": "2"}, 1) is True
+    assert has_more({"total": "3", "per_page": "2", "page": "1"}, 1) is True
+    assert (
+        has_more(
+            {
+                "total": "16",
+                "per_page": "50",
+                "pagination": {"page": 1, "total_pages": 2},
+            },
+            1,
+        )
+        is True
+    )
+    assert has_more({}, 1) is None
+
+
+@pytest.mark.asyncio
+async def test_inventory_runtime_parameter_later_page_failure_retains_readings(
+    coordinator_factory,
+) -> None:
+    runtime = coordinator_factory().inventory_runtime
+    fetcher = AsyncMock(
+        side_effect=[
+            {
+                "intervals": [{"serial_number": "INV-A", "value": 250}],
+                "has_next": True,
+            },
+            TimeoutError("later page timed out"),
+        ]
+    )
+
+    result = await runtime._async_fetch_complete_inverter_parameter(  # noqa: SLF001
+        fetcher,
+        ["INV-A", "INV-B"],
+        "power",
+        per_page=50,
+    )
+
+    assert result.readings == {"INV-A": (250.0, None)}
+    assert result.authoritative_serials == frozenset({"INV-A"})
+    assert isinstance(result.error, TimeoutError)
 
 
 @pytest.mark.asyncio
