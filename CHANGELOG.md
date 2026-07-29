@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Kept optional HEMS authentication diagnostics out of unrelated repair issues,
   preventing battery and other repairs from presenting irrelevant HEMS failures.
   (#799)
+- Preserved ignored repair state when transient issues clear and recur. (#799)
 
 ### 🔧 Improvements
 - None
