@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-07-29T15:12:55.951375Z",
+  "checked_at": "2026-07-29T16:48:58.307900Z",
   "checks": [
     {
       "affects": true,
@@ -334,7 +334,7 @@
       "name": "session_history_criteria",
       "ok": true,
       "status": 200,
-      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=76fda9c3-7a9b-44c7-9219-0a0bf084399e&username=2999024"
+      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=adc1d1d1-d8df-43ca-abc0-ff0de710de3d&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -404,7 +404,7 @@
       "name": "evse_timeseries_daily_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=76fda9c3-7a9b-44c7-9219-0a0bf084399e&start_date=2026-07-29&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=adc1d1d1-d8df-43ca-abc0-ff0de710de3d&start_date=2026-07-29&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -418,7 +418,7 @@
       "name": "evse_timeseries_lifetime_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=76fda9c3-7a9b-44c7-9219-0a0bf084399e&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=adc1d1d1-d8df-43ca-abc0-ff0de710de3d&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -566,12 +566,12 @@
       "category": "system_dashboard",
       "check_group": "system_dashboard_tree",
       "check_mode": "any",
-      "error": "The read operation timed out",
+      "error": null,
       "group": "degraded",
       "method": "GET",
       "name": "devices_tree_modern",
-      "ok": false,
-      "status": null,
+      "ok": true,
+      "status": 200,
       "url": "/service/system_dashboard/api_internal/dashboard/sites/{site_id}/devices-tree"
     },
     {
@@ -737,8 +737,8 @@
     "checks_failed_non_affecting": 0,
     "checks_ok": 17,
     "checks_total": 17,
-    "endpoints_failed": 1,
-    "endpoints_ok": 36,
+    "endpoints_failed": 0,
+    "endpoints_ok": 37,
     "endpoints_total": 37
   }
 }
