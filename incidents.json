@@ -1,10 +1,10 @@
 {
   "current_status": "Fully Operational",
-  "generated_at": "2026-07-30T20:12:53.354009Z",
+  "generated_at": "2026-07-30T21:41:31.974066Z",
   "incidents": [
     {
       "active": false,
-      "duration_minutes": 171,
+      "duration_minutes": 81,
       "ended_at": null,
       "failed_checks": [
         "battery_config",
@@ -13,7 +13,7 @@
         "session_history"
       ],
       "last_seen_at": "2026-06-30T23:20:31.888021Z",
-      "started_at": "2026-06-30T20:28:54.266901Z",
+      "started_at": "2026-06-30T21:58:52.165564Z",
       "status": "Down"
     },
     {
