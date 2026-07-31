@@ -1,11 +1,11 @@
 # Service Status History
 
 - Current status: **Fully Operational**
-- Last updated: `2026-07-31 21:36 UTC`
-- Failed checks in latest run: `1`
-- Latest failed checks: system_dashboard
+- Last updated: `2026-07-31 22:58 UTC`
+- Failed checks in latest run: `0`
+- Latest failed checks: None
 - Retained hourly samples: `370`
-- Incident windows in last 30 days: `29`
+- Incident windows in last 30 days: `28`
 
 This page is generated from hourly synthetic checks against Enphase cloud endpoints. It may miss incidents that begin and recover between checks.
 
@@ -16,36 +16,35 @@ gantt
     title Enphase Service Status Incident Timeline (Last 30 Days)
     dateFormat  YYYY-MM-DDTHH:mm:ss
     axisFormat  %b %d
-    Window start :vert, window-start, 2026-07-01T21:36:55, 0ms
-    Window end :vert, window-end, 2026-07-31T21:36:55, 0ms
+    Window start :vert, window-start, 2026-07-01T22:58:03, 0ms
+    Window end :vert, window-end, 2026-07-31T22:58:03, 0ms
     section Down
-    Down 1 (2026-07-01 2203 UTC) :crit, down-1, 2026-07-01T22:03:46, 60m
-    Down 2 (2026-07-01 2350 UTC) :crit, down-2, 2026-07-01T23:50:52, 60m
-    Down 3 (2026-07-02 0328 UTC) :crit, down-3, 2026-07-02T03:28:33, 60m
-    Down 4 (2026-07-02 0655 UTC) :crit, down-4, 2026-07-02T06:55:07, 60m
-    Down 5 (2026-07-02 1009 UTC) :crit, down-5, 2026-07-02T10:09:15, 60m
-    Down 6 (2026-07-02 1227 UTC) :crit, down-6, 2026-07-02T12:27:49, 60m
-    Down 7 (2026-07-02 1440 UTC) :crit, down-7, 2026-07-02T14:40:53, 60m
-    Down 8 (2026-07-02 1647 UTC) :crit, down-8, 2026-07-02T16:47:47, 60m
-    Down 9 (2026-07-02 1824 UTC) :crit, down-9, 2026-07-02T18:24:26, 60m
-    Down 10 (2026-07-02 2000 UTC) :crit, down-10, 2026-07-02T20:00:57, 60m
-    Down 11 (2026-07-02 2143 UTC) :crit, down-11, 2026-07-02T21:43:52, 80m
-    Down 12 (2026-07-03 0109 UTC) :crit, down-12, 2026-07-03T01:09:19, 60m
-    Down 13 (2026-07-03 0524 UTC) :crit, down-13, 2026-07-03T05:24:23, 60m
-    Down 14 (2026-07-03 0834 UTC) :crit, down-14, 2026-07-03T08:34:05, 60m
-    Down 15 (2026-07-03 1130 UTC) :crit, down-15, 2026-07-03T11:30:41, 60m
-    Down 16 (2026-07-03 1400 UTC) :crit, down-16, 2026-07-03T14:00:48, 60m
-    Down 17 (2026-07-03 1605 UTC) :crit, down-17, 2026-07-03T16:05:49, 60m
-    Down 18 (2026-07-03 1755 UTC) :crit, down-18, 2026-07-03T17:55:54, 338m
-    Down 19 (2026-07-04 0247 UTC) :crit, down-19, 2026-07-04T02:47:22, 60m
-    Down 20 (2026-07-04 0618 UTC) :crit, down-20, 2026-07-04T06:18:09, 60m
-    Down 21 (2026-07-04 0904 UTC) :crit, down-21, 2026-07-04T09:04:41, 60m
-    Down 22 (2026-07-04 1105 UTC) :crit, down-22, 2026-07-04T11:05:21, 60m
-    Down 23 (2026-07-04 1243 UTC) :crit, down-23, 2026-07-04T12:43:25, 60m
-    Down 24 (2026-07-04 1428 UTC) :crit, down-24, 2026-07-04T14:28:07, 243m
-    Down 25 (2026-07-04 2007 UTC) :crit, down-25, 2026-07-04T20:07:50, 206m
-    Down 26 (2026-07-05 0227 UTC) :crit, down-26, 2026-07-05T02:27:32, 109m
-    Down 27 (2026-07-11 1420 UTC) :crit, down-27, 2026-07-11T14:20:54, 69m
+    Down 1 (2026-07-01 2350 UTC) :crit, down-1, 2026-07-01T23:50:52, 60m
+    Down 2 (2026-07-02 0328 UTC) :crit, down-2, 2026-07-02T03:28:33, 60m
+    Down 3 (2026-07-02 0655 UTC) :crit, down-3, 2026-07-02T06:55:07, 60m
+    Down 4 (2026-07-02 1009 UTC) :crit, down-4, 2026-07-02T10:09:15, 60m
+    Down 5 (2026-07-02 1227 UTC) :crit, down-5, 2026-07-02T12:27:49, 60m
+    Down 6 (2026-07-02 1440 UTC) :crit, down-6, 2026-07-02T14:40:53, 60m
+    Down 7 (2026-07-02 1647 UTC) :crit, down-7, 2026-07-02T16:47:47, 60m
+    Down 8 (2026-07-02 1824 UTC) :crit, down-8, 2026-07-02T18:24:26, 60m
+    Down 9 (2026-07-02 2000 UTC) :crit, down-9, 2026-07-02T20:00:57, 60m
+    Down 10 (2026-07-02 2143 UTC) :crit, down-10, 2026-07-02T21:43:52, 80m
+    Down 11 (2026-07-03 0109 UTC) :crit, down-11, 2026-07-03T01:09:19, 60m
+    Down 12 (2026-07-03 0524 UTC) :crit, down-12, 2026-07-03T05:24:23, 60m
+    Down 13 (2026-07-03 0834 UTC) :crit, down-13, 2026-07-03T08:34:05, 60m
+    Down 14 (2026-07-03 1130 UTC) :crit, down-14, 2026-07-03T11:30:41, 60m
+    Down 15 (2026-07-03 1400 UTC) :crit, down-15, 2026-07-03T14:00:48, 60m
+    Down 16 (2026-07-03 1605 UTC) :crit, down-16, 2026-07-03T16:05:49, 60m
+    Down 17 (2026-07-03 1755 UTC) :crit, down-17, 2026-07-03T17:55:54, 338m
+    Down 18 (2026-07-04 0247 UTC) :crit, down-18, 2026-07-04T02:47:22, 60m
+    Down 19 (2026-07-04 0618 UTC) :crit, down-19, 2026-07-04T06:18:09, 60m
+    Down 20 (2026-07-04 0904 UTC) :crit, down-20, 2026-07-04T09:04:41, 60m
+    Down 21 (2026-07-04 1105 UTC) :crit, down-21, 2026-07-04T11:05:21, 60m
+    Down 22 (2026-07-04 1243 UTC) :crit, down-22, 2026-07-04T12:43:25, 60m
+    Down 23 (2026-07-04 1428 UTC) :crit, down-23, 2026-07-04T14:28:07, 243m
+    Down 24 (2026-07-04 2007 UTC) :crit, down-24, 2026-07-04T20:07:50, 206m
+    Down 25 (2026-07-05 0227 UTC) :crit, down-25, 2026-07-05T02:27:32, 109m
+    Down 26 (2026-07-11 1420 UTC) :crit, down-26, 2026-07-11T14:20:54, 69m
     section Degraded
     Degraded 1 (2026-07-09 1701 UTC) :active, degraded-1, 2026-07-09T17:01:02, 60m
     Degraded 2 (2026-07-15 0221 UTC) :active, degraded-2, 2026-07-15T02:21:35, 60m
@@ -55,7 +54,6 @@ gantt
 
 | Status | Started (UTC) | Ended (UTC) | Duration | Failed checks |
 | --- | --- | --- | --- | --- |
-| Down | 2026-07-01 22:03 UTC | Unknown after last seen 2026-07-01 22:03 UTC | Observed 0m | battery_config, evse_control, evse_scheduler, session_history |
 | Down | 2026-07-01 23:50 UTC | Unknown after last seen 2026-07-01 23:50 UTC | Observed 0m | battery_config, evse_control, evse_scheduler, session_history |
 | Down | 2026-07-02 03:28 UTC | Unknown after last seen 2026-07-02 03:28 UTC | Observed 0m | battery_config, evse_control, evse_scheduler, session_history |
 | Down | 2026-07-02 06:55 UTC | Unknown after last seen 2026-07-02 06:55 UTC | Observed 0m | battery_config, evse_control, evse_scheduler, session_history |
