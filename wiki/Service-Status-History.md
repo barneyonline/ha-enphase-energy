@@ -1,7 +1,7 @@
 # Service Status History
 
 - Current status: **Fully Operational**
-- Last updated: `2026-08-02 19:44 UTC`
+- Last updated: `2026-08-02 20:53 UTC`
 - Failed checks in latest run: `0`
 - Latest failed checks: None
 - Retained hourly samples: `377`
@@ -16,10 +16,10 @@ gantt
     title Enphase Service Status Incident Timeline (Last 30 Days)
     dateFormat  YYYY-MM-DDTHH:mm:ss
     axisFormat  %b %d
-    Window start :vert, window-start, 2026-07-03T19:44:41, 0ms
-    Window end :vert, window-end, 2026-08-02T19:44:41, 0ms
+    Window start :vert, window-start, 2026-07-03T20:53:42, 0ms
+    Window end :vert, window-end, 2026-08-02T20:53:42, 0ms
     section Down
-    Down 1 (2026-07-03 2037 UTC) :crit, down-1, 2026-07-03T20:37:29, 176m
+    Down 1 (2026-07-03 2203 UTC) :crit, down-1, 2026-07-03T22:03:17, 90m
     Down 2 (2026-07-04 0247 UTC) :crit, down-2, 2026-07-04T02:47:22, 60m
     Down 3 (2026-07-04 0618 UTC) :crit, down-3, 2026-07-04T06:18:09, 60m
     Down 4 (2026-07-04 0904 UTC) :crit, down-4, 2026-07-04T09:04:41, 60m
@@ -38,7 +38,7 @@ gantt
 
 | Status | Started (UTC) | Ended (UTC) | Duration | Failed checks |
 | --- | --- | --- | --- | --- |
-| Down | 2026-07-03 20:37 UTC | Unknown after last seen 2026-07-03 23:34 UTC | Observed 2h 56m | battery_config, evse_control, evse_scheduler, session_history |
+| Down | 2026-07-03 22:03 UTC | Unknown after last seen 2026-07-03 23:34 UTC | Observed 1h 30m | battery_config, evse_control, evse_scheduler, session_history |
 | Down | 2026-07-04 02:47 UTC | Unknown after last seen 2026-07-04 02:47 UTC | Observed 0m | battery_config, evse_control, evse_scheduler, session_history |
 | Down | 2026-07-04 06:18 UTC | Unknown after last seen 2026-07-04 06:18 UTC | Observed 0m | battery_config, evse_control, evse_scheduler, session_history |
 | Down | 2026-07-04 09:04 UTC | Unknown after last seen 2026-07-04 09:04 UTC | Observed 0m | battery_config, evse_control, evse_scheduler, session_history |
