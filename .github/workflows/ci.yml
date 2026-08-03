@@ -11,8 +11,12 @@ on:
     paths:
       - 'custom_components/**'
       - 'tests/components/enphase_ev/**'
+      - 'tests/compatibility/**'
       - '.pre-commit-config.yaml'
       - '.ruff.toml'
+      - 'devtools/docker/requirements-ha-2026.8.txt'
+      - 'devtools/docker/Dockerfile'
+      - 'devtools/docker/docker-compose.yml'
       - '.github/workflows/tests.yml'
       - '.github/workflows/ci.yml'
 

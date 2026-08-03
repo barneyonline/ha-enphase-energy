@@ -42,6 +42,12 @@ Include the integration version, Home Assistant version, affected entity IDs, de
    docker compose -f devtools/docker/docker-compose.yml build ha-dev
    ```
 4. **Develop and test** your changes inside `ha-dev`.
+   To reproduce the forward-compatibility lane against the pinned Home Assistant
+   2026.8 beta, run:
+   ```bash
+   docker compose -f devtools/docker/docker-compose.yml build ha-2026-8
+   docker compose -f devtools/docker/docker-compose.yml run --rm ha-2026-8 bash -lc "pytest -q tests/compatibility/test_ha_2026_8_device_registry.py tests/components/enphase_ev/test_init_module.py::test_async_setup_entry_updates_existing_device tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_preserves_real_devices_with_site_identifier tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_removes_empty_device_without_gateway tests/components/enphase_ev/test_services.py::test_services_route_evse_targets_to_owning_entry_with_site_only_entry"
+   ```
 5. **Start `ha-runtime` when you need a real Home Assistant UI for manual verification**:
    ```bash
    mkdir -p .ha-config
