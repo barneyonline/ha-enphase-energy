@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-08-03T18:15:49.512611Z",
+  "checked_at": "2026-08-03T20:10:14.911651Z",
   "checks": [
     {
       "affects": true,
@@ -334,7 +334,7 @@
       "name": "session_history_criteria",
       "ok": true,
       "status": 200,
-      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=60b40e3a-9d53-4493-b58c-e4bf103245c5&username=2999024"
+      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=a8dec064-fcc7-4058-b276-2ff2c72a6f12&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -404,7 +404,7 @@
       "name": "evse_timeseries_daily_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=60b40e3a-9d53-4493-b58c-e4bf103245c5&start_date=2026-08-03&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=a8dec064-fcc7-4058-b276-2ff2c72a6f12&start_date=2026-08-03&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -418,7 +418,7 @@
       "name": "evse_timeseries_lifetime_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=60b40e3a-9d53-4493-b58c-e4bf103245c5&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=a8dec064-fcc7-4058-b276-2ff2c72a6f12&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -594,12 +594,12 @@
       "category": "system_dashboard",
       "check_group": "system_dashboard_details",
       "check_mode": "any",
-      "error": null,
+      "error": "The read operation timed out",
       "group": "degraded",
       "method": "GET",
       "name": "devices_details_modern",
-      "ok": true,
-      "status": 200,
+      "ok": false,
+      "status": null,
       "url": "/service/system_dashboard/api_internal/dashboard/sites/{site_id}/devices_details?type=inverters"
     },
     {
@@ -737,8 +737,8 @@
     "checks_failed_non_affecting": 1,
     "checks_ok": 16,
     "checks_total": 17,
-    "endpoints_failed": 2,
-    "endpoints_ok": 35,
+    "endpoints_failed": 3,
+    "endpoints_ok": 34,
     "endpoints_total": 37
   }
 }
