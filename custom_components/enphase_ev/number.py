@@ -5,8 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
 
+from homeassistant import const as ha_const
 from homeassistant.components.number import NumberEntity, NumberMode
-from homeassistant.const import PERCENTAGE, UnitOfElectricCurrent, UnitOfEnergy
+from homeassistant.const import UnitOfElectricCurrent, UnitOfEnergy
 from homeassistant.core import HomeAssistant, callback as ha_callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
@@ -32,6 +33,17 @@ PARALLEL_UPDATES = 0
 
 _CallbackT = TypeVar("_CallbackT", bound=Callable[..., object])
 callback = cast(Callable[[_CallbackT], _CallbackT], ha_callback)
+
+
+def _percentage_unit(constants: object) -> str:
+    """Return the current percentage unit with pre-2026.7 compatibility."""
+    unit_of_ratio = getattr(constants, "UnitOfRatio", None)
+    if unit_of_ratio is not None:
+        return cast(str, unit_of_ratio.PERCENTAGE)
+    return cast(str, getattr(constants, "PERCENTAGE"))
+
+
+_PERCENTAGE_UNIT = _percentage_unit(ha_const)
 
 
 def _site_has_battery(coord: EnphaseCoordinator) -> bool:
@@ -611,7 +623,7 @@ class _BatteryScheduleEditorLimitNumber(BatteryScheduleEditorEntity, NumberEntit
     _attr_native_min_value = 5.0
     _attr_native_max_value = 100.0
     _attr_native_step = 1.0
-    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_native_unit_of_measurement = _PERCENTAGE_UNIT
     _attr_mode = NumberMode.SLIDER
 
     def __init__(
