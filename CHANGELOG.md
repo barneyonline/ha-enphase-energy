@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
 - Scoped device-registry synchronization, cleanup, and service routing to the
   owning config entry for compatibility with Home Assistant 2026.8's per-entry
   device identifiers.
+- Used Home Assistant's typed percentage unit on 2026.7 and newer while retaining
+  compatibility with the minimum supported Home Assistant 2026.6 release.
 
 ### 🔄 Other changes
 - None
