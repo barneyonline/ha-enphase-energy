@@ -1,11 +1,11 @@
 # Service Status History
 
 - Current status: **Fully Operational**
-- Last updated: `2026-08-03 06:44 UTC`
+- Last updated: `2026-08-03 10:41 UTC`
 - Failed checks in latest run: `0`
 - Latest failed checks: None
 - Retained hourly samples: `378`
-- Incident windows in last 30 days: `9`
+- Incident windows in last 30 days: `8`
 
 This page is generated from hourly synthetic checks against Enphase cloud endpoints. It may miss incidents that begin and recover between checks.
 
@@ -16,16 +16,15 @@ gantt
     title Enphase Service Status Incident Timeline (Last 30 Days)
     dateFormat  YYYY-MM-DDTHH:mm:ss
     axisFormat  %b %d
-    Window start :vert, window-start, 2026-07-04T06:44:36, 0ms
-    Window end :vert, window-end, 2026-08-03T06:44:36, 0ms
+    Window start :vert, window-start, 2026-07-04T10:41:02, 0ms
+    Window end :vert, window-end, 2026-08-03T10:41:02, 0ms
     section Down
-    Down 1 (2026-07-04 0904 UTC) :crit, down-1, 2026-07-04T09:04:41, 60m
-    Down 2 (2026-07-04 1105 UTC) :crit, down-2, 2026-07-04T11:05:21, 60m
-    Down 3 (2026-07-04 1243 UTC) :crit, down-3, 2026-07-04T12:43:25, 60m
-    Down 4 (2026-07-04 1428 UTC) :crit, down-4, 2026-07-04T14:28:07, 243m
-    Down 5 (2026-07-04 2007 UTC) :crit, down-5, 2026-07-04T20:07:50, 206m
-    Down 6 (2026-07-05 0227 UTC) :crit, down-6, 2026-07-05T02:27:32, 109m
-    Down 7 (2026-07-11 1420 UTC) :crit, down-7, 2026-07-11T14:20:54, 69m
+    Down 1 (2026-07-04 1105 UTC) :crit, down-1, 2026-07-04T11:05:21, 60m
+    Down 2 (2026-07-04 1243 UTC) :crit, down-2, 2026-07-04T12:43:25, 60m
+    Down 3 (2026-07-04 1428 UTC) :crit, down-3, 2026-07-04T14:28:07, 243m
+    Down 4 (2026-07-04 2007 UTC) :crit, down-4, 2026-07-04T20:07:50, 206m
+    Down 5 (2026-07-05 0227 UTC) :crit, down-5, 2026-07-05T02:27:32, 109m
+    Down 6 (2026-07-11 1420 UTC) :crit, down-6, 2026-07-11T14:20:54, 69m
     section Degraded
     Degraded 1 (2026-07-09 1701 UTC) :active, degraded-1, 2026-07-09T17:01:02, 60m
     Degraded 2 (2026-07-15 0221 UTC) :active, degraded-2, 2026-07-15T02:21:35, 60m
@@ -35,7 +34,6 @@ gantt
 
 | Status | Started (UTC) | Ended (UTC) | Duration | Failed checks |
 | --- | --- | --- | --- | --- |
-| Down | 2026-07-04 09:04 UTC | Unknown after last seen 2026-07-04 09:04 UTC | Observed 0m | battery_config, evse_control, evse_scheduler, session_history |
 | Down | 2026-07-04 11:05 UTC | Unknown after last seen 2026-07-04 11:05 UTC | Observed 0m | battery_config, evse_control, evse_scheduler, session_history |
 | Down | 2026-07-04 12:43 UTC | Unknown after last seen 2026-07-04 12:43 UTC | Observed 0m | battery_config, evse_control, evse_scheduler, session_history |
 | Down | 2026-07-04 14:28 UTC | Unknown after last seen 2026-07-04 18:31 UTC | Observed 4h 3m | battery_config, evse_control, evse_scheduler, session_history |
