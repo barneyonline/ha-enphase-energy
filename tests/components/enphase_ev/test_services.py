@@ -761,6 +761,133 @@ async def test_services_route_evse_targets_to_owning_entry_with_site_only_entry(
 
 
 @pytest.mark.asyncio
+async def test_services_route_duplicate_serial_to_device_config_entry(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A device owner disambiguates a serial exposed by multiple entries."""
+
+    handlers = _register_service_handlers(hass, monkeypatch)
+    serial = "SHARED-EVSE"
+    first_coord = _fake_service_coordinator(site_id="shared-site", serials={serial})
+    second_coord = _fake_service_coordinator(site_id="shared-site", serials={serial})
+    first_entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "shared-site"},
+        title="First shared site",
+        unique_id="first-shared-site",
+    )
+    second_entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "shared-site"},
+        title="Second shared site",
+        unique_id="second-shared-site",
+    )
+    for entry, coord in (
+        (first_entry, first_coord),
+        (second_entry, second_coord),
+    ):
+        entry.add_to_hass(hass)
+        entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+
+    device = SimpleNamespace(
+        id="second-device",
+        identifiers={(DOMAIN, serial)},
+        config_entry_id=second_entry.entry_id,
+        via_device_id=None,
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.services.dr.async_get",
+        lambda _hass: SimpleNamespace(
+            async_get=lambda device_id: device if device_id == device.id else None
+        ),
+    )
+
+    await handlers[(DOMAIN, "start_charging")](
+        SimpleNamespace(
+            data={
+                "device_id": [device.id],
+                "charging_level": 24,
+                "connector_id": 1,
+            }
+        )
+    )
+
+    second_coord.async_start_charging.assert_awaited_once_with(
+        serial, requested_amps=24, connector_id=1
+    )
+    first_coord.async_start_charging.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_services_route_composite_device_through_split_owners(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A pre-migration composite target checks each real split owner."""
+
+    handlers = _register_service_handlers(hass, monkeypatch)
+    serial = "COMPOSITE-EVSE"
+    first_coord = _fake_service_coordinator(
+        site_id="first-site", serials={"OTHER-EVSE"}
+    )
+    second_coord = _fake_service_coordinator(site_id="second-site", serials={serial})
+    first_entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "first-site"},
+        title="First composite owner",
+        unique_id="first-composite-owner",
+    )
+    second_entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "second-site"},
+        title="Second composite owner",
+        unique_id="second-composite-owner",
+    )
+    for entry, coord in (
+        (first_entry, first_coord),
+        (second_entry, second_coord),
+    ):
+        entry.add_to_hass(hass)
+        entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+
+    composite = SimpleNamespace(
+        id="old-composite-device-id",
+        identifiers={(DOMAIN, serial)},
+        config_entry_id=first_entry.entry_id,
+        config_entries={first_entry.entry_id, second_entry.entry_id},
+        via_device_id=None,
+    )
+    split_devices = [
+        SimpleNamespace(config_entry_id=first_entry.entry_id),
+        SimpleNamespace(config_entry_id=second_entry.entry_id),
+    ]
+    registry = SimpleNamespace(
+        async_get=lambda device_id: (composite if device_id == composite.id else None),
+        async_get_devices_for_composite_device_id=lambda device_id: (
+            split_devices if device_id == composite.id else []
+        ),
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.services.dr.async_get",
+        lambda _hass: registry,
+    )
+
+    await handlers[(DOMAIN, "start_charging")](
+        SimpleNamespace(
+            data={
+                "device_id": [composite.id],
+                "charging_level": 18,
+                "connector_id": 2,
+            }
+        )
+    )
+
+    second_coord.async_start_charging.assert_awaited_once_with(
+        serial, requested_amps=18, connector_id=2
+    )
+    first_coord.async_start_charging.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_targeted_services_raise_without_target_or_owner(
     hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
 ) -> None:

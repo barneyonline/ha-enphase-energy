@@ -37,6 +37,7 @@ from .const import (
     ISSUE_TOO_MANY_ACTIVE_SESSIONS,
 )
 from .device_types import parse_type_identifier
+from .device_registry_compat import device_config_entry_ids
 from .log_redaction import redact_site_id
 from .parsing_helpers import coerce_optional_bool
 from .grid_profile_runtime import SUPPORT_DENIED, GridProfileRuntime
@@ -168,20 +169,15 @@ def async_setup_services(
         data = coord.data if isinstance(getattr(coord, "data", None), dict) else {}
         return bool(not serials and not data and sn)
 
-    def _device_config_entry_ids(device: dr.DeviceEntry) -> list[str]:
-        entry_ids: list[str] = []
-        config_entries = getattr(device, "config_entries", None)
-        if config_entries:
-            entry_ids.extend(str(entry_id) for entry_id in config_entries)
-        config_entry_id = getattr(device, "config_entry_id", None)
-        if config_entry_id:
-            entry_ids.append(str(config_entry_id))
-        return list(dict.fromkeys(entry_ids))
+    def _device_config_entry_ids(
+        dev_reg: dr.DeviceRegistry, device: dr.DeviceEntry
+    ) -> list[str]:
+        return list(device_config_entry_ids(device, device_registry=dev_reg))
 
     def _config_entry_ids_for_device(
         dev_reg: dr.DeviceRegistry, dev: dr.DeviceEntry
     ) -> list[str]:
-        entry_ids = _device_config_entry_ids(dev)
+        entry_ids = _device_config_entry_ids(dev_reg, dev)
         if entry_ids:
             return entry_ids
         via = dev.via_device_id
@@ -190,7 +186,7 @@ def async_setup_services(
         parent = dev_reg.async_get(via)
         if not parent:
             return []
-        return _device_config_entry_ids(parent)
+        return _device_config_entry_ids(dev_reg, parent)
 
     async def _resolve_device_routing_context(
         device_id: str,

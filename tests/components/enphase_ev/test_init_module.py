@@ -41,6 +41,7 @@ from custom_components.enphase_ev import (
     _registry_type_metadata_signature,
     _remove_retired_grid_profile_device_entities,
     _remove_evse_type_device_and_entities,
+    _remove_empty_inactive_serial_devices,
     _remove_legacy_inventory_entities,
     _remove_legacy_site_device,
     _startup_migration_version,
@@ -3386,6 +3387,144 @@ class _FakeDeviceRegistry:
             if device.id == device_id:
                 del self._devices[ident]
                 break
+
+
+class _ScopedFakeDeviceRegistry:
+    """Model the per-config-entry identifier uniqueness introduced in HA 2026.8."""
+
+    def __init__(self) -> None:
+        self.devices: dict[str, _FakeDevice] = {}
+        self._by_owner_and_identifier: dict[
+            tuple[str, tuple[str, str]], _FakeDevice
+        ] = {}
+
+    def async_get_device_by_identifier(self, identifier, config_entry_id):
+        return self._by_owner_and_identifier.get((config_entry_id, identifier))
+
+    def async_get_or_create(self, **kwargs):
+        identifier = next(iter(kwargs["identifiers"]))
+        config_entry_id = kwargs["config_entry_id"]
+        key = (config_entry_id, identifier)
+        device = self._by_owner_and_identifier.get(key)
+        if device is None:
+            device = _FakeDevice(
+                id=f"{config_entry_id}-{len(self.devices) + 1}",
+                config_entry_id=config_entry_id,
+                identifiers={identifier},
+                manufacturer=None,
+                name=None,
+                model=None,
+                model_id=None,
+                serial_number=None,
+                hw_version=None,
+                sw_version=None,
+                via_device_id=None,
+            )
+            self._by_owner_and_identifier[key] = device
+            self.devices[device.id] = device
+        for field in (
+            "name",
+            "manufacturer",
+            "model",
+            "model_id",
+            "serial_number",
+            "hw_version",
+            "sw_version",
+            "via_device_id",
+        ):
+            if field in kwargs:
+                setattr(device, field, kwargs[field])
+        return device
+
+    def async_remove_device(self, device_id):
+        device = self.devices.pop(device_id)
+        identifier = next(iter(device.identifiers))
+        self._by_owner_and_identifier.pop((device.config_entry_id, identifier))
+
+
+def test_sync_type_devices_scopes_duplicate_identifier_to_config_entry(
+    config_entry,
+) -> None:
+    """Registry synchronization must not update another entry's matching device."""
+
+    registry = _ScopedFakeDeviceRegistry()
+    identifier = (DOMAIN, "type:shared-site:envoy")
+    other_entry = SimpleNamespace(entry_id="other-entry")
+
+    def _coordinator(name: str):
+        return _with_inventory_view(
+            SimpleNamespace(
+                iter_type_keys=lambda: ["envoy"],
+                type_identifier=lambda _key: identifier,
+                type_label=lambda _key: "Gateway",
+                type_device_name=lambda _key: name,
+                type_device_model=lambda _key: "IQ Gateway",
+            )
+        )
+
+    _sync_type_devices(
+        other_entry, _coordinator("Other Gateway"), registry, "shared-site"
+    )
+    _sync_type_devices(
+        config_entry, _coordinator("Owned Gateway"), registry, "shared-site"
+    )
+
+    other_device = registry.async_get_device_by_identifier(
+        identifier, other_entry.entry_id
+    )
+    owned_device = registry.async_get_device_by_identifier(
+        identifier, config_entry.entry_id
+    )
+    assert other_device is not None
+    assert owned_device is not None
+    assert other_device.id != owned_device.id
+    assert other_device.name == "Other Gateway"
+    assert owned_device.name == "Owned Gateway"
+
+
+def test_inactive_device_cleanup_only_removes_owned_duplicate(
+    hass: HomeAssistant, config_entry, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Cleanup ignores another entry's device with the same identifier."""
+
+    registry = _ScopedFakeDeviceRegistry()
+    identifier = (DOMAIN, "SHARED-INACTIVE")
+    for entry_id in ("other-entry", config_entry.entry_id):
+        registry.async_get_or_create(
+            config_entry_id=entry_id,
+            identifiers={identifier},
+            manufacturer="Enphase",
+            name=f"Charger {entry_id}",
+        )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.er.async_get",
+        lambda _hass: SimpleNamespace(entities={}),
+    )
+    monkeypatch.setattr(
+        enphase_init,
+        "active_serial_registry_identifiers",
+        lambda _coord: {
+            "charger": set(),
+            "battery": set(),
+            "ac_battery": set(),
+            "inverter": set(),
+        },
+    )
+    coord = SimpleNamespace(_devices_inventory_ready=True)
+
+    assert (
+        _remove_empty_inactive_serial_devices(
+            hass, config_entry, coord, registry, "shared-site"
+        )
+        == 1
+    )
+    assert (
+        registry.async_get_device_by_identifier(identifier, "other-entry") is not None
+    )
+    assert (
+        registry.async_get_device_by_identifier(identifier, config_entry.entry_id)
+        is None
+    )
 
 
 def test_sync_type_devices_skips_invalid_and_updates_existing(config_entry) -> None:

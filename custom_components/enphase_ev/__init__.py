@@ -41,6 +41,11 @@ from .device_info_helpers import (
     _normalize_evse_model_name as _normalize_evse_model_name,
     async_prime_integration_version,
 )
+from .device_registry_compat import (
+    device_belongs_to_config_entry,
+    get_device_by_identifier,
+    via_device_kwargs,
+)
 from .device_types import (
     is_dry_contact_type_key,
     normalize_type_key,
@@ -460,7 +465,7 @@ def _sync_type_devices(
         kwargs["serial_number"] = serial_number
         kwargs["model_id"] = model_id
         kwargs["sw_version"] = sw_version
-        existing = dev_reg.async_get_device(identifiers={ident})
+        existing = get_device_by_identifier(dev_reg, ident, entry.entry_id)
         changes: list[str] = []
         if existing is None:
             changes.append("new_device")
@@ -533,8 +538,10 @@ def _sync_charger_devices(
             "manufacturer": "Enphase",
             "name": dev_name,
             "serial_number": str(sn),
-            "via_device": None,
         }
+        kwargs.update(
+            via_device_kwargs(dev_reg, via_device_id=None, legacy_via_device=None)
+        )
         model_name_raw = d.get("model_name")
         model_display = _compose_charger_model_display(
             display_name,
@@ -551,7 +558,7 @@ def _sync_charger_devices(
             kwargs["sw_version"] = str(sw)
 
         changes: list[str] = []
-        existing = dev_reg.async_get_device(identifiers={(DOMAIN, sn)})
+        existing = get_device_by_identifier(dev_reg, (DOMAIN, sn), entry.entry_id)
         if existing is None:
             changes.append("new_device")
         else:
@@ -732,8 +739,7 @@ def _remove_empty_inactive_serial_devices(
     entry_id = getattr(entry, "entry_id", None)
     removed = 0
     for device in iter_device_registry_entries(dev_reg):
-        config_entries = getattr(device, "config_entries", None)
-        if config_entries is not None and entry_id not in config_entries:
+        if not device_belongs_to_config_entry(device, entry_id):
             continue
         identifiers = getattr(device, "identifiers", None)
         if not identifiers:
@@ -1218,7 +1224,7 @@ def _migrate_legacy_gateway_type_devices(
         DOMAIN,
         f"type:{site_id_text}:envoy",
     )
-    gateway_device = dev_reg.async_get_device(identifiers={gateway_ident})
+    gateway_device = get_device_by_identifier(dev_reg, gateway_ident, entry.entry_id)
     if gateway_device is None:
         return
     gateway_device_id = getattr(gateway_device, "id", None)
@@ -1301,14 +1307,13 @@ def _migrate_legacy_gateway_type_devices(
 
     for type_key in _LEGACY_GATEWAY_TYPE_KEYS:
         legacy_ident = (DOMAIN, f"type:{site_id_text}:{type_key}")
-        legacy_device = dev_reg.async_get_device(identifiers={legacy_ident})
+        legacy_device = get_device_by_identifier(dev_reg, legacy_ident, entry.entry_id)
         if legacy_device is None:
             continue
         _move_device_to_gateway(legacy_device, type_key)
 
     for legacy_device in iter_device_registry_entries(dev_reg):
-        config_entries = getattr(legacy_device, "config_entries", None)
-        if config_entries is not None and entry_id not in config_entries:
+        if not device_belongs_to_config_entry(legacy_device, entry_id):
             continue
         identifiers = getattr(legacy_device, "identifiers", None)
         if not identifiers:
@@ -1365,18 +1370,19 @@ def _remove_legacy_site_device(
         DOMAIN,
         f"type:{site_id_text}:envoy",
     )
-    gateway_device = dev_reg.async_get_device(identifiers={gateway_ident})
+    gateway_device = get_device_by_identifier(dev_reg, gateway_ident, entry.entry_id)
     if gateway_device is not None:
         gateway_device_id = getattr(gateway_device, "id", None)
 
     legacy_site_ident = (DOMAIN, f"site:{site_id_text}")
-    legacy_site_device = dev_reg.async_get_device(identifiers={legacy_site_ident})
+    legacy_site_device = get_device_by_identifier(
+        dev_reg, legacy_site_ident, entry.entry_id
+    )
     if legacy_site_device is None:
         return
     if not _is_legacy_site_device(legacy_site_device, legacy_site_ident):
         return
-    config_entries = getattr(legacy_site_device, "config_entries", None)
-    if config_entries is not None and entry_id not in config_entries:
+    if not device_belongs_to_config_entry(legacy_site_device, entry_id):
         return
     legacy_site_device_id = getattr(legacy_site_device, "id", None)
     if legacy_site_device_id is None:
@@ -1514,7 +1520,7 @@ def _remove_evse_type_device_and_entities(
         return
 
     evse_ident = (DOMAIN, f"type:{site_id_text}:iqevse")
-    evse_device = dev_reg.async_get_device(identifiers={evse_ident})
+    evse_device = get_device_by_identifier(dev_reg, evse_ident, entry.entry_id)
     if evse_device is None:
         return
     evse_device_id = getattr(evse_device, "id", None)

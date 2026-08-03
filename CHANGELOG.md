@@ -14,7 +14,9 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔧 Improvements
-- None
+- Scoped device-registry synchronization, cleanup, and service routing to the
+  owning config entry for compatibility with Home Assistant 2026.8's per-entry
+  device identifiers.
 
 ### 🔄 Other changes
 - None
