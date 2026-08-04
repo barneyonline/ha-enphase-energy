@@ -7415,6 +7415,7 @@ async def test_lifetime_energy_normalization() -> None:
                         "production": [1000, "2000", None, -5],
                         "import": ["", "30"],
                         "grid_home": [15],
+                        "generator_grid": ["12.5"],
                         "update_pending": False,
                         "start_date": "2024-01-01",
                         "last_report_date": "1700000000",
@@ -7432,6 +7433,7 @@ async def test_lifetime_energy_normalization() -> None:
     assert payload["production"] == [1000.0, 2000.0, None, -5.0]
     assert payload["import"] == [None, 30.0]
     assert payload["grid_home"] == [15.0]
+    assert payload["generator_grid"] == [12.5]
     assert payload["update_pending"] is False
     assert payload["start_date"] == "2024-01-01"
     assert payload["last_report_date"] == "1700000000"

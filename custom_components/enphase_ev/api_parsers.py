@@ -314,6 +314,7 @@ def normalize_lifetime_energy_payload(payload: object) -> PayloadMap | None:
         "consumption",
         "solar_home",
         "solar_grid",
+        "generator_grid",
         "grid_home",
         "import",
         "export",

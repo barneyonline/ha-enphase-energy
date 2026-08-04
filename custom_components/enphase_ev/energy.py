@@ -53,6 +53,7 @@ class SiteEnergyFlow:
     source_unit: str = UnitOfPower.WATT
     last_reset_at: str | None = None
     interval_minutes: float | None = None
+    legacy_offset_kwh: float = 0.0
 
 
 class EnergyManager:
@@ -514,6 +515,7 @@ class EnergyManager:
             bucket_count: int,
             *,
             allow_zero: bool = False,
+            legacy_offset_wh: float = 0.0,
         ) -> None:
             if bucket_count <= 0 or total_wh < 0:
                 return
@@ -546,6 +548,7 @@ class EnergyManager:
                 source_unit=source_unit,
                 last_reset_at=last_reset,
                 interval_minutes=interval_minutes,
+                legacy_offset_kwh=round(legacy_offset_wh / 1000.0, 3),
             )
             if last_reset:
                 self._site_energy_last_reset[flow] = last_reset
@@ -672,11 +675,31 @@ class EnergyManager:
                 allow_zero=True,
             )
 
-        # Grid export
-        exp_total, exp_count = self._sum_energy_buckets(
-            payload.get("solar_grid"), interval_hours
-        )
-        _store("grid_export", exp_total, ["solar_grid"], exp_count)
+        # Grid export (all energy delivered through the site meter).
+        exp_total = 0.0
+        exp_count = 0
+        exp_fields: list[str] = []
+        legacy_offset_wh = 0.0
+        for field in ("solar_grid", "battery_grid", "generator_grid"):
+            field_total, field_count = self._sum_energy_buckets(
+                payload.get(field), interval_hours
+            )
+            if field_count <= 0:
+                continue
+            exp_total += field_total
+            exp_count = max(exp_count, field_count)
+            exp_fields.append(field)
+            if field in ("battery_grid", "generator_grid"):
+                legacy_offset_wh += field_total
+        if exp_fields:
+            _store(
+                "grid_export",
+                exp_total,
+                exp_fields,
+                exp_count,
+                allow_zero=True,
+                legacy_offset_wh=legacy_offset_wh,
+            )
 
         # Battery charge (into battery)
         charge_total, charge_count = self._sum_energy_buckets(
