@@ -66,6 +66,7 @@ from custom_components.enphase_ev.const import (
     ISSUE_TOO_MANY_ACTIVE_SESSIONS,
     OPT_API_TIMEOUT,
     OPT_WEATHER_ENABLED,
+    OPT_VPP_EVENTS_ENABLED,
 )
 from custom_components.enphase_ev.device_types import type_identifier
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
@@ -2055,12 +2056,12 @@ async def test_update_listener_preserves_runtime_for_topology_reload(
 ) -> None:
     hass.config_entries.async_update_entry(
         config_entry,
-        options={OPT_WEATHER_ENABLED: True},
+        options={OPT_VPP_EVENTS_ENABLED: True},
     )
     runtime_data = EnphaseRuntimeData(
         coordinator=SimpleNamespace(),
         applied_data=dict(config_entry.data),
-        applied_options={OPT_WEATHER_ENABLED: False},
+        applied_options={OPT_VPP_EVENTS_ENABLED: False},
     )
     config_entry.runtime_data = runtime_data
     object.__setattr__(config_entry, "state", config_entries.ConfigEntryState.LOADED)

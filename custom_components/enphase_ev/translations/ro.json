@@ -601,7 +601,8 @@
               "weather_enabled": "Activează vremea",
               "nominal_voltage": "Tensiunea nominală a încărcătorului EV (V)",
               "microinverter_lifetime_energy_enabled": "Activează energia totală a microinvertoarelor",
-              "microinverter_power_enabled": "Activează puterea microinvertoarelor"
+              "microinverter_power_enabled": "Activează puterea microinvertoarelor",
+              "vpp_events_enabled": "Activează evenimentele VPP"
             },
             "data_description": {
               "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit.",
@@ -611,7 +612,8 @@
               "schedule_sync_enabled": "Gestionați programele IQ EV Charger.",
               "battery_schedules_enabled": "Gestionați programele IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor.",
-              "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă."
+              "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă.",
+              "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit."
             }
           }
         },
@@ -631,7 +633,8 @@
           "weather_enabled": "Activează vremea",
           "nominal_voltage": "Tensiunea nominală a încărcătorului EV (V)",
           "microinverter_lifetime_energy_enabled": "Activează energia totală a microinvertoarelor",
-          "microinverter_power_enabled": "Activează puterea microinvertoarelor"
+          "microinverter_power_enabled": "Activează puterea microinvertoarelor",
+          "vpp_events_enabled": "Activează evenimentele VPP"
         },
         "data_description": {
           "type_envoy": "Include conectivitatea gateway-ului și diagnosticul contoarelor.",
@@ -647,7 +650,8 @@
           "schedule_sync_enabled": "Gestionați programele IQ EV Charger.",
           "battery_schedules_enabled": "Gestionați programele IQ Battery.",
           "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor.",
-          "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă."
+          "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă.",
+          "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit."
         }
       },
       "repair_notifications": {
@@ -2003,6 +2007,21 @@
       },
       "current_grid_profile": {
         "name": "Profil de rețea"
+      },
+      "vpp_next_event_start": {
+        "name": "Începutul următorului eveniment VPP"
+      },
+      "vpp_next_event_end": {
+        "name": "Sfârșitul următorului eveniment VPP"
+      },
+      "vpp_next_event_type": {
+        "name": "Tipul următorului eveniment VPP"
+      },
+      "vpp_next_event_subtype": {
+        "name": "Subtipul următorului eveniment VPP"
+      },
+      "vpp_next_event_status": {
+        "name": "Starea următorului eveniment VPP"
       }
     },
     "number": {
@@ -2433,6 +2452,9 @@
       },
       "system_event_history": {
         "name": "Istoricul evenimentelor de sistem"
+      },
+      "vpp_events": {
+        "name": "Evenimente VPP"
       }
     },
     "update": {

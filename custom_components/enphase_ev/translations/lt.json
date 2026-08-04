@@ -601,7 +601,8 @@
               "weather_enabled": "Įjungti orus",
               "nominal_voltage": "EV įkroviklio vardinė įtampa (V)",
               "microinverter_lifetime_energy_enabled": "Įjungti mikroinverterių viso veikimo energiją",
-              "microinverter_power_enabled": "Įjungti mikroinverterių galią"
+              "microinverter_power_enabled": "Įjungti mikroinverterių galią",
+              "vpp_events_enabled": "Įjungti VPP įvykius"
             },
             "data_description": {
               "system_event_repair_issues": "Kuria Home Assistant taisymus aktyviems nuolatiniams Enphase pavojaus signalams. Pagal numatytuosius išjungta.",
@@ -611,7 +612,8 @@
               "schedule_sync_enabled": "Tvarkykite „IQ EV Charger“ tvarkaraščius.",
               "battery_schedules_enabled": "Tvarkykite „IQ Battery“ tvarkaraščius.",
               "microinverter_lifetime_energy_enabled": "Įjungia visus kiekvieno mikroinverterio viso veikimo energijos jutiklius.",
-              "microinverter_power_enabled": "Įjungia visus kiekvieno mikroinverterio galios jutiklius, kai pasiekiama montuotojo telemetrija."
+              "microinverter_power_enabled": "Įjungia visus kiekvieno mikroinverterio galios jutiklius, kai pasiekiama montuotojo telemetrija.",
+              "vpp_events_enabled": "Gauna VPP/ELRP tvarkaraščius iš „Enphase“ ir kuria įvykių esybes tik užregistruotoms vietoms. Pagal numatytuosius nustatymus išjungta."
             }
           }
         },
@@ -631,7 +633,8 @@
           "weather_enabled": "Įjungti orus",
           "nominal_voltage": "EV įkroviklio vardinė įtampa (V)",
           "microinverter_lifetime_energy_enabled": "Įjungti mikroinverterių viso veikimo energiją",
-          "microinverter_power_enabled": "Įjungti mikroinverterių galią"
+          "microinverter_power_enabled": "Įjungti mikroinverterių galią",
+          "vpp_events_enabled": "Įjungti VPP įvykius"
         },
         "data_description": {
           "type_envoy": "Apima šliuzo ryšio ir skaitiklių diagnostiką.",
@@ -647,7 +650,8 @@
           "schedule_sync_enabled": "Tvarkykite „IQ EV Charger“ tvarkaraščius.",
           "battery_schedules_enabled": "Tvarkykite „IQ Battery“ tvarkaraščius.",
           "microinverter_lifetime_energy_enabled": "Įjungia visus kiekvieno mikroinverterio viso veikimo energijos jutiklius.",
-          "microinverter_power_enabled": "Įjungia visus kiekvieno mikroinverterio galios jutiklius, kai pasiekiama montuotojo telemetrija."
+          "microinverter_power_enabled": "Įjungia visus kiekvieno mikroinverterio galios jutiklius, kai pasiekiama montuotojo telemetrija.",
+          "vpp_events_enabled": "Gauna VPP/ELRP tvarkaraščius iš „Enphase“ ir kuria įvykių esybes tik užregistruotoms vietoms. Pagal numatytuosius nustatymus išjungta."
         }
       },
       "repair_notifications": {
@@ -2003,6 +2007,21 @@
       },
       "current_grid_profile": {
         "name": "Tinklo profilis"
+      },
+      "vpp_next_event_start": {
+        "name": "Kito VPP įvykio pradžia"
+      },
+      "vpp_next_event_end": {
+        "name": "Kito VPP įvykio pabaiga"
+      },
+      "vpp_next_event_type": {
+        "name": "Kito VPP įvykio tipas"
+      },
+      "vpp_next_event_subtype": {
+        "name": "Kito VPP įvykio potipis"
+      },
+      "vpp_next_event_status": {
+        "name": "Kito VPP įvykio būsena"
       }
     },
     "number": {
@@ -2433,6 +2452,9 @@
       },
       "system_event_history": {
         "name": "Sistemos įvykių istorija"
+      },
+      "vpp_events": {
+        "name": "VPP įvykiai"
       }
     },
     "update": {

@@ -77,6 +77,7 @@ from .const import (
     DEFAULT_SYSTEM_EVENT_REPAIR_ISSUES,
     DEFAULT_SLOW_POLL_INTERVAL,
     DEFAULT_WEATHER_ENABLED,
+    DEFAULT_VPP_EVENTS_ENABLED,
     DOMAIN,
     MAX_API_TIMEOUT,
     MAX_POLL_INTERVAL,
@@ -97,6 +98,7 @@ from .const import (
     OPT_SLOW_POLL_INTERVAL,
     OPT_SESSION_HISTORY_INTERVAL,
     OPT_WEATHER_ENABLED,
+    OPT_VPP_EVENTS_ENABLED,
     DEFAULT_SESSION_HISTORY_INTERVAL_MIN,
     OPT_SCHEDULE_SYNC_ENABLED,
     OPT_SYSTEM_EVENT_REPAIR_ISSUES,
@@ -1429,6 +1431,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 ),
             ): bool,
             vol.Optional(
+                OPT_VPP_EVENTS_ENABLED,
+                default=self._entry.options.get(
+                    OPT_VPP_EVENTS_ENABLED,
+                    DEFAULT_VPP_EVENTS_ENABLED,
+                ),
+            ): bool,
+            vol.Optional(
                 OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
                 default=self._entry.options.get(
                     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
@@ -2293,6 +2302,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             option_data.pop(OPT_SYSTEM_EVENT_REPAIR_ISSUES, None)
             option_data.pop(OPT_PRICING_EDITS_ENABLED, None)
             option_data.pop(OPT_WEATHER_ENABLED, None)
+            option_data.pop(OPT_VPP_EVENTS_ENABLED, None)
             option_data.pop(OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED, None)
             option_data.pop(OPT_MICROINVERTER_POWER_ENABLED, None)
             option_data.pop(OPT_NOMINAL_VOLTAGE, None)
@@ -2388,6 +2398,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 options.get(
                     OPT_WEATHER_ENABLED,
                     DEFAULT_WEATHER_ENABLED,
+                ),
+            )
+        )
+        options[OPT_VPP_EVENTS_ENABLED] = bool(
+            device_data.get(
+                OPT_VPP_EVENTS_ENABLED,
+                options.get(
+                    OPT_VPP_EVENTS_ENABLED,
+                    DEFAULT_VPP_EVENTS_ENABLED,
                 ),
             )
         )

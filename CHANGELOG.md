@@ -8,7 +8,9 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
-- None
+- Added default-off, read-only VPP/ELRP event monitoring for enrolled sites. The
+  Enphase Cloud device gains a VPP Events calendar and five next-event sensors
+  when enabled under Options > Devices > Device Features.
 
 ### 🐛 Bug fixes
 - Exposed the discharge-to-grid switch and configured window for IQ Battery sites

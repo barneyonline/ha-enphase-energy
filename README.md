@@ -54,6 +54,10 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
   default-off Repair notifications sourced from authoritative standing alarms
 - A site-level System Event History calendar on the Enphase Cloud device, with
   localized descriptions, bounded on-demand pagination, and identifier redaction
+- Optional read-only VPP/ELRP monitoring for enrolled sites, with a VPP Events
+  calendar and next-event start, end, type, subtype, and status sensors on the
+  Enphase Cloud device. Enable it under Options > Devices > Device Features;
+  it is disabled by default and makes no VPP service requests until enabled
 - Detailed diagnostic and inventory entities remain available but are disabled by default when they are mainly useful for troubleshooting
 - Restored discovery data creates known entities early during startup; live power
   acquisition starts alongside the minimal setup refresh and is attempted within

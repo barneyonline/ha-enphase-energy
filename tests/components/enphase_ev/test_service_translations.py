@@ -194,6 +194,7 @@ def test_literal_translation_references_exist_in_canonical_catalog() -> None:
         "number.py": "number",
         "select.py": "select",
         "sensor.py": "sensor",
+        "sensor_vpp.py": "sensor",
         "switch.py": "switch",
         "time.py": "time",
         "update.py": "update",

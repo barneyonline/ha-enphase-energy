@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -17,6 +17,8 @@ from custom_components.enphase_ev.integration_snapshot import (
     freeze_charger_data,
 )
 from custom_components.enphase_ev.snapshot_helpers import freeze_snapshot_value
+from custom_components.enphase_ev.const import OPT_VPP_EVENTS_ENABLED
+from custom_components.enphase_ev.vpp_runtime import VppEvent
 
 
 def _snapshot(
@@ -113,6 +115,33 @@ def test_evse_feature_flag_runtime_snapshot_is_detached(coordinator_factory) -> 
     assert snapshot.site_feature_flags == {"remote_start": True}
     with pytest.raises(TypeError):
         snapshot.site_feature_flags["other"] = True  # type: ignore[index]
+
+
+def test_vpp_snapshot_changes_publish_without_charger_changes(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord.config_entry = SimpleNamespace(options={OPT_VPP_EVENTS_ENABLED: True})
+    coord.async_set_updated_data(dict(coord.data))
+    first_revision = coord.integration_snapshot.revision
+    now = datetime.now(UTC)
+    coord.vpp_runtime._enrollment_state = "enrolled"  # noqa: SLF001
+    coord.vpp_runtime._events_last_success_mono = 1e30  # noqa: SLF001
+    coord.vpp_runtime._events = (  # noqa: SLF001
+        VppEvent(
+            fingerprint="safe",
+            start=now,
+            end=now + timedelta(hours=1),
+            event_type="battery_discharge",
+            subtype="Discharge_To_Load_Grid",
+            status="scheduled",
+        ),
+    )
+
+    coord.async_set_updated_data(dict(coord.data))
+
+    assert coord.integration_snapshot.revision == first_revision + 1
+    assert coord.integration_snapshot.vpp.events == coord.vpp_runtime.events
 
 
 def test_migrated_state_compatibility_before_runtime_construction(

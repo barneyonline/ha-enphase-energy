@@ -90,6 +90,7 @@ from .const import (
     DEFAULT_SCHEDULE_SYNC_ENABLED,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SYSTEM_EVENT_REPAIR_ISSUES,
+    DEFAULT_VPP_EVENTS_ENABLED,
     MAX_API_TIMEOUT,
     MAX_POLL_INTERVAL,
     MAX_SESSION_HISTORY_INTERVAL_MIN,
@@ -115,6 +116,7 @@ from .const import (
     OPT_SLOW_POLL_INTERVAL,
     OPT_SESSION_HISTORY_INTERVAL,
     OPT_SYSTEM_EVENT_REPAIR_ISSUES,
+    OPT_VPP_EVENTS_ENABLED,
     PHASE_SWITCH_CONFIG_SETTING,
     SAVINGS_OPERATION_MODE_SUBTYPE,
     DEFAULT_SESSION_HISTORY_INTERVAL_MIN,
@@ -194,6 +196,11 @@ from .request_metrics import RequestMetrics, request_metrics_scope
 from .summary import SummaryStore
 from . import system_dashboard_helpers as sd_helpers
 from .system_events import SystemEventsRuntime
+from .vpp_runtime import (
+    VPP_ENROLLMENT_ENDPOINT_FAMILY,
+    VPP_EVENTS_ENDPOINT_FAMILY,
+    VppRuntime,
+)
 from .refresh_plan import (
     build_followup_plan,
     build_heatpump_followup_plan,
@@ -277,6 +284,7 @@ COORDINATOR_RUNTIME_CLASSES: dict[str, type] = {
     "grid_profile_runtime": GridProfileRuntime,
     "tariff_runtime": TariffRuntime,
     "system_events_runtime": SystemEventsRuntime,
+    "vpp_runtime": VppRuntime,
 }
 
 
@@ -1073,6 +1081,7 @@ class EnphaseCoordinator(
         self._ensure_coordinator_runtime("grid_profile_runtime")
         self._ensure_coordinator_runtime("tariff_runtime")
         self._ensure_coordinator_runtime("system_events_runtime")
+        self._ensure_coordinator_runtime("vpp_runtime")
         self.inventory_runtime = InventoryRuntime(self)
         self.discovery_snapshot = DiscoverySnapshotManager(self)
         self.inventory_view = InventoryView(self)
@@ -1118,6 +1127,7 @@ class EnphaseCoordinator(
             chargers=freeze_charger_data(data),
             evse_feature_flags=feature_flags,
             current_power=current_power,
+            vpp=self.vpp_runtime.snapshot,
             runtime_revisions=tuple(
                 sorted(self._runtime_publication_revisions.items())
             ),
@@ -1130,6 +1140,7 @@ class EnphaseCoordinator(
                 chargers=candidate.chargers,
                 evse_feature_flags=candidate.evse_feature_flags,
                 current_power=candidate.current_power,
+                vpp=candidate.vpp,
                 runtime_revisions=candidate.runtime_revisions,
                 revision=self._publication_revision,
             )
@@ -1391,6 +1402,10 @@ class EnphaseCoordinator(
             )
         ):
             self.system_events_runtime.clear_repairs()
+        if not bool(options.get(OPT_VPP_EVENTS_ENABLED, DEFAULT_VPP_EVENTS_ENABLED)):
+            self.vpp_runtime.clear()
+            self._endpoint_family_health.pop(VPP_ENROLLMENT_ENDPOINT_FAMILY, None)
+            self._endpoint_family_health.pop(VPP_EVENTS_ENDPOINT_FAMILY, None)
 
         schedule_sync_changed = bool(
             previous_options.get(
@@ -1487,6 +1502,24 @@ class EnphaseCoordinator(
                 stale_after_s=86400.0,
                 failure_backoff_schedule_s=(900.0, 1800.0, 3600.0, 7200.0),
                 max_backoff_s=7200.0,
+                optional=True,
+                suppress_after_failures=3,
+                support_state_on_success=True,
+            ),
+            "vpp_enrollment": EndpointFamilyPolicy(
+                success_ttl_s=21600.0,
+                stale_after_s=604800.0,
+                failure_backoff_schedule_s=(900.0, 1800.0, 3600.0, 7200.0),
+                max_backoff_s=7200.0,
+                optional=True,
+                suppress_after_failures=3,
+                support_state_on_success=True,
+            ),
+            "vpp_events": EndpointFamilyPolicy(
+                success_ttl_s=300.0,
+                stale_after_s=3600.0,
+                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
+                max_backoff_s=3600.0,
                 optional=True,
                 suppress_after_failures=3,
                 support_state_on_success=True,

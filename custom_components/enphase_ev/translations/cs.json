@@ -601,7 +601,8 @@
               "weather_enabled": "Povolit počasí",
               "nominal_voltage": "Jmenovité napětí nabíječky EV (V)",
               "microinverter_lifetime_energy_enabled": "Povolit celoživotní energii mikrostřídačů",
-              "microinverter_power_enabled": "Povolit výkon mikrostřídačů"
+              "microinverter_power_enabled": "Povolit výkon mikrostřídačů",
+              "vpp_events_enabled": "Povolit události VPP"
             },
             "data_description": {
               "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto.",
@@ -611,7 +612,8 @@
               "schedule_sync_enabled": "Spravujte plány nabíječky IQ EV Charger.",
               "battery_schedules_enabled": "Spravujte plány baterie IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů.",
-              "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika."
+              "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika.",
+              "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto."
             }
           }
         },
@@ -631,7 +633,8 @@
           "weather_enabled": "Povolit počasí",
           "nominal_voltage": "Jmenovité napětí nabíječky EV (V)",
           "microinverter_lifetime_energy_enabled": "Povolit celoživotní energii mikrostřídačů",
-          "microinverter_power_enabled": "Povolit výkon mikrostřídačů"
+          "microinverter_power_enabled": "Povolit výkon mikrostřídačů",
+          "vpp_events_enabled": "Povolit události VPP"
         },
         "data_description": {
           "type_envoy": "Zahrnuje diagnostiku konektivity brány a měřidel.",
@@ -647,7 +650,8 @@
           "schedule_sync_enabled": "Spravujte plány nabíječky IQ EV Charger.",
           "battery_schedules_enabled": "Spravujte plány baterie IQ Battery.",
           "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů.",
-          "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika."
+          "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika.",
+          "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto."
         }
       },
       "repair_notifications": {
@@ -2003,6 +2007,21 @@
       },
       "current_grid_profile": {
         "name": "Síťový profil"
+      },
+      "vpp_next_event_start": {
+        "name": "Začátek příští události VPP"
+      },
+      "vpp_next_event_end": {
+        "name": "Konec příští události VPP"
+      },
+      "vpp_next_event_type": {
+        "name": "Typ příští události VPP"
+      },
+      "vpp_next_event_subtype": {
+        "name": "Podtyp příští události VPP"
+      },
+      "vpp_next_event_status": {
+        "name": "Stav příští události VPP"
       }
     },
     "number": {
@@ -2433,6 +2452,9 @@
       },
       "system_event_history": {
         "name": "Historie systémových událostí"
+      },
+      "vpp_events": {
+        "name": "Události VPP"
       }
     },
     "update": {

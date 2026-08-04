@@ -38,6 +38,7 @@ from .const import (
     DEFAULT_CHARGE_LEVEL_SETTING,
     DEFAULT_AUTH_TIMEOUT,
     ENTREZ_URL,
+    GS_BASE_URL,
     GREEN_BATTERY_SETTING,
     LOGIN_FORM_URL,
     LOGIN_URL,
@@ -50,6 +51,7 @@ from . import api_parsers
 from .api_client import auth as api_auth
 from .api_client import site_surface as api_site_surface
 from .api_client import transport as api_transport
+from .api_client import vpp_surface as api_vpp_surface
 from .api_models import (
     AuthTokens as AuthTokens,
     ChargerInfo as ChargerInfo,
@@ -990,7 +992,7 @@ def _should_limit_enlighten_read_request(method: object, url: object) -> bool:
         url_text = str(url).strip()
     except Exception:  # noqa: BLE001 - defensive casting
         return False
-    return url_text.startswith(f"{BASE_URL}/")
+    return url_text.startswith((f"{BASE_URL}/", f"{GS_BASE_URL}/"))
 
 
 def _get_enlighten_read_semaphore() -> asyncio.Semaphore:
@@ -2473,6 +2475,22 @@ class EnphaseEVClient:
         if bearer:
             return {"Authorization": f"Bearer {bearer}"}
         return {}
+
+    def _vpp_headers(self) -> dict[str, str | None]:
+        """Return isolated browser headers for the Grid Services host."""
+
+        headers: dict[str, str | None] = {
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Origin": BASE_URL,
+            "Referer": f"{BASE_URL}/",
+            "Cookie": None,
+            "X-CSRF-Token": None,
+            "X-Requested-With": None,
+            "e-auth-token": None,
+            "Content-Type": None,
+        }
+        headers.update(self._control_headers())
+        return headers
 
     def control_headers(self) -> dict[str, str]:
         """Public control header helper for read-only diagnostics checks."""
@@ -4553,12 +4571,16 @@ class EnphaseEVClient:
             "debug_battery_attempt_changes",
             None,
         )
+        redaction_identifiers = kwargs.pop("redaction_identifiers", None)
         allow_reauth = bool(kwargs.pop("allow_reauth", True))
         allow_empty_success = bool(kwargs.pop("allow_empty_success", False))
         attempt = 0
         request_label = _request_label(method, url)
         safe_request_label = redact_text(
-            request_label, site_ids=(self._site,), max_length=256
+            request_label,
+            site_ids=(self._site,),
+            identifiers=redaction_identifiers,
+            max_length=256,
         )
         endpoint = ""
         try:
@@ -4819,10 +4841,9 @@ class EnphaseEVClient:
     ) -> AsyncIterator[aiohttp.ClientSession]:
         """Yield the HTTP session to use for a request.
 
-        Cookie-backed BatteryConfig writes need the explicit raw Cookie header to be
-        sent without any session-jar merging. The injected stateless session avoids
-        hidden cookie mutations from the shared client while preserving connection
-        reuse across writes.
+        Requests with an explicit cookie policy need their headers sent without any
+        session-jar merging. The injected stateless session avoids hidden cookie
+        mutations from the shared client while preserving connection reuse.
         """
 
         if not cookie_header_only:
@@ -7614,6 +7635,29 @@ class EnphaseEVClient:
         )
         legacy_url = f"{BASE_URL}/pv/systems/{self._site}/system_dashboard/devices-tree"
         return await self._system_dashboard_get(modern_url, legacy_url)
+
+    async def vpp_enrollment_id(self) -> object:
+        """Return the VPP enrollment lookup wrapper for this site."""
+
+        return await api_vpp_surface.enrollment_id(self, gs_base_url=GS_BASE_URL)
+
+    async def vpp_enrollment_details(self, enrollment_id: str) -> object:
+        """Return VPP enrollment details for one enrollment id."""
+
+        return await api_vpp_surface.enrollment_details(
+            self,
+            enrollment_id,
+            gs_base_url=GS_BASE_URL,
+        )
+
+    async def vpp_events(self, program_id: str) -> object:
+        """Return the default VPP event result for one program."""
+
+        return await api_vpp_surface.events(
+            self,
+            program_id,
+            gs_base_url=GS_BASE_URL,
+        )
 
     async def system_dashboard_summary(
         self, *, allow_reauth: bool = True

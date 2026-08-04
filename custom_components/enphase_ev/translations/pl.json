@@ -601,7 +601,8 @@
               "weather_enabled": "Włącz pogodę",
               "nominal_voltage": "Napięcie znamionowe ładowarki EV (V)",
               "microinverter_lifetime_energy_enabled": "Włącz energię całkowitą mikroinwerterów",
-              "microinverter_power_enabled": "Włącz moc mikroinwerterów"
+              "microinverter_power_enabled": "Włącz moc mikroinwerterów",
+              "vpp_events_enabled": "Włącz zdarzenia VPP"
             },
             "data_description": {
               "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone.",
@@ -611,7 +612,8 @@
               "schedule_sync_enabled": "Zarządzaj harmonogramami IQ EV Charger.",
               "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
-              "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna."
+              "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna.",
+              "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone."
             }
           }
         },
@@ -631,7 +633,8 @@
           "weather_enabled": "Włącz pogodę",
           "nominal_voltage": "Napięcie znamionowe ładowarki EV (V)",
           "microinverter_lifetime_energy_enabled": "Włącz energię całkowitą mikroinwerterów",
-          "microinverter_power_enabled": "Włącz moc mikroinwerterów"
+          "microinverter_power_enabled": "Włącz moc mikroinwerterów",
+          "vpp_events_enabled": "Włącz zdarzenia VPP"
         },
         "data_description": {
           "type_envoy": "Zawiera diagnostykę łączności bramy i liczników.",
@@ -647,7 +650,8 @@
           "schedule_sync_enabled": "Zarządzaj harmonogramami IQ EV Charger.",
           "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery.",
           "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
-          "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna."
+          "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna.",
+          "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone."
         }
       },
       "repair_notifications": {
@@ -2003,6 +2007,21 @@
       },
       "current_grid_profile": {
         "name": "Profil sieci"
+      },
+      "vpp_next_event_start": {
+        "name": "Początek następnego zdarzenia VPP"
+      },
+      "vpp_next_event_end": {
+        "name": "Koniec następnego zdarzenia VPP"
+      },
+      "vpp_next_event_type": {
+        "name": "Typ następnego zdarzenia VPP"
+      },
+      "vpp_next_event_subtype": {
+        "name": "Podtyp następnego zdarzenia VPP"
+      },
+      "vpp_next_event_status": {
+        "name": "Stan następnego zdarzenia VPP"
       }
     },
     "number": {
@@ -2433,6 +2452,9 @@
       },
       "system_event_history": {
         "name": "Historia zdarzeń systemowych"
+      },
+      "vpp_events": {
+        "name": "Zdarzenia VPP"
       }
     },
     "update": {

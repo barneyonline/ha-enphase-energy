@@ -601,7 +601,8 @@
               "weather_enabled": "Wetter aktivieren",
               "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)",
               "microinverter_lifetime_energy_enabled": "Lebensdauerenergie der Mikro-Wechselrichter aktivieren",
-              "microinverter_power_enabled": "Leistung der Mikro-Wechselrichter aktivieren"
+              "microinverter_power_enabled": "Leistung der Mikro-Wechselrichter aktivieren",
+              "vpp_events_enabled": "VPP-Ereignisse aktivieren"
             },
             "data_description": {
               "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert.",
@@ -611,7 +612,8 @@
               "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten.",
               "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten.",
               "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
-              "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist."
+              "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist.",
+              "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert."
             }
           }
         },
@@ -631,7 +633,8 @@
           "weather_enabled": "Wetter aktivieren",
           "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)",
           "microinverter_lifetime_energy_enabled": "Lebensdauerenergie der Mikro-Wechselrichter aktivieren",
-          "microinverter_power_enabled": "Leistung der Mikro-Wechselrichter aktivieren"
+          "microinverter_power_enabled": "Leistung der Mikro-Wechselrichter aktivieren",
+          "vpp_events_enabled": "VPP-Ereignisse aktivieren"
         },
         "data_description": {
           "type_envoy": "Enthält Gateway-Konnektivitäts- und Zählerdiagnosen.",
@@ -647,7 +650,8 @@
           "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten.",
           "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten.",
           "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
-          "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist."
+          "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist.",
+          "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert."
         }
       },
       "repair_notifications": {
@@ -2003,6 +2007,21 @@
       },
       "current_grid_profile": {
         "name": "Gridprofil"
+      },
+      "vpp_next_event_start": {
+        "name": "Beginn des nächsten VPP-Ereignisses"
+      },
+      "vpp_next_event_end": {
+        "name": "Ende des nächsten VPP-Ereignisses"
+      },
+      "vpp_next_event_type": {
+        "name": "Typ des nächsten VPP-Ereignisses"
+      },
+      "vpp_next_event_subtype": {
+        "name": "Untertyp des nächsten VPP-Ereignisses"
+      },
+      "vpp_next_event_status": {
+        "name": "Status des nächsten VPP-Ereignisses"
       }
     },
     "number": {
@@ -2433,6 +2452,9 @@
       },
       "system_event_history": {
         "name": "Systemereignisverlauf"
+      },
+      "vpp_events": {
+        "name": "VPP-Ereignisse"
       }
     },
     "update": {

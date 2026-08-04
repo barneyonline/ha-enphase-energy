@@ -306,6 +306,10 @@ class _RefreshOwner:
             history_refresh_due=lambda: False,
             async_refresh_history=lambda: self._record("system_event_history"),
         )
+        self.vpp_runtime = SimpleNamespace(
+            refresh_due=lambda: False,
+            async_refresh=lambda: self._record("vpp"),
+        )
         self.battery_runtime = SimpleNamespace(
             async_refresh_grid_control_check=self._async_refresh_grid_control_check,
             async_refresh_grid_mode_status=self._async_refresh_grid_mode_status,
@@ -477,6 +481,7 @@ def test_followup_refresh_stage_binds_zero_arg_calls() -> None:
     assert bound.defer_topology is True
     assert [call[0] for call in bound.parallel_calls] == [
         "system_events_s",
+        "vpp_s",
         "battery_site_settings_s",
         "battery_backup_history_s",
         "battery_settings_s",
@@ -497,11 +502,12 @@ def test_followup_refresh_stage_binds_zero_arg_calls() -> None:
         "hems_devices_s",
     ]
 
-    assert bound.parallel_calls[1][2]() == "site-settings"
+    assert bound.parallel_calls[1][2]() == "vpp"
+    assert bound.parallel_calls[2][2]() == "site-settings"
     assert bound.ordered_calls[-1][2]() == "hems-devices"
-    assert bound.parallel_calls[1][3] == "battery_site_settings"
+    assert bound.parallel_calls[2][3] == "battery_site_settings"
     assert bound.ordered_calls[-1][3] == "inventory_topology"
-    assert owner.calls == ["battery_site_settings", "hems_devices"]
+    assert owner.calls == ["vpp", "battery_site_settings", "hems_devices"]
 
 
 def test_refresh_plans_bind_dynamic_followup_and_warmup_calls() -> None:
@@ -767,6 +773,36 @@ def test_dynamic_followup_plan_includes_due_system_event_history() -> None:
     ]
 
 
+def test_dynamic_followup_plan_includes_due_vpp_events() -> None:
+    owner = _RefreshOwner()
+    owner.vpp_runtime.refresh_due = lambda: True
+    for method_name in (
+        "battery_site_settings_refresh_due",
+        "battery_backup_history_refresh_due",
+        "battery_settings_refresh_due",
+        "battery_schedules_refresh_due",
+        "storm_guard_refresh_due",
+        "storm_alert_refresh_due",
+        "grid_control_check_refresh_due",
+        "grid_mode_status_refresh_due",
+        "grid_outage_context_refresh_due",
+        "dry_contact_settings_refresh_due",
+        "battery_status_refresh_due",
+        "ac_battery_devices_refresh_due",
+    ):
+        setattr(owner.battery_runtime, method_name, lambda: False)
+    owner.inventory_runtime.devices_inventory_refresh_due = lambda: False
+    owner.inventory_runtime.hems_devices_refresh_due = lambda: False
+    owner.current_power_runtime.refresh_due = lambda: False
+    owner.evse_feature_flags_runtime.refresh_due = lambda: False
+    owner.system_events_runtime.refresh_due = lambda: False
+    owner.tariff_runtime.refresh_due = lambda: False
+
+    plan = build_followup_plan(owner)
+
+    assert [task.timing_key for task in plan.stages[0].parallel_tasks] == ["vpp_s"]
+
+
 def test_dynamic_plan_builders_force_full_plans() -> None:
     owner = _RefreshOwner()
 
@@ -896,7 +932,7 @@ async def test_coordinator_refresh_plan_runner_executes_each_stage(
     await coord.refresh_runner.async_run_refresh_plan({}, plan=FOLLOWUP_PLAN)
 
     assert seen == [
-        (None, True, 13, 4),
+        (None, True, 14, 4),
     ]
 
 

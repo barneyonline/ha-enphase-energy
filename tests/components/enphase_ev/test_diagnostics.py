@@ -788,6 +788,13 @@ async def test_config_entry_diagnostics_includes_coordinator(
             "truncated": False,
         },
     )
+    coord.vpp_runtime = SimpleNamespace(
+        diagnostics=lambda: {
+            "enabled": True,
+            "enrollment_state": "enrolled",
+            "event_count": 2,
+        }
+    )
     coord.current_power_runtime = SimpleNamespace(
         diagnostics=lambda: {
             "accepted_value_w": 2452.0,
@@ -1094,6 +1101,11 @@ async def test_config_entry_diagnostics_includes_coordinator(
         "cached_event_count": 3,
         "truncated": False,
     }
+    assert diag["coordinator"]["vpp"] == {
+        "enabled": True,
+        "enrollment_state": "enrolled",
+        "event_count": 2,
+    }
 
 
 @pytest.mark.asyncio
@@ -1102,6 +1114,9 @@ async def test_config_entry_diagnostics_handles_system_events_capture_error(
 ) -> None:
     coord = DummyCoordinator()
     coord.system_events_runtime = SimpleNamespace(
+        diagnostics=lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
+    coord.vpp_runtime = SimpleNamespace(
         diagnostics=lambda: (_ for _ in ()).throw(RuntimeError("boom"))
     )
     config_entry.runtime_data = EnphaseRuntimeData(
@@ -1114,6 +1129,7 @@ async def test_config_entry_diagnostics_handles_system_events_capture_error(
     diag = await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
 
     assert diag["coordinator"]["system_events"] == {}
+    assert diag["coordinator"]["vpp"] == {}
     assert diag["coordinator"]["weather"] is None
 
 
