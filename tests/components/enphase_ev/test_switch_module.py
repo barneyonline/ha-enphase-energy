@@ -693,14 +693,21 @@ async def test_async_setup_entry_adds_supported_battery_site_switches_and_prunes
             {"show": True, "enabled": False}
         )
     )
-    coord._battery_dtg_control = (
-        coord.battery_runtime._parse_battery_control_capability(  # noqa: SLF001
-            {"show": True, "showDaySchedule": True, "scheduleSupported": True}
-        )
+    coord.battery_runtime.parse_battery_settings_payload(
+        {
+            "data": {
+                "dtgControl": {
+                    "show": True,
+                    "showDaySchedule": False,
+                    "enabled": True,
+                    "locked": False,
+                    "scheduleSupported": True,
+                    "startTime": 1020,
+                    "endTime": 1379,
+                }
+            }
+        }
     )
-    coord._battery_dtg_schedule_id = "sched-dtg"  # noqa: SLF001
-    coord._battery_dtg_begin_time = 1080  # noqa: SLF001
-    coord._battery_dtg_end_time = 1380  # noqa: SLF001
     coord._battery_rbd_control = (
         coord.battery_runtime._parse_battery_control_capability(  # noqa: SLF001
             {"show": True, "showDaySchedule": True, "scheduleSupported": True}
@@ -2309,6 +2316,36 @@ def test_discharge_to_grid_schedule_switch_availability(coordinator_factory) -> 
 
     assert sw.available is True
     assert sw.is_on is True
+
+
+def test_discharge_to_grid_control_window_switch_availability(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord._battery_has_encharge = True  # noqa: SLF001
+    coord._battery_user_is_owner = True  # noqa: SLF001
+    coord.battery_runtime.parse_battery_settings_payload(
+        {
+            "data": {
+                "dtgControl": {
+                    "show": True,
+                    "showDaySchedule": False,
+                    "enabled": True,
+                    "locked": False,
+                    "scheduleSupported": True,
+                    "startTime": 1020,
+                    "endTime": 1379,
+                }
+            }
+        }
+    )
+
+    sw = DischargeToGridScheduleSwitch(coord)
+
+    assert sw.available is True
+    assert sw.is_on is True
+    assert sw.extra_state_attributes["start_time"] == "17:00"
+    assert sw.extra_state_attributes["end_time"] == "22:59"
 
 
 def test_discharge_to_grid_schedule_switch_exposes_schedule_attributes(

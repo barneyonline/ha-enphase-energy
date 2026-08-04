@@ -11,7 +11,8 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Exposed the discharge-to-grid switch and configured window for IQ Battery sites
+  that use the `dtgControl` window without per-day schedule rows. (#810)
 
 ### 🔧 Improvements
 - Scoped device-registry synchronization, cleanup, and service routing to the

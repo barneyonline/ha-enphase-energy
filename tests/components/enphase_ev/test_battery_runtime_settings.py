@@ -693,6 +693,40 @@ def test_battery_schedule_support_helpers_cover_false_paths(
     assert coord.discharge_to_grid_schedule_available is False
 
 
+def test_dtg_control_window_without_day_schedule_is_available(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord._battery_has_encharge = True  # noqa: SLF001
+    coord._battery_user_is_owner = True  # noqa: SLF001
+
+    coord.battery_runtime.parse_battery_settings_payload(
+        {
+            "data": {
+                "batteryGridMode": "ExportOnly",
+                "dtgControl": {
+                    "show": True,
+                    "showDaySchedule": False,
+                    "enabled": True,
+                    "locked": False,
+                    "scheduleSupported": True,
+                    "startTime": 1020,
+                    "endTime": 1379,
+                },
+            }
+        }
+    )
+
+    assert coord._battery_dtg_schedule_id is None  # noqa: SLF001
+    assert coord._battery_dtg_begin_time is None  # noqa: SLF001
+    assert coord._battery_dtg_end_time is None  # noqa: SLF001
+    assert coord.discharge_to_grid_schedule_supported is True
+    assert coord.discharge_to_grid_schedule_available is True
+    assert coord.battery_discharge_to_grid_schedule_enabled is True
+    assert coord.battery_discharge_to_grid_start_time == dt_time(17, 0)
+    assert coord.battery_discharge_to_grid_end_time == dt_time(22, 59)
+
+
 def test_rbd_time_properties_fall_back_to_control_window(coordinator_factory) -> None:
     coord = coordinator_factory()
     coord._battery_rbd_control_begin_time = 60  # noqa: SLF001
@@ -3956,6 +3990,53 @@ async def test_dtg_schedule_enabled_without_schedule_uses_battery_settings_toggl
     assert coord._battery_dtg_end_time is None  # noqa: SLF001
     assert coord.battery_discharge_to_grid_start_time == dt_time(19, 0)
     assert coord.battery_discharge_to_grid_end_time == dt_time(22, 0)
+
+
+@pytest.mark.asyncio
+async def test_dtg_control_window_without_day_schedule_uses_battery_settings_toggle(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord._battery_has_encharge = True  # noqa: SLF001
+    coord._battery_user_is_owner = True  # noqa: SLF001
+    coord.battery_runtime.parse_battery_settings_payload(
+        {
+            "data": {
+                "dtgControl": {
+                    "show": True,
+                    "showDaySchedule": False,
+                    "enabled": True,
+                    "locked": False,
+                    "scheduleSupported": True,
+                    "startTime": 1020,
+                    "endTime": 1379,
+                }
+            }
+        }
+    )
+    coord.client.set_battery_settings = AsyncMock(return_value={})
+    coord.battery_runtime._async_verify_schedule_family_toggle_applied = (
+        AsyncMock()
+    )  # noqa: SLF001
+    coord.async_request_refresh = AsyncMock()
+    coord.kick_fast = MagicMock()
+
+    await coord.async_set_discharge_to_grid_schedule_enabled(False)
+
+    coord.client.set_battery_settings.assert_awaited_once_with(
+        {
+            "dtgControl": {
+                "enabled": False,
+                "show": True,
+                "locked": False,
+                "showDaySchedule": False,
+                "scheduleSupported": True,
+                "startTime": 1020,
+                "endTime": 1379,
+            }
+        },
+        schedule_type="dtg",
+    )
 
 
 @pytest.mark.asyncio
