@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from homeassistant.const import UnitOfPower
+from homeassistant.const import UnitOfEnergy, UnitOfPower
 
 from custom_components.enphase_ev import energy as energy_mod
 from custom_components.enphase_ev.api import SiteEnergyUnavailable
@@ -20,6 +20,7 @@ from custom_components.enphase_ev.sensor import (
     EnphaseBatteryPowerSensor,
     EnphaseGridPowerSensor,
     EnphaseSiteEnergySensor,
+    _SiteEnergyRestoreData,
     _SiteLifetimePowerRestoreData,
     _lifetime_energy_delta,
 )
@@ -32,6 +33,7 @@ def test_site_energy_aggregation_with_fallbacks(coordinator_factory) -> None:
         "consumption": [1500, 500],
         "solar_home": [400, 100],
         "solar_grid": [600, None],
+        "generator_grid": [25],
         "grid_battery": [50],
         "battery_grid": [100],
         "charge": None,
@@ -62,7 +64,12 @@ def test_site_energy_aggregation_with_fallbacks(coordinator_factory) -> None:
         "grid_battery",
     ]
     assert flows["grid_import"].value_kwh == pytest.approx(1.4)
-    assert flows["grid_export"].fields_used == ["solar_grid"]
+    assert flows["grid_export"].fields_used == [
+        "solar_grid",
+        "battery_grid",
+        "generator_grid",
+    ]
+    assert flows["grid_export"].value_kwh == pytest.approx(0.725)
     assert flows["battery_charge"].bucket_count == 1
     assert flows["battery_charge"].value_kwh == pytest.approx(0.15)
     assert flows["battery_discharge"].value_kwh == pytest.approx(0.25)
@@ -81,6 +88,39 @@ def test_site_energy_refresh_due_respects_backoff(
     monkeypatch.setattr(energy_mod.time, "monotonic", lambda: 100.0)
 
     assert manager.site_energy_refresh_due() is False
+
+
+def test_site_energy_grid_export_includes_battery_discharge_to_grid(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    payload = {
+        "solar_grid": [0, 0],
+        "battery_grid": [8000, 8180],
+        "interval_minutes": 60,
+    }
+
+    flows, _meta = coord.energy._aggregate_site_energy(payload)  # noqa: SLF001
+
+    assert flows["grid_export"].value_kwh == pytest.approx(16.18)
+    assert flows["grid_export"].fields_used == ["solar_grid", "battery_grid"]
+    assert flows["grid_export"].legacy_offset_kwh == pytest.approx(16.18)
+
+
+def test_site_energy_grid_export_preserves_zero_channels(coordinator_factory) -> None:
+    coord = coordinator_factory()
+    payload = {
+        "solar_grid": [0, 0],
+        "battery_grid": [0, 0],
+        "interval_minutes": 60,
+    }
+
+    flows, _meta = coord.energy._aggregate_site_energy(payload)  # noqa: SLF001
+
+    assert flows["grid_export"].value_kwh == 0.0
+    assert flows["grid_export"].bucket_count == 2
+    assert flows["grid_export"].fields_used == ["solar_grid", "battery_grid"]
+    assert flows["grid_export"].legacy_offset_kwh == 0.0
 
 
 def test_site_energy_refresh_due_skips_when_cache_is_fresh(
@@ -1381,7 +1421,7 @@ def test_site_grid_power_sensor_stays_available_at_zero_when_channel_known(
     coord = coordinator_factory()
     coord.energy.site_energy = {}
     coord.energy._site_energy_meta = {  # noqa: SLF001
-        "bucket_lengths": {"solar_grid": 12},
+        "bucket_lengths": {"battery_grid": 12},
         "last_report_date": datetime(2024, 1, 2, tzinfo=timezone.utc),
     }
     sensor = EnphaseGridPowerSensor(coord)
@@ -1502,6 +1542,7 @@ async def test_site_lifetime_power_sensor_restores_and_handles_resets(
         }
 
     sensor.async_get_last_state = AsyncMock(return_value=LastState())
+    sensor.async_get_last_extra_data = AsyncMock(return_value=None)
     await sensor.async_added_to_hass()
     assert sensor.available is False
 
@@ -3110,7 +3151,15 @@ async def test_site_energy_sensor_restoration(monkeypatch, hass, coordinator_fac
     sensor2.hass = hass
     sensor2.async_get_last_sensor_data = AsyncMock(return_value=None)
     sensor2.async_get_last_state = AsyncMock(side_effect=RuntimeError("boom"))
+    sensor2.async_get_last_extra_data = AsyncMock(return_value=None)
     await sensor2.async_added_to_hass()
+    assert sensor2.native_value is None
+    assert "composition_offset_kwh" not in sensor2.extra_state_attributes
+    assert sensor2.extra_restore_state_data is not None
+    assert (
+        sensor2.extra_restore_state_data.as_dict()["composition_migration_checked"]
+        is False
+    )
 
     class BadLastData:
         @property
@@ -3123,6 +3172,7 @@ async def test_site_energy_sensor_restoration(monkeypatch, hass, coordinator_fac
     sensor3.hass = hass
     sensor3.async_get_last_sensor_data = AsyncMock(return_value=BadLastData())
     sensor3.async_get_last_state = AsyncMock(return_value=None)
+    sensor3.async_get_last_extra_data = AsyncMock(return_value=None)
     await sensor3.async_added_to_hass()
     sensor3._restored_value = 1.5
     assert sensor3.available is True
@@ -3146,6 +3196,7 @@ async def test_site_energy_sensor_restoration(monkeypatch, hass, coordinator_fac
         "source_unit": UnitOfPower.WATT,
         "last_reset_at": None,
         "interval_minutes": None,
+        "legacy_offset_kwh": 0.0,
     }
 
     class BadStr:
@@ -3157,6 +3208,401 @@ async def test_site_energy_sensor_restoration(monkeypatch, hass, coordinator_fac
     }
     attrs = sensor3.extra_state_attributes
     assert "last_report_date" not in attrs
+
+
+@pytest.mark.asyncio
+async def test_grid_export_sensor_preserves_statistics_across_composition_migration(
+    hass, coordinator_factory
+) -> None:
+    coord = coordinator_factory()
+    coord.energy.site_energy = {
+        "grid_export": SiteEnergyFlow(
+            value_kwh=26.105,
+            bucket_count=2,
+            fields_used=["solar_grid", "battery_grid"],
+            start_date="2023-08-10",
+            last_report_date=datetime(2026, 8, 2, tzinfo=timezone.utc),
+            update_pending=False,
+            source_unit="Wh",
+            interval_minutes=60,
+            legacy_offset_kwh=16.18,
+        )
+    }
+    sensor = EnphaseSiteEnergySensor(
+        coord, "grid_export", "site_grid_export", "Grid Export"
+    )
+    sensor.hass = hass
+
+    class LastData:
+        native_value = 9.9
+
+    class LastState:
+        attributes = {}
+
+    sensor.async_get_last_sensor_data = AsyncMock(return_value=LastData())
+    sensor.async_get_last_state = AsyncMock(return_value=LastState())
+    sensor.async_get_last_extra_data = AsyncMock(return_value=None)
+    await sensor.async_added_to_hass()
+
+    assert sensor.native_value == pytest.approx(9.93)
+    restore_data = sensor.extra_restore_state_data
+    assert restore_data is not None
+    assert restore_data.as_dict()["composition_offset_kwh"] == pytest.approx(16.18)
+
+    coord.energy.site_energy["grid_export"] = SiteEnergyFlow(
+        value_kwh=26.28,
+        bucket_count=2,
+        fields_used=["solar_grid", "battery_grid"],
+        start_date="2023-08-10",
+        last_report_date=datetime(2026, 8, 2, 1, tzinfo=timezone.utc),
+        update_pending=False,
+        source_unit="Wh",
+        interval_minutes=60,
+        legacy_offset_kwh=16.255,
+    )
+
+    assert sensor.native_value == pytest.approx(10.1)
+    restore_data = sensor.extra_restore_state_data
+    assert restore_data is not None
+    assert restore_data.as_dict()["composition_offset_kwh"] == pytest.approx(16.18)
+
+    coord.energy.site_energy["grid_export"] = SiteEnergyFlow(
+        value_kwh=1.0,
+        bucket_count=2,
+        fields_used=["solar_grid", "battery_grid"],
+        start_date="2026-08-03",
+        last_report_date=datetime(2026, 8, 3, tzinfo=timezone.utc),
+        update_pending=False,
+        source_unit="Wh",
+        last_reset_at="2026-08-03T00:00:00+00:00",
+        interval_minutes=60,
+        legacy_offset_kwh=0.7,
+    )
+
+    assert sensor.native_value == pytest.approx(1.0)
+    restore_data = sensor.extra_restore_state_data
+    assert restore_data is not None
+    assert restore_data.as_dict()["composition_offset_kwh"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_grid_export_sensor_restores_composition_offset(
+    hass, coordinator_factory
+) -> None:
+    coord = coordinator_factory()
+    coord.energy.site_energy = {
+        "grid_export": SiteEnergyFlow(
+            value_kwh=26.28,
+            bucket_count=2,
+            fields_used=["solar_grid", "battery_grid"],
+            start_date="2023-08-10",
+            last_report_date=datetime(2026, 8, 2, 1, tzinfo=timezone.utc),
+            update_pending=False,
+            source_unit="Wh",
+            interval_minutes=60,
+            legacy_offset_kwh=16.255,
+        )
+    }
+    sensor = EnphaseSiteEnergySensor(
+        coord, "grid_export", "site_grid_export", "Grid Export"
+    )
+    sensor.hass = hass
+
+    class LastData:
+        native_value = 10.1
+
+    class LastState:
+        attributes = {}
+
+    class LastExtra:
+        def as_dict(self):
+            return {
+                "composition_offset_kwh": "16.18",
+                "composition_offset_reset_at": None,
+                "composition_source_start_date": "2023-08-10",
+                "composition_migration_checked": True,
+            }
+
+    sensor.async_get_last_sensor_data = AsyncMock(return_value=LastData())
+    sensor.async_get_last_state = AsyncMock(return_value=LastState())
+    sensor.async_get_last_extra_data = AsyncMock(return_value=LastExtra())
+    await sensor.async_added_to_hass()
+
+    assert sensor.native_value == pytest.approx(10.1)
+    restore_data = sensor.extra_restore_state_data
+    assert restore_data is not None
+    assert restore_data.as_dict()["composition_offset_kwh"] == pytest.approx(16.18)
+
+
+@pytest.mark.asyncio
+async def test_grid_export_sensor_does_not_offset_migrated_composite_history(
+    hass, coordinator_factory
+) -> None:
+    coord = coordinator_factory()
+    coord.energy.site_energy = {
+        "grid_export": SiteEnergyFlow(
+            value_kwh=26.105,
+            bucket_count=2,
+            fields_used=["solar_grid", "battery_grid"],
+            start_date="2023-08-10",
+            last_report_date=datetime(2026, 8, 2, tzinfo=timezone.utc),
+            update_pending=False,
+            source_unit="Wh",
+            interval_minutes=60,
+            legacy_offset_kwh=16.18,
+        )
+    }
+    sensor = EnphaseSiteEnergySensor(
+        coord, "grid_export", "site_grid_export", "Grid Export"
+    )
+    sensor.hass = hass
+
+    class LastData:
+        native_value = 26.0
+
+    class LastState:
+        attributes = {}
+
+    sensor.async_get_last_sensor_data = AsyncMock(return_value=LastData())
+    sensor.async_get_last_state = AsyncMock(return_value=LastState())
+    sensor.async_get_last_extra_data = AsyncMock(return_value=None)
+    await sensor.async_added_to_hass()
+
+    assert sensor.native_value == pytest.approx(26.11)
+    restore_data = sensor.extra_restore_state_data
+    assert restore_data is not None
+    assert restore_data.as_dict()["composition_offset_kwh"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_grid_export_sensor_clears_offset_after_offline_lifetime_reset(
+    hass, coordinator_factory
+) -> None:
+    coord = coordinator_factory()
+    coord.energy.site_energy = {
+        "grid_export": SiteEnergyFlow(
+            value_kwh=1.0,
+            bucket_count=2,
+            fields_used=["solar_grid", "battery_grid"],
+            start_date="2026-08-03",
+            last_report_date=datetime(2026, 8, 3, tzinfo=timezone.utc),
+            update_pending=False,
+            source_unit="Wh",
+            interval_minutes=60,
+            legacy_offset_kwh=0.7,
+        )
+    }
+    sensor = EnphaseSiteEnergySensor(
+        coord, "grid_export", "site_grid_export", "Grid Export"
+    )
+    sensor.hass = hass
+
+    class LastData:
+        native_value = 10.1
+
+    class LastState:
+        attributes = {}
+
+    class LastExtra:
+        def as_dict(self):
+            return {
+                "composition_offset_kwh": 16.18,
+                "composition_offset_reset_at": None,
+                "composition_source_start_date": "2023-08-10",
+                "composition_migration_checked": True,
+            }
+
+    sensor.async_get_last_sensor_data = AsyncMock(return_value=LastData())
+    sensor.async_get_last_state = AsyncMock(return_value=LastState())
+    sensor.async_get_last_extra_data = AsyncMock(return_value=LastExtra())
+    await sensor.async_added_to_hass()
+
+    assert sensor.native_value == pytest.approx(1.0)
+    restore_data = sensor.extra_restore_state_data
+    assert restore_data is not None
+    assert restore_data.as_dict() == {
+        "native_value": 1.0,
+        "native_unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
+        "composition_offset_kwh": 0.0,
+        "composition_offset_reset_at": None,
+        "composition_source_start_date": "2026-08-03",
+        "composition_migration_checked": True,
+    }
+
+
+@pytest.mark.asyncio
+async def test_new_grid_export_sensor_uses_full_composite_total(
+    hass, coordinator_factory
+) -> None:
+    coord = coordinator_factory()
+    coord.energy.site_energy = {
+        "grid_export": SiteEnergyFlow(
+            value_kwh=26.105,
+            bucket_count=2,
+            fields_used=["solar_grid", "battery_grid"],
+            start_date="2023-08-10",
+            last_report_date=datetime(2026, 8, 2, tzinfo=timezone.utc),
+            update_pending=False,
+            source_unit="Wh",
+            interval_minutes=60,
+            legacy_offset_kwh=16.18,
+        )
+    }
+    sensor = EnphaseSiteEnergySensor(
+        coord, "grid_export", "site_grid_export", "Grid Export"
+    )
+    sensor.hass = hass
+    sensor.async_get_last_sensor_data = AsyncMock(return_value=None)
+    sensor.async_get_last_state = AsyncMock(return_value=None)
+    sensor.async_get_last_extra_data = AsyncMock(return_value=None)
+
+    await sensor.async_added_to_hass()
+
+    assert sensor.native_value == pytest.approx(26.11)
+    restore_data = sensor.extra_restore_state_data
+    assert restore_data is not None
+    assert restore_data.as_dict() == {
+        "native_value": 26.11,
+        "native_unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
+        "composition_offset_kwh": 0.0,
+        "composition_offset_reset_at": None,
+        "composition_source_start_date": "2023-08-10",
+        "composition_migration_checked": True,
+    }
+    assert "composition_offset_kwh" not in sensor.extra_state_attributes
+    assert sensor._coerce_nonnegative_float("bad") is None  # noqa: SLF001
+    assert sensor._coerce_nonnegative_float(-1) is None  # noqa: SLF001
+    assert sensor._coerce_nonnegative_float(float("inf")) is None  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_grid_export_zero_channels_finalize_migration_before_first_export(
+    hass, coordinator_factory
+) -> None:
+    coord = coordinator_factory()
+    zero_flows, _meta = coord.energy._aggregate_site_energy(  # noqa: SLF001
+        {"solar_grid": [0, 0], "battery_grid": [0, 0]}
+    )
+    coord.energy.site_energy = zero_flows
+    sensor = EnphaseSiteEnergySensor(
+        coord, "grid_export", "site_grid_export", "Grid Export"
+    )
+    sensor.hass = hass
+
+    class LastData:
+        native_value = 5.0
+
+    class LastState:
+        attributes = {}
+
+    sensor.async_get_last_sensor_data = AsyncMock(return_value=LastData())
+    sensor.async_get_last_state = AsyncMock(return_value=LastState())
+    sensor.async_get_last_extra_data = AsyncMock(return_value=None)
+    await sensor.async_added_to_hass()
+
+    assert sensor.native_value == 0.0
+    restore_data = sensor.extra_restore_state_data
+    assert restore_data is not None
+    assert restore_data.as_dict()["composition_migration_checked"] is True
+
+    export_flows, _meta = coord.energy._aggregate_site_energy(  # noqa: SLF001
+        {"solar_grid": [0, 0], "battery_grid": [8000, 8180]}
+    )
+    coord.energy.site_energy = export_flows
+
+    assert sensor.native_value == pytest.approx(16.18)
+
+
+@pytest.mark.asyncio
+async def test_site_energy_sensor_restore_data_round_trip(
+    hass, coordinator_factory
+) -> None:
+    coord = coordinator_factory()
+    source = EnphaseSiteEnergySensor(
+        coord, "grid_export", "site_grid_export", "Grid Export"
+    )
+    source.hass = hass
+    source._restored_value = 10.1  # noqa: SLF001
+    source._composition_offset_kwh = 16.18  # noqa: SLF001
+    source._composition_source_start_date = "2023-08-10"  # noqa: SLF001
+    source._composition_migration_checked = True  # noqa: SLF001
+
+    stored = source.extra_restore_state_data
+    assert stored is not None
+    assert stored.as_dict() == {
+        "native_value": 10.1,
+        "native_unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
+        "composition_offset_kwh": 16.18,
+        "composition_offset_reset_at": None,
+        "composition_source_start_date": "2023-08-10",
+        "composition_migration_checked": True,
+    }
+
+    restored = EnphaseSiteEnergySensor(
+        coord, "grid_export", "site_grid_export", "Grid Export"
+    )
+    restored.hass = hass
+    restored.async_get_last_extra_data = AsyncMock(return_value=stored)
+    restored.async_get_last_state = AsyncMock(return_value=None)
+
+    await restored.async_added_to_hass()
+
+    assert restored.native_value == pytest.approx(10.1)
+    assert restored._composition_offset_kwh == pytest.approx(16.18)  # noqa: SLF001
+    assert restored.async_get_last_extra_data.await_count == 2
+
+    non_export = EnphaseSiteEnergySensor(
+        coord, "grid_import", "site_grid_import", "Grid Import"
+    )
+    non_export._restored_value = 2.5  # noqa: SLF001
+    non_export_stored = non_export.extra_restore_state_data
+    assert non_export_stored is not None
+    assert non_export_stored.as_dict() == {
+        "native_value": 2.5,
+        "native_unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
+    }
+
+
+def test_site_energy_restore_data_handles_invalid_payloads() -> None:
+    assert _SiteEnergyRestoreData.from_dict(None).as_dict() == {
+        "native_value": None,
+        "native_unit_of_measurement": None,
+        "composition_offset_kwh": 0.0,
+        "composition_offset_reset_at": None,
+        "composition_source_start_date": None,
+        "composition_migration_checked": False,
+    }
+    assert _SiteEnergyRestoreData.from_dict(
+        {
+            "composition_offset_kwh": "bad",
+            "composition_offset_reset_at": 123,
+            "composition_source_start_date": 456,
+            "composition_migration_checked": "true",
+        }
+    ).as_dict() == {
+        "native_value": None,
+        "native_unit_of_measurement": None,
+        "composition_offset_kwh": 0.0,
+        "composition_offset_reset_at": None,
+        "composition_source_start_date": None,
+        "composition_migration_checked": False,
+    }
+    assert (
+        _SiteEnergyRestoreData.from_dict(
+            {
+                "composition_offset_kwh": -1,
+                "composition_offset_reset_at": "2026-08-03T00:00:00+00:00",
+                "composition_migration_checked": True,
+            }
+        ).composition_offset_kwh
+        == 0.0
+    )
+    assert (
+        _SiteEnergyRestoreData.from_dict(
+            {"composition_offset_kwh": float("nan")}
+        ).composition_offset_kwh
+        == 0.0
+    )
 
 
 @pytest.mark.asyncio
