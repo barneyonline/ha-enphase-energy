@@ -1449,6 +1449,7 @@
           "charging": "Uzlāde",
           "discharging": "Izlāde",
           "idle": "Dīkstāve",
+          "error": "Kļūda",
           "unknown": "Nezināms"
         }
       },

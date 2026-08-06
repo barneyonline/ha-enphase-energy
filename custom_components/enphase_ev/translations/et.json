@@ -1449,6 +1449,7 @@
           "charging": "Laadimine",
           "discharging": "Tühjenemine",
           "idle": "Jõudeolek",
+          "error": "Viga",
           "unknown": "Tundmatu"
         }
       },

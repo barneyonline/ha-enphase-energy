@@ -1449,6 +1449,7 @@
           "charging": "Charging",
           "discharging": "Discharging",
           "idle": "Idle",
+          "error": "Error",
           "unknown": "Unknown"
         }
       },

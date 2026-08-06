@@ -114,6 +114,7 @@ def _intentional_identical_translation(
         "entity.sensor.ac_battery_overall_status.state.error",
         "entity.sensor.ac_battery_storage_status.state.error",
         "entity.sensor.battery_overall_status.state.error",
+        "entity.sensor.battery_storage_status.state.error",
         "entity.sensor.shared_labels.state.error",
     }
     if path in error_paths and value == "Error":
@@ -858,6 +859,7 @@ def test_battery_settings_entity_strings_exist_for_all_locales() -> None:
         "entity.sensor.battery_storage_status.state.charging",
         "entity.sensor.battery_storage_status.state.discharging",
         "entity.sensor.battery_storage_status.state.idle",
+        "entity.sensor.battery_storage_status.state.error",
         "entity.sensor.battery_storage_status.state.unknown",
         "entity.sensor.battery_overall_charge.name",
         "entity.sensor.battery_overall_status.name",
