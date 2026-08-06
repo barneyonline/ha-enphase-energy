@@ -601,7 +601,8 @@
               "weather_enabled": "Időjárás engedélyezése",
               "nominal_voltage": "EV-töltő névleges feszültsége (V)",
               "microinverter_lifetime_energy_enabled": "Mikroinverterek teljes élettartam-energiájának engedélyezése",
-              "microinverter_power_enabled": "Mikroinverterek teljesítményének engedélyezése"
+              "microinverter_power_enabled": "Mikroinverterek teljesítményének engedélyezése",
+              "vpp_events_enabled": "VPP-események engedélyezése"
             },
             "data_description": {
               "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva.",
@@ -611,7 +612,8 @@
               "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése.",
               "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése.",
               "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
-              "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria."
+              "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria.",
+              "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva."
             }
           }
         },
@@ -631,7 +633,8 @@
           "weather_enabled": "Időjárás engedélyezése",
           "nominal_voltage": "EV-töltő névleges feszültsége (V)",
           "microinverter_lifetime_energy_enabled": "Mikroinverterek teljes élettartam-energiájának engedélyezése",
-          "microinverter_power_enabled": "Mikroinverterek teljesítményének engedélyezése"
+          "microinverter_power_enabled": "Mikroinverterek teljesítményének engedélyezése",
+          "vpp_events_enabled": "VPP-események engedélyezése"
         },
         "data_description": {
           "type_envoy": "Tartalmazza az átjáró-kapcsolat és a mérők diagnosztikáját.",
@@ -647,7 +650,8 @@
           "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése.",
           "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése.",
           "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
-          "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria."
+          "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria.",
+          "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva."
         }
       },
       "repair_notifications": {
@@ -2003,6 +2007,21 @@
       },
       "current_grid_profile": {
         "name": "Hálózati profil"
+      },
+      "vpp_next_event_start": {
+        "name": "Következő VPP-esemény kezdete"
+      },
+      "vpp_next_event_end": {
+        "name": "Következő VPP-esemény vége"
+      },
+      "vpp_next_event_type": {
+        "name": "Következő VPP-esemény típusa"
+      },
+      "vpp_next_event_subtype": {
+        "name": "Következő VPP-esemény altípusa"
+      },
+      "vpp_next_event_status": {
+        "name": "Következő VPP-esemény állapota"
       }
     },
     "number": {
@@ -2433,6 +2452,9 @@
       },
       "system_event_history": {
         "name": "Rendszeresemények előzményei"
+      },
+      "vpp_events": {
+        "name": "VPP-események"
       }
     },
     "update": {

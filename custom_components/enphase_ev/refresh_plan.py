@@ -222,6 +222,12 @@ WARMUP_STATE_STAGE = RefreshStage(
             "system_events_runtime",
             "async_refresh_history",
         ),
+        object_method_task(
+            "vpp_s",
+            "VPP events",
+            "vpp_runtime",
+            "async_refresh",
+        ),
         method_task(
             "battery_backup_history_s",
             "battery backup history",
@@ -331,6 +337,12 @@ SITE_ONLY_FOLLOWUP_STAGE = RefreshStage(
             "system_events_s",
             "system events",
             "system_events_runtime",
+            "async_refresh",
+        ),
+        object_method_task(
+            "vpp_s",
+            "VPP events",
+            "vpp_runtime",
             "async_refresh",
         ),
         method_task(
@@ -741,6 +753,7 @@ def build_followup_plan(owner: object, *, force_full: bool = False) -> RefreshPl
     current_power = getattr(owner, "current_power_runtime")
     evse_feature_flags = getattr(owner, "evse_feature_flags_runtime")
     system_events = getattr(owner, "system_events_runtime", None)
+    vpp = getattr(owner, "vpp_runtime", None)
     parallel: list[RefreshTask] = []
     ordered: list[RefreshTask] = []
     if battery.battery_site_settings_refresh_due():
@@ -869,6 +882,15 @@ def build_followup_plan(owner: object, *, force_full: bool = False) -> RefreshPl
                 "system event history",
                 "system_events_runtime",
                 "async_refresh_history",
+            )
+        )
+    if vpp is not None and vpp.refresh_due():
+        parallel.append(
+            object_method_task(
+                "vpp_s",
+                "VPP events",
+                "vpp_runtime",
+                "async_refresh",
             )
         )
     if battery.battery_status_refresh_due():

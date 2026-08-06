@@ -59,6 +59,17 @@ class RefreshRunner:
 
     def _warmup_site_state_available(self) -> bool:
         coordinator = self._coordinator
+        vpp_runtime = getattr(coordinator, "vpp_runtime", None)
+        vpp_snapshot = getattr(vpp_runtime, "snapshot", None)
+        published_snapshot = getattr(coordinator, "integration_snapshot", None)
+        published_vpp = getattr(published_snapshot, "vpp", None)
+        if vpp_snapshot is not None and (
+            (published_vpp is not None and vpp_snapshot != published_vpp)
+            or (
+                published_vpp is None and bool(getattr(vpp_runtime, "available", False))
+            )
+        ):
+            return True
         system_events = getattr(coordinator, "system_events_runtime", None)
         if bool(getattr(system_events, "available", False)):
             return True

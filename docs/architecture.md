@@ -45,6 +45,9 @@ entities. Changes that alter platform topology still reload the config entry, bu
 the runtime is handed across that reload so platforms can recreate entities from
 the last published state immediately. The reused coordinator then refreshes in
 the background. Cold setup continues to require an authoritative first refresh.
+The default-off VPP Events device feature is one of those topology options. Its
+reload clears the VPP cache before optional warmup so disabling the feature cannot
+publish preserved event state or make requests to the VPP service.
 
 Device and entity registry cleanup is intentionally conservative. Startup migrations
 run once per migration version, while normal reconciliation runs only when the
@@ -141,6 +144,12 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
 - `current_power_runtime.py`, `evse_feature_flags_runtime.py`, `auth_refresh_runtime.py`, and `ac_battery_runtime.py` handle smaller endpoint families.
 - `system_events.py` independently manages active System Dashboard events and the
   bounded, on-demand homeowner event-history cache used by the Cloud calendar.
+- `vpp_runtime.py` owns the opt-in VPP/ELRP enrollment state, singular enrolled
+  program lookup, normalized event cache, one-hour stale-data policy, and
+  identifier-free diagnostics. Enrollment is refreshed every six hours and may
+  reuse a confirmed program for seven days; event data is refreshed every five
+  minutes. Its immutable snapshot participates in aggregate snapshot equality so
+  VPP-only changes notify entity listeners.
 
 These managers should own cache lifetimes, stale data decisions, and endpoint-specific parsing for their family. The coordinator should expose their normalized state through properties and helper methods.
 
@@ -161,6 +170,12 @@ Entity platforms under `sensor.py`, `binary_sensor.py`, `button.py`, `number.py`
 3. Wait for inventory readiness before pruning managed entity registry entries.
 4. Use optimistic coordinator caches only when Enphase writes are known to settle asynchronously.
 
+VPP/ELRP is a Cloud-device feature, not a separate device family. `calendar.py`
+and `sensor_vpp.py` dynamically publish six read-only entities only after a valid
+events response, or immediately from their registry records during a reload. A
+confirmed unenrolled response removes them; ambiguous enrollment keeps registered
+entities unavailable and never selects an eligible program speculatively.
+
 `discovery_snapshot.py` persists only stable identity and capability metadata
 needed to restore entity discovery before live inventory arrives. It observes a
 lightweight discovery revision on refresh completion; unchanged telemetry does
@@ -178,6 +193,10 @@ Diagnostics may include raw or near-raw Enphase payloads after redaction. Any ne
 - Tokens, cookies, credentials, emails, user IDs, and auth headers.
 - Site IDs, serials, device UIDs, MAC addresses, IP addresses, hostnames, URLs, and modem/SIM identifiers.
 - Nested payloads where future fields may add identifiers.
+
+VPP diagnostics deliberately expose only enrollment/availability state, aggregate
+event counts, last-success and cached-data flags, and truncation. Site, enrollment,
+program, event, gateway, and request identifiers are never included.
 
 When in doubt, redact broadly and expose counts, status summaries, field names, or shape summaries instead of raw values.
 

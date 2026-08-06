@@ -51,9 +51,11 @@ from .const import (
     DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     DEFAULT_MICROINVERTER_POWER_ENABLED,
     DEFAULT_NOMINAL_VOLTAGE,
+    DEFAULT_VPP_EVENTS_ENABLED,
     DOMAIN,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_MICROINVERTER_POWER_ENABLED,
+    OPT_VPP_EVENTS_ENABLED,
     PHASE_SWITCH_CONFIG_SETTING,
     SAFE_LIMIT_AMPS,
 )
@@ -132,6 +134,7 @@ from .sensor_registry import EnphaseSensorRegistrySetup
 from .sensor_snapshot_helpers import (
     parse_gateway_timestamp as _gateway_parse_timestamp,
 )
+from .sensor_vpp import VPP_SENSOR_KEYS, vpp_sensor_entities
 from .serial_entity_metadata import (
     AC_BATTERY_ENTITY_UNIQUE_SUFFIXES as AC_BATTERY_ENTITY_UNIQUE_SUFFIXES,
     AC_BATTERY_RETIRED_UNIQUE_SUFFIXES as AC_BATTERY_RETIRED_UNIQUE_SUFFIXES,
@@ -899,6 +902,32 @@ async def async_setup_entry(
                 "ac_battery_last_reported",
             ):
                 _async_remove_site_sensor_entity(entity_key)
+        vpp_enabled = bool(
+            entry.options.get(OPT_VPP_EVENTS_ENABLED, DEFAULT_VPP_EVENTS_ENABLED)
+        )
+        vpp_runtime = getattr(coord, "vpp_runtime", None)
+        vpp_registered = any(
+            _site_sensor_entity_registered(key) for key in VPP_SENSOR_KEYS
+        )
+        if (
+            vpp_enabled
+            and vpp_runtime is not None
+            and vpp_runtime.enrollment_state != "unenrolled"
+            and (vpp_runtime.available or vpp_registered)
+        ):
+            for key, entity in zip(
+                VPP_SENSOR_KEYS,
+                vpp_sensor_entities(coord),
+                strict=True,
+            ):
+                _add_site_entity(key, entity)
+        elif (
+            not vpp_enabled
+            or vpp_runtime is None
+            or vpp_runtime.enrollment_state == "unenrolled"
+        ):
+            for key in VPP_SENSOR_KEYS:
+                _async_remove_site_sensor_entity(key)
         if site_entities:
             async_add_entities(site_entities, update_before_add=False)
 
@@ -1194,6 +1223,7 @@ async def async_setup_entry(
                 except Exception:  # noqa: BLE001
                     values.append(False)
             known_channels = tuple(values)
+        vpp_runtime = getattr(coord, "vpp_runtime", None)
         return (
             bool(getattr(coord, "_devices_inventory_ready", False)),
             _site_has_battery(coord),
@@ -1207,6 +1237,14 @@ async def async_setup_entry(
             _type_available(coord, "enpower"),
             _heatpump_runtime_device_uid(coord),
             battery_scheduler_enabled(entry),
+            bool(
+                entry.options.get(
+                    OPT_VPP_EVENTS_ENABLED,
+                    DEFAULT_VPP_EVENTS_ENABLED,
+                )
+            ),
+            getattr(vpp_runtime, "enrollment_state", "disabled"),
+            bool(getattr(vpp_runtime, "available", False)),
             _battery_schedule_inventory_supported(coord),
             _grid_control_site_applicable(coord),
             getattr(coord, "tariff_billing", None) is not None,

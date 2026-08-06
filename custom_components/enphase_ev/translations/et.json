@@ -601,7 +601,8 @@
               "weather_enabled": "Luba ilmateave",
               "nominal_voltage": "EV-laadija nimipinge (V)",
               "microinverter_lifetime_energy_enabled": "Luba mikroinverterite koguenergia",
-              "microinverter_power_enabled": "Luba mikroinverterite võimsus"
+              "microinverter_power_enabled": "Luba mikroinverterite võimsus",
+              "vpp_events_enabled": "Luba VPP sündmused"
             },
             "data_description": {
               "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud.",
@@ -611,7 +612,8 @@
               "schedule_sync_enabled": "Halda IQ EV Chargeri ajakavasid.",
               "battery_schedules_enabled": "Halda IQ Battery ajakavasid.",
               "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
-              "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval."
+              "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval.",
+              "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud."
             }
           }
         },
@@ -631,7 +633,8 @@
           "weather_enabled": "Luba ilmateave",
           "nominal_voltage": "EV-laadija nimipinge (V)",
           "microinverter_lifetime_energy_enabled": "Luba mikroinverterite koguenergia",
-          "microinverter_power_enabled": "Luba mikroinverterite võimsus"
+          "microinverter_power_enabled": "Luba mikroinverterite võimsus",
+          "vpp_events_enabled": "Luba VPP sündmused"
         },
         "data_description": {
           "type_envoy": "Sisaldab lüüsi ühenduvuse ja arvestite diagnostikat.",
@@ -647,7 +650,8 @@
           "schedule_sync_enabled": "Halda IQ EV Chargeri ajakavasid.",
           "battery_schedules_enabled": "Halda IQ Battery ajakavasid.",
           "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
-          "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval."
+          "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval.",
+          "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud."
         }
       },
       "repair_notifications": {
@@ -2003,6 +2007,21 @@
       },
       "current_grid_profile": {
         "name": "Võrguprofiil"
+      },
+      "vpp_next_event_start": {
+        "name": "Järgmise VPP sündmuse algus"
+      },
+      "vpp_next_event_end": {
+        "name": "Järgmise VPP sündmuse lõpp"
+      },
+      "vpp_next_event_type": {
+        "name": "Järgmise VPP sündmuse tüüp"
+      },
+      "vpp_next_event_subtype": {
+        "name": "Järgmise VPP sündmuse alamtüüp"
+      },
+      "vpp_next_event_status": {
+        "name": "Järgmise VPP sündmuse olek"
       }
     },
     "number": {
@@ -2433,6 +2452,9 @@
       },
       "system_event_history": {
         "name": "Süsteemisündmuste ajalugu"
+      },
+      "vpp_events": {
+        "name": "VPP sündmused"
       }
     },
     "update": {

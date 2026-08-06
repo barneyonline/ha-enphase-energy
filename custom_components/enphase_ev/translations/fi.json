@@ -601,7 +601,8 @@
               "weather_enabled": "Ota sää käyttöön",
               "nominal_voltage": "EV-laturin nimellisjännite (V)",
               "microinverter_lifetime_energy_enabled": "Ota mikroinvertterien elinkaarienergia käyttöön",
-              "microinverter_power_enabled": "Ota mikroinvertterien teho käyttöön"
+              "microinverter_power_enabled": "Ota mikroinvertterien teho käyttöön",
+              "vpp_events_enabled": "Ota VPP-tapahtumat käyttöön"
             },
             "data_description": {
               "system_event_repair_issues": "Luo Home Assistant -korjauksia aktiivisille Enphasen pysyville hälytyksille. Oletuksena pois käytöstä.",
@@ -611,7 +612,8 @@
               "schedule_sync_enabled": "Hallitse IQ EV Chargerin aikatauluja.",
               "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja.",
               "microinverter_lifetime_energy_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset elinkaarienergia-anturit.",
-              "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla."
+              "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla.",
+              "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä."
             }
           }
         },
@@ -631,7 +633,8 @@
           "weather_enabled": "Ota sää käyttöön",
           "nominal_voltage": "EV-laturin nimellisjännite (V)",
           "microinverter_lifetime_energy_enabled": "Ota mikroinvertterien elinkaarienergia käyttöön",
-          "microinverter_power_enabled": "Ota mikroinvertterien teho käyttöön"
+          "microinverter_power_enabled": "Ota mikroinvertterien teho käyttöön",
+          "vpp_events_enabled": "Ota VPP-tapahtumat käyttöön"
         },
         "data_description": {
           "type_envoy": "Sisältää yhdyskäytävän yhteys- ja mittaridiagnostiikan.",
@@ -647,7 +650,8 @@
           "schedule_sync_enabled": "Hallitse IQ EV Chargerin aikatauluja.",
           "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja.",
           "microinverter_lifetime_energy_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset elinkaarienergia-anturit.",
-          "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla."
+          "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla.",
+          "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä."
         }
       },
       "repair_notifications": {
@@ -2003,6 +2007,21 @@
       },
       "current_grid_profile": {
         "name": "Verkkoprofiili"
+      },
+      "vpp_next_event_start": {
+        "name": "Seuraavan VPP-tapahtuman alku"
+      },
+      "vpp_next_event_end": {
+        "name": "Seuraavan VPP-tapahtuman loppu"
+      },
+      "vpp_next_event_type": {
+        "name": "Seuraavan VPP-tapahtuman tyyppi"
+      },
+      "vpp_next_event_subtype": {
+        "name": "Seuraavan VPP-tapahtuman alatyyppi"
+      },
+      "vpp_next_event_status": {
+        "name": "Seuraavan VPP-tapahtuman tila"
       }
     },
     "number": {
@@ -2433,6 +2452,9 @@
       },
       "system_event_history": {
         "name": "Järjestelmätapahtumien historia"
+      },
+      "vpp_events": {
+        "name": "VPP-tapahtumat"
       }
     },
     "update": {

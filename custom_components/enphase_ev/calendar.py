@@ -12,7 +12,11 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import (
+    DEFAULT_VPP_EVENTS_ENABLED,
+    DOMAIN,
+    OPT_VPP_EVENTS_ENABLED,
+)
 from .coordinator import EnphaseCoordinator
 from .runtime_helpers import (
     inventory_type_available as _type_available,
@@ -23,6 +27,7 @@ from .system_events import (
     SYSTEM_EVENT_HISTORY_ENDPOINT_FAMILY,
     SystemEventHistoryEntry,
 )
+from .vpp_runtime import VppEvent
 
 PARALLEL_UPDATES = 0
 
@@ -45,6 +50,7 @@ async def async_setup_entry(
     coord: EnphaseCoordinator = get_runtime_data(entry).coordinator
     backup_history_entity_added = False
     system_event_history_entity_added = False
+    vpp_entity_added = False
     ent_reg = er.async_get(hass)
 
     def _site_calendar_unique_id(key: str) -> str:
@@ -53,6 +59,7 @@ async def async_setup_entry(
     @callback
     def _async_sync_site_entities() -> None:
         nonlocal backup_history_entity_added, system_event_history_entity_added
+        nonlocal vpp_entity_added
         if (
             not backup_history_entity_added
             and _site_has_battery(coord, strict=True)
@@ -87,9 +94,103 @@ async def async_setup_entry(
                 ent_reg.async_remove(history_entity_id)
             system_event_history_entity_added = False
 
+        vpp_entity_id = ent_reg.async_get_entity_id(
+            "calendar",
+            DOMAIN,
+            _site_calendar_unique_id("vpp_events"),
+        )
+        vpp_enabled = bool(
+            entry.options.get(OPT_VPP_EVENTS_ENABLED, DEFAULT_VPP_EVENTS_ENABLED)
+        )
+        vpp_runtime = coord.vpp_runtime
+        if (
+            vpp_enabled
+            and vpp_runtime.enrollment_state != "unenrolled"
+            and (vpp_runtime.available or vpp_entity_id is not None)
+        ):
+            if not vpp_entity_added:
+                async_add_entities(
+                    [VppEventsCalendarEntity(coord)],
+                    update_before_add=False,
+                )
+                vpp_entity_added = True
+        elif not vpp_enabled or vpp_runtime.enrollment_state == "unenrolled":
+            if vpp_entity_id is not None:
+                ent_reg.async_remove(vpp_entity_id)
+            vpp_entity_added = False
+
     unsubscribe = coord.async_add_listener(_async_sync_site_entities)
     entry.async_on_unload(unsubscribe)
     _async_sync_site_entities()
+
+
+class VppEventsCalendarEntity(
+    CoordinatorEntity,  # type: ignore[misc]
+    CalendarEntity,  # type: ignore[misc]
+):
+    """Expose Enphase VPP/ELRP events as a read-only calendar."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "vpp_events"
+
+    def __init__(self, coord: EnphaseCoordinator) -> None:
+        super().__init__(coord)
+        self._coord = coord
+        self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_vpp_events"
+
+    @property
+    def available(self) -> bool:
+        return bool(self._coord.vpp_runtime.available)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        info = _type_device_info(self._coord, "cloud")
+        if info is not None:
+            return info
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"type:{self._coord.site_id}:cloud")},
+            manufacturer="Enphase",
+            name="Enphase Cloud",
+            model="Cloud Service",
+        )
+
+    @staticmethod
+    def _to_calendar_event(item: VppEvent) -> CalendarEvent:
+        label = item.subtype if item.subtype != "unknown" else item.event_type
+        return CalendarEvent(
+            summary=f"{label} ({item.status})",
+            start=item.start,
+            end=item.end,
+            description=(
+                f"type={item.event_type}\n"
+                f"subtype={item.subtype}\n"
+                f"status={item.status}"
+            ),
+        )
+
+    @property
+    def event(self) -> CalendarEvent | None:
+        item = self._coord.vpp_runtime.next_actionable()
+        return self._to_calendar_event(item) if item is not None else None
+
+    async def async_get_events(
+        self,
+        hass: HomeAssistant,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> list[CalendarEvent]:
+        _ = hass
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
+        if end_date <= start_date:
+            return []
+        return [
+            self._to_calendar_event(item)
+            for item in self._coord.vpp_runtime.events
+            if item.end > start_date and item.start < end_date
+        ]
 
 
 class SystemEventHistoryCalendarEntity(

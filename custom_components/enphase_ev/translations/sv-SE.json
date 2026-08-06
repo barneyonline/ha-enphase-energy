@@ -601,7 +601,8 @@
               "weather_enabled": "Aktivera väder",
               "nominal_voltage": "EV-laddarens nominella spänning (V)",
               "microinverter_lifetime_energy_enabled": "Aktivera mikroväxelriktarnas livstidsenergi",
-              "microinverter_power_enabled": "Aktivera mikroväxelriktarnas effekt"
+              "microinverter_power_enabled": "Aktivera mikroväxelriktarnas effekt",
+              "vpp_events_enabled": "Aktivera VPP-händelser"
             },
             "data_description": {
               "system_event_repair_issues": "Skapar Home Assistant-reparationer för aktiva stående Enphase-larm. Inaktiverat som standard.",
@@ -611,7 +612,8 @@
               "schedule_sync_enabled": "Hantera scheman för IQ EV Charger.",
               "battery_schedules_enabled": "Hantera scheman för IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Aktiverar alla sensorer för livstidsenergi per mikroväxelriktare.",
-              "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig."
+              "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig.",
+              "vpp_events_enabled": "Hämtar VPP/ELRP-scheman från Enphase och skapar endast händelseentiteter för anslutna anläggningar. Inaktiverat som standard."
             }
           }
         },
@@ -631,7 +633,8 @@
           "weather_enabled": "Aktivera väder",
           "nominal_voltage": "EV-laddarens nominella spänning (V)",
           "microinverter_lifetime_energy_enabled": "Aktivera mikroväxelriktarnas livstidsenergi",
-          "microinverter_power_enabled": "Aktivera mikroväxelriktarnas effekt"
+          "microinverter_power_enabled": "Aktivera mikroväxelriktarnas effekt",
+          "vpp_events_enabled": "Aktivera VPP-händelser"
         },
         "data_description": {
           "type_envoy": "Inkluderar gateway-anslutning och mätardiagnostik.",
@@ -647,7 +650,8 @@
           "schedule_sync_enabled": "Hantera scheman för IQ EV Charger.",
           "battery_schedules_enabled": "Hantera scheman för IQ Battery.",
           "microinverter_lifetime_energy_enabled": "Aktiverar alla sensorer för livstidsenergi per mikroväxelriktare.",
-          "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig."
+          "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig.",
+          "vpp_events_enabled": "Hämtar VPP/ELRP-scheman från Enphase och skapar endast händelseentiteter för anslutna anläggningar. Inaktiverat som standard."
         }
       },
       "repair_notifications": {
@@ -2003,6 +2007,21 @@
       },
       "current_grid_profile": {
         "name": "Nätprofil"
+      },
+      "vpp_next_event_start": {
+        "name": "Start för nästa VPP-händelse"
+      },
+      "vpp_next_event_end": {
+        "name": "Slut för nästa VPP-händelse"
+      },
+      "vpp_next_event_type": {
+        "name": "Typ för nästa VPP-händelse"
+      },
+      "vpp_next_event_subtype": {
+        "name": "Undertyp för nästa VPP-händelse"
+      },
+      "vpp_next_event_status": {
+        "name": "Status för nästa VPP-händelse"
       }
     },
     "number": {
@@ -2433,6 +2452,9 @@
       },
       "system_event_history": {
         "name": "Historik över systemhändelser"
+      },
+      "vpp_events": {
+        "name": "VPP-händelser"
       }
     },
     "update": {

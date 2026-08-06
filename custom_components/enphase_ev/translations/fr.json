@@ -601,7 +601,8 @@
               "weather_enabled": "Activer la météo",
               "nominal_voltage": "Tension nominale du chargeur EV (V)",
               "microinverter_lifetime_energy_enabled": "Activer l’énergie totale des micro-onduleurs",
-              "microinverter_power_enabled": "Activer la puissance des micro-onduleurs"
+              "microinverter_power_enabled": "Activer la puissance des micro-onduleurs",
+              "vpp_events_enabled": "Activer les événements VPP"
             },
             "data_description": {
               "system_event_repair_issues": "Crée des réparations Home Assistant pour les alarmes permanentes Enphase actives. Désactivé par défaut.",
@@ -611,7 +612,8 @@
               "schedule_sync_enabled": "Gérer les plannings de l’IQ EV Charger.",
               "battery_schedules_enabled": "Gérer les programmes de l’IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Active tous les capteurs d’énergie totale par micro-onduleur.",
-              "microinverter_power_enabled": "Active tous les capteurs de puissance par micro-onduleur lorsque la télémétrie installateur est disponible."
+              "microinverter_power_enabled": "Active tous les capteurs de puissance par micro-onduleur lorsque la télémétrie installateur est disponible.",
+              "vpp_events_enabled": "Récupère les calendriers VPP/ELRP auprès d’Enphase et crée des entités d’événement uniquement pour les sites inscrits. Désactivé par défaut."
             }
           }
         },
@@ -631,7 +633,8 @@
           "weather_enabled": "Activer la météo",
           "nominal_voltage": "Tension nominale du chargeur EV (V)",
           "microinverter_lifetime_energy_enabled": "Activer l’énergie totale des micro-onduleurs",
-          "microinverter_power_enabled": "Activer la puissance des micro-onduleurs"
+          "microinverter_power_enabled": "Activer la puissance des micro-onduleurs",
+          "vpp_events_enabled": "Activer les événements VPP"
         },
         "data_description": {
           "type_envoy": "Inclut la connectivité de la passerelle et les diagnostics de compteurs.",
@@ -647,7 +650,8 @@
           "schedule_sync_enabled": "Gérer les plannings de l’IQ EV Charger.",
           "battery_schedules_enabled": "Gérer les programmes de l’IQ Battery.",
           "microinverter_lifetime_energy_enabled": "Active tous les capteurs d’énergie totale par micro-onduleur.",
-          "microinverter_power_enabled": "Active tous les capteurs de puissance par micro-onduleur lorsque la télémétrie installateur est disponible."
+          "microinverter_power_enabled": "Active tous les capteurs de puissance par micro-onduleur lorsque la télémétrie installateur est disponible.",
+          "vpp_events_enabled": "Récupère les calendriers VPP/ELRP auprès d’Enphase et crée des entités d’événement uniquement pour les sites inscrits. Désactivé par défaut."
         }
       },
       "repair_notifications": {
@@ -2003,6 +2007,21 @@
       },
       "current_grid_profile": {
         "name": "Profil réseau"
+      },
+      "vpp_next_event_start": {
+        "name": "Début du prochain événement VPP"
+      },
+      "vpp_next_event_end": {
+        "name": "Fin du prochain événement VPP"
+      },
+      "vpp_next_event_type": {
+        "name": "Type du prochain événement VPP"
+      },
+      "vpp_next_event_subtype": {
+        "name": "Sous-type du prochain événement VPP"
+      },
+      "vpp_next_event_status": {
+        "name": "État du prochain événement VPP"
       }
     },
     "number": {
@@ -2433,6 +2452,9 @@
       },
       "system_event_history": {
         "name": "Historique des événements système"
+      },
+      "vpp_events": {
+        "name": "Événements VPP"
       }
     },
     "update": {

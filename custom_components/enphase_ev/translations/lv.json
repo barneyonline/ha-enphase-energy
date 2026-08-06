@@ -601,7 +601,8 @@
               "weather_enabled": "Iespējot laikapstākļus",
               "nominal_voltage": "EV lādētāja nominālais spriegums (V)",
               "microinverter_lifetime_energy_enabled": "Iespējot mikroinvertoru kopējo enerģiju",
-              "microinverter_power_enabled": "Iespējot mikroinvertoru jaudu"
+              "microinverter_power_enabled": "Iespējot mikroinvertoru jaudu",
+              "vpp_events_enabled": "Iespējot VPP notikumus"
             },
             "data_description": {
               "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts.",
@@ -611,7 +612,8 @@
               "schedule_sync_enabled": "Pārvaldiet IQ EV Charger grafikus.",
               "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus.",
               "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
-              "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija."
+              "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija.",
+              "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts."
             }
           }
         },
@@ -631,7 +633,8 @@
           "weather_enabled": "Iespējot laikapstākļus",
           "nominal_voltage": "EV lādētāja nominālais spriegums (V)",
           "microinverter_lifetime_energy_enabled": "Iespējot mikroinvertoru kopējo enerģiju",
-          "microinverter_power_enabled": "Iespējot mikroinvertoru jaudu"
+          "microinverter_power_enabled": "Iespējot mikroinvertoru jaudu",
+          "vpp_events_enabled": "Iespējot VPP notikumus"
         },
         "data_description": {
           "type_envoy": "Ietver vārtejas savienojamības un skaitītāju diagnostiku.",
@@ -647,7 +650,8 @@
           "schedule_sync_enabled": "Pārvaldiet IQ EV Charger grafikus.",
           "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus.",
           "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
-          "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija."
+          "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija.",
+          "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts."
         }
       },
       "repair_notifications": {
@@ -2003,6 +2007,21 @@
       },
       "current_grid_profile": {
         "name": "Tīkla profils"
+      },
+      "vpp_next_event_start": {
+        "name": "Nākamā VPP notikuma sākums"
+      },
+      "vpp_next_event_end": {
+        "name": "Nākamā VPP notikuma beigas"
+      },
+      "vpp_next_event_type": {
+        "name": "Nākamā VPP notikuma tips"
+      },
+      "vpp_next_event_subtype": {
+        "name": "Nākamā VPP notikuma apakštips"
+      },
+      "vpp_next_event_status": {
+        "name": "Nākamā VPP notikuma statuss"
       }
     },
     "number": {
@@ -2433,6 +2452,9 @@
       },
       "system_event_history": {
         "name": "Sistēmas notikumu vēsture"
+      },
+      "vpp_events": {
+        "name": "VPP notikumi"
       }
     },
     "update": {

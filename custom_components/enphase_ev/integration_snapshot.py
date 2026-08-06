@@ -8,6 +8,7 @@ from typing import Mapping, cast
 from .current_power_runtime import CurrentPowerSample
 from .evse_feature_flags_runtime import EvseFeatureFlagsSnapshot
 from .snapshot_helpers import freeze_snapshot_mapping
+from .vpp_runtime import VppSnapshot
 
 type ChargerPayload = Mapping[str, object]
 type ChargerPayloads = Mapping[str, ChargerPayload]
@@ -42,6 +43,7 @@ class IntegrationSnapshot:
     chargers: ChargerPayloads
     evse_feature_flags: EvseFeatureFlagsSnapshot
     current_power: CurrentPowerSample
+    vpp: VppSnapshot = field(default_factory=VppSnapshot)
     runtime_revisions: tuple[tuple[str, int], ...] = ()
     revision: int = field(default=0, compare=False)
 

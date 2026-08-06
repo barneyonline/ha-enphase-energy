@@ -601,7 +601,8 @@
               "weather_enabled": "Aktiver vær",
               "nominal_voltage": "EV-laderens nominelle spenning (V)",
               "microinverter_lifetime_energy_enabled": "Aktiver mikroinverternes levetidsenergi",
-              "microinverter_power_enabled": "Aktiver mikroinvertereffekt"
+              "microinverter_power_enabled": "Aktiver mikroinvertereffekt",
+              "vpp_events_enabled": "Aktiver VPP-hendelser"
             },
             "data_description": {
               "system_event_repair_issues": "Oppretter Home Assistant-reparasjoner for aktive stående Enphase-alarmer. Deaktivert som standard.",
@@ -611,7 +612,8 @@
               "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger.",
               "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter.",
-              "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig."
+              "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig.",
+              "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og oppretter hendelsesenheter bare for påmeldte anlegg. Deaktivert som standard."
             }
           }
         },
@@ -631,7 +633,8 @@
           "weather_enabled": "Aktiver vær",
           "nominal_voltage": "EV-laderens nominelle spenning (V)",
           "microinverter_lifetime_energy_enabled": "Aktiver mikroinverternes levetidsenergi",
-          "microinverter_power_enabled": "Aktiver mikroinvertereffekt"
+          "microinverter_power_enabled": "Aktiver mikroinvertereffekt",
+          "vpp_events_enabled": "Aktiver VPP-hendelser"
         },
         "data_description": {
           "type_envoy": "Inkluderer gateway-tilkobling og målerdiagnostikk.",
@@ -647,7 +650,8 @@
           "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger.",
           "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery.",
           "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter.",
-          "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig."
+          "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig.",
+          "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og oppretter hendelsesenheter bare for påmeldte anlegg. Deaktivert som standard."
         }
       },
       "repair_notifications": {
@@ -2003,6 +2007,21 @@
       },
       "current_grid_profile": {
         "name": "Nettprofil"
+      },
+      "vpp_next_event_start": {
+        "name": "Start for neste VPP-hendelse"
+      },
+      "vpp_next_event_end": {
+        "name": "Slutt for neste VPP-hendelse"
+      },
+      "vpp_next_event_type": {
+        "name": "Type for neste VPP-hendelse"
+      },
+      "vpp_next_event_subtype": {
+        "name": "Undertype for neste VPP-hendelse"
+      },
+      "vpp_next_event_status": {
+        "name": "Status for neste VPP-hendelse"
       }
     },
     "number": {
@@ -2433,6 +2452,9 @@
       },
       "system_event_history": {
         "name": "Historikk for systemhendelser"
+      },
+      "vpp_events": {
+        "name": "VPP-hendelser"
       }
     },
     "update": {

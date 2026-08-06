@@ -40,6 +40,7 @@ from custom_components.enphase_ev.const import (
     OPT_SLOW_POLL_INTERVAL,
     OPT_SESSION_HISTORY_INTERVAL,
     OPT_SYSTEM_EVENT_REPAIR_ISSUES,
+    OPT_VPP_EVENTS_ENABLED,
 )
 from custom_components.enphase_ev.evse_runtime import (
     FAST_TOGGLE_POLL_HOLD_S,
@@ -58,6 +59,10 @@ from custom_components.enphase_ev.session_history import (
     SessionCacheView,
 )
 from custom_components.enphase_ev.voltage import resolve_nominal_voltage_for_hass
+from custom_components.enphase_ev.vpp_runtime import (
+    VPP_ENROLLMENT_ENDPOINT_FAMILY,
+    VPP_EVENTS_ENDPOINT_FAMILY,
+)
 
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL, RANDOM_SITE_ID
 
@@ -158,6 +163,53 @@ async def test_apply_config_entry_options_without_reload(
 
     coord.config_entry = None
     await coord.async_apply_config_entry_options(options)
+
+
+@pytest.mark.asyncio
+async def test_vpp_option_reenable_ignores_preserved_endpoint_ttls(
+    hass, coordinator_factory
+) -> None:
+    enrollment_id = "a" * 24
+    program_id = "b" * 24
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={},
+        options={OPT_VPP_EVENTS_ENABLED: True},
+    )
+    entry.add_to_hass(hass)
+    coord = coordinator_factory(data={})
+    coord.config_entry = entry
+    coord.client.vpp_enrollment_id = AsyncMock(return_value={"data": enrollment_id})
+    coord.client.vpp_enrollment_details = AsyncMock(
+        return_value={"data": {"program_id": program_id}}
+    )
+    coord.client.vpp_events = AsyncMock(return_value={"data": []})
+
+    await coord.vpp_runtime.async_refresh()
+
+    assert coord._endpoint_family_should_run(VPP_ENROLLMENT_ENDPOINT_FAMILY) is False
+    assert coord._endpoint_family_should_run(VPP_EVENTS_ENDPOINT_FAMILY) is False
+
+    hass.config_entries.async_update_entry(
+        entry,
+        options={OPT_VPP_EVENTS_ENABLED: False},
+    )
+    await coord.async_apply_config_entry_options({OPT_VPP_EVENTS_ENABLED: True})
+
+    assert VPP_ENROLLMENT_ENDPOINT_FAMILY not in coord._endpoint_family_health
+    assert VPP_EVENTS_ENDPOINT_FAMILY not in coord._endpoint_family_health
+    assert coord.vpp_runtime.events == ()
+
+    hass.config_entries.async_update_entry(
+        entry,
+        options={OPT_VPP_EVENTS_ENABLED: True},
+    )
+    await coord.async_apply_config_entry_options({OPT_VPP_EVENTS_ENABLED: False})
+    await coord.vpp_runtime.async_refresh()
+
+    assert coord.client.vpp_enrollment_id.await_count == 2
+    assert coord.client.vpp_enrollment_details.await_count == 2
+    assert coord.client.vpp_events.await_count == 2
 
 
 @pytest.mark.asyncio
@@ -4964,6 +5016,53 @@ async def test_startup_warmup_publishes_power_before_discovery(
     assert first_publish < order.index("discovery")
     assert coord.async_set_updated_data.call_count == 5  # type: ignore[attr-defined]
     assert "power_s" in coord._warmup_phase_timings  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_startup_warmup_publishes_vpp_only_state(coordinator_factory) -> None:
+    coord = coordinator_factory(data={})
+    coord.data = {}
+    coord.config_entry = SimpleNamespace(options={OPT_VPP_EVENTS_ENABLED: True})
+    coord.energy.site_energy = None
+    coord._current_power_consumption_w = None  # noqa: SLF001
+    for attr in (
+        "tariff_billing",
+        "tariff_import_rate",
+        "tariff_export_rate",
+        "tariff_last_refresh_utc",
+        "tariff_rates_last_refresh_utc",
+    ):
+        setattr(coord, attr, None)
+    coord.async_set_updated_data({})
+    baseline_revision = coord.integration_snapshot.revision
+    sequence: list[str] = []
+    original_publish = coord.async_set_updated_data
+
+    def _publish(data) -> None:
+        sequence.append("publish")
+        original_publish(data)
+
+    async def _run_plan(_timings, *, plan) -> None:
+        stage_key = plan.stages[0].stage_key
+        sequence.append(str(stage_key))
+        if stage_key == "state":
+            coord.vpp_runtime._enrollment_state = "enrolled"  # noqa: SLF001
+            coord.vpp_runtime._events_last_success_mono = (
+                time.monotonic()
+            )  # noqa: SLF001
+
+    coord.async_set_updated_data = Mock(side_effect=_publish)  # type: ignore[assignment]
+    coord.refresh_runner.async_start_startup_power = AsyncMock()  # type: ignore[method-assign]
+    coord.refresh_runner.async_run_refresh_plan = AsyncMock(  # type: ignore[method-assign]
+        side_effect=_run_plan
+    )
+    coord.discovery_snapshot.schedule_save = Mock()  # type: ignore[assignment]
+
+    await coord.refresh_runner.async_startup_warmup_runner()
+
+    assert sequence.index("state") < sequence.index("publish")
+    assert coord.async_set_updated_data.call_count == 1  # type: ignore[attr-defined]
+    assert coord.integration_snapshot.revision == baseline_revision + 1
 
 
 @pytest.mark.asyncio

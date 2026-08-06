@@ -56,6 +56,7 @@ Example response:
 
 - **Auth and discovery:** `1.1`, `6.1`-`6.6`
 - **Site/system inventory and telemetry:** `2.9`-`2.21`
+- **VPP/ELRP enrollment and events:** `2.10.2`
 - **Enlighten Manager and installer diagnostics:** `2.24`-`2.29`
 - **EV charger telemetry and metadata:** `2.1`-`2.8`
 - **EV charger controls and scheduling:** `3.1`-`3.3`, `4.1`-`4.5`
@@ -117,6 +118,9 @@ Status labels:
 | Site live-debug MQTT authorizer | `GET` | `/service/system_dashboard/api_internal/cs/sites/livestream?serial_num=<gateway_sn>&live_debug=true` | authenticated Enlighten session cookies + `e-auth-token`; browser XHR request | Runtime (gateway update progress) |
 | Site latest power | `GET` | `/app-api/<site_id>/get_latest_power` | `e-auth-token` + cookies | Runtime |
 | Site weather | `GET` | `/systems/<site_id>/weather.json?locale=<locale>` | authenticated session cookies + XHR headers; `e-auth-token` when available | Runtime (opt-in) |
+| VPP enrollment lookup | `GET` | `https://gs.enphaseenergy.com/enrollment-mgr/api/v1/enrollment/enrolled/<site_id>` | isolated Grid Services headers with the raw control token in `Authorization`; no Enlighten cookies, XSRF, `X-Requested-With`, or `e-auth-token` | Runtime (opt-in) |
+| VPP enrollment details | `GET` | `https://gs.enphaseenergy.com/enrollment-mgr/api/v1/enrollment/<enrollment_id>` | isolated Grid Services headers with the raw control token in `Authorization`; 24-character hexadecimal enrollment ID required | Runtime (opt-in) |
+| VPP events | `GET` | `https://gs.enphaseenergy.com/vpp-mgr/api/v1/events/get?site_id=<site_id>&programId=<program_id>&start_date=&end_date=&sort_by=&ascending=&time=` | isolated Grid Services headers with the raw control token in `Authorization`; 24-character hexadecimal program ID required | Runtime (opt-in) |
 | Site currency conversion settings | `GET` | `/app-api/<site_id>/get_currency_conversion.json` | authenticated session cookies + `e-auth-token` | Browser capture only |
 | Requested battery usage hint | `GET` | `/app-api/<site_id>/get_requested_battery_usage` | authenticated session cookies + `e-auth-token` | Browser capture only |
 | Site performance widget flags | `GET` | `/app-api/<site_id>/performance_widgets` | authenticated session cookies + `e-auth-token` | Browser capture only |
@@ -221,6 +225,7 @@ The integration currently implements these feature groups:
 - EV charging: status, summary, firmware details, feature flags, daily/lifetime EVSE energy, start/stop controls, charge-level configuration, and scheduler preference writes.
 - Site energy and inventory: latest power, today snapshot, lifetime energy, battery backup/grid eligibility, device inventory, microinverter inventory, live-stream capability flags, tariff reads/writes, dry contacts, and system dashboard summary/tree/details.
 - HEMS: inventory, heat-pump runtime state, HEMS daily energy split metadata, HEMS lifetime merge, and heat-pump power derivation from site-today heat-pump deltas.
+- VPP/ELRP: opt-in enrolled-program resolution and read-only event monitoring through the Grid Services host, with bounded normalized caching and no eligible-program fallback.
 - Battery and BatteryConfig: site settings, profile/details, battery settings writes, ITC disclaimer acceptance, DTG/RBD/CFG controls, dry-contact parsing, schedules, validation/XSRF bootstrap, and AC Battery HTML runtime/control paths.
 - Firmware catalog and diagnostics: repository-managed runtime firmware catalog, endpoint health/backoff summaries, payload health, tariff health, heat-pump diagnostics, and redacted system-health output.
 
@@ -3572,6 +3577,101 @@ Runtime safety rules:
   discarded.
 - Repairs are synchronized from Standing Alarms rather than event-history rows. A
   transient endpoint failure never clears a last-known active repair.
+
+### 2.10.2 VPP/ELRP Enrollment and Events
+
+The optional VPP Events feature uses the `https://gs.enphaseenergy.com` service.
+It is disabled by default. The integration sends no requests to this host unless
+the config-entry option is enabled.
+
+Program resolution follows one authoritative chain and supports one active
+program per site:
+
+1. `GET /enrollment-mgr/api/v1/enrollment/enrolled/{site_id}` resolves the
+   enrolled enrollment ID.
+2. `GET /enrollment-mgr/api/v1/enrollment/{enrollment_id}` resolves that
+   enrollment's `program_id`.
+3. `GET /vpp-mgr/api/v1/events/get` reads the program's events with the query
+   parameters `site_id`, `programId`, `start_date=`, `end_date=`, `sort_by=`,
+   `ascending=`, and `time=`.
+
+Request shapes:
+
+```http
+GET https://gs.enphaseenergy.com/enrollment-mgr/api/v1/enrollment/enrolled/<site_id>
+Accept: application/json, text/javascript, */*; q=0.01
+Authorization: <control_token>
+Origin: https://enlighten.enphaseenergy.com
+Referer: https://enlighten.enphaseenergy.com/
+```
+
+```http
+GET https://gs.enphaseenergy.com/enrollment-mgr/api/v1/enrollment/<enrollment_id>
+Accept: application/json, text/javascript, */*; q=0.01
+Authorization: <control_token>
+Origin: https://enlighten.enphaseenergy.com
+Referer: https://enlighten.enphaseenergy.com/
+```
+
+```http
+GET https://gs.enphaseenergy.com/vpp-mgr/api/v1/events/get?site_id=<site_id>&programId=<program_id>&start_date=&end_date=&sort_by=&ascending=&time=
+Accept: application/json, text/javascript, */*; q=0.01
+Authorization: <control_token>
+Origin: https://enlighten.enphaseenergy.com
+Referer: https://enlighten.enphaseenergy.com/
+```
+
+Normalized input shapes used by the runtime are represented below. Identifiers
+are placeholders and must never be logged or exposed through entities or
+diagnostics.
+
+```json
+{"data": "aaaaaaaaaaaaaaaaaaaaaaaa"}
+```
+
+```json
+{"data": {"program_id": "bbbbbbbbbbbbbbbbbbbbbbbb"}}
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "<event_id>",
+      "start_time": "2026-08-04T10:00:00Z",
+      "end_time": "2026-08-04T12:00:00Z",
+      "type": "battery_discharge",
+      "subtype": "Discharge_To_Load_Grid",
+      "status": "scheduled"
+    }
+  ]
+}
+```
+
+The runtime does not fall back to `/enrollment/site/{site_id}` or choose from an
+eligible-program list. Site, enrollment, and program IDs must pass their expected
+format validation before use; enrollment and program IDs are 24-character
+hexadecimal object IDs.
+
+Requests use the raw control token as `Authorization: <control token>` (with no
+`Bearer` prefix) together with the Enlighten origin and referer. Enlighten
+cookies, XSRF, `X-Requested-With`, and `e-auth-token` headers are intentionally
+omitted across the host boundary. Auth headers are rebuilt for retries after
+successful reauthentication.
+
+Event normalization retains only a hashed fingerprint, aware UTC start/end,
+type, subtype, status, and cancellation/superseded state. Rows with invalid
+timestamps or `end <= start` are discarded, duplicates are collapsed, unknown
+string values are preserved, and the sorted cache is capped at 500 records.
+A valid empty enrollment response means unenrolled; a valid empty events list
+means enrolled with no events. Malformed/ambiguous responses and 403/404 failures
+remain isolated from core setup. Authentication failures follow the integration's
+normal reauthentication path.
+
+Enrollment lookup uses a six-hour refresh interval and a seven-day cached-program
+lifetime. Events refresh every five minutes and retain the last successful data
+for up to one hour after transient failures. An invalid-program events response
+clears the cached program so the next cycle repeats the authoritative lookup.
 
 ### 2.11 Battery Backup History
 ```
