@@ -8,16 +8,34 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v4.2.0 - 2026-08-06
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
 - Added default-off, read-only VPP/ELRP event monitoring for enrolled sites. The
   Enphase Cloud device gains a VPP Events calendar and five next-event sensors
-  when enabled under Options > Devices > Device Features.
+  when enabled under Options > Devices > Device Features. (#813)
 
 ### 🐛 Bug fixes
 - Displayed battery state value `7` as Error on per-battery status entities.
+  (#815)
 - Kept the current Grid Profile readable for owner accounts while treating the
   Activation UI's installer-only response as a read-only capability instead of
   a recurring endpoint failure, and followed the current cross-origin
-  Activation launch-token format used by Enlighten Settings.
+  Activation launch-token format used by Enlighten Settings. (#816)
 - Exposed the discharge-to-grid switch and configured window for IQ Battery sites
   that use the `dtgControl` window without per-day schedule rows. (#810)
 - Included battery-to-grid and generator-to-grid energy in the Site Grid Export
@@ -27,12 +45,14 @@ All notable changes to this project will be documented in this file.
 ### 🔧 Improvements
 - Scoped device-registry synchronization, cleanup, and service routing to the
   owning config entry for compatibility with Home Assistant 2026.8's per-entry
-  device identifiers.
+  device identifiers. (#806)
 - Used Home Assistant's typed percentage unit on 2026.7 and newer while retaining
-  compatibility with the minimum supported Home Assistant 2026.6 release.
+  compatibility with the minimum supported Home Assistant 2026.6 release. (#807)
 
 ### 🔄 Other changes
-- None
+- Added a Home Assistant 2026.8 compatibility test lane. (#808)
+- Bumped `actions/stale` from `10` to `11` in GitHub Actions. (#805)
+- Bumped the integration manifest version to `4.2.0`.
 
 ## v4.1.1 - 2026-07-29
 
