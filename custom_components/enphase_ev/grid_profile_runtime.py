@@ -10,7 +10,7 @@ from typing import Any
 import aiohttp
 from homeassistant.exceptions import ServiceValidationError
 
-from .api import ActivationAccessDenied, Unauthorized
+from .api import ActivationAccessDenied, OptionalEndpointUnavailable, Unauthorized
 from .const import DOMAIN
 from .service_validation import raise_translated_service_validation
 
@@ -18,6 +18,7 @@ ACTIVATION_GRID_PROFILE_FAMILY = "activation_grid_profile"
 SUPPORT_UNKNOWN = "unknown"
 SUPPORT_CONFIRMED = "installer_access_confirmed"
 SUPPORT_DENIED = "installer_access_denied"
+SUPPORT_READ_ONLY = "read_only_available"
 SUPPORT_UNAVAILABLE = "activation_unavailable"
 COMMONLY_USED_OPTION = "commonly_used"
 ALL_PROFILES_OPTION = "all_profiles"
@@ -378,7 +379,15 @@ class GridProfileRuntime:
         source = (
             "ambiguous_gateway"
             if ambiguous_gateway
-            else ("gateway" if target is not None else "activation_record")
+            else (
+                "gateway"
+                if target is not None
+                else (
+                    "enlighten_settings"
+                    if self.support_state == SUPPORT_READ_ONLY
+                    else "activation_record"
+                )
+            )
         )
         profile = self.profile_for_id_in_region(profile_id, self.site_region_code)
         if profile is not None:
@@ -981,12 +990,71 @@ class GridProfileRuntime:
             ACTIVATION_GRID_PROFILE_FAMILY, err
         )
 
-    async def _async_prepare_activation_auth(self) -> None:
+    def _sync_settings_profiles(self) -> bool:
+        """Use read-only Grid Profile labels exposed by classic Settings."""
+
+        getter = getattr(self.client, "activation_settings_grid_profiles", None)
+        if not callable(getter):
+            return False
+        try:
+            profiles = getter()
+        except Exception:  # noqa: BLE001 - optional compatibility surface
+            return False
+        normalized: list[tuple[str, str]] = []
+        if isinstance(profiles, list):
+            for item in profiles:
+                if not isinstance(item, (list, tuple)) or len(item) != 2:
+                    continue
+                serial = _clean_text(item[0])
+                name = _clean_text(item[1])
+                if serial and name:
+                    normalized.append((serial, name))
+        if not normalized:
+            return False
+        names = {name for _serial, name in normalized}
+        self.gateway_targets = {}
+        self.current_profile_id = None
+        self.current_profile_name = next(iter(names)) if len(names) == 1 else None
+        return True
+
+    def _mark_read_only(self) -> None:
+        """Record expected owner access without an endpoint failure."""
+
+        self.support_state = SUPPORT_READ_ONLY
+        self.coordinator._note_endpoint_family_success(
+            ACTIVATION_GRID_PROFILE_FAMILY,
+            success_ttl_s=3600.0,
+        )
+
+    async def _async_prepare_activation_auth(self, *, force: bool = False) -> bool:
         """Allow the client to acquire the settings-page Activation JWT."""
 
         prepare = getattr(self.client, "async_prepare_activation_auth", None)
         if callable(prepare):
-            await prepare()
+            return bool(await prepare(force=force))
+        return False
+
+    async def _async_refresh_read_only_settings(self) -> GridProfileBrowseResult:
+        """Refresh the Settings-derived profile without installer-only calls."""
+
+        try:
+            prepared = await self._async_prepare_activation_auth(force=True)
+        except Exception as err:  # noqa: BLE001
+            self.coordinator._note_endpoint_family_failure(
+                ACTIVATION_GRID_PROFILE_FAMILY, err
+            )
+        else:
+            if prepared and self._sync_settings_profiles():
+                self._mark_read_only()
+            else:
+                self.coordinator._note_endpoint_family_failure(
+                    ACTIVATION_GRID_PROFILE_FAMILY,
+                    OptionalEndpointUnavailable(
+                        "Grid profile was unavailable in Enlighten Settings"
+                    ),
+                )
+        self._publish_state_update()
+        return self.browse()
 
     @staticmethod
     def _is_access_denied(err: Exception) -> bool:
@@ -1014,6 +1082,14 @@ class GridProfileRuntime:
             except Exception as err:  # noqa: BLE001
                 if (
                     self._is_access_denied(err)
+                    and not self.installer_access_ever_confirmed
+                    and self._sync_settings_profiles()
+                ):
+                    self._mark_read_only()
+                    self._publish_state_update()
+                    return self.browse()
+                if (
+                    self._is_access_denied(err)
                     or not self.installer_access_ever_confirmed
                 ):
                     self._mark_denied(err)
@@ -1035,9 +1111,11 @@ class GridProfileRuntime:
             family = ACTIVATION_GRID_PROFILE_FAMILY
             if not self.coordinator._endpoint_family_should_run(family, force=force):
                 return self.browse()
+            if self.support_state == SUPPORT_READ_ONLY and not force:
+                return await self._async_refresh_read_only_settings()
             errors: list[Exception] = []
             successful_requests = 0
-            await self._async_prepare_activation_auth()
+            await self._async_prepare_activation_auth(force=force)
             if force or self.reference_payload is None:
                 try:
                     reference = await self.client.async_get_activation_reference_data()
@@ -1061,6 +1139,13 @@ class GridProfileRuntime:
                 (err for err in errors if self._is_access_denied(err)), None
             )
             if denied_error is not None:
+                if (
+                    not self.installer_access_ever_confirmed
+                    and self._sync_settings_profiles()
+                ):
+                    self._mark_read_only()
+                    self._publish_state_update()
+                    return self.browse()
                 self._mark_denied(denied_error)
                 self._publish_state_update()
                 return self.browse()

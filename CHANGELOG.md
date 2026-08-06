@@ -14,6 +14,10 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 - Displayed battery state value `7` as Error on per-battery status entities.
+- Kept the current Grid Profile readable for owner accounts while treating the
+  Activation UI's installer-only response as a read-only capability instead of
+  a recurring endpoint failure, and followed the current cross-origin
+  Activation launch-token format used by Enlighten Settings.
 - Exposed the discharge-to-grid switch and configured window for IQ Battery sites
   that use the `dtgControl` window without per-day schedule rows. (#810)
 - Included battery-to-grid and generator-to-grid energy in the Site Grid Export

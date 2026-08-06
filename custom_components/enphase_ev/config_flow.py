@@ -136,6 +136,7 @@ from .grid_profile_runtime import (
     ALL_PROFILES_OPTION,
     COMMONLY_USED_OPTION,
     SUPPORT_DENIED,
+    SUPPORT_READ_ONLY,
     GridProfile,
     GridProfileRuntime,
 )
@@ -1778,7 +1779,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
     def _grid_profile_unavailable_reason(runtime: GridProfileRuntime) -> str:
         return (
             "grid_profile_installer_required"
-            if runtime.support_state == SUPPORT_DENIED
+            if runtime.support_state in {SUPPORT_DENIED, SUPPORT_READ_ONLY}
             else "grid_profile_unavailable"
         )
 

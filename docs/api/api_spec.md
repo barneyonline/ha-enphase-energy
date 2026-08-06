@@ -207,7 +207,7 @@ Status labels:
 | BatteryConfig schedule update | `PUT` | `/service/batteryConfig/api/v1/battery/sites/<site_id>/schedules/<schedule_id>` | BatteryConfig write shape plus `X-XSRF-Token`; ordinary time/limit edits can omit `isEnabled`, while explicit schedule-entry toggle writes may include it; verified working update uses the raw-cookie browser request (`Cookie`, `e-auth-token`, `Username`, `X-XSRF-Token`, `X-Requested-With`) from a stateless client session; current client falls back across cookie-backed, primary, lean, and mixed-auth variants | Runtime |
 | BatteryConfig schedule legacy delete alias | `POST` | `/service/batteryConfig/api/v1/battery/sites/<site_id>/schedules/<schedule_id>/delete` | same BatteryConfig write planner as schedule create/update; cookie-backed browser request is the verified working compatibility shape on affected sites | Runtime |
 | BatteryConfig disclaimer accept | `POST` | `/service/batteryConfig/api/v1/batterySettings/acceptDisclaimer/<site_id>` | same BatteryConfig write planner as other battery settings mutations | Runtime |
-| Activation auth bootstrap | `GET` | `/systems/<site_id>/details` | authenticated Enlighten Settings HTML embeds a same-origin `/app/activation_ui/` URL containing the short-lived Activation JWT and exact referer context; token and referer are retained in memory only | Runtime |
+| Activation auth bootstrap | `GET` | `/systems/<site_id>/details` | authenticated Enlighten Settings HTML contains the short-lived Activation JWT and launch context; current pages interpolate it into `https://activations-ui.enphaseenergy.com/`, while older pages embed a same-origin `/app/activation_ui/` URL; token and referer are retained in memory only | Runtime |
 | Activation reference data | `GET` | `/service/activation_service/api/details/reference_data` | authenticated session cookies with `enlighten_manager_token_production` synchronized to the bootstrapped Activation JWT, plus the JWT in `enlm-token`; browser capture did not include an explicit `Authorization` header | Runtime |
 | Activation record | `GET` | `/service/activation_backend/api/gateway/v4/activations/<site_id>?expand=owner,host` | synchronized Activation cookie, exact embedded Activation UI referer, and `Authorization: Bearer <activation_jwt>`; requires account role with Activation access | Runtime |
 | Activation device list and grid-profile status | `GET` | `/service/activation_backend/api/gateway/v4/systems/<site_id>/devices/list` | same synchronized Activation bearer/cookie/referer context; requires installer-level Activation access | Runtime |
@@ -6976,21 +6976,38 @@ Operational constraints:
 GET /systems/<site_id>/details
 ```
 
-The authenticated classic Enlighten Settings HTML contains a same-origin iframe
-URL with this sanitized shape:
+The authenticated classic Enlighten Settings HTML contains the Grid Profile
+label for each Gateway. Current pages also contain an inert launch script with a
+short-lived token and this cross-origin iframe template:
 ```text
-https://enlighten.enphaseenergy.com/app/activation_ui/?locale=<locale>&token=<activation_jwt>&siteid=<site_id>&gridprofile=gridprofile&envoyserialnumber=<gateway_serial>
+https://activations-ui.enphaseenergy.com/?locale=<locale>&token=${token}&siteid=<site_id>&gridprofile=gridprofile&envoyserialnumber=${serialnum}
 ```
 
-The 2026-07-22 browser capture confirmed that requests made by this iframe use
-the query-string JWT both as `Authorization: Bearer <activation_jwt>` and as the
-value of the `enlighten_manager_token_production` cookie. The full iframe URL is
-also sent as the request `Referer`.
+The 2026-08-06 browser capture confirmed this replaced the earlier same-origin
+`/app/activation_ui/` launch shape captured on 2026-07-22. Requests made by the
+iframe use the query-string JWT as `Authorization: Bearer <activation_jwt>` and
+the full interpolated iframe URL as the request `Referer`; the integration also
+synchronizes that JWT into the `enlighten_manager_token_production` cookie for
+the Activation backend requests.
 
 Current runtime behavior:
 - Fetch the Settings page with the authenticated Enlighten session before an Activation refresh, profile-list request, or profile write.
-- HTML-decode the embedded iframe URL and accept it only when its host is `enlighten.enphaseenergy.com` and its path is `/app/activation_ui/`.
-- Retain the extracted JWT and exact iframe referer in memory only. Do not persist either value to config-entry data or diagnostics.
+- HTML-decode the page, accept either the legacy same-origin iframe or the
+  current `activations-ui.enphaseenergy.com` template, and interpolate only the
+  page's validated JWT and concrete Gateway serial into the current template.
+- Derive the write-request `Origin` from that validated referer so current
+  cross-origin launches and legacy same-origin launches each use their matching
+  browser context.
+- Parse the current Grid Profile label already rendered by Settings. If the
+  Activation backend rejects the account as installer-ineligible, retain that
+  label as read-only state and do not record the expected role limitation as an
+  endpoint failure. Refresh read-only labels hourly from Settings without
+  repeating installer-only Activation calls. Profile discovery and apply remain
+  installer/maintainer-only.
+- Retain the extracted JWT, exact iframe referer, and Settings-derived profile
+  labels in memory only. Invalidate them together when credentials or the
+  Activation auth context changes; do not persist them to config-entry data or
+  diagnostics.
 - Replace the `enlighten_manager_token_production` value in the outbound serialized cookie header with the extracted JWT so the cookie and bearer contexts agree, while preserving the other authenticated session cookies.
 - Treat a JWT as expired 60 seconds before its `exp` claim and reacquire it from the Settings page. A normal credential refresh also clears the cached Activation JWT and referer.
 - If the Settings page or embedded token is temporarily unavailable, preserve the original session cookies and fall back to the Manager JWT already present in the cookie, then to the stored Enlighten access token.

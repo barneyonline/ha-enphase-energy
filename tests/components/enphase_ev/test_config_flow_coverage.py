@@ -112,6 +112,7 @@ from custom_components.enphase_ev.grid_profile_runtime import (
     GridProfileRuntime,
     SUPPORT_CONFIRMED,
     SUPPORT_DENIED,
+    SUPPORT_READ_ONLY,
     SUPPORT_UNAVAILABLE,
 )
 
@@ -3337,12 +3338,15 @@ async def test_options_flow_grid_profile_aborts_without_runtime(hass) -> None:
 
 
 @pytest.mark.asyncio
-async def test_options_flow_grid_profile_aborts_without_installer_access(hass) -> None:
+@pytest.mark.parametrize("support_state", [SUPPORT_DENIED, SUPPORT_READ_ONLY])
+async def test_options_flow_grid_profile_aborts_without_installer_access(
+    hass, support_state: str
+) -> None:
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
     entry.runtime_data = SimpleNamespace(
         coordinator=SimpleNamespace(
             grid_profile_runtime=_options_flow_grid_profile_runtime(
-                support_state=SUPPORT_DENIED
+                support_state=support_state
             )
         )
     )
