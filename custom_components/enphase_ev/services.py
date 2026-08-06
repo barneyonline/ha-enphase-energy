@@ -40,7 +40,7 @@ from .device_types import parse_type_identifier
 from .device_registry_compat import device_config_entry_ids
 from .log_redaction import redact_site_id
 from .parsing_helpers import coerce_optional_bool
-from .grid_profile_runtime import SUPPORT_DENIED, GridProfileRuntime
+from .grid_profile_runtime import SUPPORT_DENIED, SUPPORT_READ_ONLY, GridProfileRuntime
 from .runtime_data import EnphaseRuntimeData, iter_coordinators
 from .service_validation import raise_translated_service_validation
 
@@ -1177,7 +1177,10 @@ def async_setup_services(
     def _require_grid_profile_installer(runtime: object) -> None:
         if getattr(runtime, "installer_access_confirmed", False):
             return
-        if getattr(runtime, "support_state", None) != SUPPORT_DENIED:
+        if getattr(runtime, "support_state", None) not in {
+            SUPPORT_DENIED,
+            SUPPORT_READ_ONLY,
+        }:
             _raise_service_validation(
                 "grid_profile_unavailable",
                 message="Grid profile control is unavailable.",

@@ -84,6 +84,22 @@ _ACTIVATION_UI_URL_RE = re.compile(
     r"(?:(?:https?:)?//[^\"'<>\s]+)?/app/activation_ui/\?[^\"'<>\s]+",
     re.IGNORECASE,
 )
+_ACTIVATION_UI_TEMPLATE_RE = re.compile(
+    r"https://activations-ui\.enphaseenergy\.com/?\?[^`\"'<>\s]+",
+    re.IGNORECASE,
+)
+_ACTIVATION_TOKEN_ASSIGNMENT_RE = re.compile(
+    r"\b(?:const|let|var)\s+token\s*=\s*['\"]"
+    r"(?P<token>[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)['\"]",
+    re.IGNORECASE,
+)
+_ACTIVATION_GRID_PROFILE_RE = re.compile(
+    r"Gateway\s*-\s*(?P<serial>[A-Za-z0-9_-]+)\s*</h[1-6]>"
+    r"(?:(?!</div>).){0,2000}?Grid\s+Profile\s*:\s*"
+    r"(?P<name>.*?)(?=<button\b|</div>)",
+    re.IGNORECASE | re.DOTALL,
+)
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
 _ENLIGHTEN_READ_CONCURRENCY_LIMIT = 3
 _ENLIGHTEN_OPTIONAL_READ_CONCURRENCY_LIMIT = 2
 _SYSTEM_EVENTS_PAGE_SIZE = 200
@@ -788,12 +804,60 @@ def _activation_context_from_settings_html(
             activation_url = URL(candidate)
         except Exception:  # noqa: BLE001 - malformed unrelated page content
             continue
-        if activation_url.host != URL(BASE_URL).host:
+        if (
+            activation_url.host != URL(BASE_URL).host
+            or activation_url.path != "/app/activation_ui/"
+        ):
             continue
         token = activation_url.query.get("token")
         if token and token.count(".") >= 2:
             return str(token), str(activation_url)
-    return None
+
+    # Current Settings pages create a cross-origin Activation iframe only after
+    # Change is selected. Reconstruct that browser referer from the inert script
+    # template without executing page JavaScript.
+    token_match = _ACTIVATION_TOKEN_ASSIGNMENT_RE.search(normalized)
+    template_match = _ACTIVATION_UI_TEMPLATE_RE.search(normalized)
+    if token_match is None or template_match is None:
+        return None
+    token = token_match.group("token")
+    candidate = template_match.group(0).replace("${token}", token)
+    serial_match = re.search(
+        r"showGridProfileModal\(\s*['\"](?P<serial>[A-Za-z0-9_-]+)['\"]\s*\)",
+        normalized,
+        re.IGNORECASE,
+    )
+    if serial_match is not None:
+        candidate = candidate.replace("${serialnum}", serial_match.group("serial"))
+    if "${" in candidate:
+        return None
+    try:
+        activation_url = URL(candidate)
+    except Exception:  # noqa: BLE001 - malformed unrelated page content
+        return None
+    if (
+        activation_url.host != "activations-ui.enphaseenergy.com"
+        or activation_url.path not in {"", "/"}
+        or activation_url.query.get("token") != token
+    ):
+        return None
+    return token, str(activation_url)
+
+
+def _activation_grid_profiles_from_settings_html(
+    payload: str,
+) -> list[tuple[str, str]]:
+    """Extract read-only Gateway Grid Profile labels from Settings HTML."""
+
+    normalized = unescape(payload).replace(r"\u0026", "&").replace(r"\/", "/")
+    profiles: list[tuple[str, str]] = []
+    for match in _ACTIVATION_GRID_PROFILE_RE.finditer(normalized):
+        serial = match.group("serial").strip()
+        name = _HTML_TAG_RE.sub(" ", match.group("name"))
+        name = " ".join(unescape(name).split())
+        if serial and name:
+            profiles.append((serial, name))
+    return profiles
 
 
 def _decode_jwt_payload(token: str) -> dict[str, Any] | None:
@@ -2115,6 +2179,7 @@ class EnphaseEVClient:
         self._eauth = eauth or None
         self._activation_token: str | None = None
         self._activation_referer: str | None = None
+        self._activation_settings_grid_profiles: list[tuple[str, str]] = []
         self._hems_site_supported: bool | None = None
         self._system_dashboard_summary_payload: dict[str, object] | None = None
         self._reauth_cb: Callable[[], Awaitable[bool]] | None = reauth_callback
@@ -2768,18 +2833,20 @@ class EnphaseEVClient:
         """Return cloud Activation API headers."""
 
         token = self._activation_auth_token()
+        referer = self._activation_referer or (
+            f"{BASE_URL}/app/activation_ui/?system_id={self._site}"
+        )
         headers: dict[str, str | None] = {
             "Accept": "application/json, text/plain, */*",
             "Authorization": f"Bearer {token}" if token else None,
             "Cookie": self._activation_cookie(token),
-            "Referer": self._activation_referer
-            or f"{BASE_URL}/app/activation_ui/?system_id={self._site}",
+            "Referer": referer,
             "X-Requested-With": None,
             "e-auth-token": None,
         }
         if write:
             headers["Content-Type"] = "application/json"
-            headers["Origin"] = BASE_URL
+            headers["Origin"] = str(URL(referer).origin())
         return headers
 
     def _activation_auth_token(self) -> str | None:
@@ -2797,10 +2864,16 @@ class EnphaseEVClient:
         return self._battery_config_single_auth_token()
 
     def _clear_activation_auth_context(self) -> None:
-        """Discard the in-memory Activation JWT and its matching referer."""
+        """Discard the in-memory Activation data tied to the current session."""
 
         self._activation_token = None
         self._activation_referer = None
+        self._activation_settings_grid_profiles = []
+
+    def activation_settings_grid_profiles(self) -> list[tuple[str, str]]:
+        """Return Grid Profile labels visible on the classic Settings page."""
+
+        return list(self._activation_settings_grid_profiles)
 
     def _activation_cookie(self, token: str | None) -> str | None:
         """Return session cookies with the Activation Manager token synchronized."""
@@ -2842,6 +2915,9 @@ class EnphaseEVClient:
                 redact_text(err, site_ids=(self._site,)),
             )
             return False
+        self._activation_settings_grid_profiles = (
+            _activation_grid_profiles_from_settings_html(payload)
+        )
         context = _activation_context_from_settings_html(payload)
         if context is None:
             _LOGGER.debug(

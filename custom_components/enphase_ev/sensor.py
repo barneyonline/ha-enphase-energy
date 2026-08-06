@@ -71,6 +71,7 @@ from .entity import (
 from .labels import friendly_status_text, status_label
 from .log_redaction import redact_text
 from .grid_profile_runtime import (
+    SUPPORT_READ_ONLY,
     SUPPORT_UNKNOWN,
     SUPPORT_UNAVAILABLE,
     GridProfileRuntime,
@@ -194,6 +195,8 @@ def _retain_grid_profile_sensors(coord: EnphaseCoordinator) -> bool:
         return False
     if getattr(runtime, "installer_access_confirmed", False):
         return True
+    if getattr(runtime, "support_state", None) == SUPPORT_READ_ONLY:
+        return bool(runtime.current_profile_display())
     return bool(
         getattr(runtime, "installer_access_ever_confirmed", False)
         and getattr(runtime, "support_state", None) == SUPPORT_UNAVAILABLE
@@ -5807,7 +5810,16 @@ class _GridProfileSensor(_SiteBaseEntity):
     @property
     def available(self) -> bool:
         runtime = self._coord.grid_profile_runtime
-        return bool(super().available and runtime.installer_access_confirmed)
+        return bool(
+            super().available
+            and (
+                runtime.installer_access_confirmed
+                or (
+                    runtime.support_state == SUPPORT_READ_ONLY
+                    and runtime.current_profile_display()
+                )
+            )
+        )
 
 
 class EnphaseCurrentGridProfileSensor(_GridProfileSensor):

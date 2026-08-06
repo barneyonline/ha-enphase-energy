@@ -22,6 +22,7 @@ from custom_components.enphase_ev.api import (
 from custom_components.enphase_ev.const import CONF_SITE_ID, CONF_SITE_ONLY, DOMAIN
 from custom_components.enphase_ev.grid_profile_runtime import (
     SUPPORT_DENIED,
+    SUPPORT_READ_ONLY,
     SUPPORT_UNAVAILABLE,
 )
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
@@ -240,13 +241,14 @@ def test_grid_mode_automation_blueprint_uses_config_entry_routing() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("support_state", [SUPPORT_DENIED, SUPPORT_READ_ONLY])
 async def test_grid_profile_browse_services_require_installer_access(
-    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch, support_state: str
 ) -> None:
     handlers = _register_service_handlers(hass, monkeypatch)
     runtime = SimpleNamespace(
         installer_access_confirmed=False,
-        support_state=SUPPORT_DENIED,
+        support_state=support_state,
         async_refresh=AsyncMock(),
         async_load_profiles=AsyncMock(),
     )

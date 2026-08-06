@@ -25,9 +25,11 @@ from custom_components.enphase_ev.grid_profile_runtime import (
     COMMONLY_USED_OPTION,
     SUPPORT_CONFIRMED,
     SUPPORT_DENIED,
+    SUPPORT_READ_ONLY,
     SUPPORT_UNKNOWN,
     SUPPORT_UNAVAILABLE,
     ActivationRegion,
+    GatewayGridProfileTarget,
     GridProfile,
     GridProfileRuntime,
     _clean_text,
@@ -89,6 +91,12 @@ def test_activation_auth_parser_handles_protocol_relative_and_malformed_urls() -
         )
         is None
     )
+    assert (
+        api._activation_context_from_settings_html(  # noqa: SLF001
+            f"https://enlighten.enphaseenergy.com/not-activation/?token={token}"
+        )
+        is None
+    )
     with patch.object(api, "URL", side_effect=ValueError):
         assert (
             api._activation_context_from_settings_html(  # noqa: SLF001
@@ -98,13 +106,107 @@ def test_activation_auth_parser_handles_protocol_relative_and_malformed_urls() -
         )
 
 
+def test_activation_auth_parser_handles_current_cross_origin_launch_script() -> None:
+    token = "header.payload.signature"
+    payload = f"""
+        <div class="modern_block">
+          <h4>Gateway - 122532006376</h4>
+          Grid Profile: AS/NZS 4777.2: 2020 Australia A Region
+          <button onclick="showGridProfileModal('122532006376')">Change</button>
+        </div>
+        <script>
+          showGridProfileModal = function(serialnum) {{
+            var token = "{token}";
+            document.getElementById("myFrame").src =
+              `https://activations-ui.enphaseenergy.com?locale=en-AU&amp;token=${{token}}&amp;siteid=3381244&amp;gridprofile=gridprofile&amp;envoyserialnumber=${{serialnum}}`;
+          }};
+        </script>
+    """
+
+    assert api._activation_context_from_settings_html(payload) == (  # noqa: SLF001
+        token,
+        "https://activations-ui.enphaseenergy.com/"
+        f"?locale=en-AU&token={token}&siteid=3381244&gridprofile=gridprofile"
+        "&envoyserialnumber=122532006376",
+    )
+    assert api._activation_grid_profiles_from_settings_html(
+        payload
+    ) == [  # noqa: SLF001
+        ("122532006376", "AS/NZS 4777.2: 2020 Australia A Region")
+    ]
+
+
+async def test_activation_auth_bootstrap_caches_settings_profile_labels() -> None:
+    client = _make_api_client()
+    token = "header.payload.signature"
+    client._text = AsyncMock(
+        return_value=f"""
+            <div><h4>Gateway - 122532006376</h4>
+            Grid Profile: Australia A Region <button>Change</button></div>
+            <button onclick="showGridProfileModal('122532006376')">Change</button>
+            <script>var token = "{token}";
+            const url = `https://activations-ui.enphaseenergy.com/?token=${{token}}&envoyserialnumber=${{serialnum}}`;</script>
+        """
+    )  # noqa: SLF001
+
+    assert await client.async_prepare_activation_auth()
+    assert client.activation_settings_grid_profiles() == [
+        ("122532006376", "Australia A Region")
+    ]
+    assert client._activation_headers(write=True)["Origin"] == (  # noqa: SLF001
+        "https://activations-ui.enphaseenergy.com"
+    )
+
+
+def test_activation_auth_parser_rejects_incomplete_cross_origin_template() -> None:
+    token = "header.payload.signature"
+    payload = (
+        f'<script>const token = "{token}"; '
+        "const url = `https://activations-ui.enphaseenergy.com/"
+        "?token=${token}&envoyserialnumber=${serialnum}`;</script>"
+    )
+
+    assert api._activation_context_from_settings_html(payload) is None  # noqa: SLF001
+    assert (
+        api._activation_grid_profiles_from_settings_html(  # noqa: SLF001
+            "<h4>Gateway - serial</h4>Grid Profile: <button>Change</button>"
+        )
+        == []
+    )
+
+    complete_payload = payload.replace(
+        "</script>",
+        "<button onclick=\"showGridProfileModal('gateway')\">Change</button></script>",
+    )
+    with patch.object(api, "URL", side_effect=ValueError):
+        assert (  # noqa: SLF001
+            api._activation_context_from_settings_html(complete_payload) is None
+        )
+    with patch.object(
+        api,
+        "URL",
+        return_value=SimpleNamespace(
+            host="example.com",
+            path="/",
+            query={"token": token},
+        ),
+    ):
+        assert (  # noqa: SLF001
+            api._activation_context_from_settings_html(complete_payload) is None
+        )
+
+
 def test_activation_auth_expired_cached_token_uses_stored_fallback() -> None:
     client = _make_api_client()
     client._activation_token = "header.eyJleHAiOjF9.signature"  # noqa: SLF001
+    client._activation_settings_grid_profiles = [  # noqa: SLF001
+        ("gateway", "Old profile")
+    ]
 
     assert client._activation_auth_token() == "TOKEN"  # noqa: SLF001
     assert client._activation_token is None  # noqa: SLF001
     assert client._activation_referer is None  # noqa: SLF001
+    assert client.activation_settings_grid_profiles() == []
 
 
 @pytest.mark.parametrize(
@@ -409,6 +511,8 @@ async def test_activation_api_validates_response_shapes() -> None:
 class _FakeGridProfileClient:
     def __init__(self) -> None:
         self.activation_auth_prepare_requests = 0
+        self.activation_auth_prepare_forces: list[bool] = []
+        self.settings_grid_profiles: list[tuple[str, str]] = []
         self.profile_requests: list[tuple[str, str, bool]] = []
         self.apply_requests: list[dict[str, object]] = []
         self.reference_payload: dict[str, object] = {
@@ -505,9 +609,13 @@ class _FakeGridProfileClient:
         self.activation_record_requests = 0
         self.activation_device_requests = 0
 
-    async def async_prepare_activation_auth(self) -> bool:
+    async def async_prepare_activation_auth(self, *, force: bool = False) -> bool:
         self.activation_auth_prepare_requests += 1
+        self.activation_auth_prepare_forces.append(force)
         return True
+
+    def activation_settings_grid_profiles(self) -> list[tuple[str, str]]:
+        return list(self.settings_grid_profiles)
 
     async def async_get_activation_reference_data(self) -> dict[str, object]:
         self.reference_requests += 1
@@ -764,6 +872,14 @@ async def test_coordinator_refreshes_grid_profile_metadata_after_first_poll() ->
     coordinator._schedule_grid_profile_metadata_refresh(steady_refresh)
     refresh.assert_not_awaited()
 
+    coordinator.grid_profile_runtime.support_state = SUPPORT_READ_ONLY
+    coordinator._schedule_grid_profile_metadata_refresh(steady_refresh)
+    task = coordinator._grid_profile_metadata_task
+    assert task is not None
+    await task
+    refresh.assert_awaited_once_with(force=False, load_profiles=True)
+
+    refresh.reset_mock()
     coordinator.grid_profile_runtime.support_state = SUPPORT_CONFIRMED
     coordinator.grid_profile_runtime.async_refresh = None
     await coordinator.async_refresh_grid_profile_metadata()
@@ -914,6 +1030,8 @@ async def test_runtime_denies_feature_when_activation_access_unavailable() -> No
         raise ActivationAccessDenied("denied")
 
     client.async_get_activation_reference_data = denied_reference  # type: ignore[method-assign]
+    client.async_get_activation_record = denied_reference  # type: ignore[method-assign]
+    client.async_get_activation_device_list = denied_reference  # type: ignore[method-assign]
     runtime = GridProfileRuntime(_FakeCoordinator(client))
 
     result = await runtime.async_refresh(force=True)
@@ -921,6 +1039,155 @@ async def test_runtime_denies_feature_when_activation_access_unavailable() -> No
     assert result.support_state == SUPPORT_DENIED
     assert not runtime.installer_access_confirmed
     assert runtime.region_options == []
+
+
+async def test_runtime_retains_read_only_settings_profile_when_activation_denied() -> (
+    None
+):
+    client = _FakeGridProfileClient()
+    client.settings_grid_profiles = [
+        ("122532006376", "AS/NZS 4777.2: 2020 Australia A Region")
+    ]
+
+    activation_calls = 0
+
+    async def denied_reference() -> dict[str, object]:
+        nonlocal activation_calls
+        activation_calls += 1
+        raise ActivationAccessDenied("denied")
+
+    client.async_get_activation_reference_data = denied_reference  # type: ignore[method-assign]
+    client.async_get_activation_record = denied_reference  # type: ignore[method-assign]
+    client.async_get_activation_device_list = denied_reference  # type: ignore[method-assign]
+    coordinator = _FakeCoordinator(client)
+    runtime = GridProfileRuntime(coordinator)
+
+    result = await runtime.async_refresh(force=True)
+
+    assert result.support_state == SUPPORT_READ_ONLY
+    assert runtime.current_profile_display() == (
+        "AS/NZS 4777.2: 2020 Australia A Region"
+    )
+    assert runtime.current_profile_attributes()["source"] == "enlighten_settings"
+    assert coordinator.successes == ["activation_grid_profile"]
+    assert coordinator.failures == []
+
+    client.settings_grid_profiles = [
+        ("122532006376", "AS/NZS 4777.2: 2020 Australia B Region")
+    ]
+    refreshed = await runtime.async_refresh(force=False)
+
+    assert refreshed.support_state == SUPPORT_READ_ONLY
+    assert runtime.current_profile_display() == (
+        "AS/NZS 4777.2: 2020 Australia B Region"
+    )
+    assert activation_calls == 3
+    assert client.activation_auth_prepare_forces == [True, True]
+    assert coordinator.successes == [
+        "activation_grid_profile",
+        "activation_grid_profile",
+    ]
+
+    client.async_get_activation_reference_data = AsyncMock(  # type: ignore[method-assign]
+        return_value=client.reference_payload
+    )
+    client.async_get_activation_record = AsyncMock(  # type: ignore[method-assign]
+        return_value=client.activation_record
+    )
+    client.async_get_activation_device_list = AsyncMock(  # type: ignore[method-assign]
+        return_value={"devices": []}
+    )
+
+    upgraded = await runtime.async_refresh(force=True, load_profiles=False)
+
+    assert upgraded.support_state == SUPPORT_CONFIRMED
+    assert runtime.installer_access_confirmed
+    assert activation_calls == 3
+    assert client.activation_auth_prepare_forces == [True, True, True]
+    client.async_get_activation_reference_data.assert_awaited_once()  # type: ignore[attr-defined]
+    client.async_get_activation_record.assert_awaited_once()  # type: ignore[attr-defined]
+    client.async_get_activation_device_list.assert_awaited_once()  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize("prepare_failure", [False, RuntimeError("unavailable")])
+async def test_runtime_read_only_refresh_preserves_stale_profile_on_settings_failure(
+    prepare_failure: bool | Exception,
+) -> None:
+    client = _FakeGridProfileClient()
+    client.settings_grid_profiles = [("gateway", "Australia A Region")]
+    client.async_prepare_activation_auth = AsyncMock(  # type: ignore[method-assign]
+        side_effect=(
+            prepare_failure if isinstance(prepare_failure, Exception) else None
+        ),
+        return_value=prepare_failure if isinstance(prepare_failure, bool) else None,
+    )
+    coordinator = _FakeCoordinator(client)
+    runtime = GridProfileRuntime(coordinator)
+    runtime.support_state = SUPPORT_READ_ONLY
+    runtime.current_profile_name = "Australia A Region"
+
+    result = await runtime.async_refresh(force=False)
+
+    assert result.support_state == SUPPORT_READ_ONLY
+    assert runtime.current_profile_display() == "Australia A Region"
+    assert len(coordinator.failures) == 1
+    assert coordinator.failures[0][0] == "activation_grid_profile"
+    client.async_prepare_activation_auth.assert_awaited_once_with(force=True)  # type: ignore[attr-defined]
+
+
+async def test_runtime_status_refresh_retains_read_only_settings_profile() -> None:
+    client = _FakeGridProfileClient()
+    client.settings_grid_profiles = [
+        ("gateway-a", "Australia A Region"),
+        ("gateway-b", "Australia A Region"),
+    ]
+
+    async def denied_devices() -> dict[str, object]:
+        raise ActivationAccessDenied("denied")
+
+    client.async_get_activation_device_list = denied_devices  # type: ignore[method-assign]
+    coordinator = _FakeCoordinator(client)
+    runtime = GridProfileRuntime(coordinator)
+
+    result = await runtime.async_refresh_device_status(force=True)
+
+    assert result.support_state == SUPPORT_READ_ONLY
+    assert runtime.current_profile_display() == "Australia A Region"
+    assert coordinator.failures == []
+
+    client.settings_grid_profiles = [
+        ("gateway-a", "Australia A Region"),
+        ("gateway-b", "Australia B Region"),
+    ]
+    runtime.gateway_targets["stale-gateway"] = GatewayGridProfileTarget(
+        serial_num="stale-gateway",
+        part_num=None,
+        ensemble_envoy=False,
+        current_profile_name="Stale profile",
+    )
+    assert runtime._sync_settings_profiles()  # noqa: SLF001
+    assert runtime.current_profile_display() is None
+    assert runtime.gateway_targets == {}
+
+
+async def test_runtime_settings_profile_compatibility_edge_paths() -> None:
+    without_getter = GridProfileRuntime(SimpleNamespace(client=object()))
+    assert not without_getter._sync_settings_profiles()  # noqa: SLF001
+    assert not await without_getter._async_prepare_activation_auth()  # noqa: SLF001
+
+    raising_client = SimpleNamespace(
+        activation_settings_grid_profiles=lambda: (_ for _ in ()).throw(
+            RuntimeError("failed")
+        )
+    )
+    raising = GridProfileRuntime(SimpleNamespace(client=raising_client))
+    assert not raising._sync_settings_profiles()  # noqa: SLF001
+
+    malformed_client = SimpleNamespace(
+        activation_settings_grid_profiles=lambda: [None, ("only-one",)]
+    )
+    malformed = GridProfileRuntime(SimpleNamespace(client=malformed_client))
+    assert not malformed._sync_settings_profiles()  # noqa: SLF001
 
 
 async def test_runtime_marks_optional_activation_failure_unavailable() -> None:
@@ -1172,6 +1439,7 @@ def test_grid_profile_sensor_survives_only_transient_unavailability() -> None:
         installer_access_confirmed=False,
         installer_access_ever_confirmed=True,
         support_state=SUPPORT_UNAVAILABLE,
+        current_profile_display=lambda: None,
     )
     coordinator = SimpleNamespace(grid_profile_runtime=runtime)
 
@@ -1179,6 +1447,10 @@ def test_grid_profile_sensor_survives_only_transient_unavailability() -> None:
 
     runtime.support_state = SUPPORT_DENIED
     assert not _retain_grid_profile_sensors(coordinator)
+
+    runtime.support_state = SUPPORT_READ_ONLY
+    runtime.current_profile_display = lambda: "AS/NZS 4777.2"
+    assert _retain_grid_profile_sensors(coordinator)
 
     runtime.support_state = SUPPORT_UNAVAILABLE
     runtime.installer_access_ever_confirmed = False

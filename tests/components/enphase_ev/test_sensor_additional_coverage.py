@@ -132,6 +132,9 @@ async def test_async_setup_entry_registers_entities(
     assert grid_profile.available
     assert grid_profile.native_value == "Australia A Region (1.3.12)"
     assert grid_profile.extra_state_attributes == {"profile_id": "agf:current"}
+    coord.grid_profile_runtime.installer_access_confirmed = False
+    coord.grid_profile_runtime.support_state = "read_only_available"
+    assert grid_profile.available
 
     sync_topology_cb = next(
         cb for cb in callbacks if cb.__name__ == "_async_sync_topology"
