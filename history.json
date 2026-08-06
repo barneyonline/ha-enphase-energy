@@ -1,14 +1,8 @@
 {
-  "current_status": "Degraded",
-  "generated_at": "2026-08-06T03:48:14.382657Z",
+  "current_status": "Fully Operational",
+  "generated_at": "2026-08-06T06:28:25.879203Z",
   "retention_days": 30,
   "samples": [
-    {
-      "checked_at": "2026-07-07T04:32:17.844349Z",
-      "checks_failed": 0,
-      "failed_check_names": [],
-      "status": "Fully Operational"
-    },
     {
       "checked_at": "2026-07-07T08:22:14.482915Z",
       "checks_failed": 0,
@@ -2319,6 +2313,12 @@
         "evse_scheduler"
       ],
       "status": "Degraded"
+    },
+    {
+      "checked_at": "2026-08-06T06:28:25.879203Z",
+      "checks_failed": 0,
+      "failed_check_names": [],
+      "status": "Fully Operational"
     }
   ]
 }
