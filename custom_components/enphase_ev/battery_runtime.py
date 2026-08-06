@@ -2341,6 +2341,7 @@ class BatteryRuntime:
         include_source: bool = True,
         merged_payload: bool = False,
         strip_devices: bool = False,
+        partial_payload_only: bool = False,
         request_refresh: bool = True,
     ) -> None:
         coord = self.coordinator
@@ -2354,13 +2355,23 @@ class BatteryRuntime:
         async with state._battery_settings_write_lock:
             state._battery_settings_last_write_mono = time.monotonic()
             try:
-                await coord.client.set_battery_settings_compat(
-                    payload,
-                    schedule_type=schedule_type,
-                    include_source=include_source,
-                    merged_payload=merged_payload,
-                    strip_devices=strip_devices,
-                )
+                if partial_payload_only:
+                    await coord.client.set_battery_settings_compat(
+                        payload,
+                        schedule_type=schedule_type,
+                        include_source=include_source,
+                        merged_payload=merged_payload,
+                        strip_devices=strip_devices,
+                        partial_payload_only=True,
+                    )
+                else:
+                    await coord.client.set_battery_settings_compat(
+                        payload,
+                        schedule_type=schedule_type,
+                        include_source=include_source,
+                        merged_payload=merged_payload,
+                        strip_devices=strip_devices,
+                    )
             except aiohttp.ClientResponseError as err:
                 if err.status == HTTPStatus.FORBIDDEN:
                     self._raise_validation(
@@ -4406,27 +4417,21 @@ class BatteryRuntime:
             return
         previous_control = state._battery_power_match_control
 
+        payload: dict[str, object] = {"powerMatch": target}
         await self.async_apply_battery_settings_compat(
-            {"powerMatchControl": {"enabled": target}},
-            merged_payload=True,
+            payload,
             strip_devices=True,
+            partial_payload_only=True,
             request_refresh=False,
         )
 
-        authoritative_refresh_observed = False
-        for attempt in range(4):
-            refreshed = await self.async_refresh_battery_settings(force=True)
-            authoritative_refresh_observed |= refreshed
-            if (
-                refreshed
-                and coord.power_match_control_available
-                and coord.battery_power_match_enabled is target
-            ):
-                self.clear_battery_settings_write_pending()
-                coord.publish_runtime_state_update("power_match")
-                return
-            if attempt < 3:
-                await asyncio.sleep(0.75)
+        confirmed, authoritative_refresh_observed = (
+            await self._async_confirm_power_match(target)
+        )
+        if confirmed:
+            self.clear_battery_settings_write_pending()
+            coord.publish_runtime_state_update("power_match")
+            return
 
         if not authoritative_refresh_observed:
             state._battery_power_match_control = previous_control
@@ -4436,6 +4441,24 @@ class BatteryRuntime:
             "power_match_toggle_not_applied",
             message="PowerMatch toggle was not applied by Enphase.",
         )
+
+    async def _async_confirm_power_match(self, target: bool) -> tuple[bool, bool]:
+        """Confirm a PowerMatch write and report whether any read succeeded."""
+
+        coord = self.coordinator
+        authoritative_refresh_observed = False
+        for attempt in range(4):
+            refreshed = await self.async_refresh_battery_settings(force=True)
+            authoritative_refresh_observed |= refreshed
+            if (
+                refreshed
+                and coord.power_match_control_available
+                and coord.battery_power_match_enabled is target
+            ):
+                return True, True
+            if attempt < 3:
+                await asyncio.sleep(0.75)
+        return False, authoritative_refresh_observed
 
     async def async_set_charge_from_grid_schedule_enabled(self, enabled: bool) -> None:
         coord = self.coordinator

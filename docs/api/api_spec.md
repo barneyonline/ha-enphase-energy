@@ -6380,12 +6380,12 @@ Example payloads observed:
 ```
 
 ```json
-{ "powerMatchControl": { "enabled": true } }
+{ "powerMatch": true }
 ```
 
 PowerMatch implementation notes:
 - The runtime treats `batterySettings.data.powerMatchControl` as the sole capability and state source. The switch is offered only when `show=true`, `enabled` is Boolean, and `locked` is not `true`.
-- PowerMatch writes merge `powerMatchControl.enabled` into the latest allowlisted BatteryConfig settings payload so other control fields and unrelated settings are preserved.
+- PowerMatch writes send the first-party `{ "powerMatch": <boolean> }` payload unchanged across authentication retries. Stateful merged-payload attempts are disabled for this control.
 - The separate `/app-api/<site_id>/powermatch_details` route remains unused because captured evidence establishes only UI visibility/state flags, not writable backend semantics.
 
 ```json
