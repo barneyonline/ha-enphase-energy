@@ -1090,7 +1090,7 @@ async def test_set_charge_from_grid_disable_omits_disclaimer(
 
 
 @pytest.mark.asyncio
-async def test_set_power_match_uses_fresh_merged_settings_and_confirms(
+async def test_set_power_match_uses_partial_payload_and_confirms(
     coordinator_factory,
 ) -> None:
     coord = coordinator_factory()
@@ -1123,11 +1123,12 @@ async def test_set_power_match_uses_fresh_merged_settings_and_confirms(
     await coord.battery_runtime.async_set_power_match(True)
 
     coord.client.set_battery_settings_compat.assert_awaited_once_with(
-        {"powerMatchControl": {"enabled": True}},
+        {"powerMatch": True},
         schedule_type="cfg",
         include_source=True,
-        merged_payload=True,
+        merged_payload=False,
         strip_devices=True,
+        partial_payload_only=True,
     )
     assert coord.client.battery_settings_details.await_count == 2
     assert coord.battery_power_match_enabled is True
@@ -1209,12 +1210,19 @@ async def test_set_power_match_rejects_unconfirmed_server_state(
     monkeypatch.setattr(
         "custom_components.enphase_ev.battery_runtime.asyncio.sleep", sleep
     )
-
     with pytest.raises(ServiceValidationError, match="was not applied"):
         await coord.battery_runtime.async_set_power_match(True)
 
     assert coord.client.battery_settings_details.await_count == 5
     assert sleep.await_count == 3
+    coord.client.set_battery_settings_compat.assert_awaited_once_with(
+        {"powerMatch": True},
+        schedule_type="cfg",
+        include_source=True,
+        merged_payload=False,
+        strip_devices=True,
+        partial_payload_only=True,
+    )
     assert coord.battery_power_match_enabled is False
     assert coord.battery_settings_write_pending is False
     coord.publish_runtime_state_update.assert_called_once_with("power_match")
@@ -1269,6 +1277,14 @@ async def test_set_power_match_restores_authoritative_state_when_confirmation_fa
         "force_schedule_opted": None,
     }
     assert coord.battery_settings_write_pending is False
+    coord.client.set_battery_settings_compat.assert_awaited_once_with(
+        {"powerMatch": True},
+        schedule_type="cfg",
+        include_source=True,
+        merged_payload=False,
+        strip_devices=True,
+        partial_payload_only=True,
+    )
     coord.async_request_refresh.assert_not_awaited()
     coord.publish_runtime_state_update.assert_called_once_with("power_match")
 

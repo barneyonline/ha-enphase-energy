@@ -3975,6 +3975,7 @@ class EnphaseEVClient:
         write_intent: str = "generic",
         supports_mqtt: bool | None = None,
         strip_devices: bool = False,
+        partial_payload_only: bool = False,
     ) -> JsonDict:
         """Issue a BatteryConfig write using endpoint-specific compatibility attempts."""
 
@@ -3986,6 +3987,8 @@ class EnphaseEVClient:
             params=params,
             json_body=json_body,
         )
+        if partial_payload_only:
+            attempts = [attempt for attempt in attempts if not attempt.merged_payload]
         if strip_devices:
             attempts = [replace(attempt, strip_devices=True) for attempt in attempts]
         last_error: aiohttp.ClientResponseError | None = None
@@ -6106,6 +6109,7 @@ class EnphaseEVClient:
         include_source: bool = True,
         merged_payload: bool = False,
         strip_devices: bool = False,
+        partial_payload_only: bool = False,
     ) -> JsonDict:
         """Update battery settings using an explicit compatibility payload shape."""
 
@@ -6128,6 +6132,7 @@ class EnphaseEVClient:
             write_intent="battery_settings_update",
             supports_mqtt=self._battery_config_supports_mqtt,
             strip_devices=strip_devices,
+            partial_payload_only=partial_payload_only,
         )
 
     async def set_battery_profile(

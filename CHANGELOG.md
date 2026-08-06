@@ -19,6 +19,25 @@ All notable changes to this project will be documented in this file.
 ### 🔄 Other changes
 - None
 
+## v4.2.1 - 2026-08-06
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Sent the exact first-party `powerMatch` BatteryConfig payload for PowerMatch
+  changes across every authentication attempt, preventing Enphase from silently
+  ignoring the previous merged `powerMatchControl` payload.
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Bumped the integration manifest version to `4.2.1`.
+
 ## v4.2.0 - 2026-08-06
 
 ### 🚧 Breaking changes

@@ -7029,6 +7029,43 @@ async def test_battery_config_write_request_strips_devices_from_stateful_attempt
 
 
 @pytest.mark.asyncio
+async def test_power_match_partial_payload_skips_cached_stateful_attempt() -> None:
+    client = _make_client()
+    client._battery_config_supports_mqtt = True  # noqa: SLF001
+    client._remember_battery_config_write_base(  # noqa: SLF001
+        "battery_settings",
+        {
+            "data": {
+                "powerMatchControl": {"show": True, "enabled": False},
+                "devices": {"iqEvse": {"enabled": True}},
+            }
+        },
+    )
+    client._cache_battery_config_write_attempt(  # noqa: SLF001
+        "battery_settings",
+        "battery_settings_stateful_primary_source",
+        supports_mqtt=True,
+    )
+    client._acquire_xsrf_token = AsyncMock(return_value="token")  # noqa: SLF001
+    client._battery_config_attempt_headers = MagicMock(return_value={})  # noqa: SLF001
+    client._json = AsyncMock(return_value={"message": "success"})  # noqa: SLF001
+
+    await client.set_battery_settings_compat(
+        {"powerMatch": True},
+        strip_devices=True,
+        partial_payload_only=True,
+    )
+
+    assert client._json.await_args.kwargs["json"] == {
+        "powerMatch": True
+    }  # noqa: SLF001
+    assert (
+        client._json.await_args.kwargs["debug_battery_attempt_id"]  # noqa: SLF001
+        == "battery_settings_primary_source"
+    )
+
+
+@pytest.mark.asyncio
 async def test_cancel_battery_profile_update_uses_empty_body() -> None:
     token = _make_token({"user_id": "44"})
     client = _make_client()
