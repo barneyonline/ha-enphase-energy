@@ -118,9 +118,9 @@ Status labels:
 | Site live-debug MQTT authorizer | `GET` | `/service/system_dashboard/api_internal/cs/sites/livestream?serial_num=<gateway_sn>&live_debug=true` | authenticated Enlighten session cookies + `e-auth-token`; browser XHR request | Runtime (gateway update progress) |
 | Site latest power | `GET` | `/app-api/<site_id>/get_latest_power` | `e-auth-token` + cookies | Runtime |
 | Site weather | `GET` | `/systems/<site_id>/weather.json?locale=<locale>` | authenticated session cookies + XHR headers; `e-auth-token` when available | Runtime (opt-in) |
-| VPP enrollment lookup | `GET` | `https://gs.enphaseenergy.com/enrollment-mgr/api/v1/enrollment/enrolled/<site_id>` | isolated Grid Services headers with control bearer; no Enlighten cookies, XSRF, `X-Requested-With`, or `e-auth-token` | Runtime (opt-in) |
-| VPP enrollment details | `GET` | `https://gs.enphaseenergy.com/enrollment-mgr/api/v1/enrollment/<enrollment_id>` | isolated Grid Services headers with control bearer; 24-character hexadecimal enrollment ID required | Runtime (opt-in) |
-| VPP events | `GET` | `https://gs.enphaseenergy.com/vpp-mgr/api/v1/events/get?site_id=<site_id>&programId=<program_id>&start_date=&end_date=&sort_by=&ascending=&time=` | isolated Grid Services headers with control bearer; 24-character hexadecimal program ID required | Runtime (opt-in) |
+| VPP enrollment lookup | `GET` | `https://gs.enphaseenergy.com/enrollment-mgr/api/v1/enrollment/enrolled/<site_id>` | isolated Grid Services headers with the raw control token in `Authorization`; no Enlighten cookies, XSRF, `X-Requested-With`, or `e-auth-token` | Runtime (opt-in) |
+| VPP enrollment details | `GET` | `https://gs.enphaseenergy.com/enrollment-mgr/api/v1/enrollment/<enrollment_id>` | isolated Grid Services headers with the raw control token in `Authorization`; 24-character hexadecimal enrollment ID required | Runtime (opt-in) |
+| VPP events | `GET` | `https://gs.enphaseenergy.com/vpp-mgr/api/v1/events/get?site_id=<site_id>&programId=<program_id>&start_date=&end_date=&sort_by=&ascending=&time=` | isolated Grid Services headers with the raw control token in `Authorization`; 24-character hexadecimal program ID required | Runtime (opt-in) |
 | Site currency conversion settings | `GET` | `/app-api/<site_id>/get_currency_conversion.json` | authenticated session cookies + `e-auth-token` | Browser capture only |
 | Requested battery usage hint | `GET` | `/app-api/<site_id>/get_requested_battery_usage` | authenticated session cookies + `e-auth-token` | Browser capture only |
 | Site performance widget flags | `GET` | `/app-api/<site_id>/performance_widgets` | authenticated session cookies + `e-auth-token` | Browser capture only |
@@ -3600,7 +3600,7 @@ Request shapes:
 ```http
 GET https://gs.enphaseenergy.com/enrollment-mgr/api/v1/enrollment/enrolled/<site_id>
 Accept: application/json, text/javascript, */*; q=0.01
-Authorization: Bearer <control_token>
+Authorization: <control_token>
 Origin: https://enlighten.enphaseenergy.com
 Referer: https://enlighten.enphaseenergy.com/
 ```
@@ -3608,7 +3608,7 @@ Referer: https://enlighten.enphaseenergy.com/
 ```http
 GET https://gs.enphaseenergy.com/enrollment-mgr/api/v1/enrollment/<enrollment_id>
 Accept: application/json, text/javascript, */*; q=0.01
-Authorization: Bearer <control_token>
+Authorization: <control_token>
 Origin: https://enlighten.enphaseenergy.com
 Referer: https://enlighten.enphaseenergy.com/
 ```
@@ -3616,7 +3616,7 @@ Referer: https://enlighten.enphaseenergy.com/
 ```http
 GET https://gs.enphaseenergy.com/vpp-mgr/api/v1/events/get?site_id=<site_id>&programId=<program_id>&start_date=&end_date=&sort_by=&ascending=&time=
 Accept: application/json, text/javascript, */*; q=0.01
-Authorization: Bearer <control_token>
+Authorization: <control_token>
 Origin: https://enlighten.enphaseenergy.com
 Referer: https://enlighten.enphaseenergy.com/
 ```
@@ -3653,10 +3653,11 @@ eligible-program list. Site, enrollment, and program IDs must pass their expecte
 format validation before use; enrollment and program IDs are 24-character
 hexadecimal object IDs.
 
-Requests use `Authorization: Bearer <control token>` together with the Enlighten
-origin and referer. Enlighten cookies, XSRF, `X-Requested-With`, and
-`e-auth-token` headers are intentionally omitted across the host boundary. Auth
-headers are rebuilt for retries after successful reauthentication.
+Requests use the raw control token as `Authorization: <control token>` (with no
+`Bearer` prefix) together with the Enlighten origin and referer. Enlighten
+cookies, XSRF, `X-Requested-With`, and `e-auth-token` headers are intentionally
+omitted across the host boundary. Auth headers are rebuilt for retries after
+successful reauthentication.
 
 Event normalization retains only a hashed fingerprint, aware UTC start/end,
 type, subtype, status, and cancellation/superseded state. Rows with invalid

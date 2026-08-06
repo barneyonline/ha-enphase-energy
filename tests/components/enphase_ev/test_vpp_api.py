@@ -63,8 +63,12 @@ def test_vpp_header_profile_isolates_grid_services_request() -> None:
         "X-Requested-With": None,
         "e-auth-token": None,
         "Content-Type": None,
-        "Authorization": "Bearer MANAGER",
+        "Authorization": "MANAGER",
     }
+
+    client.update_credentials(eauth="REFRESHED", cookie="session=private")
+
+    assert client._vpp_headers()["Authorization"] == "REFRESHED"  # noqa: SLF001
 
 
 @pytest.mark.asyncio
@@ -121,7 +125,7 @@ async def test_vpp_api_uses_stateless_session_even_when_shared_jar_has_cookies()
     stateless.request.assert_called_once()
     request_headers = stateless.request.call_args.kwargs["headers"]
     assert "Cookie" not in request_headers
-    assert request_headers["Authorization"] == "Bearer MANAGER"
+    assert request_headers["Authorization"] == "MANAGER"
 
 
 @pytest.mark.asyncio

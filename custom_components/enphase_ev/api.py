@@ -2479,6 +2479,8 @@ class EnphaseEVClient:
     def _vpp_headers(self) -> dict[str, str | None]:
         """Return isolated browser headers for the Grid Services host."""
 
+        # Observed GS requests send the control token without a Bearer prefix.
+        token = self._bearer() or self._eauth
         headers: dict[str, str | None] = {
             "Accept": "application/json, text/javascript, */*; q=0.01",
             "Origin": BASE_URL,
@@ -2488,8 +2490,8 @@ class EnphaseEVClient:
             "X-Requested-With": None,
             "e-auth-token": None,
             "Content-Type": None,
+            "Authorization": token,
         }
-        headers.update(self._control_headers())
         return headers
 
     def control_headers(self) -> dict[str, str]:
