@@ -33,6 +33,7 @@ from .sensor_battery_helpers import (
 )
 
 BATTERY_LED_STATUS_STATE_MAP: dict[int, str] = {
+    7: "error",
     12: "charging",
     13: "discharging",
     14: "idle",

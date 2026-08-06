@@ -1449,6 +1449,7 @@
           "charging": "Cargando",
           "discharging": "Descargando",
           "idle": "Inactivo",
+          "error": "Error",
           "unknown": "Desconocido"
         }
       },

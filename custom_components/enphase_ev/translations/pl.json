@@ -1449,6 +1449,7 @@
           "charging": "Ładowanie",
           "discharging": "Rozładowywanie",
           "idle": "Bezczynny",
+          "error": "Błąd",
           "unknown": "Nieznany"
         }
       },

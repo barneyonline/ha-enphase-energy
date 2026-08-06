@@ -1449,6 +1449,7 @@
           "charging": "Nabíjení",
           "discharging": "Vybíjení",
           "idle": "Nečinný",
+          "error": "Chyba",
           "unknown": "Neznámý"
         }
       },

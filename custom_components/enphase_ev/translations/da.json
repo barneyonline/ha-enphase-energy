@@ -1449,6 +1449,7 @@
           "charging": "Oplader",
           "discharging": "Aflader",
           "idle": "Inaktiv",
+          "error": "Fejl",
           "unknown": "Ukendt"
         }
       },

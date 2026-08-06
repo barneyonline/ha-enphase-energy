@@ -1449,6 +1449,7 @@
           "charging": "Töltés",
           "discharging": "Kisütés",
           "idle": "Tétlen",
+          "error": "Hiba",
           "unknown": "Ismeretlen"
         }
       },

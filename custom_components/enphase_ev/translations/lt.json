@@ -1449,6 +1449,7 @@
           "charging": "Įkrovimas",
           "discharging": "Iškrovimas",
           "idle": "Neaktyvus",
+          "error": "Klaida",
           "unknown": "Nežinoma"
         }
       },

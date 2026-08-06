@@ -1449,6 +1449,7 @@
           "charging": "Opladen",
           "discharging": "Ontladen",
           "idle": "Inactief",
+          "error": "Fout",
           "unknown": "Onbekend"
         }
       },

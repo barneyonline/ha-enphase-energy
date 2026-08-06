@@ -1449,6 +1449,7 @@
           "charging": "In carica",
           "discharging": "In scarica",
           "idle": "Inattivo",
+          "error": "Errore",
           "unknown": "Sconosciuto"
         }
       },

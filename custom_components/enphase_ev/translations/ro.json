@@ -1449,6 +1449,7 @@
           "charging": "Încărcare",
           "discharging": "Descărcare",
           "idle": "Inactiv",
+          "error": "Eroare",
           "unknown": "Necunoscut"
         }
       },

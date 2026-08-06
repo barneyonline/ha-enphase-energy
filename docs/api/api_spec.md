@@ -4268,8 +4268,8 @@ Observed structure:
 - Status appears as normalized code (`status`) plus a display label (`statusText`); observed pair so far: `normal` / `Normal`.
 - `battery_mode` is a human-readable profile label from the live battery controller. The integration normalizes observed labels such as `Self-Consumption`, `Self - Consumption`, `Full Backup`, `Savings`, and `AI Optimization` back to BatteryConfig profile keys. A confirmed BatteryConfig `profile` is the authoritative selected/effective profile; `battery_mode` is retained as live controller telemetry and fallback context when BatteryConfig profile data is unavailable or stale.
 - `battery_phase_count` and `is_flex_phase` vary by hardware/site topology; observed combinations so far: `1` / `false` and `3` / `true`.
-- `led_status` is the raw battery LED/runtime status code. The integration currently interprets `12` as charging, `13` as discharging, `14` as idle, `15` as idle, and `17` as idle; any other value is treated as unknown runtime state.
-- `led_status` should be interpreted alongside `status`/`statusText`; observed values in captures so far: `12` and `17`.
+- `led_status` is the raw battery LED/runtime status code. The integration currently interprets `7` as error, `12` as charging, `13` as discharging, and `14` through `17` as idle; any other value is treated as unknown runtime state.
+- `led_status` should be interpreted alongside `status`/`statusText`; observed values in captures so far: `7`, `12`, and `17`.
 
 Observed battery LED legend:
 - Rapidly Flashing Yellow: Starting up / establishing communications
@@ -7606,7 +7606,7 @@ There is no single universal header set; the implementation varies headers by en
 | `show_battery_banner` | Battery-card UI hint flag from `/pv/settings/<site_id>/battery_status.json`; observed value so far: `false` |
 | `storages[].serial_number` | Battery serial identifier |
 | `storages[].excluded` | Battery inclusion flag; observed value so far: `false` |
-| `storages[].led_status` | Raw battery LED/runtime status code; observed values so far: `12`, `17` |
+| `storages[].led_status` | Raw battery LED/runtime status code; observed values so far: `7`, `12`, `17` |
 | `storages[].status` / `storages[].statusText` | Battery status code + display label; observed pair so far: `normal` / `Normal` |
 | `storages[].last_report` | Epoch seconds for latest battery telemetry |
 | `storages[].battery_mode` | Human-readable live controller profile label for the individual storage unit. The integration normalizes this as live controller telemetry and fallback profile context, but a confirmed BatteryConfig `profile` remains authoritative for the selected/effective system profile; observed value so far: `Self-Consumption` |

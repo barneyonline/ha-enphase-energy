@@ -1449,6 +1449,7 @@
           "charging": "Lataa",
           "discharging": "Purkaa",
           "idle": "Joutokäynti",
+          "error": "Virhe",
           "unknown": "Tuntematon"
         }
       },

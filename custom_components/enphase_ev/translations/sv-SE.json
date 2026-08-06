@@ -1449,6 +1449,7 @@
           "charging": "Laddar",
           "discharging": "Urladdar",
           "idle": "Inaktiv",
+          "error": "Fel",
           "unknown": "Okänd"
         }
       },
