@@ -11,7 +11,9 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Retried owner-access Grid Profile discovery through Enlighten Settings after a
+  preserved installer-access denial, and kept that non-degrading denial out of
+  the Service Status failure details.
 
 ### 🔧 Improvements
 - None

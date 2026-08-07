@@ -145,7 +145,7 @@ from .evse_runtime import (
     evse_power_is_actively_charging,
 )
 from .evse_power import build_evse_power_snapshot
-from .grid_profile_runtime import SUPPORT_DENIED, SUPPORT_UNKNOWN, GridProfileRuntime
+from .grid_profile_runtime import SUPPORT_UNKNOWN, GridProfileRuntime
 from .heatpump_runtime import HeatpumpRuntime
 from .inventory_runtime import CoordinatorTopologySnapshot, InventoryRuntime
 from .inventory_view import InventoryView
@@ -4033,10 +4033,7 @@ class EnphaseCoordinator(
         if context.first_refresh:
             return
         runtime = self.grid_profile_runtime
-        if getattr(runtime, "support_state", SUPPORT_UNKNOWN) in {
-            SUPPORT_UNKNOWN,
-            SUPPORT_DENIED,
-        }:
+        if getattr(runtime, "support_state", SUPPORT_UNKNOWN) == SUPPORT_UNKNOWN:
             return
         task = self._grid_profile_metadata_task
         if task is not None and not task.done():

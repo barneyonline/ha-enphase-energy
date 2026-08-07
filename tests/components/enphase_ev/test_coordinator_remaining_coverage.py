@@ -329,7 +329,7 @@ def test_grid_profile_failure_does_not_degrade_service(
     )
     assert metrics["degraded_endpoint_families"] == []
     assert "activation_grid_profile" not in metrics["degraded_services"]
-    assert "activation_grid_profile" in metrics["endpoint_failure_details"]
+    assert "activation_grid_profile" not in metrics["endpoint_failure_details"]
 
 
 def test_degraded_endpoint_family_rollup_tolerates_unexpected_health(
