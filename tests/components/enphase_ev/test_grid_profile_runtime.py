@@ -868,10 +868,16 @@ async def test_coordinator_refreshes_grid_profile_metadata_after_first_poll() ->
     refresh.reset_mock()
     coordinator.grid_profile_runtime.support_state = SUPPORT_UNKNOWN
     coordinator._schedule_grid_profile_metadata_refresh(steady_refresh)
-    coordinator.grid_profile_runtime.support_state = SUPPORT_DENIED
-    coordinator._schedule_grid_profile_metadata_refresh(steady_refresh)
     refresh.assert_not_awaited()
 
+    coordinator.grid_profile_runtime.support_state = SUPPORT_DENIED
+    coordinator._schedule_grid_profile_metadata_refresh(steady_refresh)
+    task = coordinator._grid_profile_metadata_task
+    assert task is not None
+    await task
+    refresh.assert_awaited_once_with(force=False, load_profiles=True)
+
+    refresh.reset_mock()
     coordinator.grid_profile_runtime.support_state = SUPPORT_READ_ONLY
     coordinator._schedule_grid_profile_metadata_refresh(steady_refresh)
     task = coordinator._grid_profile_metadata_task
@@ -1107,6 +1113,51 @@ async def test_runtime_retains_read_only_settings_profile_when_activation_denied
     client.async_get_activation_reference_data.assert_awaited_once()  # type: ignore[attr-defined]
     client.async_get_activation_record.assert_awaited_once()  # type: ignore[attr-defined]
     client.async_get_activation_device_list.assert_awaited_once()  # type: ignore[attr-defined]
+
+
+async def test_runtime_recovers_preserved_denied_state_from_settings() -> None:
+    client = _FakeGridProfileClient()
+    client.settings_grid_profiles = [
+        ("122532006376", "AS/NZS 4777.2: 2020 Australia A Region")
+    ]
+    client.async_get_activation_reference_data = AsyncMock()  # type: ignore[method-assign]
+    client.async_get_activation_record = AsyncMock()  # type: ignore[method-assign]
+    client.async_get_activation_device_list = AsyncMock()  # type: ignore[method-assign]
+    coordinator = _FakeCoordinator(client)
+    runtime = GridProfileRuntime(coordinator)
+    runtime.support_state = SUPPORT_DENIED
+
+    result = await runtime.async_refresh(force=False)
+
+    assert result.support_state == SUPPORT_READ_ONLY
+    assert runtime.current_profile_display() == (
+        "AS/NZS 4777.2: 2020 Australia A Region"
+    )
+    assert coordinator.successes == ["activation_grid_profile"]
+    assert coordinator.failures == []
+    assert client.activation_auth_prepare_forces == [True]
+    client.async_get_activation_reference_data.assert_not_awaited()  # type: ignore[attr-defined]
+    client.async_get_activation_record.assert_not_awaited()  # type: ignore[attr-defined]
+    client.async_get_activation_device_list.assert_not_awaited()  # type: ignore[attr-defined]
+
+
+async def test_runtime_retries_activation_for_previously_confirmed_installer() -> None:
+    client = _FakeGridProfileClient()
+    coordinator = _FakeCoordinator(client)
+    runtime = GridProfileRuntime(coordinator)
+    runtime.support_state = SUPPORT_DENIED
+    runtime.installer_access_ever_confirmed = True
+
+    result = await runtime.async_refresh(force=False, load_profiles=False)
+
+    assert result.support_state == SUPPORT_CONFIRMED
+    assert runtime.installer_access_confirmed
+    assert client.activation_auth_prepare_forces == [False]
+    assert client.reference_requests == 1
+    assert client.activation_record_requests == 1
+    assert client.activation_device_requests == 1
+    assert coordinator.successes == ["activation_grid_profile"]
+    assert coordinator.failures == []
 
 
 @pytest.mark.parametrize("prepare_failure", [False, RuntimeError("unavailable")])

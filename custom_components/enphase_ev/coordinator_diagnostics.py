@@ -1115,7 +1115,8 @@ class CoordinatorDiagnostics:
                 "retry_utc": state.get("next_retry_utc"),
             }
             for family, state in endpoint_family_health.items()
-            if isinstance(state, dict)
+            if family not in _NON_DEGRADING_OPTIONAL_ENDPOINT_FAMILIES
+            and isinstance(state, dict)
             and isinstance(state.get("last_error"), str)
             and bool(state.get("last_error"))
         }

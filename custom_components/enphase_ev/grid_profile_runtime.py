@@ -1111,7 +1111,13 @@ class GridProfileRuntime:
             family = ACTIVATION_GRID_PROFILE_FAMILY
             if not self.coordinator._endpoint_family_should_run(family, force=force):
                 return self.browse()
-            if self.support_state == SUPPORT_READ_ONLY and not force:
+            if not force and (
+                self.support_state == SUPPORT_READ_ONLY
+                or (
+                    self.support_state == SUPPORT_DENIED
+                    and not self.installer_access_ever_confirmed
+                )
+            ):
                 return await self._async_refresh_read_only_settings()
             errors: list[Exception] = []
             successful_requests = 0
