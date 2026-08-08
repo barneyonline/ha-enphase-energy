@@ -1,18 +1,7 @@
 {
   "current_status": "Fully Operational",
-  "generated_at": "2026-08-08T16:33:10.282790Z",
+  "generated_at": "2026-08-08T17:28:06.012366Z",
   "incidents": [
-    {
-      "active": false,
-      "duration_minutes": 0,
-      "ended_at": null,
-      "failed_checks": [
-        "site_energy"
-      ],
-      "last_seen_at": "2026-07-09T17:01:02.563957Z",
-      "started_at": "2026-07-09T17:01:02.563957Z",
-      "status": "Degraded"
-    },
     {
       "active": false,
       "duration_minutes": 69,
