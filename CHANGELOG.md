@@ -8,21 +8,38 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
-- Added a default-enabled Current Power Consumption sensor calculated from
-  consecutive Enphase consumption-energy buckets. The five-minute average uses
-  source timestamps and avoids negative values caused by combining independently
-  updated production, grid, and battery sensors.
+- None
 
 ### 🐛 Bug fixes
-- Retried owner-access Grid Profile discovery through Enlighten Settings after a
-  preserved installer-access denial, and kept that non-degrading denial out of
-  the Service Status failure details.
+- None
 
 ### 🔧 Improvements
 - None
 
 ### 🔄 Other changes
 - None
+
+## v4.2.2 - 2026-08-09
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- Added a default-enabled Current Power Consumption sensor calculated from
+  consecutive Enphase consumption-energy buckets. The five-minute average uses
+  source timestamps and avoids negative values caused by combining independently
+  updated production, grid, and battery sensors. (#821)
+
+### 🐛 Bug fixes
+- Retried owner-access Grid Profile discovery through Enlighten Settings after a
+  preserved installer-access denial, and kept that non-degrading denial out of
+  the Service Status failure details. (#819)
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Bumped the integration manifest version to `4.2.2`.
 
 ## v4.2.1 - 2026-08-06
 
