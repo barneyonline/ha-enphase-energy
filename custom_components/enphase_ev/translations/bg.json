@@ -1224,6 +1224,20 @@
           }
         }
       },
+      "site_consumption_power": {
+        "name": "Текуща консумация на мощност",
+        "state_attributes": {
+          "last_window_seconds": {
+            "name": "Последен прозорец (s)"
+          },
+          "sampled_at_utc": {
+            "name": "Измерено в (UTC)"
+          },
+          "method": {
+            "name": "Метод"
+          }
+        }
+      },
       "site_grid_power": {
         "name": "Текуща мощност на мрежата",
         "state_attributes": {

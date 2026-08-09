@@ -1224,6 +1224,20 @@
           }
         }
       },
+      "site_consumption_power": {
+        "name": "Τρέχουσα κατανάλωση ισχύος",
+        "state_attributes": {
+          "last_window_seconds": {
+            "name": "Τελευταίο παράθυρο (s)"
+          },
+          "sampled_at_utc": {
+            "name": "Δειγματοληψία στις (UTC)"
+          },
+          "method": {
+            "name": "Μέθοδος"
+          }
+        }
+      },
       "site_grid_power": {
         "name": "Τρέχουσα ισχύς δικτύου",
         "state_attributes": {

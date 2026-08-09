@@ -1224,6 +1224,20 @@
           }
         }
       },
+      "site_consumption_power": {
+        "name": "Dabartinis galios suvartojimas",
+        "state_attributes": {
+          "last_window_seconds": {
+            "name": "Paskutinis langas (s)"
+          },
+          "sampled_at_utc": {
+            "name": "Matuota (UTC)"
+          },
+          "method": {
+            "name": "Metodas"
+          }
+        }
+      },
       "site_grid_power": {
         "name": "Dabartinė tinklo galia",
         "state_attributes": {

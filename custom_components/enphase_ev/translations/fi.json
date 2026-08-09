@@ -1224,6 +1224,20 @@
           }
         }
       },
+      "site_consumption_power": {
+        "name": "Nykyinen tehonkulutus",
+        "state_attributes": {
+          "last_window_seconds": {
+            "name": "Viimeiset ikkunat"
+          },
+          "sampled_at_utc": {
+            "name": "Näyte otettu (UTC)"
+          },
+          "method": {
+            "name": "Menetelmä"
+          }
+        }
+      },
       "site_grid_power": {
         "name": "Nykyinen verkkoteho",
         "state_attributes": {

@@ -1224,6 +1224,20 @@
           }
         }
       },
+      "site_consumption_power": {
+        "name": "Aktueller Stromverbrauch",
+        "state_attributes": {
+          "last_window_seconds": {
+            "name": "Letztes Fenster (s)"
+          },
+          "sampled_at_utc": {
+            "name": "Gemessen um (UTC)"
+          },
+          "method": {
+            "name": "Methode"
+          }
+        }
+      },
       "site_grid_power": {
         "name": "Aktuelle Netzleistung",
         "state_attributes": {

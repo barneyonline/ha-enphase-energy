@@ -1224,6 +1224,20 @@
           }
         }
       },
+      "site_consumption_power": {
+        "name": "Aktuális teljesítményfelvétel",
+        "state_attributes": {
+          "last_window_seconds": {
+            "name": "Utolsó ablak (s)"
+          },
+          "sampled_at_utc": {
+            "name": "Mintavételezve ekkor (UTC)"
+          },
+          "method": {
+            "name": "Módszer"
+          }
+        }
+      },
       "site_grid_power": {
         "name": "Aktuális hálózati teljesítmény",
         "state_attributes": {

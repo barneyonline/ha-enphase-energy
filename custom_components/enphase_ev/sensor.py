@@ -585,6 +585,13 @@ async def async_setup_entry(
             "current_production_power",
             EnphaseCurrentPowerConsumptionSensor(coord),
         )
+        if _site_lifetime_power_channel_present("consumption"):
+            _add_site_entity(
+                "site_consumption_power",
+                EnphaseSiteConsumptionPowerSensor(coord),
+            )
+        else:
+            _async_remove_site_sensor_entity("site_consumption_power")
         if _site_lifetime_power_channel_present(
             "grid_import"
         ) or _site_lifetime_power_channel_present("grid_export"):
@@ -1550,6 +1557,60 @@ class _SiteLifetimePowerRestoreData(ExtraStoredData):  # type: ignore[misc]
             ),
             last_live_flow_sources=_source_map("last_live_flow_sources"),
             previous_live_flow_sources=_source_map("previous_live_flow_sources"),
+        )
+
+
+@dataclass
+class _SiteConsumptionPowerRestoreData(ExtraStoredData):  # type: ignore[misc]
+    """Persist a validated site-consumption bucket baseline across restarts."""
+
+    latest_bucket_wh: float | None
+    raw_bucket_count: int | None
+    start_date: str | None
+    energy_ts: float | None
+    interval_minutes: float | None
+    last_power_w: int | None
+    last_window_seconds: float | None
+    method: str | None
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "latest_bucket_wh": self.latest_bucket_wh,
+            "raw_bucket_count": self.raw_bucket_count,
+            "start_date": self.start_date,
+            "energy_ts": self.energy_ts,
+            "interval_minutes": self.interval_minutes,
+            "last_power_w": self.last_power_w,
+            "last_window_seconds": self.last_window_seconds,
+            "method": self.method,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> _SiteConsumptionPowerRestoreData:
+        if not isinstance(data, dict):
+            return cls(None, None, None, None, None, None, None, None)
+
+        def _as_float(value: object) -> float | None:
+            try:
+                numeric = float(value)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                return None
+            return numeric if math.isfinite(numeric) else None
+
+        def _as_int(value: object) -> int | None:
+            return _restore_optional_int_value(value)
+
+        start_date = data.get("start_date")
+        method = data.get("method")
+        return cls(
+            latest_bucket_wh=_as_float(data.get("latest_bucket_wh")),
+            raw_bucket_count=_as_int(data.get("raw_bucket_count")),
+            start_date=start_date if isinstance(start_date, str) else None,
+            energy_ts=_as_float(data.get("energy_ts")),
+            interval_minutes=_as_float(data.get("interval_minutes")),
+            last_power_w=_as_int(data.get("last_power_w")),
+            last_window_seconds=_as_float(data.get("last_window_seconds")),
+            method=method if isinstance(method, str) else None,
         )
 
 
@@ -5723,6 +5784,335 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
             last_live_interval_minutes=self._last_live_interval_minutes,
             last_live_flow_sources=dict(self._last_live_flow_sources),
             previous_live_flow_sources=dict(self._previous_live_flow_sources),
+        )
+
+
+class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type: ignore[misc]
+    """Average site consumption from consecutive authoritative energy buckets."""
+
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_registry_enabled_default = True
+    _attr_translation_key = "site_consumption_power"
+    _unrecorded_attributes = _SiteBaseEntity._unrecorded_attributes | frozenset(
+        {"sampled_at_utc", "last_window_seconds", "method"}
+    )
+
+    _DEFAULT_INTERVAL_MINUTES = 5.0
+    _MAX_INTERVAL_FACTOR = 3.0
+    _MAX_FUTURE_SKEW_SECONDS = 60.0
+
+    def __init__(self, coord: EnphaseCoordinator) -> None:
+        super().__init__(
+            coord,
+            "site_consumption_power",
+            "Current Power Consumption",
+            type_key=None,
+        )
+        self._last_bucket_wh: float | None = None
+        self._last_bucket_count: int | None = None
+        self._last_start_date: str | None = None
+        self._last_energy_ts: float | None = None
+        self._last_interval_minutes: float | None = None
+        self._last_power_w: int | None = None
+        self._last_window_s: float | None = None
+        self._last_method = "seeded"
+        self._restored_pending_validation = False
+
+    @staticmethod
+    def _timestamp_age_seconds(timestamp: float) -> float:
+        now = dt_util.utcnow()
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        return float(now.timestamp()) - timestamp
+
+    def _timestamp_is_too_far_in_future(self, timestamp: float) -> bool:
+        return self._timestamp_age_seconds(timestamp) < -self._MAX_FUTURE_SKEW_SECONDS
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last_extra = await self.async_get_last_extra_data()
+        restored = _SiteConsumptionPowerRestoreData.from_dict(
+            last_extra.as_dict() if last_extra is not None else None
+        )
+        if (
+            restored.latest_bucket_wh is None
+            or restored.latest_bucket_wh < 0
+            or restored.raw_bucket_count is None
+            or restored.raw_bucket_count <= 0
+            or restored.energy_ts is None
+            or restored.energy_ts <= 0
+            or restored.interval_minutes is None
+            or restored.interval_minutes <= 0
+            or restored.last_power_w is None
+            or restored.last_power_w < 0
+        ):
+            return
+        if self._timestamp_is_too_far_in_future(restored.energy_ts):
+            return
+        self._last_bucket_wh = restored.latest_bucket_wh
+        self._last_bucket_count = restored.raw_bucket_count
+        self._last_start_date = restored.start_date
+        self._last_energy_ts = restored.energy_ts
+        self._last_interval_minutes = restored.interval_minutes
+        self._last_power_w = restored.last_power_w
+        self._last_window_s = restored.last_window_seconds
+        self._last_method = restored.method or "restored"
+        self._restored_pending_validation = True
+
+    @staticmethod
+    def _coerce_nonnegative_float(value: object) -> float | None:
+        try:
+            numeric = float(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return None
+        return numeric if math.isfinite(numeric) and numeric >= 0 else None
+
+    @staticmethod
+    def _coerce_positive_int(value: object) -> int | None:
+        numeric = _restore_optional_int_value(value)
+        return numeric if numeric is not None and numeric > 0 else None
+
+    def _flow_data(self) -> dict[str, object]:
+        energy = getattr(self._coord, "energy", None)
+        flows = (
+            getattr(energy, "site_energy", None)
+            if energy is not None
+            else getattr(self._coord, "site_energy", None)
+        )
+        if not isinstance(flows, dict):
+            return {}
+        entry = flows.get("consumption")
+        if isinstance(entry, SiteEnergyFlow):
+            return {
+                "latest_bucket_wh": entry.latest_bucket_wh,
+                "previous_bucket_wh": entry.previous_bucket_wh,
+                "raw_bucket_count": entry.raw_bucket_count,
+                "start_date": entry.start_date,
+                "last_report_date": entry.last_report_date,
+                "update_pending": entry.update_pending,
+                "interval_minutes": entry.interval_minutes,
+            }
+        return entry if isinstance(entry, dict) else {}
+
+    def _discard_baseline(self, method: str) -> None:
+        self._last_bucket_wh = None
+        self._last_bucket_count = None
+        self._last_start_date = None
+        self._last_energy_ts = None
+        self._last_interval_minutes = None
+        self._last_power_w = None
+        self._last_window_s = None
+        self._last_method = method
+        self._restored_pending_validation = False
+
+    def _seed(
+        self,
+        *,
+        latest_bucket_wh: float,
+        bucket_count: int,
+        start_date: str | None,
+        energy_ts: float,
+        interval_minutes: float,
+        method: str,
+    ) -> None:
+        self._last_bucket_wh = latest_bucket_wh
+        self._last_bucket_count = bucket_count
+        self._last_start_date = start_date
+        self._last_energy_ts = energy_ts
+        self._last_interval_minutes = interval_minutes
+        self._last_power_w = None
+        self._last_window_s = None
+        self._last_method = method
+        self._restored_pending_validation = False
+
+    def _process_current_sample(self) -> None:
+        data = self._flow_data()
+        if not data or data.get("update_pending") is True:
+            return
+
+        latest_bucket_wh = self._coerce_nonnegative_float(data.get("latest_bucket_wh"))
+        bucket_count = self._coerce_positive_int(data.get("raw_bucket_count"))
+        energy_ts = _EnphaseSiteLifetimePowerSensor._parse_sample_timestamp(
+            data.get("last_report_date")
+        )
+        interval_minutes = self._coerce_nonnegative_float(data.get("interval_minutes"))
+        if interval_minutes is None or interval_minutes <= 0:
+            interval_minutes = self._DEFAULT_INTERVAL_MINUTES
+        start_date_raw = data.get("start_date")
+        start_date = start_date_raw if isinstance(start_date_raw, str) else None
+
+        if latest_bucket_wh is None or bucket_count is None:
+            self._discard_baseline("invalid_bucket")
+            return
+        if energy_ts is None or energy_ts <= 0:
+            return
+        if self._timestamp_is_too_far_in_future(energy_ts):
+            return
+
+        if (
+            self._last_bucket_wh is None
+            or self._last_bucket_count is None
+            or self._last_energy_ts is None
+            or self._last_interval_minutes is None
+        ):
+            self._seed(
+                latest_bucket_wh=latest_bucket_wh,
+                bucket_count=bucket_count,
+                start_date=start_date,
+                energy_ts=energy_ts,
+                interval_minutes=interval_minutes,
+                method="seeded",
+            )
+            return
+
+        if energy_ts == self._last_energy_ts:
+            if not self._restored_pending_validation:
+                return
+            if (
+                bucket_count == self._last_bucket_count
+                and start_date == self._last_start_date
+                and math.isclose(
+                    latest_bucket_wh,
+                    self._last_bucket_wh,
+                    rel_tol=0.0,
+                    abs_tol=1e-6,
+                )
+                and math.isclose(
+                    interval_minutes,
+                    self._last_interval_minutes,
+                    rel_tol=0.0,
+                    abs_tol=1e-6,
+                )
+            ):
+                self._restored_pending_validation = False
+                return
+            self._seed(
+                latest_bucket_wh=latest_bucket_wh,
+                bucket_count=bucket_count,
+                start_date=start_date,
+                energy_ts=energy_ts,
+                interval_minutes=interval_minutes,
+                method="restore_mismatch",
+            )
+            return
+
+        elapsed_s = energy_ts - self._last_energy_ts
+        interval_s = interval_minutes * 60.0
+        if elapsed_s < 0:
+            return
+        if elapsed_s > interval_s * self._MAX_INTERVAL_FACTOR or not math.isclose(
+            interval_minutes,
+            self._last_interval_minutes,
+            rel_tol=0.0,
+            abs_tol=1e-6,
+        ):
+            self._seed(
+                latest_bucket_wh=latest_bucket_wh,
+                bucket_count=bucket_count,
+                start_date=start_date,
+                energy_ts=energy_ts,
+                interval_minutes=interval_minutes,
+                method="interval_discontinuity",
+            )
+            return
+
+        delta_wh: float | None = None
+        method = "consumption_bucket_delta"
+        if (
+            start_date == self._last_start_date
+            and bucket_count == self._last_bucket_count
+        ):
+            delta_wh = latest_bucket_wh - self._last_bucket_wh
+        elif (
+            start_date == self._last_start_date
+            and bucket_count == self._last_bucket_count + 1
+        ):
+            previous_bucket_wh = self._coerce_nonnegative_float(
+                data.get("previous_bucket_wh")
+            )
+            if (
+                previous_bucket_wh is not None
+                and previous_bucket_wh >= self._last_bucket_wh
+            ):
+                delta_wh = (
+                    previous_bucket_wh - self._last_bucket_wh
+                ) + latest_bucket_wh
+                method = "consumption_bucket_rollover"
+
+        if delta_wh is None or delta_wh < 0:
+            self._seed(
+                latest_bucket_wh=latest_bucket_wh,
+                bucket_count=bucket_count,
+                start_date=start_date,
+                energy_ts=energy_ts,
+                interval_minutes=interval_minutes,
+                method="bucket_discontinuity",
+            )
+            return
+
+        window_s = max(elapsed_s, interval_s)
+        self._last_power_w = max(round(delta_wh * 3600.0 / window_s), 0)
+        self._last_window_s = window_s
+        self._last_method = method
+        self._last_bucket_wh = latest_bucket_wh
+        self._last_bucket_count = bucket_count
+        self._last_start_date = start_date
+        self._last_energy_ts = energy_ts
+        self._last_interval_minutes = interval_minutes
+        self._restored_pending_validation = False
+
+    def _sample_is_fresh(self) -> bool:
+        if self._last_energy_ts is None or self._last_interval_minutes is None:
+            return False
+        age_s = self._timestamp_age_seconds(self._last_energy_ts)
+        return bool(
+            -self._MAX_FUTURE_SKEW_SECONDS
+            <= age_s
+            <= (self._last_interval_minutes * 60.0 * self._MAX_INTERVAL_FACTOR)
+        )
+
+    @property
+    def available(self) -> bool:
+        if not super().available:
+            return False
+        self._process_current_sample()
+        return bool(
+            self._last_power_w is not None
+            and not self._restored_pending_validation
+            and self._sample_is_fresh()
+        )
+
+    @property
+    def native_value(self) -> int | None:
+        self._process_current_sample()
+        return self._last_power_w
+
+    @property
+    def extra_state_attributes(self) -> Any:
+        sampled_at = None
+        if self._last_energy_ts is not None:
+            sampled_at = datetime.fromtimestamp(
+                self._last_energy_ts, tz=timezone.utc
+            ).isoformat()
+        return {
+            "sampled_at_utc": sampled_at,
+            "last_window_seconds": self._last_window_s,
+            "method": self._last_method,
+        }
+
+    @property
+    def extra_restore_state_data(self) -> ExtraStoredData | None:
+        return _SiteConsumptionPowerRestoreData(
+            latest_bucket_wh=self._last_bucket_wh,
+            raw_bucket_count=self._last_bucket_count,
+            start_date=self._last_start_date,
+            energy_ts=self._last_energy_ts,
+            interval_minutes=self._last_interval_minutes,
+            last_power_w=self._last_power_w,
+            last_window_seconds=self._last_window_s,
+            method=self._last_method,
         )
 
 

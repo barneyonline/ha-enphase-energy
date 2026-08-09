@@ -5457,7 +5457,20 @@ async def test_async_setup_entry_adds_site_energy_entities(
             last_report_date=None,
             update_pending=False,
             source_unit="Wh",
-        )
+        ),
+        "consumption": SimpleNamespace(
+            value_kwh=2.0,
+            bucket_count=2,
+            fields_used=["consumption"],
+            start_date="2024-01-01",
+            last_report_date=None,
+            update_pending=False,
+            source_unit="Wh",
+            latest_bucket_wh=1000.0,
+            previous_bucket_wh=900.0,
+            raw_bucket_count=2,
+            interval_minutes=5.0,
+        ),
     }
 
     callbacks: list = []
@@ -5477,6 +5490,7 @@ async def test_async_setup_entry_adds_site_energy_entities(
     created: list = []
     created_power: list = []
     created_battery_power: list = []
+    created_consumption_power: list = []
 
     class StubSiteEnergy(sensor_mod.EnphaseSiteEnergySensor):
         def __init__(self, *args, **kwargs):
@@ -5493,9 +5507,19 @@ async def test_async_setup_entry_adds_site_energy_entities(
             super().__init__(*args, **kwargs)
             created_battery_power.append(self)
 
+    class StubConsumptionPower(sensor_mod.EnphaseSiteConsumptionPowerSensor):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            created_consumption_power.append(self)
+
     monkeypatch.setattr(sensor_mod, "EnphaseSiteEnergySensor", StubSiteEnergy)
     monkeypatch.setattr(sensor_mod, "EnphaseGridPowerSensor", StubGridPower)
     monkeypatch.setattr(sensor_mod, "EnphaseBatteryPowerSensor", StubBatteryPower)
+    monkeypatch.setattr(
+        sensor_mod,
+        "EnphaseSiteConsumptionPowerSensor",
+        StubConsumptionPower,
+    )
 
     await async_setup_entry(hass, config_entry, _async_add_entities)
     for cb in callbacks:
@@ -5515,6 +5539,7 @@ async def test_async_setup_entry_adds_site_energy_entities(
         ent.translation_key == "site_water_heater_consumption" for ent in created
     )
     assert created_power[0].translation_key == "site_grid_power"
+    assert created_consumption_power[0].translation_key == "site_consumption_power"
     assert not created_battery_power
 
 

@@ -1224,6 +1224,20 @@
           }
         }
       },
+      "site_consumption_power": {
+        "name": "Consumo de potencia actual",
+        "state_attributes": {
+          "last_window_seconds": {
+            "name": "Última ventana (s)"
+          },
+          "sampled_at_utc": {
+            "name": "Muestreado a las (UTC)"
+          },
+          "method": {
+            "name": "Método"
+          }
+        }
+      },
       "site_grid_power": {
         "name": "Potencia actual de la red",
         "state_attributes": {
