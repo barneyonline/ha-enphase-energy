@@ -1332,6 +1332,20 @@
           }
         }
       },
+      "site_consumption_power": {
+        "name": "Current Power Consumption",
+        "state_attributes": {
+          "last_window_seconds": {
+            "name": "Last Window (s)"
+          },
+          "sampled_at_utc": {
+            "name": "Sampled At (UTC)"
+          },
+          "method": {
+            "name": "Method"
+          }
+        }
+      },
       "site_grid_power": {
         "name": "Current Grid Power",
         "state_attributes": {

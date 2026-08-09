@@ -1224,6 +1224,20 @@
           }
         }
       },
+      "site_consumption_power": {
+        "name": "Consommation électrique actuelle",
+        "state_attributes": {
+          "last_window_seconds": {
+            "name": "Dernière fenêtre (s)"
+          },
+          "sampled_at_utc": {
+            "name": "Mesuré à (UTC)"
+          },
+          "method": {
+            "name": "Méthode"
+          }
+        }
+      },
       "site_grid_power": {
         "name": "Puissance actuelle du réseau",
         "state_attributes": {

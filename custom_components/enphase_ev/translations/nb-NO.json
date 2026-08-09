@@ -1224,6 +1224,20 @@
           }
         }
       },
+      "site_consumption_power": {
+        "name": "Nåværende effektforbruk",
+        "state_attributes": {
+          "last_window_seconds": {
+            "name": "Siste vindu (s)"
+          },
+          "sampled_at_utc": {
+            "name": "Målt kl. (UTC)"
+          },
+          "method": {
+            "name": "Metode"
+          }
+        }
+      },
       "site_grid_power": {
         "name": "Nåværende netteffekt",
         "state_attributes": {

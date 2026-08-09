@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -54,6 +55,9 @@ class SiteEnergyFlow:
     last_reset_at: str | None = None
     interval_minutes: float | None = None
     legacy_offset_kwh: float = 0.0
+    latest_bucket_wh: float | None = None
+    previous_bucket_wh: float | None = None
+    raw_bucket_count: int = 0
 
 
 class EnergyManager:
@@ -286,6 +290,26 @@ class EnergyManager:
             count += 1
         return total, count
 
+    def _latest_energy_buckets(
+        self, values: object
+    ) -> tuple[float | None, float | None, int]:
+        """Return the latest two valid-position bucket values and raw length."""
+
+        if not isinstance(values, list) or not values:
+            return None, None, 0
+
+        def _bucket_at(index: int) -> float | None:
+            numeric = self._coerce_energy_value(values[index])
+            if numeric is None or not math.isfinite(numeric) or numeric < 0:
+                return None
+            return numeric
+
+        return (
+            _bucket_at(-1),
+            _bucket_at(-2) if len(values) > 1 else None,
+            len(values),
+        )
+
     def _sum_energy_fields(
         self,
         payload: dict[str, object],
@@ -516,6 +540,9 @@ class EnergyManager:
             *,
             allow_zero: bool = False,
             legacy_offset_wh: float = 0.0,
+            latest_bucket_wh: float | None = None,
+            previous_bucket_wh: float | None = None,
+            raw_bucket_count: int = 0,
         ) -> None:
             if bucket_count <= 0 or total_wh < 0:
                 return
@@ -549,6 +576,9 @@ class EnergyManager:
                 last_reset_at=last_reset,
                 interval_minutes=interval_minutes,
                 legacy_offset_kwh=round(legacy_offset_wh / 1000.0, 3),
+                latest_bucket_wh=latest_bucket_wh,
+                previous_bucket_wh=previous_bucket_wh,
+                raw_bucket_count=raw_bucket_count,
             )
             if last_reset:
                 self._site_energy_last_reset[flow] = last_reset
@@ -563,7 +593,19 @@ class EnergyManager:
         cons_total, cons_count = self._sum_energy_buckets(
             payload.get("consumption"), interval_hours
         )
-        _store("consumption", cons_total, ["consumption"], cons_count)
+        cons_latest, cons_previous, cons_raw_count = self._latest_energy_buckets(
+            payload.get("consumption")
+        )
+        _store(
+            "consumption",
+            cons_total,
+            ["consumption"],
+            cons_count,
+            allow_zero=True,
+            latest_bucket_wh=cons_latest,
+            previous_bucket_wh=cons_previous,
+            raw_bucket_count=cons_raw_count,
+        )
 
         # EVSE lifetime charging energy when the backend provides a dedicated flow.
         evse_total, evse_count = self._sum_energy_buckets(

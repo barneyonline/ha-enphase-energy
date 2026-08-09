@@ -8,7 +8,10 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
-- None
+- Added a default-enabled Current Power Consumption sensor calculated from
+  consecutive Enphase consumption-energy buckets. The five-minute average uses
+  source timestamps and avoids negative values caused by combining independently
+  updated production, grid, and battery sensors.
 
 ### 🐛 Bug fixes
 - Retried owner-access Grid Profile discovery through Enlighten Settings after a

@@ -1224,6 +1224,20 @@
           }
         }
       },
+      "site_consumption_power": {
+        "name": "Praegune võimsustarve",
+        "state_attributes": {
+          "last_window_seconds": {
+            "name": "Viimane aken (s)"
+          },
+          "sampled_at_utc": {
+            "name": "Mõõdetud kell (UTC)"
+          },
+          "method": {
+            "name": "Meetod"
+          }
+        }
+      },
       "site_grid_power": {
         "name": "Praegune võrguvõimsus",
         "state_attributes": {
