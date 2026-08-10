@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
   a fresh cached grid state; degradation now begins only after that data is stale.
 - Kept optional inverter parameter telemetry rate limits from degrading the
   overall cloud service, and retained fresh cached readings until they expire.
+- Prevented zero-only consumption payloads from resetting an established site
+  lifetime total and corrupting Home Assistant long-term energy statistics. (#823)
 
 ### 🔧 Improvements
 - Extended owner-access Grid Profile retry backoff from hourly polling to one

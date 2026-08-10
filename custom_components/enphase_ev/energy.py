@@ -539,6 +539,7 @@ class EnergyManager:
             bucket_count: int,
             *,
             allow_zero: bool = False,
+            hold_zero_after_positive: bool = False,
             legacy_offset_wh: float = 0.0,
             latest_bucket_wh: float | None = None,
             previous_bucket_wh: float | None = None,
@@ -555,9 +556,43 @@ class EnergyManager:
             if isinstance(prev_entry, SiteEnergyFlow):
                 prev_value = prev_entry.value_kwh
                 prev_reset_at = prev_entry.last_reset_at
-            filtered, reset_at = self._apply_site_energy_guard(
-                flow, total_kwh, prev_value
+            guard_state = self._site_energy_guard.get(flow)
+            accepted_baseline = (
+                guard_state.last
+                if guard_state is not None
+                and guard_state.last is not None
+                and guard_state.last > 0
+                else prev_value
             )
+            filtered: float | None
+            reset_at: str | None
+            if (
+                hold_zero_after_positive
+                and total_kwh == 0
+                and accepted_baseline is not None
+                and accepted_baseline > 0
+            ):
+                guard_state = self._site_energy_guard.setdefault(
+                    flow, LifetimeGuardState()
+                )
+                guard_state.last = accepted_baseline
+                guard_state.pending_value = None
+                guard_state.pending_ts = None
+                guard_state.pending_count = 0
+                filtered = accepted_baseline
+                reset_at = None
+                latest_bucket_wh = None
+                previous_bucket_wh = None
+                raw_bucket_count = 0
+                self._logger.debug(
+                    "Holding site energy flow %s at %.3f after a zero dropout",
+                    flow,
+                    accepted_baseline,
+                )
+            else:
+                filtered, reset_at = self._apply_site_energy_guard(
+                    flow, total_kwh, prev_value
+                )
             if filtered is None:
                 return
             last_reset = (
@@ -602,6 +637,7 @@ class EnergyManager:
             ["consumption"],
             cons_count,
             allow_zero=True,
+            hold_zero_after_positive=True,
             latest_bucket_wh=cons_latest,
             previous_bucket_wh=cons_previous,
             raw_bucket_count=cons_raw_count,
