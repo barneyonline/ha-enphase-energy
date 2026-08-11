@@ -182,6 +182,7 @@ class RefreshHealthState:
     _endpoint_family_health: dict[str, EndpointFamilyHealth] = field(
         default_factory=dict
     )
+    _endpoint_failure_history: list[dict[str, object]] = field(default_factory=list)
     _endpoint_manual_bypass_requested: bool = False
     _endpoint_manual_bypass_active: bool = False
 

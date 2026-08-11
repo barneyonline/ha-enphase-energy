@@ -835,6 +835,7 @@ async def test_coordinator_refreshes_grid_profile_metadata_after_first_poll() ->
 
         def __init__(self) -> None:
             self.site_id = "site"
+            self.grid_profile_controls_enabled = True
             self.grid_profile_runtime = SimpleNamespace(
                 async_refresh=refresh,
                 support_state=SUPPORT_CONFIRMED,
@@ -890,6 +891,12 @@ async def test_coordinator_refreshes_grid_profile_metadata_after_first_poll() ->
     coordinator.grid_profile_runtime.async_refresh = None
     await coordinator.async_refresh_grid_profile_metadata()
 
+    coordinator.grid_profile_controls_enabled = False
+    coordinator.grid_profile_runtime.async_refresh = refresh
+    coordinator._schedule_grid_profile_metadata_refresh(steady_refresh)
+    await coordinator.async_refresh_grid_profile_metadata(force=True)
+    refresh.assert_not_awaited()
+
 
 async def test_coordinator_grid_profile_metadata_refresh_has_deadline() -> None:
     async def _never_finishes(**_kwargs) -> None:
@@ -897,6 +904,7 @@ async def test_coordinator_grid_profile_metadata_refresh_has_deadline() -> None:
 
     coordinator = SimpleNamespace(
         site_id="site",
+        grid_profile_controls_enabled=True,
         grid_profile_runtime=SimpleNamespace(async_refresh=_never_finishes),
         _grid_profile_metadata_refresh_lock=asyncio.Lock(),
     )
@@ -915,6 +923,7 @@ async def test_coordinator_grid_profile_deadline_includes_lock_wait() -> None:
     await lock.acquire()
     coordinator = SimpleNamespace(
         site_id="site",
+        grid_profile_controls_enabled=True,
         grid_profile_runtime=SimpleNamespace(async_refresh=refresh),
         _grid_profile_metadata_refresh_lock=lock,
     )
@@ -944,6 +953,7 @@ async def test_coordinator_serializes_startup_and_steady_grid_profile_refreshes(
 
     coordinator = SimpleNamespace(
         site_id="site",
+        grid_profile_controls_enabled=True,
         grid_profile_runtime=SimpleNamespace(async_refresh=_refresh),
         _grid_profile_metadata_refresh_lock=asyncio.Lock(),
     )
@@ -1492,9 +1502,16 @@ def test_grid_profile_sensor_survives_only_transient_unavailability() -> None:
         support_state=SUPPORT_UNAVAILABLE,
         current_profile_display=lambda: None,
     )
-    coordinator = SimpleNamespace(grid_profile_runtime=runtime)
+    coordinator = SimpleNamespace(
+        grid_profile_controls_enabled=True,
+        grid_profile_runtime=runtime,
+    )
 
     assert _retain_grid_profile_sensors(coordinator)
+
+    coordinator.grid_profile_runtime = None
+    assert not _retain_grid_profile_sensors(coordinator)
+    coordinator.grid_profile_runtime = runtime
 
     runtime.support_state = SUPPORT_DENIED
     assert not _retain_grid_profile_sensors(coordinator)

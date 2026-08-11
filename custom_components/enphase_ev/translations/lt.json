@@ -486,6 +486,9 @@
     },
     "grid_profile_unavailable": {
       "message": "Tinklo profilio valdymas nepasiekiamas."
+    },
+    "grid_profile_controls_disabled": {
+      "message": "Prieš naudodami šį veiksmą integracijos parinktyse įjunkite montuotojo tinklo profilio valdiklius."
     }
   },
   "options": {
@@ -602,7 +605,8 @@
               "nominal_voltage": "EV įkroviklio vardinė įtampa (V)",
               "microinverter_lifetime_energy_enabled": "Įjungti mikroinverterių viso veikimo energiją",
               "microinverter_power_enabled": "Įjungti mikroinverterių galią",
-              "vpp_events_enabled": "Įjungti VPP įvykius"
+              "vpp_events_enabled": "Įjungti VPP įvykius",
+              "grid_profile_controls_enabled": "Įjungti montuotojo tinklo profilio valdiklius"
             },
             "data_description": {
               "system_event_repair_issues": "Kuria Home Assistant taisymus aktyviems nuolatiniams Enphase pavojaus signalams. Pagal numatytuosius išjungta.",
@@ -613,7 +617,8 @@
               "battery_schedules_enabled": "Tvarkykite „IQ Battery“ tvarkaraščius.",
               "microinverter_lifetime_energy_enabled": "Įjungia visus kiekvieno mikroinverterio viso veikimo energijos jutiklius.",
               "microinverter_power_enabled": "Įjungia visus kiekvieno mikroinverterio galios jutiklius, kai pasiekiama montuotojo telemetrija.",
-              "vpp_events_enabled": "Gauna VPP/ELRP tvarkaraščius iš „Enphase“ ir kuria įvykių esybes tik užregistruotoms vietoms. Pagal numatytuosius nustatymus išjungta."
+              "vpp_events_enabled": "Gauna VPP/ELRP tvarkaraščius iš „Enphase“ ir kuria įvykių esybes tik užregistruotoms vietoms. Pagal numatytuosius nustatymus išjungta.",
+              "grid_profile_controls_enabled": "Gauna tik montuotojui skirtus tinklo profilio metaduomenis ir įjungia profilio veiksmus. Pagal numatytuosius nustatymus išjungta."
             }
           }
         },
@@ -634,7 +639,8 @@
           "nominal_voltage": "EV įkroviklio vardinė įtampa (V)",
           "microinverter_lifetime_energy_enabled": "Įjungti mikroinverterių viso veikimo energiją",
           "microinverter_power_enabled": "Įjungti mikroinverterių galią",
-          "vpp_events_enabled": "Įjungti VPP įvykius"
+          "vpp_events_enabled": "Įjungti VPP įvykius",
+          "grid_profile_controls_enabled": "Įjungti montuotojo tinklo profilio valdiklius"
         },
         "data_description": {
           "type_envoy": "Apima šliuzo ryšio ir skaitiklių diagnostiką.",
@@ -651,7 +657,8 @@
           "battery_schedules_enabled": "Tvarkykite „IQ Battery“ tvarkaraščius.",
           "microinverter_lifetime_energy_enabled": "Įjungia visus kiekvieno mikroinverterio viso veikimo energijos jutiklius.",
           "microinverter_power_enabled": "Įjungia visus kiekvieno mikroinverterio galios jutiklius, kai pasiekiama montuotojo telemetrija.",
-          "vpp_events_enabled": "Gauna VPP/ELRP tvarkaraščius iš „Enphase“ ir kuria įvykių esybes tik užregistruotoms vietoms. Pagal numatytuosius nustatymus išjungta."
+          "vpp_events_enabled": "Gauna VPP/ELRP tvarkaraščius iš „Enphase“ ir kuria įvykių esybes tik užregistruotoms vietoms. Pagal numatytuosius nustatymus išjungta.",
+          "grid_profile_controls_enabled": "Gauna tik montuotojui skirtus tinklo profilio metaduomenis ir įjungia profilio veiksmus. Pagal numatytuosius nustatymus išjungta."
         }
       },
       "repair_notifications": {

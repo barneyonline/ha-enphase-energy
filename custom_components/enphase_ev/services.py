@@ -1193,8 +1193,20 @@ def async_setup_services(
             ),
         )
 
+    def _require_grid_profile_controls_enabled(coord: object) -> None:
+        if getattr(coord, "grid_profile_controls_enabled", False):
+            return
+        _raise_service_validation(
+            "grid_profile_controls_disabled",
+            message=(
+                "Enable installer Grid Profile controls in the integration options "
+                "before using this action."
+            ),
+        )
+
     async def _svc_browse_grid_profiles(call: ServiceCall) -> dict[str, object]:
         coord = await _resolve_single_site_coordinator(call)
+        _require_grid_profile_controls_enabled(coord)
         runtime = cast(GridProfileRuntime, coord.grid_profile_runtime)
         await runtime.async_refresh(force=False, load_profiles=False)
         _require_grid_profile_installer(runtime)
@@ -1212,6 +1224,7 @@ def async_setup_services(
 
     async def _svc_refresh_grid_profiles(call: ServiceCall) -> dict[str, object]:
         coord = await _resolve_single_site_coordinator(call)
+        _require_grid_profile_controls_enabled(coord)
         runtime = cast(GridProfileRuntime, coord.grid_profile_runtime)
         await runtime.async_refresh(force=True, load_profiles=False)
         _require_grid_profile_installer(runtime)
@@ -1233,6 +1246,7 @@ def async_setup_services(
                 message="Confirmation is required to apply a grid profile.",
             )
         coord = await _resolve_single_site_coordinator(call)
+        _require_grid_profile_controls_enabled(coord)
         runtime = cast(GridProfileRuntime, coord.grid_profile_runtime)
         await runtime.async_refresh(force=False, load_profiles=False)
         _require_grid_profile_installer(runtime)

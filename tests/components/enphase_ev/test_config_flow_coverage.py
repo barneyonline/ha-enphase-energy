@@ -69,6 +69,7 @@ from custom_components.enphase_ev.const import (
     CONF_SITE_ONLY,
     CONF_ACCESS_TOKEN,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
     DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     DEFAULT_MICROINVERTER_POWER_ENABLED,
     DEFAULT_PRICING_EDITS_ENABLED,
@@ -87,6 +88,7 @@ from custom_components.enphase_ev.const import (
     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
     OPT_FAST_POLL_INTERVAL,
     OPT_FAST_WHILE_STREAMING,
+    OPT_GRID_PROFILE_CONTROLS_ENABLED,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_MICROINVERTER_POWER_ENABLED,
     OPT_NOMINAL_VOLTAGE,
@@ -3328,6 +3330,19 @@ async def test_options_flow_grid_profile_aborts_without_runtime(hass) -> None:
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "grid_profile_unavailable"
 
+    disabled_entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "12345"},
+        options={OPT_GRID_PROFILE_CONTROLS_ENABLED: False},
+        minor_version=EnphaseEVConfigFlow.MINOR_VERSION,
+    )
+    disabled_handler = OptionsFlowHandler(disabled_entry)
+    disabled_handler.hass = hass
+    assert disabled_handler._grid_profile_controls_enabled() is False  # noqa: SLF001
+    assert (
+        await disabled_handler._async_grid_profile_runtime_for_options()
+    ) is None  # noqa: SLF001
+
     result = await handler.async_step_grid_profile_select()
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "grid_profile_unavailable"
@@ -3772,6 +3787,7 @@ async def test_options_flow_devices_form_with_defaults(hass) -> None:
         OPT_PRICING_EDITS_ENABLED,
         OPT_WEATHER_ENABLED,
         OPT_VPP_EVENTS_ENABLED,
+        OPT_GRID_PROFILE_CONTROLS_ENABLED,
         OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
         OPT_MICROINVERTER_POWER_ENABLED,
         OPT_NOMINAL_VOLTAGE,
@@ -3794,6 +3810,10 @@ async def test_options_flow_devices_form_with_defaults(hass) -> None:
     assert features[OPT_PRICING_EDITS_ENABLED] is DEFAULT_PRICING_EDITS_ENABLED
     assert features[OPT_WEATHER_ENABLED] is DEFAULT_WEATHER_ENABLED
     assert features[OPT_VPP_EVENTS_ENABLED] is DEFAULT_VPP_EVENTS_ENABLED
+    assert (
+        features[OPT_GRID_PROFILE_CONTROLS_ENABLED]
+        is DEFAULT_GRID_PROFILE_CONTROLS_ENABLED
+    )
     assert (
         features[OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED]
         is DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED
@@ -3879,6 +3899,18 @@ async def test_options_flow_device_section_translations_load_at_runtime(hass) ->
             f"component.{DOMAIN}.options.step.devices.sections.device_features.data.vpp_events_enabled"
         ]
         == "Enable VPP events"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.devices.sections.device_features.data.grid_profile_controls_enabled"
+        ]
+        == "Enable installer Grid Profile controls"
+    )
+    assert (
+        translations[
+            f"component.{DOMAIN}.options.step.devices.sections.device_features.data_description.grid_profile_controls_enabled"
+        ]
+        == "Fetch installer-only Grid Profile metadata and enable profile actions. Disabled by default."
     )
     assert (
         translations[
@@ -4025,6 +4057,7 @@ async def test_options_flow_sections_use_existing_options(hass) -> None:
             OPT_DEGRADED_SERVICE_REPAIR_ISSUES: False,
             OPT_WEATHER_ENABLED: True,
             OPT_VPP_EVENTS_ENABLED: True,
+            OPT_GRID_PROFILE_CONTROLS_ENABLED: True,
             OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED: False,
             OPT_MICROINVERTER_POWER_ENABLED: True,
             CONF_SITE_ONLY: True,
@@ -4079,6 +4112,7 @@ async def test_options_flow_sections_use_existing_options(hass) -> None:
     assert features[OPT_PRICING_EDITS_ENABLED] is False
     assert features[OPT_WEATHER_ENABLED] is True
     assert features[OPT_VPP_EVENTS_ENABLED] is True
+    assert features[OPT_GRID_PROFILE_CONTROLS_ENABLED] is True
     assert features[OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED] is False
     assert features[OPT_MICROINVERTER_POWER_ENABLED] is True
     assert features[OPT_NOMINAL_VOLTAGE] == 230

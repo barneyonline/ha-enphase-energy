@@ -486,6 +486,9 @@
     },
     "grid_profile_unavailable": {
       "message": "El control de perfil de red no está disponible."
+    },
+    "grid_profile_controls_disabled": {
+      "message": "Activa los controles de perfil de red para instaladores en las opciones de la integración antes de usar esta acción."
     }
   },
   "options": {
@@ -602,7 +605,8 @@
               "nominal_voltage": "Tensión nominal del cargador EV (V)",
               "microinverter_lifetime_energy_enabled": "Activar energía de por vida de los microinversores",
               "microinverter_power_enabled": "Activar potencia de los microinversores",
-              "vpp_events_enabled": "Activar eventos VPP"
+              "vpp_events_enabled": "Activar eventos VPP",
+              "grid_profile_controls_enabled": "Activar controles de perfil de red para instaladores"
             },
             "data_description": {
               "system_event_repair_issues": "Crea reparaciones de Home Assistant para alarmas permanentes activas de Enphase. Desactivado de forma predeterminada.",
@@ -613,7 +617,8 @@
               "battery_schedules_enabled": "Gestiona los horarios de la IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Activa todos los sensores de energía de por vida de cada microinversor.",
               "microinverter_power_enabled": "Activa todos los sensores de potencia de cada microinversor cuando la telemetría del instalador está disponible.",
-              "vpp_events_enabled": "Obtiene los horarios VPP/ELRP de Enphase y crea entidades de eventos solo para sitios inscritos. Desactivado de forma predeterminada."
+              "vpp_events_enabled": "Obtiene los horarios VPP/ELRP de Enphase y crea entidades de eventos solo para sitios inscritos. Desactivado de forma predeterminada.",
+              "grid_profile_controls_enabled": "Obtiene metadatos del perfil de red exclusivos para instaladores y activa las acciones de perfil. Desactivado de forma predeterminada."
             }
           }
         },
@@ -634,7 +639,8 @@
           "nominal_voltage": "Tensión nominal del cargador EV (V)",
           "microinverter_lifetime_energy_enabled": "Activar energía de por vida de los microinversores",
           "microinverter_power_enabled": "Activar potencia de los microinversores",
-          "vpp_events_enabled": "Activar eventos VPP"
+          "vpp_events_enabled": "Activar eventos VPP",
+          "grid_profile_controls_enabled": "Activar controles de perfil de red para instaladores"
         },
         "data_description": {
           "type_envoy": "Incluye conectividad de la puerta de enlace y diagnósticos de medidores.",
@@ -651,7 +657,8 @@
           "battery_schedules_enabled": "Gestiona los horarios de la IQ Battery.",
           "microinverter_lifetime_energy_enabled": "Activa todos los sensores de energía de por vida de cada microinversor.",
           "microinverter_power_enabled": "Activa todos los sensores de potencia de cada microinversor cuando la telemetría del instalador está disponible.",
-          "vpp_events_enabled": "Obtiene los horarios VPP/ELRP de Enphase y crea entidades de eventos solo para sitios inscritos. Desactivado de forma predeterminada."
+          "vpp_events_enabled": "Obtiene los horarios VPP/ELRP de Enphase y crea entidades de eventos solo para sitios inscritos. Desactivado de forma predeterminada.",
+          "grid_profile_controls_enabled": "Obtiene metadatos del perfil de red exclusivos para instaladores y activa las acciones de perfil. Desactivado de forma predeterminada."
         }
       },
       "repair_notifications": {

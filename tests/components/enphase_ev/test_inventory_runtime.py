@@ -1698,7 +1698,7 @@ async def test_inventory_runtime_empty_parameter_rows_clear_cached_value(
 
 
 @pytest.mark.asyncio
-async def test_inventory_runtime_full_parameter_failures_degrade_at_threshold(
+async def test_inventory_runtime_full_parameter_failures_use_fresh_cache_until_stale(
     coordinator_factory, monkeypatch
 ) -> None:
     coord = coordinator_factory()
@@ -1729,7 +1729,7 @@ async def test_inventory_runtime_full_parameter_failures_degrade_at_threshold(
         )
         assert result == {"INV-A": {"power": 250.0}}
         assert health.consecutive_failures == failure_count
-        assert health.degraded is (failure_count >= 3)
+        assert health.degraded is False
         assert health.successful_items == 0
         assert health.total_items == 2
         assert health.using_cached_data is True
@@ -1737,22 +1737,160 @@ async def test_inventory_runtime_full_parameter_failures_degrade_at_threshold(
         assert "9633674" not in (health.last_error or "")
         assert "INV-A" not in (health.last_error or "")
         assert health.next_retry_utc is not None
-        if failure_count < 3:
-            assert (
-                "inverter_parameter_telemetry"
-                not in coord.collect_site_metrics()["degraded_endpoint_families"]
-            )
+        assert (
+            "inverter_parameter_telemetry"
+            not in coord.collect_site_metrics()["degraded_endpoint_families"]
+        )
 
     metrics = coord.collect_site_metrics()
-    assert metrics["degraded_endpoint_families"] == ["inverter_parameter_telemetry"]
+    assert metrics["degraded_endpoint_families"] == []
     assert (
         metrics["endpoint_failure_details"]["inverter_parameter_telemetry"]["reason"]
         == health.last_error
     )
     endpoint_health = metrics["endpoint_family_health"]["inverter_parameter_telemetry"]
-    assert endpoint_health["degraded"] is True
+    assert endpoint_health["degraded"] is False
     assert endpoint_health["successful_items"] == 0
     assert endpoint_health["using_cached_data"] is True
+
+    runtime._set_shared_state_attr(  # noqa: SLF001
+        "_inverter_parameter_success_mono",
+        {"INV-A": {"power": time.monotonic() - 1_801.0}},
+    )
+    result = await runtime._async_refresh_inverter_parameter_telemetry(  # noqa: SLF001
+        ["INV-A"]
+    )
+
+    assert result == {}
+    assert health.degraded is True
+    assert health.cache_stale is True
+    assert health.using_cached_data is False
+    assert coord.collect_site_metrics()["degraded_endpoint_families"] == [
+        "inverter_parameter_telemetry"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_inventory_runtime_rate_limit_does_not_degrade_cloud_service(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.inventory_runtime
+    runtime._set_shared_state_attr("_inverter_parameter_ids", ["power"])  # noqa: SLF001
+    monkeypatch.setattr(
+        coord,
+        "_endpoint_family_should_run",
+        lambda family, **_kwargs: family == "inverter_parameter_telemetry",
+    )
+    coord.client.system_dashboard_parameter_view = AsyncMock(
+        side_effect=api.InvalidPayloadError(
+            "HTTP error from Enphase endpoint at /systems/9633674/inverters",
+            status=429,
+            endpoint="/systems/9633674/inverters",
+        )
+    )
+
+    assert (
+        await runtime._async_refresh_inverter_parameter_telemetry(  # noqa: SLF001
+            ["INV-A"]
+        )
+        == {}
+    )
+
+    health = coord._endpoint_family_state(  # noqa: SLF001
+        "inverter_parameter_telemetry"
+    )
+    assert health.degraded is True
+    assert health.last_status == 429
+    assert health.last_error == "Enphase rate limit (HTTP 429)"
+    metrics = coord.collect_site_metrics()
+    endpoint_health = metrics["endpoint_family_health"]["inverter_parameter_telemetry"]
+    assert endpoint_health["rate_limited"] is True
+    assert metrics["degraded_endpoint_families"] == []
+    assert metrics["degraded_services"] == []
+    assert metrics["endpoint_failure_details"]["inverter_parameter_telemetry"] == {
+        "reason": "Enphase rate limit (HTTP 429)",
+        "retry_utc": health.next_retry_utc.isoformat(),
+    }
+
+
+@pytest.mark.asyncio
+async def test_inventory_runtime_partial_rate_limit_preserves_cooldown(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.inventory_runtime
+    runtime._set_shared_state_attr(  # noqa: SLF001
+        "_inverter_parameter_ids",
+        ["power", "temperature"],
+    )
+    should_run = coord._endpoint_family_should_run  # noqa: SLF001
+    monkeypatch.setattr(
+        coord,
+        "_endpoint_family_should_run",
+        lambda family, **kwargs: (
+            should_run(family, **kwargs)
+            if family == "inverter_parameter_telemetry"
+            else False
+        ),
+    )
+    coord.client.system_dashboard_parameter_view = AsyncMock(
+        side_effect=[
+            {
+                "intervals": [
+                    {"serial_number": "INV-A", "value": 250.0},
+                    {"serial_number": "INV-B", "value": 240.0},
+                ]
+            },
+            {
+                "intervals": [{"serial_number": "INV-A", "value": 42.0}],
+                "has_next": True,
+            },
+            api.InvalidPayloadError(
+                "HTTP error from Enphase endpoint",
+                status=429,
+                endpoint="/systems/9633674/inverters",
+            ),
+        ]
+    )
+
+    result = await runtime._async_refresh_inverter_parameter_telemetry(  # noqa: SLF001
+        ["INV-A", "INV-B"]
+    )
+
+    assert result == {
+        "INV-A": {
+            "power": 250.0,
+            "temperature": 42.0,
+            "parameter_ids": {
+                "power": "power",
+                "temperature": "temperature",
+            },
+        },
+        "INV-B": {
+            "power": 240.0,
+            "parameter_ids": {"power": "power"},
+        },
+    }
+    health = coord._endpoint_family_state(  # noqa: SLF001
+        "inverter_parameter_telemetry"
+    )
+    assert health.consecutive_failures == 1
+    assert health.last_status == 429
+    assert health.cooldown_active is True
+    assert health.partial_success is True
+    assert health.degraded is False
+    assert health.last_error == "Enphase rate limit (HTTP 429)"
+    assert coord.collect_site_metrics()["degraded_endpoint_families"] == []
+    assert coord.client.system_dashboard_parameter_view.await_count == 3
+
+    assert (
+        await runtime._async_refresh_inverter_parameter_telemetry(  # noqa: SLF001
+            ["INV-A", "INV-B"]
+        )
+        == result
+    )
+    assert coord.client.system_dashboard_parameter_view.await_count == 3
 
 
 @pytest.mark.asyncio

@@ -486,6 +486,9 @@
     },
     "grid_profile_unavailable": {
       "message": "Ovládání síťového profilu není dostupné."
+    },
+    "grid_profile_controls_disabled": {
+      "message": "Před použitím této akce povolte v možnostech integrace instalační ovládání síťového profilu."
     }
   },
   "options": {
@@ -602,7 +605,8 @@
               "nominal_voltage": "Jmenovité napětí nabíječky EV (V)",
               "microinverter_lifetime_energy_enabled": "Povolit celoživotní energii mikrostřídačů",
               "microinverter_power_enabled": "Povolit výkon mikrostřídačů",
-              "vpp_events_enabled": "Povolit události VPP"
+              "vpp_events_enabled": "Povolit události VPP",
+              "grid_profile_controls_enabled": "Povolit instalační ovládání síťového profilu"
             },
             "data_description": {
               "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto.",
@@ -613,7 +617,8 @@
               "battery_schedules_enabled": "Spravujte plány baterie IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů.",
               "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika.",
-              "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto."
+              "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto.",
+              "grid_profile_controls_enabled": "Načte metadata síťového profilu dostupná pouze instalačnímu technikovi a povolí akce s profily. Ve výchozím nastavení je vypnuto."
             }
           }
         },
@@ -634,7 +639,8 @@
           "nominal_voltage": "Jmenovité napětí nabíječky EV (V)",
           "microinverter_lifetime_energy_enabled": "Povolit celoživotní energii mikrostřídačů",
           "microinverter_power_enabled": "Povolit výkon mikrostřídačů",
-          "vpp_events_enabled": "Povolit události VPP"
+          "vpp_events_enabled": "Povolit události VPP",
+          "grid_profile_controls_enabled": "Povolit instalační ovládání síťového profilu"
         },
         "data_description": {
           "type_envoy": "Zahrnuje diagnostiku konektivity brány a měřidel.",
@@ -651,7 +657,8 @@
           "battery_schedules_enabled": "Spravujte plány baterie IQ Battery.",
           "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů.",
           "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika.",
-          "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto."
+          "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto.",
+          "grid_profile_controls_enabled": "Načte metadata síťového profilu dostupná pouze instalačnímu technikovi a povolí akce s profily. Ve výchozím nastavení je vypnuto."
         }
       },
       "repair_notifications": {

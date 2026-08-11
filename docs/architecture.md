@@ -48,6 +48,10 @@ the background. Cold setup continues to require an authoritative first refresh.
 The default-off VPP Events device feature is one of those topology options. Its
 reload clears the VPP cache before optional warmup so disabling the feature cannot
 publish preserved event state or make requests to the VPP service.
+Installer Grid Profile controls are also a default-off topology option. Disabled
+entries skip both the startup Activation probe and steady metadata refreshes;
+config-entry migration enables the option only when an existing Current Grid
+Profile entity demonstrates prior use.
 
 Device and entity registry cleanup is intentionally conservative. Startup migrations
 run once per migration version, while normal reconciliation runs only when the

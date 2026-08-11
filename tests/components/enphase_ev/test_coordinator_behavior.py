@@ -142,8 +142,11 @@ async def test_apply_config_entry_options_without_reload(
         async_stop=AsyncMock(),
         async_start=AsyncMock(),
     )
+    grid_profile_task = asyncio.create_task(asyncio.sleep(60))
+    coord._grid_profile_metadata_task = grid_profile_task  # noqa: SLF001
 
     await coord.async_apply_config_entry_options({OPT_SCHEDULE_SYNC_ENABLED: False})
+    await asyncio.gather(grid_profile_task, return_exceptions=True)
 
     assert coord.client._timeout == 20  # noqa: SLF001
     assert coord._configured_slow_poll_interval == 90  # noqa: SLF001
@@ -156,6 +159,7 @@ async def test_apply_config_entry_options_without_reload(
     coord.system_events_runtime.clear_repairs.assert_called_once_with()
     coord.schedule_sync.async_stop.assert_awaited_once_with()
     coord.schedule_sync.async_start.assert_awaited_once_with()
+    assert grid_profile_task.cancelled()
 
     coord._determine_polling_state = Mock(side_effect=RuntimeError("bad cache"))
     await coord.async_apply_config_entry_options(options)

@@ -486,6 +486,9 @@
     },
     "grid_profile_unavailable": {
       "message": "Tīkla profila vadība nav pieejama."
+    },
+    "grid_profile_controls_disabled": {
+      "message": "Pirms šīs darbības izmantošanas integrācijas opcijās iespējojiet uzstādītāja tīkla profila vadīklas."
     }
   },
   "options": {
@@ -602,7 +605,8 @@
               "nominal_voltage": "EV lādētāja nominālais spriegums (V)",
               "microinverter_lifetime_energy_enabled": "Iespējot mikroinvertoru kopējo enerģiju",
               "microinverter_power_enabled": "Iespējot mikroinvertoru jaudu",
-              "vpp_events_enabled": "Iespējot VPP notikumus"
+              "vpp_events_enabled": "Iespējot VPP notikumus",
+              "grid_profile_controls_enabled": "Iespējot uzstādītāja tīkla profila vadīklas"
             },
             "data_description": {
               "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts.",
@@ -613,7 +617,8 @@
               "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus.",
               "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
               "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija.",
-              "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts."
+              "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts.",
+              "grid_profile_controls_enabled": "Iegūst tikai uzstādītājam pieejamos tīkla profila metadatus un iespējo profila darbības. Pēc noklusējuma atspējots."
             }
           }
         },
@@ -634,7 +639,8 @@
           "nominal_voltage": "EV lādētāja nominālais spriegums (V)",
           "microinverter_lifetime_energy_enabled": "Iespējot mikroinvertoru kopējo enerģiju",
           "microinverter_power_enabled": "Iespējot mikroinvertoru jaudu",
-          "vpp_events_enabled": "Iespējot VPP notikumus"
+          "vpp_events_enabled": "Iespējot VPP notikumus",
+          "grid_profile_controls_enabled": "Iespējot uzstādītāja tīkla profila vadīklas"
         },
         "data_description": {
           "type_envoy": "Ietver vārtejas savienojamības un skaitītāju diagnostiku.",
@@ -651,7 +657,8 @@
           "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus.",
           "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
           "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija.",
-          "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts."
+          "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts.",
+          "grid_profile_controls_enabled": "Iegūst tikai uzstādītājam pieejamos tīkla profila metadatus un iespējo profila darbības. Pēc noklusējuma atspējots."
         }
       },
       "repair_notifications": {

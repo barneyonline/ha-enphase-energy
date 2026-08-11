@@ -486,6 +486,9 @@
     },
     "grid_profile_unavailable": {
       "message": "Il controllo del profilo di rete non è disponibile."
+    },
+    "grid_profile_controls_disabled": {
+      "message": "Abilita i controlli del profilo di rete per installatori nelle opzioni dell'integrazione prima di usare questa azione."
     }
   },
   "options": {
@@ -602,7 +605,8 @@
               "nominal_voltage": "Tensione nominale del caricatore EV (V)",
               "microinverter_lifetime_energy_enabled": "Abilita energia totale dei microinverter",
               "microinverter_power_enabled": "Abilita potenza dei microinverter",
-              "vpp_events_enabled": "Abilita eventi VPP"
+              "vpp_events_enabled": "Abilita eventi VPP",
+              "grid_profile_controls_enabled": "Abilita i controlli del profilo di rete per installatori"
             },
             "data_description": {
               "system_event_repair_issues": "Crea riparazioni di Home Assistant per gli allarmi Enphase permanenti attivi. Disabilitato per impostazione predefinita.",
@@ -613,7 +617,8 @@
               "battery_schedules_enabled": "Gestisci le pianificazioni di IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Abilita tutti i sensori di energia totale per ciascun microinverter.",
               "microinverter_power_enabled": "Abilita tutti i sensori di potenza per ciascun microinverter quando è disponibile la telemetria dell’installatore.",
-              "vpp_events_enabled": "Recupera le pianificazioni VPP/ELRP da Enphase e crea entità evento solo per i siti iscritti. Disabilitato per impostazione predefinita."
+              "vpp_events_enabled": "Recupera le pianificazioni VPP/ELRP da Enphase e crea entità evento solo per i siti iscritti. Disabilitato per impostazione predefinita.",
+              "grid_profile_controls_enabled": "Recupera i metadati del profilo di rete riservati agli installatori e abilita le azioni del profilo. Disabilitato per impostazione predefinita."
             }
           }
         },
@@ -634,7 +639,8 @@
           "nominal_voltage": "Tensione nominale del caricatore EV (V)",
           "microinverter_lifetime_energy_enabled": "Abilita energia totale dei microinverter",
           "microinverter_power_enabled": "Abilita potenza dei microinverter",
-          "vpp_events_enabled": "Abilita eventi VPP"
+          "vpp_events_enabled": "Abilita eventi VPP",
+          "grid_profile_controls_enabled": "Abilita i controlli del profilo di rete per installatori"
         },
         "data_description": {
           "type_envoy": "Include connettività del gateway e diagnostica dei contatori.",
@@ -651,7 +657,8 @@
           "battery_schedules_enabled": "Gestisci le pianificazioni di IQ Battery.",
           "microinverter_lifetime_energy_enabled": "Abilita tutti i sensori di energia totale per ciascun microinverter.",
           "microinverter_power_enabled": "Abilita tutti i sensori di potenza per ciascun microinverter quando è disponibile la telemetria dell’installatore.",
-          "vpp_events_enabled": "Recupera le pianificazioni VPP/ELRP da Enphase e crea entità evento solo per i siti iscritti. Disabilitato per impostazione predefinita."
+          "vpp_events_enabled": "Recupera le pianificazioni VPP/ELRP da Enphase e crea entità evento solo per i siti iscritti. Disabilitato per impostazione predefinita.",
+          "grid_profile_controls_enabled": "Recupera i metadati del profilo di rete riservati agli installatori e abilita le azioni del profilo. Disabilitato per impostazione predefinita."
         }
       },
       "repair_notifications": {

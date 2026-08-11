@@ -486,6 +486,9 @@
     },
     "grid_profile_unavailable": {
       "message": "Controlul profilului de rețea nu este disponibil."
+    },
+    "grid_profile_controls_disabled": {
+      "message": "Activează comenzile profilului de rețea pentru instalator în opțiunile integrării înainte de a utiliza această acțiune."
     }
   },
   "options": {
@@ -602,7 +605,8 @@
               "nominal_voltage": "Tensiunea nominală a încărcătorului EV (V)",
               "microinverter_lifetime_energy_enabled": "Activează energia totală a microinvertoarelor",
               "microinverter_power_enabled": "Activează puterea microinvertoarelor",
-              "vpp_events_enabled": "Activează evenimentele VPP"
+              "vpp_events_enabled": "Activează evenimentele VPP",
+              "grid_profile_controls_enabled": "Activează comenzile profilului de rețea pentru instalator"
             },
             "data_description": {
               "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit.",
@@ -613,7 +617,8 @@
               "battery_schedules_enabled": "Gestionați programele IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor.",
               "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă.",
-              "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit."
+              "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit.",
+              "grid_profile_controls_enabled": "Preia metadatele profilului de rețea disponibile numai instalatorului și activează acțiunile profilului. Dezactivat implicit."
             }
           }
         },
@@ -634,7 +639,8 @@
           "nominal_voltage": "Tensiunea nominală a încărcătorului EV (V)",
           "microinverter_lifetime_energy_enabled": "Activează energia totală a microinvertoarelor",
           "microinverter_power_enabled": "Activează puterea microinvertoarelor",
-          "vpp_events_enabled": "Activează evenimentele VPP"
+          "vpp_events_enabled": "Activează evenimentele VPP",
+          "grid_profile_controls_enabled": "Activează comenzile profilului de rețea pentru instalator"
         },
         "data_description": {
           "type_envoy": "Include conectivitatea gateway-ului și diagnosticul contoarelor.",
@@ -651,7 +657,8 @@
           "battery_schedules_enabled": "Gestionați programele IQ Battery.",
           "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor.",
           "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă.",
-          "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit."
+          "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit.",
+          "grid_profile_controls_enabled": "Preia metadatele profilului de rețea disponibile numai instalatorului și activează acțiunile profilului. Dezactivat implicit."
         }
       },
       "repair_notifications": {

@@ -486,6 +486,9 @@
     },
     "grid_profile_unavailable": {
       "message": "Nätprofilstyrning är inte tillgänglig."
+    },
+    "grid_profile_controls_disabled": {
+      "message": "Aktivera installatörskontroller för nätprofil i integrationsalternativen innan du använder den här åtgärden."
     }
   },
   "options": {
@@ -602,7 +605,8 @@
               "nominal_voltage": "EV-laddarens nominella spänning (V)",
               "microinverter_lifetime_energy_enabled": "Aktivera mikroväxelriktarnas livstidsenergi",
               "microinverter_power_enabled": "Aktivera mikroväxelriktarnas effekt",
-              "vpp_events_enabled": "Aktivera VPP-händelser"
+              "vpp_events_enabled": "Aktivera VPP-händelser",
+              "grid_profile_controls_enabled": "Aktivera installatörskontroller för nätprofil"
             },
             "data_description": {
               "system_event_repair_issues": "Skapar Home Assistant-reparationer för aktiva stående Enphase-larm. Inaktiverat som standard.",
@@ -613,7 +617,8 @@
               "battery_schedules_enabled": "Hantera scheman för IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Aktiverar alla sensorer för livstidsenergi per mikroväxelriktare.",
               "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig.",
-              "vpp_events_enabled": "Hämtar VPP/ELRP-scheman från Enphase och skapar endast händelseentiteter för anslutna anläggningar. Inaktiverat som standard."
+              "vpp_events_enabled": "Hämtar VPP/ELRP-scheman från Enphase och skapar endast händelseentiteter för anslutna anläggningar. Inaktiverat som standard.",
+              "grid_profile_controls_enabled": "Hämtar nätprofilmetadata som endast är tillgängliga för installatörer och aktiverar profilåtgärder. Inaktiverat som standard."
             }
           }
         },
@@ -634,7 +639,8 @@
           "nominal_voltage": "EV-laddarens nominella spänning (V)",
           "microinverter_lifetime_energy_enabled": "Aktivera mikroväxelriktarnas livstidsenergi",
           "microinverter_power_enabled": "Aktivera mikroväxelriktarnas effekt",
-          "vpp_events_enabled": "Aktivera VPP-händelser"
+          "vpp_events_enabled": "Aktivera VPP-händelser",
+          "grid_profile_controls_enabled": "Aktivera installatörskontroller för nätprofil"
         },
         "data_description": {
           "type_envoy": "Inkluderar gateway-anslutning och mätardiagnostik.",
@@ -651,7 +657,8 @@
           "battery_schedules_enabled": "Hantera scheman för IQ Battery.",
           "microinverter_lifetime_energy_enabled": "Aktiverar alla sensorer för livstidsenergi per mikroväxelriktare.",
           "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig.",
-          "vpp_events_enabled": "Hämtar VPP/ELRP-scheman från Enphase och skapar endast händelseentiteter för anslutna anläggningar. Inaktiverat som standard."
+          "vpp_events_enabled": "Hämtar VPP/ELRP-scheman från Enphase och skapar endast händelseentiteter för anslutna anläggningar. Inaktiverat som standard.",
+          "grid_profile_controls_enabled": "Hämtar nätprofilmetadata som endast är tillgängliga för installatörer och aktiverar profilåtgärder. Inaktiverat som standard."
         }
       },
       "repair_notifications": {

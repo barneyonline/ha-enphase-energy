@@ -486,6 +486,9 @@
     },
     "grid_profile_unavailable": {
       "message": "Verkkoprofiilin hallinta ei ole käytettävissä."
+    },
+    "grid_profile_controls_disabled": {
+      "message": "Ota asentajan verkkoprofiilin hallinta käyttöön integraation asetuksissa ennen tämän toiminnon käyttämistä."
     }
   },
   "options": {
@@ -602,7 +605,8 @@
               "nominal_voltage": "EV-laturin nimellisjännite (V)",
               "microinverter_lifetime_energy_enabled": "Ota mikroinvertterien elinkaarienergia käyttöön",
               "microinverter_power_enabled": "Ota mikroinvertterien teho käyttöön",
-              "vpp_events_enabled": "Ota VPP-tapahtumat käyttöön"
+              "vpp_events_enabled": "Ota VPP-tapahtumat käyttöön",
+              "grid_profile_controls_enabled": "Ota asentajan verkkoprofiilin hallinta käyttöön"
             },
             "data_description": {
               "system_event_repair_issues": "Luo Home Assistant -korjauksia aktiivisille Enphasen pysyville hälytyksille. Oletuksena pois käytöstä.",
@@ -613,7 +617,8 @@
               "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja.",
               "microinverter_lifetime_energy_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset elinkaarienergia-anturit.",
               "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla.",
-              "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä."
+              "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä.",
+              "grid_profile_controls_enabled": "Hakee vain asentajalle tarkoitetut verkkoprofiilin metatiedot ja ottaa profiilitoiminnot käyttöön. Oletuksena poissa käytöstä."
             }
           }
         },
@@ -634,7 +639,8 @@
           "nominal_voltage": "EV-laturin nimellisjännite (V)",
           "microinverter_lifetime_energy_enabled": "Ota mikroinvertterien elinkaarienergia käyttöön",
           "microinverter_power_enabled": "Ota mikroinvertterien teho käyttöön",
-          "vpp_events_enabled": "Ota VPP-tapahtumat käyttöön"
+          "vpp_events_enabled": "Ota VPP-tapahtumat käyttöön",
+          "grid_profile_controls_enabled": "Ota asentajan verkkoprofiilin hallinta käyttöön"
         },
         "data_description": {
           "type_envoy": "Sisältää yhdyskäytävän yhteys- ja mittaridiagnostiikan.",
@@ -651,7 +657,8 @@
           "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja.",
           "microinverter_lifetime_energy_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset elinkaarienergia-anturit.",
           "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla.",
-          "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä."
+          "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä.",
+          "grid_profile_controls_enabled": "Hakee vain asentajalle tarkoitetut verkkoprofiilin metatiedot ja ottaa profiilitoiminnot käyttöön. Oletuksena poissa käytöstä."
         }
       },
       "repair_notifications": {
