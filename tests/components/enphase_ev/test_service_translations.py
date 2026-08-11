@@ -1879,6 +1879,7 @@ def test_options_device_category_strings_exist_for_all_locales() -> None:
         "options.step.devices.sections.device_features.data.microinverter_lifetime_energy_enabled",
         "options.step.devices.sections.device_features.data.microinverter_power_enabled",
         "options.step.devices.sections.device_features.data.weather_enabled",
+        "options.step.devices.sections.device_features.data.grid_profile_controls_enabled",
         "options.step.init.data.api_timeout",
         "options.step.init.data.nominal_voltage",
         "options.step.devices.sections.devices.data_description.type_envoy",
@@ -1894,6 +1895,7 @@ def test_options_device_category_strings_exist_for_all_locales() -> None:
         "options.step.devices.sections.device_features.data_description.microinverter_lifetime_energy_enabled",
         "options.step.devices.sections.device_features.data_description.microinverter_power_enabled",
         "options.step.devices.sections.device_features.data_description.weather_enabled",
+        "options.step.devices.sections.device_features.data_description.grid_profile_controls_enabled",
         "options.step.authentication_settings.title",
         "options.step.authentication_settings.description",
         "options.step.authentication_settings.data.reauth",
@@ -1908,6 +1910,7 @@ def test_options_device_category_strings_exist_for_all_locales() -> None:
         "options.step.repair_notifications.data_description.system_event_repair_issues",
         "options.step.init.data_description.api_timeout",
         "options.step.init.data_description.nominal_voltage",
+        "exceptions.grid_profile_controls_disabled.message",
         "options.error.serials_required",
     ]
     non_english_must_differ = [
@@ -1933,6 +1936,7 @@ def test_options_device_category_strings_exist_for_all_locales() -> None:
         "options.step.devices.sections.device_features.data.microinverter_lifetime_energy_enabled",
         "options.step.devices.sections.device_features.data.microinverter_power_enabled",
         "options.step.devices.sections.device_features.data.weather_enabled",
+        "options.step.devices.sections.device_features.data.grid_profile_controls_enabled",
         "options.step.devices.sections.devices.data_description.type_heatpump",
         "options.step.devices.sections.device_features.data_description.system_event_repair_issues",
         "options.step.devices.sections.device_features.data_description.schedule_sync_enabled",
@@ -1941,6 +1945,7 @@ def test_options_device_category_strings_exist_for_all_locales() -> None:
         "options.step.devices.sections.device_features.data_description.microinverter_lifetime_energy_enabled",
         "options.step.devices.sections.device_features.data_description.microinverter_power_enabled",
         "options.step.devices.sections.device_features.data_description.weather_enabled",
+        "options.step.devices.sections.device_features.data_description.grid_profile_controls_enabled",
         "options.step.authentication_settings.title",
         "options.step.authentication_settings.description",
         "options.step.authentication_settings.data.reauth",
@@ -1956,6 +1961,7 @@ def test_options_device_category_strings_exist_for_all_locales() -> None:
         "options.step.init.data.nominal_voltage",
         "options.step.init.data_description.api_timeout",
         "options.step.init.data_description.nominal_voltage",
+        "exceptions.grid_profile_controls_disabled.message",
     ]
     en_data = json.loads((translations_dir / "en.json").read_text(encoding="utf-8"))
     for locale in translations_dir.glob("*.json"):

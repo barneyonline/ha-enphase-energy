@@ -14,6 +14,7 @@ from homeassistant.helpers.entity import EntityCategory
 
 from custom_components.enphase_ev import sensor as sensor_mod
 from custom_components.enphase_ev.const import (
+    OPT_GRID_PROFILE_CONTROLS_ENABLED,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_MICROINVERTER_POWER_ENABLED,
 )
@@ -89,6 +90,11 @@ async def test_async_setup_entry_registers_entities(
     from custom_components.enphase_ev.sensor import async_setup_entry
 
     coord = coordinator_factory(serials=[RANDOM_SERIAL])
+    hass.config_entries.async_update_entry(
+        config_entry,
+        options={OPT_GRID_PROFILE_CONTROLS_ENABLED: True},
+    )
+    coord.config_entry = config_entry
     coord.data[RANDOM_SERIAL].update(
         {
             "connector_status": "AVAILABLE",

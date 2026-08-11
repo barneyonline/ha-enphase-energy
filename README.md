@@ -46,7 +46,10 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - Optional current site weather on the Enphase Cloud device, created only when the authenticated Enphase weather endpoint is available
 - Independent Microinverter Lifetime Energy and optional installer-level power telemetry
 - Site tariff visibility, editable rate entities, and tariff update actions
-- Installer-only Grid Profile Control through Enphase cloud Activation, with country-scoped profile selection and current profile monitoring
+- Optional installer-only Grid Profile Control through Enphase cloud Activation,
+  with country-scoped profile selection and current profile monitoring. Enable it
+  under Options > Devices > Device Features; it is disabled by default and makes
+  no Grid Profile requests until enabled
 - Read-only Grid Mode monitoring with a guided, OTP-confirmed control workflow under Configure > Advanced > Grid Mode and admin-only actions for scripts
 - Health diagnostics, service-availability tracking, and actionable repair issues
 - Read-only System Dashboard event and standing-alarm monitoring, including a
@@ -62,9 +65,10 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - Restored discovery data creates known entities early during startup; live power
   acquisition starts alongside the minimal setup refresh and is attempted within
   55 seconds, while optional feature data fills in incrementally afterward
-- Rate-conscious microinverter telemetry uses limited-concurrency bulk reads,
-  preserves fresh partial results, and exposes power plus available AC/DC,
-  frequency, temperature, signal, and firmware details when available
+- Rate-conscious microinverter telemetry runs no more than once every 15 minutes,
+  uses limited-concurrency bulk reads, preserves fresh partial results, and
+  exposes power plus available AC/DC, frequency, temperature, signal, and
+  firmware details when available
 - Broad localization support across all user-facing integration strings
 
 Localized strings cover English (default plus US, Canada, Australia, New Zealand, and Ireland variants), French, German, Spanish, Italian, Dutch, Swedish, Danish, Finnish, Norwegian Bokmal, Polish, Greek, Romanian, Czech, Hungarian, Bulgarian, Latvian, Lithuanian, Estonian, and Brazilian Portuguese.

@@ -50,6 +50,9 @@ _DEGRADED_SERVICE_REPAIR_ISSUE_IDS = frozenset(
     issue_id for _flag_attr, issue_id in _DEGRADED_SERVICE_REPAIR_ISSUES
 )
 _NON_DEGRADING_OPTIONAL_ENDPOINT_FAMILIES = frozenset({"activation_grid_profile"})
+_NON_DEGRADING_RATE_LIMITED_ENDPOINT_FAMILIES = frozenset(
+    {"inverter_parameter_telemetry"}
+)
 
 
 class CoordinatorDiagnostics:
@@ -451,6 +454,12 @@ class CoordinatorDiagnostics:
             "type_device_counts": type_counts,
             "payload_health": self.payload_health_diagnostics(),
             "endpoint_family_health": endpoint_family_health,
+            "endpoint_failure_history": list(
+                getattr(coord, "_endpoint_failure_history", []) or []
+            ),
+            "grid_profile_controls_enabled": bool(
+                getattr(coord, "grid_profile_controls_enabled", False)
+            ),
             "tariff_available": tariff_available,
             "tariff_service_status": tariff_service_status,
             "tariff_failures": tariff_failures,
@@ -1086,8 +1095,16 @@ class CoordinatorDiagnostics:
         if evse_timeseries is not None:
             metrics["evse_timeseries"] = evse_timeseries.diagnostics()
 
-        def _endpoint_family_degraded(state: object) -> bool:
+        def _endpoint_family_degraded(family: str, state: object) -> bool:
             if not isinstance(state, dict):
+                return False
+            # This is optional, high-volume telemetry. A 429 confirms that the
+            # cloud is reachable and is handled by the endpoint cooldown, so it
+            # must not degrade the overall Enphase Cloud service.
+            if (
+                family in _NON_DEGRADING_RATE_LIMITED_ENDPOINT_FAMILIES
+                and state.get("last_status") == 429
+            ):
                 return False
             degraded = state.get("degraded")
             if isinstance(degraded, bool):
@@ -1106,7 +1123,7 @@ class CoordinatorDiagnostics:
             family
             for family, state in endpoint_family_health.items()
             if family not in _NON_DEGRADING_OPTIONAL_ENDPOINT_FAMILIES
-            and _endpoint_family_degraded(state)
+            and _endpoint_family_degraded(family, state)
         ]
         metrics["degraded_endpoint_families"] = degraded_endpoint_families
         metrics["endpoint_failure_details"] = {
@@ -1411,8 +1428,26 @@ class CoordinatorDiagnostics:
                 "support_state": support_state,
                 "suppressed": support_state == "suppressed",
                 "last_error": getattr(state, "last_error", None),
+                "rate_limited": getattr(state, "last_status", None) == 429,
             }
             degraded = getattr(state, "degraded", None)
+            if family == "grid_mode_status" and int(
+                getattr(state, "consecutive_failures", 0) or 0
+            ):
+                can_use_stale = False
+                stale_check = getattr(coord, "_endpoint_family_can_use_stale", None)
+                if callable(stale_check):
+                    try:
+                        can_use_stale = bool(stale_check(family))
+                    except Exception:  # noqa: BLE001
+                        can_use_stale = False
+                degraded = not can_use_stale
+                family_health.update(
+                    {
+                        "using_cached_data": can_use_stale,
+                        "cache_stale": not can_use_stale,
+                    }
+                )
             if isinstance(degraded, bool):
                 family_health.update(
                     {
@@ -1422,10 +1457,14 @@ class CoordinatorDiagnostics:
                         ),
                         "successful_items": getattr(state, "successful_items", None),
                         "total_items": getattr(state, "total_items", None),
-                        "using_cached_data": bool(
-                            getattr(state, "using_cached_data", False)
+                        "using_cached_data": family_health.get(
+                            "using_cached_data",
+                            bool(getattr(state, "using_cached_data", False)),
                         ),
-                        "cache_stale": bool(getattr(state, "cache_stale", False)),
+                        "cache_stale": family_health.get(
+                            "cache_stale",
+                            bool(getattr(state, "cache_stale", False)),
+                        ),
                     }
                 )
             out[family] = family_health

@@ -190,6 +190,8 @@ SITE_LIFETIME_FLOW_BUCKET_LENGTH_KEYS: dict[str, tuple[str, ...]] = {
 
 
 def _retain_grid_profile_sensors(coord: EnphaseCoordinator) -> bool:
+    if not getattr(coord, "grid_profile_controls_enabled", False):
+        return False
     runtime = getattr(coord, "grid_profile_runtime", None)
     if runtime is None:
         return False

@@ -486,6 +486,9 @@
     },
     "grid_profile_unavailable": {
       "message": "Netprofielbeheer is niet beschikbaar."
+    },
+    "grid_profile_controls_disabled": {
+      "message": "Schakel de installateursbediening voor netprofielen in bij de integratieopties voordat u deze actie gebruikt."
     }
   },
   "options": {
@@ -602,7 +605,8 @@
               "nominal_voltage": "Nominale spanning van EV-lader (V)",
               "microinverter_lifetime_energy_enabled": "Levensduurenergie van micro-omvormers inschakelen",
               "microinverter_power_enabled": "Vermogen van micro-omvormers inschakelen",
-              "vpp_events_enabled": "VPP-gebeurtenissen inschakelen"
+              "vpp_events_enabled": "VPP-gebeurtenissen inschakelen",
+              "grid_profile_controls_enabled": "Installateursbediening voor netprofielen inschakelen"
             },
             "data_description": {
               "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld.",
@@ -613,7 +617,8 @@
               "battery_schedules_enabled": "Beheer schema's voor de IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in.",
               "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is.",
-              "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld."
+              "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld.",
+              "grid_profile_controls_enabled": "Haalt netprofielmetadata op die alleen voor installateurs beschikbaar zijn en schakelt profielacties in. Standaard uitgeschakeld."
             }
           }
         },
@@ -634,7 +639,8 @@
           "nominal_voltage": "Nominale spanning van EV-lader (V)",
           "microinverter_lifetime_energy_enabled": "Levensduurenergie van micro-omvormers inschakelen",
           "microinverter_power_enabled": "Vermogen van micro-omvormers inschakelen",
-          "vpp_events_enabled": "VPP-gebeurtenissen inschakelen"
+          "vpp_events_enabled": "VPP-gebeurtenissen inschakelen",
+          "grid_profile_controls_enabled": "Installateursbediening voor netprofielen inschakelen"
         },
         "data_description": {
           "type_envoy": "Bevat gateway-connectiviteit en meterdiagnostiek.",
@@ -651,7 +657,8 @@
           "battery_schedules_enabled": "Beheer schema's voor de IQ Battery.",
           "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in.",
           "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is.",
-          "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld."
+          "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld.",
+          "grid_profile_controls_enabled": "Haalt netprofielmetadata op die alleen voor installateurs beschikbaar zijn en schakelt profielacties in. Standaard uitgeschakeld."
         }
       },
       "repair_notifications": {

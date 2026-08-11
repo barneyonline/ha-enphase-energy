@@ -69,6 +69,7 @@ from .const import (
     DEFAULT_API_TIMEOUT,
     DEFAULT_DEGRADED_SERVICE_REPAIR_ISSUES,
     DEFAULT_FAST_POLL_INTERVAL,
+    DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
     DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     DEFAULT_MICROINVERTER_POWER_ENABLED,
     DEFAULT_PRICING_EDITS_ENABLED,
@@ -91,6 +92,7 @@ from .const import (
     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
     OPT_FAST_POLL_INTERVAL,
     OPT_FAST_WHILE_STREAMING,
+    OPT_GRID_PROFILE_CONTROLS_ENABLED,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_MICROINVERTER_POWER_ENABLED,
     OPT_PRICING_EDITS_ENABLED,
@@ -299,7 +301,7 @@ def _legacy_microinverters_available(payload: object) -> bool:
 
 class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg,misc]
     VERSION = 1
-    MINOR_VERSION = 2
+    MINOR_VERSION = 3
 
     def __init__(self) -> None:
         self._auth_tokens: AuthTokens | None = None
@@ -1439,6 +1441,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 ),
             ): bool,
             vol.Optional(
+                OPT_GRID_PROFILE_CONTROLS_ENABLED,
+                default=self._entry.options.get(
+                    OPT_GRID_PROFILE_CONTROLS_ENABLED,
+                    DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
+                ),
+            ): bool,
+            vol.Optional(
                 OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
                 default=self._entry.options.get(
                     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
@@ -1770,10 +1779,18 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
     def _grid_profile_options_available(self) -> bool:
         runtime = self._grid_profile_runtime()
         return bool(
-            runtime is not None
+            self._grid_profile_controls_enabled()
+            and runtime is not None
             and runtime.installer_access_confirmed
             and runtime.regions
         )
+
+    def _grid_profile_controls_enabled(self) -> bool:
+        """Return the option state, preserving pre-migration options-flow behavior."""
+
+        if OPT_GRID_PROFILE_CONTROLS_ENABLED in self._entry.options:
+            return bool(self._entry.options[OPT_GRID_PROFILE_CONTROLS_ENABLED])
+        return bool(self._entry.minor_version < EnphaseEVConfigFlow.MINOR_VERSION)
 
     @staticmethod
     def _grid_profile_unavailable_reason(runtime: GridProfileRuntime) -> str:
@@ -1786,6 +1803,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
     async def _async_grid_profile_runtime_for_options(
         self,
     ) -> GridProfileRuntime | None:
+        if not self._grid_profile_controls_enabled():
+            return None
         runtime = self._grid_profile_runtime()
         if runtime is None:
             return None
@@ -2304,6 +2323,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             option_data.pop(OPT_PRICING_EDITS_ENABLED, None)
             option_data.pop(OPT_WEATHER_ENABLED, None)
             option_data.pop(OPT_VPP_EVENTS_ENABLED, None)
+            option_data.pop(OPT_GRID_PROFILE_CONTROLS_ENABLED, None)
             option_data.pop(OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED, None)
             option_data.pop(OPT_MICROINVERTER_POWER_ENABLED, None)
             option_data.pop(OPT_NOMINAL_VOLTAGE, None)
@@ -2408,6 +2428,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 options.get(
                     OPT_VPP_EVENTS_ENABLED,
                     DEFAULT_VPP_EVENTS_ENABLED,
+                ),
+            )
+        )
+        options[OPT_GRID_PROFILE_CONTROLS_ENABLED] = bool(
+            device_data.get(
+                OPT_GRID_PROFILE_CONTROLS_ENABLED,
+                options.get(
+                    OPT_GRID_PROFILE_CONTROLS_ENABLED,
+                    DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
                 ),
             )
         )

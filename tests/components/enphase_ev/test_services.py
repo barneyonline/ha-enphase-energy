@@ -118,6 +118,7 @@ def _register_service_metadata(
 
 def _fake_service_coordinator(*, site_id: str, serials: set[str]):
     return SimpleNamespace(
+        grid_profile_controls_enabled=True,
         site_id=site_id,
         serials=serials,
         data={serial: {"sn": serial} for serial in serials},
@@ -276,6 +277,37 @@ async def test_grid_profile_browse_services_require_installer_access(
         {"force": True, "load_profiles": False},
     ]
     runtime.async_load_profiles.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_grid_profile_services_require_enabled_option(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    handlers = _register_service_handlers(hass, monkeypatch)
+    runtime = SimpleNamespace(
+        installer_access_confirmed=True,
+        async_refresh=AsyncMock(),
+        async_load_profiles=AsyncMock(),
+    )
+    coord = _fake_service_coordinator(site_id="grid-site", serials=set())
+    coord.grid_profile_controls_enabled = False
+    coord.grid_profile_runtime = runtime
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "grid-site", CONF_SITE_ONLY: True},
+        title="Grid Site",
+        unique_id="grid-site",
+    )
+    entry.add_to_hass(hass)
+    entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+
+    with pytest.raises(ServiceValidationError) as err:
+        await handlers[(DOMAIN, "browse_grid_profiles")](
+            SimpleNamespace(data={"site_id": "grid-site"})
+        )
+
+    assert err.value.translation_key == "grid_profile_controls_disabled"
+    runtime.async_refresh.assert_not_awaited()
 
 
 @pytest.mark.asyncio

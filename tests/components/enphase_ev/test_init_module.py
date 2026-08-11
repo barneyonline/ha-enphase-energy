@@ -65,6 +65,7 @@ from custom_components.enphase_ev.const import (
     ISSUE_AUTH_BLOCKED,
     ISSUE_TOO_MANY_ACTIVE_SESSIONS,
     OPT_API_TIMEOUT,
+    OPT_GRID_PROFILE_CONTROLS_ENABLED,
     OPT_WEATHER_ENABLED,
     OPT_VPP_EVENTS_ENABLED,
 )
@@ -163,7 +164,7 @@ async def test_config_entry_minor_migration_retires_grid_control_entities(
     )
     no_site.add_to_hass(hass)
     assert await async_migrate_entry(hass, no_site) is True
-    assert no_site.options == {}
+    assert no_site.options == {OPT_GRID_PROFILE_CONTROLS_ENABLED: False}
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -196,10 +197,31 @@ async def test_config_entry_minor_migration_retires_grid_control_entities(
     assert await async_migrate_entry(hass, entry) is True
 
     assert entry.version == 1
-    assert entry.minor_version == 2
-    assert entry.options == {"existing": True}
+    assert entry.minor_version == 3
+    assert entry.options == {
+        "existing": True,
+        OPT_GRID_PROFILE_CONTROLS_ENABLED: False,
+    }
     assert ent_reg.async_get(grid_mode.entity_id) is not None
     assert all(ent_reg.async_get(item.entity_id) is None for item in retired)
+
+    installer_entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "67890"},
+        version=1,
+        minor_version=2,
+    )
+    installer_entry.add_to_hass(hass)
+    ent_reg.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{DOMAIN}_site_67890_current_grid_profile",
+        config_entry=installer_entry,
+    )
+
+    assert await async_migrate_entry(hass, installer_entry) is True
+    assert installer_entry.minor_version == 3
+    assert installer_entry.options[OPT_GRID_PROFILE_CONTROLS_ENABLED] is True
 
 
 @pytest.mark.asyncio
@@ -831,6 +853,10 @@ async def test_async_setup_entry_uses_background_task_for_schedule_sync_start(
     hass: HomeAssistant, config_entry, monkeypatch
 ) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
+    hass.config_entries.async_update_entry(
+        config_entry,
+        options={OPT_GRID_PROFILE_CONTROLS_ENABLED: True},
+    )
 
     class DummyCoordinator:
         def __init__(self) -> None:

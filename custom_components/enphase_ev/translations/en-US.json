@@ -486,6 +486,9 @@
     },
     "grid_profile_unavailable": {
       "message": "Grid profile control is unavailable."
+    },
+    "grid_profile_controls_disabled": {
+      "message": "Enable installer Grid Profile controls in the integration options before using this action."
     }
   },
   "options": {
@@ -602,7 +605,8 @@
               "nominal_voltage": "EV Charger nominal voltage (V)",
               "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
               "microinverter_power_enabled": "Enable Microinverter Power",
-              "vpp_events_enabled": "Enable VPP events"
+              "vpp_events_enabled": "Enable VPP events",
+              "grid_profile_controls_enabled": "Enable installer Grid Profile controls"
             },
             "data_description": {
               "system_event_repair_issues": "Create Home Assistant Repairs for active Enphase standing alarms. Disabled by default.",
@@ -613,7 +617,8 @@
               "battery_schedules_enabled": "Manage IQ Battery schedules.",
               "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
               "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available.",
-              "vpp_events_enabled": "Fetch VPP/ELRP schedules from Enphase and create event entities only for enrolled sites. Disabled by default."
+              "vpp_events_enabled": "Fetch VPP/ELRP schedules from Enphase and create event entities only for enrolled sites. Disabled by default.",
+              "grid_profile_controls_enabled": "Fetch installer-only Grid Profile metadata and enable profile actions. Disabled by default."
             }
           }
         },
@@ -634,7 +639,8 @@
           "nominal_voltage": "EV Charger nominal voltage (V)",
           "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
           "microinverter_power_enabled": "Enable Microinverter Power",
-          "vpp_events_enabled": "Enable VPP events"
+          "vpp_events_enabled": "Enable VPP events",
+          "grid_profile_controls_enabled": "Enable installer Grid Profile controls"
         },
         "data_description": {
           "type_envoy": "Includes gateway connectivity and meter diagnostics.",
@@ -651,7 +657,8 @@
           "battery_schedules_enabled": "Manage IQ Battery schedules.",
           "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
           "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available.",
-          "vpp_events_enabled": "Fetch VPP/ELRP schedules from Enphase and create event entities only for enrolled sites. Disabled by default."
+          "vpp_events_enabled": "Fetch VPP/ELRP schedules from Enphase and create event entities only for enrolled sites. Disabled by default.",
+          "grid_profile_controls_enabled": "Fetch installer-only Grid Profile metadata and enable profile actions. Disabled by default."
         }
       },
       "repair_notifications": {

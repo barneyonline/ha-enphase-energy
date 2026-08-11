@@ -22,7 +22,7 @@ No local Gateway endpoints are used in v1.
 
 ## Runtime Design
 
-- Add an optional `activation_grid_profile` endpoint family with cooldown/backoff and suppressed non-installer failures.
+- Add an optional `activation_grid_profile` endpoint family with cooldown/backoff and suppressed non-installer failures. Do not probe it until the default-off installer Grid Profile controls option is enabled.
 - Bootstrap the short-lived Activation JWT from the authenticated
   `/systems/<site_id>/details` page that embeds `/app/activation_ui/`, keep it
   in memory only, and synchronize it into both the bearer header and
@@ -36,7 +36,7 @@ No local Gateway endpoints are used in v1.
 - Cache profile catalogs by `(country, region_code, commonly_used)`.
 - Search region code/name/group label/profile name/profile ID within the selected country only.
 - Keep staged region, list mode, staged profile, and pending cloud apply state in `GridProfileRuntime`.
-- Do not create grid-profile entities unless installer access is confirmed.
+- Do not create grid-profile entities unless the feature option is enabled and installer access is confirmed.
 
 ## Public Interfaces
 

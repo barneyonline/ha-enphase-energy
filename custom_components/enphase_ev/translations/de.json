@@ -486,6 +486,9 @@
     },
     "grid_profile_unavailable": {
       "message": "Die Netzprofil-Steuerung ist nicht verfügbar."
+    },
+    "grid_profile_controls_disabled": {
+      "message": "Aktiviere die Installateursteuerung für Netzprofile in den Integrationsoptionen, bevor du diese Aktion verwendest."
     }
   },
   "options": {
@@ -602,7 +605,8 @@
               "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)",
               "microinverter_lifetime_energy_enabled": "Lebensdauerenergie der Mikro-Wechselrichter aktivieren",
               "microinverter_power_enabled": "Leistung der Mikro-Wechselrichter aktivieren",
-              "vpp_events_enabled": "VPP-Ereignisse aktivieren"
+              "vpp_events_enabled": "VPP-Ereignisse aktivieren",
+              "grid_profile_controls_enabled": "Installateursteuerung für Netzprofile aktivieren"
             },
             "data_description": {
               "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert.",
@@ -613,7 +617,8 @@
               "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten.",
               "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
               "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist.",
-              "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert."
+              "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert.",
+              "grid_profile_controls_enabled": "Ruft nur für Installateure verfügbare Netzprofil-Metadaten ab und aktiviert Profilaktionen. Standardmäßig deaktiviert."
             }
           }
         },
@@ -634,7 +639,8 @@
           "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)",
           "microinverter_lifetime_energy_enabled": "Lebensdauerenergie der Mikro-Wechselrichter aktivieren",
           "microinverter_power_enabled": "Leistung der Mikro-Wechselrichter aktivieren",
-          "vpp_events_enabled": "VPP-Ereignisse aktivieren"
+          "vpp_events_enabled": "VPP-Ereignisse aktivieren",
+          "grid_profile_controls_enabled": "Installateursteuerung für Netzprofile aktivieren"
         },
         "data_description": {
           "type_envoy": "Enthält Gateway-Konnektivitäts- und Zählerdiagnosen.",
@@ -651,7 +657,8 @@
           "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten.",
           "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
           "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist.",
-          "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert."
+          "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert.",
+          "grid_profile_controls_enabled": "Ruft nur für Installateure verfügbare Netzprofil-Metadaten ab und aktiviert Profilaktionen. Standardmäßig deaktiviert."
         }
       },
       "repair_notifications": {

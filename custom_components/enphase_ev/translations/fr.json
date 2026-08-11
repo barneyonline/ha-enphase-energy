@@ -486,6 +486,9 @@
     },
     "grid_profile_unavailable": {
       "message": "Le contrôle du profil réseau est indisponible."
+    },
+    "grid_profile_controls_disabled": {
+      "message": "Activez les contrôles du profil réseau installateur dans les options de l'intégration avant d'utiliser cette action."
     }
   },
   "options": {
@@ -602,7 +605,8 @@
               "nominal_voltage": "Tension nominale du chargeur EV (V)",
               "microinverter_lifetime_energy_enabled": "Activer l’énergie totale des micro-onduleurs",
               "microinverter_power_enabled": "Activer la puissance des micro-onduleurs",
-              "vpp_events_enabled": "Activer les événements VPP"
+              "vpp_events_enabled": "Activer les événements VPP",
+              "grid_profile_controls_enabled": "Activer les contrôles du profil réseau installateur"
             },
             "data_description": {
               "system_event_repair_issues": "Crée des réparations Home Assistant pour les alarmes permanentes Enphase actives. Désactivé par défaut.",
@@ -613,7 +617,8 @@
               "battery_schedules_enabled": "Gérer les programmes de l’IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Active tous les capteurs d’énergie totale par micro-onduleur.",
               "microinverter_power_enabled": "Active tous les capteurs de puissance par micro-onduleur lorsque la télémétrie installateur est disponible.",
-              "vpp_events_enabled": "Récupère les calendriers VPP/ELRP auprès d’Enphase et crée des entités d’événement uniquement pour les sites inscrits. Désactivé par défaut."
+              "vpp_events_enabled": "Récupère les calendriers VPP/ELRP auprès d’Enphase et crée des entités d’événement uniquement pour les sites inscrits. Désactivé par défaut.",
+              "grid_profile_controls_enabled": "Récupère les métadonnées du profil réseau réservées aux installateurs et active les actions de profil. Désactivé par défaut."
             }
           }
         },
@@ -634,7 +639,8 @@
           "nominal_voltage": "Tension nominale du chargeur EV (V)",
           "microinverter_lifetime_energy_enabled": "Activer l’énergie totale des micro-onduleurs",
           "microinverter_power_enabled": "Activer la puissance des micro-onduleurs",
-          "vpp_events_enabled": "Activer les événements VPP"
+          "vpp_events_enabled": "Activer les événements VPP",
+          "grid_profile_controls_enabled": "Activer les contrôles du profil réseau installateur"
         },
         "data_description": {
           "type_envoy": "Inclut la connectivité de la passerelle et les diagnostics de compteurs.",
@@ -651,7 +657,8 @@
           "battery_schedules_enabled": "Gérer les programmes de l’IQ Battery.",
           "microinverter_lifetime_energy_enabled": "Active tous les capteurs d’énergie totale par micro-onduleur.",
           "microinverter_power_enabled": "Active tous les capteurs de puissance par micro-onduleur lorsque la télémétrie installateur est disponible.",
-          "vpp_events_enabled": "Récupère les calendriers VPP/ELRP auprès d’Enphase et crée des entités d’événement uniquement pour les sites inscrits. Désactivé par défaut."
+          "vpp_events_enabled": "Récupère les calendriers VPP/ELRP auprès d’Enphase et crée des entités d’événement uniquement pour les sites inscrits. Désactivé par défaut.",
+          "grid_profile_controls_enabled": "Récupère les métadonnées du profil réseau réservées aux installateurs et active les actions de profil. Désactivé par défaut."
         }
       },
       "repair_notifications": {

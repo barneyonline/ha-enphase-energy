@@ -29,6 +29,8 @@ from .const import (
     CONF_SITE_NAME,
     CONF_SITE_ONLY,
     DOMAIN,
+    DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
+    OPT_GRID_PROFILE_CONTROLS_ENABLED,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_MICROINVERTER_POWER_ENABLED,
     OPT_WEATHER_ENABLED,
@@ -87,6 +89,7 @@ _LOGGER = logging.getLogger(__name__)
 _RUNTIME_HANDOFF_KEY = f"{DOMAIN}_runtime_handoffs"
 _RELOAD_REQUIRED_OPTION_KEYS = frozenset(
     {
+        OPT_GRID_PROFILE_CONTROLS_ENABLED,
         OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
         OPT_MICROINVERTER_POWER_ENABLED,
         OPT_WEATHER_ENABLED,
@@ -267,6 +270,26 @@ async def async_migrate_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) ->
             options=options,
             version=1,
             minor_version=2,
+        )
+    if entry.minor_version < 3:
+        options = dict(entry.options)
+        if OPT_GRID_PROFILE_CONTROLS_ENABLED not in options:
+            site_id = str(entry.data.get("site_id", "") or "").strip()
+            ent_reg = er.async_get(hass)
+            current_profile_entity_id = None
+            if site_id:
+                current_profile_entity_id = find_entity_id_by_unique_id(
+                    ent_reg,
+                    "sensor",
+                    f"{DOMAIN}_site_{site_id}_current_grid_profile",
+                    entry_id=entry.entry_id,
+                )
+            options[OPT_GRID_PROFILE_CONTROLS_ENABLED] = bool(current_profile_entity_id)
+        hass.config_entries.async_update_entry(
+            entry,
+            options=options,
+            version=1,
+            minor_version=3,
         )
     return True
 
@@ -1966,7 +1989,13 @@ async def _async_setup_entry_impl(
     grid_profile_startup_probe = getattr(
         coord, "async_refresh_grid_profile_metadata", None
     )
-    if callable(grid_profile_startup_probe):
+    grid_profile_controls_enabled = bool(
+        entry.options.get(
+            OPT_GRID_PROFILE_CONTROLS_ENABLED,
+            DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
+        )
+    )
+    if grid_profile_controls_enabled and callable(grid_profile_startup_probe):
         _schedule_background_task(
             grid_profile_startup_probe(force=True),
             f"{DOMAIN}_grid_profile_startup_probe",

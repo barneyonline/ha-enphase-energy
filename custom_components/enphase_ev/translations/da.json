@@ -486,6 +486,9 @@
     },
     "grid_profile_unavailable": {
       "message": "Netprofilstyring er ikke tilgængelig."
+    },
+    "grid_profile_controls_disabled": {
+      "message": "Aktivér installatørstyring af netprofil i integrationsindstillingerne, før du bruger denne handling."
     }
   },
   "options": {
@@ -602,7 +605,8 @@
               "nominal_voltage": "EV-opladerens nominelle spænding (V)",
               "microinverter_lifetime_energy_enabled": "Aktivér mikroinverteres levetidsenergi",
               "microinverter_power_enabled": "Aktivér mikroinvertereffekt",
-              "vpp_events_enabled": "Aktivér VPP-hændelser"
+              "vpp_events_enabled": "Aktivér VPP-hændelser",
+              "grid_profile_controls_enabled": "Aktivér installatørstyring af netprofil"
             },
             "data_description": {
               "system_event_repair_issues": "Opretter Home Assistant-reparationer for aktive stående Enphase-alarmer. Deaktiveret som standard.",
@@ -613,7 +617,8 @@
               "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi pr. mikroinverter.",
               "microinverter_power_enabled": "Aktiverer alle effektsensorer pr. mikroinverter, når installatørtelemetri er tilgængelig.",
-              "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og opretter kun hændelsesenheder for tilmeldte anlæg. Deaktiveret som standard."
+              "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og opretter kun hændelsesenheder for tilmeldte anlæg. Deaktiveret som standard.",
+              "grid_profile_controls_enabled": "Henter metadata for netprofiler, som kun er tilgængelige for installatører, og aktiverer profilhandlinger. Deaktiveret som standard."
             }
           }
         },
@@ -634,7 +639,8 @@
           "nominal_voltage": "EV-opladerens nominelle spænding (V)",
           "microinverter_lifetime_energy_enabled": "Aktivér mikroinverteres levetidsenergi",
           "microinverter_power_enabled": "Aktivér mikroinvertereffekt",
-          "vpp_events_enabled": "Aktivér VPP-hændelser"
+          "vpp_events_enabled": "Aktivér VPP-hændelser",
+          "grid_profile_controls_enabled": "Aktivér installatørstyring af netprofil"
         },
         "data_description": {
           "type_envoy": "Inkluderer gateway-forbindelse og målerdiagnostik.",
@@ -651,7 +657,8 @@
           "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery.",
           "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi pr. mikroinverter.",
           "microinverter_power_enabled": "Aktiverer alle effektsensorer pr. mikroinverter, når installatørtelemetri er tilgængelig.",
-          "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og opretter kun hændelsesenheder for tilmeldte anlæg. Deaktiveret som standard."
+          "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og opretter kun hændelsesenheder for tilmeldte anlæg. Deaktiveret som standard.",
+          "grid_profile_controls_enabled": "Henter metadata for netprofiler, som kun er tilgængelige for installatører, og aktiverer profilhandlinger. Deaktiveret som standard."
         }
       },
       "repair_notifications": {

@@ -486,6 +486,9 @@
     },
     "grid_profile_unavailable": {
       "message": "Sterowanie profilem sieci jest niedostępne."
+    },
+    "grid_profile_controls_disabled": {
+      "message": "Przed użyciem tej czynności włącz sterowanie profilem sieci dla instalatora w opcjach integracji."
     }
   },
   "options": {
@@ -602,7 +605,8 @@
               "nominal_voltage": "Napięcie znamionowe ładowarki EV (V)",
               "microinverter_lifetime_energy_enabled": "Włącz energię całkowitą mikroinwerterów",
               "microinverter_power_enabled": "Włącz moc mikroinwerterów",
-              "vpp_events_enabled": "Włącz zdarzenia VPP"
+              "vpp_events_enabled": "Włącz zdarzenia VPP",
+              "grid_profile_controls_enabled": "Włącz sterowanie profilem sieci dla instalatora"
             },
             "data_description": {
               "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone.",
@@ -613,7 +617,8 @@
               "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
               "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna.",
-              "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone."
+              "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone.",
+              "grid_profile_controls_enabled": "Pobiera metadane profilu sieci dostępne tylko dla instalatora i włącza działania na profilach. Domyślnie wyłączone."
             }
           }
         },
@@ -634,7 +639,8 @@
           "nominal_voltage": "Napięcie znamionowe ładowarki EV (V)",
           "microinverter_lifetime_energy_enabled": "Włącz energię całkowitą mikroinwerterów",
           "microinverter_power_enabled": "Włącz moc mikroinwerterów",
-          "vpp_events_enabled": "Włącz zdarzenia VPP"
+          "vpp_events_enabled": "Włącz zdarzenia VPP",
+          "grid_profile_controls_enabled": "Włącz sterowanie profilem sieci dla instalatora"
         },
         "data_description": {
           "type_envoy": "Zawiera diagnostykę łączności bramy i liczników.",
@@ -651,7 +657,8 @@
           "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery.",
           "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
           "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna.",
-          "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone."
+          "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone.",
+          "grid_profile_controls_enabled": "Pobiera metadane profilu sieci dostępne tylko dla instalatora i włącza działania na profilach. Domyślnie wyłączone."
         }
       },
       "repair_notifications": {

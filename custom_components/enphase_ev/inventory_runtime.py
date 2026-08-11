@@ -3422,6 +3422,7 @@ class InventoryRuntime:
         successful_parameter_count = 0
         updated_parameter_count = 0
         first_error: Exception | None = None
+        rate_limit_error: Exception | None = None
         telemetry_by_serial = {
             serial: value
             for serial, value in cached_by_serial.items()
@@ -3433,6 +3434,11 @@ class InventoryRuntime:
             canonical = INVERTER_PARAMETER_ALIASES[parameter_id.lower()]
             if isinstance(result, Exception):
                 first_error = first_error or result
+                if (
+                    rate_limit_error is None
+                    and coord._endpoint_family_status_from_error(result) == 429
+                ):
+                    rate_limit_error = result
                 failed_pairs.update((serial, canonical) for serial in serials)
                 continue
             assert isinstance(result, InverterParameterFetchResult)
@@ -3440,6 +3446,11 @@ class InventoryRuntime:
                 successful_parameter_count += 1
             else:
                 first_error = first_error or result.error
+                if (
+                    rate_limit_error is None
+                    and coord._endpoint_family_status_from_error(result.error) == 429
+                ):
+                    rate_limit_error = result.error
                 failed_pairs.update(
                     (serial, canonical)
                     for serial in set(serials) - result.authoritative_serials
@@ -3494,30 +3505,37 @@ class InventoryRuntime:
         batch_error = first_error or ValueError(
             "Dashboard parameter readings were unavailable"
         )
+        reported_error = (
+            rate_limit_error
+            if updated_parameter_count and rate_limit_error is not None
+            else batch_error
+        )
         safe_batch_error = redact_text(
-            batch_error,
+            reported_error,
             site_ids=(coord.site_id,),
             identifiers=serials,
             max_length=160,
         )
+        batch_status = coord._endpoint_family_status_from_error(reported_error)
+        if batch_status == 429:
+            # aiohttp includes the request URL in ClientResponseError.__str__.
+            # Keep entity attributes concise and avoid exposing endpoint details.
+            safe_batch_error = "Enphase rate limit (HTTP 429)"
         if updated_parameter_count:
-            coord._note_endpoint_family_success(telemetry_family)
+            if rate_limit_error is not None:
+                coord._note_endpoint_family_failure(
+                    telemetry_family,
+                    rate_limit_error,
+                )
+            else:
+                coord._note_endpoint_family_success(telemetry_family)
             telemetry_health.last_error = safe_batch_error
             telemetry_health.degraded = bool(failed_cache_stale or not useful_telemetry)
             telemetry_health.partial_success = True
         else:
             coord._note_endpoint_family_failure(telemetry_family, batch_error)
             telemetry_health.last_error = safe_batch_error
-            failure_threshold = (
-                int(policy.suppress_after_failures)
-                if policy is not None and policy.suppress_after_failures is not None
-                else 1
-            )
-            telemetry_health.degraded = bool(
-                failed_cache_stale
-                or not useful_telemetry
-                or telemetry_health.consecutive_failures >= failure_threshold
-            )
+            telemetry_health.degraded = bool(failed_cache_stale or not useful_telemetry)
             telemetry_health.partial_success = False
         telemetry_health.successful_items = successful_parameter_count
         telemetry_health.total_items = len(parameter_ids)

@@ -88,6 +88,17 @@ def test_endpoint_family_failure_classification_and_core_backoff(
     assert (
         coord._endpoint_family_policy("inverter_production").success_ttl_s == 600.0
     )  # noqa: SLF001
+    telemetry_policy = coord._endpoint_family_policy(  # noqa: SLF001
+        "inverter_parameter_telemetry"
+    )
+    assert telemetry_policy.success_ttl_s == 900.0
+    assert telemetry_policy.failure_backoff_schedule_s == (
+        3600.0,
+        7200.0,
+        14400.0,
+        21600.0,
+    )
+    assert telemetry_policy.max_backoff_s == 21600.0
 
     err_404 = aiohttp.ClientResponseError(
         _request_info(),
@@ -330,6 +341,60 @@ def test_grid_profile_failure_does_not_degrade_service(
     assert metrics["degraded_endpoint_families"] == []
     assert "activation_grid_profile" not in metrics["degraded_services"]
     assert "activation_grid_profile" not in metrics["endpoint_failure_details"]
+
+
+def test_grid_mode_status_uses_fresh_cache_before_reporting_degraded(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    monkeypatch.setattr(coord_mod.random, "uniform", lambda _a, _b: 1.0)
+    coord._note_endpoint_family_success("grid_mode_status")  # noqa: SLF001
+    coord._note_endpoint_family_failure(  # noqa: SLF001
+        "grid_mode_status",
+        OptionalEndpointUnavailable("live grid relay temporarily unavailable"),
+    )
+
+    metrics = coord.collect_site_metrics()
+    health = metrics["endpoint_family_health"]["grid_mode_status"]
+    assert health["degraded"] is False
+    assert health["using_cached_data"] is True
+    assert health["cache_stale"] is False
+    assert metrics["degraded_endpoint_families"] == []
+
+    coord._endpoint_family_state(  # noqa: SLF001
+        "grid_mode_status"
+    ).last_success_mono = (coord_mod.time.monotonic() - 361)
+    metrics = coord.collect_site_metrics()
+    health = metrics["endpoint_family_health"]["grid_mode_status"]
+    assert health["degraded"] is True
+    assert health["using_cached_data"] is False
+    assert health["cache_stale"] is True
+    assert metrics["degraded_endpoint_families"] == ["grid_mode_status"]
+
+    coord._endpoint_family_can_use_stale = MagicMock(  # type: ignore[method-assign]
+        side_effect=RuntimeError("stale check unavailable")
+    )
+    metrics = coord.collect_site_metrics()
+    assert metrics["endpoint_family_health"]["grid_mode_status"]["degraded"] is True
+
+
+def test_endpoint_failure_history_is_bounded_and_redacted(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    monkeypatch.setattr(coord_mod.random, "uniform", lambda _a, _b: 1.0)
+
+    for index in range(coord_mod.ENDPOINT_FAILURE_HISTORY_LIMIT + 2):
+        coord._note_endpoint_family_failure(  # noqa: SLF001
+            "battery_status",
+            OptionalEndpointUnavailable(f"site {coord.site_id} failure {index}"),
+        )
+
+    history = coord.collect_site_metrics()["endpoint_failure_history"]
+    assert len(history) == coord_mod.ENDPOINT_FAILURE_HISTORY_LIMIT
+    assert history[0]["reason"].endswith("failure 2")
+    assert history[-1]["reason"].endswith("failure 21")
+    assert all(str(coord.site_id) not in str(item) for item in history)
 
 
 def test_degraded_endpoint_family_rollup_tolerates_unexpected_health(

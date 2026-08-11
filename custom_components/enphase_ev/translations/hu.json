@@ -486,6 +486,9 @@
     },
     "grid_profile_unavailable": {
       "message": "A hálózati profil vezérlése nem érhető el."
+    },
+    "grid_profile_controls_disabled": {
+      "message": "A művelet használata előtt engedélyezze a telepítői hálózati profilvezérlést az integráció beállításaiban."
     }
   },
   "options": {
@@ -602,7 +605,8 @@
               "nominal_voltage": "EV-töltő névleges feszültsége (V)",
               "microinverter_lifetime_energy_enabled": "Mikroinverterek teljes élettartam-energiájának engedélyezése",
               "microinverter_power_enabled": "Mikroinverterek teljesítményének engedélyezése",
-              "vpp_events_enabled": "VPP-események engedélyezése"
+              "vpp_events_enabled": "VPP-események engedélyezése",
+              "grid_profile_controls_enabled": "Telepítői hálózati profilvezérlés engedélyezése"
             },
             "data_description": {
               "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva.",
@@ -613,7 +617,8 @@
               "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése.",
               "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
               "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria.",
-              "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva."
+              "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva.",
+              "grid_profile_controls_enabled": "Lekéri a csak telepítők számára elérhető hálózatiprofil-metaadatokat, és engedélyezi a profilműveleteket. Alapértelmezés szerint letiltva."
             }
           }
         },
@@ -634,7 +639,8 @@
           "nominal_voltage": "EV-töltő névleges feszültsége (V)",
           "microinverter_lifetime_energy_enabled": "Mikroinverterek teljes élettartam-energiájának engedélyezése",
           "microinverter_power_enabled": "Mikroinverterek teljesítményének engedélyezése",
-          "vpp_events_enabled": "VPP-események engedélyezése"
+          "vpp_events_enabled": "VPP-események engedélyezése",
+          "grid_profile_controls_enabled": "Telepítői hálózati profilvezérlés engedélyezése"
         },
         "data_description": {
           "type_envoy": "Tartalmazza az átjáró-kapcsolat és a mérők diagnosztikáját.",
@@ -651,7 +657,8 @@
           "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése.",
           "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
           "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria.",
-          "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva."
+          "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva.",
+          "grid_profile_controls_enabled": "Lekéri a csak telepítők számára elérhető hálózatiprofil-metaadatokat, és engedélyezi a profilműveleteket. Alapértelmezés szerint letiltva."
         }
       },
       "repair_notifications": {

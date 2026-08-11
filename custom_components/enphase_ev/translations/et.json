@@ -486,6 +486,9 @@
     },
     "grid_profile_unavailable": {
       "message": "Võrguprofiili juhtimine pole saadaval."
+    },
+    "grid_profile_controls_disabled": {
+      "message": "Enne selle toimingu kasutamist lubage integratsiooni suvandites paigaldaja võrguprofiili juhtelemendid."
     }
   },
   "options": {
@@ -602,7 +605,8 @@
               "nominal_voltage": "EV-laadija nimipinge (V)",
               "microinverter_lifetime_energy_enabled": "Luba mikroinverterite koguenergia",
               "microinverter_power_enabled": "Luba mikroinverterite võimsus",
-              "vpp_events_enabled": "Luba VPP sündmused"
+              "vpp_events_enabled": "Luba VPP sündmused",
+              "grid_profile_controls_enabled": "Paigaldaja võrguprofiili juhtelementide lubamine"
             },
             "data_description": {
               "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud.",
@@ -613,7 +617,8 @@
               "battery_schedules_enabled": "Halda IQ Battery ajakavasid.",
               "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
               "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval.",
-              "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud."
+              "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud.",
+              "grid_profile_controls_enabled": "Hangib ainult paigaldajale mõeldud võrguprofiili metaandmed ja lubab profiilitoimingud. Vaikimisi keelatud."
             }
           }
         },
@@ -634,7 +639,8 @@
           "nominal_voltage": "EV-laadija nimipinge (V)",
           "microinverter_lifetime_energy_enabled": "Luba mikroinverterite koguenergia",
           "microinverter_power_enabled": "Luba mikroinverterite võimsus",
-          "vpp_events_enabled": "Luba VPP sündmused"
+          "vpp_events_enabled": "Luba VPP sündmused",
+          "grid_profile_controls_enabled": "Paigaldaja võrguprofiili juhtelementide lubamine"
         },
         "data_description": {
           "type_envoy": "Sisaldab lüüsi ühenduvuse ja arvestite diagnostikat.",
@@ -651,7 +657,8 @@
           "battery_schedules_enabled": "Halda IQ Battery ajakavasid.",
           "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
           "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval.",
-          "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud."
+          "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud.",
+          "grid_profile_controls_enabled": "Hangib ainult paigaldajale mõeldud võrguprofiili metaandmed ja lubab profiilitoimingud. Vaikimisi keelatud."
         }
       },
       "repair_notifications": {

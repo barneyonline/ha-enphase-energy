@@ -8,13 +8,23 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
-- None
+- Added a default-off Device Features option for installer-only Grid Profile
+  controls. Disabled entries no longer probe Enphase Activation, while migration
+  preserves the feature for entries with an existing Current Grid Profile entity.
 
 ### 🐛 Bug fixes
-- None
+- Kept Service Status healthy when a transient Grid Mode status failure can reuse
+  a fresh cached grid state; degradation now begins only after that data is stale.
+- Kept optional inverter parameter telemetry rate limits from degrading the
+  overall cloud service, and retained fresh cached readings until they expire.
 
 ### 🔧 Improvements
-- None
+- Extended owner-access Grid Profile retry backoff from hourly polling to one
+  hour, six hours, then daily when the optional feature is enabled.
+- Added a bounded, redacted endpoint failure history to config-entry diagnostics
+  so recovered optional-service failures retain their cause and retry timing.
+- Reduced inverter parameter telemetry request pressure and replaced verbose HTTP
+  429 entity details with a concise, URL-free rate-limit summary.
 
 ### 🔄 Other changes
 - None

@@ -86,6 +86,7 @@ from .const import (
     DEFAULT_API_TIMEOUT,
     DEFAULT_DEGRADED_SERVICE_REPAIR_ISSUES,
     DEFAULT_FAST_POLL_INTERVAL,
+    DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
     DEFAULT_PRICING_EDITS_ENABLED,
     DEFAULT_SCHEDULE_SYNC_ENABLED,
     DEFAULT_SCAN_INTERVAL,
@@ -110,6 +111,7 @@ from .const import (
     OPT_API_TIMEOUT,
     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
     OPT_FAST_POLL_INTERVAL,
+    OPT_GRID_PROFILE_CONTROLS_ENABLED,
     OPT_NOMINAL_VOLTAGE,
     OPT_PRICING_EDITS_ENABLED,
     OPT_SCHEDULE_SYNC_ENABLED,
@@ -145,7 +147,11 @@ from .evse_runtime import (
     evse_power_is_actively_charging,
 )
 from .evse_power import build_evse_power_snapshot
-from .grid_profile_runtime import SUPPORT_UNKNOWN, GridProfileRuntime
+from .grid_profile_runtime import (
+    ACTIVATION_GRID_PROFILE_FAMILY,
+    SUPPORT_UNKNOWN,
+    GridProfileRuntime,
+)
 from .heatpump_runtime import HeatpumpRuntime
 from .inventory_runtime import CoordinatorTopologySnapshot, InventoryRuntime
 from .inventory_view import InventoryView
@@ -259,6 +265,7 @@ SESSION_HISTORY_RECENT_STOP_SOFT_TTL_S = 300.0
 SESSION_HISTORY_IDLE_HARD_TTL_GRACE_S = 300.0
 SESSION_HISTORY_RECENT_STOP_WINDOW_S = 600.0
 GRID_PROFILE_METADATA_REFRESH_DEADLINE_S = 15.0
+ENDPOINT_FAILURE_HISTORY_LIMIT = 20
 RUNTIME_CLEANUP_TIMEOUT_S = 10.0
 EVSE_EMPTY_STATUS_CONFIRMATIONS = 3
 BATTERY_GRID_MODE_PERMISSIONS = {
@@ -1406,6 +1413,26 @@ class EnphaseCoordinator(
             self.vpp_runtime.clear()
             self._endpoint_family_health.pop(VPP_ENROLLMENT_ENDPOINT_FAMILY, None)
             self._endpoint_family_health.pop(VPP_EVENTS_ENDPOINT_FAMILY, None)
+        grid_profile_enabled = bool(
+            options.get(
+                OPT_GRID_PROFILE_CONTROLS_ENABLED,
+                DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
+            )
+        )
+        grid_profile_was_enabled = bool(
+            previous_options.get(
+                OPT_GRID_PROFILE_CONTROLS_ENABLED,
+                DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
+            )
+        )
+        if not grid_profile_enabled or not grid_profile_was_enabled:
+            self._endpoint_family_health.pop(ACTIVATION_GRID_PROFILE_FAMILY, None)
+        if not grid_profile_enabled:
+            metadata_task = self._grid_profile_metadata_task
+            if metadata_task is not None and not metadata_task.done():
+                metadata_task.cancel()
+            self._grid_profile_metadata_task = None
+            self.grid_profile_runtime.cancel_pending_refresh()
 
         schedule_sync_changed = bool(
             previous_options.get(
@@ -1554,8 +1581,8 @@ class EnphaseCoordinator(
             "activation_grid_profile": EndpointFamilyPolicy(
                 success_ttl_s=300.0,
                 stale_after_s=3600.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
+                failure_backoff_schedule_s=(3600.0, 21600.0, 86400.0),
+                max_backoff_s=86400.0,
                 optional=True,
                 suppress_after_failures=3,
                 support_state_on_success=True,
@@ -1685,10 +1712,10 @@ class EnphaseCoordinator(
                 support_state_on_success=True,
             ),
             "inverter_parameter_telemetry": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
+                success_ttl_s=900.0,
                 stale_after_s=1800.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
+                failure_backoff_schedule_s=(3600.0, 7200.0, 14400.0, 21600.0),
+                max_backoff_s=21600.0,
                 optional=True,
                 suppress_after_failures=3,
                 support_state_on_success=True,
@@ -1950,6 +1977,20 @@ class EnphaseCoordinator(
             health.next_retry_utc = now_utc + timedelta(seconds=delay)
         except Exception:
             health.next_retry_utc = None
+        self._endpoint_failure_history.append(
+            {
+                "family": family,
+                "failed_utc": now_utc.isoformat(),
+                "status": status,
+                "reason": health.last_error,
+                "retry_utc": (
+                    health.next_retry_utc.isoformat()
+                    if isinstance(health.next_retry_utc, datetime)
+                    else None
+                ),
+            }
+        )
+        del self._endpoint_failure_history[:-ENDPOINT_FAILURE_HISTORY_LIMIT]
         self._log_endpoint_family_transition(
             family,
             previous_wait_active=previous_wait_active,
@@ -4002,6 +4043,8 @@ class EnphaseCoordinator(
     async def async_refresh_grid_profile_metadata(self, *, force: bool = False) -> None:
         """Refresh optional grid-profile status outside the core pipeline."""
 
+        if not self.grid_profile_controls_enabled:
+            return
         runtime = self.grid_profile_runtime
         refresh = getattr(runtime, "async_refresh", None)
         if not callable(refresh):
@@ -4030,7 +4073,7 @@ class EnphaseCoordinator(
     ) -> None:
         """Schedule optional grid-profile status without delaying core state."""
 
-        if context.first_refresh:
+        if context.first_refresh or not self.grid_profile_controls_enabled:
             return
         runtime = self.grid_profile_runtime
         if getattr(runtime, "support_state", SUPPORT_UNKNOWN) == SUPPORT_UNKNOWN:
@@ -7590,6 +7633,21 @@ class EnphaseCoordinator(
         """Return whether tariff editing controls and writes are enabled."""
 
         return bool(getattr(self, "_pricing_edits_enabled", True))
+
+    @property
+    def grid_profile_controls_enabled(self) -> bool:
+        """Return whether installer-only cloud Grid Profile controls are enabled."""
+
+        config_entry = self.config_entry
+        options = (
+            getattr(config_entry, "options", {}) if config_entry is not None else {}
+        )
+        return bool(
+            options.get(
+                OPT_GRID_PROFILE_CONTROLS_ENABLED,
+                DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
+            )
+        )
 
     @property
     def grid_toggle_blocked_reasons(self) -> list[str]:
