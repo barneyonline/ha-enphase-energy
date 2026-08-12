@@ -8,6 +8,23 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v4.2.3 - 2026-08-12
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
 - Added a default-off Device Features option for installer-only Grid Profile
   controls. Disabled entries no longer probe Enphase Activation, while migration
   preserves the feature for entries with an existing Current Grid Profile entity.
@@ -29,7 +46,7 @@ All notable changes to this project will be documented in this file.
   429 entity details with a concise, URL-free rate-limit summary.
 
 ### 🔄 Other changes
-- None
+- Bumped the integration manifest version to `4.2.3`.
 
 ## v4.2.2 - 2026-08-09
 
