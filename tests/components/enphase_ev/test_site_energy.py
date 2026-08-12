@@ -585,6 +585,68 @@ def test_site_consumption_power_ignores_historical_bucket_corrections(
     assert sensor.native_value == 1200
 
 
+def test_site_consumption_power_reseeds_after_zero_lifetime_dropout(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    base_ts = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(minutes=20)
+
+    first, _ = coord.energy._aggregate_site_energy(  # noqa: SLF001
+        {
+            "consumption": [1000.0, 2000.0],
+            "last_report_date": base_ts.timestamp(),
+            "interval_minutes": 5,
+        }
+    )
+    coord.energy.site_energy = first
+    assert sensor.native_value is None
+
+    second, _ = coord.energy._aggregate_site_energy(  # noqa: SLF001
+        {
+            "consumption": [1000.0, 2100.0],
+            "last_report_date": (base_ts + timedelta(minutes=5)).timestamp(),
+            "interval_minutes": 5,
+        }
+    )
+    coord.energy.site_energy = second
+    assert sensor.native_value == 1200
+
+    dropout, _ = coord.energy._aggregate_site_energy(  # noqa: SLF001
+        {
+            "consumption": [0.0, 0.0],
+            "last_report_date": (base_ts + timedelta(minutes=10)).timestamp(),
+            "interval_minutes": 5,
+        }
+    )
+    coord.energy.site_energy = dropout
+    assert dropout["consumption"].value_kwh == pytest.approx(3.1)
+    assert sensor.native_value is None
+    assert sensor.extra_state_attributes["method"] == "invalid_bucket"
+
+    recovered, _ = coord.energy._aggregate_site_energy(  # noqa: SLF001
+        {
+            "consumption": [1000.0, 2200.0],
+            "last_report_date": (base_ts + timedelta(minutes=15)).timestamp(),
+            "interval_minutes": 5,
+        }
+    )
+    coord.energy.site_energy = recovered
+    assert recovered["consumption"].last_reset_at is None
+    assert sensor.native_value is None
+    assert sensor.extra_state_attributes["method"] == "seeded"
+
+    next_sample, _ = coord.energy._aggregate_site_energy(  # noqa: SLF001
+        {
+            "consumption": [1000.0, 2300.0],
+            "last_report_date": (base_ts + timedelta(minutes=20)).timestamp(),
+            "interval_minutes": 5,
+        }
+    )
+    coord.energy.site_energy = next_sample
+    assert sensor.native_value == 1200
+
+
 def test_site_consumption_power_handles_bucket_rollover(coordinator_factory) -> None:
     coord = coordinator_factory()
     sensor = EnphaseSiteConsumptionPowerSensor(coord)
@@ -1510,6 +1572,109 @@ def test_site_energy_guard_confirms_reset(coordinator_factory) -> None:
     flows_reset, _ = coord.energy._aggregate_site_energy(drop_payload)  # noqa: SLF001
     assert flows_reset["solar_production"].value_kwh == pytest.approx(0.1)
     assert flows_reset["solar_production"].last_reset_at is not None
+
+
+def test_site_energy_zero_consumption_holds_positive_lifetime_baseline(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    healthy = {
+        "consumption": [4000.0, 3_500_000.0],
+        "start_date": "2023-08-10",
+        "last_report_date": 1_700_000_001,
+        "update_pending": False,
+        "interval_minutes": 5,
+    }
+    flows, _ = coord.energy._aggregate_site_energy(healthy)  # noqa: SLF001
+    coord.energy.site_energy = flows
+
+    for report_date in (1_700_000_301, 1_700_000_601, 1_700_000_901):
+        coord.energy._site_energy_force_refresh = False  # noqa: SLF001
+        held, _ = coord.energy._aggregate_site_energy(  # noqa: SLF001
+            {
+                **healthy,
+                "consumption": [0.0, 0.0],
+                "last_report_date": report_date,
+            }
+        )
+        coord.energy.site_energy = held
+
+        consumption = held["consumption"]
+        assert consumption.value_kwh == pytest.approx(3504.0)
+        assert consumption.last_reset_at is None
+        assert consumption.bucket_count == 2
+        assert consumption.latest_bucket_wh is None
+        assert consumption.previous_bucket_wh is None
+        assert consumption.raw_bucket_count == 0
+        assert coord.energy._site_energy_force_refresh is False  # noqa: SLF001
+
+    recovered, _ = coord.energy._aggregate_site_energy(  # noqa: SLF001
+        {
+            **healthy,
+            "consumption": [4100.0, 3_500_100.0],
+            "last_report_date": 1_700_001_201,
+        }
+    )
+    assert recovered["consumption"].value_kwh == pytest.approx(3504.2)
+    assert recovered["consumption"].last_reset_at is None
+
+
+def test_site_energy_zero_consumption_uses_guard_baseline_without_previous_flow(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    healthy, _ = coord.energy._aggregate_site_energy(  # noqa: SLF001
+        {"consumption": [4000.0, 3_500_000.0], "interval_minutes": 5}
+    )
+    assert healthy["consumption"].value_kwh == pytest.approx(3504.0)
+    coord.energy.site_energy = {}
+
+    held, _ = coord.energy._aggregate_site_energy(  # noqa: SLF001
+        {"consumption": [0.0, 0.0], "interval_minutes": 5}
+    )
+
+    assert held["consumption"].value_kwh == pytest.approx(3504.0)
+    assert held["consumption"].last_reset_at is None
+    assert held["consumption"].raw_bucket_count == 0
+
+
+def test_site_energy_initial_zero_consumption_keeps_bucket_metadata(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+
+    flows, _ = coord.energy._aggregate_site_energy(  # noqa: SLF001
+        {"consumption": [0.0, 0.0], "interval_minutes": 5}
+    )
+
+    consumption = flows["consumption"]
+    assert consumption.value_kwh == 0.0
+    assert consumption.latest_bucket_wh == 0.0
+    assert consumption.previous_bucket_wh == 0.0
+    assert consumption.raw_bucket_count == 2
+
+
+def test_site_energy_consumption_guard_confirms_nonzero_reset(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    base, _ = coord.energy._aggregate_site_energy(  # noqa: SLF001
+        {"consumption": [1000.0], "interval_minutes": 60}
+    )
+    coord.energy.site_energy = base
+
+    first, _ = coord.energy._aggregate_site_energy(  # noqa: SLF001
+        {"consumption": [100.0], "interval_minutes": 60}
+    )
+    coord.energy.site_energy = first
+    assert first["consumption"].value_kwh == pytest.approx(1.0)
+    assert coord.energy._site_energy_force_refresh is True  # noqa: SLF001
+
+    confirmed, _ = coord.energy._aggregate_site_energy(  # noqa: SLF001
+        {"consumption": [100.0], "interval_minutes": 60}
+    )
+    assert confirmed["consumption"].value_kwh == pytest.approx(0.1)
+    assert confirmed["consumption"].last_reset_at is not None
 
 
 @pytest.mark.asyncio
