@@ -1,14 +1,8 @@
 {
   "current_status": "Fully Operational",
-  "generated_at": "2026-08-14T22:48:59.037665Z",
+  "generated_at": "2026-08-14T23:19:41.289450Z",
   "retention_days": 30,
   "samples": [
-    {
-      "checked_at": "2026-07-15T23:04:37.440115Z",
-      "checks_failed": 0,
-      "failed_check_names": [],
-      "status": "Fully Operational"
-    },
     {
       "checked_at": "2026-07-16T00:55:10.565616Z",
       "checks_failed": 0,
@@ -2704,6 +2698,12 @@
     },
     {
       "checked_at": "2026-08-14T22:48:59.037665Z",
+      "checks_failed": 0,
+      "failed_check_names": [],
+      "status": "Fully Operational"
+    },
+    {
+      "checked_at": "2026-08-14T23:19:41.289450Z",
       "checks_failed": 0,
       "failed_check_names": [],
       "status": "Fully Operational"
