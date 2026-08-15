@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v4.2.4 - 2026-08-15
+
+### 🚧 Breaking changes
 - Restricted credential-backed charger, reauthentication, live-stream, battery
   schedule, tariff, and Grid Profile service actions to Home Assistant
   administrators.
@@ -17,10 +34,11 @@ All notable changes to this project will be documented in this file.
   from exported diagnostics.
 
 ### 🔧 Improvements
-- None
+- Deferred setup-only imports to Home Assistant's executor to reduce event-loop
+  blocking during integration and config-flow startup. (#828)
 
 ### 🔄 Other changes
-- None
+- Bumped the integration manifest version to `4.2.4`.
 
 ## v4.2.3 - 2026-08-12
 
