@@ -1796,26 +1796,25 @@ def async_setup_services(
         _svc_refresh_grid_profiles,
         **grid_profile_refresh_kwargs,
     )
-    grid_profile_set_kwargs: dict[str, object] = {
-        "schema": SET_GRID_PROFILE_SCHEMA,
-        "supports_response": supports_response.OPTIONAL,
-    }
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         DOMAIN,
         "set_grid_profile",
         _svc_set_grid_profile,
-        **grid_profile_set_kwargs,
+        SET_GRID_PROFILE_SCHEMA,
+        supports_response=supports_response.OPTIONAL,
     )
-    hass.services.async_register(
-        DOMAIN, "start_charging", _svc_start, schema=START_SCHEMA
+    async_register_admin_service(
+        hass, DOMAIN, "start_charging", _svc_start, START_SCHEMA
     )
-    hass.services.async_register(DOMAIN, "stop_charging", _svc_stop, schema=STOP_SCHEMA)
+    async_register_admin_service(hass, DOMAIN, "stop_charging", _svc_stop, STOP_SCHEMA)
 
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         DOMAIN,
         "trigger_message",
         _svc_trigger,
-        schema=TRIGGER_SCHEMA,
+        TRIGGER_SCHEMA,
         supports_response=supports_response.OPTIONAL,
     )
 
@@ -1836,33 +1835,43 @@ def async_setup_services(
     hass.services.async_register(
         DOMAIN, "clear_reauth_issue", _svc_clear_issue, schema=CLEAR_SCHEMA
     )
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         DOMAIN,
         "try_reauth_now",
         _svc_try_reauth_now,
-        schema=CLEAR_SCHEMA,
+        CLEAR_SCHEMA,
         supports_response=supports_response.OPTIONAL,
     )
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         DOMAIN,
         "clear_hems_auth_backoff",
         _svc_clear_hems_auth_backoff,
-        schema=CLEAR_SCHEMA,
+        CLEAR_SCHEMA,
         supports_response=supports_response.OPTIONAL,
     )
-    hass.services.async_register(DOMAIN, "start_live_stream", _svc_start_stream)
-    hass.services.async_register(DOMAIN, "stop_live_stream", _svc_stop_stream)
+    async_register_admin_service(hass, DOMAIN, "start_live_stream", _svc_start_stream)
+    async_register_admin_service(hass, DOMAIN, "stop_live_stream", _svc_stop_stream)
     hass.services.async_register(
         DOMAIN, "sync_schedules", _svc_sync_schedules, schema=SYNC_SCHEMA
     )
-    hass.services.async_register(
-        DOMAIN, "add_schedule", _svc_add_schedule, schema=ADD_SCHEDULE_SCHEMA
+    async_register_admin_service(
+        hass, DOMAIN, "add_schedule", _svc_add_schedule, ADD_SCHEDULE_SCHEMA
     )
-    hass.services.async_register(
-        DOMAIN, "update_schedule", _svc_update_schedule, schema=UPDATE_SCHEDULE_SCHEMA
+    async_register_admin_service(
+        hass,
+        DOMAIN,
+        "update_schedule",
+        _svc_update_schedule,
+        UPDATE_SCHEDULE_SCHEMA,
     )
-    hass.services.async_register(
-        DOMAIN, "delete_schedule", _svc_delete_schedule, schema=DELETE_SCHEDULE_SCHEMA
+    async_register_admin_service(
+        hass,
+        DOMAIN,
+        "delete_schedule",
+        _svc_delete_schedule,
+        DELETE_SCHEDULE_SCHEMA,
     )
     hass.services.async_register(
         DOMAIN,
@@ -1871,17 +1880,19 @@ def async_setup_services(
         schema=VALIDATE_SCHEDULE_SCHEMA,
         supports_response=supports_response.OPTIONAL,
     )
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         DOMAIN,
         "update_cfg_schedule",
         _svc_update_cfg_schedule,
-        schema=UPDATE_CFG_SCHEMA,
+        UPDATE_CFG_SCHEMA,
     )
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         DOMAIN,
         "update_tariff",
         _svc_update_tariff,
-        schema=UPDATE_TARIFF_SCHEMA,
+        UPDATE_TARIFF_SCHEMA,
     )
 
 

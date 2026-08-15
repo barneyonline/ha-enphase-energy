@@ -53,6 +53,14 @@ DIAGNOSTIC_IDENTIFIER_KEYS = [
     "grid_profile_id",
     "name",
     "device_name",
+    "device_id",
+    "device-id",
+    "deviceId",
+    "deviceID",
+    "inverter_id",
+    "inverter-id",
+    "inverterId",
+    "inverterID",
     "hostname",
     "host",
     "ip",
@@ -180,6 +188,45 @@ def _redact_diagnostics_payload(
 
     redacted = async_redact_data(payload, DIAGNOSTICS_REDACT_KEYS)
     return cast(dict[str, Any], _redact_embedded_diagnostics_text(redacted, site_ids))
+
+
+def _redact_identifier_map(
+    payload: Any, *, aliases: dict[object, str] | None = None
+) -> Any:
+    """Redact every key in a map known to be keyed by an Enphase identifier."""
+
+    if not isinstance(payload, dict):
+        return payload
+    if aliases is None:
+        aliases = {}
+    redacted: dict[str, Any] = {}
+    for key, value in payload.items():
+        alias = aliases.get(key)
+        if alias is None:
+            alias = f"[inverter_{len(aliases) + 1}]"
+            aliases[key] = alias
+        redacted[alias] = value
+    return redacted
+
+
+def _redact_identifier_keyed_payload(payload: Any) -> Any:
+    """Redact identifier-keyed maps within raw inverter diagnostics."""
+
+    if not isinstance(payload, dict):
+        return payload
+    redacted = dict(payload)
+    aliases: dict[object, str] = {}
+    redacted["status_payload"] = _redact_identifier_map(
+        redacted.get("status_payload"), aliases=aliases
+    )
+    production_payload = redacted.get("production_payload")
+    if isinstance(production_payload, dict):
+        production_payload = dict(production_payload)
+        production_payload["production"] = _redact_identifier_map(
+            production_payload.get("production"), aliases=aliases
+        )
+        redacted["production_payload"] = production_payload
+    return redacted
 
 
 def _text(value: Any) -> str | None:
@@ -516,6 +563,8 @@ async def async_get_config_entry_diagnostics(
         inverters = coord.inverter_diagnostics_payloads()
     except DIAGNOSTIC_CAPTURE_ERRORS:
         inverters = {}
+    else:
+        inverters = _redact_identifier_keyed_payload(inverters)
 
     try:
         payload_health = coord.payload_health_diagnostics()

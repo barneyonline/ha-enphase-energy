@@ -75,6 +75,28 @@ from custom_components.enphase_ev.services import async_setup_services
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
 
 
+@pytest.fixture(autouse=True)
+def _expose_admin_service_handlers_for_unit_tests(monkeypatch) -> None:
+    """Keep direct handler tests focused on routing, not HA authorization."""
+
+    def fake_register_admin(
+        hass, domain, service, handler, schema=None, supports_response=None, **kwargs
+    ) -> None:
+        hass.services.async_register(
+            domain,
+            service,
+            handler,
+            schema,
+            supports_response,
+            **kwargs,
+        )
+
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.services.async_register_admin_service",
+        fake_register_admin,
+    )
+
+
 def _with_inventory_view(coord):
     coord.inventory_view = SimpleNamespace(
         iter_type_keys=getattr(coord, "iter_type_keys", lambda: []),
@@ -2358,7 +2380,7 @@ async def test_registered_services_cover_branches(
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
 
-    def fake_register_admin(hass_, domain, service, handler, schema, **kwargs):
+    def fake_register_admin(hass_, domain, service, handler, schema=None, **kwargs):
         hass_.services.async_register(domain, service, handler, schema=schema, **kwargs)
 
     monkeypatch.setattr(
