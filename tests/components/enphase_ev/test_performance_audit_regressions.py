@@ -13,6 +13,12 @@ import pytest
 
 from homeassistant.util import dt as dt_util
 
+from custom_components.enphase_ev import (
+    async_create_clientsession as lazy_create_clientsession,
+)
+from custom_components.enphase_ev.config_flow import (
+    async_get_clientsession as lazy_get_clientsession,
+)
 from custom_components.enphase_ev.const import (
     DEFAULT_CHARGE_LEVEL_SETTING,
     PHASE_SWITCH_CONFIG_SETTING,
@@ -22,22 +28,33 @@ from custom_components.enphase_ev.session_history import SessionCacheView
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
 
 
-def test_config_flow_import_keeps_heavy_modules_lazy() -> None:
-    script = """
+@pytest.mark.parametrize(
+    "target",
+    (
+        "custom_components.enphase_ev",
+        "custom_components.enphase_ev.config_flow",
+    ),
+)
+def test_import_keeps_heavy_modules_lazy(target: str) -> None:
+    script = f"""
 import importlib
 import json
 import sys
 
-importlib.import_module("custom_components.enphase_ev.config_flow")
-print(json.dumps({
+importlib.import_module({target!r})
+print(json.dumps({{
     name: name in sys.modules
     for name in (
-        "custom_components.enphase_ev.config_flow",
+        {target!r},
         "custom_components.enphase_ev.services",
         "homeassistant.components.recorder",
         "homeassistant.components.recorder.statistics",
+        "homeassistant.helpers.aiohttp_client",
+        "homeassistant.components.zeroconf",
+        "hass_nabucasa",
+        "boto3",
     )
-}))
+}}))
 """
 
     result = subprocess.run(
@@ -48,10 +65,29 @@ print(json.dumps({
     )
     modules = json.loads(result.stdout)
 
-    assert modules["custom_components.enphase_ev.config_flow"] is True
-    assert modules["custom_components.enphase_ev.services"] is False
-    assert modules["homeassistant.components.recorder"] is False
-    assert modules["homeassistant.components.recorder.statistics"] is False
+    assert modules.pop(target) is True
+    assert not any(modules.values())
+
+
+@pytest.mark.asyncio
+async def test_lazy_clientsession_wrappers_delegate(monkeypatch) -> None:
+    from homeassistant.helpers import aiohttp_client
+
+    get_session = MagicMock(return_value=object())
+    create_session = MagicMock(return_value=object())
+    monkeypatch.setattr(aiohttp_client, "async_get_clientsession", get_session)
+    monkeypatch.setattr(aiohttp_client, "async_create_clientsession", create_session)
+    hass = MagicMock()
+    hass.async_add_import_executor_job = AsyncMock(side_effect=lambda job: job())
+
+    assert await lazy_get_clientsession(hass) is get_session.return_value
+    assert (
+        lazy_create_clientsession(hass, auto_cleanup=True)
+        is create_session.return_value
+    )
+    hass.async_add_import_executor_job.assert_awaited_once()
+    get_session.assert_called_once_with(hass)
+    create_session.assert_called_once_with(hass, auto_cleanup=True)
 
 
 def _prepare_refresh_target(

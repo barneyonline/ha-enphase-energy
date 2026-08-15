@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import inspect
 import logging
 import re
 import time as _time
 from typing import TYPE_CHECKING, Any, Coroutine, cast
 
-import aiohttp
 from homeassistant.config_entries import ConfigEntryState, OperationNotAllowed
 from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.helpers import (
@@ -17,7 +17,6 @@ from homeassistant.helpers import (
     device_registry as dr,
     entity_registry as er,
 )
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from .const import (
     CONF_EMAIL,
@@ -82,6 +81,8 @@ from .serial_entity_metadata import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
+    import aiohttp
+
     from .coordinator import EnphaseCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -108,6 +109,34 @@ _RUNTIME_HANDOFF_DATA_KEYS = frozenset(
 )
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+_SETUP_MODULES = (
+    "aiohttp",
+    f"{__package__}.battery_schedule_editor",
+    f"{__package__}.coordinator",
+    f"{__package__}.evse_firmware",
+    f"{__package__}.evse_schedule_editor",
+    f"{__package__}.firmware_catalog",
+    f"{__package__}.gateway_software_update",
+    f"{__package__}.labels",
+)
+
+
+def _load_setup_modules() -> None:
+    """Load setup-only modules from Home Assistant's executor."""
+
+    for module_name in _SETUP_MODULES:
+        importlib.import_module(module_name)
+
+
+def async_create_clientsession(*args: Any, **kwargs: Any) -> aiohttp.ClientSession:
+    """Create a Home Assistant client session without loading it at import time."""
+
+    from homeassistant.helpers.aiohttp_client import (
+        async_create_clientsession as create_clientsession,
+    )
+
+    return create_clientsession(*args, **kwargs)
 
 
 def async_setup_services(
@@ -1743,6 +1772,8 @@ async def _async_setup_entry_impl(
     # Ensure services are present after config-entry reloads/transient unload states.
     async_setup_services(hass, supports_response=SupportsResponse)
 
+    await hass.async_add_import_executor_job(_load_setup_modules)
+
     # Create and prime the coordinator once, used by all platforms
     from .coordinator import (
         EnphaseCoordinator,
@@ -1780,6 +1811,8 @@ async def _async_setup_entry_impl(
         preserved_runtime.applied_data = dict(entry.data)
         preserved_runtime.applied_options = dict(entry.options)
     else:
+        import aiohttp
+
         coord = EnphaseCoordinator(
             hass,
             entry.data,
