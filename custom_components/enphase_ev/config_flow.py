@@ -6,8 +6,8 @@ import asyncio
 import logging
 import re
 import time
-from collections.abc import Mapping
-from typing import Any, cast
+from collections.abc import Callable, Mapping
+from typing import TYPE_CHECKING, Any, cast
 
 import voluptuous as vol
 from homeassistant import config_entries
@@ -15,7 +15,6 @@ from homeassistant.const import CONF_PASSWORD
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult, section
 from homeassistant.exceptions import ServiceValidationError
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import selector
 from homeassistant.helpers.translation import (
     async_get_cached_translations,
@@ -142,10 +141,14 @@ from .grid_profile_runtime import (
     GridProfile,
     GridProfileRuntime,
 )
-from .runtime_data import EnphaseConfigEntry
 from .log_redaction import redact_site_id, redact_text
+from .runtime_data import EnphaseConfigEntry
 from .runtime_helpers import normalize_poll_intervals
 from .voltage import coerce_nominal_voltage, resolve_nominal_voltage_for_hass
+
+if TYPE_CHECKING:  # pragma: no cover
+    import aiohttp
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -159,6 +162,27 @@ CONF_TYPE_IQEVSE = "type_iqevse"
 CONF_TYPE_HEATPUMP = "type_heatpump"
 CONF_TYPE_MICROINVERTER = "type_microinverter"
 CONF_DEVICE_CATEGORIES_SECTION = "devices"
+
+
+def _load_get_clientsession() -> Callable[[HomeAssistant], aiohttp.ClientSession]:
+    """Load the Home Assistant session factory outside the event loop."""
+
+    from homeassistant.helpers.aiohttp_client import (
+        async_get_clientsession as get_clientsession,
+    )
+
+    return cast("Callable[[HomeAssistant], aiohttp.ClientSession]", get_clientsession)
+
+
+async def async_get_clientsession(hass: HomeAssistant) -> aiohttp.ClientSession:
+    """Return the shared client session without loading it at import time."""
+
+    get_clientsession = await hass.async_add_import_executor_job(
+        _load_get_clientsession
+    )
+    return get_clientsession(hass)
+
+
 CONF_DEVICE_FEATURES_SECTION = "device_features"
 CONF_MIGRATION_SOURCE_ENTRY = "selected_envoy_source"
 CONF_MIGRATION_BACKUP_CONFIRMED = "backup_confirmed"
@@ -383,7 +407,7 @@ class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
             remember = bool(user_input.get(CONF_REMEMBER_PASSWORD, False))
             self._clear_mfa()
 
-            session = async_get_clientsession(self.hass)
+            session = await async_get_clientsession(self.hass)
             try:
                 tokens, sites = await async_authenticate(session, email, password)
             except EnlightenAuthInvalidCredentials:
@@ -490,7 +514,7 @@ class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
             resend = bool(user_input.get(CONF_RESEND_CODE, False))
             otp = str(user_input.get(CONF_OTP, "")).strip()
 
-            session = async_get_clientsession(self.hass)
+            session = await async_get_clientsession(self.hass)
 
             if resend:
                 if not self._mfa_can_resend():
@@ -551,7 +575,7 @@ class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
     async def _send_mfa_code(self) -> dict[str, str]:
         if not self._mfa_tokens or not self._mfa_tokens.raw_cookies:
             return {"base": "unknown"}
-        session = async_get_clientsession(self.hass)
+        session = await async_get_clientsession(self.hass)
         try:
             updated = await async_resend_login_otp(
                 session, self._mfa_tokens.raw_cookies
@@ -859,7 +883,7 @@ class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
         if not self._auth_tokens or not self._selected_site_id:
             self._chargers_loaded = True
             return
-        session = async_get_clientsession(self.hass)
+        session = await async_get_clientsession(self.hass)
         chargers = await async_fetch_chargers(
             session, self._selected_site_id, self._auth_tokens
         )
@@ -875,7 +899,7 @@ class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
             self._available_type_keys = []
             self._inventory_iqevse_serials = []
             return
-        session = async_get_clientsession(self.hass)
+        session = await async_get_clientsession(self.hass)
         discovery_results = await asyncio.gather(
             async_fetch_devices_inventory(
                 session, self._selected_site_id, self._auth_tokens
@@ -1378,7 +1402,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         if tokens is None or not site_id:
             return False
         payload = await async_fetch_battery_site_settings(
-            async_get_clientsession(self.hass),
+            await async_get_clientsession(self.hass),
             site_id,
             tokens,
         )
@@ -1692,7 +1716,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             or self._entry.data.get(CONF_ACCESS_TOKEN),
             token_expires_at=self._entry.data.get(CONF_TOKEN_EXPIRES_AT),
         )
-        session = async_get_clientsession(self.hass)
+        session = await async_get_clientsession(self.hass)
 
         discovered: list[str] = []
         try:
