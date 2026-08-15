@@ -30,6 +30,28 @@ from custom_components.enphase_ev.labels import battery_schedule_create_label
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 
 
+@pytest.fixture(autouse=True)
+def _expose_admin_service_handlers_for_unit_tests(monkeypatch) -> None:
+    """Keep direct handler tests focused on schedule behavior, not HA authorization."""
+
+    def fake_register_admin(
+        hass, domain, service, handler, schema=None, supports_response=None, **kwargs
+    ) -> None:
+        hass.services.async_register(
+            domain,
+            service,
+            handler,
+            schema,
+            supports_response,
+            **kwargs,
+        )
+
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.services.async_register_admin_service",
+        fake_register_admin,
+    )
+
+
 def _schedule_payload() -> dict[str, object]:
     return {
         "cfg": {

@@ -86,6 +86,94 @@ async def test_grid_mode_services_require_admin(hass: HomeAssistant) -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("service", "data"),
+    (
+        ("set_grid_profile", {"profile_id": "agf:test", "confirm": True}),
+        ("start_charging", {}),
+        ("stop_charging", {}),
+        ("trigger_message", {"requested_message": "Heartbeat"}),
+        ("try_reauth_now", {}),
+        ("clear_hems_auth_backoff", {}),
+        ("start_live_stream", {}),
+        ("stop_live_stream", {}),
+        (
+            "add_schedule",
+            {
+                "schedule_type": "cfg",
+                "start_time": "01:00",
+                "end_time": "02:00",
+                "limit": 50,
+                "days": [1],
+            },
+        ),
+        (
+            "update_schedule",
+            {
+                "schedule_id": "schedule-1",
+                "schedule_type": "cfg",
+                "start_time": "01:00",
+                "end_time": "02:00",
+                "limit": 50,
+                "days": [1],
+                "confirm": True,
+            },
+        ),
+        ("delete_schedule", {"schedule_id": "schedule-1", "confirm": True}),
+        ("update_cfg_schedule", {"limit": 50}),
+        (
+            "update_tariff",
+            {
+                "billing_start_date": "2026-01-01",
+                "billing_frequency": "MONTH",
+                "billing_interval_value": 1,
+            },
+        ),
+    ),
+)
+@pytest.mark.asyncio
+async def test_credentialed_control_services_require_admin(
+    hass: HomeAssistant, service: str, data: dict[str, object]
+) -> None:
+    """Non-admin users must not invoke services backed by stored credentials."""
+
+    async_setup_services(hass)
+    await hass.auth.async_create_user("Owner", group_ids=[GROUP_ID_ADMIN])
+    user = await hass.auth.async_create_user(
+        "Control service user", group_ids=[GROUP_ID_USER]
+    )
+
+    with pytest.raises(Unauthorized):
+        await hass.services.async_call(
+            DOMAIN,
+            service,
+            data,
+            blocking=True,
+            context=Context(user_id=user.id),
+        )
+
+
+@pytest.mark.asyncio
+async def test_admin_reaches_credentialed_control_handler(hass: HomeAssistant) -> None:
+    """Admin callers must continue through authorization to service validation."""
+
+    async_setup_services(hass)
+    admin = await hass.auth.async_create_user(
+        "Control service owner", group_ids=[GROUP_ID_ADMIN]
+    )
+
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            "start_charging",
+            {},
+            blocking=True,
+            context=Context(user_id=admin.id),
+        )
+
+    assert err.value.translation_key == "grid_site_required"
+
+
 def _register_service_handlers(
     hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
 ) -> dict[tuple[str, str], object]:
@@ -94,7 +182,23 @@ def _register_service_handlers(
     def fake_register(self, domain, service, handler, schema=None, *args, **kwargs):
         registered[(domain, service)] = handler
 
+    def fake_register_admin(
+        hass_, domain, service, handler, schema=None, supports_response=None, **kwargs
+    ):
+        hass_.services.async_register(
+            domain,
+            service,
+            handler,
+            schema,
+            supports_response,
+            **kwargs,
+        )
+
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.services.async_register_admin_service",
+        fake_register_admin,
+    )
     async_setup_services(hass)
     return registered
 
@@ -111,7 +215,23 @@ def _register_service_metadata(
             "kwargs": kwargs,
         }
 
+    def fake_register_admin(
+        hass_, domain, service, handler, schema=None, supports_response=None, **kwargs
+    ):
+        hass_.services.async_register(
+            domain,
+            service,
+            handler,
+            schema,
+            supports_response,
+            **kwargs,
+        )
+
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.services.async_register_admin_service",
+        fake_register_admin,
+    )
     async_setup_services(hass)
     return registered
 

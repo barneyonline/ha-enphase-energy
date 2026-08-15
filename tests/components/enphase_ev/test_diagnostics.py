@@ -160,6 +160,17 @@ def test_diagnostics_redacts_numeric_site_ids_in_nested_payloads() -> None:
     )
 
 
+def test_inverter_identifier_redaction_handles_malformed_payload_shapes() -> None:
+    """Identifier-key redaction must leave malformed payload families safe to inspect."""
+
+    assert diagnostics._redact_identifier_map(None) is None
+    assert diagnostics._redact_identifier_map({"raw-id": 1}) == {"[inverter_1]": 1}
+    assert diagnostics._redact_identifier_keyed_payload(None) is None
+    assert diagnostics._redact_identifier_keyed_payload(
+        {"status_payload": [], "production_payload": []}
+    ) == {"status_payload": [], "production_payload": []}
+
+
 class DummyClient(SimpleNamespace):
     def __init__(self) -> None:
         super().__init__()
@@ -1299,6 +1310,49 @@ async def test_config_entry_diagnostics_handles_snapshot_helper_errors(
     assert coordinator["session_history"] == {}
     assert coordinator["battery_config"] == {}
     assert coordinator["inverters"] == {}
+
+
+@pytest.mark.asyncio
+async def test_config_diagnostics_redacts_raw_inverter_identifiers(
+    hass, config_entry
+) -> None:
+    """Raw inverter identifiers must not survive config diagnostics redaction."""
+
+    raw_inverter_id = "987611111234"
+    production_only_inverter_id = "987622221234"
+    raw_serial = "INV-SERIAL-123456"
+    coord = DummyCoordinator()
+    coord._inverter_status_payload = {
+        raw_inverter_id: {
+            "deviceId": raw_inverter_id,
+            "serialNum": raw_serial,
+            "status": "normal",
+        }
+    }
+    coord._inverter_production_payload = {
+        "production": {
+            raw_inverter_id: 123.0,
+            production_only_inverter_id: 456.0,
+        }
+    }
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+
+    diag = await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
+
+    inverter_diag = diag["coordinator"]["inverters"]
+    serialized = json.dumps(inverter_diag, default=str)
+    assert raw_inverter_id not in serialized
+    assert production_only_inverter_id not in serialized
+    assert raw_serial not in serialized
+    status_key, status = next(iter(inverter_diag["status_payload"].items()))
+    assert status["deviceId"] == "**REDACTED**"
+    assert status["serialNum"] == "**REDACTED**"
+    assert inverter_diag["production_payload"]["production"][status_key] == 123.0
+    assert sorted(inverter_diag["production_payload"]["production"].values()) == [
+        123.0,
+        456.0,
+    ]
+    assert inverter_diag["summary_counts"]["total"] == 2
 
 
 @pytest.mark.asyncio

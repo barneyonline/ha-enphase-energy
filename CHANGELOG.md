@@ -5,13 +5,16 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
-- None
+- Restricted credential-backed charger, reauthentication, live-stream, battery
+  schedule, tariff, and Grid Profile service actions to Home Assistant
+  administrators.
 
 ### ✨ New features
 - None
 
 ### 🐛 Bug fixes
-- None
+- Redacted raw inverter and device identifiers, including identifier-keyed maps,
+  from exported diagnostics.
 
 ### 🔧 Improvements
 - None
