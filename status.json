@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-08-17T04:39:21.972471Z",
+  "checked_at": "2026-08-17T05:32:55.910211Z",
   "checks": [
     {
       "affects": true,
@@ -82,7 +82,7 @@
       ],
       "group": "degraded",
       "name": "site_live",
-      "ok": false
+      "ok": true
     },
     {
       "affects": false,
@@ -334,7 +334,7 @@
       "name": "session_history_criteria",
       "ok": true,
       "status": 200,
-      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=76f40e8d-b8d7-4487-957a-3b7464f790b4&username=2999024"
+      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=e70af6ce-0603-497d-beab-397bcb014c80&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -370,12 +370,12 @@
       "category": "site_live",
       "check_group": "site_live",
       "check_mode": "all",
-      "error": "HTTP 500",
+      "error": null,
       "group": "degraded",
       "method": "GET",
       "name": "site_latest_power",
-      "ok": false,
-      "status": 500,
+      "ok": true,
+      "status": 200,
       "url": "/app-api/{site_id}/get_latest_power"
     },
     {
@@ -404,7 +404,7 @@
       "name": "evse_timeseries_daily_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=76f40e8d-b8d7-4487-957a-3b7464f790b4&start_date=2026-08-17&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=e70af6ce-0603-497d-beab-397bcb014c80&start_date=2026-08-17&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -418,7 +418,7 @@
       "name": "evse_timeseries_lifetime_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=76f40e8d-b8d7-4487-957a-3b7464f790b4&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=e70af6ce-0603-497d-beab-397bcb014c80&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -731,14 +731,14 @@
   ],
   "status": "Fully Operational",
   "summary": {
-    "checks_failed": 1,
+    "checks_failed": 0,
     "checks_failed_affecting": 0,
-    "checks_failed_broad_outage": 1,
-    "checks_failed_non_affecting": 1,
-    "checks_ok": 16,
+    "checks_failed_broad_outage": 0,
+    "checks_failed_non_affecting": 0,
+    "checks_ok": 17,
     "checks_total": 17,
-    "endpoints_failed": 1,
-    "endpoints_ok": 36,
+    "endpoints_failed": 0,
+    "endpoints_ok": 37,
     "endpoints_total": 37
   }
 }
