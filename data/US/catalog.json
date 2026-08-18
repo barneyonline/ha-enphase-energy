@@ -4,30 +4,30 @@
     "envoy": {
       "document_topic_id": 217,
       "latest": {
-        "countries_text": "United States of America Puerto Rico Serial no",
+        "countries_text": "United States and Puerto Rico",
         "document_topic_id": 217,
-        "media_id": "29875",
+        "media_id": "35249",
         "product_media_name_id": null,
         "product_type": "141",
-        "release_date": "2026-06-24",
-        "summary": "The IQ Gateway software version 8.3.4041 introduces support for IQ9N Microinverters in systems with IQ Combiner 6C, IQ Battery 10C, or both. This release also includes efficiency improvements and bug fixes for: Grid-tied systems (without backup and backup-ready) Grid-forming systems (with backup) using IQ Combiner 6C, IQ Battery 10C, and IQ Meter Collar Supported countries : United States of America Puerto Rico Serial no. Feature classification Feature Description 1 New product Support for IQ...",
-        "title": "IQ Gateway software release notes (8.3.4041)",
+        "release_date": "2026-07-09",
+        "summary": "IQ Gateway software version 8.3.5566 includes system robustness improvements and security fixes for grid-tied systems (without backup and backup-ready) and grid-forming systems (with backup) with IQ Combiner 6C, IQ Battery 10C, and IQ Meter Collar. Countries: United States and Puerto Rico. # Feature classification Feature Description 1 Product reliability IQ Battery 10C state-of-charge (SoC) recovery improvements Improvements to very low state-of-charge (VLS) recovery behavior in systems with...",
+        "title": "IQ Gateway software release notes (8.3.5566)",
         "urls_by_locale": {
           "en": "https://enphase.com/installers/resources/documentation/communication?product_type=141&f%5B0%5D=document%3A217&search_api_language=en&field_alternative_language=en"
         },
-        "version": "8.3.4041"
+        "version": "8.3.5566"
       },
       "product_media_name_id": null
     }
   },
-  "generated_at": "2026-08-08T04:29:15.498259Z",
+  "generated_at": "2026-08-18T03:58:53.932521Z",
   "schema_version": 1,
   "source": {
     "apps_url": "https://enphase.com/installers/resources/documentation/communication",
     "crawl": {
       "envoy": {
         "bootstrap_error_targets": [],
-        "count": 244,
+        "count": 246,
         "crawl_error_targets": [],
         "empty_release_targets": [
           "https://enphase.com/en-lac/|en-lac",
@@ -776,7 +776,7 @@
           "https://enphase.com/|en": {
             "apps_url": "https://enphase.com/installers/resources/documentation/communication",
             "bootstrap_error": null,
-            "count": 15,
+            "count": 17,
             "crawl_error": null,
             "pages": [
               "https://enphase.com/installers/resources/documentation/communication?product_type=141&f%5B0%5D=document%3A217&search_api_language=en&field_alternative_language=en&page=0",
