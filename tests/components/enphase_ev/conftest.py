@@ -210,21 +210,31 @@ def pytest_runtest_setup() -> None:
     pytest_socket.enable_socket()
 
 
-@pytest.fixture(autouse=True)
-async def auto_enable_custom_integrations(hass):
-    """Ensure custom integrations remain enabled for each test run."""
+@pytest.hookimpl(hookwrapper=True)
+def pytest_fixture_setup(fixturedef, request):
+    """Enable custom integrations whenever the HA fixture is actually used.
+
+    Making this an autouse fixture with a ``hass`` dependency constructed a full
+    Home Assistant instance for every pure unit test in this package. Wrapping
+    setup keeps the behavior for HA tests without adding ``hass`` to unrelated
+    fixture closures.
+    """
+    outcome = yield
+    if fixturedef.argname != "hass":
+        return
+
+    hass = outcome.get_result()
     try:
         from homeassistant import loader
 
         hass.data.pop(loader.DATA_CUSTOM_COMPONENTS, None)
     except Exception:
         pass
-    yield
 
 
 @pytest.fixture(autouse=True)
 def ensure_hass_stopped(stop_hass):
-    """Ensure Home Assistant instances are shut down cleanly after tests."""
+    """Ensure manually constructed Home Assistant instances are stopped cleanly."""
     yield
 
 

@@ -41,7 +41,13 @@ Include the integration version, Home Assistant version, affected entity IDs, de
    ```bash
    docker compose -f devtools/docker/docker-compose.yml build ha-dev
    ```
-4. **Develop and test** your changes inside `ha-dev`.
+4. **Start `ha-dev` once, then develop and test inside it**:
+   ```bash
+   docker compose -f devtools/docker/docker-compose.yml up -d ha-dev
+   docker compose -f devtools/docker/docker-compose.yml exec ha-dev pytest -q tests/components/enphase_ev
+   ```
+   Reuse the running container with `docker compose exec` for subsequent checks
+   to avoid paying container startup costs on every command.
    To reproduce the forward-compatibility lane against the pinned Home Assistant
    2026.8 beta, run:
    ```bash
@@ -60,12 +66,30 @@ Include the integration version, Home Assistant version, affected entity IDs, de
 Use the pinned Docker environment for linting, formatting, coverage, and tests:
 
 ```bash
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "ruff check ."
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "black custom_components/enphase_ev tests/components/enphase_ev"
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "python scripts/validate_quality_scale.py"
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "mypy --strict --ignore-missing-imports --follow-imports=skip custom_components/enphase_ev"
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "pre-commit run --all-files"
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "pytest -q tests/components/enphase_ev"
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev ruff check .
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev black custom_components/enphase_ev tests/components/enphase_ev
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev python scripts/validate_quality_scale.py
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev mypy --strict --ignore-missing-imports --follow-imports=skip custom_components/enphase_ev
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev pre-commit run --all-files
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev pytest -q tests/components/enphase_ev
+```
+
+For a full coverage run, collect coverage once and reuse that data when enforcing
+100% coverage on the integration modules you changed. Replace the example
+`--include` value with your changed module paths. This coverage run replaces the
+plain integration pytest command above:
+
+```bash
+docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage run --source=custom_components.enphase_ev -m pytest -q tests/components/enphase_ev
+docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage report -m --fail-under=95
+docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage report -m --include="custom_components/enphase_ev/api.py,custom_components/enphase_ev/coordinator.py" --fail-under=100
+```
+
+Maintenance-script tests use only lightweight dependencies and can be run
+separately while iterating on `scripts/`:
+
+```bash
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev pytest -q tests/scripts
 ```
 
 ## Coding Standards and Tooling
@@ -80,12 +104,12 @@ Home Assistant integrations must follow the [core development guidelines](https:
 This repository relies on the following checks. Please run them locally before pushing:
 
 ```bash
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "ruff check ."
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "black custom_components/enphase_ev tests/components/enphase_ev"
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "pytest -q tests/components/enphase_ev"
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "python scripts/validate_quality_scale.py"
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "mypy --strict --ignore-missing-imports --follow-imports=skip custom_components/enphase_ev"
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "pre-commit run --all-files"
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev ruff check .
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev black custom_components/enphase_ev tests/components/enphase_ev
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev pytest -q tests/components/enphase_ev
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev python scripts/validate_quality_scale.py
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev mypy --strict --ignore-missing-imports --follow-imports=skip custom_components/enphase_ev
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev pre-commit run --all-files
 ```
 
 > hassfest validation runs automatically in CI via [`home-assistant/actions/hassfest`](https://github.com/home-assistant/actions/tree/master/hassfest). If you need to run it locally, clone the Home Assistant Core repository and execute `python -m script.hassfest` from your integration checkout.

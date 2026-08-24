@@ -21,15 +21,16 @@ List related issues or discussions if this PR does not close them directly.
 List the exact commands you ran. Prefer the pinned Docker environment from `devtools/docker/`.
 
 ```bash
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "ruff check ."
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "black <changed-python-files> tests/components/enphase_ev/<changed-test-files>"
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "python scripts/validate_quality_scale.py"
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "python scripts/validate_quality_scale.py --validate-remote-brands"
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "python scripts/importtime_profile.py --strict-integration-warnings --output importtime-enphase-ev.log"
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "mypy --strict --ignore-missing-imports --follow-imports=skip custom_components/enphase_ev"
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "pre-commit run --all-files"
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "pytest -q tests/components/enphase_ev"
-docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "COVERAGE_FILE=/tmp/enphase_ev.coverage python -m coverage erase && COVERAGE_FILE=/tmp/enphase_ev.coverage python -m coverage run -m pytest tests/components/enphase_ev -q && COVERAGE_FILE=/tmp/enphase_ev.coverage python -m coverage report -m --include=<touched-module-paths-comma-separated> --fail-under=100"
+docker compose -f devtools/docker/docker-compose.yml up -d ha-dev
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev ruff check .
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev black <changed-python-files> tests/components/enphase_ev/<changed-test-files>
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev python scripts/validate_quality_scale.py --validate-remote-brands
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev python scripts/importtime_profile.py --strict-integration-warnings --output importtime-enphase-ev.log
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev mypy --strict --ignore-missing-imports --follow-imports=skip custom_components/enphase_ev
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev pre-commit run --all-files
+docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage run --source=custom_components.enphase_ev -m pytest -q tests/components/enphase_ev
+docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage report -m --fail-under=95
+docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage report -m --include=<touched-module-paths-comma-separated> --fail-under=100
 ```
 
 Add any extra commands, targeted tests, or manual validation below.
