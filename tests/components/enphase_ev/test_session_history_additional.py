@@ -46,8 +46,11 @@ def test_history_timezone_falls_back_when_default_invalid(monkeypatch):
         def __str__(self) -> str:
             raise RuntimeError("boom")
 
-    monkeypatch.setattr(sh_mod.dt_util, "DEFAULT_TIME_ZONE", BadTZ())
-    assert manager._history_timezone() is None
+    # Restore Home Assistant's process-global timezone before its autouse
+    # cleanup fixture validates test isolation.
+    with monkeypatch.context() as patch_context:
+        patch_context.setattr(sh_mod.dt_util, "DEFAULT_TIME_ZONE", BadTZ())
+        assert manager._history_timezone() is None
 
 
 @pytest.mark.asyncio

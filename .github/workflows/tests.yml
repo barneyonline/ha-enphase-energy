@@ -6,18 +6,20 @@ on:
       - 'custom_components/**'
       - 'tests/components/enphase_ev/**'
       - 'tests/compatibility/**'
+      - 'scripts/**/*.py'
+      - 'tests/scripts/**/*.py'
       - '.pre-commit-config.yaml'
       - '.ruff.toml'
       - '.strict-typing'
       - 'devtools/docker/requirements-dev.txt'
+      - 'devtools/docker/requirements-ci-quality.txt'
+      - 'devtools/docker/requirements-ci-scripts.txt'
       - 'devtools/docker/requirements-min-ha.txt'
       - 'devtools/docker/requirements-ha-2026.8.txt'
       - 'devtools/docker/Dockerfile'
       - 'devtools/docker/docker-compose.yml'
+      - 'pytest.ini'
       - 'quality_scale.yaml'
-      - 'scripts/importtime_profile.py'
-      - 'scripts/validate_quality_scale.py'
-      - 'tests/scripts/test_importtime_profile.py'
       - '.github/workflows/ci.yml'
       - '.github/workflows/tests.yml'
   workflow_dispatch:
@@ -31,6 +33,53 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      compatibility: ${{ steps.paths.outputs.compatibility }}
+      diagnostics: ${{ steps.paths.outputs.diagnostics }}
+      integration: ${{ steps.paths.outputs.integration }}
+      quality: ${{ steps.paths.outputs.quality }}
+      scripts: ${{ steps.paths.outputs.scripts }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Classify changed paths
+        id: paths
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            for group in compatibility diagnostics integration quality scripts; do
+              echo "${group}=true" >> "$GITHUB_OUTPUT"
+            done
+            exit 0
+          fi
+
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          # Disable rename detection so cross-group moves expose both the deleted
+          # source path and the added destination path to the classifiers below.
+          changed_files="$(git diff --name-only --no-renames "origin/${{ github.base_ref }}...HEAD")"
+
+          set_output() {
+            local name="$1"
+            local pattern="$2"
+            local value="false"
+            if printf '%s\n' "$changed_files" | grep -Eq "$pattern"; then
+              value="true"
+            fi
+            echo "${name}=${value}" >> "$GITHUB_OUTPUT"
+          }
+
+          common='^(\.github/workflows/(ci|tests)\.yml|devtools/docker/(Dockerfile|docker-compose\.yml))$'
+          set_output integration "${common}|^custom_components/enphase_ev/|^tests/(components/enphase_ev|compatibility)/|^devtools/docker/requirements-dev\.txt$|^pytest\.ini$|^\.pre-commit-config\.yaml$|^\.ruff\.toml$"
+          set_output compatibility "${common}|^custom_components/enphase_ev/.*\.py$|^custom_components/enphase_ev/manifest\.json$|^tests/compatibility/|^tests/components/enphase_ev/(conftest|test_(device_action|device_trigger|init_module|manifest|schedule_sync|services))\.py$|^devtools/docker/requirements-(min-ha|ha-2026\.8)\.txt$|^pytest\.ini$"
+          set_output diagnostics "${common}|^custom_components/enphase_ev/.*\.py$|^scripts/importtime_profile\.py$|^tests/scripts/test_importtime_profile\.py$|^devtools/docker/requirements-dev\.txt$"
+          set_output quality "${common}|^custom_components/enphase_ev/|^tests/components/enphase_ev/|^quality_scale\.yaml$|^scripts/validate_quality_scale\.py$|^tests/scripts/test_validate_quality_scale\.py$|^devtools/docker/requirements-(dev|ci-quality)\.txt$|^\.pre-commit-config\.yaml$|^\.strict-typing$"
+          set_output scripts "${common}|^scripts/.*\.py$|^tests/scripts/.*\.py$|^devtools/docker/requirements-ci-scripts\.txt$"
+
   pre-commit:
     runs-on: ubuntu-latest
     permissions:
@@ -42,15 +91,21 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.14'
-          cache: 'pip'
-          cache-dependency-path: |
-            .pre-commit-config.yaml
-            .github/workflows/tests.yml
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: .pre-commit-config.yaml
+      - name: Cache pre-commit environments
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-lint-${{ runner.os }}-py314-${{ hashFiles('.pre-commit-config.yaml') }}
       - name: Install pre-commit
-        run: |
-          python -m pip install --upgrade pip
-          pip install pre-commit
+        run: uv pip install --system "pre-commit==4.6.2"
       - name: Run pre-commit
+        env:
+          SKIP: codespell,mypy-enphase-ev
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             git fetch origin "${{ github.base_ref }}" --depth=1
@@ -64,77 +119,50 @@ jobs:
             pre-commit run --all-files
           fi
 
-  translation-regressions:
-    runs-on: ubuntu-latest
-    needs: pre-commit
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v7
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.14'
-          cache: 'pip'
-          cache-dependency-path: |
-            devtools/docker/requirements-dev.txt
-            .github/workflows/tests.yml
-      - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install --upgrade -r devtools/docker/requirements-dev.txt aiohttp async-timeout voluptuous
-      - name: Run translation regression tests
-        run: |
-          pytest -q tests/components/enphase_ev/test_service_translations.py
-
   quality-scale:
     runs-on: ubuntu-latest
-    needs: pre-commit
+    needs: changes
+    if: ${{ needs.changes.outputs.quality == 'true' }}
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.14'
-          cache: 'pip'
-          cache-dependency-path: |
-            devtools/docker/requirements-dev.txt
-            .github/workflows/tests.yml
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: devtools/docker/requirements-ci-quality.txt
+          cache-suffix: quality
       - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install --upgrade -r devtools/docker/requirements-dev.txt aiohttp async-timeout voluptuous
-      - name: Validate quality scale evidence
-        run: python scripts/validate_quality_scale.py
-      - name: Validate Home Assistant brands assets
+        run: uv pip install --system -r devtools/docker/requirements-ci-quality.txt
+      - name: Validate quality scale evidence and Home Assistant brands assets
         run: python scripts/validate_quality_scale.py --validate-remote-brands
       - name: Validate strict typing for full integration package
         run: mypy --strict --ignore-missing-imports --follow-imports=skip custom_components/enphase_ev
 
   python314-diagnostics:
     runs-on: ubuntu-latest
-    needs: pre-commit
+    needs: changes
+    if: ${{ needs.changes.outputs.diagnostics == 'true' }}
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.14'
-          cache: 'pip'
-          cache-dependency-path: |
-            devtools/docker/requirements-dev.txt
-            .github/workflows/tests.yml
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: devtools/docker/requirements-dev.txt
       - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install --upgrade -r devtools/docker/requirements-dev.txt aiohttp async-timeout voluptuous
+        run: uv pip install --system -r devtools/docker/requirements-dev.txt aiohttp async-timeout voluptuous
       - name: Gate integration import deprecations and profile import time
-        run: |
-          python scripts/importtime_profile.py --strict-integration-warnings --output importtime-enphase-ev.log
+        run: python scripts/importtime_profile.py --strict-integration-warnings --output importtime-enphase-ev.log
       - name: Upload import-time profile
         uses: actions/upload-artifact@v7
         with:
@@ -143,29 +171,32 @@ jobs:
 
   minimum-homeassistant:
     runs-on: ubuntu-latest
-    needs: pre-commit
+    needs: changes
+    if: ${{ needs.changes.outputs.compatibility == 'true' }}
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.14'
-          cache: 'pip'
-          cache-dependency-path: |
-            devtools/docker/requirements-min-ha.txt
-            .github/workflows/tests.yml
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: devtools/docker/requirements-min-ha.txt
       - name: Install minimum Home Assistant test deps
         run: |
           # pytest-homeassistant-custom-component pins exact Home Assistant patch
           # releases, so keep the full pytest job on the latest compatible stack
           # and install the plugin without dependencies for this minimum test path.
-          python -m pip install --upgrade pip
-          pip install --upgrade -r devtools/docker/requirements-min-ha.txt
-          pip install --no-deps "pytest-homeassistant-custom-component==0.13.340"
+          uv pip install --system -r devtools/docker/requirements-min-ha.txt
+          uv pip install --system --no-deps "pytest-homeassistant-custom-component==0.13.340"
           python -c "from homeassistant.const import __version__; assert __version__ == '2026.6.0', __version__; print(f'Home Assistant {__version__}')"
       - name: Run minimum Home Assistant tests
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTEST_PLUGINS: pytest_asyncio.plugin,pytest_homeassistant_custom_component.plugins,pytest_github_actions_annotate_failures.plugin
         run: >
           pytest -q
           tests/components/enphase_ev/test_manifest.py
@@ -175,28 +206,31 @@ jobs:
 
   homeassistant-2026-8:
     runs-on: ubuntu-latest
-    needs: pre-commit
+    needs: changes
+    if: ${{ needs.changes.outputs.compatibility == 'true' }}
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.14'
-          cache: 'pip'
-          cache-dependency-path: |
-            devtools/docker/requirements-ha-2026.8.txt
-            .github/workflows/tests.yml
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: devtools/docker/requirements-ha-2026.8.txt
       - name: Install Home Assistant 2026.8 test deps
         run: |
           # The current plugin release pins 2026.8.0b3. Install its compatible
           # dependency stack, then overlay the beta under test without deps.
-          python -m pip install --upgrade pip
-          pip install --upgrade --pre -r devtools/docker/requirements-ha-2026.8.txt
-          pip install --upgrade --pre --no-deps "homeassistant==2026.8.0b4"
+          uv pip install --system --prerelease allow -r devtools/docker/requirements-ha-2026.8.txt
+          uv pip install --system --prerelease allow --no-deps "homeassistant==2026.8.0b4"
           python -c "from homeassistant.const import __version__; assert __version__ == '2026.8.0b4', __version__; print(f'Home Assistant {__version__}')"
       - name: Run Home Assistant 2026.8 compatibility tests
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTEST_PLUGINS: pytest_asyncio.plugin,pytest_homeassistant_custom_component.plugins,pytest_github_actions_annotate_failures.plugin
         run: >
           pytest -q --asyncio-mode=auto
           tests/compatibility/test_ha_2026_8_device_registry.py
@@ -207,7 +241,8 @@ jobs:
 
   pytest:
     runs-on: ubuntu-latest
-    needs: pre-commit
+    needs: changes
+    if: ${{ needs.changes.outputs.integration == 'true' }}
     permissions:
       contents: read
       checks: write
@@ -218,68 +253,23 @@ jobs:
         python-version: ['3.14']
     steps:
       - uses: actions/checkout@v7
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-          cache-dependency-path: |
-            devtools/docker/requirements-dev.txt
-            .github/workflows/tests.yml
-      - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install --upgrade -r devtools/docker/requirements-dev.txt aiohttp async-timeout voluptuous
-          python -c "from homeassistant.const import __version__; print(f'Home Assistant {__version__}')"
-      - name: Run tests
-        id: pytest
-        continue-on-error: true
-        run: pytest --cov=custom_components.enphase_ev --cov-report=term-missing --cov-report=xml --cov-fail-under=95 --junitxml=junit.xml -o junit_family=legacy
-      - name: Import Codecov GPG key
-        if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
-        run: curl -fsSL https://keybase.io/codecovsecops/pgp_keys.asc | gpg --import
-      - name: Upload coverage to Codecov
-        if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
-        uses: codecov/codecov-action@v7
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.xml
-          fail_ci_if_error: true
-      - name: Upload test results to Codecov
-        if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
-        uses: codecov/codecov-action@v7
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./junit.xml
-          report_type: test_results
-      - name: Fail if tests failed
-        if: ${{ steps.pytest.outcome == 'failure' }}
-        run: exit 1
-
-  targeted-coverage:
-    if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
-    needs: pre-commit
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - uses: actions/setup-python@v7
         with:
-          python-version: '3.14'
-          cache: 'pip'
-          cache-dependency-path: |
-            devtools/docker/requirements-dev.txt
-            .github/workflows/tests.yml
+          python-version: ${{ matrix.python-version }}
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: devtools/docker/requirements-dev.txt
       - name: Install deps
         run: |
-          python -m pip install --upgrade pip
-          pip install --upgrade -r devtools/docker/requirements-dev.txt aiohttp async-timeout voluptuous coverage
+          uv pip install --system -r devtools/docker/requirements-dev.txt aiohttp async-timeout voluptuous
+          python -c "from homeassistant.const import __version__; print(f'Home Assistant {__version__}')"
       - name: Detect changed integration modules
         id: changed
+        if: ${{ github.event_name == 'pull_request' }}
         shell: bash
         run: |
           git fetch origin "${{ github.base_ref }}" --depth=1
@@ -298,9 +288,60 @@ jobs:
           printf '  %s\n' "${changed[@]}"
           include=$(IFS=,; echo "${changed[*]}")
           echo "include=${include}" >> "$GITHUB_OUTPUT"
+      - name: Run tests
+        id: pytest
+        continue-on-error: true
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTEST_PLUGINS: pytest_asyncio.plugin,pytest_homeassistant_custom_component.plugins,pytest_cov.plugin,pytest_github_actions_annotate_failures.plugin
+        run: pytest -q tests/components/enphase_ev tests/compatibility --cov=custom_components.enphase_ev --cov-report=term-missing --cov-report=xml --cov-fail-under=95 --junitxml=junit.xml -o junit_family=legacy
       - name: Enforce 100% coverage on changed integration modules
+        id: targeted_coverage
         if: ${{ steps.changed.outputs.include != '' }}
-        run: |
-          COVERAGE_FILE=/tmp/enphase_ev.coverage python -m coverage erase
-          COVERAGE_FILE=/tmp/enphase_ev.coverage python -m coverage run -m pytest tests/components/enphase_ev -q
-          COVERAGE_FILE=/tmp/enphase_ev.coverage python -m coverage report -m --include="${{ steps.changed.outputs.include }}" --fail-under=100
+        continue-on-error: true
+        run: python -m coverage report -m --include="${{ steps.changed.outputs.include }}" --fail-under=100
+      - name: Import Codecov GPG key
+        if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
+        run: curl -fsSL https://keybase.io/codecovsecops/pgp_keys.asc | gpg --import
+      - name: Upload coverage to Codecov
+        if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          fail_ci_if_error: true
+      - name: Upload test results to Codecov
+        if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./junit.xml
+          report_type: test_results
+      - name: Fail if tests or targeted coverage failed
+        if: ${{ steps.pytest.outcome == 'failure' || steps.targeted_coverage.outcome == 'failure' }}
+        run: exit 1
+
+  script-tests:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.scripts == 'true' }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: devtools/docker/requirements-ci-scripts.txt
+          cache-suffix: script-tests
+      - name: Install deps
+        run: uv pip install --system -r devtools/docker/requirements-ci-scripts.txt
+      - name: Run maintenance script tests
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTEST_PLUGINS: pytest_asyncio.plugin
+        run: pytest -q tests/scripts

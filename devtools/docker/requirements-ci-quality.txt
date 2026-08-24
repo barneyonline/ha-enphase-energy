@@ -1,0 +1,3 @@
+# Lightweight dependencies for quality-scale validation and strict mypy.
+PyYAML==6.0.3
+mypy==2.2.0
