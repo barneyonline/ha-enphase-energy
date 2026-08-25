@@ -158,6 +158,19 @@ def test_translation_catalogs_cover_every_canonical_leaf() -> None:
             )
 
 
+def test_dutch_charger_authentication_disabled_translation() -> None:
+    """Keep the disabled state in the device sense, not the disability sense."""
+
+    catalog = json.loads(
+        (ROOT / "translations" / "nl.json").read_text(encoding="utf-8")
+    )
+
+    assert (
+        catalog["entity"]["sensor"]["charger_authentication"]["state"]["disabled"]
+        == "Uitgeschakeld"
+    )
+
+
 def test_non_english_catalogs_have_no_unreviewed_english_fallbacks() -> None:
     """Reject untranslated English copy while allowing valid cognates and brands."""
 

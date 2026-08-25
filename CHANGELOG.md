@@ -11,7 +11,8 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Corrected the Dutch IQ EV Charger authentication state so disabled is shown as
+  “Uitgeschakeld” instead of the disability-related “Gehandicapt”. (#831)
 
 ### 🔧 Improvements
 - None

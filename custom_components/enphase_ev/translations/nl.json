@@ -1030,7 +1030,7 @@
         },
         "state": {
           "enabled": "Ingeschakeld",
-          "disabled": "Gehandicapt"
+          "disabled": "Uitgeschakeld"
         }
       },
       "set_amps": {
