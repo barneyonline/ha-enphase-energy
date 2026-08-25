@@ -98,7 +98,7 @@
       "message": "Netbeheer is momenteel geblokkeerd."
     },
     "grid_mode_invalid": {
-      "message": "De rastermodus moet on_grid of off_grid zijn."
+      "message": "De netmodus moet on_grid of off_grid zijn."
     },
     "grid_otp_required": {
       "message": "OTP is vereist."
@@ -110,7 +110,7 @@
       "message": "Het OTP is ongeldig of verlopen."
     },
     "grid_envoy_serial_missing": {
-      "message": "Kan het serienummer van de gezant voor deze site niet bepalen."
+      "message": "Kan het Envoy-serienummer voor deze locatie niet bepalen."
     },
     "grid_site_required": {
       "message": "Selecteer precies één Enphase-site."
@@ -741,9 +741,9 @@
       },
       "grid_toggle": {
         "title": "Netmodus",
-        "description": "Huidige rastermodus: **{current_mode}**.\n\nHet wijzigen van de rastermodus is veiligheidsgevoelig. Selecteer de gevraagde modus om een ​​eenmalige code naar de geregistreerde e-mail en telefoon te sturen.",
+        "description": "Huidige netmodus: **{current_mode}**.\n\nHet wijzigen van de netmodus is veiligheidsgevoelig. Selecteer de gevraagde modus om een ​​eenmalige code naar de geregistreerde e-mail en telefoon te sturen.",
         "data": {
-          "mode": "Gevraagde rastermodus"
+          "mode": "Gevraagde netmodus"
         }
       },
       "grid_profile": {
@@ -777,16 +777,16 @@
         "description": "Enphase heeft de netprofielupdate voor **{selected_profile}** geaccepteerd.\n\nAangevraagde profiel-ID: **{requested_profile_id}**\n\nCloudstatus: **{cloud_apply_status}**\n\nHet kan tot **5 minuten** duren voordat het nieuwe profiel als huidig verschijnt terwijl de cloud en Gateway de verwerking afronden. De Grid Profile-sensor wordt bijgewerkt nadat het Activation-record het nieuwe huidige profiel meldt."
       },
       "grid_toggle_otp": {
-        "title": "Bevestig de wijziging van de rastermodus",
-        "description": "Huidige rastermodus: **{current_mode}**.\n\nAangevraagde rastermodus: **{target_mode}**.\n\nVoer de 4-cijferige eenmalige code in en bevestig de veiligheidsgevoelige wijziging.",
+        "title": "Bevestig de wijziging van de netmodus",
+        "description": "Huidige netmodus: **{current_mode}**.\n\nAangevraagde netmodus: **{target_mode}**.\n\nVoer de 4-cijferige eenmalige code in en bevestig de veiligheidsgevoelige wijziging.",
         "data": {
           "otp": "Eenmalige code",
-          "confirm": "Bevestig de wijziging in de rastermodus"
+          "confirm": "Bevestig de wijziging in de netmodus"
         }
       },
       "grid_toggle_applied": {
-        "title": "Wijziging rastermodus geaccepteerd",
-        "description": "Enphase accepteerde het verzoek om de rastermodus te wijzigen in **{target_mode}**.\n\nHet fysieke relais is mogelijk nog steeds aan het veranderen. Gebruik de Grid Mode-sensor om de resulterende status te observeren."
+        "title": "Wijziging netmodus geaccepteerd",
+        "description": "Enphase accepteerde het verzoek om de netmodus te wijzigen in **{target_mode}**.\n\nHet fysieke relais is mogelijk nog steeds aan het veranderen. Gebruik de netmodus-sensor om de resulterende status te observeren."
       }
     },
     "error": {
@@ -805,9 +805,9 @@
       "grid_profile_profile_invalid": "Het geselecteerde netprofiel is niet beschikbaar voor het land en de regio van deze locatie.",
       "grid_profile_gateway_required": "Netprofiel toepassen vereist een cloud Activation Gateway-record.",
       "grid_profile_apply_failed": "Netprofiel toepassen is mislukt.",
-      "grid_mode_invalid": "Selecteer Op raster of Buiten raster.",
-      "grid_mode_already_active": "De site bevindt zich al in de geselecteerde rastermodus.",
-      "grid_mode_confirm_required": "Bevestig de wijziging in de rastermodus voordat u doorgaat.",
+      "grid_mode_invalid": "Selecteer Verbonden met het net of Losgekoppeld van het net.",
+      "grid_mode_already_active": "De site bevindt zich al in de geselecteerde netmodus.",
+      "grid_mode_confirm_required": "Bevestig de wijziging in de netmodus voordat u doorgaat.",
       "grid_control_unavailable": "Netbeheer is niet beschikbaar voor deze site.",
       "grid_control_blocked": "Netbeheer is momenteel geblokkeerd.",
       "grid_otp_required": "Voer de eenmalige code in.",
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "Netprofielbeheer is niet beschikbaar.",
       "grid_profile_installer_required": "Netprofielbeheer vereist installateurstoegang tot Enphase Activation.",
       "grid_profile_no_regions": "Er zijn geen netprofielregio’s beschikbaar voor het land van deze locatie.",
-      "grid_mode_unavailable": "Beheer van de rastermodus is niet beschikbaar voor deze site.",
-      "grid_mode_blocked": "De rastermodusbesturing is momenteel geblokkeerd: {reasons}."
+      "grid_mode_unavailable": "Beheer van de netmodus is niet beschikbaar voor deze site.",
+      "grid_mode_blocked": "De netmodusbesturing is momenteel geblokkeerd: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migratie voltooid. Enphase Energy bezit nu de geselecteerde bron-entiteits-ID's. Controleer het Energy-dashboard en Developer Tools > Statistics na de volgende vernieuwing.",
@@ -849,8 +849,8 @@
     },
     "grid_mode": {
       "options": {
-        "on_grid": "Op raster",
-        "off_grid": "Buiten het raster",
+        "on_grid": "Verbonden met het net",
+        "off_grid": "Losgekoppeld van het net",
         "unknown": "Onbekend"
       }
     },
@@ -1453,8 +1453,8 @@
       "grid_mode": {
         "name": "Netmodus",
         "state": {
-          "on_grid": "Op raster",
-          "off_grid": "Buiten het raster",
+          "on_grid": "Verbonden met het net",
+          "off_grid": "Losgekoppeld van het net",
           "unknown": "Onbekend"
         }
       },
@@ -2725,8 +2725,8 @@
       }
     },
     "request_grid_toggle_otp": {
-      "name": "Verzoek raster Toggle OTP",
-      "description": "Verzend de eenmalige code die vereist is voordat u de siterastermodus wijzigt.",
+      "name": "Eenmalige code voor netmodus aanvragen",
+      "description": "Verzend de eenmalige code die vereist is voordat u de netmodus van de installatie wijzigt.",
       "fields": {
         "config_entry_id": {
           "name": "Enphase-configuratie-invoer",
@@ -2735,11 +2735,11 @@
       }
     },
     "set_grid_mode": {
-      "name": "Stel de rastermodus in",
-      "description": "Wijzig de siterastermodus na het valideren van de eenmalige code.",
+      "name": "Stel de netmodus in",
+      "description": "Wijzig de netmodus van de installatie na het valideren van de eenmalige code.",
       "fields": {
         "mode": {
-          "name": "Rastermodus",
+          "name": "Netmodus",
           "description": "Selecteer on_grid of off_grid."
         },
         "otp": {
@@ -2748,7 +2748,7 @@
         },
         "config_entry_id": {
           "name": "Enphase-configuratie-invoer",
-          "description": "Selecteer de Enphase-site waarvan de rastermodus moet veranderen."
+          "description": "Selecteer de Enphase-site waarvan de netmodus moet veranderen."
         }
       }
     },
@@ -3017,68 +3017,68 @@
           "description": "Vervangende tak voor het exporttarief met type, exportplan, seizoenen, perioden, staffels en tarieven."
         },
         "configure_import_tariff": {
-          "name": "Guidet importtarif",
-          "description": "Aktiver dette felt for at opbygge en erstatning for importtariffen med de guidede felter."
+          "name": "Importtarief configureren",
+          "description": "Schakel dit in om met de onderstaande begeleide velden een vervangend importtarief op te bouwen."
         },
         "import_tariff_type": {
-          "name": "Importtariftype",
-          "description": "Vælg flad, tidsafhængig eller trindelt importpris."
+          "name": "Type importtarief",
+          "description": "Kies of de importprijs vast, tijdsafhankelijk of getrapt is."
         },
         "import_variation": {
-          "name": "Importvariation",
-          "description": "Vælg om importprisen varierer efter sæson eller hverdag/weekend."
+          "name": "Importvariatie",
+          "description": "Kies of de importprijs per seizoen of tussen weekdagen en weekenden verandert."
         },
         "import_flat_rate": {
-          "name": "Flad importpris",
-          "description": "En enkelt importpris for flad tarif uden periode-rækker."
+          "name": "Vaste importprijs",
+          "description": "Eén importprijs voor een vast tarief wanneer er geen perioderegels zijn opgegeven."
         },
         "import_periods": {
-          "name": "Importperioder",
-          "description": "Rækker til flade eller tidsafhængige importpriser. Dage 1-7 er mandag-søndag; tider kan være HH:MM eller minutter efter midnat."
+          "name": "Importperioden",
+          "description": "Regels voor vaste of tijdsafhankelijke importprijzen. Dagen 1-7 zijn maandag-zondag; tijden kunnen HH:MM of minuten na middernacht zijn."
         },
         "import_tiers": {
-          "name": "Importtrin",
-          "description": "Rækker til trindelte importpriser. Brug end_value -1 for sidste ubegrænsede trin."
+          "name": "Importstaffels",
+          "description": "Regels voor getrapte importprijzen. Gebruik end_value -1 voor de laatste onbeperkte staffel."
         },
         "import_off_peak_rate": {
-          "name": "Import off-peak basis",
-          "description": "Basispris uden for spidsbelastning for trindelte importtariffer."
+          "name": "Basisimportprijs buiten piekuren",
+          "description": "Basisprijs buiten piekuren voor getrapte importtarieven."
         },
         "configure_export_tariff": {
-          "name": "Guidet eksporttarif",
-          "description": "Aktiver dette felt for at opbygge en erstatning for eksporttariffen med de guidede felter."
+          "name": "Exporttarief configureren",
+          "description": "Schakel dit in om met de onderstaande begeleide velden een vervangend exporttarief op te bouwen."
         },
         "export_tariff_type": {
-          "name": "Eksporttariftype",
-          "description": "Vælg flad, tidsafhængig eller trindelt eksportpris."
+          "name": "Type exporttarief",
+          "description": "Kies of de exportvergoeding vast, tijdsafhankelijk of getrapt is."
         },
         "export_variation": {
-          "name": "Eksportvariation",
-          "description": "Vælg om eksportprisen varierer efter sæson eller hverdag/weekend."
+          "name": "Exportvariatie",
+          "description": "Kies of de exportprijs per seizoen of tussen weekdagen en weekenden verandert."
         },
         "export_plan": {
-          "name": "Eksportplan",
-          "description": "Vælg Enphase-eksportplanen der skal skrives med eksporttariffen."
+          "name": "Exportplan",
+          "description": "Kies het label van het Enphase-exportplan dat bij het exporttarief moet worden opgeslagen."
         },
         "export_flat_rate": {
-          "name": "Flad eksportpris",
-          "description": "En enkelt eksportpris for flad tarif uden periode-rækker."
+          "name": "Vaste exportprijs",
+          "description": "Eén exportprijs voor een vast tarief wanneer er geen perioderegels zijn opgegeven."
         },
         "export_periods": {
-          "name": "Eksportperioder",
-          "description": "Rækker til flade eller tidsafhængige eksportpriser. Dage 1-7 er mandag-søndag; tider kan være HH:MM eller minutter efter midnat."
+          "name": "Exportperioden",
+          "description": "Regels voor vaste of tijdsafhankelijke exportprijzen. Dagen 1-7 zijn maandag-zondag; tijden kunnen HH:MM of minuten na middernacht zijn."
         },
         "export_tiers": {
-          "name": "Eksporttrin",
-          "description": "Rækker til trindelte eksportpriser. Brug end_value -1 for sidste ubegrænsede trin."
+          "name": "Exportstaffels",
+          "description": "Regels voor getrapte exportprijzen. Gebruik end_value -1 voor de laatste onbeperkte staffel."
         },
         "export_off_peak_rate": {
-          "name": "Eksport off-peak basis",
-          "description": "Basispris uden for spidsbelastning for trindelte eksporttariffer."
+          "name": "Basisexportprijs buiten piekuren",
+          "description": "Basisprijs buiten piekuren voor getrapte exporttarieven."
         },
         "device_id": {
-          "name": "Enphase-enhed",
-          "description": "Valgfri Enphase-enhed til at vælge stedet for fakturerings- eller tarifstrukturændringer."
+          "name": "Apparaat",
+          "description": "Optioneel Enphase-apparaat om de installatie voor facturerings- of tariefstructuurupdates te kiezen."
         }
       },
       "sections": {

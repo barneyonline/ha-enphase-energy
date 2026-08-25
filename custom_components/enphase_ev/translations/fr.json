@@ -110,7 +110,7 @@
       "message": "L'OTP est invalide ou a expiré."
     },
     "grid_envoy_serial_missing": {
-      "message": "Impossible de déterminer le numéro de série de l'envoyé pour ce site."
+      "message": "Impossible de déterminer le numéro de série de l’Envoy pour ce site."
     },
     "grid_site_required": {
       "message": "Sélectionnez exactement un site Enphase."
@@ -743,7 +743,7 @@
         "title": "Mode réseau",
         "description": "Mode réseau actuel : **{current_mode}**.\n\nLe changement de mode réseau est sensible à la sécurité. Sélectionnez le mode demandé pour envoyer un code à usage unique à l'e-mail et au téléphone enregistrés.",
         "data": {
-          "mode": "Mode grille demandé"
+          "mode": "Mode réseau demandé"
         }
       },
       "grid_profile": {
@@ -778,7 +778,7 @@
       },
       "grid_toggle_otp": {
         "title": "Confirmer le changement de mode réseau",
-        "description": "Mode réseau actuel : **{current_mode}**.\n\nMode grille demandé : **{target_mode}**.\n\nEntrez le code à usage unique à 4 chiffres et confirmez le changement sensible à la sécurité.",
+        "description": "Mode réseau actuel : **{current_mode}**.\n\nMode réseau demandé : **{target_mode}**.\n\nEntrez le code à usage unique à 4 chiffres et confirmez le changement sensible à la sécurité.",
         "data": {
           "otp": "Code à usage unique",
           "confirm": "Confirmez le changement de mode réseau"
@@ -786,7 +786,7 @@
       },
       "grid_toggle_applied": {
         "title": "Changement de mode réseau accepté",
-        "description": "Enphase a accepté la demande de changement du mode grille en **{target_mode}**.\n\nLe relais physique est peut-être encore en train de changer. Utilisez le capteur Grid Mode pour observer l’état résultant."
+        "description": "Enphase a accepté la demande de changement du mode réseau en **{target_mode}**.\n\nLe relais physique est peut-être encore en train de changer. Utilisez le capteur mode réseau pour observer l’état résultant."
       }
     },
     "error": {
@@ -805,8 +805,8 @@
       "grid_profile_profile_invalid": "Le profil réseau sélectionné n’est pas disponible pour le pays et la région de ce site.",
       "grid_profile_gateway_required": "L’application du profil réseau nécessite un enregistrement Gateway Activation cloud.",
       "grid_profile_apply_failed": "Échec de l’application du profil réseau.",
-      "grid_mode_invalid": "Sélectionnez Sur la grille ou Hors grille.",
-      "grid_mode_already_active": "Le site est déjà dans le mode Grille sélectionné.",
+      "grid_mode_invalid": "Sélectionnez Sur le réseau ou Hors réseau.",
+      "grid_mode_already_active": "Le site est déjà dans le mode Réseau sélectionné.",
       "grid_mode_confirm_required": "Confirmez le changement de mode réseau avant de continuer.",
       "grid_control_unavailable": "Le contrôle du réseau n'est pas disponible pour ce site.",
       "grid_control_blocked": "Le contrôle du réseau est actuellement bloqué.",
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "Le contrôle du profil réseau est indisponible.",
       "grid_profile_installer_required": "Le contrôle du profil réseau nécessite un accès installateur à Enphase Activation.",
       "grid_profile_no_regions": "Aucune région de profil réseau n'est disponible pour le pays de ce site.",
-      "grid_mode_unavailable": "Le contrôle du mode grille n’est pas disponible pour ce site.",
-      "grid_mode_blocked": "Le contrôle du mode grille est actuellement bloqué : {reasons}."
+      "grid_mode_unavailable": "Le contrôle du mode réseau n’est pas disponible pour ce site.",
+      "grid_mode_blocked": "Le contrôle du mode réseau est actuellement bloqué : {reasons}."
     },
     "create_entry": {
       "migration_success": "Migration terminée. Enphase Energy possède maintenant les identifiants d’entité source sélectionnés. Vérifiez le tableau de bord Energy et Developer Tools > Statistics après la prochaine actualisation.",

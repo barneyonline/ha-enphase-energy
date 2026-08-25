@@ -158,17 +158,197 @@ def test_translation_catalogs_cover_every_canonical_leaf() -> None:
             )
 
 
-def test_dutch_charger_authentication_disabled_translation() -> None:
-    """Keep the disabled state in the device sense, not the disability sense."""
+def test_charger_authentication_disabled_translations_use_device_sense() -> None:
+    """Keep disabled states in the device sense, not the disability sense."""
 
-    catalog = json.loads(
-        (ROOT / "translations" / "nl.json").read_text(encoding="utf-8")
+    expected = {
+        "bg": "Деактивирано",
+        "cs": "Deaktivováno",
+        "da": "Deaktiveret",
+        "de": "Deaktiviert",
+        "el": "Απενεργοποιημένο",
+        "es": "Desactivado",
+        "et": "Deaktiveeritud",
+        "fi": "Ei käytössä",
+        "fr": "Désactivé",
+        "hu": "Letiltva",
+        "it": "Disattivato",
+        "lt": "Išjungta",
+        "lv": "Atspējots",
+        "nb-NO": "Deaktivert",
+        "nl": "Uitgeschakeld",
+        "pl": "Wyłączony",
+        "pt-BR": "Desativado",
+        "ro": "Dezactivat",
+        "sv-SE": "Inaktiverad",
+    }
+    path = "entity.sensor.charger_authentication.state.disabled"
+
+    for locale, expected_value in expected.items():
+        catalog = json.loads(
+            (ROOT / "translations" / f"{locale}.json").read_text(encoding="utf-8")
+        )
+        assert _at_path(catalog, path) == expected_value
+
+
+def test_non_english_catalogs_preserve_envoy_brand_name() -> None:
+    """Keep Envoy as a product name instead of translating it as a person."""
+
+    path = "exceptions.grid_envoy_serial_missing.message"
+    for locale_path in sorted((ROOT / "translations").glob("*.json")):
+        if locale_path.stem == "en" or locale_path.stem.startswith("en-"):
+            continue
+        catalog = json.loads(locale_path.read_text(encoding="utf-8"))
+        assert re.search(
+            r"\bEnvoy\b", _at_path(catalog, path)
+        ), f"{locale_path.name} must preserve the Envoy product name"
+
+
+def test_guided_tariff_fields_are_not_copied_from_danish() -> None:
+    """Reject the copied Danish guided-tariff block in unrelated locales."""
+
+    field_names = {
+        "configure_import_tariff",
+        "import_tariff_type",
+        "import_variation",
+        "import_flat_rate",
+        "import_periods",
+        "import_tiers",
+        "import_off_peak_rate",
+        "configure_export_tariff",
+        "export_tariff_type",
+        "export_variation",
+        "export_plan",
+        "export_flat_rate",
+        "export_periods",
+        "export_tiers",
+        "export_off_peak_rate",
+        "device_id",
+    }
+    catalogs = {
+        path.stem: json.loads(path.read_text(encoding="utf-8"))
+        for path in sorted((ROOT / "translations").glob("*.json"))
+        if path.stem == "da" or (path.stem != "en" and not path.stem.startswith("en-"))
+    }
+
+    def guided_fields(catalog: dict[str, object]) -> dict[str, object]:
+        flattened = _flatten_catalog(catalog)
+        return {
+            path: value
+            for path, value in flattened.items()
+            if path.startswith("services.update_tariff.fields.")
+            and path.split(".")[3] in field_names
+        }
+
+    danish = guided_fields(catalogs.pop("da"))
+    for locale, catalog in catalogs.items():
+        assert (
+            guided_fields(catalog) != danish
+        ), f"{locale}.json copied the Danish guided-tariff translations"
+
+
+def test_advanced_grid_profile_labels_are_not_copied_from_estonian() -> None:
+    """Reject an Estonian advanced-options label copied into other locales."""
+
+    services = ("browse_grid_profiles", "refresh_grid_profiles", "set_grid_profile")
+    path_template = "services.{}.sections.advanced.name"
+    for locale_path in sorted((ROOT / "translations").glob("*.json")):
+        locale = locale_path.stem
+        if locale == "en" or locale.startswith("en-"):
+            continue
+        catalog = json.loads(locale_path.read_text(encoding="utf-8"))
+        values = {
+            _at_path(catalog, path_template.format(service)) for service in services
+        }
+        assert len(values) == 1, f"{locale_path.name} has inconsistent labels: {values}"
+        if locale != "et":
+            assert values != {
+                "Täiendavad valikud"
+            }, f"{locale_path.name} copied the Estonian advanced-options label"
+
+
+def test_electrical_grid_and_site_terms_avoid_website_false_friends() -> None:
+    """Reject geometric-grid and website terms in physical-site contexts."""
+
+    forbidden_grid_terms = {
+        "bg": r"решет",
+        "cs": r"mříž",
+        "da": r"gitter",
+        "de": r"Gitter|Raster",
+        "el": r"πλέγμα",
+        "es": r"cuadrícul",
+        "et": r"ruudust",
+        "fi": r"ruuduk",
+        "fr": r"grille",
+        "hu": r"rács",
+        "it": r"grigli",
+        "lt": r"tinklel",
+        "lv": r"režģ",
+        "nb-NO": r"rutenett",
+        "nl": r"raster",
+        "pl": r"siatk",
+        "pt-BR": r"grade",
+        "ro": r"gril",
+        "sv-SE": r"rutnät",
+    }
+    forbidden_website_terms = {
+        "bg": r"сайт",
+        "cs": r"\bweb",
+        "da": r"websted",
+        "el": r"ιστότοπ",
+        "et": r"\b(?:sait|saidi|saite|saidil|saidile|saidilt|saidid|saitide)",
+        "fi": r"sivusto",
+        "hu": r"webhely",
+        "lt": r"svetain",
+        "lv": r"vietn",
+        "nb-NO": r"nettsted",
+        "pl": r"witryn",
+        "sv-SE": r"webbplats",
+    }
+    canonical = _flatten_catalog(
+        json.loads((ROOT / "strings.json").read_text(encoding="utf-8"))
     )
 
-    assert (
-        catalog["entity"]["sensor"]["charger_authentication"]["state"]["disabled"]
-        == "Uitgeschakeld"
+    for locale_path in sorted((ROOT / "translations").glob("*.json")):
+        locale = locale_path.stem
+        if locale == "en" or locale.startswith("en-"):
+            continue
+        translated = _flatten_catalog(
+            json.loads(locale_path.read_text(encoding="utf-8"))
+        )
+        for path, source in canonical.items():
+            value = translated[path]
+            assert isinstance(source, str) and isinstance(value, str)
+            if re.search(r"\bgrid\b", source, re.IGNORECASE):
+                assert not re.search(
+                    forbidden_grid_terms[locale], value, re.IGNORECASE
+                ), f"{locale_path.name}:{path} uses a geometric-grid translation"
+            if locale in forbidden_website_terms and re.search(
+                r"\bsite\b", source, re.IGNORECASE
+            ):
+                assert not re.search(
+                    forbidden_website_terms[locale], value, re.IGNORECASE
+                ), f"{locale_path.name}:{path} translates an installation as a website"
+
+
+def test_tariff_labels_use_native_bulgarian_and_greek_scripts() -> None:
+    """Reject Latin transliterations in Bulgarian and Greek tariff labels."""
+
+    paths = (
+        "entity.sensor.tariff_billing_cycle.name",
+        "entity.sensor.tariff_import_rate.name",
+        "entity.sensor.tariff_import_rate.state_attributes.source.name",
+        "entity.sensor.tariff_export_rate.name",
+        "entity.sensor.tariff_export_rate.state_attributes.export_plan.name",
     )
+    for locale, native_script in {"bg": r"[А-Яа-я]", "el": r"[Α-Ωα-ω]"}.items():
+        catalog = json.loads(
+            (ROOT / "translations" / f"{locale}.json").read_text(encoding="utf-8")
+        )
+        for path in paths:
+            assert re.search(
+                native_script, _at_path(catalog, path)
+            ), f"{locale}.json:{path} must use the locale's native script"
 
 
 def test_non_english_catalogs_have_no_unreviewed_english_fallbacks() -> None:

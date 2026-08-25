@@ -31,7 +31,7 @@
         "title": "Vælg site",
         "description": "Vælg hvilket Enlighten-site der skal linkes.",
         "data": {
-          "site_id": "websted"
+          "site_id": "anlæg"
         }
       },
       "devices": {
@@ -92,13 +92,13 @@
       "message": "Start af opladning blev afvist af Enphase (HTTP {status})."
     },
     "grid_control_unavailable": {
-      "message": "Gitterstyring er ikke tilgængelig for dette websted."
+      "message": "Netstyring er ikke tilgængelig for dette anlæg."
     },
     "grid_control_blocked": {
       "message": "Netstyring er i øjeblikket blokeret."
     },
     "grid_mode_invalid": {
-      "message": "Gittertilstand skal være on_grid eller off_grid."
+      "message": "Nettilstand skal være on_grid eller off_grid."
     },
     "grid_otp_required": {
       "message": "OTP er påkrævet."
@@ -110,13 +110,13 @@
       "message": "OTP er ugyldig eller udløbet."
     },
     "grid_envoy_serial_missing": {
-      "message": "Kan ikke bestemme udsendingens serienummer for dette websted."
+      "message": "Kan ikke fastslå Envoy-serienummeret for dette anlæg."
     },
     "grid_site_required": {
       "message": "Vælg præcis ét Enphase-sted."
     },
     "grid_site_ambiguous": {
-      "message": "Flere websteder blev valgt ({count}). Vælg præcis ét websted."
+      "message": "Flere anlæg blev valgt ({count}). Vælg præcis ét anlæg."
     },
     "schedule_required": {
       "message": "Aktivér mindst én tidsplan, før du vælger planlagt opladning."
@@ -191,7 +191,7 @@
       "message": "Tidsplan er i konflikt med den eksisterende tidsplan for begrænsning af batteriafladning. Juster eller deaktiver den tidsplan først."
     },
     "schedule_conflict_cfg": {
-      "message": "Tidsplan er i konflikt med den eksisterende afgift-fra-net-plan. Juster eller deaktiver den tidsplan først."
+      "message": "Tidsplanen er i konflikt med den eksisterende plan for opladning fra elnettet. Juster eller deaktiver den plan først."
     },
     "schedule_update_conflict": {
       "message": "Planlæg opdatering er i konflikt med en eksisterende batteritidsplan."
@@ -230,7 +230,7 @@
       "message": "Den valgte batteriprofil understøttes ikke."
     },
     "charge_from_grid_unavailable": {
-      "message": "Opladning fra gitterindstillingen er ikke tilgængelig."
+      "message": "Opladning fra netindstillingen er ikke tilgængelig."
     },
     "charge_from_grid_toggle_not_applied": {
       "message": "Charge from grid toggle blev ikke anvendt af Enphase."
@@ -242,10 +242,10 @@
       "message": "PowerMatch-skiftet blev ikke anvendt af Enphase."
     },
     "charge_from_grid_schedule_unavailable": {
-      "message": "Opkrævning fra netplan er ikke tilgængelig."
+      "message": "Planen for opladning fra elnettet er ikke tilgængelig."
     },
     "charge_from_grid_schedule_times_different": {
-      "message": "Start- og sluttidspunkter for gebyr-fra-gitter skal være forskellige."
+      "message": "Start- og sluttidspunkterne for planen for opladning fra elnettet skal være forskellige."
     },
     "charge_from_grid_schedule_toggle_not_applied": {
       "message": "Til/fra-til-fra-net-planlægning blev ikke anvendt af Enphase."
@@ -257,19 +257,19 @@
       "message": "En tidsplanændring afventer Envoy-synkronisering. Vent venligst."
     },
     "charge_from_grid_schedule_time_invalid": {
-      "message": "Tidsplan for opkrævning fra nettet er ugyldig."
+      "message": "Tidspunktet i planen for opladning fra elnettet er ugyldigt."
     },
     "schedule_api_unavailable": {
       "message": "Schedule API er ikke tilgængelig på denne klientversion."
     },
     "charge_from_grid_schedule_missing": {
-      "message": "Der er ingen eksisterende afgift-fra-net-plan tilgængelig."
+      "message": "Der findes ingen eksisterende plan for opladning fra elnettet."
     },
     "schedule_toggle_create_before_enable": {
       "message": "Opret en {schedule_label} i IQ Battery Scheduler, før du aktiverer den."
     },
     "schedule_not_exposed": {
-      "message": "{schedule_label} er i øjeblikket ikke eksponeret af Enphase for dette websted. Vent på, at tidsplansynkroniseringen er fuldført, og opdater derefter, og prøv igen."
+      "message": "{schedule_label} er i øjeblikket ikke eksponeret af Enphase for dette anlæg. Vent på, at tidsplansynkroniseringen er fuldført, og opdater derefter, og prøv igen."
     },
     "schedule_toggle_not_applied": {
       "message": "{schedule_label} toggle blev ikke anvendt af Enphase."
@@ -305,10 +305,10 @@
       "message": "Aktuelle tidsplaner er ikke tilgængelige."
     },
     "charge_from_grid_schedule_limit_range": {
-      "message": "Tidsplangrænsen for gebyr fra nettet skal være mellem {minimum} og {maximum}."
+      "message": "Grænsen for planen for opladning fra elnettet skal være mellem {minimum} og {maximum}."
     },
     "charge_from_grid_schedule_limit_minimum": {
-      "message": "Tidsplangrænsen for afgift fra nettet skal være mindst {minimum} %."
+      "message": "Grænsen for planen for opladning fra elnettet skal være mindst {minimum} %."
     },
     "battery_shutdown_level_unavailable": {
       "message": "Batteriets nedlukningsniveau er ikke tilgængeligt."
@@ -741,9 +741,9 @@
       },
       "grid_toggle": {
         "title": "Nettilstand",
-        "description": "Aktuel gittertilstand: **{current_mode}**.\n\nÆndring af gittertilstand er sikkerhedsfølsomt. Vælg den ønskede tilstand for at sende en engangskode til den registrerede e-mail og telefon.",
+        "description": "Aktuel nettilstand: **{current_mode}**.\n\nÆndring af nettilstand er sikkerhedsfølsomt. Vælg den ønskede tilstand for at sende en engangskode til den registrerede e-mail og telefon.",
         "data": {
-          "mode": "Anmodet gittertilstand"
+          "mode": "Anmodet nettilstand"
         }
       },
       "grid_profile": {
@@ -777,16 +777,16 @@
         "description": "Enphase har accepteret netprofilopdateringen for **{selected_profile}**.\n\nAnmodet profil-id: **{requested_profile_id}**\n\nCloudstatus: **{cloud_apply_status}**\n\nDet kan tage op til **5 minutter**, før den nye profil vises som aktuel, mens skyen og Gateway færdiggør behandlingen. Grid Profile-sensoren opdateres, når Activation-posten rapporterer den nye aktuelle profil."
       },
       "grid_toggle_otp": {
-        "title": "Bekræft ændring af gittertilstand",
-        "description": "Aktuel gittertilstand: **{current_mode}**.\n\nAnmodet gittertilstand: **{target_mode}**.\n\nIndtast den 4-cifrede engangskode og bekræft den sikkerhedsfølsomme ændring.",
+        "title": "Bekræft ændring af nettilstand",
+        "description": "Aktuel nettilstand: **{current_mode}**.\n\nAnmodet nettilstand: **{target_mode}**.\n\nIndtast den 4-cifrede engangskode og bekræft den sikkerhedsfølsomme ændring.",
         "data": {
           "otp": "Engangskode",
-          "confirm": "Bekræft ændringen af ​​gittertilstanden"
+          "confirm": "Bekræft ændringen af ​​nettilstanden"
         }
       },
       "grid_toggle_applied": {
-        "title": "Ændring af gittertilstand accepteret",
-        "description": "Enphase accepterede anmodningen om at ændre Grid Mode til **{target_mode}**.\n\nDet fysiske relæ kan stadig ændre sig. Brug Grid Mode-sensoren til at observere den resulterende tilstand."
+        "title": "Ændring af nettilstand accepteret",
+        "description": "Enphase accepterede anmodningen om at ændre nettilstand til **{target_mode}**.\n\nDet fysiske relæ kan stadig ændre sig. Brug nettilstand-sensoren til at observere den resulterende tilstand."
       }
     },
     "error": {
@@ -806,14 +806,14 @@
       "grid_profile_gateway_required": "Anvendelse af netprofil kræver en cloudbaseret Activation Gateway-post.",
       "grid_profile_apply_failed": "Anvendelse af netprofil mislykkedes.",
       "grid_mode_invalid": "Vælg On Grid eller Off Grid.",
-      "grid_mode_already_active": "Webstedet er allerede i den valgte Grid Mode.",
-      "grid_mode_confirm_required": "Bekræft ændringen af ​​gittertilstanden, før du fortsætter.",
-      "grid_control_unavailable": "Gitterstyring er ikke tilgængelig for dette websted.",
+      "grid_mode_already_active": "Anlægget er allerede i den valgte nettilstand.",
+      "grid_mode_confirm_required": "Bekræft ændringen af ​​nettilstanden, før du fortsætter.",
+      "grid_control_unavailable": "Netstyring er ikke tilgængelig for dette anlæg.",
       "grid_control_blocked": "Netstyring er i øjeblikket blokeret.",
       "grid_otp_required": "Indtast engangskoden.",
       "grid_otp_invalid_format": "Engangskoden skal indeholde præcis fire cifre.",
       "grid_otp_invalid": "Engangskoden er ugyldig eller udløbet.",
-      "grid_envoy_serial_missing": "Gatewayen for dette websted kunne ikke bestemmes."
+      "grid_envoy_serial_missing": "Gatewayen for dette anlæg kunne ikke bestemmes."
     },
     "abort": {
       "migration_no_envoy_sources": "Ingen Enphase Envoy-energisensorer er tilgængelige til migrering.",
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "Netprofilstyring er ikke tilgængelig.",
       "grid_profile_installer_required": "Netprofilstyring kræver installatøradgang til Enphase Activation.",
       "grid_profile_no_regions": "Der er ingen netprofilregioner tilgængelige for dette anlægs land.",
-      "grid_mode_unavailable": "Grid Mode-kontrol er ikke tilgængelig for dette websted.",
-      "grid_mode_blocked": "Grid Mode-kontrol er i øjeblikket blokeret: {reasons}."
+      "grid_mode_unavailable": "nettilstand-kontrol er ikke tilgængelig for dette anlæg.",
+      "grid_mode_blocked": "nettilstand-kontrol er i øjeblikket blokeret: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migrering fuldført. Enphase Energy ejer nu de valgte kildeentitets-id'er. Kontrollér Energy-dashboardet og Developer Tools > Statistics efter næste opdatering.",
@@ -1030,7 +1030,7 @@
         },
         "state": {
           "enabled": "Aktiveret",
-          "disabled": "Handicappet"
+          "disabled": "Deaktiveret"
         }
       },
       "set_amps": {
@@ -1360,7 +1360,7 @@
       "system_profile_status": {
         "name": "Systemprofilstatus",
         "state": {
-          "pending": "Indtil"
+          "pending": "Afventer"
         },
         "state_attributes": {
           "effective_profile": {
@@ -2541,19 +2541,19 @@
     },
     "scheduler_unavailable": {
       "title": "Enphase Energy-planlæggeren er ikke tilgængelig",
-      "description": "Enphase-planlægningstjenesten for websted {site_id} er ikke tilgængelig. Valg af opladningstilstand og synkronisering af tidsplan er midlertidigt deaktiveret."
+      "description": "Enphase-planlægningstjenesten for anlæg {site_id} er ikke tilgængelig. Valg af opladningstilstand og synkronisering af tidsplan er midlertidigt deaktiveret."
     },
     "session_history_unavailable": {
       "title": "Enphase Energy-sessionshistorik er ikke tilgængelig",
-      "description": "Enphase sessionshistoriktjenesten for webstedet {site_id} er ikke tilgængelig. Sessionshistoriksensorer viser cachelagrede data, indtil tjenesten genoprettes."
+      "description": "Enphase sessionshistoriktjenesten for anlægget {site_id} er ikke tilgængelig. Sessionshistoriksensorer viser cachelagrede data, indtil tjenesten genoprettes."
     },
     "site_energy_unavailable": {
       "title": "Enphase Energy-stedenergi er ikke tilgængelig",
-      "description": "Enphase livstidsenergitjenesten for websted {site_id} er ikke tilgængelig. Stedets energisensorer viser cachelagrede data, indtil tjenesten genoprettes."
+      "description": "Enphase livstidsenergitjenesten for anlæg {site_id} er ikke tilgængelig. Stedets energisensorer viser cachelagrede data, indtil tjenesten genoprettes."
     },
     "auth_settings_unavailable": {
       "title": "Enphase Energy-godkendelsesindstillinger er ikke tilgængelige",
-      "description": "Enphase-opladergodkendelsesindstillingstjenesten for websted {site_id} er ikke tilgængelig. Appgodkendelseskontroller er midlertidigt deaktiveret."
+      "description": "Enphase-opladergodkendelsesindstillingstjenesten for anlæg {site_id} er ikke tilgængelig. Appgodkendelseskontroller er midlertidigt deaktiveret."
     },
     "battery_profile_pending": {
       "title": "Opdatering af Enphase Energy-batteriprofil afventer",
@@ -2583,15 +2583,15 @@
       "backoff_active": "Backoff aktiv",
       "network_errors": "Efterfølgende netværksfejl",
       "http_errors": "Efterfølgende HTTP-fejl",
-      "site_count": "Antal websteder",
-      "site_name": "Webstedets navn",
+      "site_count": "Antal anlæg",
+      "site_name": "Anlæggets navn",
       "site_ids": "Site-id'er",
-      "site_names": "Webstedsnavne",
+      "site_names": "Anlægsnavne",
       "last_failure_status": "Sidste fejlstatus",
       "last_failure_description": "Sidste fejlbeskrivelse",
       "phase_timings": "Fase timings",
       "session_cache_ttl_s": "Session-cache TTL (s)",
-      "sites": "websteder",
+      "sites": "anlæg",
       "auth_settings_available": "Godkendelsesindstillinger tilgængelige",
       "auth_settings_last_error": "Godkendelsesindstillinger sidste fejl",
       "auth_settings_failures": "Godkendelsesindstillinger fejler",
@@ -2603,7 +2603,7 @@
       "session_history_backoff_active": "Sessionshistorik backoff aktiv",
       "session_history_backoff_ends_utc": "Sessionshistorik backoff slutter (UTC)",
       "site_energy_available": "Site energi tilgængelig",
-      "site_energy_last_error": "Sidste fejl på webstedets energi",
+      "site_energy_last_error": "Sidste fejl på anlæggets energi",
       "site_energy_failures": "Energisvigt på stedet",
       "site_energy_backoff_active": "Site energy backoff aktiv",
       "site_energy_backoff_ends_utc": "Backoff for siteenergi slutter (UTC)",
@@ -2725,8 +2725,8 @@
       }
     },
     "request_grid_toggle_otp": {
-      "name": "Anmod om Grid Toggle OTP",
-      "description": "Send den engangskode, der kræves, før du ændrer webstedsgittertilstand.",
+      "name": "Anmod om engangskode til skift af nettilstand",
+      "description": "Send den engangskode, der kræves, før du ændrer anlæggets nettilstand.",
       "fields": {
         "config_entry_id": {
           "name": "Enphase config-indgang",
@@ -2735,11 +2735,11 @@
       }
     },
     "set_grid_mode": {
-      "name": "Indstil gittertilstand",
-      "description": "Skift webstedsgittertilstand efter validering af engangskoden.",
+      "name": "Indstil nettilstand",
+      "description": "Skift anlæggets nettilstand efter validering af engangskoden.",
       "fields": {
         "mode": {
-          "name": "Gittertilstand",
+          "name": "Nettilstand",
           "description": "Vælg on_grid eller off_grid."
         },
         "otp": {
@@ -2748,7 +2748,7 @@
         },
         "config_entry_id": {
           "name": "Enphase config-indgang",
-          "description": "Vælg det Enphase-sted, hvis gittertilstand skal ændres."
+          "description": "Vælg det Enphase-sted, hvis nettilstand skal ændres."
         }
       }
     },
@@ -2790,11 +2790,11 @@
       "fields": {
         "site_id": {
           "name": "Side ID",
-          "description": "Valgfri webstedsidentifikator; registreres automatisk, når en webstedsenhed vælges."
+          "description": "Valgfri anlægsidentifikator; registreres automatisk, når en anlægsenhed vælges."
         },
         "config_entry_id": {
           "name": "Konfigurer indtastnings-id",
-          "description": "Valgfri konfigurationsindtastningsidentifikator for en enkelt Enphase-webstedsindtastning."
+          "description": "Valgfri konfigurationsindtastningsidentifikator for en enkelt Enphase-anlægsregistrering."
         }
       }
     },
@@ -2820,7 +2820,7 @@
           "description": "Planlæg sluttidspunkt."
         },
         "limit": {
-          "name": "ladningsgrænse",
+          "name": "Opladningsgrænse",
           "description": "Maksimal batteriladningstilstand (%)."
         },
         "days": {
@@ -2829,11 +2829,11 @@
         },
         "site_id": {
           "name": "Side ID",
-          "description": "Valgfri webstedsidentifikator; registreres automatisk, når en webstedsenhed vælges."
+          "description": "Valgfri anlægsidentifikator; registreres automatisk, når en anlægsenhed vælges."
         },
         "config_entry_id": {
           "name": "Konfigurer indtastnings-id",
-          "description": "Valgfri konfigurationsindtastningsidentifikator for en enkelt Enphase-webstedsindtastning."
+          "description": "Valgfri konfigurationsindtastningsidentifikator for en enkelt Enphase-anlægsregistrering."
         }
       }
     },
@@ -2863,7 +2863,7 @@
           "description": "Planlæg sluttidspunkt."
         },
         "limit": {
-          "name": "ladningsgrænse",
+          "name": "Opladningsgrænse",
           "description": "Maksimal batteriladningstilstand (%)."
         },
         "days": {
@@ -2876,11 +2876,11 @@
         },
         "site_id": {
           "name": "Side ID",
-          "description": "Valgfri webstedsidentifikator; registreres automatisk, når en webstedsenhed vælges."
+          "description": "Valgfri anlægsidentifikator; registreres automatisk, når en anlægsenhed vælges."
         },
         "config_entry_id": {
           "name": "Konfigurer indtastnings-id",
-          "description": "Valgfri konfigurationsindtastningsidentifikator for en enkelt Enphase-webstedsindtastning."
+          "description": "Valgfri konfigurationsindtastningsidentifikator for en enkelt Enphase-anlægsregistrering."
         }
       }
     },
@@ -2907,11 +2907,11 @@
         },
         "site_id": {
           "name": "Side ID",
-          "description": "Valgfri webstedsidentifikator; registreres automatisk, når en webstedsenhed vælges."
+          "description": "Valgfri anlægsidentifikator; registreres automatisk, når en anlægsenhed vælges."
         },
         "config_entry_id": {
           "name": "Konfigurer indtastnings-id",
-          "description": "Valgfri konfigurationsindtastningsidentifikator for en enkelt Enphase-webstedsindtastning."
+          "description": "Valgfri konfigurationsindtastningsidentifikator for en enkelt Enphase-anlægsregistrering."
         }
       }
     },
@@ -2930,11 +2930,11 @@
         },
         "site_id": {
           "name": "Side ID",
-          "description": "Valgfri webstedsidentifikator; registreres automatisk, når en webstedsenhed vælges."
+          "description": "Valgfri anlægsidentifikator; registreres automatisk, når en anlægsenhed vælges."
         },
         "config_entry_id": {
           "name": "Konfigurer indtastnings-id",
-          "description": "Valgfri konfigurationsindtastningsidentifikator for en enkelt Enphase-webstedsindtastning."
+          "description": "Valgfri konfigurationsindtastningsidentifikator for en enkelt Enphase-anlægsregistrering."
         }
       }
     },

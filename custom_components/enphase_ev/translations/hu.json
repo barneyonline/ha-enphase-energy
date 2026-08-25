@@ -92,13 +92,13 @@
       "message": "Az Enphase elutasította a töltés indítását (HTTP {status})."
     },
     "grid_control_unavailable": {
-      "message": "A rácsvezérlés nem érhető el ezen a webhelyen."
+      "message": "A hálózatvezérlés nem érhető el ezen a helyszínen."
     },
     "grid_control_blocked": {
-      "message": "A rácsvezérlés jelenleg le van tiltva."
+      "message": "A hálózatvezérlés jelenleg le van tiltva."
     },
     "grid_mode_invalid": {
-      "message": "A rács módnak on_grid vagy off_grid értékűnek kell lennie."
+      "message": "A hálózati módnak on_grid vagy off_grid értékűnek kell lennie."
     },
     "grid_otp_required": {
       "message": "OTP szükséges."
@@ -110,13 +110,13 @@
       "message": "Az OTP érvénytelen vagy lejárt."
     },
     "grid_envoy_serial_missing": {
-      "message": "Nem lehet meghatározni a küldött sorozatszámát ehhez a webhelyhez."
+      "message": "Nem állapítható meg az Envoy sorozatszáma ehhez a helyszínhez."
     },
     "grid_site_required": {
-      "message": "Válasszon ki pontosan egy Enphase webhelyet."
+      "message": "Válasszon ki pontosan egy Enphase helyszínt."
     },
     "grid_site_ambiguous": {
-      "message": "Több webhely lett kiválasztva ({count}). Válasszon ki pontosan egy webhelyet."
+      "message": "Több helyszín lett kiválasztva ({count}). Válasszon ki pontosan egy helyszínt."
     },
     "schedule_required": {
       "message": "Ütemezett töltés kiválasztása előtt engedélyezzen legalább egy ütemezést."
@@ -741,9 +741,9 @@
       },
       "grid_toggle": {
         "title": "Hálózati mód",
-        "description": "Jelenlegi rács mód: **{current_mode}**.\n\nA rács mód váltása biztonsági szempontból érzékeny. Válassza ki a kért módot, hogy egyszeri kódot küldjön a regisztrált e-mailre és telefonra.",
+        "description": "Jelenlegi hálózati mód: **{current_mode}**.\n\nA hálózati mód váltása biztonsági szempontból érzékeny. Válassza ki a kért módot, hogy egyszeri kódot küldjön a regisztrált e-mailre és telefonra.",
         "data": {
-          "mode": "Kért rács mód"
+          "mode": "Kért hálózati mód"
         }
       },
       "grid_profile": {
@@ -777,16 +777,16 @@
         "description": "Az Enphase elfogadta a hálózati profil frissítését ehhez: **{selected_profile}**.\n\nKért profilazonosító: **{requested_profile_id}**\n\nFelhőállapot: **{cloud_apply_status}**\n\nAkár **5 percig** is eltarthat, amíg az új profil aktuálisként megjelenik, amíg a felhő és a Gateway befejezi a feldolgozást. A Grid Profile érzékelő akkor frissül, amikor az Activation rekord jelzi az új aktuális profilt."
       },
       "grid_toggle_otp": {
-        "title": "Erősítse meg a rács mód megváltoztatását",
-        "description": "Jelenlegi rács mód: **{current_mode}**.\n\nKért rács mód: **{target_mode}**.\n\nÍrja be a 4 számjegyű egyszeri kódot, és erősítse meg a biztonságra érzékeny módosítást.",
+        "title": "Erősítse meg a hálózati mód megváltoztatását",
+        "description": "Jelenlegi hálózati mód: **{current_mode}**.\n\nKért hálózati mód: **{target_mode}**.\n\nÍrja be a 4 számjegyű egyszeri kódot, és erősítse meg a biztonságra érzékeny módosítást.",
         "data": {
           "otp": "Egyszeri kód",
-          "confirm": "Erősítse meg a rács mód módosítását"
+          "confirm": "Erősítse meg a hálózati mód módosítását"
         }
       },
       "grid_toggle_applied": {
-        "title": "A rács mód módosítása elfogadva",
-        "description": "Az Enphase elfogadta a kérést, hogy módosítsa a Grid módot **{target_mode}**-ra.\n\nA fizikai relé még változhat. Használja a Grid Mode érzékelőt a kapott állapot megfigyeléséhez."
+        "title": "A hálózati mód módosítása elfogadva",
+        "description": "Az Enphase elfogadta a kérést, hogy módosítsa a hálózati módot **{target_mode}**-ra.\n\nA fizikai relé még változhat. Használja a hálózati mód érzékelőt a kapott állapot megfigyeléséhez."
       }
     },
     "error": {
@@ -806,14 +806,14 @@
       "grid_profile_gateway_required": "A hálózati profil alkalmazásához felhőbeli Activation Gateway rekord szükséges.",
       "grid_profile_apply_failed": "A hálózati profil alkalmazása sikertelen.",
       "grid_mode_invalid": "Válassza az On Grid vagy Off Grid lehetőséget.",
-      "grid_mode_already_active": "A webhely már a kiválasztott rács módban van.",
-      "grid_mode_confirm_required": "A folytatás előtt erősítse meg a rács mód módosítását.",
-      "grid_control_unavailable": "A rácsvezérlés nem érhető el ezen a webhelyen.",
-      "grid_control_blocked": "A rácsvezérlés jelenleg le van tiltva.",
+      "grid_mode_already_active": "A helyszín már a kiválasztott hálózati módban van.",
+      "grid_mode_confirm_required": "A folytatás előtt erősítse meg a hálózati mód módosítását.",
+      "grid_control_unavailable": "A hálózatvezérlés nem érhető el ezen a helyszínen.",
+      "grid_control_blocked": "A hálózatvezérlés jelenleg le van tiltva.",
       "grid_otp_required": "Írja be az egyszeri kódot.",
       "grid_otp_invalid_format": "Az egyszeri kódnak pontosan négy számjegyből kell állnia.",
       "grid_otp_invalid": "Az egyszeri kód érvénytelen vagy lejárt.",
-      "grid_envoy_serial_missing": "A webhely átjárója nem határozható meg."
+      "grid_envoy_serial_missing": "A helyszín átjárója nem határozható meg."
     },
     "abort": {
       "migration_no_envoy_sources": "Nincsenek elérhető Enphase Envoy energiaérzékelők a migrációhoz.",
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "A hálózati profil vezérlése nem érhető el.",
       "grid_profile_installer_required": "A hálózati profil vezérléséhez telepítői hozzáférés szükséges az Enphase Activation szolgáltatáshoz.",
       "grid_profile_no_regions": "Ehhez a helyszínországhoz nem érhető el hálózati profil régió.",
-      "grid_mode_unavailable": "A rács mód vezérlése nem érhető el ezen a webhelyen.",
-      "grid_mode_blocked": "A rács mód vezérlése jelenleg le van tiltva: {reasons}."
+      "grid_mode_unavailable": "A hálózati mód vezérlése nem érhető el ezen a helyszínen.",
+      "grid_mode_blocked": "A hálózati mód vezérlése jelenleg le van tiltva: {reasons}."
     },
     "create_entry": {
       "migration_success": "A migráció befejeződött. Az Enphase Energy most már a kiválasztott forrásentitás-azonosítókat használja. Ellenőrizze a következő frissítés után az Energy irányítópultot és a Developer Tools > Statistics oldalt.",
@@ -2541,19 +2541,19 @@
     },
     "scheduler_unavailable": {
       "title": "Az Enphase Energy ütemező nem érhető el",
-      "description": "A {site_id} webhely Enphase ütemező szolgáltatása nem érhető el. A töltési mód kiválasztása és az ütemezés szinkronizálása átmenetileg le van tiltva."
+      "description": "A {site_id} helyszín Enphase ütemező szolgáltatása nem érhető el. A töltési mód kiválasztása és az ütemezés szinkronizálása átmenetileg le van tiltva."
     },
     "session_history_unavailable": {
       "title": "Az Enphase Energy munkamenet előzményei nem érhetők el",
-      "description": "Az Enphase munkamenet-előzmények szolgáltatása a {site_id} webhelyhez nem érhető el. A munkamenet-előzmények érzékelői a szolgáltatás helyreállításáig a gyorsítótárazott adatokat mutatják."
+      "description": "Az Enphase munkamenet-előzmények szolgáltatása a {site_id} helyszínhez nem érhető el. A munkamenet-előzmények érzékelői a szolgáltatás helyreállításáig a gyorsítótárazott adatokat mutatják."
     },
     "site_energy_unavailable": {
       "title": "Az Enphase Energy helyszíni energiája nem érhető el",
-      "description": "A {site_id} webhely Enphase élettartamára vonatkozó energiaszolgáltatása nem érhető el. A webhely energiaérzékelői a gyorsítótárazott adatokat mutatják, amíg a szolgáltatás helyreáll."
+      "description": "A {site_id} helyszín Enphase élettartamára vonatkozó energiaszolgáltatása nem érhető el. A helyszín energiaérzékelői a gyorsítótárazott adatokat mutatják, amíg a szolgáltatás helyreáll."
     },
     "auth_settings_unavailable": {
       "title": "Az Enphase Energy hitelesítési beállítások nem érhetők el",
-      "description": "Az Enphase töltő hitelesítési beállítási szolgáltatása a {site_id} webhelyhez nem érhető el. Az alkalmazáshitelesítési vezérlők ideiglenesen le vannak tiltva."
+      "description": "Az Enphase töltő hitelesítési beállítási szolgáltatása a {site_id} helyszínhez nem érhető el. Az alkalmazáshitelesítési vezérlők ideiglenesen le vannak tiltva."
     },
     "battery_profile_pending": {
       "title": "Az Enphase Energy akkumulátorprofil frissítése függőben",
@@ -2583,15 +2583,15 @@
       "backoff_active": "Backoff aktív",
       "network_errors": "Egymást követő hálózati hibák",
       "http_errors": "Egymást követő HTTP-hibák",
-      "site_count": "A webhelyek száma",
-      "site_name": "Webhely neve",
-      "site_ids": "Webhelyazonosítók",
-      "site_names": "A webhelyek nevei",
+      "site_count": "A helyszínek száma",
+      "site_name": "Helyszín neve",
+      "site_ids": "Helyszínazonosítók",
+      "site_names": "A helyszínek nevei",
       "last_failure_status": "Utolsó hiba állapota",
       "last_failure_description": "Utolsó hiba leírása",
       "phase_timings": "Fázisidőzítések",
       "session_cache_ttl_s": "Munkamenet gyorsítótár TTL (s)",
-      "sites": "Webhelyek",
+      "sites": "Helyszínek",
       "auth_settings_available": "Elérhető hitelesítési beállítások",
       "auth_settings_last_error": "Hitelesítési beállítások utolsó hibája",
       "auth_settings_failures": "Hibás hitelesítési beállítások",
@@ -2603,10 +2603,10 @@
       "session_history_backoff_active": "A munkamenet-előzmények visszalépése aktív",
       "session_history_backoff_ends_utc": "A munkamenet-előzmények visszalépése véget ér (UTC)",
       "site_energy_available": "A helyszínen rendelkezésre álló energia",
-      "site_energy_last_error": "A webhely energia utolsó hibája",
+      "site_energy_last_error": "A helyszín energia utolsó hibája",
       "site_energy_failures": "Telephelyi energiahiba",
-      "site_energy_backoff_active": "A webhely energiavisszatartása aktív",
-      "site_energy_backoff_ends_utc": "A webhely energiahátrálásának vége (UTC)",
+      "site_energy_backoff_active": "A helyszín energiavisszatartása aktív",
+      "site_energy_backoff_ends_utc": "A helyszín energiahátrálásának vége (UTC)",
       "tariff_available": "Tarifa elérhető",
       "tariff_service_status": "Tarifaszolgáltatás állapota",
       "tariff_last_error": "Tarifa utolsó hibája",
@@ -2725,21 +2725,21 @@
       }
     },
     "request_grid_toggle_otp": {
-      "name": "Rács váltás OTP kérése",
-      "description": "A webhelyrács mód megváltoztatása előtt küldje el a szükséges egyszeri kódot.",
+      "name": "Hálózat váltás OTP kérése",
+      "description": "A helyszíni hálózati mód megváltoztatása előtt küldje el a szükséges egyszeri kódot.",
       "fields": {
         "config_entry_id": {
           "name": "Enphase konfigurációs bejegyzés",
-          "description": "Válassza ki azt az Enphase webhelyet, amelyre meg kell kapnia az egyszeri kódot."
+          "description": "Válassza ki azt az Enphase helyszínt, amelyre meg kell kapnia az egyszeri kódot."
         }
       }
     },
     "set_grid_mode": {
-      "name": "Állítsa be a rács módot",
-      "description": "Az egyszeri kód érvényesítése után módosítsa a webhelyrács módot.",
+      "name": "Állítsa be a hálózati módot",
+      "description": "Az egyszeri kód érvényesítése után módosítsa a helyszíni hálózati módot.",
       "fields": {
         "mode": {
-          "name": "Rács mód",
+          "name": "Hálózati mód",
           "description": "Válassza a on_grid vagy a off_grid lehetőséget."
         },
         "otp": {
@@ -2748,7 +2748,7 @@
         },
         "config_entry_id": {
           "name": "Enphase konfigurációs bejegyzés",
-          "description": "Válassza ki azt az Enphase webhelyet, amelynek a rácsmódját módosítani kell."
+          "description": "Válassza ki azt az Enphase helyszínt, amelynek a hálózati módját módosítani kell."
         }
       }
     },
@@ -3017,68 +3017,68 @@
           "description": "Csere exporttarifa ág típussal, exporttervvel, szezonokkal, időszakokkal, sávokkal és díjakkal."
         },
         "configure_import_tariff": {
-          "name": "Guidet importtarif",
-          "description": "Aktiver dette felt for at opbygge en erstatning for importtariffen med de guidede felter."
+          "name": "Importtarifa beállítása",
+          "description": "Engedélyezze, hogy az alábbi vezetett mezőkkel helyettesítő importtarifát hozzon létre."
         },
         "import_tariff_type": {
-          "name": "Importtariftype",
-          "description": "Vælg flad, tidsafhængig eller trindelt importpris."
+          "name": "Importtarifa típusa",
+          "description": "Válassza ki, hogy az importár állandó, használati idő szerinti vagy sávos legyen."
         },
         "import_variation": {
-          "name": "Importvariation",
-          "description": "Vælg om importprisen varierer efter sæson eller hverdag/weekend."
+          "name": "Import változása",
+          "description": "Válassza ki, hogy az importár évszak vagy hétköznap és hétvége szerint változzon-e."
         },
         "import_flat_rate": {
-          "name": "Flad importpris",
-          "description": "En enkelt importpris for flad tarif uden periode-rækker."
+          "name": "Állandó importár",
+          "description": "Egyetlen importár állandó tarifához, ha nincsenek megadva időszaksorok."
         },
         "import_periods": {
-          "name": "Importperioder",
-          "description": "Rækker til flade eller tidsafhængige importpriser. Dage 1-7 er mandag-søndag; tider kan være HH:MM eller minutter efter midnat."
+          "name": "Importidőszakok",
+          "description": "Sorok állandó vagy használati idő szerinti importárazáshoz. Az 1-7. nap hétfő-vasárnap; az idő HH:MM vagy éjfél utáni perc lehet."
         },
         "import_tiers": {
-          "name": "Importtrin",
-          "description": "Rækker til trindelte importpriser. Brug end_value -1 for sidste ubegrænsede trin."
+          "name": "Importsávok",
+          "description": "Sorok sávos importárazáshoz. Az utolsó korlátlan sávhoz használja az end_value -1 értéket."
         },
         "import_off_peak_rate": {
-          "name": "Import off-peak basis",
-          "description": "Basispris uden for spidsbelastning for trindelte importtariffer."
+          "name": "Import csúcsidőn kívüli alapár",
+          "description": "Csúcsidőn kívüli alapár sávos importtarifákhoz."
         },
         "configure_export_tariff": {
-          "name": "Guidet eksporttarif",
-          "description": "Aktiver dette felt for at opbygge en erstatning for eksporttariffen med de guidede felter."
+          "name": "Exporttarifa beállítása",
+          "description": "Engedélyezze, hogy az alábbi vezetett mezőkkel helyettesítő exporttarifát hozzon létre."
         },
         "export_tariff_type": {
-          "name": "Eksporttariftype",
-          "description": "Vælg flad, tidsafhængig eller trindelt eksportpris."
+          "name": "Exporttarifa típusa",
+          "description": "Válassza ki, hogy az exportkompenzáció állandó, használati idő szerinti vagy sávos legyen."
         },
         "export_variation": {
-          "name": "Eksportvariation",
-          "description": "Vælg om eksportprisen varierer efter sæson eller hverdag/weekend."
+          "name": "Export változása",
+          "description": "Válassza ki, hogy az exportár évszak vagy hétköznap és hétvége szerint változzon-e."
         },
         "export_plan": {
-          "name": "Eksportplan",
-          "description": "Vælg Enphase-eksportplanen der skal skrives med eksporttariffen."
+          "name": "Exportprogram",
+          "description": "Válassza ki az exporttarifához írandó Enphase exportprogram-címkét."
         },
         "export_flat_rate": {
-          "name": "Flad eksportpris",
-          "description": "En enkelt eksportpris for flad tarif uden periode-rækker."
+          "name": "Állandó exportár",
+          "description": "Egyetlen exportár állandó tarifához, ha nincsenek megadva időszaksorok."
         },
         "export_periods": {
-          "name": "Eksportperioder",
-          "description": "Rækker til flade eller tidsafhængige eksportpriser. Dage 1-7 er mandag-søndag; tider kan være HH:MM eller minutter efter midnat."
+          "name": "Exportidőszakok",
+          "description": "Sorok állandó vagy használati idő szerinti exportárazáshoz. Az 1-7. nap hétfő-vasárnap; az idő HH:MM vagy éjfél utáni perc lehet."
         },
         "export_tiers": {
-          "name": "Eksporttrin",
-          "description": "Rækker til trindelte eksportpriser. Brug end_value -1 for sidste ubegrænsede trin."
+          "name": "Exportsávok",
+          "description": "Sorok sávos exportárazáshoz. Az utolsó korlátlan sávhoz használja az end_value -1 értéket."
         },
         "export_off_peak_rate": {
-          "name": "Eksport off-peak basis",
-          "description": "Basispris uden for spidsbelastning for trindelte eksporttariffer."
+          "name": "Export csúcsidőn kívüli alapár",
+          "description": "Csúcsidőn kívüli alapár sávos exporttarifákhoz."
         },
         "device_id": {
-          "name": "Enphase-enhed",
-          "description": "Valgfri Enphase-enhed til at vælge stedet for fakturerings- eller tarifstrukturændringer."
+          "name": "Eszköz",
+          "description": "Opcionális Enphase-eszköz a helyszín kiválasztásához számlázási vagy tarifaszerkezeti frissítéseknél."
         }
       },
       "sections": {

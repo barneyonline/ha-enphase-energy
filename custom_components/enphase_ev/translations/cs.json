@@ -92,13 +92,13 @@
       "message": "Spuštění nabíjení bylo službou Enphase odmítnuto (HTTP {status})."
     },
     "grid_control_unavailable": {
-      "message": "Ovládání mřížky není pro tento web k dispozici."
+      "message": "Ovládání sítě není pro tento systém k dispozici."
     },
     "grid_control_blocked": {
       "message": "Řízení sítě je aktuálně zablokováno."
     },
     "grid_mode_invalid": {
-      "message": "Režim mřížky musí být on_grid nebo off_grid."
+      "message": "Režim sítě musí být on_grid nebo off_grid."
     },
     "grid_otp_required": {
       "message": "Je vyžadováno OTP."
@@ -110,13 +110,13 @@
       "message": "Jednorázové heslo je neplatné nebo jeho platnost vypršela."
     },
     "grid_envoy_serial_missing": {
-      "message": "Nelze určit sériové číslo vyslance pro tento web."
+      "message": "Nelze určit sériové číslo zařízení Envoy pro tuto lokalitu."
     },
     "grid_site_required": {
-      "message": "Vyberte přesně jeden web Enphase."
+      "message": "Vyberte přesně jeden systém Enphase."
     },
     "grid_site_ambiguous": {
-      "message": "Bylo vybráno více webů ({count}). Vyberte přesně jeden web."
+      "message": "Bylo vybráno více systémů ({count}). Vyberte přesně jeden systém."
     },
     "schedule_required": {
       "message": "Před výběrem plánovaného nabíjení povolte alespoň jeden plán."
@@ -233,7 +233,7 @@
       "message": "Nabíjení z nastavení sítě není k dispozici."
     },
     "charge_from_grid_toggle_not_applied": {
-      "message": "Enphase nepoužilo nabíjení z přepínače mřížky."
+      "message": "Enphase nepoužilo nabíjení z přepínače sítě."
     },
     "power_match_unavailable": {
       "message": "Nastavení PowerMatch není k dispozici."
@@ -242,13 +242,13 @@
       "message": "Přepnutí PowerMatch nebylo společností Enphase použito."
     },
     "charge_from_grid_schedule_unavailable": {
-      "message": "Poplatek ze sítě není k dispozici."
+      "message": "Plán nabíjení ze sítě není k dispozici."
     },
     "charge_from_grid_schedule_times_different": {
       "message": "Čas začátku a konce plánu nabíjení ze sítě se musí lišit."
     },
     "charge_from_grid_schedule_toggle_not_applied": {
-      "message": "Enphase nepoužil přepínač plánu nabíjení z mřížky."
+      "message": "Enphase nepoužil přepínač plánu nabíjení z sítě."
     },
     "charge_from_grid_required": {
       "message": "Nejprve musí být povoleno nabíjení ze sítě."
@@ -269,7 +269,7 @@
       "message": "Před aktivací vytvořte {schedule_label} v plánovači baterie IQ."
     },
     "schedule_not_exposed": {
-      "message": "{schedule_label} aktuálně není pro tento web vystaven Enphase. Počkejte na dokončení synchronizace plánu, poté obnovte stránku a zkuste to znovu."
+      "message": "{schedule_label} aktuálně není pro tento systém vystaven Enphase. Počkejte na dokončení synchronizace plánu, poté obnovte stránku a zkuste to znovu."
     },
     "schedule_toggle_not_applied": {
       "message": "Enphase nepoužil přepínač {schedule_label}."
@@ -458,7 +458,7 @@
       "message": "Duplicitní entita tarifní sazby: {entity_id}"
     },
     "tariff_site_mismatch": {
-      "message": "Všechny aktualizace tarifu musí cílit na stejný web Enphase."
+      "message": "Všechny aktualizace tarifu musí cílit na stejný systém Enphase."
     },
     "tariff_structure_invalid": {
       "message": "Struktura tarifu je neplatná."
@@ -741,9 +741,9 @@
       },
       "grid_toggle": {
         "title": "Režim sítě",
-        "description": "Aktuální režim mřížky: **{current_mode}**.\n\nZměna režimu mřížky je citlivá na bezpečnost. Vyberte požadovaný režim pro odeslání jednorázového kódu na registrovaný e-mail a telefon.",
+        "description": "Aktuální režim sítě: **{current_mode}**.\n\nZměna režimu sítě je citlivá na bezpečnost. Vyberte požadovaný režim pro odeslání jednorázového kódu na registrovaný e-mail a telefon.",
         "data": {
-          "mode": "Požadovaný režim mřížky"
+          "mode": "Požadovaný režim sítě"
         }
       },
       "grid_profile": {
@@ -777,16 +777,16 @@
         "description": "Enphase přijal aktualizaci síťového profilu pro **{selected_profile}**.\n\nID požadovaného profilu: **{requested_profile_id}**\n\nStav cloudu: **{cloud_apply_status}**\n\nMůže trvat až **5 minut**, než se nový profil zobrazí jako aktuální, zatímco cloud a Gateway dokončí zpracování. Senzor Grid Profile se aktualizuje, jakmile záznam Activation nahlásí nový aktuální profil."
       },
       "grid_toggle_otp": {
-        "title": "Potvrďte změnu režimu mřížky",
-        "description": "Aktuální režim mřížky: **{current_mode}**.\n\nPožadovaný režim mřížky: **{target_mode}**.\n\nZadejte 4místný jednorázový kód a potvrďte bezpečnostně citlivou změnu.",
+        "title": "Potvrďte změnu režimu sítě",
+        "description": "Aktuální režim sítě: **{current_mode}**.\n\nPožadovaný režim sítě: **{target_mode}**.\n\nZadejte 4místný jednorázový kód a potvrďte bezpečnostně citlivou změnu.",
         "data": {
           "otp": "Jednorázový kód",
-          "confirm": "Potvrďte změnu režimu mřížky"
+          "confirm": "Potvrďte změnu režimu sítě"
         }
       },
       "grid_toggle_applied": {
-        "title": "Změna režimu mřížky přijata",
-        "description": "Společnost Enphase přijala požadavek na změnu režimu mřížky na **{target_mode}**.\n\nFyzické relé se může stále měnit. Pomocí senzoru Grid Mode pozorujte výsledný stav."
+        "title": "Změna režimu sítě přijata",
+        "description": "Společnost Enphase přijala požadavek na změnu režimu sítě na **{target_mode}**.\n\nFyzické relé se může stále měnit. Pomocí senzoru režim sítě pozorujte výsledný stav."
       }
     },
     "error": {
@@ -806,14 +806,14 @@
       "grid_profile_gateway_required": "Použití síťového profilu vyžaduje cloudový záznam Gateway v Activation.",
       "grid_profile_apply_failed": "Použití síťového profilu se nezdařilo.",
       "grid_mode_invalid": "Vyberte možnost Zapnuto nebo Vypnuto.",
-      "grid_mode_already_active": "Web je již ve vybraném režimu mřížky.",
-      "grid_mode_confirm_required": "Než budete pokračovat, potvrďte změnu režimu mřížky.",
-      "grid_control_unavailable": "Ovládání mřížky není pro tento web k dispozici.",
+      "grid_mode_already_active": "Systém je již ve vybraném režimu sítě.",
+      "grid_mode_confirm_required": "Než budete pokračovat, potvrďte změnu režimu sítě.",
+      "grid_control_unavailable": "Ovládání sítě není pro tento systém k dispozici.",
       "grid_control_blocked": "Řízení sítě je aktuálně zablokováno.",
       "grid_otp_required": "Zadejte jednorázový kód.",
       "grid_otp_invalid_format": "Jednorázový kód musí obsahovat přesně čtyři číslice.",
       "grid_otp_invalid": "Jednorázový kód je neplatný nebo jeho platnost vypršela.",
-      "grid_envoy_serial_missing": "Bránu pro tento web nelze určit."
+      "grid_envoy_serial_missing": "Bránu pro tento systém nelze určit."
     },
     "abort": {
       "migration_no_envoy_sources": "Nejsou k dispozici žádné energetické senzory Enphase Envoy pro migraci.",
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "Ovládání síťového profilu není dostupné.",
       "grid_profile_installer_required": "Ovládání síťového profilu vyžaduje instalační přístup k Enphase Activation.",
       "grid_profile_no_regions": "Pro zemi tohoto místa nejsou dostupné žádné oblasti síťových profilů.",
-      "grid_mode_unavailable": "Ovládání režimu mřížky není pro tento web k dispozici.",
-      "grid_mode_blocked": "Ovládání režimu mřížky je aktuálně zablokováno: {reasons}."
+      "grid_mode_unavailable": "Ovládání režimu sítě není pro tento systém k dispozici.",
+      "grid_mode_blocked": "Ovládání režimu sítě je aktuálně zablokováno: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migrace dokončena. Enphase Energy nyní vlastní vybraná ID zdrojových entit. Po příští aktualizaci zkontrolujte panel Energy a Developer Tools > Statistics.",
@@ -1030,7 +1030,7 @@
         },
         "state": {
           "enabled": "Povoleno",
-          "disabled": "Zakázáno"
+          "disabled": "Deaktivováno"
         }
       },
       "set_amps": {
@@ -2541,19 +2541,19 @@
     },
     "scheduler_unavailable": {
       "title": "Plánovač Enphase Energy není k dispozici",
-      "description": "Služba plánovače Enphase pro web {site_id} není k dispozici. Výběr režimu nabíjení a plánovaná synchronizace jsou dočasně zakázány."
+      "description": "Služba plánovače Enphase pro systém {site_id} není k dispozici. Výběr režimu nabíjení a plánovaná synchronizace jsou dočasně zakázány."
     },
     "session_history_unavailable": {
       "title": "Historie relace Enphase Energy není k dispozici",
-      "description": "Služba Enphase historie relací pro web {site_id} není k dispozici. Senzory historie relací budou zobrazovat data uložená v mezipaměti, dokud se služba neobnoví."
+      "description": "Služba Enphase historie relací pro systém {site_id} není k dispozici. Senzory historie relací budou zobrazovat data uložená v mezipaměti, dokud se služba neobnoví."
     },
     "site_energy_unavailable": {
       "title": "Energie místa Enphase Energy není k dispozici",
-      "description": "Služba Enphase Lifetime Energy pro web {site_id} není k dispozici. Energetické senzory webu budou zobrazovat data uložená v mezipaměti, dokud se služba neobnoví."
+      "description": "Služba Enphase Lifetime Energy pro systém {site_id} není k dispozici. Energetické senzory systému budou zobrazovat data uložená v mezipaměti, dokud se služba neobnoví."
     },
     "auth_settings_unavailable": {
       "title": "Nastavení ověřování Enphase Energy není k dispozici",
-      "description": "Služba nastavení ověření nabíječky Enphase pro web {site_id} není k dispozici. Ovládací prvky ověřování aplikací jsou dočasně zakázány."
+      "description": "Služba nastavení ověření nabíječky Enphase pro systém {site_id} není k dispozici. Ovládací prvky ověřování aplikací jsou dočasně zakázány."
     },
     "battery_profile_pending": {
       "title": "Probíhá aktualizace profilu baterie Enphase Energy",
@@ -2584,14 +2584,14 @@
       "network_errors": "Po sobě jdoucí síťové chyby",
       "http_errors": "Po sobě jdoucí chyby HTTP",
       "site_count": "Počet stránek",
-      "site_name": "Název webu",
+      "site_name": "Název systému",
       "site_ids": "ID stránek",
       "site_names": "Názvy stránek",
       "last_failure_status": "Stav poslední poruchy",
       "last_failure_description": "Popis poslední poruchy",
       "phase_timings": "Časování fází",
       "session_cache_ttl_s": "TTL mezipaměti relace (s)",
-      "sites": "Weby",
+      "sites": "Systémy",
       "auth_settings_available": "Nastavení ověření k dispozici",
       "auth_settings_last_error": "Poslední chyba nastavení ověření",
       "auth_settings_failures": "Selhání nastavení ověření",
@@ -2603,10 +2603,10 @@
       "session_history_backoff_active": "Stažení historie relace je aktivní",
       "session_history_backoff_ends_utc": "Ukončení ukončení historie relací (UTC)",
       "site_energy_available": "Energie na místě k dispozici",
-      "site_energy_last_error": "Poslední chyba energie webu",
+      "site_energy_last_error": "Poslední chyba energie systému",
       "site_energy_failures": "Výpadky energie na místě",
       "site_energy_backoff_active": "Aktivní zpětné odpojení energie na místě",
-      "site_energy_backoff_ends_utc": "Konec energetického backoff webu (UTC)",
+      "site_energy_backoff_ends_utc": "Konec energetického backoff systému (UTC)",
       "tariff_available": "Tarif k dispozici",
       "tariff_service_status": "Stav tarifní služby",
       "tariff_last_error": "Poslední chyba tarifu",
@@ -2726,20 +2726,20 @@
     },
     "request_grid_toggle_otp": {
       "name": "Požadavek na přepínání sítě OTP",
-      "description": "Před změnou režimu mřížky webu odešlete požadovaný jednorázový kód.",
+      "description": "Před změnou režimu sítě systému odešlete požadovaný jednorázový kód.",
       "fields": {
         "config_entry_id": {
           "name": "Enphase konfigurační záznam",
-          "description": "Vyberte web Enphase, který by měl obdržet jednorázový kód."
+          "description": "Vyberte systém Enphase, který by měl obdržet jednorázový kód."
         }
       }
     },
     "set_grid_mode": {
-      "name": "Nastavte režim mřížky",
-      "description": "Po ověření jednorázového kódu změňte režim mřížky webu.",
+      "name": "Nastavte režim sítě",
+      "description": "Po ověření jednorázového kódu změňte režim sítě systému.",
       "fields": {
         "mode": {
-          "name": "Mřížkový režim",
+          "name": "Režim sítě",
           "description": "Vyberte on_grid nebo off_grid."
         },
         "otp": {
@@ -2748,7 +2748,7 @@
         },
         "config_entry_id": {
           "name": "Enphase konfigurační záznam",
-          "description": "Vyberte web Enphase, jehož režim mřížky by se měl změnit."
+          "description": "Vyberte systém Enphase, jehož režim sítě by se měl změnit."
         }
       }
     },
@@ -2789,12 +2789,12 @@
       },
       "fields": {
         "site_id": {
-          "name": "ID webu",
+          "name": "ID systému",
           "description": "Volitelný identifikátor pracoviště; detekován automaticky, když je vybráno zařízení pracoviště."
         },
         "config_entry_id": {
           "name": "ID vstupu konfigurace",
-          "description": "Volitelný identifikátor položky konfigurace pro jednu položku webu Enphase."
+          "description": "Volitelný identifikátor položky konfigurace pro jednu položku systému Enphase."
         }
       }
     },
@@ -2828,12 +2828,12 @@
           "description": "Seznam aktivních pracovních dnů s použitím pondělí=1 až neděle=7."
         },
         "site_id": {
-          "name": "ID webu",
+          "name": "ID systému",
           "description": "Volitelný identifikátor pracoviště; detekován automaticky, když je vybráno zařízení pracoviště."
         },
         "config_entry_id": {
           "name": "ID vstupu konfigurace",
-          "description": "Volitelný identifikátor položky konfigurace pro jednu položku webu Enphase."
+          "description": "Volitelný identifikátor položky konfigurace pro jednu položku systému Enphase."
         }
       }
     },
@@ -2875,12 +2875,12 @@
           "description": "Nastavením na hodnotu true potvrdíte aktualizaci plánu."
         },
         "site_id": {
-          "name": "ID webu",
+          "name": "ID systému",
           "description": "Volitelný identifikátor pracoviště; detekován automaticky, když je vybráno zařízení pracoviště."
         },
         "config_entry_id": {
           "name": "ID vstupu konfigurace",
-          "description": "Volitelný identifikátor položky konfigurace pro jednu položku webu Enphase."
+          "description": "Volitelný identifikátor položky konfigurace pro jednu položku systému Enphase."
         }
       }
     },
@@ -2906,12 +2906,12 @@
           "description": "Nastavením na hodnotu true potvrdíte odstranění plánu."
         },
         "site_id": {
-          "name": "ID webu",
+          "name": "ID systému",
           "description": "Volitelný identifikátor pracoviště; detekován automaticky, když je vybráno zařízení pracoviště."
         },
         "config_entry_id": {
           "name": "ID vstupu konfigurace",
-          "description": "Volitelný identifikátor položky konfigurace pro jednu položku webu Enphase."
+          "description": "Volitelný identifikátor položky konfigurace pro jednu položku systému Enphase."
         }
       }
     },
@@ -2929,12 +2929,12 @@
           "description": "Rodina rozvrhu baterií: cfg, dtg nebo rbd."
         },
         "site_id": {
-          "name": "ID webu",
+          "name": "ID systému",
           "description": "Volitelný identifikátor pracoviště; detekován automaticky, když je vybráno zařízení pracoviště."
         },
         "config_entry_id": {
           "name": "ID vstupu konfigurace",
-          "description": "Volitelný identifikátor položky konfigurace pro jednu položku webu Enphase."
+          "description": "Volitelný identifikátor položky konfigurace pro jednu položku systému Enphase."
         }
       }
     },
@@ -2997,12 +2997,12 @@
           "description": "Seznam ID entit tarifních sazeb a nezáporných hodnot sazeb k aktualizaci."
         },
         "site_id": {
-          "name": "ID webu",
-          "description": "Volitelný identifikátor webu pro aktualizace fakturace."
+          "name": "ID systému",
+          "description": "Volitelný identifikátor systému pro aktualizace fakturace."
         },
         "config_entry_id": {
           "name": "ID položky konfigurace",
-          "description": "Volitelný identifikátor položky konfigurace pro jeden web Enphase."
+          "description": "Volitelný identifikátor položky konfigurace pro jeden systém Enphase."
         },
         "tariff_payload": {
           "name": "Datová část tarifu",
@@ -3017,68 +3017,68 @@
           "description": "Náhradní větev exportního tarifu s typem, exportním plánem, sezónami, obdobími, pásmy a sazbami."
         },
         "configure_import_tariff": {
-          "name": "Guidet importtarif",
-          "description": "Aktiver dette felt for at opbygge en erstatning for importtariffen med de guidede felter."
+          "name": "Nastavit importní tarif",
+          "description": "Povolte tuto možnost, chcete-li pomocí níže uvedených průvodcových polí vytvořit náhradní importní tarif."
         },
         "import_tariff_type": {
-          "name": "Importtariftype",
-          "description": "Vælg flad, tidsafhængig eller trindelt importpris."
+          "name": "Typ importního tarifu",
+          "description": "Zvolte, zda je importní cena pevná, podle času využití, nebo stupňovitá."
         },
         "import_variation": {
-          "name": "Importvariation",
-          "description": "Vælg om importprisen varierer efter sæson eller hverdag/weekend."
+          "name": "Varianta importu",
+          "description": "Zvolte, zda se importní cena mění podle sezóny nebo mezi pracovním dnem a víkendem."
         },
         "import_flat_rate": {
-          "name": "Flad importpris",
-          "description": "En enkelt importpris for flad tarif uden periode-rækker."
+          "name": "Pevná importní sazba",
+          "description": "Jedna importní sazba použitá pro pevný tarif, pokud nejsou zadány řádky období."
         },
         "import_periods": {
-          "name": "Importperioder",
-          "description": "Rækker til flade eller tidsafhængige importpriser. Dage 1-7 er mandag-søndag; tider kan være HH:MM eller minutter efter midnat."
+          "name": "Období importu",
+          "description": "Řádky pro pevné nebo časově závislé importní ceny. Dny 1-7 znamenají pondělí-neděli; čas může být HH:MM nebo počet minut po půlnoci."
         },
         "import_tiers": {
-          "name": "Importtrin",
-          "description": "Rækker til trindelte importpriser. Brug end_value -1 for sidste ubegrænsede trin."
+          "name": "Stupně importu",
+          "description": "Řádky pro stupňovité importní ceny. Pro poslední neomezený stupeň použijte end_value -1."
         },
         "import_off_peak_rate": {
-          "name": "Import off-peak basis",
-          "description": "Basispris uden for spidsbelastning for trindelte importtariffer."
+          "name": "Základní importní sazba mimo špičku",
+          "description": "Základní sazba mimo špičku pro stupňovité importní tarify."
         },
         "configure_export_tariff": {
-          "name": "Guidet eksporttarif",
-          "description": "Aktiver dette felt for at opbygge en erstatning for eksporttariffen med de guidede felter."
+          "name": "Nastavit exportní tarif",
+          "description": "Povolte tuto možnost, chcete-li pomocí níže uvedených průvodcových polí vytvořit náhradní exportní tarif."
         },
         "export_tariff_type": {
-          "name": "Eksporttariftype",
-          "description": "Vælg flad, tidsafhængig eller trindelt eksportpris."
+          "name": "Typ exportního tarifu",
+          "description": "Zvolte, zda je kompenzace za export pevná, podle času využití, nebo stupňovitá."
         },
         "export_variation": {
-          "name": "Eksportvariation",
-          "description": "Vælg om eksportprisen varierer efter sæson eller hverdag/weekend."
+          "name": "Varianta exportu",
+          "description": "Zvolte, zda se exportní cena mění podle sezóny nebo mezi pracovním dnem a víkendem."
         },
         "export_plan": {
-          "name": "Eksportplan",
-          "description": "Vælg Enphase-eksportplanen der skal skrives med eksporttariffen."
+          "name": "Plán exportu",
+          "description": "Zvolte označení plánu exportu Enphase, které se má zapsat s exportním tarifem."
         },
         "export_flat_rate": {
-          "name": "Flad eksportpris",
-          "description": "En enkelt eksportpris for flad tarif uden periode-rækker."
+          "name": "Pevná exportní sazba",
+          "description": "Jedna exportní sazba použitá pro pevný tarif, pokud nejsou zadány řádky období."
         },
         "export_periods": {
-          "name": "Eksportperioder",
-          "description": "Rækker til flade eller tidsafhængige eksportpriser. Dage 1-7 er mandag-søndag; tider kan være HH:MM eller minutter efter midnat."
+          "name": "Období exportu",
+          "description": "Řádky pro pevné nebo časově závislé exportní ceny. Dny 1-7 znamenají pondělí-neděli; čas může být HH:MM nebo počet minut po půlnoci."
         },
         "export_tiers": {
-          "name": "Eksporttrin",
-          "description": "Rækker til trindelte eksportpriser. Brug end_value -1 for sidste ubegrænsede trin."
+          "name": "Stupně exportu",
+          "description": "Řádky pro stupňovité exportní ceny. Pro poslední neomezený stupeň použijte end_value -1."
         },
         "export_off_peak_rate": {
-          "name": "Eksport off-peak basis",
-          "description": "Basispris uden for spidsbelastning for trindelte eksporttariffer."
+          "name": "Základní exportní sazba mimo špičku",
+          "description": "Základní sazba mimo špičku pro stupňovité exportní tarify."
         },
         "device_id": {
-          "name": "Enphase-enhed",
-          "description": "Valgfri Enphase-enhed til at vælge stedet for fakturerings- eller tarifstrukturændringer."
+          "name": "Zařízení",
+          "description": "Volitelné zařízení Enphase pro výběr lokality při aktualizaci fakturace nebo struktury tarifu."
         }
       },
       "sections": {

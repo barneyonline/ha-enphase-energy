@@ -28,10 +28,10 @@
         }
       },
       "site": {
-        "title": "Valitse Sivusto",
-        "description": "Valitse linkitettävä Enlighten-sivusto.",
+        "title": "Valitse Kohde",
+        "description": "Valitse linkitettävä Enlighten-kohde.",
         "data": {
-          "site_id": "Sivusto"
+          "site_id": "Kohde"
         }
       },
       "devices": {
@@ -67,10 +67,10 @@
       "otp_invalid": "Virheellinen tai vanhentunut koodi. Yritä uudelleen.",
       "otp_blocked": "Liikaa yrityksiä. Tili on väliaikaisesti estetty.",
       "resend_wait": "Odota 30 sekuntia ennen kuin pyydät uutta koodia.",
-      "site_required": "Valitse sivusto jatkaaksesi.",
-      "site_invalid": "Sivuston tunnuksen on oltava numeerinen.",
+      "site_required": "Valitse kohde jatkaaksesi.",
+      "site_invalid": "Kohteen tunnuksen on oltava numeerinen.",
       "serials_required": "Valitse tai syötä vähintään yksi laturi.",
-      "serials_or_site_only_required": "Anna vähintään yksi laturi tai ota käyttöön vain sivusto -tila.",
+      "serials_or_site_only_required": "Anna vähintään yksi laturi tai ota käyttöön vain kohde -tila.",
       "unknown": "Odottamaton virhe"
     },
     "abort": {
@@ -92,13 +92,13 @@
       "message": "Enphase hylkäsi latauksen käynnistyksen (HTTP {status})."
     },
     "grid_control_unavailable": {
-      "message": "Verkkoohjaus ei ole käytettävissä tälle sivustolle."
+      "message": "Verkkoohjaus ei ole käytettävissä tälle kohteelle."
     },
     "grid_control_blocked": {
       "message": "Verkon ohjaus on tällä hetkellä estetty."
     },
     "grid_mode_invalid": {
-      "message": "Ruudukkotilan on oltava on_grid tai off_grid."
+      "message": "Verkkotilan on oltava on_grid tai off_grid."
     },
     "grid_otp_required": {
       "message": "OTP vaaditaan."
@@ -110,13 +110,13 @@
       "message": "OTP on virheellinen tai vanhentunut."
     },
     "grid_envoy_serial_missing": {
-      "message": "Tämän sivuston lähettilään sarjanumeroa ei voida määrittää."
+      "message": "Tämän kohteen Envoy-sarjanumeroa ei voida määrittää."
     },
     "grid_site_required": {
-      "message": "Valitse täsmälleen yksi Enphase-sivusto."
+      "message": "Valitse täsmälleen yksi Enphase-kohde."
     },
     "grid_site_ambiguous": {
-      "message": "Valittiin useita sivustoja ({count}). Valitse täsmälleen yksi sivusto."
+      "message": "Valittiin useita kohteita ({count}). Valitse täsmälleen yksi kohde."
     },
     "schedule_required": {
       "message": "Ota käyttöön vähintään yksi aikataulu ennen kuin valitset ajastetun latauksen."
@@ -269,7 +269,7 @@
       "message": "Luo {schedule_label} IQ Battery -ajastimeen ennen sen käyttöönottoa."
     },
     "schedule_not_exposed": {
-      "message": "Enphase ei tällä hetkellä tuo {schedule_label} esiin tälle sivustolle. Odota, että aikataulun synkronointi valmistuu, päivitä ja yritä uudelleen."
+      "message": "Enphase ei tällä hetkellä tuo {schedule_label} esiin tälle kohteelle. Odota, että aikataulun synkronointi valmistuu, päivitä ja yritä uudelleen."
     },
     "schedule_toggle_not_applied": {
       "message": "Enphase ei ottanut käyttöön {schedule_label}-kytkintä."
@@ -711,12 +711,12 @@
           "battery_discharge": "Akun purku"
         },
         "data_description": {
-          "solar_production": "Määritä kumulatiivinen kokonaisarvo anturille Aurinkoenergian tuotantosivusto. Älä valitse päiväenergiaa tai hetkellistä tehoa.",
-          "consumption": "Määritä kumulatiivinen kokonaisarvo anturille Sivuston kulutus. Älä valitse päiväenergiaa tai hetkellistä tehoa.",
-          "grid_import": "Määritä kumulatiivinen kokonaisarvo anturille Sivustoruudukon tuonti. Älä valitse päiväenergiaa tai hetkellistä tehoa.",
-          "grid_export": "Määritä kumulatiivinen kokonaisarvo anturille Sivustoruudukon vienti. Älä valitse päiväenergiaa tai hetkellistä tehoa.",
-          "battery_charge": "Määritä kumulatiivinen kokonaisarvo anturille Sivuston akun lataus. Älä valitse päiväenergiaa tai hetkellistä tehoa.",
-          "battery_discharge": "Määritä kumulatiivinen kokonaisarvo anturille Sivuston akun purkautuminen. Älä valitse päiväenergiaa tai hetkellistä tehoa."
+          "solar_production": "Määritä kumulatiivinen kokonaisarvo anturille Aurinkoenergian tuotantokohde. Älä valitse päiväenergiaa tai hetkellistä tehoa.",
+          "consumption": "Määritä kumulatiivinen kokonaisarvo anturille Kohteen kulutus. Älä valitse päiväenergiaa tai hetkellistä tehoa.",
+          "grid_import": "Määritä kumulatiivinen kokonaisarvo anturille Kohteen sähköverkon tuonti. Älä valitse päiväenergiaa tai hetkellistä tehoa.",
+          "grid_export": "Määritä kumulatiivinen kokonaisarvo anturille Kohteen sähköverkon vienti. Älä valitse päiväenergiaa tai hetkellistä tehoa.",
+          "battery_charge": "Määritä kumulatiivinen kokonaisarvo anturille Kohteen akun lataus. Älä valitse päiväenergiaa tai hetkellistä tehoa.",
+          "battery_discharge": "Määritä kumulatiivinen kokonaisarvo anturille Kohteen akun purkautuminen. Älä valitse päiväenergiaa tai hetkellistä tehoa."
         }
       },
       "migrate_envoy_confirm": {
@@ -741,9 +741,9 @@
       },
       "grid_toggle": {
         "title": "Verkkotila",
-        "description": "Nykyinen ruudukkotila: **{current_mode}**.\n\nGrid-tilan vaihtaminen on turvallisuusherkkä. Valitse pyydetty tila lähettääksesi kertakoodin rekisteröityyn sähköpostiin ja puhelimeen.",
+        "description": "Nykyinen verkkotila: **{current_mode}**.\n\nGrid-tilan vaihtaminen on turvallisuusherkkä. Valitse pyydetty tila lähettääksesi kertakoodin rekisteröityyn sähköpostiin ja puhelimeen.",
         "data": {
-          "mode": "Pyydetty ruudukkotila"
+          "mode": "Pyydetty verkkotila"
         }
       },
       "grid_profile": {
@@ -777,16 +777,16 @@
         "description": "Enphase hyväksyi verkkoprofiilin päivityksen profiilille **{selected_profile}**.\n\nPyydetty profiilin tunnus: **{requested_profile_id}**\n\nPilvitila: **{cloud_apply_status}**\n\nUuden profiilin näkyminen nykyisenä voi kestää enintään **5 minuuttia**, kun pilvi ja Gateway viimeistelevät käsittelyn. Grid Profile -anturi päivittyy, kun Activation-tietue ilmoittaa uuden nykyisen profiilin."
       },
       "grid_toggle_otp": {
-        "title": "Vahvista ruudukkotilan muutos",
-        "description": "Nykyinen ruudukkotila: **{current_mode}**.\n\nPyydetty ruudukkotila: **{target_mode}**.\n\nSyötä 4-numeroinen kertakoodi ja vahvista turvallisuusherkkä muutos.",
+        "title": "Vahvista verkkotilan muutos",
+        "description": "Nykyinen verkkotila: **{current_mode}**.\n\nPyydetty verkkotila: **{target_mode}**.\n\nSyötä 4-numeroinen kertakoodi ja vahvista turvallisuusherkkä muutos.",
         "data": {
           "otp": "Kertakäyttöinen koodi",
-          "confirm": "Vahvista ruudukkotilan muutos"
+          "confirm": "Vahvista verkkotilan muutos"
         }
       },
       "grid_toggle_applied": {
-        "title": "Ruudukkotilan muutos hyväksytty",
-        "description": "Enphase hyväksyi pyynnön muuttaa ruudukkotilaksi **{target_mode}**.\n\nFyysinen rele saattaa vielä muuttua. Käytä Grid Mode -anturia seurataksesi tuloksena olevaa tilaa."
+        "title": "Verkkotilan muutos hyväksytty",
+        "description": "Enphase hyväksyi pyynnön muuttaa verkkotilaksi **{target_mode}**.\n\nFyysinen rele saattaa vielä muuttua. Käytä verkkotila -anturia seurataksesi tuloksena olevaa tilaa."
       }
     },
     "error": {
@@ -806,14 +806,14 @@
       "grid_profile_gateway_required": "Verkkoprofiilin käyttöönotto edellyttää pilven Activation Gateway -tietuetta.",
       "grid_profile_apply_failed": "Verkkoprofiilin käyttöönotto epäonnistui.",
       "grid_mode_invalid": "Valitse On Grid tai Off Grid.",
-      "grid_mode_already_active": "Sivusto on jo valitussa ruudukkotilassa.",
-      "grid_mode_confirm_required": "Vahvista ruudukkotilan muutos ennen kuin jatkat.",
-      "grid_control_unavailable": "Verkkoohjaus ei ole käytettävissä tälle sivustolle.",
+      "grid_mode_already_active": "Kohde on jo valitussa verkkotilassa.",
+      "grid_mode_confirm_required": "Vahvista verkkotilan muutos ennen kuin jatkat.",
+      "grid_control_unavailable": "Verkkoohjaus ei ole käytettävissä tälle kohteelle.",
       "grid_control_blocked": "Verkon ohjaus on tällä hetkellä estetty.",
       "grid_otp_required": "Syötä kertakoodi.",
       "grid_otp_invalid_format": "Kertakoodin tulee sisältää täsmälleen neljä numeroa.",
       "grid_otp_invalid": "Kertakäyttöinen koodi on virheellinen tai vanhentunut.",
-      "grid_envoy_serial_missing": "Tämän sivuston yhdyskäytävää ei voitu määrittää."
+      "grid_envoy_serial_missing": "Tämän kohteen yhdyskäytävää ei voitu määrittää."
     },
     "abort": {
       "migration_no_envoy_sources": "Yhtään Enphase Envoy -energia-anturia ei ole saatavilla siirtoon.",
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "Verkkoprofiilin hallinta ei ole käytettävissä.",
       "grid_profile_installer_required": "Verkkoprofiilin hallinta edellyttää asentajan käyttöoikeutta Enphase Activationiin.",
       "grid_profile_no_regions": "Tämän kohteen maalle ei ole käytettävissä verkkoprofiilin alueita.",
-      "grid_mode_unavailable": "Grid Mode -ohjaus ei ole saatavilla tälle sivustolle.",
-      "grid_mode_blocked": "Grid Mode -ohjaus on tällä hetkellä estetty: {reasons}."
+      "grid_mode_unavailable": "verkkotila -ohjaus ei ole saatavilla tälle kohteelle.",
+      "grid_mode_blocked": "verkkotila -ohjaus on tällä hetkellä estetty: {reasons}."
     },
     "create_entry": {
       "migration_success": "Siirto valmis. Enphase Energy omistaa nyt valitut lähde-entiteettien tunnukset. Tarkista seuraavan päivityksen jälkeen Energy-koontinäyttö ja Developer Tools > Statistics.",
@@ -850,7 +850,7 @@
     "grid_mode": {
       "options": {
         "on_grid": "Gridillä",
-        "off_grid": "Pois ruudukosta",
+        "off_grid": "Pois sähköverkosta",
         "unknown": "Tuntematon"
       }
     },
@@ -1199,7 +1199,7 @@
         }
       },
       "site_solar_production": {
-        "name": "Aurinkoenergian tuotantosivusto",
+        "name": "Aurinkoenergian tuotantokohde",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Näyte otettu (UTC)"
@@ -1210,7 +1210,7 @@
         }
       },
       "site_consumption": {
-        "name": "Sivuston kulutus",
+        "name": "Kohteen kulutus",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Näyte otettu (UTC)"
@@ -1221,7 +1221,7 @@
         }
       },
       "site_grid_import": {
-        "name": "Sivustoruudukon tuonti",
+        "name": "Kohteen sähköverkon tuonti",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Näyte otettu (UTC)"
@@ -1278,7 +1278,7 @@
         }
       },
       "site_grid_export": {
-        "name": "Sivustoruudukon vienti",
+        "name": "Kohteen sähköverkon vienti",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Näyte otettu (UTC)"
@@ -1289,7 +1289,7 @@
         }
       },
       "site_battery_charge": {
-        "name": "Sivuston akun lataus",
+        "name": "Kohteen akun lataus",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Näyte otettu (UTC)"
@@ -1300,7 +1300,7 @@
         }
       },
       "site_battery_discharge": {
-        "name": "Sivuston akun purkautuminen",
+        "name": "Kohteen akun purkautuminen",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Näyte otettu (UTC)"
@@ -1454,7 +1454,7 @@
         "name": "Verkkotila",
         "state": {
           "on_grid": "Gridillä",
-          "off_grid": "Pois ruudukosta",
+          "off_grid": "Pois sähköverkosta",
           "unknown": "Tuntematon"
         }
       },
@@ -2513,15 +2513,15 @@
   "issues": {
     "reauth_required": {
       "title": "Enphase Energy tarvitsee uudelleentodennuksen",
-      "description": "Sivusto {site_id} vaatii päivitetyt istunnon otsikot. Ole hyvä ja todenna uudelleen."
+      "description": "Kohde {site_id} vaatii päivitetyt istunnon otsikot. Ole hyvä ja todenna uudelleen."
     },
     "auth_blocked": {
       "title": "Enphase Energy -todennus on tilapäisesti estetty",
-      "description": "Enphase näyttää estävän sivuston {site_id} todennuksen tilapäisesti. Automaattiset yritykset on keskeytetty aikaan {blocked_until} asti. Onnistunut manuaalinen uudelleentodennus voi poistaa eston aiemmin."
+      "description": "Enphase näyttää estävän kohteen {site_id} todennuksen tilapäisesti. Automaattiset yritykset on keskeytetty aikaan {blocked_until} asti. Onnistunut manuaalinen uudelleentodennus voi poistaa eston aiemmin."
     },
     "too_many_active_sessions": {
       "title": "Enphase Energyllä on liian monta aktiivista istuntoa",
-      "description": "Enphase hylkäsi sivuston {site_id} todennuksen, koska tilillä on liian monta aktiivista istuntoa. Automaattiset uudelleenyritykset on keskeytetty aikaan {blocked_until} asti. Kirjaudu ulos muista Enphase-sovelluksen tai selaimen istunnoista ja yritä sitten todennusta uudelleen."
+      "description": "Enphase hylkäsi kohteen {site_id} todennuksen, koska tilillä on liian monta aktiivista istuntoa. Automaattiset uudelleenyritykset on keskeytetty aikaan {blocked_until} asti. Kirjaudu ulos muista Enphase-sovelluksen tai selaimen istunnoista ja yritä sitten todennusta uudelleen."
     },
     "rate_limited": {
       "title": "Enphase Energyn kutsutiheyttä on rajoitettu",
@@ -2529,35 +2529,35 @@
     },
     "cloud_unreachable": {
       "title": "Enphase Energy -pilvi ei ole tavoitettavissa",
-      "description": "Home Assistant ei voi ottaa yhteyttä Enphase-pilveen sivustolle {site_id}. Pollaus hidastuu automaattisesti; tarkista palvelun tila ja verkkosi."
+      "description": "Home Assistant ei voi ottaa yhteyttä Enphase-pilveen kohteelle {site_id}. Pollaus hidastuu automaattisesti; tarkista palvelun tila ja verkkosi."
     },
     "cloud_dns_resolution": {
       "title": "Enphase Energy DNS -resoluutiovirhe",
-      "description": "Home Assistant ei voinut ratkaista enlighten.enphaseenergy.com-osoitetta sivustolle {site_id}. Tarkista DNS-ratkaisusi tai Internet-yhteytesi."
+      "description": "Home Assistant ei voinut ratkaista enlighten.enphaseenergy.com-osoitetta kohteelle {site_id}. Tarkista DNS-ratkaisusi tai Internet-yhteytesi."
     },
     "cloud_service_unavailable": {
       "title": "Enphase Energy -pilvivirheet",
-      "description": "Enphase-pilvi sivustolle {site_id} vastaa virheillä. Pollaus peruuntuu automaattisesti; tarkista palvelun tila tai käyttörajoitukset."
+      "description": "Enphase-pilvi kohteelle {site_id} vastaa virheillä. Pollaus peruuntuu automaattisesti; tarkista palvelun tila tai käyttörajoitukset."
     },
     "scheduler_unavailable": {
       "title": "Enphase Energy -ajastin ei ole käytettävissä",
-      "description": "Enphase-aikataulupalvelu sivustolle {site_id} ei ole käytettävissä. Lataustilan valinta ja aikataulun synkronointi on tilapäisesti poistettu käytöstä."
+      "description": "Enphase-aikataulupalvelu kohteelle {site_id} ei ole käytettävissä. Lataustilan valinta ja aikataulun synkronointi on tilapäisesti poistettu käytöstä."
     },
     "session_history_unavailable": {
       "title": "Enphase Energy -istuntohistoria ei ole käytettävissä",
-      "description": "Enphase-istuntohistoriapalvelu sivustolle {site_id} ei ole käytettävissä. Istuntohistoria-anturit näyttävät välimuistissa olevia tietoja, kunnes palvelu palautuu."
+      "description": "Enphase-istuntohistoriapalvelu kohteelle {site_id} ei ole käytettävissä. Istuntohistoria-anturit näyttävät välimuistissa olevia tietoja, kunnes palvelu palautuu."
     },
     "site_energy_unavailable": {
-      "title": "Enphase Energy -sivuston energiaa ei ole saatavilla",
-      "description": "Enphase elinikäinen energiapalvelu sivustolle {site_id} ei ole käytettävissä. Sivuston energiaanturit näyttävät välimuistissa olevia tietoja, kunnes palvelu palautuu."
+      "title": "Enphase Energy -kohteen energiaa ei ole saatavilla",
+      "description": "Enphase elinikäinen energiapalvelu kohteelle {site_id} ei ole käytettävissä. Kohteen energiaanturit näyttävät välimuistissa olevia tietoja, kunnes palvelu palautuu."
     },
     "auth_settings_unavailable": {
       "title": "Enphase Energy -todennusasetukset eivät ole käytettävissä",
-      "description": "Enphase laturin todennusasetuspalvelu sivustolle {site_id} ei ole käytettävissä. Sovellusten todennuksen hallinta on tilapäisesti poistettu käytöstä."
+      "description": "Enphase laturin todennusasetuspalvelu kohteelle {site_id} ei ole käytettävissä. Sovellusten todennuksen hallinta on tilapäisesti poistettu käytöstä."
     },
     "battery_profile_pending": {
       "title": "Enphase Energy -akun profiilin päivitys odottaa",
-      "description": "Sivuston {site_id} akun profiilin muutos on ollut odottamassa yli {pending_timeout_minutes} minuuttia. Pilvipalvelu saattaa edelleen käsitellä pyyntöä."
+      "description": "Kohteen {site_id} akun profiilin muutos on ollut odottamassa yli {pending_timeout_minutes} minuuttia. Pilvipalvelu saattaa edelleen käsitellä pyyntöä."
     },
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS on tilapäisesti keskeytetty",
@@ -2570,7 +2570,7 @@
   },
   "system_health": {
     "info": {
-      "site_id": "Sivuston tunnus",
+      "site_id": "Kohteen tunnus",
       "can_reach_server": "Saavuta Enphase-pilvi",
       "last_success": "Viimeisin onnistunut päivitys",
       "latency_ms": "Pilviviive (ms)",
@@ -2583,15 +2583,15 @@
       "backoff_active": "Peruutus aktiivinen",
       "network_errors": "Peräkkäiset verkkovirheet",
       "http_errors": "Peräkkäiset HTTP-virheet",
-      "site_count": "Sivuston määrä",
-      "site_name": "Sivuston nimi",
-      "site_ids": "Sivuston tunnukset",
-      "site_names": "sivustojen nimet",
+      "site_count": "Kohteen määrä",
+      "site_name": "Kohteen nimi",
+      "site_ids": "Kohteen tunnukset",
+      "site_names": "kohteiden nimet",
       "last_failure_status": "Viimeinen vikatila",
       "last_failure_description": "Viimeisimmän vian kuvaus",
       "phase_timings": "Vaiheen ajoitukset",
       "session_cache_ttl_s": "Istuntovälimuisti TTL (s)",
-      "sites": "Sivustot",
+      "sites": "Kohdet",
       "auth_settings_available": "Todennusasetukset käytettävissä",
       "auth_settings_last_error": "Todennusasetusten viimeisin virhe",
       "auth_settings_failures": "Todennusasetusten virhe",
@@ -2602,11 +2602,11 @@
       "session_history_failures": "Istuntohistorian epäonnistumiset",
       "session_history_backoff_active": "Istuntohistorian peruutus aktiivinen",
       "session_history_backoff_ends_utc": "Istuntohistorian peruutus päättyy (UTC)",
-      "site_energy_available": "Sivuston energiaa saatavilla",
-      "site_energy_last_error": "Sivuston energian viimeinen virhe",
+      "site_energy_available": "Kohteen energiaa saatavilla",
+      "site_energy_last_error": "Kohteen energian viimeinen virhe",
       "site_energy_failures": "Työpaikan energiahäiriöt",
-      "site_energy_backoff_active": "Sivuston energian peruutus aktiivinen",
-      "site_energy_backoff_ends_utc": "Sivuston energian takaisku päättyy (UTC)",
+      "site_energy_backoff_active": "Kohteen energian peruutus aktiivinen",
+      "site_energy_backoff_ends_utc": "Kohteen energian takaisku päättyy (UTC)",
       "tariff_available": "Tariffi saatavilla",
       "tariff_service_status": "Tariffipalvelun tila",
       "tariff_last_error": "Tariffin viimeisin virhe",
@@ -2665,22 +2665,22 @@
           "description": "Vaaditaan OCPP-lisäkäynnistysviesteille, jotka voivat pyytää laturin diagnostiikkaa, laiteohjelmistoa tai käynnistysilmoituksia."
         },
         "site_id": {
-          "name": "Sivuston tunnus",
-          "description": "Valinnainen sivuston tunniste; havaitaan automaattisesti, kun sivuston laite valitaan."
+          "name": "Kohteen tunnus",
+          "description": "Valinnainen kohteen tunniste; havaitaan automaattisesti, kun kohteen laite valitaan."
         }
       }
     },
     "clear_reauth_issue": {
       "name": "Poista Reauth-ongelma",
-      "description": "Valitse Enphase-sivuston laite poistaaksesi sen uudelleentodennuksen korjausongelman.",
+      "description": "Valitse Enphase-kohteen laite poistaaksesi sen uudelleentodennuksen korjausongelman.",
       "fields": {
         "device_id": {
           "name": "Laturit",
           "description": "Valitse Enphase-laturit, joiden uudelleentodennuskorjausongelma on poistettava."
         },
         "site_id": {
-          "name": "Sivuston tunnus",
-          "description": "Valinnainen sivuston tunniste; havaitaan automaattisesti, kun sivuston laite valitaan."
+          "name": "Kohteen tunnus",
+          "description": "Valinnainen kohteen tunniste; havaitaan automaattisesti, kun kohteen laite valitaan."
         }
       }
     },
@@ -2694,8 +2694,8 @@
       },
       "fields": {
         "site_id": {
-          "name": "Sivuston tunnus",
-          "description": "Valinnainen sivuston tunniste; havaitaan automaattisesti, kun sivuston laite valitaan."
+          "name": "Kohteen tunnus",
+          "description": "Valinnainen kohteen tunniste; havaitaan automaattisesti, kun kohteen laite valitaan."
         }
       }
     },
@@ -2709,8 +2709,8 @@
       },
       "fields": {
         "site_id": {
-          "name": "Sivuston tunnus",
-          "description": "Valinnainen sivuston tunniste; havaitaan automaattisesti, kun sivuston laite valitaan."
+          "name": "Kohteen tunnus",
+          "description": "Valinnainen kohteen tunniste; havaitaan automaattisesti, kun kohteen laite valitaan."
         }
       }
     },
@@ -2725,21 +2725,21 @@
       }
     },
     "request_grid_toggle_otp": {
-      "name": "Pyydä ruudukon OTP:tä",
-      "description": "Lähetä tarvittava kertakoodi ennen sivustoruudukon tilan vaihtamista.",
+      "name": "Pyydä sähköverkon OTP:tä",
+      "description": "Lähetä tarvittava kertakoodi ennen kohteen sähköverkon tilan vaihtamista.",
       "fields": {
         "config_entry_id": {
           "name": "Enphase-asetusten syöttö",
-          "description": "Valitse Enphase-sivusto, jonka pitäisi saada kertaluonteinen koodi."
+          "description": "Valitse Enphase-kohde, jonka pitäisi saada kertaluonteinen koodi."
         }
       }
     },
     "set_grid_mode": {
-      "name": "Aseta ruudukkotila",
-      "description": "Vaihda sivuston ruudukkotilaa kertakoodin vahvistamisen jälkeen.",
+      "name": "Aseta verkkotila",
+      "description": "Vaihda kohteen verkkotilaa kertakoodin vahvistamisen jälkeen.",
       "fields": {
         "mode": {
-          "name": "Ruudukkotila",
+          "name": "Verkkotila",
           "description": "Valitse on_grid tai off_grid."
         },
         "otp": {
@@ -2748,7 +2748,7 @@
         },
         "config_entry_id": {
           "name": "Enphase-asetusten syöttö",
-          "description": "Valitse Enphase-sivusto, jonka ruudukkotilan tulee muuttua."
+          "description": "Valitse Enphase-kohde, jonka verkkotilan tulee muuttua."
         }
       }
     },
@@ -2769,8 +2769,8 @@
           "description": "Akun enimmäisvaraustaso (%)."
         },
         "site_id": {
-          "name": "Sivuston tunnus",
-          "description": "Enphase-sivuston tunnus (valinnainen; päätellään kohdelaitteesta)."
+          "name": "Kohteen tunnus",
+          "description": "Enphase-kohteen tunnus (valinnainen; päätellään kohdelaitteesta)."
         }
       },
       "sections": {
@@ -2940,15 +2940,15 @@
     },
     "try_reauth_now": {
       "name": "Yritä uudelleentodennusta nyt",
-      "description": "Käytä tallennettuja Enphase-tunnuksia valitun sivuston välittömään uudelleentodennusyritykseen.",
+      "description": "Käytä tallennettuja Enphase-tunnuksia valitun kohteen välittömään uudelleentodennusyritykseen.",
       "fields": {
         "device_id": {
-          "name": "Sivuston laitteet",
-          "description": "Valitse Enphase-sivustolaite, jolle uudelleentodennusta yritetään."
+          "name": "Kohteen laitteet",
+          "description": "Valitse Enphase-kohdelaite, jolle uudelleentodennusta yritetään."
         },
         "site_id": {
-          "name": "Sivuston ID",
-          "description": "Valinnainen sivustotunniste; havaitaan automaattisesti, kun sivuston laite valitaan."
+          "name": "Kohteen ID",
+          "description": "Valinnainen kohdetunniste; havaitaan automaattisesti, kun kohteen laite valitaan."
         }
       }
     },
@@ -3017,68 +3017,68 @@
           "description": "Korvaava vientitariffin haara, jossa on tyyppi, vientisuunnitelma, kaudet, jaksot, portaat ja hinnat."
         },
         "configure_import_tariff": {
-          "name": "Guidet importtarif",
-          "description": "Aktiver dette felt for at opbygge en erstatning for importtariffen med de guidede felter."
+          "name": "Määritä tuontitariffi",
+          "description": "Ota käyttöön, jos haluat luoda korvaavan tuontitariffin alla olevien ohjattujen kenttien avulla."
         },
         "import_tariff_type": {
-          "name": "Importtariftype",
-          "description": "Vælg flad, tidsafhængig eller trindelt importpris."
+          "name": "Tuontitariffin tyyppi",
+          "description": "Valitse, onko tuontihinta kiinteä, käyttöaikaan perustuva vai porrastettu."
         },
         "import_variation": {
-          "name": "Importvariation",
-          "description": "Vælg om importprisen varierer efter sæson eller hverdag/weekend."
+          "name": "Tuonnin vaihtelu",
+          "description": "Valitse, muuttuuko tuontihinta vuodenajan tai arkipäivän ja viikonlopun mukaan."
         },
         "import_flat_rate": {
-          "name": "Flad importpris",
-          "description": "En enkelt importpris for flad tarif uden periode-rækker."
+          "name": "Kiinteä tuontihinta",
+          "description": "Yksi tuontihinta, jota käytetään kiinteässä tariffissa, kun jaksojen rivejä ei ole annettu."
         },
         "import_periods": {
-          "name": "Importperioder",
-          "description": "Rækker til flade eller tidsafhængige importpriser. Dage 1-7 er mandag-søndag; tider kan være HH:MM eller minutter efter midnat."
+          "name": "Tuonnin jaksot",
+          "description": "Kiinteän tai käyttöaikaan perustuvan tuontihinnoittelun rivit. Päivät 1-7 ovat maanantai-sunnuntai; aika voi olla HH:MM tai minuutteja keskiyön jälkeen."
         },
         "import_tiers": {
-          "name": "Importtrin",
-          "description": "Rækker til trindelte importpriser. Brug end_value -1 for sidste ubegrænsede trin."
+          "name": "Tuonnin portaat",
+          "description": "Porrastetun tuontihinnoittelun rivit. Käytä arvoa end_value -1 viimeiselle rajoittamattomalle portaalle."
         },
         "import_off_peak_rate": {
-          "name": "Import off-peak basis",
-          "description": "Basispris uden for spidsbelastning for trindelte importtariffer."
+          "name": "Tuonnin perushinta ruuhka-ajan ulkopuolella",
+          "description": "Ruuhka-ajan ulkopuolinen perushinta porrastetuille tuontitariffeille."
         },
         "configure_export_tariff": {
-          "name": "Guidet eksporttarif",
-          "description": "Aktiver dette felt for at opbygge en erstatning for eksporttariffen med de guidede felter."
+          "name": "Määritä vientitariffi",
+          "description": "Ota käyttöön, jos haluat luoda korvaavan vientitariffin alla olevien ohjattujen kenttien avulla."
         },
         "export_tariff_type": {
-          "name": "Eksporttariftype",
-          "description": "Vælg flad, tidsafhængig eller trindelt eksportpris."
+          "name": "Vientitariffin tyyppi",
+          "description": "Valitse, onko vientikorvaus kiinteä, käyttöaikaan perustuva vai porrastettu."
         },
         "export_variation": {
-          "name": "Eksportvariation",
-          "description": "Vælg om eksportprisen varierer efter sæson eller hverdag/weekend."
+          "name": "Viennin vaihtelu",
+          "description": "Valitse, muuttuuko vientihinta vuodenajan tai arkipäivän ja viikonlopun mukaan."
         },
         "export_plan": {
-          "name": "Eksportplan",
-          "description": "Vælg Enphase-eksportplanen der skal skrives med eksporttariffen."
+          "name": "Vientisuunnitelma",
+          "description": "Valitse vientitariffiin kirjoitettava Enphase-vientisuunnitelman tunniste."
         },
         "export_flat_rate": {
-          "name": "Flad eksportpris",
-          "description": "En enkelt eksportpris for flad tarif uden periode-rækker."
+          "name": "Kiinteä vientihinta",
+          "description": "Yksi vientihinta, jota käytetään kiinteässä tariffissa, kun jaksojen rivejä ei ole annettu."
         },
         "export_periods": {
-          "name": "Eksportperioder",
-          "description": "Rækker til flade eller tidsafhængige eksportpriser. Dage 1-7 er mandag-søndag; tider kan være HH:MM eller minutter efter midnat."
+          "name": "Viennin jaksot",
+          "description": "Kiinteän tai käyttöaikaan perustuvan vientihinnoittelun rivit. Päivät 1-7 ovat maanantai-sunnuntai; aika voi olla HH:MM tai minuutteja keskiyön jälkeen."
         },
         "export_tiers": {
-          "name": "Eksporttrin",
-          "description": "Rækker til trindelte eksportpriser. Brug end_value -1 for sidste ubegrænsede trin."
+          "name": "Viennin portaat",
+          "description": "Porrastetun vientihinnoittelun rivit. Käytä arvoa end_value -1 viimeiselle rajoittamattomalle portaalle."
         },
         "export_off_peak_rate": {
-          "name": "Eksport off-peak basis",
-          "description": "Basispris uden for spidsbelastning for trindelte eksporttariffer."
+          "name": "Viennin perushinta ruuhka-ajan ulkopuolella",
+          "description": "Ruuhka-ajan ulkopuolinen perushinta porrastetuille vientitariffeille."
         },
         "device_id": {
-          "name": "Enphase-enhed",
-          "description": "Valgfri Enphase-enhed til at vælge stedet for fakturerings- eller tarifstrukturændringer."
+          "name": "Laite",
+          "description": "Valinnainen Enphase-laite, jolla valitaan laskutuksen tai tariffirakenteen päivitysten kohde."
         }
       },
       "sections": {
@@ -3128,7 +3128,7 @@
         },
         "config_entry_id": {
           "name": "Määrityskohteen tunnus",
-          "description": "Valinnainen kohdesivuston määrityskohteen tunniste."
+          "description": "Valinnainen kohdekohteen määrityskohteen tunniste."
         },
         "query": {
           "name": "Haku",
@@ -3163,7 +3163,7 @@
         },
         "config_entry_id": {
           "name": "Määrityskohteen tunnus",
-          "description": "Valinnainen kohdesivuston määrityskohteen tunniste."
+          "description": "Valinnainen kohdekohteen määrityskohteen tunniste."
         }
       }
     },
@@ -3190,7 +3190,7 @@
         },
         "config_entry_id": {
           "name": "Määrityskohteen tunnus",
-          "description": "Valinnainen kohdesivuston määrityskohteen tunniste."
+          "description": "Valinnainen kohdekohteen määrityskohteen tunniste."
         },
         "profile_id": {
           "name": "Profiilitunnus",
