@@ -95,7 +95,7 @@
       "message": "Nätstyrning är inte tillgänglig för den här anläggningen."
     },
     "grid_control_blocked": {
-      "message": "elnätsstyrning är för närvarande blockerad."
+      "message": "Elnätsstyrning är för närvarande blockerad."
     },
     "grid_mode_invalid": {
       "message": "Nätläge måste vara on_grid eller off_grid."
@@ -786,7 +786,7 @@
       },
       "grid_toggle_applied": {
         "title": "Ändring av nätläge accepteras",
-        "description": "Enphase accepterade begäran om att ändra nätläge till **{target_mode}**.\n\nDet fysiska reläet kan fortfarande ändras. Använd nätläge-sensorn för att observera det resulterande tillståndet."
+        "description": "Enphase accepterade begäran om att ändra nätläge till **{target_mode}**.\n\nDet fysiska reläet kan fortfarande ändras. Använd sensorn för nätläge för att observera det resulterande tillståndet."
       }
     },
     "error": {
@@ -808,8 +808,8 @@
       "grid_mode_invalid": "Välj On Grid eller Off Grid.",
       "grid_mode_already_active": "Anläggningen är redan i det valda nätläget.",
       "grid_mode_confirm_required": "Bekräfta ändringen av nätläge innan du fortsätter.",
-      "grid_control_unavailable": "elnätsstyrning är inte tillgänglig för den här anläggningen.",
-      "grid_control_blocked": "elnätsstyrning är för närvarande blockerad.",
+      "grid_control_unavailable": "Elnätsstyrning är inte tillgänglig för den här anläggningen.",
+      "grid_control_blocked": "Elnätsstyrning är för närvarande blockerad.",
       "grid_otp_required": "Ange engångskoden.",
       "grid_otp_invalid_format": "Engångskoden måste innehålla exakt fyra siffror.",
       "grid_otp_invalid": "Engångskoden är ogiltig eller har löpt ut.",
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "Nätprofilstyrning är inte tillgänglig.",
       "grid_profile_installer_required": "Nätprofilstyrning kräver installatörsåtkomst till Enphase Activation.",
       "grid_profile_no_regions": "Inga nätprofilregioner är tillgängliga för platsens land.",
-      "grid_mode_unavailable": "nätläge-kontroll är inte tillgänglig för den här anläggningen.",
-      "grid_mode_blocked": "nätläge-kontrollen är för närvarande blockerad: {reasons}."
+      "grid_mode_unavailable": "Styrning av nätläge är inte tillgänglig för den här anläggningen.",
+      "grid_mode_blocked": "Styrning av nätläge är för närvarande blockerad: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migreringen är klar. Enphase Energy äger nu de valda källentitets-ID:na. Kontrollera Energy-instrumentpanelen och Developer Tools > Statistics efter nästa uppdatering.",
@@ -2591,7 +2591,7 @@
       "last_failure_description": "Senaste felbeskrivning",
       "phase_timings": "Fastider",
       "session_cache_ttl_s": "Sessionscache TTL (s)",
-      "sites": "Anläggninger",
+      "sites": "Anläggningar",
       "auth_settings_available": "Auth-inställningar tillgängliga",
       "auth_settings_last_error": "Auth-inställningar senaste fel",
       "auth_settings_failures": "Autentiseringsinställningar misslyckades",

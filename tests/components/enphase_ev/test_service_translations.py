@@ -278,7 +278,7 @@ def test_electrical_grid_and_site_terms_avoid_website_false_friends() -> None:
         "el": r"πλέγμα",
         "es": r"cuadrícul",
         "et": r"ruudust",
-        "fi": r"ruuduk",
+        "fi": r"ruuduk|Gridillä",
         "fr": r"grille",
         "hu": r"rács",
         "it": r"grigli",
@@ -286,8 +286,8 @@ def test_electrical_grid_and_site_terms_avoid_website_false_friends() -> None:
         "lv": r"režģ",
         "nb-NO": r"rutenett",
         "nl": r"raster",
-        "pl": r"siatk",
-        "pt-BR": r"grade",
+        "pl": r"siat(?:k|c)",
+        "pt-BR": r"grade|modo Grid",
         "ro": r"gril",
         "sv-SE": r"rutnät",
     }
@@ -319,16 +319,94 @@ def test_electrical_grid_and_site_terms_avoid_website_false_friends() -> None:
         for path, source in canonical.items():
             value = translated[path]
             assert isinstance(source, str) and isinstance(value, str)
-            if re.search(r"\bgrid\b", source, re.IGNORECASE):
+            if re.search(r"\bgrids?\b", source, re.IGNORECASE):
                 assert not re.search(
                     forbidden_grid_terms[locale], value, re.IGNORECASE
                 ), f"{locale_path.name}:{path} uses a geometric-grid translation"
             if locale in forbidden_website_terms and re.search(
-                r"\bsite\b", source, re.IGNORECASE
+                r"\bsites?\b", source, re.IGNORECASE
             ):
                 assert not re.search(
                     forbidden_website_terms[locale], value, re.IGNORECASE
                 ), f"{locale_path.name}:{path} translates an installation as a website"
+
+
+def test_reviewed_grid_mode_phrases_use_grammatical_locale_forms() -> None:
+    """Keep sentence-level grid-mode translations grammatical."""
+
+    expected_fragments = {
+        "da": {
+            "options.step.grid_toggle_applied.description": "sensoren for nettilstand",
+            "options.abort.grid_mode_unavailable": "Styring af nettilstand",
+            "options.abort.grid_mode_blocked": "Styring af nettilstand",
+        },
+        "el": {
+            "options.step.grid_toggle_applied.description": "αισθητήρα λειτουργίας δικτύου",
+            "options.abort.grid_mode_unavailable": "ελέγχου λειτουργίας δικτύου",
+            "options.abort.grid_mode_blocked": "έλεγχος λειτουργίας δικτύου",
+            "selector.grid_control_block_reason.options.pending": "αλλαγή λειτουργίας δικτύου",
+        },
+        "fi": {
+            "options.step.grid_toggle_applied.description": "verkkotilan anturia",
+            "options.abort.grid_mode_unavailable": "Verkkotilan ohjaus",
+            "options.abort.grid_mode_blocked": "Verkkotilan ohjaus",
+        },
+        "nb-NO": {
+            "options.step.grid_toggle_applied.description": "sensoren for nettmodus",
+            "options.abort.grid_mode_unavailable": "Styring av nettmodus",
+            "options.abort.grid_mode_blocked": "Styring av nettmodus",
+        },
+        "sv-SE": {
+            "options.step.grid_toggle_applied.description": "sensorn för nätläge",
+            "options.error.grid_control_unavailable": "Elnätsstyrning",
+            "options.error.grid_control_blocked": "Elnätsstyrning",
+            "options.abort.grid_mode_unavailable": "Styrning av nätläge",
+            "options.abort.grid_mode_blocked": "Styrning av nätläge",
+        },
+    }
+
+    for locale, fragments in expected_fragments.items():
+        catalog = json.loads(
+            (ROOT / "translations" / f"{locale}.json").read_text(encoding="utf-8")
+        )
+        for path, fragment in fragments.items():
+            assert fragment in _at_path(catalog, path)
+
+
+def test_reviewed_system_health_site_labels_use_valid_plurals() -> None:
+    """Keep reviewed installation labels in their correct plural forms."""
+
+    expected = {
+        "fi": "Kohteet",
+        "nb-NO": "Anlegg",
+        "pl": "Instalacje",
+        "sv-SE": "Anläggningar",
+    }
+    path = "system_health.info.sites"
+
+    for locale, expected_value in expected.items():
+        catalog = json.loads(
+            (ROOT / "translations" / f"{locale}.json").read_text(encoding="utf-8")
+        )
+        assert _at_path(catalog, path) == expected_value
+
+
+def test_finnish_grid_profile_target_descriptions_are_grammatical() -> None:
+    """Keep target-site descriptions free of duplicated compound words."""
+
+    catalog = json.loads(
+        (ROOT / "translations" / "fi.json").read_text(encoding="utf-8")
+    )
+    expected = "Valinnainen määrityskohteen tunniste valitulle kohteelle."
+    for service in (
+        "browse_grid_profiles",
+        "refresh_grid_profiles",
+        "set_grid_profile",
+    ):
+        assert (
+            _at_path(catalog, f"services.{service}.fields.config_entry_id.description")
+            == expected
+        )
 
 
 def test_tariff_labels_use_native_bulgarian_and_greek_scripts() -> None:

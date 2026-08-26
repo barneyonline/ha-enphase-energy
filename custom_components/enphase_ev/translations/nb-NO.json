@@ -786,7 +786,7 @@
       },
       "grid_toggle_applied": {
         "title": "Endring av nettmodus akseptert",
-        "description": "Enphase godtok forespørselen om å endre nettmodus til **{target_mode}**.\n\nDet fysiske releet kan fortsatt være i endring. Bruk nettmodus-sensoren for å observere den resulterende tilstanden."
+        "description": "Enphase godtok forespørselen om å endre nettmodus til **{target_mode}**.\n\nDet fysiske releet kan fortsatt være i endring. Bruk sensoren for nettmodus for å observere den resulterende tilstanden."
       }
     },
     "error": {
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "Nettprofilstyring er ikke tilgjengelig.",
       "grid_profile_installer_required": "Nettprofilstyring krever installatørtilgang til Enphase Activation.",
       "grid_profile_no_regions": "Ingen nettprofilregioner er tilgjengelige for landet til dette anlegget.",
-      "grid_mode_unavailable": "nettmodus-kontroll er utilgjengelig for dette anlegget.",
-      "grid_mode_blocked": "nettmodus-kontroll er for øyeblikket blokkert: {reasons}."
+      "grid_mode_unavailable": "Styring av nettmodus er utilgjengelig for dette anlegget.",
+      "grid_mode_blocked": "Styring av nettmodus er for øyeblikket blokkert: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migreringen er fullført. Enphase Energy eier nå de valgte kildeentitets-ID-ene. Kontroller Energy-oversikten og Developer Tools > Statistics etter neste oppdatering.",
@@ -2591,7 +2591,7 @@
       "last_failure_description": "Siste feilbeskrivelse",
       "phase_timings": "Fasetider",
       "session_cache_ttl_s": "Sesjonsbuffer TTL (s)",
-      "sites": "Anlegger",
+      "sites": "Anlegg",
       "auth_settings_available": "Auth-innstillinger tilgjengelig",
       "auth_settings_last_error": "Auth-innstillinger siste feil",
       "auth_settings_failures": "Feil på autentiseringsinnstillinger",

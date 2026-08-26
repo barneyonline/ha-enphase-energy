@@ -805,7 +805,7 @@
       "grid_profile_profile_invalid": "Wybrany profil sieci jest niedostępny dla kraju i regionu tej instalacji.",
       "grid_profile_gateway_required": "Zastosowanie profilu sieci wymaga rekordu Gateway z chmurowej usługi Activation.",
       "grid_profile_apply_failed": "Nie udało się zastosować profilu sieci.",
-      "grid_mode_invalid": "Wybierz opcję Na siatce lub Poza siecią.",
+      "grid_mode_invalid": "Wybierz tryb pracy w sieci lub poza siecią.",
       "grid_mode_already_active": "Instalacja jest już w wybranym trybie sieci.",
       "grid_mode_confirm_required": "Przed kontynuowaniem potwierdź zmianę trybu sieci.",
       "grid_control_unavailable": "Sterowanie siecią jest niedostępne dla tej instalacji.",
@@ -849,7 +849,7 @@
     },
     "grid_mode": {
       "options": {
-        "on_grid": "Na siatce",
+        "on_grid": "W sieci",
         "off_grid": "Poza siecią",
         "unknown": "Nieznany"
       }
@@ -1453,7 +1453,7 @@
       "grid_mode": {
         "name": "Tryb sieci",
         "state": {
-          "on_grid": "Na siatce",
+          "on_grid": "W sieci",
           "off_grid": "Poza siecią",
           "unknown": "Nieznany"
         }
@@ -2591,7 +2591,7 @@
       "last_failure_description": "Ostatni opis awarii",
       "phase_timings": "Czasy faz",
       "session_cache_ttl_s": "Pamięć podręczna sesji TTL (s)",
-      "sites": "Witryny",
+      "sites": "Instalacje",
       "auth_settings_available": "Dostępne ustawienia autoryzacji",
       "auth_settings_last_error": "Ostatni błąd ustawień autoryzacji",
       "auth_settings_failures": "Błędy ustawień uwierzytelniania",

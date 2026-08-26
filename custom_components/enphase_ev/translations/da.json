@@ -786,7 +786,7 @@
       },
       "grid_toggle_applied": {
         "title": "Ændring af nettilstand accepteret",
-        "description": "Enphase accepterede anmodningen om at ændre nettilstand til **{target_mode}**.\n\nDet fysiske relæ kan stadig ændre sig. Brug nettilstand-sensoren til at observere den resulterende tilstand."
+        "description": "Enphase accepterede anmodningen om at ændre nettilstand til **{target_mode}**.\n\nDet fysiske relæ kan stadig ændre sig. Brug sensoren for nettilstand til at observere den resulterende tilstand."
       }
     },
     "error": {
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "Netprofilstyring er ikke tilgængelig.",
       "grid_profile_installer_required": "Netprofilstyring kræver installatøradgang til Enphase Activation.",
       "grid_profile_no_regions": "Der er ingen netprofilregioner tilgængelige for dette anlægs land.",
-      "grid_mode_unavailable": "nettilstand-kontrol er ikke tilgængelig for dette anlæg.",
-      "grid_mode_blocked": "nettilstand-kontrol er i øjeblikket blokeret: {reasons}."
+      "grid_mode_unavailable": "Styring af nettilstand er ikke tilgængelig for dette anlæg.",
+      "grid_mode_blocked": "Styring af nettilstand er i øjeblikket blokeret: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migrering fuldført. Enphase Energy ejer nu de valgte kildeentitets-id'er. Kontrollér Energy-dashboardet og Developer Tools > Statistics efter næste opdatering.",

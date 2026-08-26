@@ -781,12 +781,12 @@
         "description": "Modo de rede atual: **{current_mode}**.\n\nModo de rede solicitado: **{target_mode}**.\n\nInsira o código único de 4 dígitos e confirme a alteração sensível à segurança.",
         "data": {
           "otp": "Código único",
-          "confirm": "Confirme a mudança do modo Grid"
+          "confirm": "Confirme a mudança do modo de rede"
         }
       },
       "grid_toggle_applied": {
         "title": "Alteração do modo de rede aceita",
-        "description": "A Enphase aceitou a solicitação para alterar o modo de rede para **{target_mode}**.\n\nO relé físico ainda pode estar mudando. Use o sensor modo de rede para observar o estado resultante."
+        "description": "A Enphase aceitou a solicitação para alterar o modo de rede para **{target_mode}**.\n\nO relé físico ainda pode estar mudando. Use o sensor de modo de rede para observar o estado resultante."
       }
     },
     "error": {
@@ -807,7 +807,7 @@
       "grid_profile_apply_failed": "Falha ao aplicar o perfil de rede.",
       "grid_mode_invalid": "Selecione Na rede ou Fora da rede.",
       "grid_mode_already_active": "O site já está no modo de rede selecionado.",
-      "grid_mode_confirm_required": "Confirme a alteração do modo Grid antes de continuar.",
+      "grid_mode_confirm_required": "Confirme a alteração do modo de rede antes de continuar.",
       "grid_control_unavailable": "O controle da rede não está disponível para este site.",
       "grid_control_blocked": "O controle da rede está atualmente bloqueado.",
       "grid_otp_required": "Digite o código único.",
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "O controle de perfil de rede não está disponível.",
       "grid_profile_installer_required": "O controle de perfil de rede requer acesso de instalador ao Enphase Activation.",
       "grid_profile_no_regions": "Não há regiões de perfil de rede disponíveis para o país deste local.",
-      "grid_mode_unavailable": "O controle do modo Grid não está disponível para este site.",
-      "grid_mode_blocked": "O controle do modo Grid está atualmente bloqueado: {reasons}."
+      "grid_mode_unavailable": "O controle do modo de rede não está disponível para este site.",
+      "grid_mode_blocked": "O controle do modo de rede está atualmente bloqueado: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migração concluída. O Enphase Energy agora possui os IDs das entidades de origem selecionadas. Verifique o painel Energy e Developer Tools > Statistics após a próxima atualização.",
@@ -2748,7 +2748,7 @@
         },
         "config_entry_id": {
           "name": "Enphase entrada de configuração",
-          "description": "Selecione o site Enphase cujo modo Grid deve mudar."
+          "description": "Selecione o site Enphase cujo modo de rede deve mudar."
         }
       }
     },

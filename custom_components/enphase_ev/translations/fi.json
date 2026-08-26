@@ -786,7 +786,7 @@
       },
       "grid_toggle_applied": {
         "title": "Verkkotilan muutos hyväksytty",
-        "description": "Enphase hyväksyi pyynnön muuttaa verkkotilaksi **{target_mode}**.\n\nFyysinen rele saattaa vielä muuttua. Käytä verkkotila -anturia seurataksesi tuloksena olevaa tilaa."
+        "description": "Enphase hyväksyi pyynnön muuttaa verkkotilaksi **{target_mode}**.\n\nFyysinen rele saattaa vielä muuttua. Käytä verkkotilan anturia seurataksesi tuloksena olevaa tilaa."
       }
     },
     "error": {
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "Verkkoprofiilin hallinta ei ole käytettävissä.",
       "grid_profile_installer_required": "Verkkoprofiilin hallinta edellyttää asentajan käyttöoikeutta Enphase Activationiin.",
       "grid_profile_no_regions": "Tämän kohteen maalle ei ole käytettävissä verkkoprofiilin alueita.",
-      "grid_mode_unavailable": "verkkotila -ohjaus ei ole saatavilla tälle kohteelle.",
-      "grid_mode_blocked": "verkkotila -ohjaus on tällä hetkellä estetty: {reasons}."
+      "grid_mode_unavailable": "Verkkotilan ohjaus ei ole saatavilla tälle kohteelle.",
+      "grid_mode_blocked": "Verkkotilan ohjaus on tällä hetkellä estetty: {reasons}."
     },
     "create_entry": {
       "migration_success": "Siirto valmis. Enphase Energy omistaa nyt valitut lähde-entiteettien tunnukset. Tarkista seuraavan päivityksen jälkeen Energy-koontinäyttö ja Developer Tools > Statistics.",
@@ -849,7 +849,7 @@
     },
     "grid_mode": {
       "options": {
-        "on_grid": "Gridillä",
+        "on_grid": "Sähköverkossa",
         "off_grid": "Pois sähköverkosta",
         "unknown": "Tuntematon"
       }
@@ -1453,7 +1453,7 @@
       "grid_mode": {
         "name": "Verkkotila",
         "state": {
-          "on_grid": "Gridillä",
+          "on_grid": "Sähköverkossa",
           "off_grid": "Pois sähköverkosta",
           "unknown": "Tuntematon"
         }
@@ -2591,7 +2591,7 @@
       "last_failure_description": "Viimeisimmän vian kuvaus",
       "phase_timings": "Vaiheen ajoitukset",
       "session_cache_ttl_s": "Istuntovälimuisti TTL (s)",
-      "sites": "Kohdet",
+      "sites": "Kohteet",
       "auth_settings_available": "Todennusasetukset käytettävissä",
       "auth_settings_last_error": "Todennusasetusten viimeisin virhe",
       "auth_settings_failures": "Todennusasetusten virhe",
@@ -3128,7 +3128,7 @@
         },
         "config_entry_id": {
           "name": "Määrityskohteen tunnus",
-          "description": "Valinnainen kohdekohteen määrityskohteen tunniste."
+          "description": "Valinnainen määrityskohteen tunniste valitulle kohteelle."
         },
         "query": {
           "name": "Haku",
@@ -3163,7 +3163,7 @@
         },
         "config_entry_id": {
           "name": "Määrityskohteen tunnus",
-          "description": "Valinnainen kohdekohteen määrityskohteen tunniste."
+          "description": "Valinnainen määrityskohteen tunniste valitulle kohteelle."
         }
       }
     },
@@ -3190,7 +3190,7 @@
         },
         "config_entry_id": {
           "name": "Määrityskohteen tunnus",
-          "description": "Valinnainen kohdekohteen määrityskohteen tunniste."
+          "description": "Valinnainen määrityskohteen tunniste valitulle kohteelle."
         },
         "profile_id": {
           "name": "Profiilitunnus",
