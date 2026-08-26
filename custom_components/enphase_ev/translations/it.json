@@ -98,7 +98,7 @@
       "message": "Il controllo della rete è attualmente bloccato."
     },
     "grid_mode_invalid": {
-      "message": "La modalità rete deve essere on_grid o off_grid."
+      "message": "La modalità di rete deve essere on_grid o off_grid."
     },
     "grid_otp_required": {
       "message": "L'OTP è obbligatorio."
@@ -510,7 +510,7 @@
           "repair_notifications": "Gestisci le notifiche di riparazione di Home Assistant.",
           "authentication_settings": "Avvia il flusso di accesso per aggiornare le credenziali senza rimuovere l'integrazione.",
           "migrate_envoy": "Riassegna gli ID entità energia selezionati di Enphase Envoy in modo che la cronologia di Home Assistant Energy continui con questa integrazione.",
-          "advanced": "Controlli facoltativi della modalità rete e controlli del profilo riservati agli installatori."
+          "advanced": "Controlli facoltativi della modalità di rete e controlli del profilo riservati agli installatori."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -731,19 +731,19 @@
         "title": "Avanzate",
         "description": "Azioni per installatore e manutenzione.",
         "menu_options": {
-          "grid_toggle": "Modalità rete",
+          "grid_toggle": "Modalità di rete",
           "grid_profile": "Controllo profilo di rete"
         },
         "menu_option_descriptions": {
-          "grid_toggle": "Configura i controlli manuali della modalità rete.",
+          "grid_toggle": "Configura i controlli manuali della modalità di rete.",
           "grid_profile": "Sfoglia e applica profili di rete Activation riservati agli installatori."
         }
       },
       "grid_toggle": {
-        "title": "Modalità rete",
-        "description": "Modalità rete corrente: **{current_mode}**.\n\nLa modifica della modalità rete è sensibile alla sicurezza. Seleziona la modalità richiesta per inviare un codice monouso all'e-mail e al telefono registrati.",
+        "title": "Modalità di rete",
+        "description": "Modalità di rete corrente: **{current_mode}**.\n\nLa modifica della modalità di rete è sensibile alla sicurezza. Seleziona la modalità richiesta per inviare un codice monouso all'e-mail e al telefono registrati.",
         "data": {
-          "mode": "Modalità rete richiesta"
+          "mode": "Modalità di rete richiesta"
         }
       },
       "grid_profile": {
@@ -778,15 +778,15 @@
       },
       "grid_toggle_otp": {
         "title": "Conferma la modifica della modalità di rete",
-        "description": "Modalità rete corrente: **{current_mode}**.\n\nModalità rete richiesta: **{target_mode}**.\n\nImmettere il codice monouso a 4 cifre e confermare la modifica sensibile alla sicurezza.",
+        "description": "Modalità di rete corrente: **{current_mode}**.\n\nModalità di rete richiesta: **{target_mode}**.\n\nImmettere il codice monouso a 4 cifre e confermare la modifica sensibile alla sicurezza.",
         "data": {
           "otp": "Codice monouso",
-          "confirm": "Conferma la modifica della modalità rete"
+          "confirm": "Conferma la modifica della modalità di rete"
         }
       },
       "grid_toggle_applied": {
-        "title": "Modifica della modalità rete accettata",
-        "description": "Enphase ha accettato la richiesta di modificare la modalità rete in **{target_mode}**.\n\nIl relè fisico potrebbe ancora essere in fase di modifica. Utilizzare il sensore modalità rete per osservare lo stato risultante."
+        "title": "Modifica della modalità di rete accettata",
+        "description": "Enphase ha accettato la richiesta di modificare la modalità di rete in **{target_mode}**.\n\nIl relè fisico potrebbe ancora essere in fase di modifica. Utilizzare il sensore della modalità di rete per osservare lo stato risultante."
       }
     },
     "error": {
@@ -806,8 +806,8 @@
       "grid_profile_gateway_required": "L’applicazione del profilo di rete richiede un record Gateway Activation nel cloud.",
       "grid_profile_apply_failed": "Applicazione del profilo di rete non riuscita.",
       "grid_mode_invalid": "Selezionare Connesso alla rete o Disconnesso dalla rete.",
-      "grid_mode_already_active": "Il sito è già nella modalità Rete selezionata.",
-      "grid_mode_confirm_required": "Confermare la modifica della modalità rete prima di continuare.",
+      "grid_mode_already_active": "Il sito è già nella modalità di rete selezionata.",
+      "grid_mode_confirm_required": "Confermare la modifica della modalità di rete prima di continuare.",
       "grid_control_unavailable": "Il controllo della rete non è disponibile per questo sito.",
       "grid_control_blocked": "Il controllo della rete è attualmente bloccato.",
       "grid_otp_required": "Inserisci il codice monouso.",
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "Il controllo del profilo di rete non è disponibile.",
       "grid_profile_installer_required": "Il controllo del profilo di rete richiede accesso installatore a Enphase Activation.",
       "grid_profile_no_regions": "Non sono disponibili regioni di profilo di rete per il paese di questo sito.",
-      "grid_mode_unavailable": "Il controllo della modalità rete non è disponibile per questo sito.",
-      "grid_mode_blocked": "Il controllo della modalità rete è attualmente bloccato: {reasons}."
+      "grid_mode_unavailable": "Il controllo della modalità di rete non è disponibile per questo sito.",
+      "grid_mode_blocked": "Il controllo della modalità di rete è attualmente bloccato: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migrazione completata. Enphase Energy ora possiede gli ID entità sorgente selezionati. Verifica la dashboard Energy e Developer Tools > Statistics dopo il prossimo aggiornamento.",
@@ -1451,7 +1451,7 @@
         }
       },
       "grid_mode": {
-        "name": "Modalità rete",
+        "name": "Modalità di rete",
         "state": {
           "on_grid": "Connesso alla rete",
           "off_grid": "Disconnesso dalla rete",
@@ -2726,7 +2726,7 @@
     },
     "request_grid_toggle_otp": {
       "name": "Richiedi rete Attiva/disattiva OTP",
-      "description": "Invia il codice monouso richiesto prima di modificare la modalità rete del sito.",
+      "description": "Invia il codice monouso richiesto prima di modificare la modalità di rete del sito.",
       "fields": {
         "config_entry_id": {
           "name": "Voce di configurazione Enphase",
@@ -2735,11 +2735,11 @@
       }
     },
     "set_grid_mode": {
-      "name": "Imposta la modalità rete",
-      "description": "Modificare la modalità rete del sito dopo aver convalidato il codice monouso.",
+      "name": "Imposta la modalità di rete",
+      "description": "Modificare la modalità di rete del sito dopo aver convalidato il codice monouso.",
       "fields": {
         "mode": {
-          "name": "Modalità rete",
+          "name": "Modalità di rete",
           "description": "Seleziona on_grid o off_grid."
         },
         "otp": {
@@ -2748,7 +2748,7 @@
         },
         "config_entry_id": {
           "name": "Voce di configurazione Enphase",
-          "description": "Selezionare il sito Enphase di cui modificare la modalità rete."
+          "description": "Selezionare il sito Enphase di cui modificare la modalità di rete."
         }
       }
     },

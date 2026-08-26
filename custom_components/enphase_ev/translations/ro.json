@@ -92,7 +92,7 @@
       "message": "Pornirea încărcării a fost respinsă de Enphase (HTTP {status})."
     },
     "grid_control_unavailable": {
-      "message": "Controlul rețelei nu este disponibil pentru acest site."
+      "message": "Controlul rețelei nu este disponibil pentru această instalație."
     },
     "grid_control_blocked": {
       "message": "Controlul rețelei este blocat în prezent."
@@ -113,10 +113,10 @@
       "message": "Nu se poate determina numărul de serie Envoy pentru această instalație."
     },
     "grid_site_required": {
-      "message": "Selectați exact un site Enphase."
+      "message": "Selectați exact o instalație Enphase."
     },
     "grid_site_ambiguous": {
-      "message": "Au fost selectate mai multe site-uri ({count}). Selectați exact un site."
+      "message": "Au fost selectate mai multe instalații ({count}). Selectați exact o instalație."
     },
     "schedule_required": {
       "message": "Activați cel puțin un program înainte de a selecta încărcarea programată."
@@ -269,7 +269,7 @@
       "message": "Creați un {schedule_label} în programatorul IQ Battery înainte de a-l activa."
     },
     "schedule_not_exposed": {
-      "message": "{schedule_label} nu este expus momentan de către Enphase pentru acest site. Așteptați finalizarea sincronizarii programului, apoi reîmprospătați și încercați din nou."
+      "message": "{schedule_label} nu este expus momentan de către Enphase pentru această instalație. Așteptați finalizarea sincronizarii programului, apoi reîmprospătați și încercați din nou."
     },
     "schedule_toggle_not_applied": {
       "message": "Comutatorul {schedule_label} nu a fost aplicat de Enphase."
@@ -458,7 +458,7 @@
       "message": "Entitate tarifară duplicată: {entity_id}"
     },
     "tariff_site_mismatch": {
-      "message": "Toate actualizările tarifului trebuie să vizeze același site Enphase."
+      "message": "Toate actualizările tarifului trebuie să vizeze aceeași instalație Enphase."
     },
     "tariff_structure_invalid": {
       "message": "Structura tarifului este invalidă."
@@ -510,7 +510,7 @@
           "repair_notifications": "Gestionează notificările de reparații Home Assistant.",
           "authentication_settings": "Lansați fluxul de autentificare pentru a reîmprospăta credențialele fără a elimina integrarea.",
           "migrate_envoy": "Preluați ID-urile entităților de energie Enphase Envoy selectate pentru ca istoricul Home Assistant Energy să continue în această integrare.",
-          "advanced": "Comenzi opționale pentru modul rețea și controale ale profilului numai pentru instalatori."
+          "advanced": "Comenzi opționale pentru modul de rețea și controale ale profilului numai pentru instalatori."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -735,15 +735,15 @@
           "grid_profile": "Control profil rețea"
         },
         "menu_option_descriptions": {
-          "grid_toggle": "Configurează comenzile manuale pentru modul rețea.",
+          "grid_toggle": "Configurează comenzile manuale pentru modul de rețea.",
           "grid_profile": "Răsfoiește și aplică profiluri de rețea Activation disponibile doar pentru instalatori."
         }
       },
       "grid_toggle": {
         "title": "Mod rețea",
-        "description": "Modul actual al rețelei: **{current_mode}**.\n\nSchimbarea modului Grid este sensibilă la siguranță. Selectați modul solicitat pentru a trimite un cod unic către e-mailul și telefonul înregistrat.",
+        "description": "Modul de rețea actual: **{current_mode}**.\n\nSchimbarea modului de rețea este sensibilă la siguranță. Selectați modul solicitat pentru a trimite un cod unic către e-mailul și telefonul înregistrat.",
         "data": {
-          "mode": "Modul rețea solicitat"
+          "mode": "Modul de rețea solicitat"
         }
       },
       "grid_profile": {
@@ -777,16 +777,16 @@
         "description": "Enphase a acceptat actualizarea profilului de rețea pentru **{selected_profile}**.\n\nID profil solicitat: **{requested_profile_id}**\n\nStare cloud: **{cloud_apply_status}**\n\nPoate dura până la **5 minute** până când noul profil apare ca profil curent, în timp ce cloudul și Gateway finalizează procesarea. Senzorul Grid Profile se va actualiza după ce înregistrarea Activation raportează noul profil curent."
       },
       "grid_toggle_otp": {
-        "title": "Confirmați schimbarea modului rețea",
-        "description": "Modul actual al rețelei: **{current_mode}**.\n\nModul rețea solicitat: **{target_mode}**.\n\nIntroduceți codul unic din 4 cifre și confirmați modificarea sensibilă la siguranță.",
+        "title": "Confirmați schimbarea modului de rețea",
+        "description": "Modul de rețea actual: **{current_mode}**.\n\nModul de rețea solicitat: **{target_mode}**.\n\nIntroduceți codul unic din 4 cifre și confirmați modificarea sensibilă la siguranță.",
         "data": {
           "otp": "Cod unic",
-          "confirm": "Confirmați modificarea modului Grid"
+          "confirm": "Confirmați modificarea modului de rețea"
         }
       },
       "grid_toggle_applied": {
-        "title": "Modificarea modului rețea a fost acceptată",
-        "description": "Enphase a acceptat solicitarea de a schimba modul rețea în **{target_mode}**.\n\nEste posibil ca releul fizic să se schimbe în continuare. Utilizați senzorul modul rețea pentru a observa starea rezultată."
+        "title": "Modificarea modului de rețea a fost acceptată",
+        "description": "Enphase a acceptat solicitarea de a schimba modul de rețea în **{target_mode}**.\n\nEste posibil ca releul fizic să se schimbe în continuare. Utilizați senzorul modului de rețea pentru a observa starea rezultată."
       }
     },
     "error": {
@@ -806,14 +806,14 @@
       "grid_profile_gateway_required": "Aplicarea profilului de rețea necesită o înregistrare Gateway din Activation în cloud.",
       "grid_profile_apply_failed": "Aplicarea profilului de rețea a eșuat.",
       "grid_mode_invalid": "Selectați On Grid sau Off Grid.",
-      "grid_mode_already_active": "Site-ul este deja în modul rețea selectat.",
-      "grid_mode_confirm_required": "Confirmați schimbarea modului Grid înainte de a continua.",
-      "grid_control_unavailable": "Controlul rețelei nu este disponibil pentru acest site.",
+      "grid_mode_already_active": "Instalația este deja în modul de rețea selectat.",
+      "grid_mode_confirm_required": "Confirmați schimbarea modului de rețea înainte de a continua.",
+      "grid_control_unavailable": "Controlul rețelei nu este disponibil pentru această instalație.",
       "grid_control_blocked": "Controlul rețelei este blocat în prezent.",
       "grid_otp_required": "Introduceți codul unic.",
       "grid_otp_invalid_format": "Codul unic trebuie să conțină exact patru cifre.",
       "grid_otp_invalid": "Codul unic este invalid sau a expirat.",
-      "grid_envoy_serial_missing": "Gateway-ul pentru acest site nu a putut fi determinat."
+      "grid_envoy_serial_missing": "Gateway-ul pentru această instalație nu a putut fi determinat."
     },
     "abort": {
       "migration_no_envoy_sources": "Nu există senzori de energie Enphase Envoy disponibili pentru migrare.",
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "Controlul profilului de rețea nu este disponibil.",
       "grid_profile_installer_required": "Controlul profilului de rețea necesită acces de instalator la Enphase Activation.",
       "grid_profile_no_regions": "Nu există regiuni de profil de rețea disponibile pentru țara acestui amplasament.",
-      "grid_mode_unavailable": "Controlul modului rețea nu este disponibil pentru acest site.",
-      "grid_mode_blocked": "Controlul modului rețea este blocat în prezent: {reasons}."
+      "grid_mode_unavailable": "Controlul modului de rețea nu este disponibil pentru această instalație.",
+      "grid_mode_blocked": "Controlul modului de rețea este blocat în prezent: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migrare finalizată. Enphase Energy deține acum ID-urile entităților sursă selectate. Verificați tabloul Energy și Developer Tools > Statistics după următoarea actualizare.",
@@ -2517,11 +2517,11 @@
     },
     "auth_blocked": {
       "title": "Autentificarea Enphase Energy este blocată temporar",
-      "description": "Enphase pare să blocheze temporar autentificarea pentru site-ul {site_id}. Încercările automate sunt întrerupte până la {blocked_until}. O reautentificare manuală reușită poate elimina blocarea mai devreme."
+      "description": "Enphase pare să blocheze temporar autentificarea pentru instalația {site_id}. Încercările automate sunt întrerupte până la {blocked_until}. O reautentificare manuală reușită poate elimina blocarea mai devreme."
     },
     "too_many_active_sessions": {
       "title": "Enphase Energy are prea multe sesiuni active",
-      "description": "Enphase a respins autentificarea pentru site-ul {site_id} deoarece există prea multe sesiuni active ale contului. Reîncercările automate sunt suspendate până la {blocked_until}. Deconectați-vă din alte sesiuni ale aplicației sau browserului Enphase, apoi reîncercați autentificarea."
+      "description": "Enphase a respins autentificarea pentru instalația {site_id} deoarece există prea multe sesiuni active ale contului. Reîncercările automate sunt suspendate până la {blocked_until}. Deconectați-vă din alte sesiuni ale aplicației sau browserului Enphase, apoi reîncercați autentificarea."
     },
     "rate_limited": {
       "title": "Enphase Energy are frecvența limitată",
@@ -2541,31 +2541,31 @@
     },
     "scheduler_unavailable": {
       "title": "Programatorul Enphase Energy nu este disponibil",
-      "description": "Serviciul de planificare Enphase pentru site-ul {site_id} este indisponibil. Selectarea modului de încărcare și sincronizarea programului sunt temporar dezactivate."
+      "description": "Serviciul de planificare Enphase pentru instalația {site_id} este indisponibil. Selectarea modului de încărcare și sincronizarea programului sunt temporar dezactivate."
     },
     "session_history_unavailable": {
       "title": "Istoricul sesiunilor Enphase Energy nu este disponibil",
-      "description": "Serviciul de istoric al sesiunilor Enphase pentru site-ul {site_id} este indisponibil. Senzorii istoricului sesiunii vor afișa datele stocate în cache până când serviciul se recuperează."
+      "description": "Serviciul de istoric al sesiunilor Enphase pentru instalația {site_id} este indisponibil. Senzorii istoricului sesiunii vor afișa datele stocate în cache până când serviciul se recuperează."
     },
     "site_energy_unavailable": {
-      "title": "Energia site-ului Enphase Energy nu este disponibilă",
-      "description": "Serviciul de energie Enphase pe viață pentru site-ul {site_id} este indisponibil. Senzorii de energie ale site-ului vor afișa datele stocate în cache până când serviciul se recuperează."
+      "title": "Energia instalației Enphase Energy nu este disponibilă",
+      "description": "Serviciul de energie Enphase pe viață pentru instalația {site_id} este indisponibil. Senzorii de energie ai instalației vor afișa datele stocate în cache până când serviciul se recuperează."
     },
     "auth_settings_unavailable": {
       "title": "Setările de autentificare Enphase Energy nu sunt disponibile",
-      "description": "Serviciul de setări de autentificare a încărcătorului Enphase pentru site-ul {site_id} nu este disponibil. Comenzile de autentificare a aplicației sunt dezactivate temporar."
+      "description": "Serviciul de setări de autentificare a încărcătorului Enphase pentru instalația {site_id} nu este disponibil. Comenzile de autentificare a aplicației sunt dezactivate temporar."
     },
     "battery_profile_pending": {
       "title": "Actualizarea profilului bateriei Enphase Energy este în așteptare",
-      "description": "O modificare a profilului bateriei pentru site-ul {site_id} este în așteptare de mai mult de {pending_timeout_minutes} minute. Serviciul cloud poate încă procesa solicitarea."
+      "description": "O modificare a profilului bateriei pentru instalația {site_id} este în așteptare de mai mult de {pending_timeout_minutes} minute. Serviciul cloud poate încă procesa solicitarea."
     },
     "hems_auth_degraded": {
       "title": "HEMS Enphase Energy este pauzat temporar",
-      "description": "Interogarea Heat Pump/HEMS pentru site-ul {site_id} este pauzată până la {backoff_until} după {failure_count} erori de tip autentificare ({reason}). Wallbox, bateria, gateway-ul și alte date pot continua. Dezactivează grupul Heat Pump sau folosește Clear HEMS Auth Backoff după revenirea Enphase."
+      "description": "Interogarea Heat Pump/HEMS pentru instalația {site_id} este pauzată până la {backoff_until} după {failure_count} erori de tip autentificare ({reason}). Wallbox, bateria, gateway-ul și alte date pot continua. Dezactivează grupul Heat Pump sau folosește Clear HEMS Auth Backoff după revenirea Enphase."
     },
     "active_system_event": {
       "title": "Eveniment de sistem Enphase cu impact ridicat activ",
-      "description": "Site-ul {site_id} are un eveniment {severity} activ care afectează {device_type}, raportat prima dată la {event_date}. Consultați Enlighten pentru detalii și acțiunea recomandată. Această reparație se elimină automat când Enphase raportează că evenimentul este rezolvat."
+      "description": "Instalația {site_id} are un eveniment {severity} activ care afectează {device_type}, raportat prima dată la {event_date}. Consultați Enlighten pentru detalii și acțiunea recomandată. Această reparație se elimină automat când Enphase raportează că evenimentul este rezolvat."
     }
   },
   "system_health": {
@@ -2583,15 +2583,15 @@
       "backoff_active": "Backoff activ",
       "network_errors": "Erori de rețea consecutive",
       "http_errors": "Erori HTTP consecutive",
-      "site_count": "Număr de site-uri",
-      "site_name": "Numele site-ului",
-      "site_ids": "ID-urile site-ului",
-      "site_names": "Numele site-urilor",
+      "site_count": "Număr de instalații",
+      "site_name": "Numele instalației",
+      "site_ids": "ID-urile instalațiilor",
+      "site_names": "Numele instalațiilor",
       "last_failure_status": "Ultima stare de eșec",
       "last_failure_description": "Descrierea ultimei erori",
       "phase_timings": "Timpurile fazelor",
       "session_cache_ttl_s": "TTL (e) cache de sesiune",
-      "sites": "Site-uri",
+      "sites": "Instalații",
       "auth_settings_available": "Setări de autentificare disponibile",
       "auth_settings_last_error": "Ultima eroare a setărilor de autentificare",
       "auth_settings_failures": "Eșecuri ale setărilor de autentificare",
@@ -2602,11 +2602,11 @@
       "session_history_failures": "Eșecuri în istoricul sesiunilor",
       "session_history_backoff_active": "Istoricul sesiunii este activ",
       "session_history_backoff_ends_utc": "Închiderea istoricului sesiunii se încheie (UTC)",
-      "site_energy_available": "Energia site-ului disponibilă",
-      "site_energy_last_error": "Ultima eroare privind energia site-ului",
+      "site_energy_available": "Energia instalației disponibilă",
+      "site_energy_last_error": "Ultima eroare privind energia instalației",
       "site_energy_failures": "Defecțiuni de energie ale șantierului",
       "site_energy_backoff_active": "Retragerea energiei pe amplasament este activă",
-      "site_energy_backoff_ends_utc": "Retragerea energiei site-ului se încheie (UTC)",
+      "site_energy_backoff_ends_utc": "Retragerea energiei instalației se încheie (UTC)",
       "tariff_available": "Tarif disponibil",
       "tariff_service_status": "Starea serviciului de tarife",
       "tariff_last_error": "Ultima eroare de tarif",
@@ -2726,17 +2726,17 @@
     },
     "request_grid_toggle_otp": {
       "name": "Solicită OTP pentru comutare rețea",
-      "description": "Trimite codul unic necesar înainte de schimbarea modului rețelei site-ului.",
+      "description": "Trimite codul unic necesar înainte de schimbarea modului de rețea al instalației.",
       "fields": {
         "config_entry_id": {
           "name": "Intrare de configurare Enphase",
-          "description": "Selectați site-ul Enphase care ar trebui să primească codul unic."
+          "description": "Selectați instalația Enphase care ar trebui să primească codul unic."
         }
       }
     },
     "set_grid_mode": {
-      "name": "Setează modul rețea",
-      "description": "Schimbă modul rețelei site-ului după validarea codului unic.",
+      "name": "Setează modul de rețea",
+      "description": "Schimbă modul de rețea al instalației după validarea codului unic.",
       "fields": {
         "mode": {
           "name": "Mod rețea",
@@ -2748,7 +2748,7 @@
         },
         "config_entry_id": {
           "name": "Intrare de configurare Enphase",
-          "description": "Selectați site-ul Enphase al cărui mod Grid ar trebui să se schimbe."
+          "description": "Selectați instalația Enphase al cărei mod de rețea ar trebui să se schimbe."
         }
       }
     },
@@ -2789,12 +2789,12 @@
       },
       "fields": {
         "site_id": {
-          "name": "ID-ul site-ului",
-          "description": "Identificator opțional de site; detectat automat atunci când este selectat un dispozitiv de site."
+          "name": "ID-ul instalației",
+          "description": "Identificator opțional al instalației; detectat automat atunci când este selectat un dispozitiv al instalației."
         },
         "config_entry_id": {
           "name": "ID de intrare de configurare",
-          "description": "Identificator opțional de intrare de configurare pentru o singură intrare de site Enphase."
+          "description": "Identificator opțional de intrare de configurare pentru o singură intrare a instalației Enphase."
         }
       }
     },
@@ -2940,15 +2940,15 @@
     },
     "try_reauth_now": {
       "name": "Încearcă reautentificarea acum",
-      "description": "Folosește acreditările Enphase salvate pentru a încerca imediat reautentificarea site-ului selectat.",
+      "description": "Folosește acreditările Enphase salvate pentru a încerca imediat reautentificarea instalației selectate.",
       "fields": {
         "device_id": {
-          "name": "Dispozitive site",
-          "description": "Selectați un dispozitiv de site Enphase pentru care să se încerce reautentificarea."
+          "name": "Dispozitive ale instalației",
+          "description": "Selectați un dispozitiv al instalației Enphase pentru care să se încerce reautentificarea."
         },
         "site_id": {
-          "name": "ID site",
-          "description": "Identificator opțional al site-ului; detectat automat când este selectat un dispozitiv de site."
+          "name": "ID-ul instalației",
+          "description": "Identificator opțional al instalației; detectat automat când este selectat un dispozitiv al instalației."
         }
       }
     },
@@ -2997,12 +2997,12 @@
           "description": "Lista ID-urilor entităților tarifare și a valorilor nenegative de actualizat."
         },
         "site_id": {
-          "name": "ID site",
-          "description": "Identificator opțional de site pentru actualizări de facturare."
+          "name": "ID-ul instalației",
+          "description": "Identificator opțional al instalației pentru actualizări de facturare."
         },
         "config_entry_id": {
           "name": "ID intrare de configurare",
-          "description": "Identificator opțional al intrării de configurare pentru un singur site Enphase."
+          "description": "Identificator opțional al intrării de configurare pentru o singură instalație Enphase."
         },
         "tariff_payload": {
           "name": "Payload tarifar",
@@ -3092,12 +3092,12 @@
       "description": "Șterge pauza temporară de autentificare HEMS/Heat Pump fără autentificare cu parolă.",
       "fields": {
         "device_id": {
-          "name": "Dispozitive site",
-          "description": "Selectează un dispozitiv de site Enphase pentru care se șterge HEMS auth backoff."
+          "name": "Dispozitive ale instalației",
+          "description": "Selectează un dispozitiv al instalației Enphase pentru care se șterge HEMS auth backoff."
         },
         "site_id": {
-          "name": "ID site",
-          "description": "Identificator opțional de site; detectat automat când este selectat un dispozitiv."
+          "name": "ID-ul instalației",
+          "description": "Identificator opțional al instalației; detectat automat când este selectat un dispozitiv."
         }
       }
     },

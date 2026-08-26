@@ -116,7 +116,7 @@
       "message": "Wählen Sie genau eine Enphase-Site aus."
     },
     "grid_site_ambiguous": {
-      "message": "Es wurden mehrere Websites ausgewählt ({count}). Wählen Sie genau eine Site aus."
+      "message": "Es wurden mehrere Anlagen ausgewählt ({count}). Wählen Sie genau eine Anlage aus."
     },
     "schedule_required": {
       "message": "Aktivieren Sie mindestens einen Zeitplan, bevor Sie geplantes Laden auswählen."
@@ -2583,7 +2583,7 @@
       "backoff_active": "Backoff aktiv",
       "network_errors": "Aufeinanderfolgende Netzwerkfehler",
       "http_errors": "Aufeinanderfolgende HTTP-Fehler",
-      "site_count": "Anzahl der Websites",
+      "site_count": "Anzahl der Anlagen",
       "site_name": "Site-Name",
       "site_ids": "Site-IDs",
       "site_names": "Site-Namen",
@@ -2591,7 +2591,7 @@
       "last_failure_description": "Letzte Fehlerbeschreibung",
       "phase_timings": "Phasenzeiten",
       "session_cache_ttl_s": "Sitzungscache-TTL(s)",
-      "sites": "Websites",
+      "sites": "Anlagen",
       "auth_settings_available": "Authentifizierungseinstellungen verfügbar",
       "auth_settings_last_error": "Letzter Fehler bei den Authentifizierungseinstellungen",
       "auth_settings_failures": "Fehler bei den Authentifizierungseinstellungen",

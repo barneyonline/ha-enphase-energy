@@ -288,21 +288,23 @@ def test_electrical_grid_and_site_terms_avoid_website_false_friends() -> None:
         "nl": r"raster",
         "pl": r"siat(?:k|c)",
         "pt-BR": r"grade|modo Grid",
-        "ro": r"gril",
+        "ro": r"gril|mod(?:ul|ului) Grid",
         "sv-SE": r"rutnät",
     }
     forbidden_website_terms = {
         "bg": r"сайт",
         "cs": r"\bweb",
         "da": r"websted",
+        "de": r"Website",
         "el": r"ιστότοπ",
         "et": r"\b(?:sait|saidi|saite|saidil|saidile|saidilt|saidid|saitide)",
         "fi": r"sivusto",
         "hu": r"webhely",
         "lt": r"svetain",
-        "lv": r"vietn",
+        "lv": r"vietn|vietņ",
         "nb-NO": r"nettsted",
         "pl": r"witryn",
+        "ro": r"\bsite(?:-ul|-uri|-ului|-urilor)?\b",
         "sv-SE": r"webbplats",
     }
     canonical = _flatten_catalog(
@@ -335,6 +337,16 @@ def test_reviewed_grid_mode_phrases_use_grammatical_locale_forms() -> None:
     """Keep sentence-level grid-mode translations grammatical."""
 
     expected_fragments = {
+        "bg": {
+            "options.step.grid_toggle_applied.description": "сензора за режим на мрежата",
+            "options.error.grid_mode_confirm_required": "промяната на режима на мрежата",
+            "options.abort.grid_mode_unavailable": "Управлението на режима на мрежата",
+            "options.abort.grid_mode_blocked": "Управлението на режима на мрежата",
+            "selector.grid_control_block_reason.options.pending": "чакаща промяна на режима на мрежата",
+        },
+        "cs": {
+            "options.step.grid_toggle_applied.description": "senzoru režimu sítě",
+        },
         "da": {
             "options.step.grid_toggle_applied.description": "sensoren for nettilstand",
             "options.abort.grid_mode_unavailable": "Styring af nettilstand",
@@ -351,10 +363,26 @@ def test_reviewed_grid_mode_phrases_use_grammatical_locale_forms() -> None:
             "options.abort.grid_mode_unavailable": "Verkkotilan ohjaus",
             "options.abort.grid_mode_blocked": "Verkkotilan ohjaus",
         },
+        "fr": {
+            "options.step.grid_toggle_applied.description": "capteur de mode réseau",
+        },
+        "it": {
+            "options.step.grid_toggle_applied.description": "sensore della modalità di rete",
+            "options.abort.grid_mode_unavailable": "controllo della modalità di rete",
+            "options.abort.grid_mode_blocked": "controllo della modalità di rete",
+        },
         "nb-NO": {
             "options.step.grid_toggle_applied.description": "sensoren for nettmodus",
             "options.abort.grid_mode_unavailable": "Styring av nettmodus",
             "options.abort.grid_mode_blocked": "Styring av nettmodus",
+        },
+        "ro": {
+            "options.step.grid_toggle.description": "Schimbarea modului de rețea",
+            "options.step.grid_toggle_otp.title": "schimbarea modului de rețea",
+            "options.step.grid_toggle_applied.description": "senzorul modului de rețea",
+            "options.error.grid_mode_already_active": "de rețea selectat",
+            "options.abort.grid_mode_unavailable": "Controlul modului de rețea",
+            "options.abort.grid_mode_blocked": "Controlul modului de rețea",
         },
         "sv-SE": {
             "options.step.grid_toggle_applied.description": "sensorn för nätläge",
@@ -377,18 +405,46 @@ def test_reviewed_system_health_site_labels_use_valid_plurals() -> None:
     """Keep reviewed installation labels in their correct plural forms."""
 
     expected = {
-        "fi": "Kohteet",
-        "nb-NO": "Anlegg",
-        "pl": "Instalacje",
-        "sv-SE": "Anläggningar",
+        "cs": {
+            "site_count": "Počet systémů",
+            "site_ids": "ID systémů",
+            "site_names": "Názvy systémů",
+            "sites": "Systémy",
+        },
+        "de": {
+            "site_count": "Anzahl der Anlagen",
+            "sites": "Anlagen",
+        },
+        "fi": {
+            "site_count": "Kohteiden määrä",
+            "site_ids": "Kohteiden tunnukset",
+            "site_names": "Kohteiden nimet",
+            "sites": "Kohteet",
+        },
+        "lv": {
+            "site_count": "Vietu skaits",
+            "site_ids": "Vietu ID",
+            "site_names": "Vietu nosaukumi",
+            "sites": "Vietas",
+        },
+        "nb-NO": {"sites": "Anlegg"},
+        "pl": {"sites": "Instalacje"},
+        "ro": {
+            "site_count": "Număr de instalații",
+            "site_name": "Numele instalației",
+            "site_ids": "ID-urile instalațiilor",
+            "site_names": "Numele instalațiilor",
+            "sites": "Instalații",
+        },
+        "sv-SE": {"sites": "Anläggningar"},
     }
-    path = "system_health.info.sites"
 
-    for locale, expected_value in expected.items():
+    for locale, labels in expected.items():
         catalog = json.loads(
             (ROOT / "translations" / f"{locale}.json").read_text(encoding="utf-8")
         )
-        assert _at_path(catalog, path) == expected_value
+        for key, expected_value in labels.items():
+            assert _at_path(catalog, f"system_health.info.{key}") == expected_value
 
 
 def test_finnish_grid_profile_target_descriptions_are_grammatical() -> None:

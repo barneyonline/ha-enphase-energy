@@ -786,7 +786,7 @@
       },
       "grid_toggle_applied": {
         "title": "Změna režimu sítě přijata",
-        "description": "Společnost Enphase přijala požadavek na změnu režimu sítě na **{target_mode}**.\n\nFyzické relé se může stále měnit. Pomocí senzoru režim sítě pozorujte výsledný stav."
+        "description": "Společnost Enphase přijala požadavek na změnu režimu sítě na **{target_mode}**.\n\nFyzické relé se může stále měnit. Pomocí senzoru režimu sítě pozorujte výsledný stav."
       }
     },
     "error": {
@@ -2583,10 +2583,10 @@
       "backoff_active": "Backoff aktivní",
       "network_errors": "Po sobě jdoucí síťové chyby",
       "http_errors": "Po sobě jdoucí chyby HTTP",
-      "site_count": "Počet stránek",
+      "site_count": "Počet systémů",
       "site_name": "Název systému",
-      "site_ids": "ID stránek",
-      "site_names": "Názvy stránek",
+      "site_ids": "ID systémů",
+      "site_names": "Názvy systémů",
       "last_failure_status": "Stav poslední poruchy",
       "last_failure_description": "Popis poslední poruchy",
       "phase_timings": "Časování fází",

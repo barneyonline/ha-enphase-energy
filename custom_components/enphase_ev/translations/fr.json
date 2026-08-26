@@ -786,7 +786,7 @@
       },
       "grid_toggle_applied": {
         "title": "Changement de mode réseau accepté",
-        "description": "Enphase a accepté la demande de changement du mode réseau en **{target_mode}**.\n\nLe relais physique est peut-être encore en train de changer. Utilisez le capteur mode réseau pour observer l’état résultant."
+        "description": "Enphase a accepté la demande de changement du mode réseau en **{target_mode}**.\n\nLe relais physique est peut-être encore en train de changer. Utilisez le capteur de mode réseau pour observer l’état résultant."
       }
     },
     "error": {
