@@ -2585,7 +2585,7 @@
       "http_errors": "På varandra följande HTTP-fel",
       "site_count": "Antal anläggningar",
       "site_name": "Anläggningens namn",
-      "site_ids": "Anläggning-ID:n",
+      "site_ids": "Anläggnings-ID:n",
       "site_names": "Anläggningsnamn",
       "last_failure_status": "Status för senaste fel",
       "last_failure_description": "Senaste felbeskrivning",

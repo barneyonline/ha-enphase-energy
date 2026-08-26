@@ -248,7 +248,7 @@
       "message": "Čas začátku a konce plánu nabíjení ze sítě se musí lišit."
     },
     "charge_from_grid_schedule_toggle_not_applied": {
-      "message": "Enphase nepoužil přepínač plánu nabíjení z sítě."
+      "message": "Enphase nepoužil přepínač plánu nabíjení ze sítě."
     },
     "charge_from_grid_required": {
       "message": "Nejprve musí být povoleno nabíjení ze sítě."

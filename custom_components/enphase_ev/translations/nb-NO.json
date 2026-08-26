@@ -2585,7 +2585,7 @@
       "http_errors": "Påfølgende HTTP-feil",
       "site_count": "Antall anlegg",
       "site_name": "Navn på anlegg",
-      "site_ids": "Anlegg-ID-er",
+      "site_ids": "Anleggs-ID-er",
       "site_names": "Navn på anlegg",
       "last_failure_status": "Siste feilstatus",
       "last_failure_description": "Siste feilbeskrivelse",

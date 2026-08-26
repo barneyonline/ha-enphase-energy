@@ -92,7 +92,7 @@
       "message": "Enphase lükkas laadimise alustamise tagasi (HTTP {status})."
     },
     "grid_control_unavailable": {
-      "message": "Võrgu juhtimine pole sellel asukohas saadaval."
+      "message": "Võrgu juhtimine pole selles asukohas saadaval."
     },
     "grid_control_blocked": {
       "message": "Võrgu juhtimine on praegu blokeeritud."
@@ -808,7 +808,7 @@
       "grid_mode_invalid": "Valige On Grid või Off Grid.",
       "grid_mode_already_active": "Asukoht on juba valitud võrgurežiimis.",
       "grid_mode_confirm_required": "Enne jätkamist kinnitage võrgurežiimi muudatus.",
-      "grid_control_unavailable": "Võrgu juhtimine pole sellel asukohas saadaval.",
+      "grid_control_unavailable": "Võrgu juhtimine pole selles asukohas saadaval.",
       "grid_control_blocked": "Võrgu juhtimine on praegu blokeeritud.",
       "grid_otp_required": "Sisestage ühekordne kood.",
       "grid_otp_invalid_format": "Ühekordne kood peab sisaldama täpselt nelja numbrit.",
@@ -822,7 +822,7 @@
       "grid_profile_unavailable": "Võrguprofiili juhtimine pole saadaval.",
       "grid_profile_installer_required": "Võrguprofiili juhtimine nõuab paigaldaja juurdepääsu Enphase Activationile.",
       "grid_profile_no_regions": "Selle asukoha riigi jaoks pole võrguprofiili piirkondi saadaval.",
-      "grid_mode_unavailable": "Võrgurežiimi juhtimine pole sellel asukohas saadaval.",
+      "grid_mode_unavailable": "Võrgurežiimi juhtimine pole selles asukohas saadaval.",
       "grid_mode_blocked": "Võrgurežiimi juhtimine on praegu blokeeritud: {reasons}."
     },
     "create_entry": {
@@ -2561,7 +2561,7 @@
     },
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS on ajutiselt peatatud",
-      "description": "Heat Pump/HEMS päringud asukohase {site_id} on peatatud kuni {backoff_until} pärast {failure_count} autentimislaadset tõrget ({reason}). Wallbox, aku, lüüs ja muud andmed võivad jätkata. Keela Heat Pump seadmerühm või kasuta Clear HEMS Auth Backoff pärast Enphase taastumist."
+      "description": "Heat Pump/HEMS päringud asukohale {site_id} on peatatud kuni {backoff_until} pärast {failure_count} autentimislaadset tõrget ({reason}). Wallbox, aku, lüüs ja muud andmed võivad jätkata. Keela Heat Pump seadmerühm või kasuta Clear HEMS Auth Backoff pärast Enphase taastumist."
     },
     "active_system_event": {
       "title": "Aktiivne suure mõjuga Enphase süsteemisündmus",

@@ -401,6 +401,29 @@ def test_reviewed_grid_mode_phrases_use_grammatical_locale_forms() -> None:
             assert fragment in _at_path(catalog, path)
 
 
+def test_reviewed_locale_inflections_use_grammatical_forms() -> None:
+    """Keep reviewed replacements in the cases required by their sentences."""
+
+    expected_fragments = {
+        "cs": {
+            "exceptions.charge_from_grid_schedule_toggle_not_applied.message": "nabíjení ze sítě",
+        },
+        "et": {
+            "exceptions.grid_control_unavailable.message": "selles asukohas",
+            "options.error.grid_control_unavailable": "selles asukohas",
+            "options.abort.grid_mode_unavailable": "selles asukohas",
+            "issues.hems_auth_degraded.description": "päringud asukohale {site_id}",
+        },
+    }
+
+    for locale, fragments in expected_fragments.items():
+        catalog = json.loads(
+            (ROOT / "translations" / f"{locale}.json").read_text(encoding="utf-8")
+        )
+        for path, fragment in fragments.items():
+            assert fragment in _at_path(catalog, path)
+
+
 def test_reviewed_system_health_site_labels_use_valid_plurals() -> None:
     """Keep reviewed installation labels in their correct plural forms."""
 
@@ -427,7 +450,10 @@ def test_reviewed_system_health_site_labels_use_valid_plurals() -> None:
             "site_names": "Vietu nosaukumi",
             "sites": "Vietas",
         },
-        "nb-NO": {"sites": "Anlegg"},
+        "nb-NO": {
+            "site_ids": "Anleggs-ID-er",
+            "sites": "Anlegg",
+        },
         "pl": {"sites": "Instalacje"},
         "ro": {
             "site_count": "Număr de instalații",
@@ -436,7 +462,10 @@ def test_reviewed_system_health_site_labels_use_valid_plurals() -> None:
             "site_names": "Numele instalațiilor",
             "sites": "Instalații",
         },
-        "sv-SE": {"sites": "Anläggningar"},
+        "sv-SE": {
+            "site_ids": "Anläggnings-ID:n",
+            "sites": "Anläggningar",
+        },
     }
 
     for locale, labels in expected.items():
