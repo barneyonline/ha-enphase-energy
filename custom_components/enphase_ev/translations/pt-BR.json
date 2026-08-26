@@ -2739,7 +2739,7 @@
       "description": "Altere o modo de rede do site após validar o código único.",
       "fields": {
         "mode": {
-          "name": "Modo rede",
+          "name": "Modo de rede",
           "description": "Selecione on_grid ou off_grid."
         },
         "otp": {

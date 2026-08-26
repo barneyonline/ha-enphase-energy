@@ -406,6 +406,7 @@ def test_reviewed_locale_inflections_use_grammatical_forms() -> None:
 
     expected_fragments = {
         "cs": {
+            "exceptions.charge_from_grid_toggle_not_applied.message": "Přepnutí nabíjení ze sítě nebylo společností Enphase použito.",
             "exceptions.charge_from_grid_schedule_toggle_not_applied.message": "nabíjení ze sítě",
         },
         "et": {
@@ -424,6 +425,24 @@ def test_reviewed_locale_inflections_use_grammatical_forms() -> None:
             assert fragment in _at_path(catalog, path)
 
 
+def test_reviewed_locale_labels_use_grammatical_forms() -> None:
+    """Keep reviewed labels grammatical in their locale and UI context."""
+
+    expected = {
+        "es": {"services.set_grid_mode.fields.mode.name": "Modo de red"},
+        "pl": {"entity.sensor.system_profile_status.state.pending": "Oczekujący"},
+        "pt-BR": {"services.set_grid_mode.fields.mode.name": "Modo de rede"},
+        "sv-SE": {"services.force_refresh.fields.site_id.name": "Anläggnings-ID"},
+    }
+
+    for locale, labels in expected.items():
+        catalog = json.loads(
+            (ROOT / "translations" / f"{locale}.json").read_text(encoding="utf-8")
+        )
+        for path, expected_value in labels.items():
+            assert _at_path(catalog, path) == expected_value
+
+
 def test_reviewed_system_health_site_labels_use_valid_plurals() -> None:
     """Keep reviewed installation labels in their correct plural forms."""
 
@@ -438,6 +457,7 @@ def test_reviewed_system_health_site_labels_use_valid_plurals() -> None:
             "site_count": "Anzahl der Anlagen",
             "sites": "Anlagen",
         },
+        "el": {"site_ids": "Αναγνωριστικά τοποθεσιών"},
         "fi": {
             "site_count": "Kohteiden määrä",
             "site_ids": "Kohteiden tunnukset",

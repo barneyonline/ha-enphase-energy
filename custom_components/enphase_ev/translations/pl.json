@@ -1360,7 +1360,7 @@
       "system_profile_status": {
         "name": "Stan profilu systemowego",
         "state": {
-          "pending": "Oczekujące"
+          "pending": "Oczekujący"
         },
         "state_attributes": {
           "effective_profile": {

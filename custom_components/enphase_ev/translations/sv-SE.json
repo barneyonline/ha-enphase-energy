@@ -2789,7 +2789,7 @@
       },
       "fields": {
         "site_id": {
-          "name": "Anläggning-ID",
+          "name": "Anläggnings-ID",
           "description": "Valfri platsidentifierare; detekteras automatiskt när en platsenhet väljs."
         },
         "config_entry_id": {

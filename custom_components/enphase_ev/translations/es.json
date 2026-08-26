@@ -2739,7 +2739,7 @@
       "description": "Cambie el modo de red del sitio después de validar el código de un solo uso.",
       "fields": {
         "mode": {
-          "name": "Modo red",
+          "name": "Modo de red",
           "description": "Seleccione on_grid o off_grid."
         },
         "otp": {

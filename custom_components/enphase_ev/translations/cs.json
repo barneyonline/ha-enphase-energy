@@ -233,7 +233,7 @@
       "message": "Nabíjení z nastavení sítě není k dispozici."
     },
     "charge_from_grid_toggle_not_applied": {
-      "message": "Enphase nepoužilo nabíjení z přepínače sítě."
+      "message": "Přepnutí nabíjení ze sítě nebylo společností Enphase použito."
     },
     "power_match_unavailable": {
       "message": "Nastavení PowerMatch není k dispozici."
