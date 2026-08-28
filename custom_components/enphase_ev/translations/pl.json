@@ -92,7 +92,7 @@
       "message": "Uruchomienie ładowania zostało odrzucone przez Enphase (HTTP {status})."
     },
     "grid_control_unavailable": {
-      "message": "Sterowanie siecią jest niedostępne dla tej witryny."
+      "message": "Sterowanie siecią jest niedostępne dla tej instalacji."
     },
     "grid_control_blocked": {
       "message": "Sterowanie siecią jest obecnie zablokowane."
@@ -110,13 +110,13 @@
       "message": "Hasło jednorazowe jest nieprawidłowe lub wygasło."
     },
     "grid_envoy_serial_missing": {
-      "message": "Nie można określić numeru seryjnego wysłannika dla tej witryny."
+      "message": "Nie można określić numeru seryjnego Envoy dla tej lokalizacji."
     },
     "grid_site_required": {
-      "message": "Wybierz dokładnie jedną witrynę Enphase."
+      "message": "Wybierz dokładnie jedną instalację Enphase."
     },
     "grid_site_ambiguous": {
-      "message": "Wybrano wiele witryn ({count}). Wybierz dokładnie jedną witrynę."
+      "message": "Wybrano wiele instalacji ({count}). Wybierz dokładnie jedną instalację."
     },
     "schedule_required": {
       "message": "Włącz co najmniej jeden harmonogram przed wybraniem ładowania zaplanowanego."
@@ -269,7 +269,7 @@
       "message": "Przed włączeniem utwórz {schedule_label} w harmonogramie IQ Battery."
     },
     "schedule_not_exposed": {
-      "message": "{schedule_label} nie jest obecnie udostępniany przez Enphase dla tej witryny. Poczekaj na zakończenie synchronizacji harmonogramu, a następnie odśwież i spróbuj ponownie."
+      "message": "{schedule_label} nie jest obecnie udostępniany przez Enphase dla tej instalacji. Poczekaj na zakończenie synchronizacji harmonogramu, a następnie odśwież i spróbuj ponownie."
     },
     "schedule_toggle_not_applied": {
       "message": "Przełącznik {schedule_label} nie został zastosowany przez Enphase."
@@ -743,7 +743,7 @@
         "title": "Tryb sieci",
         "description": "Bieżący tryb sieci: **{current_mode}**.\n\nZmiana trybu sieci ma wpływ na bezpieczeństwo. Wybierz żądany tryb, aby wysłać jednorazowy kod na zarejestrowany adres e-mail i telefon.",
         "data": {
-          "mode": "Żądany tryb siatki"
+          "mode": "Żądany tryb sieci"
         }
       },
       "grid_profile": {
@@ -777,16 +777,16 @@
         "description": "Enphase zaakceptował aktualizację profilu sieci dla **{selected_profile}**.\n\nŻądany identyfikator profilu: **{requested_profile_id}**\n\nStatus chmury: **{cloud_apply_status}**\n\nNowy profil może pojawić się jako bieżący dopiero po maksymalnie **5 minutach**, gdy chmura i Gateway zakończą przetwarzanie. Czujnik Grid Profile zaktualizuje się, gdy rekord Activation zgłosi nowy bieżący profil."
       },
       "grid_toggle_otp": {
-        "title": "Potwierdź zmianę trybu siatki",
-        "description": "Bieżący tryb sieci: **{current_mode}**.\n\nŻądany tryb siatki: **{target_mode}**.\n\nWprowadź 4-cyfrowy kod jednorazowy i potwierdź zmianę ze względów bezpieczeństwa.",
+        "title": "Potwierdź zmianę trybu sieci",
+        "description": "Bieżący tryb sieci: **{current_mode}**.\n\nŻądany tryb sieci: **{target_mode}**.\n\nWprowadź 4-cyfrowy kod jednorazowy i potwierdź zmianę ze względów bezpieczeństwa.",
         "data": {
           "otp": "Kod jednorazowy",
-          "confirm": "Potwierdź zmianę trybu siatki"
+          "confirm": "Potwierdź zmianę trybu sieci"
         }
       },
       "grid_toggle_applied": {
-        "title": "Zmiana trybu siatki została zaakceptowana",
-        "description": "Enphase zaakceptował żądanie zmiany trybu sieci na **{target_mode}**.\n\nPrzekaźnik fizyczny może wciąż się zmieniać. Użyj czujnika trybu siatki, aby obserwować wynikowy stan."
+        "title": "Zmiana trybu sieci została zaakceptowana",
+        "description": "Enphase zaakceptował żądanie zmiany trybu sieci na **{target_mode}**.\n\nPrzekaźnik fizyczny może wciąż się zmieniać. Użyj czujnika trybu sieci, aby obserwować wynikowy stan."
       }
     },
     "error": {
@@ -805,15 +805,15 @@
       "grid_profile_profile_invalid": "Wybrany profil sieci jest niedostępny dla kraju i regionu tej instalacji.",
       "grid_profile_gateway_required": "Zastosowanie profilu sieci wymaga rekordu Gateway z chmurowej usługi Activation.",
       "grid_profile_apply_failed": "Nie udało się zastosować profilu sieci.",
-      "grid_mode_invalid": "Wybierz opcję Na siatce lub Poza siecią.",
-      "grid_mode_already_active": "Witryna jest już w wybranym trybie siatki.",
-      "grid_mode_confirm_required": "Przed kontynuowaniem potwierdź zmianę trybu siatki.",
-      "grid_control_unavailable": "Sterowanie siecią jest niedostępne dla tej witryny.",
+      "grid_mode_invalid": "Wybierz tryb pracy w sieci lub poza siecią.",
+      "grid_mode_already_active": "Instalacja jest już w wybranym trybie sieci.",
+      "grid_mode_confirm_required": "Przed kontynuowaniem potwierdź zmianę trybu sieci.",
+      "grid_control_unavailable": "Sterowanie siecią jest niedostępne dla tej instalacji.",
       "grid_control_blocked": "Sterowanie siecią jest obecnie zablokowane.",
       "grid_otp_required": "Wprowadź kod jednorazowy.",
       "grid_otp_invalid_format": "Kod jednorazowy musi zawierać dokładnie cztery cyfry.",
       "grid_otp_invalid": "Kod jednorazowy jest nieprawidłowy lub wygasł.",
-      "grid_envoy_serial_missing": "Nie można określić bramy dla tej witryny."
+      "grid_envoy_serial_missing": "Nie można określić bramy dla tej instalacji."
     },
     "abort": {
       "migration_no_envoy_sources": "Brak dostępnych sensorów energii Enphase Envoy do migracji.",
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "Sterowanie profilem sieci jest niedostępne.",
       "grid_profile_installer_required": "Sterowanie profilem sieci wymaga dostępu instalatora do Enphase Activation.",
       "grid_profile_no_regions": "Dla kraju tej instalacji nie ma dostępnych regionów profilu sieci.",
-      "grid_mode_unavailable": "Sterowanie trybem siatki jest niedostępne dla tej witryny.",
-      "grid_mode_blocked": "Kontrola trybu siatki jest obecnie zablokowana: {reasons}."
+      "grid_mode_unavailable": "Sterowanie trybem sieci jest niedostępne dla tej instalacji.",
+      "grid_mode_blocked": "Kontrola trybu sieci jest obecnie zablokowana: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migracja zakończona. Enphase Energy przejęło teraz wybrane identyfikatory encji źródłowych. Sprawdź panel Energy i Developer Tools > Statistics po następnym odświeżeniu.",
@@ -849,7 +849,7 @@
     },
     "grid_mode": {
       "options": {
-        "on_grid": "Na siatce",
+        "on_grid": "W sieci",
         "off_grid": "Poza siecią",
         "unknown": "Nieznany"
       }
@@ -1360,7 +1360,7 @@
       "system_profile_status": {
         "name": "Stan profilu systemowego",
         "state": {
-          "pending": "Aż do"
+          "pending": "Oczekujący"
         },
         "state_attributes": {
           "effective_profile": {
@@ -1453,7 +1453,7 @@
       "grid_mode": {
         "name": "Tryb sieci",
         "state": {
-          "on_grid": "Na siatce",
+          "on_grid": "W sieci",
           "off_grid": "Poza siecią",
           "unknown": "Nieznany"
         }
@@ -2541,11 +2541,11 @@
     },
     "scheduler_unavailable": {
       "title": "Harmonogram Enphase Energy jest niedostępny",
-      "description": "Usługa harmonogramu Enphase dla witryny {site_id} jest niedostępna. Wybór trybu ładowania i synchronizacja harmonogramu są tymczasowo wyłączone."
+      "description": "Usługa harmonogramu Enphase dla instalacji {site_id} jest niedostępna. Wybór trybu ładowania i synchronizacja harmonogramu są tymczasowo wyłączone."
     },
     "session_history_unavailable": {
       "title": "Historia sesji Enphase Energy jest niedostępna",
-      "description": "Usługa historii sesji Enphase dla witryny {site_id} jest niedostępna. Czujniki historii sesji będą wyświetlać dane w pamięci podręcznej do czasu przywrócenia usługi."
+      "description": "Usługa historii sesji Enphase dla instalacji {site_id} jest niedostępna. Czujniki historii sesji będą wyświetlać dane w pamięci podręcznej do czasu przywrócenia usługi."
     },
     "site_energy_unavailable": {
       "title": "Energia w obiekcie Enphase Energy jest niedostępna",
@@ -2553,7 +2553,7 @@
     },
     "auth_settings_unavailable": {
       "title": "Ustawienia uwierzytelniania Enphase Energy są niedostępne",
-      "description": "Usługa ustawień uwierzytelniania ładowarki Enphase dla witryny {site_id} jest niedostępna. Opcje uwierzytelniania aplikacji są tymczasowo wyłączone."
+      "description": "Usługa ustawień uwierzytelniania ładowarki Enphase dla instalacji {site_id} jest niedostępna. Opcje uwierzytelniania aplikacji są tymczasowo wyłączone."
     },
     "battery_profile_pending": {
       "title": "Oczekująca aktualizacja profilu baterii Enphase Energy",
@@ -2583,15 +2583,15 @@
       "backoff_active": "Backoff aktywny",
       "network_errors": "Kolejne błędy sieci",
       "http_errors": "Kolejne błędy HTTP",
-      "site_count": "Liczba witryn",
-      "site_name": "Nazwa witryny",
-      "site_ids": "Identyfikatory witryn",
-      "site_names": "Nazwy witryn",
+      "site_count": "Liczba instalacji",
+      "site_name": "Nazwa instalacji",
+      "site_ids": "Identyfikatory instalacji",
+      "site_names": "Nazwy instalacji",
       "last_failure_status": "Ostatni stan awarii",
       "last_failure_description": "Ostatni opis awarii",
       "phase_timings": "Czasy faz",
       "session_cache_ttl_s": "Pamięć podręczna sesji TTL (s)",
-      "sites": "Witryny",
+      "sites": "Instalacje",
       "auth_settings_available": "Dostępne ustawienia autoryzacji",
       "auth_settings_last_error": "Ostatni błąd ustawień autoryzacji",
       "auth_settings_failures": "Błędy ustawień uwierzytelniania",
@@ -2725,21 +2725,21 @@
       }
     },
     "request_grid_toggle_otp": {
-      "name": "Żądanie przełączenia siatki OTP",
-      "description": "Wyślij wymagany kod jednorazowy przed zmianą trybu siatki witryny.",
+      "name": "Żądanie przełączenia sieci OTP",
+      "description": "Wyślij wymagany kod jednorazowy przed zmianą trybu sieci instalacji.",
       "fields": {
         "config_entry_id": {
           "name": "Wpis konfiguracji Enphase",
-          "description": "Wybierz witrynę Enphase, która powinna otrzymać jednorazowy kod."
+          "description": "Wybierz instalację Enphase, która powinna otrzymać jednorazowy kod."
         }
       }
     },
     "set_grid_mode": {
-      "name": "Ustaw tryb siatki",
-      "description": "Zmień tryb siatki witryny po sprawdzeniu poprawności kodu jednorazowego.",
+      "name": "Ustaw tryb sieci",
+      "description": "Zmień tryb sieci instalacji po sprawdzeniu poprawności kodu jednorazowego.",
       "fields": {
         "mode": {
-          "name": "Tryb siatki",
+          "name": "Tryb sieci",
           "description": "Wybierz on_grid lub off_grid."
         },
         "otp": {
@@ -2789,12 +2789,12 @@
       },
       "fields": {
         "site_id": {
-          "name": "Identyfikator witryny",
-          "description": "Opcjonalny identyfikator witryny; wykrywany automatycznie po wybraniu urządzenia witryny."
+          "name": "Identyfikator instalacji",
+          "description": "Opcjonalny identyfikator instalacji; wykrywany automatycznie po wybraniu urządzenia instalacji."
         },
         "config_entry_id": {
           "name": "Identyfikator wpisu konfiguracji",
-          "description": "Opcjonalny identyfikator wpisu konfiguracji dla pojedynczego wpisu witryny Enphase."
+          "description": "Opcjonalny identyfikator wpisu konfiguracji dla pojedynczego wpisu instalacji Enphase."
         }
       }
     },
@@ -2828,12 +2828,12 @@
           "description": "Lista aktywnych dni tygodnia, gdzie poniedziałek=1, a niedziela=7."
         },
         "site_id": {
-          "name": "Identyfikator witryny",
-          "description": "Opcjonalny identyfikator witryny; wykrywany automatycznie po wybraniu urządzenia witryny."
+          "name": "Identyfikator instalacji",
+          "description": "Opcjonalny identyfikator instalacji; wykrywany automatycznie po wybraniu urządzenia instalacji."
         },
         "config_entry_id": {
           "name": "Identyfikator wpisu konfiguracji",
-          "description": "Opcjonalny identyfikator wpisu konfiguracji dla pojedynczego wpisu witryny Enphase."
+          "description": "Opcjonalny identyfikator wpisu konfiguracji dla pojedynczego wpisu instalacji Enphase."
         }
       }
     },
@@ -2875,12 +2875,12 @@
           "description": "Ustaw wartość true, aby potwierdzić aktualizację harmonogramu."
         },
         "site_id": {
-          "name": "Identyfikator witryny",
-          "description": "Opcjonalny identyfikator witryny; wykrywany automatycznie po wybraniu urządzenia witryny."
+          "name": "Identyfikator instalacji",
+          "description": "Opcjonalny identyfikator instalacji; wykrywany automatycznie po wybraniu urządzenia instalacji."
         },
         "config_entry_id": {
           "name": "Identyfikator wpisu konfiguracji",
-          "description": "Opcjonalny identyfikator wpisu konfiguracji dla pojedynczego wpisu witryny Enphase."
+          "description": "Opcjonalny identyfikator wpisu konfiguracji dla pojedynczego wpisu instalacji Enphase."
         }
       }
     },
@@ -2906,12 +2906,12 @@
           "description": "Ustaw wartość true, aby potwierdzić usunięcie harmonogramu."
         },
         "site_id": {
-          "name": "Identyfikator witryny",
-          "description": "Opcjonalny identyfikator witryny; wykrywany automatycznie po wybraniu urządzenia witryny."
+          "name": "Identyfikator instalacji",
+          "description": "Opcjonalny identyfikator instalacji; wykrywany automatycznie po wybraniu urządzenia instalacji."
         },
         "config_entry_id": {
           "name": "Identyfikator wpisu konfiguracji",
-          "description": "Opcjonalny identyfikator wpisu konfiguracji dla pojedynczego wpisu witryny Enphase."
+          "description": "Opcjonalny identyfikator wpisu konfiguracji dla pojedynczego wpisu instalacji Enphase."
         }
       }
     },
@@ -2929,12 +2929,12 @@
           "description": "Rodzina harmonogramu baterii: cfg, dtg lub rbd."
         },
         "site_id": {
-          "name": "Identyfikator witryny",
-          "description": "Opcjonalny identyfikator witryny; wykrywany automatycznie po wybraniu urządzenia witryny."
+          "name": "Identyfikator instalacji",
+          "description": "Opcjonalny identyfikator instalacji; wykrywany automatycznie po wybraniu urządzenia instalacji."
         },
         "config_entry_id": {
           "name": "Identyfikator wpisu konfiguracji",
-          "description": "Opcjonalny identyfikator wpisu konfiguracji dla pojedynczego wpisu witryny Enphase."
+          "description": "Opcjonalny identyfikator wpisu konfiguracji dla pojedynczego wpisu instalacji Enphase."
         }
       }
     },
@@ -3017,68 +3017,68 @@
           "description": "Zastępcza gałąź taryfy eksportu z typem, planem eksportu, sezonami, okresami, progami i stawkami."
         },
         "configure_import_tariff": {
-          "name": "Guidet importtarif",
-          "description": "Aktiver dette felt for at opbygge en erstatning for importtariffen med de guidede felter."
+          "name": "Skonfiguruj taryfę importową",
+          "description": "Włącz, aby utworzyć zastępczą taryfę importową za pomocą poniższych pól z przewodnikiem."
         },
         "import_tariff_type": {
-          "name": "Importtariftype",
-          "description": "Vælg flad, tidsafhængig eller trindelt importpris."
+          "name": "Typ taryfy importowej",
+          "description": "Wybierz, czy cena importu jest stała, zależna od czasu użytkowania, czy progowa."
         },
         "import_variation": {
-          "name": "Importvariation",
-          "description": "Vælg om importprisen varierer efter sæson eller hverdag/weekend."
+          "name": "Zmienność importu",
+          "description": "Wybierz, czy cena importu zmienia się według pory roku lub między dniami roboczymi a weekendem."
         },
         "import_flat_rate": {
-          "name": "Flad importpris",
-          "description": "En enkelt importpris for flad tarif uden periode-rækker."
+          "name": "Stała cena importu",
+          "description": "Jedna cena importu używana dla taryfy stałej, gdy nie podano wierszy okresów."
         },
         "import_periods": {
-          "name": "Importperioder",
-          "description": "Rækker til flade eller tidsafhængige importpriser. Dage 1-7 er mandag-søndag; tider kan være HH:MM eller minutter efter midnat."
+          "name": "Okresy importu",
+          "description": "Wiersze stałych lub zależnych od czasu cen importu. Dni 1-7 oznaczają poniedziałek-niedzielę; czas może mieć format HH:MM lub oznaczać minuty po północy."
         },
         "import_tiers": {
-          "name": "Importtrin",
-          "description": "Rækker til trindelte importpriser. Brug end_value -1 for sidste ubegrænsede trin."
+          "name": "Progi importu",
+          "description": "Wiersze progowych cen importu. Użyj end_value -1 dla ostatniego nieograniczonego progu."
         },
         "import_off_peak_rate": {
-          "name": "Import off-peak basis",
-          "description": "Basispris uden for spidsbelastning for trindelte importtariffer."
+          "name": "Bazowa cena importu poza szczytem",
+          "description": "Bazowa cena poza szczytem dla progowych taryf importowych."
         },
         "configure_export_tariff": {
-          "name": "Guidet eksporttarif",
-          "description": "Aktiver dette felt for at opbygge en erstatning for eksporttariffen med de guidede felter."
+          "name": "Skonfiguruj taryfę eksportową",
+          "description": "Włącz, aby utworzyć zastępczą taryfę eksportową za pomocą poniższych pól z przewodnikiem."
         },
         "export_tariff_type": {
-          "name": "Eksporttariftype",
-          "description": "Vælg flad, tidsafhængig eller trindelt eksportpris."
+          "name": "Typ taryfy eksportowej",
+          "description": "Wybierz, czy rekompensata za eksport jest stała, zależna od czasu użytkowania, czy progowa."
         },
         "export_variation": {
-          "name": "Eksportvariation",
-          "description": "Vælg om eksportprisen varierer efter sæson eller hverdag/weekend."
+          "name": "Zmienność eksportu",
+          "description": "Wybierz, czy cena eksportu zmienia się według pory roku lub między dniami roboczymi a weekendem."
         },
         "export_plan": {
-          "name": "Eksportplan",
-          "description": "Vælg Enphase-eksportplanen der skal skrives med eksporttariffen."
+          "name": "Plan eksportu",
+          "description": "Wybierz etykietę planu eksportu Enphase, która ma zostać zapisana z taryfą eksportową."
         },
         "export_flat_rate": {
-          "name": "Flad eksportpris",
-          "description": "En enkelt eksportpris for flad tarif uden periode-rækker."
+          "name": "Stała cena eksportu",
+          "description": "Jedna cena eksportu używana dla taryfy stałej, gdy nie podano wierszy okresów."
         },
         "export_periods": {
-          "name": "Eksportperioder",
-          "description": "Rækker til flade eller tidsafhængige eksportpriser. Dage 1-7 er mandag-søndag; tider kan være HH:MM eller minutter efter midnat."
+          "name": "Okresy eksportu",
+          "description": "Wiersze stałych lub zależnych od czasu cen eksportu. Dni 1-7 oznaczają poniedziałek-niedzielę; czas może mieć format HH:MM lub oznaczać minuty po północy."
         },
         "export_tiers": {
-          "name": "Eksporttrin",
-          "description": "Rækker til trindelte eksportpriser. Brug end_value -1 for sidste ubegrænsede trin."
+          "name": "Progi eksportu",
+          "description": "Wiersze progowych cen eksportu. Użyj end_value -1 dla ostatniego nieograniczonego progu."
         },
         "export_off_peak_rate": {
-          "name": "Eksport off-peak basis",
-          "description": "Basispris uden for spidsbelastning for trindelte eksporttariffer."
+          "name": "Bazowa cena eksportu poza szczytem",
+          "description": "Bazowa cena poza szczytem dla progowych taryf eksportowych."
         },
         "device_id": {
-          "name": "Enphase-enhed",
-          "description": "Valgfri Enphase-enhed til at vælge stedet for fakturerings- eller tarifstrukturændringer."
+          "name": "Urządzenie",
+          "description": "Opcjonalne urządzenie Enphase do wyboru instalacji przy aktualizacji rozliczeń lub struktury taryfy."
         }
       },
       "sections": {

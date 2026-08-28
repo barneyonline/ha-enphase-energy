@@ -92,7 +92,7 @@
       "message": "Стартирането на зареждането беше отхвърлено от Enphase (HTTP {status})."
     },
     "grid_control_unavailable": {
-      "message": "Контролът на мрежата не е наличен за този сайт."
+      "message": "Контролът на мрежата не е наличен за този обект."
     },
     "grid_control_blocked": {
       "message": "Контролът на мрежата в момента е блокиран."
@@ -110,13 +110,13 @@
       "message": "OTP е невалиден или изтекъл."
     },
     "grid_envoy_serial_missing": {
-      "message": "Не може да се определи сериен номер на пратеник за този сайт."
+      "message": "Не може да се определи серийният номер на Envoy за този обект."
     },
     "grid_site_required": {
-      "message": "Изберете точно един сайт на Enphase."
+      "message": "Изберете точно един обект на Enphase."
     },
     "grid_site_ambiguous": {
-      "message": "Бяха избрани множество сайтове ({count}). Изберете точно един сайт."
+      "message": "Бяха избрани множество обекти ({count}). Изберете точно един обект."
     },
     "schedule_required": {
       "message": "Активирайте поне един график, преди да изберете планирано зареждане."
@@ -191,7 +191,7 @@
       "message": "Графикът е в конфликт със съществуващия график за ограничаване на разреждането на батерията. Първо коригирайте или деактивирайте този график."
     },
     "schedule_conflict_cfg": {
-      "message": "Графикът е в конфликт със съществуващия график за таксуване от мрежата. Първо коригирайте или деактивирайте този график."
+      "message": "Графикът е в конфликт със съществуващия график за зареждане от мрежата. Първо коригирайте или деактивирайте този график."
     },
     "schedule_update_conflict": {
       "message": "Актуализацията на графика е в конфликт със съществуващ график на батерията."
@@ -242,16 +242,16 @@
       "message": "Превключването на PowerMatch не беше приложено от Enphase."
     },
     "charge_from_grid_schedule_unavailable": {
-      "message": "Таксуването от графика на мрежата не е налично."
+      "message": "Графикът за зареждане от мрежата не е наличен."
     },
     "charge_from_grid_schedule_times_different": {
       "message": "Началният и крайният час на графика за зареждане от мрежата трябва да са различни."
     },
     "charge_from_grid_schedule_toggle_not_applied": {
-      "message": "Превключването на графика за таксуване от мрежата не е приложено от Enphase."
+      "message": "Превключването на графика за зареждане от мрежата не беше приложено от Enphase."
     },
     "charge_from_grid_required": {
-      "message": "Първо трябва да се активира таксуването от мрежата."
+      "message": "Първо трябва да се активира зареждането от мрежата."
     },
     "schedule_change_pending": {
       "message": "Промяна в графика чака синхронизиране на Envoy. моля изчакайте"
@@ -269,7 +269,7 @@
       "message": "Създайте {schedule_label} в планировчика на IQ Battery, преди да го активирате."
     },
     "schedule_not_exposed": {
-      "message": "{schedule_label} в момента не се излага от Enphase за този сайт. Изчакайте синхронизирането на графика да завърши, след това опреснете и опитайте отново."
+      "message": "{schedule_label} в момента не се излага от Enphase за този обект. Изчакайте синхронизирането на графика да завърши, след това опреснете и опитайте отново."
     },
     "schedule_toggle_not_applied": {
       "message": "Превключването {schedule_label} не е приложено от Enphase."
@@ -305,10 +305,10 @@
       "message": "Текущите часове по график не са налични."
     },
     "charge_from_grid_schedule_limit_range": {
-      "message": "Графикът за таксуване от мрежата трябва да бъде между {minimum} и {maximum}."
+      "message": "Лимитът на графика за зареждане от мрежата трябва да бъде между {minimum} и {maximum}."
     },
     "charge_from_grid_schedule_limit_minimum": {
-      "message": "Графикът за таксуване от мрежата трябва да бъде поне {minimum}%."
+      "message": "Лимитът на графика за зареждане от мрежата трябва да бъде поне {minimum}%."
     },
     "battery_shutdown_level_unavailable": {
       "message": "Нивото на изключване на батерията не е налично."
@@ -458,7 +458,7 @@
       "message": "Дублирана същност за тарифна ставка: {entity_id}"
     },
     "tariff_site_mismatch": {
-      "message": "Всички актуализации на тарифата трябва да са за един и същ сайт на Enphase."
+      "message": "Всички актуализации на тарифата трябва да са за един и същ обект на Enphase."
     },
     "tariff_structure_invalid": {
       "message": "Структурата на тарифата е невалидна."
@@ -781,12 +781,12 @@
         "description": "Текущ режим на мрежата: **{current_mode}**.\n\nЗаявен режим на мрежа: **{target_mode}**.\n\nВъведете 4-цифрения еднократен код и потвърдете промяната, свързана с безопасността.",
         "data": {
           "otp": "Еднократен код",
-          "confirm": "Потвърдете промяната на Grid Mode"
+          "confirm": "Потвърдете промяната на режима на мрежата"
         }
       },
       "grid_toggle_applied": {
         "title": "Промяната на режима на мрежата е приета",
-        "description": "Enphase прие заявката за промяна на Grid Mode на **{target_mode}**.\n\nФизическото реле може все още да се променя. Използвайте сензора Grid Mode, за да наблюдавате полученото състояние."
+        "description": "Enphase прие заявката режимът на мрежата да бъде променен на **{target_mode}**.\n\nФизическото реле може все още да се променя. Използвайте сензора за режим на мрежата, за да наблюдавате полученото състояние."
       }
     },
     "error": {
@@ -806,14 +806,14 @@
       "grid_profile_gateway_required": "Прилагането на мрежов профил изисква Gateway запис от облачната Activation услуга.",
       "grid_profile_apply_failed": "Прилагането на мрежов профил бе неуспешно.",
       "grid_mode_invalid": "Изберете On Grid или Off Grid.",
-      "grid_mode_already_active": "Сайтът вече е в избрания Grid Mode.",
-      "grid_mode_confirm_required": "Потвърдете промяната на Grid Mode, преди да продължите.",
-      "grid_control_unavailable": "Контролът на мрежата не е наличен за този сайт.",
+      "grid_mode_already_active": "Обектът вече е в избрания режим на мрежата.",
+      "grid_mode_confirm_required": "Потвърдете промяната на режима на мрежата, преди да продължите.",
+      "grid_control_unavailable": "Контролът на мрежата не е наличен за този обект.",
       "grid_control_blocked": "Контролът на мрежата в момента е блокиран.",
       "grid_otp_required": "Въведете еднократния код.",
       "grid_otp_invalid_format": "Еднократният код трябва да съдържа точно четири цифри.",
       "grid_otp_invalid": "Еднократният код е невалиден или изтекъл.",
-      "grid_envoy_serial_missing": "Шлюзът за този сайт не можа да бъде определен."
+      "grid_envoy_serial_missing": "Шлюзът за този обект не можа да бъде определен."
     },
     "abort": {
       "migration_no_envoy_sources": "Няма налични енергийни сензори на Enphase Envoy за миграция.",
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "Управлението на мрежов профил не е налично.",
       "grid_profile_installer_required": "Управлението на мрежов профил изисква инсталаторски достъп до Enphase Activation.",
       "grid_profile_no_regions": "Няма налични региони за мрежов профил за държавата на този обект.",
-      "grid_mode_unavailable": "Контролът в режим на решетка не е наличен за този сайт.",
-      "grid_mode_blocked": "Контролът на режим на мрежа в момента е блокиран: {reasons}."
+      "grid_mode_unavailable": "Управлението на режима на мрежата не е налично за този обект.",
+      "grid_mode_blocked": "Управлението на режима на мрежата в момента е блокирано: {reasons}."
     },
     "create_entry": {
       "migration_success": "Миграцията завърши. Enphase Energy вече притежава избраните идентификатори на изходните обекти. Проверете таблото Energy и Developer Tools > Statistics след следващото обновяване.",
@@ -849,7 +849,7 @@
     },
     "grid_mode": {
       "options": {
-        "on_grid": "В решетка",
+        "on_grid": "В мрежата",
         "off_grid": "Извън мрежата",
         "unknown": "Неизвестен"
       }
@@ -860,7 +860,7 @@
         "active_download": "Извършва се системно изтегляне.",
         "sunlight_backup_system_check": "Проверката на системата Sunlight Backup е активна.",
         "grid_outage_check": "Проверката за прекъсване на мрежата е активна.",
-        "pending": "Промяна на Grid Mode вече е в процес на изчакване.",
+        "pending": "Вече има чакаща промяна на режима на мрежата.",
         "unknown": "Активно е неизвестно блокиращо условие."
       }
     }
@@ -1030,7 +1030,7 @@
         },
         "state": {
           "enabled": "Активирано",
-          "disabled": "Забранено"
+          "disabled": "Деактивирано"
         }
       },
       "set_amps": {
@@ -1453,7 +1453,7 @@
       "grid_mode": {
         "name": "Режим на мрежата",
         "state": {
-          "on_grid": "В решетка",
+          "on_grid": "В мрежата",
           "off_grid": "Извън мрежата",
           "unknown": "Неизвестен"
         }
@@ -1507,62 +1507,62 @@
         "name": "Последно докладван шлюз"
       },
       "tariff_billing_cycle": {
-        "name": "Sledvashta data na fakturirane",
+        "name": "Следваща дата на фактуриране",
         "state_attributes": {
           "start_date": {
-            "name": "Nachalna data"
+            "name": "Начална дата"
           },
           "billing_frequency": {
-            "name": "Chestota na fakturirane"
+            "name": "Честота на фактуриране"
           },
           "billing_interval_value": {
-            "name": "Stoynost na intervala za fakturirane"
+            "name": "Стойност на интервала за фактуриране"
           },
           "last_refresh_utc": {
-            "name": "Posledno opresnyavane (UTC)"
+            "name": "Последно опресняване (UTC)"
           },
           "billing_cycle": {
-            "name": "Cikul na fakturirane"
+            "name": "Цикъл на фактуриране"
           }
         }
       },
       "tariff_import_rate": {
-        "name": "Tarifa za vnos",
+        "name": "Тарифа за внос",
         "state_attributes": {
           "rate_structure": {
-            "name": "Struktura na tarifata"
+            "name": "Структура на тарифата"
           },
           "variation_type": {
-            "name": "Tip variacia"
+            "name": "Тип вариация"
           },
           "source": {
-            "name": "Iztochnik"
+            "name": "Източник"
           },
           "currency": {
-            "name": "Valuta"
+            "name": "Валута"
           },
           "seasons": {
-            "name": "Sezoni"
+            "name": "Сезони"
           },
           "last_refresh_utc": {
-            "name": "Posledno opresnyavane (UTC)"
+            "name": "Последно опресняване (UTC)"
           }
         }
       },
       "tariff_import_rate_value": {
-        "name": "Tarifa za vnos {detail}",
+        "name": "Тарифа за внос {detail}",
         "state_attributes": {
           "rate_structure": {
-            "name": "Struktura na tarifata"
+            "name": "Структура на тарифата"
           },
           "variation_type": {
-            "name": "Tip variacia"
+            "name": "Тип вариация"
           },
           "source": {
-            "name": "Iztochnik"
+            "name": "Източник"
           },
           "currency": {
-            "name": "Valuta"
+            "name": "Валута"
           },
           "season_id": {
             "name": "ID на сезон"
@@ -1610,7 +1610,7 @@
             "name": "Без горна граница"
           },
           "last_refresh_utc": {
-            "name": "Posledno opresnyavane (UTC)"
+            "name": "Последно опресняване (UTC)"
           },
           "tariff_locator": {
             "name": "Локатор на тарифата"
@@ -1618,48 +1618,48 @@
         }
       },
       "tariff_export_rate": {
-        "name": "Tarifa za iznos",
+        "name": "Тарифа за износ",
         "state_attributes": {
           "rate_structure": {
-            "name": "Struktura na tarifata"
+            "name": "Структура на тарифата"
           },
           "variation_type": {
-            "name": "Tip variacia"
+            "name": "Тип вариация"
           },
           "source": {
-            "name": "Iztochnik"
+            "name": "Източник"
           },
           "currency": {
-            "name": "Valuta"
+            "name": "Валута"
           },
           "export_plan": {
-            "name": "Plan za iznos"
+            "name": "План за износ"
           },
           "seasons": {
-            "name": "Sezoni"
+            "name": "Сезони"
           },
           "last_refresh_utc": {
-            "name": "Posledno opresnyavane (UTC)"
+            "name": "Последно опресняване (UTC)"
           }
         }
       },
       "tariff_export_rate_value": {
-        "name": "Tarifa za iznos {detail}",
+        "name": "Тарифа за износ {detail}",
         "state_attributes": {
           "rate_structure": {
-            "name": "Struktura na tarifata"
+            "name": "Структура на тарифата"
           },
           "variation_type": {
-            "name": "Tip variacia"
+            "name": "Тип вариация"
           },
           "source": {
-            "name": "Iztochnik"
+            "name": "Източник"
           },
           "currency": {
-            "name": "Valuta"
+            "name": "Валута"
           },
           "export_plan": {
-            "name": "Plan za iznos"
+            "name": "План за износ"
           },
           "season_id": {
             "name": "ID на сезон"
@@ -1707,7 +1707,7 @@
             "name": "Без горна граница"
           },
           "last_refresh_utc": {
-            "name": "Posledno opresnyavane (UTC)"
+            "name": "Последно опресняване (UTC)"
           },
           "tariff_locator": {
             "name": "Локатор на тарифата"
@@ -1877,16 +1877,16 @@
         "name": "Текуща тарифа за внос",
         "state_attributes": {
           "rate_structure": {
-            "name": "Struktura na tarifata"
+            "name": "Структура на тарифата"
           },
           "variation_type": {
-            "name": "Tip variacia"
+            "name": "Тип вариация"
           },
           "source": {
-            "name": "Iztochnik"
+            "name": "Източник"
           },
           "currency": {
-            "name": "Valuta"
+            "name": "Валута"
           },
           "season_id": {
             "name": "ID на сезон"
@@ -1934,7 +1934,7 @@
             "name": "Без горна граница"
           },
           "last_refresh_utc": {
-            "name": "Posledno opresnyavane (UTC)"
+            "name": "Последно опресняване (UTC)"
           },
           "tariff_locator": {
             "name": "Локатор на тарифата"
@@ -1951,19 +1951,19 @@
         "name": "Текуща тарифа за износ",
         "state_attributes": {
           "rate_structure": {
-            "name": "Struktura na tarifata"
+            "name": "Структура на тарифата"
           },
           "variation_type": {
-            "name": "Tip variacia"
+            "name": "Тип вариация"
           },
           "source": {
-            "name": "Iztochnik"
+            "name": "Източник"
           },
           "currency": {
-            "name": "Valuta"
+            "name": "Валута"
           },
           "export_plan": {
-            "name": "Plan za iznos"
+            "name": "План за износ"
           },
           "season_id": {
             "name": "ID на сезон"
@@ -2011,7 +2011,7 @@
             "name": "Без горна граница"
           },
           "last_refresh_utc": {
-            "name": "Posledno opresnyavane (UTC)"
+            "name": "Последно опресняване (UTC)"
           },
           "tariff_locator": {
             "name": "Локатор на тарифата"
@@ -2075,19 +2075,19 @@
         "name": "График на батерията"
       },
       "tariff_import_rate_value": {
-        "name": "Tarifa za vnos {detail}",
+        "name": "Тарифа за внос {detail}",
         "state_attributes": {
           "rate_structure": {
-            "name": "Struktura na tarifata"
+            "name": "Структура на тарифата"
           },
           "variation_type": {
-            "name": "Tip variacia"
+            "name": "Тип вариация"
           },
           "source": {
-            "name": "Iztochnik"
+            "name": "Източник"
           },
           "currency": {
-            "name": "Valuta"
+            "name": "Валута"
           },
           "season_id": {
             "name": "ID на сезон"
@@ -2135,7 +2135,7 @@
             "name": "Без горна граница"
           },
           "last_refresh_utc": {
-            "name": "Posledno opresnyavane (UTC)"
+            "name": "Последно опресняване (UTC)"
           },
           "tariff_locator": {
             "name": "Локатор на тарифата"
@@ -2143,22 +2143,22 @@
         }
       },
       "tariff_export_rate_value": {
-        "name": "Tarifa za iznos {detail}",
+        "name": "Тарифа за износ {detail}",
         "state_attributes": {
           "rate_structure": {
-            "name": "Struktura na tarifata"
+            "name": "Структура на тарифата"
           },
           "variation_type": {
-            "name": "Tip variacia"
+            "name": "Тип вариация"
           },
           "source": {
-            "name": "Iztochnik"
+            "name": "Източник"
           },
           "currency": {
-            "name": "Valuta"
+            "name": "Валута"
           },
           "export_plan": {
-            "name": "Plan za iznos"
+            "name": "План за износ"
           },
           "season_id": {
             "name": "ID на сезон"
@@ -2206,7 +2206,7 @@
             "name": "Без горна граница"
           },
           "last_refresh_utc": {
-            "name": "Posledno opresnyavane (UTC)"
+            "name": "Последно опресняване (UTC)"
           },
           "tariff_locator": {
             "name": "Локатор на тарифата"
@@ -2517,11 +2517,11 @@
     },
     "auth_blocked": {
       "title": "Удостоверяването на Enphase Energy е временно блокирано",
-      "description": "Enphase изглежда временно блокира удостоверяването за сайт {site_id}. Автоматичните опити са паузирани до {blocked_until}. Успешно ръчно повторно удостоверяване може да изчисти блока по-рано."
+      "description": "Enphase изглежда временно блокира удостоверяването за обект {site_id}. Автоматичните опити са паузирани до {blocked_until}. Успешно ръчно повторно удостоверяване може да изчисти блока по-рано."
     },
     "too_many_active_sessions": {
       "title": "Enphase Energy има твърде много активни сесии",
-      "description": "Enphase отхвърли удостоверяването за сайт {site_id}, защото има твърде много активни сесии в акаунта. Автоматичните повторни опити са спрени до {blocked_until}. Излезте от други сесии в приложението или браузъра на Enphase, след което опитайте повторно удостоверяване."
+      "description": "Enphase отхвърли удостоверяването за обект {site_id}, защото има твърде много активни сесии в акаунта. Автоматичните повторни опити са спрени до {blocked_until}. Излезте от други сесии в приложението или браузъра на Enphase, след което опитайте повторно удостоверяване."
     },
     "rate_limited": {
       "title": "Enphase Energy е с ограничение на заявките",
@@ -2541,19 +2541,19 @@
     },
     "scheduler_unavailable": {
       "title": "Планировчикът на Enphase Energy не е наличен",
-      "description": "Услугата за планиране на Enphase за сайт {site_id} не е налична. Изборът на режим на зареждане и синхронизирането на графика са временно деактивирани."
+      "description": "Услугата за планиране на Enphase за обект {site_id} не е налична. Изборът на режим на зареждане и синхронизирането на графика са временно деактивирани."
     },
     "session_history_unavailable": {
       "title": "Историята на сесиите на Enphase Energy не е налице",
-      "description": "Услугата за история на сесиите на Enphase за сайт {site_id} не е налична. Сензорите за история на сесиите ще показват кеширани данни, докато услугата се възстанови."
+      "description": "Услугата за история на сесиите на Enphase за обект {site_id} не е налична. Сензорите за история на сесиите ще показват кеширани данни, докато услугата се възстанови."
     },
     "site_energy_unavailable": {
-      "title": "Enphase Energy сайт не е наличен",
-      "description": "Доживотната енергийна услуга Enphase за обект {site_id} не е налична. Енергийните сензори на сайта ще показват кеширани данни, докато услугата се възстанови."
+      "title": "Enphase Energy обект не е наличен",
+      "description": "Доживотната енергийна услуга Enphase за обект {site_id} не е налична. Енергийните сензори на обекта ще показват кеширани данни, докато услугата се възстанови."
     },
     "auth_settings_unavailable": {
       "title": "Настройките за удостоверяване на Enphase Energy не са налични",
-      "description": "Услугата за настройки за удостоверяване на зарядно устройство Enphase за сайт {site_id} не е налична. Контролите за удостоверяване на приложението са временно деактивирани."
+      "description": "Услугата за настройки за удостоверяване на зарядно устройство Enphase за обект {site_id} не е налична. Контролите за удостоверяване на приложението са временно деактивирани."
     },
     "battery_profile_pending": {
       "title": "Чакаща актуализация на профила на батерията в Enphase Energy",
@@ -2561,11 +2561,11 @@
     },
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS е временно спрян",
-      "description": "Запитванията Heat Pump/HEMS за сайт {site_id} са спрени до {backoff_until} след {failure_count} грешки, подобни на удостоверяване ({reason}). Wallbox, батерията, шлюзът и другите данни могат да продължат. Изключете групата Heat Pump, за да спрете HEMS, или използвайте Clear HEMS Auth Backoff след възстановяване на Enphase."
+      "description": "Запитванията Heat Pump/HEMS за обект {site_id} са спрени до {backoff_until} след {failure_count} грешки, подобни на удостоверяване ({reason}). Wallbox, батерията, шлюзът и другите данни могат да продължат. Изключете групата Heat Pump, за да спрете HEMS, или използвайте Clear HEMS Auth Backoff след възстановяване на Enphase."
     },
     "active_system_event": {
       "title": "Активно системно събитие на Enphase с голямо въздействие",
-      "description": "Сайт {site_id} има активно събитие {severity}, засягащо {device_type}, отчетено за първи път в {event_date}. Проверете Enlighten за подробности и препоръчано действие. Тази поправка се изчиства автоматично, когато Enphase отчете събитието като разрешено."
+      "description": "Обект {site_id} има активно събитие {severity}, засягащо {device_type}, отчетено за първи път в {event_date}. Проверете Enlighten за подробности и препоръчано действие. Тази поправка се изчиства автоматично, когато Enphase отчете събитието като разрешено."
     }
   },
   "system_health": {
@@ -2583,15 +2583,15 @@
       "backoff_active": "Backoff активен",
       "network_errors": "Последователни мрежови грешки",
       "http_errors": "Последователни HTTP грешки",
-      "site_count": "Брой сайтове",
-      "site_name": "Име на сайта",
-      "site_ids": "Идентификационни номера на сайтове",
-      "site_names": "Имена на сайтове",
+      "site_count": "Брой обекти",
+      "site_name": "Име на обекта",
+      "site_ids": "Идентификационни номера на обекти",
+      "site_names": "Имена на обекти",
       "last_failure_status": "Последно състояние на грешка",
       "last_failure_description": "Описание на последния отказ",
       "phase_timings": "Времена на фазите",
       "session_cache_ttl_s": "TTL на кеша на сесията (s)",
-      "sites": "сайтове",
+      "sites": "обекти",
       "auth_settings_available": "Налични настройки за удостоверяване",
       "auth_settings_last_error": "Последна грешка в настройките за удостоверяване",
       "auth_settings_failures": "Грешки в настройките за удостоверяване",
@@ -2602,11 +2602,11 @@
       "session_history_failures": "Грешки в историята на сесиите",
       "session_history_backoff_active": "Отлагането на историята на сесията е активно",
       "session_history_backoff_ends_utc": "Историята на сесията приключва (UTC)",
-      "site_energy_available": "Налична енергия на сайта",
-      "site_energy_last_error": "Последна грешка в енергията на сайта",
-      "site_energy_failures": "Енергийни повреди на сайта",
-      "site_energy_backoff_active": "Енергийното забавяне на сайта е активно",
-      "site_energy_backoff_ends_utc": "Край на намаляването на енергията на сайта (UTC)",
+      "site_energy_available": "Налична енергия на обекта",
+      "site_energy_last_error": "Последна грешка в енергията на обекта",
+      "site_energy_failures": "Енергийни повреди на обекта",
+      "site_energy_backoff_active": "Енергийното забавяне на обекта е активно",
+      "site_energy_backoff_ends_utc": "Край на намаляването на енергията на обекта (UTC)",
       "tariff_available": "Налична тарифа",
       "tariff_service_status": "Състояние на тарифната услуга",
       "tariff_last_error": "Последна грешка на тарифата",
@@ -2725,21 +2725,21 @@
       }
     },
     "request_grid_toggle_otp": {
-      "name": "Заявка за превключване на решетка OTP",
-      "description": "Изпратете необходимия еднократен код, преди да промените режима на мрежата на сайта.",
+      "name": "Заявка за превключване на мрежата OTP",
+      "description": "Изпратете необходимия еднократен код, преди да промените режима на мрежата на обекта.",
       "fields": {
         "config_entry_id": {
           "name": "Enphase config запис",
-          "description": "Изберете сайта на Enphase, който трябва да получи еднократния код."
+          "description": "Изберете обекта на Enphase, който трябва да получи еднократния код."
         }
       }
     },
     "set_grid_mode": {
       "name": "Задайте режим на мрежа",
-      "description": "Променете режима на мрежата на сайта след валидиране на еднократния код.",
+      "description": "Променете режима на мрежата на обекта след валидиране на еднократния код.",
       "fields": {
         "mode": {
-          "name": "Режим на решетка",
+          "name": "Режим на мрежата",
           "description": "Изберете on_grid или off_grid."
         },
         "otp": {
@@ -2748,7 +2748,7 @@
         },
         "config_entry_id": {
           "name": "Enphase config запис",
-          "description": "Изберете сайта Enphase, чийто Grid Mode трябва да се промени."
+          "description": "Изберете обекта Enphase, чийто режим на мрежата трябва да се промени."
         }
       }
     },
@@ -2794,7 +2794,7 @@
         },
         "config_entry_id": {
           "name": "Конфигуриране на идентификатор на запис",
-          "description": "Незадължителен идентификатор за въвеждане на конфигурация за единичен запис в Enphase сайт."
+          "description": "Незадължителен идентификатор за въвеждане на конфигурация за единичен запис в Enphase обект."
         }
       }
     },
@@ -2820,7 +2820,7 @@
           "description": "Насрочване на краен час."
         },
         "limit": {
-          "name": "Лимит на таксуване",
+          "name": "Лимит на зареждане",
           "description": "Максимално ниво на зареждане на батерията (%)."
         },
         "days": {
@@ -2833,7 +2833,7 @@
         },
         "config_entry_id": {
           "name": "Конфигуриране на идентификатор на запис",
-          "description": "Незадължителен идентификатор за въвеждане на конфигурация за единичен запис в Enphase сайт."
+          "description": "Незадължителен идентификатор за въвеждане на конфигурация за единичен запис в Enphase обект."
         }
       }
     },
@@ -2863,7 +2863,7 @@
           "description": "Насрочване на краен час."
         },
         "limit": {
-          "name": "Лимит на таксуване",
+          "name": "Лимит на зареждане",
           "description": "Максимално ниво на зареждане на батерията (%)."
         },
         "days": {
@@ -2880,7 +2880,7 @@
         },
         "config_entry_id": {
           "name": "Конфигуриране на идентификатор на запис",
-          "description": "Незадължителен идентификатор за въвеждане на конфигурация за единичен запис в Enphase сайт."
+          "description": "Незадължителен идентификатор за въвеждане на конфигурация за единичен запис в Enphase обект."
         }
       }
     },
@@ -2911,7 +2911,7 @@
         },
         "config_entry_id": {
           "name": "Конфигуриране на идентификатор на запис",
-          "description": "Незадължителен идентификатор за въвеждане на конфигурация за единичен запис в Enphase сайт."
+          "description": "Незадължителен идентификатор за въвеждане на конфигурация за единичен запис в Enphase обект."
         }
       }
     },
@@ -2934,21 +2934,21 @@
         },
         "config_entry_id": {
           "name": "Конфигуриране на идентификатор на запис",
-          "description": "Незадължителен идентификатор за въвеждане на конфигурация за единичен запис в Enphase сайт."
+          "description": "Незадължителен идентификатор за въвеждане на конфигурация за единичен запис в Enphase обект."
         }
       }
     },
     "try_reauth_now": {
       "name": "Опитай повторно удостоверяване сега",
-      "description": "Използва съхранените Enphase идентификационни данни за незабавен опит за повторно удостоверяване на избрания сайт.",
+      "description": "Използва съхранените Enphase идентификационни данни за незабавен опит за повторно удостоверяване на избрания обект.",
       "fields": {
         "device_id": {
-          "name": "Устройства на сайта",
-          "description": "Изберете Enphase устройство на сайта, за което да се опита повторно удостоверяване."
+          "name": "Устройства на обекта",
+          "description": "Изберете Enphase устройство на обекта, за което да се опита повторно удостоверяване."
         },
         "site_id": {
-          "name": "ID на сайта",
-          "description": "Незадължителен идентификатор на сайта; открива се автоматично, когато е избрано устройство на сайта."
+          "name": "ID на обекта",
+          "description": "Незадължителен идентификатор на обекта; открива се автоматично, когато е избрано устройство на обекта."
         }
       }
     },
@@ -2997,12 +2997,12 @@
           "description": "Списък с ID на същности за тарифни ставки и неотрицателни стойности за актуализиране."
         },
         "site_id": {
-          "name": "ID на сайт",
-          "description": "Незадължителен идентификатор на сайт за актуализации на фактуриране."
+          "name": "ID на обект",
+          "description": "Незадължителен идентификатор на обект за актуализации на фактуриране."
         },
         "config_entry_id": {
           "name": "ID на запис за конфигурация",
-          "description": "Незадължителен идентификатор на запис за конфигурация за един сайт на Enphase."
+          "description": "Незадължителен идентификатор на запис за конфигурация за един обект на Enphase."
         },
         "tariff_payload": {
           "name": "Тарифен payload",
@@ -3017,68 +3017,68 @@
           "description": "Заместващ клон за тарифата за износ с тип, план за износ, сезони, периоди, стъпала и цени."
         },
         "configure_import_tariff": {
-          "name": "Guidet importtarif",
-          "description": "Aktiver dette felt for at opbygge en erstatning for importtariffen med de guidede felter."
+          "name": "Конфигуриране на тарифата за внос",
+          "description": "Активирайте, за да създадете заместваща тарифа за внос чрез полетата с указания по-долу."
         },
         "import_tariff_type": {
-          "name": "Importtariftype",
-          "description": "Vælg flad, tidsafhængig eller trindelt importpris."
+          "name": "Тип тарифа за внос",
+          "description": "Изберете дали цената за внос е фиксирана, според времето на използване или стъпаловидна."
         },
         "import_variation": {
-          "name": "Importvariation",
-          "description": "Vælg om importprisen varierer efter sæson eller hverdag/weekend."
+          "name": "Вариация на вноса",
+          "description": "Изберете дали цената за внос се променя според сезона или между делнични и почивни дни."
         },
         "import_flat_rate": {
-          "name": "Flad importpris",
-          "description": "En enkelt importpris for flad tarif uden periode-rækker."
+          "name": "Фиксирана цена за внос",
+          "description": "Единна цена за внос, използвана при фиксирана тарифа без зададени редове за периоди."
         },
         "import_periods": {
-          "name": "Importperioder",
-          "description": "Rækker til flade eller tidsafhængige importpriser. Dage 1-7 er mandag-søndag; tider kan være HH:MM eller minutter efter midnat."
+          "name": "Периоди за внос",
+          "description": "Редове за фиксирани или зависещи от времето цени за внос. Дните 1-7 са понеделник-неделя; часовете могат да бъдат HH:MM или минути след полунощ."
         },
         "import_tiers": {
-          "name": "Importtrin",
-          "description": "Rækker til trindelte importpriser. Brug end_value -1 for sidste ubegrænsede trin."
+          "name": "Стъпала за внос",
+          "description": "Редове за стъпаловидни цени за внос. Използвайте end_value -1 за последното неограничено стъпало."
         },
         "import_off_peak_rate": {
-          "name": "Import off-peak basis",
-          "description": "Basispris uden for spidsbelastning for trindelte importtariffer."
+          "name": "Базова извънпикова цена за внос",
+          "description": "Базова извънпикова цена за стъпаловидни тарифи за внос."
         },
         "configure_export_tariff": {
-          "name": "Guidet eksporttarif",
-          "description": "Aktiver dette felt for at opbygge en erstatning for eksporttariffen med de guidede felter."
+          "name": "Конфигуриране на тарифата за износ",
+          "description": "Активирайте, за да създадете заместваща тарифа за износ чрез полетата с указания по-долу."
         },
         "export_tariff_type": {
-          "name": "Eksporttariftype",
-          "description": "Vælg flad, tidsafhængig eller trindelt eksportpris."
+          "name": "Тип тарифа за износ",
+          "description": "Изберете дали компенсацията за износ е фиксирана, според времето на използване или стъпаловидна."
         },
         "export_variation": {
-          "name": "Eksportvariation",
-          "description": "Vælg om eksportprisen varierer efter sæson eller hverdag/weekend."
+          "name": "Вариация на износа",
+          "description": "Изберете дали цената за износ се променя според сезона или между делнични и почивни дни."
         },
         "export_plan": {
-          "name": "Eksportplan",
-          "description": "Vælg Enphase-eksportplanen der skal skrives med eksporttariffen."
+          "name": "План за износ",
+          "description": "Изберете етикета на плана за износ на Enphase, който да бъде записан с тарифата за износ."
         },
         "export_flat_rate": {
-          "name": "Flad eksportpris",
-          "description": "En enkelt eksportpris for flad tarif uden periode-rækker."
+          "name": "Фиксирана цена за износ",
+          "description": "Единна цена за износ, използвана при фиксирана тарифа без зададени редове за периоди."
         },
         "export_periods": {
-          "name": "Eksportperioder",
-          "description": "Rækker til flade eller tidsafhængige eksportpriser. Dage 1-7 er mandag-søndag; tider kan være HH:MM eller minutter efter midnat."
+          "name": "Периоди за износ",
+          "description": "Редове за фиксирани или зависещи от времето цени за износ. Дните 1-7 са понеделник-неделя; часовете могат да бъдат HH:MM или минути след полунощ."
         },
         "export_tiers": {
-          "name": "Eksporttrin",
-          "description": "Rækker til trindelte eksportpriser. Brug end_value -1 for sidste ubegrænsede trin."
+          "name": "Стъпала за износ",
+          "description": "Редове за стъпаловидни цени за износ. Използвайте end_value -1 за последното неограничено стъпало."
         },
         "export_off_peak_rate": {
-          "name": "Eksport off-peak basis",
-          "description": "Basispris uden for spidsbelastning for trindelte eksporttariffer."
+          "name": "Базова извънпикова цена за износ",
+          "description": "Базова извънпикова цена за стъпаловидни тарифи за износ."
         },
         "device_id": {
-          "name": "Enphase-enhed",
-          "description": "Valgfri Enphase-enhed til at vælge stedet for fakturerings- eller tarifstrukturændringer."
+          "name": "Устройство",
+          "description": "Незадължително устройство Enphase за избор на обекта при актуализации на фактурирането или структурата на тарифата."
         }
       },
       "sections": {
@@ -3092,12 +3092,12 @@
       "description": "Изчиства временната HEMS/Heat Pump пауза за удостоверяване без вход с парола.",
       "fields": {
         "device_id": {
-          "name": "Устройства на сайта",
-          "description": "Изберете устройство на Enphase сайт, за което да се изчисти HEMS auth backoff."
+          "name": "Устройства на обекта",
+          "description": "Изберете устройство на Enphase обект, за което да се изчисти HEMS auth backoff."
         },
         "site_id": {
-          "name": "ID на сайт",
-          "description": "Незадължителен идентификатор на сайт; открива се автоматично при избрано устройство."
+          "name": "ID на обект",
+          "description": "Незадължителен идентификатор на обект; открива се автоматично при избрано устройство."
         }
       }
     },

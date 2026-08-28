@@ -92,13 +92,13 @@
       "message": "Start av lading ble avvist av Enphase (HTTP {status})."
     },
     "grid_control_unavailable": {
-      "message": "Rutenettkontroll er utilgjengelig for dette nettstedet."
+      "message": "Nettkontroll er utilgjengelig for dette anlegget."
     },
     "grid_control_blocked": {
       "message": "Nettkontroll er for øyeblikket blokkert."
     },
     "grid_mode_invalid": {
-      "message": "Rutenettmodus må være on_grid eller off_grid."
+      "message": "Nettmodus må være on_grid eller off_grid."
     },
     "grid_otp_required": {
       "message": "OTP kreves."
@@ -110,13 +110,13 @@
       "message": "OTP er ugyldig eller utløpt."
     },
     "grid_envoy_serial_missing": {
-      "message": "Kan ikke bestemme utsendingens serienummer for dette nettstedet."
+      "message": "Kan ikke fastslå Envoy-serienummeret for dette anlegget."
     },
     "grid_site_required": {
-      "message": "Velg nøyaktig ett Enphase-nettsted."
+      "message": "Velg nøyaktig ett Enphase-anlegg."
     },
     "grid_site_ambiguous": {
-      "message": "Flere nettsteder ble valgt ({count}). Velg nøyaktig ett nettsted."
+      "message": "Flere anlegg ble valgt ({count}). Velg nøyaktig ett anlegg."
     },
     "schedule_required": {
       "message": "Aktiver minst én tidsplan før du velger planlagt lading."
@@ -741,9 +741,9 @@
       },
       "grid_toggle": {
         "title": "Nettmodus",
-        "description": "Gjeldende rutenettmodus: **{current_mode}**.\n\nEndring av rutenettmodus er sikkerhetssensitivt. Velg ønsket modus for å sende en engangskode til den registrerte e-posten og telefonen.",
+        "description": "Gjeldende nettmodus: **{current_mode}**.\n\nEndring av nettmodus er sikkerhetssensitivt. Velg ønsket modus for å sende en engangskode til den registrerte e-posten og telefonen.",
         "data": {
-          "mode": "Forespurt rutenettmodus"
+          "mode": "Forespurt nettmodus"
         }
       },
       "grid_profile": {
@@ -777,16 +777,16 @@
         "description": "Enphase har godtatt nettprofiloppdateringen for **{selected_profile}**.\n\nForespurt profil-ID: **{requested_profile_id}**\n\nSkystatus: **{cloud_apply_status}**\n\nDet kan ta opptil **5 minutter** før den nye profilen vises som gjeldende mens skyen og Gateway fullfører behandlingen. Grid Profile-sensoren oppdateres når Activation-posten rapporterer den nye gjeldende profilen."
       },
       "grid_toggle_otp": {
-        "title": "Bekreft endring av rutenettmodus",
-        "description": "Gjeldende rutenettmodus: **{current_mode}**.\n\nForespurt rutenettmodus: **{target_mode}**.\n\nTast inn den 4-sifrede engangskoden og bekreft den sikkerhetssensitive endringen.",
+        "title": "Bekreft endring av nettmodus",
+        "description": "Gjeldende nettmodus: **{current_mode}**.\n\nForespurt nettmodus: **{target_mode}**.\n\nTast inn den 4-sifrede engangskoden og bekreft den sikkerhetssensitive endringen.",
         "data": {
           "otp": "Engangskode",
-          "confirm": "Bekreft endringen av rutenettmodus"
+          "confirm": "Bekreft endringen av nettmodus"
         }
       },
       "grid_toggle_applied": {
-        "title": "Endring av rutenettmodus akseptert",
-        "description": "Enphase godtok forespørselen om å endre rutenettmodus til **{target_mode}**.\n\nDet fysiske releet kan fortsatt være i endring. Bruk Grid Mode-sensoren for å observere den resulterende tilstanden."
+        "title": "Endring av nettmodus akseptert",
+        "description": "Enphase godtok forespørselen om å endre nettmodus til **{target_mode}**.\n\nDet fysiske releet kan fortsatt være i endring. Bruk sensoren for nettmodus for å observere den resulterende tilstanden."
       }
     },
     "error": {
@@ -806,14 +806,14 @@
       "grid_profile_gateway_required": "Bruk av nettprofil krever en skybasert Activation Gateway-oppføring.",
       "grid_profile_apply_failed": "Bruk av nettprofil mislyktes.",
       "grid_mode_invalid": "Velg On Grid eller Off Grid.",
-      "grid_mode_already_active": "Nettstedet er allerede i den valgte rutenettmodusen.",
-      "grid_mode_confirm_required": "Bekreft endringen av rutenettmodus før du fortsetter.",
-      "grid_control_unavailable": "Rutenettkontroll er utilgjengelig for dette nettstedet.",
+      "grid_mode_already_active": "Anlegget er allerede i den valgte nettmodusen.",
+      "grid_mode_confirm_required": "Bekreft endringen av nettmodus før du fortsetter.",
+      "grid_control_unavailable": "Nettkontroll er utilgjengelig for dette anlegget.",
       "grid_control_blocked": "Nettkontroll er for øyeblikket blokkert.",
       "grid_otp_required": "Skriv inn engangskoden.",
       "grid_otp_invalid_format": "Engangskoden må inneholde nøyaktig fire sifre.",
       "grid_otp_invalid": "Engangskoden er ugyldig eller utløpt.",
-      "grid_envoy_serial_missing": "Gatewayen for dette nettstedet kunne ikke bestemmes."
+      "grid_envoy_serial_missing": "Gatewayen for dette anlegget kunne ikke bestemmes."
     },
     "abort": {
       "migration_no_envoy_sources": "Ingen Enphase Envoy-energisensorer er tilgjengelige for migrering.",
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "Nettprofilstyring er ikke tilgjengelig.",
       "grid_profile_installer_required": "Nettprofilstyring krever installatørtilgang til Enphase Activation.",
       "grid_profile_no_regions": "Ingen nettprofilregioner er tilgjengelige for landet til dette anlegget.",
-      "grid_mode_unavailable": "Grid Mode-kontroll er utilgjengelig for dette nettstedet.",
-      "grid_mode_blocked": "Grid Mode-kontroll er for øyeblikket blokkert: {reasons}."
+      "grid_mode_unavailable": "Styring av nettmodus er utilgjengelig for dette anlegget.",
+      "grid_mode_blocked": "Styring av nettmodus er for øyeblikket blokkert: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migreringen er fullført. Enphase Energy eier nå de valgte kildeentitets-ID-ene. Kontroller Energy-oversikten og Developer Tools > Statistics etter neste oppdatering.",
@@ -1030,7 +1030,7 @@
         },
         "state": {
           "enabled": "Aktivert",
-          "disabled": "Funksjonshemmet"
+          "disabled": "Deaktivert"
         }
       },
       "set_amps": {
@@ -1360,7 +1360,7 @@
       "system_profile_status": {
         "name": "Systemprofilstatus",
         "state": {
-          "pending": "I påvente av"
+          "pending": "Venter"
         },
         "state_attributes": {
           "effective_profile": {
@@ -2541,19 +2541,19 @@
     },
     "scheduler_unavailable": {
       "title": "Enphase Energy-planlegger er ikke tilgjengelig",
-      "description": "Enphase-planleggertjenesten for nettsted {site_id} er utilgjengelig. Valg av lademodus og tidsplansynkronisering er midlertidig deaktivert."
+      "description": "Enphase-planleggertjenesten for anlegg {site_id} er utilgjengelig. Valg av lademodus og tidsplansynkronisering er midlertidig deaktivert."
     },
     "session_history_unavailable": {
       "title": "Enphase Energy-økthistorikk er utilgjengelig",
-      "description": "Enphase-økthistorikktjenesten for nettsted {site_id} er utilgjengelig. Sesjonshistorikksensorer vil vise bufrede data til tjenesten gjenopprettes."
+      "description": "Enphase-økthistorikktjenesten for anlegg {site_id} er utilgjengelig. Sesjonshistorikksensorer vil vise bufrede data til tjenesten gjenopprettes."
     },
     "site_energy_unavailable": {
-      "title": "Enphase Energy-nettstedets energi er ikke tilgjengelig",
-      "description": "Enphase livstidsenergitjeneste for nettsted {site_id} er utilgjengelig. Nettstedets energisensorer vil vise bufrede data til tjenesten gjenopprettes."
+      "title": "Enphase Energy-anleggets energi er ikke tilgjengelig",
+      "description": "Enphase livstidsenergitjeneste for anlegg {site_id} er utilgjengelig. Anleggets energisensorer vil vise bufrede data til tjenesten gjenopprettes."
     },
     "auth_settings_unavailable": {
       "title": "Enphase Energy-autentiseringsinnstillinger er utilgjengelige",
-      "description": "Innstillingstjenesten for Enphase-laderautentisering for nettsted {site_id} er utilgjengelig. Appautentiseringskontroller er midlertidig deaktivert."
+      "description": "Innstillingstjenesten for Enphase-laderautentisering for anlegg {site_id} er utilgjengelig. Appautentiseringskontroller er midlertidig deaktivert."
     },
     "battery_profile_pending": {
       "title": "Oppdatering av Enphase Energy-batteriprofil venter",
@@ -2583,15 +2583,15 @@
       "backoff_active": "Backoff aktiv",
       "network_errors": "Påfølgende nettverksfeil",
       "http_errors": "Påfølgende HTTP-feil",
-      "site_count": "Antall nettsteder",
-      "site_name": "Navn på nettsted",
-      "site_ids": "Nettsted-ID-er",
-      "site_names": "Navn på nettsteder",
+      "site_count": "Antall anlegg",
+      "site_name": "Navn på anlegg",
+      "site_ids": "Anleggs-ID-er",
+      "site_names": "Navn på anlegg",
       "last_failure_status": "Siste feilstatus",
       "last_failure_description": "Siste feilbeskrivelse",
       "phase_timings": "Fasetider",
       "session_cache_ttl_s": "Sesjonsbuffer TTL (s)",
-      "sites": "Nettsteder",
+      "sites": "Anlegg",
       "auth_settings_available": "Auth-innstillinger tilgjengelig",
       "auth_settings_last_error": "Auth-innstillinger siste feil",
       "auth_settings_failures": "Feil på autentiseringsinnstillinger",
@@ -2602,11 +2602,11 @@
       "session_history_failures": "Feil i økthistorikk",
       "session_history_backoff_active": "Sesjonshistorikk backoff aktiv",
       "session_history_backoff_ends_utc": "Sesjonshistorikk slutter (UTC)",
-      "site_energy_available": "Nettstedets energi tilgjengelig",
-      "site_energy_last_error": "Nettstedsenergi siste feil",
+      "site_energy_available": "Anleggets energi tilgjengelig",
+      "site_energy_last_error": "Anleggsenergi siste feil",
       "site_energy_failures": "Energisvikt på stedet",
       "site_energy_backoff_active": "Site energy backoff aktiv",
-      "site_energy_backoff_ends_utc": "Backoff for nettstedenergi slutter (UTC)",
+      "site_energy_backoff_ends_utc": "Backoff for anleggsenergi slutter (UTC)",
       "tariff_available": "Tariff tilgjengelig",
       "tariff_service_status": "Status for tarifftjeneste",
       "tariff_last_error": "Siste tarifffeil",
@@ -2725,21 +2725,21 @@
       }
     },
     "request_grid_toggle_otp": {
-      "name": "Be om Grid Toggle OTP",
-      "description": "Send engangskoden som kreves før du endrer rutenettmodus.",
+      "name": "Be om engangskode for bytte av nettmodus",
+      "description": "Send engangskoden som kreves før du endrer nettmodus.",
       "fields": {
         "config_entry_id": {
           "name": "Enphase konfigurasjonsoppføring",
-          "description": "Velg Enphase-nettstedet som skal motta engangskoden."
+          "description": "Velg Enphase-anlegget som skal motta engangskoden."
         }
       }
     },
     "set_grid_mode": {
-      "name": "Angi rutenettmodus",
+      "name": "Angi nettmodus",
       "description": "Endre stedsnettmodus etter å ha validert engangskoden.",
       "fields": {
         "mode": {
-          "name": "Rutenettmodus",
+          "name": "Nettmodus",
           "description": "Velg on_grid eller off_grid."
         },
         "otp": {
@@ -2748,7 +2748,7 @@
         },
         "config_entry_id": {
           "name": "Enphase konfigurasjonsoppføring",
-          "description": "Velg Enphase-nettstedet hvis rutenettmodus skal endres."
+          "description": "Velg Enphase-anlegget hvis nettmodus skal endres."
         }
       }
     },
@@ -3017,68 +3017,68 @@
           "description": "Erstatningsgren for eksporttariff med type, eksportplan, sesonger, perioder, trinn og satser."
         },
         "configure_import_tariff": {
-          "name": "Guidet importtarif",
-          "description": "Aktiver dette felt for at opbygge en erstatning for importtariffen med de guidede felter."
+          "name": "Konfigurer importtariff",
+          "description": "Aktiver for å lage en ny importtariff med de veiledede feltene nedenfor."
         },
         "import_tariff_type": {
-          "name": "Importtariftype",
-          "description": "Vælg flad, tidsafhængig eller trindelt importpris."
+          "name": "Type importtariff",
+          "description": "Velg om importprisen er fast, tidsbasert eller trinnvis."
         },
         "import_variation": {
-          "name": "Importvariation",
-          "description": "Vælg om importprisen varierer efter sæson eller hverdag/weekend."
+          "name": "Importvariasjon",
+          "description": "Velg om importprisen varierer etter sesong eller mellom hverdag og helg."
         },
         "import_flat_rate": {
-          "name": "Flad importpris",
-          "description": "En enkelt importpris for flad tarif uden periode-rækker."
+          "name": "Fast importpris",
+          "description": "Én importpris som brukes for en fast tariff når ingen perioder er oppgitt."
         },
         "import_periods": {
           "name": "Importperioder",
-          "description": "Rækker til flade eller tidsafhængige importpriser. Dage 1-7 er mandag-søndag; tider kan være HH:MM eller minutter efter midnat."
+          "description": "Rader for fast eller tidsbasert importpris. Dagene 1-7 er mandag-søndag; tider kan være HH:MM eller minutter etter midnatt."
         },
         "import_tiers": {
-          "name": "Importtrin",
-          "description": "Rækker til trindelte importpriser. Brug end_value -1 for sidste ubegrænsede trin."
+          "name": "Importtrinn",
+          "description": "Rader for trinnvis importpris. Bruk end_value -1 for det siste ubegrensede trinnet."
         },
         "import_off_peak_rate": {
-          "name": "Import off-peak basis",
-          "description": "Basispris uden for spidsbelastning for trindelte importtariffer."
+          "name": "Grunnpris for import utenom høylast",
+          "description": "Grunnpris utenom høylast for trinnvise importtariffer."
         },
         "configure_export_tariff": {
-          "name": "Guidet eksporttarif",
-          "description": "Aktiver dette felt for at opbygge en erstatning for eksporttariffen med de guidede felter."
+          "name": "Konfigurer eksporttariff",
+          "description": "Aktiver for å lage en ny eksporttariff med de veiledede feltene nedenfor."
         },
         "export_tariff_type": {
-          "name": "Eksporttariftype",
-          "description": "Vælg flad, tidsafhængig eller trindelt eksportpris."
+          "name": "Type eksporttariff",
+          "description": "Velg om eksportkompensasjonen er fast, tidsbasert eller trinnvis."
         },
         "export_variation": {
-          "name": "Eksportvariation",
-          "description": "Vælg om eksportprisen varierer efter sæson eller hverdag/weekend."
+          "name": "Eksportvariasjon",
+          "description": "Velg om eksportprisen varierer etter sesong eller mellom hverdag og helg."
         },
         "export_plan": {
           "name": "Eksportplan",
-          "description": "Vælg Enphase-eksportplanen der skal skrives med eksporttariffen."
+          "description": "Velg etiketten for Enphase-eksportplanen som skal skrives med eksporttariffen."
         },
         "export_flat_rate": {
-          "name": "Flad eksportpris",
-          "description": "En enkelt eksportpris for flad tarif uden periode-rækker."
+          "name": "Fast eksportpris",
+          "description": "Én eksportpris som brukes for en fast tariff når ingen perioder er oppgitt."
         },
         "export_periods": {
           "name": "Eksportperioder",
-          "description": "Rækker til flade eller tidsafhængige eksportpriser. Dage 1-7 er mandag-søndag; tider kan være HH:MM eller minutter efter midnat."
+          "description": "Rader for fast eller tidsbasert eksportpris. Dagene 1-7 er mandag-søndag; tider kan være HH:MM eller minutter etter midnatt."
         },
         "export_tiers": {
-          "name": "Eksporttrin",
-          "description": "Rækker til trindelte eksportpriser. Brug end_value -1 for sidste ubegrænsede trin."
+          "name": "Eksporttrinn",
+          "description": "Rader for trinnvis eksportpris. Bruk end_value -1 for det siste ubegrensede trinnet."
         },
         "export_off_peak_rate": {
-          "name": "Eksport off-peak basis",
-          "description": "Basispris uden for spidsbelastning for trindelte eksporttariffer."
+          "name": "Grunnpris for eksport utenom høylast",
+          "description": "Grunnpris utenom høylast for trinnvise eksporttariffer."
         },
         "device_id": {
-          "name": "Enphase-enhed",
-          "description": "Valgfri Enphase-enhed til at vælge stedet for fakturerings- eller tarifstrukturændringer."
+          "name": "Enhet",
+          "description": "Valgfri Enphase-enhet for å velge anlegg for fakturerings- eller tariffstrukturendringer."
         }
       },
       "sections": {

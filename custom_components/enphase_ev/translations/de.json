@@ -92,13 +92,13 @@
       "message": "Ladestart wurde von Enphase abgelehnt (HTTP {status})."
     },
     "grid_control_unavailable": {
-      "message": "Die Rastersteuerung ist für diese Site nicht verfügbar."
+      "message": "Die Netzsteuerung ist für diese Site nicht verfügbar."
     },
     "grid_control_blocked": {
       "message": "Die Netzsteuerung ist derzeit gesperrt."
     },
     "grid_mode_invalid": {
-      "message": "Der Rastermodus muss on_grid oder off_grid sein."
+      "message": "Der Netzmodus muss on_grid oder off_grid sein."
     },
     "grid_otp_required": {
       "message": "OTP ist erforderlich."
@@ -110,13 +110,13 @@
       "message": "Das OTP ist ungültig oder abgelaufen."
     },
     "grid_envoy_serial_missing": {
-      "message": "Die Envoy-Seriennummer für diese Site konnte nicht ermittelt werden."
+      "message": "Die Envoy-Seriennummer für diese Anlage konnte nicht ermittelt werden."
     },
     "grid_site_required": {
       "message": "Wählen Sie genau eine Enphase-Site aus."
     },
     "grid_site_ambiguous": {
-      "message": "Es wurden mehrere Websites ausgewählt ({count}). Wählen Sie genau eine Site aus."
+      "message": "Es wurden mehrere Anlagen ausgewählt ({count}). Wählen Sie genau eine Anlage aus."
     },
     "schedule_required": {
       "message": "Aktivieren Sie mindestens einen Zeitplan, bevor Sie geplantes Laden auswählen."
@@ -741,9 +741,9 @@
       },
       "grid_toggle": {
         "title": "Netzmodus",
-        "description": "Aktueller Rastermodus: **{current_mode}**.\n\nDas Ändern des Netzmodus ist sicherheitsrelevant. Wählen Sie den gewünschten Modus aus, um einen Einmalcode an die registrierte E-Mail-Adresse und das registrierte Telefon zu senden.",
+        "description": "Aktueller Netzmodus: **{current_mode}**.\n\nDas Ändern des Netzmodus ist sicherheitsrelevant. Wählen Sie den gewünschten Modus aus, um einen Einmalcode an die registrierte E-Mail-Adresse und das registrierte Telefon zu senden.",
         "data": {
-          "mode": "Angeforderter Rastermodus"
+          "mode": "Angeforderter Netzmodus"
         }
       },
       "grid_profile": {
@@ -777,15 +777,15 @@
         "description": "Enphase hat das Netzprofil-Update für **{selected_profile}** akzeptiert.\n\nAngeforderte Profil-ID: **{requested_profile_id}**\n\nCloud-Status: **{cloud_apply_status}**\n\nEs kann bis zu **5 Minuten** dauern, bis das neue Profil als aktuell angezeigt wird, während Cloud und Gateway die Verarbeitung abschließen. Der Grid Profile Sensor wird aktualisiert, nachdem der Activation-Datensatz das neue aktuelle Profil meldet."
       },
       "grid_toggle_otp": {
-        "title": "Bestätigen Sie die Änderung des Rastermodus",
-        "description": "Aktueller Rastermodus: **{current_mode}**.\n\nAngeforderter Rastermodus: **{target_mode}**.\n\nGeben Sie den 4-stelligen Einmalcode ein und bestätigen Sie die sicherheitsrelevante Änderung.",
+        "title": "Bestätigen Sie die Änderung des Netzmodus",
+        "description": "Aktueller Netzmodus: **{current_mode}**.\n\nAngeforderter Netzmodus: **{target_mode}**.\n\nGeben Sie den 4-stelligen Einmalcode ein und bestätigen Sie die sicherheitsrelevante Änderung.",
         "data": {
           "otp": "Einmaliger Code",
-          "confirm": "Bestätigen Sie die Änderung des Rastermodus"
+          "confirm": "Bestätigen Sie die Änderung des Netzmodus"
         }
       },
       "grid_toggle_applied": {
-        "title": "Änderung des Rastermodus akzeptiert",
+        "title": "Änderung des Netzmodus akzeptiert",
         "description": "Enphase hat die Anfrage zur Änderung des Grid-Modus in **{target_mode}** angenommen.\n\nDas physische Relais ändert sich möglicherweise noch. Verwenden Sie den Grid-Modus-Sensor, um den resultierenden Zustand zu beobachten."
       }
     },
@@ -806,9 +806,9 @@
       "grid_profile_gateway_required": "Zum Anwenden des Netzprofils ist ein Cloud-Activation-Gateway-Datensatz erforderlich.",
       "grid_profile_apply_failed": "Anwenden des Netzprofils fehlgeschlagen.",
       "grid_mode_invalid": "Wählen Sie „On Grid“ oder „Off Grid“.",
-      "grid_mode_already_active": "Die Site befindet sich bereits im ausgewählten Rastermodus.",
-      "grid_mode_confirm_required": "Bestätigen Sie die Änderung des Rastermodus, bevor Sie fortfahren.",
-      "grid_control_unavailable": "Die Rastersteuerung ist für diese Site nicht verfügbar.",
+      "grid_mode_already_active": "Die Site befindet sich bereits im ausgewählten Netzmodus.",
+      "grid_mode_confirm_required": "Bestätigen Sie die Änderung des Netzmodus, bevor Sie fortfahren.",
+      "grid_control_unavailable": "Die Netzsteuerung ist für diese Site nicht verfügbar.",
       "grid_control_blocked": "Die Netzsteuerung ist derzeit gesperrt.",
       "grid_otp_required": "Geben Sie den Einmalcode ein.",
       "grid_otp_invalid_format": "Der Einmalcode muss genau vier Ziffern enthalten.",
@@ -822,7 +822,7 @@
       "grid_profile_unavailable": "Die Netzprofil-Steuerung ist nicht verfügbar.",
       "grid_profile_installer_required": "Die Netzprofil-Steuerung erfordert Installateurzugriff auf Enphase Activation.",
       "grid_profile_no_regions": "Für das Land dieses Standorts sind keine Netzprofilregionen verfügbar.",
-      "grid_mode_unavailable": "Die Steuerung des Rastermodus ist für diese Site nicht verfügbar.",
+      "grid_mode_unavailable": "Die Steuerung des Netzmodus ist für diese Site nicht verfügbar.",
       "grid_mode_blocked": "Die Steuerung im Grid-Modus ist derzeit blockiert: {reasons}."
     },
     "create_entry": {
@@ -2583,7 +2583,7 @@
       "backoff_active": "Backoff aktiv",
       "network_errors": "Aufeinanderfolgende Netzwerkfehler",
       "http_errors": "Aufeinanderfolgende HTTP-Fehler",
-      "site_count": "Anzahl der Websites",
+      "site_count": "Anzahl der Anlagen",
       "site_name": "Site-Name",
       "site_ids": "Site-IDs",
       "site_names": "Site-Namen",
@@ -2591,7 +2591,7 @@
       "last_failure_description": "Letzte Fehlerbeschreibung",
       "phase_timings": "Phasenzeiten",
       "session_cache_ttl_s": "Sitzungscache-TTL(s)",
-      "sites": "Websites",
+      "sites": "Anlagen",
       "auth_settings_available": "Authentifizierungseinstellungen verfügbar",
       "auth_settings_last_error": "Letzter Fehler bei den Authentifizierungseinstellungen",
       "auth_settings_failures": "Fehler bei den Authentifizierungseinstellungen",
@@ -2725,7 +2725,7 @@
       }
     },
     "request_grid_toggle_otp": {
-      "name": "Fordern Sie Grid Toggle OTP an",
+      "name": "Einmalcode für Netzmoduswechsel anfordern",
       "description": "Senden Sie den erforderlichen Einmalcode, bevor Sie den Site-Grid-Modus ändern.",
       "fields": {
         "config_entry_id": {
@@ -2735,11 +2735,11 @@
       }
     },
     "set_grid_mode": {
-      "name": "Legen Sie den Rastermodus fest",
+      "name": "Legen Sie den Netzmodus fest",
       "description": "Ändern Sie den Site-Grid-Modus, nachdem Sie den Einmalcode validiert haben.",
       "fields": {
         "mode": {
-          "name": "Rastermodus",
+          "name": "Netzmodus",
           "description": "Wählen Sie on_grid oder off_grid."
         },
         "otp": {
@@ -2820,7 +2820,7 @@
           "description": "Planen Sie die Endzeit ein."
         },
         "limit": {
-          "name": "Gebührenlimit",
+          "name": "Ladegrenze",
           "description": "Maximaler Ladezustand der Batterie (%)."
         },
         "days": {
@@ -2863,7 +2863,7 @@
           "description": "Planen Sie die Endzeit ein."
         },
         "limit": {
-          "name": "Gebührenlimit",
+          "name": "Ladegrenze",
           "description": "Maximaler Ladezustand der Batterie (%)."
         },
         "days": {

@@ -98,7 +98,7 @@
       "message": "El control de red está actualmente bloqueado."
     },
     "grid_mode_invalid": {
-      "message": "El modo de cuadrícula debe ser on_grid o off_grid."
+      "message": "El modo de red debe ser on_grid o off_grid."
     },
     "grid_otp_required": {
       "message": "Se requiere OTP."
@@ -110,7 +110,7 @@
       "message": "La OTP no es válida o ha caducado."
     },
     "grid_envoy_serial_missing": {
-      "message": "No se puede determinar el número de serie del enviado para este sitio."
+      "message": "No se puede determinar el número de serie de Envoy para este sitio."
     },
     "grid_site_required": {
       "message": "Seleccione exactamente un sitio de Enphase."
@@ -741,9 +741,9 @@
       },
       "grid_toggle": {
         "title": "Modo de red",
-        "description": "Modo de cuadrícula actual: **{current_mode}**.\n\nCambiar el modo de red es una cuestión de seguridad. Seleccione el modo solicitado para enviar un código de un solo uso al correo electrónico y al teléfono registrados.",
+        "description": "Modo de red actual: **{current_mode}**.\n\nCambiar el modo de red es una cuestión de seguridad. Seleccione el modo solicitado para enviar un código de un solo uso al correo electrónico y al teléfono registrados.",
         "data": {
-          "mode": "Modo de cuadrícula solicitado"
+          "mode": "Modo de red solicitado"
         }
       },
       "grid_profile": {
@@ -777,16 +777,16 @@
         "description": "Enphase aceptó la actualización del perfil de red para **{selected_profile}**.\n\nID del perfil solicitado: **{requested_profile_id}**\n\nEstado en la nube: **{cloud_apply_status}**\n\nEl nuevo perfil puede tardar hasta **5 minutos** en aparecer como actual mientras la nube y el Gateway terminan de procesarlo. El sensor Grid Profile se actualizará cuando el registro de Activation informe el nuevo perfil actual."
       },
       "grid_toggle_otp": {
-        "title": "Confirmar cambio de modo de cuadrícula",
-        "description": "Modo de cuadrícula actual: **{current_mode}**.\n\nModo de cuadrícula solicitado: **{target_mode}**.\n\nIngrese el código único de 4 dígitos y confirme el cambio sensible a la seguridad.",
+        "title": "Confirmar cambio de modo de red",
+        "description": "Modo de red actual: **{current_mode}**.\n\nModo de red solicitado: **{target_mode}**.\n\nIngrese el código único de 4 dígitos y confirme el cambio sensible a la seguridad.",
         "data": {
           "otp": "código de un solo uso",
-          "confirm": "Confirme el cambio de modo de cuadrícula"
+          "confirm": "Confirme el cambio de modo de red"
         }
       },
       "grid_toggle_applied": {
-        "title": "Cambio de modo de cuadrícula aceptado",
-        "description": "Enphase aceptó la solicitud para cambiar el modo de cuadrícula a **{target_mode}**.\n\nEs posible que el relé físico aún esté cambiando. Utilice el sensor de modo de cuadrícula para observar el estado resultante."
+        "title": "Cambio de modo de red aceptado",
+        "description": "Enphase aceptó la solicitud para cambiar el modo de red a **{target_mode}**.\n\nEs posible que el relé físico aún esté cambiando. Utilice el sensor de modo de red para observar el estado resultante."
       }
     },
     "error": {
@@ -806,8 +806,8 @@
       "grid_profile_gateway_required": "Aplicar el perfil de red requiere un registro de Gateway de Activation en la nube.",
       "grid_profile_apply_failed": "No se pudo aplicar el perfil de red.",
       "grid_mode_invalid": "Seleccione En la red o Fuera de la red.",
-      "grid_mode_already_active": "El sitio ya está en el modo de cuadrícula seleccionado.",
-      "grid_mode_confirm_required": "Confirme el cambio del modo de cuadrícula antes de continuar.",
+      "grid_mode_already_active": "El sitio ya está en el modo de red seleccionado.",
+      "grid_mode_confirm_required": "Confirme el cambio del modo de red antes de continuar.",
       "grid_control_unavailable": "El control de red no está disponible para este sitio.",
       "grid_control_blocked": "El control de red está actualmente bloqueado.",
       "grid_otp_required": "Ingrese el código de un solo uso.",
@@ -822,8 +822,8 @@
       "grid_profile_unavailable": "El control de perfil de red no está disponible.",
       "grid_profile_installer_required": "El control de perfil de red requiere acceso de instalador a Enphase Activation.",
       "grid_profile_no_regions": "No hay regiones de perfil de red disponibles para el país de este sitio.",
-      "grid_mode_unavailable": "El control del modo de cuadrícula no está disponible para este sitio.",
-      "grid_mode_blocked": "El control del modo de cuadrícula está bloqueado actualmente: {reasons}."
+      "grid_mode_unavailable": "El control del modo de red no está disponible para este sitio.",
+      "grid_mode_blocked": "El control del modo de red está bloqueado actualmente: {reasons}."
     },
     "create_entry": {
       "migration_success": "Migración completada. Enphase Energy ahora posee los identificadores de entidad de origen seleccionados. Verifica el panel de Energy y Developer Tools > Statistics después de la próxima actualización.",
@@ -849,7 +849,7 @@
     },
     "grid_mode": {
       "options": {
-        "on_grid": "En la cuadrícula",
+        "on_grid": "En la red",
         "off_grid": "Fuera de la red",
         "unknown": "Desconocido"
       }
@@ -1453,7 +1453,7 @@
       "grid_mode": {
         "name": "Modo de red",
         "state": {
-          "on_grid": "En la cuadrícula",
+          "on_grid": "En la red",
           "off_grid": "Fuera de la red",
           "unknown": "Desconocido"
         }
@@ -2725,8 +2725,8 @@
       }
     },
     "request_grid_toggle_otp": {
-      "name": "Solicitar OTP de alternancia de cuadrícula",
-      "description": "Envíe el código de un solo uso requerido antes de cambiar el modo de cuadrícula del sitio.",
+      "name": "Solicitar OTP de alternancia de red",
+      "description": "Envíe el código de un solo uso requerido antes de cambiar el modo de red del sitio.",
       "fields": {
         "config_entry_id": {
           "name": "Entrada de configuración de Enphase",
@@ -2735,11 +2735,11 @@
       }
     },
     "set_grid_mode": {
-      "name": "Establecer modo de cuadrícula",
-      "description": "Cambie el modo de cuadrícula del sitio después de validar el código de un solo uso.",
+      "name": "Establecer modo de red",
+      "description": "Cambie el modo de red del sitio después de validar el código de un solo uso.",
       "fields": {
         "mode": {
-          "name": "Modo cuadrícula",
+          "name": "Modo de red",
           "description": "Seleccione on_grid o off_grid."
         },
         "otp": {
@@ -2748,7 +2748,7 @@
         },
         "config_entry_id": {
           "name": "Entrada de configuración de Enphase",
-          "description": "Seleccione el sitio de Enphase cuyo modo de cuadrícula debería cambiar."
+          "description": "Seleccione el sitio de Enphase cuyo modo de red debería cambiar."
         }
       }
     },
