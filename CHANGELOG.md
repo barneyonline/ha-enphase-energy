@@ -11,6 +11,23 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v4.2.5 - 2026-08-28
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
 - Corrected context-sensitive translations across all non-English catalogs,
   including disabled charger authentication, electrical grid and site terms,
   charging actions, Envoy branding, and tariff editing. (#831)
@@ -19,7 +36,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔄 Other changes
-- None
+- Bumped the integration manifest version to `4.2.5`.
 
 ## v4.2.4 - 2026-08-15
 
