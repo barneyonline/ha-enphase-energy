@@ -5,7 +5,7 @@ pytest-homeassistant-custom-component
 pytest-cov
 PyYAML
 mypy==2.2.0
-ruff
+ruff==0.16.4
 black
 freezegun
 pre-commit
