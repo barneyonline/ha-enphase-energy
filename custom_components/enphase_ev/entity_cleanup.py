@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 
 from homeassistant.helpers import entity_registry as er
 
@@ -32,14 +32,24 @@ def iter_device_registry_entries(dev_reg: object) -> list[object]:
     devices = getattr(dev_reg, "devices", None)
     if devices is None:
         return []
+    if isinstance(devices, dict):
+        return list(dict.values(devices))
+    if isinstance(devices, Mapping):
+        try:
+            return list(devices.values())
+        except Exception:  # noqa: BLE001
+            return []
+    if isinstance(devices, Iterable):
+        try:
+            return list(devices)
+        except Exception:  # noqa: BLE001
+            return []
     values = getattr(devices, "values", None)
     if callable(values):
         try:
             return list(values())
         except Exception:  # noqa: BLE001
             return []
-    if isinstance(devices, dict):
-        return list(dict.values(devices))
     return []
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+from collections import UserDict
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, Mock, call
@@ -391,6 +392,41 @@ def test_complete_startup_migrations_clears_reload_suppression_when_update_not_a
 
 def test_iter_device_registry_entries_handles_edge_paths() -> None:
     assert _iter_device_registry_entries(SimpleNamespace()) == []
+
+    device_entries = [SimpleNamespace(id="dev-1"), SimpleNamespace(id="dev-2")]
+
+    class DeviceCollection:
+        def __iter__(self):
+            return iter(device_entries)
+
+        def values(self):
+            raise AssertionError("collection values() must not be called")
+
+    assert (
+        _iter_device_registry_entries(SimpleNamespace(devices=DeviceCollection()))
+        == device_entries
+    )
+
+    class LegacyDevices:
+        def values(self):
+            return device_entries
+
+    assert (
+        _iter_device_registry_entries(SimpleNamespace(devices=LegacyDevices()))
+        == device_entries
+    )
+
+    class BadMapping(UserDict):
+        def values(self):
+            raise RuntimeError("boom")
+
+    assert _iter_device_registry_entries(SimpleNamespace(devices=BadMapping())) == []
+
+    class BadCollection:
+        def __iter__(self):
+            raise RuntimeError("boom")
+
+    assert _iter_device_registry_entries(SimpleNamespace(devices=BadCollection())) == []
 
     class BadDevices:
         def values(self):
