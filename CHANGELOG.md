@@ -19,6 +19,24 @@ All notable changes to this project will be documented in this file.
 ### 🔄 Other changes
 - None
 
+## v4.2.6 - 2026-08-30
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Updated device registry cleanup for Home Assistant 2026.9 compatibility by
+  supporting iterable device collections. (#836)
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Bumped the integration manifest version to `4.2.6`.
+
 ## v4.2.5 - 2026-08-28
 
 ### 🚧 Breaking changes
