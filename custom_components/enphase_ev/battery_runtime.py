@@ -1755,6 +1755,12 @@ class BatteryRuntime:
     ) -> bool:
         if err.status != HTTPStatus.CONFLICT:
             return False
+        error_status = getattr(err, "enphase_error_status", None)
+        if (
+            isinstance(error_status, str)
+            and error_status.strip().upper() == "ALREADY_PROCESSED"
+        ):
+            return True
         raw_message = getattr(err, "message", None)
         if not isinstance(raw_message, str) or not raw_message.strip():
             return False

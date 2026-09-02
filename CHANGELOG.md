@@ -11,7 +11,9 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Fixed cancellation of stale IQ Battery profile changes when Enphase reports
+  that the request was already processed, while preserving sanitized HTTP error
+  messages and continuing to raise unrelated conflicts. (#839)
 
 ### 🔧 Improvements
 - None

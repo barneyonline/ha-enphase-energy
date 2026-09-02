@@ -164,6 +164,25 @@ def test_safe_response_error_message_handles_header_failures() -> None:
     assert "content_type" not in message
 
 
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        (None, None),
+        ("not-json", None),
+        (json.dumps(["bad"]), None),
+        (json.dumps({"error": "bad"}), None),
+        (json.dumps({"error": {"status": 409}}), None),
+        (json.dumps({"error": {"status": "contains spaces"}}), None),
+        (
+            json.dumps({"error": {"status": " already_processed "}}),
+            "ALREADY_PROCESSED",
+        ),
+    ],
+)
+def test_enphase_error_status_from_text(body, expected) -> None:
+    assert api._enphase_error_status_from_text(body) == expected  # noqa: SLF001
+
+
 def test_scheduler_error_code_ignores_unexpected_payload_shapes() -> None:
     assert api._scheduler_error_context_from_text(None) == (None, None)  # noqa: SLF001
     assert api._scheduler_error_context_from_text(
@@ -2056,6 +2075,35 @@ async def test_json_attaches_scheduler_error_context_without_raw_body() -> None:
         "display": "No Schedules enabled for Scheduled Charging",
     }
     assert not hasattr(err.value, "enphase_response_body")
+
+
+@pytest.mark.asyncio
+async def test_json_preserves_profile_cancel_status_without_raw_body() -> None:
+    body = json.dumps(
+        {
+            "error": {
+                "status": "ALREADY_PROCESSED",
+                "message": "Changes already processed.",
+            }
+        }
+    )
+    session = _FakeSession([_FakeResponse(status=409, json_body={}, text_body=body)])
+    client = api.EnphaseEVClient(session, "SITE", None, None)
+
+    with pytest.raises(aiohttp.ClientResponseError) as err:
+        await client._json(
+            "PUT",
+            "https://example.test/service/batteryConfig/api/v1/cancel/profile/SITE",
+            json={},
+        )
+
+    assert err.value.enphase_error_status == "ALREADY_PROCESSED"
+    assert "ALREADY_PROCESSED" not in err.value.message
+    assert not hasattr(err.value, "enphase_response_body")
+
+    from custom_components.enphase_ev.battery_runtime import BatteryRuntime
+
+    assert BatteryRuntime._is_already_processed_profile_cancel_error(err.value)
 
 
 @pytest.mark.asyncio

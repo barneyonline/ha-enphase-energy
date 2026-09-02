@@ -259,9 +259,14 @@ async def test_cancel_pending_profile_change_reraises_non_benign_conflict(
             message='{"error":{"status":"NOT_ALLOWED","message":"Denied."}}',
         )
     )
+    coord.client.cancel_battery_profile_update.side_effect.enphase_error_status = (
+        "NOT_ALLOWED"
+    )
 
     with pytest.raises(aiohttp.ClientResponseError):
         await coord.async_cancel_pending_profile_change()
+
+    assert coord.battery_profile_pending is True
 
 
 def test_pending_profile_timeout_issue_lifecycle(
