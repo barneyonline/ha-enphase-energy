@@ -133,6 +133,7 @@ OCPP_TRIGGER_MESSAGES_REQUIRING_CONFIRMATION = frozenset(
 )
 _OCPP_TRIGGER_MESSAGE_MAX_LENGTH = 64
 _OCPP_TRIGGER_MESSAGE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9]{0,63}$")
+_ENPHASE_ERROR_STATUS_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
 # Enlighten web pages and XHR endpoints share service capacity with the mobile
 # app. A module-level limiter keeps parallel refresh helpers from creating a
 # burst of browser-like reads during one Home Assistant update cycle.
@@ -429,6 +430,29 @@ def _safe_response_error_message(
     if body_text is not None:
         detail_parts.append(f"body_length={len(body_text)}")
     return f"HTTP error from Enphase endpoint ({', '.join(detail_parts)})"
+
+
+def _enphase_error_status_from_text(text: str | None) -> str | None:
+    """Return a bounded Enphase error status without retaining the response body."""
+
+    if not text:
+        return None
+    try:
+        payload = json.loads(text)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        return None
+    status = error.get("status")
+    if not isinstance(status, str):
+        return None
+    normalized = status.strip().upper()
+    if not _ENPHASE_ERROR_STATUS_RE.fullmatch(normalized):
+        return None
+    return normalized
 
 
 def _scheduler_error_context_from_text(
@@ -4847,6 +4871,11 @@ class EnphaseEVClient:
                                         )
                                     ),
                                 )
+                                setattr(
+                                    response_error,
+                                    "enphase_error_status",
+                                    _enphase_error_status_from_text(body_text),
+                                )
                                 if _is_scheduler_charging_mode_endpoint(endpoint):
                                     code, display = _scheduler_error_context_from_text(
                                         body_text
@@ -5027,13 +5056,19 @@ class EnphaseEVClient:
                                 headers=r.headers,
                                 body_text=body_text,
                             )
-                            raise aiohttp.ClientResponseError(
+                            response_error = aiohttp.ClientResponseError(
                                 r.request_info,
                                 r.history,
                                 status=r.status,
                                 message=message,
                                 headers=r.headers,
                             )
+                            setattr(
+                                response_error,
+                                "enphase_error_status",
+                                _enphase_error_status_from_text(body_text),
+                            )
+                            raise response_error
                         text = await _timed_response_text(r)
                         if _is_enphase_login_wall(
                             endpoint=endpoint or None, payload=text
