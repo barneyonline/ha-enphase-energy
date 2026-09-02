@@ -11,6 +11,23 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v4.2.7 - 2026-09-02
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
 - Fixed cancellation of stale IQ Battery profile changes when Enphase reports
   that the request was already processed, while preserving sanitized HTTP error
   messages and continuing to raise unrelated conflicts. (#839)
@@ -19,7 +36,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔄 Other changes
-- None
+- Bumped the integration manifest version to `4.2.7`.
 
 ## v4.2.6 - 2026-08-30
 
