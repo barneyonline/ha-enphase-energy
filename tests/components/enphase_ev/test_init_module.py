@@ -71,6 +71,10 @@ from custom_components.enphase_ev.const import (
     OPT_VPP_EVENTS_ENABLED,
 )
 from custom_components.enphase_ev.device_types import type_identifier
+from custom_components.enphase_ev.device_registry_compat import (
+    get_device_by_identifier,
+    via_device_kwargs,
+)
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from custom_components.enphase_ev.services import async_setup_services
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
@@ -696,15 +700,19 @@ async def test_async_setup_entry_updates_existing_device(
     dummy_coord.schedule_sync.async_start.assert_awaited_once()
     forward.assert_awaited_once()
 
-    updated = device_registry.async_get_device(identifiers={(DOMAIN, RANDOM_SERIAL)})
+    updated = get_device_by_identifier(
+        device_registry, (DOMAIN, RANDOM_SERIAL), config_entry.entry_id
+    )
     assert updated is not None
     assert updated.name == "Garage Charger"
     assert updated.manufacturer == "Enphase"
     assert updated.model == "Garage Charger (IQ EVSE)"
     assert updated.hw_version == "321"
     assert updated.sw_version == "654"
-    ev_type_device = device_registry.async_get_device(
-        identifiers={(DOMAIN, f"type:{site_id}:iqevse")}
+    ev_type_device = get_device_by_identifier(
+        device_registry,
+        (DOMAIN, f"type:{site_id}:iqevse"),
+        config_entry.entry_id,
     )
     assert ev_type_device is None
     assert updated.via_device_id is None
@@ -1224,7 +1232,11 @@ async def test_async_setup_entry_skips_legacy_cleanup_when_migration_current(
 
     assert dev_reg.async_get(legacy_site_device.id) is not None
     assert (
-        dev_reg.async_get_device(identifiers={(DOMAIN, f"type:{site_id}:envoy")})
+        get_device_by_identifier(
+            dev_reg,
+            (DOMAIN, f"type:{site_id}:envoy"),
+            config_entry.entry_id,
+        )
         is not None
     )
 
@@ -1732,11 +1744,11 @@ async def test_async_setup_entry_model_display_variants(
 
     assert await async_setup_entry(hass, config_entry)
 
-    model_device = device_registry.async_get_device(
-        identifiers={(DOMAIN, "MODEL_ONLY")}
+    model_device = get_device_by_identifier(
+        device_registry, (DOMAIN, "MODEL_ONLY"), config_entry.entry_id
     )
-    display_device = device_registry.async_get_device(
-        identifiers={(DOMAIN, "DISPLAY_ONLY")}
+    display_device = get_device_by_identifier(
+        device_registry, (DOMAIN, "DISPLAY_ONLY"), config_entry.entry_id
     )
 
     assert model_device is not None
@@ -1793,7 +1805,9 @@ async def test_async_setup_entry_uses_fallback_name_for_model(
 
     assert await async_setup_entry(hass, config_entry)
 
-    device = device_registry.async_get_device(identifiers={(DOMAIN, "FALLBACK_ONLY")})
+    device = get_device_by_identifier(
+        device_registry, (DOMAIN, "FALLBACK_ONLY"), config_entry.entry_id
+    )
     assert device is not None
     assert device.model == "Fallback Charger"
 
@@ -2472,7 +2486,11 @@ async def test_registered_services_cover_branches(
         identifiers={(DOMAIN, first_serial)},
         manufacturer="Enphase",
         name="Driveway Charger",
-        via_device=(DOMAIN, f"site:{site_id}"),
+        **via_device_kwargs(
+            device_registry,
+            via_device_id=site_device.id,
+            legacy_via_device=(DOMAIN, f"site:{site_id}"),
+        ),
     )
     charger_two = device_registry.async_get_or_create(
         config_entry_id=config_entry.entry_id,
@@ -3367,7 +3385,7 @@ async def test_service_helper_resolve_functions_cover_none_branches(
     assert await resolve_device_routing_context(child_no_parent.id) is None
     assert await resolve_site(child_no_parent.id) is None
 
-    dev_reg.async_get_or_create(
+    parent_site_device = dev_reg.async_get_or_create(
         config_entry_id=config_entry.entry_id,
         identifiers={(DOMAIN, "site:PARENT")},
         manufacturer="Enphase",
@@ -3378,7 +3396,11 @@ async def test_service_helper_resolve_functions_cover_none_branches(
         identifiers={(DOMAIN, "EVCHILD")},
         manufacturer="Enphase",
         name="Child Device",
-        via_device=(DOMAIN, "site:PARENT"),
+        **via_device_kwargs(
+            dev_reg,
+            via_device_id=parent_site_device.id,
+            legacy_via_device=(DOMAIN, "site:PARENT"),
+        ),
     )
     assert await resolve_device_routing_context(child_with_via.id) == (
         "EVCHILD",
@@ -3401,7 +3423,11 @@ async def test_service_helper_resolve_functions_cover_none_branches(
         identifiers={(DOMAIN, "EVTYPED")},
         manufacturer="Enphase",
         name="Typed Child",
-        via_device=(DOMAIN, "type:TYPED:envoy"),
+        **via_device_kwargs(
+            dev_reg,
+            via_device_id=type_device.id,
+            legacy_via_device=(DOMAIN, "type:TYPED:envoy"),
+        ),
     )
     assert await resolve_site(child_with_type_parent.id) == "TYPED"
 
@@ -4079,7 +4105,11 @@ async def test_startup_migration_removes_evse_type_device_and_inventory_entity(
         identifiers={(DOMAIN, RANDOM_SERIAL)},
         manufacturer="Enphase",
         name="Garage Charger",
-        via_device=(DOMAIN, f"type:{site_id}:iqevse"),
+        **via_device_kwargs(
+            dev_reg,
+            via_device_id=evse_type.id,
+            legacy_via_device=(DOMAIN, f"type:{site_id}:iqevse"),
+        ),
     )
     entity = ent_reg.async_get_or_create(
         "sensor",
@@ -4957,8 +4987,10 @@ async def test_migrate_cloud_entities_to_cloud_device_rehomes_known_entities(
     coord = SimpleNamespace(site_id=site_id)
     _migrate_cloud_entities_to_cloud_device(hass, config_entry, coord, dev_reg, None)
 
-    cloud_device = dev_reg.async_get_device(
-        identifiers={(DOMAIN, f"type:{site_id}:cloud")}
+    cloud_device = get_device_by_identifier(
+        dev_reg,
+        (DOMAIN, f"type:{site_id}:cloud"),
+        config_entry.entry_id,
     )
     assert cloud_device is not None
 
@@ -5244,8 +5276,10 @@ async def test_migrate_cloud_entities_to_cloud_device_rehomes_legacy_cloud_suffi
     coord = SimpleNamespace(site_id=site_id)
     _migrate_cloud_entities_to_cloud_device(hass, config_entry, coord, dev_reg, None)
 
-    cloud_device = dev_reg.async_get_device(
-        identifiers={(DOMAIN, f"type:{site_id}:cloud")}
+    cloud_device = get_device_by_identifier(
+        dev_reg,
+        (DOMAIN, f"type:{site_id}:cloud"),
+        config_entry.entry_id,
     )
     assert cloud_device is not None
     reg_entry = ent_reg.async_get(legacy_cloud_error.entity_id)
