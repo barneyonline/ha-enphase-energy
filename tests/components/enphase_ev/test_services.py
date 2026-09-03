@@ -12,6 +12,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from homeassistant.auth.const import GROUP_ID_ADMIN, GROUP_ID_USER
 from homeassistant.core import Context, HomeAssistant
 from homeassistant.exceptions import ServiceValidationError, Unauthorized
+from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
@@ -174,6 +175,103 @@ async def test_admin_reaches_credentialed_control_handler(hass: HomeAssistant) -
     assert err.value.translation_key == "grid_site_required"
 
 
+@pytest.mark.asyncio
+async def test_admin_live_stream_services_resolve_supported_site_targets(
+    hass: HomeAssistant,
+) -> None:
+    """Live-stream services accept UI targets and explicit site IDs."""
+
+    coord = _fake_service_coordinator(site_id="stream-site", serials=set())
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "stream-site", CONF_SITE_ONLY: True},
+        title="Stream Site",
+        unique_id="stream-site",
+    )
+    entry.add_to_hass(hass)
+    entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+
+    area = ar.async_get(hass).async_create("Garage")
+    device_registry = dr.async_get(hass)
+    site_device = device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, "site:stream-site")},
+        manufacturer="Enphase",
+        name="Stream Site Device",
+    )
+    device_registry.async_update_device(site_device.id, area_id=area.id)
+    site_entity = er.async_get(hass).async_get_or_create(
+        "sensor",
+        DOMAIN,
+        "stream-site-available-power",
+        config_entry=entry,
+        device_id=site_device.id,
+    )
+    entry_entity = er.async_get(hass).async_get_or_create(
+        "sensor",
+        DOMAIN,
+        "stream-site-without-device",
+        config_entry=entry,
+    )
+    foreign_entity = er.async_get(hass).async_get_or_create(
+        "sensor", "test", "foreign-stream-target"
+    )
+
+    async_setup_services(hass)
+    admin = await hass.auth.async_create_user(
+        "Live-stream owner", group_ids=[GROUP_ID_ADMIN]
+    )
+    context = Context(user_id=admin.id)
+
+    await hass.services.async_call(
+        DOMAIN,
+        "start_live_stream",
+        {"entity_id": site_entity.entity_id},
+        blocking=True,
+        context=context,
+    )
+    await hass.services.async_call(
+        DOMAIN,
+        "stop_live_stream",
+        {"device_id": site_device.id},
+        blocking=True,
+        context=context,
+    )
+    await hass.services.async_call(
+        DOMAIN,
+        "start_live_stream",
+        {"area_id": area.id},
+        blocking=True,
+        context=context,
+    )
+    await hass.services.async_call(
+        DOMAIN,
+        "stop_live_stream",
+        {"site_id": "stream-site"},
+        blocking=True,
+        context=context,
+    )
+    await hass.services.async_call(
+        DOMAIN,
+        "start_live_stream",
+        {"entity_id": entry_entity.entity_id},
+        blocking=True,
+        context=context,
+    )
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            "start_live_stream",
+            {"entity_id": foreign_entity.entity_id},
+            blocking=True,
+            context=context,
+        )
+
+    assert coord.async_start_streaming.await_count == 3
+    assert coord.async_stop_streaming.await_count == 2
+    assert coord.async_request_refresh.await_count == 5
+
+
 def _register_service_handlers(
     hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
 ) -> dict[tuple[str, str], object]:
@@ -297,6 +395,29 @@ def test_trigger_message_schema_restricts_requested_message(
     ):
         with pytest.raises(vol.Invalid):
             schema({"requested_message": requested_message})
+
+
+def test_live_stream_schema_accepts_targets_and_explicit_site(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Live-stream schemas accept every target selector field and site routing."""
+
+    registered = _register_service_metadata(hass, monkeypatch)
+    for service in ("start_live_stream", "stop_live_stream"):
+        schema = registered[(DOMAIN, service)]["schema"]
+        for data in (
+            {"entity_id": "sensor.available_power"},
+            {"device_id": "device-id"},
+            {"area_id": "area-id"},
+            {"floor_id": "floor-id"},
+            {"label_id": "label-id"},
+            {"site_id": "1234567"},
+            {"config_entry_id": "entry-id"},
+        ):
+            assert schema(data)
+        assert schema({"site_id": "1234567", "metadata": {}}) == {"site_id": "1234567"}
+        with pytest.raises(vol.Invalid):
+            schema({"unknown_target": "value"})
 
 
 def test_trigger_message_service_options_match_allowlist() -> None:
@@ -1388,6 +1509,12 @@ async def test_update_tariff_accepts_friendly_rate_fields(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    site_device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, "site:tariff-site")},
+        manufacturer="Enphase",
+        name="Tariff Site Device",
+    )
     import_locator = {
         "branch": "purchase",
         "kind": "period",
@@ -1408,12 +1535,14 @@ async def test_update_tariff_accepts_friendly_rate_fields(
         DOMAIN,
         f"{DOMAIN}_site_tariff-site_tariff_import_rate_default_week_peak_number",
         config_entry=entry,
+        device_id=site_device.id,
     )
     export_entity = ent_reg.async_get_or_create(
         "number",
         DOMAIN,
         f"{DOMAIN}_site_tariff-site_tariff_export_rate_default_week_peak_number",
         config_entry=entry,
+        device_id=site_device.id,
     )
     hass.states.async_set(
         import_entity.entity_id, 0.18, {"tariff_locator": import_locator}
@@ -1429,6 +1558,22 @@ async def test_update_tariff_accepts_friendly_rate_fields(
     coord.tariff_runtime.async_update_tariff.assert_awaited_once_with(
         billing=None,
         rate_updates=[{"locator": import_locator, "rate": 0.25}],
+    )
+    coord.tariff_runtime.async_update_tariff.reset_mock()
+
+    await handlers[(DOMAIN, "update_tariff")](
+        SimpleNamespace(
+            data={
+                "entity_id": import_entity.entity_id,
+                "device_id": site_device.id,
+                "rate": 0.255,
+            }
+        )
+    )
+
+    coord.tariff_runtime.async_update_tariff.assert_awaited_once_with(
+        billing=None,
+        rate_updates=[{"locator": import_locator, "rate": 0.255}],
     )
     coord.tariff_runtime.async_update_tariff.reset_mock()
 
@@ -1501,6 +1646,19 @@ async def test_update_tariff_rate_entity_extractor_fallback(
         config_entry=entry,
     )
     hass.states.async_set(reg_entry.entity_id, 0.18, {"tariff_locator": locator})
+    monkeypatch.setattr(
+        "homeassistant.helpers.target.async_extract_referenced_entity_ids",
+        lambda _hass, _selection: [reg_entry.entity_id],
+    )
+
+    await handlers[(DOMAIN, "update_tariff")](SimpleNamespace(data={"rate": 0.24}))
+
+    coord.tariff_runtime.async_update_tariff.assert_awaited_once_with(
+        billing=None,
+        rate_updates=[{"locator": locator, "rate": 0.24}],
+    )
+    coord.tariff_runtime.async_update_tariff.reset_mock()
+
     monkeypatch.setattr(
         "homeassistant.helpers.target.async_extract_referenced_entity_ids",
         None,

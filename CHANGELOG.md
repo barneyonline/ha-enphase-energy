@@ -11,10 +11,13 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Fixed the administrator-only Start/Stop Live Stream actions so Home Assistant
+  entity, device, area, floor, and label targets, explicit site IDs, and config
+  entry IDs pass service validation and resolve to the intended Enphase site.
 
 ### 🔧 Improvements
-- None
+- Documented live-stream target selection and clarified the difference between
+  Home Assistant device IDs and numeric Enphase site IDs.
 
 ### 🔄 Other changes
 - None

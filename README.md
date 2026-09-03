@@ -137,6 +137,23 @@ Manual install steps: see the wiki Installation page.
 
 Sign in with your Enlighten credentials; MFA is supported. See the wiki for details.
 
+## Live-stream actions
+
+`enphase_ev.start_live_stream` and `enphase_ev.stop_live_stream` are
+administrator-only, site-scoped actions for IQ EV Charger live updates. Select an
+Enphase entity, device, area, floor, or label belonging to the intended site, or
+enter the numeric Enphase site ID under Advanced options. A selected entity only
+identifies its owning site; it does not limit updates to that entity.
+
+When writing YAML manually, `device_id` means the Home Assistant device-registry
+ID. Use `site_id` for the numeric identifier shown by Enphase.
+
+```yaml
+action: enphase_ev.start_live_stream
+target:
+  entity_id: sensor.iq_battery_battery_available_power
+```
+
 ## Documentation
 
 Refer to the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki) for setup,

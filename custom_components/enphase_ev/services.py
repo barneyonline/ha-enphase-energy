@@ -331,6 +331,22 @@ def async_setup_services(
     CLEAR_SCHEMA = vol.Schema(
         {vol.Optional("device_id"): DEVICE_ID_LIST, vol.Optional("site_id"): cv.string}
     )
+    STREAM_SITE_SCHEMA = vol.Schema(
+        {
+            vol.Remove("metadata"): dict,
+            vol.Optional("site_id"): cv.string,
+            vol.Optional("config_entry_id"): cv.string,
+        }
+    )
+    STREAM_SCHEMA = vol.Any(
+        cv.make_entity_service_schema(
+            {
+                vol.Optional("site_id"): cv.string,
+                vol.Optional("config_entry_id"): cv.string,
+            }
+        ),
+        STREAM_SITE_SCHEMA,
+    )
     SYNC_SCHEMA = vol.Schema({vol.Optional("device_id"): DEVICE_ID_LIST})
     FORCE_REFRESH_SCHEMA = vol.Schema(
         {
@@ -740,14 +756,46 @@ def async_setup_services(
         _validate_update_tariff,
     )
 
-    def _extract_device_ids(call: ServiceCall) -> list[str]:
+    def _extract_target_references(
+        call: ServiceCall,
+    ) -> tuple[set[str], set[str], set[str], bool]:
+        referenced_entity_ids: set[str] = set()
+        indirect_entity_ids: set[str] = set()
         device_ids: set[str] = set()
+        extractor = getattr(ha_target, "async_extract_referenced_entity_ids", None)
+        target_selection = getattr(ha_target, "TargetSelection", None)
+        if not callable(extractor):
+            return referenced_entity_ids, indirect_entity_ids, device_ids, False
         try:
-            extractor = getattr(ha_service, "async_extract_referenced_device_ids", None)
-            if callable(extractor):
-                device_ids |= {str(value) for value in extractor(hass, call)}
+            selection = (
+                target_selection(call.data) if callable(target_selection) else call
+            )
+            selected = extractor(hass, selection)
         except Exception:
-            pass
+            return referenced_entity_ids, indirect_entity_ids, device_ids, False
+        referenced = getattr(selected, "referenced", None)
+        indirectly_referenced = getattr(selected, "indirectly_referenced", None)
+        referenced_devices = getattr(selected, "referenced_devices", None)
+        if referenced is None and indirectly_referenced is None:
+            referenced_entity_ids |= {str(entity_id) for entity_id in selected}
+        else:
+            referenced_entity_ids |= {str(entity_id) for entity_id in referenced or ()}
+            indirect_entity_ids |= {
+                str(entity_id) for entity_id in indirectly_referenced or ()
+            }
+        device_ids |= {str(device_id) for device_id in referenced_devices or ()}
+        return referenced_entity_ids, indirect_entity_ids, device_ids, True
+
+    def _extract_device_ids(call: ServiceCall) -> list[str]:
+        _entity_ids, _indirect_entity_ids, device_ids, _extracted = (
+            _extract_target_references(call)
+        )
+        extractor = getattr(ha_service, "async_extract_referenced_device_ids", None)
+        if callable(extractor):
+            try:
+                device_ids |= {str(value) for value in extractor(hass, call)}
+            except Exception:
+                pass
         data_ids = call.data.get("device_id")
         if data_ids:
             if isinstance(data_ids, str):
@@ -756,12 +804,51 @@ def async_setup_services(
                 device_ids |= {str(v) for v in data_ids}
         return list(device_ids)
 
+    def _extract_entity_ids(
+        call: ServiceCall, *, include_indirect: bool = False
+    ) -> list[str]:
+        entity_ids, indirect_entity_ids, _device_ids, extracted = (
+            _extract_target_references(call)
+        )
+        if include_indirect:
+            entity_ids |= indirect_entity_ids
+        if not extracted:
+            extractor = getattr(ha_service, "async_extract_referenced_entity_ids", None)
+            if callable(extractor):
+                try:
+                    entity_ids |= {
+                        str(entity_id) for entity_id in extractor(hass, call)
+                    }
+                except Exception:
+                    pass
+        raw_entity_ids = call.data.get("entity_id")
+        if raw_entity_ids:
+            if isinstance(raw_entity_ids, str):
+                entity_ids.add(raw_entity_ids)
+            else:
+                entity_ids |= {str(entity_id) for entity_id in raw_entity_ids}
+        return list(entity_ids)
+
     async def _resolve_site_ids_from_call(call: ServiceCall) -> set[str]:
         site_ids: set[str] = set()
         for device_id in _extract_device_ids(call):
             site_id = await _resolve_site_id(device_id)
             if site_id:
                 site_ids.add(site_id)
+        ent_reg = er.async_get(hass)
+        for entity_id in _extract_entity_ids(call, include_indirect=True):
+            reg_entry = ent_reg.async_get(entity_id)
+            if reg_entry is None or reg_entry.platform != DOMAIN:
+                continue
+            device_id = reg_entry.device_id
+            if device_id and (site_id := await _resolve_site_id(device_id)):
+                site_ids.add(site_id)
+                continue
+            config_entry_id = reg_entry.config_entry_id
+            if config_entry_id and (
+                coord := _get_coordinator_for_entry_id(config_entry_id)
+            ):
+                site_ids.add(str(coord.site_id))
         explicit = call.data.get("site_id")
         if explicit:
             site_ids.add(str(explicit))
@@ -795,31 +882,6 @@ def async_setup_services(
             translation_domain=DOMAIN,
             translation_key="grid_site_required",
         )
-
-    def _extract_entity_ids(call: ServiceCall) -> list[str]:
-        entity_ids: set[str] = set()
-        extractor = getattr(ha_target, "async_extract_referenced_entity_ids", None)
-        if callable(extractor):
-            try:
-                entity_ids |= {str(entity_id) for entity_id in extractor(hass, call)}
-            except Exception:
-                pass
-        else:
-            extractor = getattr(ha_service, "async_extract_referenced_entity_ids", None)
-            if callable(extractor):
-                try:
-                    entity_ids |= {
-                        str(entity_id) for entity_id in extractor(hass, call)
-                    }
-                except Exception:
-                    pass
-        raw_entity_ids = call.data.get("entity_id")
-        if raw_entity_ids:
-            if isinstance(raw_entity_ids, str):
-                entity_ids.add(raw_entity_ids)
-            else:
-                entity_ids |= {str(entity_id) for entity_id in raw_entity_ids}
-        return list(entity_ids)
 
     def _coordinator_from_tariff_entity(
         entity_id: str,
@@ -1851,8 +1913,12 @@ def async_setup_services(
         CLEAR_SCHEMA,
         supports_response=supports_response.OPTIONAL,
     )
-    async_register_admin_service(hass, DOMAIN, "start_live_stream", _svc_start_stream)
-    async_register_admin_service(hass, DOMAIN, "stop_live_stream", _svc_stop_stream)
+    async_register_admin_service(
+        hass, DOMAIN, "start_live_stream", _svc_start_stream, STREAM_SCHEMA
+    )
+    async_register_admin_service(
+        hass, DOMAIN, "stop_live_stream", _svc_stop_stream, STREAM_SCHEMA
+    )
     hass.services.async_register(
         DOMAIN, "sync_schedules", _svc_sync_schedules, schema=SYNC_SCHEMA
     )
