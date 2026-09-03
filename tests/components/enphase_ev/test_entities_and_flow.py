@@ -23,6 +23,9 @@ from custom_components.enphase_ev.const import (
     CONF_TOKEN_EXPIRES_AT,
     DOMAIN,
 )
+from custom_components.enphase_ev.device_registry_compat import (
+    get_device_by_identifier,
+)
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from custom_components.enphase_ev.config_flow import CONF_TYPE_IQEVSE
 
@@ -150,18 +153,22 @@ async def test_integration_setup_creates_entities(
     coord = entry_data.coordinator
     assert coord is not None
 
-    gateway_device = device_registry.async_get_device(
-        identifiers={(DOMAIN, f"type:{RANDOM_SITE_ID}:envoy")}
+    gateway_device = get_device_by_identifier(
+        device_registry,
+        (DOMAIN, f"type:{RANDOM_SITE_ID}:envoy"),
+        config_entry.entry_id,
     )
     assert gateway_device is not None
     assert gateway_device.name == "IQ Gateway"
 
-    charger_device = device_registry.async_get_device(
-        identifiers={(DOMAIN, RANDOM_SERIAL)}
+    charger_device = get_device_by_identifier(
+        device_registry, (DOMAIN, RANDOM_SERIAL), config_entry.entry_id
     )
     assert charger_device is not None
-    ev_type_device = device_registry.async_get_device(
-        identifiers={(DOMAIN, f"type:{RANDOM_SITE_ID}:iqevse")}
+    ev_type_device = get_device_by_identifier(
+        device_registry,
+        (DOMAIN, f"type:{RANDOM_SITE_ID}:iqevse"),
+        config_entry.entry_id,
     )
     assert ev_type_device is None
     assert charger_device.via_device_id is None

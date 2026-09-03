@@ -21,6 +21,7 @@ from custom_components.enphase_ev.api import (
     OCPP_TRIGGER_MESSAGES_REQUIRING_CONFIRMATION,
 )
 from custom_components.enphase_ev.const import CONF_SITE_ID, CONF_SITE_ONLY, DOMAIN
+from custom_components.enphase_ev.device_registry_compat import via_device_kwargs
 from custom_components.enphase_ev.grid_profile_runtime import (
     SUPPORT_DENIED,
     SUPPORT_READ_ONLY,
@@ -945,7 +946,7 @@ async def test_services_route_evse_targets_to_owning_entry_with_site_only_entry(
         manufacturer="Enphase",
         name="Site Only Device",
     )
-    device_registry.async_get_or_create(
+    evse_site_device = device_registry.async_get_or_create(
         config_entry_id=evse_entry.entry_id,
         identifiers={(DOMAIN, "site:evse-site")},
         manufacturer="Enphase",
@@ -956,7 +957,11 @@ async def test_services_route_evse_targets_to_owning_entry_with_site_only_entry(
         identifiers={(DOMAIN, "EVSE123")},
         manufacturer="Enphase",
         name="Garage Charger",
-        via_device=(DOMAIN, "site:evse-site"),
+        **via_device_kwargs(
+            device_registry,
+            via_device_id=evse_site_device.id,
+            legacy_via_device=(DOMAIN, "site:evse-site"),
+        ),
     )
 
     await handlers[(DOMAIN, "start_charging")](
@@ -1250,7 +1255,7 @@ async def test_targeted_services_reject_mixed_valid_and_unknown_devices(
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
 
     device_registry = dr.async_get(hass)
-    device_registry.async_get_or_create(
+    site_device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, "site:evse-site")},
         manufacturer="Enphase",
@@ -1261,7 +1266,11 @@ async def test_targeted_services_reject_mixed_valid_and_unknown_devices(
         identifiers={(DOMAIN, "EVSE123")},
         manufacturer="Enphase",
         name="Garage Charger",
-        via_device=(DOMAIN, "site:evse-site"),
+        **via_device_kwargs(
+            device_registry,
+            via_device_id=site_device.id,
+            legacy_via_device=(DOMAIN, "site:evse-site"),
+        ),
     )
     unknown_device_id = "missing-device-id"
 
