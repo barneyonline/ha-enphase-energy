@@ -11,6 +11,11 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- Fixed entity targets being rejected by charging, schedule, grid-profile, refresh,
+  and authentication actions. Charger entity targets now resolve to their owning
+  charger, and site actions resolve to the selected Enphase site. Area, floor, and
+  label charging targets ignore unrelated devices while explicit invalid device
+  targets remain rejected.
 - Fixed the administrator-only Start/Stop Live Stream actions so Home Assistant
   entity, device, area, floor, and label targets, explicit site IDs, and config
   entry IDs pass service validation and resolve to the intended Enphase site.

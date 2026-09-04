@@ -137,6 +137,26 @@ Manual install steps: see the wiki Installation page.
 
 Sign in with your Enlighten credentials; MFA is supported. See the wiki for details.
 
+## Action targets
+
+Charging, battery schedule, grid-profile, refresh, and authentication actions
+accept the entity targets offered in Developer Tools → Actions. Site actions
+resolve the selected Enphase entity to its site; charging actions resolve it to
+its charger. Device, area, floor, and label targets are also supported for these
+actions. Charging actions ignore unrelated devices selected through an area, floor,
+or label, but reject explicitly selected invalid devices. Actions operating on a
+single site reject selections spanning multiple sites.
+Existing explicit `device_id`, `site_id`, and `config_entry_id` fields remain
+supported where offered by the action.
+
+```yaml
+action: enphase_ev.validate_schedule
+target:
+  entity_id: switch.my_discharge_to_grid_schedule
+data:
+  schedule_type: dtg
+```
+
 ## Live-stream actions
 
 `enphase_ev.start_live_stream` and `enphase_ev.stop_live_stream` are
