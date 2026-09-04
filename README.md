@@ -143,7 +143,9 @@ Charging, battery schedule, grid-profile, refresh, and authentication actions
 accept the entity targets offered in Developer Tools → Actions. Site actions
 resolve the selected Enphase entity to its site; charging actions resolve it to
 its charger. Device, area, floor, and label targets are also supported for these
-actions. Actions operating on a single site reject selections spanning multiple sites.
+actions. Charging actions ignore unrelated devices selected through an area, floor,
+or label, but reject explicitly selected invalid devices. Actions operating on a
+single site reject selections spanning multiple sites.
 Existing explicit `device_id`, `site_id`, and `config_entry_id` fields remain
 supported where offered by the action.
 

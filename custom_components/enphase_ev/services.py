@@ -1209,16 +1209,28 @@ def async_setup_services(
         call: ServiceCall,
     ) -> list[tuple[str, str, EnphaseCoordinator]]:
         device_ids = _extract_device_ids(call)
-        if not device_ids:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="grid_site_required",
+        # Group targets may include lights, gateways, or other non-chargers.
+        # Keep explicit device/entity selections strict, even in a mixed call.
+        explicit_device_ids = set(device_ids)
+        if any(key in call.data for key in ("area_id", "floor_id", "label_id")):
+            direct_call = ServiceCall(
+                hass,
+                call.domain,
+                call.service,
+                {
+                    key: value
+                    for key, value in call.data.items()
+                    if key not in {"area_id", "floor_id", "label_id"}
+                },
             )
+            explicit_device_ids = set(_extract_device_ids(direct_call))
 
         targets: list[tuple[str, str, EnphaseCoordinator]] = []
         for device_id in device_ids:
             routing_context = await _resolve_device_routing_context(device_id)
             if routing_context is None:
+                if device_id not in explicit_device_ids:
+                    continue
                 raise ServiceValidationError(
                     translation_domain=DOMAIN,
                     translation_key="grid_site_required",
@@ -1230,12 +1242,19 @@ def async_setup_services(
                 config_entry_ids=config_entry_ids,
             )
             if coord is None:
+                if device_id not in explicit_device_ids:
+                    continue
                 raise ServiceValidationError(
                     translation_domain=DOMAIN,
                     translation_key="grid_site_required",
                 )
             targets.append((device_id, sn, coord))
 
+        if not targets:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="grid_site_required",
+            )
         return targets
 
     async def _svc_force_refresh(call: ServiceCall) -> None:

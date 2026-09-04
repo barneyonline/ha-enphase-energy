@@ -15,6 +15,8 @@ from homeassistant.exceptions import ServiceValidationError, Unauthorized
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import floor_registry as fr
+from homeassistant.helpers import label_registry as lr
 
 from custom_components.enphase_ev.api import (
     OCPP_TRIGGER_MESSAGES,
@@ -2341,7 +2343,9 @@ def test_advertised_entity_targets_pass_registered_schemas(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("target_kind", ["entity_id", "device_id", "area_id"])
+@pytest.mark.parametrize(
+    "target_kind", ["entity_id", "device_id", "area_id", "floor_id", "label_id"]
+)
 async def test_charging_service_routes_ui_targets(
     hass: HomeAssistant, target_kind: str
 ) -> None:
@@ -2351,11 +2355,32 @@ async def test_charging_service_routes_ui_targets(
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
     area = ar.async_get(hass).async_create("Target Garage")
+    floor = fr.async_get(hass).async_create("Target Floor", level=0)
+    ar.async_get(hass).async_update(area.id, floor_id=floor.floor_id)
+    label = lr.async_get(hass).async_create("Target Chargers")
     registry = dr.async_get(hass)
     device = registry.async_get_or_create(
         config_entry_id=entry.entry_id, identifiers={(DOMAIN, "charger-1")}
     )
-    registry.async_update_device(device.id, area_id=area.id)
+    registry.async_update_device(device.id, area_id=area.id, labels={label.label_id})
+    unrelated_entry = MockConfigEntry(domain="hue", data={})
+    unrelated_entry.add_to_hass(hass)
+    unrelated_devices = [
+        registry.async_get_or_create(
+            config_entry_id=unrelated_entry.entry_id,
+            identifiers={("hue", "garage-light")},
+        ),
+        registry.async_get_or_create(
+            config_entry_id=entry.entry_id, identifiers={(DOMAIN, "site:target-site")}
+        ),
+        registry.async_get_or_create(
+            config_entry_id=entry.entry_id, identifiers={(DOMAIN, "not-a-charger")}
+        ),
+    ]
+    for unrelated in unrelated_devices:
+        registry.async_update_device(
+            unrelated.id, area_id=area.id, labels={label.label_id}
+        )
     entity = er.async_get(hass).async_get_or_create(
         "button", DOMAIN, "charger-start", config_entry=entry, device_id=device.id
     )
@@ -2363,6 +2388,8 @@ async def test_charging_service_routes_ui_targets(
         "entity_id": entity.entity_id,
         "device_id": device.id,
         "area_id": area.id,
+        "floor_id": floor.floor_id,
+        "label_id": label.label_id,
     }
     async_setup_services(hass)
     for service in ("start_charging", "stop_charging"):
@@ -2377,6 +2404,36 @@ async def test_charging_service_routes_ui_targets(
         "charger-1", requested_amps=32, connector_id=1
     )
     coord.async_stop_charging.assert_awaited_once_with("charger-1")
+
+    if target_kind in {"area_id", "floor_id", "label_id"}:
+        for service in ("start_charging", "stop_charging"):
+            for invalid_device_id in [
+                "missing-device",
+                *(d.id for d in unrelated_devices),
+            ]:
+                with pytest.raises(ServiceValidationError):
+                    await hass.services.async_call(
+                        DOMAIN,
+                        service,
+                        {},
+                        target={
+                            target_kind: targets[target_kind],
+                            "device_id": invalid_device_id,
+                        },
+                        blocking=True,
+                    )
+        # A group containing only unrelated devices must not silently succeed.
+        registry.async_update_device(device.id, area_id=None, labels=set())
+        with pytest.raises(ServiceValidationError):
+            await hass.services.async_call(
+                DOMAIN,
+                "start_charging",
+                {},
+                target={target_kind: targets[target_kind]},
+                blocking=True,
+            )
+        assert coord.async_start_charging.await_count == 1
+        assert coord.async_stop_charging.await_count == 1
 
 
 @pytest.mark.asyncio
