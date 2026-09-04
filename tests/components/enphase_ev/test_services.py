@@ -2298,3 +2298,126 @@ async def test_update_tariff_rejects_duplicate_and_cross_site_rates(
             )
         )
     assert err.value.translation_key == "tariff_rate_entity_invalid"
+
+
+def test_advertised_entity_targets_pass_registered_schemas(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every entity picker must produce a payload its registered schema accepts."""
+    registered = _register_service_metadata(hass, monkeypatch)
+    descriptions = yaml.safe_load(SERVICES_YAML.read_text())
+    fields = {
+        "requested_message": "Heartbeat",
+        "profile_id": "agf:test",
+        "confirm": True,
+        "schedule_type": "dtg",
+        "schedule_id": "schedule-1",
+        "start_time": "01:00",
+        "end_time": "02:00",
+        "limit": 50,
+        "days": [1],
+    }
+    for service, description in descriptions.items():
+        if "entity" not in description.get("target", {}):
+            continue
+        data = {
+            name: fields[name]
+            for name, field in description.get("fields", {}).items()
+            if field.get("required")
+        }
+        if service == "update_cfg_schedule":
+            data["limit"] = 50
+        if service == "update_tariff":
+            data["rate"] = 0.25
+        schema = registered[(DOMAIN, service)]["schema"]
+        for target in ("sensor.enphase_target", ["sensor.enphase_target"]):
+            assert schema({**data, "entity_id": target})["entity_id"] == [
+                "sensor.enphase_target"
+            ], service
+        with pytest.raises(vol.Invalid):
+            schema({**data, "entity_id": "invalid entity"})
+        with pytest.raises(vol.Invalid):
+            schema({**data, "entity_id": "sensor.enphase_target", "unknown": True})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("target_kind", ["entity_id", "device_id", "area_id"])
+async def test_charging_service_routes_ui_targets(
+    hass: HomeAssistant, target_kind: str
+) -> None:
+    """A selected charger entity or area reaches only its owning charger."""
+    coord = _fake_service_coordinator(site_id="target-site", serials={"charger-1"})
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "target-site"})
+    entry.add_to_hass(hass)
+    entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    area = ar.async_get(hass).async_create("Target Garage")
+    registry = dr.async_get(hass)
+    device = registry.async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={(DOMAIN, "charger-1")}
+    )
+    registry.async_update_device(device.id, area_id=area.id)
+    entity = er.async_get(hass).async_get_or_create(
+        "button", DOMAIN, "charger-start", config_entry=entry, device_id=device.id
+    )
+    targets = {
+        "entity_id": entity.entity_id,
+        "device_id": device.id,
+        "area_id": area.id,
+    }
+    async_setup_services(hass)
+    for service in ("start_charging", "stop_charging"):
+        await hass.services.async_call(
+            DOMAIN,
+            service,
+            {},
+            target={target_kind: targets[target_kind]},
+            blocking=True,
+        )
+    coord.async_start_charging.assert_awaited_once_with(
+        "charger-1", requested_amps=32, connector_id=1
+    )
+    coord.async_stop_charging.assert_awaited_once_with("charger-1")
+
+
+@pytest.mark.asyncio
+async def test_validate_schedule_entity_target_routes_selected_site(
+    hass: HomeAssistant,
+) -> None:
+    """The issue's DTG payload passes validation and calls the selected site's API."""
+    coords = []
+    entities = []
+    for site_id in ("selected-site", "other-site"):
+        coord = _fake_service_coordinator(site_id=site_id, serials=set())
+        coord.battery_write_access_confirmed = True
+        coord.client = SimpleNamespace(
+            validate_battery_schedule=AsyncMock(return_value={"valid": True})
+        )
+        entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: site_id})
+        entry.add_to_hass(hass)
+        entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+        entities.append(
+            er.async_get(hass).async_get_or_create(
+                "switch", DOMAIN, f"{site_id}-dtg", config_entry=entry
+            )
+        )
+        coords.append(coord)
+    async_setup_services(hass)
+    result = await hass.services.async_call(
+        DOMAIN,
+        "validate_schedule",
+        {"schedule_type": "dtg"},
+        target={"entity_id": entities[0].entity_id},
+        blocking=True,
+        return_response=True,
+    )
+    assert result == {"valid": True}
+    coords[0].client.validate_battery_schedule.assert_awaited_once_with("dtg")
+    coords[1].client.validate_battery_schedule.assert_not_awaited()
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            "validate_schedule",
+            {"schedule_type": "dtg"},
+            target={"entity_id": [entity.entity_id for entity in entities]},
+            blocking=True,
+        )

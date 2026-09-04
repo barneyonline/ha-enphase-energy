@@ -271,6 +271,13 @@ def async_setup_services(
     DEVICE_ID_LIST = vol.All(cv.ensure_list, [cv.string])
     ENTRY_SCHEMA: dict[object, object] = {vol.Optional("config_entry_id"): cv.string}
 
+    def _target_schema(fields: dict[object, object]) -> vol.Any:
+        """Accept Home Assistant targets while preserving explicit service fields."""
+        return vol.Any(
+            cv.make_entity_service_schema(fields),
+            vol.Schema({vol.Remove("metadata"): dict, **fields}),
+        )
+
     def _validate_trigger_message(value: object) -> str:
         try:
             return str(validate_ocpp_trigger_message(value))
@@ -299,7 +306,7 @@ def async_setup_services(
             message=f"{message} requires confirm_advanced.",
         )
 
-    START_SCHEMA = vol.Schema(
+    START_SCHEMA = _target_schema(
         {
             vol.Optional("device_id"): DEVICE_ID_LIST,
             vol.Optional("charging_level", default=32): vol.All(
@@ -310,8 +317,8 @@ def async_setup_services(
             ),
         }
     )
-    STOP_SCHEMA = vol.Schema({vol.Optional("device_id"): DEVICE_ID_LIST})
-    TRIGGER_SCHEMA = vol.Schema(
+    STOP_SCHEMA = _target_schema({vol.Optional("device_id"): DEVICE_ID_LIST})
+    TRIGGER_SCHEMA = _target_schema(
         {
             vol.Optional("device_id"): DEVICE_ID_LIST,
             vol.Required("requested_message"): vol.All(
@@ -328,34 +335,24 @@ def async_setup_services(
             vol.Required("otp"): cv.string,
         }
     )
-    CLEAR_SCHEMA = vol.Schema(
+    CLEAR_SCHEMA = _target_schema(
         {vol.Optional("device_id"): DEVICE_ID_LIST, vol.Optional("site_id"): cv.string}
     )
-    STREAM_SITE_SCHEMA = vol.Schema(
+    STREAM_SCHEMA = _target_schema(
         {
-            vol.Remove("metadata"): dict,
             vol.Optional("site_id"): cv.string,
             vol.Optional("config_entry_id"): cv.string,
         }
     )
-    STREAM_SCHEMA = vol.Any(
-        cv.make_entity_service_schema(
-            {
-                vol.Optional("site_id"): cv.string,
-                vol.Optional("config_entry_id"): cv.string,
-            }
-        ),
-        STREAM_SITE_SCHEMA,
-    )
     SYNC_SCHEMA = vol.Schema({vol.Optional("device_id"): DEVICE_ID_LIST})
-    FORCE_REFRESH_SCHEMA = vol.Schema(
+    FORCE_REFRESH_SCHEMA = _target_schema(
         {
             vol.Optional("device_id"): DEVICE_ID_LIST,
             vol.Optional("site_id"): cv.string,
             vol.Optional("config_entry_id"): cv.string,
         }
     )
-    BROWSE_GRID_PROFILES_SCHEMA = vol.Schema(
+    BROWSE_GRID_PROFILES_SCHEMA = _target_schema(
         {
             **ENTRY_SCHEMA,
             vol.Optional("device_id"): DEVICE_ID_LIST,
@@ -365,7 +362,7 @@ def async_setup_services(
             vol.Optional("commonly_used", default=True): cv.boolean,
         }
     )
-    REFRESH_GRID_PROFILES_SCHEMA = vol.Schema(
+    REFRESH_GRID_PROFILES_SCHEMA = _target_schema(
         {
             **ENTRY_SCHEMA,
             vol.Optional("device_id"): DEVICE_ID_LIST,
@@ -374,7 +371,7 @@ def async_setup_services(
             vol.Optional("commonly_used", default=True): cv.boolean,
         }
     )
-    SET_GRID_PROFILE_SCHEMA = vol.Schema(
+    SET_GRID_PROFILE_SCHEMA = _target_schema(
         {
             **ENTRY_SCHEMA,
             vol.Optional("device_id"): DEVICE_ID_LIST,
@@ -385,7 +382,7 @@ def async_setup_services(
             vol.Required("confirm"): cv.boolean,
         }
     )
-    ADD_SCHEDULE_SCHEMA = vol.Schema(
+    ADD_SCHEDULE_SCHEMA = _target_schema(
         {
             **ENTRY_SCHEMA,
             vol.Optional("device_id"): DEVICE_ID_LIST,
@@ -397,7 +394,7 @@ def async_setup_services(
             vol.Required("days"): DAYS_SCHEMA,
         }
     )
-    UPDATE_SCHEDULE_SCHEMA = vol.Schema(
+    UPDATE_SCHEDULE_SCHEMA = _target_schema(
         {
             **ENTRY_SCHEMA,
             vol.Optional("device_id"): DEVICE_ID_LIST,
@@ -411,7 +408,7 @@ def async_setup_services(
             vol.Required("confirm"): cv.boolean,
         }
     )
-    DELETE_SCHEDULE_SCHEMA = vol.Schema(
+    DELETE_SCHEDULE_SCHEMA = _target_schema(
         {
             **ENTRY_SCHEMA,
             vol.Optional("device_id"): DEVICE_ID_LIST,
@@ -422,7 +419,7 @@ def async_setup_services(
             vol.Required("confirm"): cv.boolean,
         }
     )
-    VALIDATE_SCHEDULE_SCHEMA = vol.Schema(
+    VALIDATE_SCHEDULE_SCHEMA = _target_schema(
         {
             **ENTRY_SCHEMA,
             vol.Optional("device_id"): DEVICE_ID_LIST,
@@ -625,7 +622,7 @@ def async_setup_services(
         return data
 
     UPDATE_CFG_SCHEMA = vol.All(
-        vol.Schema(
+        _target_schema(
             {
                 vol.Optional("device_id"): DEVICE_ID_LIST,
                 vol.Optional("site_id"): cv.string,
@@ -802,6 +799,15 @@ def async_setup_services(
                 device_ids.add(data_ids)
             else:
                 device_ids |= {str(v) for v in data_ids}
+        ent_reg = er.async_get(hass)
+        for entity_id in _extract_entity_ids(call, include_indirect=True):
+            reg_entry = ent_reg.async_get(entity_id)
+            if (
+                reg_entry is not None
+                and reg_entry.platform == DOMAIN
+                and reg_entry.device_id
+            ):
+                device_ids.add(reg_entry.device_id)
         return list(device_ids)
 
     def _extract_entity_ids(
@@ -1379,14 +1385,7 @@ def async_setup_services(
         await coord.async_set_grid_mode(call.data["mode"], call.data["otp"])
 
     async def _svc_clear_issue(call: ServiceCall) -> None:
-        site_ids: set[str] = set()
-        for device_id in _extract_device_ids(call):
-            site_id = await _resolve_site_id(device_id)
-            if site_id:
-                site_ids.add(site_id)
-        explicit = call.data.get("site_id")
-        if explicit:
-            site_ids.add(str(explicit))
+        site_ids = await _resolve_site_ids_from_call(call)
 
         issue_ids = {
             ISSUE_REAUTH_REQUIRED,

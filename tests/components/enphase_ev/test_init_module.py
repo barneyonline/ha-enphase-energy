@@ -3361,7 +3361,8 @@ async def test_service_helper_resolve_functions_cover_none_branches(
     resolve_device_routing_context = _extract_helper(
         resolve_targets, "_resolve_device_routing_context"
     )
-    resolve_site = _extract_helper(svc_clear, "_resolve_site_id")
+    resolve_sites = _extract_helper(svc_clear, "_resolve_site_ids_from_call")
+    resolve_site = _extract_helper(resolve_sites, "_resolve_site_id")
 
     dev_reg = dr.async_get(hass)
     assert await resolve_device_routing_context("does-not-exist") is None
