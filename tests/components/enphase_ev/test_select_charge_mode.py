@@ -270,9 +270,14 @@ def test_select_helper_fallbacks() -> None:
     from custom_components.enphase_ev import select as select_mod
 
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            has_type=lambda type_key: type_key == "envoy",
+            type_bucket=lambda _key: None,
+            type_device_info=lambda _key: None,
+            has_type_for_entities=lambda type_key: type_key == "envoy",
+        ),
         site_id="site",
         battery_has_encharge=True,
-        has_type=lambda type_key: type_key == "envoy",
         battery_write_access_confirmed=None,
         battery_user_is_owner=True,
         battery_user_is_installer=False,
@@ -1357,11 +1362,16 @@ def test_system_profile_select_available_with_legacy_fallback_controls() -> None
     from custom_components.enphase_ev.select import SystemProfileSelect
 
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            has_type=lambda type_key: type_key == "envoy",
+            type_bucket=lambda _key: None,
+            type_device_info=lambda _key: None,
+            has_type_for_entities=lambda type_key: type_key == "envoy",
+        ),
         site_id="site",
         hass=None,
         last_update_success=True,
         battery_has_encharge=True,
-        has_type=lambda type_key: type_key == "envoy",
         battery_profile_selection_available=None,
         battery_controls_available=True,
         battery_write_access_confirmed=None,

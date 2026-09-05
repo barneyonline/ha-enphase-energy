@@ -969,6 +969,12 @@ def test_battery_runtime_top_level_helper_passthroughs_cover_private_hooks() -> 
     refreshed = Mock()
     runtime = BatteryRuntime(
         SimpleNamespace(
+            inventory_view=SimpleNamespace(
+                type_bucket=lambda _key: None,
+                type_device_info=lambda _key: None,
+                has_type=lambda _key: False,
+                has_type_for_entities=lambda _key: False,
+            ),
             _coerce_optional_int=lambda value: 7 if value == "7" else None,
             _coerce_optional_float=lambda value: 1.5 if value == "1.5" else None,
             _coerce_optional_kwh=lambda value: 2.5 if value == "2.5" else None,
@@ -1012,7 +1018,16 @@ def test_battery_runtime_top_level_helper_passthroughs_cover_private_hooks() -> 
 
 
 def test_battery_runtime_top_level_helper_passthroughs_cover_fallback_paths() -> None:
-    runtime = BatteryRuntime(SimpleNamespace())
+    runtime = BatteryRuntime(
+        SimpleNamespace(
+            inventory_view=SimpleNamespace(
+                type_bucket=lambda _key: None,
+                type_device_info=lambda _key: None,
+                has_type=lambda _key: False,
+                has_type_for_entities=lambda _key: False,
+            ),
+        )
+    )
     source = {"id": 1, "nested": {"value": 2}, "items": [{"x": 1}]}
 
     assert runtime._coerce_optional_int("7") == 7
@@ -1044,7 +1059,16 @@ def test_battery_runtime_top_level_helper_passthroughs_cover_fallback_paths() ->
 def test_battery_runtime_dry_contact_member_collection_handles_callable_none_bucket() -> (
     None
 ):
-    runtime = BatteryRuntime(SimpleNamespace(type_bucket=lambda _key: None))
+    runtime = BatteryRuntime(
+        SimpleNamespace(
+            inventory_view=SimpleNamespace(
+                type_bucket=lambda _key: None,
+                type_device_info=lambda _key: None,
+                has_type=lambda _key: False,
+                has_type_for_entities=lambda _key: False,
+            ),
+        )
+    )
 
     assert runtime._dry_contact_members_for_settings() == []
 
@@ -1052,7 +1076,14 @@ def test_battery_runtime_dry_contact_member_collection_handles_callable_none_buc
 def test_battery_runtime_dry_contact_member_collection_skips_non_dict_members() -> None:
     runtime = BatteryRuntime(
         SimpleNamespace(
-            type_bucket=lambda key: {"devices": ["bad"]} if key == "dry_contact" else {}
+            inventory_view=SimpleNamespace(
+                type_bucket=lambda key: (
+                    {"devices": ["bad"]} if key == "dry_contact" else {}
+                ),
+                type_device_info=lambda _key: None,
+                has_type=lambda _key: False,
+                has_type_for_entities=lambda _key: False,
+            ),
         )
     )
 

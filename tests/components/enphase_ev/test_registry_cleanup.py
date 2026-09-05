@@ -297,8 +297,9 @@ async def test_prune_inactive_serial_entities_removes_retired_charger_entities(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("ac_capability", [True, None])
 async def test_prune_inactive_serial_entities_skips_unknown_device_families(
-    hass: HomeAssistant, config_entry
+    hass: HomeAssistant, config_entry, ac_capability
 ) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
     ent_reg = er.async_get(hass)
@@ -312,7 +313,7 @@ async def test_prune_inactive_serial_entities_skips_unknown_device_families(
             has_type_for_entities=lambda key: key
             in {"encharge", "ac_battery", "microinverter"}
         ),
-        battery_has_acb=True,
+        battery_has_acb=ac_capability,
         include_inverters=True,
         _battery_status_payload=None,
         _ac_battery_devices_payload=None,

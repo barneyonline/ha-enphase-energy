@@ -191,6 +191,7 @@ class DummyCoordinator(SimpleNamespace):
 
     def __init__(self) -> None:
         super().__init__()
+        self.inventory_view = SimpleNamespace(type_bucket=lambda _key: None)
         self.client = DummyClient()
         self.update_interval = timedelta(seconds=45)
         self._charge_mode_cache = {RANDOM_SERIAL: ("FAST", 0)}
@@ -1700,7 +1701,7 @@ async def test_device_diagnostics_redacts_session_auth_fields(
 @pytest.mark.asyncio
 async def test_device_diagnostics_type_device_payload(hass, config_entry) -> None:
     coord = DummyCoordinator()
-    coord.type_bucket = lambda type_key: (
+    coord.inventory_view.type_bucket = lambda type_key: (
         {  # type: ignore[attr-defined]
             "type_label": "Battery",
             "count": 2,
@@ -1738,7 +1739,7 @@ async def test_device_diagnostics_heatpump_includes_runtime_payloads(
     hass, config_entry
 ) -> None:
     coord = DummyCoordinator()
-    coord.type_bucket = lambda type_key: (
+    coord.inventory_view.type_bucket = lambda type_key: (
         {  # type: ignore[attr-defined]
             "type_label": "Heat Pump",
             "count": 1,
@@ -1808,7 +1809,7 @@ async def test_device_diagnostics_ac_battery_type_includes_payloads(
     hass, config_entry
 ) -> None:
     coord = DummyCoordinator()
-    coord.type_bucket = lambda type_key: (  # type: ignore[attr-defined]
+    coord.inventory_view.type_bucket = lambda type_key: (  # type: ignore[attr-defined]
         {
             "type_label": "AC Battery",
             "count": 1,
@@ -1904,7 +1905,7 @@ async def test_device_diagnostics_heatpump_runtime_errors_are_swallowed(
     hass, config_entry
 ) -> None:
     coord = DummyCoordinator()
-    coord.type_bucket = lambda type_key: (
+    coord.inventory_view.type_bucket = lambda type_key: (
         {  # type: ignore[attr-defined]
             "type_label": "Heat Pump",
             "count": 1,
@@ -1940,7 +1941,7 @@ async def test_device_diagnostics_ac_battery_capture_errors_are_swallowed(
     hass, config_entry
 ) -> None:
     coord = DummyCoordinator()
-    coord.type_bucket = lambda type_key: (  # type: ignore[attr-defined]
+    coord.inventory_view.type_bucket = lambda type_key: (  # type: ignore[attr-defined]
         {
             "type_label": "AC Battery",
             "count": 1,
@@ -1974,7 +1975,7 @@ async def test_device_diagnostics_envoy_includes_gateway_summary(
     hass, config_entry
 ) -> None:
     coord = DummyCoordinator()
-    coord.type_bucket = lambda type_key: (
+    coord.inventory_view.type_bucket = lambda type_key: (
         {  # type: ignore[attr-defined]
             "type_label": "Gateway",
             "count": 3,
@@ -2042,7 +2043,7 @@ async def test_device_diagnostics_envoy_gateway_summary_handles_bad_bucket_shape
     hass, config_entry
 ) -> None:
     coord = DummyCoordinator()
-    coord.type_bucket = lambda type_key: (
+    coord.inventory_view.type_bucket = lambda type_key: (
         {  # type: ignore[attr-defined]
             "type_label": "Gateway",
             "count": "bad",
@@ -2072,7 +2073,7 @@ async def test_device_diagnostics_microinverter_includes_summary(
     hass, config_entry
 ) -> None:
     coord = DummyCoordinator()
-    coord.type_bucket = lambda type_key: (
+    coord.inventory_view.type_bucket = lambda type_key: (
         {  # type: ignore[attr-defined]
             "type_label": "Microinverters",
             "count": 3,
@@ -2145,7 +2146,7 @@ async def test_device_diagnostics_encharge_includes_system_dashboard_details(
     coord = DummyCoordinator()
     coord.async_ensure_system_dashboard_diagnostics = AsyncMock()
     coord.async_ensure_battery_status_diagnostics = AsyncMock()
-    coord.type_bucket = lambda type_key: (
+    coord.inventory_view.type_bucket = lambda type_key: (
         {  # type: ignore[attr-defined]
             "type_label": "Battery",
             "count": 1,
@@ -2197,7 +2198,7 @@ async def test_device_diagnostics_encharge_does_not_prefetch_battery_status(
     )
     coord._battery_status_payload = None
     coord.battery_status_summary = {}
-    coord.type_bucket = lambda type_key: (
+    coord.inventory_view.type_bucket = lambda type_key: (
         {  # type: ignore[attr-defined]
             "type_label": "Battery",
             "count": 1,
@@ -2232,7 +2233,7 @@ async def test_device_diagnostics_does_not_prefetch_dashboard(
     coord.async_ensure_system_dashboard_diagnostics = AsyncMock(
         side_effect=RuntimeError("boom")
     )
-    coord.type_bucket = lambda type_key: (
+    coord.inventory_view.type_bucket = lambda type_key: (
         {  # type: ignore[attr-defined]
             "type_label": "Gateway",
             "count": 1,
@@ -2266,7 +2267,7 @@ async def test_device_diagnostics_handles_system_dashboard_capture_error(
             raise RuntimeError("boom")
 
     coord = BrokenDashboardCoordinator()
-    coord.type_bucket = lambda type_key: (
+    coord.inventory_view.type_bucket = lambda type_key: (
         {  # type: ignore[attr-defined]
             "type_label": "Gateway",
             "count": 1,

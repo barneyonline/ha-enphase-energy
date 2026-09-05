@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import sys
-import types as types_module
 from collections.abc import Callable
 from contextlib import ExitStack
 from pathlib import Path
@@ -58,107 +57,6 @@ from .random_ids import RANDOM_SERIAL, RANDOM_SITE_ID
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
-_ORIGINAL_SIMPLE_NAMESPACE = SimpleNamespace
-
-
-def _inventory_view_callable(owner: Any, attr: str, default: Any):
-    if hasattr(owner, attr):
-        value = getattr(owner, attr)
-        if callable(value):
-            return value
-        return lambda *_args, **_kwargs: value
-    return default
-
-
-def _build_inventory_view(owner: Any) -> SimpleNamespace:
-    has_type = _inventory_view_callable(owner, "has_type", lambda *_args: True)
-    has_type_for_entities = _inventory_view_callable(
-        owner, "has_type_for_entities", has_type
-    )
-    attrs: dict[str, Any] = {
-        "has_type": has_type,
-        "has_type_for_entities": has_type_for_entities,
-        "type_device_info": _inventory_view_callable(
-            owner, "type_device_info", lambda *_args: None
-        ),
-        "type_label": _inventory_view_callable(
-            owner, "type_label", lambda *_args: None
-        ),
-        "type_bucket": _inventory_view_callable(
-            owner, "type_bucket", lambda *_args: None
-        ),
-        "iter_type_keys": _inventory_view_callable(owner, "iter_type_keys", lambda: []),
-        "gateway_iq_energy_router_records": _inventory_view_callable(
-            owner, "gateway_iq_energy_router_records", lambda: []
-        ),
-        "gateway_iq_energy_router_record": _inventory_view_callable(
-            owner, "gateway_iq_energy_router_record", lambda *_args: None
-        ),
-        "type_identifier": _inventory_view_callable(
-            owner, "type_identifier", lambda *_args: None
-        ),
-    }
-    for attr in (
-        "type_device_name",
-        "type_device_model",
-        "type_device_hw_version",
-        "type_device_serial_number",
-        "type_device_model_id",
-        "type_device_sw_version",
-    ):
-        if hasattr(owner, attr):
-            attrs[attr] = _inventory_view_callable(owner, attr, None)
-    return _ORIGINAL_SIMPLE_NAMESPACE(**attrs)
-
-
-class InventoryAwareSimpleNamespace(_ORIGINAL_SIMPLE_NAMESPACE):
-    """Test helper namespace that mirrors legacy coordinator attrs into inventory_view."""
-
-    _INVENTORY_VIEW_ATTRS = {
-        "has_type",
-        "has_type_for_entities",
-        "type_device_name",
-        "type_device_model",
-        "type_device_hw_version",
-        "type_device_serial_number",
-        "type_device_model_id",
-        "type_device_info",
-        "type_label",
-        "type_bucket",
-        "type_device_sw_version",
-        "iter_type_keys",
-        "gateway_iq_energy_router_records",
-        "gateway_iq_energy_router_record",
-        "type_identifier",
-    }
-
-    def __init__(self, /, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        inventory_view = kwargs.get("inventory_view")
-        if inventory_view is None:
-            inventory_view = _build_inventory_view(self)
-        else:
-            for attr, value in vars(_build_inventory_view(self)).items():
-                if not hasattr(inventory_view, attr):
-                    setattr(inventory_view, attr, value)
-        object.__setattr__(self, "inventory_view", inventory_view)
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        super().__setattr__(name, value)
-        if name == "inventory_view":
-            return
-        inventory_view = getattr(self, "inventory_view", None)
-        if inventory_view is None or name not in self._INVENTORY_VIEW_ATTRS:
-            return
-        setattr(
-            inventory_view,
-            name,
-            _inventory_view_callable(self, name, lambda *_args, **_kwargs: None),
-        )
-
-
-types_module.SimpleNamespace = InventoryAwareSimpleNamespace
-
 
 def _seed_default_type_buckets(coord: Any) -> None:
     """Populate default type buckets for coordinator stubs in tests."""
@@ -170,11 +68,7 @@ def _seed_default_type_buckets(coord: Any) -> None:
     serials = [str(sn) for sn in (getattr(coord, "serials", set()) or set()) if sn]
     if not callable(setter):
         return
-    iqevse_devices = (
-        [{"serial_number": sn, "name": f"Charger {sn}"} for sn in serials]
-        if serials
-        else [{"name": "Charger"}]
-    )
+    iqevse_devices = [{"serial_number": sn, "name": f"Charger {sn}"} for sn in serials]
     grouped = {
         "envoy": {
             "type_key": "envoy",
@@ -195,7 +89,9 @@ def _seed_default_type_buckets(coord: Any) -> None:
             "devices": iqevse_devices,
         },
     }
-    setter(grouped, ["envoy", "encharge", "iqevse"])
+    if not serials:
+        grouped.pop("iqevse")
+    setter(grouped, list(grouped))
 
 
 @pytest.hookimpl(tryfirst=True)
@@ -396,22 +292,28 @@ def coordinator_factory(hass, mock_clientsession, mock_issue_registry, monkeypat
         client: Any | None = None,
         data: dict[str, Any] | None = None,
     ) -> EnphaseCoordinator:
-        active_serials = serials or [RANDOM_SERIAL]
-        cfg = config or {
-            CONF_SITE_ID: RANDOM_SITE_ID,
-            CONF_SERIALS: active_serials,
-            CONF_EAUTH: "EAUTH",
-            CONF_COOKIE: "COOKIE",
-            CONF_SCAN_INTERVAL: 15,
-            CONF_SITE_ONLY: False,
-        }
+        active_serials = [RANDOM_SERIAL] if serials is None else serials
+        cfg = (
+            config
+            if config is not None
+            else {
+                CONF_SITE_ID: RANDOM_SITE_ID,
+                CONF_SERIALS: active_serials,
+                CONF_EAUTH: "EAUTH",
+                CONF_COOKIE: "COOKIE",
+                CONF_SCAN_INTERVAL: 15,
+                CONF_SITE_ONLY: False,
+            }
+        )
         coord = EnphaseCoordinator(hass, cfg)
         # Most legacy coordinator tests exercise Grid Toggle behavior directly.
         # Individual opt-in tests override this to validate the production default.
         coord.serials = set(active_serials)
-        coord.data = data or {
-            sn: {"sn": sn, "name": f"Charger {sn}"} for sn in coord.serials
-        }
+        coord.data = (
+            data
+            if data is not None
+            else {sn: {"sn": sn, "name": f"Charger {sn}"} for sn in coord.serials}
+        )
         _seed_default_type_buckets(coord)
         coord.last_set_amps = getattr(coord, "last_set_amps", {}) or {}
         if client is not None:

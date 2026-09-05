@@ -668,12 +668,17 @@ def test_storm_alert_opt_out_button_availability_guards() -> None:
     from custom_components.enphase_ev.button import StormAlertOptOutButton
 
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            has_type=lambda key: key == "envoy",
+            type_bucket=lambda _key: None,
+            type_device_info=lambda _key: None,
+            has_type_for_entities=lambda key: key == "envoy",
+        ),
         site_id="site",
         last_update_success=False,
         battery_has_encharge=True,
         battery_has_enpower=True,
         battery_show_storm_guard=True,
-        has_type=lambda key: key == "envoy",
     )
     button = StormAlertOptOutButton(coord)
     assert button.available is False

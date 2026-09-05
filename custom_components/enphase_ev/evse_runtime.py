@@ -878,7 +878,7 @@ class EvseRuntime:
                 fast_seconds=fast_seconds,
                 allow_unplugged=True,
             )
-        except asyncio.CancelledError:  # pragma: no cover
+        except asyncio.CancelledError:
             raise
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug(
@@ -890,13 +890,13 @@ class EvseRuntime:
         if delay_s:
             try:
                 await asyncio.sleep(delay_s)
-            except asyncio.CancelledError:  # pragma: no cover
+            except asyncio.CancelledError:
                 raise
             except Exception:  # noqa: BLE001
                 return
         try:
             await coord.async_start_charging(sn_str)
-        except asyncio.CancelledError:  # pragma: no cover
+        except asyncio.CancelledError:
             raise
         except ServiceValidationError as err:
             reason = "validation error"
