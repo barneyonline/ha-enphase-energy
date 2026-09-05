@@ -7,8 +7,9 @@ coordinates discovery and entity registration.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, time as dt_time
 import time
+import math
 from typing import Any, TypedDict, cast
 
 from homeassistant.components.sensor import (
@@ -17,7 +18,9 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import UnitOfEnergy, UnitOfPower
 from homeassistant.helpers.entity import EntityCategory
+from homeassistant.util import dt as dt_util
 
+from .parsing_helpers import heatpump_worst_status_text
 from .coordinator import EnphaseCoordinator
 from .labels import friendly_status_text, status_label
 from .parsing_helpers import heatpump_status_text
@@ -26,6 +29,8 @@ from .sensor_base import EnphaseSiteSensorEntity as _SiteBaseEntity
 from .sensor_snapshot_helpers import (
     parse_gateway_timestamp as _gateway_parse_timestamp,
 )
+
+_heatpump_worst_status_text = heatpump_worst_status_text
 
 
 class HeatPumpInventorySnapshot(TypedDict, total=False):
@@ -85,20 +90,6 @@ def _heatpump_status_counts(members: list[dict[str, object]]) -> dict[str, int]:
         )
         counts[status_key] = int(counts.get(status_key, 0)) + 1
     return counts
-
-
-def _heatpump_worst_status_text(status_counts: dict[str, int]) -> str | None:
-    if int(status_counts.get("error", 0) or 0) > 0:
-        return "Error"
-    if int(status_counts.get("warning", 0) or 0) > 0:
-        return "Warning"
-    if int(status_counts.get("not_reporting", 0) or 0) > 0:
-        return "Not Reporting"
-    if int(status_counts.get("unknown", 0) or 0) > 0:
-        return "Unknown"
-    if int(status_counts.get("normal", 0) or 0) > 0:
-        return "Normal"
-    return None
 
 
 def _heatpump_member_last_reported(member: dict[str, object] | None) -> datetime | None:
@@ -765,6 +756,19 @@ class EnphaseHeatPumpLastReportedSensor(_SiteBaseEntity):
 
 
 class _EnphaseHeatPumpDailyEnergySensor(_SiteBaseEntity):
+    _unrecorded_attributes = _SiteBaseEntity._unrecorded_attributes | frozenset(
+        {
+            "sampled_at_utc",
+            "daily_endpoint_timestamp",
+            "split_endpoint_timestamp",
+            "details",
+            "daily_energy_wh",
+            "split_daily_energy_wh",
+            "daily_grid_wh",
+            "daily_solar_wh",
+            "daily_battery_wh",
+        }
+    )
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
     _attr_state_class = SensorStateClass.TOTAL
@@ -778,11 +782,29 @@ class _EnphaseHeatPumpDailyEnergySensor(_SiteBaseEntity):
         return _heatpump_daily_snapshot(self._coord)
 
     @property
+    def last_reset(self) -> datetime | None:
+        """Use the source day, including when yesterday's reading is retained."""
+
+        snapshot = self._snapshot()
+        day = snapshot.get("day_key")
+        timezone_name = snapshot.get("timezone")
+        if not isinstance(day, str) or not isinstance(timezone_name, str):
+            return None
+        try:
+            source_day = dt_util.parse_date(day)
+            source_timezone = dt_util.get_time_zone(timezone_name)
+        except (TypeError, ValueError):
+            return None
+        if source_day is None or source_timezone is None:
+            return None
+        return datetime.combine(source_day, dt_time.min, tzinfo=source_timezone)
+
+    @property
     def available(self) -> bool:
         if not super().available:
             return False
-        snapshot = self._snapshot()
-        return snapshot.get(self._daily_key) is not None
+        # A resetting counter without a source day would corrupt recorder sums.
+        return self.native_value is not None and self.last_reset is not None
 
     @property
     def native_value(self) -> Any:
@@ -791,7 +813,8 @@ class _EnphaseHeatPumpDailyEnergySensor(_SiteBaseEntity):
         if value is None:
             return None
         try:
-            return round(float(value) / 1000.0, 3)  # type: ignore[arg-type]
+            numeric = float(value)  # type: ignore[arg-type]
+            return round(numeric / 1000.0, 3) if math.isfinite(numeric) else None
         except Exception:  # noqa: BLE001
             return None
 

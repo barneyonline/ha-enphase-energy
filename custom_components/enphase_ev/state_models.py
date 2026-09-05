@@ -5,6 +5,8 @@ from datetime import datetime
 from typing import Any
 
 from .const import BATTERY_PROFILE_DEFAULT_RESERVE
+from .auth_refresh_state import AuthRefreshState
+from .evse_state import EVSEState as EVSEState
 
 type PayloadMap = dict[str, object]
 type PayloadRecords = list[PayloadMap]
@@ -134,15 +136,6 @@ class RefreshHealthState:
     _auth_settings_backoff_until: float | None = None
     _auth_settings_backoff_ends_utc: datetime | None = None
     _auth_settings_issue_reported: bool = False
-    _auth_refresh_task: Any = None
-    _auth_refresh_rejected_count: int = 0
-    _auth_refresh_rejected_until: float | None = None
-    _auth_refresh_rejected_ends_utc: datetime | None = None
-    _auth_refresh_manual_retry_until: float | None = None
-    _auth_refresh_last_success_mono: float | None = None
-    _auth_refresh_last_attempt_utc: datetime | None = None
-    _auth_refresh_last_success_utc: datetime | None = None
-    _auth_refresh_last_failure_reason: str | None = None
     _hems_auth_backoff_until: float | None = None
     _hems_auth_backoff_ends_utc: datetime | None = None
     _hems_auth_failure_count: int = 0
@@ -153,10 +146,6 @@ class RefreshHealthState:
     _hems_auth_last_reason: str | None = None
     _hems_auth_issue_reported: bool = False
     _hems_auth_manual_clear_until: float | None = None
-    _auth_refresh_suspended_until_utc: datetime | None = None
-    _auth_blocked_until_utc: datetime | None = None
-    _auth_block_reason: str | None = None
-    _auth_block_issue_reported: bool = False
     _session_history_issue_reported: bool = False
     _site_energy_issue_reported: bool = False
     _payload_health: PayloadMapByKey = field(default_factory=dict)
@@ -286,31 +275,6 @@ class HeatpumpState:
     _heatpump_power_last_success_utc: datetime | None = None
     _heatpump_power_using_stale: bool = False
     _heatpump_power_snapshot: PayloadMap | None = None
-
-
-@dataclass(slots=True)
-class EVSEState:
-    _charge_mode_cache: dict[str, tuple[str, float]] = field(default_factory=dict)
-    _green_battery_cache: dict[str, tuple[bool | None, bool, float]] = field(
-        default_factory=dict
-    )
-    _green_battery_pending: dict[str, tuple[bool, float]] = field(default_factory=dict)
-    _charger_config_cache: dict[str, tuple[PayloadMap, float]] = field(
-        default_factory=dict
-    )
-    _charger_config_backoff_until: dict[str, float] = field(default_factory=dict)
-    _auth_settings_cache: dict[
-        str, tuple[bool | None, bool | None, bool, bool, float]
-    ] = field(default_factory=dict)
-    _app_auth_pending: dict[str, tuple[bool, float]] = field(default_factory=dict)
-    _last_charging: dict[str, bool] = field(default_factory=dict)
-    _last_actual_charging: dict[str, bool | None] = field(default_factory=dict)
-    _pending_charging: dict[str, tuple[bool, float]] = field(default_factory=dict)
-    _desired_charging: dict[str, bool] = field(default_factory=dict)
-    _auto_resume_attempts: dict[str, float] = field(default_factory=dict)
-    _session_end_fix: dict[str, int] = field(default_factory=dict)
-    _evse_power_snapshots: PayloadMapByKey = field(default_factory=dict)
-    _evse_transition_snapshots: dict[str, PayloadRecords] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -511,6 +475,7 @@ class BatteryState:
 type CoordinatorState = (
     DiscoveryState
     | RefreshHealthState
+    | AuthRefreshState
     | InventoryState
     | HeatpumpState
     | EVSEState
@@ -522,6 +487,7 @@ type StateModelRegistry = dict[str, type[CoordinatorState]]
 STATE_MODELS: StateModelRegistry = {
     "discovery_state": DiscoveryState,
     "refresh_state": RefreshHealthState,
+    "auth_state": AuthRefreshState,
     "inventory_state": InventoryState,
     "heatpump_state": HeatpumpState,
     "evse_state": EVSEState,

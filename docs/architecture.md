@@ -26,7 +26,7 @@ flowchart TD
 
 ## Setup And Authentication
 
-`config_flow.py` handles user login, MFA, site selection, device-category selection, reconfigure, and reauth entry updates. It stores the tokens and cookies needed for refreshes in the config entry. The password is stored only when the user opts into remembered credentials so the integration can attempt automatic token refresh.
+`config_flow.py` handles user login, MFA, site selection, device-category selection, reconfigure, and reauth entry updates. `options_flow.py` owns options forms; `config_flow_support.py` and `config_selection.py` share discovery and selection policy. It stores the tokens and cookies needed for refreshes in the config entry. The password is stored only when the user opts into remembered credentials so the integration can attempt automatic token refresh.
 
 `__init__.py` handles config entry setup and unload. It creates the coordinator
 and invokes its public bootstrap API. Coordinator-owned `_async_setup` restores
@@ -42,9 +42,12 @@ Config-entry update handling distinguishes live-applicable options from topology
 changes. Polling, timeout, history, voltage, scheduler, pricing, and notification
 options are applied to the existing coordinator and published without unloading
 entities. Changes that alter platform topology still reload the config entry, but
-the runtime is handed across that reload so platforms can recreate entities from
-the last published state immediately. The reused coordinator then refreshes in
-the background. Cold setup continues to require an authoritative first refresh.
+`reload_snapshot.py` transfers detached discovery metadata and charger data so
+platforms can recreate entities promptly. Setup constructs a new coordinator and
+private session; the previous lifecycle fully cancels its tasks and shuts down.
+No session, manager, lock, or task crosses the reload. New option and device
+selections are applied before restored data is published, followed by a background
+refresh. Cold setup continues to require an authoritative first refresh.
 The default-off VPP Events device feature is one of those topology options. Its
 reload clears the VPP cache before optional warmup so disabling the feature cannot
 publish preserved event state or make requests to the VPP service.
@@ -53,7 +56,8 @@ entries skip both the startup Activation probe and steady metadata refreshes;
 config-entry migration enables the option only when an existing Current Grid
 Profile entity demonstrates prior use.
 
-Device and entity registry cleanup is intentionally conservative. Startup migrations
+`registry_migrations.py` owns versioned migrations and `registry_sync.py` owns
+ongoing reconciliation. Device and entity registry cleanup is intentionally conservative. Startup migrations
 run once per migration version, while normal reconciliation runs only when the
 coordinator reports a topology change—not for ordinary telemetry updates. Cleanup
 still waits for inventory readiness so transient cloud discovery failures do not
@@ -86,6 +90,12 @@ The coordinator distinguishes core failures from optional endpoint failures:
 - Rate limits and cloud outages enter bounded backoff and expose diagnostic sensors.
 - Optional endpoint failures mark that family stale, preserve recent useful data where safe, and report repairs when needed.
 
+Authentication refresh uses its own lock and one shared, cancellation-shielded
+login task, so a 401 during a poll cannot reacquire the poll lock. Each retry
+builds authentication headers from current credentials. Startup enrichment
+merges its changes into current charger data after awaits, preserving intervening
+commands, polls, and removals.
+
 Cloud request metrics are scoped to logical operations. Core refresh, startup
 warmup, session-history enrichment, and schedule sync use separate scopes, so
 the coordinator's rolling performance history reports only work performed for
@@ -106,12 +116,18 @@ the integration. Cohesive implementations live under `api_client/`:
 
 - `transport.py` owns injected-`ClientSession` authentication requests and response handling.
 - `auth.py` owns login, MFA, cookie, and XSRF request shaping.
-- `site_surface.py` owns site telemetry and livestream HTTP surface behavior.
+- `site_surface.py` owns site telemetry and VPP behavior.
+- `header_surface.py` and `request_surface.py` own per-attempt headers, authenticated retries, timeouts, and response decoding.
+- `battery_surface.py` owns BatteryConfig settings and schedules.
+- `evse_surface.py` owns charger controls, livestream, and EVSE scheduler requests.
+- `dashboard_surface.py` owns dashboard, tariff, inventory, and history requests.
+- `activation_surface.py` owns installer grid-profile requests.
+- `mqtt.py`, `errors.py`, and `common.py` hold MQTT parsing, sanitized error metadata, and shared guards.
 
 The facade remains intentionally thin for migrated slices. New cloud behavior
 should be added to a cohesive internal surface rather than growing `api.py`.
-Internal modules must accept the Home Assistant-provided `ClientSession` and
-must not create or own a session. This keeps the boundary suitable for eventual
+Transport modules accept the injected `ClientSession`; surface functions use the
+client facade through typed boundaries and do not create or own sessions. This keeps the boundary suitable for eventual
 extraction into an independent async client library without adding a runtime
 dependency today.
 
@@ -160,19 +176,44 @@ These managers should own cache lifetimes, stale data decisions, and endpoint-sp
 New manager state is published through immutable snapshots rather than projected
 private coordinator fields. The aggregate integration snapshot determines update
 equality while preserving the historical dictionary-shaped `coordinator.data`
-interface. See [ADR 0001](adr/0001-runtime-state-ownership.md) for dependency,
+interface. Charger acquisition timestamps do not define equality. Auth, EVSE
+controls, endpoint health, battery, heat-pump, inventory, site energy, tariffs,
+and system events do participate,
+so device-family-only changes still publish. `feature_snapshot.py` freezes these
+legacy family states, detaches nested dataclass content, compares values, and reuses unchanged immutable
+mappings. Cache deadlines and diagnostic-only payloads are excluded; schedule
+inventory remains included because editor entities read it.
+
+Auth and EVSE state live with their runtimes. Battery, heat-pump, and inventory
+runtimes receive their state explicitly; compatibility coordinator projections
+remain for existing consumers. Migrate those consumers incrementally instead of
+introducing additional dynamic fields. See [ADR 0001](adr/0001-runtime-state-ownership.md) for dependency,
 ownership, and incremental migration rules.
 
 ## Inventory And Entity Gating
 
 `inventory_runtime.py` builds type buckets from cloud inventory. `inventory_view.py` is the read-facing layer used by entity platforms to decide whether a type should exist or be available. `device_types.py` normalizes Enphase product labels into canonical type keys.
 
-Entity platforms under `sensor.py`, `binary_sensor.py`, `button.py`, `number.py`, `select.py`, `switch.py`, `time.py`, `calendar.py`, and `update.py` create Home Assistant entities from coordinator state. `sensor.py` remains the sensor platform and discovery entry point; cohesive battery and heat-pump entity models live in `sensor_battery.py` and `sensor_heatpump.py`, with shared presentation and normalization boundaries in `sensor_base.py` and `sensor_snapshot_helpers.py`. New device families should follow that split instead of adding payload interpretation to the platform entry point. Platform setup usually follows this pattern:
+Entity platforms under `sensor.py`, `binary_sensor.py`, `button.py`, `number.py`, `select.py`, `switch.py`, `time.py`, `calendar.py`, and `update.py` create Home Assistant entities from coordinator state. `sensor.py` remains the sensor platform and discovery entry point; cohesive battery and heat-pump entity models live in `sensor_battery.py` and `sensor_heatpump.py`, with gateway, inverter, site-energy, and tariff models in `sensor_gateway.py`, `sensor_inverter.py`, `sensor_site_energy.py`, and `sensor_tariff.py`. Shared presentation and normalization boundaries live in `sensor_base.py`, `sensor_common.py`, and `sensor_snapshot_helpers.py`. New device families should follow that split instead of adding payload interpretation to the platform entry point. Platform setup usually follows this pattern:
 
 1. Add site-level entities that are supported by selected inventory types and permissions.
 2. Add charger or device entities for discovered serials/type members.
 3. Wait for inventory readiness before pruning managed entity registry entries.
 4. Use optimistic coordinator caches only when Enphase writes are known to settle asynchronously.
+
+Instantaneous site telemetry has bounded freshness: after a core outage, the
+last successful sample has a 15-minute grace period. Battery and heat-pump
+measurements with an established family success expire after 30 minutes without
+that family succeeding, even when core polling still works. Entity-owned timers
+publish expiry without waiting for another coordinator callback and are cancelled
+on recovery/removal. Current-power and VPP managers retain their separate
+source-specific policies. Cumulative energy totals remain available as historical
+measurements. Daily heat-pump totals expose a source-day `last_reset` so recorder
+handles midnight and within-day corrections correctly.
+
+Inverter discovery uses `inverter_inventory.py` for bounded pagination with an
+explicit completeness result. Partial, repeated, or malformed inventory cannot
+authorize pruning previously known devices.
 
 VPP/ELRP is a Cloud-device feature, not a separate device family. `calendar.py`
 and `sensor_vpp.py` dynamically publish six read-only entities only after a valid
@@ -204,6 +245,11 @@ program, event, gateway, and request identifiers are never included.
 
 When in doubt, redact broadly and expose counts, status summaries, field names, or shape summaries instead of raw values.
 
+Domain actions are registered once during integration setup and remain registered
+after unloading the last entry. `service_routing.py` requires loaded runtime data
+for actions and resolves targets without falling back from an invalid explicit
+entry to another site. Platform setup uses a separate runtime accessor.
+
 ## Schedule Editing And Sync
 
 EVSE schedules use Home Assistant schedule helpers through `schedule_sync.py`. The sync layer mirrors Enphase scheduler slots into helper entities and pushes helper changes back to Enphase. It keeps server timestamps as optimistic concurrency metadata and refreshes shortly after writes because scheduler reads can lag writes.
@@ -216,7 +262,7 @@ Battery schedule editing is separate and lives in `battery_schedule_editor.py`. 
 
 Use this starting-point map:
 
-- New cloud endpoint: start in `api.py`, then add a parser/helper if payload normalization is non-trivial.
+- New cloud endpoint: implement it in the relevant `api_client/` surface and add a thin `api.py` facade method when needed; keep payload normalization in a parser/helper.
 - New endpoint family state: add or extend a runtime manager, then expose normalized coordinator properties.
 - New entity: add the entity in the relevant platform and gate it through `InventoryView` or existing coordinator capability flags.
 - New diagnostic payload: add redaction first, then add summaries or payload copies.
@@ -233,5 +279,8 @@ Keep tests close to the changed behavior under `tests/components/enphase_ev/`.
 - Battery controls and schedules: `test_battery_*.py`, `test_battery_schedule_editor_parity.py`.
 - EVSE controls and schedules: `test_evse_*.py`, `test_select_charge_mode.py`, `test_schedule_sync.py`.
 - Diagnostics and redaction: `test_diagnostics*.py`, `test_log_redaction.py`, `test_payload_debug.py`.
+- Framework lifecycle and queued entry changes: `test_entry_lifecycle.py`, `test_reload_snapshot.py`, `test_init_module.py`.
+- Concurrent authentication and publication: `test_transport_publication_contracts.py`, `test_feature_snapshot.py`, `test_evse_state.py`.
+- Recorder statistics, serialization, and actual stale entity states: `test_entity_architecture.py`.
 
 Use the pinned Docker commands from `CONTRIBUTING.md` for validation.

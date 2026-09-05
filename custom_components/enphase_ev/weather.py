@@ -85,7 +85,7 @@ class EnphaseWeatherData:
     temperature_unit: str
 
 
-class WeatherEndpointUnsupported(Exception):
+class WeatherEndpointUnsupported(UpdateFailed):  # type: ignore[misc]
     """Signal that Enlighten does not provide weather for this site."""
 
 
@@ -165,6 +165,7 @@ class EnphaseWeatherCoordinator(
             _LOGGER,
             name=f"{DOMAIN}_weather",
             update_interval=_WEATHER_UPDATE_INTERVAL,
+            always_update=False,
         )
         self._client = client
         self._locale = locale
@@ -178,15 +179,23 @@ class EnphaseWeatherCoordinator(
                 payload = await self._client.weather(locale=self._locale)
         except aiohttp.ClientResponseError as err:
             if err.status in _WEATHER_UNSUPPORTED_STATUSES:
-                raise WeatherEndpointUnsupported from err
-            raise UpdateFailed(str(err) or err.__class__.__name__) from err
+                raise WeatherEndpointUnsupported(
+                    "Weather endpoint unsupported"
+                ) from err
+            raise UpdateFailed(
+                redact_text(err, site_ids=((self._site_id,) if self._site_id else ()))
+                or err.__class__.__name__
+            ) from err
         except (
             aiohttp.ClientError,
             asyncio.TimeoutError,
             InvalidPayloadError,
             Unauthorized,
         ) as err:
-            raise UpdateFailed(str(err) or err.__class__.__name__) from err
+            raise UpdateFailed(
+                redact_text(err, site_ids=((self._site_id,) if self._site_id else ()))
+                or err.__class__.__name__
+            ) from err
         normalized = _normalize_weather(payload)
         if normalized is None:
             raise UpdateFailed("Weather payload is missing a valid temperature")
@@ -197,6 +206,8 @@ class EnphaseWeatherCoordinator(
 
         try:
             data = await self._async_update_data()
+        except WeatherEndpointUnsupported:
+            raise
         except UpdateFailed:
             self._discovery_state = "retrying"
             self._discovery_failures += 1

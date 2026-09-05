@@ -10,11 +10,12 @@ from yarl import URL
 
 from .. import api_parsers
 from ..log_redaction import redact_site_id
+from .protocols import SiteClient
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def weather(client: Any, *, base_url: str, locale: str) -> dict[str, Any]:
+async def weather(client: SiteClient, *, base_url: str, locale: str) -> dict[str, Any]:
     """Return and validate current weather for a client site."""
 
     endpoint = f"/systems/{client._site}/weather.json"
@@ -22,7 +23,7 @@ async def weather(client: Any, *, base_url: str, locale: str) -> dict[str, Any]:
     data = await client._json(
         "GET",
         str(url),
-        headers=client._systems_json_headers(),
+        headers=client._systems_json_headers,
     )
     if not isinstance(data, dict):
         raise client._invalid_payload_error(
@@ -43,11 +44,13 @@ def normalize_latest_power(payload: object) -> dict[str, object] | None:
     )
 
 
-async def latest_power(client: Any, *, base_url: str) -> dict[str, object] | None:
+async def latest_power(
+    client: SiteClient, *, base_url: str
+) -> dict[str, object] | None:
     """Return the latest normalized site power sample."""
 
     url = f"{base_url}/app-api/{client._site}/get_latest_power"
-    data = await client._json("GET", url, headers=client._history_headers())
+    data = await client._json("GET", url, headers=client._history_headers)
     normalized = normalize_latest_power(data)
     if normalized is not None:
         return normalized
@@ -78,7 +81,7 @@ async def latest_power(client: Any, *, base_url: str) -> dict[str, object] | Non
 
 
 async def show_livestream(
-    client: Any,
+    client: SiteClient,
     *,
     base_url: str,
     allow_reauth: bool,
@@ -93,7 +96,7 @@ async def show_livestream(
         data = await client._json(
             "GET",
             url,
-            headers=client._system_dashboard_headers(),
+            headers=client._system_dashboard_headers,
             allow_reauth=allow_reauth,
         )
     except unauthorized_error:
@@ -114,7 +117,7 @@ async def show_livestream(
 
 
 async def livestream_authorizer(
-    client: Any,
+    client: SiteClient,
     serial_num: str,
     *,
     base_url: str,
@@ -135,8 +138,10 @@ async def livestream_authorizer(
         else "/pv/aws_sigv4/livestream.json"
     )
     url = URL(f"{base_url}{endpoint}").with_query(query)
-    headers = client._today_headers()
-    headers["X-Requested-With"] = "XMLHttpRequest"
+
+    def headers() -> dict[str, str]:
+        return {**client._today_headers(), "X-Requested-With": "XMLHttpRequest"}
+
     try:
         data = await client._json(
             "GET",

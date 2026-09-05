@@ -46,7 +46,8 @@ from .runtime_helpers import (
     resolve_site_local_current_date,
     resolve_site_timezone_name,
 )
-from .state_models import install_state_descriptors
+from .scalar_helpers import sum_optional_values
+from .state_models import HeatpumpState, install_state_descriptors
 
 if TYPE_CHECKING:  # pragma: no cover
     from .api import EnphaseEVClient
@@ -131,10 +132,12 @@ class HeatpumpRuntime:
     _heatpump_power_sample_history: list[dict[str, object]]
     _heatpump_power_using_stale: bool
 
-    def __init__(self, coordinator: EnphaseCoordinator) -> None:
+    def __init__(
+        self, coordinator: EnphaseCoordinator, *, state: HeatpumpState | None = None
+    ) -> None:
         self.coordinator = coordinator
         self.inventory_state = coordinator.inventory_state
-        self.heatpump_state = coordinator.heatpump_state
+        self.heatpump_state = state if state is not None else coordinator.heatpump_state
 
     @property
     def client(self) -> EnphaseEVClient:
@@ -866,24 +869,7 @@ class HeatpumpRuntime:
             marker,
         )
 
-    @staticmethod
-    def _sum_optional_values(values: object) -> float | None:
-        if not isinstance(values, list):
-            return None
-        total = 0.0
-        found = False
-        for item in values:
-            if item is None:
-                continue
-            try:
-                numeric = float(item)
-            except Exception:
-                continue
-            if numeric != numeric or numeric in (float("inf"), float("-inf")):
-                continue
-            total += numeric
-            found = True
-        return total if found else None
+    _sum_optional_values = staticmethod(sum_optional_values)
 
     @staticmethod
     def _first_optional_numeric_value(values: object) -> float | None:

@@ -7,7 +7,7 @@ from contextlib import suppress
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 
 from .const import DOMAIN
 
@@ -36,6 +36,9 @@ class EnphaseRuntimeData:
     weather_coordinator: EnphaseWeatherCoordinator | None = None
     weather_discovery_task: asyncio.Task[None] | None = None
     reload_suppression_count: int = 0
+    internal_data_updates: list[dict[str, tuple[bool, Any]]] = field(
+        default_factory=list, repr=False
+    )
     applied_data: dict[str, Any] | None = None
     applied_options: dict[str, Any] | None = None
     preserve_for_reload: bool = False
@@ -43,6 +46,37 @@ class EnphaseRuntimeData:
         default_factory=asyncio.Lock,
         repr=False,
     )
+
+    def mark_internal_data_update(
+        self, before: dict[str, Any], after: dict[str, Any]
+    ) -> None:
+        """Remember only fields changed by integration-owned persistence."""
+        self.internal_data_updates.append(
+            {
+                key: (key in after, after.get(key))
+                for key in before.keys() | after.keys()
+                if (key in before, before.get(key)) != (key in after, after.get(key))
+            }
+        )
+        self.reload_suppression_count += 1
+
+    def unmark_internal_data_update(self) -> None:
+        """Undo the last synchronous persistence attempt when it failed."""
+        if self.internal_data_updates:
+            self.internal_data_updates.pop()
+        self.reload_suppression_count = max(0, self.reload_suppression_count - 1)
+
+    def consume_internal_data_updates(self) -> None:
+        """Advance applied data without swallowing concurrent user changes."""
+        if self.applied_data is not None:
+            for changes in self.internal_data_updates:
+                for key, (present, value) in changes.items():
+                    if present:
+                        self.applied_data[key] = value
+                    else:
+                        self.applied_data.pop(key, None)
+        self.internal_data_updates.clear()
+        self.reload_suppression_count = 0
 
     async def async_stop_weather(self) -> None:
         """Stop and release the optional weather child coordinator."""
@@ -81,8 +115,8 @@ def iter_coordinators(
     coordinators: list[EnphaseCoordinator] = []
     seen: set[str] = set()
     for entry in hass.config_entries.async_entries(DOMAIN):
-        runtime_data = getattr(entry, "runtime_data", None)
-        if not isinstance(runtime_data, EnphaseRuntimeData):
+        runtime_data = loaded_runtime_data(entry)
+        if runtime_data is None:
             continue
         coord = runtime_data.coordinator
         site_id = str(getattr(coord, "site_id", ""))
@@ -94,3 +128,12 @@ def iter_coordinators(
         seen.add(site_id)
         coordinators.append(coord)
     return coordinators
+
+
+def loaded_runtime_data(entry: EnphaseConfigEntry) -> EnphaseRuntimeData | None:
+    """Return action-routing state only while the entry is actually loaded."""
+
+    if entry.state is not ConfigEntryState.LOADED or entry.disabled_by is not None:
+        return None
+    runtime_data = getattr(entry, "runtime_data", None)
+    return runtime_data if isinstance(runtime_data, EnphaseRuntimeData) else None

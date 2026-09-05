@@ -1,36 +1,5 @@
-# Dependencies for the GitHub Actions minimum Home Assistant test job.
-#
-# pytest-homeassistant-custom-component pins exact Home Assistant patch releases.
-# Install that package with --no-deps in the workflow so this file can keep the
-# advertised integration minimum pinned to Home Assistant 2026.6.0.
+# Advertised minimum Home Assistant and its exact matching test-plugin stack.
+-c constraints-min-ha.txt
 homeassistant==2026.6.0
-aiohttp
-async-timeout
-voluptuous
-PyYAML
-coverage==7.10.6
-freezegun==1.5.2
-license-expression==30.4.3
-mock-open==1.4.0
-numpy==2.3.2
-paho-mqtt==2.1.0
-pydantic==2.12.2
-pipdeptree==2.26.1
-pylint-per-file-ignores==1.4.0
-pytest==9.0.3
-pytest-aiohttp==1.1.0
-pytest-asyncio==1.3.0
-pytest-cov==7.0.0
-pytest-freezer==0.4.9
-pytest-github-actions-annotate-failures==0.3.0
-pytest-picked==0.5.1
-pytest-socket==0.7.0
-pytest-sugar==1.0.0
-pytest-timeout==2.4.0
-pytest-unordered==0.7.0
-pytest-xdist==3.8.0
-requests-mock==1.12.1
-respx==0.22.0
-SQLAlchemy==2.0.49
-syrupy==5.0.0
-tqdm==4.67.1
+pytest-homeassistant-custom-component==0.13.336
+PyYAML==6.0.3

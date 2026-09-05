@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from custom_components.enphase_ev import options_flow as options_module
 import voluptuous as vol
 from voluptuous.schema_builder import Optional as VolOptional
 from voluptuous.schema_builder import Required as VolRequired
@@ -2500,7 +2501,7 @@ def test_options_flow_build_devices_schema_skips_missing_type_mapping(hass) -> N
     handler.hass = hass
 
     with patch.dict(
-        "custom_components.enphase_ev.config_flow._TYPE_FIELD_BY_KEY",
+        "custom_components.enphase_ev.options_flow._TYPE_FIELD_BY_KEY",
         {"envoy": CONF_TYPE_ENVOY},
         clear=True,
     ):
@@ -2580,7 +2581,7 @@ async def test_options_flow_devices_hides_ac_battery_when_site_not_supported(
     handler.hass = hass
 
     monkeypatch.setattr(
-        "custom_components.enphase_ev.config_flow.async_fetch_battery_site_settings",
+        "custom_components.enphase_ev.options_flow.async_fetch_battery_site_settings",
         AsyncMock(return_value={"data": {"hasAcb": False}}),
     )
 
@@ -2617,7 +2618,7 @@ async def test_options_flow_devices_shows_ac_battery_when_site_supported(
     handler.hass = hass
 
     monkeypatch.setattr(
-        "custom_components.enphase_ev.config_flow.async_fetch_battery_site_settings",
+        "custom_components.enphase_ev.options_flow.async_fetch_battery_site_settings",
         AsyncMock(return_value={"data": {"hasAcb": True}}),
     )
 
@@ -2771,11 +2772,11 @@ async def test_options_flow_discover_iqevse_serials_returns_empty_when_inventory
 
     with (
         patch(
-            "custom_components.enphase_ev.config_flow.async_fetch_chargers",
+            "custom_components.enphase_ev.options_flow.async_fetch_chargers",
             AsyncMock(return_value=[]),
         ),
         patch(
-            "custom_components.enphase_ev.config_flow.async_fetch_devices_inventory",
+            "custom_components.enphase_ev.options_flow.async_fetch_devices_inventory",
             AsyncMock(return_value=None),
         ),
     ):
@@ -2799,11 +2800,11 @@ async def test_options_flow_discover_iqevse_serials_prefers_inventory(
 
     with (
         patch(
-            "custom_components.enphase_ev.config_flow.async_fetch_chargers",
+            "custom_components.enphase_ev.options_flow.async_fetch_chargers",
             AsyncMock(side_effect=AssertionError("should not fetch chargers")),
         ) as mock_chargers,
         patch(
-            "custom_components.enphase_ev.config_flow.async_fetch_devices_inventory",
+            "custom_components.enphase_ev.options_flow.async_fetch_devices_inventory",
             AsyncMock(
                 return_value={
                     "result": [
@@ -2835,11 +2836,11 @@ async def test_options_flow_discover_iqevse_serials_falls_back_when_inventory_fa
 
     with (
         patch(
-            "custom_components.enphase_ev.config_flow.async_fetch_chargers",
+            "custom_components.enphase_ev.options_flow.async_fetch_chargers",
             AsyncMock(return_value=[ChargerInfo(serial="EV-FALLBACK", name="Garage")]),
         ) as mock_chargers,
         patch(
-            "custom_components.enphase_ev.config_flow.async_fetch_devices_inventory",
+            "custom_components.enphase_ev.options_flow.async_fetch_devices_inventory",
             AsyncMock(side_effect=RuntimeError("inventory failed")),
         ) as mock_inventory,
     ):
@@ -3186,7 +3187,7 @@ async def test_options_flow_grid_toggle_rejects_invalid_mode_and_labels_fallback
     assert result["description_placeholders"]["current_mode"] == "Mystery Mode"
     coordinator.async_request_grid_toggle_otp.assert_not_awaited()
 
-    with patch.object(config_flow, "async_get_cached_translations", return_value={}):
+    with patch.object(options_module, "async_get_cached_translations", return_value={}):
         assert (
             handler._grid_control_block_reason_label("future_reason")
             == "Unknown blocking condition"
@@ -4424,13 +4425,13 @@ async def test_options_flow_enabling_iqevse_discovers_serials(hass) -> None:
 
     with (
         patch(
-            "custom_components.enphase_ev.config_flow.async_fetch_chargers",
+            "custom_components.enphase_ev.options_flow.async_fetch_chargers",
             AsyncMock(
                 return_value=[ChargerInfo(serial="EV-DISCOVERED", name="Garage")]
             ),
         ),
         patch(
-            "custom_components.enphase_ev.config_flow.async_fetch_devices_inventory",
+            "custom_components.enphase_ev.options_flow.async_fetch_devices_inventory",
             AsyncMock(return_value={"result": []}),
         ) as mock_inventory,
     ):
@@ -4470,11 +4471,11 @@ async def test_options_flow_iqevse_without_serials_shows_error(hass) -> None:
 
     with (
         patch(
-            "custom_components.enphase_ev.config_flow.async_fetch_chargers",
+            "custom_components.enphase_ev.options_flow.async_fetch_chargers",
             AsyncMock(return_value=[]),
         ),
         patch(
-            "custom_components.enphase_ev.config_flow.async_fetch_devices_inventory",
+            "custom_components.enphase_ev.options_flow.async_fetch_devices_inventory",
             AsyncMock(return_value={"result": []}),
         ),
     ):
@@ -4511,7 +4512,7 @@ async def test_options_flow_submit_skips_unmapped_type_fields(hass) -> None:
     handler.hass = hass
 
     with patch.dict(
-        "custom_components.enphase_ev.config_flow._TYPE_FIELD_BY_KEY",
+        "custom_components.enphase_ev.options_flow._TYPE_FIELD_BY_KEY",
         {"iqevse": CONF_TYPE_IQEVSE},
         clear=True,
     ):
@@ -4571,11 +4572,11 @@ async def test_options_flow_reauth_not_blocked_by_missing_iqevse_serials(hass) -
 
     with (
         patch(
-            "custom_components.enphase_ev.config_flow.async_fetch_chargers",
+            "custom_components.enphase_ev.options_flow.async_fetch_chargers",
             AsyncMock(return_value=[]),
         ) as mock_chargers,
         patch(
-            "custom_components.enphase_ev.config_flow.async_fetch_devices_inventory",
+            "custom_components.enphase_ev.options_flow.async_fetch_devices_inventory",
             AsyncMock(return_value={"result": []}),
         ) as mock_inventory,
     ):
@@ -4700,7 +4701,7 @@ async def test_options_flow_migrate_envoy_aborts_without_sources_or_targets(
     assert result["reason"] == "migration_no_envoy_sources"
 
     handler._migration_sources = [
-        config_flow.EnvoyHistorySource("envoy-a", "Envoy", [])
+        options_module.EnvoyHistorySource("envoy-a", "Envoy", [])
     ]
     result = await handler.async_step_migrate_envoy()
     assert result["type"] is FlowResultType.ABORT
@@ -4810,7 +4811,7 @@ async def test_options_flow_migrate_envoy_source_accepts_selected_entry(
     handler.hass = hass
 
     result = await handler.async_step_migrate_envoy_source(
-        {config_flow.CONF_MIGRATION_SOURCE_ENTRY: "envoy-a"}
+        {options_module.CONF_MIGRATION_SOURCE_ENTRY: "envoy-a"}
     )
 
     assert result["type"] is FlowResultType.FORM
@@ -5003,7 +5004,7 @@ async def test_options_flow_migrate_mapping_has_no_skip_default_without_suggesti
     handler = OptionsFlowHandler(entry)
     handler.hass = hass
     handler._migration_targets = {
-        "solar_production": config_flow.EnvoyHistoryTarget(
+        "solar_production": options_module.EnvoyHistoryTarget(
             flow_key="solar_production",
             label="Site Solar Production",
             unique_id="uid",
@@ -5012,7 +5013,7 @@ async def test_options_flow_migrate_mapping_has_no_skip_default_without_suggesti
         )
     }
     schema = handler._build_migration_mapping_schema(
-        config_flow.EnvoyHistorySource("envoy-a", "Envoy", []),
+        options_module.EnvoyHistorySource("envoy-a", "Envoy", []),
         [],
         {},
     )
@@ -5348,11 +5349,11 @@ async def test_options_flow_migrate_confirm_redirects_when_source_or_selection_m
     assert result["reason"] == "migration_no_envoy_sources"
 
     handler._migration_sources = [
-        config_flow.EnvoyHistorySource("envoy-a", "Envoy", [])
+        options_module.EnvoyHistorySource("envoy-a", "Envoy", [])
     ]
     handler._selected_migration_source_id = "envoy-a"
     handler._migration_targets = {
-        "solar_production": config_flow.EnvoyHistoryTarget(
+        "solar_production": options_module.EnvoyHistoryTarget(
             flow_key="solar_production",
             label="Solar",
             unique_id="uid",
@@ -5732,7 +5733,7 @@ async def test_options_flow_migrate_confirm_reloads_source_after_post_unload_val
         return error_validation if require_source_unloaded else success_validation
 
     monkeypatch.setattr(
-        "custom_components.enphase_ev.config_flow.validate_selected_mappings",
+        "custom_components.enphase_ev.options_flow.validate_selected_mappings",
         _validate,
     )
 
@@ -5970,7 +5971,7 @@ async def test_options_flow_reload_migration_source_helper_handles_none_and_erro
     )
     handler = OptionsFlowHandler(entry)
     handler.hass = hass
-    source = config_flow.EnvoyHistorySource("envoy-a", "Envoy A", [])
+    source = options_module.EnvoyHistorySource("envoy-a", "Envoy A", [])
 
     assert await handler._async_reload_migration_source_entry(source, None) is True
 
@@ -6029,7 +6030,7 @@ async def test_options_flow_migrate_confirm_reports_partial_failure_after_source
         hass.config_entries, "async_unload", AsyncMock(return_value=True)
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev.config_flow.execute_takeover",
+        "custom_components.enphase_ev.options_flow.execute_takeover",
         lambda *_args, **_kwargs: EnvoyHistoryExecutionError(
             completed=[],
             failed=EnvoyHistoryMapping(

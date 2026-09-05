@@ -86,7 +86,7 @@ class InventoryView:
             return True
         return normalized in selected
 
-    def has_type(self, type_key: object) -> bool:  # pragma: no cover
+    def has_type(self, type_key: object) -> bool:
         normalized = normalize_type_key(type_key)
         if not normalized:
             return False
@@ -101,7 +101,7 @@ class InventoryView:
         except Exception:
             return False
 
-    def has_type_for_entities(self, type_key: object) -> bool:  # pragma: no cover
+    def has_type_for_entities(self, type_key: object) -> bool:
         """Return whether a type should gate entity creation/availability."""
 
         normalized = normalize_type_key(type_key)
@@ -133,9 +133,7 @@ class InventoryView:
             return self._has_known_chargers()
         return False
 
-    def type_bucket(
-        self, type_key: object
-    ) -> dict[str, object] | None:  # pragma: no cover
+    def type_bucket(self, type_key: object) -> dict[str, object] | None:
         normalized = normalize_type_key(type_key)
         if not normalized:
             return None
@@ -167,7 +165,7 @@ class InventoryView:
                 out[key] = value
         return out
 
-    def type_label(self, type_key: object) -> str | None:  # pragma: no cover
+    def type_label(self, type_key: object) -> str | None:
         normalized = normalize_type_key(type_key)
         if not normalized:
             return None
@@ -180,9 +178,7 @@ class InventoryView:
         label = type_display_label(normalized)
         return str(label) if label else None
 
-    def type_identifier(
-        self, type_key: object
-    ) -> tuple[str, str] | None:  # pragma: no cover
+    def type_identifier(self, type_key: object) -> tuple[str, str] | None:
         normalized = normalize_type_key(type_key)
         if not normalized:
             return None
@@ -207,7 +203,8 @@ class InventoryView:
         members = bucket.get("devices")
         if not isinstance(members, list):
             return []
-        return [dict(item) for item in members if isinstance(item, dict)]
+        # type_bucket already detached the member dictionaries from runtime state.
+        return [item for item in members if isinstance(item, dict)]
 
     @staticmethod
     def _type_member_text(member: dict[str, object] | None, *keys: str) -> str | None:
@@ -455,7 +452,7 @@ class InventoryView:
         member = self.heatpump_runtime._heatpump_primary_member()
         return member if isinstance(member, dict) else None
 
-    def type_device_name(self, type_key: object) -> str | None:  # pragma: no cover
+    def type_device_name(self, type_key: object) -> str | None:
         normalized = normalize_type_key(type_key)
         if not normalized:
             return None
@@ -470,7 +467,7 @@ class InventoryView:
             return None
         return label.strip()
 
-    def type_device_model(self, type_key: object) -> str | None:  # pragma: no cover
+    def type_device_model(self, type_key: object) -> str | None:
         normalized = normalize_type_key(type_key)
         if not normalized:
             return None
@@ -530,9 +527,7 @@ class InventoryView:
             return model
         return self.type_device_name(normalized) or self.type_label(normalized)
 
-    def type_device_serial_number(
-        self, type_key: object
-    ) -> str | None:  # pragma: no cover
+    def type_device_serial_number(self, type_key: object) -> str | None:
         normalized = normalize_type_key(type_key)
         if not normalized:
             return None
@@ -572,7 +567,7 @@ class InventoryView:
             )
         return None
 
-    def type_device_model_id(self, type_key: object) -> str | None:  # pragma: no cover
+    def type_device_model_id(self, type_key: object) -> str | None:
         normalized = normalize_type_key(type_key)
         if not normalized:
             return None
@@ -617,9 +612,7 @@ class InventoryView:
             return None
         return model_id
 
-    def type_device_sw_version(
-        self, type_key: object
-    ) -> str | None:  # pragma: no cover
+    def type_device_sw_version(self, type_key: object) -> str | None:
         normalized = normalize_type_key(type_key)
         if not normalized:
             return None
@@ -638,16 +631,13 @@ class InventoryView:
             "application-version",
         )
         if normalized == "envoy":
-            member = self._envoy_preferred_member()
-            sw_version = self._type_member_text(member, *sw_keys)
-            if sw_version:
-                return sw_version
-            other_member = (
-                self._envoy_system_controller_member()
-                if member is self._envoy_primary_gateway_member()
-                else self._envoy_primary_gateway_member()
+            # Inventory views return defensive copies, so object identity cannot
+            # distinguish the gateway from the controller on a later lookup.
+            gateway = self._envoy_primary_gateway_member()
+            controller = self._envoy_system_controller_member()
+            return self._type_member_text(gateway, *sw_keys) or self._type_member_text(
+                controller, *sw_keys
             )
-            return self._type_member_text(other_member, *sw_keys)
         if normalized == "heatpump":
             primary = self._heatpump_primary_member()
             sw_version = self._type_member_text(primary, *sw_keys)
@@ -670,9 +660,7 @@ class InventoryView:
             )
         return None
 
-    def type_device_sw_version_summary(
-        self, type_key: object
-    ) -> str | None:  # pragma: no cover
+    def type_device_sw_version_summary(self, type_key: object) -> str | None:
         normalized = normalize_type_key(type_key)
         if not normalized:
             return None
@@ -710,9 +698,7 @@ class InventoryView:
             )
         return None
 
-    def type_device_hw_version(
-        self, type_key: object
-    ) -> str | None:  # pragma: no cover
+    def type_device_hw_version(self, type_key: object) -> str | None:
         normalized = normalize_type_key(type_key)
         if not normalized:
             return None
@@ -774,7 +760,7 @@ class InventoryView:
 
     def type_device_info(
         self, type_key: object
-    ) -> DeviceInfo | dict[str, object] | None:  # pragma: no cover
+    ) -> DeviceInfo | dict[str, object] | None:
         normalized = normalize_type_key(type_key)
         if not normalized:
             return None
@@ -827,6 +813,6 @@ class InventoryView:
     @staticmethod
     def parse_type_identifier(
         identifier: object,
-    ) -> tuple[str, str] | None:  # pragma: no cover
+    ) -> tuple[str, str] | None:
         parsed = parse_type_identifier(identifier)
         return parsed if isinstance(parsed, tuple) else None

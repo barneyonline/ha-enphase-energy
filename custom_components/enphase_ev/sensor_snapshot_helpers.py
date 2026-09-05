@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import cast
+import math
+
+from homeassistant.const import UnitOfPower
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.util.unit_conversion import PowerConverter
 
 from homeassistant.util import dt as dt_util
 
@@ -55,3 +60,18 @@ def parse_gateway_timestamp(value: object) -> datetime | None:
 
 # Compatibility name retained for existing sensor tests and imports.
 _gateway_parse_timestamp = parse_gateway_timestamp
+
+
+def restore_power_w(state: object) -> int | None:
+    """Convert a legacy restored display value back to native watts."""
+    attrs = getattr(state, "attributes", {}) or {}
+    unit = attrs.get("unit_of_measurement", UnitOfPower.WATT)
+    try:
+        raw = getattr(state, "state", None)
+        if raw is None:
+            return None
+        numeric = float(raw)
+        value = PowerConverter.convert(numeric, unit, UnitOfPower.WATT)
+        return int(round(value)) if math.isfinite(value) else None
+    except (TypeError, ValueError, HomeAssistantError):
+        return None

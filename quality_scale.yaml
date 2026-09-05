@@ -75,6 +75,8 @@ rules:
         - custom_components/enphase_ev/__init__.py
         - custom_components/enphase_ev/services.py
       tests:
+        - tests/components/enphase_ev/test_entry_lifecycle.py
+        - tests/components/enphase_ev/test_reload_snapshot.py
         - tests/components/enphase_ev/test_services.py
         - tests/components/enphase_ev/test_init_module.py
   appropriate-polling:
@@ -104,6 +106,10 @@ rules:
     status: done
     references:
       code:
+        - custom_components/enphase_ev/config_selection.py
+        - custom_components/enphase_ev/schedule_editor_helpers.py
+        - custom_components/enphase_ev/inventory_payload_helpers.py
+        - custom_components/enphase_ev/service_routing.py
         - custom_components/enphase_ev/runtime_helpers.py
         - custom_components/enphase_ev/parsing_helpers.py
         - custom_components/enphase_ev/service_validation.py
@@ -115,6 +121,8 @@ rules:
     references:
       code:
         - custom_components/enphase_ev/config_flow.py
+        - custom_components/enphase_ev/options_flow.py
+        - custom_components/enphase_ev/config_flow_support.py
       tests:
         - tests/components/enphase_ev/test_config_flow_coverage.py
         - tests/components/enphase_ev/test_reconfigure_flow.py
@@ -123,6 +131,8 @@ rules:
     references:
       code:
         - custom_components/enphase_ev/config_flow.py
+        - custom_components/enphase_ev/options_flow.py
+        - custom_components/enphase_ev/config_flow_support.py
       tests:
         - tests/components/enphase_ev/test_config_flow_coverage.py
       docs:
@@ -221,6 +231,8 @@ rules:
     references:
       code:
         - custom_components/enphase_ev/config_flow.py
+        - custom_components/enphase_ev/options_flow.py
+        - custom_components/enphase_ev/config_flow_support.py
       tests:
         - tests/components/enphase_ev/test_config_flow_coverage.py
   test-before-setup:
@@ -237,6 +249,8 @@ rules:
     references:
       code:
         - custom_components/enphase_ev/config_flow.py
+        - custom_components/enphase_ev/options_flow.py
+        - custom_components/enphase_ev/config_flow_support.py
       tests:
         - tests/components/enphase_ev/test_config_flow_coverage.py
 
@@ -256,6 +270,8 @@ rules:
       code:
         - custom_components/enphase_ev/__init__.py
       tests:
+        - tests/components/enphase_ev/test_entry_lifecycle.py
+        - tests/components/enphase_ev/test_reload_snapshot.py
         - tests/components/enphase_ev/test_init_module.py
   docs-configuration-parameters:
     status: done
@@ -315,6 +331,8 @@ rules:
     references:
       code:
         - custom_components/enphase_ev/config_flow.py
+        - custom_components/enphase_ev/options_flow.py
+        - custom_components/enphase_ev/config_flow_support.py
         - custom_components/enphase_ev/coordinator.py
       tests:
         - tests/components/enphase_ev/test_reconfigure_flow.py
@@ -368,6 +386,8 @@ rules:
     references:
       code:
         - custom_components/enphase_ev/config_flow.py
+        - custom_components/enphase_ev/options_flow.py
+        - custom_components/enphase_ev/config_flow_support.py
       docs:
         - README.md
   docs-data-update:
@@ -478,6 +498,8 @@ rules:
     references:
       code:
         - custom_components/enphase_ev/config_flow.py
+        - custom_components/enphase_ev/options_flow.py
+        - custom_components/enphase_ev/config_flow_support.py
       tests:
         - tests/components/enphase_ev/test_reconfigure_flow.py
       docs:
@@ -520,6 +542,8 @@ rules:
       code:
         - custom_components/enphase_ev/__init__.py
         - custom_components/enphase_ev/config_flow.py
+        - custom_components/enphase_ev/options_flow.py
+        - custom_components/enphase_ev/config_flow_support.py
         - custom_components/enphase_ev/coordinator.py
       tests:
         - tests/components/enphase_ev/test_config_flow_coverage.py

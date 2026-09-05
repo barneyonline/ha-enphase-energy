@@ -1,0 +1,47 @@
+{
+  "python": "3.14.6",
+  "iterations_per_batch": 500,
+  "batches": 5,
+  "scope": "synthetic nested charger freeze; excludes network and HA recorder",
+  "scenarios": [
+    {
+      "chargers": 1,
+      "results": {
+        "baseline": {
+          "median_microseconds_per_build": 36.404,
+          "peak_traced_bytes": 2136
+        },
+        "current": {
+          "median_microseconds_per_build": 17.494,
+          "peak_traced_bytes": 1776
+        }
+      }
+    },
+    {
+      "chargers": 8,
+      "results": {
+        "baseline": {
+          "median_microseconds_per_build": 304.325,
+          "peak_traced_bytes": 20488
+        },
+        "current": {
+          "median_microseconds_per_build": 198.057,
+          "peak_traced_bytes": 7752
+        }
+      }
+    },
+    {
+      "chargers": 32,
+      "results": {
+        "baseline": {
+          "median_microseconds_per_build": 1565.416,
+          "peak_traced_bytes": 122600
+        },
+        "current": {
+          "median_microseconds_per_build": 697.088,
+          "peak_traced_bytes": 63976
+        }
+      }
+    }
+  ]
+}

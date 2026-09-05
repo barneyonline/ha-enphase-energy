@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from custom_components.enphase_ev import sensor_gateway
+
 from datetime import datetime, timezone
 import time
 from types import SimpleNamespace
@@ -2631,7 +2633,13 @@ def test_microinverter_sensor_available_branches(coordinator_factory) -> None:
 
 def test_heatpump_diagnostic_sensors_expose_inventory_and_power(
     coordinator_factory,
+    monkeypatch,
 ) -> None:
+    monkeypatch.setattr(
+        sensor_mod.dt_util,
+        "utcnow",
+        lambda: datetime(2026, 2, 27, 9, 17, tzinfo=timezone.utc),
+    )
     from custom_components.enphase_ev.sensor import (
         EnphaseHeatPumpConnectivityStatusSensor,
         EnphaseHeatPumpEnergyMeterSensor,
@@ -4143,14 +4151,14 @@ def test_gateway_iq_energy_router_sensor_name_and_availability_edge_paths(
     sensor = EnphaseGatewayIQEnergyRouterSensor(coord, "router_a", 1)
 
     monkeypatch.setattr(
-        sensor_mod,
+        sensor_gateway,
         "_gateway_iq_energy_router_record",
         lambda *_args, **_kwargs: {"member": {"name": "Router Alpha"}},
     )
     assert sensor.name == "Router Alpha"
 
     monkeypatch.setattr(
-        sensor_mod,
+        sensor_gateway,
         "_gateway_iq_energy_router_record",
         lambda *_args, **_kwargs: {"member": "bad"},
     )

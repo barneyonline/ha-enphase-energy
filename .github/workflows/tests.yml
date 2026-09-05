@@ -12,6 +12,7 @@ on:
       - '.ruff.toml'
       - '.strict-typing'
       - 'devtools/docker/requirements-dev.txt'
+      - 'devtools/docker/constraints*.txt'
       - 'devtools/docker/requirements-ci-quality.txt'
       - 'devtools/docker/requirements-ci-scripts.txt'
       - 'devtools/docker/requirements-min-ha.txt'
@@ -73,9 +74,9 @@ jobs:
             echo "${name}=${value}" >> "$GITHUB_OUTPUT"
           }
 
-          common='^(\.github/workflows/(ci|tests)\.yml|devtools/docker/(Dockerfile|docker-compose\.yml))$'
+          common='^(\.github/workflows/(ci|tests)\.yml|devtools/docker/(Dockerfile|docker-compose\.yml|constraints-[^/]+\.txt))$'
           set_output integration "${common}|^custom_components/enphase_ev/|^tests/(components/enphase_ev|compatibility)/|^devtools/docker/requirements-dev\.txt$|^pytest\.ini$|^\.pre-commit-config\.yaml$|^\.ruff\.toml$"
-          set_output compatibility "${common}|^custom_components/enphase_ev/.*\.py$|^custom_components/enphase_ev/manifest\.json$|^tests/compatibility/|^tests/components/enphase_ev/(conftest|test_(device_action|device_trigger|init_module|manifest|schedule_sync|services))\.py$|^devtools/docker/requirements-(min-ha|ha-2026\.8)\.txt$|^pytest\.ini$"
+          set_output compatibility "${common}|^custom_components/enphase_ev/.*\.py$|^custom_components/enphase_ev/manifest\.json$|^tests/compatibility/|^tests/components/enphase_ev/(conftest|test_(device_action|device_trigger|entry_lifecycle|init_module|manifest|runtime_data|schedule_sync|services))\.py$|^devtools/docker/requirements-(min-ha|ha-2026\.8)\.txt$|^pytest\.ini$"
           set_output diagnostics "${common}|^custom_components/enphase_ev/.*\.py$|^scripts/importtime_profile\.py$|^tests/scripts/test_importtime_profile\.py$|^devtools/docker/requirements-dev\.txt$"
           set_output quality "${common}|^custom_components/enphase_ev/|^tests/components/enphase_ev/|^quality_scale\.yaml$|^scripts/validate_quality_scale\.py$|^tests/scripts/test_validate_quality_scale\.py$|^devtools/docker/requirements-(dev|ci-quality)\.txt$|^\.pre-commit-config\.yaml$|^\.strict-typing$"
           set_output scripts "${common}|^scripts/.*\.py$|^tests/scripts/.*\.py$|^devtools/docker/requirements-ci-scripts\.txt$"
@@ -158,9 +159,11 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          cache-dependency-glob: devtools/docker/requirements-dev.txt
+          cache-dependency-glob: |
+            devtools/docker/requirements-dev.txt
+            devtools/docker/constraints-dev.txt
       - name: Install deps
-        run: uv pip install --system -r devtools/docker/requirements-dev.txt aiohttp async-timeout voluptuous
+        run: uv pip install --system -r devtools/docker/requirements-dev.txt
       - name: Gate integration import deprecations and profile import time
         run: python scripts/importtime_profile.py --strict-integration-warnings --output importtime-enphase-ev.log
       - name: Upload import-time profile
@@ -184,14 +187,12 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          cache-dependency-glob: devtools/docker/requirements-min-ha.txt
+          cache-dependency-glob: |
+            devtools/docker/requirements-min-ha.txt
+            devtools/docker/constraints-min-ha.txt
       - name: Install minimum Home Assistant test deps
         run: |
-          # pytest-homeassistant-custom-component pins exact Home Assistant patch
-          # releases, so keep the full pytest job on the latest compatible stack
-          # and install the plugin without dependencies for this minimum test path.
           uv pip install --system -r devtools/docker/requirements-min-ha.txt
-          uv pip install --system --no-deps "pytest-homeassistant-custom-component==0.13.340"
           python -c "from homeassistant.const import __version__; assert __version__ == '2026.6.0', __version__; print(f'Home Assistant {__version__}')"
       - name: Run minimum Home Assistant tests
         env:
@@ -203,6 +204,9 @@ jobs:
           tests/components/enphase_ev/test_device_action.py
           tests/components/enphase_ev/test_device_trigger.py
           tests/components/enphase_ev/test_schedule_sync.py
+          tests/components/enphase_ev/test_entry_lifecycle.py
+          tests/components/enphase_ev/test_reload_snapshot.py
+          tests/components/enphase_ev/test_services.py
 
   homeassistant-2026-8:
     runs-on: ubuntu-latest
@@ -219,14 +223,13 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          cache-dependency-glob: devtools/docker/requirements-ha-2026.8.txt
+          cache-dependency-glob: |
+            devtools/docker/requirements-ha-2026.8.txt
+            devtools/docker/constraints-ha-2026.8.txt
       - name: Install Home Assistant 2026.8 test deps
         run: |
-          # The current plugin release pins 2026.8.0b3. Install its compatible
-          # dependency stack, then overlay the beta under test without deps.
-          uv pip install --system --prerelease allow -r devtools/docker/requirements-ha-2026.8.txt
-          uv pip install --system --prerelease allow --no-deps "homeassistant==2026.8.0b4"
-          python -c "from homeassistant.const import __version__; assert __version__ == '2026.8.0b4', __version__; print(f'Home Assistant {__version__}')"
+          uv pip install --system -r devtools/docker/requirements-ha-2026.8.txt
+          python -c "from homeassistant.const import __version__; assert __version__ == '2026.8.3', __version__; print(f'Home Assistant {__version__}')"
       - name: Run Home Assistant 2026.8 compatibility tests
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -234,6 +237,8 @@ jobs:
         run: >
           pytest -q --asyncio-mode=auto
           tests/compatibility/test_ha_2026_8_device_registry.py
+          tests/components/enphase_ev/test_entry_lifecycle.py
+          tests/components/enphase_ev/test_reload_snapshot.py
           tests/components/enphase_ev/test_init_module.py::test_async_setup_entry_updates_existing_device
           tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_preserves_real_devices_with_site_identifier
           tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_removes_empty_device_without_gateway
@@ -262,11 +267,13 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          cache-dependency-glob: devtools/docker/requirements-dev.txt
+          cache-dependency-glob: |
+            devtools/docker/requirements-dev.txt
+            devtools/docker/constraints-dev.txt
       - name: Install deps
         run: |
-          uv pip install --system -r devtools/docker/requirements-dev.txt aiohttp async-timeout voluptuous
-          python -c "from homeassistant.const import __version__; print(f'Home Assistant {__version__}')"
+          uv pip install --system -r devtools/docker/requirements-dev.txt
+          python -c "from homeassistant.const import __version__; assert __version__ == '2026.9.0', __version__; print(f'Home Assistant {__version__}')"
       - name: Detect changed integration modules
         id: changed
         if: ${{ github.event_name == 'pull_request' }}

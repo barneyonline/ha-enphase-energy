@@ -67,7 +67,17 @@ def test_development_requirements_cover_minimum_homeassistant_version():
     ).read_text()
 
     assert hacs.get("homeassistant") == MIN_HOME_ASSISTANT_VERSION
-    assert f"homeassistant>={MIN_HOME_ASSISTANT_VERSION}" in requirements_dev
+    current_pin = next(
+        line.split("==", 1)[1]
+        for line in requirements_dev.splitlines()
+        if line.startswith("homeassistant==")
+    )
+    assert tuple(map(int, current_pin.split("."))) >= tuple(
+        map(int, MIN_HOME_ASSISTANT_VERSION.split("."))
+    )
+    assert "-c constraints-dev.txt" in requirements_dev
+    constraints = (root / "devtools/docker/constraints-dev.txt").read_text()
+    assert f"homeassistant=={current_pin}" in constraints
     assert f"homeassistant=={MIN_HOME_ASSISTANT_VERSION}" in requirements_min_ha
 
 

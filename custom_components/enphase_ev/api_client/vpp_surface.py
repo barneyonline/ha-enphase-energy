@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import re
-from typing import Any
 
 from yarl import URL
+
+from .protocols import VppClient
 
 _HEX24_RE = re.compile(r"^[0-9a-fA-F]{24}$")
 
@@ -19,7 +20,7 @@ def valid_object_id(value: object) -> str | None:
     return candidate if _HEX24_RE.fullmatch(candidate) else None
 
 
-async def enrollment_id(client: Any, *, gs_base_url: str) -> object:
+async def enrollment_id(client: VppClient, *, gs_base_url: str) -> object:
     """Return the enrollment lookup wrapper for the client's site."""
 
     url = f"{gs_base_url}/enrollment-mgr/api/v1/enrollment/enrolled/{client._site}"
@@ -33,7 +34,7 @@ async def enrollment_id(client: Any, *, gs_base_url: str) -> object:
 
 
 async def enrollment_details(
-    client: Any,
+    client: VppClient,
     enrollment_id: str,
     *,
     gs_base_url: str,
@@ -54,7 +55,7 @@ async def enrollment_details(
     )
 
 
-async def events(client: Any, program_id: str, *, gs_base_url: str) -> object:
+async def events(client: VppClient, program_id: str, *, gs_base_url: str) -> object:
     """Return the default upcoming-and-recent VPP event wrapper."""
 
     validated = valid_object_id(program_id)

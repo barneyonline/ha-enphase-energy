@@ -137,7 +137,7 @@ async def test_apply_config_entry_options_without_reload(
     coord = coordinator_factory(data={RANDOM_SERIAL: {"sn": RANDOM_SERIAL}})
     coord.config_entry = entry
     coord.diagnostics = SimpleNamespace(clear_degraded_service_repair_issues=Mock())
-    coord.system_events_runtime = SimpleNamespace(clear_repairs=Mock())
+    coord.system_events_runtime.clear_repairs = Mock()
     coord.schedule_sync = SimpleNamespace(
         async_stop=AsyncMock(),
         async_start=AsyncMock(),
@@ -237,7 +237,7 @@ async def test_apply_config_entry_options_preserves_legacy_scan_interval(
     coord = coordinator_factory(config=config)
     coord.config_entry = entry
     coord.diagnostics = SimpleNamespace(clear_degraded_service_repair_issues=Mock())
-    coord.system_events_runtime = SimpleNamespace(clear_repairs=Mock())
+    coord.system_events_runtime.clear_repairs = Mock()
 
     await coord.async_apply_config_entry_options({OPT_API_TIMEOUT: 15})
 

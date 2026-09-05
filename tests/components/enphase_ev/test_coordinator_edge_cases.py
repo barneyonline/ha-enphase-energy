@@ -42,6 +42,7 @@ class _BadStr:
 
 def _attach_evse_runtime(coord):
     coord.evse_runtime = EvseRuntime(coord)
+    coord.evse_state = coord.evse_runtime.state
     return coord
 
 

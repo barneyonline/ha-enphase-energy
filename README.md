@@ -137,6 +137,26 @@ Manual install steps: see the wiki Installation page.
 
 Sign in with your Enlighten credentials; MFA is supported. See the wiki for details.
 
+## Data updates and recovery
+
+Core telemetry updates independently of optional cloud services. Startup enrichment
+preserves newer charging changes, and changing device options recreates the runtime
+from detached discovery data so known entities can return before optional requests
+finish. Incomplete inverter discovery retains existing devices until a complete
+inventory response is available.
+
+Instantaneous site measurements become unavailable after 15 minutes of a core
+outage. Battery and heat-pump measurements expire after 30 minutes without a
+successful family update, even if other cloud services keep responding. Historical
+energy totals remain available; current-power and VPP data retain their own
+source-specific freshness policies.
+
+Daily heat-pump energy uses the source day's reset time, including its timezone,
+so midnight starts a new statistics cycle while same-day corrections remain valid.
+Invalid nonfinite inverter energy readings retain the last valid measurement.
+Diagnostic timestamps and repeated detail payloads remain visible as live entity
+attributes but are excluded from recorder history where they duplicate telemetry.
+
 ## Action targets
 
 Charging, battery schedule, grid-profile, refresh, and authentication actions
@@ -148,6 +168,10 @@ or label, but reject explicitly selected invalid devices. Actions operating on a
 single site reject selections spanning multiple sites.
 Existing explicit `device_id`, `site_id`, and `config_entry_id` fields remain
 supported where offered by the action.
+
+Actions remain registered while the integration is unloaded or retrying setup,
+so Home Assistant can still validate automations. Calling an action requires its
+target config entry to be loaded; unavailable targets return a validation error.
 
 ```yaml
 action: enphase_ev.validate_schedule

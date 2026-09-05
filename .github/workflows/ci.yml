@@ -18,6 +18,7 @@ on:
       - '.ruff.toml'
       - '.strict-typing'
       - 'devtools/docker/requirements-dev.txt'
+      - 'devtools/docker/constraints*.txt'
       - 'devtools/docker/requirements-ci-quality.txt'
       - 'devtools/docker/requirements-ci-scripts.txt'
       - 'devtools/docker/requirements-min-ha.txt'

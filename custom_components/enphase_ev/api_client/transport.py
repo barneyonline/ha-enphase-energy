@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
-import json
 from typing import Any
 
 import aiohttp

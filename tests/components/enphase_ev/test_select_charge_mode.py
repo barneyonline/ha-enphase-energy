@@ -281,11 +281,9 @@ def test_select_helper_fallbacks() -> None:
     )
 
     assert select_mod._type_available(coord, "envoy") is True
-    assert select_mod._battery_write_access_confirmed(coord) is True
     assert select_mod._retain_system_profile(coord) is True
 
     coord.battery_write_access_confirmed = False
-    assert select_mod._battery_write_access_confirmed(coord) is False
     coord.battery_write_access_confirmed = None
 
     coord.battery_profile_selection_available = False

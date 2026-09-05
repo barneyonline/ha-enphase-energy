@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .scalar_helpers import coerce_optional_bool as coerce_optional_bool
+
 from datetime import datetime
 from datetime import timezone as _tz
 
@@ -30,22 +32,6 @@ def coerce_optional_float(value: object) -> float | None:
             return float(cleaned)
         except Exception:
             return None
-    return None
-
-
-def coerce_optional_bool(value: object) -> bool | None:
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return value != 0
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in ("true", "1", "yes", "y", "enabled", "enable", "on"):
-            return True
-        if normalized in ("false", "0", "no", "n", "disabled", "disable", "off"):
-            return False
     return None
 
 
@@ -223,3 +209,17 @@ def parse_inverter_last_report(value: object) -> datetime | None:
         return datetime.fromtimestamp(epoch_value, tz=_tz.utc)
     except Exception:
         return None
+
+
+def heatpump_worst_status_text(status_counts: dict[str, int]) -> str | None:
+    if int(status_counts.get("error", 0) or 0) > 0:
+        return "Error"
+    if int(status_counts.get("warning", 0) or 0) > 0:
+        return "Warning"
+    if int(status_counts.get("not_reporting", 0) or 0) > 0:
+        return "Not Reporting"
+    if int(status_counts.get("unknown", 0) or 0) > 0:
+        return "Unknown"
+    if int(status_counts.get("normal", 0) or 0) > 0:
+        return "Normal"
+    return None

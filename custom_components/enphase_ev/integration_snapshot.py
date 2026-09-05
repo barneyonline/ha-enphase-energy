@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Mapping, cast
 
+from .auth_refresh_state import AuthRefreshSnapshot
+from .evse_state import EvseControlSnapshot
+from .feature_snapshot import FeatureSnapshot
 from .current_power_runtime import CurrentPowerSample
 from .evse_feature_flags_runtime import EvseFeatureFlagsSnapshot
 from .snapshot_helpers import freeze_snapshot_mapping
@@ -17,13 +20,17 @@ type ChargerPayloads = Mapping[str, ChargerPayload]
 def freeze_charger_data(
     data: Mapping[str, Mapping[str, object]],
 ) -> ChargerPayloads:
-    """Return a read-only, detached view of normalized charger data."""
+    """Freeze semantic charger data once, excluding acquisition-only metadata."""
 
     return cast(
         ChargerPayloads,
         freeze_snapshot_mapping(
             {
-                str(serial): freeze_snapshot_mapping(payload)
+                str(serial): {
+                    key: value
+                    for key, value in payload.items()
+                    if key != "fetched_at_utc"
+                }
                 for serial, payload in data.items()
             }
         ),
@@ -44,6 +51,10 @@ class IntegrationSnapshot:
     evse_feature_flags: EvseFeatureFlagsSnapshot
     current_power: CurrentPowerSample
     vpp: VppSnapshot = field(default_factory=VppSnapshot)
+    evse: EvseControlSnapshot = field(default_factory=EvseControlSnapshot)
+    auth: AuthRefreshSnapshot = field(default_factory=AuthRefreshSnapshot)
+    health: tuple[object, ...] = ()
+    features: FeatureSnapshot = field(default_factory=FeatureSnapshot)
     runtime_revisions: tuple[tuple[str, int], ...] = ()
     revision: int = field(default=0, compare=False)
 

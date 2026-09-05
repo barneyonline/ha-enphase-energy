@@ -11,11 +11,7 @@ import voluptuous as vol
 
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
-from homeassistant.helpers import service as ha_service
-from homeassistant.helpers import target as ha_target
 from homeassistant.helpers.service import async_register_admin_service
 
 from .api import (
@@ -36,40 +32,15 @@ from .const import (
     ISSUE_REAUTH_REQUIRED,
     ISSUE_TOO_MANY_ACTIVE_SESSIONS,
 )
-from .device_types import parse_type_identifier
-from .device_registry_compat import device_config_entry_ids
 from .log_redaction import redact_site_id
 from .parsing_helpers import coerce_optional_bool
 from .grid_profile_runtime import SUPPORT_DENIED, SUPPORT_READ_ONLY, GridProfileRuntime
-from .runtime_data import EnphaseRuntimeData, iter_coordinators
+from .service_routing import ServiceRouter
 from .service_validation import raise_translated_service_validation
 
 if TYPE_CHECKING:  # pragma: no cover
     from .coordinator import EnphaseCoordinator
 
-REGISTERED_SERVICES = (
-    "force_refresh",
-    "start_charging",
-    "stop_charging",
-    "trigger_message",
-    "request_grid_toggle_otp",
-    "set_grid_mode",
-    "clear_reauth_issue",
-    "clear_hems_auth_backoff",
-    "try_reauth_now",
-    "start_live_stream",
-    "stop_live_stream",
-    "sync_schedules",
-    "add_schedule",
-    "update_schedule",
-    "delete_schedule",
-    "validate_schedule",
-    "update_cfg_schedule",
-    "update_tariff",
-    "browse_grid_profiles",
-    "refresh_grid_profiles",
-    "set_grid_profile",
-)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -84,7 +55,14 @@ def async_setup_services(
     if hass.services.has_service(DOMAIN, "start_charging"):
         return
 
-    from homeassistant.exceptions import ServiceValidationError
+    router = ServiceRouter(hass)
+    _coordinator_from_tariff_entity = router._coordinator_from_tariff_entity
+    _extract_device_ids = router._extract_device_ids
+    _extract_entity_ids = router._extract_entity_ids
+    _get_coordinator_for_entry_id = router._get_coordinator_for_entry_id
+    _resolve_charger_targets = router._resolve_charger_targets
+    _resolve_single_site_coordinator = router._resolve_single_site_coordinator
+    _resolve_site_ids_from_call = router._resolve_site_ids_from_call
 
     SCHEDULE_TYPE_SCHEMA = vol.In(("cfg", "dtg", "rbd"))
     DAYS_SCHEMA = vol.All(
@@ -105,168 +83,6 @@ def async_setup_services(
             message=message,
         )
         raise AssertionError("unreachable")  # pragma: no cover
-
-    def _serial_from_device(dev: dr.DeviceEntry) -> str | None:
-        for domain, sn in dev.identifiers:
-            if domain == DOMAIN:
-                if sn.startswith("site:"):
-                    continue
-                if sn.startswith("type:"):
-                    continue
-                return str(sn)
-        return None
-
-    def _site_id_from_device(
-        dev_reg: dr.DeviceRegistry, dev: dr.DeviceEntry
-    ) -> str | None:
-        for domain, identifier in dev.identifiers:
-            if domain == DOMAIN and identifier.startswith("site:"):
-                return str(identifier.partition(":")[2])
-            if domain == DOMAIN and identifier.startswith("type:"):
-                parsed = parse_type_identifier(identifier)
-                if parsed:
-                    return str(parsed[0])
-        via = dev.via_device_id
-        if via:
-            parent = dev_reg.async_get(via)
-            if parent:
-                for domain, identifier in parent.identifiers:
-                    if domain == DOMAIN and identifier.startswith("site:"):
-                        return str(identifier.partition(":")[2])
-                    if domain == DOMAIN and identifier.startswith("type:"):
-                        parsed = parse_type_identifier(identifier)
-                        if parsed:
-                            return str(parsed[0])
-        return None
-
-    async def _resolve_site_id(device_id: str) -> str | None:
-        dev_reg = dr.async_get(hass)
-        dev = dev_reg.async_get(device_id)
-        if not dev:
-            return None
-        return _site_id_from_device(dev_reg, dev)
-
-    def _iter_loaded_coordinators() -> list[EnphaseCoordinator]:
-        coordinators: list[EnphaseCoordinator] = []
-        for entry in hass.config_entries.async_entries(DOMAIN):
-            runtime_data = getattr(entry, "runtime_data", None)
-            if isinstance(runtime_data, EnphaseRuntimeData):
-                coordinators.append(runtime_data.coordinator)
-        return coordinators
-
-    def _coordinator_has_serial(coord: EnphaseCoordinator, sn: str) -> bool:
-        data = coord.data if isinstance(getattr(coord, "data", None), dict) else {}
-        return sn in (getattr(coord, "serials", None) or set()) or sn in data
-
-    def _coordinator_can_fallback_for_serial(
-        coord: EnphaseCoordinator, sn: str, site_id: str | None
-    ) -> bool:
-        if site_id is not None and str(getattr(coord, "site_id", "")) != site_id:
-            return False
-        if getattr(coord, "site_only", False):
-            return False
-        serials = getattr(coord, "serials", None) or set()
-        data = coord.data if isinstance(getattr(coord, "data", None), dict) else {}
-        return bool(not serials and not data and sn)
-
-    def _device_config_entry_ids(
-        dev_reg: dr.DeviceRegistry, device: dr.DeviceEntry
-    ) -> list[str]:
-        return list(device_config_entry_ids(device, device_registry=dev_reg))
-
-    def _config_entry_ids_for_device(
-        dev_reg: dr.DeviceRegistry, dev: dr.DeviceEntry
-    ) -> list[str]:
-        entry_ids = _device_config_entry_ids(dev_reg, dev)
-        if entry_ids:
-            return entry_ids
-        via = dev.via_device_id
-        if not via:
-            return []
-        parent = dev_reg.async_get(via)
-        if not parent:
-            return []
-        return _device_config_entry_ids(dev_reg, parent)
-
-    async def _resolve_device_routing_context(
-        device_id: str,
-    ) -> tuple[str, str | None, list[str]] | None:
-        dev_reg = dr.async_get(hass)
-        dev = dev_reg.async_get(device_id)
-        if not dev:
-            return None
-        sn = _serial_from_device(dev)
-        if not sn:
-            return None
-        return (
-            sn,
-            _site_id_from_device(dev_reg, dev),
-            _config_entry_ids_for_device(dev_reg, dev),
-        )
-
-    async def _get_coordinator_for_sn(
-        sn: str,
-        *,
-        site_id: str | None = None,
-        config_entry_ids: list[str] | None = None,
-    ) -> EnphaseCoordinator | None:
-        sn = str(sn)
-        for entry_id in config_entry_ids or []:
-            coord = _get_coordinator_for_entry_id(entry_id)
-            if coord is None:
-                continue
-            if _coordinator_has_serial(coord, sn):
-                return coord
-
-        all_coordinators = _iter_loaded_coordinators()
-        if site_id is not None:
-            site_coordinators = [
-                coord
-                for coord in all_coordinators
-                if str(getattr(coord, "site_id", "")) == site_id
-            ]
-            exact_matches = [
-                coord
-                for coord in site_coordinators
-                if _coordinator_has_serial(coord, sn)
-            ]
-            if len(exact_matches) == 1:
-                return exact_matches[0]
-            if exact_matches:
-                return None
-            fallback_candidates = [
-                coord
-                for coord in site_coordinators
-                if _coordinator_can_fallback_for_serial(coord, sn, site_id)
-            ]
-            if len(fallback_candidates) == 1:
-                return fallback_candidates[0]
-            return None
-
-        exact_matches = [
-            coord for coord in all_coordinators if _coordinator_has_serial(coord, sn)
-        ]
-        if len(exact_matches) == 1:
-            return exact_matches[0]
-        if exact_matches:
-            return None
-        fallback_candidates = [
-            coord
-            for coord in all_coordinators
-            if _coordinator_can_fallback_for_serial(coord, sn, None)
-        ]
-        if len(fallback_candidates) == 1:
-            return fallback_candidates[0]
-        return None
-
-    def _get_coordinator_for_entry_id(entry_id: str) -> EnphaseCoordinator | None:
-        for entry in hass.config_entries.async_entries(DOMAIN):
-            if entry.entry_id != entry_id:
-                continue
-            runtime_data = getattr(entry, "runtime_data", None)
-            if isinstance(runtime_data, EnphaseRuntimeData):
-                return runtime_data.coordinator
-        return None
 
     DEVICE_ID_LIST = vol.All(cv.ensure_list, [cv.string])
     ENTRY_SCHEMA: dict[object, object] = {vol.Optional("config_entry_id"): cv.string}
@@ -753,173 +569,6 @@ def async_setup_services(
         _validate_update_tariff,
     )
 
-    def _extract_target_references(
-        call: ServiceCall,
-    ) -> tuple[set[str], set[str], set[str], bool]:
-        referenced_entity_ids: set[str] = set()
-        indirect_entity_ids: set[str] = set()
-        device_ids: set[str] = set()
-        extractor = getattr(ha_target, "async_extract_referenced_entity_ids", None)
-        target_selection = getattr(ha_target, "TargetSelection", None)
-        if not callable(extractor):
-            return referenced_entity_ids, indirect_entity_ids, device_ids, False
-        try:
-            selection = (
-                target_selection(call.data) if callable(target_selection) else call
-            )
-            selected = extractor(hass, selection)
-        except Exception:
-            return referenced_entity_ids, indirect_entity_ids, device_ids, False
-        referenced = getattr(selected, "referenced", None)
-        indirectly_referenced = getattr(selected, "indirectly_referenced", None)
-        referenced_devices = getattr(selected, "referenced_devices", None)
-        if referenced is None and indirectly_referenced is None:
-            referenced_entity_ids |= {str(entity_id) for entity_id in selected}
-        else:
-            referenced_entity_ids |= {str(entity_id) for entity_id in referenced or ()}
-            indirect_entity_ids |= {
-                str(entity_id) for entity_id in indirectly_referenced or ()
-            }
-        device_ids |= {str(device_id) for device_id in referenced_devices or ()}
-        return referenced_entity_ids, indirect_entity_ids, device_ids, True
-
-    def _extract_device_ids(call: ServiceCall) -> list[str]:
-        _entity_ids, _indirect_entity_ids, device_ids, _extracted = (
-            _extract_target_references(call)
-        )
-        extractor = getattr(ha_service, "async_extract_referenced_device_ids", None)
-        if callable(extractor):
-            try:
-                device_ids |= {str(value) for value in extractor(hass, call)}
-            except Exception:
-                pass
-        data_ids = call.data.get("device_id")
-        if data_ids:
-            if isinstance(data_ids, str):
-                device_ids.add(data_ids)
-            else:
-                device_ids |= {str(v) for v in data_ids}
-        ent_reg = er.async_get(hass)
-        for entity_id in _extract_entity_ids(call, include_indirect=True):
-            reg_entry = ent_reg.async_get(entity_id)
-            if (
-                reg_entry is not None
-                and reg_entry.platform == DOMAIN
-                and reg_entry.device_id
-            ):
-                device_ids.add(reg_entry.device_id)
-        return list(device_ids)
-
-    def _extract_entity_ids(
-        call: ServiceCall, *, include_indirect: bool = False
-    ) -> list[str]:
-        entity_ids, indirect_entity_ids, _device_ids, extracted = (
-            _extract_target_references(call)
-        )
-        if include_indirect:
-            entity_ids |= indirect_entity_ids
-        if not extracted:
-            extractor = getattr(ha_service, "async_extract_referenced_entity_ids", None)
-            if callable(extractor):
-                try:
-                    entity_ids |= {
-                        str(entity_id) for entity_id in extractor(hass, call)
-                    }
-                except Exception:
-                    pass
-        raw_entity_ids = call.data.get("entity_id")
-        if raw_entity_ids:
-            if isinstance(raw_entity_ids, str):
-                entity_ids.add(raw_entity_ids)
-            else:
-                entity_ids |= {str(entity_id) for entity_id in raw_entity_ids}
-        return list(entity_ids)
-
-    async def _resolve_site_ids_from_call(call: ServiceCall) -> set[str]:
-        site_ids: set[str] = set()
-        for device_id in _extract_device_ids(call):
-            site_id = await _resolve_site_id(device_id)
-            if site_id:
-                site_ids.add(site_id)
-        ent_reg = er.async_get(hass)
-        for entity_id in _extract_entity_ids(call, include_indirect=True):
-            reg_entry = ent_reg.async_get(entity_id)
-            if reg_entry is None or reg_entry.platform != DOMAIN:
-                continue
-            device_id = reg_entry.device_id
-            if device_id and (site_id := await _resolve_site_id(device_id)):
-                site_ids.add(site_id)
-                continue
-            config_entry_id = reg_entry.config_entry_id
-            if config_entry_id and (
-                coord := _get_coordinator_for_entry_id(config_entry_id)
-            ):
-                site_ids.add(str(coord.site_id))
-        explicit = call.data.get("site_id")
-        if explicit:
-            site_ids.add(str(explicit))
-        return site_ids
-
-    async def _resolve_single_site_coordinator(
-        call: ServiceCall,
-    ) -> EnphaseCoordinator:
-        config_entry_id = call.data.get("config_entry_id")
-        if config_entry_id:
-            coord = _get_coordinator_for_entry_id(str(config_entry_id))
-            if coord is not None:
-                return coord
-        site_ids = await _resolve_site_ids_from_call(call)
-        if not site_ids:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="grid_site_required",
-            )
-        if len(site_ids) > 1:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="grid_site_ambiguous",
-                translation_placeholders={"count": str(len(site_ids))},
-            )
-        target = next(iter(site_ids))
-        coordinators = iter_coordinators(hass, site_ids={target})
-        if coordinators:
-            return coordinators[0]
-        raise ServiceValidationError(
-            translation_domain=DOMAIN,
-            translation_key="grid_site_required",
-        )
-
-    def _coordinator_from_tariff_entity(
-        entity_id: str,
-    ) -> EnphaseCoordinator | None:
-        ent_reg = er.async_get(hass)
-        reg_entry = ent_reg.async_get(entity_id)
-        if reg_entry is None:
-            return None
-        entry_domain = getattr(reg_entry, "domain", entity_id.partition(".")[0])
-        if reg_entry.platform != DOMAIN or entry_domain not in {"sensor", "number"}:
-            return None
-        unique_id = str(reg_entry.unique_id or "")
-        if not any(
-            token in unique_id
-            for token in (
-                "_tariff_import_rate_",
-                "_tariff_export_rate_",
-                "_tariff_current_import_rate",
-                "_tariff_current_export_rate",
-            )
-        ):
-            return None
-        config_entry_id = getattr(reg_entry, "config_entry_id", None)
-        if config_entry_id:
-            coord = _get_coordinator_for_entry_id(str(config_entry_id))
-            if coord is not None:
-                return coord
-        for coord in _iter_loaded_coordinators():
-            if f"{DOMAIN}_site_{coord.site_id}_" in unique_id:
-                return coord
-        return None
-
     def _tariff_rate_update_from_entity(
         entity_id: str,
         rate: float,
@@ -1204,58 +853,6 @@ def async_setup_services(
                 ]
             branch["seasons"] = _guided_tou_seasons(periods)
         return branch
-
-    async def _resolve_charger_targets(
-        call: ServiceCall,
-    ) -> list[tuple[str, str, EnphaseCoordinator]]:
-        device_ids = _extract_device_ids(call)
-        # Group targets may include lights, gateways, or other non-chargers.
-        # Keep explicit device/entity selections strict, even in a mixed call.
-        explicit_device_ids = set(device_ids)
-        if any(key in call.data for key in ("area_id", "floor_id", "label_id")):
-            direct_call = ServiceCall(
-                hass,
-                call.domain,
-                call.service,
-                {
-                    key: value
-                    for key, value in call.data.items()
-                    if key not in {"area_id", "floor_id", "label_id"}
-                },
-            )
-            explicit_device_ids = set(_extract_device_ids(direct_call))
-
-        targets: list[tuple[str, str, EnphaseCoordinator]] = []
-        for device_id in device_ids:
-            routing_context = await _resolve_device_routing_context(device_id)
-            if routing_context is None:
-                if device_id not in explicit_device_ids:
-                    continue
-                raise ServiceValidationError(
-                    translation_domain=DOMAIN,
-                    translation_key="grid_site_required",
-                )
-            sn, site_id, config_entry_ids = routing_context
-            coord = await _get_coordinator_for_sn(
-                sn,
-                site_id=site_id,
-                config_entry_ids=config_entry_ids,
-            )
-            if coord is None:
-                if device_id not in explicit_device_ids:
-                    continue
-                raise ServiceValidationError(
-                    translation_domain=DOMAIN,
-                    translation_key="grid_site_required",
-                )
-            targets.append((device_id, sn, coord))
-
-        if not targets:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="grid_site_required",
-            )
-        return targets
 
     async def _svc_force_refresh(call: ServiceCall) -> None:
         coord = await _resolve_single_site_coordinator(call)
@@ -1978,10 +1575,3 @@ def async_setup_services(
         _svc_update_tariff,
         UPDATE_TARIFF_SCHEMA,
     )
-
-
-def async_unload_services(hass: HomeAssistant) -> None:
-    """Remove registered integration services."""
-
-    for service in REGISTERED_SERVICES:
-        hass.services.async_remove(DOMAIN, service)

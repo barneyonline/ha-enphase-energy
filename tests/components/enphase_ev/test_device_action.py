@@ -9,6 +9,7 @@ from types import ModuleType, SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 import voluptuous as vol
 
 from homeassistant.const import CONF_DEVICE_ID, CONF_DOMAIN
@@ -139,6 +140,7 @@ async def test_async_call_action_requires_serial_identifier(hass, config_entry) 
     )
     coord = _make_coordinator()
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     await device_action.async_call_action_from_config(
         hass,
@@ -169,6 +171,7 @@ async def test_async_call_action_skips_type_identifier_before_serial(
     )
     coord = _make_coordinator()
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     await device_action.async_call_action_from_config(
         hass,
@@ -194,6 +197,7 @@ async def test_async_call_action_skips_type_identifier_with_ordered_identifiers(
     monkeypatch.setattr(device_action.dr, "async_get", lambda _hass: fake_registry)
     coord = _make_coordinator()
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     await device_action.async_call_action_from_config(
         hass,
@@ -219,6 +223,7 @@ async def test_async_call_action_ignores_non_domain_identifiers_first(
     monkeypatch.setattr(device_action.dr, "async_get", lambda _hass: fake_registry)
     coord = _make_coordinator()
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     await device_action.async_call_action_from_config(
         hass,
@@ -254,6 +259,7 @@ async def test_async_call_action_start_success(
     """Starting a charge session should invoke the coordinator helpers."""
     coord = _make_coordinator()
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     config = {
         CONF_DEVICE_ID: device_id,
@@ -277,6 +283,7 @@ async def test_async_call_action_start_handles_not_ready(
     coord = _make_coordinator()
     coord.async_start_charging.return_value = {"status": "not_ready"}
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     await device_action.async_call_action_from_config(
         hass,
@@ -298,6 +305,7 @@ async def test_async_call_action_stop(hass, config_entry, device_id) -> None:
     """Stopping a charge session should invoke the coordinator client."""
     coord = _make_coordinator()
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     await device_action.async_call_action_from_config(
         hass,

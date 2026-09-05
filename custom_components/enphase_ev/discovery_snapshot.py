@@ -13,6 +13,7 @@ from homeassistant.helpers.storage import Store
 from .const import DOMAIN
 from .device_types import normalize_type_key
 from .log_redaction import redact_site_id
+from .scalar_helpers import coerce_snapshot_bool, snapshot_compatible_value
 
 if TYPE_CHECKING:  # pragma: no cover
     from .coordinator import EnphaseCoordinator
@@ -166,42 +167,8 @@ def _compact_keyed_records(value: object) -> dict[str, object]:
     }
 
 
-def _snapshot_compatible_value(value: object) -> object:
-    if value is None or isinstance(value, (bool, int, float, str)):
-        return value
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, dict):
-        out: dict[str, object] = {}
-        for key, item in value.items():
-            try:
-                key_text = str(key)
-            except Exception:  # noqa: BLE001
-                continue
-            out[key_text] = _snapshot_compatible_value(item)
-        return out
-    if isinstance(value, (list, tuple, set)):
-        return [_snapshot_compatible_value(item) for item in value]
-    try:
-        return str(value)
-    except Exception:  # noqa: BLE001
-        return None
-
-
-def _snapshot_bool(value: object) -> bool | None:
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return value != 0
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in ("true", "1", "yes", "y", "enabled", "on"):
-            return True
-        if normalized in ("false", "0", "no", "n", "disabled", "off"):
-            return False
-    return None
+_snapshot_compatible_value = snapshot_compatible_value
+_snapshot_bool = coerce_snapshot_bool
 
 
 class DiscoverySnapshotManager:

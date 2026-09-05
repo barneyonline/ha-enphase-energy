@@ -11,13 +11,26 @@ services:
       - PYTHONDONTWRITEBYTECODE=1
       - PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
 
+  ha-minimum:
+    build:
+      context: ../..
+      dockerfile: devtools/docker/Dockerfile
+      args:
+        REQUIREMENTS_FILE: requirements-min-ha.txt
+    volumes:
+      - ../..:/workspace:delegated
+    working_dir: /workspace
+    command: sleep infinity
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+
   ha-2026-8:
     build:
       context: ../..
       dockerfile: devtools/docker/Dockerfile
       args:
         REQUIREMENTS_FILE: requirements-ha-2026.8.txt
-        HOME_ASSISTANT_VERSION: 2026.8.0b4
     volumes:
       - ../..:/workspace:delegated
     working_dir: /workspace

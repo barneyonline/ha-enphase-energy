@@ -354,6 +354,11 @@ def mock_clientsession(monkeypatch):
         raising=False,
     )
     monkeypatch.setattr(
+        "custom_components.enphase_ev.options_flow.async_get_clientsession",
+        AsyncMock(return_value=session),
+        raising=False,
+    )
+    monkeypatch.setattr(
         "custom_components.enphase_ev.async_create_clientsession",
         lambda *args, **kwargs: create_calls.append((args, kwargs))
         or stateless_session,

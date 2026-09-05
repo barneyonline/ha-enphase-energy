@@ -11,6 +11,20 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- Fixed automatic cloud reauthentication waiting on its own polling lock and
+  retries reusing old credentials after a successful login.
+- Fixed startup enrichment replacing newer charger state and topology reloads
+  reusing coordinator/session objects already shut down by Home Assistant.
+- Added explicit failed-setup rollback and kept service actions registered while
+  entries are unloaded, with validation against loaded target entries.
+- Corrected daily heat-pump energy reset metadata, nonfinite inverter lifetime
+  readings, inverter snapshot invalidation, and power restoration with display-unit
+  overrides.
+- Preserved device inventory after incomplete pagination and normalized optional
+  weather errors before logging.
+- Expired stale instantaneous site, battery, and heat-pump measurements using
+  family-specific timers while retaining historical energy totals.
+- Preserved user option changes when internal configuration updates are queued.
 - Fixed entity targets being rejected by charging, schedule, grid-profile, refresh,
   and authentication actions. Charger entity targets now resolve to their owning
   charger, and site actions resolve to the selected Enphase site. Area, floor, and
@@ -21,6 +35,14 @@ All notable changes to this project will be documented in this file.
   entry IDs pass service validation and resolve to the intended Enphase site.
 
 ### 🔧 Improvements
+- Split sensor features, registry maintenance, and cloud request policies into
+  focused modules; consolidated shared normalization and schedule helpers.
+- Made feature runtime state ownership explicit and included semantic feature and
+  health changes in coordinator publication, avoiding updates caused only by a new
+  fetch timestamp.
+- Reduced repeated snapshot copying and recorder storage of diagnostic details,
+  with reproducible synthetic snapshot benchmarks and broader lifecycle,
+  concurrency, inventory, and statistics regression coverage.
 - Documented live-stream target selection and clarified the difference between
   Home Assistant device IDs and numeric Enphase site IDs.
 

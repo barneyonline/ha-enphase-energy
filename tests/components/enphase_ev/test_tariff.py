@@ -10,7 +10,8 @@ import pytest
 from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.enphase_ev import coordinator as coord_mod
-from custom_components.enphase_ev import sensor as sensor_mod
+from custom_components.enphase_ev import sensor_tariff as sensor_mod
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from custom_components.enphase_ev import tariff as tariff_mod
 from custom_components.enphase_ev.api import OptionalEndpointUnavailable
 from custom_components.enphase_ev.const import DOMAIN
@@ -3300,17 +3301,17 @@ async def test_current_rate_sensor_timer_lifecycle_and_guard_branches(
         lambda: datetime(2026, 1, 5, 7, 1, tzinfo=timezone.utc),
     )
     monkeypatch.setattr(
-        sensor_mod.CoordinatorEntity,
+        CoordinatorEntity,
         "async_added_to_hass",
         AsyncMock(),
     )
     monkeypatch.setattr(
-        sensor_mod.CoordinatorEntity,
+        CoordinatorEntity,
         "async_will_remove_from_hass",
         AsyncMock(),
     )
     monkeypatch.setattr(
-        sensor_mod.CoordinatorEntity,
+        CoordinatorEntity,
         "_handle_coordinator_update",
         MagicMock(),
     )

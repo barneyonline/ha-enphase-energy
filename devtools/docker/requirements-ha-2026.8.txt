@@ -1,7 +1,4 @@
-# Dependencies for the Home Assistant 2026.8 forward-compatibility lane.
-#
-# This plugin release supplies the test dependencies for Home Assistant
-# 2026.8.0b3. Docker and CI then overlay 2026.8.0b4 without dependencies so the
-# tested Home Assistant version remains authoritative while the compatible
-# plugin stack is retained.
-pytest-homeassistant-custom-component==0.13.351
+-c constraints-ha-2026.8.txt
+# Previous stable Home Assistant compatibility lane; no beta dependency overlay.
+homeassistant==2026.8.3
+pytest-homeassistant-custom-component==0.13.357

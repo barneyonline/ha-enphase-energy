@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, call
 
 import aiohttp
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 import voluptuous as vol
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from homeassistant import config_entries
@@ -18,6 +19,7 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 import custom_components.enphase_ev as enphase_init
+from custom_components.enphase_ev import registry_sync, registry_migrations
 from custom_components.enphase_ev import (
     PLATFORMS,
     DOMAIN,
@@ -311,15 +313,15 @@ def test_complete_startup_migrations_if_ready_ignores_failing_readiness_check(
     migrate_cloud = MagicMock()
     migrate_updates = MagicMock()
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_legacy_gateway_type_devices",
+        "custom_components.enphase_ev.registry_migrations._migrate_legacy_gateway_type_devices",
         migrate_gateway,
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_orphaned_update_entities_to_type_devices",
+        "custom_components.enphase_ev.registry_migrations._migrate_orphaned_update_entities_to_type_devices",
         migrate_updates,
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_cloud_entities_to_cloud_device",
+        "custom_components.enphase_ev.registry_migrations._migrate_cloud_entities_to_cloud_device",
         migrate_cloud,
     )
 
@@ -343,37 +345,38 @@ def test_complete_startup_migrations_clears_reload_suppression_when_update_not_a
     site_id = config_entry.data[CONF_SITE_ID]
     dev_reg = dr.async_get(hass)
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=SimpleNamespace())
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     class DummyCoordinator:
         def startup_migrations_ready(self) -> bool:
             return True
 
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_cloud_entity_unique_ids",
+        "custom_components.enphase_ev.registry_migrations._migrate_cloud_entity_unique_ids",
         MagicMock(),
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_legacy_gateway_type_devices",
+        "custom_components.enphase_ev.registry_migrations._migrate_legacy_gateway_type_devices",
         MagicMock(),
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_orphaned_update_entities_to_type_devices",
+        "custom_components.enphase_ev.registry_migrations._migrate_orphaned_update_entities_to_type_devices",
         MagicMock(),
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._remove_evse_type_device_and_entities",
+        "custom_components.enphase_ev.registry_migrations._remove_evse_type_device_and_entities",
         MagicMock(),
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_cloud_entities_to_cloud_device",
+        "custom_components.enphase_ev.registry_migrations._migrate_cloud_entities_to_cloud_device",
         MagicMock(),
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._remove_legacy_site_device",
+        "custom_components.enphase_ev.registry_migrations._remove_legacy_site_device",
         MagicMock(),
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._remove_retired_grid_profile_device_entities",
+        "custom_components.enphase_ev.registry_migrations._remove_retired_grid_profile_device_entities",
         MagicMock(),
     )
     update_entry = MagicMock()
@@ -501,7 +504,7 @@ def test_migrate_orphaned_update_entities_to_type_devices_handles_edge_paths(
 
     _migrate_orphaned_update_entities_to_type_devices(hass, config_entry, _BadSiteId())
 
-    monkeypatch.setattr("custom_components.enphase_ev.er", None)
+    monkeypatch.setattr("custom_components.enphase_ev.registry_migrations.er", None)
     _migrate_orphaned_update_entities_to_type_devices(
         hass, config_entry, config_entry.data[CONF_SITE_ID]
     )
@@ -511,7 +514,10 @@ def test_migrate_orphaned_update_entities_to_type_devices_handles_edge_paths(
         def async_get(_hass):
             raise RuntimeError("boom")
 
-    monkeypatch.setattr("custom_components.enphase_ev.er", _BrokenEntityRegistryModule)
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.registry_migrations.er",
+        _BrokenEntityRegistryModule,
+    )
     _migrate_orphaned_update_entities_to_type_devices(
         hass, config_entry, config_entry.data[CONF_SITE_ID]
     )
@@ -587,7 +593,7 @@ def test_migrate_orphaned_update_entities_to_type_devices_handles_edge_paths(
         async_remove=lambda entity_id: removed.append(entity_id),
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev.er",
+        "custom_components.enphase_ev.registry_migrations.er",
         SimpleNamespace(async_get=lambda _hass: fake_registry),
     )
     _migrate_orphaned_update_entities_to_type_devices(
@@ -609,7 +615,7 @@ def test_migrate_orphaned_update_entities_to_type_devices_handles_edge_paths(
         async_remove=lambda entity_id: removed.append(entity_id),
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev.er",
+        "custom_components.enphase_ev.registry_migrations.er",
         SimpleNamespace(async_get=lambda _hass: wrong_platform_registry),
     )
     removed.clear()
@@ -821,7 +827,7 @@ async def test_async_setup_entry_restores_discovery_before_first_refresh(
 
 
 @pytest.mark.asyncio
-async def test_async_setup_entry_reuses_handoff_without_blocking_refresh(
+async def test_async_setup_entry_restores_handoff_without_blocking_refresh(
     hass: HomeAssistant, config_entry, monkeypatch
 ) -> None:
     first_refresh = Mock()
@@ -866,7 +872,11 @@ async def test_async_setup_entry_reuses_handoff_without_blocking_refresh(
 
     assert await async_setup_entry(hass, config_entry)
     original_runtime = config_entry.runtime_data
-    original_runtime.coordinator.async_request_refresh = AsyncMock()
+    refresh = AsyncMock()
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.coordinator.EnphaseCoordinator.async_request_refresh",
+        refresh,
+    )
     original_runtime.preserve_for_reload = True
 
     assert await async_unload_entry(hass, config_entry)
@@ -874,12 +884,13 @@ async def test_async_setup_entry_reuses_handoff_without_blocking_refresh(
     assert await async_setup_entry(hass, config_entry)
     await hass.async_block_till_done()
 
-    assert config_entry.runtime_data is original_runtime
+    assert config_entry.runtime_data is not original_runtime
+    assert config_entry.runtime_data.coordinator is not original_runtime.coordinator
     assert config_entry.runtime_data.coordinator.data[RANDOM_SERIAL]["status"] == (
         "available"
     )
     assert first_refresh.call_count == 1
-    original_runtime.coordinator.async_request_refresh.assert_awaited_once_with()
+    refresh.assert_awaited_once_with()
     assert (
         config_entry.runtime_data.coordinator.setup_phase_timings["first_refresh_s"]
         == 0.0
@@ -887,31 +898,29 @@ async def test_async_setup_entry_reuses_handoff_without_blocking_refresh(
 
 
 @pytest.mark.asyncio
-async def test_async_setup_entry_rejects_incomplete_runtime_handoff(
-    hass: HomeAssistant, config_entry, caplog
+async def test_async_setup_entry_cleans_cold_runtime_after_manager_failure(
+    hass: HomeAssistant, config_entry, monkeypatch, caplog
 ) -> None:
     coordinator = SimpleNamespace(
-        apply_config_entry_data=Mock(),
-        apply_auth_storage_config=Mock(),
-        async_apply_config_entry_options=AsyncMock(),
         async_cleanup_runtime_state=AsyncMock(
             side_effect=RuntimeError("cleanup failed")
         ),
         async_close=AsyncMock(),
     )
-    hass.data[enphase_init._RUNTIME_HANDOFF_KEY] = {
-        config_entry.entry_id: EnphaseRuntimeData(coordinator=coordinator)
-    }
-
-    with pytest.raises(RuntimeError, match="Incomplete preserved Enphase runtime"):
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
+        lambda *args, **kwargs: coordinator,
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.firmware_catalog.FirmwareCatalogManager",
+        Mock(side_effect=RuntimeError("manager failed")),
+    )
+    with pytest.raises(RuntimeError, match="manager failed"):
         await async_setup_entry(hass, config_entry)
-
     coordinator.async_cleanup_runtime_state.assert_awaited_once_with()
     coordinator.async_close.assert_awaited_once_with()
-    coordinator.apply_auth_storage_config.assert_called_once_with(config_entry.data)
-    assert "Failed cleaning up a preserved runtime" in caplog.text
+    assert "Failed cleaning up runtime" in caplog.text
     assert config_entry.runtime_data is None
-    assert config_entry.entry_id not in hass.data[enphase_init._RUNTIME_HANDOFF_KEY]
 
 
 @pytest.mark.asyncio
@@ -1111,15 +1120,15 @@ async def test_async_setup_entry_records_startup_migration_version(
         lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_legacy_gateway_type_devices",
+        "custom_components.enphase_ev.registry_migrations._migrate_legacy_gateway_type_devices",
         migrate_gateway,
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_orphaned_update_entities_to_type_devices",
+        "custom_components.enphase_ev.registry_migrations._migrate_orphaned_update_entities_to_type_devices",
         migrate_updates,
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_cloud_entities_to_cloud_device",
+        "custom_components.enphase_ev.registry_migrations._migrate_cloud_entities_to_cloud_device",
         migrate_cloud,
     )
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", AsyncMock())
@@ -1163,11 +1172,11 @@ async def test_async_setup_entry_skips_startup_migrations_when_version_current(
         lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_legacy_gateway_type_devices",
+        "custom_components.enphase_ev.registry_migrations._migrate_legacy_gateway_type_devices",
         migrate_gateway,
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_cloud_entities_to_cloud_device",
+        "custom_components.enphase_ev.registry_migrations._migrate_cloud_entities_to_cloud_device",
         migrate_cloud,
     )
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", AsyncMock())
@@ -1885,6 +1894,7 @@ async def test_async_unload_entry_stops_schedule_sync(
         async_close=AsyncMock(),
     )
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     unload = AsyncMock(return_value=True)
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_unload", unload)
@@ -1970,6 +1980,7 @@ async def test_async_unload_entry_cancels_background_lifecycle_tasks(
 
     coord = CleanupCoordinator()
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
     unload = AsyncMock(return_value=True)
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_unload", unload)
 
@@ -2013,6 +2024,7 @@ async def test_async_unload_entry_does_not_cleanup_when_unload_fails(
     )
     runtime_data = EnphaseRuntimeData(coordinator=coord)
     config_entry.runtime_data = runtime_data
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     async def unload(_entry, platform):
         return platform != "calendar"
@@ -2068,6 +2080,7 @@ async def test_update_listener_hot_applies_runtime_options(
         applied_options=previous_options,
     )
     config_entry.runtime_data = runtime_data
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
     object.__setattr__(config_entry, "state", config_entries.ConfigEntryState.LOADED)
     reload_entry = AsyncMock()
     monkeypatch.setattr(hass.config_entries, "async_reload", reload_entry)
@@ -2107,6 +2120,7 @@ async def test_update_listener_serializes_concurrent_option_updates(
         applied_options={OPT_API_TIMEOUT: 10},
     )
     config_entry.runtime_data = runtime_data
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
     object.__setattr__(config_entry, "state", config_entries.ConfigEntryState.LOADED)
     monkeypatch.setattr(hass.config_entries, "async_reload", AsyncMock())
 
@@ -2135,6 +2149,7 @@ async def test_update_listener_ignores_runtime_replaced_while_waiting(
     original_runtime = EnphaseRuntimeData(coordinator=SimpleNamespace())
     replacement_runtime = EnphaseRuntimeData(coordinator=SimpleNamespace())
     config_entry.runtime_data = original_runtime
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
     await original_runtime.update_listener_lock.acquire()
     reload_entry = AsyncMock()
     monkeypatch.setattr(hass.config_entries, "async_reload", reload_entry)
@@ -2142,6 +2157,7 @@ async def test_update_listener_ignores_runtime_replaced_while_waiting(
     listener = asyncio.create_task(_async_update_listener(hass, config_entry))
     await asyncio.sleep(0)
     config_entry.runtime_data = replacement_runtime
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
     original_runtime.update_listener_lock.release()
     await listener
 
@@ -2162,6 +2178,7 @@ async def test_update_listener_preserves_runtime_for_topology_reload(
         applied_options={OPT_VPP_EVENTS_ENABLED: False},
     )
     config_entry.runtime_data = runtime_data
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
     object.__setattr__(config_entry, "state", config_entries.ConfigEntryState.LOADED)
     reload_entry = AsyncMock(return_value=True)
     monkeypatch.setattr(hass.config_entries, "async_reload", reload_entry)
@@ -2182,6 +2199,7 @@ async def test_update_listener_does_not_preserve_runtime_for_credential_reload(
         applied_options=dict(config_entry.options),
     )
     config_entry.runtime_data = runtime_data
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
     object.__setattr__(config_entry, "state", config_entries.ConfigEntryState.LOADED)
     reload_entry = AsyncMock(return_value=True)
     monkeypatch.setattr(hass.config_entries, "async_reload", reload_entry)
@@ -2206,6 +2224,7 @@ async def test_update_listener_falls_back_to_reload_when_hot_apply_fails(
         applied_options={OPT_API_TIMEOUT: 10},
     )
     config_entry.runtime_data = runtime_data
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
     hass.config_entries.async_update_entry(
         config_entry,
         options={OPT_API_TIMEOUT: 20},
@@ -2230,6 +2249,7 @@ async def test_update_listener_clears_handoff_flag_when_reload_raises(
         applied_options={OPT_WEATHER_ENABLED: False},
     )
     config_entry.runtime_data = runtime_data
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
     hass.config_entries.async_update_entry(
         config_entry,
         options={OPT_WEATHER_ENABLED: True},
@@ -2285,6 +2305,7 @@ async def test_update_listener_ignores_operation_not_allowed(
     object.__setattr__(config_entry, "state", config_entries.ConfigEntryState.LOADED)
     runtime_data = EnphaseRuntimeData(coordinator=SimpleNamespace())
     config_entry.runtime_data = runtime_data
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     await _async_update_listener(hass, config_entry)
 
@@ -2301,6 +2322,7 @@ async def test_async_unload_entry_tolerates_platform_never_loaded(
         schedule_sync=schedule_sync, cleanup_runtime_state=MagicMock()
     )
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     async def unload(_entry, platform):
         if platform == "calendar":
@@ -2321,7 +2343,9 @@ async def test_async_unload_entry_hands_off_preserved_runtime(
     hass: HomeAssistant, config_entry, monkeypatch
 ) -> None:
     schedule_sync = SimpleNamespace(async_stop=AsyncMock())
+    snapshot = object()
     coord = SimpleNamespace(
+        capture_reload_snapshot=Mock(return_value=snapshot),
         schedule_sync=schedule_sync,
         async_quiesce_for_reload=AsyncMock(return_value=True),
         async_cleanup_runtime_state=AsyncMock(),
@@ -2332,6 +2356,7 @@ async def test_async_unload_entry_hands_off_preserved_runtime(
         preserve_for_reload=True,
     )
     config_entry.runtime_data = runtime_data
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
     monkeypatch.setattr(
         hass.config_entries,
         "async_forward_entry_unload",
@@ -2342,11 +2367,10 @@ async def test_async_unload_entry_hands_off_preserved_runtime(
 
     schedule_sync.async_stop.assert_awaited_once()
     coord.async_quiesce_for_reload.assert_awaited_once_with()
-    coord.async_cleanup_runtime_state.assert_not_awaited()
-    coord.async_close.assert_not_awaited()
+    coord.async_cleanup_runtime_state.assert_awaited_once_with()
+    coord.async_close.assert_awaited_once_with()
     assert (
-        hass.data[enphase_init._RUNTIME_HANDOFF_KEY][config_entry.entry_id]
-        is runtime_data
+        hass.data[enphase_init._RUNTIME_HANDOFF_KEY][config_entry.entry_id] is snapshot
     )
     assert config_entry.runtime_data is None
 
@@ -2367,6 +2391,7 @@ async def test_async_unload_entry_discards_handoff_when_quiesce_times_out(
         preserve_for_reload=True,
     )
     config_entry.runtime_data = runtime_data
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
     monkeypatch.setattr(
         hass.config_entries,
         "async_forward_entry_unload",
@@ -2394,6 +2419,7 @@ async def test_async_unload_entry_reraises_unexpected_value_error(
         schedule_sync=schedule_sync, cleanup_runtime_state=MagicMock()
     )
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     async def unload(_entry, platform):
         if platform == "calendar":
@@ -2469,7 +2495,7 @@ async def test_registered_services_cover_branches(
 
     fake_service_helper = FakeHAService()
     monkeypatch.setattr(
-        "custom_components.enphase_ev.services.ha_service", fake_service_helper
+        "custom_components.enphase_ev.service_routing.ha_service", fake_service_helper
     )
 
     site_device = device_registry.async_get_or_create(
@@ -2590,6 +2616,7 @@ async def test_registered_services_cover_branches(
     )
     entry_one.add_to_hass(hass)
     entry_one.runtime_data = EnphaseRuntimeData(coordinator=coord_primary)
+    object.__setattr__(entry_one, "state", ConfigEntryState.LOADED)
 
     entry_two = MockConfigEntry(
         domain=DOMAIN,
@@ -2599,6 +2626,7 @@ async def test_registered_services_cover_branches(
     )
     entry_two.add_to_hass(hass)
     entry_two.runtime_data = EnphaseRuntimeData(coordinator=coord_duplicate)
+    object.__setattr__(entry_two, "state", ConfigEntryState.LOADED)
 
     entry_three = MockConfigEntry(
         domain=DOMAIN,
@@ -2608,6 +2636,7 @@ async def test_registered_services_cover_branches(
     )
     entry_three.add_to_hass(hass)
     entry_three.runtime_data = EnphaseRuntimeData(coordinator=coord_other)
+    object.__setattr__(entry_three, "state", ConfigEntryState.LOADED)
 
     async_setup_services(hass)
 
@@ -2707,6 +2736,7 @@ async def test_registered_services_cover_branches(
     )
     entry_site_only.add_to_hass(hass)
     entry_site_only.runtime_data = EnphaseRuntimeData(coordinator=coord_site_only)
+    object.__setattr__(entry_site_only, "state", ConfigEntryState.LOADED)
 
     start_call = SimpleNamespace(
         data={
@@ -2794,9 +2824,13 @@ async def test_registered_services_cover_branches(
     assert coord_primary.schedule_sync.async_refresh.await_count >= 1
 
     entry_site_only.runtime_data = None
+    object.__setattr__(entry_site_only, "state", ConfigEntryState.LOADED)
     entry_one.runtime_data = None
+    object.__setattr__(entry_one, "state", ConfigEntryState.LOADED)
     entry_two.runtime_data = None
+    object.__setattr__(entry_two, "state", ConfigEntryState.LOADED)
     entry_three.runtime_data = None
+    object.__setattr__(entry_three, "state", ConfigEntryState.LOADED)
     with pytest.raises(ServiceValidationError):
         await svc_start_stream(SimpleNamespace(data={"site_id": "missing"}))
     with pytest.raises(ServiceValidationError):
@@ -2856,7 +2890,7 @@ async def test_device_service_routing_prefers_owning_entry_over_empty_serial_fal
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
     monkeypatch.setattr(
-        "custom_components.enphase_ev.services.ha_service",
+        "custom_components.enphase_ev.service_routing.ha_service",
         SimpleNamespace(async_extract_referenced_device_ids=lambda *_args: []),
     )
 
@@ -2885,6 +2919,7 @@ async def test_device_service_routing_prefers_owning_entry_over_empty_serial_fal
     )
     site_only_entry.add_to_hass(hass)
     site_only_entry.runtime_data = EnphaseRuntimeData(coordinator=site_only_coord)
+    object.__setattr__(site_only_entry, "state", ConfigEntryState.LOADED)
 
     owning_entry = MockConfigEntry(
         domain=DOMAIN,
@@ -2894,6 +2929,7 @@ async def test_device_service_routing_prefers_owning_entry_over_empty_serial_fal
     )
     owning_entry.add_to_hass(hass)
     owning_entry.runtime_data = EnphaseRuntimeData(coordinator=owning_coord)
+    object.__setattr__(owning_entry, "state", ConfigEntryState.LOADED)
 
     device = dr.async_get(hass).async_get_or_create(
         config_entry_id=owning_entry.entry_id,
@@ -2938,7 +2974,7 @@ async def test_device_service_routing_prefers_global_exact_match_before_empty_en
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
     monkeypatch.setattr(
-        "custom_components.enphase_ev.services.ha_service",
+        "custom_components.enphase_ev.service_routing.ha_service",
         SimpleNamespace(async_extract_referenced_device_ids=lambda *_args: []),
     )
 
@@ -2966,6 +3002,7 @@ async def test_device_service_routing_prefers_global_exact_match_before_empty_en
     )
     empty_entry.add_to_hass(hass)
     empty_entry.runtime_data = EnphaseRuntimeData(coordinator=empty_coord)
+    object.__setattr__(empty_entry, "state", ConfigEntryState.LOADED)
 
     owning_entry = MockConfigEntry(
         domain=DOMAIN,
@@ -2975,6 +3012,7 @@ async def test_device_service_routing_prefers_global_exact_match_before_empty_en
     )
     owning_entry.add_to_hass(hass)
     owning_entry.runtime_data = EnphaseRuntimeData(coordinator=owning_coord)
+    object.__setattr__(owning_entry, "state", ConfigEntryState.LOADED)
 
     device = dr.async_get(hass).async_get_or_create(
         config_entry_id=empty_entry.entry_id,
@@ -3019,7 +3057,7 @@ async def test_device_service_routing_skips_ambiguous_empty_serial_fallback(
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
     monkeypatch.setattr(
-        "custom_components.enphase_ev.services.ha_service",
+        "custom_components.enphase_ev.service_routing.ha_service",
         SimpleNamespace(async_extract_referenced_device_ids=lambda *_args: []),
     )
 
@@ -3047,6 +3085,7 @@ async def test_device_service_routing_skips_ambiguous_empty_serial_fallback(
     )
     first_entry.add_to_hass(hass)
     first_entry.runtime_data = EnphaseRuntimeData(coordinator=first_empty_coord)
+    object.__setattr__(first_entry, "state", ConfigEntryState.LOADED)
 
     second_entry = MockConfigEntry(
         domain=DOMAIN,
@@ -3056,6 +3095,7 @@ async def test_device_service_routing_skips_ambiguous_empty_serial_fallback(
     )
     second_entry.add_to_hass(hass)
     second_entry.runtime_data = EnphaseRuntimeData(coordinator=second_empty_coord)
+    object.__setattr__(second_entry, "state", ConfigEntryState.LOADED)
 
     device = dr.async_get(hass).async_get_or_create(
         config_entry_id=first_entry.entry_id,
@@ -3099,7 +3139,7 @@ async def test_device_service_routing_allows_single_empty_serial_fallback(
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
     monkeypatch.setattr(
-        "custom_components.enphase_ev.services.ha_service",
+        "custom_components.enphase_ev.service_routing.ha_service",
         SimpleNamespace(async_extract_referenced_device_ids=lambda *_args: []),
     )
 
@@ -3120,6 +3160,7 @@ async def test_device_service_routing_allows_single_empty_serial_fallback(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=empty_coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     device = dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id,
@@ -3162,6 +3203,9 @@ async def test_device_service_routing_helper_guard_paths(
         }
 
     def extract_helper(func, target):
+        owner = getattr(func, "__self__", None)
+        if owner is not None:
+            return getattr(owner, target)
         for cell in func.__closure__ or ():
             value = cell.cell_contents
             if callable(value) and getattr(value, "__name__", "") == target:
@@ -3170,7 +3214,7 @@ async def test_device_service_routing_helper_guard_paths(
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
     monkeypatch.setattr(
-        "custom_components.enphase_ev.services.ha_service",
+        "custom_components.enphase_ev.service_routing.ha_service",
         SimpleNamespace(async_extract_referenced_device_ids=lambda *_args: []),
     )
 
@@ -3250,6 +3294,7 @@ async def test_device_service_routing_helper_guard_paths(
         )
         entry.add_to_hass(hass)
         entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+        object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     assert await get_coord(site_serial, site_id="site-dupe") is None
 
@@ -3268,6 +3313,7 @@ async def test_device_service_routing_helper_guard_paths(
         )
         entry.add_to_hass(hass)
         entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+        object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     assert await get_coord("EV-SITE-EMPTY-DUPE", site_id="site-empty-dupe") is None
 
@@ -3293,6 +3339,7 @@ async def test_device_service_routing_helper_guard_paths(
         )
         entry.add_to_hass(hass)
         entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+        object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     assert await get_coord(global_serial) is None
 
@@ -3312,6 +3359,7 @@ async def test_device_service_routing_helper_guard_paths(
     site_fallback_entry.runtime_data = EnphaseRuntimeData(
         coordinator=site_fallback_coord
     )
+    object.__setattr__(site_fallback_entry, "state", ConfigEntryState.LOADED)
 
     assert (
         await get_coord("EV-SITE-FALLBACK", site_id="site-fallback")
@@ -3351,6 +3399,9 @@ async def test_service_helper_resolve_functions_cover_none_branches(
     svc_clear = registered[(DOMAIN, "clear_reauth_issue")]["handler"]
 
     def _extract_helper(func, target):
+        owner = getattr(func, "__self__", None)
+        if owner is not None:
+            return getattr(owner, target)
         for cell in func.__closure__ or ():
             value = cell.cell_contents
             if callable(value) and getattr(value, "__name__", "") == target:
@@ -3613,7 +3664,7 @@ def test_inactive_device_cleanup_only_removes_owned_duplicate(
         lambda _hass: SimpleNamespace(entities={}),
     )
     monkeypatch.setattr(
-        enphase_init,
+        registry_sync,
         "active_serial_registry_identifiers",
         lambda _coord: {
             "charger": set(),
@@ -3682,11 +3733,11 @@ def test_sync_registry_devices_runs_cleanup_when_requested(
     sync_chargers = Mock()
     prune = Mock()
     remove_empty = Mock()
-    monkeypatch.setattr(enphase_init, "_sync_type_devices", sync_types)
-    monkeypatch.setattr(enphase_init, "_sync_charger_devices", sync_chargers)
-    monkeypatch.setattr(enphase_init, "_prune_inactive_serial_entities", prune)
+    monkeypatch.setattr(registry_sync, "_sync_type_devices", sync_types)
+    monkeypatch.setattr(registry_sync, "_sync_charger_devices", sync_chargers)
+    monkeypatch.setattr(registry_sync, "_prune_inactive_serial_entities", prune)
     monkeypatch.setattr(
-        enphase_init, "_remove_empty_inactive_serial_devices", remove_empty
+        registry_sync, "_remove_empty_inactive_serial_devices", remove_empty
     )
 
     _sync_registry_devices(
@@ -4134,20 +4185,21 @@ async def test_startup_migration_removes_evse_type_device_and_inventory_entity(
         evse_firmware_details=None,
     )
     config_entry.runtime_data = runtime_data
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_cloud_entity_unique_ids",
+        "custom_components.enphase_ev.registry_migrations._migrate_cloud_entity_unique_ids",
         Mock(),
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_legacy_gateway_type_devices",
+        "custom_components.enphase_ev.registry_migrations._migrate_legacy_gateway_type_devices",
         Mock(),
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_orphaned_update_entities_to_type_devices",
+        "custom_components.enphase_ev.registry_migrations._migrate_orphaned_update_entities_to_type_devices",
         Mock(),
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_cloud_entities_to_cloud_device",
+        "custom_components.enphase_ev.registry_migrations._migrate_cloud_entities_to_cloud_device",
         Mock(),
     )
 
@@ -5112,14 +5164,14 @@ def test_migrate_cloud_entity_unique_ids_handles_guard_paths(
 ) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
 
-    monkeypatch.setattr(enphase_init, "er", None)
+    monkeypatch.setattr(registry_migrations, "er", None)
     _migrate_cloud_entity_unique_ids(hass, config_entry, site_id)
 
     class BadSiteId:
         def __str__(self) -> str:
             raise RuntimeError("boom")
 
-    monkeypatch.setattr(enphase_init, "er", er)
+    monkeypatch.setattr(registry_migrations, "er", er)
     _migrate_cloud_entity_unique_ids(hass, config_entry, BadSiteId())
     _migrate_cloud_entity_unique_ids(hass, config_entry, "   ")
 
@@ -5128,7 +5180,7 @@ def test_migrate_cloud_entity_unique_ids_handles_guard_paths(
         def async_get(_hass):
             raise RuntimeError("boom")
 
-    monkeypatch.setattr(enphase_init, "er", RaisingRegistryModule())
+    monkeypatch.setattr(registry_migrations, "er", RaisingRegistryModule())
     _migrate_cloud_entity_unique_ids(hass, config_entry, site_id)
 
 
@@ -5414,7 +5466,7 @@ def test_migrate_cloud_entities_to_cloud_device_cloud_info_fallbacks(
         "custom_components.enphase_ev.er.async_get", lambda _hass: ent_reg
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev._cloud_device_info",
+        "custom_components.enphase_ev.registry_migrations._cloud_device_info",
         lambda _site_id: {"model": object(), "sw_version": object()},
     )
 
@@ -5835,16 +5887,17 @@ async def test_async_setup_entry_registry_sync_runs_only_for_topology_updates(
     )
     migrate = Mock()
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_legacy_gateway_type_devices", migrate
+        "custom_components.enphase_ev.registry_migrations._migrate_legacy_gateway_type_devices",
+        migrate,
     )
     migrate_updates = Mock()
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_orphaned_update_entities_to_type_devices",
+        "custom_components.enphase_ev.registry_migrations._migrate_orphaned_update_entities_to_type_devices",
         migrate_updates,
     )
     migrate_cloud = Mock()
     monkeypatch.setattr(
-        "custom_components.enphase_ev._migrate_cloud_entities_to_cloud_device",
+        "custom_components.enphase_ev.registry_migrations._migrate_cloud_entities_to_cloud_device",
         migrate_cloud,
     )
 
@@ -5933,3 +5986,34 @@ async def test_async_setup_entry_registry_sync_listener_swallows_sync_errors(
     assert topology_listeners
 
     topology_listeners[0]()
+
+
+@pytest.mark.parametrize(
+    "helper",
+    [
+        "_migrate_cloud_entities_to_cloud_device",
+        "_migrate_legacy_gateway_type_devices",
+        "_remove_legacy_site_device",
+        "_remove_evse_type_device_and_entities",
+    ],
+)
+def test_registry_migrations_without_entity_registry(
+    hass, config_entry, monkeypatch, helper
+):
+    from custom_components.enphase_ev import registry_migrations
+
+    monkeypatch.setattr(registry_migrations, "er", None)
+    args = [hass, config_entry]
+    if helper != "_remove_evse_type_device_and_entities":
+        args.append(SimpleNamespace())
+    args.extend([SimpleNamespace(), "123"])
+    getattr(registry_migrations, helper)(*args)
+
+
+def test_service_registration_is_idempotent(hass):
+    from custom_components.enphase_ev.services import async_setup_services
+
+    async_setup_services(hass)
+    first = hass.services._services[DOMAIN]["start_charging"]
+    async_setup_services(hass)
+    assert hass.services._services[DOMAIN]["start_charging"] is first

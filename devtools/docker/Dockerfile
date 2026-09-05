@@ -33,17 +33,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /workspace
 
 ARG REQUIREMENTS_FILE=requirements-dev.txt
-ARG HOME_ASSISTANT_VERSION=""
 
-COPY devtools/docker/requirements*.txt /tmp/enphase-ev-requirements/
+COPY devtools/docker/requirements*.txt devtools/docker/constraints*.txt /tmp/enphase-ev-requirements/
 
-RUN python -m pip install --upgrade pip && \
+RUN python -m pip install --upgrade "pip==26.2.1" && \
     pip install --no-cache-dir \
-        -r "/tmp/enphase-ev-requirements/${REQUIREMENTS_FILE}" && \
-    if [ -n "${HOME_ASSISTANT_VERSION}" ]; then \
-        pip install --no-cache-dir --no-deps \
-            "homeassistant==${HOME_ASSISTANT_VERSION}"; \
-    fi
+        -r "/tmp/enphase-ev-requirements/${REQUIREMENTS_FILE}"
 
 # Allow git operations (e.g. pre-commit) inside the mounted workspace.
 RUN git config --global --add safe.directory /workspace
