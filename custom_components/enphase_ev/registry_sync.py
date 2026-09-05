@@ -20,7 +20,6 @@ from .device_info_helpers import (
 from .device_registry_compat import (
     device_belongs_to_config_entry,
     get_device_by_identifier,
-    via_device_kwargs,
 )
 from .device_types import (
     is_dry_contact_type_key,
@@ -197,10 +196,8 @@ def _sync_charger_devices(
             "manufacturer": "Enphase",
             "name": dev_name,
             "serial_number": str(sn),
+            "via_device_id": None,
         }
-        kwargs.update(
-            via_device_kwargs(dev_reg, via_device_id=None, legacy_via_device=None)
-        )
         model_name_raw = d.get("model_name")
         model_display = _compose_charger_model_display(
             display_name,

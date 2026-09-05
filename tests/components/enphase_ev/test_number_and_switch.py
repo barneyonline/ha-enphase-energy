@@ -2,28 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-try:
-    from homeassistant.exceptions import ServiceValidationError
-except ImportError:  # pragma: no cover - older HA cores
-    from homeassistant.exceptions import HomeAssistantError
-
-    class ServiceValidationError(HomeAssistantError):
-        """Fallback for environments lacking ServiceValidationError."""
-
-        def __init__(
-            self,
-            message: str | None = None,
-            *,
-            translation_domain: str | None = None,
-            translation_key: str | None = None,
-            translation_placeholders: dict[str, object] | None = None,
-            **_: object,
-        ) -> None:
-            super().__init__(message)
-            self.translation_domain = translation_domain
-            self.translation_key = translation_key
-            self.translation_placeholders = translation_placeholders
-
+from homeassistant.exceptions import ServiceValidationError
 
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL, RANDOM_SITE_ID
 

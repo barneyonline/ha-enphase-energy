@@ -51,17 +51,14 @@ Include the integration version, Home Assistant version, affected entity IDs, de
    The default `ha-dev` lane pins Home Assistant 2026.9.0, the matching test
    plugin, and Linux/Python 3.14 transitive constraints in
    `devtools/docker/constraints-dev.txt`. Rebuild after changing requirements.
-   The minimum supported Home Assistant version remains 2026.6.0.
-   To reproduce the previous stable compatibility lane (Home Assistant
-   2026.8.3), run:
-   ```bash
-   docker compose -f devtools/docker/docker-compose.yml build ha-2026-8
-   docker compose -f devtools/docker/docker-compose.yml run --rm ha-2026-8 bash -lc "pytest -q tests/compatibility/test_ha_2026_8_device_registry.py tests/components/enphase_ev/test_entry_lifecycle.py tests/components/enphase_ev/test_reload_snapshot.py tests/components/enphase_ev/test_init_module.py::test_async_setup_entry_updates_existing_device tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_preserves_real_devices_with_site_identifier tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_removes_empty_device_without_gateway tests/components/enphase_ev/test_services.py::test_services_route_evse_targets_to_owning_entry_with_site_only_entry"
-   ```
-   To reproduce the minimum-version lane, run:
+   The minimum supported Home Assistant version is 2026.8.0, paired with
+   `pytest-homeassistant-custom-component==0.13.354`. The `ha-minimum` lane
+   covers this exact version; the default lane covers current stable Home
+   Assistant.
+   To reproduce minimum-version coverage, run:
    ```bash
    docker compose -f devtools/docker/docker-compose.yml build ha-minimum
-   docker compose -f devtools/docker/docker-compose.yml run --rm ha-minimum bash -lc "python -c 'from homeassistant.const import __version__; assert __version__ == \"2026.6.0\"'; pytest -q tests/components/enphase_ev/test_manifest.py tests/components/enphase_ev/test_device_action.py tests/components/enphase_ev/test_device_trigger.py tests/components/enphase_ev/test_schedule_sync.py tests/components/enphase_ev/test_entry_lifecycle.py tests/components/enphase_ev/test_reload_snapshot.py tests/components/enphase_ev/test_services.py"
+   docker compose -f devtools/docker/docker-compose.yml run --rm ha-minimum bash -lc "python -c 'from homeassistant.const import __version__; assert __version__ == \"2026.8.0\"' && python -m pip check && pytest -q tests/components/enphase_ev/test_manifest.py tests/components/enphase_ev/test_device_registry_compat.py tests/components/enphase_ev/test_number_module.py tests/components/enphase_ev/test_device_action.py tests/components/enphase_ev/test_device_trigger.py tests/components/enphase_ev/test_schedule_sync.py tests/components/enphase_ev/test_entry_lifecycle.py tests/components/enphase_ev/test_integration_lifecycle.py tests/components/enphase_ev/test_reload_snapshot.py tests/components/enphase_ev/test_services.py tests/components/enphase_ev/test_init_module.py::test_async_setup_entry_updates_existing_device tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_preserves_real_devices_with_site_identifier tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_removes_empty_device_without_gateway"
    ```
    Every lane resolves Home Assistant together with its exact matching test
    plugin and transitive constraints. Upgrade each Home Assistant/plugin pair
@@ -106,7 +103,7 @@ test needs; do not modify standard-library classes to supply missing behavior.
 `test_integration_lifecycle.py` covers charger and site-only setup with real
 platforms, topology-option reload, registry customization, polling, and unload.
 It replaces cloud methods and fails on unexpected cloud calls. These scenarios
-also run in both Home Assistant compatibility lanes.
+also run in the minimum Home Assistant lane.
 
 Maintenance-script tests use only lightweight dependencies and can be run
 separately while iterating on `scripts/`:
@@ -127,8 +124,8 @@ Keep Dependabot alerts enabled and review new advisories even for ignored
 packages. Address applicable advisories through a compatible Home Assistant
 upgrade: update the Home Assistant version and matching test plugin together,
 regenerate that lane's constraints, and validate it in Docker. Preserve the
-exact dependency stacks for older compatibility lanes while those Home
-Assistant versions remain supported. Do not override their dependency pins
+exact dependency stack for the minimum-version lane while that Home
+Assistant version remains supported. Do not override their dependency pins
 independently to clear an alert.
 
 The `open-pull-requests-limit: 0` setting only disables version-update PRs;

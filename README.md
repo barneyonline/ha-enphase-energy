@@ -130,7 +130,7 @@ Manual install steps: see the wiki Installation page.
 
 ## Compatibility
 
-- Minimum supported Home Assistant version is `2026.6.0` (Python `3.14`+).
+- Minimum supported Home Assistant version is `2026.8.0` (Python `3.14`+).
 - Users migrating from the core Enphase Envoy integration can preserve compatible Energy-dashboard history with the [Envoy History Migration](https://github.com/barneyonline/ha-enphase-energy/wiki/Envoy-History-Migration) assistant. Create a full Home Assistant backup first.
 
 ## Authentication
