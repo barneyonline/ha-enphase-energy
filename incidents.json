@@ -1,18 +1,6 @@
 {
   "current_status": "Fully Operational",
-  "generated_at": "2026-09-05T00:37:07.904143Z",
-  "incidents": [
-    {
-      "active": false,
-      "duration_minutes": 0,
-      "ended_at": null,
-      "failed_checks": [
-        "evse_scheduler"
-      ],
-      "last_seen_at": "2026-08-06T03:48:14.382657Z",
-      "started_at": "2026-08-06T03:48:14.382657Z",
-      "status": "Degraded"
-    }
-  ],
+  "generated_at": "2026-09-05T05:16:03.412187Z",
+  "incidents": [],
   "retention_days": 30
 }
