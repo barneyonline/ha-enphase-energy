@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from enum import StrEnum
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from homeassistant import const as ha_const
 
 from custom_components.enphase_ev.battery_schedule_editor import (
     BatteryScheduleEditorManager,
@@ -130,34 +128,6 @@ def test_number_battery_write_access_confirmed_falls_back_to_roles() -> None:
     coord.battery_user_is_installer = False
     coord.battery_write_access_confirmed = True
     assert number_mod._battery_write_access_confirmed(coord) is True
-
-
-def test_percentage_unit_prefers_unit_of_ratio_without_legacy_access() -> None:
-    from custom_components.enphase_ev import number as number_mod
-
-    class FakeUnitOfRatio(StrEnum):
-        PERCENTAGE = "%"
-
-    class ModernConstants:
-        UnitOfRatio = FakeUnitOfRatio
-
-        @property
-        def PERCENTAGE(self) -> str:
-            raise AssertionError("legacy PERCENTAGE must not be accessed")
-
-    assert number_mod._percentage_unit(ModernConstants()) is FakeUnitOfRatio.PERCENTAGE
-
-    runtime_unit_of_ratio = getattr(ha_const, "UnitOfRatio", None)
-    if runtime_unit_of_ratio is not None:
-        assert number_mod._PERCENTAGE_UNIT is runtime_unit_of_ratio.PERCENTAGE
-    else:
-        assert number_mod._PERCENTAGE_UNIT == ha_const.PERCENTAGE
-
-
-def test_percentage_unit_falls_back_for_home_assistant_2026_6() -> None:
-    from custom_components.enphase_ev import number as number_mod
-
-    assert number_mod._percentage_unit(SimpleNamespace(PERCENTAGE="%")) == "%"
 
 
 def test_retained_site_number_unique_ids_follow_scheduler_state() -> None:
@@ -747,6 +717,7 @@ def test_battery_schedule_edit_limit_number_uses_editor_and_device_info(
     )
 
     number = BatteryScheduleEditLimitNumber(coord, config_entry)
+    assert number.native_unit_of_measurement == "%"
 
     assert number.available is True
     assert number.native_value == 80.0

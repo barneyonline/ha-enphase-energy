@@ -66,6 +66,11 @@ All notable changes to this project will be documented in this file.
   Home Assistant device IDs and numeric Enphase site IDs.
 
 ### 🔄 Other changes
+- Consolidated compatibility CI on Home Assistant `2026.8.0` and current stable,
+  replacing the June dependency stack and redundant August patch-version lane.
+- Removed pre-August device-registry and percentage-unit fallbacks, obsolete
+  tests, and duplicate legacy test fixtures while preserving composite-device
+  migration coverage.
 - Pinned compatible Home Assistant development and test dependencies and prevented
   Dependabot from proposing incompatible updates to those stacks.
 - Bumped the integration manifest version to `4.3.0`.

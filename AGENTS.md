@@ -41,7 +41,7 @@
 
 ## Coding Style & Naming Conventions
 - Follow Home Assistant integration patterns and keep dependencies limited to the standard library or Home Assistant unless there is a strong reason otherwise.
-- Target Home Assistant `2026.6.0+` behavior and Python `3.14` syntax/runtime expectations, matching `hacs.json` and the minimum-version CI lane.
+- Target Home Assistant `2026.8.0+` behavior and Python `3.14` syntax/runtime expectations, matching `hacs.json` and the minimum-version CI lane.
 - Keep external I/O async and avoid blocking the event loop; use executor jobs only for genuinely blocking work.
 - Keep code Black-formatted, Ruff-clean, and consistent with lazy logging and clear type hints.
 - Keep `try` blocks narrow and raise the most specific Home Assistant exception available.

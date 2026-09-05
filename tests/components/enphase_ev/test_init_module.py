@@ -75,7 +75,6 @@ from custom_components.enphase_ev.const import (
 from custom_components.enphase_ev.device_types import type_identifier
 from custom_components.enphase_ev.device_registry_compat import (
     get_device_by_identifier,
-    via_device_kwargs,
 )
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from custom_components.enphase_ev.services import async_setup_services
@@ -1350,7 +1349,7 @@ def test_remove_legacy_site_device_handles_guard_paths(
     coord = _with_inventory_view(
         SimpleNamespace(type_identifier=lambda _key: (DOMAIN, "type:site-1:envoy"))
     )
-    noop_dev_reg = SimpleNamespace(async_get_device=lambda **_kwargs: None)
+    noop_dev_reg = SimpleNamespace(async_get_device_by_identifier=lambda *_args: None)
 
     monkeypatch.setattr(enphase_init, "er", None)
     _remove_legacy_site_device(hass, config_entry, coord, noop_dev_reg, "site-1")
@@ -1369,21 +1368,21 @@ def test_remove_legacy_site_device_handles_guard_paths(
         hass,
         config_entry,
         coord,
-        SimpleNamespace(async_get_device=lambda **_kwargs: gateway_no_id),
+        SimpleNamespace(async_get_device_by_identifier=lambda *_args: gateway_no_id),
         "site-1",
     )
 
     gateway = SimpleNamespace(id="gateway")
 
     def _device_reg_for(legacy_device):
-        def _get_device(*, identifiers):
-            if (DOMAIN, "type:site-1:envoy") in identifiers:
+        def _get_device(identifier, _entry_id):
+            if identifier == (DOMAIN, "type:site-1:envoy"):
                 return gateway
-            if (DOMAIN, "site:site-1") in identifiers:
+            if identifier == (DOMAIN, "site:site-1"):
                 return legacy_device
             return None
 
-        return SimpleNamespace(async_get_device=_get_device)
+        return SimpleNamespace(async_get_device_by_identifier=_get_device)
 
     legacy_other_entry = SimpleNamespace(
         id="legacy",
@@ -2512,11 +2511,7 @@ async def test_registered_services_cover_branches(
         identifiers={(DOMAIN, first_serial)},
         manufacturer="Enphase",
         name="Driveway Charger",
-        **via_device_kwargs(
-            device_registry,
-            via_device_id=site_device.id,
-            legacy_via_device=(DOMAIN, f"site:{site_id}"),
-        ),
+        via_device_id=site_device.id,
     )
     charger_two = device_registry.async_get_or_create(
         config_entry_id=config_entry.entry_id,
@@ -3448,11 +3443,7 @@ async def test_service_helper_resolve_functions_cover_none_branches(
         identifiers={(DOMAIN, "EVCHILD")},
         manufacturer="Enphase",
         name="Child Device",
-        **via_device_kwargs(
-            dev_reg,
-            via_device_id=parent_site_device.id,
-            legacy_via_device=(DOMAIN, "site:PARENT"),
-        ),
+        via_device_id=parent_site_device.id,
     )
     assert await resolve_device_routing_context(child_with_via.id) == (
         "EVCHILD",
@@ -3475,11 +3466,7 @@ async def test_service_helper_resolve_functions_cover_none_branches(
         identifiers={(DOMAIN, "EVTYPED")},
         manufacturer="Enphase",
         name="Typed Child",
-        **via_device_kwargs(
-            dev_reg,
-            via_device_id=type_device.id,
-            legacy_via_device=(DOMAIN, "type:TYPED:envoy"),
-        ),
+        via_device_id=type_device.id,
     )
     assert await resolve_site(child_with_type_parent.id) == "TYPED"
 
@@ -3499,60 +3486,6 @@ class _FakeDevice(SimpleNamespace):
 
 
 class _FakeDeviceRegistry:
-    def __init__(self) -> None:
-        self._devices: dict[tuple[str, str], _FakeDevice] = {}
-        self._next_id = 1
-
-    def async_get_device(self, *, identifiers):
-        ident = next(iter(identifiers))
-        return self._devices.get(ident)
-
-    def async_get_or_create(self, **kwargs):
-        ident = next(iter(kwargs["identifiers"]))
-        existing = self._devices.get(ident)
-        if existing is None:
-            existing = _FakeDevice(
-                id=f"dev-{self._next_id}",
-                identifiers={ident},
-                manufacturer=None,
-                name=None,
-                model=None,
-                model_id=None,
-                serial_number=None,
-                hw_version=None,
-                sw_version=None,
-                via_device_id=None,
-            )
-            self._next_id += 1
-            self._devices[ident] = existing
-        for field in (
-            "name",
-            "manufacturer",
-            "model",
-            "model_id",
-            "serial_number",
-            "hw_version",
-            "sw_version",
-        ):
-            if field in kwargs:
-                setattr(existing, field, kwargs[field])
-        if "via_device" in kwargs:
-            via = kwargs.get("via_device")
-            if via is None:
-                existing.via_device_id = None
-            else:
-                parent = self._devices.get(via)
-                existing.via_device_id = parent.id if parent else None
-        return existing
-
-    def async_remove_device(self, device_id):
-        for ident, device in list(self._devices.items()):
-            if device.id == device_id:
-                del self._devices[ident]
-                break
-
-
-class _ScopedFakeDeviceRegistry:
     """Model the per-config-entry identifier uniqueness introduced in HA 2026.8."""
 
     def __init__(self) -> None:
@@ -3610,7 +3543,7 @@ def test_sync_type_devices_scopes_duplicate_identifier_to_config_entry(
 ) -> None:
     """Registry synchronization must not update another entry's matching device."""
 
-    registry = _ScopedFakeDeviceRegistry()
+    registry = _FakeDeviceRegistry()
     identifier = (DOMAIN, "type:shared-site:envoy")
     other_entry = SimpleNamespace(entry_id="other-entry")
 
@@ -3650,7 +3583,7 @@ def test_inactive_device_cleanup_only_removes_owned_duplicate(
 ) -> None:
     """Cleanup ignores another entry's device with the same identifier."""
 
-    registry = _ScopedFakeDeviceRegistry()
+    registry = _FakeDeviceRegistry()
     identifier = (DOMAIN, "SHARED-INACTIVE")
     for entry_id in ("other-entry", config_entry.entry_id):
         registry.async_get_or_create(
@@ -3772,7 +3705,7 @@ def test_sync_type_devices_deduplicates_merged_identifiers(config_entry) -> None
 
     assert set(type_devices) == {"envoy", "meter", "enpower"}
     assert len({type_devices[key].id for key in type_devices}) == 1
-    assert len(dev_reg._devices) == 1
+    assert len(dev_reg.devices) == 1
 
 
 def test_sync_type_devices_uses_model_and_hw_summary(config_entry) -> None:
@@ -4090,7 +4023,9 @@ def test_sync_charger_devices_clears_legacy_type_parent(config_entry) -> None:
     )
 
     _sync_charger_devices(config_entry, coord, dev_reg, site_id, type_devices={})
-    charger = dev_reg.async_get_device(identifiers={(DOMAIN, RANDOM_SERIAL)})
+    charger = dev_reg.async_get_device_by_identifier(
+        (DOMAIN, RANDOM_SERIAL), config_entry.entry_id
+    )
     assert charger is not None
     assert charger.via_device_id is None
 
@@ -4100,7 +4035,7 @@ def test_sync_charger_devices_marks_existing_legacy_parent_for_update(
 ) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
     dev_reg = _FakeDeviceRegistry()
-    dev_reg.async_get_or_create(
+    parent = dev_reg.async_get_or_create(
         config_entry_id=config_entry.entry_id,
         identifiers={(DOMAIN, f"type:{site_id}:iqevse")},
         manufacturer="Enphase",
@@ -4112,7 +4047,7 @@ def test_sync_charger_devices_marks_existing_legacy_parent_for_update(
         identifiers={(DOMAIN, RANDOM_SERIAL)},
         manufacturer="Enphase",
         name="Garage Charger",
-        via_device=(DOMAIN, f"type:{site_id}:iqevse"),
+        via_device_id=parent.id,
     )
 
     coord = _with_inventory_view(
@@ -4125,7 +4060,9 @@ def test_sync_charger_devices_marks_existing_legacy_parent_for_update(
 
     _sync_charger_devices(config_entry, coord, dev_reg, site_id, type_devices={})
 
-    charger = dev_reg.async_get_device(identifiers={(DOMAIN, RANDOM_SERIAL)})
+    charger = dev_reg.async_get_device_by_identifier(
+        (DOMAIN, RANDOM_SERIAL), config_entry.entry_id
+    )
     assert charger is not None
     assert charger.via_device_id is None
 
@@ -4157,11 +4094,7 @@ async def test_startup_migration_removes_evse_type_device_and_inventory_entity(
         identifiers={(DOMAIN, RANDOM_SERIAL)},
         manufacturer="Enphase",
         name="Garage Charger",
-        **via_device_kwargs(
-            dev_reg,
-            via_device_id=evse_type.id,
-            legacy_via_device=(DOMAIN, f"type:{site_id}:iqevse"),
-        ),
+        via_device_id=evse_type.id,
     )
     entity = ent_reg.async_get_or_create(
         "sensor",
@@ -4243,7 +4176,9 @@ def test_sync_charger_devices_dedupes_extended_evse_model_display(config_entry) 
     )
 
     _sync_charger_devices(config_entry, coord, dev_reg, site_id, type_devices={})
-    charger = dev_reg.async_get_device(identifiers={(DOMAIN, RANDOM_SERIAL)})
+    charger = dev_reg.async_get_device_by_identifier(
+        (DOMAIN, RANDOM_SERIAL), config_entry.entry_id
+    )
     assert charger is not None
     assert charger.name == "IQ EV Charger (IQ-EVSE-EU-3032)"
     assert charger.model == "IQ EV Charger (IQ-EVSE-EU-3032)"
@@ -4259,7 +4194,7 @@ def test_remove_evse_type_device_and_entities_handles_guard_paths(
     _remove_evse_type_device_and_entities(
         hass,
         config_entry,
-        SimpleNamespace(async_get_device=lambda **_kwargs: None),
+        SimpleNamespace(async_get_device_by_identifier=lambda *_args: None),
         config_entry.data[CONF_SITE_ID],
     )
     monkeypatch.setattr(module, "er", original_er)
@@ -4271,26 +4206,26 @@ def test_remove_evse_type_device_and_entities_handles_guard_paths(
     _remove_evse_type_device_and_entities(
         hass,
         config_entry,
-        SimpleNamespace(async_get_device=lambda **_kwargs: None),
+        SimpleNamespace(async_get_device_by_identifier=lambda *_args: None),
         BadStr(),
     )
     _remove_evse_type_device_and_entities(
         hass,
         config_entry,
-        SimpleNamespace(async_get_device=lambda **_kwargs: None),
+        SimpleNamespace(async_get_device_by_identifier=lambda *_args: None),
         "   ",
     )
     _remove_evse_type_device_and_entities(
         hass,
         config_entry,
-        SimpleNamespace(async_get_device=lambda **_kwargs: None),
+        SimpleNamespace(async_get_device_by_identifier=lambda *_args: None),
         config_entry.data[CONF_SITE_ID],
     )
     _remove_evse_type_device_and_entities(
         hass,
         config_entry,
         SimpleNamespace(
-            async_get_device=lambda **_kwargs: SimpleNamespace(id=None),
+            async_get_device_by_identifier=lambda *_args: SimpleNamespace(id=None),
         ),
         config_entry.data[CONF_SITE_ID],
     )
@@ -4303,7 +4238,9 @@ def test_remove_evse_type_device_and_entities_handles_guard_paths(
         hass,
         config_entry,
         SimpleNamespace(
-            async_get_device=lambda **_kwargs: SimpleNamespace(id="evse-device"),
+            async_get_device_by_identifier=lambda *_args: SimpleNamespace(
+                id="evse-device"
+            ),
         ),
         config_entry.data[CONF_SITE_ID],
     )
@@ -4342,9 +4279,9 @@ def test_remove_evse_type_device_and_entities_handles_remove_failures(
     )
 
     dev_reg = SimpleNamespace(
-        async_get_device=lambda **kwargs: (
+        async_get_device_by_identifier=lambda identifier, _entry_id: (
             SimpleNamespace(id="evse-device")
-            if next(iter(kwargs["identifiers"])) == (DOMAIN, f"type:{site_id}:iqevse")
+            if identifier == (DOMAIN, f"type:{site_id}:iqevse")
             else None
         ),
         async_remove_device=lambda _device_id: (_ for _ in ()).throw(
@@ -4377,9 +4314,9 @@ def test_remove_evse_type_device_and_entities_removes_device_when_entries_cleare
     )
     removed_device_ids: list[str] = []
     dev_reg = SimpleNamespace(
-        async_get_device=lambda **kwargs: (
+        async_get_device_by_identifier=lambda identifier, _entry_id: (
             SimpleNamespace(id="evse-device")
-            if next(iter(kwargs["identifiers"])) == (DOMAIN, f"type:{site_id}:iqevse")
+            if identifier == (DOMAIN, f"type:{site_id}:iqevse")
             else None
         ),
         async_remove_device=lambda device_id: removed_device_ids.append(device_id),
@@ -4411,9 +4348,9 @@ def test_remove_evse_type_device_and_entities_handles_remove_device_failure(
         lambda _reg, _device_id: entry_lists.pop(0),
     )
     dev_reg = SimpleNamespace(
-        async_get_device=lambda **kwargs: (
+        async_get_device_by_identifier=lambda identifier, _entry_id: (
             SimpleNamespace(id="evse-device")
-            if next(iter(kwargs["identifiers"])) == (DOMAIN, f"type:{site_id}:iqevse")
+            if identifier == (DOMAIN, f"type:{site_id}:iqevse")
             else None
         ),
         async_remove_device=lambda _device_id: (_ for _ in ()).throw(
@@ -4744,7 +4681,9 @@ async def test_migrate_legacy_gateway_type_devices_rehomes_entities_and_prunes(
 
 
 def test_sync_type_devices_skips_dry_contact_types(config_entry) -> None:
-    dev_reg = SimpleNamespace(async_get_device=Mock(), async_get_or_create=Mock())
+    dev_reg = SimpleNamespace(
+        async_get_device_by_identifier=Mock(), async_get_or_create=Mock()
+    )
     coord = _with_inventory_view(
         SimpleNamespace(
             iter_type_keys=lambda: ["envoy", "dry_contact", "nc1"],
@@ -4771,7 +4710,9 @@ def test_sync_type_devices_skips_dry_contact_types(config_entry) -> None:
 def test_sync_type_devices_skips_selected_type_without_bucket(config_entry) -> None:
     from custom_components.enphase_ev.inventory_view import InventoryView
 
-    dev_reg = SimpleNamespace(async_get_device=Mock(), async_get_or_create=Mock())
+    dev_reg = SimpleNamespace(
+        async_get_device_by_identifier=Mock(), async_get_or_create=Mock()
+    )
     coord = SimpleNamespace(
         site_id="site-1",
         inventory_runtime=SimpleNamespace(),
@@ -4802,7 +4743,7 @@ def test_migrate_legacy_gateway_type_devices_handles_internal_edge_paths(
         _with_inventory_view(
             SimpleNamespace(type_identifier=lambda _key: (DOMAIN, "type:x:envoy"))
         ),
-        SimpleNamespace(async_get_device=lambda **_kwargs: None),
+        SimpleNamespace(async_get_device_by_identifier=lambda *_args: None),
         "x",
     )
     monkeypatch.setattr(module, "er", original_er)
@@ -4818,7 +4759,7 @@ def test_migrate_legacy_gateway_type_devices_handles_internal_edge_paths(
         _with_inventory_view(
             SimpleNamespace(type_identifier=lambda _key: (DOMAIN, "type:x:envoy"))
         ),
-        SimpleNamespace(async_get_device=lambda **_kwargs: None),
+        SimpleNamespace(async_get_device_by_identifier=lambda *_args: None),
         BadStr(),
     )
     _migrate_legacy_gateway_type_devices(
@@ -4827,7 +4768,7 @@ def test_migrate_legacy_gateway_type_devices_handles_internal_edge_paths(
         _with_inventory_view(
             SimpleNamespace(type_identifier=lambda _key: (DOMAIN, "type:x:envoy"))
         ),
-        SimpleNamespace(async_get_device=lambda **_kwargs: None),
+        SimpleNamespace(async_get_device_by_identifier=lambda *_args: None),
         "   ",
     )
 
@@ -4838,7 +4779,9 @@ def test_migrate_legacy_gateway_type_devices_handles_internal_edge_paths(
         _with_inventory_view(
             SimpleNamespace(type_identifier=lambda _key: (DOMAIN, "type:x:envoy"))
         ),
-        SimpleNamespace(async_get_device=lambda **_kwargs: SimpleNamespace(id=None)),
+        SimpleNamespace(
+            async_get_device_by_identifier=lambda *_args: SimpleNamespace(id=None)
+        ),
         "x",
     )
 
@@ -4854,9 +4797,9 @@ def test_migrate_legacy_gateway_type_devices_handles_internal_edge_paths(
             SimpleNamespace(type_identifier=lambda _key: (DOMAIN, "type:x:envoy"))
         ),
         SimpleNamespace(
-            async_get_device=lambda **kwargs: (
+            async_get_device_by_identifier=lambda identifier, _entry_id: (
                 SimpleNamespace(id="gw")
-                if next(iter(kwargs["identifiers"])) == (DOMAIN, "type:x:envoy")
+                if identifier == (DOMAIN, "type:x:envoy")
                 else None
             )
         ),
@@ -4890,12 +4833,12 @@ def test_migrate_legacy_gateway_type_devices_handles_internal_edge_paths(
         lambda _reg, _device_id: entries,
     )
     dev_reg = SimpleNamespace(
-        async_get_device=lambda **kwargs: {
+        async_get_device_by_identifier=lambda identifier, _entry_id: {
             (DOMAIN, "type:site-fallback:envoy"): SimpleNamespace(id="gw"),
             (DOMAIN, "type:site-fallback:meter"): SimpleNamespace(id="legacy-meter"),
             (DOMAIN, "type:site-fallback:enpower"): SimpleNamespace(id=None),
             (DOMAIN, "site:site-fallback"): SimpleNamespace(id=None),
-        }.get(next(iter(kwargs["identifiers"]))),
+        }.get(identifier),
         async_remove_device=lambda _device_id: None,
     )
     coord = _with_inventory_view(
@@ -4908,10 +4851,10 @@ def test_migrate_legacy_gateway_type_devices_handles_internal_edge_paths(
     _migrate_legacy_gateway_type_devices(hass, config_entry, coord, dev_reg, None)
 
     dev_reg_site_update = SimpleNamespace(
-        async_get_device=lambda **kwargs: {
+        async_get_device_by_identifier=lambda identifier, _entry_id: {
             (DOMAIN, "type:site-fallback:envoy"): SimpleNamespace(id="gw"),
             (DOMAIN, "site:site-fallback"): SimpleNamespace(id="legacy-site"),
-        }.get(next(iter(kwargs["identifiers"]))),
+        }.get(identifier),
         async_remove_device=lambda _device_id: None,
     )
     _migrate_legacy_gateway_type_devices(
@@ -4919,9 +4862,9 @@ def test_migrate_legacy_gateway_type_devices_handles_internal_edge_paths(
     )
 
     dev_reg_scanned = SimpleNamespace(
-        async_get_device=lambda **kwargs: {
+        async_get_device_by_identifier=lambda identifier, _entry_id: {
             (DOMAIN, "type:site-fallback:envoy"): SimpleNamespace(id="gw"),
-        }.get(next(iter(kwargs["identifiers"]))),
+        }.get(identifier),
         async_remove_device=lambda _device_id: None,
         devices={
             "foreign": SimpleNamespace(

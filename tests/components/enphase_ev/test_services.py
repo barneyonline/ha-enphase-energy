@@ -24,7 +24,6 @@ from custom_components.enphase_ev.api import (
     OCPP_TRIGGER_MESSAGES_REQUIRING_CONFIRMATION,
 )
 from custom_components.enphase_ev.const import CONF_SITE_ID, CONF_SITE_ONLY, DOMAIN
-from custom_components.enphase_ev.device_registry_compat import via_device_kwargs
 from custom_components.enphase_ev.grid_profile_runtime import (
     SUPPORT_DENIED,
     SUPPORT_READ_ONLY,
@@ -969,11 +968,7 @@ async def test_services_route_evse_targets_to_owning_entry_with_site_only_entry(
         identifiers={(DOMAIN, "EVSE123")},
         manufacturer="Enphase",
         name="Garage Charger",
-        **via_device_kwargs(
-            device_registry,
-            via_device_id=evse_site_device.id,
-            legacy_via_device=(DOMAIN, "site:evse-site"),
-        ),
+        via_device_id=evse_site_device.id,
     )
 
     await handlers[(DOMAIN, "start_charging")](
@@ -1282,11 +1277,7 @@ async def test_targeted_services_reject_mixed_valid_and_unknown_devices(
         identifiers={(DOMAIN, "EVSE123")},
         manufacturer="Enphase",
         name="Garage Charger",
-        **via_device_kwargs(
-            device_registry,
-            via_device_id=site_device.id,
-            legacy_via_device=(DOMAIN, "site:evse-site"),
-        ),
+        via_device_id=site_device.id,
     )
     unknown_device_id = "missing-device-id"
 

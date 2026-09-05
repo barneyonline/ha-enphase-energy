@@ -25,21 +25,6 @@ services:
       - PYTHONDONTWRITEBYTECODE=1
       - PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
 
-  ha-2026-8:
-    build:
-      context: ../..
-      dockerfile: devtools/docker/Dockerfile
-      args:
-        REQUIREMENTS_FILE: requirements-ha-2026.8.txt
-    volumes:
-      - ../..:/workspace:delegated
-    working_dir: /workspace
-    command: sleep infinity
-    environment:
-      - PYTHONDONTWRITEBYTECODE=1
-      - PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
-      - PYTEST_ASYNCIO_MODE=auto
-
   ha-runtime:
     image: ghcr.io/home-assistant/home-assistant:stable
     restart: unless-stopped
