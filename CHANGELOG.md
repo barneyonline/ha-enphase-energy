@@ -11,6 +11,23 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v4.3.0 - 2026-09-05
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
 - Fixed automatic cloud reauthentication waiting on its own polling lock and
   retries reusing old credentials after a successful login.
 - Fixed startup enrichment replacing newer charger state and topology reloads
@@ -47,7 +64,9 @@ All notable changes to this project will be documented in this file.
   Home Assistant device IDs and numeric Enphase site IDs.
 
 ### 🔄 Other changes
-- None
+- Pinned compatible Home Assistant development and test dependencies and prevented
+  Dependabot from proposing incompatible updates to those stacks.
+- Bumped the integration manifest version to `4.3.0`.
 
 ## v4.2.7 - 2026-09-02
 
