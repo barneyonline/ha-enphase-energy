@@ -13,6 +13,10 @@ from .const import DEFAULT_SCHEDULE_SYNC_ENABLED, OPT_SCHEDULE_SYNC_ENABLED
 from .coordinator import EnphaseCoordinator
 from .entity import EnphaseBaseEntity
 from .labels import evse_schedule_create_label as _evse_schedule_create_label
+from .schedule_editor_helpers import (
+    normalize_days as _normalize_days,
+    time_to_text as _time_to_text,
+)
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -55,34 +59,6 @@ NEW_SCHEDULE_OPTION = "new_schedule"
 
 def default_day_flags() -> dict[str, bool]:
     return {key: False for key, _ in DAY_ORDER}
-
-
-def _time_to_text(value: object, *, default: str = "00:00") -> str:
-    if isinstance(value, dt_time):
-        return value.strftime("%H:%M")
-    if value is None:
-        return default
-    if isinstance(value, (int, float)):
-        total_minutes = int(value)
-        return f"{(total_minutes // 60) % 24:02d}:{total_minutes % 60:02d}"
-    text = str(value).strip()
-    if len(text) >= 5 and text[2] == ":":
-        return text[:5]
-    return default
-
-
-def _normalize_days(raw: object) -> list[int]:
-    if not isinstance(raw, list):
-        return []
-    days: list[int] = []
-    for value in raw:
-        try:
-            day = int(value)
-        except (TypeError, ValueError):
-            continue
-        if 1 <= day <= 7 and day not in days:
-            days.append(day)
-    return sorted(days)
 
 
 def editor_days_from_list(days: list[int]) -> dict[str, bool]:

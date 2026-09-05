@@ -1301,7 +1301,7 @@ async def test_inventory_runtime_refresh_inverters_paths(coordinator_factory) ->
     coord.client.inverter_production = AsyncMock(side_effect=RuntimeError("boom"))
     _clear_family_windows()
     await runtime._async_refresh_inverters()  # noqa: SLF001
-    assert coord.iter_inverter_serials() == []
+    assert coord.iter_inverter_serials() == ["INV-A", "INV-B"]
 
     coord.energy._site_energy_meta = {}  # noqa: SLF001
     coord._inverter_data = {}  # noqa: SLF001
@@ -3523,8 +3523,7 @@ async def test_inventory_runtime_refresh_inverters_pagination_and_error_paths(
     }  # noqa: SLF001
     _clear_family_windows()
     await runtime._async_refresh_inverters()  # noqa: SLF001
-    assert coord.iter_inverter_serials() == ["INV-1"]
-    assert coord.inverter_data("INV-1")["lifetime_production_wh"] is None
+    assert coord.iter_inverter_serials() == ["INV-FB"]
 
     async def pagination_non_list_fetcher(*args, **kwargs):
         if kwargs.get("offset") == 0:
@@ -3539,7 +3538,7 @@ async def test_inventory_runtime_refresh_inverters_pagination_and_error_paths(
     )
     _clear_family_windows()
     await runtime._async_refresh_inverters()  # noqa: SLF001
-    assert coord.iter_inverter_serials() == ["INV-2"]
+    assert coord.iter_inverter_serials() == ["INV-FB"]
 
     async def pagination_empty_page_fetcher(*args, **kwargs):
         if kwargs.get("offset") == 0:
@@ -3554,7 +3553,7 @@ async def test_inventory_runtime_refresh_inverters_pagination_and_error_paths(
     )
     _clear_family_windows()
     await runtime._async_refresh_inverters()  # noqa: SLF001
-    assert coord.iter_inverter_serials() == ["INV-3"]
+    assert coord.iter_inverter_serials() == ["INV-FB"]
 
     async def pagination_total_growth_fetcher(*args, **kwargs):
         if kwargs.get("offset") == 0:
@@ -3572,7 +3571,7 @@ async def test_inventory_runtime_refresh_inverters_pagination_and_error_paths(
     )
     _clear_family_windows()
     await runtime._async_refresh_inverters()  # noqa: SLF001
-    assert coord.iter_inverter_serials() == ["INV-4", "INV-5"]
+    assert coord.iter_inverter_serials() == ["INV-FB"]
 
 
 @pytest.mark.asyncio

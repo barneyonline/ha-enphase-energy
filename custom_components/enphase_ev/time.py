@@ -15,6 +15,7 @@ from .battery_schedule_editor import (
     battery_scheduler_enabled,
 )
 from .const import DOMAIN
+from .entity import battery_schedule_supported
 from .coordinator import EnphaseCoordinator
 from .entity_cleanup import prune_managed_entities
 from .evse_schedule_editor import (
@@ -46,18 +47,7 @@ def _battery_schedule_editor_active(
     coord: EnphaseCoordinator, entry: EnphaseConfigEntry | None
 ) -> bool:
     client = getattr(coord, "client", None)
-    return bool(
-        battery_scheduler_enabled(entry)
-        and callable(getattr(client, "battery_schedules", None))
-        and all(
-            callable(getattr(client, method, None))
-            for method in (
-                "create_battery_schedule",
-                "update_battery_schedule",
-                "delete_battery_schedule",
-            )
-        )
-    )
+    return bool(battery_scheduler_enabled(entry) and battery_schedule_supported(client))
 
 
 def _retained_site_time_unique_ids(
@@ -247,10 +237,7 @@ class _BatteryScheduleEditorTimeEntity(
             and battery_scheduler_enabled(self._entry)
             and _type_available(self._coord, "encharge")
             and getattr(self._coord, "battery_write_access_confirmed", False)
-            and callable(getattr(client, "battery_schedules", None))
-            and callable(getattr(client, "create_battery_schedule", None))
-            and callable(getattr(client, "update_battery_schedule", None))
-            and callable(getattr(client, "delete_battery_schedule", None))
+            and battery_schedule_supported(client)
             and self._editor is not None
         )
 

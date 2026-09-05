@@ -12,6 +12,7 @@ import pytest
 from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.enphase_ev import api
+from custom_components.enphase_ev.api_client import common as api_common
 from custom_components.enphase_ev.api import (
     ActivationAccessDenied,
     EnphaseLoginWallUnauthorized,
@@ -97,7 +98,7 @@ def test_activation_auth_parser_handles_protocol_relative_and_malformed_urls() -
         )
         is None
     )
-    with patch.object(api, "URL", side_effect=ValueError):
+    with patch.object(api_common, "URL", side_effect=ValueError):
         assert (
             api._activation_context_from_settings_html(  # noqa: SLF001
                 f"/app/activation_ui/?token={token}"
@@ -139,15 +140,14 @@ def test_activation_auth_parser_handles_current_cross_origin_launch_script() -> 
 async def test_activation_auth_bootstrap_caches_settings_profile_labels() -> None:
     client = _make_api_client()
     token = "header.payload.signature"
-    client._text = AsyncMock(
-        return_value=f"""
+    settings_html = f"""
             <div><h4>Gateway - 122532006376</h4>
             Grid Profile: Australia A Region <button>Change</button></div>
             <button onclick="showGridProfileModal('122532006376')">Change</button>
             <script>var token = "{token}";
             const url = `https://activations-ui.enphaseenergy.com/?token=${{token}}&envoyserialnumber=${{serialnum}}`;</script>
         """
-    )  # noqa: SLF001
+    client._text = AsyncMock(return_value=settings_html)  # noqa: SLF001
 
     assert await client.async_prepare_activation_auth()
     assert client.activation_settings_grid_profiles() == [
@@ -178,12 +178,12 @@ def test_activation_auth_parser_rejects_incomplete_cross_origin_template() -> No
         "</script>",
         "<button onclick=\"showGridProfileModal('gateway')\">Change</button></script>",
     )
-    with patch.object(api, "URL", side_effect=ValueError):
+    with patch.object(api_common, "URL", side_effect=ValueError):
         assert (  # noqa: SLF001
             api._activation_context_from_settings_html(complete_payload) is None
         )
     with patch.object(
-        api,
+        api_common,
         "URL",
         return_value=SimpleNamespace(
             host="example.com",

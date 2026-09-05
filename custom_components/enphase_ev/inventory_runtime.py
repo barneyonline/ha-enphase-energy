@@ -27,7 +27,10 @@ from .device_types import (
     type_display_label,
 )
 from .log_redaction import redact_site_id, redact_text
+from .inventory_payload_helpers import hems_devices_groups
+from .inverter_inventory import async_fetch_inverter_pages
 from .payload_debug import debug_field_keys, debug_render_summary, debug_sorted_keys
+from .parsing_helpers import heatpump_worst_status_text
 from .parsing_helpers import (
     coerce_optional_bool,
     coerce_optional_text,
@@ -45,8 +48,13 @@ from .runtime_helpers import (
     resolve_site_local_current_date,
     resolve_site_timezone_name,
 )
-from .state_models import install_state_descriptors
+from .state_models import (
+    InventoryState,
+    StateBackedAttribute,
+    install_state_descriptors,
+)
 from .system_dashboard_helpers import (
+    _format_inverter_model_summary,
     build_system_dashboard_summaries,
     system_dashboard_battery_detail_subset,
     system_dashboard_detail_records,
@@ -171,11 +179,15 @@ class InventoryRuntime:
     _inverter_model_counts: dict[str, int]
     _inverter_summary_counts: dict[str, int]
 
-    def __init__(self, coordinator: EnphaseCoordinator) -> None:
+    def __init__(
+        self, coordinator: EnphaseCoordinator, *, state: InventoryState | None = None
+    ) -> None:
         self.coordinator = coordinator
         self.discovery_state = coordinator.discovery_state
         self.refresh_state = coordinator.refresh_state
-        self.inventory_state = coordinator.inventory_state
+        self.inventory_state = (
+            state if state is not None else coordinator.inventory_state
+        )
         self.heatpump_state = coordinator.heatpump_state
         self._update_shared_state(
             _gateway_phase_map={},
@@ -185,7 +197,10 @@ class InventoryRuntime:
 
     def _set_shared_state_attr(self, name: str, value: object) -> None:
         object.__setattr__(self, name, value)
-        setattr(self.coordinator, name, value)
+        # Production descriptors already address the injected shared state.
+        # Keep the legacy non-descriptor fallback for older runtime adapters.
+        if not isinstance(getattr(type(self), name, None), StateBackedAttribute):
+            setattr(self.coordinator, name, value)
 
     def _update_shared_state(self, **values: object) -> None:
         for name, value in values.items():
@@ -194,7 +209,10 @@ class InventoryRuntime:
     def _coordinator_backed_attr(self, name: str, default: object = None) -> object:
         if name in self.__dict__:
             return self.__dict__[name]
-        return getattr(self.coordinator, name, default)
+        try:
+            return getattr(self, name)
+        except AttributeError:
+            return getattr(self.coordinator, name, default)
 
     @property
     def client(self) -> EnphaseEVClient:
@@ -1141,29 +1159,7 @@ class InventoryRuntime:
                 return [item for item in wrapped_result if isinstance(item, dict)]
         return []
 
-    @staticmethod
-    def _hems_devices_groups(payload: object) -> list[dict[str, object]]:
-        if not isinstance(payload, dict):
-            return []
-        result = payload.get("result")
-        if isinstance(result, dict):
-            devices = result.get("devices")
-            if isinstance(devices, list):
-                return [grouped for grouped in devices if isinstance(grouped, dict)]
-            if isinstance(devices, dict):
-                return [devices]
-        data = payload.get("data")
-        if not isinstance(data, dict):
-            return []
-        hems_devices = (
-            data.get("hems-devices")
-            if data.get("hems-devices") is not None
-            else data.get("hems_devices")
-        )
-        # The HEMS endpoint has appeared with both hyphenated and underscored keys.
-        if not isinstance(hems_devices, dict):
-            return []
-        return [hems_devices]
+    _hems_devices_groups = staticmethod(hems_devices_groups)
 
     @classmethod
     def _legacy_hems_devices_groups(cls, payload: object) -> list[dict[str, object]]:
@@ -1313,19 +1309,7 @@ class InventoryRuntime:
         device_type = heatpump_member_device_type(member)
         return str(device_type) if device_type is not None else None
 
-    @staticmethod
-    def _heatpump_worst_status_text(status_counts: dict[str, int]) -> str | None:
-        if int(status_counts.get("error", 0) or 0) > 0:
-            return "Error"
-        if int(status_counts.get("warning", 0) or 0) > 0:
-            return "Warning"
-        if int(status_counts.get("not_reporting", 0) or 0) > 0:
-            return "Not Reporting"
-        if int(status_counts.get("unknown", 0) or 0) > 0:
-            return "Unknown"
-        if int(status_counts.get("normal", 0) or 0) > 0:
-            return "Normal"
-        return None
+    _heatpump_worst_status_text = staticmethod(heatpump_worst_status_text)
 
     def _merge_heatpump_type_bucket(self) -> None:
         ready_before = bool(getattr(self, "_devices_inventory_ready", False))
@@ -2621,24 +2605,7 @@ class InventoryRuntime:
         )
         return str(start_date) if start_date is not None else None
 
-    @staticmethod
-    def _format_inverter_model_summary(model_counts: dict[str, int]) -> str | None:
-        clean: dict[str, int] = {}
-        for model, count in (model_counts or {}).items():
-            name = str(model).strip()
-            if not name:
-                continue
-            try:
-                count_int = int(count)
-            except (TypeError, ValueError):
-                continue
-            if count_int <= 0:
-                continue
-            clean[name] = count_int
-        if not clean:
-            return None
-        ordered = sorted(clean.items(), key=lambda item: (-item[1], item[0]))
-        return ", ".join(f"{name} x{count}" for name, count in ordered)
+    _format_inverter_model_summary = staticmethod(_format_inverter_model_summary)
 
     @staticmethod
     def _format_inverter_status_summary(summary_counts: dict[str, int]) -> str:
@@ -3629,13 +3596,12 @@ class InventoryRuntime:
                 if offset != 0:
                     return None
                 payload = await fetch_inventory()
-            except Exception:
-                raise
             if not isinstance(payload, dict):
                 return None
             return payload
 
         inventory_payload: dict[str, object] | None = None
+        inventory_fetched_complete = False
         fetch_inventory_now = True
         if inventory_cache_until is not None and now < float(inventory_cache_until):
             fetch_inventory_now = False
@@ -3643,7 +3609,30 @@ class InventoryRuntime:
             fetch_inventory_now = coord._endpoint_family_should_run(inventory_family)
         if fetch_inventory_now:
             try:
-                inventory_payload = await _fetch_inventory_page(0)
+                inventory_result = await async_fetch_inverter_pages(
+                    _fetch_inventory_page
+                )
+                if not inventory_result.complete:
+                    raise ValueError(
+                        f"Incomplete inverter inventory: {inventory_result.reason}"
+                    )
+                inventory_payload = inventory_result.payload
+                rows = inventory_payload["inverters"]
+                known_serials = (
+                    {
+                        str(item.get("serial_number") or "").strip()
+                        for item in rows
+                        if isinstance(item, dict)
+                    }
+                    if isinstance(rows, list)
+                    else set()
+                )
+                known_serials.discard("")
+                if len(known_serials) < self._coerce_int(
+                    inventory_payload.get("total"), default=0
+                ):
+                    raise ValueError("Incomplete inverter inventory: missing serials")
+                inventory_fetched_complete = True
             except Exception as err:  # noqa: BLE001
                 coord._note_endpoint_family_failure(inventory_family, err)
                 self._set_shared_state_attr(
@@ -3651,17 +3640,6 @@ class InventoryRuntime:
                     coord._endpoint_family_next_retry_mono(inventory_family),
                 )
                 inventory_payload = cached_inventory_payload
-            else:
-                if inventory_payload is None:
-                    coord._note_endpoint_family_failure(
-                        inventory_family,
-                        ValueError("Inverters inventory payload was not a dictionary"),
-                    )
-                    self._set_shared_state_attr(
-                        "_inverters_inventory_cache_until",
-                        coord._endpoint_family_next_retry_mono(inventory_family),
-                    )
-                    inventory_payload = cached_inventory_payload
         else:
             inventory_payload = cached_inventory_payload
         if inventory_payload is None:
@@ -3671,33 +3649,6 @@ class InventoryRuntime:
         if not isinstance(inverters_raw, list):
             inverters_raw = []
         inverters_list = [item for item in inverters_raw if isinstance(item, dict)]
-        total_expected = self._coerce_int(
-            inventory_payload.get("total"), default=len(inverters_list)
-        )
-        if total_expected > len(inverters_list):
-            merged = list(inverters_list)
-            next_offset = len(merged)
-            while next_offset < total_expected:
-                next_payload = await _fetch_inventory_page(next_offset)
-                if next_payload is None:
-                    break
-                next_raw = next_payload.get("inverters")
-                if not isinstance(next_raw, list):
-                    break
-                next_items = [item for item in next_raw if isinstance(item, dict)]
-                if not next_items:
-                    break
-                merged.extend(next_items)
-                total_candidate = self._coerce_int(
-                    next_payload.get("total"), default=total_expected
-                )
-                if total_candidate > total_expected:
-                    total_expected = total_candidate
-                page_size = len(next_items)
-                next_offset += page_size
-            inventory_payload = dict(inventory_payload)
-            inventory_payload["inverters"] = merged
-            inverters_list = merged
         inverters_list = await self._async_inverter_dashboard_inventory(inverters_list)
         inventory_payload = dict(inventory_payload)
         inventory_payload["inverters"] = inverters_list
@@ -3708,7 +3659,7 @@ class InventoryRuntime:
                 if str(item.get("serial_number") or "").strip()
             ]
         )
-        if fetch_inventory_now and inventory_payload is not cached_inventory_payload:
+        if inventory_fetched_complete:
             coord._note_endpoint_family_success(inventory_family)
             self._set_shared_state_attr(
                 "_inverters_inventory_cache_until",
@@ -3889,7 +3840,13 @@ class InventoryRuntime:
                 prev_wh = float(raw_prev_wh) if raw_prev_wh is not None else None
             except (TypeError, ValueError):
                 prev_wh = None
-            if production_wh is None or production_wh < 0:
+            if prev_wh is not None and (not math.isfinite(prev_wh) or prev_wh < 0):
+                prev_wh = None
+            if (
+                production_wh is None
+                or not math.isfinite(production_wh)
+                or production_wh < 0
+            ):
                 production_wh = prev_wh
             elif prev_wh is not None and production_wh < prev_wh:
                 production_wh = prev_wh

@@ -103,14 +103,19 @@ _LIVE_BATTERY_MODE_PROFILE_ALIASES = {
 class BatteryRuntime:
     """Battery profile selection and pending-state helpers."""
 
-    def __init__(self, coordinator: EnphaseCoordinator) -> None:
+    def __init__(
+        self, coordinator: EnphaseCoordinator, *, state: BatteryState | None = None
+    ) -> None:
         self.coordinator = coordinator
+        self._state = state
         self._ac_battery_runtime = AcBatteryRuntime(self)
 
     @property
     def battery_state(self) -> BatteryState:
-        """Return the explicit battery state bag when available."""
+        """Return runtime-owned state, with the legacy constructor adapter."""
 
+        if self._state is not None:
+            return self._state
         return cast(
             BatteryState,
             getattr(self.coordinator, "battery_state", self.coordinator),

@@ -1,11 +1,10 @@
-homeassistant>=2026.6.0
-pytest
-pytest-asyncio
-pytest-homeassistant-custom-component
-pytest-cov
-PyYAML
+# Current stable Home Assistant and its matching test-plugin dependency stack.
+# Upgrade both together and regenerate the constraints after validating the lane.
+-c constraints-dev.txt
+homeassistant==2026.9.0
+pytest-homeassistant-custom-component==0.13.363
+PyYAML==6.0.3
 mypy==2.2.0
 ruff==0.16.4
-black
-freezegun
-pre-commit
+black==26.5.1
+pre-commit==4.6.2

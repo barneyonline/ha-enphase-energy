@@ -208,6 +208,7 @@ from .vpp_runtime import (
     VppRuntime,
 )
 from .refresh_plan import (
+    BoundRefreshCall,
     build_followup_plan,
     build_heatpump_followup_plan,
     build_post_session_followup_plan,
@@ -216,12 +217,17 @@ from .refresh_plan import (
 from .refresh_runner import RefreshRunner
 from .tariff import TARIFF_SUCCESS_TTL_S, TariffRuntime
 from .service_validation import raise_translated_service_validation
+from .feature_snapshot import capture_feature_snapshot
+from .scalar_helpers import (
+    coerce_snapshot_bool,
+    snapshot_compatible_value,
+    sum_optional_values,
+)
 from .state_models import (
     BatteryControlCapability,
     BatteryState,
     DiscoveryState,
     EndpointFamilyHealth,
-    EVSEState,
     HeatpumpState,
     InventoryState,
     RefreshHealthState,
@@ -234,6 +240,7 @@ from .voltage import (
 )
 
 if TYPE_CHECKING:
+    from .reload_snapshot import ReloadSnapshot
     from .runtime_data import EnphaseConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
@@ -402,28 +409,7 @@ def _coerce_boolish(value: object) -> bool:
     return False
 
 
-def _coerce_optional_boolish(value: object) -> bool | None:
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return value != 0
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in ("true", "1", "yes", "y", "enabled", "enable", "on"):
-            return True
-        if normalized in (
-            "false",
-            "0",
-            "no",
-            "n",
-            "disabled",
-            "disable",
-            "off",
-        ):
-            return False
-    return None
+_coerce_optional_boolish = coerce_optional_bool
 
 
 def _coerce_floatish(value: object, *, precision: int | None = None) -> float | None:
@@ -932,17 +918,20 @@ class EnphaseCoordinator(
             ),
         )
         object.__setattr__(self, "refresh_state", RefreshHealthState())
+        self.auth_refresh_runtime = AuthRefreshRuntime(self)
         object.__setattr__(self, "inventory_state", InventoryState())
         object.__setattr__(self, "heatpump_state", HeatpumpState())
-        object.__setattr__(self, "evse_state", EVSEState())
-        object.__setattr__(
+        self.evse_runtime = EvseRuntime(self)
+        # Compatibility alias; the EVSE runtime owns the mutable caches.
+        object.__setattr__(self, "evse_state", self.evse_runtime.state)
+        self.battery_runtime = BatteryRuntime(
             self,
-            "battery_state",
-            BatteryState(
+            state=BatteryState(
                 _battery_profile_write_lock=asyncio.Lock(),
                 _battery_settings_write_lock=asyncio.Lock(),
             ),
         )
+        object.__setattr__(self, "battery_state", self.battery_runtime.battery_state)
         self._refresh_lock = asyncio.Lock()
         self._grid_profile_metadata_task = None
         self._grid_profile_metadata_refresh_lock = asyncio.Lock()
@@ -1079,9 +1068,7 @@ class EnphaseCoordinator(
             site_id_getter=lambda: self.site_id,
             logger=_LOGGER,
         )
-        self.evse_runtime = EvseRuntime(self)
-        self.battery_runtime = BatteryRuntime(self)
-        self.heatpump_runtime = HeatpumpRuntime(self)
+        self.heatpump_runtime = HeatpumpRuntime(self, state=self.heatpump_state)
         self._ensure_coordinator_runtime("current_power_runtime")
         self._ensure_coordinator_runtime("auth_refresh_runtime")
         self._ensure_coordinator_runtime("evse_feature_flags_runtime")
@@ -1089,12 +1076,29 @@ class EnphaseCoordinator(
         self._ensure_coordinator_runtime("tariff_runtime")
         self._ensure_coordinator_runtime("system_events_runtime")
         self._ensure_coordinator_runtime("vpp_runtime")
-        self.inventory_runtime = InventoryRuntime(self)
+        self.inventory_runtime = InventoryRuntime(self, state=self.inventory_state)
         self.discovery_snapshot = DiscoverySnapshotManager(self)
         self.inventory_view = InventoryView(self)
         self.diagnostics = CoordinatorDiagnostics(self)
         self.refresh_runner = RefreshRunner(self)
         self._endpoint_family_policies = self._build_endpoint_family_policies()
+
+    def capture_reload_snapshot(self) -> ReloadSnapshot:
+        """Capture detached discovery/telemetry before retiring this lifecycle."""
+
+        from .reload_snapshot import ReloadSnapshot
+
+        return ReloadSnapshot.capture(self)
+
+    def restore_reload_snapshot(self, snapshot: ReloadSnapshot) -> None:
+        """Restore cached entity discovery into a fresh coordinator and client."""
+
+        snapshot.apply(self)
+
+    async def async_bootstrap_cached_refresh(self) -> None:
+        """Initialize fresh runtime work without blocking cached entity discovery."""
+
+        await self._async_setup()
 
     async def async_close(self) -> None:
         """Release config-entry-owned HTTP resources."""
@@ -1135,6 +1139,58 @@ class EnphaseCoordinator(
             evse_feature_flags=feature_flags,
             current_power=current_power,
             vpp=self.vpp_runtime.snapshot,
+            evse=self.evse_runtime.snapshot,
+            auth=self.auth_refresh_runtime.snapshot,
+            features=capture_feature_snapshot(
+                self.battery_state,
+                self.heatpump_state,
+                self.inventory_state,
+                (
+                    self._integration_snapshot.features
+                    if self._integration_snapshot
+                    else None
+                ),
+                site_energy={
+                    "flows": self.energy.site_energy,
+                    "metadata": self.energy.site_energy_meta,
+                    "available": self.energy.service_available,
+                },
+                tariff={
+                    name: getattr(self, name, None)
+                    for name in (
+                        "tariff_billing",
+                        "tariff_import_rate",
+                        "tariff_export_rate",
+                    )
+                },
+                system_events={
+                    "events": self.system_events_runtime.active_events,
+                    "standing_alarms": self.system_events_runtime._standing_alarms,
+                    "available": self.system_events_runtime.available,
+                    "truncated": self.system_events_runtime._snapshot_truncated,
+                    "repairs_enabled": self.system_events_runtime.repairs_enabled,
+                },
+            ),
+            health=(
+                getattr(self, "_last_error", None),
+                getattr(self, "last_failure_status", None),
+                tuple(
+                    (
+                        family,
+                        state.consecutive_failures,
+                        state.last_status,
+                        state.cooldown_active,
+                        state.support_state,
+                        state.degraded,
+                        state.partial_success,
+                        state.using_cached_data,
+                        state.cache_stale,
+                    )
+                    for family, state in sorted(
+                        getattr(self, "_endpoint_family_health", {}).items()
+                    )
+                ),
+            ),
             runtime_revisions=tuple(
                 sorted(self._runtime_publication_revisions.items())
             ),
@@ -1148,6 +1204,10 @@ class EnphaseCoordinator(
                 evse_feature_flags=candidate.evse_feature_flags,
                 current_power=candidate.current_power,
                 vpp=candidate.vpp,
+                evse=candidate.evse,
+                auth=candidate.auth,
+                health=candidate.health,
+                features=candidate.features,
                 runtime_revisions=candidate.runtime_revisions,
                 revision=self._publication_revision,
             )
@@ -1735,6 +1795,12 @@ class EnphaseCoordinator(
 
     def _endpoint_family_policy(self, family: str) -> EndpointFamilyPolicy | None:
         return self._endpoint_family_policies.get(family)
+
+    def endpoint_family_last_success_utc(self, family: str) -> datetime | None:
+        """Return source freshness without creating or changing health state."""
+
+        state = self._endpoint_family_health.get(family)
+        return state.last_success_utc if state is not None else None
 
     def _endpoint_family_state(self, family: str) -> EndpointFamilyHealth:
         state = self._endpoint_family_health.get(family)
@@ -2536,45 +2602,9 @@ class EnphaseCoordinator(
     def _end_topology_refresh_batch(self) -> bool:
         return self.inventory_runtime._end_topology_refresh_batch()
 
-    @staticmethod
-    def _snapshot_compatible_value(value: object) -> object:
-        if value is None or isinstance(value, (bool, int, float, str)):
-            return value
-        if isinstance(value, datetime):
-            return value.isoformat()
-        if isinstance(value, dict):
-            out: dict[str, object] = {}
-            for key, item in value.items():
-                try:
-                    key_text = str(key)
-                except Exception:  # noqa: BLE001
-                    continue
-                out[key_text] = EnphaseCoordinator._snapshot_compatible_value(item)
-            return out
-        if isinstance(value, (list, tuple, set)):
-            return [
-                EnphaseCoordinator._snapshot_compatible_value(item) for item in value
-            ]
-        try:
-            return str(value)
-        except Exception:  # noqa: BLE001
-            return None
+    _snapshot_compatible_value = staticmethod(snapshot_compatible_value)
 
-    @staticmethod
-    def _snapshot_bool(value: object) -> bool | None:
-        if value is None:
-            return None
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, (int, float)):
-            return value != 0
-        if isinstance(value, str):
-            normalized = value.strip().lower()
-            if normalized in ("true", "1", "yes", "y", "enabled", "on"):
-                return True
-            if normalized in ("false", "0", "no", "n", "disabled", "off"):
-                return False
-        return None
+    _snapshot_bool = staticmethod(coerce_snapshot_bool)
 
     @staticmethod
     def _snapshot_text(value: object) -> str | None:
@@ -3079,24 +3109,7 @@ class EnphaseCoordinator(
     def _heatpump_daily_window(self) -> tuple[str, str, str, tuple[str, str]] | None:
         return self.heatpump_runtime._heatpump_daily_window()
 
-    @staticmethod
-    def _sum_optional_values(values: object) -> float | None:
-        if not isinstance(values, list):
-            return None
-        total = 0.0
-        found = False
-        for item in values:
-            if item is None:
-                continue
-            try:
-                numeric = float(item)
-            except Exception:
-                continue
-            if numeric != numeric or numeric in (float("inf"), float("-inf")):
-                continue
-            total += numeric
-            found = True
-        return total if found else None
+    _sum_optional_values = staticmethod(sum_optional_values)
 
     def _build_heatpump_daily_consumption_snapshot(
         self, split_payload: object, site_today_payload: object | None = None
@@ -3710,8 +3723,8 @@ class EnphaseCoordinator(
 
     def _first_refresh_followup_calls(
         self,
-    ) -> tuple[tuple[str, str, Callable[[], object], str | None], ...]:
-        calls: list[tuple[str, str, Callable[[], object], str | None]] = []
+    ) -> tuple[BoundRefreshCall, ...]:
+        calls: list[BoundRefreshCall] = []
         if self._first_refresh_storm_guard_followups_needed():
             calls.extend(
                 (
@@ -5724,7 +5737,7 @@ class EnphaseCoordinator(
         )
         if not changed_keys:
             return False
-        self._mark_internal_config_entry_data_update()
+        self._mark_internal_config_entry_data_update(old_data, merged)
         try:
             changed = self.hass.config_entries.async_update_entry(
                 config_entry, data=merged
@@ -5743,11 +5756,17 @@ class EnphaseCoordinator(
         )
         return True
 
-    def _mark_internal_config_entry_data_update(self) -> None:
+    def _mark_internal_config_entry_data_update(
+        self, before: dict[str, object], after: dict[str, object]
+    ) -> None:
         """Avoid reloading this entry for coordinator-owned data persistence."""
 
         config_entry = getattr(self, "config_entry", None)
         runtime_data = getattr(config_entry, "runtime_data", None)
+        mark = getattr(runtime_data, "mark_internal_data_update", None)
+        if callable(mark):
+            mark(before, after)
+            return
         if runtime_data is not None and hasattr(
             runtime_data, "reload_suppression_count"
         ):
@@ -5760,6 +5779,10 @@ class EnphaseCoordinator(
 
         config_entry = getattr(self, "config_entry", None)
         runtime_data = getattr(config_entry, "runtime_data", None)
+        unmark = getattr(runtime_data, "unmark_internal_data_update", None)
+        if callable(unmark):
+            unmark()
+            return
         if runtime_data is not None and hasattr(
             runtime_data, "reload_suppression_count"
         ):
@@ -6184,15 +6207,12 @@ class EnphaseCoordinator(
         Implementation lives on :class:`~custom_components.enphase_ev.auth_refresh_runtime.AuthRefreshRuntime`.
         """
 
-        return cast(bool, await self.auth_refresh_runtime.attempt_auto_refresh())
+        return await self.auth_refresh_runtime.attempt_auto_refresh()
 
     async def async_try_reauth_now(self) -> ManualAuthRefreshResult:
         """Attempt one manual stored-credential reauthentication."""
 
-        return cast(
-            ManualAuthRefreshResult,
-            await self.auth_refresh_runtime.attempt_manual_refresh(),
-        )
+        return await self.auth_refresh_runtime.attempt_manual_refresh()
 
     def _clear_auth_refresh_task(self, task: asyncio.Task[bool]) -> None:
         """Clear the shared auth-refresh task once it completes (delegates to ``AuthRefreshRuntime``)."""
@@ -6202,7 +6222,7 @@ class EnphaseCoordinator(
     def _auth_refresh_rejected_active(self) -> bool:
         """Return True while stored-credential refresh is in cooldown (delegates to ``AuthRefreshRuntime``)."""
 
-        return cast(bool, self.auth_refresh_runtime.auth_refresh_rejected_active())
+        return self.auth_refresh_runtime.auth_refresh_rejected_active()
 
     def _note_auth_refresh_rejected(self, message: str) -> None:
         """Start a cooldown after stored credentials are rejected (delegates to ``AuthRefreshRuntime``)."""
@@ -6212,14 +6232,12 @@ class EnphaseCoordinator(
     def _auth_refresh_recent_success_active(self) -> bool:
         """Return True when a recent successful refresh can satisfy stale 401s (delegates to ``AuthRefreshRuntime``)."""
 
-        return cast(
-            bool, self.auth_refresh_runtime.auth_refresh_recent_success_active()
-        )
+        return self.auth_refresh_runtime.auth_refresh_recent_success_active()
 
     async def _async_run_auto_refresh(self) -> bool:
         """Run one stored-credential refresh attempt for all concurrent waiters (delegates to ``AuthRefreshRuntime``)."""
 
-        return cast(bool, await self.auth_refresh_runtime.async_run_auto_refresh())
+        return await self.auth_refresh_runtime.async_run_auto_refresh()
 
     async def _handle_client_unauthorized(self) -> bool:
         """Handle client Unauthorized responses and retry when possible."""

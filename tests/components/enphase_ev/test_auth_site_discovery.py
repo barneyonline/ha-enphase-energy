@@ -5,6 +5,7 @@ import pytest
 from yarl import URL
 
 from custom_components.enphase_ev import api
+from custom_components.enphase_ev.api_client import authentication as api_authentication
 
 
 @pytest.mark.asyncio
@@ -43,7 +44,7 @@ async def test_async_authenticate_populates_site_headers(monkeypatch):
             return {"sites": [{"id": 7812456, "title": "Garage"}]}
         raise AssertionError(f"Unexpected URL: {url}")
 
-    monkeypatch.setattr(api, "_request_json", _fake_request_json)
+    monkeypatch.setattr(api_authentication, "_request_json", _fake_request_json)
 
     class StubSession:
         def __init__(self):

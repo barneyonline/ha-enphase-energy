@@ -15,6 +15,7 @@ def _make_site_coord():
     coord.site_id = RANDOM_SITE_ID
     coord.update_interval = timedelta(seconds=10)
     coord.last_success_utc = None
+    coord.last_update_success = True
     coord.last_failure_utc = None
     coord.last_failure_status = None
     coord.last_failure_description = None

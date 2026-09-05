@@ -31,6 +31,10 @@ from .ac_battery_support import (
     ac_battery_soc_option_label,
 )
 from .const import DOMAIN
+from .entity import battery_schedule_supported
+from .entity import (
+    battery_write_access_explicitly_denied as _battery_write_access_explicitly_denied,
+)
 from .coordinator import EnphaseCoordinator
 from .entity import EnphaseBaseEntity
 from .entity_cleanup import prune_managed_entities
@@ -142,24 +146,6 @@ def _site_has_battery(coord: EnphaseCoordinator) -> bool:
     return has_encharge is not False
 
 
-def _battery_write_access_confirmed(coord: EnphaseCoordinator) -> bool:
-    confirmed = getattr(coord, "battery_write_access_confirmed", None)
-    if confirmed is not None:
-        return bool(confirmed)
-    owner = getattr(coord, "battery_user_is_owner", None)
-    installer = getattr(coord, "battery_user_is_installer", None)
-    return owner is True or installer is True
-
-
-def _battery_write_access_explicitly_denied(coord: EnphaseCoordinator) -> bool:
-    if getattr(coord, "battery_write_access_confirmed", None) is True:
-        return False
-    return (
-        getattr(coord, "battery_user_is_owner", None) is False
-        and getattr(coord, "battery_user_is_installer", None) is False
-    )
-
-
 def _retain_system_profile(coord: EnphaseCoordinator) -> bool:
     if not _site_has_battery(coord):
         return False
@@ -187,10 +173,7 @@ def _retain_battery_schedule_editor(
         battery_scheduler_enabled(entry)
         and _site_has_battery(coord)
         and _type_available(coord, "encharge")
-        and callable(getattr(client, "battery_schedules", None))
-        and callable(getattr(client, "create_battery_schedule", None))
-        and callable(getattr(client, "update_battery_schedule", None))
-        and callable(getattr(client, "delete_battery_schedule", None))
+        and battery_schedule_supported(client)
     )
 
 

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
+from copy import deepcopy
+from collections.abc import Awaitable
 import logging
 import time
 from datetime import datetime
@@ -49,6 +50,34 @@ _SKIPPABLE_REFRESH_ERRORS = (
 
 class _RefreshCallCancelled(Exception):
     """Signal a child refresh cancellation that should cancel sibling tasks."""
+
+
+def merge_warmup_enrichment(
+    baseline: dict[str, dict[str, object]],
+    enriched: dict[str, dict[str, object]],
+    current: dict[str, dict[str, object]],
+) -> dict[str, dict[str, object]]:
+    """Apply only warmup changes whose source fields have not changed meanwhile."""
+
+    result = {serial: dict(payload) for serial, payload in current.items()}
+    missing = object()
+    for serial, payload in enriched.items():
+        original = baseline.get(serial)
+        if original is not None and serial not in current:
+            # A newer authoritative inventory removed this charger.
+            continue
+        previous = original or {}
+        target = result.setdefault(serial, {})
+        for key in previous.keys() | payload.keys():
+            before = previous.get(key, missing)
+            after = payload.get(key, missing)
+            if after == before or target.get(key, missing) != before:
+                continue
+            if after is missing:
+                target.pop(key, None)
+            else:
+                target[key] = after
+    return result
 
 
 class RefreshRunner:
@@ -98,16 +127,14 @@ class RefreshRunner:
         self,
         timing_key: str,
         log_label: str,
-        callback_factory: Callable[[], object],
+        callback_factory: Callable[[], Awaitable[object]],
         *,
         endpoint_family: str | None = None,
     ) -> tuple[str, float | None]:
         started = time.monotonic()
         try:
             with enlighten_optional_read_scope():
-                result = callback_factory()
-                if inspect.isawaitable(result):
-                    await result
+                await callback_factory()
         except asyncio.CancelledError:
             raise
         except EnphaseLoginWallUnauthorized as err:
@@ -142,7 +169,7 @@ class RefreshRunner:
         self,
         timing_key: str,
         log_label: str,
-        callback_factory: Callable[[], object],
+        callback_factory: Callable[[], Awaitable[object]],
         *,
         endpoint_family: str | None = None,
     ) -> tuple[str, float | None]:
@@ -382,11 +409,23 @@ class RefreshRunner:
         warmup_timings: dict[str, float] = {}
         coordinator._warmup_in_progress = True
         coordinator._warmup_last_error = None
-        warmup_data = (
-            {sn: dict(payload) for sn, payload in coordinator.data.items()}
+        baseline = (
+            deepcopy(dict(coordinator.data))
             if isinstance(coordinator.data, dict)
             else {}
         )
+        warmup_data = deepcopy(baseline)
+
+        def publish_enrichment() -> None:
+            nonlocal baseline
+            current = coordinator.data if isinstance(coordinator.data, dict) else {}
+            merged = merge_warmup_enrichment(baseline, warmup_data, current)
+            coordinator.async_set_updated_data(merged)
+            baseline = deepcopy(merged)
+            # Bound plan callbacks retain this dictionary, so update it in place.
+            warmup_data.clear()
+            warmup_data.update(deepcopy(merged))
+
         try:
             await self.async_start_startup_power()
             power_task = getattr(coordinator, "_startup_power_task", None)
@@ -404,7 +443,7 @@ class RefreshRunner:
                 dict(getattr(coordinator, "_startup_power_phase_timings", {}) or {})
             )
             if warmup_data or self._warmup_site_state_available():
-                coordinator.async_set_updated_data(warmup_data)
+                publish_enrichment()
             plan = warmup_plan(warmup_data, owner=coordinator)
             for stage in plan.stages:
                 await self.async_run_refresh_plan(
@@ -412,7 +451,7 @@ class RefreshRunner:
                     plan=RefreshPlan(stages=(stage,)),
                 )
                 if warmup_data or self._warmup_site_state_available():
-                    coordinator.async_set_updated_data(warmup_data)
+                    publish_enrichment()
         except asyncio.CancelledError:
             raise
         except Exception as err:  # noqa: BLE001
@@ -479,7 +518,10 @@ class RefreshRunner:
         working_data: dict[str, dict[str, object]] | None = None,
     ) -> None:
         coordinator = self._coordinator
-        target = working_data if working_data is not None else coordinator.data
+        baseline = (
+            deepcopy(dict(coordinator.data or {})) if working_data is None else {}
+        )
+        target = working_data if working_data is not None else baseline
         if not isinstance(target, dict) or not target:
             return
         try:
@@ -507,7 +549,9 @@ class RefreshRunner:
                 sessions
             )
         if working_data is None:
-            coordinator.async_set_updated_data(merged)
+            coordinator.async_set_updated_data(
+                merge_warmup_enrichment(baseline, merged, coordinator.data or {})
+            )
         coordinator._sync_session_history_issue()
 
     async def async_refresh_secondary_evse_state_for_warmup(
@@ -516,7 +560,10 @@ class RefreshRunner:
         working_data: dict[str, dict[str, object]] | None = None,
     ) -> None:
         coordinator = self._coordinator
-        target = working_data if working_data is not None else coordinator.data
+        baseline = (
+            deepcopy(dict(coordinator.data or {})) if working_data is None else {}
+        )
+        target = working_data if working_data is not None else baseline
         if not isinstance(target, dict) or not target:
             return
         serials = [sn for sn in coordinator.iter_serials() if sn]
@@ -591,7 +638,9 @@ class RefreshRunner:
                     payload["default_charge_level_supported"] = False
                     payload["default_charge_level_supported_source"] = "charger_config"
         if working_data is None:
-            coordinator.async_set_updated_data(merged)
+            coordinator.async_set_updated_data(
+                merge_warmup_enrichment(baseline, merged, coordinator.data or {})
+            )
 
 
 # Backward-compatible alias for older tests and patch targets.

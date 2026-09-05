@@ -7,6 +7,7 @@ import base64
 from contextlib import asynccontextmanager
 import datetime
 import hashlib
+import inspect
 from http.cookies import SimpleCookie
 import json
 import logging
@@ -19,6 +20,9 @@ from multidict import CIMultiDict
 from yarl import URL
 
 from custom_components.enphase_ev import api
+from custom_components.enphase_ev.api_client import common as api_common
+from custom_components.enphase_ev.api_client import battery_surface as api_battery
+from custom_components.enphase_ev.api_client import dashboard_surface as api_dashboard
 from custom_components.enphase_ev.const import (
     AUTH_APP_SETTING,
     AUTH_RFID_SETTING,
@@ -27,6 +31,20 @@ from custom_components.enphase_ev.const import (
     PHASE_SWITCH_CONFIG_SETTING,
 )
 from custom_components.enphase_ev.request_metrics import request_metrics_scope
+
+
+class _RequestMock(AsyncMock):
+    """Capture resolved request policies like the real transport boundary."""
+
+    async def _execute_mock_call(self, *args, **kwargs):
+        headers = kwargs.get("headers")
+        if callable(headers):
+            headers = headers()
+            if inspect.isawaitable(headers):
+                headers = await headers
+            kwargs["headers"] = headers
+        return await super()._execute_mock_call(*args, **kwargs)
+
 
 TEST_EVSE_SERIAL = "EVSE-SERIAL-0001"
 
@@ -263,7 +281,7 @@ def test_battery_config_cookie_header_xsrf_token_handles_quotes_and_decode_fallb
 
     client.update_credentials(cookie='session=1; BP-XSRF-Token="opaque"')
     monkeypatch.setattr(
-        api, "unquote", lambda value: (_ for _ in ()).throw(ValueError(value))
+        api_battery, "unquote", lambda value: (_ for _ in ()).throw(ValueError(value))
     )
     assert client._battery_config_cookie_header_xsrf_token() == "opaque"  # noqa: SLF001
 
@@ -389,7 +407,7 @@ def test_extract_xsrf_token_branches(monkeypatch) -> None:
     assert api._extract_xsrf_token({"XSRF-TOKEN": '""', "BP-XSRF-Token": "bp"}) == "bp"
 
     monkeypatch.setattr(
-        api,
+        api_common,
         "unquote",
         lambda _value: (_ for _ in ()).throw(ValueError("decode-fail")),
     )
@@ -602,7 +620,7 @@ async def test_text_response_retries_unauthorized_with_header_callback(
     client = _make_client(session)
     client._reauth_cb = AsyncMock(return_value=True)  # noqa: SLF001
     ticks = iter((0.0, 0.1, 1.0, 1.2, 2.0, 2.3, 3.0, 3.4, 4.0, 4.5))
-    monkeypatch.setattr(api, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(api_common, "monotonic", lambda: next(ticks))
 
     with request_metrics_scope("text_retry") as metrics:
         result = await client._text_response(  # noqa: SLF001
@@ -770,7 +788,7 @@ def test_xsrf_token_handles_empty_and_decode_fallback(monkeypatch) -> None:
     assert client._xsrf_token() == "bp=token"
 
     monkeypatch.setattr(
-        api,
+        api_battery,
         "unquote",
         lambda _value: (_ for _ in ()).throw(ValueError("decode-fail")),
     )
@@ -1119,7 +1137,7 @@ def test_request_label_handles_bad_method_and_raw_url_fallback(monkeypatch) -> N
             raise RuntimeError("boom")
 
     monkeypatch.setattr(
-        api,
+        api_common,
         "URL",
         lambda _value: (_ for _ in ()).throw(ValueError("bad url")),
     )
@@ -1133,7 +1151,7 @@ def test_request_label_handles_url_and_raw_text_failures(monkeypatch) -> None:
             raise RuntimeError("boom")
 
     monkeypatch.setattr(
-        api,
+        api_common,
         "URL",
         lambda _value: (_ for _ in ()).throw(ValueError("bad url")),
     )
@@ -1148,7 +1166,7 @@ def test_request_label_returns_method_when_url_has_no_path(monkeypatch) -> None:
             self.query_string = ""
 
     monkeypatch.setattr(
-        api,
+        api_common,
         "URL",
         _UrlNoPath,
     )
@@ -1600,7 +1618,7 @@ async def test_json_merges_headers_and_returns_payload(monkeypatch) -> None:
     session = _FakeSession([_FakeResponse(status=200, json_body={"ok": True})])
     client = api.EnphaseEVClient(session, "SITE", None, "COOKIE")
     ticks = iter((10.0, 10.25, 20.0, 20.5, 30.0, 30.75))
-    monkeypatch.setattr(api, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(api_common, "monotonic", lambda: next(ticks))
 
     with request_metrics_scope("json") as metrics:
         payload = await client._json(
@@ -1625,9 +1643,9 @@ async def test_json_merges_headers_and_returns_payload(monkeypatch) -> None:
 async def test_json_queue_timeout_records_wait_without_attempt(monkeypatch) -> None:
     session = _FakeSession([_FakeResponse(status=200, json_body={"ok": True})])
     client = api.EnphaseEVClient(session, "SITE", None, None, timeout=0.01)
-    monkeypatch.setattr(api, "_enlighten_read_semaphore", asyncio.Semaphore(0))
+    monkeypatch.setattr(api_common, "_enlighten_read_semaphore", asyncio.Semaphore(0))
     ticks = iter((10.0, 10.5))
-    monkeypatch.setattr(api, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(api_common, "monotonic", lambda: next(ticks))
 
     with request_metrics_scope("queue_timeout") as metrics:
         with pytest.raises(TimeoutError):
@@ -1647,9 +1665,9 @@ async def test_json_network_failure_records_header_wait(monkeypatch) -> None:
 
     session = _FakeSession([_EnterFailureResponse(status=200, json_body={"ok": True})])
     client = api.EnphaseEVClient(session, "SITE", None, None)
-    monkeypatch.setattr(api, "_enlighten_read_semaphore", asyncio.Semaphore(2))
+    monkeypatch.setattr(api_common, "_enlighten_read_semaphore", asyncio.Semaphore(2))
     ticks = iter((0.0, 0.1, 1.0, 1.3))
-    monkeypatch.setattr(api, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(api_common, "monotonic", lambda: next(ticks))
 
     with request_metrics_scope("network_failure") as metrics:
         with pytest.raises(RuntimeError, match="connection failed"):
@@ -1915,7 +1933,7 @@ async def test_evse_fw_details_normalizes_null_payload_to_empty_list() -> None:
 @pytest.mark.asyncio
 async def test_evse_fw_details_returns_none_on_unauthorized() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=api.Unauthorized())
+    client._json = _RequestMock(side_effect=api.Unauthorized())
 
     assert await client.evse_fw_details() is None
 
@@ -1926,7 +1944,7 @@ async def test_evse_fw_details_returns_none_for_optional_http_errors(
     status: int,
 ) -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(status, "missing"))
+    client._json = _RequestMock(side_effect=_make_cre(status, "missing"))
 
     assert await client.evse_fw_details() is None
 
@@ -1958,7 +1976,7 @@ async def test_evse_fw_details_rejects_non_list_payload() -> None:
 @pytest.mark.asyncio
 async def test_evse_feature_flags_uses_endpoint_and_optional_country() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"data": {"evse_charging_mode": True}})
+    client._json = _RequestMock(return_value={"data": {"evse_charging_mode": True}})
 
     result = await client.evse_feature_flags(country="DE")
 
@@ -1973,7 +1991,7 @@ async def test_evse_feature_flags_uses_endpoint_and_optional_country() -> None:
 @pytest.mark.asyncio
 async def test_evse_feature_flags_returns_none_when_payload_not_dict() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["bad"])
+    client._json = _RequestMock(return_value=["bad"])
 
     assert await client.evse_feature_flags() is None
 
@@ -1982,7 +2000,7 @@ async def test_evse_feature_flags_returns_none_when_payload_not_dict() -> None:
 @pytest.mark.parametrize("error", [api.Unauthorized(), _make_cre(403), _make_cre(404)])
 async def test_evse_feature_flags_optional_errors_return_none(error) -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     assert await client.evse_feature_flags() is None
 
@@ -1990,7 +2008,7 @@ async def test_evse_feature_flags_optional_errors_return_none(error) -> None:
 @pytest.mark.asyncio
 async def test_evse_feature_flags_reraises_unexpected_http_error() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(500))
+    client._json = _RequestMock(side_effect=_make_cre(500))
 
     with pytest.raises(aiohttp.ClientResponseError):
         await client.evse_feature_flags()
@@ -2520,7 +2538,7 @@ async def test_json_invalid_payload_handles_unparseable_url() -> None:
 @pytest.mark.asyncio
 async def test_devices_inventory_uses_devices_json_endpoint() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"result": []})
+    client._json = _RequestMock(return_value={"result": []})
 
     result = await client.devices_inventory()
 
@@ -2535,7 +2553,7 @@ async def test_devices_inventory_uses_devices_json_endpoint() -> None:
 @pytest.mark.asyncio
 async def test_devices_inventory_returns_empty_when_payload_not_dict() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["not", "a", "dict"])
+    client._json = _RequestMock(return_value=["not", "a", "dict"])
 
     result = await client.devices_inventory()
 
@@ -2546,7 +2564,7 @@ async def test_devices_inventory_returns_empty_when_payload_not_dict() -> None:
 async def test_phase_map_multiple_envoy_uses_app_api_endpoint() -> None:
     client = _make_client()
     payload = {"GW-2": {"isDefaultGateway": True, "totalPhase": 3}}
-    client._json = AsyncMock(return_value=payload)
+    client._json = _RequestMock(return_value=payload)
 
     result = await client.phase_map_multiple_envoy()
 
@@ -2561,7 +2579,7 @@ async def test_phase_map_multiple_envoy_uses_app_api_endpoint() -> None:
 @pytest.mark.asyncio
 async def test_phase_map_multiple_envoy_rejects_non_mapping_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=[])
+    client._json = _RequestMock(return_value=[])
 
     assert await client.phase_map_multiple_envoy() is None
 
@@ -2577,7 +2595,7 @@ async def test_phase_map_multiple_envoy_wraps_optional_html_payload() -> None:
         failure_kind="html",
         body_preview_redacted="<html></html>",
     )
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     with pytest.raises(api.OptionalEndpointUnavailable):
         await client.phase_map_multiple_envoy()
@@ -2593,7 +2611,7 @@ async def test_phase_map_multiple_envoy_reraises_json_payload_error() -> None:
         endpoint="/app-api/SITE/phase_map_multiple_envoy",
         failure_kind="decode",
     )
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     with pytest.raises(api.InvalidPayloadError):
         await client.phase_map_multiple_envoy()
@@ -2602,7 +2620,7 @@ async def test_phase_map_multiple_envoy_reraises_json_payload_error() -> None:
 @pytest.mark.asyncio
 async def test_devices_tree_uses_system_dashboard_endpoint_and_headers() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"devices": []})
+    client._json = _RequestMock(return_value={"devices": []})
 
     result = await client.devices_tree()
 
@@ -2617,7 +2635,7 @@ async def test_devices_tree_uses_system_dashboard_endpoint_and_headers() -> None
 @pytest.mark.asyncio
 async def test_devices_tree_returns_none_when_payload_not_dict() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["bad"])
+    client._json = _RequestMock(return_value=["bad"])
 
     assert await client.devices_tree() is None
 
@@ -2626,7 +2644,7 @@ async def test_devices_tree_returns_none_when_payload_not_dict() -> None:
 @pytest.mark.parametrize("error", [api.Unauthorized(), _make_cre(403), _make_cre(404)])
 async def test_devices_tree_optional_errors_return_none(error) -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=[error, error])
+    client._json = _RequestMock(side_effect=[error, error])
 
     assert await client.devices_tree() is None
 
@@ -2634,7 +2652,7 @@ async def test_devices_tree_optional_errors_return_none(error) -> None:
 @pytest.mark.asyncio
 async def test_devices_tree_falls_back_to_legacy_route() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(404), {"devices": []}])
+    client._json = _RequestMock(side_effect=[_make_cre(404), {"devices": []}])
 
     result = await client.devices_tree()
 
@@ -2656,7 +2674,7 @@ async def test_devices_tree_non_json_payload_returns_none(monkeypatch) -> None:
         content_type="text/html",
         endpoint="/service/system_dashboard/api_internal/dashboard/sites/SITE/devices-tree",
     )
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=[err, err]))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=[err, err]))
 
     assert await client.devices_tree() is None
 
@@ -2670,7 +2688,7 @@ async def test_devices_tree_json_invalid_payload_reraises(monkeypatch) -> None:
         content_type="application/json",
         endpoint="/service/system_dashboard/api_internal/dashboard/sites/SITE/devices-tree",
     )
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
 
     with pytest.raises(api.InvalidPayloadError):
         await client.devices_tree()
@@ -2679,7 +2697,7 @@ async def test_devices_tree_json_invalid_payload_reraises(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_devices_tree_reraises_unexpected_http_error() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(500))
+    client._json = _RequestMock(side_effect=_make_cre(500))
 
     with pytest.raises(aiohttp.ClientResponseError):
         await client.devices_tree()
@@ -2688,7 +2706,7 @@ async def test_devices_tree_reraises_unexpected_http_error() -> None:
 @pytest.mark.asyncio
 async def test_devices_details_uses_system_dashboard_endpoint_and_headers() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"details": []})
+    client._json = _RequestMock(return_value={"details": []})
 
     result = await client.devices_details("meter")
 
@@ -2703,7 +2721,7 @@ async def test_devices_details_uses_system_dashboard_endpoint_and_headers() -> N
 @pytest.mark.asyncio
 async def test_devices_details_returns_none_when_type_invalid_or_payload_bad() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["bad"])
+    client._json = _RequestMock(return_value=["bad"])
 
     assert await client.devices_details("") is None
     assert await client.devices_details("unsupported") is None
@@ -2714,7 +2732,7 @@ async def test_devices_details_returns_none_when_type_invalid_or_payload_bad() -
 @pytest.mark.parametrize("error", [api.Unauthorized(), _make_cre(401), _make_cre(404)])
 async def test_devices_details_optional_errors_return_none(error) -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=[error, error])
+    client._json = _RequestMock(side_effect=[error, error])
 
     assert await client.devices_details("envoy") is None
 
@@ -2722,7 +2740,7 @@ async def test_devices_details_optional_errors_return_none(error) -> None:
 @pytest.mark.asyncio
 async def test_devices_details_falls_back_to_legacy_route_and_query_mapping() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(404), {"details": []}])
+    client._json = _RequestMock(side_effect=[_make_cre(404), {"details": []}])
 
     result = await client.devices_details("microinverter")
 
@@ -2744,7 +2762,7 @@ async def test_devices_details_non_json_payload_returns_none(monkeypatch) -> Non
         content_type="text/html",
         endpoint="/service/system_dashboard/api_internal/dashboard/sites/SITE/devices_details",
     )
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=[err, err]))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=[err, err]))
 
     assert await client.devices_details("envoy") is None
 
@@ -2758,7 +2776,7 @@ async def test_devices_details_json_invalid_payload_reraises(monkeypatch) -> Non
         content_type="application/json",
         endpoint="/service/system_dashboard/api_internal/dashboard/sites/SITE/devices_details",
     )
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
 
     with pytest.raises(api.InvalidPayloadError):
         await client.devices_details("envoy")
@@ -2767,7 +2785,7 @@ async def test_devices_details_json_invalid_payload_reraises(monkeypatch) -> Non
 @pytest.mark.asyncio
 async def test_devices_details_reraises_unexpected_http_error() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(500))
+    client._json = _RequestMock(side_effect=_make_cre(500))
 
     with pytest.raises(aiohttp.ClientResponseError):
         await client.devices_details("envoy")
@@ -2776,7 +2794,7 @@ async def test_devices_details_reraises_unexpected_http_error() -> None:
 @pytest.mark.asyncio
 async def test_system_dashboard_microinverter_parameter_endpoints() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=[
             {"parameters": [{"id": "power"}]},
             {"data": [{"serial_number": "INV-A"}]},
@@ -2818,7 +2836,7 @@ async def test_system_dashboard_microinverter_parameter_endpoints() -> None:
 @pytest.mark.asyncio
 async def test_system_dashboard_microinverter_parameter_endpoint_guards() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["bad"])
+    client._json = _RequestMock(return_value=["bad"])
 
     assert await client.system_dashboard_envoy_inverters("") is None
     assert await client.system_dashboard_data_columns("") is None
@@ -2826,13 +2844,13 @@ async def test_system_dashboard_microinverter_parameter_endpoint_guards() -> Non
     assert await client.system_dashboard_parameter_view(["INV-A"], "") is None
     assert await client.system_dashboard_master_data() is None
 
-    client._json = AsyncMock(side_effect=_make_cre(404))
+    client._json = _RequestMock(side_effect=_make_cre(404))
     assert await client.system_dashboard_master_data() is None
     assert await client.system_dashboard_envoy_inverters("GW-A") is None
     assert await client.system_dashboard_data_columns("GW-A") is None
     assert await client.system_dashboard_parameter_view(["INV-A"], "power") is None
 
-    client._json = AsyncMock(side_effect=_make_cre(500))
+    client._json = _RequestMock(side_effect=_make_cre(500))
     with pytest.raises(aiohttp.ClientResponseError):
         await client.system_dashboard_parameter_view(["INV-A"], "power")
 
@@ -2840,7 +2858,7 @@ async def test_system_dashboard_microinverter_parameter_endpoint_guards() -> Non
 @pytest.mark.asyncio
 async def test_grid_control_check_uses_grid_control_check_endpoint() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"disableGridControl": False})
+    client._json = _RequestMock(return_value={"disableGridControl": False})
 
     result = await client.grid_control_check()
 
@@ -2862,7 +2880,7 @@ async def test_grid_control_check_uses_grid_control_check_endpoint() -> None:
 @pytest.mark.asyncio
 async def test_off_grid_due_to_grid_outage_uses_status_context_endpoint() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"is_grid_outage": True})
+    client._json = _RequestMock(return_value={"is_grid_outage": True})
 
     result = await client.off_grid_due_to_grid_outage()
 
@@ -2886,7 +2904,7 @@ async def test_off_grid_due_to_grid_outage_returns_empty_when_payload_not_dict()
     None
 ):
     client = _make_client()
-    client._json = AsyncMock(return_value=["bad"])
+    client._json = _RequestMock(return_value=["bad"])
 
     result = await client.off_grid_due_to_grid_outage()
 
@@ -2896,7 +2914,7 @@ async def test_off_grid_due_to_grid_outage_returns_empty_when_payload_not_dict()
 @pytest.mark.asyncio
 async def test_request_grid_toggle_otp_uses_endpoint() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"success": "email sent successfully"})
+    client._json = _RequestMock(return_value={"success": "email sent successfully"})
 
     result = await client.request_grid_toggle_otp()
 
@@ -2913,7 +2931,7 @@ async def test_request_grid_toggle_otp_uses_endpoint() -> None:
 @pytest.mark.asyncio
 async def test_request_grid_toggle_otp_returns_empty_when_payload_not_dict() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["bad"])
+    client._json = _RequestMock(return_value=["bad"])
 
     result = await client.request_grid_toggle_otp()
 
@@ -2923,7 +2941,7 @@ async def test_request_grid_toggle_otp_returns_empty_when_payload_not_dict() -> 
 @pytest.mark.asyncio
 async def test_validate_grid_toggle_otp_success() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"valid": True})
+    client._json = _RequestMock(return_value={"valid": True})
 
     result = await client.validate_grid_toggle_otp("1234")
 
@@ -2941,7 +2959,7 @@ async def test_validate_grid_toggle_otp_success() -> None:
 @pytest.mark.asyncio
 async def test_validate_grid_toggle_otp_returns_false_on_non_dict_or_invalid() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=[["bad"], {"valid": False}])
+    client._json = _RequestMock(side_effect=[["bad"], {"valid": False}])
 
     assert await client.validate_grid_toggle_otp("1111") is False
     assert await client.validate_grid_toggle_otp("1111") is False
@@ -2950,7 +2968,7 @@ async def test_validate_grid_toggle_otp_returns_false_on_non_dict_or_invalid() -
 @pytest.mark.asyncio
 async def test_set_grid_state_uses_endpoint() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"request_id": "req"})
+    client._json = _RequestMock(return_value={"request_id": "req"})
 
     result = await client.set_grid_state("122447007044", 1)
 
@@ -2968,7 +2986,7 @@ async def test_set_grid_state_uses_endpoint() -> None:
 @pytest.mark.asyncio
 async def test_set_grid_state_returns_empty_on_non_dict() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=None)
+    client._json = _RequestMock(return_value=None)
 
     result = await client.set_grid_state("122447007044", 2)
 
@@ -2978,7 +2996,7 @@ async def test_set_grid_state_returns_empty_on_non_dict() -> None:
 @pytest.mark.asyncio
 async def test_log_grid_change_uses_endpoint() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"status": "Grid Change Logged"})
+    client._json = _RequestMock(return_value={"status": "Grid Change Logged"})
 
     result = await client.log_grid_change(
         "122447007044",
@@ -3004,7 +3022,7 @@ async def test_log_grid_change_uses_endpoint() -> None:
 @pytest.mark.asyncio
 async def test_log_grid_change_returns_empty_on_non_dict() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value="bad")
+    client._json = _RequestMock(return_value="bad")
 
     result = await client.log_grid_change("ENV", "OLD", "NEW")
 
@@ -3014,7 +3032,7 @@ async def test_log_grid_change_returns_empty_on_non_dict() -> None:
 @pytest.mark.asyncio
 async def test_battery_backup_history_uses_endpoint() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"histories": []})
+    client._json = _RequestMock(return_value={"histories": []})
 
     result = await client.battery_backup_history()
 
@@ -3036,7 +3054,7 @@ async def test_battery_backup_history_uses_endpoint() -> None:
 @pytest.mark.asyncio
 async def test_grid_control_check_returns_empty_when_payload_not_dict() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["bad"])
+    client._json = _RequestMock(return_value=["bad"])
 
     result = await client.grid_control_check()
 
@@ -3046,7 +3064,7 @@ async def test_grid_control_check_returns_empty_when_payload_not_dict() -> None:
 @pytest.mark.asyncio
 async def test_battery_backup_history_returns_empty_when_payload_not_dict() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["bad"])
+    client._json = _RequestMock(return_value=["bad"])
 
     result = await client.battery_backup_history()
 
@@ -3056,7 +3074,7 @@ async def test_battery_backup_history_returns_empty_when_payload_not_dict() -> N
 @pytest.mark.asyncio
 async def test_battery_status_uses_battery_status_json_endpoint() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"current_charge": "48%"})
+    client._json = _RequestMock(return_value={"current_charge": "48%"})
 
     result = await client.battery_status()
 
@@ -3078,7 +3096,7 @@ async def test_battery_status_uses_battery_status_json_endpoint() -> None:
 @pytest.mark.asyncio
 async def test_battery_status_returns_empty_when_payload_not_dict() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["bad"])
+    client._json = _RequestMock(return_value=["bad"])
 
     result = await client.battery_status()
 
@@ -3088,7 +3106,7 @@ async def test_battery_status_returns_empty_when_payload_not_dict() -> None:
 @pytest.mark.asyncio
 async def test_dry_contacts_settings_uses_endpoint() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"contacts": []})
+    client._json = _RequestMock(return_value={"contacts": []})
 
     result = await client.dry_contacts_settings()
 
@@ -3103,7 +3121,7 @@ async def test_dry_contacts_settings_uses_endpoint() -> None:
 @pytest.mark.asyncio
 async def test_dry_contacts_settings_returns_empty_when_payload_not_dict() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["bad"])
+    client._json = _RequestMock(return_value=["bad"])
 
     result = await client.dry_contacts_settings()
 
@@ -3113,7 +3131,7 @@ async def test_dry_contacts_settings_returns_empty_when_payload_not_dict() -> No
 @pytest.mark.asyncio
 async def test_inverters_inventory_uses_inverters_json_endpoint() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"inverters": []})
+    client._json = _RequestMock(return_value={"inverters": []})
 
     result = await client.inverters_inventory(limit=30, offset=0, search="")
 
@@ -3136,7 +3154,7 @@ async def test_inverters_inventory_uses_inverters_json_endpoint() -> None:
 @pytest.mark.asyncio
 async def test_inverters_inventory_returns_empty_when_payload_not_dict() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["not", "dict"])
+    client._json = _RequestMock(return_value=["not", "dict"])
 
     result = await client.inverters_inventory()
 
@@ -3146,7 +3164,7 @@ async def test_inverters_inventory_returns_empty_when_payload_not_dict() -> None
 @pytest.mark.asyncio
 async def test_inverter_status_normalizes_keyed_dict() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "1": {"serialNum": "A", "deviceId": 10},
             "2": "invalid",
@@ -3174,7 +3192,7 @@ async def test_inverter_status_normalizes_keyed_dict() -> None:
 @pytest.mark.asyncio
 async def test_inverter_status_returns_empty_when_payload_not_dict() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["bad"])
+    client._json = _RequestMock(return_value=["bad"])
 
     result = await client.inverter_status()
 
@@ -3184,7 +3202,7 @@ async def test_inverter_status_returns_empty_when_payload_not_dict() -> None:
 @pytest.mark.asyncio
 async def test_inverter_production_normalizes_values() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "production": {"a": 100, "b": "200.5", "c": "bad"},
             "start_date": "2022-01-01",
@@ -3216,7 +3234,7 @@ async def test_inverter_production_normalizes_values() -> None:
 @pytest.mark.asyncio
 async def test_inverter_production_returns_empty_when_payload_not_dict() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["bad"])
+    client._json = _RequestMock(return_value=["bad"])
 
     result = await client.inverter_production(
         start_date="2022-01-01", end_date="2026-01-01"
@@ -3228,7 +3246,7 @@ async def test_inverter_production_returns_empty_when_payload_not_dict() -> None
 @pytest.mark.asyncio
 async def test_inverter_production_skips_blank_keys() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "production": {"": 100, "good": 50},
             "start_date": "2022-01-01",
@@ -3246,7 +3264,7 @@ async def test_inverter_production_skips_blank_keys() -> None:
 @pytest.mark.asyncio
 async def test_status_normalizes_charger_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "data": {
                 "chargers": [
@@ -3309,7 +3327,7 @@ async def test_status_normalizes_charger_payload() -> None:
 async def test_status_normalizes_start_time_variants() -> None:
     client = _make_client()
     huge = 1_700_000_000_123
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "data": {
                 "chargers": [
@@ -3338,7 +3356,7 @@ async def test_status_normalizes_start_time_variants() -> None:
 @pytest.mark.asyncio
 async def test_status_handles_bad_start_time_values() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "data": {
                 "chargers": [
@@ -3367,7 +3385,7 @@ async def test_status_handles_bad_start_time_values() -> None:
 @pytest.mark.asyncio
 async def test_status_rejects_non_dict_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["bad"])
+    client._json = _RequestMock(return_value=["bad"])
 
     with pytest.raises(api.InvalidPayloadError, match="must be an object") as err:
         await client.status()
@@ -3381,7 +3399,7 @@ async def test_status_raises_optional_endpoint_unavailable_for_html_json_payload
     None
 ):
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=api.InvalidPayloadError(
             "Invalid JSON response (status=200, endpoint=/service/evse_controller/SITE/ev_chargers/status)",
             endpoint="/service/evse_controller/SITE/ev_chargers/status",
@@ -3409,7 +3427,7 @@ async def test_status_reraises_non_optional_invalid_payload() -> None:
         decode_error="JSONDecodeError",
         body_preview_redacted='{"bad":true}',
     )
-    client._json = AsyncMock(side_effect=err)
+    client._json = _RequestMock(side_effect=err)
 
     with pytest.raises(api.InvalidPayloadError) as raised:
         await client.status()
@@ -3424,7 +3442,7 @@ async def test_get_schedules_normalizes_payload() -> None:
         "meta": {"serverTimeStamp": "ts"},
         "data": {"config": {"name": "config"}, "slots": [{"id": "slot-1"}]},
     }
-    client._json = AsyncMock(return_value=payload)
+    client._json = _RequestMock(return_value=payload)
 
     data = await client.get_schedules("SN123")
 
@@ -3433,7 +3451,7 @@ async def test_get_schedules_normalizes_payload() -> None:
     assert data["slots"] == [{"id": "slot-1"}]
 
     method, url = client._json.call_args.args[:2]
-    headers = client._json.call_args.kwargs["headers"]
+    headers = client._json.await_args.kwargs["headers"]
     assert method == "GET"
     assert url.endswith("/charging-mode/SCHEDULED_CHARGING/SITE/SN123/schedules")
     assert "Authorization" in headers
@@ -3442,11 +3460,11 @@ async def test_get_schedules_normalizes_payload() -> None:
 @pytest.mark.asyncio
 async def test_get_schedules_handles_bad_payloads() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value="bad")
+    client._json = _RequestMock(return_value="bad")
     data = await client.get_schedules("SN123")
     assert data == {"meta": None, "config": None, "slots": []}
 
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={"meta": {"serverTimeStamp": "ts"}, "data": "bad"}
     )
     data = await client.get_schedules("SN123")
@@ -3458,7 +3476,7 @@ async def test_get_schedules_handles_bad_payloads() -> None:
 @pytest.mark.asyncio
 async def test_patch_schedules_builds_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"ok": True})
+    client._json = _RequestMock(return_value={"ok": True})
 
     data = await client.patch_schedules(
         "SN123",
@@ -3480,7 +3498,7 @@ async def test_patch_schedules_builds_payload() -> None:
 @pytest.mark.asyncio
 async def test_patch_schedule_states_builds_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"ok": True})
+    client._json = _RequestMock(return_value={"ok": True})
 
     data = await client.patch_schedule_states(
         "SN123",
@@ -3499,7 +3517,7 @@ async def test_patch_schedule_states_builds_payload() -> None:
 @pytest.mark.asyncio
 async def test_patch_schedule_builds_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"ok": True})
+    client._json = _RequestMock(return_value={"ok": True})
     slot = {"id": "slot-1", "startTime": "11:00"}
 
     data = await client.patch_schedule("SN123", "slot-1", slot)
@@ -3516,7 +3534,7 @@ async def test_patch_schedule_builds_payload() -> None:
 @pytest.mark.asyncio
 async def test_create_schedule_builds_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"ok": True})
+    client._json = _RequestMock(return_value={"ok": True})
     slot = {"id": "slot-2", "startTime": "03:15"}
 
     data = await client.create_schedule("SN123", slot)
@@ -3534,7 +3552,7 @@ async def test_create_schedule_builds_payload() -> None:
 async def test_create_schedule_wraps_scheduler_unavailable(monkeypatch) -> None:
     client = _make_client()
     monkeypatch.setattr(
-        client, "_json", AsyncMock(side_effect=_make_cre(503, "Service Unavailable"))
+        client, "_json", _RequestMock(side_effect=_make_cre(503, "Service Unavailable"))
     )
 
     with pytest.raises(api.SchedulerUnavailable):
@@ -3544,7 +3562,7 @@ async def test_create_schedule_wraps_scheduler_unavailable(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_delete_schedule_uses_single_slot_endpoint() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"ok": True})
+    client._json = _RequestMock(return_value={"ok": True})
 
     data = await client.delete_schedule("SN123", "slot-2")
 
@@ -3559,7 +3577,7 @@ async def test_delete_schedule_uses_single_slot_endpoint() -> None:
 async def test_delete_schedule_wraps_scheduler_unavailable(monkeypatch) -> None:
     client = _make_client()
     monkeypatch.setattr(
-        client, "_json", AsyncMock(side_effect=_make_cre(503, "Service Unavailable"))
+        client, "_json", _RequestMock(side_effect=_make_cre(503, "Service Unavailable"))
     )
 
     with pytest.raises(api.SchedulerUnavailable):
@@ -3569,7 +3587,7 @@ async def test_delete_schedule_wraps_scheduler_unavailable(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_status_does_not_call_legacy_endpoint() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"evChargerData": []})
+    client._json = _RequestMock(return_value={"evChargerData": []})
     data = await client.status()
     assert data == {"evChargerData": []}
     assert client._json.call_count == 1
@@ -3578,7 +3596,7 @@ async def test_status_does_not_call_legacy_endpoint() -> None:
 @pytest.mark.asyncio
 async def test_status_handles_mapping_failure() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"data": {"chargers": ["bad-entry"]}})
+    client._json = _RequestMock(return_value={"data": {"chargers": ["bad-entry"]}})
     data = await client.status()
     assert data == {"data": {"chargers": ["bad-entry"]}}
 
@@ -3586,7 +3604,7 @@ async def test_status_handles_mapping_failure() -> None:
 @pytest.mark.asyncio
 async def test_start_charging_success_and_cache() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"status": "ok"})
+    client._json = _RequestMock(return_value={"status": "ok"})
     out = await client.start_charging("SN", 32, connector_id=1)
     assert out == {"status": "ok"}
     assert client._start_variant_idx == 0
@@ -3634,7 +3652,7 @@ async def test_start_charging_exclude_level_strict_requires_payload(
 async def test_start_charging_uses_cached_variant() -> None:
     client = _make_client()
     client._start_variant_idx = 5
-    client._json = AsyncMock(return_value={"status": "ok"})
+    client._json = _RequestMock(return_value={"status": "ok"})
     await client.start_charging("SN", 32, connector_id=2)
     args, kwargs = client._json.await_args
     assert "ev_chargers" in args[1]
@@ -3644,7 +3662,7 @@ async def test_start_charging_uses_cached_variant() -> None:
 @pytest.mark.asyncio
 async def test_start_charging_not_ready_on_409() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(409), {"status": "ok"}])
+    client._json = _RequestMock(side_effect=[_make_cre(409), {"status": "ok"}])
     out = await client.start_charging("SN", 32, connector_id=1)
     assert out == {"status": "not_ready"}
     assert client._start_variant_idx == 0
@@ -3654,7 +3672,7 @@ async def test_start_charging_not_ready_on_409() -> None:
 async def test_start_charging_raises_503_without_trying_fallback() -> None:
     client = _make_client()
     error = _make_cre(503, '{"errorMessageCode":"iqevc_ms-10007"}')
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     with pytest.raises(aiohttp.ClientResponseError) as err:
         await client.start_charging("SN", 32, connector_id=1)
@@ -3673,7 +3691,7 @@ async def test_start_charging_interprets_errors() -> None:
         }
     }
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=[_make_cre(400, message=json.dumps(body)), {"status": "ok"}]
     )
     out = await client.start_charging("SN", 32, connector_id=1)
@@ -3684,7 +3702,7 @@ async def test_start_charging_interprets_errors() -> None:
 async def test_start_charging_error_code_maps_to_already_charging() -> None:
     message = '{"error":{"errorMessageCode":"iqevc_ms-10012"}}'
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(400, message)])
+    client._json = _RequestMock(side_effect=[_make_cre(400, message)])
     out = await client.start_charging("SN", 32)
     assert out == {"status": "already_charging"}
 
@@ -3693,7 +3711,7 @@ async def test_start_charging_error_code_maps_to_already_charging() -> None:
 async def test_start_charging_error_code_maps_to_not_ready() -> None:
     message = '{"error":{"errorMessageCode":"iqevc_ms-10008"}}'
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(400, message)])
+    client._json = _RequestMock(side_effect=[_make_cre(400, message)])
     out = await client.start_charging("SN", 32)
     assert out == {"status": "not_ready"}
 
@@ -3702,7 +3720,7 @@ async def test_start_charging_error_code_maps_to_not_ready() -> None:
 async def test_start_charging_display_message_fallback() -> None:
     message = '{"error":{"displayMessage":"\\u004eot plugged into vehicle"}}'
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(400, message)])
+    client._json = _RequestMock(side_effect=[_make_cre(400, message)])
     out = await client.start_charging("SN", 32)
     assert out == {"status": "not_ready"}
 
@@ -3710,7 +3728,7 @@ async def test_start_charging_display_message_fallback() -> None:
 @pytest.mark.asyncio
 async def test_start_charging_plain_not_plugged_message_maps_to_not_ready() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(400, "Vehicle not plugged in")])
+    client._json = _RequestMock(side_effect=[_make_cre(400, "Vehicle not plugged in")])
 
     out = await client.start_charging("SN", 32)
 
@@ -3721,7 +3739,7 @@ async def test_start_charging_plain_not_plugged_message_maps_to_not_ready() -> N
 async def test_start_charging_display_message_already_charging() -> None:
     message = '{"error":{"message":"\\u0041lready in charging state"}}'
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(400, message)])
+    client._json = _RequestMock(side_effect=[_make_cre(400, message)])
     out = await client.start_charging("SN", 32)
     assert out == {"status": "already_charging"}
 
@@ -3730,7 +3748,7 @@ async def test_start_charging_display_message_already_charging() -> None:
 async def test_start_charging_parses_single_quoted_payload() -> None:
     payload = '{"errorMessageCode":"iqevc_ms-10008"}'
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(400, message=f"'{payload}'")])
+    client._json = _RequestMock(side_effect=[_make_cre(400, message=f"'{payload}'")])
     out = await client.start_charging("SN", 32, connector_id=1)
     assert out == {"status": "not_ready"}
 
@@ -3748,7 +3766,7 @@ async def test_start_charging_prefers_cached_level_variant(monkeypatch) -> None:
 
     monkeypatch.setattr(client, "_start_charging_candidates", _candidates)
     client._start_variant_idx_with_level = 2
-    client._json = AsyncMock(return_value={"status": "ok"})
+    client._json = _RequestMock(return_value={"status": "ok"})
 
     await client.start_charging("SN", 40, include_level=True)
 
@@ -3771,7 +3789,7 @@ async def test_start_charging_prefers_cached_no_level_variant(monkeypatch) -> No
 
     monkeypatch.setattr(client, "_start_charging_candidates", _candidates)
     client._start_variant_idx_no_level = 2
-    client._json = AsyncMock(return_value={"status": "ok"})
+    client._json = _RequestMock(return_value={"status": "ok"})
 
     await client.start_charging("SN", 24, include_level=False)
     args, kwargs = client._json.await_args
@@ -3790,7 +3808,7 @@ async def test_start_charging_falls_back_to_general_cache(monkeypatch) -> None:
         ]
 
     monkeypatch.setattr(client, "_start_charging_candidates", _candidates)
-    client._json = AsyncMock(return_value={"status": "ok"})
+    client._json = _RequestMock(return_value={"status": "ok"})
 
     await client.start_charging("SN", 24, include_level=True)
 
@@ -3809,7 +3827,7 @@ async def test_start_charging_includes_fallback_variants(monkeypatch) -> None:
         ]
 
     monkeypatch.setattr(client, "_start_charging_candidates", _no_level_candidates)
-    client._json = AsyncMock(return_value={"status": "ok"})
+    client._json = _RequestMock(return_value={"status": "ok"})
 
     await client.start_charging("SN", 16, include_level=True, strict_preference=False)
     # Order was extended with fallback entry so the call succeeds.
@@ -3827,7 +3845,7 @@ async def test_start_charging_excludes_level_variants_when_requested(
         ]
 
     monkeypatch.setattr(client, "_start_charging_candidates", _level_only_candidates)
-    client._json = AsyncMock(return_value={"status": "ok"})
+    client._json = _RequestMock(return_value={"status": "ok"})
 
     await client.start_charging("SN", 30, include_level=False, strict_preference=False)
     assert client._start_variant_idx_no_level is None
@@ -3846,7 +3864,7 @@ async def test_start_charging_raises_when_order_empty(monkeypatch) -> None:
         return TruthyEmpty()
 
     monkeypatch.setattr(client, "_start_charging_candidates", _candidates)
-    client._json = AsyncMock(return_value={"status": "ok"})
+    client._json = _RequestMock(return_value={"status": "ok"})
 
     with pytest.raises(aiohttp.ClientError):
         await client.start_charging("SN", 32)
@@ -3880,7 +3898,7 @@ async def test_start_charging_falls_through_and_raises_generic(monkeypatch) -> N
 @pytest.mark.asyncio
 async def test_start_charging_whitespace_error_message() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(400, "  ")] * 8)
+    client._json = _RequestMock(side_effect=[_make_cre(400, "  ")] * 8)
     with pytest.raises(aiohttp.ClientResponseError):
         await client.start_charging("SN", 32)
 
@@ -3888,7 +3906,7 @@ async def test_start_charging_whitespace_error_message() -> None:
 @pytest.mark.asyncio
 async def test_start_charging_none_error_message() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(400, None)] * 8)
+    client._json = _RequestMock(side_effect=[_make_cre(400, None)] * 8)
     with pytest.raises(aiohttp.ClientResponseError):
         await client.start_charging("SN", 32)
 
@@ -3896,7 +3914,7 @@ async def test_start_charging_none_error_message() -> None:
 @pytest.mark.asyncio
 async def test_start_charging_non_dict_error_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(400, "[1, 2, 3]")] * 8)
+    client._json = _RequestMock(side_effect=[_make_cre(400, "[1, 2, 3]")] * 8)
     with pytest.raises(aiohttp.ClientResponseError):
         await client.start_charging("SN", 32)
 
@@ -3904,7 +3922,7 @@ async def test_start_charging_non_dict_error_payload() -> None:
 @pytest.mark.asyncio
 async def test_start_charging_retries_all_and_raises() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(400, "bad")] * 8)
+    client._json = _RequestMock(side_effect=[_make_cre(400, "bad")] * 8)
     with pytest.raises(aiohttp.ClientResponseError):
         await client.start_charging("SN", 32)
 
@@ -3924,7 +3942,7 @@ async def test_start_charging_no_candidates_raises_client_error(monkeypatch) -> 
 async def test_start_charging_unknown_error_returns_none() -> None:
     message = '{"error":{"details":42}}'
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(400, message)] * 8)
+    client._json = _RequestMock(side_effect=[_make_cre(400, message)] * 8)
     with pytest.raises(aiohttp.ClientResponseError):
         await client.start_charging("SN", 32)
 
@@ -3933,7 +3951,7 @@ async def test_start_charging_unknown_error_returns_none() -> None:
 async def test_start_charging_error_list_candidate() -> None:
     message = '{"error":["unexpected"]}'
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(400, message)] * 8)
+    client._json = _RequestMock(side_effect=[_make_cre(400, message)] * 8)
     with pytest.raises(aiohttp.ClientResponseError):
         await client.start_charging("SN", 32)
 
@@ -3941,7 +3959,7 @@ async def test_start_charging_error_list_candidate() -> None:
 @pytest.mark.asyncio
 async def test_stop_charging_success_and_cache() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"status": "ok"})
+    client._json = _RequestMock(return_value={"status": "ok"})
     out = await client.stop_charging("SN")
     assert out == {"status": "ok"}
     assert client._stop_variant_idx == 0
@@ -3951,7 +3969,7 @@ async def test_stop_charging_success_and_cache() -> None:
 async def test_stop_charging_reorders_cached_variant() -> None:
     client = _make_client()
     client._stop_variant_idx = 2
-    client._json = AsyncMock(return_value={"status": "ok"})
+    client._json = _RequestMock(return_value={"status": "ok"})
     await client.stop_charging("SN")
     args, _kwargs = client._json.await_args
     assert "/ev_charger/" in args[1]
@@ -3961,7 +3979,7 @@ async def test_stop_charging_reorders_cached_variant() -> None:
 @pytest.mark.asyncio
 async def test_stop_charging_handles_noop_status() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(404), {"status": "ok"}])
+    client._json = _RequestMock(side_effect=[_make_cre(404), {"status": "ok"}])
     out = await client.stop_charging("SN")
     assert out == {"status": "not_active"}
     assert client._stop_variant_idx is None
@@ -3988,7 +4006,7 @@ async def test_control_candidates_keep_legacy_singular_fallbacks() -> None:
 async def test_stop_charging_raises_503_without_trying_fallback() -> None:
     client = _make_client()
     error = _make_cre(503, '{"errorMessageCode":"iqevc_ms-10007"}')
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     with pytest.raises(aiohttp.ClientResponseError) as err:
         await client.stop_charging("SN")
@@ -4009,7 +4027,7 @@ async def test_stop_charging_routing_404_is_not_noop(monkeypatch) -> None:
         ],
     )
     error = _make_cre(404, '{"type":"about:blank","detail":"No static resource"}')
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     with pytest.raises(aiohttp.ClientResponseError) as err:
         await client.stop_charging("SN")
@@ -4029,7 +4047,7 @@ async def test_stop_charging_about_blank_404_with_spacing_is_not_noop(
         lambda _sn: [("POST", "https://example.test/stop_charging", None)],
     )
     error = _make_cre(404, '{ "type": "about:blank", "detail": "No static resource" }')
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     with pytest.raises(aiohttp.ClientResponseError) as err:
         await client.stop_charging("SN")
@@ -4041,7 +4059,7 @@ async def test_stop_charging_about_blank_404_with_spacing_is_not_noop(
 @pytest.mark.asyncio
 async def test_stop_charging_semantic_404_remains_noop() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=[
             _make_cre(
                 404,
@@ -4060,7 +4078,7 @@ async def test_stop_charging_semantic_404_remains_noop() -> None:
 async def test_stop_charging_routing_404_falls_back_to_legacy_singular() -> None:
     client = _make_client()
     error = _make_cre(404, '{"type":"about:blank","detail":"No static resource"}')
-    client._json = AsyncMock(side_effect=[error, _make_cre(405), {"status": "ok"}])
+    client._json = _RequestMock(side_effect=[error, _make_cre(405), {"status": "ok"}])
 
     out = await client.stop_charging("SN")
 
@@ -4124,7 +4142,7 @@ def test_stop_charging_routing_404_helper_handles_empty_message() -> None:
 @pytest.mark.asyncio
 async def test_stop_charging_raises_last_exception() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=[_make_cre(405)] * 3)
+    client._json = _RequestMock(side_effect=[_make_cre(405)] * 3)
     with pytest.raises(aiohttp.ClientResponseError):
         await client.stop_charging("SN")
 
@@ -4138,7 +4156,7 @@ async def test_stop_charging_handles_payload_variant(monkeypatch) -> None:
         "_stop_charging_candidates",
         lambda _sn: [("POST", "https://example.test/stop", payload)],
     )
-    client._json = AsyncMock(return_value={"status": "ok"})
+    client._json = _RequestMock(return_value={"status": "ok"})
 
     out = await client.stop_charging("SN")
 
@@ -4158,7 +4176,7 @@ async def test_stop_charging_no_candidates_raises_client_error(monkeypatch) -> N
 @pytest.mark.asyncio
 async def test_trigger_and_stream_helpers_delegate_to_json() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"status": "ok"})
+    client._json = _RequestMock(return_value={"status": "ok"})
     await client.trigger_message("SN", "MeterValues")
     await client.start_live_stream()
     await client.stop_live_stream()
@@ -4168,7 +4186,7 @@ async def test_trigger_and_stream_helpers_delegate_to_json() -> None:
 @pytest.mark.asyncio
 async def test_charge_mode_extracts_enabled_mode() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "data": {
                 "modes": {
@@ -4189,7 +4207,7 @@ async def test_charge_mode_extracts_enabled_mode() -> None:
 @pytest.mark.asyncio
 async def test_charge_mode_extracts_enabled_smart_mode() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "data": {
                 "modes": {
@@ -4212,14 +4230,14 @@ async def test_charge_mode_extracts_enabled_smart_mode() -> None:
 @pytest.mark.asyncio
 async def test_charge_mode_handles_unexpected_shape() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"data": {"modes": "invalid"}})
+    client._json = _RequestMock(return_value={"data": {"modes": "invalid"}})
     assert await client.charge_mode("SN") is None
 
 
 @pytest.mark.asyncio
 async def test_charge_mode_returns_none_when_no_enabled() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "data": {
                 "modes": {
@@ -4237,7 +4255,7 @@ async def test_charge_mode_returns_none_when_no_enabled() -> None:
 @pytest.mark.asyncio
 async def test_set_charge_mode_passes_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"status": "ok"})
+    client._json = _RequestMock(return_value={"status": "ok"})
     out = await client.set_charge_mode(
         "SN", "GREEN_CHARGING", previous_mode="MANUAL_CHARGING"
     )
@@ -4249,7 +4267,7 @@ async def test_set_charge_mode_passes_payload() -> None:
 @pytest.mark.asyncio
 async def test_set_charge_mode_skips_write_when_already_active() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "data": {
                 "modes": {
@@ -4272,7 +4290,7 @@ async def test_set_charge_mode_skips_write_when_already_active() -> None:
 @pytest.mark.asyncio
 async def test_set_charge_mode_accepts_verified_preference_after_400() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=[
             {
                 "data": {
@@ -4315,7 +4333,7 @@ async def test_set_charge_mode_retries_verified_preference_after_400(
     monkeypatch,
 ) -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=[
             {
                 "data": {
@@ -4351,7 +4369,7 @@ async def test_set_charge_mode_retries_verified_preference_after_400(
         ]
     )
     sleep = AsyncMock()
-    monkeypatch.setattr(api.asyncio, "sleep", sleep)
+    monkeypatch.setattr(asyncio, "sleep", sleep)
 
     out = await client.set_charge_mode("SN", "MANUAL_CHARGING")
 
@@ -4368,7 +4386,7 @@ async def test_set_charge_mode_does_not_verify_schedule_required_error() -> None
         "code": "iqevc_sch_10031",
         "display": "No Schedules enabled for Scheduled Charging",
     }
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=[
             {
                 "data": {
@@ -4393,7 +4411,7 @@ async def test_set_charge_mode_does_not_verify_schedule_required_error() -> None
 @pytest.mark.asyncio
 async def test_set_charge_mode_preserves_scheduler_unavailable_error() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(503, "Scheduler MS unavailable"))
+    client._json = _RequestMock(side_effect=_make_cre(503, "Scheduler MS unavailable"))
 
     with pytest.raises(api.SchedulerUnavailable):
         await client.set_charge_mode(
@@ -4419,9 +4437,11 @@ async def test_set_charge_mode_reraises_when_400_readback_never_matches(
             }
         }
     }
-    client._json = AsyncMock(side_effect=[green_payload, err, *([green_payload] * 6)])
+    client._json = _RequestMock(
+        side_effect=[green_payload, err, *([green_payload] * 6)]
+    )
     sleep = AsyncMock()
-    monkeypatch.setattr(api.asyncio, "sleep", sleep)
+    monkeypatch.setattr(asyncio, "sleep", sleep)
 
     with pytest.raises(aiohttp.ClientResponseError):
         await client.set_charge_mode("SN", "MANUAL_CHARGING")
@@ -4434,7 +4454,7 @@ async def test_set_charge_mode_reraises_when_400_readback_never_matches(
 async def test_set_charge_mode_reraises_when_400_readback_fails() -> None:
     client = _make_client()
     err = _make_cre(400, "HTTP error from Enphase endpoint (status=400)")
-    client._json = AsyncMock(side_effect=[err, aiohttp.ClientError("down")])
+    client._json = _RequestMock(side_effect=[err, aiohttp.ClientError("down")])
 
     with pytest.raises(aiohttp.ClientResponseError):
         await client.set_charge_mode(
@@ -4447,7 +4467,7 @@ async def test_set_charge_mode_reraises_when_400_readback_fails() -> None:
 @pytest.mark.asyncio
 async def test_green_charging_settings_filters_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "data": [
                 {"chargerSettingName": GREEN_BATTERY_SETTING, "enabled": True},
@@ -4466,21 +4486,21 @@ async def test_green_charging_settings_filters_payload() -> None:
 @pytest.mark.asyncio
 async def test_green_charging_settings_handles_non_dict_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["bad"])
+    client._json = _RequestMock(return_value=["bad"])
     assert await client.green_charging_settings("SN") == []
 
 
 @pytest.mark.asyncio
 async def test_green_charging_settings_handles_non_list_data() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"data": "nope"})
+    client._json = _RequestMock(return_value={"data": "nope"})
     assert await client.green_charging_settings("SN") == []
 
 
 @pytest.mark.asyncio
 async def test_set_green_battery_setting_passes_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"status": "ok"})
+    client._json = _RequestMock(return_value={"status": "ok"})
     out = await client.set_green_battery_setting("SN", enabled=True)
     assert out == {"status": "ok"}
     args, kwargs = client._json.await_args
@@ -4507,7 +4527,7 @@ async def test_storm_guard_alert_passes_headers() -> None:
             f"{token}; XSRF-TOKEN=xsrf-token; other=1"
         ),
     )
-    client._json = AsyncMock(return_value={"criticalAlertActive": False})
+    client._json = _RequestMock(return_value={"criticalAlertActive": False})
     out = await client.storm_guard_alert()
     assert out == {"criticalAlertActive": False}
     args, kwargs = client._json.await_args
@@ -4531,7 +4551,7 @@ async def test_storm_guard_profile_passes_params() -> None:
     token = _make_token({"user_id": "55"})
     client = _make_client()
     client.update_credentials(eauth=token, cookie="session=1")
-    client._json = AsyncMock(return_value={"data": {}})
+    client._json = _RequestMock(return_value={"data": {}})
     await client.storm_guard_profile(locale="en-US")
     args, kwargs = client._json.await_args
     assert args[0] == "GET"
@@ -4551,7 +4571,7 @@ async def test_battery_site_settings_passes_params_and_headers() -> None:
             " XSRF-TOKEN=xsrf-token; other=1"
         ),
     )
-    client._json = AsyncMock(return_value={"data": {}})
+    client._json = _RequestMock(return_value={"data": {}})
 
     out = await client.battery_site_settings()
 
@@ -4579,7 +4599,7 @@ async def test_site_tariff_billing_details_passes_tariff_headers() -> None:
         eauth=token,
         cookie="session=1; XSRF-TOKEN=xsrf-token; other=1",
     )
-    client._json = AsyncMock(return_value={"billingFrequency": "MONTH"})
+    client._json = _RequestMock(return_value={"billingFrequency": "MONTH"})
 
     out = await client.site_tariff_billing_details()
 
@@ -4601,7 +4621,7 @@ async def test_site_tariff_billing_details_passes_tariff_headers() -> None:
 @pytest.mark.asyncio
 async def test_site_tariff_billing_update_posts_payload_with_today() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"billingFrequency": "MONTH"})
+    client._json = _RequestMock(return_value={"billingFrequency": "MONTH"})
     payload = {
         "anyBillPeriodStartDate": "2026-04-01",
         "billingFrequency": "MONTH",
@@ -4622,7 +4642,7 @@ async def test_site_tariff_billing_update_posts_payload_with_today() -> None:
 @pytest.mark.asyncio
 async def test_site_tariff_billing_update_accepts_request_date_override() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"billingFrequency": "DAY"})
+    client._json = _RequestMock(return_value={"billingFrequency": "DAY"})
 
     await client.site_tariff_billing_update(
         {
@@ -4662,7 +4682,7 @@ async def test_site_tariff_billing_update_accepts_request_date_override() -> Non
 @pytest.mark.asyncio
 async def test_site_tariff_passes_include_site_details() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"purchase": {"typeId": "flat"}})
+    client._json = _RequestMock(return_value={"purchase": {"typeId": "flat"}})
 
     out = await client.site_tariff()
 
@@ -4676,7 +4696,7 @@ async def test_site_tariff_passes_include_site_details() -> None:
 @pytest.mark.asyncio
 async def test_site_tariff_rates_passes_rate_type_and_date() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"data": {"buyback": []}})
+    client._json = _RequestMock(return_value={"data": {"buyback": []}})
 
     out = await client.site_tariff_rates(
         rate_type="buyback",
@@ -4762,7 +4782,7 @@ async def test_site_tariff_update_passes_user_id_and_write_headers() -> None:
         eauth=token,
         cookie="session=1; XSRF-TOKEN=xsrf-token; other=1",
     )
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
 
     out = await client.site_tariff_update({"purchase": {"typeId": "flat"}})
 
@@ -4781,7 +4801,7 @@ async def test_site_tariff_update_passes_user_id_and_write_headers() -> None:
 @pytest.mark.asyncio
 async def test_notify_tariff_change_uses_scheduler_endpoint() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"data": "Request Accepted"})
+    client._json = _RequestMock(return_value={"data": "Request Accepted"})
 
     out = await client.notify_tariff_change()
 
@@ -4798,7 +4818,7 @@ async def test_battery_settings_details_passes_params_and_headers() -> None:
     token = _make_token({"user_id": "99"})
     client = _make_client()
     client.update_credentials(eauth=token, cookie="session=1")
-    client._json = AsyncMock(return_value={"data": {"chargeFromGrid": True}})
+    client._json = _RequestMock(return_value={"data": {"chargeFromGrid": True}})
 
     out = await client.battery_settings_details()
 
@@ -4851,7 +4871,7 @@ async def test_set_battery_settings_payload_and_xsrf() -> None:
     client.update_credentials(eauth=token, cookie="other=1")
     client._acquire_xsrf_token = AsyncMock(return_value="xsrf=token")  # noqa: SLF001
     client._bp_xsrf_token = "xsrf=token"  # noqa: SLF001
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
 
     out = await client.set_battery_settings({"veryLowSoc": 15})
 
@@ -4872,7 +4892,7 @@ async def test_set_battery_settings_payload_and_xsrf() -> None:
 @pytest.mark.asyncio
 async def test_set_battery_settings_uses_requested_schedule_type_for_xsrf() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
 
     async def _acquire(
         schedule_type: str = "cfg",
@@ -5049,7 +5069,7 @@ async def test_set_battery_profile_uses_canonical_batteryconfig_write_path() -> 
     client.update_credentials(eauth=token, cookie="session=1")
     client._acquire_xsrf_token = AsyncMock(return_value="fresh-xsrf")  # noqa: SLF001
     client._bp_xsrf_token = "fresh-xsrf"  # noqa: SLF001
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
 
     out = await client.set_battery_profile(
         profile="self-consumption",
@@ -5138,7 +5158,7 @@ async def test_battery_config_request_retries_403_and_caches_variant_when_bootst
 ):
     client = _make_client()
     client._acquire_xsrf_token = AsyncMock(return_value="xsrf-token")  # noqa: SLF001
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=[_make_cre(403, "Forbidden"), {"message": "success"}]
     )
 
@@ -5172,7 +5192,7 @@ async def test_battery_config_request_retries_login_wall_with_token_variant() ->
         content_type="text/html",
         body_preview_redacted="Enlighten Login",
     )
-    client._json = AsyncMock(side_effect=[login_wall, {"message": "success"}])
+    client._json = _RequestMock(side_effect=[login_wall, {"message": "success"}])
 
     out = await client._battery_config_request(  # noqa: SLF001
         "GET",
@@ -5204,7 +5224,7 @@ async def test_battery_config_request_reraises_login_wall_after_all_variants() -
         content_type="text/html",
         body_preview_redacted="Enlighten Login",
     )
-    client._json = AsyncMock(side_effect=[login_wall, login_wall])
+    client._json = _RequestMock(side_effect=[login_wall, login_wall])
 
     with pytest.raises(api.EnphaseLoginWallUnauthorized):
         await client._battery_config_request(  # noqa: SLF001
@@ -5219,7 +5239,7 @@ async def test_battery_config_request_reraises_login_wall_after_all_variants() -
 @pytest.mark.asyncio
 async def test_battery_config_request_reraises_401() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(401, "Unauthorized"))
+    client._json = _RequestMock(side_effect=_make_cre(401, "Unauthorized"))
 
     with pytest.raises(aiohttp.ClientResponseError) as err:
         await client._battery_config_request(  # noqa: SLF001
@@ -5234,7 +5254,7 @@ async def test_battery_config_request_reraises_401() -> None:
 @pytest.mark.asyncio
 async def test_battery_config_request_reraises_non_403_errors() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(500, "boom"))
+    client._json = _RequestMock(side_effect=_make_cre(500, "boom"))
 
     with pytest.raises(aiohttp.ClientResponseError) as err:
         await client._battery_config_request(  # noqa: SLF001
@@ -5250,7 +5270,7 @@ async def test_battery_config_request_reraises_non_403_errors() -> None:
 async def test_battery_config_write_request_reraises_non_403_errors() -> None:
     client = _make_client()
     client._acquire_xsrf_token = AsyncMock(return_value="xsrf-token")  # noqa: SLF001
-    client._json = AsyncMock(side_effect=_make_cre(401, "Unauthorized"))
+    client._json = _RequestMock(side_effect=_make_cre(401, "Unauthorized"))
 
     with pytest.raises(aiohttp.ClientResponseError):
         await client._battery_config_write_request(  # noqa: SLF001
@@ -5268,7 +5288,7 @@ async def test_battery_config_write_request_reraises_non_403_errors() -> None:
 async def test_battery_config_write_request_reraises_403_after_fallback() -> None:
     client = _make_client()
     client._acquire_xsrf_token = AsyncMock(return_value="xsrf-token")  # noqa: SLF001
-    client._json = AsyncMock(side_effect=_make_cre(403, "Forbidden"))
+    client._json = _RequestMock(side_effect=_make_cre(403, "Forbidden"))
     attempts = client._battery_config_write_attempts(  # noqa: SLF001
         "profile",
         write_intent="generic",
@@ -5300,7 +5320,7 @@ async def test_battery_config_write_request_caches_successful_fallback_variant()
 ):
     client = _make_client()
     client._acquire_xsrf_token = AsyncMock(return_value="xsrf-token")  # noqa: SLF001
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=[
             _make_cre(403, "Forbidden"),
             {"message": "success"},
@@ -5350,7 +5370,7 @@ async def test_battery_config_write_request_updates_cached_attempt_after_403() -
         supports_mqtt=None,
     )
     client._acquire_xsrf_token = AsyncMock(return_value="xsrf-token")  # noqa: SLF001
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=[_make_cre(403, "Forbidden"), {"message": "success"}]
     )
 
@@ -5382,7 +5402,7 @@ async def test_battery_config_write_request_does_not_update_cached_attempt_on_40
         supports_mqtt=None,
     )
     client._acquire_xsrf_token = AsyncMock(return_value="xsrf-token")  # noqa: SLF001
-    client._json = AsyncMock(side_effect=_make_cre(401, "Unauthorized"))
+    client._json = _RequestMock(side_effect=_make_cre(401, "Unauthorized"))
 
     with pytest.raises(aiohttp.ClientResponseError):
         await client._battery_config_write_request(  # noqa: SLF001
@@ -5414,7 +5434,7 @@ async def test_battery_config_write_request_raises_last_error_when_duplicate_att
     client._battery_config_write_attempts = MagicMock(  # noqa: SLF001
         return_value=[duplicate, duplicate]
     )
-    client._json = AsyncMock(side_effect=[_make_cre(403, "Forbidden")])
+    client._json = _RequestMock(side_effect=[_make_cre(403, "Forbidden")])
 
     with pytest.raises(aiohttp.ClientResponseError) as err:
         await client._battery_config_write_request(  # noqa: SLF001
@@ -5455,7 +5475,7 @@ async def test_battery_config_write_request_retries_without_source_when_mqtt_sup
     client = _make_client()
     client._battery_config_supports_mqtt = True  # noqa: SLF001
     client._acquire_xsrf_token = AsyncMock(return_value="xsrf-token")  # noqa: SLF001
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=[
             _make_cre(403, "Forbidden"),
             _make_cre(403, "Forbidden"),
@@ -5861,7 +5881,7 @@ async def test_battery_config_write_request_uses_cookie_header_only_for_cookie_a
         ]
     )
     client._acquire_xsrf_token = AsyncMock(return_value="fresh-xsrf")  # noqa: SLF001
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
 
     out = await client._battery_config_write_request(  # noqa: SLF001
         "PUT",
@@ -6050,7 +6070,7 @@ async def test_validate_battery_schedule_cfg_payload_keeps_force_schedule_opted(
     client = _make_client()
     client._bp_xsrf_token = "xsrf=token"  # noqa: SLF001
     client._acquire_xsrf_token = AsyncMock(return_value="xsrf=token")  # noqa: SLF001
-    client._json = AsyncMock(return_value={"isValid": True})
+    client._json = _RequestMock(return_value={"isValid": True})
 
     out = await client.validate_battery_schedule("CFG")
 
@@ -6173,7 +6193,7 @@ async def test_acquire_xsrf_token_returns_none_for_empty_decoded_cookie() -> Non
     client = _make_client(session)
 
     with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(api, "unquote", lambda _value: "")
+        monkeypatch.setattr(api_battery, "unquote", lambda _value: "")
         assert await client._acquire_xsrf_token() is None  # noqa: SLF001
 
 
@@ -6401,7 +6421,7 @@ async def test_acquire_xsrf_token_post_fallback_tolerates_unquote_errors(
     def _boom(_value: str) -> str:
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(api, "unquote", _boom)
+    monkeypatch.setattr(api_battery, "unquote", _boom)
 
     assert await client._acquire_xsrf_token() == "raw-token"  # noqa: SLF001
 
@@ -6581,7 +6601,7 @@ async def test_acquire_xsrf_token_uses_validation_error_response_cookie() -> Non
 @pytest.mark.asyncio
 async def test_battery_schedule_crud_methods_build_requests() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
 
     async def _acquire(*_args: object, **_kwargs: object) -> str:
         client._bp_xsrf_token = "fresh-token"  # noqa: SLF001
@@ -6645,7 +6665,7 @@ async def test_create_battery_schedule_omits_optional_limit_and_sets_is_enabled(
     None
 ):
     client = _make_client()
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
 
     async def _acquire(*_args: object, **_kwargs: object) -> str:
         client._bp_xsrf_token = "fresh-token"  # noqa: SLF001
@@ -6682,7 +6702,7 @@ async def test_update_battery_schedule_sets_optional_is_enabled_and_is_deleted()
     None
 ):
     client = _make_client()
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
 
     async def _acquire(*_args: object, **_kwargs: object) -> str:
         client._bp_xsrf_token = "fresh-token"  # noqa: SLF001
@@ -6720,7 +6740,7 @@ async def test_update_battery_schedule_sets_optional_is_enabled_and_is_deleted()
 @pytest.mark.asyncio
 async def test_update_battery_schedule_builds_request_and_clears_xsrf() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
 
     async def _acquire(*_args: object, **_kwargs: object) -> str:
         client._bp_xsrf_token = "fresh-token"  # noqa: SLF001
@@ -6772,7 +6792,7 @@ async def test_update_battery_schedule_builds_request_and_clears_xsrf() -> None:
 @pytest.mark.asyncio
 async def test_set_battery_settings_reacquires_xsrf_for_each_write() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
     call_number = 0
 
     async def _acquire(
@@ -6824,7 +6844,7 @@ async def test_storm_guard_profile_delegates_to_battery_profile_details() -> Non
 @pytest.mark.asyncio
 async def test_set_battery_profile_reraises_non_403_errors() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(500, "boom"))
+    client._json = _RequestMock(side_effect=_make_cre(500, "boom"))
 
     with pytest.raises(aiohttp.ClientResponseError) as err:
         await client.set_battery_profile(
@@ -6841,7 +6861,7 @@ async def test_set_battery_profile_retries_without_devices_then_without_source()
 ):
     client = _make_client()
     client._acquire_xsrf_token = AsyncMock(return_value="xsrf-token")  # noqa: SLF001
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=[
             _make_cre(403, "Forbidden"),
             _make_cre(403, "Forbidden"),
@@ -6878,7 +6898,7 @@ async def test_set_battery_profile_retries_without_devices_then_without_source()
 async def test_set_battery_profile_retries_without_devices_after_400() -> None:
     client = _make_client()
     client._acquire_xsrf_token = AsyncMock(return_value="xsrf-token")  # noqa: SLF001
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=[
             _make_cre(400, "Bad Request"),
             {"message": "success"},
@@ -6915,7 +6935,7 @@ async def test_set_battery_settings_retries_disclaimer_as_boolean_true_after_403
         return "xsrf-token"
 
     client._acquire_xsrf_token = AsyncMock(side_effect=_acquire)  # noqa: SLF001
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=[
             _make_cre(403, "Forbidden"),
             _make_cre(403, "Forbidden"),
@@ -7061,7 +7081,7 @@ async def test_battery_config_write_request_strips_devices_from_stateful_attempt
     )
     client._acquire_xsrf_token = AsyncMock(return_value="token")  # noqa: SLF001
     client._battery_config_attempt_headers = MagicMock(return_value={})  # noqa: SLF001
-    client._json = AsyncMock(return_value={"message": "success"})  # noqa: SLF001
+    client._json = _RequestMock(return_value={"message": "success"})  # noqa: SLF001
 
     await client._battery_config_write_request(  # noqa: SLF001
         "PUT",
@@ -7096,7 +7116,7 @@ async def test_power_match_partial_payload_skips_cached_stateful_attempt() -> No
     )
     client._acquire_xsrf_token = AsyncMock(return_value="token")  # noqa: SLF001
     client._battery_config_attempt_headers = MagicMock(return_value={})  # noqa: SLF001
-    client._json = AsyncMock(return_value={"message": "success"})  # noqa: SLF001
+    client._json = _RequestMock(return_value={"message": "success"})  # noqa: SLF001
 
     await client.set_battery_settings_compat(
         {"powerMatch": True},
@@ -7120,7 +7140,7 @@ async def test_cancel_battery_profile_update_uses_empty_body() -> None:
     client.update_credentials(eauth=token, cookie="XSRF-TOKEN=t; other=1")
     client._acquire_xsrf_token = AsyncMock(return_value="t")  # noqa: SLF001
     client._bp_xsrf_token = "t"  # noqa: SLF001
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
 
     out = await client.cancel_battery_profile_update()
 
@@ -7147,7 +7167,7 @@ async def test_set_storm_guard_passes_payload_and_xsrf() -> None:
     )
     client._acquire_xsrf_token = AsyncMock(return_value="xsrf-token")  # noqa: SLF001
     client._bp_xsrf_token = "xsrf-token"  # noqa: SLF001
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
     out = await client.set_storm_guard(enabled=True, evse_enabled=False)
     assert out == {"message": "success"}
     args, kwargs = client._json.await_args
@@ -7173,7 +7193,7 @@ async def test_opt_out_storm_alert_passes_payload_and_xsrf() -> None:
         eauth=token,
         cookie="XSRF-TOKEN=xsrf-token; other=1",
     )
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
 
     out = await client.opt_out_storm_alert(alert_id="IDV21037", name="Severe Weather")
 
@@ -7201,7 +7221,7 @@ async def test_opt_out_storm_alert_handles_missing_xsrf() -> None:
     client = _make_client()
     client.update_credentials(cookie="cookie=1")
     client._acquire_xsrf_token = AsyncMock(return_value=None)  # noqa: SLF001
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
 
     await client.opt_out_storm_alert(alert_id="IDV21037", name="Severe Weather")
 
@@ -7221,7 +7241,7 @@ async def test_opt_out_storm_alert_retries_403_with_lean_auth() -> None:
         return "fresh-xsrf"
 
     client._acquire_xsrf_token = AsyncMock(side_effect=_acquire)  # noqa: SLF001
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=[_make_cre(403, "Forbidden"), {"message": "success"}]
     )
 
@@ -7256,7 +7276,7 @@ async def test_battery_config_prefers_cookie_bearer_when_it_has_user_id() -> Non
     )
     client._acquire_xsrf_token = AsyncMock(return_value="token")  # noqa: SLF001
     client._bp_xsrf_token = "token"  # noqa: SLF001
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
 
     await client.set_storm_guard(enabled=True, evse_enabled=True)
 
@@ -7272,7 +7292,7 @@ async def test_battery_config_prefers_cookie_bearer_when_it_has_user_id() -> Non
 async def test_set_storm_guard_handles_missing_xsrf() -> None:
     client = _make_client()
     client.update_credentials(cookie="cookie=1")
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
 
     await client.set_storm_guard(enabled=False, evse_enabled=True)
 
@@ -7285,7 +7305,7 @@ async def test_set_storm_guard_handles_missing_xsrf() -> None:
 async def test_set_storm_guard_uses_bp_xsrf_cookie_fallback() -> None:
     client = _make_client()
     client.update_credentials(cookie="BP-XSRF-Token=bp%3Dtoken; other=1")
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
 
     await client.set_storm_guard(enabled=False, evse_enabled=True)
 
@@ -7298,7 +7318,7 @@ async def test_set_storm_guard_uses_bp_xsrf_cookie_fallback() -> None:
 async def test_set_storm_guard_handles_bad_cookie() -> None:
     client = _make_client()
     client._cookie = _BadCookie()
-    client._json = AsyncMock(return_value={"message": "success"})
+    client._json = _RequestMock(return_value={"message": "success"})
 
     await client.set_storm_guard(enabled=True, evse_enabled=True)
 
@@ -7309,7 +7329,7 @@ async def test_set_storm_guard_handles_bad_cookie() -> None:
 @pytest.mark.asyncio
 async def test_charger_auth_settings_filters_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "data": [{"key": AUTH_APP_SETTING, "value": "enabled"}, "invalid"]
         }
@@ -7356,21 +7376,21 @@ async def test_charger_auth_settings_retries_without_authorization_on_401() -> N
 @pytest.mark.asyncio
 async def test_charger_auth_settings_handles_non_dict_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["bad"])
+    client._json = _RequestMock(return_value=["bad"])
     assert await client.charger_auth_settings("SN") == []
 
 
 @pytest.mark.asyncio
 async def test_charger_auth_settings_handles_non_list_data() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"data": "nope"})
+    client._json = _RequestMock(return_value={"data": "nope"})
     assert await client.charger_auth_settings("SN") == []
 
 
 @pytest.mark.asyncio
 async def test_charger_config_filters_payload_and_passes_requested_keys() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "data": [
                 {"key": DEFAULT_CHARGE_LEVEL_SETTING, "value": None},
@@ -7404,7 +7424,7 @@ async def test_charger_config_filters_payload_and_passes_requested_keys() -> Non
 @pytest.mark.asyncio
 async def test_charger_config_normalizes_requested_keys() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"data": []})
+    client._json = _RequestMock(return_value={"data": []})
 
     class _BadKey:
         def __str__(self) -> str:
@@ -7422,7 +7442,7 @@ async def test_charger_config_normalizes_requested_keys() -> None:
 @pytest.mark.asyncio
 async def test_charger_config_returns_empty_when_no_valid_keys() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"data": []})
+    client._json = _RequestMock(return_value={"data": []})
 
     class _BadKey:
         def __str__(self) -> str:
@@ -7435,7 +7455,7 @@ async def test_charger_config_returns_empty_when_no_valid_keys() -> None:
 @pytest.mark.asyncio
 async def test_set_default_charge_level_uses_charger_config_put() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "data": [{"key": DEFAULT_CHARGE_LEVEL_SETTING, "value": "30", "status": 2}]
         }
@@ -7458,7 +7478,7 @@ async def test_set_default_charge_level_uses_charger_config_put() -> None:
 @pytest.mark.asyncio
 async def test_set_default_charge_level_wraps_config_unavailable() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=_make_cre(503, "ev_charger_config service unavailable")
     )
 
@@ -7470,7 +7490,7 @@ async def test_set_default_charge_level_wraps_config_unavailable() -> None:
 @pytest.mark.asyncio
 async def test_set_default_charge_level_reraises_non_config_error() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(400, "bad request"))
+    client._json = _RequestMock(side_effect=_make_cre(400, "bad request"))
 
     with pytest.raises(aiohttp.ClientResponseError):
         await client.set_default_charge_level("SN", 30)
@@ -7479,7 +7499,7 @@ async def test_set_default_charge_level_reraises_non_config_error() -> None:
 @pytest.mark.asyncio
 async def test_set_app_authentication_passes_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"status": "ok"})
+    client._json = _RequestMock(return_value={"status": "ok"})
     out = await client.set_app_authentication("SN", enabled=False)
     assert out == {"status": "ok"}
     args, kwargs = client._json.await_args
@@ -7538,7 +7558,7 @@ async def test_lifetime_energy_normalization() -> None:
 @pytest.mark.asyncio
 async def test_latest_power_normalization() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "latest_power": {
                 "value": 752,
@@ -7567,7 +7587,7 @@ async def test_latest_power_normalization() -> None:
 @pytest.mark.asyncio
 async def test_latest_power_logs_invalid_payload_shape(caplog) -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "latest_power": {
                 "units": "W",
@@ -7588,7 +7608,7 @@ async def test_latest_power_logs_invalid_payload_shape(caplog) -> None:
 @pytest.mark.asyncio
 async def test_latest_power_logs_invalid_nested_data_payload_shape(caplog) -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "data": {
                 "units": "W",
@@ -7677,7 +7697,7 @@ def test_normalize_latest_power_payload_handles_unstringable_units_and_nan_metad
 async def test_evse_timeseries_daily_energy_normalization() -> None:
     client = _make_client()
     client.update_credentials(eauth=_make_token({"user_id": "user-123"}))
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "data": {
                 TEST_EVSE_SERIAL: {
@@ -7717,7 +7737,7 @@ async def test_evse_timeseries_daily_energy_normalization() -> None:
 @pytest.mark.asyncio
 async def test_evse_timeseries_lifetime_energy_normalization() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "data": [
                 {
@@ -7746,7 +7766,7 @@ async def test_evse_timeseries_lifetime_energy_normalization() -> None:
 @pytest.mark.asyncio
 async def test_evse_timeseries_wraps_unavailable() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(503, "service unavailable"))
+    client._json = _RequestMock(side_effect=_make_cre(503, "service unavailable"))
 
     with pytest.raises(api.EVSETimeseriesUnavailable):
         await client.evse_timeseries_daily_energy()
@@ -7758,17 +7778,17 @@ async def test_evse_timeseries_wraps_unavailable() -> None:
 @pytest.mark.asyncio
 async def test_evse_timeseries_methods_handle_username_and_reraise() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=None)
+    client._json = _RequestMock(return_value=None)
 
     assert await client.evse_timeseries_lifetime_energy(username="user-1") is None
     args, _kwargs = client._json.await_args
     assert "username=user-1" in args[1]
 
-    client._json = AsyncMock(side_effect=_make_cre(400, "bad request"))
+    client._json = _RequestMock(side_effect=_make_cre(400, "bad request"))
     with pytest.raises(aiohttp.ClientResponseError):
         await client.evse_timeseries_daily_energy()
 
-    client._json = AsyncMock(side_effect=_make_cre(400, "bad request"))
+    client._json = _RequestMock(side_effect=_make_cre(400, "bad request"))
     with pytest.raises(aiohttp.ClientResponseError):
         await client.evse_timeseries_lifetime_energy()
 
@@ -7776,10 +7796,10 @@ async def test_evse_timeseries_methods_handle_username_and_reraise() -> None:
 @pytest.mark.asyncio
 async def test_evse_timeseries_daily_energy_defaults_start_date(monkeypatch) -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=None)
+    client._json = _RequestMock(return_value=None)
     fixed_now = datetime.datetime(2026, 3, 12, 4, 5, tzinfo=datetime.timezone.utc)
-    monkeypatch.setattr(api, "datetime", MagicMock(wraps=datetime.datetime))
-    api.datetime.now.return_value = fixed_now
+    monkeypatch.setattr(api_dashboard, "datetime", MagicMock(wraps=datetime.datetime))
+    api_dashboard.datetime.now.return_value = fixed_now
 
     assert await client.evse_timeseries_daily_energy() is None
 
@@ -7790,7 +7810,7 @@ async def test_evse_timeseries_daily_energy_defaults_start_date(monkeypatch) -> 
 @pytest.mark.asyncio
 async def test_lifetime_energy_handles_non_dict() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["not-a-dict"])
+    client._json = _RequestMock(return_value=["not-a-dict"])
     assert await client.lifetime_energy() is None
 
 
@@ -7801,7 +7821,7 @@ async def test_lifetime_energy_coerce_errors() -> None:
             raise ValueError("boom")
 
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "production": [BadFloat(), "bad-number"],
         }
@@ -7817,7 +7837,7 @@ async def test_lifetime_energy_coerce_bad_number_subclass() -> None:
             raise ValueError("bad")
 
     client = _make_client()
-    client._json = AsyncMock(return_value={"production": [BadFloat(1.0)]})
+    client._json = _RequestMock(return_value={"production": [BadFloat(1.0)]})
     payload = await client.lifetime_energy()
     assert payload["production"] == [None]
 
@@ -7825,7 +7845,7 @@ async def test_lifetime_energy_coerce_bad_number_subclass() -> None:
 @pytest.mark.asyncio
 async def test_hems_consumption_lifetime_normalization() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "data": {
                 "production": [100, "200"],
@@ -7859,7 +7879,7 @@ async def test_hems_consumption_lifetime_uses_systems_json_headers() -> None:
         cookie="enlighten_manager_token_production=BEAR; XSRF-TOKEN=xsrf",
         eauth="EAUTH",
     )
-    client._json = AsyncMock(return_value={"heatpump": []})
+    client._json = _RequestMock(return_value={"heatpump": []})
 
     await client.hems_consumption_lifetime()
 
@@ -7873,7 +7893,7 @@ async def test_hems_consumption_lifetime_uses_systems_json_headers() -> None:
 @pytest.mark.asyncio
 async def test_hems_consumption_lifetime_unauthorized_reraises() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=api.Unauthorized())
+    client._json = _RequestMock(side_effect=api.Unauthorized())
 
     with pytest.raises(api.Unauthorized):
         await client.hems_consumption_lifetime()
@@ -7986,7 +8006,7 @@ async def test_hems_heatpump_state_optional_failures_return_none(
     monkeypatch, side_effect
 ) -> None:
     client = _make_client()
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=side_effect))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=side_effect))
 
     assert await client.hems_heatpump_state("HP-1") is None
 
@@ -7999,7 +8019,7 @@ async def test_hems_heatpump_state_auth_failures_reraise(
     monkeypatch, side_effect
 ) -> None:
     client = _make_client()
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=side_effect))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=side_effect))
 
     with pytest.raises((api.Unauthorized, aiohttp.ClientResponseError)):
         await client.hems_heatpump_state("HP-1")
@@ -8008,7 +8028,7 @@ async def test_hems_heatpump_state_auth_failures_reraise(
 @pytest.mark.asyncio
 async def test_hems_heatpump_state_optional_invalid_payload_and_invalid_site() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=_make_optional_payload_error(
             "/api/v1/hems/SITE/heatpump/HP-1/state"
         )
@@ -8017,7 +8037,7 @@ async def test_hems_heatpump_state_optional_invalid_payload_and_invalid_site() -
     assert await client.hems_heatpump_state("HP-1") is None
 
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=_make_cre(
             550,
             json.dumps({"error": {"status": "INVALID_SITE", "message": "unsupported"}}),
@@ -8037,13 +8057,13 @@ async def test_hems_heatpump_state_reraises_non_optional_errors() -> None:
         content_type="application/json",
         endpoint="/api/v1/hems/SITE/heatpump/HP-1/state",
     )
-    client._json = AsyncMock(side_effect=invalid_json)
+    client._json = _RequestMock(side_effect=invalid_json)
 
     with pytest.raises(api.InvalidPayloadError):
         await client.hems_heatpump_state("HP-1")
 
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(500))
+    client._json = _RequestMock(side_effect=_make_cre(500))
 
     with pytest.raises(aiohttp.ClientResponseError):
         await client.hems_heatpump_state("HP-1")
@@ -8052,7 +8072,7 @@ async def test_hems_heatpump_state_reraises_non_optional_errors() -> None:
 @pytest.mark.asyncio
 async def test_hems_heatpump_state_skips_blank_device_uid() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=AssertionError("should not fetch"))
+    client._json = _RequestMock(side_effect=AssertionError("should not fetch"))
 
     assert await client.hems_heatpump_state("   ") is None
     client._json.assert_not_awaited()
@@ -8238,7 +8258,7 @@ async def test_hems_energy_consumption_optional_invalid_payload_and_invalid_site
     None
 ):
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=_make_optional_payload_error("/api/v1/hems/SITE/energy-consumption")
     )
 
@@ -8252,7 +8272,7 @@ async def test_hems_energy_consumption_optional_invalid_payload_and_invalid_site
     )
 
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=_make_cre(
             550,
             json.dumps(
@@ -8280,7 +8300,7 @@ async def test_hems_energy_consumption_optional_invalid_payload_and_invalid_site
 @pytest.mark.asyncio
 async def test_hems_energy_consumption_optional_and_reraise_variants() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=api.Unauthorized())
+    client._json = _RequestMock(side_effect=api.Unauthorized())
 
     with pytest.raises(api.Unauthorized):
         await client.hems_energy_consumption(
@@ -8290,7 +8310,7 @@ async def test_hems_energy_consumption_optional_and_reraise_variants() -> None:
         )
 
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(403))
+    client._json = _RequestMock(side_effect=_make_cre(403))
 
     with pytest.raises(aiohttp.ClientResponseError):
         await client.hems_energy_consumption(
@@ -8306,7 +8326,7 @@ async def test_hems_energy_consumption_optional_and_reraise_variants() -> None:
         content_type="application/json",
         endpoint="/api/v1/hems/SITE/energy-consumption",
     )
-    client._json = AsyncMock(side_effect=invalid_json)
+    client._json = _RequestMock(side_effect=invalid_json)
 
     with pytest.raises(api.InvalidPayloadError):
         await client.hems_energy_consumption(
@@ -8316,7 +8336,7 @@ async def test_hems_energy_consumption_optional_and_reraise_variants() -> None:
         )
 
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(500))
+    client._json = _RequestMock(side_effect=_make_cre(500))
 
     with pytest.raises(aiohttp.ClientResponseError):
         await client.hems_energy_consumption(
@@ -8329,7 +8349,7 @@ async def test_hems_energy_consumption_optional_and_reraise_variants() -> None:
 @pytest.mark.asyncio
 async def test_pv_system_today_normalization_and_headers() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "stats": [
                 {
@@ -8362,7 +8382,7 @@ async def test_pv_system_today_normalization_and_headers() -> None:
     }
     args, kwargs = client._json.await_args
     assert args == ("GET", "https://enlighten.enphaseenergy.com/pv/systems/SITE/today")
-    headers = kwargs["headers"]()
+    headers = kwargs["headers"]
     assert headers["Accept"] == "application/json, text/javascript, */*; q=0.01"
     assert "/web/SITE/today/graph/hours" in headers["Referer"]
     assert kwargs["allow_reauth"] is True
@@ -8371,7 +8391,7 @@ async def test_pv_system_today_normalization_and_headers() -> None:
 @pytest.mark.asyncio
 async def test_pv_system_today_can_disable_reauth() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"stats": []})
+    client._json = _RequestMock(return_value={"stats": []})
 
     assert await client.pv_system_today(allow_reauth=False) == {"stats": []}
 
@@ -8392,7 +8412,7 @@ async def test_pv_system_today_auth_errors_reraise_when_reauth_disabled(
     error,
 ) -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     with pytest.raises((api.Unauthorized, aiohttp.ClientResponseError)):
         await client.pv_system_today(allow_reauth=False)
@@ -8401,21 +8421,21 @@ async def test_pv_system_today_auth_errors_reraise_when_reauth_disabled(
 @pytest.mark.asyncio
 async def test_pv_system_today_optional_failures_return_none() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=_make_optional_payload_error("/pv/systems/SITE/today")
     )
     assert await client.pv_system_today() is None
 
     client = _make_client()
-    client._json = AsyncMock(side_effect=api.Unauthorized())
+    client._json = _RequestMock(side_effect=api.Unauthorized())
     assert await client.pv_system_today() is None
 
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(404))
+    client._json = _RequestMock(side_effect=_make_cre(404))
     assert await client.pv_system_today() is None
 
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(403))
+    client._json = _RequestMock(side_effect=_make_cre(403))
     assert await client.pv_system_today() is None
 
 
@@ -8446,13 +8466,13 @@ async def test_pv_system_today_reraises_non_optional_failures() -> None:
         content_type="application/json",
         endpoint="/pv/systems/SITE/today",
     )
-    client._json = AsyncMock(side_effect=invalid_json)
+    client._json = _RequestMock(side_effect=invalid_json)
 
     with pytest.raises(api.InvalidPayloadError):
         await client.pv_system_today()
 
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(500))
+    client._json = _RequestMock(side_effect=_make_cre(500))
 
     with pytest.raises(aiohttp.ClientResponseError):
         await client.pv_system_today()
@@ -8491,7 +8511,7 @@ async def test_system_dashboard_summary_sets_hems_support_hint() -> None:
         cookie="enlighten_manager_token_production=BEAR; XSRF-TOKEN=xsrf",
         eauth="EAUTH",
     )
-    client._json = AsyncMock(return_value={"is_hems": False, "geo": "APAC"})
+    client._json = _RequestMock(return_value={"is_hems": False, "geo": "APAC"})
 
     payload = await client.system_dashboard_summary()
 
@@ -8512,7 +8532,7 @@ async def test_system_dashboard_summary_sets_hems_support_hint() -> None:
 @pytest.mark.asyncio
 async def test_system_dashboard_summary_can_disable_reauth() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"is_hems": True})
+    client._json = _RequestMock(return_value={"is_hems": True})
 
     assert await client.system_dashboard_summary(allow_reauth=False) == {
         "is_hems": True
@@ -8541,7 +8561,7 @@ async def test_system_dashboard_summary_auth_errors_reraise_when_reauth_disabled
     error,
 ) -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     with pytest.raises((api.Unauthorized, aiohttp.ClientResponseError)):
         await client.system_dashboard_summary(allow_reauth=False)
@@ -8552,7 +8572,7 @@ async def test_system_dashboard_summary_optional_404_still_soft_fails_without_re
     None
 ):
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(404, "Not found"))
+    client._json = _RequestMock(side_effect=_make_cre(404, "Not found"))
 
     assert await client.system_dashboard_summary(allow_reauth=False) is None
 
@@ -8564,7 +8584,7 @@ async def test_system_dashboard_summary_optional_errors_return_none(
 ) -> None:
     client = _make_client()
     err = _make_cre(status, "Unavailable")
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
 
     assert await client.system_dashboard_summary() is None
     assert client.hems_site_supported is None
@@ -8573,7 +8593,7 @@ async def test_system_dashboard_summary_optional_errors_return_none(
 @pytest.mark.asyncio
 async def test_system_dashboard_summary_returns_none_for_non_dict_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["not-a-dict"])
+    client._json = _RequestMock(return_value=["not-a-dict"])
 
     assert await client.system_dashboard_summary() is None
     assert client.hems_site_supported is None
@@ -8586,7 +8606,7 @@ async def test_system_dashboard_events_uses_observed_query_and_headers() -> None
         cookie="enlighten_manager_token_production=BEAR; XSRF-TOKEN=xsrf",
         eauth="EAUTH",
     )
-    client._json = AsyncMock(return_value={"events": []})
+    client._json = _RequestMock(return_value={"events": []})
 
     assert await client.system_dashboard_events() == {
         "events": [],
@@ -8627,7 +8647,7 @@ async def test_system_dashboard_events_paginates_and_merges_catalogs() -> None:
         "event_states": [{"id": 2}],
         "event_severities": [{"id": 3}],
     }
-    client._json = AsyncMock(side_effect=[first_page, second_page])
+    client._json = _RequestMock(side_effect=[first_page, second_page])
 
     result = await client.system_dashboard_events()
 
@@ -8649,7 +8669,7 @@ async def test_system_dashboard_events_paginates_and_merges_catalogs() -> None:
 async def test_system_dashboard_events_pagination_is_bounded() -> None:
     client = _make_client()
     full_page = {"events": [{"id": str(index)} for index in range(200)]}
-    client._json = AsyncMock(return_value=full_page)
+    client._json = _RequestMock(return_value=full_page)
 
     result = await client.system_dashboard_events()
 
@@ -8662,7 +8682,7 @@ async def test_system_dashboard_events_pagination_is_bounded() -> None:
 @pytest.mark.asyncio
 async def test_system_dashboard_events_rejects_invalid_later_page() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=[
             {"events": [{"id": str(index)} for index in range(200)]},
             {"events": "invalid"},
@@ -8676,7 +8696,7 @@ async def test_system_dashboard_events_rejects_invalid_later_page() -> None:
 @pytest.mark.parametrize("error", [api.Unauthorized(), _make_cre(404)])
 async def test_system_dashboard_events_optional_errors_return_none(error) -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     assert await client.system_dashboard_events() is None
 
@@ -8686,10 +8706,10 @@ async def test_system_dashboard_events_rejects_invalid_shapes_and_unexpected_err
     None
 ):
     client = _make_client()
-    client._json = AsyncMock(return_value=[])
+    client._json = _RequestMock(return_value=[])
     assert await client.system_dashboard_events() is None
 
-    client._json = AsyncMock(side_effect=RuntimeError("boom"))
+    client._json = _RequestMock(side_effect=RuntimeError("boom"))
     with pytest.raises(RuntimeError, match="boom"):
         await client.system_dashboard_events()
 
@@ -8701,7 +8721,7 @@ async def test_homeowner_events_page_uses_cursor_locale_and_history_headers() ->
         cookie="enlighten_manager_token_production=BEAR; XSRF-TOKEN=xsrf",
         eauth="EAUTH",
     )
-    client._json = AsyncMock(return_value={"events": [], "next": "private cursor"})
+    client._json = _RequestMock(return_value={"events": [], "next": "private cursor"})
 
     result = await client.homeowner_events_page(
         next_cursor="private cursor",
@@ -8740,7 +8760,7 @@ async def test_homeowner_events_page_uses_cursor_locale_and_history_headers() ->
 )
 async def test_homeowner_events_page_rejects_invalid_shapes(payload) -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=payload)
+    client._json = _RequestMock(return_value=payload)
 
     assert await client.homeowner_events_page() is None
 
@@ -8757,7 +8777,7 @@ async def test_homeowner_events_page_rejects_invalid_shapes(payload) -> None:
 )
 async def test_homeowner_events_page_optional_errors_return_none(error) -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     assert await client.homeowner_events_page() is None
 
@@ -8772,7 +8792,7 @@ async def test_homeowner_events_page_preserves_login_wall_failure() -> None:
         content_type="text/html",
         body_preview_redacted="login",
     )
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     with pytest.raises(api.EnphaseLoginWallUnauthorized):
         await client.homeowner_events_page()
@@ -8787,7 +8807,7 @@ async def test_system_dashboard_standing_alarms_uses_observed_query_and_headers(
         cookie="enlighten_manager_token_production=BEAR; XSRF-TOKEN=xsrf",
         eauth="EAUTH",
     )
-    client._json = AsyncMock(return_value={"alarms": []})
+    client._json = _RequestMock(return_value={"alarms": []})
 
     assert await client.system_dashboard_standing_alarms() == {
         "alarms": [],
@@ -8817,7 +8837,7 @@ async def test_system_dashboard_standing_alarms_paginates_and_is_bounded() -> No
     client = _make_client()
     full_page = {"alarms": [{"id": str(index)} for index in range(200)]}
     last_page = {"alarms": [{"id": "last"}]}
-    client._json = AsyncMock(side_effect=[full_page, last_page])
+    client._json = _RequestMock(side_effect=[full_page, last_page])
 
     result = await client.system_dashboard_standing_alarms()
 
@@ -8826,7 +8846,7 @@ async def test_system_dashboard_standing_alarms_paginates_and_is_bounded() -> No
     assert result["alarms"][-1] == {"id": "last"}
     assert result["_enphase_ev_truncated"] is False
 
-    client._json = AsyncMock(return_value=full_page)
+    client._json = _RequestMock(return_value=full_page)
     result = await client.system_dashboard_standing_alarms()
     assert result is not None
     assert len(result["alarms"]) == 2_000
@@ -8840,7 +8860,7 @@ async def test_system_dashboard_standing_alarms_optional_errors_return_none(
     error,
 ) -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     assert await client.system_dashboard_standing_alarms() is None
 
@@ -8848,13 +8868,13 @@ async def test_system_dashboard_standing_alarms_optional_errors_return_none(
 @pytest.mark.asyncio
 async def test_system_dashboard_standing_alarms_rejects_invalid_payloads() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=[])
+    client._json = _RequestMock(return_value=[])
     assert await client.system_dashboard_standing_alarms() is None
 
-    client._json = AsyncMock(return_value={"alarms": "invalid"})
+    client._json = _RequestMock(return_value={"alarms": "invalid"})
     assert await client.system_dashboard_standing_alarms() is None
 
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=[
             {"alarms": [{"id": str(index)} for index in range(200)]},
             {"alarms": "invalid"},
@@ -8862,7 +8882,7 @@ async def test_system_dashboard_standing_alarms_rejects_invalid_payloads() -> No
     )
     assert await client.system_dashboard_standing_alarms() is None
 
-    client._json = AsyncMock(side_effect=RuntimeError("boom"))
+    client._json = _RequestMock(side_effect=RuntimeError("boom"))
     with pytest.raises(RuntimeError, match="boom"):
         await client.system_dashboard_standing_alarms()
 
@@ -8870,7 +8890,7 @@ async def test_system_dashboard_standing_alarms_rejects_invalid_payloads() -> No
 @pytest.mark.asyncio
 async def test_hems_devices_supports_refresh_data_query_flag() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"data": {}})
+    client._json = _RequestMock(return_value={"data": {}})
 
     await client.hems_devices(refresh_data=True)
 
@@ -8881,7 +8901,7 @@ async def test_hems_devices_supports_refresh_data_query_flag() -> None:
 @pytest.mark.asyncio
 async def test_hems_devices_returns_none_when_payload_not_dict() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["bad"])
+    client._json = _RequestMock(return_value=["bad"])
 
     assert await client.hems_devices() is None
 
@@ -8889,7 +8909,7 @@ async def test_hems_devices_returns_none_when_payload_not_dict() -> None:
 @pytest.mark.asyncio
 async def test_hems_devices_raises_on_unauthorized() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=api.Unauthorized("nope"))
+    client._json = _RequestMock(side_effect=api.Unauthorized("nope"))
 
     with pytest.raises(api.Unauthorized):
         await client.hems_devices()
@@ -8900,7 +8920,7 @@ async def test_hems_devices_raises_on_unauthorized() -> None:
 async def test_hems_devices_auth_errors_reraise(monkeypatch, status) -> None:
     client = _make_client()
     err = _make_cre(status, "Unavailable")
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
 
     with pytest.raises(aiohttp.ClientResponseError):
         await client.hems_devices()
@@ -8911,7 +8931,7 @@ async def test_hems_devices_auth_errors_reraise(monkeypatch, status) -> None:
 async def test_hems_devices_optional_errors_return_none(monkeypatch, status) -> None:
     client = _make_client()
     err = _make_cre(status, "Unavailable")
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
 
     assert await client.hems_devices() is None
 
@@ -8929,7 +8949,7 @@ async def test_hems_devices_invalid_site_error_returns_none(
 ) -> None:
     client = _make_client()
     err = _make_cre(550, message)
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
 
     assert await client.hems_devices() is None
     assert client.hems_site_supported is False
@@ -8944,7 +8964,7 @@ async def test_hems_devices_non_json_payload_returns_none(monkeypatch) -> None:
         content_type="text/html",
         endpoint="/api/v1/hems/SITE/hems-devices",
     )
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
 
     assert await client.hems_devices() is None
 
@@ -8958,7 +8978,7 @@ async def test_hems_devices_json_invalid_payload_reraises(monkeypatch) -> None:
         content_type="application/json",
         endpoint="/api/v1/hems/SITE/hems-devices",
     )
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
 
     with pytest.raises(api.InvalidPayloadError):
         await client.hems_devices()
@@ -8967,7 +8987,9 @@ async def test_hems_devices_json_invalid_payload_reraises(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_show_livestream_returns_capability_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"live_status": True, "live_vitals": False})
+    client._json = _RequestMock(
+        return_value={"live_status": True, "live_vitals": False}
+    )
 
     payload = await client.show_livestream()
 
@@ -8983,7 +9005,7 @@ async def test_show_livestream_returns_capability_payload() -> None:
 @pytest.mark.asyncio
 async def test_show_livestream_can_disable_reauth() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"live_status": True})
+    client._json = _RequestMock(return_value={"live_status": True})
 
     assert await client.show_livestream(allow_reauth=False) == {"live_status": True}
 
@@ -9008,7 +9030,7 @@ async def test_show_livestream_auth_errors_reraise_when_reauth_disabled(
     error,
 ) -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     with pytest.raises((api.Unauthorized, aiohttp.ClientResponseError)):
         await client.show_livestream(allow_reauth=False)
@@ -9018,7 +9040,7 @@ async def test_show_livestream_auth_errors_reraise_when_reauth_disabled(
 @pytest.mark.parametrize("status", [401, 403, 404])
 async def test_show_livestream_optional_errors_return_none(monkeypatch, status) -> None:
     client = _make_client()
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=_make_cre(status)))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=_make_cre(status)))
 
     assert await client.show_livestream() is None
 
@@ -9035,7 +9057,7 @@ async def test_show_livestream_returns_none_for_optional_failures(
     monkeypatch, side_effect
 ) -> None:
     client = _make_client()
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=side_effect))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=side_effect))
 
     assert await client.show_livestream() is None
 
@@ -9047,7 +9069,7 @@ async def test_show_livestream_reraises_unexpected_failures(monkeypatch) -> None
     monkeypatch.setattr(
         client,
         "_json",
-        AsyncMock(
+        _RequestMock(
             side_effect=api.InvalidPayloadError(
                 "bad json",
                 status=200,
@@ -9059,7 +9081,7 @@ async def test_show_livestream_reraises_unexpected_failures(monkeypatch) -> None
     with pytest.raises(api.InvalidPayloadError):
         await client.show_livestream()
 
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=_make_cre(500)))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=_make_cre(500)))
     with pytest.raises(aiohttp.ClientResponseError):
         await client.show_livestream()
 
@@ -9067,7 +9089,7 @@ async def test_show_livestream_reraises_unexpected_failures(monkeypatch) -> None
 @pytest.mark.asyncio
 async def test_show_livestream_returns_none_for_non_mapping_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=["not", "a", "dict"])
+    client._json = _RequestMock(return_value=["not", "a", "dict"])
 
     assert await client.show_livestream() is None
 
@@ -9075,7 +9097,9 @@ async def test_show_livestream_returns_none_for_non_mapping_payload() -> None:
 @pytest.mark.asyncio
 async def test_site_livestream_authorizer_returns_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"live_stream_topic": "v1/live-stream/abc"})
+    client._json = _RequestMock(
+        return_value={"live_stream_topic": "v1/live-stream/abc"}
+    )
 
     payload = await client.site_livestream_authorizer("GW-1")
 
@@ -9108,7 +9132,7 @@ async def test_site_livestream_authorizer_returns_payload() -> None:
 )
 async def test_site_livestream_authorizer_optional_errors_return_none(error) -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     assert await client.site_livestream_authorizer("GW-1") is None
 
@@ -9119,7 +9143,7 @@ async def test_site_livestream_authorizer_auth_errors_reraise_when_disabled(
     error,
 ) -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     with pytest.raises((api.Unauthorized, aiohttp.ClientResponseError)):
         await client.site_livestream_authorizer("GW-1", allow_reauth=False)
@@ -9140,7 +9164,7 @@ async def test_site_livestream_authorizer_auth_errors_reraise_when_disabled(
 )
 async def test_site_livestream_authorizer_reraises_unexpected_errors(error) -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=error)
+    client._json = _RequestMock(side_effect=error)
 
     with pytest.raises((api.InvalidPayloadError, aiohttp.ClientResponseError)):
         await client.site_livestream_authorizer("GW-1")
@@ -9448,7 +9472,7 @@ async def test_read_mqtt_websocket_payload_rejects_failed_handshake(
 @pytest.mark.asyncio
 async def test_heat_pump_events_json_returns_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=[{"statusText": "Recommended"}])
+    client._json = _RequestMock(return_value=[{"statusText": "Recommended"}])
 
     payload = await client.heat_pump_events_json("HP-1")
 
@@ -9462,7 +9486,7 @@ async def test_heat_pump_events_json_returns_payload() -> None:
 @pytest.mark.asyncio
 async def test_heat_pump_events_json_returns_none_on_optional_errors() -> None:
     client = _make_client()
-    client._json = AsyncMock(side_effect=_make_cre(404, "Unavailable"))
+    client._json = _RequestMock(side_effect=_make_cre(404, "Unavailable"))
 
     assert await client.heat_pump_events_json("HP-1") is None
 
@@ -9477,7 +9501,7 @@ async def test_heat_pump_events_json_returns_none_on_optional_errors() -> None:
 )
 async def test_events_json_returns_none_for_blank_device_uid(method_name) -> None:
     client = _make_client()
-    client._json = AsyncMock()
+    client._json = _RequestMock()
     method = getattr(client, method_name)
 
     assert await method("  ") is None
@@ -9511,7 +9535,7 @@ async def test_events_json_returns_none_for_optional_failures(
     monkeypatch.setattr(
         client,
         "_json",
-        AsyncMock(side_effect=side_effect_factory(endpoint)),
+        _RequestMock(side_effect=side_effect_factory(endpoint)),
     )
 
     method = getattr(client, method_name)
@@ -9532,7 +9556,7 @@ async def test_events_json_auth_failures_reraise(
     monkeypatch, method_name, uid, side_effect
 ) -> None:
     client = _make_client()
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=side_effect))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=side_effect))
 
     method = getattr(client, method_name)
     with pytest.raises((api.Unauthorized, aiohttp.ClientResponseError)):
@@ -9560,7 +9584,7 @@ async def test_events_json_reraises_unexpected_failures(
     monkeypatch.setattr(
         client,
         "_json",
-        AsyncMock(
+        _RequestMock(
             side_effect=api.InvalidPayloadError(
                 "bad json",
                 status=200,
@@ -9572,7 +9596,7 @@ async def test_events_json_reraises_unexpected_failures(
     with pytest.raises(api.InvalidPayloadError):
         await method(uid)
 
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=_make_cre(500)))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=_make_cre(500)))
     with pytest.raises(aiohttp.ClientResponseError):
         await method(uid)
 
@@ -9604,7 +9628,7 @@ async def test_events_json_raises_diagnostic_signal_for_html_payload_with_json_c
     monkeypatch.setattr(
         client,
         "_json",
-        AsyncMock(
+        _RequestMock(
             side_effect=api.InvalidPayloadError(
                 "Invalid JSON response",
                 status=200,
@@ -9713,7 +9737,7 @@ async def test_events_json_returns_none_for_non_container_payload(
     method_name, uid
 ) -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value="not-json-container")
+    client._json = _RequestMock(return_value="not-json-container")
 
     method = getattr(client, method_name)
     assert await method(uid) is None
@@ -9722,7 +9746,7 @@ async def test_events_json_returns_none_for_non_container_payload(
 @pytest.mark.asyncio
 async def test_iq_er_events_json_returns_payload() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value=[{"statusText": "Recommended"}])
+    client._json = _RequestMock(return_value=[{"statusText": "Recommended"}])
 
     payload = await client.iq_er_events_json("HP-SG")
 
@@ -9847,7 +9871,7 @@ def test_payload_preview_and_hash_handles_bytes_and_fallback_branches(
 
     monkeypatch.setattr(api.json, "dumps", MagicMock(side_effect=TypeError("boom")))
     monkeypatch.setattr(
-        api, "_redact_debug_json_body", MagicMock(side_effect=TypeError)
+        api_common, "_redact_debug_json_body", MagicMock(side_effect=TypeError)
     )
 
     class BadPayload:
@@ -9860,7 +9884,7 @@ def test_payload_preview_and_hash_handles_bytes_and_fallback_branches(
     assert preview == "SERIAL-12345678"
 
     monkeypatch.setattr(
-        api,
+        api_common,
         "_redact_debug_json_body",
         MagicMock(return_value=object()),
     )
@@ -9918,7 +9942,7 @@ def test_is_hems_invalid_site_error_accepts_code_and_message_fallback() -> None:
 async def test_hems_devices_reraises_non_optional_error(monkeypatch) -> None:
     client = _make_client()
     err = _make_cre(500, "Server Error")
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
 
     with pytest.raises(aiohttp.ClientResponseError):
         await client.hems_devices()
@@ -9927,7 +9951,7 @@ async def test_hems_devices_reraises_non_optional_error(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_lifetime_energy_normalization_accepts_alias_fields() -> None:
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         return_value={
             "data": {
                 "evse": [1],
@@ -9963,7 +9987,7 @@ async def test_hems_consumption_lifetime_auth_errors_reraise(
 ) -> None:
     client = _make_client()
     err = _make_cre(status, "Unavailable")
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
 
     with pytest.raises(aiohttp.ClientResponseError):
         await client.hems_consumption_lifetime()
@@ -9976,7 +10000,7 @@ async def test_hems_consumption_lifetime_optional_errors_return_none(
 ) -> None:
     client = _make_client()
     err = _make_cre(status, "Unavailable")
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
 
     assert await client.hems_consumption_lifetime() is None
 
@@ -9990,7 +10014,7 @@ async def test_hems_consumption_lifetime_invalid_site_error_returns_none(
         550,
         '{"type":"hemsIntegrationError","error":{"code":900,"status":"INVALID_SITE","message":"Site is not a valid HEMS site"}}',
     )
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
 
     assert await client.hems_consumption_lifetime() is None
     assert client.hems_site_supported is False
@@ -10007,7 +10031,7 @@ async def test_hems_consumption_lifetime_non_json_payload_returns_none(
         content_type="text/html",
         endpoint="/systems/SITE/hems_consumption_lifetime",
     )
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
 
     assert await client.hems_consumption_lifetime() is None
 
@@ -10018,7 +10042,7 @@ async def test_hems_consumption_lifetime_reraises_non_optional_error(
 ) -> None:
     client = _make_client()
     err = _make_cre(500, "Server Error")
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
 
     with pytest.raises(aiohttp.ClientResponseError):
         await client.hems_consumption_lifetime()
@@ -10035,7 +10059,7 @@ async def test_hems_consumption_lifetime_json_invalid_payload_reraises(
         content_type="application/json",
         endpoint="/systems/SITE/hems_consumption_lifetime",
     )
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
 
     with pytest.raises(api.InvalidPayloadError):
         await client.hems_consumption_lifetime()
@@ -10044,7 +10068,7 @@ async def test_hems_consumption_lifetime_json_invalid_payload_reraises(
 @pytest.mark.asyncio
 async def test_summary_v2_normalizes_list() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"data": [{"serialNumber": "EV"}]})
+    client._json = _RequestMock(return_value={"data": [{"serialNumber": "EV"}]})
     data = await client.summary_v2()
     assert data == [{"serialNumber": "EV"}]
 
@@ -10052,7 +10076,7 @@ async def test_summary_v2_normalizes_list() -> None:
 @pytest.mark.asyncio
 async def test_summary_v2_handles_exception() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value="not-a-dict")
+    client._json = _RequestMock(return_value="not-a-dict")
     assert await client.summary_v2() is None
 
 
@@ -10061,7 +10085,7 @@ async def test_summary_v2_raises_optional_endpoint_unavailable_for_html_json_pay
     None
 ):
     client = _make_client()
-    client._json = AsyncMock(
+    client._json = _RequestMock(
         side_effect=api.InvalidPayloadError(
             "Invalid JSON response (status=200, endpoint=/service/evse_controller/api/v2/SITE/ev_chargers/summary)",
             endpoint="/service/evse_controller/api/v2/SITE/ev_chargers/summary",
@@ -10089,7 +10113,7 @@ async def test_summary_v2_reraises_non_optional_invalid_payload() -> None:
         decode_error="JSONDecodeError",
         body_preview_redacted='{"bad":true}',
     )
-    client._json = AsyncMock(side_effect=err)
+    client._json = _RequestMock(side_effect=err)
 
     with pytest.raises(api.InvalidPayloadError) as raised:
         await client.summary_v2()
@@ -10103,7 +10127,7 @@ async def test_session_history_adds_bearer_from_cookie() -> None:
     client.update_credentials(
         cookie="enlighten_manager_token_production=BEAR; other=1", eauth=""
     )
-    client._json = AsyncMock(return_value={"sessions": []})
+    client._json = _RequestMock(return_value={"sessions": []})
     await client.session_history(
         "SN",
         start_date="01-01-2024",
@@ -10125,7 +10149,7 @@ async def test_session_history_falls_back_to_eauth() -> None:
     client.update_credentials(
         cookie="enlighten_manager_token_production=BEAR", eauth="EAUTH"
     )
-    client._json = AsyncMock(return_value={"sessions": []})
+    client._json = _RequestMock(return_value={"sessions": []})
     await client.session_history("SN", start_date="01-01-2024", end_date="02-01-2024")
     args, kwargs = client._json.await_args
     assert kwargs["headers"]["Authorization"] == "Bearer EAUTH"
@@ -10137,7 +10161,7 @@ async def test_session_history_uses_session_id_header() -> None:
     client = _make_client()
     token = _make_token({"data": {"session_id": "SID123"}})
     client.update_credentials(eauth=token)
-    client._json = AsyncMock(return_value={"sessions": []})
+    client._json = _RequestMock(return_value={"sessions": []})
     await client.session_history("SN", start_date="01-01-2024")
     args, kwargs = client._json.await_args
     assert kwargs["headers"]["e-auth-token"] == "SID123"
@@ -10146,7 +10170,7 @@ async def test_session_history_uses_session_id_header() -> None:
 @pytest.mark.asyncio
 async def test_session_history_filter_criteria_builds_headers() -> None:
     client = _make_client()
-    client._json = AsyncMock(return_value={"data": []})
+    client._json = _RequestMock(return_value={"data": []})
     await client.session_history_filter_criteria(request_id="req-2", username="2999")
     args, kwargs = client._json.await_args
     assert args[0] == "GET"
@@ -10163,7 +10187,7 @@ async def test_session_history_filter_criteria_uses_default_username() -> None:
     token = _make_token({"user_id": "2999"})
     client = _make_client()
     client.update_credentials(eauth=token)
-    client._json = AsyncMock(return_value={"data": []})
+    client._json = _RequestMock(return_value={"data": []})
 
     await client.session_history_filter_criteria(request_id="req-3")
 
@@ -10194,7 +10218,7 @@ async def test_scheduler_endpoints_wrap_unavailable(
 ) -> None:
     client = _make_client()
     err = _make_cre(503, "Service Unavailable")
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
     with pytest.raises(api.SchedulerUnavailable):
         await getattr(client, method)(*args, **kwargs)
 
@@ -10220,7 +10244,7 @@ async def test_scheduler_endpoints_reraise_non_scheduler_error(
 ) -> None:
     client = _make_client()
     err = _make_cre(400, "Bad Request")
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
     with pytest.raises(aiohttp.ClientResponseError):
         await getattr(client, method)(*args, **kwargs)
 
@@ -10229,11 +10253,11 @@ async def test_scheduler_endpoints_reraise_non_scheduler_error(
 async def test_auth_settings_reraise_non_service_errors(monkeypatch) -> None:
     client = _make_client()
     err = _make_cre(400, "Bad Request")
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
     with pytest.raises(aiohttp.ClientResponseError):
         await client.charger_auth_settings("SN")
 
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
     with pytest.raises(aiohttp.ClientResponseError):
         await client.set_app_authentication("SN", enabled=False)
 
@@ -10244,7 +10268,7 @@ async def test_charger_auth_settings_reraises_retry_error(monkeypatch) -> None:
     monkeypatch.setattr(
         client,
         "_json",
-        AsyncMock(side_effect=[api.Unauthorized(), _make_cre(400, "Bad")]),
+        _RequestMock(side_effect=[api.Unauthorized(), _make_cre(400, "Bad")]),
     )
     with pytest.raises(aiohttp.ClientResponseError) as ctx:
         await client.charger_auth_settings("SN")
@@ -10258,7 +10282,7 @@ async def test_charger_auth_settings_wraps_retry_unavailable(monkeypatch) -> Non
     monkeypatch.setattr(
         client,
         "_json",
-        AsyncMock(
+        _RequestMock(
             side_effect=[api.Unauthorized(), _make_cre(503, "Service Unavailable")]
         ),
     )
@@ -10271,7 +10295,7 @@ async def test_charger_auth_settings_unauthorized_without_control_auth_reraises(
     None
 ):
     client = api.EnphaseEVClient(_DefaultSession(), "SITE", None, "COOKIE")
-    client._json = AsyncMock(side_effect=api.Unauthorized())
+    client._json = _RequestMock(side_effect=api.Unauthorized())
 
     with pytest.raises(api.Unauthorized):
         await client.charger_auth_settings("SN")
@@ -10283,7 +10307,7 @@ async def test_charger_auth_settings_retries_without_auth_on_403(monkeypatch) ->
     monkeypatch.setattr(
         client,
         "_json",
-        AsyncMock(
+        _RequestMock(
             side_effect=[
                 _make_cre(403, "Forbidden"),
                 {"data": [{"key": AUTH_APP_SETTING, "value": "enabled"}]},
@@ -10309,7 +10333,7 @@ async def test_charger_auth_settings_retries_without_auth_on_403(monkeypatch) ->
 async def test_lifetime_energy_reraises_non_service_error(monkeypatch) -> None:
     client = _make_client()
     err = _make_cre(400, "Bad Request")
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
     with pytest.raises(aiohttp.ClientResponseError):
         await client.lifetime_energy()
 
@@ -10318,7 +10342,7 @@ async def test_lifetime_energy_reraises_non_service_error(monkeypatch) -> None:
 async def test_session_history_reraises_non_service_error(monkeypatch) -> None:
     client = _make_client()
     err = _make_cre(400, "Bad Request")
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
     with pytest.raises(aiohttp.ClientResponseError):
         await client.session_history("SN", start_date="01-01-2024")
 
@@ -10327,7 +10351,7 @@ async def test_session_history_reraises_non_service_error(monkeypatch) -> None:
 async def test_charger_auth_settings_wraps_unavailable(monkeypatch) -> None:
     client = _make_client()
     err = _make_cre(503, "Service Unavailable")
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
     with pytest.raises(api.AuthSettingsUnavailable):
         await client.charger_auth_settings("SN")
 
@@ -10336,7 +10360,7 @@ async def test_charger_auth_settings_wraps_unavailable(monkeypatch) -> None:
 async def test_set_app_authentication_wraps_unavailable(monkeypatch) -> None:
     client = _make_client()
     err = _make_cre(503, "Service Unavailable")
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
     with pytest.raises(api.AuthSettingsUnavailable):
         await client.set_app_authentication("SN", enabled=True)
 
@@ -10345,7 +10369,7 @@ async def test_set_app_authentication_wraps_unavailable(monkeypatch) -> None:
 async def test_lifetime_energy_wraps_unavailable(monkeypatch) -> None:
     client = _make_client()
     err = _make_cre(503, "Service Unavailable")
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
     with pytest.raises(api.SiteEnergyUnavailable):
         await client.lifetime_energy()
 
@@ -10355,6 +10379,6 @@ async def test_lifetime_energy_wraps_unavailable(monkeypatch) -> None:
 async def test_session_history_wraps_unavailable(monkeypatch, status) -> None:
     client = _make_client()
     err = _make_cre(status, "Service Unavailable")
-    monkeypatch.setattr(client, "_json", AsyncMock(side_effect=err))
+    monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
     with pytest.raises(api.SessionHistoryUnavailable):
         await client.session_history("SN", start_date="01-01-2024")

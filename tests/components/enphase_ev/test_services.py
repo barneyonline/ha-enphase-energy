@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 import voluptuous as vol
 import yaml
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -193,6 +194,7 @@ async def test_admin_live_stream_services_resolve_supported_site_targets(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     area = ar.async_get(hass).async_create("Garage")
     device_registry = dr.async_get(hass)
@@ -507,6 +509,7 @@ async def test_grid_profile_browse_services_require_installer_access(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     for service in ("browse_grid_profiles", "refresh_grid_profiles"):
         with pytest.raises(ServiceValidationError) as err:
@@ -544,6 +547,7 @@ async def test_grid_profile_services_require_enabled_option(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     with pytest.raises(ServiceValidationError) as err:
         await handlers[(DOMAIN, "browse_grid_profiles")](
@@ -581,6 +585,7 @@ async def test_grid_profile_browse_services_recheck_access_after_catalog_load(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     for service in ("browse_grid_profiles", "refresh_grid_profiles"):
         runtime.installer_access_confirmed = True
@@ -614,6 +619,7 @@ async def test_grid_profile_services_report_activation_unavailable(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     for service in (
         "browse_grid_profiles",
@@ -649,6 +655,7 @@ async def test_grid_profile_browse_services_return_requested_catalog(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     browse = await handlers[(DOMAIN, "browse_grid_profiles")](
         SimpleNamespace(
@@ -706,6 +713,7 @@ async def test_set_grid_profile_service_uses_metadata_only_preflight(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     with pytest.raises(ServiceValidationError) as err:
         await handlers[(DOMAIN, "set_grid_profile")](
@@ -931,6 +939,7 @@ async def test_services_route_evse_targets_to_owning_entry_with_site_only_entry(
     )
     site_only_entry.add_to_hass(hass)
     site_only_entry.runtime_data = EnphaseRuntimeData(coordinator=site_only_coord)
+    object.__setattr__(site_only_entry, "state", ConfigEntryState.LOADED)
 
     evse_entry = MockConfigEntry(
         domain=DOMAIN,
@@ -940,6 +949,7 @@ async def test_services_route_evse_targets_to_owning_entry_with_site_only_entry(
     )
     evse_entry.add_to_hass(hass)
     evse_entry.runtime_data = EnphaseRuntimeData(coordinator=evse_coord)
+    object.__setattr__(evse_entry, "state", ConfigEntryState.LOADED)
 
     device_registry = dr.async_get(hass)
     device_registry.async_get_or_create(
@@ -1070,6 +1080,7 @@ async def test_services_route_duplicate_serial_to_device_config_entry(
     ):
         entry.add_to_hass(hass)
         entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+        object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     device = SimpleNamespace(
         id="second-device",
@@ -1078,7 +1089,7 @@ async def test_services_route_duplicate_serial_to_device_config_entry(
         via_device_id=None,
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev.services.dr.async_get",
+        "custom_components.enphase_ev.service_routing.dr.async_get",
         lambda _hass: SimpleNamespace(
             async_get=lambda device_id: device if device_id == device.id else None
         ),
@@ -1130,6 +1141,7 @@ async def test_services_route_composite_device_through_split_owners(
     ):
         entry.add_to_hass(hass)
         entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+        object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     composite = SimpleNamespace(
         id="old-composite-device-id",
@@ -1149,7 +1161,7 @@ async def test_services_route_composite_device_through_split_owners(
         ),
     )
     monkeypatch.setattr(
-        "custom_components.enphase_ev.services.dr.async_get",
+        "custom_components.enphase_ev.service_routing.dr.async_get",
         lambda _hass: registry,
     )
 
@@ -1185,6 +1197,7 @@ async def test_targeted_services_raise_without_target_or_owner(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     device_registry = dr.async_get(hass)
     site_device = device_registry.async_get_or_create(
@@ -1255,6 +1268,7 @@ async def test_targeted_services_reject_mixed_valid_and_unknown_devices(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     device_registry = dr.async_get(hass)
     site_device = device_registry.async_get_or_create(
@@ -1316,6 +1330,7 @@ async def test_try_reauth_now_uses_stored_credentials_for_selected_site(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     result = await handlers[(DOMAIN, "try_reauth_now")](
         SimpleNamespace(data={"site_id": "evse-site"})
@@ -1348,6 +1363,7 @@ async def test_try_reauth_now_reused_success_does_not_force_refresh(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     result = await handlers[(DOMAIN, "try_reauth_now")](
         SimpleNamespace(data={"site_id": "evse-site"})
@@ -1375,6 +1391,7 @@ async def test_try_reauth_now_reports_missing_stored_credentials(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     result = await handlers[(DOMAIN, "try_reauth_now")](
         SimpleNamespace(data={"site_id": "evse-site"})
@@ -1410,6 +1427,7 @@ async def test_try_reauth_now_reports_manual_retry_cooldown(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     result = await handlers[(DOMAIN, "try_reauth_now")](
         SimpleNamespace(data={"site_id": "evse-site"})
@@ -1448,6 +1466,7 @@ async def test_clear_hems_auth_backoff_targets_selected_site(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     result = await handlers[(DOMAIN, "clear_hems_auth_backoff")](
         SimpleNamespace(data={"site_id": "evse-site"})
@@ -1478,6 +1497,7 @@ async def test_update_tariff_accepts_rate_entities(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
     locator = {
         "branch": "purchase",
         "kind": "period",
@@ -1520,6 +1540,7 @@ async def test_update_tariff_accepts_friendly_rate_fields(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
     site_device = dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, "site:tariff-site")},
@@ -1643,6 +1664,7 @@ async def test_update_tariff_rate_entity_extractor_fallback(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
     locator = {
         "branch": "purchase",
         "kind": "period",
@@ -1723,6 +1745,7 @@ async def test_update_tariff_rejects_invalid_rate_entity_targets(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
     ent_reg = er.async_get(hass)
     other_platform = ent_reg.async_get_or_create(
         "number",
@@ -1821,6 +1844,7 @@ async def test_update_tariff_billing_only_resolves_site_targets(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     await handlers[(DOMAIN, "update_tariff")](
         SimpleNamespace(
@@ -1892,6 +1916,7 @@ async def test_update_tariff_structural_updates_resolve_site_targets(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
     purchase = {
         "typeKind": "single",
         "typeId": "flat",
@@ -1991,6 +2016,7 @@ async def test_update_tariff_guided_structural_fields_build_tariffs(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     await handlers[(DOMAIN, "update_tariff")](
         SimpleNamespace(
@@ -2128,6 +2154,7 @@ async def test_update_tariff_guided_structural_fields_validate_inputs(
     )
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
     invalid_inputs = (
         {"configure_import_tariff": True},
@@ -2226,7 +2253,9 @@ async def test_update_tariff_rejects_duplicate_and_cross_site_rates(
     first_entry.add_to_hass(hass)
     second_entry.add_to_hass(hass)
     first_entry.runtime_data = EnphaseRuntimeData(coordinator=first)
+    object.__setattr__(first_entry, "state", ConfigEntryState.LOADED)
     second_entry.runtime_data = EnphaseRuntimeData(coordinator=second)
+    object.__setattr__(second_entry, "state", ConfigEntryState.LOADED)
     ent_reg = er.async_get(hass)
     first_entity = ent_reg.async_get_or_create(
         "sensor",
@@ -2354,6 +2383,7 @@ async def test_charging_service_routes_ui_targets(
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "target-site"})
     entry.add_to_hass(hass)
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
     area = ar.async_get(hass).async_create("Target Garage")
     floor = fr.async_get(hass).async_create("Target Floor", level=0)
     ar.async_get(hass).async_update(area.id, floor_id=floor.floor_id)
@@ -2452,6 +2482,7 @@ async def test_validate_schedule_entity_target_routes_selected_site(
         entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: site_id})
         entry.add_to_hass(hass)
         entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+        object.__setattr__(entry, "state", ConfigEntryState.LOADED)
         entities.append(
             er.async_get(hass).async_get_or_create(
                 "switch", DOMAIN, f"{site_id}-dtg", config_entry=entry

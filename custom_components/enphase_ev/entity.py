@@ -11,6 +11,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .scalar_helpers import coerce_snapshot_bool
 from .coordinator import EnphaseCoordinator
 from .device_info_helpers import (
     _compose_charger_model_display,
@@ -214,3 +215,54 @@ class EnphaseBaseEntity(
             if mac_clean:
                 info_kwargs["connections"] = {(CONNECTION_NETWORK_MAC, mac_clean)}
         return DeviceInfo(**info_kwargs)
+
+
+def evse_safe_limit_active(value: object) -> bool:
+    """Interpret the EVSE integer safe-limit flag."""
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    try:
+        return int(str(value).strip()) != 0
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def evse_charging_active(value: object) -> bool:
+    """Interpret the EVSE charging flag using its narrower boolean vocabulary."""
+    if isinstance(value, str) and value.strip().lower() in {"enabled", "disabled"}:
+        return False
+    return coerce_snapshot_bool(value) is True
+
+
+def battery_write_access_confirmed(coord: object) -> bool:
+    """Return established write permission, preserving unknown startup roles."""
+    owner = getattr(coord, "battery_user_is_owner", None)
+    installer = getattr(coord, "battery_user_is_installer", None)
+    if owner is True or installer is True:
+        return True
+    return bool(getattr(coord, "battery_write_access_confirmed", False))
+
+
+def battery_write_access_explicitly_denied(coord: object) -> bool:
+    """Keep unknown permissions distinct from explicit denial."""
+    if getattr(coord, "battery_write_access_confirmed", None) is True:
+        return False
+    return (
+        getattr(coord, "battery_user_is_owner", None) is False
+        and getattr(coord, "battery_user_is_installer", None) is False
+    )
+
+
+def battery_schedule_supported(client: object) -> bool:
+    """Return whether the client exposes the complete schedule CRUD contract."""
+    return all(
+        callable(getattr(client, method, None))
+        for method in (
+            "battery_schedules",
+            "create_battery_schedule",
+            "update_battery_schedule",
+            "delete_battery_schedule",
+        )
+    )

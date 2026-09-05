@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass
 from functools import partial
 from typing import Any, Callable
 
 from .const import OPT_BATTERY_SCHEDULES_ENABLED
 
-CallbackFactory = Callable[[Any], object]
-BoundRefreshCall = tuple[str, str, Callable[[], object], str | None]
+CallbackFactory = Callable[[Any], Awaitable[object]]
+BoundRefreshCall = tuple[str, str, Callable[[], Awaitable[object]], str | None]
 
 REFRESH_TASK_ENDPOINT_FAMILIES: dict[str, str] = {
     "battery_site_settings_s": "battery_site_settings",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import time
 from dataclasses import dataclass
@@ -33,6 +34,7 @@ from .const import (
     OPT_SLOW_POLL_INTERVAL,
     STORM_GUARD_CACHE_TTL,
 )
+from .evse_state import EVSEState, EvseControlSnapshot
 from .log_redaction import redact_identifier, redact_text
 from .request_metrics import request_metrics_scope
 from .runtime_helpers import coerce_int, normalize_poll_intervals
@@ -133,7 +135,14 @@ def evse_power_is_actively_charging(
 class EvseRuntime:
     def __init__(self, coordinator: EnphaseCoordinator) -> None:
         self.coordinator = coordinator
+        self.state = EVSEState()
         self._lookup_semaphore = asyncio.Semaphore(EVSE_LOOKUP_CONCURRENCY)
+
+    @property
+    def snapshot(self) -> EvseControlSnapshot:
+        """Return detached user-visible command and capability state."""
+
+        return self.state.snapshot()
 
     def _instance_override(self, name: str) -> object | None:
         return cast(object | None, self.coordinator.__dict__.get(name))
@@ -158,7 +167,15 @@ class EvseRuntime:
             )
             for sn, awaitable in pending.items()
         }
-        responses = await asyncio.gather(*wrapped.values(), return_exceptions=True)
+        try:
+            responses = await asyncio.gather(*wrapped.values(), return_exceptions=True)
+        finally:
+            # A queued coroutine may never enter the semaphore before cancellation.
+            # Closing completed coroutines is harmless; closing the unused ones
+            # releases their frames and prevents unawaited-coroutine warnings.
+            for awaitable in pending.values():
+                if inspect.iscoroutine(awaitable):
+                    awaitable.close()
         return dict(zip(wrapped.keys(), responses, strict=False))
 
     def schedule_session_enrichment(
@@ -397,26 +414,13 @@ class EvseRuntime:
             coord._serial_order = [sn for sn in serial_order if sn in keep_serials]
         else:
             coord._serial_order = [sn for sn in keep_serials]
+        self.state.prune(keep_serials)
         for attr_name in (
             "last_set_amps",
             "_operating_v",
-            "_charge_mode_cache",
             "_start_without_level_fallback",
-            "_green_battery_cache",
-            "_green_battery_pending",
-            "_charger_config_cache",
-            "_charger_config_backoff_until",
-            "_auth_settings_cache",
-            "_app_auth_pending",
             "_evse_feature_flags_by_serial",
-            "_last_charging",
-            "_last_actual_charging",
-            "_pending_charging",
-            "_desired_charging",
-            "_auto_resume_attempts",
-            "_session_end_fix",
             "_streaming_targets",
-            "_evse_transition_snapshots",
         ):
             cache = getattr(coord, attr_name, None)
             if not isinstance(cache, dict):
@@ -460,12 +464,12 @@ class EvseRuntime:
         for sn, info in data.items():
             sn_str = str(sn)
             charging = bool(info.get("charging"))
-            desired = coord._desired_charging.get(sn_str)
+            desired = self.state._desired_charging.get(sn_str)
             if desired is None:
-                coord._desired_charging[sn_str] = charging
+                self.state._desired_charging[sn_str] = charging
                 desired = charging
             if charging:
-                coord._auto_resume_attempts.pop(sn_str, None)
+                self.state._auto_resume_attempts.pop(sn_str, None)
                 continue
             if not desired or not info.get("plugged"):
                 continue
@@ -489,11 +493,11 @@ class EvseRuntime:
                     mode,
                 )
                 continue
-            last_attempt = coord._auto_resume_attempts.get(sn_str)
+            last_attempt = self.state._auto_resume_attempts.get(sn_str)
             # A suspended EVSE can report unchanged state for more than one poll.
             if last_attempt is not None and (now - last_attempt) < 120:
                 continue
-            coord._auto_resume_attempts[sn_str] = now
+            self.state._auto_resume_attempts[sn_str] = now
             _LOGGER.debug(
                 "Scheduling auto-resume for charger %s after connector reported %s",
                 redact_identifier(sn_str),
@@ -1055,12 +1059,12 @@ class EvseRuntime:
         coord = self.coordinator
         sn_str = str(sn)
         if charging is None:
-            coord._last_actual_charging.pop(sn_str, None)
+            self.state._last_actual_charging.pop(sn_str, None)
             return
-        previous = coord._last_actual_charging.get(sn_str)
+        previous = self.state._last_actual_charging.get(sn_str)
         if previous is not None and previous != charging:
             coord.kick_fast(FAST_TOGGLE_POLL_HOLD_S)
-        coord._last_actual_charging[sn_str] = charging
+        self.state._last_actual_charging[sn_str] = charging
         if not coord._streaming_manual and self.streaming_active():
             expected = coord._streaming_targets.get(sn_str)
             if expected is not None and charging == expected:
@@ -1082,10 +1086,10 @@ class EvseRuntime:
         except Exception:
             hold = 90.0
         if hold <= 0:
-            self.coordinator._pending_charging.pop(sn_str, None)
+            self.state._pending_charging.pop(sn_str, None)
             return
         expires = time.monotonic() + hold
-        self.coordinator._pending_charging[sn_str] = (bool(should_charge), expires)
+        self.state._pending_charging[sn_str] = (bool(should_charge), expires)
 
     def slow_interval_floor(self) -> int:
         coord = self.coordinator
@@ -1158,15 +1162,15 @@ class EvseRuntime:
         return False
 
     def get_desired_charging(self, sn: str) -> bool | None:
-        desired = self.coordinator._desired_charging.get(str(sn))
+        desired = self.state._desired_charging.get(str(sn))
         return desired if isinstance(desired, bool) else None
 
     def set_desired_charging(self, sn: str, desired: bool | None) -> None:
         sn_str = str(sn)
         if desired is None:
-            self.coordinator._desired_charging.pop(sn_str, None)
+            self.state._desired_charging.pop(sn_str, None)
             return
-        self.coordinator._desired_charging[sn_str] = bool(desired)
+        self.state._desired_charging[sn_str] = bool(desired)
 
     @staticmethod
     def coerce_amp(value: object) -> int | None:
@@ -1251,14 +1255,14 @@ class EvseRuntime:
             mode = None
         if mode:
             self.coordinator.mark_scheduler_available()
-            self.coordinator._charge_mode_cache[sn] = (mode, now)
+            self.state._charge_mode_cache[sn] = (mode, now)
         return mode
 
     async def async_get_green_battery_setting(
         self, sn: str
     ) -> tuple[bool | None, bool] | None:
         now = time.monotonic()
-        cached = self.coordinator._green_battery_cache.get(sn)
+        cached = self.state._green_battery_cache.get(sn)
         if cached and (now - cached[2] < GREEN_BATTERY_CACHE_TTL):
             return cached[0], cached[1]
         try:
@@ -1296,7 +1300,7 @@ class EvseRuntime:
                 supported = True
                 enabled = _as_bool(item.get("enabled"))
                 break
-        self.coordinator._green_battery_cache[sn] = (enabled, supported, now)
+        self.state._green_battery_cache[sn] = (enabled, supported, now)
         return enabled, supported
 
     async def async_get_auth_settings(
@@ -1304,7 +1308,7 @@ class EvseRuntime:
     ) -> tuple[bool | None, bool | None, bool, bool] | None:
         coord = self.coordinator
         now = time.monotonic()
-        cached = coord._auth_settings_cache.get(sn)
+        cached = self.state._auth_settings_cache.get(sn)
         if cached and (now - cached[4] < AUTH_SETTINGS_CACHE_TTL):
             return cached[0], cached[1], cached[2], cached[3]
         if coord._auth_settings_backoff_active():
@@ -1376,7 +1380,7 @@ class EvseRuntime:
         if not app_supported and not rfid_supported:
             return None
         coord.mark_auth_settings_available()
-        coord._auth_settings_cache[sn] = (
+        self.state._auth_settings_cache[sn] = (
             app_enabled,
             rfid_enabled,
             app_supported,
@@ -1407,7 +1411,7 @@ class EvseRuntime:
         if not requested:
             return {}
 
-        cached = coord._charger_config_cache.get(sn)
+        cached = self.state._charger_config_cache.get(sn)
         cached_values: dict[str, object] = {}
         cache_fresh = False
         if cached and (now - cached[1] < CHARGER_CONFIG_CACHE_TTL):
@@ -1422,7 +1426,7 @@ class EvseRuntime:
         elif cached:
             cached_values = dict(cached[0])
 
-        backoff_until = coord._charger_config_backoff_until.get(sn)
+        backoff_until = self.state._charger_config_backoff_until.get(sn)
         if backoff_until is not None and backoff_until > now:
             if cache_fresh:
                 return {
@@ -1438,7 +1442,7 @@ class EvseRuntime:
         try:
             settings = await coord.client.charger_config(sn, requested)
         except Exception:
-            coord._charger_config_backoff_until[sn] = (
+            self.state._charger_config_backoff_until[sn] = (
                 time.monotonic() + CHARGER_CONFIG_FAILURE_BACKOFF_S
             )
             if cache_fresh:
@@ -1475,8 +1479,8 @@ class EvseRuntime:
                 if key not in returned_keys:
                     merged[key] = _MISSING_CHARGER_CONFIG_VALUE
 
-        coord._charger_config_cache[sn] = (merged, now)
-        coord._charger_config_backoff_until.pop(sn, None)
+        self.state._charger_config_cache[sn] = (merged, now)
+        self.state._charger_config_backoff_until.pop(sn, None)
         return {
             key: merged[key]
             for key in requested
@@ -1487,12 +1491,12 @@ class EvseRuntime:
         normalized = self.normalize_charge_mode_preference(mode)
         if normalized is None:
             return
-        self.coordinator._charge_mode_cache[str(sn)] = (normalized, time.monotonic())
+        self.state._charge_mode_cache[str(sn)] = (normalized, time.monotonic())
 
     def set_green_battery_cache(
         self, sn: str, enabled: bool, supported: bool = True
     ) -> None:
-        self.coordinator._green_battery_cache[str(sn)] = (
+        self.state._green_battery_cache[str(sn)] = (
             bool(enabled),
             bool(supported),
             time.monotonic(),
@@ -1501,10 +1505,10 @@ class EvseRuntime:
     def set_app_auth_cache(self, sn: str, enabled: bool) -> None:
         sn_str = str(sn)
         now = time.monotonic()
-        cached = self.coordinator._auth_settings_cache.get(sn_str)
+        cached = self.state._auth_settings_cache.get(sn_str)
         if cached:
             _, rfid_enabled, _app_supported, rfid_supported, _ts = cached
-            self.coordinator._auth_settings_cache[sn_str] = (
+            self.state._auth_settings_cache[sn_str] = (
                 bool(enabled),
                 rfid_enabled,
                 True,
@@ -1512,7 +1516,7 @@ class EvseRuntime:
                 now,
             )
             return
-        self.coordinator._auth_settings_cache[sn_str] = (
+        self.state._auth_settings_cache[sn_str] = (
             bool(enabled),
             None,
             True,
@@ -1532,10 +1536,10 @@ class EvseRuntime:
     def set_default_charge_level_cache(self, sn: str, amps: int) -> None:
         sn_str = str(sn)
         now = time.monotonic()
-        cached = self.coordinator._charger_config_cache.get(sn_str)
+        cached = self.state._charger_config_cache.get(sn_str)
         values = dict(cached[0]) if cached else {}
         values[DEFAULT_CHARGE_LEVEL_SETTING] = int(amps)
-        self.coordinator._charger_config_cache[sn_str] = (values, now)
+        self.state._charger_config_cache[sn_str] = (values, now)
 
     def _set_evse_toggle_pending(self, attr_name: str, sn: str, enabled: bool) -> None:
         pending = getattr(self.coordinator, attr_name, None)
@@ -1649,12 +1653,12 @@ class EvseRuntime:
                             identifiers=(sn,),
                         ),
                     )
-                    cached = coord._green_battery_cache.get(sn)
+                    cached = self.state._green_battery_cache.get(sn)
                     if cached:
                         results[sn] = (cached[0], cached[1])
                     continue
                 if response is None:
-                    cached = coord._green_battery_cache.get(sn)
+                    cached = self.state._green_battery_cache.get(sn)
                     if cached:
                         results[sn] = (cached[0], cached[1])
                     continue
@@ -1684,12 +1688,12 @@ class EvseRuntime:
                             identifiers=(sn,),
                         ),
                     )
-                    cached = coord._auth_settings_cache.get(sn)
+                    cached = self.state._auth_settings_cache.get(sn)
                     if cached:
                         results[sn] = cached[0], cached[1], cached[2], cached[3]
                     continue
                 if response is None:
-                    cached = coord._auth_settings_cache.get(sn)
+                    cached = self.state._auth_settings_cache.get(sn)
                     if cached:
                         results[sn] = cached[0], cached[1], cached[2], cached[3]
                     continue
@@ -1733,7 +1737,7 @@ class EvseRuntime:
                             identifiers=(sn,),
                         ),
                     )
-                    cached = coord._charger_config_cache.get(sn)
+                    cached = self.state._charger_config_cache.get(sn)
                     if cached:
                         cached_values = dict(cached[0])
                         filtered = {
@@ -1796,7 +1800,7 @@ class EvseRuntime:
             now = time.monotonic()
         results: dict[str, tuple[bool | None, bool]] = {}
         for sn in self._unique_serials(serials):
-            cached = self.coordinator._green_battery_cache.get(sn)
+            cached = self.state._green_battery_cache.get(sn)
             if cached and (now - cached[2] < GREEN_BATTERY_CACHE_TTL):
                 results[sn] = (cached[0], cached[1])
         return results
@@ -1827,7 +1831,7 @@ class EvseRuntime:
             now = time.monotonic()
         results: dict[str, tuple[bool | None, bool | None, bool, bool]] = {}
         for sn in self._unique_serials(serials):
-            cached = self.coordinator._auth_settings_cache.get(sn)
+            cached = self.state._auth_settings_cache.get(sn)
             if cached and (now - cached[4] < AUTH_SETTINGS_CACHE_TTL):
                 results[sn] = cached[0], cached[1], cached[2], cached[3]
         return results
@@ -1860,7 +1864,7 @@ class EvseRuntime:
         requested = tuple(keys)
         results: dict[str, dict[str, object]] = {}
         for sn in self._unique_serials(serials):
-            cached = self.coordinator._charger_config_cache.get(sn)
+            cached = self.state._charger_config_cache.get(sn)
             if not cached or now - cached[1] >= CHARGER_CONFIG_CACHE_TTL:
                 continue
             cached_values = dict(cached[0])
@@ -1891,7 +1895,7 @@ class EvseRuntime:
         for sn in self._unique_serials(serials):
             if sn in cached_results:
                 continue
-            backoff_until = self.coordinator._charger_config_backoff_until.get(sn)
+            backoff_until = self.state._charger_config_backoff_until.get(sn)
             if backoff_until is not None and backoff_until > now:
                 continue
             candidates.append(sn)
@@ -1964,7 +1968,7 @@ class EvseRuntime:
         *,
         now: float | None = None,
     ) -> str | None:
-        cache_entry = self.coordinator._charge_mode_cache.get(str(sn))
+        cache_entry = self.state._charge_mode_cache.get(str(sn))
         if not cache_entry:
             return None
         if now is None:

@@ -14,6 +14,7 @@ from .device_types import parse_type_identifier
 from .energy import SiteEnergyFlow
 from .log_redaction import redact_text
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
+from .scalar_helpers import coerce_snapshot_bool
 
 DIAGNOSTIC_CAPTURE_ERRORS = (RuntimeError, TypeError, ValueError, AttributeError)
 
@@ -239,20 +240,7 @@ def _text(value: Any) -> str | None:
     return out or None
 
 
-def _optional_bool(value: Any) -> bool | None:
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return value != 0
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in ("true", "1", "yes", "y", "enabled", "on"):
-            return True
-        if normalized in ("false", "0", "no", "n", "disabled", "off"):
-            return False
-    return None
+_optional_bool = coerce_snapshot_bool
 
 
 def _normalize_gateway_status(value: Any) -> str:

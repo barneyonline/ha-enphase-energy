@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from typing import Any
+from datetime import datetime, timedelta
+from collections.abc import Callable
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.event import async_track_point_in_utc_time
+from .entity import callback
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
@@ -41,6 +45,8 @@ class EnphaseSiteSensorEntity(CoordinatorEntity, SensorEntity):  # type: ignore[
         self._coord = coord
         self._key = key
         self._type_key = type_key
+        self._cancel_freshness_expiry: Callable[[], None] | None = None
+        self._source_first_observed: datetime | None = None
         self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_{key}"
 
     @property
@@ -51,9 +57,87 @@ class EnphaseSiteSensorEntity(CoordinatorEntity, SensorEntity):  # type: ignore[
             self._coord, self._type_key
         ):
             return False
+        deadline = self._freshness_deadline()
+        if deadline is not None and dt_util.utcnow() >= deadline:
+            return False
         if self._coord.last_success_utc is not None:
             return True
         return super().available  # type: ignore[no-any-return]
+
+    def _freshness_deadline(self) -> datetime | None:
+        """Bound live readings while preserving cumulative and diagnostic state."""
+
+        if self.device_class not in {
+            SensorDeviceClass.POWER,
+            SensorDeviceClass.BATTERY,
+            SensorDeviceClass.ENERGY_STORAGE,
+        }:
+            return None
+        source_success: datetime | None = None
+        family_source = self._type_key in {"heatpump", "encharge", "ac_battery"}
+        if self._type_key == "heatpump":
+            source_success = getattr(
+                self._coord, "heatpump_power_last_success_utc", None
+            )
+        elif self._type_key in {"encharge", "ac_battery"}:
+            getter = getattr(self._coord, "endpoint_family_last_success_utc", None)
+            if callable(getter):
+                source_success = getter(
+                    "battery_status"
+                    if self._type_key == "encharge"
+                    else "ac_battery_telemetry"
+                )
+        if family_source and not isinstance(source_success, datetime):
+            if self._source_first_observed is None:
+                self._source_first_observed = dt_util.utcnow()
+            source_success = self._source_first_observed
+        if not isinstance(source_success, datetime):
+            source_success = (
+                self._coord.last_success_utc
+                if not self._coord.last_update_success
+                else None
+            )
+        return (
+            source_success + timedelta(minutes=30 if family_source else 15)
+            if source_success is not None
+            else None
+        )
+
+    @callback
+    def _schedule_freshness_expiry(self) -> None:
+        if self._cancel_freshness_expiry is not None:
+            self._cancel_freshness_expiry()
+            self._cancel_freshness_expiry = None
+        deadline = self._freshness_deadline()
+        if self.hass is None or deadline is None or deadline <= dt_util.utcnow():
+            return
+
+        @callback
+        def expire(_now: datetime) -> None:
+            self._cancel_freshness_expiry = None
+            # Successful unchanged polls may advance source freshness without
+            # notifying listeners; follow their new deadline before publishing.
+            self._schedule_freshness_expiry()
+            self.async_write_ha_state()
+
+        self._cancel_freshness_expiry = async_track_point_in_utc_time(
+            self.hass, expire, deadline
+        )
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._schedule_freshness_expiry()
+
+    async def async_will_remove_from_hass(self) -> None:
+        if self._cancel_freshness_expiry is not None:
+            self._cancel_freshness_expiry()
+            self._cancel_freshness_expiry = None
+        await super().async_will_remove_from_hass()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        self._schedule_freshness_expiry()
+        super()._handle_coordinator_update()
 
     def _cloud_diag_attrs(
         self, *, include_last_success: bool = True

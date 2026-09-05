@@ -19,6 +19,12 @@ from .battery_schedule_editor import (
     battery_scheduler_enabled,
 )
 from .const import DOMAIN, SAFE_LIMIT_AMPS
+from .entity import evse_safe_limit_active, evse_charging_active
+from .entity import (
+    battery_schedule_supported,
+    battery_write_access_explicitly_denied as _battery_write_access_explicitly_denied,
+)
+from .entity import battery_write_access_confirmed as _battery_write_access_confirmed
 from .coordinator import EnphaseCoordinator
 from .entity import EnphaseBaseEntity, evse_amp_control_applicable
 from .entity_cleanup import prune_managed_entities
@@ -51,38 +57,11 @@ def _site_has_battery(coord: EnphaseCoordinator) -> bool:
     return has_encharge is not False
 
 
-def _battery_write_access_confirmed(coord: EnphaseCoordinator) -> bool:
-    confirmed = getattr(coord, "battery_write_access_confirmed", None)
-    owner = getattr(coord, "battery_user_is_owner", None)
-    installer = getattr(coord, "battery_user_is_installer", None)
-    if owner is True or installer is True:
-        return True
-    if confirmed is not None:
-        return bool(confirmed)
-    # Battery write access starts unknown until BatteryConfig permissions load.
-    return False
-
-
-def _battery_write_access_explicitly_denied(coord: EnphaseCoordinator) -> bool:
-    if getattr(coord, "battery_write_access_confirmed", None) is True:
-        return False
-    return (
-        getattr(coord, "battery_user_is_owner", None) is False
-        and getattr(coord, "battery_user_is_installer", None) is False
-    )
-
-
 def _battery_schedule_editor_active(
     coord: EnphaseCoordinator, entry: EnphaseConfigEntry | None
 ) -> bool:
     client = getattr(coord, "client", None)
-    return bool(
-        battery_scheduler_enabled(entry)
-        and callable(getattr(client, "battery_schedules", None))
-        and callable(getattr(client, "create_battery_schedule", None))
-        and callable(getattr(client, "update_battery_schedule", None))
-        and callable(getattr(client, "delete_battery_schedule", None))
-    )
+    return bool(battery_scheduler_enabled(entry) and battery_schedule_supported(client))
 
 
 def _retained_site_number_unique_ids(
@@ -414,33 +393,9 @@ class ChargingAmpsNumber(EnphaseBaseEntity, NumberEntity):  # type: ignore[misc]
         super().__init__(coord, sn)
         self._attr_unique_id = f"{DOMAIN}_{sn}_amps_number"
 
-    @staticmethod
-    def _safe_limit_active(value: object) -> bool:
-        if value is None:
-            return False
-        if isinstance(value, bool):
-            return bool(value)
-        try:
-            return int(str(value).strip()) != 0
-        except Exception:  # noqa: BLE001
-            return False
+    _safe_limit_active = staticmethod(evse_safe_limit_active)
 
-    @staticmethod
-    def _charging_active(value: object) -> bool:
-        if value is None:
-            return False
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, (int, float)):
-            return value != 0
-        if isinstance(value, str):
-            normalized = value.strip().lower()
-            if normalized in ("true", "1", "yes", "y", "on"):
-                return True
-            if normalized in ("false", "0", "no", "n", "off"):
-                return False
-            return False
-        return False
+    _charging_active = staticmethod(evse_charging_active)
 
     @staticmethod
     def _coerce_amp(value: object) -> int | None:
@@ -646,10 +601,7 @@ class _BatteryScheduleEditorLimitNumber(BatteryScheduleEditorEntity, NumberEntit
             and battery_scheduler_enabled(self._entry)
             and _type_available(self._coord, "encharge")
             and _battery_write_access_confirmed(self._coord)
-            and callable(getattr(client, "battery_schedules", None))
-            and callable(getattr(client, "create_battery_schedule", None))
-            and callable(getattr(client, "update_battery_schedule", None))
-            and callable(getattr(client, "delete_battery_schedule", None))
+            and battery_schedule_supported(client)
             and self._editor is not None
         )
 

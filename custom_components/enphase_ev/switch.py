@@ -30,6 +30,10 @@ from .battery_schedule_editor import (
     battery_scheduler_enabled,
 )
 from .const import DOMAIN
+from .entity import (
+    battery_write_access_explicitly_denied as _battery_write_access_explicitly_denied,
+)
+from .entity import battery_write_access_confirmed as _battery_write_access_confirmed
 from .coordinator import EnphaseCoordinator
 from .entity import EnphaseBaseEntity, battery_schedule_extra_state_attributes
 from .entity_cleanup import prune_managed_entities
@@ -194,26 +198,6 @@ def _migrated_switch_entity_id(
 def _site_has_battery(coord: EnphaseCoordinator) -> bool:
     has_encharge = getattr(coord, "battery_has_encharge", None)
     return has_encharge is not False
-
-
-def _battery_write_access_confirmed(coord: EnphaseCoordinator) -> bool:
-    confirmed = getattr(coord, "battery_write_access_confirmed", None)
-    owner = getattr(coord, "battery_user_is_owner", None)
-    installer = getattr(coord, "battery_user_is_installer", None)
-    if owner is True or installer is True:
-        return True
-    if confirmed is not None:
-        return bool(confirmed)
-    return False
-
-
-def _battery_write_access_explicitly_denied(coord: EnphaseCoordinator) -> bool:
-    if getattr(coord, "battery_write_access_confirmed", None) is True:
-        return False
-    return (
-        getattr(coord, "battery_user_is_owner", None) is False
-        and getattr(coord, "battery_user_is_installer", None) is False
-    )
 
 
 def _storm_guard_visible(coord: EnphaseCoordinator) -> bool:

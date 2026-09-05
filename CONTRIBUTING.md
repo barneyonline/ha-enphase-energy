@@ -48,12 +48,24 @@ Include the integration version, Home Assistant version, affected entity IDs, de
    ```
    Reuse the running container with `docker compose exec` for subsequent checks
    to avoid paying container startup costs on every command.
-   To reproduce the forward-compatibility lane against the pinned Home Assistant
-   2026.8 beta, run:
+   The default `ha-dev` lane pins Home Assistant 2026.9.0, the matching test
+   plugin, and Linux/Python 3.14 transitive constraints in
+   `devtools/docker/constraints-dev.txt`. Rebuild after changing requirements.
+   The minimum supported Home Assistant version remains 2026.6.0.
+   To reproduce the previous stable compatibility lane (Home Assistant
+   2026.8.3), run:
    ```bash
    docker compose -f devtools/docker/docker-compose.yml build ha-2026-8
-   docker compose -f devtools/docker/docker-compose.yml run --rm ha-2026-8 bash -lc "pytest -q tests/compatibility/test_ha_2026_8_device_registry.py tests/components/enphase_ev/test_init_module.py::test_async_setup_entry_updates_existing_device tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_preserves_real_devices_with_site_identifier tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_removes_empty_device_without_gateway tests/components/enphase_ev/test_services.py::test_services_route_evse_targets_to_owning_entry_with_site_only_entry"
+   docker compose -f devtools/docker/docker-compose.yml run --rm ha-2026-8 bash -lc "pytest -q tests/compatibility/test_ha_2026_8_device_registry.py tests/components/enphase_ev/test_entry_lifecycle.py tests/components/enphase_ev/test_reload_snapshot.py tests/components/enphase_ev/test_init_module.py::test_async_setup_entry_updates_existing_device tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_preserves_real_devices_with_site_identifier tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_removes_empty_device_without_gateway tests/components/enphase_ev/test_services.py::test_services_route_evse_targets_to_owning_entry_with_site_only_entry"
    ```
+   To reproduce the minimum-version lane, run:
+   ```bash
+   docker compose -f devtools/docker/docker-compose.yml build ha-minimum
+   docker compose -f devtools/docker/docker-compose.yml run --rm ha-minimum bash -lc "python -c 'from homeassistant.const import __version__; assert __version__ == \"2026.6.0\"'; pytest -q tests/components/enphase_ev/test_manifest.py tests/components/enphase_ev/test_device_action.py tests/components/enphase_ev/test_device_trigger.py tests/components/enphase_ev/test_schedule_sync.py tests/components/enphase_ev/test_entry_lifecycle.py tests/components/enphase_ev/test_reload_snapshot.py tests/components/enphase_ev/test_services.py"
+   ```
+   Every lane resolves Home Assistant together with its exact matching test
+   plugin and transitive constraints. Upgrade each Home Assistant/plugin pair
+   deliberately; do not overlay a beta on an unrelated dependency stack.
 5. **Start `ha-runtime` when you need a real Home Assistant UI for manual verification**:
    ```bash
    mkdir -p .ha-config

@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 
 import aiohttp
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers.entity import EntityCategory
 
 from custom_components.enphase_ev.battery_schedule_editor import (
@@ -124,6 +125,7 @@ def _attach_editor_runtime(config_entry, coord) -> BatteryScheduleEditorManager:
         coordinator=coord,
         battery_schedule_editor=editor,
     )
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
     return editor
 
 
@@ -789,6 +791,7 @@ async def test_sensor_setup_removes_schedule_sensors_when_scheduler_disabled(
         {OPT_BATTERY_SCHEDULES_ENABLED: False},
     )
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
     ent_reg = er.async_get(hass)
     unique_ids = [
         f"{DOMAIN}_site_{coord.site_id}_{key}"
@@ -913,6 +916,7 @@ async def test_battery_schedule_platform_setup_skips_editor_when_option_disabled
         coordinator=coord,
         battery_schedule_editor=BatteryScheduleEditorManager(coord),
     )
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     added: list[object] = []
 
@@ -1389,6 +1393,7 @@ async def test_battery_schedule_select_and_buttons_cover_missing_selection_paths
     assert service_calls == []
 
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
     no_editor_type_select = BatteryNewScheduleTypeSelect(coord, config_entry)
     await no_editor_type_select.async_select_option("Charge From Grid Schedule")
 
@@ -1416,6 +1421,7 @@ async def test_battery_schedule_editor_guard_paths_cover_missing_editor_and_fall
     _prepare_battery_schedule_coord(coord)
     coord.inventory_view.type_device_info = lambda *_args: None
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     schedule_select = BatteryScheduleSelect(coord, config_entry)
     new_type_select = BatteryNewScheduleTypeSelect(coord, config_entry)
@@ -1509,6 +1515,7 @@ async def test_battery_schedule_sensor_setup_prunes_stale_inventory_entities_whe
         coord, "async_add_listener", lambda callback: (lambda: None), raising=False
     )
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     ent_reg = er.async_get(hass)
     stale = ent_reg.async_get_or_create(
@@ -1551,6 +1558,7 @@ async def test_battery_schedule_sensor_setup_prunes_stale_summary_when_supported
         coord, "async_add_listener", lambda callback: (lambda: None), raising=False
     )
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     ent_reg = er.async_get(hass)
     stale = ent_reg.async_get_or_create(
@@ -1585,6 +1593,7 @@ async def test_battery_schedule_services_support_crud_and_validation(
     _prepare_battery_schedule_coord(coord)
     coord._battery_charge_from_grid = False  # noqa: SLF001
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
@@ -1752,6 +1761,7 @@ async def test_battery_schedule_services_update_uses_inventory_schedule_family(
     coord = coordinator_factory()
     _prepare_battery_schedule_coord(coord)
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
@@ -1841,6 +1851,7 @@ async def test_battery_schedule_services_delete_uses_enabled_remaining_schedule(
     coord.parse_battery_schedules_payload(payload)
     coord._battery_dtg_schedule_id = None  # noqa: SLF001
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
@@ -1932,6 +1943,7 @@ async def test_battery_schedule_services_delete_prefers_selected_remaining_sched
     coord._battery_schedules_payload = payload  # noqa: SLF001
     coord.parse_battery_schedules_payload(payload)
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
@@ -2002,6 +2014,7 @@ async def test_battery_schedule_services_delete_falls_back_to_first_remaining_sc
     coord._battery_schedules_payload = payload  # noqa: SLF001
     coord.parse_battery_schedules_payload(payload)
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
@@ -2070,6 +2083,7 @@ async def test_battery_schedule_services_update_preserves_selected_family_window
     coord._battery_schedules_payload = payload  # noqa: SLF001
     coord.parse_battery_schedules_payload(payload)
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
@@ -2130,6 +2144,7 @@ async def test_battery_schedule_services_update_falls_back_when_selected_schedul
     _prepare_battery_schedule_coord(coord)
     coord._battery_dtg_schedule_id = "missing-id"  # noqa: SLF001
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
@@ -2180,6 +2195,7 @@ async def test_battery_schedule_services_reject_local_overlaps_before_client_cal
     coord = coordinator_factory()
     _prepare_battery_schedule_coord(coord)
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
@@ -2269,6 +2285,7 @@ async def test_battery_schedule_services_cover_failure_paths(
     coord = coordinator_factory()
     _prepare_battery_schedule_coord(coord)
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
@@ -2660,6 +2677,7 @@ async def test_battery_schedule_service_handlers_reraise_client_errors_when_help
         MagicMock()
     )  # noqa: SLF001
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     registered: dict[tuple[str, str], dict[str, object]] = {}
 
