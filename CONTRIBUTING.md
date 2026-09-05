@@ -104,6 +104,27 @@ separately while iterating on `scripts/`:
 docker compose -f devtools/docker/docker-compose.yml exec ha-dev pytest -q tests/scripts
 ```
 
+## Dependency Maintenance
+
+Dependabot continues to propose weekly GitHub Actions updates. For
+`devtools/docker`, routine Python version PRs are disabled. Standalone updates
+to `cryptography`, `PyJWT`, `aiohttp`, and `Pillow`, including security-update
+PRs, are ignored because Home Assistant requires exact versions of these
+packages. Other Python security updates remain enabled.
+
+Keep Dependabot alerts enabled and review new advisories even for ignored
+packages. Address applicable advisories through a compatible Home Assistant
+upgrade: update the Home Assistant version and matching test plugin together,
+regenerate that lane's constraints, and validate it in Docker. Preserve the
+exact dependency stacks for older compatibility lanes while those Home
+Assistant versions remain supported. Do not override their dependency pins
+independently to clear an alert.
+
+The `open-pull-requests-limit: 0` setting only disables version-update PRs;
+the explicit `ignore` rules suppress security-update PRs for these four
+packages. Neither setting disables Dependabot alerts. See GitHub's
+[security-update configuration guidance](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configure-security-updates).
+
 ## Coding Standards and Tooling
 
 Home Assistant integrations must follow the [core development guidelines](https://developers.home-assistant.io/docs/development_guidelines/). Key points:
