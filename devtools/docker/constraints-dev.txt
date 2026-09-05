@@ -50,7 +50,7 @@ ciso8601==2.3.3
 click==8.5.0
 coverage==7.15.4
 cronsim==2.7
-cryptography==48.0.1
+cryptography==50.0.0
 dbus-fast==5.0.22
 distlib==0.4.3
 envs==1.4
