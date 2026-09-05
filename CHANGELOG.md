@@ -5,8 +5,26 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
-- Raised the minimum supported Home Assistant version to `2026.8.0`. Update
-  Home Assistant before installing this integration release.
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v4.3.0 - 2026-09-05
+
+### 🚧 Breaking changes
+- Raised the minimum supported Home Assistant version from `2026.6.0` to
+  `2026.8.0`. Upgrade Home Assistant before installing this release if you are
+  running an older version. (#852)
 
 ### ✨ New features
 - None
@@ -53,6 +71,9 @@ All notable changes to this project will be documented in this file.
 - Removed pre-August device-registry and percentage-unit fallbacks, obsolete
   tests, and duplicate legacy test fixtures while preserving composite-device
   migration coverage.
+- Pinned compatible Home Assistant development and test dependencies and prevented
+  Dependabot from proposing incompatible updates to those stacks.
+- Bumped the integration manifest version to `4.3.0`.
 
 ## v4.2.7 - 2026-09-02
 
