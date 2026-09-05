@@ -1,4 +1,0 @@
--c constraints-ha-2026.8.txt
-# Previous stable Home Assistant compatibility lane; no beta dependency overlay.
-homeassistant==2026.8.3
-pytest-homeassistant-custom-component==0.13.357

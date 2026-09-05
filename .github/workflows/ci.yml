@@ -11,7 +11,6 @@ on:
     paths:
       - 'custom_components/**'
       - 'tests/components/enphase_ev/**'
-      - 'tests/compatibility/**'
       - 'scripts/**/*.py'
       - 'tests/scripts/**/*.py'
       - '.pre-commit-config.yaml'
@@ -22,9 +21,9 @@ on:
       - 'devtools/docker/requirements-ci-quality.txt'
       - 'devtools/docker/requirements-ci-scripts.txt'
       - 'devtools/docker/requirements-min-ha.txt'
-      - 'devtools/docker/requirements-ha-2026.8.txt'
       - 'devtools/docker/Dockerfile'
       - 'devtools/docker/docker-compose.yml'
+      - 'hacs.json'
       - 'pytest.ini'
       - 'quality_scale.yaml'
       - '.github/workflows/tests.yml'

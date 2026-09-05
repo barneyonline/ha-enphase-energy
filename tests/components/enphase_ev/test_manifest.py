@@ -3,7 +3,7 @@ import pathlib
 
 import yaml
 
-MIN_HOME_ASSISTANT_VERSION = "2026.6.0"
+MIN_HOME_ASSISTANT_VERSION = "2026.8.0"
 
 
 def test_manifest_keys_present():
@@ -79,6 +79,18 @@ def test_development_requirements_cover_minimum_homeassistant_version():
     constraints = (root / "devtools/docker/constraints-dev.txt").read_text()
     assert f"homeassistant=={current_pin}" in constraints
     assert f"homeassistant=={MIN_HOME_ASSISTANT_VERSION}" in requirements_min_ha
+    assert "-c constraints-min-ha.txt" in requirements_min_ha
+    minimum_constraints = (root / "devtools/docker/constraints-min-ha.txt").read_text()
+    for line in requirements_min_ha.splitlines():
+        if "==" in line and not line.startswith("#"):
+            assert line in minimum_constraints
+    workflow = yaml.safe_load((root / ".github/workflows/tests.yml").read_text())
+    install_step = next(
+        step
+        for step in workflow["jobs"]["minimum-homeassistant"]["steps"]
+        if step.get("name") == "Install minimum Home Assistant test deps"
+    )
+    assert f"== '{MIN_HOME_ASSISTANT_VERSION}'" in install_step["run"]
 
 
 def test_service_actions_have_icons():

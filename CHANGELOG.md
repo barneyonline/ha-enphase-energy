@@ -5,7 +5,8 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
-- None
+- Raised the minimum supported Home Assistant version to `2026.8.0`. Update
+  Home Assistant before installing this integration release.
 
 ### ✨ New features
 - None
@@ -47,7 +48,11 @@ All notable changes to this project will be documented in this file.
   Home Assistant device IDs and numeric Enphase site IDs.
 
 ### 🔄 Other changes
-- None
+- Consolidated compatibility CI on Home Assistant `2026.8.0` and current stable,
+  replacing the June dependency stack and redundant August patch-version lane.
+- Removed pre-August device-registry and percentage-unit fallbacks, obsolete
+  tests, and duplicate legacy test fixtures while preserving composite-device
+  migration coverage.
 
 ## v4.2.7 - 2026-09-02
 

@@ -7,7 +7,6 @@ from custom_components.enphase_ev.device_registry_compat import (
     device_belongs_to_config_entry,
     device_config_entry_ids,
     get_device_by_identifier,
-    via_device_kwargs,
 )
 
 
@@ -23,20 +22,6 @@ def test_scoped_identifier_lookup_uses_modern_registry_api() -> None:
         is device
     )
     scoped_lookup.assert_called_once_with(("enphase_ev", "shared"), "entry-a")
-
-
-def test_scoped_identifier_lookup_falls_back_for_old_home_assistant() -> None:
-    """The advertised minimum HA version keeps using its legacy lookup."""
-
-    device = SimpleNamespace(id="legacy-device")
-    legacy_lookup = Mock(return_value=device)
-    registry = SimpleNamespace(async_get_device=legacy_lookup)
-
-    assert (
-        get_device_by_identifier(registry, ("enphase_ev", "serial"), "entry-a")
-        is device
-    )
-    legacy_lookup.assert_called_once_with(identifiers={("enphase_ev", "serial")})
 
 
 def test_device_config_entry_ids_support_modern_legacy_and_composite_devices() -> None:
@@ -88,20 +73,3 @@ def test_device_config_entry_ids_support_modern_legacy_and_composite_devices() -
     assert not device_belongs_to_config_entry(
         SimpleNamespace(config_entry_id="entry-a"), None
     )
-
-
-def test_via_device_kwargs_follow_available_registry_api() -> None:
-    """Parent linkage uses via_device_id only when Home Assistant supports it."""
-
-    modern_registry = SimpleNamespace(async_get_device_by_identifier=Mock())
-    assert via_device_kwargs(
-        modern_registry,
-        via_device_id="parent-id",
-        legacy_via_device=("enphase_ev", "parent-serial"),
-    ) == {"via_device_id": "parent-id"}
-
-    assert via_device_kwargs(
-        SimpleNamespace(),
-        via_device_id="parent-id",
-        legacy_via_device=("enphase_ev", "parent-serial"),
-    ) == {"via_device": ("enphase_ev", "parent-serial")}

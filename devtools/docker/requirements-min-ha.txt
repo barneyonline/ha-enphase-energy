@@ -1,5 +1,5 @@
 # Advertised minimum Home Assistant and its exact matching test-plugin stack.
 -c constraints-min-ha.txt
-homeassistant==2026.6.0
-pytest-homeassistant-custom-component==0.13.336
+homeassistant==2026.8.0
+pytest-homeassistant-custom-component==0.13.354
 PyYAML==6.0.3

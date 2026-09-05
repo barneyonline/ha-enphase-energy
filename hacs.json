@@ -1,6 +1,6 @@
 {
     "name": "Enphase Energy",
-    "homeassistant": "2026.6.0",
+    "homeassistant": "2026.8.0",
     "render_readme": true,
     "content_in_root": false
 }

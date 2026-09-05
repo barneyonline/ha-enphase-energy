@@ -27,7 +27,6 @@ def test_slow_jobs_use_path_classification_instead_of_precommit_gate() -> None:
     assert "changes" in jobs
     assert "translation-regressions" not in jobs
     for name in (
-        "homeassistant-2026-8",
         "minimum-homeassistant",
         "pytest",
         "python314-diagnostics",
@@ -100,17 +99,24 @@ def test_duplicate_static_gates_have_single_ci_owners() -> None:
 
 def _compatibility_test_paths():
     paths = set()
-    for name in ("minimum-homeassistant", "homeassistant-2026-8"):
-        for step in _jobs()[name]["steps"]:
-            for token in shlex.split(step.get("run", "")):
-                if token.startswith("tests/"):
-                    paths.add(token.split("::")[0])
+    for step in _jobs()["minimum-homeassistant"]["steps"]:
+        for token in shlex.split(step.get("run", "")):
+            if token.startswith("tests/"):
+                paths.add(token.split("::")[0])
     return sorted(paths)
 
 
-@pytest.mark.parametrize("path", _compatibility_test_paths())
-def test_every_compatibility_test_triggers_its_lane(path, tmp_path):
-    """Execute the workflow classifier with a test-only changed path."""
+@pytest.mark.parametrize(
+    "path",
+    [
+        *_compatibility_test_paths(),
+        "hacs.json",
+        "devtools/docker/requirements-min-ha.txt",
+        "devtools/docker/constraints-min-ha.txt",
+    ],
+)
+def test_every_compatibility_input_triggers_its_lane(path, tmp_path):
+    """Execute the classifier for minimum-version metadata, dependencies, and tests."""
     step = next(
         step
         for step in _jobs()["changes"]["steps"]
