@@ -1,4 +1,4 @@
-"""Verify the benchmark exercises detached nested payloads and reports its scope."""
+"""Test the Home Assistant-dependent snapshot benchmark with integration fixtures."""
 
 import importlib.util
 from pathlib import Path
@@ -7,7 +7,7 @@ import pytest
 
 
 def _module():
-    path = Path(__file__).resolve().parents[2] / "scripts" / "benchmark_snapshots.py"
+    path = Path(__file__).resolve().parents[3] / "scripts" / "benchmark_snapshots.py"
     spec = importlib.util.spec_from_file_location("benchmark_snapshots", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
