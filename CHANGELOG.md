@@ -22,7 +22,9 @@ All notable changes to this project will be documented in this file.
 ## v4.3.0 - 2026-09-05
 
 ### 🚧 Breaking changes
-- None
+- Raised the minimum supported Home Assistant version from `2026.6.0` to
+  `2026.8.0`. Upgrade Home Assistant before installing this release if you are
+  running an older version. (#852)
 
 ### ✨ New features
 - None
