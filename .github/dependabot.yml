@@ -4,3 +4,17 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  - package-ecosystem: pip
+    directory: /devtools/docker
+    schedule:
+      interval: weekly
+    # Keep routine Python version PRs disabled; other security updates remain enabled.
+    open-pull-requests-limit: 0
+    # Home Assistant pins these dependencies exactly. Upgrade the Home Assistant
+    # and test-plugin pair together, then regenerate each lane's constraints.
+    # These ignores suppress update PRs, including security PRs, not security alerts.
+    ignore:
+      - dependency-name: cryptography
+      - dependency-name: pyjwt
+      - dependency-name: aiohttp
+      - dependency-name: pillow
