@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
+import shlex
+import subprocess
+
+import pytest
 
 import yaml
 
@@ -57,7 +62,9 @@ def test_pytest_reuses_one_coverage_run_and_loads_only_required_plugins() -> Non
     assert "pytest_cov.plugin" in test_step["env"]["PYTEST_PLUGINS"]
     assert "tests/scripts" not in test_step["run"]
     assert "coverage run" not in coverage_step["run"]
-    assert "coverage report" in coverage_step["run"]
+    assert "check_statement_coverage.py" in coverage_step["run"]
+    assert "--cov-branch" in test_step["run"]
+    assert "--cov-report=json" in test_step["run"]
 
 
 def test_uv_caches_depend_only_on_dependency_inputs() -> None:
@@ -89,3 +96,33 @@ def test_duplicate_static_gates_have_single_ci_owners() -> None:
     assert (
         sum(command.lstrip().startswith("mypy ") for command in quality_commands) == 1
     )
+
+
+def _compatibility_test_paths():
+    paths = set()
+    for name in ("minimum-homeassistant", "homeassistant-2026-8"):
+        for step in _jobs()[name]["steps"]:
+            for token in shlex.split(step.get("run", "")):
+                if token.startswith("tests/"):
+                    paths.add(token.split("::")[0])
+    return sorted(paths)
+
+
+@pytest.mark.parametrize("path", _compatibility_test_paths())
+def test_every_compatibility_test_triggers_its_lane(path, tmp_path):
+    """Execute the workflow classifier with a test-only changed path."""
+    step = next(
+        step
+        for step in _jobs()["changes"]["steps"]
+        if step.get("name") == "Classify changed paths"
+    )
+    script = step["run"]
+    # The classifier below consumes git's changed-path output. No network/git
+    # mutation is needed to exercise its actual shell expressions.
+    script = script[script.index("          set_output()".strip()) :]
+    output = tmp_path / "outputs"
+    env = {**os.environ, "GITHUB_OUTPUT": str(output), "changed_files": path}
+    subprocess.run(
+        ["bash", "-c", script], env=env, check=True, capture_output=True, text=True
+    )
+    assert "compatibility=true" in output.read_text().splitlines()

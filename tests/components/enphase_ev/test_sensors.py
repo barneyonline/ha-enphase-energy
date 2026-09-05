@@ -452,6 +452,12 @@ def test_battery_overall_charge_sensor_states():
     from custom_components.enphase_ev.sensor import EnphaseBatteryOverallChargeSensor
 
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _key: None,
+            type_device_info=lambda _key: None,
+            has_type=lambda key: key in {"envoy", "encharge"},
+            has_type_for_entities=lambda key: key in {"envoy", "encharge"},
+        ),
         site_id="site",
         battery_aggregate_charge_pct=47.8,
         battery_status_summary={
@@ -507,6 +513,12 @@ def test_battery_overall_status_sensor_states():
     from homeassistant.helpers.entity import EntityCategory
 
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _key: None,
+            type_device_info=lambda _key: None,
+            has_type=lambda key: key in {"envoy", "encharge"},
+            has_type_for_entities=lambda key: key in {"envoy", "encharge"},
+        ),
         site_id="site",
         battery_aggregate_status="warning",
         battery_status_summary={
@@ -555,6 +567,12 @@ def test_battery_cfg_schedule_status_sensor_states():
     from homeassistant.helpers.entity import EntityCategory
 
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _key: None,
+            type_device_info=lambda _key: None,
+            has_type=lambda key: key in {"envoy", "encharge"},
+            has_type_for_entities=lambda key: key in {"envoy", "encharge"},
+        ),
         site_id="site",
         battery_cfg_schedule_status="pending",
         charge_from_grid_control_available=True,
@@ -855,6 +873,12 @@ def test_battery_site_summary_sensors_state_and_attributes():
     )
 
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _key: None,
+            type_device_info=lambda _key: None,
+            has_type=lambda key: key in {"envoy", "encharge"},
+            has_type_for_entities=lambda key: key in {"envoy", "encharge"},
+        ),
         site_id="site",
         battery_status_summary={
             "site_available_energy_kwh": 4.75,
@@ -950,6 +974,12 @@ def test_battery_last_reported_sensor_states_and_attributes():
         ]
     }
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _key: None,
+            type_device_info=lambda _key: None,
+            has_type=lambda key: key in {"envoy", "encharge"},
+            has_type_for_entities=lambda key: key in {"envoy", "encharge"},
+        ),
         site_id="site",
         battery_status_payload=payload,
         iter_battery_serials=lambda: ["BAT-FALLBACK"],
@@ -1437,6 +1467,12 @@ def test_battery_mode_sensor_states():
     from custom_components.enphase_ev.sensor import EnphaseBatteryModeSensor
 
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _key: None,
+            type_device_info=lambda _key: None,
+            has_type=lambda key: key in {"envoy", "encharge"},
+            has_type_for_entities=lambda key: key in {"envoy", "encharge"},
+        ),
         site_id="site",
         battery_grid_mode="ImportExport",
         battery_mode_display="Import and Export",
@@ -1509,6 +1545,12 @@ def test_battery_mode_sensor_falls_back_to_status_payload():
     from custom_components.enphase_ev.sensor import EnphaseBatteryModeSensor
 
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _key: None,
+            type_device_info=lambda _key: None,
+            has_type=lambda key: key in {"envoy", "encharge"},
+            has_type_for_entities=lambda key: key in {"envoy", "encharge"},
+        ),
         site_id="site",
         battery_grid_mode=None,
         battery_mode_display=None,
@@ -1559,6 +1601,12 @@ def test_battery_mode_sensor_skips_invalid_status_payload_entries():
             raise ValueError("boom")
 
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _key: None,
+            type_device_info=lambda _key: None,
+            has_type=lambda key: key in {"envoy", "encharge"},
+            has_type_for_entities=lambda key: key in {"envoy", "encharge"},
+        ),
         site_id="site",
         battery_grid_mode=None,
         battery_mode_display=None,
@@ -1605,9 +1653,14 @@ def test_grid_mode_sensor_states_and_attributes():
     from custom_components.enphase_ev.sensor import EnphaseGridModeSensor
 
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            has_type=lambda key: key in ("envoy", "enpower"),
+            type_bucket=lambda _key: None,
+            type_device_info=lambda _key: None,
+            has_type_for_entities=lambda key: key in ("envoy", "enpower"),
+        ),
         site_id="site",
         battery_has_encharge=True,
-        has_type=lambda key: key in ("envoy", "enpower"),
         grid_mode="off_grid",
         grid_mode_raw_states=["is_grid_outage:false", "show_grid_connect:true"],
         grid_mode_source="grid_outage_context",
@@ -1720,14 +1773,17 @@ def test_microinverter_inventory_zero_total_paths():
         "connectivity_state": "unknown",
     }
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _key: bucket,
+            has_type=lambda key: key == "microinverter",
+            has_type_for_entities=lambda key: key == "microinverter",
+            type_device_info=lambda _key: None,
+        ),
         site_id="site",
         include_inverters=True,
         last_success_utc=datetime(2026, 2, 15, 5, 31, 33, tzinfo=timezone.utc),
         last_update_success=False,
         _devices_inventory_ready=False,
-        type_bucket=lambda _key: bucket,
-        has_type=lambda key: key == "microinverter",
-        has_type_for_entities=lambda key: key == "microinverter",
     )
 
     connectivity = EnphaseMicroinverterConnectivityStatusSensor(coord)
@@ -1742,6 +1798,12 @@ def test_system_profile_status_sensor_states():
     from custom_components.enphase_ev.sensor import EnphaseSystemProfileStatusSensor
 
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _key: None,
+            type_device_info=lambda _key: None,
+            has_type=lambda key: key in {"envoy", "encharge"},
+            has_type_for_entities=lambda key: key in {"envoy", "encharge"},
+        ),
         site_id="site",
         storm_alert_active=None,
         last_success_utc=None,

@@ -2531,31 +2531,36 @@ def test_microinverter_snapshot_fallback_covers_summary_error_and_zero_status_pa
     None
 ):
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _type_key: {
+                "count": 2,
+                "devices": [
+                    {
+                        "serial_number": "INV-A",
+                        "name": "Inverter A",
+                        "status": "normal",
+                        "last_report": "2026-02-15T10:00:00Z",
+                    }
+                ],
+                "status_counts": {
+                    "total": 0,
+                    "normal": 0,
+                    "warning": 0,
+                    "error": 0,
+                    "not_reporting": 0,
+                    "unknown": 0,
+                },
+                "panel_info": {"panels": 1},
+                "status_type_counts": {"ok": 1},
+                "connectivity_state": " ",
+            },
+            type_device_info=lambda _key: None,
+            has_type=lambda _key: False,
+            has_type_for_entities=lambda _key: False,
+        ),
         microinverter_inventory_summary=lambda: (_ for _ in ()).throw(
             RuntimeError("boom")
         ),
-        type_bucket=lambda _type_key: {
-            "count": 2,
-            "devices": [
-                {
-                    "serial_number": "INV-A",
-                    "name": "Inverter A",
-                    "status": "normal",
-                    "last_report": "2026-02-15T10:00:00Z",
-                }
-            ],
-            "status_counts": {
-                "total": 0,
-                "normal": 0,
-                "warning": 0,
-                "error": 0,
-                "not_reporting": 0,
-                "unknown": 0,
-            },
-            "panel_info": {"panels": 1},
-            "status_type_counts": {"ok": 1},
-            "connectivity_state": " ",
-        },
     )
 
     snapshot = sensor_mod._microinverter_inventory_snapshot(coord)
@@ -3220,48 +3225,53 @@ def test_heatpump_snapshot_fallback_covers_summary_error_and_type_snapshot_paths
 ):
     mono_now = time.monotonic()
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _type_key: {
+                "count": "bad-count",
+                "devices": [
+                    {
+                        "device-type": "HEAT_PUMP",
+                        "name": "Heat Pump",
+                        "status": "not_reporting",
+                        "last-report": "2026-02-15T10:00:00Z",
+                    },
+                    {
+                        "device_type": "ENERGY_METER",
+                        "name": "Meter 1",
+                        "status": "warning",
+                        "device_uid": "EM-1",
+                        "last_reported": "2026-02-15T10:05:00Z",
+                    },
+                    {
+                        "device_type": "ENERGY_METER",
+                        "name": "Meter 2",
+                        "status_text": "Normal",
+                        "device-uid": "EM-2",
+                        "last_reported_at": "2026-02-15T10:06:00Z",
+                    },
+                    {"device_type": "", "name": "Unknown Member"},
+                    "bad-member",
+                ],
+                "status_counts": {"total": "bad"},
+                "overall_status_text": " ",
+                "device_type_counts": {
+                    None: 1,
+                    "ENERGY_METER": "2",
+                    "SG_READY_GATEWAY": "bad",
+                    "ZERO": 0,
+                },
+                "status_summary": " ",
+                "model_summary": "Model A x1",
+                "firmware_summary": "FW x1",
+            },
+            type_device_info=lambda _key: None,
+            has_type=lambda _key: False,
+            has_type_for_entities=lambda _key: False,
+        ),
         heatpump_inventory_summary=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
         heatpump_type_summary=lambda _device_type: (_ for _ in ()).throw(
             RuntimeError("boom")
         ),
-        type_bucket=lambda _type_key: {
-            "count": "bad-count",
-            "devices": [
-                {
-                    "device-type": "HEAT_PUMP",
-                    "name": "Heat Pump",
-                    "status": "not_reporting",
-                    "last-report": "2026-02-15T10:00:00Z",
-                },
-                {
-                    "device_type": "ENERGY_METER",
-                    "name": "Meter 1",
-                    "status": "warning",
-                    "device_uid": "EM-1",
-                    "last_reported": "2026-02-15T10:05:00Z",
-                },
-                {
-                    "device_type": "ENERGY_METER",
-                    "name": "Meter 2",
-                    "status_text": "Normal",
-                    "device-uid": "EM-2",
-                    "last_reported_at": "2026-02-15T10:06:00Z",
-                },
-                {"device_type": "", "name": "Unknown Member"},
-                "bad-member",
-            ],
-            "status_counts": {"total": "bad"},
-            "overall_status_text": " ",
-            "device_type_counts": {
-                None: 1,
-                "ENERGY_METER": "2",
-                "SG_READY_GATEWAY": "bad",
-                "ZERO": 0,
-            },
-            "status_summary": " ",
-            "model_summary": "Model A x1",
-            "firmware_summary": "FW x1",
-        },
         _hems_devices_last_success_utc=datetime(
             2026, 2, 15, 10, 7, tzinfo=timezone.utc
         ),
@@ -3322,30 +3332,39 @@ def test_heatpump_snapshot_fallback_covers_summary_error_and_type_snapshot_paths
 
 def test_heatpump_snapshot_fallback_covers_remaining_edge_paths() -> None:
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _type_key: {
+                "count": 0,
+                "devices": [
+                    {
+                        "device_type": "ENERGY_METER",
+                        "name": "Meter A",
+                        "status": "warning",
+                    },
+                    {
+                        "device_type": "SG_READY_GATEWAY",
+                        "name": "Gateway",
+                        "status": "normal",
+                        "last_report": "2026-02-15T10:00:00Z",
+                    },
+                ],
+                "status_counts": {
+                    "total": 2,
+                    "normal": 1,
+                    "warning": 1,
+                    "error": 0,
+                    "not_reporting": 0,
+                    "unknown": 0,
+                },
+            },
+            type_device_info=lambda _key: None,
+            has_type=lambda _key: False,
+            has_type_for_entities=lambda _key: False,
+        ),
         heatpump_inventory_summary=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
         heatpump_type_summary=lambda _device_type: (_ for _ in ()).throw(
             RuntimeError("boom")
         ),
-        type_bucket=lambda _type_key: {
-            "count": 0,
-            "devices": [
-                {"device_type": "ENERGY_METER", "name": "Meter A", "status": "warning"},
-                {
-                    "device_type": "SG_READY_GATEWAY",
-                    "name": "Gateway",
-                    "status": "normal",
-                    "last_report": "2026-02-15T10:00:00Z",
-                },
-            ],
-            "status_counts": {
-                "total": 2,
-                "normal": 1,
-                "warning": 1,
-                "error": 0,
-                "not_reporting": 0,
-                "unknown": 0,
-            },
-        },
         _hems_devices_last_success_utc="bad",
         _hems_devices_last_success_mono=None,
         _hems_devices_using_stale=False,
@@ -5223,36 +5242,41 @@ def test_gateway_inventory_snapshot_fallback_covers_summary_error_and_dashboard_
     None
 ):
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _type_key: {
+                "count": "bad-count",
+                "devices": [
+                    {
+                        "name": "Gateway A",
+                        "serial_number": "GW-A",
+                        "statusText": "Normal",
+                        "model": "IQ Gateway",
+                        "sw_version": "8.2.0",
+                        "last_reported": "2026-02-15T10:00:00Z",
+                    },
+                    {
+                        "name": "Gateway B",
+                        "serial_number": "GW-B",
+                        "status": "offline",
+                        "connected": None,
+                        "model_name": "System Controller",
+                        "firmware": "1.0.0",
+                    },
+                    {
+                        "name": "Gateway C",
+                        "serial_number": "GW-C",
+                        "status": "warn",
+                        "connected": "maybe",
+                        "firmwareVersion": "2.0.0",
+                        "last-report": "2026-02-15T10:05:00Z",
+                    },
+                ],
+            },
+            type_device_info=lambda _key: None,
+            has_type=lambda _key: False,
+            has_type_for_entities=lambda _key: False,
+        ),
         gateway_inventory_summary=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
-        type_bucket=lambda _type_key: {
-            "count": "bad-count",
-            "devices": [
-                {
-                    "name": "Gateway A",
-                    "serial_number": "GW-A",
-                    "statusText": "Normal",
-                    "model": "IQ Gateway",
-                    "sw_version": "8.2.0",
-                    "last_reported": "2026-02-15T10:00:00Z",
-                },
-                {
-                    "name": "Gateway B",
-                    "serial_number": "GW-B",
-                    "status": "offline",
-                    "connected": None,
-                    "model_name": "System Controller",
-                    "firmware": "1.0.0",
-                },
-                {
-                    "name": "Gateway C",
-                    "serial_number": "GW-C",
-                    "status": "warn",
-                    "connected": "maybe",
-                    "firmwareVersion": "2.0.0",
-                    "last-report": "2026-02-15T10:05:00Z",
-                },
-            ],
-        },
         system_dashboard_envoy_detail=lambda: {
             "name": "",
             "serial_number": "GW-D",
@@ -5287,8 +5311,13 @@ def test_gateway_inventory_snapshot_fallback_covers_summary_error_and_dashboard_
     assert "statusText" in snapshot["property_keys"]
 
     dashboard_only_coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _type_key: {"count": 0, "devices": []},
+            type_device_info=lambda _key: None,
+            has_type=lambda _key: False,
+            has_type_for_entities=lambda _key: False,
+        ),
         gateway_inventory_summary=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
-        type_bucket=lambda _type_key: {"count": 0, "devices": []},
         system_dashboard_envoy_detail=lambda: {
             "name": "",
             "serial_number": "GW-FALLBACK",
@@ -5308,8 +5337,13 @@ def test_gateway_inventory_snapshot_fallback_covers_summary_error_and_dashboard_
 
 def test_gateway_inventory_snapshot_zero_devices_returns_empty_status_summary() -> None:
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _type_key: {"count": 0, "devices": []},
+            type_device_info=lambda _key: None,
+            has_type=lambda _key: False,
+            has_type_for_entities=lambda _key: False,
+        ),
         gateway_inventory_summary=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
-        type_bucket=lambda _type_key: {"count": 0, "devices": []},
         system_dashboard_envoy_detail=lambda: None,
     )
 
@@ -5327,36 +5361,41 @@ def test_microinverter_snapshot_fallback_covers_bad_counts_and_missing_status_co
             raise ValueError("bad")
 
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _type_key: {
+                "count": BadInt(),
+                "devices": [
+                    {"serial_number": "INV-A", "last_report": "invalid"},
+                    {
+                        "serial_number": "INV-B",
+                        "name": "Inverter B",
+                        "status": "warning",
+                        "last_reported_at": "2026-02-15T11:00:00Z",
+                    },
+                ],
+                "status_counts": {
+                    "total": 1,
+                    "normal": BadInt(),
+                    "warning": 0,
+                    "error": 0,
+                    "not_reporting": 1,
+                    "unknown": 2,
+                },
+                "latest_reported_utc": "2026-02-15T07:00:00Z",
+                "latest_reported_device": {
+                    "serial_number": "TOPOLOGY",
+                    "name": "Topology summary",
+                    "status": "normal",
+                },
+                "connectivity_state": " ",
+            },
+            type_device_info=lambda _key: None,
+            has_type=lambda _key: False,
+            has_type_for_entities=lambda _key: False,
+        ),
         microinverter_inventory_summary=lambda: (_ for _ in ()).throw(
             RuntimeError("boom")
         ),
-        type_bucket=lambda _type_key: {
-            "count": BadInt(),
-            "devices": [
-                {"serial_number": "INV-A", "last_report": "invalid"},
-                {
-                    "serial_number": "INV-B",
-                    "name": "Inverter B",
-                    "status": "warning",
-                    "last_reported_at": "2026-02-15T11:00:00Z",
-                },
-            ],
-            "status_counts": {
-                "total": 1,
-                "normal": BadInt(),
-                "warning": 0,
-                "error": 0,
-                "not_reporting": 1,
-                "unknown": 2,
-            },
-            "latest_reported_utc": "2026-02-15T07:00:00Z",
-            "latest_reported_device": {
-                "serial_number": "TOPOLOGY",
-                "name": "Topology summary",
-                "status": "normal",
-            },
-            "connectivity_state": " ",
-        },
     )
 
     snapshot = sensor_mod._microinverter_inventory_snapshot(coord)
@@ -5372,15 +5411,20 @@ def test_microinverter_snapshot_fallback_covers_bad_counts_and_missing_status_co
     assert snapshot["connectivity_state"] == "offline"
 
     missing_status_counts_coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _type_key: {
+                "count": 2,
+                "devices": [],
+                "status_counts": "bad",
+                "connectivity_state": " ",
+            },
+            type_device_info=lambda _key: None,
+            has_type=lambda _key: False,
+            has_type_for_entities=lambda _key: False,
+        ),
         microinverter_inventory_summary=lambda: (_ for _ in ()).throw(
             RuntimeError("boom")
         ),
-        type_bucket=lambda _type_key: {
-            "count": 2,
-            "devices": [],
-            "status_counts": "bad",
-            "connectivity_state": " ",
-        },
     )
     snapshot2 = sensor_mod._microinverter_inventory_snapshot(
         missing_status_counts_coord

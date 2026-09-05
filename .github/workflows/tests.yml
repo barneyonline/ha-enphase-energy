@@ -75,8 +75,8 @@ jobs:
           }
 
           common='^(\.github/workflows/(ci|tests)\.yml|devtools/docker/(Dockerfile|docker-compose\.yml|constraints-[^/]+\.txt))$'
-          set_output integration "${common}|^scripts/benchmark_snapshots\.py$|^custom_components/enphase_ev/|^tests/(components/enphase_ev|compatibility)/|^devtools/docker/requirements-dev\.txt$|^pytest\.ini$|^\.pre-commit-config\.yaml$|^\.ruff\.toml$"
-          set_output compatibility "${common}|^custom_components/enphase_ev/.*\.py$|^custom_components/enphase_ev/manifest\.json$|^tests/compatibility/|^tests/components/enphase_ev/(conftest|test_(device_action|device_trigger|entry_lifecycle|init_module|manifest|runtime_data|schedule_sync|services))\.py$|^devtools/docker/requirements-(min-ha|ha-2026\.8)\.txt$|^pytest\.ini$"
+          set_output integration "${common}|^scripts/(benchmark_snapshots|check_statement_coverage)\.py$|^custom_components/enphase_ev/|^tests/(components/enphase_ev|compatibility)/|^devtools/docker/requirements-dev\.txt$|^pytest\.ini$|^\.pre-commit-config\.yaml$|^\.ruff\.toml$"
+          set_output compatibility "${common}|^custom_components/enphase_ev/.*\.py$|^custom_components/enphase_ev/manifest\.json$|^tests/compatibility/|^tests/components/enphase_ev/(conftest|test_(device_action|device_trigger|entry_lifecycle|integration_lifecycle|reload_snapshot|init_module|manifest|runtime_data|schedule_sync|services))\.py$|^devtools/docker/requirements-(min-ha|ha-2026\.8)\.txt$|^pytest\.ini$"
           set_output diagnostics "${common}|^custom_components/enphase_ev/.*\.py$|^scripts/importtime_profile\.py$|^tests/scripts/test_importtime_profile\.py$|^devtools/docker/requirements-dev\.txt$"
           set_output quality "${common}|^custom_components/enphase_ev/|^tests/components/enphase_ev/|^quality_scale\.yaml$|^scripts/validate_quality_scale\.py$|^tests/scripts/test_validate_quality_scale\.py$|^devtools/docker/requirements-(dev|ci-quality)\.txt$|^\.pre-commit-config\.yaml$|^\.strict-typing$"
           set_output scripts "${common}|^scripts/.*\.py$|^tests/scripts/.*\.py$|^devtools/docker/requirements-ci-scripts\.txt$"
@@ -205,6 +205,7 @@ jobs:
           tests/components/enphase_ev/test_device_trigger.py
           tests/components/enphase_ev/test_schedule_sync.py
           tests/components/enphase_ev/test_entry_lifecycle.py
+          tests/components/enphase_ev/test_integration_lifecycle.py
           tests/components/enphase_ev/test_reload_snapshot.py
           tests/components/enphase_ev/test_services.py
 
@@ -238,6 +239,7 @@ jobs:
           pytest -q --asyncio-mode=auto
           tests/compatibility/test_ha_2026_8_device_registry.py
           tests/components/enphase_ev/test_entry_lifecycle.py
+          tests/components/enphase_ev/test_integration_lifecycle.py
           tests/components/enphase_ev/test_reload_snapshot.py
           tests/components/enphase_ev/test_init_module.py::test_async_setup_entry_updates_existing_device
           tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_preserves_real_devices_with_site_identifier
@@ -301,12 +303,12 @@ jobs:
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
           PYTEST_PLUGINS: pytest_asyncio.plugin,pytest_homeassistant_custom_component.plugins,pytest_cov.plugin,pytest_github_actions_annotate_failures.plugin
-        run: pytest -q tests/components/enphase_ev tests/compatibility --cov=custom_components.enphase_ev --cov-report=term-missing --cov-report=xml --cov-fail-under=95 --junitxml=junit.xml -o junit_family=legacy
+        run: pytest -q tests/components/enphase_ev tests/compatibility --cov=custom_components.enphase_ev --cov-branch --cov-report=term-missing --cov-report=xml --cov-report=json --cov-fail-under=95 --junitxml=junit.xml -o junit_family=legacy
       - name: Enforce 100% coverage on changed integration modules
         id: targeted_coverage
         if: ${{ steps.changed.outputs.include != '' }}
         continue-on-error: true
-        run: python -m coverage report -m --include="${{ steps.changed.outputs.include }}" --fail-under=100
+        run: python scripts/check_statement_coverage.py --report coverage.json --include="${{ steps.changed.outputs.include }}"
       - name: Import Codecov GPG key
         if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
         run: curl -fsSL https://keybase.io/codecovsecops/pgp_keys.asc | gpg --import

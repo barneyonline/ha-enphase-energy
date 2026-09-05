@@ -87,15 +87,26 @@ docker compose -f devtools/docker/docker-compose.yml exec ha-dev pytest -q tests
 ```
 
 For a full coverage run, collect coverage once and reuse that data when enforcing
-100% coverage on the integration modules you changed. Replace the example
-`--include` value with your changed module paths. This coverage run replaces the
+100% statement coverage on the integration modules you changed. Branch data is
+also collected to expose untested decisions; the changed-module gate checks
+statements independently so it does not impose blanket 100% branch coverage.
+Replace the example `--include` value with your changed module paths. This coverage run replaces the
 plain integration pytest command above:
 
 ```bash
-docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage run --source=custom_components.enphase_ev -m pytest -q tests/components/enphase_ev
+docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage run --branch --source=custom_components.enphase_ev -m pytest -q tests/components/enphase_ev
 docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage report -m --fail-under=95
-docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage report -m --include="custom_components/enphase_ev/api.py,custom_components/enphase_ev/coordinator.py" --fail-under=100
+docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage json -o /tmp/enphase_ev.coverage.json
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev python scripts/check_statement_coverage.py --report /tmp/enphase_ev.coverage.json --include="custom_components/enphase_ev/api.py,custom_components/enphase_ev/coordinator.py"
 ```
+
+Shared fixtures preserve explicit empty serial lists and payloads. Give unit-test
+coordinator doubles an explicit `inventory_view` with only the capabilities the
+test needs; do not modify standard-library classes to supply missing behavior.
+`test_integration_lifecycle.py` covers charger and site-only setup with real
+platforms, topology-option reload, registry customization, polling, and unload.
+It replaces cloud methods and fails on unexpected cloud calls. These scenarios
+also run in both Home Assistant compatibility lanes.
 
 Maintenance-script tests use only lightweight dependencies and can be run
 separately while iterating on `scripts/`:

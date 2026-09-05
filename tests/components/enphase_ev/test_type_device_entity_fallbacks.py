@@ -70,6 +70,12 @@ def test_site_binary_sensor_device_info_falls_back_without_type_info() -> None:
 
 def test_site_device_info_fallbacks_without_type_device_info_provider() -> None:
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _key: None,
+            type_device_info=lambda _key: None,
+            has_type=lambda key: key in {"envoy", "encharge"},
+            has_type_for_entities=lambda key: key in {"envoy", "encharge"},
+        ),
         site_id="site-1",
         last_update_success=True,
         battery_profile_pending=True,
@@ -153,10 +159,14 @@ def test_system_profile_select_and_storm_guard_availability_type_checks() -> Non
     assert StormGuardSwitch(coord).available is False
 
 
-def test_site_entities_fall_back_to_role_checks_without_property_or_type_helpers() -> (
-    None
-):
+def test_site_entities_fall_back_to_role_checks_with_explicit_inventory() -> None:
     coord = SimpleNamespace(
+        inventory_view=SimpleNamespace(
+            type_bucket=lambda _key: None,
+            type_device_info=lambda _key: None,
+            has_type=lambda key: key in {"envoy", "encharge"},
+            has_type_for_entities=lambda key: key in {"envoy", "encharge"},
+        ),
         site_id="site-3",
         last_update_success=True,
         battery_user_is_owner=True,
@@ -176,6 +186,21 @@ def test_site_entities_fall_back_to_role_checks_without_property_or_type_helpers
     assert BatteryReserveNumber(coord).available is True
     assert SystemProfileSelect(coord).available is True
     assert StormGuardSwitch(coord).available is True
+
+    # Neither a missing inventory view nor missing capability methods may grant
+    # access, even when the account role permits battery controls.
+    enabled_view = coord.inventory_view
+    for unavailable_view in (
+        None,
+        SimpleNamespace(),
+        SimpleNamespace(has_type_for_entities=lambda _key: False),
+    ):
+        coord.inventory_view = unavailable_view
+        assert BatteryReserveNumber(coord).available is False
+        assert SystemProfileSelect(coord).available is False
+        assert StormGuardSwitch(coord).available is False
+    coord.inventory_view = enabled_view
+    assert BatteryReserveNumber(coord).available is True
 
 
 def test_system_profile_select_fallback_unavailable_without_battery_controls() -> None:

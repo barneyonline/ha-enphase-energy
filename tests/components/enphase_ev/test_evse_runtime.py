@@ -861,3 +861,78 @@ def test_coordinator_evse_runtime_wrapper_delegation(coordinator_factory) -> Non
     runtime.cached_charge_mode_preference.assert_called_once_with("EV1", now=None)
     runtime.normalize_effective_charge_mode.assert_called_once_with("idle")
     runtime.charge_mode_start_preferences.assert_called_once_with("EV1")
+
+
+@pytest.mark.parametrize("phase", ["stop", "delay", "start"])
+async def test_amp_restart_cancellation_propagates(
+    coordinator_factory, monkeypatch, phase
+):
+    """Cancellation at each await must stop the real restart sequence."""
+    coord = coordinator_factory(serials=["EV1"])
+    entered = asyncio.Event()
+    stopped = asyncio.Event()
+
+    async def blocked(*_args, **_kwargs):
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            stopped.set()
+
+    coord.async_stop_charging = AsyncMock(
+        side_effect=blocked if phase == "stop" else None
+    )
+    coord.async_start_charging = AsyncMock(
+        side_effect=blocked if phase == "start" else None
+    )
+    if phase == "delay":
+        monkeypatch.setattr(
+            "custom_components.enphase_ev.evse_runtime.asyncio",
+            SimpleNamespace(**(vars(asyncio) | {"sleep": blocked})),
+        )
+    task = asyncio.create_task(
+        coord.evse_runtime.async_restart_after_amp_change(
+            "EV1", 30 if phase == "delay" else 0
+        )
+    )
+    await asyncio.wait_for(entered.wait(), 1)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(task, 1)
+    assert stopped.is_set()
+    assert coord.async_start_charging.await_count == (1 if phase == "start" else 0)
+
+
+async def test_replacing_amp_restart_cancels_old_sequence(
+    coordinator_factory, monkeypatch
+):
+    """Only the replacement restart may send a start command."""
+    coord = coordinator_factory(serials=["EV1"])
+    sleeping = asyncio.Event()
+    release = asyncio.Event()
+    original_sleep = asyncio.sleep
+
+    async def delay(_seconds):
+        sleeping.set()
+        await release.wait()
+
+    coord.async_stop_charging = AsyncMock()
+    coord.async_start_charging = AsyncMock()
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.evse_runtime.asyncio",
+        SimpleNamespace(**(vars(asyncio) | {"sleep": delay})),
+    )
+    coord.schedule_amp_restart("EV1", delay=30)
+    old = coord._amp_restart_tasks["EV1"]
+    await asyncio.wait_for(sleeping.wait(), 1)
+    coord.schedule_amp_restart("EV1", delay=30)
+    current = coord._amp_restart_tasks["EV1"]
+    with pytest.raises(asyncio.CancelledError):
+        await old
+    assert coord._amp_restart_tasks["EV1"] is current
+    coord.async_start_charging.assert_not_awaited()
+    release.set()
+    await asyncio.wait_for(current, 1)
+    await original_sleep(0)
+    coord.async_start_charging.assert_awaited_once_with("EV1")
+    assert coord._amp_restart_tasks == {}
