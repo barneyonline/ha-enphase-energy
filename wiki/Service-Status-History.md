@@ -1,7 +1,7 @@
 # Service Status History
 
 - Current status: **Fully Operational**
-- Last updated: `2026-09-05 12:54 UTC`
+- Last updated: `2026-09-05 15:46 UTC`
 - Failed checks in latest run: `0`
 - Latest failed checks: None
 - Retained hourly samples: `619`
@@ -16,10 +16,10 @@ gantt
     title Enphase Service Status Incident Timeline (Last 30 Days)
     dateFormat  YYYY-MM-DDTHH:mm:ss
     axisFormat  %b %d
-    Window start :vert, window-start, 2026-08-06T12:54:40, 0ms
-    Window end :vert, window-end, 2026-09-05T12:54:40, 0ms
+    Window start :vert, window-start, 2026-08-06T15:46:38, 0ms
+    Window end :vert, window-end, 2026-09-05T15:46:38, 0ms
     section Summary
-    No incidents observed :done, 2026-09-05T12:54:40, 1m
+    No incidents observed :done, 2026-09-05T15:46:38, 1m
 ```
 
 ## Incident Summary
