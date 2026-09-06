@@ -1448,6 +1448,18 @@ async def test_config_entry_diagnostics_includes_site_energy(
     coord = DummyCoordinator()
     coord.energy = SimpleNamespace(
         site_energy={
+            "consumption": SiteEnergyFlow(
+                value_kwh=3.1,
+                bucket_count=2,
+                fields_used=["consumption"],
+                start_date="2024-01-01",
+                last_report_date=datetime(2024, 1, 2, tzinfo=timezone.utc),
+                update_pending=False,
+                latest_bucket_wh=0,
+                previous_bucket_wh=0,
+                raw_bucket_count=2,
+                power_sample_error="zero_lifetime_dropout",
+            ),
             "grid_import": SiteEnergyFlow(
                 value_kwh=1.0,
                 bucket_count=2,
@@ -1476,6 +1488,17 @@ async def test_config_entry_diagnostics_includes_site_energy(
             "last_report_date": datetime(2024, 1, 3, tzinfo=timezone.utc),
         },
         site_energy_cache_age=1.23,
+        consumption_power_diagnostics={
+            "last_valid_power_w": 1200,
+            "using_cached": True,
+            "retention_seconds": 900,
+            "last_rejection": {
+                "reason": "zero_lifetime_dropout",
+                "latest_bucket_wh": 0,
+                "baseline_bucket_wh": 2100,
+                "site_id": RANDOM_SITE_ID,
+            },
+        },
     )
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
 
@@ -1485,6 +1508,19 @@ async def test_config_entry_diagnostics_includes_site_energy(
     assert site_energy["flows"]["grid_import"]["interval_minutes"] == 60
     assert site_energy["flows"]["legacy_flow"]["interval_minutes"] == 30
     assert site_energy["meta"]["last_report_date"].startswith("2024-01-03")
+    assert site_energy["flows"]["consumption"]["latest_bucket_wh"] == 0
+    assert (
+        site_energy["flows"]["consumption"]["power_sample_error"]
+        == "zero_lifetime_dropout"
+    )
+    power = site_energy["consumption_power"]
+    assert power["last_valid_power_w"] == 1200
+    assert power["using_cached"] is True
+    assert power["last_rejection"]["reason"] == "zero_lifetime_dropout"
+    assert power["last_rejection"]["latest_bucket_wh"] == 0
+    assert power["last_rejection"]["baseline_bucket_wh"] == 2100
+    assert power["last_rejection"]["site_id"] == "**REDACTED**"
+    assert RANDOM_SITE_ID not in json.dumps(diag)
 
 
 @pytest.mark.asyncio

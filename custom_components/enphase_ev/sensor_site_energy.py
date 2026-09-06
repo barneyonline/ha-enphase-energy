@@ -197,6 +197,7 @@ class _SiteConsumptionPowerRestoreData(ExtraStoredData):  # type: ignore[misc]
     last_power_w: int | None
     last_window_seconds: float | None
     method: str | None
+    power_sample_ts: float | None = None
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -208,6 +209,11 @@ class _SiteConsumptionPowerRestoreData(ExtraStoredData):  # type: ignore[misc]
             "last_power_w": self.last_power_w,
             "last_window_seconds": self.last_window_seconds,
             "method": self.method,
+            "power_sample_ts": (
+                self.power_sample_ts
+                if self.power_sample_ts is not None
+                else self.energy_ts
+            ),
         }
 
     @classmethod
@@ -236,6 +242,9 @@ class _SiteConsumptionPowerRestoreData(ExtraStoredData):  # type: ignore[misc]
             last_power_w=_as_int(data.get("last_power_w")),
             last_window_seconds=_as_float(data.get("last_window_seconds")),
             method=method if isinstance(method, str) else None,
+            power_sample_ts=_as_float(
+                data.get("power_sample_ts", data.get("energy_ts"))
+            ),
         )
 
 
@@ -1307,6 +1316,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
     _DEFAULT_INTERVAL_MINUTES = 5.0
     _MAX_INTERVAL_FACTOR = 3.0
     _MAX_FUTURE_SKEW_SECONDS = 60.0
+    _MAX_SAMPLE_AGE_SECONDS = 900.0
 
     def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(
@@ -1321,9 +1331,13 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._last_energy_ts: float | None = None
         self._last_interval_minutes: float | None = None
         self._last_power_w: int | None = None
+        self._last_power_ts: float | None = None
         self._last_window_s: float | None = None
         self._last_method = "seeded"
         self._restored_pending_validation = False
+        self._using_cached = False
+        self._last_rejection: dict[str, object] | None = None
+        self._last_rejected_sample: dict[str, object] | None = None
 
     @staticmethod
     def _timestamp_age_seconds(timestamp: float) -> float:
@@ -1352,6 +1366,9 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             or restored.interval_minutes <= 0
             or restored.last_power_w is None
             or restored.last_power_w < 0
+            or restored.power_sample_ts is None
+            or restored.power_sample_ts <= 0
+            or restored.power_sample_ts > restored.energy_ts
         ):
             return
         if self._timestamp_is_too_far_in_future(restored.energy_ts):
@@ -1362,9 +1379,12 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._last_energy_ts = restored.energy_ts
         self._last_interval_minutes = restored.interval_minutes
         self._last_power_w = restored.last_power_w
+        self._last_power_ts = restored.power_sample_ts
         self._last_window_s = restored.last_window_seconds
         self._last_method = restored.method or "restored"
         self._restored_pending_validation = True
+        self._using_cached = restored.power_sample_ts != restored.energy_ts
+        self._schedule_freshness_expiry()
 
     @staticmethod
     def _coerce_nonnegative_float(value: object) -> float | None:
@@ -1398,19 +1418,63 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
                 "last_report_date": entry.last_report_date,
                 "update_pending": entry.update_pending,
                 "interval_minutes": entry.interval_minutes,
+                "power_sample_error": entry.power_sample_error,
             }
         return entry if isinstance(entry, dict) else {}
 
-    def _discard_baseline(self, method: str) -> None:
-        self._last_bucket_wh = None
-        self._last_bucket_count = None
-        self._last_start_date = None
-        self._last_energy_ts = None
-        self._last_interval_minutes = None
-        self._last_power_w = None
-        self._last_window_s = None
-        self._last_method = method
-        self._restored_pending_validation = False
+    @staticmethod
+    def _diagnostic_number(value: object) -> float | None:
+        try:
+            numeric = float(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return None
+        return numeric if math.isfinite(numeric) else None
+
+    def _reject_sample(
+        self, reason: str, data: dict[str, object], *, method: str | None = None
+    ) -> None:
+        """Retain a bounded reading and a detached, numeric rejection snapshot."""
+
+        self._last_method = method or reason
+        self._using_cached = self._last_power_w is not None
+        rejected = {
+            "reason": reason,
+            "latest_bucket_wh": self._diagnostic_number(data.get("latest_bucket_wh")),
+            "previous_bucket_wh": self._diagnostic_number(
+                data.get("previous_bucket_wh")
+            ),
+            "raw_bucket_count": self._diagnostic_number(data.get("raw_bucket_count")),
+            "source_timestamp": self._diagnostic_number(
+                _EnphaseSiteLifetimePowerSensor._parse_sample_timestamp(
+                    data.get("last_report_date")
+                )
+            ),
+            "interval_minutes": self._diagnostic_number(data.get("interval_minutes")),
+            "start_date": (
+                data.get("start_date")
+                if isinstance(data.get("start_date"), str)
+                else None
+            ),
+            "baseline_bucket_wh": self._last_bucket_wh,
+            "baseline_bucket_count": self._last_bucket_count,
+            "baseline_timestamp": self._last_energy_ts,
+            "baseline_start_date": self._last_start_date,
+        }
+        if rejected != self._last_rejected_sample:
+            self._last_rejected_sample = rejected
+            self._last_rejection = {
+                **rejected,
+                "observed_at_utc": dt_util.utcnow().isoformat(),
+            }
+
+    def _freshness_deadline(self) -> datetime | None:
+        deadline = super()._freshness_deadline()
+        if self._last_power_ts is None:
+            return deadline
+        power_deadline = datetime.fromtimestamp(
+            self._last_power_ts, tz=timezone.utc
+        ) + timedelta(seconds=self._MAX_SAMPLE_AGE_SECONDS)
+        return min(deadline, power_deadline) if deadline is not None else power_deadline
 
     def _seed(
         self,
@@ -1422,19 +1486,49 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         interval_minutes: float,
         method: str,
     ) -> None:
+        # Retention applies only after validation against the live source.
+        # Reseeding an incompatible restored baseline cannot validate its power.
+        if self._restored_pending_validation:
+            self._last_power_w = None
+            self._last_power_ts = None
+            self._last_window_s = None
+            self._using_cached = False
         self._last_bucket_wh = latest_bucket_wh
         self._last_bucket_count = bucket_count
         self._last_start_date = start_date
         self._last_energy_ts = energy_ts
         self._last_interval_minutes = interval_minutes
-        self._last_power_w = None
-        self._last_window_s = None
         self._last_method = method
         self._restored_pending_validation = False
 
     def _process_current_sample(self) -> None:
+        previous_power_ts = self._last_power_ts
+        self._process_consumption_sample()
+        if self._last_power_ts != previous_power_ts:
+            self._schedule_freshness_expiry()
+        energy = getattr(self._coord, "energy", None)
+        if energy is not None:
+            energy.consumption_power_diagnostics = {
+                "last_valid_power_w": self._last_power_w,
+                "last_valid_sample_timestamp": self._last_power_ts,
+                "retention_seconds": self._MAX_SAMPLE_AGE_SECONDS,
+                "sample_fresh": self._sample_is_fresh(),
+                "using_cached": self._using_cached,
+                "restored_pending_validation": self._restored_pending_validation,
+                "method": self._last_method,
+                "last_rejection": self._last_rejection,
+            }
+
+    def _process_consumption_sample(self) -> None:
         data = self._flow_data()
-        if not data or data.get("update_pending") is True:
+        if not data:
+            self._reject_sample("missing_consumption", data)
+            return
+        if data.get("update_pending") is True:
+            self._reject_sample("update_pending", data)
+            return
+        if data.get("power_sample_error") is not None:
+            self._reject_sample("zero_lifetime_dropout", data, method="invalid_bucket")
             return
 
         latest_bucket_wh = self._coerce_nonnegative_float(data.get("latest_bucket_wh"))
@@ -1449,11 +1543,13 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         start_date = start_date_raw if isinstance(start_date_raw, str) else None
 
         if latest_bucket_wh is None or bucket_count is None:
-            self._discard_baseline("invalid_bucket")
+            self._reject_sample("invalid_bucket", data)
             return
-        if energy_ts is None or energy_ts <= 0:
+        if energy_ts is None or not math.isfinite(energy_ts) or energy_ts <= 0:
+            self._reject_sample("invalid_timestamp", data)
             return
         if self._timestamp_is_too_far_in_future(energy_ts):
+            self._reject_sample("future_timestamp", data)
             return
 
         if (
@@ -1493,6 +1589,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             ):
                 self._restored_pending_validation = False
                 return
+            self._reject_sample("restore_mismatch", data)
             self._seed(
                 latest_bucket_wh=latest_bucket_wh,
                 bucket_count=bucket_count,
@@ -1506,6 +1603,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         elapsed_s = energy_ts - self._last_energy_ts
         interval_s = interval_minutes * 60.0
         if elapsed_s < 0:
+            self._reject_sample("out_of_order_timestamp", data)
             return
         if elapsed_s > interval_s * self._MAX_INTERVAL_FACTOR or not math.isclose(
             interval_minutes,
@@ -1513,6 +1611,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             rel_tol=0.0,
             abs_tol=1e-6,
         ):
+            self._reject_sample("interval_discontinuity", data)
             self._seed(
                 latest_bucket_wh=latest_bucket_wh,
                 bucket_count=bucket_count,
@@ -1546,7 +1645,17 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
                 ) + latest_bucket_wh
                 method = "consumption_bucket_rollover"
 
-        if delta_wh is None or delta_wh < 0:
+        if delta_wh is not None and delta_wh < 0:
+            self._reject_sample("bucket_decreased", data, method="bucket_discontinuity")
+            return
+        if delta_wh is None:
+            self._reject_sample("bucket_discontinuity", data)
+            # An incomplete/corrected rollover must not replace a valid bucket.
+            if (
+                start_date == self._last_start_date
+                and bucket_count == self._last_bucket_count + 1
+            ):
+                return
             self._seed(
                 latest_bucket_wh=latest_bucket_wh,
                 bucket_count=bucket_count,
@@ -1559,6 +1668,8 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
 
         window_s = max(elapsed_s, interval_s)
         self._last_power_w = max(round(delta_wh * 3600.0 / window_s), 0)
+        self._last_power_ts = energy_ts
+        self._using_cached = False
         self._last_window_s = window_s
         self._last_method = method
         self._last_bucket_wh = latest_bucket_wh
@@ -1569,20 +1680,18 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._restored_pending_validation = False
 
     def _sample_is_fresh(self) -> bool:
-        if self._last_energy_ts is None or self._last_interval_minutes is None:
+        if self._last_power_ts is None:
             return False
-        age_s = self._timestamp_age_seconds(self._last_energy_ts)
+        age_s = self._timestamp_age_seconds(self._last_power_ts)
         return bool(
-            -self._MAX_FUTURE_SKEW_SECONDS
-            <= age_s
-            <= (self._last_interval_minutes * 60.0 * self._MAX_INTERVAL_FACTOR)
+            -self._MAX_FUTURE_SKEW_SECONDS <= age_s < self._MAX_SAMPLE_AGE_SECONDS
         )
 
     @property
     def available(self) -> bool:
+        self._process_current_sample()
         if not super().available:
             return False
-        self._process_current_sample()
         return bool(
             self._last_power_w is not None
             and not self._restored_pending_validation
@@ -1597,9 +1706,9 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
     @property
     def extra_state_attributes(self) -> Any:
         sampled_at = None
-        if self._last_energy_ts is not None:
+        if self._last_power_ts is not None:
             sampled_at = datetime.fromtimestamp(
-                self._last_energy_ts, tz=timezone.utc
+                self._last_power_ts, tz=timezone.utc
             ).isoformat()
         return {
             "sampled_at_utc": sampled_at,
@@ -1618,6 +1727,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             last_power_w=self._last_power_w,
             last_window_seconds=self._last_window_s,
             method=self._last_method,
+            power_sample_ts=self._last_power_ts,
         )
 
 
