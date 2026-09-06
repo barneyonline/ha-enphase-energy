@@ -58,6 +58,7 @@ class SiteEnergyFlow:
     latest_bucket_wh: float | None = None
     previous_bucket_wh: float | None = None
     raw_bucket_count: int = 0
+    power_sample_error: str | None = None
 
 
 class EnergyManager:
@@ -80,6 +81,7 @@ class EnergyManager:
         self._hems_auth_failure = hems_auth_failure
         self._hems_auth_success = hems_auth_success
         self.site_energy: dict[str, SiteEnergyFlow] = {}
+        self.consumption_power_diagnostics: dict[str, object] = {}
         self._site_energy_meta: dict[str, object] = {}
         self._site_energy_cache_ts: float | None = None
         self._site_energy_cache_ttl: float = SITE_ENERGY_CACHE_TTL
@@ -566,6 +568,7 @@ class EnergyManager:
             )
             filtered: float | None
             reset_at: str | None
+            power_sample_error = None
             if (
                 hold_zero_after_positive
                 and total_kwh == 0
@@ -581,9 +584,9 @@ class EnergyManager:
                 guard_state.pending_count = 0
                 filtered = accepted_baseline
                 reset_at = None
-                latest_bucket_wh = None
-                previous_bucket_wh = None
-                raw_bucket_count = 0
+                # Preserve the rejected bucket for diagnostics, but never use
+                # this zero dropout as a power calculation baseline.
+                power_sample_error = "zero_lifetime_dropout"
                 self._logger.debug(
                     "Holding site energy flow %s at %.3f after a zero dropout",
                     flow,
@@ -614,6 +617,7 @@ class EnergyManager:
                 latest_bucket_wh=latest_bucket_wh,
                 previous_bucket_wh=previous_bucket_wh,
                 raw_bucket_count=raw_bucket_count,
+                power_sample_error=power_sample_error,
             )
             if last_reset:
                 self._site_energy_last_reset[flow] = last_reset

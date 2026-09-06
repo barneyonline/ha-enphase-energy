@@ -11,10 +11,15 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Retained the last valid Current Power Consumption reading during invalid or
+  discontinuous consumption samples, up to 15 minutes from its original source
+  timestamp. Bad samples and restarts cannot extend that deadline, and rejected
+  decreasing buckets no longer replace the valid calculation baseline.
 
 ### 🔧 Improvements
-- None
+- Added consumption-power diagnostics containing the last rejected bucket,
+  rejection reason, source and baseline timestamps, and retained-reading status.
+  The latest rejection remains available after recovery.
 
 ### 🔄 Other changes
 - None

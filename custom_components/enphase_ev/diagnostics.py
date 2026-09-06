@@ -715,6 +715,10 @@ async def async_get_config_entry_diagnostics(
                     "source_unit": flow.source_unit,
                     "last_reset_at": flow.last_reset_at,
                     "interval_minutes": flow.interval_minutes,
+                    "latest_bucket_wh": flow.latest_bucket_wh,
+                    "previous_bucket_wh": flow.previous_bucket_wh,
+                    "raw_bucket_count": flow.raw_bucket_count,
+                    "power_sample_error": flow.power_sample_error,
                 }
             elif hasattr(flow, "__dict__"):
                 raw = flow.__dict__
@@ -741,6 +745,7 @@ async def async_get_config_entry_diagnostics(
             "flows": site_energy or None,
             "meta": meta,
             "cache_age_s": cache_age,
+            "consumption_power": getattr(energy, "consumption_power_diagnostics", {}),
         }
 
     return _redact_diagnostics_payload(diag, site_ids=site_ids)
