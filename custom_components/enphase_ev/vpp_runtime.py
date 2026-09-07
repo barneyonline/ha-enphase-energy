@@ -11,11 +11,9 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import aiohttp
-from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.util import dt as dt_util
 
 from .api import (
-    EnphaseLoginWallUnauthorized,
     OptionalEndpointUnavailable,
     Unauthorized,
 )
@@ -347,14 +345,14 @@ class VppRuntime:
                 self._program_id = None
                 self._program_last_confirmed_mono = None
                 raise OptionalEndpointUnavailable("Ambiguous VPP program response")
-        except EnphaseLoginWallUnauthorized as err:
+        except Unauthorized as err:
+            # Grid Services authorization does not establish account-wide expiry.
+            # The client owns the bounded stored-credential retry, when available.
             self.coordinator._note_endpoint_family_failure(
                 VPP_ENROLLMENT_ENDPOINT_FAMILY,
                 self._safe_failure("VPP enrollment unavailable", err),
             )
             return
-        except Unauthorized as err:
-            raise ConfigEntryAuthFailed from err
         except Exception as err:  # noqa: BLE001
             safe = (
                 err
@@ -385,14 +383,13 @@ class VppRuntime:
             parsed = parse_vpp_events(payload)
             if parsed is None:
                 raise OptionalEndpointUnavailable("Invalid VPP events response")
-        except EnphaseLoginWallUnauthorized as err:
+        except Unauthorized as err:
+            # Isolate event authorization failures just like enrollment failures.
             self.coordinator._note_endpoint_family_failure(
                 VPP_EVENTS_ENDPOINT_FAMILY,
                 self._safe_failure("VPP events unavailable", err),
             )
             return
-        except Unauthorized as err:
-            raise ConfigEntryAuthFailed from err
         except Exception as err:  # noqa: BLE001
             if isinstance(err, aiohttp.ClientResponseError) and err.status in (
                 400,

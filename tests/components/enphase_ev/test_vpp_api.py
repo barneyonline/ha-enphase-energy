@@ -34,9 +34,6 @@ class _Response:
     async def json(self) -> object:
         return {"data": None}
 
-    async def text(self) -> str:
-        return ""
-
 
 def _client() -> api.EnphaseEVClient:
     client = api.EnphaseEVClient(
@@ -126,6 +123,50 @@ async def test_vpp_api_uses_stateless_session_even_when_shared_jar_has_cookies()
     request_headers = stateless.request.call_args.kwargs["headers"]
     assert "Cookie" not in request_headers
     assert request_headers["Authorization"] == "MANAGER"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("method", "args"),
+    [
+        ("vpp_enrollment_id", ()),
+        ("vpp_enrollment_details", (ENROLLMENT_ID,)),
+        ("vpp_events", (PROGRAM_ID,)),
+    ],
+)
+async def test_vpp_401_retries_once_with_refreshed_credentials(
+    method: str, args: tuple[str, ...]
+) -> None:
+    response = _Response()
+    response.status = 401
+    session = SimpleNamespace(
+        cookie_jar=aiohttp.DummyCookieJar(),
+        request=MagicMock(return_value=response),
+    )
+    client = api.EnphaseEVClient(
+        session,  # type: ignore[arg-type]
+        "1234567",
+        "OLD",
+        "session=private",
+        cookie_header_session=session,  # type: ignore[arg-type]
+    )
+
+    async def refresh() -> bool:
+        client.update_credentials(eauth="NEW", cookie="session=refreshed")
+        return True
+
+    reauth = AsyncMock(side_effect=refresh)
+    client.set_reauth_callback(reauth)
+
+    with pytest.raises(api.Unauthorized):
+        await getattr(client, method)(*args)
+
+    reauth.assert_awaited_once_with()
+    assert session.request.call_count == 2
+    assert [
+        call.kwargs["headers"]["Authorization"]
+        for call in session.request.call_args_list
+    ] == ["OLD", "NEW"]
 
 
 @pytest.mark.asyncio
