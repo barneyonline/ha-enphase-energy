@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- Isolated optional VPP enrollment and event authorization failures to their
+  endpoint families so a VPP-only 401 no longer triggers whole-integration
+  reauthentication. Existing cooldowns and bounded cached data remain in use. (#855)
 - Retained the last valid Current Power Consumption reading during invalid or
   discontinuous consumption samples, up to 15 minutes from its original source
   timestamp. Bad samples and restarts cannot extend that deadline, and rejected

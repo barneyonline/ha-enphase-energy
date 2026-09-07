@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
 import pytest
-from homeassistant.exceptions import ConfigEntryAuthFailed
 
 from custom_components.enphase_ev.api import (
     EnphaseLoginWallUnauthorized,
@@ -19,6 +18,7 @@ from custom_components.enphase_ev.api import (
 from custom_components.enphase_ev.const import OPT_VPP_EVENTS_ENABLED
 from custom_components.enphase_ev.state_models import EndpointFamilyHealth
 from custom_components.enphase_ev.vpp_runtime import (
+    VPP_ENROLLMENT_ENDPOINT_FAMILY,
     VPP_EVENTS_ENDPOINT_FAMILY,
     VppRuntime,
     _datetime,
@@ -383,18 +383,145 @@ async def test_runtime_handles_missing_fetchers_and_invalid_event_shape() -> Non
 
 
 @pytest.mark.asyncio
-async def test_runtime_propagates_authentication_failures() -> None:
-    coord = _coordinator()
+@pytest.mark.parametrize(
+    ("method", "family"),
+    [
+        ("vpp_enrollment_id", VPP_ENROLLMENT_ENDPOINT_FAMILY),
+        ("vpp_enrollment_details", VPP_ENROLLMENT_ENDPOINT_FAMILY),
+        ("vpp_events", VPP_EVENTS_ENDPOINT_FAMILY),
+    ],
+)
+@pytest.mark.parametrize("cached", [False, True])
+async def test_runtime_isolates_authorization_failures_and_recovers(
+    method: str, family: str, cached: bool
+) -> None:
+    coord = _coordinator(events={"data": [_event()]})
     runtime = VppRuntime(coord)
-    coord.client.vpp_enrollment_id.side_effect = Unauthorized()
+    if cached:
+        await runtime.async_refresh()
+    original = runtime.events
+    last_success = runtime.diagnostics()["last_success_utc"]
+    fetcher = getattr(coord.client, method)
+    fetcher.side_effect = Unauthorized("private site or program details")
 
-    with pytest.raises(ConfigEntryAuthFailed):
-        await runtime._async_refresh_enrollment()  # noqa: SLF001
+    await runtime.async_refresh()
 
-    runtime._program_id = PROGRAM_ID  # noqa: SLF001
-    coord.client.vpp_events.side_effect = Unauthorized()
-    with pytest.raises(ConfigEntryAuthFailed):
-        await runtime._async_refresh_events()  # noqa: SLF001
+    failure_family, failure = coord._note_endpoint_family_failure.call_args.args
+    assert failure_family == family
+    assert isinstance(failure, OptionalEndpointUnavailable)
+    assert "private" not in str(failure)
+    assert runtime.events == original
+    assert runtime.available is cached
+    assert runtime.enrollment_state == (
+        "enrolled" if cached or method == "vpp_events" else "unknown"
+    )
+    if method == "vpp_events":
+        assert runtime.diagnostics()["last_success_utc"] == last_success
+        assert runtime.diagnostics()["using_cached_data"] is cached
+    elif not cached:
+        coord.client.vpp_events.assert_not_awaited()
+        if method == "vpp_enrollment_id":
+            coord.client.vpp_enrollment_details.assert_not_awaited()
+    if cached:
+        runtime._events_last_success_mono = time.monotonic() - 3601  # noqa: SLF001
+        assert runtime.available is False
+
+    fetcher.side_effect = None
+    await runtime.async_refresh()
+
+    assert runtime.available is True
+    assert runtime.enrollment_state == "enrolled"
+    assert coord._endpoint_family_state(family).consecutive_failures == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("method", "family"),
+    [
+        ("vpp_enrollment_id", VPP_ENROLLMENT_ENDPOINT_FAMILY),
+        ("vpp_enrollment_details", VPP_ENROLLMENT_ENDPOINT_FAMILY),
+        ("vpp_events", VPP_EVENTS_ENDPOINT_FAMILY),
+    ],
+)
+async def test_coordinator_refresh_isolates_vpp_401_with_cooldown(
+    hass, coordinator_factory, monkeypatch, method: str, family: str
+) -> None:
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.enphase_ev.const import DOMAIN
+    from custom_components.enphase_ev.coordinator import RefreshPipelineContext
+    from custom_components.enphase_ev.refresh_plan import (
+        RefreshPlan,
+        RefreshStage,
+        object_method_task,
+    )
+
+    coord = coordinator_factory()
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={}, options={OPT_VPP_EVENTS_ENABLED: True}
+    )
+    entry.add_to_hass(hass)
+    coord.config_entry = entry
+    client = _coordinator().client
+    coord.client.vpp_enrollment_id = client.vpp_enrollment_id
+    coord.client.vpp_enrollment_details = client.vpp_enrollment_details
+    coord.client.vpp_events = client.vpp_events
+    fetcher = getattr(coord.client, method)
+    fetcher.side_effect = Unauthorized("private authorization details")
+    # Exercise the actual post-status pipeline and staged runner with VPP due.
+    plan = RefreshPlan(
+        stages=(
+            RefreshStage(
+                parallel_tasks=(
+                    object_method_task(
+                        "vpp_s", "VPP events", "vpp_runtime", "async_refresh"
+                    ),
+                )
+            ),
+        )
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.coordinator.build_followup_plan",
+        lambda *_args, **_kwargs: plan,
+    )
+    context = RefreshPipelineContext(
+        started_mono=time.monotonic(),
+        refresh_started_utc=datetime.now(UTC),
+        phase_timings={},
+        fallback_data=coord.data,
+        first_refresh=False,
+    )
+
+    coord._record_status_refresh_success(context)  # noqa: SLF001
+    await coord._async_run_post_status_refresh_pipeline(context)  # noqa: SLF001
+
+    health = coord._endpoint_family_state(family)  # noqa: SLF001
+    assert health.consecutive_failures == 1
+    assert health.cooldown_active is True
+    assert health.last_error == (
+        "VPP events unavailable"
+        if method == "vpp_events"
+        else "VPP enrollment unavailable"
+    )
+    assert coord._unauth_errors == 0  # noqa: SLF001
+    assert coord.last_success_utc is not None
+    assert "vpp_s" in context.phase_timings
+    assert coord.vpp_runtime.available is False
+    assert coord.vpp_runtime.refresh_due() is False
+
+    await coord._async_run_post_status_refresh_pipeline(context)  # noqa: SLF001
+    fetcher.assert_awaited_once()
+    assert health.consecutive_failures == 1
+
+    health.next_retry_mono = time.monotonic() - 1
+    fetcher.side_effect = None
+    await coord._async_run_post_status_refresh_pipeline(context)  # noqa: SLF001
+
+    assert fetcher.await_count == 2
+    assert health.consecutive_failures == 0
+    assert health.cooldown_active is False
+    assert health.support_state == "supported"
+    assert coord.vpp_runtime.available is True
 
 
 @pytest.mark.asyncio
