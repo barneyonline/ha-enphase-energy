@@ -11,6 +11,23 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v4.3.1 - 2026-09-08
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
 - Isolated optional VPP enrollment and event authorization failures to their
   endpoint families so a VPP-only 401 no longer triggers whole-integration
   reauthentication. Existing cooldowns and bounded cached data remain in use. (#855)
@@ -25,7 +42,7 @@ All notable changes to this project will be documented in this file.
   The latest rejection remains available after recovery.
 
 ### 🔄 Other changes
-- None
+- Bumped the integration manifest version to `4.3.1`.
 
 ## v4.3.0 - 2026-09-05
 
