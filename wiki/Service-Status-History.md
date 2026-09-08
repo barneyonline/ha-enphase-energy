@@ -1,10 +1,10 @@
 # Service Status History
 
 - Current status: **Fully Operational**
-- Last updated: `2026-09-08 06:15 UTC`
+- Last updated: `2026-09-08 11:33 UTC`
 - Failed checks in latest run: `0`
 - Latest failed checks: None
-- Retained hourly samples: `585`
+- Retained hourly samples: `581`
 - Incident windows in last 30 days: `0`
 
 This page is generated from hourly synthetic checks against Enphase cloud endpoints. It may miss incidents that begin and recover between checks.
@@ -16,10 +16,10 @@ gantt
     title Enphase Service Status Incident Timeline (Last 30 Days)
     dateFormat  YYYY-MM-DDTHH:mm:ss
     axisFormat  %b %d
-    Window start :vert, window-start, 2026-08-09T06:15:52, 0ms
-    Window end :vert, window-end, 2026-09-08T06:15:52, 0ms
+    Window start :vert, window-start, 2026-08-09T11:33:59, 0ms
+    Window end :vert, window-end, 2026-09-08T11:33:59, 0ms
     section Summary
-    No incidents observed :done, 2026-09-08T06:15:52, 1m
+    No incidents observed :done, 2026-09-08T11:33:59, 1m
 ```
 
 ## Incident Summary
