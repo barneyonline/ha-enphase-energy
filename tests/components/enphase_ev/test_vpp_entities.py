@@ -244,3 +244,94 @@ async def test_disabled_vpp_removes_registered_calendar(
     )
 
     assert registry.async_get(registered.entity_id) is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["sensor", "calendar"])
+async def test_vpp_deadlines_publish_state_without_polling(
+    hass, coordinator_factory, config_entry, monkeypatch, kind
+):
+    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+    from custom_components.enphase_ev import vpp_runtime as runtime_module
+
+    now = [dt_util.utcnow()]
+    mono = [1000.0]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+    monkeypatch.setattr(dt_util, "now", lambda *args: now[0])
+    monkeypatch.setattr(
+        runtime_module, "time", SimpleNamespace(monotonic=lambda: mono[0])
+    )
+    coord = coordinator_factory()
+    coord.update_interval = None
+    event = VppEvent(
+        "first",
+        now[0] + timedelta(seconds=10),
+        now[0] + timedelta(seconds=20),
+        "charge",
+        "first",
+        "scheduled",
+    )
+    second = VppEvent(
+        "second",
+        now[0] + timedelta(seconds=30),
+        now[0] + timedelta(seconds=40),
+        "discharge",
+        "second",
+        "pending",
+    )
+    _enable_with_events(coord, (event, second))
+    runtime = coord.vpp_runtime
+    runtime._events_last_success_mono = mono[0]
+    entity = (
+        EnphaseVppNextEventStatusSensor(coord)
+        if kind == "sensor"
+        else VppEventsCalendarEntity(coord)
+    )
+    entity.hass = hass
+    entity.entity_id = f"{kind}.vpp_deadline"
+    import logging
+    from homeassistant.helpers.entity_component import EntityComponent
+
+    component = EntityComponent(logging.getLogger(__name__), kind, hass)
+    component._platforms[kind].config_entry = config_entry
+    await component.async_add_entities([entity])
+    await hass.async_block_till_done()
+
+    async def advance(seconds):
+        now[0] += timedelta(seconds=seconds)
+        mono[0] += seconds
+        async_fire_time_changed(hass, now[0])
+        await hass.async_block_till_done()
+
+    await advance(11)
+    assert hass.states.get(entity.entity_id).state == (
+        "scheduled" if kind == "sensor" else "on"
+    )
+    await advance(10)
+    assert hass.states.get(entity.entity_id).state == (
+        "pending" if kind == "sensor" else "off"
+    )
+    await advance(10)
+    assert hass.states.get(entity.entity_id).state == (
+        "pending" if kind == "sensor" else "on"
+    )
+    await advance(10)
+    assert hass.states.get(entity.entity_id).state == (
+        "unknown" if kind == "sensor" else "off"
+    )
+    # An identical successful response refreshes the source without notifying entities.
+    runtime._events_last_success_mono = mono[0]
+    await advance(3560)
+    assert hass.states.get(entity.entity_id).state != "unavailable"
+    assert entity._cancel_vpp_transition is not None
+    await advance(41)
+    assert hass.states.get(entity.entity_id).state == "unavailable"
+    assert entity._cancel_vpp_transition is None
+    # Recovery restarts the timer; removal cancels it.
+    runtime._events_last_success_mono = mono[0]
+    entity._handle_coordinator_update()
+    assert hass.states.get(entity.entity_id).state != "unavailable"
+    entity._handle_coordinator_update()
+    await component.async_remove_entity(entity.entity_id)
+    assert entity._cancel_vpp_transition is None
+    await entity.async_will_remove_from_hass()

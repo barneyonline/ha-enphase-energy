@@ -90,6 +90,7 @@ async def test_vpp_api_uses_observed_paths_queries_and_callable_headers() -> Non
         "sort_by=&ascending=&time="
     )
     assert calls[2].kwargs["redaction_identifiers"] == (PROGRAM_ID,)
+    assert all(call.kwargs["allow_reauth"] is False for call in calls)
     assert all(call.kwargs["log_invalid_payload"] is False for call in calls)
     assert all(call.kwargs["use_cookie_header_only"] is True for call in calls)
 
@@ -134,7 +135,7 @@ async def test_vpp_api_uses_stateless_session_even_when_shared_jar_has_cookies()
         ("vpp_events", (PROGRAM_ID,)),
     ],
 )
-async def test_vpp_401_retries_once_with_refreshed_credentials(
+async def test_vpp_401_never_refreshes_stored_credentials(
     method: str, args: tuple[str, ...]
 ) -> None:
     response = _Response()
@@ -151,22 +152,20 @@ async def test_vpp_401_retries_once_with_refreshed_credentials(
         cookie_header_session=session,  # type: ignore[arg-type]
     )
 
-    async def refresh() -> bool:
-        client.update_credentials(eauth="NEW", cookie="session=refreshed")
-        return True
-
-    reauth = AsyncMock(side_effect=refresh)
+    reauth = AsyncMock(return_value=True)
     client.set_reauth_callback(reauth)
 
-    with pytest.raises(api.Unauthorized):
-        await getattr(client, method)(*args)
+    # Repeated polls must not turn an entitlement failure into a login loop.
+    for _ in range(3):
+        with pytest.raises(api.Unauthorized):
+            await getattr(client, method)(*args)
 
-    reauth.assert_awaited_once_with()
-    assert session.request.call_count == 2
-    assert [
-        call.kwargs["headers"]["Authorization"]
+    reauth.assert_not_awaited()
+    assert session.request.call_count == 3
+    assert all(
+        call.kwargs["headers"]["Authorization"] == "OLD"
         for call in session.request.call_args_list
-    ] == ["OLD", "NEW"]
+    )
 
 
 @pytest.mark.asyncio

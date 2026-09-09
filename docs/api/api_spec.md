@@ -3658,22 +3658,28 @@ hexadecimal object IDs.
 Requests use the raw control token as `Authorization: <control token>` (with no
 `Bearer` prefix) together with the Enlighten origin and referer. Enlighten
 cookies, XSRF, `X-Requested-With`, and `e-auth-token` headers are intentionally
-omitted across the host boundary. Auth headers are rebuilt for retries after
-successful reauthentication.
+omitted across the host boundary. Each request uses current credentials; VPP
+authorization failures do not trigger stored-credential login.
 
 Event normalization retains only a hashed fingerprint, aware UTC start/end,
 type, subtype, status, and cancellation/superseded state. Rows with invalid
-timestamps or `end <= start` are discarded, duplicates are collapsed, unknown
+timestamps or `end <= start` are discarded; a nonempty response with no valid
+rows is treated as a failure and preserves bounded cached data. Duplicates are
+collapsed, unknown
 string values are preserved, and the sorted cache is capped at 500 records.
 A valid empty enrollment response means unenrolled; a valid empty events list
 means enrolled with no events. Malformed/ambiguous responses and 403/404 failures
-remain isolated from core setup. Authentication failures follow the integration's
-normal reauthentication path.
+remain isolated from core setup. VPP authorization failures enter only their
+endpoint-family cooldown; HTTP status and Retry-After delays are preserved in
+sanitized errors. Core authentication retains its normal reauthentication path.
 
 Enrollment lookup uses a six-hour refresh interval and a seven-day cached-program
 lifetime. Events refresh every five minutes and retain the last successful data
 for up to one hour after transient failures. An invalid-program events response
 clears the cached program so the next cycle repeats the authoritative lookup.
+A changed program invalidates previously cached events. Entity timers publish
+calendar and next-event transitions and one-hour cache expiry even when polling
+is paused.
 
 ### 2.11 Battery Backup History
 ```

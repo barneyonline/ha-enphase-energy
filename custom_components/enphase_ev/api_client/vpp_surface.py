@@ -28,6 +28,8 @@ async def enrollment_id(client: VppClient, *, gs_base_url: str) -> object:
         "GET",
         url,
         headers=client._vpp_headers,
+        # Grid Services may reject sites without VPP entitlement; login cannot fix it.
+        allow_reauth=False,
         log_invalid_payload=False,
         use_cookie_header_only=True,
     )
@@ -49,6 +51,8 @@ async def enrollment_details(
         "GET",
         url,
         headers=client._vpp_headers,
+        # Grid Services may reject sites without VPP entitlement; login cannot fix it.
+        allow_reauth=False,
         log_invalid_payload=False,
         redaction_identifiers=(validated,),
         use_cookie_header_only=True,
@@ -78,6 +82,8 @@ async def events(client: VppClient, program_id: str, *, gs_base_url: str) -> obj
         "GET",
         url,
         headers=client._vpp_headers,
+        # Grid Services may reject sites without VPP entitlement; login cannot fix it.
+        allow_reauth=False,
         log_invalid_payload=False,
         redaction_identifiers=(validated,),
         use_cookie_header_only=True,
