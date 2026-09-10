@@ -2227,6 +2227,11 @@ async def test_async_update_data_login_wall_during_refresh_cooldown_blocks(
         lambda *_args, **_kwargs: (lambda: None),
     )
     coord = EnphaseCoordinator(hass, entry.data, config_entry=entry)
+    from custom_components.enphase_ev.sensor import EnphaseSiteLastErrorCodeSensor
+
+    coord.last_success_utc = datetime.now(timezone.utc) - timedelta(seconds=5)
+    coord.last_failure_utc = None
+    coord.payload_failure_kind = "json_decode"
     coord._auth_refresh_rejected_until = time.monotonic() + 60
     coord._auth_refresh_rejected_ends_utc = datetime.now(timezone.utc) + timedelta(
         seconds=60
@@ -2247,6 +2252,13 @@ async def test_async_update_data_login_wall_during_refresh_cooldown_blocks(
     assert coord._auth_block_reason == "login_wall_after_refresh_reject"
     assert coord._auth_blocked_until_utc is not None
     assert 86390 <= exc_info.value.retry_after <= 86400
+
+    assert coord.last_failure_utc > coord.last_success_utc
+    assert coord.last_failure_source == "auth"
+    assert coord.last_failure_status is None
+    assert coord.last_failure_description == coord._blocked_auth_failure_message()
+    assert coord.payload_failure_kind is None
+    assert EnphaseSiteLastErrorCodeSensor(coord).native_value == "auth_blocked"
 
 
 @pytest.mark.asyncio

@@ -49,6 +49,70 @@ def test_path_classification_exposes_both_sides_of_renames() -> None:
     assert "git diff --name-only --no-renames" in classify_step["run"]
 
 
+def test_path_classification_when_base_advances_after_checkout(tmp_path):
+    """Keep the merge base when main advances after the PR checkout was made."""
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "Workflow Test",
+        "GIT_AUTHOR_EMAIL": "workflow@example.test",
+        "GIT_COMMITTER_NAME": "Workflow Test",
+        "GIT_COMMITTER_EMAIL": "workflow@example.test",
+    }
+
+    def git(cwd, *args):
+        return subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    git(origin, "init", "--initial-branch=main")
+    git(origin, "commit", "--allow-empty", "-m", "Initial main")
+    checkout = tmp_path / "checkout"
+    git(tmp_path, "clone", origin.as_uri(), str(checkout))
+    git(checkout, "switch", "-c", "feature")
+    source = checkout / "custom_components/enphase_ev/example.py"
+    source.parent.mkdir(parents=True)
+    source.write_text("# Integration change\n")
+    git(checkout, "add", ".")
+    git(checkout, "commit", "-m", "Change integration")
+    git(checkout, "switch", "main")
+    git(checkout, "merge", "--no-ff", "feature", "-m", "PR merge")
+    git(origin, "commit", "--allow-empty", "-m", "Advance main")
+
+    step = next(
+        step
+        for step in _jobs()["changes"]["steps"]
+        if step.get("name") == "Classify changed paths"
+    )
+    script = step["run"].replace("${{ github.event_name }}", "pull_request")
+    script = script.replace("${{ github.base_ref }}", "main")
+    output = tmp_path / "outputs"
+    result = subprocess.run(
+        ["bash", "-e", "-o", "pipefail", "-c", script],
+        cwd=checkout,
+        env={**env, "GITHUB_OUTPUT": str(output)},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert set(output.read_text().splitlines()) == {
+        "integration=true",
+        "compatibility=true",
+        "diagnostics=true",
+        "quality=true",
+        "scripts=false",
+    }
+    assert (
+        git(checkout, "rev-parse", "--is-shallow-repository").stdout.strip() == "false"
+    )
+
+
 def test_pytest_reuses_one_coverage_run_and_loads_only_required_plugins() -> None:
     pytest_job = _jobs()["pytest"]
     steps = pytest_job["steps"]

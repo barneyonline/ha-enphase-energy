@@ -13,7 +13,16 @@ All notable changes to this project will be documented in this file.
   reloads and Home Assistant restarts.
 
 ### 🐛 Bug fixes
-- None
+- Preserve VPP HTTP status and Retry-After delays without exposing private request
+  details, and clear cached events when the enrolled program changes.
+- Keep bounded VPP event data during wholly malformed responses instead of
+  reporting a successful empty schedule.
+- Publish VPP calendar transitions, next-event changes, and one-hour cache expiry
+  even when cloud polling stops or unchanged responses suppress notifications.
+- Prevented optional VPP authorization failures from triggering stored-credential
+  logins on every poll, avoiding unnecessary authentication traffic. (#859)
+- Record authentication-block failures immediately so Cloud Error Code reports
+  `auth_blocked` on the refresh that activates the block. (#859)
 
 ### 🔧 Improvements
 - None

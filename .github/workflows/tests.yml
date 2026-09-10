@@ -58,7 +58,9 @@ jobs:
             exit 0
           fi
 
-          git fetch origin "${{ github.base_ref }}" --depth=1
+          # Preserve history for the merge-base diff if the base branch advances
+          # after checkout (including when an older workflow run is retried).
+          git fetch origin "${{ github.base_ref }}"
           # Disable rename detection so cross-group moves expose both the deleted
           # source path and the added destination path to the classifiers below.
           changed_files="$(git diff --name-only --no-renames "origin/${{ github.base_ref }}...HEAD")"

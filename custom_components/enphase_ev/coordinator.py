@@ -4157,16 +4157,6 @@ class EnphaseCoordinator(
         first_refresh = context.first_refresh
 
         if self._auth_block_active():
-            self._last_error = "auth_blocked"
-            self.last_failure_utc = dt_util.utcnow()
-            self.last_failure_status = None
-            self.last_failure_description = self._blocked_auth_failure_message()
-            self.last_failure_response = self.last_failure_description
-            self.last_failure_source = "auth"
-            self.last_failure_endpoint = None
-            self._network_errors = 0
-            self._http_errors = 0
-            self._payload_errors = 0
             self.diagnostics.create_auth_block_issue()
             raise self._auth_block_update_failed()
 
@@ -6235,6 +6225,18 @@ class EnphaseCoordinator(
 
     def _auth_block_update_failed(self) -> UpdateFailed:
         """Return a recoverable update failure while Enphase auth is blocked."""
+
+        self._last_error = "auth_blocked"
+        self.last_failure_utc = dt_util.utcnow()
+        self.last_failure_status = None
+        self.last_failure_description = self._blocked_auth_failure_message()
+        self.last_failure_response = self.last_failure_description
+        self.last_failure_source = "auth"
+        self.last_failure_endpoint = None
+        self._network_errors = 0
+        self._http_errors = 0
+        self._payload_errors = 0
+        self.payload_failure_kind = None
 
         return UpdateFailed(
             self._blocked_auth_failure_message(),

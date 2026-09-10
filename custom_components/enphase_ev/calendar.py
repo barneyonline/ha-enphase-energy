@@ -28,6 +28,7 @@ from .system_events import (
     SystemEventHistoryEntry,
 )
 from .vpp_runtime import VppEvent
+from .vpp_entity import VppCoordinatorEntity
 
 PARALLEL_UPDATES = 0
 
@@ -125,7 +126,7 @@ async def async_setup_entry(
 
 
 class VppEventsCalendarEntity(
-    CoordinatorEntity,  # type: ignore[misc]
+    VppCoordinatorEntity,
     CalendarEntity,  # type: ignore[misc]
 ):
     """Expose Enphase VPP/ELRP events as a read-only calendar."""

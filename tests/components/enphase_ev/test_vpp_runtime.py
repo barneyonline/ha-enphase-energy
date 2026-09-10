@@ -328,7 +328,8 @@ async def test_runtime_retains_stale_events_and_reresolves_invalid_program() -> 
     assert runtime._program_id is None  # noqa: SLF001
     assert runtime.refresh_due() is True
     failure = coord._note_endpoint_family_failure.call_args.args[1]
-    assert isinstance(failure, OptionalEndpointUnavailable)
+    assert isinstance(failure, aiohttp.ClientResponseError)
+    assert failure.status == 404
     assert "private" not in str(failure)
 
     coord._endpoint_family_should_run.return_value = False
@@ -550,3 +551,100 @@ async def test_runtime_isolates_optional_grid_services_login_walls() -> None:
     ]
     assert all(isinstance(failure, OptionalEndpointUnavailable) for failure in failures)
     assert all("/login" not in str(failure) for failure in failures)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", ["vpp_enrollment_id", "vpp_events"])
+@pytest.mark.parametrize("retry_after", [None, "7200"])
+async def test_http_failures_preserve_sanitized_backoff(
+    coordinator_factory, method, retry_after
+):
+    coord = _coordinator(events={"data": [_event()]})
+    runtime = VppRuntime(coord)
+    await runtime.async_refresh()
+    real_coord = coordinator_factory()
+    coord._note_endpoint_family_failure = real_coord._note_endpoint_family_failure
+    headers = {"Set-Cookie": "private"}
+    if retry_after is not None:
+        headers["Retry-After"] = retry_after
+    getattr(coord.client, method).side_effect = aiohttp.ClientResponseError(
+        request_info=SimpleNamespace(real_url="https://gs.invalid/private"),
+        history=(),
+        status=429,
+        message="private",
+        headers=headers,
+    )
+    await runtime.async_refresh()
+    family = (
+        VPP_EVENTS_ENDPOINT_FAMILY
+        if method == "vpp_events"
+        else VPP_ENROLLMENT_ENDPOINT_FAMILY
+    )
+    health = real_coord._endpoint_family_state(family)
+    assert health.last_status == 429
+    assert "private" not in health.last_error
+    assert health.next_retry_mono - time.monotonic() >= (7190 if retry_after else 290)
+    error = runtime._safe_failure(
+        "Unavailable", getattr(coord.client, method).side_effect
+    )
+    assert "Set-Cookie" not in error.headers
+    assert "private" not in str(error.request_info.real_url)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("events_due", [True, False])
+async def test_program_change_cannot_publish_previous_program_events(events_due):
+    coord = _coordinator(events={"data": [_event()]})
+    runtime = VppRuntime(coord)
+    await runtime.async_refresh()
+    coord.client.vpp_enrollment_details.return_value = {
+        "data": {"program_id": "c" * 24}
+    }
+    coord._endpoint_family_should_run.side_effect = (
+        lambda family: family == VPP_ENROLLMENT_ENDPOINT_FAMILY or events_due
+    )
+    coord.client.vpp_events.side_effect = RuntimeError("offline")
+    await runtime.async_refresh()
+    assert runtime._program_id == "c" * 24
+    assert runtime.events == ()
+    assert runtime.available is False
+    assert runtime.next_actionable() is None
+    assert runtime._events_last_success_utc is None
+    coord._endpoint_family_should_run.side_effect = None
+    coord.client.vpp_events.side_effect = None
+    await runtime.async_refresh()
+    assert runtime.available is True
+    coord.client.vpp_events.assert_awaited_with("c" * 24)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [None],
+        [{"start_time": "invalid"}],
+        [{"start_time": "2026-09-10T01:00:00Z", "end_time": "2026-09-10T00:00:00Z"}],
+    ],
+)
+async def test_all_invalid_rows_preserve_cached_events_and_freshness(rows):
+    coord = _coordinator(events={"data": [_event()]})
+    runtime = VppRuntime(coord)
+    await runtime.async_refresh()
+    original = runtime.events
+    last_success = runtime._events_last_success_mono
+    coord.client.vpp_events.return_value = {"data": rows}
+    await runtime.async_refresh()
+    assert runtime.events == original
+    assert runtime._events_last_success_mono == last_success
+    assert (
+        coord._endpoint_family_state(VPP_EVENTS_ENDPOINT_FAMILY).consecutive_failures
+        == 1
+    )
+    coord.client.vpp_events.return_value = {"data": []}
+    await runtime.async_refresh()
+    assert runtime.events == ()
+    assert runtime.available is True
+    assert (
+        coord._endpoint_family_state(VPP_EVENTS_ENDPOINT_FAMILY).consecutive_failures
+        == 0
+    )

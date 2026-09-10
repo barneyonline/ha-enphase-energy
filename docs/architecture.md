@@ -170,10 +170,17 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   reuse a confirmed program for seven days; event data is refreshed every five
   minutes. Its immutable snapshot participates in aggregate snapshot equality so
   VPP-only changes notify entity listeners.
-  VPP enrollment and event authorization failures, including repeated HTTP 401s
-  after the client's stored-credential retry, enter only that endpoint family's
+  VPP enrollment and event authorization failures, including repeated HTTP 401s,
+  never trigger stored-credential login and enter only that endpoint family's
   cooldown. They preserve bounded cached data and do not independently trigger
   config-entry reauthentication; core authentication failures still can.
+  Sanitized HTTP failures retain their status and Retry-After delay. Program
+  changes invalidate event data from the previous program while respecting active
+  event-family cooldowns. Nonempty event lists with no valid rows are failures;
+  valid empty lists clear the event cache.
+  `vpp_entity.py` schedules event boundaries and cache expiry for the calendar and
+  next-event sensors independently of polling. Timers recheck freshness after
+  unchanged successful responses and are cancelled when entities are removed.
 
 These managers should own cache lifetimes, stale data decisions, and endpoint-specific parsing for their family. The coordinator should expose their normalized state through properties and helper methods.
 
