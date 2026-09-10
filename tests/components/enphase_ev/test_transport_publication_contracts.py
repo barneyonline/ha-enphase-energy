@@ -185,6 +185,10 @@ def test_observation_timestamp_excluded_but_command_auth_health_changes_publish(
     coord.async_set_updated_data(coord.data)
     assert coord.integration_snapshot != snapshot
     snapshot = coord.integration_snapshot
+    coord.auth_refresh_runtime.state._auth_refresh_attempt_count += 1
+    coord.async_set_updated_data(coord.data)
+    assert coord.integration_snapshot != snapshot
+    snapshot = coord.integration_snapshot
     coord._endpoint_family_health["battery"] = EndpointFamilyHealth(
         degraded=True, cache_stale=True
     )

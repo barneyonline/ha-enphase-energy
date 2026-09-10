@@ -15,6 +15,9 @@ from homeassistant.exceptions import ServiceValidationError
 from custom_components.enphase_ev.const import (
     CONF_AUTH_BLOCK_REASON,
     CONF_AUTH_BLOCKED_UNTIL,
+    CONF_AUTH_REFRESH_ATTEMPT_COUNT,
+    CONF_AUTH_REFRESH_FAILURE_COUNT,
+    CONF_AUTH_REFRESH_SUCCESS_COUNT,
     CONF_AUTH_REFRESH_SUSPENDED_UNTIL,
     CONF_COOKIE,
     CONF_EAUTH,
@@ -212,6 +215,9 @@ def test_collect_site_metrics_handles_unfriendly_datetime(hass):
     coord.last_success_utc = datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
     coord.last_failure_utc = datetime(2025, 1, 1, 11, 0, tzinfo=timezone.utc)
     coord._auth_refresh_rejected_count = 2
+    coord._auth_refresh_attempt_count = 7
+    coord._auth_refresh_success_count = 5
+    coord._auth_refresh_failure_count = 2
     coord._auth_refresh_suspended_until_utc = datetime(
         2025, 1, 1, 12, 30, tzinfo=timezone.utc
     )
@@ -233,6 +239,9 @@ def test_collect_site_metrics_handles_unfriendly_datetime(hass):
     assert metrics["auth_refresh_suspended_active"] is False
     assert metrics["auth_refresh_suspended_until"] is None
     assert metrics["auth_refresh_rejected_count"] == 0
+    assert metrics["auth_refresh_attempt_count"] == 7
+    assert metrics["auth_refresh_success_count"] == 5
+    assert metrics["auth_refresh_failure_count"] == 2
     assert metrics["auth_blocked_active"] is False
     assert metrics["auth_blocked_until"] is None
     assert metrics["auth_block_reason"] is None
@@ -255,6 +264,32 @@ def test_collect_site_metrics_handles_unfriendly_datetime(hass):
     assert "discharge_to_grid_schedule_available" in metrics
     assert "restrict_battery_discharge_schedule_supported" in metrics
     assert "restrict_battery_discharge_schedule_available" in metrics
+
+
+def test_auth_refresh_counters_restore_and_reject_invalid_values(
+    coordinator_factory,
+):
+    from custom_components.enphase_ev.coordinator import (
+        _coerce_nonnegative_counter,
+    )
+
+    coord = coordinator_factory(
+        config={
+            CONF_SITE_ID: "111111",
+            CONF_SERIALS: [],
+            CONF_EAUTH: "EAUTH",
+            CONF_COOKIE: "COOKIE",
+            CONF_SCAN_INTERVAL: 60,
+            CONF_AUTH_REFRESH_ATTEMPT_COUNT: 9,
+            CONF_AUTH_REFRESH_SUCCESS_COUNT: "6",
+            CONF_AUTH_REFRESH_FAILURE_COUNT: -2,
+        }
+    )
+
+    assert coord._auth_refresh_attempt_count == 9
+    assert coord._auth_refresh_success_count == 6
+    assert coord._auth_refresh_failure_count == 0
+    assert _coerce_nonnegative_counter("bad") == 0
 
 
 def test_collect_site_metrics_reports_battery_entity_availability_flags(
@@ -446,6 +481,32 @@ def test_persist_auth_refresh_suspension_state_stores_field(hass, monkeypatch):
     assert (
         captured[-1][CONF_AUTH_REFRESH_SUSPENDED_UNTIL] == "2026-05-01T12:00:00+00:00"
     )
+
+
+def test_persist_auth_refresh_counters(hass, monkeypatch):
+    from custom_components.enphase_ev.coordinator import EnphaseCoordinator
+
+    entry = _make_entry(hass)
+    coord = _attach_evse_runtime(EnphaseCoordinator.__new__(EnphaseCoordinator))
+    coord.hass = hass
+    coord.config_entry = entry
+    coord._auth_refresh_attempt_count = 7
+    coord._auth_refresh_success_count = 5
+    coord._auth_refresh_failure_count = 2
+
+    captured: list[dict] = []
+
+    def _update_entry(entry_obj, data=None, **kwargs):
+        assert entry_obj is entry
+        captured.append(dict(data))
+
+    monkeypatch.setattr(hass.config_entries, "async_update_entry", _update_entry)
+
+    coord._persist_auth_refresh_counters()
+
+    assert captured[-1][CONF_AUTH_REFRESH_ATTEMPT_COUNT] == 7
+    assert captured[-1][CONF_AUTH_REFRESH_SUCCESS_COUNT] == 5
+    assert captured[-1][CONF_AUTH_REFRESH_FAILURE_COUNT] == 2
 
 
 def test_persist_auth_refresh_suspension_state_marks_internal_update(hass, monkeypatch):
@@ -1111,6 +1172,9 @@ async def test_attempt_auto_refresh_success(monkeypatch, hass):
     )
     coord._persist_tokens.assert_called_once_with(new_tokens)
     assert coord._tokens == new_tokens
+    assert coord._auth_refresh_attempt_count == 1
+    assert coord._auth_refresh_success_count == 1
+    assert coord._auth_refresh_failure_count == 0
 
 
 @pytest.mark.asyncio
@@ -1172,6 +1236,9 @@ async def test_attempt_auto_refresh_coalesces_concurrent_calls(monkeypatch, hass
     )
     coord._persist_tokens.assert_called_once_with(new_tokens)
     assert coord._auth_refresh_task is None
+    assert coord._auth_refresh_attempt_count == 1
+    assert coord._auth_refresh_success_count == 1
+    assert coord._auth_refresh_failure_count == 0
 
 
 @pytest.mark.asyncio
@@ -1678,6 +1745,9 @@ async def test_attempt_auto_refresh_failures(monkeypatch, hass, exc_type):
     assert result is False
     coord.client.update_credentials.assert_not_called()
     coord._persist_tokens.assert_not_called()
+    assert coord._auth_refresh_attempt_count == 1
+    assert coord._auth_refresh_success_count == 0
+    assert coord._auth_refresh_failure_count == 1
 
 
 @pytest.mark.asyncio
@@ -2306,6 +2376,9 @@ def test_persist_tokens_updates_entry(hass, monkeypatch):
     )
     coord._auth_blocked_until_utc = datetime.now(timezone.utc) + timedelta(hours=1)
     coord._auth_block_reason = "login_wall_after_refresh_reject"
+    coord._auth_refresh_attempt_count = 4
+    coord._auth_refresh_success_count = 3
+    coord._auth_refresh_failure_count = 1
 
     captured: list[tuple] = []
 
@@ -2331,6 +2404,9 @@ def test_persist_tokens_updates_entry(hass, monkeypatch):
     assert CONF_AUTH_BLOCKED_UNTIL not in payload
     assert CONF_AUTH_BLOCK_REASON not in payload
     assert payload[CONF_SESSION_ID] == "sess"
+    assert payload[CONF_AUTH_REFRESH_ATTEMPT_COUNT] == 4
+    assert payload[CONF_AUTH_REFRESH_SUCCESS_COUNT] == 3
+    assert payload[CONF_AUTH_REFRESH_FAILURE_COUNT] == 1
     assert coord._auth_refresh_rejected_count == 0
     assert coord._auth_refresh_suspended_until_utc is None
 

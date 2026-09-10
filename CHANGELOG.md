@@ -8,7 +8,9 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
-- None
+- Added disabled-by-default diagnostic sensors for cumulative stored-credential
+  login attempts, successes, and failures. Counters persist across integration
+  reloads and Home Assistant restarts.
 
 ### 🐛 Bug fixes
 - None

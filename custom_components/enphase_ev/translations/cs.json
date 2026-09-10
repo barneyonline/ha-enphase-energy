@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Latence cloudu"
       },
+      "auth_refresh_attempts": {
+        "name": "Pokusy o přihlášení uloženými přihlašovacími údaji"
+      },
+      "auth_refresh_successes": {
+        "name": "Úspěšná přihlášení uloženými přihlašovacími údaji"
+      },
+      "auth_refresh_failures": {
+        "name": "Neúspěšná přihlášení uloženými přihlašovacími údaji"
+      },
       "current_production_power": {
         "name": "Aktuální výrobní výkon",
         "state_attributes": {

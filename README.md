@@ -52,7 +52,7 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
   no Grid Profile requests until enabled
 - Read-only Grid Mode monitoring with a guided, OTP-confirmed control workflow under Configure > Advanced > Grid Mode and admin-only actions for scripts
 - Administrator-only service actions for charger control, cloud reauthentication, live streaming, battery schedule changes, tariff updates, and Grid Profile application
-- Health diagnostics, service-availability tracking, and actionable repair issues
+- Health diagnostics, service-availability tracking, persistent stored-credential login counters, and actionable repair issues
 - Read-only System Dashboard event and standing-alarm monitoring, including a
   diagnostic Problem sensor with bounded sanitized event context and optional,
   default-off Repair notifications sourced from authoritative standing alarms

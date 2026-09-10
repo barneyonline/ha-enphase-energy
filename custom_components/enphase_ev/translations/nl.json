@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Cloudlatentie"
       },
+      "auth_refresh_attempts": {
+        "name": "Aanmeldpogingen met opgeslagen inloggegevens"
+      },
+      "auth_refresh_successes": {
+        "name": "Geslaagde aanmeldingen met opgeslagen inloggegevens"
+      },
+      "auth_refresh_failures": {
+        "name": "Mislukte aanmeldingen met opgeslagen inloggegevens"
+      },
       "current_production_power": {
         "name": "Huidig productievermogen",
         "state_attributes": {

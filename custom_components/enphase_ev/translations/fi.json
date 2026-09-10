@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Pilviviive"
       },
+      "auth_refresh_attempts": {
+        "name": "Kirjautumisyritykset tallennetuilla tunnuksilla"
+      },
+      "auth_refresh_successes": {
+        "name": "Onnistuneet kirjautumiset tallennetuilla tunnuksilla"
+      },
+      "auth_refresh_failures": {
+        "name": "Epäonnistuneet kirjautumiset tallennetuilla tunnuksilla"
+      },
       "current_production_power": {
         "name": "Nykyinen tuotantoteho",
         "state_attributes": {

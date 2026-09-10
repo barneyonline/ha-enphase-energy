@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Pilve latentsus"
       },
+      "auth_refresh_attempts": {
+        "name": "Salvestatud mandaatidega sisselogimiskatsed"
+      },
+      "auth_refresh_successes": {
+        "name": "Õnnestunud sisselogimised salvestatud mandaatidega"
+      },
+      "auth_refresh_failures": {
+        "name": "Ebaõnnestunud sisselogimised salvestatud mandaatidega"
+      },
       "current_production_power": {
         "name": "Praegune tootmisvõimsus",
         "state_attributes": {

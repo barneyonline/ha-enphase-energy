@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Opóźnienie chmury"
       },
+      "auth_refresh_attempts": {
+        "name": "Próby logowania zapisanymi poświadczeniami"
+      },
+      "auth_refresh_successes": {
+        "name": "Udane logowania zapisanymi poświadczeniami"
+      },
+      "auth_refresh_failures": {
+        "name": "Nieudane logowania zapisanymi poświadczeniami"
+      },
       "current_production_power": {
         "name": "Bieżąca moc produkcji",
         "state_attributes": {

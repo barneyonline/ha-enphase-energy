@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Latență cloud"
       },
+      "auth_refresh_attempts": {
+        "name": "Încercări de autentificare cu credențiale salvate"
+      },
+      "auth_refresh_successes": {
+        "name": "Autentificări reușite cu credențiale salvate"
+      },
+      "auth_refresh_failures": {
+        "name": "Autentificări eșuate cu credențiale salvate"
+      },
       "current_production_power": {
         "name": "Puterea instantanee de producție",
         "state_attributes": {

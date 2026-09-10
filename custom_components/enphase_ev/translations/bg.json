@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Латентност на облака"
       },
+      "auth_refresh_attempts": {
+        "name": "Опити за вход със запазени идентификационни данни"
+      },
+      "auth_refresh_successes": {
+        "name": "Успешни влизания със запазени идентификационни данни"
+      },
+      "auth_refresh_failures": {
+        "name": "Неуспешни влизания със запазени идентификационни данни"
+      },
       "current_production_power": {
         "name": "Текуща производствена мощност",
         "state_attributes": {

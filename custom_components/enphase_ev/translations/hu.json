@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Cloud késleltetés"
       },
+      "auth_refresh_attempts": {
+        "name": "Bejelentkezési kísérletek mentett hitelesítő adatokkal"
+      },
+      "auth_refresh_successes": {
+        "name": "Sikeres bejelentkezések mentett hitelesítő adatokkal"
+      },
+      "auth_refresh_failures": {
+        "name": "Sikertelen bejelentkezések mentett hitelesítő adatokkal"
+      },
       "current_production_power": {
         "name": "Aktuális termelési teljesítmény",
         "state_attributes": {
