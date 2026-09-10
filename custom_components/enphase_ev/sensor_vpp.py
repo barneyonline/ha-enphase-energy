@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .vpp_entity import VppCoordinatorEntity
 from .const import DOMAIN
 from .coordinator import EnphaseCoordinator
 from .device_info_helpers import _cloud_device_info
@@ -21,7 +21,7 @@ VPP_SENSOR_KEYS: tuple[str, ...] = (
 )
 
 
-class _VppNextEventSensor(CoordinatorEntity, SensorEntity):  # type: ignore[misc]
+class _VppNextEventSensor(VppCoordinatorEntity, SensorEntity):  # type: ignore[misc]
     """Base sensor reading the next actionable VPP event."""
 
     _attr_has_entity_name = True

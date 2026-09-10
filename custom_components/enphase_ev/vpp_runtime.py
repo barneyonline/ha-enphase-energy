@@ -7,10 +7,12 @@ import time
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, cast
 
 import aiohttp
+from multidict import CIMultiDict, CIMultiDictProxy
+from yarl import URL
 from homeassistant.util import dt as dt_util
 
 from .api import (
@@ -154,6 +156,9 @@ def parse_vpp_events(payload: object) -> tuple[tuple[VppEvent, ...], bool] | Non
                 or _normalized(status) in {"superseded", "superceded"}
             ),
         )
+    if rows and not parsed:
+        return None
+
     all_events = sorted(
         parsed.values(), key=lambda item: (item.start, item.end, item.fingerprint)
     )
@@ -182,6 +187,26 @@ def parse_vpp_events(payload: object) -> tuple[tuple[VppEvent, ...], bool] | Non
             key=lambda item: (item.start, item.end, item.fingerprint),
         )
     return tuple(all_events), truncated
+
+
+class VppHttpUnavailable(aiohttp.ClientResponseError, OptionalEndpointUnavailable):  # type: ignore[misc]
+    """Sanitized HTTP failure that always retains optional-family cooldowns."""
+
+    def __init__(self, summary: str, status: int, retry_after: str | None) -> None:
+        url = URL("https://gs.enphaseenergy.com/")
+        headers = CIMultiDict[str]()
+        if retry_after:
+            headers["Retry-After"] = retry_after
+        aiohttp.ClientResponseError.__init__(
+            self,
+            request_info=aiohttp.RequestInfo(
+                url, "GET", CIMultiDictProxy(CIMultiDict()), url
+            ),
+            history=(),
+            status=status,
+            message=summary,
+            headers=CIMultiDictProxy(headers),
+        )
 
 
 class VppRuntime:
@@ -223,8 +248,25 @@ class VppRuntime:
         last_success = self._events_last_success_mono
         return bool(
             isinstance(last_success, (int, float))
-            and time.monotonic() - float(last_success) <= VPP_EVENT_STALE_AFTER_S
+            and time.monotonic() - float(last_success) < VPP_EVENT_STALE_AFTER_S
         )
+
+    def next_transition_utc(self) -> datetime | None:
+        """Return the next event boundary or monotonic cache-expiry deadline."""
+
+        if not self.available:
+            return None
+        now = cast(datetime, dt_util.utcnow())
+        assert self._events_last_success_mono is not None
+        remaining = max(
+            0.0,
+            self._events_last_success_mono + VPP_EVENT_STALE_AFTER_S - time.monotonic(),
+        )
+        deadline = now + timedelta(seconds=remaining)
+        event = self.next_actionable(now)
+        if event is not None:
+            deadline = min(deadline, event.start if event.start > now else event.end)
+        return deadline
 
     @property
     def events(self) -> tuple[VppEvent, ...]:
@@ -292,10 +334,16 @@ class VppRuntime:
         )
 
     @staticmethod
-    def _safe_failure(summary: str, err: Exception) -> OptionalEndpointUnavailable:
-        status = err.status if isinstance(err, aiohttp.ClientResponseError) else None
-        suffix = f" (status {status})" if isinstance(status, int) else ""
-        return OptionalEndpointUnavailable(f"{summary}{suffix}")
+    def _safe_failure(summary: str, err: Exception) -> Exception:
+        """Preserve HTTP backoff metadata without retaining private request data."""
+
+        if isinstance(err, aiohttp.ClientResponseError):
+            return VppHttpUnavailable(
+                summary,
+                err.status,
+                err.headers.get("Retry-After") if err.headers else None,
+            )
+        return OptionalEndpointUnavailable(summary)
 
     async def _async_refresh_enrollment(self) -> None:
         force_lookup = self._force_enrollment_lookup
@@ -347,7 +395,7 @@ class VppRuntime:
                 raise OptionalEndpointUnavailable("Ambiguous VPP program response")
         except Unauthorized as err:
             # Grid Services authorization does not establish account-wide expiry.
-            # The client owns the bounded stored-credential retry, when available.
+            # VPP requests do not trigger stored-credential refresh.
             self.coordinator._note_endpoint_family_failure(
                 VPP_ENROLLMENT_ENDPOINT_FAMILY,
                 self._safe_failure("VPP enrollment unavailable", err),
@@ -364,6 +412,11 @@ class VppRuntime:
                 safe,
             )
             return
+        if program_id != self._program_id:
+            self._events = ()
+            self._truncated = False
+            self._events_last_success_mono = None
+            self._events_last_success_utc = None
         self._enrollment_state = "enrolled"
         self._program_id = program_id
         self._program_last_confirmed_mono = time.monotonic()
