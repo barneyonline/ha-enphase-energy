@@ -195,6 +195,9 @@ legacy family states, detaches nested dataclass content, compares values, and re
 mappings. Cache deadlines and diagnostic-only payloads are excluded; schedule
 inventory remains included because editor entities read it.
 
+Stored-credential login counters publish auth snapshots and notify entities without
+marking cloud telemetry successful or resetting the coordinator's polling schedule.
+
 Auth and EVSE state live with their runtimes. Battery, heat-pump, and inventory
 runtimes receive their state explicitly; compatibility coordinator projections
 remain for existing consumers. Migrate those consumers incrementally instead of

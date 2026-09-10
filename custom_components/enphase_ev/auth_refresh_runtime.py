@@ -394,4 +394,4 @@ class AuthRefreshRuntime:
         """Publish counters once the coordinator has initialized its data."""
 
         if isinstance(getattr(self.coordinator, "data", None), dict):
-            self.coordinator.publish_runtime_state_update("auth_refresh")
+            self.coordinator.publish_auth_refresh_update()

@@ -10,7 +10,8 @@ All notable changes to this project will be documented in this file.
 ### ✨ New features
 - Added disabled-by-default diagnostic sensors for cumulative stored-credential
   login attempts, successes, and failures. Counters persist across integration
-  reloads and Home Assistant restarts.
+  reloads and Home Assistant restarts. Counter updates preserve cloud availability,
+  telemetry freshness, and the existing polling schedule.
 
 ### 🐛 Bug fixes
 - Preserve VPP HTTP status and Retry-After delays without exposing private request

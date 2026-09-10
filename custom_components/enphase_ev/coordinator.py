@@ -1241,6 +1241,13 @@ class EnphaseCoordinator(
         snapshot = self._build_integration_snapshot(data)
         super().async_set_updated_data(CoordinatorData(data, snapshot))
 
+    def publish_auth_refresh_update(self) -> None:
+        """Notify auth observers without marking telemetry fresh or rescheduling polls."""
+
+        current = dict(self.data)
+        self.data = CoordinatorData(current, self._build_integration_snapshot(current))
+        self.async_update_listeners()
+
     def publish_runtime_state_update(self, source: str) -> None:
         """Publish a manager-owned state transition with unchanged charger data."""
 
