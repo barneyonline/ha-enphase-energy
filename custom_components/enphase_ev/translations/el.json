@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Καθυστέρηση cloud"
       },
+      "auth_refresh_attempts": {
+        "name": "Προσπάθειες σύνδεσης με αποθηκευμένα διαπιστευτήρια"
+      },
+      "auth_refresh_successes": {
+        "name": "Επιτυχείς συνδέσεις με αποθηκευμένα διαπιστευτήρια"
+      },
+      "auth_refresh_failures": {
+        "name": "Αποτυχημένες συνδέσεις με αποθηκευμένα διαπιστευτήρια"
+      },
       "current_production_power": {
         "name": "Τρέχουσα ισχύς παραγωγής",
         "state_attributes": {

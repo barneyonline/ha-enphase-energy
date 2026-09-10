@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Cloud-latenstid"
       },
+      "auth_refresh_attempts": {
+        "name": "Loginforsøg med gemte legitimationsoplysninger"
+      },
+      "auth_refresh_successes": {
+        "name": "Vellykkede login med gemte legitimationsoplysninger"
+      },
+      "auth_refresh_failures": {
+        "name": "Mislykkede login med gemte legitimationsoplysninger"
+      },
       "current_production_power": {
         "name": "Aktuel produktionskraft",
         "state_attributes": {

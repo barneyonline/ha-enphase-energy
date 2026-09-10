@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from copy import deepcopy
+from datetime import timedelta
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from homeassistant.helpers.entity_component import EntityComponent
+from homeassistant.util import dt as dt_util
 
 from custom_components.enphase_ev import api
 from custom_components.enphase_ev.auth_refresh_state import AuthRefreshState
@@ -14,6 +18,96 @@ from custom_components.enphase_ev.refresh_runner import merge_warmup_enrichment
 from custom_components.enphase_ev.state_models import EndpointFamilyHealth
 
 from .test_api_client_methods import _FakeResponse, _FakeSession
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("poll_succeeded", [False, True])
+@pytest.mark.parametrize("login_succeeded", [False, True])
+async def test_auth_counters_preserve_poll_health_and_schedule(
+    hass,
+    config_entry,
+    coordinator_factory,
+    monkeypatch,
+    poll_succeeded,
+    login_succeeded,
+):
+    from custom_components.enphase_ev import auth_refresh_runtime
+    from custom_components.enphase_ev.sensor import (
+        EnphaseAuthRefreshCounterSensor,
+        EnphasePowerSensor,
+    )
+
+    coord = coordinator_factory()
+    coord._email = "synthetic@example.test"
+    coord._remember_password = True
+    coord._stored_password = "synthetic-password"
+    coord.last_success_utc = dt_util.utcnow() - timedelta(hours=1)
+    coord.last_update_success = poll_succeeded
+    poll_error = RuntimeError("previous poll failed")
+    coord.last_exception = poll_error
+    counters = [
+        EnphaseAuthRefreshCounterSensor(
+            coord,
+            key=f"auth_refresh_{key}",
+            translation_key=f"auth_refresh_{key}",
+            state_attr=f"_auth_refresh_{attr}_count",
+        )
+        for key, attr in (
+            ("attempts", "attempt"),
+            ("successes", "success"),
+            ("failures", "failure"),
+        )
+    ]
+    power = EnphasePowerSensor(coord, next(iter(coord.serials)))
+    entities = [*counters, power]
+    for index, entity in enumerate(entities):
+        entity.entity_id = f"sensor.auth_publication_{index}"
+        entity._attr_entity_registry_enabled_default = True
+    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    component._platforms["sensor"].config_entry = config_entry
+    await component.async_add_entities(entities)
+    await hass.async_block_till_done()
+    power_state = hass.states.get(power.entity_id).state
+    if not poll_succeeded:
+        assert power_state == "unavailable"
+
+    cancel_refresh = Mock(wraps=coord._async_unsub_refresh)
+    schedule_refresh = Mock()
+    cancel_debounce = Mock()
+    monkeypatch.setattr(coord, "_async_unsub_refresh", cancel_refresh)
+    monkeypatch.setattr(coord, "_schedule_refresh", schedule_refresh)
+    monkeypatch.setattr(coord._debounced_refresh, "async_cancel", cancel_debounce)
+    before = deepcopy(coord.data)
+
+    async def login(*_args):
+        assert hass.states.get(counters[0].entity_id).state == "1"
+        assert coord.last_update_success is poll_succeeded
+        assert hass.states.get(power.entity_id).state == power_state
+        if not login_succeeded:
+            raise api.EnlightenAuthUnavailable("offline")
+        return api.AuthTokens("cookie", "session", "token", None), {}
+
+    monkeypatch.setattr(auth_refresh_runtime, "async_authenticate", login)
+    result = await coord.async_try_reauth_now()
+
+    assert result.success is login_succeeded
+    assert coord.last_update_success is poll_succeeded
+    assert coord.last_exception is poll_error
+    assert dict(coord.data) == dict(before)
+    assert coord.data.snapshot.auth.attempt_count == 1
+    assert coord.data.snapshot.auth.success_count == int(login_succeeded)
+    assert coord.data.snapshot.auth.failure_count == int(not login_succeeded)
+    assert [hass.states.get(entity.entity_id).state for entity in counters] == [
+        "1",
+        str(int(login_succeeded)),
+        str(int(not login_succeeded)),
+    ]
+    assert hass.states.get(power.entity_id).state == power_state
+    cancel_refresh.assert_not_called()
+    schedule_refresh.assert_not_called()
+    cancel_debounce.assert_not_called()
+    for entity in entities:
+        await entity.async_remove()
 
 
 @pytest.mark.asyncio
@@ -182,6 +276,10 @@ def test_observation_timestamp_excluded_but_command_auth_health_changes_publish(
     coord.auth_refresh_runtime.state._auth_refresh_last_failure_reason = (
         "invalid_credentials"
     )
+    coord.async_set_updated_data(coord.data)
+    assert coord.integration_snapshot != snapshot
+    snapshot = coord.integration_snapshot
+    coord.auth_refresh_runtime.state._auth_refresh_attempt_count += 1
     coord.async_set_updated_data(coord.data)
     assert coord.integration_snapshot != snapshot
     snapshot = coord.integration_snapshot

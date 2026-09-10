@@ -12,6 +12,9 @@ class AuthRefreshState:
     """Credential recovery state owned by AuthRefreshRuntime."""
 
     _auth_refresh_task: asyncio.Task[bool] | None = None
+    _auth_refresh_attempt_count: int = 0
+    _auth_refresh_success_count: int = 0
+    _auth_refresh_failure_count: int = 0
     _auth_refresh_rejected_count: int = 0
     _auth_refresh_rejected_until: float | None = None
     _auth_refresh_rejected_ends_utc: datetime | None = None
@@ -30,6 +33,9 @@ class AuthRefreshState:
 class AuthRefreshSnapshot:
     """Observable recovery state, excluding acquisition timestamps."""
 
+    attempt_count: int = 0
+    success_count: int = 0
+    failure_count: int = 0
     rejected_count: int = 0
     failure_reason: str | None = None
     blocked_until: datetime | None = None

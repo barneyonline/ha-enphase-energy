@@ -11,6 +11,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from homeassistant.components.sensor import SensorStateClass
 from homeassistant.const import UnitOfEnergy
 from homeassistant.helpers.entity import EntityCategory
 
@@ -6049,6 +6050,7 @@ def test_cloud_sensor_device_info_falls_back_to_default_cloud_device(
     coordinator_factory,
 ) -> None:
     from custom_components.enphase_ev.sensor import (
+        EnphaseAuthRefreshCounterSensor,
         EnphaseCurrentPowerConsumptionSensor,
         EnphaseCloudLatencySensor,
         EnphaseSiteBackoffEndsSensor,
@@ -6078,6 +6080,12 @@ def test_cloud_sensor_device_info_falls_back_to_default_cloud_device(
     )
     current_power = EnphaseCurrentPowerConsumptionSensor(coord)
     latency = EnphaseCloudLatencySensor(coord)
+    auth_counter = EnphaseAuthRefreshCounterSensor(
+        coord,
+        key="auth_refresh_attempts",
+        translation_key="auth_refresh_attempts",
+        state_attr="_auth_refresh_attempt_count",
+    )
     last_error = EnphaseSiteLastErrorCodeSensor(coord)
     service_status = EnphaseSiteServiceStatusSensor(coord)
     backoff = EnphaseSiteBackoffEndsSensor(coord)
@@ -6086,6 +6094,7 @@ def test_cloud_sensor_device_info_falls_back_to_default_cloud_device(
     assert site_energy.device_info["identifiers"] == expected_identifiers
     assert current_power.device_info["identifiers"] == expected_identifiers
     assert latency.device_info["identifiers"] == expected_identifiers
+    assert auth_counter.device_info["identifiers"] == expected_identifiers
     assert last_error.device_info["identifiers"] == expected_identifiers
     assert service_status.device_info["identifiers"] == expected_identifiers
     assert backoff.device_info["identifiers"] == expected_identifiers
@@ -6111,6 +6120,7 @@ async def test_async_setup_entry_keeps_gateway_site_entities_when_inventory_unkn
     hass, config_entry, coordinator_factory
 ) -> None:
     from custom_components.enphase_ev.sensor import (
+        EnphaseAuthRefreshCounterSensor,
         EnphaseCloudLatencySensor,
         EnphaseCurrentPowerConsumptionSensor,
         EnphaseGatewayConsumptionMeterSensor,
@@ -6138,6 +6148,7 @@ async def test_async_setup_entry_keeps_gateway_site_entities_when_inventory_unkn
 
     assert any(isinstance(ent, EnphaseSiteLastUpdateSensor) for ent in added)
     assert any(isinstance(ent, EnphaseCloudLatencySensor) for ent in added)
+    assert sum(isinstance(ent, EnphaseAuthRefreshCounterSensor) for ent in added) == 3
     assert any(isinstance(ent, EnphaseCurrentPowerConsumptionSensor) for ent in added)
     assert any(isinstance(ent, EnphaseSystemControllerInventorySensor) for ent in added)
     assert any(isinstance(ent, EnphaseGatewayProductionMeterSensor) for ent in added)
@@ -6192,6 +6203,26 @@ async def test_async_setup_entry_adds_cloud_site_entities_without_envoy_type(
     assert any(isinstance(ent, EnphaseSiteLastErrorCodeSensor) for ent in added)
     assert any(isinstance(ent, EnphaseSiteServiceStatusSensor) for ent in added)
     assert any(isinstance(ent, EnphaseSiteBackoffEndsSensor) for ent in added)
+
+
+def test_auth_refresh_counter_sensor_reports_persisted_total(
+    coordinator_factory,
+) -> None:
+    from custom_components.enphase_ev.sensor import EnphaseAuthRefreshCounterSensor
+
+    coord = coordinator_factory(serials=[])
+    coord._auth_refresh_attempt_count = 12
+    sensor = EnphaseAuthRefreshCounterSensor(
+        coord,
+        key="auth_refresh_attempts",
+        translation_key="auth_refresh_attempts",
+        state_attr="_auth_refresh_attempt_count",
+    )
+
+    assert sensor.native_value == 12
+    assert sensor.state_class is SensorStateClass.TOTAL_INCREASING
+    assert sensor.entity_category is EntityCategory.DIAGNOSTIC
+    assert sensor.entity_registry_enabled_default is False
 
 
 def test_site_service_status_sensor_reports_degraded_services(

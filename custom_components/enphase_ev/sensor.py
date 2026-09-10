@@ -528,6 +528,32 @@ async def async_setup_entry(
 
         _add_site_entity("site_last_update", EnphaseSiteLastUpdateSensor(coord))
         _add_site_entity("site_cloud_latency", EnphaseCloudLatencySensor(coord))
+        for counter_key, translation_key, state_attr in (
+            (
+                "auth_refresh_attempts",
+                "auth_refresh_attempts",
+                "_auth_refresh_attempt_count",
+            ),
+            (
+                "auth_refresh_successes",
+                "auth_refresh_successes",
+                "_auth_refresh_success_count",
+            ),
+            (
+                "auth_refresh_failures",
+                "auth_refresh_failures",
+                "_auth_refresh_failure_count",
+            ),
+        ):
+            _add_site_entity(
+                counter_key,
+                EnphaseAuthRefreshCounterSensor(
+                    coord,
+                    key=counter_key,
+                    translation_key=translation_key,
+                    state_attr=state_attr,
+                ),
+            )
         if _retain_grid_profile_sensors(coord):
             _add_site_entity(
                 "current_grid_profile",
@@ -3252,6 +3278,39 @@ class EnphaseCloudLatencySensor(_SiteBaseEntity):
     @property
     def extra_state_attributes(self) -> Any:
         return {}
+
+    @property
+    def device_info(self) -> Any:
+        info = _type_device_info(self._coord, "cloud")
+        if info is not None:
+            return info
+        return _cloud_device_info(self._coord.site_id)  # pragma: no cover
+
+
+class EnphaseAuthRefreshCounterSensor(_SiteBaseEntity):
+    """Count stored-credential login outcomes across integration restarts."""
+
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(
+        self,
+        coord: EnphaseCoordinator,
+        *,
+        key: str,
+        translation_key: str,
+        state_attr: str,
+    ) -> None:
+        super().__init__(coord, key, translation_key, type_key=None)
+        self._attr_translation_key = translation_key
+        self._state_attr = state_attr
+
+    @property
+    def native_value(self) -> int:
+        """Return the persisted cumulative counter."""
+
+        return max(0, int(getattr(self._coord, self._state_attr, 0)))
 
     @property
     def device_info(self) -> Any:

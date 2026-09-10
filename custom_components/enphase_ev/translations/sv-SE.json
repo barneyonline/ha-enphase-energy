@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Molnlatens"
       },
+      "auth_refresh_attempts": {
+        "name": "Inloggningsförsök med sparade autentiseringsuppgifter"
+      },
+      "auth_refresh_successes": {
+        "name": "Lyckade inloggningar med sparade autentiseringsuppgifter"
+      },
+      "auth_refresh_failures": {
+        "name": "Misslyckade inloggningar med sparade autentiseringsuppgifter"
+      },
       "current_production_power": {
         "name": "Aktuell produktionskraft",
         "state_attributes": {

@@ -1096,6 +1096,15 @@
       "cloud_latency": {
         "name": "Cloud Latency"
       },
+      "auth_refresh_attempts": {
+        "name": "Stored-Credential Login Attempts"
+      },
+      "auth_refresh_successes": {
+        "name": "Successful Stored-Credential Logins"
+      },
+      "auth_refresh_failures": {
+        "name": "Failed Stored-Credential Logins"
+      },
       "current_production_power": {
         "name": "Current Production Power",
         "state_attributes": {

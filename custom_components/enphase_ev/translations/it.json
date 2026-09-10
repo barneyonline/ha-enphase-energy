@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Latenza cloud"
       },
+      "auth_refresh_attempts": {
+        "name": "Tentativi di accesso con credenziali salvate"
+      },
+      "auth_refresh_successes": {
+        "name": "Accessi riusciti con credenziali salvate"
+      },
+      "auth_refresh_failures": {
+        "name": "Accessi non riusciti con credenziali salvate"
+      },
       "current_production_power": {
         "name": "Potenza attuale di produzione",
         "state_attributes": {

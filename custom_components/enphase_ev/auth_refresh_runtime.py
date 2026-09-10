@@ -68,6 +68,9 @@ class AuthRefreshRuntime:
 
         state = self.state
         return AuthRefreshSnapshot(
+            attempt_count=state._auth_refresh_attempt_count,
+            success_count=state._auth_refresh_success_count,
+            failure_count=state._auth_refresh_failure_count,
             rejected_count=state._auth_refresh_rejected_count,
             failure_reason=state._auth_refresh_last_failure_reason,
             blocked_until=state._auth_blocked_until_utc,
@@ -320,22 +323,25 @@ class AuthRefreshRuntime:
         password = coord._stored_password
         if not isinstance(email, str) or not isinstance(password, str):
             return False
+        self.state._auth_refresh_attempt_count += 1
+        coord._persist_auth_refresh_counters()
+        self._publish_counters()
         try:
             tokens, _ = await async_authenticate(session, email, password)
         except EnlightenAuthInvalidCredentials:
-            self.state._auth_refresh_last_failure_reason = "invalid_credentials"
+            self._record_failure("invalid_credentials")
             self.note_auth_refresh_rejected(
                 "Stored Enlighten credentials were rejected; reauthenticate via the integration options"
             )
             return False
         except EnlightenAuthMFARequired:
-            self.state._auth_refresh_last_failure_reason = "mfa_required"
+            self._record_failure("mfa_required")
             self.note_auth_refresh_rejected(
                 "Enphase account requires multi-factor authentication; complete MFA in the browser and reauthenticate"
             )
             return False
         except EnlightenAuthTooManySessions:
-            self.state._auth_refresh_last_failure_reason = "too_many_active_sessions"
+            self._record_failure("too_many_active_sessions")
             self.note_login_wall_block(reason="too_many_active_sessions")
             _LOGGER.warning(
                 "Enphase rejected stored-credential reauthentication because too many account sessions are active; automatic retries are paused for %s seconds",
@@ -343,19 +349,20 @@ class AuthRefreshRuntime:
             )
             return False
         except EnlightenAuthUnavailable:
-            self.state._auth_refresh_last_failure_reason = "auth_service_unavailable"
+            self._record_failure("auth_service_unavailable")
             _LOGGER.debug(
                 "Auth service unavailable while refreshing tokens; will retry later"
             )
             return False
         except Exception as err:  # noqa: BLE001
-            self.state._auth_refresh_last_failure_reason = err.__class__.__name__
+            self._record_failure(err.__class__.__name__)
             _LOGGER.debug(
                 "Unexpected error refreshing Enlighten auth: %s",
                 redact_text(err),
             )
             return False
 
+        self.state._auth_refresh_success_count += 1
         self.state._auth_refresh_rejected_until = None
         self.state._auth_refresh_rejected_ends_utc = None
         self.state._auth_refresh_manual_retry_until = None
@@ -372,4 +379,19 @@ class AuthRefreshRuntime:
             cookie=tokens.cookie,
         )
         coord._persist_tokens(tokens)
+        self._publish_counters()
         return True
+
+    def _record_failure(self, reason: str) -> None:
+        """Record and publish one completed stored-credential login failure."""
+
+        self.state._auth_refresh_failure_count += 1
+        self.state._auth_refresh_last_failure_reason = reason
+        self.coordinator._persist_auth_refresh_counters()
+        self._publish_counters()
+
+    def _publish_counters(self) -> None:
+        """Publish counters once the coordinator has initialized its data."""
+
+        if isinstance(getattr(self.coordinator, "data", None), dict):
+            self.coordinator.publish_auth_refresh_update()

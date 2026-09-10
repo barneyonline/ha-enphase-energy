@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Mākoņa aizture"
       },
+      "auth_refresh_attempts": {
+        "name": "Pieteikšanās mēģinājumi ar saglabātiem akreditācijas datiem"
+      },
+      "auth_refresh_successes": {
+        "name": "Veiksmīgas pieteikšanās ar saglabātiem akreditācijas datiem"
+      },
+      "auth_refresh_failures": {
+        "name": "Neveiksmīgas pieteikšanās ar saglabātiem akreditācijas datiem"
+      },
       "current_production_power": {
         "name": "Pašreizējā ražošanas jauda",
         "state_attributes": {

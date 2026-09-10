@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Cloud-Latenz"
       },
+      "auth_refresh_attempts": {
+        "name": "Anmeldeversuche mit gespeicherten Zugangsdaten"
+      },
+      "auth_refresh_successes": {
+        "name": "Erfolgreiche Anmeldungen mit gespeicherten Zugangsdaten"
+      },
+      "auth_refresh_failures": {
+        "name": "Fehlgeschlagene Anmeldungen mit gespeicherten Zugangsdaten"
+      },
       "current_production_power": {
         "name": "Aktuelle Erzeugungsleistung",
         "state_attributes": {

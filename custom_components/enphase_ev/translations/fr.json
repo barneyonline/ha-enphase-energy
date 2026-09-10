@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Latence cloud"
       },
+      "auth_refresh_attempts": {
+        "name": "Tentatives de connexion avec les identifiants enregistrés"
+      },
+      "auth_refresh_successes": {
+        "name": "Connexions réussies avec les identifiants enregistrés"
+      },
+      "auth_refresh_failures": {
+        "name": "Échecs de connexion avec les identifiants enregistrés"
+      },
       "current_production_power": {
         "name": "Puissance actuelle de production",
         "state_attributes": {

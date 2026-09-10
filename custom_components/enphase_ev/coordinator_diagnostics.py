@@ -473,6 +473,15 @@ class CoordinatorDiagnostics:
             "auth_refresh_rejected_count": getattr(
                 coord, "_auth_refresh_rejected_count", 0
             ),
+            "auth_refresh_attempt_count": getattr(
+                coord, "_auth_refresh_attempt_count", 0
+            ),
+            "auth_refresh_success_count": getattr(
+                coord, "_auth_refresh_success_count", 0
+            ),
+            "auth_refresh_failure_count": getattr(
+                coord, "_auth_refresh_failure_count", 0
+            ),
             "auth_refresh_recent_success_active": _safe_bool_call(
                 "_auth_refresh_recent_success_active"
             ),

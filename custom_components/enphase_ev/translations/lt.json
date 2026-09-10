@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Debesies delsa"
       },
+      "auth_refresh_attempts": {
+        "name": "Prisijungimo bandymai naudojant išsaugotus kredencialus"
+      },
+      "auth_refresh_successes": {
+        "name": "Sėkmingi prisijungimai naudojant išsaugotus kredencialus"
+      },
+      "auth_refresh_failures": {
+        "name": "Nepavykę prisijungimai naudojant išsaugotus kredencialus"
+      },
       "current_production_power": {
         "name": "Dabartinė gamybos galia",
         "state_attributes": {

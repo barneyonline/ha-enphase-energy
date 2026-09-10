@@ -1093,6 +1093,15 @@
       "cloud_latency": {
         "name": "Sky-latens"
       },
+      "auth_refresh_attempts": {
+        "name": "Påloggingsforsøk med lagret legitimasjon"
+      },
+      "auth_refresh_successes": {
+        "name": "Vellykkede pålogginger med lagret legitimasjon"
+      },
+      "auth_refresh_failures": {
+        "name": "Mislykkede pålogginger med lagret legitimasjon"
+      },
       "current_production_power": {
         "name": "Nåværende produksjonseffekt",
         "state_attributes": {
