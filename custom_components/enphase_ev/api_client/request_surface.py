@@ -385,6 +385,28 @@ async def _json(
                                 payload=body_text,
                             ):
                                 self._last_unauthorized_request = safe_request_label
+                                if (
+                                    allow_reauth
+                                    and not self._is_hems_api_endpoint(endpoint or None)
+                                    and self._reauth_cb
+                                    and attempt == 0
+                                ):
+                                    # Join the same shared refresh as concurrent 401s
+                                    # before exposing a whole-entry auth failure.
+                                    from homeassistant.exceptions import (
+                                        ConfigEntryAuthFailed,
+                                    )
+
+                                    attempt += 1
+                                    try:
+                                        with _enlighten_reauth_read_scope():
+                                            reauth_ok = await self._reauth_cb()
+                                    except ConfigEntryAuthFailed:
+                                        # Preserve login-wall-specific token variants
+                                        # and rejected-refresh cooldown handling.
+                                        reauth_ok = False
+                                    if reauth_ok:
+                                        continue
                                 raise self._login_wall_unauthorized(
                                     endpoint=endpoint or None,
                                     request_label=safe_request_label,

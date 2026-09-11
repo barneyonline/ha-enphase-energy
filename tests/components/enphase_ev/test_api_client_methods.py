@@ -10382,3 +10382,68 @@ async def test_session_history_wraps_unavailable(monkeypatch, status) -> None:
     monkeypatch.setattr(client, "_json", _RequestMock(side_effect=err))
     with pytest.raises(api.SessionHistoryUnavailable):
         await client.session_history("SN", start_date="01-01-2024")
+
+
+def _login_wall_response() -> _FakeResponse:
+    return _FakeResponse(
+        status=200,
+        json_body=ValueError("invalid-json"),
+        text_body="<html><script>window.OptanonWrapper = function () {};</script></html>",
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("first_status", [200, 401])
+@pytest.mark.parametrize("retry_status", [200, 401])
+async def test_json_login_wall_retry_is_bounded(first_status, retry_status):
+    session = _FakeSession(
+        [
+            (
+                _login_wall_response()
+                if status == 200
+                else _FakeResponse(status=401, json_body={})
+            )
+            for status in (first_status, retry_status)
+        ]
+    )
+    client = api.EnphaseEVClient(session, "SITE", None, None)
+    refresh = AsyncMock(return_value=True)
+    client.set_reauth_callback(refresh)
+    error = (
+        api.EnphaseLoginWallUnauthorized if retry_status == 200 else api.Unauthorized
+    )
+    with pytest.raises(error):
+        await client._json("GET", "https://example.test/service/test")
+    refresh.assert_awaited_once()
+    assert len(session.calls) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "allow_reauth,endpoint,success",
+    [
+        (False, "/service/test", True),
+        (True, "/service/hems/test", True),
+        (True, "/service/test", False),
+    ],
+)
+async def test_json_login_wall_respects_refresh_policy(
+    monkeypatch, allow_reauth, endpoint, success
+):
+    monkeypatch.setattr(
+        api.EnphaseEVClient,
+        "_is_hems_api_endpoint",
+        staticmethod(lambda value: value == "/service/hems/test"),
+    )
+    session = _FakeSession([_login_wall_response()])
+    client = api.EnphaseEVClient(session, "SITE", None, None)
+    refresh = AsyncMock(return_value=success)
+    client.set_reauth_callback(refresh)
+    with pytest.raises(api.EnphaseLoginWallUnauthorized):
+        await client._json(
+            "GET", f"https://example.test{endpoint}", allow_reauth=allow_reauth
+        )
+    assert refresh.await_count == int(
+        allow_reauth and not client._is_hems_api_endpoint(endpoint)
+    )
+    assert len(session.calls) == 1
