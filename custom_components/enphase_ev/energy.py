@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 import time
@@ -22,6 +23,7 @@ LIFETIME_CONFIRM_TOLERANCE_KWH = 0.05
 LIFETIME_CONFIRM_COUNT = 2
 LIFETIME_CONFIRM_WINDOW_S = 180.0
 SITE_ENERGY_CACHE_TTL = 300.0
+SITE_ENERGY_SOURCE_FUTURE_SKEW_S = 60.0
 SITE_ENERGY_DEFAULT_INTERVAL_MIN = 5.0
 SITE_ENERGY_FAILURE_BACKOFF_S = 15 * 60
 HEMS_LIFETIME_FAILURE_BACKOFF_S = 60 * 60
@@ -82,6 +84,11 @@ class EnergyManager:
         self._hems_auth_success = hems_auth_success
         self.site_energy: dict[str, SiteEnergyFlow] = {}
         self.consumption_power_diagnostics: dict[str, object] = {}
+        self._site_energy_fetch_attempts = 0
+        self._site_energy_fetch_failures = 0
+        self._site_energy_unchanged_responses = 0
+        self._site_energy_source_timestamp: datetime | None = None
+        self._site_energy_fetch_diagnostics: dict[str, object] = {}
         self._site_energy_meta: dict[str, object] = {}
         self._site_energy_cache_ts: float | None = None
         self._site_energy_cache_ttl: float = SITE_ENERGY_CACHE_TTL
@@ -116,6 +123,63 @@ class EnergyManager:
         """Return a copy of cached site energy metadata."""
 
         return dict(self._site_energy_meta)
+
+    @property
+    def site_energy_fetch_diagnostics(self) -> dict[str, object]:
+        """Return detached fetch outcomes without exception text or payloads."""
+        return dict(self._site_energy_fetch_diagnostics)
+
+    def _record_site_energy_fetch(self, outcome: str) -> None:
+        self._site_energy_fetch_diagnostics.update(
+            last_outcome=outcome,
+            last_completed_utc=dt_util.utcnow().isoformat(),
+        )
+        if outcome in ("request_error", "service_unavailable", "invalid_payload"):
+            self._site_energy_fetch_failures += 1
+            self._site_energy_fetch_diagnostics.update(
+                last_failure_utc=self._site_energy_fetch_diagnostics[
+                    "last_completed_utc"
+                ],
+                last_failure_outcome=outcome,
+            )
+        self._site_energy_fetch_diagnostics["failure_count"] = (
+            self._site_energy_fetch_failures
+        )
+
+    def _record_site_energy_source(self, meta: dict[str, object]) -> None:
+        """Track the source watermark separately from successful HTTP requests."""
+        source_raw = meta.get("last_report_date")
+        source = source_raw if isinstance(source_raw, datetime) else None
+        previous = self._site_energy_source_timestamp
+        delta = (source - previous).total_seconds() if source and previous else None
+        if source is None:
+            progress = "missing"
+        elif (
+            source - dt_util.utcnow()
+        ).total_seconds() > SITE_ENERGY_SOURCE_FUTURE_SKEW_S:
+            # A rejected future sample must not prevent normal cloud timestamps
+            # from being recognized as advancing on subsequent requests.
+            progress = "future"
+        elif previous is None or source > previous:
+            progress = "initial" if previous is None else "advanced"
+            self._site_energy_source_timestamp = source
+            self._site_energy_fetch_diagnostics["last_source_advance_utc"] = (
+                dt_util.utcnow().isoformat()
+            )
+        elif source == previous:
+            progress = "unchanged"
+        else:
+            progress = "regressed"
+        self._site_energy_unchanged_responses = (
+            self._site_energy_unchanged_responses + 1 if progress == "unchanged" else 0
+        )
+        self._site_energy_fetch_diagnostics.update(
+            last_success_utc=dt_util.utcnow().isoformat(),
+            source_progress=progress,
+            source_timestamp=source.isoformat() if source else None,
+            source_delta_seconds=delta,
+            consecutive_unchanged_responses=self._site_energy_unchanged_responses,
+        )
 
     def _invalidate_site_energy_cache(self) -> None:
         """Drop the cached site energy payload."""
@@ -969,10 +1033,20 @@ class EnergyManager:
             and (now_mono - self._site_energy_cache_ts) < self._site_energy_cache_ttl
         ):
             return
+        self._site_energy_fetch_attempts += 1
+        self._site_energy_fetch_diagnostics.update(
+            attempt_count=self._site_energy_fetch_attempts,
+            last_attempt_utc=dt_util.utcnow().isoformat(),
+            last_outcome="in_progress",
+        )
         try:
             client = self._client_provider()
             payload = await client.lifetime_energy()
+        except asyncio.CancelledError:
+            self._record_site_energy_fetch("cancelled")
+            raise
         except SiteEnergyUnavailable as err:
+            self._record_site_energy_fetch("service_unavailable")
             self._logger.debug(
                 "Site energy service unavailable for site %s: %s",
                 redact_site_id(self.site_id),
@@ -981,6 +1055,7 @@ class EnergyManager:
             self._note_service_unavailable(err)
             return
         except Exception as err:  # noqa: BLE001
+            self._record_site_energy_fetch("request_error")
             self._logger.debug(
                 "Failed to fetch lifetime energy for site %s: %s",
                 redact_site_id(self.site_id),
@@ -1013,6 +1088,9 @@ class EnergyManager:
                     else:
                         try:
                             hems_payload = await hems_fetcher()
+                        except asyncio.CancelledError:
+                            self._record_site_energy_fetch("cancelled")
+                            raise
                         except Exception as err:  # noqa: BLE001
                             if self._hems_auth_failure is not None:
                                 self._hems_auth_failure(
@@ -1036,9 +1114,12 @@ class EnergyManager:
                             else:
                                 self._note_hems_lifetime_unavailable(None)
         parsed = self._aggregate_site_energy(payload)
-        if parsed is None:
+        if parsed is None or not parsed[0]:
+            self._record_site_energy_fetch("invalid_payload")
             return
+        self._record_site_energy_fetch("success")
         flows, meta = parsed
+        self._record_site_energy_source(meta)
         self._mark_service_available()
         self.site_energy = flows
         self._site_energy_meta = meta

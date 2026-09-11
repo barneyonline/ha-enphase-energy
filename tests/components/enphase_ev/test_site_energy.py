@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 import time
 from types import SimpleNamespace
@@ -1064,7 +1065,7 @@ async def test_site_consumption_power_rejects_invalid_or_mismatched_restore(
         ({"start_date": "2024-01-02"}, 300, "bucket_discontinuity"),
         ({"bucket_count": 4}, 300, "bucket_discontinuity"),
         ({"interval_minutes": 10}, 300, "interval_discontinuity"),
-        ({}, 901, "interval_discontinuity"),
+        ({}, 1801, "interval_discontinuity"),
     ],
 )
 async def test_consumption_newer_incompatible_sample_discards_unvalidated_restore(
@@ -1204,6 +1205,10 @@ async def test_async_refresh_site_energy_parsed_none(monkeypatch, coordinator_fa
     monkeypatch.setattr(coord.energy, "_aggregate_site_energy", lambda payload: None)
     await coord.energy._async_refresh_site_energy()  # noqa: SLF001
     assert coord.energy.site_energy == {}
+    assert (
+        coord.energy.site_energy_fetch_diagnostics["last_outcome"] == "invalid_payload"
+    )
+    assert coord.energy.site_energy_fetch_diagnostics["failure_count"] == 1
 
 
 @pytest.mark.asyncio
@@ -5063,4 +5068,377 @@ async def test_consumption_refresh_retention_expires_without_polling(
     async_fire_time_changed(hass, now[0])
     await hass.async_block_till_done()
     assert hass.states.get(sensor.entity_id).state == "unavailable"
+    now[0] = accepted_at + timedelta(seconds=1197)
+    await refresh([1000, 2294])
+    assert hass.states.get(sensor.entity_id).state == "583"
+    assert hass.states.get(sensor.entity_id).attributes["last_window_seconds"] == 1197
+    now[0] += timedelta(minutes=15)
+    async_fire_time_changed(hass, now[0])
+    await hass.async_block_till_done()
+    assert hass.states.get(sensor.entity_id).state == "unavailable"
     await component.async_remove_entity(sensor.entity_id)
+
+
+@pytest.mark.parametrize("gap_seconds", [901, 1197, 1500, 1800])
+@pytest.mark.parametrize("rollover", [False, True])
+def test_consumption_recovers_on_first_fresh_sample_after_long_gap(
+    coordinator_factory, monkeypatch, gap_seconds, rollover
+):
+    coord = coordinator_factory()
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    accepted_at = datetime.now(timezone.utc)
+    now = [accepted_at]
+    monkeypatch.setattr(sensor_mod.dt_util, "utcnow", lambda: now[0])
+    coord.energy.site_energy["consumption"] = _consumption_flow(
+        latest_bucket_wh=18382, reported_at=accepted_at - timedelta(minutes=5)
+    )
+    assert sensor.native_value is None
+    coord.energy.site_energy["consumption"] = _consumption_flow(
+        latest_bucket_wh=18482, reported_at=accepted_at
+    )
+    assert sensor.native_value == 1200
+    now[0] += timedelta(minutes=15)
+    assert not sensor.available
+
+    # Reproduce the observed 194 Wh increase across the 19m57s source gap,
+    # including a valid daily-bucket rollover and the recovery-window boundary.
+    source_at = accepted_at + timedelta(seconds=gap_seconds)
+    now[0] = source_at + timedelta(minutes=5)
+    coord.energy.site_energy["consumption"] = _consumption_flow(
+        latest_bucket_wh=94 if rollover else 18676,
+        previous_bucket_wh=18582 if rollover else 32786,
+        bucket_count=3 if rollover else 2,
+        reported_at=source_at,
+    )
+    assert sensor.available
+    assert sensor.native_value == round(194 * 3600 / gap_seconds)
+    assert sensor.extra_state_attributes["last_window_seconds"] == gap_seconds
+    assert sensor.extra_state_attributes["sampled_at_utc"] == source_at.isoformat()
+    diag = coord.energy.consumption_power_diagnostics
+    assert diag["last_window_seconds"] == gap_seconds
+    assert diag["max_window_seconds"] == 1800
+    assert not diag["using_cached"]
+
+    # Repeated payloads do not extend the new reading's 15-minute lifetime.
+    now[0] = source_at + timedelta(seconds=899)
+    assert sensor.available
+    now[0] += timedelta(seconds=1)
+    assert not sensor.available
+
+
+@pytest.mark.parametrize(
+    ("changes", "gap", "reason"),
+    [
+        ({}, 1801, "interval_discontinuity"),
+        ({"latest_bucket_wh": 18000}, 1197, "bucket_decreased"),
+        (
+            {"bucket_count": 3, "previous_bucket_wh": 18000},
+            1197,
+            "bucket_discontinuity",
+        ),
+        ({"bucket_count": 4}, 1197, "bucket_discontinuity"),
+        ({"start_date": "2024-02-01"}, 1197, "bucket_discontinuity"),
+        ({"interval_minutes": 10}, 1197, "interval_discontinuity"),
+        ({"update_pending": True}, 1197, "update_pending"),
+    ],
+)
+def test_consumption_long_gap_preserves_sample_guards(
+    coordinator_factory, monkeypatch, changes, gap, reason
+):
+    coord = coordinator_factory()
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    base = datetime.now(timezone.utc)
+    now = [base]
+    monkeypatch.setattr(sensor_mod.dt_util, "utcnow", lambda: now[0])
+    coord.energy.site_energy["consumption"] = _consumption_flow(
+        latest_bucket_wh=18482, reported_at=base
+    )
+    assert sensor.native_value is None
+    now[0] += timedelta(seconds=gap)
+    values = {"latest_bucket_wh": 18676, "reported_at": now[0], **changes}
+    coord.energy.site_energy["consumption"] = _consumption_flow(**values)
+    assert not sensor.available
+    assert sensor.native_value is None
+    assert (
+        coord.energy.consumption_power_diagnostics["last_rejection"]["reason"] == reason
+    )
+
+
+@pytest.mark.asyncio
+async def test_site_energy_fetch_diagnostics_distinguish_failures_and_source_progress(
+    coordinator_factory, monkeypatch
+):
+    coord = coordinator_factory()
+    energy = coord.energy
+    base = datetime.now(timezone.utc)
+    now = [base]
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now[0])
+    client = SimpleNamespace(lifetime_energy=AsyncMock())
+    energy._client_provider = lambda: client
+    assert energy.site_energy_fetch_diagnostics == {}
+
+    async def refresh(source):
+        now[0] += timedelta(minutes=5)
+        client.lifetime_energy.return_value = {
+            "consumption": [1000, 2000],
+            "last_report_date": source.timestamp() if source else None,
+            "interval_minutes": 5,
+        }
+        await energy._async_refresh_site_energy(force=True)
+        return energy.site_energy_fetch_diagnostics
+
+    diag = await refresh(base)
+    assert diag["attempt_count"] == 1
+    assert diag["failure_count"] == 0
+    assert diag["last_outcome"] == "success"
+    assert diag["source_progress"] == "initial"
+    assert diag["source_delta_seconds"] is None
+    first_advance = diag["last_source_advance_utc"]
+    diag["last_outcome"] = "caller mutation"
+    assert energy.site_energy_fetch_diagnostics["last_outcome"] == "success"
+    # A TTL-skipped call is not counted as a network attempt.
+    await energy._async_refresh_site_energy()
+    assert energy.site_energy_fetch_diagnostics["attempt_count"] == 1
+
+    for count in (1, 2):
+        diag = await refresh(base)
+        assert diag["source_progress"] == "unchanged"
+        assert diag["consecutive_unchanged_responses"] == count
+        assert diag["source_delta_seconds"] == 0
+        assert diag["last_source_advance_utc"] == first_advance
+    diag = await refresh(base - timedelta(minutes=5))
+    assert diag["source_progress"] == "regressed"
+    assert diag["source_delta_seconds"] == -300
+    assert diag["consecutive_unchanged_responses"] == 0
+    # Regressed responses cannot move the watermark backwards.
+    diag = await refresh(base)
+    assert diag["source_progress"] == "unchanged"
+    diag = await refresh(None)
+    assert diag["source_progress"] == "missing"
+    assert diag["source_timestamp"] is None
+    diag = await refresh(base + timedelta(seconds=1197))
+    assert diag["source_progress"] == "advanced"
+    assert diag["source_delta_seconds"] == 1197
+    assert diag["last_source_advance_utc"] == now[0].isoformat()
+    assert diag["last_success_utc"] == now[0].isoformat()
+    assert diag["last_attempt_utc"] == diag["last_completed_utc"]
+
+    client.lifetime_energy.side_effect = RuntimeError("secret credentials and payload")
+    await energy._async_refresh_site_energy(force=True)
+    diag = energy.site_energy_fetch_diagnostics
+    assert diag["last_outcome"] == "request_error"
+    assert diag["failure_count"] == 1
+    assert "secret" not in str(diag)
+    assert diag["source_progress"] == "advanced"
+    failed_at = diag["last_failure_utc"]
+    assert failed_at == now[0].isoformat()
+    client.lifetime_energy.side_effect = None
+    diag = await refresh(base + timedelta(seconds=1497))
+    assert diag["last_outcome"] == "success"
+    assert diag["failure_count"] == 1
+    assert diag["last_failure_utc"] == failed_at
+    assert diag["last_failure_outcome"] == "request_error"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("error", "outcome", "failures"),
+    [
+        (SiteEnergyUnavailable("private details"), "service_unavailable", 1),
+        (asyncio.CancelledError(), "cancelled", 0),
+    ],
+)
+async def test_site_energy_fetch_diagnostics_errors(
+    coordinator_factory, error, outcome, failures
+):
+    coord = coordinator_factory()
+    energy = coord.energy
+    coord.client.lifetime_energy = AsyncMock(side_effect=error)
+    if isinstance(error, asyncio.CancelledError):
+        with pytest.raises(asyncio.CancelledError):
+            await energy._async_refresh_site_energy(force=True)
+    else:
+        await energy._async_refresh_site_energy(force=True)
+        await energy._async_refresh_site_energy(force=True)  # backoff skips attempts
+    diag = energy.site_energy_fetch_diagnostics
+    assert diag["attempt_count"] == 1
+    assert diag["last_outcome"] == outcome
+    assert diag["failure_count"] == failures
+    assert "private details" not in str(diag)
+
+
+@pytest.mark.asyncio
+async def test_site_energy_fetch_cancelled_during_optional_enrichment(
+    coordinator_factory,
+):
+    coord = coordinator_factory()
+    client = SimpleNamespace(
+        lifetime_energy=AsyncMock(return_value={"consumption": [1000, 2000]}),
+        hems_consumption_lifetime=AsyncMock(side_effect=asyncio.CancelledError()),
+    )
+    coord.energy._client_provider = lambda: client
+    with pytest.raises(asyncio.CancelledError):
+        await coord.energy._async_refresh_site_energy(force=True)
+    diag = coord.energy.site_energy_fetch_diagnostics
+    assert diag["last_outcome"] == "cancelled"
+    assert diag["failure_count"] == 0
+
+
+def test_consumption_long_window_cannot_publish_stale_endpoint(
+    coordinator_factory, monkeypatch
+):
+    coord = coordinator_factory()
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    now = datetime.now(timezone.utc)
+    monkeypatch.setattr(sensor_mod.dt_util, "utcnow", lambda: now)
+    coord.energy.site_energy["consumption"] = _consumption_flow(
+        latest_bucket_wh=1000, reported_at=now - timedelta(minutes=35)
+    )
+    assert sensor.native_value is None
+    coord.energy.site_energy["consumption"] = _consumption_flow(
+        latest_bucket_wh=1200, reported_at=now - timedelta(minutes=15)
+    )
+    assert not sensor.available
+    assert not coord.energy.consumption_power_diagnostics["sample_fresh"]
+
+
+@pytest.mark.asyncio
+async def test_consumption_restored_baseline_recovers_with_fresh_long_window(
+    hass, coordinator_factory, monkeypatch
+):
+    coord = coordinator_factory()
+    coord.update_interval = None
+    now = datetime.now(timezone.utc)
+    monkeypatch.setattr(sensor_mod.dt_util, "utcnow", lambda: now)
+    baseline = now - timedelta(seconds=1197)
+    coord.energy.site_energy["consumption"] = _consumption_flow(
+        latest_bucket_wh=18676, reported_at=now
+    )
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    sensor.hass = hass
+    sensor.async_get_last_extra_data = AsyncMock(
+        return_value=_SiteConsumptionPowerRestoreData(
+            latest_bucket_wh=18482,
+            raw_bucket_count=2,
+            start_date="2024-01-01",
+            energy_ts=baseline.timestamp(),
+            interval_minutes=5,
+            last_power_w=840,
+            last_window_seconds=300,
+            method="consumption_bucket_delta",
+            power_sample_ts=baseline.timestamp(),
+        )
+    )
+    await sensor.async_added_to_hass()
+    try:
+        assert sensor.available
+        assert sensor.native_value == 583
+        assert sensor.extra_state_attributes["sampled_at_utc"] == now.isoformat()
+        assert sensor.extra_restore_state_data.as_dict()["last_window_seconds"] == 1197
+        assert not coord.energy.consumption_power_diagnostics[
+            "restored_pending_validation"
+        ]
+    finally:
+        await sensor.async_will_remove_from_hass()
+
+
+def test_consumption_interval_floor_cannot_exceed_maximum_window(coordinator_factory):
+    coord = coordinator_factory()
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    now = datetime.now(timezone.utc)
+    coord.energy.site_energy["consumption"] = _consumption_flow(
+        latest_bucket_wh=1000,
+        reported_at=now - timedelta(minutes=5),
+        interval_minutes=60,
+    )
+    assert sensor.native_value is None
+    coord.energy.site_energy["consumption"] = _consumption_flow(
+        latest_bucket_wh=1200, reported_at=now, interval_minutes=60
+    )
+    assert not sensor.available
+    assert sensor.native_value is None
+    assert (
+        coord.energy.consumption_power_diagnostics["last_rejection"]["reason"]
+        == "interval_discontinuity"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "raw_payload",
+    [
+        {},
+        {"error": "temporarily unavailable"},
+        {"consumption": "invalid", "last_report_date": 1789098320},
+    ],
+)
+async def test_site_energy_fetch_diagnostics_reject_empty_normalized_payload(
+    coordinator_factory, monkeypatch, raw_payload
+):
+    from custom_components.enphase_ev.api_parsers import (
+        normalize_lifetime_energy_payload,
+    )
+
+    coord = coordinator_factory()
+    energy = coord.energy
+    now = [datetime.now(timezone.utc)]
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now[0])
+    client = SimpleNamespace(
+        lifetime_energy=AsyncMock(
+            return_value={
+                "consumption": [1000, 2000],
+                "last_report_date": now[0].timestamp(),
+            }
+        )
+    )
+    energy._client_provider = lambda: client
+    await energy._async_refresh_site_energy(force=True)
+    accepted = energy.site_energy
+    success = energy.site_energy_fetch_diagnostics["last_success_utc"]
+    now[0] += timedelta(minutes=5)
+    client.lifetime_energy.return_value = normalize_lifetime_energy_payload(raw_payload)
+    await energy._async_refresh_site_energy(force=True)
+    diag = energy.site_energy_fetch_diagnostics
+    assert diag["last_outcome"] == "invalid_payload"
+    assert diag["failure_count"] == 1
+    assert diag["last_failure_utc"] == now[0].isoformat()
+    assert diag["last_success_utc"] == success
+    assert energy.site_energy is accepted
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("seed_baseline", [False, True])
+async def test_site_energy_future_source_does_not_poison_progress(
+    coordinator_factory, monkeypatch, seed_baseline
+):
+    coord = coordinator_factory()
+    energy = coord.energy
+    now = [datetime.now(timezone.utc).replace(microsecond=0)]
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now[0])
+    client = SimpleNamespace(lifetime_energy=AsyncMock())
+    energy._client_provider = lambda: client
+
+    async def refresh(source):
+        client.lifetime_energy.return_value = {
+            "consumption": [1000, 2000],
+            "last_report_date": source.timestamp(),
+        }
+        await energy._async_refresh_site_energy(force=True)
+        return energy.site_energy_fetch_diagnostics
+
+    if seed_baseline:
+        await refresh(now[0])
+    advanced_at = energy.site_energy_fetch_diagnostics.get("last_source_advance_utc")
+    diag = await refresh(now[0] + timedelta(hours=1))
+    assert diag["source_progress"] == "future"
+    assert diag.get("last_source_advance_utc") == advanced_at
+    now[0] += timedelta(minutes=5)
+    diag = await refresh(now[0])
+    assert diag["source_progress"] == ("advanced" if seed_baseline else "initial")
+    assert diag["source_delta_seconds"] == (300 if seed_baseline else None)
+    assert diag["last_source_advance_utc"] == now[0].isoformat()
+    # Keep the same small skew tolerance as the power sensor.
+    diag = await refresh(now[0] + timedelta(seconds=60))
+    assert diag["source_progress"] == "advanced"
+    diag = await refresh(now[0] + timedelta(seconds=61))
+    assert diag["source_progress"] == "future"

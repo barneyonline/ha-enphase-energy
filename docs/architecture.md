@@ -303,3 +303,29 @@ Keep tests close to the changed behavior under `tests/components/enphase_ev/`.
 - Recorder statistics, serialization, and actual stale entity states: `test_entity_architecture.py`.
 
 Use the pinned Docker commands from `CONTRIBUTING.md` for validation.
+
+### Consumption Power Recovery
+
+`EnphaseSiteConsumptionPowerSensor` derives average watts from compatible
+consumption buckets over at most 30 minutes. The averaging window and reading
+freshness are separate: a recovered average can span a 20-minute source gap,
+but its latest source timestamp must still be less than 15 minutes old for the
+entity to be available. Repeated or rejected payloads never extend that expiry.
+Larger gaps reseed the baseline; decreasing buckets, incompatible rollovers,
+changed intervals, and invalid timestamps remain guarded. The actual averaging
+window is exposed in `last_window_seconds` and consumption-power diagnostics.
+
+`EnergyManager.site_energy_fetch_diagnostics` exposes detached, process-local
+attempt and cumulative failure counts, attempt/completion/success timestamps,
+and categorical outcomes. The last failure timestamp and category survive
+subsequent successes so intermittent failures can be correlated with outages.
+Skipped TTL/backoff calls do not count as attempts;
+cancellation propagates and is recorded without counting as a request failure.
+Successful responses record source progression against a high-water mark,
+including consecutive unchanged responses. Regressions and missing timestamps
+do not move the watermark backwards. Timestamps more than 60 seconds ahead of
+the current clock are recorded as `future` and cannot advance the watermark.
+Responses with no usable energy flows are recorded as invalid payloads, leaving
+the last successful cache and source-progress timestamps intact. These fetch diagnostics remain available
+before any successful payload, independently of the existing service/backoff
+policy. They contain no raw payloads or exception messages.

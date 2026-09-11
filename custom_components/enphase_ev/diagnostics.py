@@ -740,12 +740,14 @@ async def async_get_config_entry_diagnostics(
         if isinstance(lr_meta, datetime):
             meta_copy["last_report_date"] = lr_meta.isoformat()
         meta = meta_copy
-    if site_energy or meta:
+    fetch = getattr(energy, "site_energy_fetch_diagnostics", {})
+    if site_energy or meta or fetch:
         diag["site_energy"] = {
             "flows": site_energy or None,
             "meta": meta,
             "cache_age_s": cache_age,
             "consumption_power": getattr(energy, "consumption_power_diagnostics", {}),
+            "fetch": fetch,
         }
 
     return _redact_diagnostics_payload(diag, site_ids=site_ids)
