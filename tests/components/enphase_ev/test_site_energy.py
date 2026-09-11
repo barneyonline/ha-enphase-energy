@@ -5361,3 +5361,84 @@ def test_consumption_interval_floor_cannot_exceed_maximum_window(coordinator_fac
         coord.energy.consumption_power_diagnostics["last_rejection"]["reason"]
         == "interval_discontinuity"
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "raw_payload",
+    [
+        {},
+        {"error": "temporarily unavailable"},
+        {"consumption": "invalid", "last_report_date": 1789098320},
+    ],
+)
+async def test_site_energy_fetch_diagnostics_reject_empty_normalized_payload(
+    coordinator_factory, monkeypatch, raw_payload
+):
+    from custom_components.enphase_ev.api_parsers import (
+        normalize_lifetime_energy_payload,
+    )
+
+    coord = coordinator_factory()
+    energy = coord.energy
+    now = [datetime.now(timezone.utc)]
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now[0])
+    client = SimpleNamespace(
+        lifetime_energy=AsyncMock(
+            return_value={
+                "consumption": [1000, 2000],
+                "last_report_date": now[0].timestamp(),
+            }
+        )
+    )
+    energy._client_provider = lambda: client
+    await energy._async_refresh_site_energy(force=True)
+    accepted = energy.site_energy
+    success = energy.site_energy_fetch_diagnostics["last_success_utc"]
+    now[0] += timedelta(minutes=5)
+    client.lifetime_energy.return_value = normalize_lifetime_energy_payload(raw_payload)
+    await energy._async_refresh_site_energy(force=True)
+    diag = energy.site_energy_fetch_diagnostics
+    assert diag["last_outcome"] == "invalid_payload"
+    assert diag["failure_count"] == 1
+    assert diag["last_failure_utc"] == now[0].isoformat()
+    assert diag["last_success_utc"] == success
+    assert energy.site_energy is accepted
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("seed_baseline", [False, True])
+async def test_site_energy_future_source_does_not_poison_progress(
+    coordinator_factory, monkeypatch, seed_baseline
+):
+    coord = coordinator_factory()
+    energy = coord.energy
+    now = [datetime.now(timezone.utc).replace(microsecond=0)]
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now[0])
+    client = SimpleNamespace(lifetime_energy=AsyncMock())
+    energy._client_provider = lambda: client
+
+    async def refresh(source):
+        client.lifetime_energy.return_value = {
+            "consumption": [1000, 2000],
+            "last_report_date": source.timestamp(),
+        }
+        await energy._async_refresh_site_energy(force=True)
+        return energy.site_energy_fetch_diagnostics
+
+    if seed_baseline:
+        await refresh(now[0])
+    advanced_at = energy.site_energy_fetch_diagnostics.get("last_source_advance_utc")
+    diag = await refresh(now[0] + timedelta(hours=1))
+    assert diag["source_progress"] == "future"
+    assert diag.get("last_source_advance_utc") == advanced_at
+    now[0] += timedelta(minutes=5)
+    diag = await refresh(now[0])
+    assert diag["source_progress"] == ("advanced" if seed_baseline else "initial")
+    assert diag["source_delta_seconds"] == (300 if seed_baseline else None)
+    assert diag["last_source_advance_utc"] == now[0].isoformat()
+    # Keep the same small skew tolerance as the power sensor.
+    diag = await refresh(now[0] + timedelta(seconds=60))
+    assert diag["source_progress"] == "advanced"
+    diag = await refresh(now[0] + timedelta(seconds=61))
+    assert diag["source_progress"] == "future"

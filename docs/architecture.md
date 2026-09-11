@@ -323,6 +323,9 @@ Skipped TTL/backoff calls do not count as attempts;
 cancellation propagates and is recorded without counting as a request failure.
 Successful responses record source progression against a high-water mark,
 including consecutive unchanged responses. Regressions and missing timestamps
-do not move the watermark backwards. These fetch diagnostics remain available
+do not move the watermark backwards. Timestamps more than 60 seconds ahead of
+the current clock are recorded as `future` and cannot advance the watermark.
+Responses with no usable energy flows are recorded as invalid payloads, leaving
+the last successful cache and source-progress timestamps intact. These fetch diagnostics remain available
 before any successful payload, independently of the existing service/backoff
 policy. They contain no raw payloads or exception messages.

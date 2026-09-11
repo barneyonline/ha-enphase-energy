@@ -18,7 +18,8 @@ All notable changes to this project will be documented in this file.
 ### 🔧 Improvements
 - Add site-energy fetch diagnostics for attempts, failures, cancellation, invalid
   payloads, and source timestamp progression to distinguish request failures from
-  unchanged cloud data.
+  unchanged cloud data. Empty payloads count as failures and future timestamps
+  cannot prevent normal source updates from being recognized.
 
 ### 🔄 Other changes
 - None

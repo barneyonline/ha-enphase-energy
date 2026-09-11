@@ -23,6 +23,7 @@ LIFETIME_CONFIRM_TOLERANCE_KWH = 0.05
 LIFETIME_CONFIRM_COUNT = 2
 LIFETIME_CONFIRM_WINDOW_S = 180.0
 SITE_ENERGY_CACHE_TTL = 300.0
+SITE_ENERGY_SOURCE_FUTURE_SKEW_S = 60.0
 SITE_ENERGY_DEFAULT_INTERVAL_MIN = 5.0
 SITE_ENERGY_FAILURE_BACKOFF_S = 15 * 60
 HEMS_LIFETIME_FAILURE_BACKOFF_S = 60 * 60
@@ -153,6 +154,12 @@ class EnergyManager:
         delta = (source - previous).total_seconds() if source and previous else None
         if source is None:
             progress = "missing"
+        elif (
+            source - dt_util.utcnow()
+        ).total_seconds() > SITE_ENERGY_SOURCE_FUTURE_SKEW_S:
+            # A rejected future sample must not prevent normal cloud timestamps
+            # from being recognized as advancing on subsequent requests.
+            progress = "future"
         elif previous is None or source > previous:
             progress = "initial" if previous is None else "advanced"
             self._site_energy_source_timestamp = source
@@ -1107,7 +1114,7 @@ class EnergyManager:
                             else:
                                 self._note_hems_lifetime_unavailable(None)
         parsed = self._aggregate_site_energy(payload)
-        if parsed is None:
+        if parsed is None or not parsed[0]:
             self._record_site_energy_fetch("invalid_payload")
             return
         self._record_site_energy_fetch("success")
