@@ -199,6 +199,7 @@ Status labels:
 | EV charger config read/write | `POST/PUT` | `/service/evse_controller/api/v1/<site_id>/ev_chargers/<sn>/ev_charger_config` | `Authorization: Bearer <token>` overlay on top of session cookies / base EV headers | Runtime |
 | Charge mode preference | `GET/PUT` | `/service/evse_scheduler/api/v1/iqevc/charging-mode/<site_id>/<sn>/preference` | bearer token + session headers | Runtime |
 | BatteryConfig site settings | `GET` | `/service/batteryConfig/api/v1/siteSettings/<site_id>?userId=<user_id>` | current web shape: fresh session `Cookie`, `Username`, `requestid`, battery-profile `Origin`/`Referer`, and no `Authorization` or `e-auth-token`; token-backed primary and lean fallbacks remain for compatibility | Runtime |
+| BatteryConfig EV battery preference | `PUT` | `/service/batteryConfig/api/v1/device/battery/preference/<site_id>` | observed header names include `Username`, `Requestid`, `X-XSRF-Token`, `Content-Type`, and `Referer`; required auth subset not verified | Browser capture only (write rejected) |
 | BatteryConfig MQTT authorizer bootstrap | `GET` | `/service/batteryConfig/api/v1/mqttSignedUrl/<site_id>` | official-web BatteryConfig shape: `Accept`, `Origin`, `Referer`, Chrome-style `User-Agent`, `Username`; suppress `Authorization`, `Cookie`, `X-CSRF-Token`, `X-Requested-With`; current client uses primary variant with `e-auth-token` + `requestid` and lean fallback without them | Browser capture only |
 | BatteryConfig third-party settings | `GET` | `/service/batteryConfig/api/v1/<site_id>/thirdPartyControlSettings` | official-web BatteryConfig shape: `Accept`, `Origin`, `Referer`, Chrome-style `User-Agent`, `Username`; suppress `Authorization`, `Cookie`, `X-CSRF-Token`, `X-Requested-With`; current client uses primary variant with `e-auth-token` + `requestid` and lean fallback without them | Browser capture only |
 | BatteryConfig schedules | `GET` | `/service/batteryConfig/api/v1/battery/sites/<site_id>/schedules` | current web shape: fresh session `Cookie`, `Username`, `requestid`, battery-profile `Origin`/`Referer`, and no `Authorization` or `e-auth-token`; token-backed primary and lean fallbacks remain for compatibility | Runtime |
@@ -6494,6 +6495,7 @@ Notes:
 - `hideChargeFromGrid` may be `true` even when charge-from-grid schedule fields are still present in the payload, so clients should not infer field absence from UI visibility. Observed values so far: `true`, `false`.
 - `systemTask` remained `false` in the capture and likely flags backend-owned operations that temporarily lock manual changes. Observed value so far: `false`.
 - `devices.iqEvse.useBatteryFrSelfConsumption` exposes whether an IQ EV charger can draw from battery during self-consumption mode. Observed value so far: `true`.
+- The newer Discharge battery to EV UI uses `devices.iqEvse.useBatteryForEVSE`, `batteryLimit`, and `minBatteryLimit`; see section 5.5.2 for the captured read fields and separate write endpoint. Do not assume these are aliases for the legacy field or the system reserve.
 - Two equivalent write variants were observed:
   - REST-only flows use `PUT /batterySettings/<site_id>?source=enho&userId=<user_id>`.
   - MQTT-backed RBD flows on `supportsMqtt=true` systems use `PUT /batterySettings/<site_id>?userId=<user_id>` after opening the MQTT response stream.
@@ -6539,6 +6541,74 @@ Implementation notes:
 - The integration treats this as an optional history-family JSON endpoint using normal authenticated Enlighten headers.
 - Payloads are normalized from nested objects/lists into dry-contact entries and matched back to inventory dry-contact members when possible.
 - Recognized fields include identity, override state, control mode, polling interval, SOC threshold bounds, and schedule windows; unmatched entries are retained for diagnostics.
+
+### 5.5.2 Discharge Battery to EV
+
+First-party web capture, 2026-09-11. The Battery page exposes an EV discharge toggle and a separate battery discharge limit.
+
+Capability response excerpt from `GET /service/batteryConfig/api/v1/siteSettings/<site_id>` (HTTP `200`):
+```json
+{
+  "data": {
+    "isUseBatteryForEVSESupported": true,
+    "iqEvseHoControl": true,
+    "iqEvseHoControlScope": []
+  }
+}
+```
+
+State response excerpt from `GET /service/batteryConfig/api/v1/batterySettings/<site_id>` (HTTP `200`):
+```json
+{
+  "data": {
+    "profile": "self-consumption",
+    "batteryBackupPercentage": 20,
+    "stormGuardState": "disabled",
+    "showStormGuardAlert": false,
+    "devices": {
+      "iqEvse": {
+        "batteryLimit": 0,
+        "useBatteryForEVSE": false,
+        "minBatteryLimit": 20
+      }
+    }
+  }
+}
+```
+
+```
+PUT /service/batteryConfig/api/v1/device/battery/preference/<site_id>
+```
+The captured request had no query parameters. Observed header names included `Accept`, `Content-Type`, `Referer`, `Requestid`, `User-Agent`, `Username`, `X-XSRF-Token`, and browser client hints. Credential/header values are omitted; this capture does not establish which headers are required.
+
+Example request observed when enabling the toggle and applying the displayed 20% limit:
+```json
+{
+  "useBatteryForEVSE": true,
+  "batteryLimit": 20
+}
+```
+
+Observed error response (HTTP `400`; timestamp anonymized):
+```json
+{
+  "timestamp": "<timestamp>",
+  "error": {
+    "code": 10003,
+    "status": "STORM_GUARD_ACTIVE",
+    "message": "Use battery for EVSE cannot be enabled when storm is active"
+  }
+}
+```
+
+Notes:
+- `batteryLimit` is separate from the system reserve `batteryBackupPercentage`. The disabled state returned EV limit `0` with system reserve `20`; enabling the UI initialized the EV slider to `minBatteryLimit=20`. This does not establish that `0` is valid when enabled.
+- The UI explains that, after reaching the EV limit, the battery can continue powering other home loads. Its displayed scale was 0/20/40/60/80/100%; the accepted maximum and step were not tested.
+- Apply presents a Local gateway connectivity notice: the IQ EV Charger must remain connected to the IQ Gateway for battery-use restrictions to hold; lost connectivity may allow the battery to supply EV charging.
+- The error conflicted with both Battery Settings and Profile returning `stormGuardState="disabled"`. Profile also returned `evseStormEnabled=false`, `showStormGuardAlert=false`, and `isBatteryChangePending=false`; the dedicated Storm Guard alert read returned no alerts and `criticalAlertActive=false` (section 5.6).
+- A verified Storm Guard enable/disable cycle succeeded, but the same EV preference request still returned `STORM_GUARD_ACTIVE`. This establishes an unresolved backend rejection, not an active storm or a proven internal root cause.
+- The first-party UI displayed Enabled after the rejected request. A fresh read and reopened Battery page confirmed `useBatteryForEVSE=false`, `batteryLimit=0`, and the original system settings. Clients must handle error responses and verify persisted state rather than trusting optimistic UI state.
+- No successful EV preference write was captured. Successful enable/disable, limit-only updates, disable-time limit preservation/reset, AI Optimization restrictions, exact capability/lock rules, and interaction with the older Green Charging scheduler remain unverified.
 
 ### 5.6 Storm Guard Alert Status, Opt-Out, and Toggle
 ```
@@ -6620,6 +6690,7 @@ Example responses:
 Notes:
 - `stormGuardState` accepts `enabled` or `disabled`.
 - `evseStormEnabled` controls EV charging behavior during Storm Guard alerts.
+- Live verification on 2026-09-11 confirmed HTTP `200` with `{"message":"success"}` for both `{"stormGuardState":"enabled","evseStormEnabled":false}` and `{"stormGuardState":"disabled","evseStormEnabled":false}`. The UI showed No Ongoing Alert while enabled; the alert GET returned the empty-alert example above. Restoring disabled did not clear the EV preference endpoint's `STORM_GUARD_ACTIVE` rejection (section 5.5.2).
 - Alert opt-out uses `PUT /stormGuard/<site_id>/stormAlert` with `status: "opted-out"` per alert ID.
 - Observed behavior: if that opt-out removes the last active Storm Alert and Storm Guard remains enabled, the system profile exits storm-driven Full Backup and returns to the normal configured profile.
 - Once enabled, the profile automatically switches to Full Backup during severe weather alerts and reserves full battery capacity.
@@ -7648,6 +7719,9 @@ There is no single universal header set; the implementation varies headers by en
 | `dtgControl` / `cfgControl` / `rbdControl` | Battery UI feature-capability blocks with visibility, lock, and schedule support flags; observed booleans so far include `show=true`, `showDaySchedule=true`, `enabled=false`, `locked=false`, `scheduleSupported=true` |
 | `systemTask` | Backend task/activity flag that may indicate settings are being managed asynchronously; observed value so far: `false` |
 | `devices.iqEvse.useBatteryFrSelfConsumption` | Indicates IQ EV charger battery participation support in self-consumption mode; observed value so far: `true` |
+| `devices.iqEvse.useBatteryForEVSE` | New Discharge battery to EV state; observed persisted value: `false`; enable request was rejected |
+| `devices.iqEvse.batteryLimit` / `minBatteryLimit` | Separate EV discharge limit and reported minimum; observed disabled limit `0`, minimum `20`, and UI enable request limit `20`; system reserve remains separate |
+| `isUseBatteryForEVSESupported` / `iqEvseHoControl` / `iqEvseHoControlScope` | Site-settings capability fields observed with the new EV battery UI: `true`, `true`, and `[]`; complete gating semantics not verified |
 | `grid_profiles` | Activation grid-profile discovery grouping keyed by display region such as `"VIC, AU"` |
 | `recommended_profile` | Activation-selected recommended grid profile; can duplicate one of the grouped `grid_profiles` entries |
 | `countries[]` | Activation reference-data country list with display `name` and ISO-like `code` |
