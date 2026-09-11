@@ -14,6 +14,9 @@ All notable changes to this project will be documented in this file.
   telemetry freshness, and the existing polling schedule.
 
 ### 🐛 Bug fixes
+- Retry JSON login-wall responses through the shared credential refresh so a
+  concurrent successful token rollover does not create a false reauthentication
+  repair. (#863)
 - Preserve VPP HTTP status and Retry-After delays without exposing private request
   details, and clear cached events when the enrolled program changes.
 - Keep bounded VPP event data during wholly malformed responses instead of

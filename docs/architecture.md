@@ -91,7 +91,12 @@ The coordinator distinguishes core failures from optional endpoint failures:
 - Optional endpoint failures mark that family stale, preserve recent useful data where safe, and report repairs when needed.
 
 Authentication refresh uses its own lock and one shared, cancellation-shielded
-login task, so a 401 during a poll cannot reacquire the poll lock. Each retry
+login task, so a 401 during a poll cannot reacquire the poll lock. JSON login-wall
+responses use the same shared refresh, including reuse of a recent success, and
+retry once before surfacing an authentication failure. Both paths preserve
+endpoint policies that disable stored-credential refresh. Failed login-wall
+refreshes retain the typed login-wall error so BatteryConfig can try alternate
+credentials and the refresh runner can apply rejected-login cooldowns. Each retry
 builds authentication headers from current credentials. Startup enrichment
 merges its changes into current charger data after awaits, preserving intervening
 commands, polls, and removals.

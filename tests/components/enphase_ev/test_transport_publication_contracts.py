@@ -359,3 +359,176 @@ async def test_direct_warmup_helpers_preserve_concurrent_control(
         coord.evse_runtime.async_resolve_charger_config = AsyncMock(return_value={})
         await coord.refresh_runner.async_refresh_secondary_evse_state_for_warmup()
     assert coord.data["EVSE"]["charging"] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("recent_success", [False, True])
+async def test_login_wall_joins_shared_401_refresh(
+    coordinator_factory, monkeypatch, recent_success
+):
+    from custom_components.enphase_ev import auth_refresh_runtime
+    from .test_api_client_methods import _login_wall_response
+
+    coord = coordinator_factory()
+    coord._email = "synthetic@example.test"
+    coord._remember_password = True
+    coord._stored_password = "synthetic-password"
+    session = _FakeSession(
+        [
+            _FakeResponse(status=401, json_body={}),
+            *(
+                [
+                    _FakeResponse(status=200, json_body={"ok": True}),
+                    _login_wall_response(),
+                ]
+                if recent_success
+                else [
+                    _login_wall_response(),
+                    _FakeResponse(status=200, json_body={"ok": True}),
+                ]
+            ),
+            _FakeResponse(status=200, json_body={"ok": True}),
+        ]
+    )
+    coord.client = api.EnphaseEVClient(session, "SITE", "old", "session=old")
+    entered = asyncio.Event()
+    finish = asyncio.Event()
+    joined = asyncio.Event()
+
+    async def authenticate(*args, **kwargs):
+        entered.set()
+        await finish.wait()
+        return (
+            api.AuthTokens(
+                cookie="session=new",
+                session_id="new",
+                access_token="new",
+                token_expires_at=9999999999,
+            ),
+            {},
+        )
+
+    login = AsyncMock(side_effect=authenticate)
+    monkeypatch.setattr(auth_refresh_runtime, "async_authenticate", login)
+
+    async def refresh():
+        if entered.is_set():
+            joined.set()
+        return await coord._handle_client_unauthorized()
+
+    coord.client.set_reauth_callback(refresh)
+
+    async def request():
+        return await coord.client._json("GET", "https://example.test/service/test")
+
+    first = asyncio.create_task(request())
+    second = None
+    try:
+        await asyncio.wait_for(entered.wait(), 1)
+        if recent_success:
+            finish.set()
+            assert await asyncio.wait_for(first, 1) == {"ok": True}
+        second = asyncio.create_task(request())
+        await asyncio.wait_for(joined.wait(), 1)
+        finish.set()
+        assert await asyncio.wait_for(first, 1) == {"ok": True}
+        assert await asyncio.wait_for(second, 1) == {"ok": True}
+    finally:
+        finish.set()
+        await asyncio.gather(
+            first, *([second] if second else []), return_exceptions=True
+        )
+    login.assert_awaited_once()
+    assert [call[2]["headers"]["e-auth-token"] for call in session.calls] == (
+        ["old", "new", "new", "new"] if recent_success else ["old", "old", "new", "new"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_login_wall_preserves_battery_variant_without_stored_credentials(
+    coordinator_factory,
+):
+    from .test_api_client_methods import _login_wall_response
+
+    coord = coordinator_factory()
+    coord._remember_password = False
+    session = _FakeSession(
+        [
+            _login_wall_response(),
+            _FakeResponse(status=200, json_body={"message": "success"}),
+        ]
+    )
+    coord.client = api.EnphaseEVClient(
+        session, "SITE", "EAUTH", "_enlighten_4_session=fresh-session"
+    )
+    coord.client.set_reauth_callback(coord._handle_client_unauthorized)
+    result = await coord.client._battery_config_request(
+        "GET",
+        "https://example.test/service/batteryConfig/api/v1/siteSettings/SITE",
+        endpoint_family="profile",
+        cache_on_success=True,
+    )
+    assert result == {"message": "success"}
+    assert len(session.calls) == 2
+    first, second = [call[2]["headers"] for call in session.calls]
+    assert first["Cookie"] == "_enlighten_4_session=fresh-session"
+    assert "e-auth-token" not in first
+    assert "Cookie" not in second
+    assert second["e-auth-token"] == "EAUTH"
+
+
+@pytest.mark.asyncio
+async def test_login_wall_preserves_rejected_refresh_cooldown(
+    coordinator_factory,
+    monkeypatch,
+):
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+    from custom_components.enphase_ev import auth_refresh_runtime
+    from .test_api_client_methods import _login_wall_response
+
+    coord = coordinator_factory()
+    coord._email = "synthetic@example.test"
+    coord._remember_password = True
+    coord._stored_password = "synthetic-password"
+    session = _FakeSession([_login_wall_response()])
+    coord.client = api.EnphaseEVClient(session, "SITE", "old", "session=old")
+    coord.client.set_reauth_callback(coord._handle_client_unauthorized)
+    login = AsyncMock(side_effect=api.EnlightenAuthInvalidCredentials())
+    monkeypatch.setattr(auth_refresh_runtime, "async_authenticate", login)
+
+    async def request():
+        return await coord.client._json("GET", "https://example.test/service/test")
+
+    with pytest.raises(UpdateFailed, match="temporarily blocked") as caught:
+        await coord.refresh_runner.async_run_refresh_call("test", "test", request)
+    login.assert_awaited_once()
+    assert len(session.calls) == 1
+    assert coord._auth_block_reason == "login_wall_after_refresh_reject"
+    assert 86390 <= caught.value.retry_after <= 86400
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("blocked", [False, True])
+async def test_login_wall_preserves_production_auth_failure(
+    coordinator_factory, blocked
+):
+    from homeassistant.exceptions import ConfigEntryAuthFailed
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+    from .test_api_client_methods import _login_wall_response
+
+    coord = coordinator_factory()
+    coord._remember_password = False
+    if blocked:
+        coord.auth_refresh_runtime.note_login_wall_block(
+            reason="too_many_active_sessions"
+        )
+    session = _FakeSession([_login_wall_response()])
+    coord.client = api.EnphaseEVClient(session, "SITE", "old", "session=old")
+    coord.client.set_reauth_callback(coord._handle_client_unauthorized)
+
+    async def request():
+        return await coord.client._json("GET", "https://example.test/service/test")
+
+    with pytest.raises(UpdateFailed if blocked else ConfigEntryAuthFailed):
+        await coord.refresh_runner.async_run_refresh_call("test", "test", request)
+    assert len(session.calls) == 1
