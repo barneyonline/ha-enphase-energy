@@ -8,6 +8,23 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v4.3.2 - 2026-09-11
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
 - Added disabled-by-default diagnostic sensors for cumulative stored-credential
   login attempts, successes, and failures. Counters persist across integration
   reloads and Home Assistant restarts. Counter updates preserve cloud availability,
@@ -29,10 +46,16 @@ All notable changes to this project will be documented in this file.
   `auth_blocked` on the refresh that activates the block. (#859)
 
 ### 🔧 Improvements
-- None
+- Simplified the README by removing detailed operational sections for data updates,
+  recovery, action targets, and live-stream actions. (#858)
 
 ### 🔄 Other changes
-- None
+- Preserved merge-base history in CI change detection so checks still work when
+  the base branch advances or an older workflow run is retried. (#862)
+- Documented EV battery preference API captures, capability and state fields,
+  and the observed Storm Guard rejection; successful preference writes remain
+  unverified and this release adds no controls for that endpoint. (#865)
+- Bumped the integration manifest version to `4.3.2`.
 
 ## v4.3.1 - 2026-09-08
 
