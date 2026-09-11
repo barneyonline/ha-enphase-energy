@@ -1488,6 +1488,13 @@ async def test_config_entry_diagnostics_includes_site_energy(
             "last_report_date": datetime(2024, 1, 3, tzinfo=timezone.utc),
         },
         site_energy_cache_age=1.23,
+        site_energy_fetch_diagnostics={
+            "attempt_count": 5,
+            "failure_count": 1,
+            "last_outcome": "success",
+            "source_progress": "unchanged",
+            "site_id": RANDOM_SITE_ID,
+        },
         consumption_power_diagnostics={
             "last_valid_power_w": 1200,
             "using_cached": True,
@@ -1513,6 +1520,10 @@ async def test_config_entry_diagnostics_includes_site_energy(
         site_energy["flows"]["consumption"]["power_sample_error"]
         == "zero_lifetime_dropout"
     )
+    assert site_energy["fetch"]["attempt_count"] == 5
+    assert site_energy["fetch"]["failure_count"] == 1
+    assert site_energy["fetch"]["source_progress"] == "unchanged"
+    assert site_energy["fetch"]["site_id"] == "**REDACTED**"
     power = site_energy["consumption_power"]
     assert power["last_valid_power_w"] == 1200
     assert power["using_cached"] is True
@@ -2324,3 +2335,21 @@ async def test_device_diagnostics_handles_system_dashboard_capture_error(
 
     result = await diagnostics.async_get_device_diagnostics(hass, config_entry, device)
     assert "system_dashboard_details" not in result
+
+
+@pytest.mark.asyncio
+async def test_site_energy_fetch_diagnostics_before_first_success(hass, config_entry):
+    coord = DummyCoordinator()
+    coord.energy = SimpleNamespace(
+        site_energy={},
+        site_energy_meta={},
+        site_energy_fetch_diagnostics={
+            "attempt_count": 1,
+            "last_outcome": "request_error",
+            "failure_count": 1,
+        },
+    )
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    diag = await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
+    assert diag["site_energy"]["flows"] is None
+    assert diag["site_energy"]["fetch"]["last_outcome"] == "request_error"

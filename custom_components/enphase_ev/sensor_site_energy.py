@@ -1314,7 +1314,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
     )
 
     _DEFAULT_INTERVAL_MINUTES = 5.0
-    _MAX_INTERVAL_FACTOR = 3.0
+    _MAX_POWER_WINDOW_SECONDS = 1800.0
     _MAX_FUTURE_SKEW_SECONDS = 60.0
     _MAX_SAMPLE_AGE_SECONDS = 900.0
 
@@ -1512,6 +1512,8 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
                 "last_valid_power_w": self._last_power_w,
                 "last_valid_sample_timestamp": self._last_power_ts,
                 "retention_seconds": self._MAX_SAMPLE_AGE_SECONDS,
+                "max_window_seconds": self._MAX_POWER_WINDOW_SECONDS,
+                "last_window_seconds": self._last_window_s,
                 "sample_fresh": self._sample_is_fresh(),
                 "using_cached": self._using_cached,
                 "restored_pending_validation": self._restored_pending_validation,
@@ -1605,7 +1607,11 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         if elapsed_s < 0:
             self._reject_sample("out_of_order_timestamp", data)
             return
-        if elapsed_s > interval_s * self._MAX_INTERVAL_FACTOR or not math.isclose(
+        # Averaging across a bounded gap is independent of the 15-minute
+        # freshness deadline, which remains tied to the newest source sample.
+        if max(
+            elapsed_s, interval_s
+        ) > self._MAX_POWER_WINDOW_SECONDS or not math.isclose(
             interval_minutes,
             self._last_interval_minutes,
             rel_tol=0.0,

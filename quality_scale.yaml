@@ -368,10 +368,14 @@ rules:
     references:
       code:
         - custom_components/enphase_ev/diagnostics.py
+        - custom_components/enphase_ev/energy.py
+        - custom_components/enphase_ev/sensor_site_energy.py
       tests:
         - tests/components/enphase_ev/test_diagnostics.py
+        - tests/components/enphase_ev/test_site_energy.py
       docs:
         - README.md
+        - docs/architecture.md
   discovery-update-info:
     status: n/a
     comment: Cloud-only integration; it has no local discovery source whose network information can update existing entries.

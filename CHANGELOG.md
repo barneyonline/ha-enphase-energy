@@ -11,10 +11,14 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Recover Current Power Consumption on the first comparable sample after source
+  gaps of up to 30 minutes, using the actual averaging interval while preserving
+  the 15-minute expiry of each accepted reading.
 
 ### 🔧 Improvements
-- None
+- Add site-energy fetch diagnostics for attempts, failures, cancellation, invalid
+  payloads, and source timestamp progression to distinguish request failures from
+  unchanged cloud data.
 
 ### 🔄 Other changes
 - None
