@@ -11,18 +11,35 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v4.3.3 - 2026-09-12
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
 - Recover Current Power Consumption on the first comparable sample after source
   gaps of up to 30 minutes, using the actual averaging interval while preserving
-  the 15-minute expiry of each accepted reading.
+  the 15-minute expiry of each accepted reading. (#867)
 
 ### 🔧 Improvements
 - Add site-energy fetch diagnostics for attempts, failures, cancellation, invalid
   payloads, and source timestamp progression to distinguish request failures from
   unchanged cloud data. Empty payloads count as failures and future timestamps
-  cannot prevent normal source updates from being recognized.
+  cannot prevent normal source updates from being recognized. (#867)
 
 ### 🔄 Other changes
-- None
+- Bumped the integration manifest version to `4.3.3`.
 
 ## v4.3.2 - 2026-09-11
 
