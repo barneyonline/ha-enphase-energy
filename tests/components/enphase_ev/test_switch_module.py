@@ -554,6 +554,73 @@ def coordinator_factory(hass, config_entry, monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("delayed_field", "initial_value"),
+    [
+        ("_battery_has_encharge", False),
+        ("_battery_show_storm_guard", False),
+        ("_battery_user_is_owner", None),
+    ],
+)
+async def test_storm_guard_evse_discovered_after_battery_warmup(
+    hass, config_entry, coordinator_factory, monkeypatch, delayed_field, initial_value
+) -> None:
+    """Existing chargers gain Storm Guard when each delayed gate becomes ready."""
+    coord = coordinator_factory(
+        {"storm_guard_state": "enabled", "storm_evse_enabled": False}
+    )
+    coord._devices_inventory_ready = True  # noqa: SLF001
+    setattr(coord, delayed_field, initial_value)
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    serials = [RANDOM_SERIAL, "EV0002"]
+    monkeypatch.setattr(coord, "iter_serials", lambda: list(serials))
+    added = []
+    listener_spy = MagicMock(wraps=coord.async_add_listener)
+    monkeypatch.setattr(coord, "async_add_listener", listener_spy)
+
+    await async_setup_entry(
+        hass, config_entry, lambda entities, **kwargs: added.extend(entities)
+    )
+    listener = listener_spy.call_args[0][0]
+    assert sum(isinstance(entity, ChargingSwitch) for entity in added) == 2
+    assert not any(isinstance(entity, StormGuardEvseSwitch) for entity in added)
+
+    setattr(coord, delayed_field, True)
+    listener()
+    storm_entities = [
+        entity for entity in added if isinstance(entity, StormGuardEvseSwitch)
+    ]
+    assert {entity._sn for entity in storm_entities} == set(serials)
+    assert len(storm_entities) == 2
+    assert all(entity.is_on is False for entity in storm_entities)
+    registry = er.async_get(hass)
+    registered = registry.async_get_or_create(
+        "switch",
+        "enphase_ev",
+        storm_entities[0].unique_id,
+        config_entry=config_entry,
+        suggested_object_id="custom_storm_guard",
+    )
+
+    # Temporary permission uncertainty retains existing entities and custom IDs.
+    coord._battery_user_is_owner = None  # noqa: SLF001
+    listener()
+    assert registry.async_get(registered.entity_id) is not None
+    coord._battery_user_is_owner = True  # noqa: SLF001
+    listener()
+    assert sum(isinstance(entity, StormGuardEvseSwitch) for entity in added) == 2
+    assert sum(isinstance(entity, ChargingSwitch) for entity in added) == 2
+
+    # Authoritative removal prunes the registry and permits rediscovery.
+    serials.clear()
+    listener()
+    assert registry.async_get(registered.entity_id) is None
+    serials.append(RANDOM_SERIAL)
+    listener()
+    assert sum(isinstance(entity, StormGuardEvseSwitch) for entity in added) == 3
+
+
+@pytest.mark.asyncio
 async def test_async_setup_entry_syncs_chargers(
     hass, config_entry, coordinator_factory, monkeypatch
 ) -> None:

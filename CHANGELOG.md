@@ -11,7 +11,8 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Create EV charger Storm Guard switches when battery capabilities or write access
+  arrive after charger discovery, without requiring a reload. (#869)
 
 ### 🔧 Improvements
 - None

@@ -330,6 +330,7 @@ async def async_setup_entry(
 
     site_entity_keys: set[str] = set()
     known_serials: set[str] = set()
+    known_storm_guard: set[str] = set()
     known_green_battery: set[str] = set()
     known_app_auth: set[str] = set()
     known_evse_schedule_days: set[tuple[str, str]] = set()
@@ -489,12 +490,15 @@ async def async_setup_entry(
         entities: list[SwitchEntity] = []
         if serials:
             entities.extend(ChargingSwitch(coord, sn) for sn in serials)
-            if (
-                site_has_battery
-                and _battery_write_access_confirmed(coord)
-                and _storm_guard_visible(coord)
-            ):
-                entities.extend(StormGuardEvseSwitch(coord, sn) for sn in serials)
+        retain_storm_guard = (
+            current_serials
+            if site_has_battery and _storm_guard_visible(coord)
+            else set()
+        )
+        if _battery_write_access_confirmed(coord):
+            for sn in retain_storm_guard - known_storm_guard:
+                entities.append(StormGuardEvseSwitch(coord, sn))
+                known_storm_guard.add(sn)
         data_source = coord.data or {}
         retain_green_battery: set[str] = set()
         retain_app_auth: set[str] = set()
@@ -541,6 +545,7 @@ async def async_setup_entry(
             async_add_entities(entities, update_before_add=False)
         known_serials.intersection_update(current_serials)
         known_serials.update(serials)
+        known_storm_guard.intersection_update(retain_storm_guard)
         known_green_battery.intersection_update(retain_green_battery)
         known_app_auth.intersection_update(retain_app_auth)
         known_evse_schedule_days.intersection_update(
@@ -553,10 +558,9 @@ async def async_setup_entry(
         if not inventory_ready:
             return
         active_unique_ids = {f"{DOMAIN}_{sn}_charging_switch" for sn in current_serials}
-        if site_has_battery and _storm_guard_visible(coord):
-            active_unique_ids.update(
-                f"{DOMAIN}_{sn}_storm_guard_evse_charge" for sn in current_serials
-            )
+        active_unique_ids.update(
+            f"{DOMAIN}_{sn}_storm_guard_evse_charge" for sn in retain_storm_guard
+        )
         active_unique_ids.update(
             f"{DOMAIN}_{sn}_green_battery" for sn in retain_green_battery
         )

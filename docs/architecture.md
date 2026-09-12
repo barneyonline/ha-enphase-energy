@@ -220,6 +220,11 @@ Entity platforms under `sensor.py`, `binary_sensor.py`, `button.py`, `number.py`
 3. Wait for inventory readiness before pruning managed entity registry entries.
 4. Use optimistic coordinator caches only when Enphase writes are known to settle asynchronously.
 
+Per-charger Storm Guard switches track discovery independently from charging
+switches, so delayed battery capabilities or write access can create them on a
+later coordinator update. Existing registry entries are retained while write access
+is unknown; availability still requires confirmed access.
+
 Instantaneous site telemetry has bounded freshness: after a core outage, the
 last successful sample has a 15-minute grace period. Battery and heat-pump
 measurements with an established family success expire after 30 minutes without
