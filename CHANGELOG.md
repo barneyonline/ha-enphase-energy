@@ -11,6 +11,23 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v4.3.4 - 2026-09-14
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
 - Create EV charger Storm Guard switches when battery capabilities or write access
   arrive after charger discovery, without requiring a reload. (#869)
 
@@ -18,7 +35,8 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔄 Other changes
-- None
+- Updated the CI setup-uv action from `10.0.1` to `10.1.0`. (#871)
+- Bumped the integration manifest version to `4.3.4`.
 
 ## v4.3.3 - 2026-09-12
 
