@@ -1751,14 +1751,14 @@
       "product_media_name_id": null
     }
   },
-  "generated_at": "2026-09-17T08:41:37.545960Z",
+  "generated_at": "2026-09-21T09:00:03.444078Z",
   "schema_version": 1,
   "source": {
     "apps_url": "https://enphase.com/installers/resources/documentation/communication",
     "crawl": {
       "envoy": {
         "bootstrap_error_targets": [],
-        "count": 251,
+        "count": 261,
         "crawl_error_targets": [],
         "empty_release_targets": [
           "https://enphase.com/en-my/|en-my",
@@ -1999,7 +1999,7 @@
           "https://enphase.com/en-lac/|en-lac": {
             "apps_url": "https://enphase.com/en-lac/installers/resources/documentation/communication",
             "bootstrap_error": null,
-            "count": 1,
+            "count": 3,
             "crawl_error": null,
             "pages": [
               "https://enphase.com/en-lac/installers/resources/documentation/communication?product_type=141&f%5B0%5D=document%3A217&search_api_language=en-lac&field_alternative_language=en-lac&page=0"
@@ -2116,7 +2116,7 @@
           "https://enphase.com/es-mx/|es-mx": {
             "apps_url": "https://enphase.com/es-mx/installers/resources/documentation/communication",
             "bootstrap_error": null,
-            "count": 6,
+            "count": 8,
             "crawl_error": null,
             "pages": [
               "https://enphase.com/es-mx/installers/resources/documentation/communication?product_type=141&f%5B0%5D=document%3A217&search_api_language=es-mx&field_alternative_language=es-mx&page=0"
@@ -2506,7 +2506,7 @@
           "https://enphase.com/|en": {
             "apps_url": "https://enphase.com/installers/resources/documentation/communication",
             "bootstrap_error": null,
-            "count": 19,
+            "count": 23,
             "crawl_error": null,
             "pages": [
               "https://enphase.com/installers/resources/documentation/communication?product_type=141&f%5B0%5D=document%3A217&search_api_language=en&field_alternative_language=en&page=0",
@@ -2533,7 +2533,7 @@
           "https://enphase.com/|en-ca": {
             "apps_url": "https://enphase.com/installers/resources/documentation/communication",
             "bootstrap_error": null,
-            "count": 7,
+            "count": 9,
             "crawl_error": null,
             "pages": [
               "https://enphase.com/installers/resources/documentation/communication?product_type=141&f%5B0%5D=document%3A217&search_api_language=en-ca&field_alternative_language=en-ca&page=0"
