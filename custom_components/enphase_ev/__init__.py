@@ -246,6 +246,12 @@ async def async_migrate_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) ->
     """Migrate Enphase config entries to the latest schema."""
 
     if entry.version != 1:
+        _LOGGER.error(
+            "Cannot migrate config entry schema version %s: supported major version "
+            "is 1. Check that the installed Enphase Energy integration version "
+            "matches the config entry",
+            entry.version,
+        )
         return False
     if entry.minor_version < 2:
         options = dict(entry.options)
