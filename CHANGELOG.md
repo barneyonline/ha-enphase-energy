@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
-- None
+- Require Home Assistant 2026.9.0 or newer.
 
 ### ✨ New features
 - None
@@ -14,7 +14,8 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔧 Improvements
-- None
+- Explain unsupported config-entry schema versions in migration error logs.
+- Strengthen device-registry compatibility regression coverage.
 
 ### 🔄 Other changes
 - None

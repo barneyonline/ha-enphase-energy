@@ -195,7 +195,7 @@ jobs:
         run: |
           uv pip install --system -r devtools/docker/requirements-min-ha.txt
           python -m pip check
-          python -c "from homeassistant.const import __version__; assert __version__ == '2026.8.0', __version__; print(f'Home Assistant {__version__}')"
+          python -c "from homeassistant.const import __version__; assert __version__ == '2026.9.0', __version__; print(f'Home Assistant {__version__}')"
       - name: Run minimum Home Assistant tests
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -212,6 +212,8 @@ jobs:
           tests/components/enphase_ev/test_integration_lifecycle.py
           tests/components/enphase_ev/test_reload_snapshot.py
           tests/components/enphase_ev/test_services.py
+          tests/components/enphase_ev/test_init_module.py::test_unsupported_migration_preserves_entry_and_registries
+          tests/components/enphase_ev/test_init_module.py::test_framework_rejects_newer_schema_before_integration_migration
           tests/components/enphase_ev/test_init_module.py::test_async_setup_entry_updates_existing_device
           tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_preserves_real_devices_with_site_identifier
           tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_removes_empty_device_without_gateway

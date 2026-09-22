@@ -3,7 +3,7 @@ import pathlib
 
 import yaml
 
-MIN_HOME_ASSISTANT_VERSION = "2026.8.0"
+MIN_HOME_ASSISTANT_VERSION = "2026.9.0"
 
 
 def test_manifest_keys_present():

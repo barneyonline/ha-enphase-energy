@@ -51,14 +51,14 @@ Include the integration version, Home Assistant version, affected entity IDs, de
    The default `ha-dev` lane pins Home Assistant 2026.9.0, the matching test
    plugin, and Linux/Python 3.14 transitive constraints in
    `devtools/docker/constraints-dev.txt`. Rebuild after changing requirements.
-   The minimum supported Home Assistant version is 2026.8.0, paired with
-   `pytest-homeassistant-custom-component==0.13.354`. The `ha-minimum` lane
+   The minimum supported Home Assistant version is 2026.9.0, paired with
+   `pytest-homeassistant-custom-component==0.13.363`. The `ha-minimum` lane
    covers this exact version; the default lane covers current stable Home
    Assistant.
    To reproduce minimum-version coverage, run:
    ```bash
    docker compose -f devtools/docker/docker-compose.yml build ha-minimum
-   docker compose -f devtools/docker/docker-compose.yml run --rm ha-minimum bash -lc "python -c 'from homeassistant.const import __version__; assert __version__ == \"2026.8.0\"' && python -m pip check && pytest -q tests/components/enphase_ev/test_manifest.py tests/components/enphase_ev/test_device_registry_compat.py tests/components/enphase_ev/test_number_module.py tests/components/enphase_ev/test_device_action.py tests/components/enphase_ev/test_device_trigger.py tests/components/enphase_ev/test_schedule_sync.py tests/components/enphase_ev/test_entry_lifecycle.py tests/components/enphase_ev/test_integration_lifecycle.py tests/components/enphase_ev/test_reload_snapshot.py tests/components/enphase_ev/test_services.py tests/components/enphase_ev/test_init_module.py::test_async_setup_entry_updates_existing_device tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_preserves_real_devices_with_site_identifier tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_removes_empty_device_without_gateway"
+   docker compose -f devtools/docker/docker-compose.yml run --rm ha-minimum bash -lc "python -c 'from homeassistant.const import __version__; assert __version__ == \"2026.9.0\"' && python -m pip check && pytest -q tests/components/enphase_ev/test_manifest.py tests/components/enphase_ev/test_device_registry_compat.py tests/components/enphase_ev/test_number_module.py tests/components/enphase_ev/test_device_action.py tests/components/enphase_ev/test_device_trigger.py tests/components/enphase_ev/test_schedule_sync.py tests/components/enphase_ev/test_entry_lifecycle.py tests/components/enphase_ev/test_integration_lifecycle.py tests/components/enphase_ev/test_reload_snapshot.py tests/components/enphase_ev/test_services.py tests/components/enphase_ev/test_init_module.py::test_unsupported_migration_preserves_entry_and_registries tests/components/enphase_ev/test_init_module.py::test_framework_rejects_newer_schema_before_integration_migration tests/components/enphase_ev/test_init_module.py::test_async_setup_entry_updates_existing_device tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_preserves_real_devices_with_site_identifier tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_removes_empty_device_without_gateway"
    ```
    Every lane resolves Home Assistant together with its exact matching test
    plugin and transitive constraints. Upgrade each Home Assistant/plugin pair

@@ -177,6 +177,67 @@ def test_startup_migration_version_returns_zero_for_invalid_value(config_entry) 
 
 
 @pytest.mark.asyncio
+async def test_unsupported_migration_preserves_entry_and_registries(hass, caplog):
+    """Reject unsupported schema versions without mutating or exposing entry data."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "private-site", "password": "private-password"},
+        options={"grid_toggle_enabled": True},
+        version=2,
+        minor_version=1,
+    )
+    entry.add_to_hass(hass)
+    devices = dr.async_get(hass)
+    entities = er.async_get(hass)
+    device = devices.async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={(DOMAIN, "private-device")}
+    )
+    entity = entities.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{DOMAIN}_site_private-site_grid_control_status",
+        config_entry=entry,
+        device_id=device.id,
+    )
+    before = entry.as_dict()
+    before_devices = tuple(devices.devices)
+    before_entities = dict(entities.entities)
+
+    assert await async_migrate_entry(hass, entry) is False
+
+    assert entry.as_dict() == before
+    assert tuple(devices.devices) == before_devices
+    assert dict(entities.entities) == before_entities
+    assert entities.async_get(entity.entity_id) is entity
+    assert "schema version 2: supported major version is 1" in caplog.text
+    assert "installed Enphase Energy integration version" in caplog.text
+    for private_value in (*entry.data.values(), "private-device"):
+        assert private_value not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_framework_rejects_newer_schema_before_integration_migration(
+    hass, monkeypatch, caplog
+):
+    """HA itself rejects a downgrade before invoking our migration callback."""
+    from custom_components.enphase_ev.config_flow import EnphaseEVConfigFlow
+
+    monkeypatch.setitem(config_entries.HANDLERS, DOMAIN, EnphaseEVConfigFlow)
+    migration = AsyncMock()
+    monkeypatch.setattr(enphase_init, "async_migrate_entry", migration)
+    entry = MockConfigEntry(domain=DOMAIN, data={}, version=2, minor_version=1)
+    entry.add_to_hass(hass)
+    before = entry.as_dict()
+
+    assert await entry.async_migrate(hass) is False
+
+    migration.assert_not_awaited()
+    assert entry.as_dict() == before
+    assert "higher than the current version 1" in caplog.text
+    assert "Cannot migrate config entry schema" not in caplog.text
+
+
+@pytest.mark.asyncio
 async def test_config_entry_minor_migration_retires_grid_control_entities(
     hass: HomeAssistant,
 ) -> None:
