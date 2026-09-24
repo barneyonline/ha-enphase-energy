@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-09-24T01:05:17.198168Z",
+  "checked_at": "2026-09-24T06:28:38.575657Z",
   "checks": [
     {
       "affects": true,
@@ -334,7 +334,7 @@
       "name": "session_history_criteria",
       "ok": true,
       "status": 200,
-      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=01ca2638-be8f-4d97-bcce-cecd3642efcc&username=2999024"
+      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=62c9f2fb-1353-4a45-b229-6797c453c5ac&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -404,7 +404,7 @@
       "name": "evse_timeseries_daily_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=01ca2638-be8f-4d97-bcce-cecd3642efcc&start_date=2026-09-24&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=62c9f2fb-1353-4a45-b229-6797c453c5ac&start_date=2026-09-24&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -418,7 +418,7 @@
       "name": "evse_timeseries_lifetime_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=01ca2638-be8f-4d97-bcce-cecd3642efcc&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=62c9f2fb-1353-4a45-b229-6797c453c5ac&username=2999024"
     },
     {
       "affects_broad_outage": true,
