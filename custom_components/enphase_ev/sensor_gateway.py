@@ -138,6 +138,75 @@ def _gateway_summary_ip_address(
     return None
 
 
+def _gateway_connection_method(
+    coord: EnphaseCoordinator, ip_address: object
+) -> str | None:
+    """Return reported active transports for the gateway shown by the IP attribute."""
+    bucket = coord.inventory_view.type_bucket("envoy") or {}
+    members_raw = bucket.get("devices")
+    members = (
+        [member for member in members_raw if isinstance(member, dict)]
+        if isinstance(members_raw, list)
+        else []
+    )
+    # Inventory and dashboard refresh independently; IP addresses can change
+    # between them. Resolve the displayed gateway's stable identity first.
+    inventory_members = sorted(
+        members, key=lambda member: not _gateway_member_preferred_for_ip(member)
+    )
+    primary = next(
+        (
+            member
+            for member in inventory_members
+            if ip_address is not None
+            and _gateway_member_ip_address(member) == ip_address
+            and _gateway_ip_member_kind(member)
+            not in {"production", "consumption", "controller"}
+        ),
+        {},
+    )
+    primary_serial = _gateway_clean_text(primary.get("serial_number"))
+    runtime = getattr(coord, "inventory_runtime", None)
+    details_getter = getattr(runtime, "system_dashboard_envoy_details", None)
+    if callable(details_getter):
+        members = list(details_getter()) + members
+    else:
+        detail_getter = getattr(coord, "system_dashboard_envoy_detail", None)
+        detail = detail_getter() if callable(detail_getter) else None
+        if isinstance(detail, dict):
+            members.insert(0, detail)
+    members.sort(key=lambda member: not _gateway_member_preferred_for_ip(member))
+    for member in members:
+        if _gateway_ip_member_kind(member) in {
+            "production",
+            "consumption",
+            "controller",
+        }:
+            continue
+        serial = _gateway_clean_text(member.get("serial_number"))
+        if primary_serial and serial:
+            if serial != primary_serial:
+                continue
+        elif (
+            ip_address is not None and _gateway_member_ip_address(member) != ip_address
+        ):
+            continue
+        details = member.get("connection_details")
+        if not isinstance(details, dict):
+            continue
+        methods = [
+            label
+            for key, label in (
+                ("ethernet", "Ethernet"),
+                ("wifi", "Wi-Fi"),
+                ("cellular", "Cellular"),
+            )
+            if details.get(key) is True
+        ]
+        return ", ".join(methods) or None
+    return None
+
+
 def _gateway_format_counts(counts: dict[str, int]) -> str | None:
     clean: dict[str, int] = {}
     for key, value in (counts or {}).items():
@@ -1579,6 +1648,9 @@ class EnphaseGatewayConnectivityStatusSensor(_SiteBaseEntity):
             "model_summary": snapshot.get("model_summary"),
             "firmware_summary": snapshot.get("firmware_summary"),
             "ip_address": snapshot.get("ip_address"),
+            "connection_method": _gateway_connection_method(
+                self._coord, snapshot.get("ip_address")
+            ),
             "latest_reported_utc": snapshot.get("latest_reported_utc"),
             "latest_reported_device": snapshot.get("latest_reported_device"),
             "property_keys": snapshot.get("property_keys"),

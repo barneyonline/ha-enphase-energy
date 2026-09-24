@@ -4169,29 +4169,44 @@ class InventoryRuntime:
         }
 
     def system_dashboard_envoy_detail(self) -> dict[str, object] | None:
+        records = self.system_dashboard_envoy_details()
+        return (records[0] or None) if records else None
+
+    def system_dashboard_envoy_details(self) -> list[dict[str, object]]:
+        """Return detached gateway details for matching multi-gateway attributes."""
         records = self._system_dashboard_detail_records(
             self._system_dashboard_raw_payloads("envoy"),
             "envoys",
             "envoy",
         )
-        if not records:
-            return None
-        record = records[0]
-        out: dict[str, object] = {}
-        for key in (
-            "status",
-            "statusText",
-            "connected",
-            "last_report",
-            "last_interval_end_date",
-            "envoy_sw_version",
-            "ap_mode",
-            "sku_id",
-        ):
-            value = record.get(key)
-            if value is not None:
-                out[key] = value
-        return out or None
+        details: list[dict[str, object]] = []
+        for record in records:
+            out: dict[str, object] = {}
+            for key in (
+                "name",
+                "serial_number",
+                "ip",
+                "status",
+                "statusText",
+                "connected",
+                "last_report",
+                "last_interval_end_date",
+                "envoy_sw_version",
+                "ap_mode",
+                "sku_id",
+            ):
+                value = record.get(key)
+                if value is not None:
+                    out[key] = value
+            connection_details = record.get("connection_details")
+            if isinstance(connection_details, dict):
+                out["connection_details"] = {
+                    key: connection_details.get(key)
+                    for key in ("ethernet", "wifi", "cellular")
+                    if isinstance(connection_details.get(key), bool)
+                }
+            details.append(out)
+        return details
 
     def system_dashboard_meter_detail(
         self, meter_kind: str

@@ -1509,6 +1509,9 @@
         "state_attributes": {
           "ip_address": {
             "name": "Adresse IP"
+          },
+          "connection_method": {
+            "name": "Mode de connexion"
           }
         }
       },
