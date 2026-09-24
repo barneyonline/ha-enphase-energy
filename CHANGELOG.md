@@ -11,7 +11,8 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Keep Current Power Consumption available between valid source updates without a
+  15-minute expiry, preserving the original sample timestamp.
 
 ### 🔧 Improvements
 - Explain unsupported config-entry schema versions in migration error logs.

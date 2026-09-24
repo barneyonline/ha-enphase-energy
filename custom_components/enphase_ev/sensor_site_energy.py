@@ -1316,7 +1316,6 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
     _DEFAULT_INTERVAL_MINUTES = 5.0
     _MAX_POWER_WINDOW_SECONDS = 1800.0
     _MAX_FUTURE_SKEW_SECONDS = 60.0
-    _MAX_SAMPLE_AGE_SECONDS = 900.0
 
     def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(
@@ -1384,7 +1383,6 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._last_method = restored.method or "restored"
         self._restored_pending_validation = True
         self._using_cached = restored.power_sample_ts != restored.energy_ts
-        self._schedule_freshness_expiry()
 
     @staticmethod
     def _coerce_nonnegative_float(value: object) -> float | None:
@@ -1433,7 +1431,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
     def _reject_sample(
         self, reason: str, data: dict[str, object], *, method: str | None = None
     ) -> None:
-        """Retain a bounded reading and a detached, numeric rejection snapshot."""
+        """Retain the last valid reading and a numeric rejection snapshot."""
 
         self._last_method = method or reason
         self._using_cached = self._last_power_w is not None
@@ -1468,13 +1466,8 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             }
 
     def _freshness_deadline(self) -> datetime | None:
-        deadline = super()._freshness_deadline()
-        if self._last_power_ts is None:
-            return deadline
-        power_deadline = datetime.fromtimestamp(
-            self._last_power_ts, tz=timezone.utc
-        ) + timedelta(seconds=self._MAX_SAMPLE_AGE_SECONDS)
-        return min(deadline, power_deadline) if deadline is not None else power_deadline
+        """Keep the last valid calculation until source data replaces it."""
+        return None
 
     def _seed(
         self,
@@ -1502,19 +1495,15 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._restored_pending_validation = False
 
     def _process_current_sample(self) -> None:
-        previous_power_ts = self._last_power_ts
         self._process_consumption_sample()
-        if self._last_power_ts != previous_power_ts:
-            self._schedule_freshness_expiry()
         energy = getattr(self._coord, "energy", None)
         if energy is not None:
             energy.consumption_power_diagnostics = {
                 "last_valid_power_w": self._last_power_w,
                 "last_valid_sample_timestamp": self._last_power_ts,
-                "retention_seconds": self._MAX_SAMPLE_AGE_SECONDS,
+                "retention_seconds": None,
                 "max_window_seconds": self._MAX_POWER_WINDOW_SECONDS,
                 "last_window_seconds": self._last_window_s,
-                "sample_fresh": self._sample_is_fresh(),
                 "using_cached": self._using_cached,
                 "restored_pending_validation": self._restored_pending_validation,
                 "method": self._last_method,
@@ -1607,8 +1596,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         if elapsed_s < 0:
             self._reject_sample("out_of_order_timestamp", data)
             return
-        # Averaging across a bounded gap is independent of the 15-minute
-        # freshness deadline, which remains tied to the newest source sample.
+        # Bound the averaging window independently of retained-value age.
         if max(
             elapsed_s, interval_s
         ) > self._MAX_POWER_WINDOW_SECONDS or not math.isclose(
@@ -1685,23 +1673,13 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._last_interval_minutes = interval_minutes
         self._restored_pending_validation = False
 
-    def _sample_is_fresh(self) -> bool:
-        if self._last_power_ts is None:
-            return False
-        age_s = self._timestamp_age_seconds(self._last_power_ts)
-        return bool(
-            -self._MAX_FUTURE_SKEW_SECONDS <= age_s < self._MAX_SAMPLE_AGE_SECONDS
-        )
-
     @property
     def available(self) -> bool:
         self._process_current_sample()
         if not super().available:
             return False
         return bool(
-            self._last_power_w is not None
-            and not self._restored_pending_validation
-            and self._sample_is_fresh()
+            self._last_power_w is not None and not self._restored_pending_validation
         )
 
     @property

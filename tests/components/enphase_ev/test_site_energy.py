@@ -849,11 +849,11 @@ def test_site_consumption_power_interval_floor_and_long_gap(
         reported_at=base_ts + timedelta(minutes=40),
     )
     assert sensor.native_value == 600
-    assert sensor.available is False
+    assert sensor.available is True
     assert sensor.extra_state_attributes["method"] == "interval_discontinuity"
 
 
-def test_site_consumption_power_stale_sample_is_unavailable(
+def test_site_consumption_power_delayed_sample_remains_available(
     coordinator_factory,
 ) -> None:
     coord = coordinator_factory()
@@ -871,7 +871,7 @@ def test_site_consumption_power_stale_sample_is_unavailable(
         reported_at=base_ts + timedelta(minutes=5),
     )
     assert sensor.native_value == 1200
-    assert sensor.available is False
+    assert sensor.available is True
 
 
 def test_site_consumption_power_rejects_future_sample_and_recovers(
@@ -1116,7 +1116,7 @@ async def test_consumption_newer_incompatible_sample_discards_unvalidated_restor
         assert sensor.available
         assert sensor.native_value == round(100 * 60 / interval_minutes)
         assert sensor.extra_state_attributes["sampled_at_utc"] == now[0].isoformat()
-        assert sensor._cancel_freshness_expiry is not None
+        assert sensor._cancel_freshness_expiry is None
     finally:
         await sensor.async_will_remove_from_hass()
 
@@ -1125,7 +1125,7 @@ def test_site_consumption_power_guard_paths(coordinator_factory, monkeypatch) ->
     coord = coordinator_factory()
     sensor = EnphaseSiteConsumptionPowerSensor(coord)
 
-    assert sensor._sample_is_fresh() is False
+    assert sensor.available is False
     assert sensor._coerce_positive_int("bad") is None
     coord.energy.site_energy = None  # type: ignore[assignment]
     assert sensor._flow_data() == {}
@@ -1154,7 +1154,7 @@ def test_site_consumption_power_guard_paths(coordinator_factory, monkeypatch) ->
         "utcnow",
         lambda: (base_ts + timedelta(minutes=6)).replace(tzinfo=None),
     )
-    assert sensor._sample_is_fresh() is True
+    assert not sensor._timestamp_is_too_far_in_future(base_ts.timestamp())
 
     monkeypatch.setattr(
         sensor_mod.dt_util, "utcnow", lambda: base_ts + timedelta(minutes=6)
@@ -4913,13 +4913,13 @@ def test_consumption_retains_valid_baseline_and_records_rejection(
     if changes.get("latest_bucket_wh") == -5:
         assert rejection["latest_bucket_wh"] == -5
 
-    # Re-reading an unchanged bad payload cannot restart the retention clock.
+    # Re-reading an unchanged bad payload preserves the reading and rejection.
     now[0] = accepted_at + timedelta(seconds=899)
     assert sensor.available
     assert coord.energy.consumption_power_diagnostics["last_rejection"] == rejection
     now[0] += timedelta(seconds=1)
-    assert not sensor.available
-    assert not coord.energy.consumption_power_diagnostics["sample_fresh"]
+    assert sensor.available
+    assert coord.energy.consumption_power_diagnostics["retention_seconds"] is None
 
     # Recover against the last valid baseline, never against the bad bucket.
     coord.energy.site_energy["consumption"] = _consumption_flow(
@@ -5010,13 +5010,13 @@ async def test_consumption_reseeding_and_restore_do_not_refresh_retained_power(
     assert restored.available
     assert restored.native_value == 1200
     now[0] += timedelta(seconds=1)
-    assert not restored.available
-    assert not sensor.available
+    assert restored.available
+    assert sensor.available
     await restored.async_will_remove_from_hass()
 
 
 @pytest.mark.asyncio
-async def test_consumption_refresh_retention_expires_without_polling(
+async def test_consumption_retains_value_without_polling_and_updates_from_source(
     hass, config_entry, coordinator_factory, monkeypatch
 ):
     import logging
@@ -5029,7 +5029,7 @@ async def test_consumption_refresh_retention_expires_without_polling(
     sensor.hass = hass
     sensor.entity_id = "sensor.enphase_consumption_retention"
     sensor.async_get_last_extra_data = AsyncMock(return_value=None)
-    accepted_at = datetime.now(timezone.utc)
+    accepted_at = datetime.now(timezone.utc).replace(microsecond=0)
     now = [accepted_at - timedelta(minutes=5)]
     monkeypatch.setattr(sensor_mod.dt_util, "utcnow", lambda: now[0])
     client = SimpleNamespace(lifetime_energy=AsyncMock())
@@ -5067,7 +5067,7 @@ async def test_consumption_refresh_retention_expires_without_polling(
     now[0] = accepted_at + timedelta(minutes=15)
     async_fire_time_changed(hass, now[0])
     await hass.async_block_till_done()
-    assert hass.states.get(sensor.entity_id).state == "unavailable"
+    assert hass.states.get(sensor.entity_id).state == "1200"
     now[0] = accepted_at + timedelta(seconds=1197)
     await refresh([1000, 2294])
     assert hass.states.get(sensor.entity_id).state == "583"
@@ -5075,7 +5075,28 @@ async def test_consumption_refresh_retention_expires_without_polling(
     now[0] += timedelta(minutes=15)
     async_fire_time_changed(hass, now[0])
     await hass.async_block_till_done()
-    assert hass.states.get(sensor.entity_id).state == "unavailable"
+    assert hass.states.get(sensor.entity_id).state == "583"
+    # A prolonged coordinator outage must not reintroduce the base-class expiry.
+    coord.last_update_success = False
+    coord.last_success_utc = accepted_at
+    now[0] += timedelta(days=1)
+    async_fire_time_changed(hass, now[0])
+    coord.async_update_listeners()
+    await hass.async_block_till_done()
+    assert hass.states.get(sensor.entity_id).state == "583"
+    assert sensor._cancel_freshness_expiry is None
+
+    # A long source gap seeds a baseline; the next comparable update recalculates.
+    coord.last_update_success = True
+    await refresh([1000, 3000])
+    assert hass.states.get(sensor.entity_id).state == "583"
+    now[0] += timedelta(minutes=5)
+    await refresh([1000, 3200])
+    assert hass.states.get(sensor.entity_id).state == "2400"
+    assert (
+        hass.states.get(sensor.entity_id).attributes["sampled_at_utc"]
+        == now[0].isoformat()
+    )
     await component.async_remove_entity(sensor.entity_id)
 
 
@@ -5098,7 +5119,7 @@ def test_consumption_recovers_on_first_fresh_sample_after_long_gap(
     )
     assert sensor.native_value == 1200
     now[0] += timedelta(minutes=15)
-    assert not sensor.available
+    assert sensor.available
 
     # Reproduce the observed 194 Wh increase across the 19m57s source gap,
     # including a valid daily-bucket rollover and the recovery-window boundary.
@@ -5119,11 +5140,11 @@ def test_consumption_recovers_on_first_fresh_sample_after_long_gap(
     assert diag["max_window_seconds"] == 1800
     assert not diag["using_cached"]
 
-    # Repeated payloads do not extend the new reading's 15-minute lifetime.
+    # Repeated payloads remain available beyond the former expiry boundary.
     now[0] = source_at + timedelta(seconds=899)
     assert sensor.available
     now[0] += timedelta(seconds=1)
-    assert not sensor.available
+    assert sensor.available
 
 
 @pytest.mark.parametrize(
@@ -5284,7 +5305,7 @@ async def test_site_energy_fetch_cancelled_during_optional_enrichment(
     assert diag["failure_count"] == 0
 
 
-def test_consumption_long_window_cannot_publish_stale_endpoint(
+def test_consumption_long_window_publishes_delayed_endpoint(
     coordinator_factory, monkeypatch
 ):
     coord = coordinator_factory()
@@ -5298,8 +5319,8 @@ def test_consumption_long_window_cannot_publish_stale_endpoint(
     coord.energy.site_energy["consumption"] = _consumption_flow(
         latest_bucket_wh=1200, reported_at=now - timedelta(minutes=15)
     )
-    assert not sensor.available
-    assert not coord.energy.consumption_power_diagnostics["sample_fresh"]
+    assert sensor.available
+    assert coord.energy.consumption_power_diagnostics["retention_seconds"] is None
 
 
 @pytest.mark.asyncio
