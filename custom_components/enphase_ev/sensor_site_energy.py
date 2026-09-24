@@ -13,7 +13,11 @@ from homeassistant.components.sensor import (
     SensorExtraStoredData,
     SensorStateClass,
 )
-from homeassistant.const import UnitOfEnergy, UnitOfPower
+from homeassistant.const import EVENT_STATE_CHANGED, UnitOfEnergy, UnitOfPower
+from homeassistant.core import Event
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
+from homeassistant.util.unit_conversion import PowerConverter
 from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 from homeassistant.util import dt as dt_util
 
@@ -25,6 +29,7 @@ from .power_validation import EXTREME_SITE_POWER_W, ExtremePowerValidator
 from .runtime_helpers import inventory_type_device_info as _type_device_info
 from .sensor_base import EnphaseSiteSensorEntity as _SiteBaseEntity
 from .sensor_common import (
+    callback,
     _energy_delta_to_power_w,
     _has_type,
     _lifetime_energy_delta,
@@ -1302,7 +1307,7 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
 
 
 class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type: ignore[misc]
-    """Average site consumption from consecutive authoritative energy buckets."""
+    """Site power balance, with consumption energy as a fallback."""
 
     _attr_device_class = SensorDeviceClass.POWER
     _attr_native_unit_of_measurement = UnitOfPower.WATT
@@ -1324,6 +1329,10 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             "Current Power Consumption",
             type_key=None,
         )
+        self._balance_power_w: int | None = None
+        self._balance_sources: dict[str, str] = {}
+        self._balance_using_cached = False
+        self._balance_source_times: dict[str, object] = {}
         self._last_bucket_wh: float | None = None
         self._last_bucket_count: int | None = None
         self._last_start_date: str | None = None
@@ -1338,6 +1347,62 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._last_rejection: dict[str, object] | None = None
         self._last_rejected_sample: dict[str, object] | None = None
 
+    def _power_source_key(self, entity_id: str) -> str | None:
+        entry = er.async_get(self.hass).async_get(entity_id)
+        if entry is None or entry.platform != DOMAIN:
+            return None
+        for key in ("current_production_power", "grid_power", "battery_power"):
+            if entry.unique_id == f"{DOMAIN}_site_{self._coord.site_id}_{key}":
+                return key
+        return None
+
+    @callback
+    def _power_source_changed(self, event: Event) -> None:
+        if self._power_source_key(event.data["entity_id"]) is not None:
+            self.async_write_ha_state()
+
+    def _update_power_balance(self) -> None:
+        """Use published source values, including user-selected power units."""
+        self._balance_using_cached = self._balance_power_w is not None
+        if self.hass is None:
+            return
+        registry = er.async_get(self.hass)
+        sources: dict[str, str] = {}
+        source_times: dict[str, object] = {}
+        total = 0.0
+        for key in ("current_production_power", "grid_power", "battery_power"):
+            entity_id = registry.async_get_entity_id(
+                "sensor", DOMAIN, f"{DOMAIN}_site_{self._coord.site_id}_{key}"
+            )
+            if entity_id is None:
+                if (
+                    key == "battery_power"
+                    and self._coord.battery_has_encharge is False
+                    and self._coord.battery_has_acb is False
+                ):
+                    continue
+                return
+            state = self.hass.states.get(entity_id)
+            if state is None:
+                return
+            try:
+                value = PowerConverter.convert(
+                    float(state.state),
+                    state.attributes.get("unit_of_measurement"),
+                    UnitOfPower.WATT,
+                )
+            except (TypeError, ValueError, HomeAssistantError):
+                return
+            if not math.isfinite(value):
+                return
+            total += value
+            sources[key] = entity_id
+            source_times[key] = state.attributes.get("sampled_at_utc")
+        self._balance_power_w = max(round(total), 0)
+        self._balance_sources = sources
+        self._balance_source_times = source_times
+        self._balance_using_cached = False
+
     @staticmethod
     def _timestamp_age_seconds(timestamp: float) -> float:
         now = dt_util.utcnow()
@@ -1350,6 +1415,9 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
+        self.async_on_remove(
+            self.hass.bus.async_listen(EVENT_STATE_CHANGED, self._power_source_changed)
+        )
         last_extra = await self.async_get_last_extra_data()
         restored = _SiteConsumptionPowerRestoreData.from_dict(
             last_extra.as_dict() if last_extra is not None else None
@@ -1496,17 +1564,39 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
 
     def _process_current_sample(self) -> None:
         self._process_consumption_sample()
+        self._update_power_balance()
         energy = getattr(self._coord, "energy", None)
         if energy is not None:
             energy.consumption_power_diagnostics = {
-                "last_valid_power_w": self._last_power_w,
-                "last_valid_sample_timestamp": self._last_power_ts,
+                "last_valid_power_w": (
+                    self._balance_power_w
+                    if self._balance_power_w is not None
+                    else self._last_power_w
+                ),
+                "last_valid_sample_timestamp": (
+                    None if self._balance_power_w is not None else self._last_power_ts
+                ),
                 "retention_seconds": None,
                 "max_window_seconds": self._MAX_POWER_WINDOW_SECONDS,
-                "last_window_seconds": self._last_window_s,
-                "using_cached": self._using_cached,
-                "restored_pending_validation": self._restored_pending_validation,
-                "method": self._last_method,
+                "last_window_seconds": (
+                    None if self._balance_power_w is not None else self._last_window_s
+                ),
+                "using_cached": (
+                    self._balance_using_cached
+                    if self._balance_power_w is not None
+                    else self._using_cached
+                ),
+                "restored_pending_validation": (
+                    self._balance_power_w is None and self._restored_pending_validation
+                ),
+                "power_balance_w": self._balance_power_w,
+                "power_balance_sources": dict(self._balance_sources),
+                "power_balance_source_timestamps": dict(self._balance_source_times),
+                "method": (
+                    "power_balance"
+                    if self._balance_power_w is not None
+                    else self._last_method
+                ),
                 "last_rejection": self._last_rejection,
             }
 
@@ -1678,17 +1768,28 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._process_current_sample()
         if not super().available:
             return False
-        return bool(
+        return self._balance_power_w is not None or bool(
             self._last_power_w is not None and not self._restored_pending_validation
         )
 
     @property
     def native_value(self) -> int | None:
         self._process_current_sample()
-        return self._last_power_w
+        return (
+            self._balance_power_w
+            if self._balance_power_w is not None
+            else self._last_power_w
+        )
 
     @property
     def extra_state_attributes(self) -> Any:
+        if self._balance_power_w is not None:
+            return {
+                "method": "power_balance",
+                "source_entities": dict(self._balance_sources),
+                "source_sampled_at_utc": dict(self._balance_source_times),
+                "using_cached": self._balance_using_cached,
+            }
         sampled_at = None
         if self._last_power_ts is not None:
             sampled_at = datetime.fromtimestamp(
