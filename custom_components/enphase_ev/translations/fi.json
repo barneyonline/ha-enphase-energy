@@ -1509,6 +1509,9 @@
         "state_attributes": {
           "ip_address": {
             "name": "IP-osoite"
+          },
+          "connection_method": {
+            "name": "Yhteystapa"
           }
         }
       },

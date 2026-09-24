@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 - Require Home Assistant 2026.9.0 or newer.
 
 ### ✨ New features
-- None
+- Show the IQ Gateway connection method alongside its IP address in Gateway Status attributes.
 
 ### 🐛 Bug fixes
 - Keep Current Power Consumption available between valid source updates without a

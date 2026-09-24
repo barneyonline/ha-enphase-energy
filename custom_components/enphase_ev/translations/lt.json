@@ -1509,6 +1509,9 @@
         "state_attributes": {
           "ip_address": {
             "name": "IP adresas"
+          },
+          "connection_method": {
+            "name": "Prisijungimo būdas"
           }
         }
       },

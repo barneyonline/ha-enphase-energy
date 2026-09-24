@@ -1509,6 +1509,9 @@
         "state_attributes": {
           "ip_address": {
             "name": "Διεύθυνση IP"
+          },
+          "connection_method": {
+            "name": "Μέθοδος σύνδεσης"
           }
         }
       },
