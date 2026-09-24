@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v4.3.5 - 2026-09-25
+
+### 🚧 Breaking changes
 - Require Home Assistant 2026.9.0 or newer.
 
 ### ✨ New features
@@ -19,7 +36,7 @@ All notable changes to this project will be documented in this file.
 - Strengthen device-registry compatibility regression coverage.
 
 ### 🔄 Other changes
-- None
+- Bumped the integration manifest version to `4.3.5`.
 
 ## v4.3.4 - 2026-09-14
 
