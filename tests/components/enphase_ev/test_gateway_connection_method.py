@@ -392,3 +392,40 @@ def test_today_flags_override_dashboard(coordinator_factory, flags, expected):
         ]
         == expected
     )
+
+
+def test_today_connection_matches_dashboard_supplied_ip(coordinator_factory):
+    """An inventory gateway can lack an IP that is present in dashboard details."""
+    coord = coordinator_factory()
+    coord.inventory_runtime._set_type_device_buckets(
+        {
+            "envoy": {
+                "count": 1,
+                "devices": [{"name": "IQ Gateway", "serial_number": "GW-1"}],
+            }
+        },
+        ["envoy"],
+    )
+    coord._system_dashboard_devices_details_raw = {
+        "envoy": {
+            "envoys": {
+                "envoys": [
+                    {"name": "IQ Gateway", "serial_number": "GW-1", "ip": "192.0.2.10"},
+                    {
+                        "name": "IQ Gateway",
+                        "serial_number": "GW-other",
+                        "ip": "192.0.2.20",
+                    },
+                ]
+            }
+        }
+    }
+    coord.inventory_state._gateway_today_connections = {
+        "GW-other": {"cellular": True},
+        "GW-1": {"ethernet": True},
+    }
+    assert _gateway_connection_method(coord, "192.0.2.10") == "Ethernet"
+    attrs = EnphaseGatewayConnectivityStatusSensor(coord).extra_state_attributes
+    assert attrs["ip_address"] == "192.0.2.10"
+    assert attrs["connection_method"] == "Ethernet"
+    assert _gateway_connection_method(coord, "192.0.2.20") == "Cellular"

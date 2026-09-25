@@ -166,6 +166,31 @@ def _gateway_connection_method(
         {},
     )
     primary_serial = _gateway_clean_text(primary.get("serial_number"))
+    runtime = getattr(coord, "inventory_runtime", None)
+    details_getter = getattr(runtime, "system_dashboard_envoy_details", None)
+    if callable(details_getter):
+        members = list(details_getter()) + members
+    else:
+        detail_getter = getattr(coord, "system_dashboard_envoy_detail", None)
+        detail = detail_getter() if callable(detail_getter) else None
+        if isinstance(detail, dict):
+            members.insert(0, detail)
+    members.sort(key=lambda member: not _gateway_member_preferred_for_ip(member))
+    if primary_serial is None:
+        # The displayed IP may come from dashboard details rather than inventory.
+        # Resolve identity through that same address before consulting today.
+        primary_serial = next(
+            (
+                serial
+                for member in members
+                if ip_address is not None
+                and _gateway_member_ip_address(member) == ip_address
+                and _gateway_ip_member_kind(member)
+                not in {"production", "consumption", "controller"}
+                and (serial := _gateway_clean_text(member.get("serial_number")))
+            ),
+            None,
+        )
     today_connections = getattr(
         getattr(coord, "inventory_state", None), "_gateway_today_connections", {}
     )
@@ -183,16 +208,6 @@ def _gateway_connection_method(
             )
             or None
         )
-    runtime = getattr(coord, "inventory_runtime", None)
-    details_getter = getattr(runtime, "system_dashboard_envoy_details", None)
-    if callable(details_getter):
-        members = list(details_getter()) + members
-    else:
-        detail_getter = getattr(coord, "system_dashboard_envoy_detail", None)
-        detail = detail_getter() if callable(detail_getter) else None
-        if isinstance(detail, dict):
-            members.insert(0, detail)
-    members.sort(key=lambda member: not _gateway_member_preferred_for_ip(member))
     for member in members:
         if _gateway_ip_member_kind(member) in {
             "production",
