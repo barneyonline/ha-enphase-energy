@@ -1047,6 +1047,7 @@ Example response shape:
   },
   "connectionDetails": [
     {
+      "serial_num": "GW0000000000",
       "cellular": false,
       "wifi": null,
       "ethernet": true,
@@ -1076,7 +1077,7 @@ Example response shape:
     "very_low_soc": 5
   },
   "system": {
-    "connection_type": "ethernet",
+    "connection_type": {"key": "ethernet", "name": "Ethernet"},
     "statusCode": "normal"
   },
   "loggers": ["<redacted>"],
@@ -1092,6 +1093,12 @@ Observed structure:
 - The integration treats this `heatpump` daily total as the authoritative displayed heat-pump energy and the source for derived heat-pump power. Running and idle power may be smoothed over longer same-day monotonic energy windows when enough history is available, with raw delta values retained in diagnostics. The HEMS `energy-consumption` endpoint is optional split metadata for diagnostics and source attribution.
 - `siteStatus="normal"` coexisted with `statusDetails.statusSeverity="warning"` in the observed capture.
 - `batteryConfig` mirrors several BatteryConfig-service concepts (`usage`, backup percentage, grid-mode settings, storm state) but adds internal class/ID fields and gateway-serial keyed maps.
+
+Gateway connectivity (live website inspection, 2026-09-25):
+- `/today.connectionDetails` records include `serial_num`, matching the gateway serial, and `ethernet`, `wifi`, and `cellular` flags. An observed record had `ethernet: true`, `wifi: null`, and `cellular: false`; the UI showed Ethernet Active, Wi-Fi Not Available, and the cellular modem Idle.
+- Enlighten's `envoyConnectionType` helper matches these records by `serial_num`, with a fallback to bootstrap device `connectionDetails`. This is separate from the dashboard endpoint's snake-case `connection_details` field.
+- `system.connection_type` was observed as an object with `key` and `name`; the previous specification example used a string. It is site-level data and must not be assigned to an arbitrary gateway on multi-gateway sites.
+- In `devices.json`, `primary_gw_connectivity` describes connection to a parent gateway, not network transport. The frontend maps `connected` and `not_connected` to connected/disconnected from IQ Gateway, using `parent_id` for the parent serial. The inspected gateway reported `null` while Ethernet was active.
 
 ### 2.B Site-Level Energy, Inventory, and Events
 

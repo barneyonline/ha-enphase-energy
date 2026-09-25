@@ -166,6 +166,23 @@ def _gateway_connection_method(
         {},
     )
     primary_serial = _gateway_clean_text(primary.get("serial_number"))
+    today_connections = getattr(
+        getattr(coord, "inventory_state", None), "_gateway_today_connections", {}
+    )
+    today_details = today_connections.get(primary_serial)
+    if isinstance(today_details, dict) and today_details:
+        return (
+            ", ".join(
+                label
+                for key, label in (
+                    ("ethernet", "Ethernet"),
+                    ("wifi", "Wi-Fi"),
+                    ("cellular", "Cellular"),
+                )
+                if today_details.get(key) is True
+            )
+            or None
+        )
     runtime = getattr(coord, "inventory_runtime", None)
     details_getter = getattr(runtime, "system_dashboard_envoy_details", None)
     if callable(details_getter):

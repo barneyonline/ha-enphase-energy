@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 - Calculate Current Power Consumption immediately from available production, grid, and battery power sensors, and recalculate whenever an input changes instead of waiting for a second consumption energy sample.
+- Resolve IQ Gateway Connection Method from serial-matched site-today transport flags when dashboard device details do not expose the connection method.
 
 ### 🔧 Improvements
 - None
