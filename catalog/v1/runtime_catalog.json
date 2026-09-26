@@ -1751,16 +1751,17 @@
       "product_media_name_id": null
     }
   },
-  "generated_at": "2026-09-21T09:00:03.444078Z",
+  "generated_at": "2026-09-26T08:38:14.211116Z",
   "schema_version": 1,
   "source": {
     "apps_url": "https://enphase.com/installers/resources/documentation/communication",
     "crawl": {
       "envoy": {
         "bootstrap_error_targets": [],
-        "count": 261,
+        "count": 255,
         "crawl_error_targets": [],
         "empty_release_targets": [
+          "https://enphase.com/el-cy/|el-cy",
           "https://enphase.com/en-my/|en-my",
           "https://enphase.com/en-sar/|en-sar",
           "https://enphase.com/es-do/|es-do",
@@ -1908,7 +1909,7 @@
           "https://enphase.com/el-cy/|el-cy": {
             "apps_url": "https://enphase.com/el-cy/installers/resources/documentation/communication",
             "bootstrap_error": null,
-            "count": 6,
+            "count": 0,
             "crawl_error": null,
             "pages": [
               "https://enphase.com/el-cy/installers/resources/documentation/communication?product_type=141&f%5B0%5D=document%3A217&search_api_language=el-cy&field_alternative_language=el-cy&page=0"
