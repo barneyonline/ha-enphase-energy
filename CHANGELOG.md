@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Calculate Current Power Consumption immediately from available production, grid, and battery power sensors, and recalculate whenever an input changes instead of waiting for a second consumption energy sample.
 
 ### 🔧 Improvements
 - None
