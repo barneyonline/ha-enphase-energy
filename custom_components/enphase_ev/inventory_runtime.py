@@ -2533,6 +2533,20 @@ class InventoryRuntime:
                     continue
                 details_payloads.setdefault(canonical_type, {})[source_type] = payload
 
+        # Today supplies per-gateway transport flags even when the dashboard
+        # detail cards omit connection_details. Keep only serial-keyed booleans.
+        today_fetcher = getattr(self.client, "pv_system_today", None)
+        if callable(today_fetcher) and coord.inventory_view.has_type("envoy"):
+            try:
+                today_payload = await today_fetcher()
+            except Exception as err:  # noqa: BLE001
+                detail_failures["today_connectivity"] = err.__class__.__name__
+            else:
+                if isinstance(today_payload, dict):
+                    self.inventory_state._gateway_today_connections = (
+                        self._normalize_today_connections(today_payload)
+                    )
+
         (
             type_summaries,
             hierarchy_summary,
@@ -4167,6 +4181,27 @@ class InventoryRuntime:
             for source_type, payload in raw.items()
             if isinstance(payload, dict)
         }
+
+    @staticmethod
+    def _normalize_today_connections(
+        payload: dict[str, object],
+    ) -> dict[str, dict[str, bool]]:
+        records = payload.get("connectionDetails")
+        connections: dict[str, dict[str, bool]] = {}
+        if not isinstance(records, list):
+            return connections
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            serial = record.get("serial_num")
+            if not isinstance(serial, str) or not serial.strip():
+                continue
+            connections[serial.strip()] = {
+                key: value
+                for key in ("ethernet", "wifi", "cellular")
+                if isinstance(value := record.get(key), bool)
+            }
+        return connections
 
     def system_dashboard_envoy_detail(self) -> dict[str, object] | None:
         records = self.system_dashboard_envoy_details()

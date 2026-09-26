@@ -178,6 +178,7 @@ class RefreshHealthState:
 
 @dataclass(slots=True)
 class InventoryState:
+    _gateway_today_connections: dict[str, dict[str, bool]] = field(default_factory=dict)
     _inverters_inventory_cache_until: float | None = None
     _devices_inventory_cache_until: float | None = None
     _devices_inventory_payload: PayloadMap | None = None

@@ -176,6 +176,38 @@ def _gateway_connection_method(
         if isinstance(detail, dict):
             members.insert(0, detail)
     members.sort(key=lambda member: not _gateway_member_preferred_for_ip(member))
+    if primary_serial is None:
+        # The displayed IP may come from dashboard details rather than inventory.
+        # Resolve identity through that same address before consulting today.
+        primary_serial = next(
+            (
+                serial
+                for member in members
+                if ip_address is not None
+                and _gateway_member_ip_address(member) == ip_address
+                and _gateway_ip_member_kind(member)
+                not in {"production", "consumption", "controller"}
+                and (serial := _gateway_clean_text(member.get("serial_number")))
+            ),
+            None,
+        )
+    today_connections = getattr(
+        getattr(coord, "inventory_state", None), "_gateway_today_connections", {}
+    )
+    today_details = today_connections.get(primary_serial)
+    if isinstance(today_details, dict) and today_details:
+        return (
+            ", ".join(
+                label
+                for key, label in (
+                    ("ethernet", "Ethernet"),
+                    ("wifi", "Wi-Fi"),
+                    ("cellular", "Cellular"),
+                )
+                if today_details.get(key) is True
+            )
+            or None
+        )
     for member in members:
         if _gateway_ip_member_kind(member) in {
             "production",

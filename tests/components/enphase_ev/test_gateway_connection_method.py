@@ -270,3 +270,162 @@ def test_gateway_connection_method_tracks_identity_after_ip_change(
     attrs = EnphaseGatewayConnectivityStatusSensor(coord).extra_state_attributes
     assert attrs["ip_address"] == "192.0.2.10"
     assert attrs["connection_method"] == "Wi-Fi"
+
+
+@pytest.mark.asyncio
+async def test_today_connectivity_refresh_and_publication(coordinator_factory):
+    from unittest.mock import AsyncMock
+
+    coord = coordinator_factory()
+    coord.update_interval = None
+    coord.always_update = False
+    runtime = coord.inventory_runtime
+    runtime._set_type_device_buckets(
+        {
+            "envoy": {
+                "count": 1,
+                "devices": [
+                    {"name": "IQ Gateway", "serial_number": "GW-1", "ip": "192.0.2.10"}
+                ],
+            }
+        },
+        ["envoy"],
+    )
+    coord.client.devices_tree = AsyncMock(return_value={})
+    coord.client.devices_details = AsyncMock(return_value={})
+    coord.client.pv_system_today = AsyncMock()
+    sensor = EnphaseGatewayConnectivityStatusSensor(coord)
+    observed = []
+    remove = coord.async_add_listener(
+        lambda: observed.append(sensor.extra_state_attributes["connection_method"])
+    )
+    try:
+        for transport in ("ethernet", "wifi"):
+            coord.client.pv_system_today.return_value = {
+                "connectionDetails": [
+                    {"serial_num": "GW-other", "cellular": True},
+                    {
+                        "serial_num": "GW-1",
+                        transport: True,
+                        "interface_ip": {transport: "192.0.2.99"},
+                    },
+                ],
+                "system": {"connection_type": {"key": "cellular", "name": "Cellular"}},
+            }
+            await runtime._async_refresh_system_dashboard(force=True)
+            coord.async_set_updated_data(dict(coord.data or {}))
+        assert observed == ["Ethernet", "Wi-Fi"]
+        assert coord.inventory_state._gateway_today_connections["GW-1"] == {
+            "wifi": True
+        }
+        coord.client.pv_system_today.side_effect = RuntimeError("private payload")
+        await runtime._async_refresh_system_dashboard(force=True)
+        assert sensor.extra_state_attributes["connection_method"] == "Wi-Fi"
+        assert (
+            coord._system_dashboard_detail_failures["today_connectivity"]
+            == "RuntimeError"
+        )
+        coord.client.pv_system_today.side_effect = None
+        coord.client.pv_system_today.return_value = None
+        await runtime._async_refresh_system_dashboard(force=True)
+        assert sensor.extra_state_attributes["connection_method"] == "Wi-Fi"
+        coord.client.pv_system_today.return_value = {"connectionDetails": []}
+        await runtime._async_refresh_system_dashboard(force=True)
+        assert sensor.extra_state_attributes["connection_method"] is None
+    finally:
+        remove()
+
+
+@pytest.mark.parametrize(
+    "records,expected",
+    [
+        (None, {}),
+        ([None, {}, {"serial_num": 123}, {"serial_num": " "}], {}),
+        (
+            [
+                {
+                    "serial_num": " GW-1 ",
+                    "wifi": "true",
+                    "ethernet": True,
+                    "cellular": False,
+                }
+            ],
+            {"GW-1": {"ethernet": True, "cellular": False}},
+        ),
+    ],
+)
+def test_today_connections_normalize(coordinator_factory, records, expected):
+    assert (
+        coordinator_factory().inventory_runtime._normalize_today_connections(
+            {"connectionDetails": records}
+        )
+        == expected
+    )
+
+
+@pytest.mark.parametrize(
+    "flags,expected",
+    [({"ethernet": False}, None), ({"wifi": True}, "Wi-Fi"), ({}, "Ethernet")],
+)
+def test_today_flags_override_dashboard(coordinator_factory, flags, expected):
+    coord = coordinator_factory()
+    coord.inventory_runtime._set_type_device_buckets(
+        {
+            "envoy": {
+                "count": 1,
+                "devices": [
+                    {
+                        "name": "IQ Gateway",
+                        "serial_number": "GW-1",
+                        "ip": "192.0.2.10",
+                        "connection_details": {"ethernet": True},
+                    }
+                ],
+            }
+        },
+        ["envoy"],
+    )
+    coord.inventory_state._gateway_today_connections = {"GW-1": flags}
+    assert (
+        EnphaseGatewayConnectivityStatusSensor(coord).extra_state_attributes[
+            "connection_method"
+        ]
+        == expected
+    )
+
+
+def test_today_connection_matches_dashboard_supplied_ip(coordinator_factory):
+    """An inventory gateway can lack an IP that is present in dashboard details."""
+    coord = coordinator_factory()
+    coord.inventory_runtime._set_type_device_buckets(
+        {
+            "envoy": {
+                "count": 1,
+                "devices": [{"name": "IQ Gateway", "serial_number": "GW-1"}],
+            }
+        },
+        ["envoy"],
+    )
+    coord._system_dashboard_devices_details_raw = {
+        "envoy": {
+            "envoys": {
+                "envoys": [
+                    {"name": "IQ Gateway", "serial_number": "GW-1", "ip": "192.0.2.10"},
+                    {
+                        "name": "IQ Gateway",
+                        "serial_number": "GW-other",
+                        "ip": "192.0.2.20",
+                    },
+                ]
+            }
+        }
+    }
+    coord.inventory_state._gateway_today_connections = {
+        "GW-other": {"cellular": True},
+        "GW-1": {"ethernet": True},
+    }
+    assert _gateway_connection_method(coord, "192.0.2.10") == "Ethernet"
+    attrs = EnphaseGatewayConnectivityStatusSensor(coord).extra_state_attributes
+    assert attrs["ip_address"] == "192.0.2.10"
+    assert attrs["connection_method"] == "Ethernet"
+    assert _gateway_connection_method(coord, "192.0.2.20") == "Cellular"

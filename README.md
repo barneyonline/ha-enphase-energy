@@ -159,3 +159,11 @@ the site is known to have no battery. Until the inputs are ready, the sensor can
 use its existing consumption-energy calculation. Once a power balance has been
 calculated, it retains that result if an input becomes unavailable and marks it
 `using_cached`, until all required power inputs are available again.
+
+### Gateway connection method
+
+Gateway Connection Method also uses the site-today response, matched by gateway
+serial number, during the inventory refresh. Explicit per-gateway transport flags
+take precedence over dashboard details. The site-level connection type is not
+assigned to individual gateways, and `primary_gw_connectivity` describes a parent
+gateway connection rather than Ethernet, Wi-Fi, or cellular transport.
