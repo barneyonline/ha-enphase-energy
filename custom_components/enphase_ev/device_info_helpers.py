@@ -4,14 +4,23 @@ from functools import lru_cache
 import json
 from pathlib import Path
 import re
+from urllib.parse import quote
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity import DeviceInfo
 
-from .const import DOMAIN
+from .const import BASE_URL, DOMAIN
 from .runtime_helpers import coerce_optional_text as _clean_text
+
+
+def _site_configuration_url(site_id: object) -> str:
+    """Link physical devices and the cloud service to their Enlighten site."""
+    site = _clean_text(site_id)
+    if not site:
+        return BASE_URL
+    return f"{BASE_URL}/app/system_dashboard/sites/{quote(site, safe='')}/summary"
 
 
 def _is_redundant_model_id(model: object, model_id: object) -> bool:
@@ -95,18 +104,16 @@ def _compose_charger_model_display(
     model_name: object,
     fallback_name: str | None = None,
 ) -> str | None:
+    """Keep the friendly model separate from the registry model_id SKU."""
     display = _normalize_evse_display_name(display_name)
     fallback = _normalize_evse_display_name(fallback_name)
     model = _normalize_evse_model_name(model_name)
-    if display and model:
-        if model.casefold() in display.casefold():
-            return display
-        return f"{display} ({model})"
-    if display:
-        return display
-    if model:
-        return model
-    return fallback
+    friendly = display or (fallback if not model else None)
+    if friendly:
+        return re.sub(
+            r"\s*\(IQ-EVSE-[^()]+\)", "", friendly, flags=re.IGNORECASE
+        ).strip()
+    return model
 
 
 @lru_cache(maxsize=1)
@@ -141,10 +148,9 @@ def _cloud_device_info(site_id: object) -> DeviceInfo | dict[str, object]:
         "manufacturer": "Enphase",
         "name": "Enphase Cloud",
         "model": "Cloud Service",
+        "configuration_url": _site_configuration_url(site_id),
     }
-    version = _integration_version()
-    if version:
-        payload["sw_version"] = version
+    payload["sw_version"] = None
     try:
         from homeassistant.helpers.entity import DeviceInfo
     except Exception:

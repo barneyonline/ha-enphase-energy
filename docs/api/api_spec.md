@@ -1604,6 +1604,8 @@ GET /app-api/<site_id>/data.json?app=1&device_status=non_retired&is_mobile=0
 ```
 Returns the site bootstrap payload used by the mobile/web app shell. It includes site paths, locale/timezone, and sanitized user/owner metadata.
 
+Runtime use: optional Cloud diagnostic metadata. The integration retains only `app.timezone` and boolean account flags, derives ownership by comparing user and owner IDs, and discards personal fields. Missing flags leave Account access unavailable. Country and currency are read separately from the site summary in §2.9.4.
+
 Example response excerpt (anonymized):
 ```json
 {

@@ -144,7 +144,8 @@ def test_device_info_includes_model_name_when_available():
     ent = EnphaseEnergyTodaySensor(coord, RANDOM_SERIAL_ALT)
     info = ent.device_info
     assert info["name"] == "IQ EV Charger"
-    assert info["model"] == "IQ EV Charger (IQ-EVSE-EU-3032)"
+    assert info["model"] == "IQ EV Charger"
+    assert info["model_id"] == coord.data[RANDOM_SERIAL_ALT]["model_name"]
 
 
 def test_device_info_suppresses_duplicate_extended_evse_model_suffix():
@@ -170,7 +171,8 @@ def test_device_info_suppresses_duplicate_extended_evse_model_suffix():
     ent = EnphaseEnergyTodaySensor(coord, RANDOM_SERIAL_ALT)
     info = ent.device_info
     assert info["name"] == "IQ EV Charger (IQ-EVSE-EU-3032)"
-    assert info["model"] == "IQ EV Charger (IQ-EVSE-EU-3032)"
+    assert info["model"] == "IQ EV Charger"
+    assert info["model_id"] == coord.data[RANDOM_SERIAL_ALT]["model_name"]
 
 
 def test_device_info_handles_empty_or_invalid_model_name():

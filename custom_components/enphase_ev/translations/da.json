@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Samlet inverterkapacitet"
+      },
+      "account_access": {
+        "name": "Kontoadgang",
+        "state": {
+          "administrator": "Kontoadministrator",
+          "installer": "Installatør",
+          "owner": "Ejer",
+          "host": "Vært",
+          "consumption_data": "Forbrugsdata",
+          "viewer": "Læseadgang"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Kontoadministrator"
+          },
+          "installer": {
+            "name": "Installatør"
+          },
+          "owner": {
+            "name": "Ejer"
+          },
+          "host": {
+            "name": "Vært"
+          },
+          "consumption_data": {
+            "name": "Forbrugsdata"
+          },
+          "viewer": {
+            "name": "Læseadgang"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Anlægsoplysninger",
+        "state_attributes": {
+          "site_id": {
+            "name": "Anlægs-ID"
+          },
+          "timezone": {
+            "name": "Tidszone"
+          },
+          "country": {
+            "name": "Land"
+          },
+          "currency": {
+            "name": "Valuta"
+          }
+        }
       }
     },
     "number": {

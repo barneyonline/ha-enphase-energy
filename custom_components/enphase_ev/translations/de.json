@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Gesamte Wechselrichterleistung"
+      },
+      "account_access": {
+        "name": "Kontozugriff",
+        "state": {
+          "administrator": "Kontoadministrator",
+          "installer": "Installateur",
+          "owner": "Eigentümer",
+          "host": "Gastgeber",
+          "consumption_data": "Verbrauchsdaten",
+          "viewer": "Betrachter"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Kontoadministrator"
+          },
+          "installer": {
+            "name": "Installateur"
+          },
+          "owner": {
+            "name": "Eigentümer"
+          },
+          "host": {
+            "name": "Gastgeber"
+          },
+          "consumption_data": {
+            "name": "Verbrauchsdaten"
+          },
+          "viewer": {
+            "name": "Betrachter"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Anlageninformationen",
+        "state_attributes": {
+          "site_id": {
+            "name": "Anlagen-ID"
+          },
+          "timezone": {
+            "name": "Zeitzone"
+          },
+          "country": {
+            "name": "Land"
+          },
+          "currency": {
+            "name": "Währung"
+          }
+        }
       }
     },
     "number": {

@@ -26,8 +26,8 @@ def test_device_info_uses_display_name_and_model():
     info = entity.device_info
 
     assert info["name"] == "Garage Charger"
-    assert info["model"] == "Garage Charger (IQ-EVSE-EU-3032)"
-    assert "model_id" not in info
+    assert info["model"] == "Garage Charger"
+    assert info["model_id"] == "IQ-EVSE-EU-3032-01"
     assert info["serial_number"] == "555555555555"
     assert info["sw_version"] == "3.1"
     assert info["connections"] == {(CONNECTION_NETWORK_MAC, "00:11:22:33:44:55")}
@@ -50,7 +50,7 @@ def test_device_info_keeps_non_redundant_model_id():
     entity._sn = "1000"
 
     info = entity.device_info
-    assert info["model"] == "Garage Charger (IQ-EVSE-EU-3032)"
+    assert info["model"] == "Garage Charger"
     assert info["model_id"] == "IQ-EVSE-BOARD-REV-A"
 
 
@@ -200,7 +200,7 @@ def test_evse_display_name_normalization_and_model_deduping() -> None:
             "Q EV Charger (IQ-EVSE-EU-3032) (IQ-EVSE-EU-3032-0105-1300)",
             "IQ-EVSE-EU-3032-0105-1300",
         )
-        == "IQ EV Charger (IQ-EVSE-EU-3032)"
+        == "IQ EV Charger"
     )
     assert _is_redundant_model_id(
         "IQ EV Charger (IQ-EVSE-EU-3032)", "IQ-EVSE-EU-3032-0105-1300"
@@ -251,3 +251,61 @@ async def test_async_prime_integration_version_uses_executor(hass, monkeypatch) 
     monkeypatch.setattr(helpers, "_integration_version", _fake_integration_version)
     await helpers.async_prime_integration_version(hass)
     assert called
+
+
+@pytest.mark.asyncio
+async def test_charger_registry_refresh_keeps_full_sku_and_user_name(
+    hass, config_entry
+):
+    from homeassistant.helpers import device_registry as dr
+
+    from custom_components.enphase_ev.const import DOMAIN
+    from custom_components.enphase_ev.registry_sync import _sync_charger_devices
+
+    registry = dr.async_get(hass)
+    device = registry.async_get_or_create(
+        config_entry_id=config_entry.entry_id,
+        identifiers={(DOMAIN, "charger-test")},
+        model="IQ EV Charger (IQ-EVSE-EU-3032)",
+        name="IQ EV Charger",
+    )
+    registry.async_update_device(device.id, name_by_user="Garage")
+    coord = SimpleNamespace(
+        iter_serials=lambda: ["charger-test"],
+        data={
+            "charger-test": {
+                "display_name": "IQ EV Charger",
+                "model_name": "IQ-EVSE-EU-3032-0105-1300",
+            }
+        },
+    )
+    for _ in range(2):
+        _sync_charger_devices(config_entry, coord, registry, "site-test", {})
+        updated = registry.async_get(device.id)
+        assert updated.model == "IQ EV Charger"
+        assert updated.model_id == "IQ-EVSE-EU-3032-0105-1300"
+        assert updated.name_by_user == "Garage"
+        assert (
+            updated.configuration_url
+            == "https://enlighten.enphaseenergy.com/app/system_dashboard/sites/site-test/summary"
+        )
+
+
+@pytest.mark.parametrize(
+    "site, suffix",
+    [
+        (None, ""),
+        (" ", ""),
+        ("12345", "/app/system_dashboard/sites/12345/summary"),
+        ("a/b?c", "/app/system_dashboard/sites/a%2Fb%3Fc/summary"),
+    ],
+)
+def test_site_management_link(site, suffix):
+    from custom_components.enphase_ev.device_info_helpers import (
+        _site_configuration_url,
+        _cloud_device_info,
+    )
+
+    expected = "https://enlighten.enphaseenergy.com" + suffix
+    assert _site_configuration_url(site) == expected
+    assert _cloud_device_info(site)["configuration_url"] == expected

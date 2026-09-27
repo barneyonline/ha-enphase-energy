@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Total Inverter Capacity"
+      },
+      "account_access": {
+        "name": "Account access",
+        "state": {
+          "administrator": "Administrator",
+          "installer": "Installer",
+          "owner": "Owner",
+          "host": "Host",
+          "consumption_data": "Consumption data",
+          "viewer": "Viewer"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Administrator"
+          },
+          "installer": {
+            "name": "Installer"
+          },
+          "owner": {
+            "name": "Owner"
+          },
+          "host": {
+            "name": "Host"
+          },
+          "consumption_data": {
+            "name": "Consumption data"
+          },
+          "viewer": {
+            "name": "Viewer"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Site information",
+        "state_attributes": {
+          "site_id": {
+            "name": "Site ID"
+          },
+          "timezone": {
+            "name": "Timezone"
+          },
+          "country": {
+            "name": "Country"
+          },
+          "currency": {
+            "name": "Currency"
+          }
+        }
       }
     },
     "number": {

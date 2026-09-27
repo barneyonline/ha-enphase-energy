@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Inverterek teljes kapacitása"
+      },
+      "account_access": {
+        "name": "Fiók hozzáférése",
+        "state": {
+          "administrator": "Rendszergazda",
+          "installer": "Telepítő",
+          "owner": "Tulajdonos",
+          "host": "Házigazda",
+          "consumption_data": "Fogyasztási adatok",
+          "viewer": "Megtekintő"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Rendszergazda"
+          },
+          "installer": {
+            "name": "Telepítő"
+          },
+          "owner": {
+            "name": "Tulajdonos"
+          },
+          "host": {
+            "name": "Házigazda"
+          },
+          "consumption_data": {
+            "name": "Fogyasztási adatok"
+          },
+          "viewer": {
+            "name": "Megtekintő"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Telephely adatai",
+        "state_attributes": {
+          "site_id": {
+            "name": "Telephely azonosítója"
+          },
+          "timezone": {
+            "name": "Időzóna"
+          },
+          "country": {
+            "name": "Ország"
+          },
+          "currency": {
+            "name": "Pénznem"
+          }
+        }
       }
     },
     "number": {

@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 ### ✨ New features
 - Add default-off installer Export Limit controls enabled under Device Features and configured in Advanced settings, with an IQ Gateway enable/disable selector, configurable default watts and slew rate exposed as control attributes, automation actions with optional slew rate, and a configuration status sensor that displays pending and unconfirmed updates.
 - Add Total Array Size and Total Inverter Capacity diagnostic sensors with per-array capacity attributes for IQ Microinverters, discovered independently when the account can access their required data.
+- Add Enphase Cloud Site information and Account access diagnostic sensors with site metadata and explicit account-role flags.
 
 ### 🐛 Bug fixes
 - Preserve the discovered charger list across settings reloads so retired chargers from the original configuration do not reappear.
@@ -18,6 +19,8 @@ All notable changes to this project will be documented in this file.
 - Resolve IQ Gateway Connection Method from serial-matched site-today transport flags when dashboard device details do not expose the connection method.
 
 ### 🔧 Improvements
+- Remove the integration version from the Enphase Cloud Service info card.
+- Align IQ Battery, microinverter, and EV charger cards with friendly model names and full shared SKUs in brackets; summarize mixed models, omit SKU-only Hardware rows, and link device and cloud service cards to the Enlighten site.
 - Keep enabled Grid Profile Control visible during session failures and explain when to reauthenticate instead of reporting installer access denial. Session failures take precedence over mixed permission errors and stop pending-profile polling.
 - Move device feature options into a top-level Features menu, with installer Grid Profile and Microinverter Power toggles grouped under Advanced Features.
 

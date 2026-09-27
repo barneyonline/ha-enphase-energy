@@ -203,6 +203,12 @@ WARMUP_STATE_STAGE = RefreshStage(
     deadline_s=WARMUP_STAGE_DEADLINE_S,
     parallel_tasks=(
         object_method_task(
+            "cloud_metadata_s",
+            "cloud metadata",
+            "cloud_metadata_runtime",
+            "async_refresh",
+        ),
+        object_method_task(
             "system_events_s",
             "system events",
             "system_events_runtime",
@@ -319,6 +325,12 @@ STARTUP_CURRENT_POWER_PLAN = RefreshPlan(stages=(STARTUP_CURRENT_POWER_STAGE,))
 SITE_ONLY_FOLLOWUP_STAGE = RefreshStage(
     defer_topology=True,
     parallel_tasks=(
+        object_method_task(
+            "cloud_metadata_s",
+            "cloud metadata",
+            "cloud_metadata_runtime",
+            "async_refresh",
+        ),
         object_method_task(
             "system_events_s",
             "system events",
@@ -728,6 +740,16 @@ def build_followup_plan(owner: object, *, force_full: bool = False) -> RefreshPl
     vpp = getattr(owner, "vpp_runtime", None)
     parallel: list[RefreshTask] = []
     ordered: list[RefreshTask] = []
+    metadata = getattr(owner, "cloud_metadata_runtime", None)
+    if metadata is not None and metadata.refresh_due():
+        parallel.append(
+            object_method_task(
+                "cloud_metadata_s",
+                "cloud metadata",
+                "cloud_metadata_runtime",
+                "async_refresh",
+            )
+        )
     if battery.battery_site_settings_refresh_due():
         parallel.append(
             method_task(

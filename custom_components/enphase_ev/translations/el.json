@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Συνολική ισχύς μετατροπέων"
+      },
+      "account_access": {
+        "name": "Πρόσβαση λογαριασμού",
+        "state": {
+          "administrator": "Διαχειριστής",
+          "installer": "Εγκαταστάτης",
+          "owner": "Ιδιοκτήτης",
+          "host": "Οικοδεσπότης",
+          "consumption_data": "Δεδομένα κατανάλωσης",
+          "viewer": "Παρατηρητής"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Διαχειριστής"
+          },
+          "installer": {
+            "name": "Εγκαταστάτης"
+          },
+          "owner": {
+            "name": "Ιδιοκτήτης"
+          },
+          "host": {
+            "name": "Οικοδεσπότης"
+          },
+          "consumption_data": {
+            "name": "Δεδομένα κατανάλωσης"
+          },
+          "viewer": {
+            "name": "Παρατηρητής"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Πληροφορίες εγκατάστασης",
+        "state_attributes": {
+          "site_id": {
+            "name": "Αναγνωριστικό εγκατάστασης"
+          },
+          "timezone": {
+            "name": "Ζώνη ώρας"
+          },
+          "country": {
+            "name": "Χώρα"
+          },
+          "currency": {
+            "name": "Νόμισμα"
+          }
+        }
       }
     },
     "number": {

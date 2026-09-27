@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Łączna moc falowników"
+      },
+      "account_access": {
+        "name": "Dostęp konta",
+        "state": {
+          "administrator": "Administrator konta",
+          "installer": "Instalator",
+          "owner": "Właściciel",
+          "host": "Gospodarz",
+          "consumption_data": "Dane zużycia",
+          "viewer": "Obserwator"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Administrator konta"
+          },
+          "installer": {
+            "name": "Instalator"
+          },
+          "owner": {
+            "name": "Właściciel"
+          },
+          "host": {
+            "name": "Gospodarz"
+          },
+          "consumption_data": {
+            "name": "Dane zużycia"
+          },
+          "viewer": {
+            "name": "Obserwator"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Informacje o instalacji",
+        "state_attributes": {
+          "site_id": {
+            "name": "Identyfikator instalacji"
+          },
+          "timezone": {
+            "name": "Strefa czasowa"
+          },
+          "country": {
+            "name": "Kraj"
+          },
+          "currency": {
+            "name": "Waluta"
+          }
+        }
       }
     },
     "number": {

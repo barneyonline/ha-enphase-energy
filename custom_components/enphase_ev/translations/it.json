@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Capacità totale degli inverter"
+      },
+      "account_access": {
+        "name": "Accesso dell’account",
+        "state": {
+          "administrator": "Amministratore",
+          "installer": "Installatore",
+          "owner": "Proprietario",
+          "host": "Ospitante",
+          "consumption_data": "Dati di consumo",
+          "viewer": "Osservatore"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Amministratore"
+          },
+          "installer": {
+            "name": "Installatore"
+          },
+          "owner": {
+            "name": "Proprietario"
+          },
+          "host": {
+            "name": "Ospitante"
+          },
+          "consumption_data": {
+            "name": "Dati di consumo"
+          },
+          "viewer": {
+            "name": "Osservatore"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Informazioni sul sito",
+        "state_attributes": {
+          "site_id": {
+            "name": "ID del sito"
+          },
+          "timezone": {
+            "name": "Fuso orario"
+          },
+          "country": {
+            "name": "Paese"
+          },
+          "currency": {
+            "name": "Valuta"
+          }
+        }
       }
     },
     "number": {
