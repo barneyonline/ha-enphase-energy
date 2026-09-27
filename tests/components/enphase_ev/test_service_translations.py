@@ -1063,7 +1063,7 @@ def _battery_schedule_string_paths(data: dict) -> list[str]:
     paths = [
         "options.step.init.data.schedule_sync_enabled",
         "options.step.init.data.battery_schedules_enabled",
-        "options.step.devices.sections.device_features.data.battery_schedules_enabled",
+        "options.step.features.sections.device_features.data.battery_schedules_enabled",
     ]
 
     scheduler_entity_prefixes = (
@@ -2185,22 +2185,22 @@ def test_pricing_edit_strings_exist_for_all_locales() -> None:
         / "translations"
     )
     paths = [
-        "options.step.devices.sections.device_features.data.pricing_edits_enabled",
-        "options.step.devices.sections.device_features.data_description.pricing_edits_enabled",
+        "options.step.features.sections.device_features.data.pricing_edits_enabled",
+        "options.step.features.sections.device_features.data_description.pricing_edits_enabled",
         "exceptions.pricing_edits_disabled.message",
     ]
     english = json.loads((translations_dir / "en.json").read_text(encoding="utf-8"))
     assert (
         _at_path(
             english,
-            "options.step.devices.sections.device_features.data.pricing_edits_enabled",
+            "options.step.features.sections.device_features.data.pricing_edits_enabled",
         )
         == "Enable Pricing Edits"
     )
     assert (
         _at_path(
             english,
-            "options.step.devices.sections.device_features.data_description.pricing_edits_enabled",
+            "options.step.features.sections.device_features.data_description.pricing_edits_enabled",
         )
         == "Manage IQ Gateway Electricity Rates"
     )
@@ -2236,11 +2236,11 @@ def test_options_device_category_strings_exist_for_all_locales() -> None:
         "options.step.devices.title",
         "options.step.devices.description",
         "options.step.devices.sections.devices.name",
-        "options.step.devices.sections.device_features.name",
+        "options.step.features.sections.device_features.name",
         "options.step.devices.data.devices",
-        "options.step.devices.data.device_features",
+        "options.step.features.data.device_features",
         "options.step.devices.data.type_envoy",
-        "options.step.devices.data.schedule_sync_enabled",
+        "options.step.features.data.schedule_sync_enabled",
         "options.step.devices.data_description.type_envoy",
         "options.step.devices.sections.devices.data.type_envoy",
         "options.step.devices.sections.devices.data.type_encharge",
@@ -2248,14 +2248,14 @@ def test_options_device_category_strings_exist_for_all_locales() -> None:
         "options.step.devices.sections.devices.data.type_iqevse",
         "options.step.devices.sections.devices.data.type_heatpump",
         "options.step.devices.sections.devices.data.type_microinverter",
-        "options.step.devices.sections.device_features.data.schedule_sync_enabled",
-        "options.step.devices.sections.device_features.data.battery_schedules_enabled",
-        "options.step.devices.sections.device_features.data.system_event_repair_issues",
-        "options.step.devices.sections.device_features.data.pricing_edits_enabled",
-        "options.step.devices.sections.device_features.data.microinverter_lifetime_energy_enabled",
-        "options.step.devices.sections.device_features.data.microinverter_power_enabled",
-        "options.step.devices.sections.device_features.data.weather_enabled",
-        "options.step.devices.sections.device_features.data.grid_profile_controls_enabled",
+        "options.step.features.sections.device_features.data.schedule_sync_enabled",
+        "options.step.features.sections.device_features.data.battery_schedules_enabled",
+        "options.step.features.sections.device_features.data.system_event_repair_issues",
+        "options.step.features.sections.device_features.data.pricing_edits_enabled",
+        "options.step.features.sections.device_features.data.microinverter_lifetime_energy_enabled",
+        "options.step.features.sections.advanced_features.data.microinverter_power_enabled",
+        "options.step.features.sections.device_features.data.weather_enabled",
+        "options.step.features.sections.advanced_features.data.grid_profile_controls_enabled",
         "options.step.init.data.api_timeout",
         "options.step.init.data.nominal_voltage",
         "options.step.devices.sections.devices.data_description.type_envoy",
@@ -2264,14 +2264,14 @@ def test_options_device_category_strings_exist_for_all_locales() -> None:
         "options.step.devices.sections.devices.data_description.type_iqevse",
         "options.step.devices.sections.devices.data_description.type_heatpump",
         "options.step.devices.sections.devices.data_description.type_microinverter",
-        "options.step.devices.sections.device_features.data_description.system_event_repair_issues",
-        "options.step.devices.sections.device_features.data_description.schedule_sync_enabled",
-        "options.step.devices.sections.device_features.data_description.battery_schedules_enabled",
-        "options.step.devices.sections.device_features.data_description.pricing_edits_enabled",
-        "options.step.devices.sections.device_features.data_description.microinverter_lifetime_energy_enabled",
-        "options.step.devices.sections.device_features.data_description.microinverter_power_enabled",
-        "options.step.devices.sections.device_features.data_description.weather_enabled",
-        "options.step.devices.sections.device_features.data_description.grid_profile_controls_enabled",
+        "options.step.features.sections.device_features.data_description.system_event_repair_issues",
+        "options.step.features.sections.device_features.data_description.schedule_sync_enabled",
+        "options.step.features.sections.device_features.data_description.battery_schedules_enabled",
+        "options.step.features.sections.device_features.data_description.pricing_edits_enabled",
+        "options.step.features.sections.device_features.data_description.microinverter_lifetime_energy_enabled",
+        "options.step.features.sections.advanced_features.data_description.microinverter_power_enabled",
+        "options.step.features.sections.device_features.data_description.weather_enabled",
+        "options.step.features.sections.advanced_features.data_description.grid_profile_controls_enabled",
         "options.step.authentication_settings.title",
         "options.step.authentication_settings.description",
         "options.step.authentication_settings.data.reauth",
@@ -2300,28 +2300,28 @@ def test_options_device_category_strings_exist_for_all_locales() -> None:
         "options.step.devices.title",
         "options.step.devices.description",
         "options.step.devices.sections.devices.name",
-        "options.step.devices.sections.device_features.name",
+        "options.step.features.sections.device_features.name",
         "options.step.devices.data.devices",
-        "options.step.devices.data.device_features",
-        "options.step.devices.data.schedule_sync_enabled",
+        "options.step.features.data.device_features",
+        "options.step.features.data.schedule_sync_enabled",
         "options.step.devices.sections.devices.data.type_heatpump",
-        "options.step.devices.sections.device_features.data.schedule_sync_enabled",
-        "options.step.devices.sections.device_features.data.battery_schedules_enabled",
-        "options.step.devices.sections.device_features.data.system_event_repair_issues",
-        "options.step.devices.sections.device_features.data.pricing_edits_enabled",
-        "options.step.devices.sections.device_features.data.microinverter_lifetime_energy_enabled",
-        "options.step.devices.sections.device_features.data.microinverter_power_enabled",
-        "options.step.devices.sections.device_features.data.weather_enabled",
-        "options.step.devices.sections.device_features.data.grid_profile_controls_enabled",
+        "options.step.features.sections.device_features.data.schedule_sync_enabled",
+        "options.step.features.sections.device_features.data.battery_schedules_enabled",
+        "options.step.features.sections.device_features.data.system_event_repair_issues",
+        "options.step.features.sections.device_features.data.pricing_edits_enabled",
+        "options.step.features.sections.device_features.data.microinverter_lifetime_energy_enabled",
+        "options.step.features.sections.advanced_features.data.microinverter_power_enabled",
+        "options.step.features.sections.device_features.data.weather_enabled",
+        "options.step.features.sections.advanced_features.data.grid_profile_controls_enabled",
         "options.step.devices.sections.devices.data_description.type_heatpump",
-        "options.step.devices.sections.device_features.data_description.system_event_repair_issues",
-        "options.step.devices.sections.device_features.data_description.schedule_sync_enabled",
-        "options.step.devices.sections.device_features.data_description.battery_schedules_enabled",
-        "options.step.devices.sections.device_features.data_description.pricing_edits_enabled",
-        "options.step.devices.sections.device_features.data_description.microinverter_lifetime_energy_enabled",
-        "options.step.devices.sections.device_features.data_description.microinverter_power_enabled",
-        "options.step.devices.sections.device_features.data_description.weather_enabled",
-        "options.step.devices.sections.device_features.data_description.grid_profile_controls_enabled",
+        "options.step.features.sections.device_features.data_description.system_event_repair_issues",
+        "options.step.features.sections.device_features.data_description.schedule_sync_enabled",
+        "options.step.features.sections.device_features.data_description.battery_schedules_enabled",
+        "options.step.features.sections.device_features.data_description.pricing_edits_enabled",
+        "options.step.features.sections.device_features.data_description.microinverter_lifetime_energy_enabled",
+        "options.step.features.sections.advanced_features.data_description.microinverter_power_enabled",
+        "options.step.features.sections.device_features.data_description.weather_enabled",
+        "options.step.features.sections.advanced_features.data_description.grid_profile_controls_enabled",
         "options.step.authentication_settings.title",
         "options.step.authentication_settings.description",
         "options.step.authentication_settings.data.reauth",
@@ -2383,3 +2383,37 @@ def test_grid_profile_description_warns_about_malfunction_for_all_locales() -> N
             assert (
                 warning != english_warning
             ), f"{locale.name} should localize the Grid Profile warning"
+
+
+def test_features_and_session_guidance_are_localized() -> None:
+    root = ROOT
+    english = json.loads((root / "strings.json").read_text())
+    for path in (root / "translations").glob("*.json"):
+        data = json.loads(path.read_text())
+        steps = data["options"]["step"]
+        assert set(steps["devices"]["sections"]) == {"devices"}
+        assert set(steps["features"]["sections"]) == {
+            "device_features",
+            "advanced_features",
+        }
+        assert set(steps["features"]["sections"]["advanced_features"]["data"]) == {
+            "grid_profile_controls_enabled",
+            "microinverter_power_enabled",
+        }
+        assert steps["init"]["menu_options"]["features"]
+        assert steps["init"]["menu_option_descriptions"]["features"]
+        message = data["options"]["abort"]["grid_profile_session_expired"]
+        assert message
+        if not path.stem.startswith("en"):
+            assert (
+                message != english["options"]["abort"]["grid_profile_session_expired"]
+            )
+            assert (
+                steps["features"]["sections"]["advanced_features"]["name"]
+                != "Advanced Features"
+            )
+        else:
+            assert (
+                steps["advanced"]["menu_options"]["grid_profile"]
+                == "Grid Profile Control"
+            )

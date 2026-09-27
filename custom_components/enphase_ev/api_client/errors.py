@@ -121,6 +121,10 @@ class ActivationAccessDenied(OptionalEndpointUnavailable):
     """Raised when Activation explicitly denies installer-level access."""
 
 
+class ActivationSessionExpired(ActivationAccessDenied):
+    """Raised when the Enlighten session cannot bootstrap Activation access."""
+
+
 @dataclass(slots=True, frozen=True)
 class PayloadFailureSignature:
     """Structured metadata describing an invalid payload response."""

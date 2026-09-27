@@ -51,10 +51,16 @@ refresh. Cold setup continues to require an authoritative first refresh.
 The default-off VPP Events device feature is one of those topology options. Its
 reload clears the VPP cache before optional warmup so disabling the feature cannot
 publish preserved event state or make requests to the VPP service.
+The options menu separates device category selection (Devices) from feature
+configuration (Features). Features contains Device Features and Advanced Features;
+the latter groups installer Grid Profile controls and Microinverter Power.
 Installer Grid Profile controls are also a default-off topology option. Disabled
 entries skip both the startup Activation probe and steady metadata refreshes;
 config-entry migration enables the option only when an existing Current Grid
 Profile entity demonstrates prior use.
+When enabled, the Grid Profile Control menu remains visible during discovery
+failures. Rejected Settings-page sessions produce `session_expired` and direct
+users to reauthenticate; this state is distinct from installer access denial.
 
 `registry_migrations.py` owns versioned migrations and `registry_sync.py` owns
 ongoing reconciliation. Device and entity registry cleanup is intentionally conservative. Startup migrations

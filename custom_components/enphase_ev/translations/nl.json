@@ -502,15 +502,17 @@
           "repair_notifications": "Meldingen",
           "authentication_settings": "Authenticatie",
           "migrate_envoy": "Envoy-geschiedenis migreren",
-          "advanced": "Geavanceerd"
+          "advanced": "Geavanceerd",
+          "features": "Functies"
         },
         "menu_option_descriptions": {
           "settings": "Pas polling en gedrag aan.",
-          "devices": "Kies welke apparaatsgroepen je wilt toevoegen. Alle selecties delen hetzelfde polling-interval.",
+          "devices": "Kies welke apparaatcategorieën u wilt opnemen.",
           "repair_notifications": "Beheer Home Assistant-reparatiemeldingen.",
           "authentication_settings": "Start de login-flow om inloggegevens te vernieuwen zonder de integratie te verwijderen.",
           "migrate_envoy": "Neem geselecteerde energie-entiteit-ID's van Enphase Envoy over zodat de Home Assistant Energy-geschiedenis onder deze integratie doorgaat.",
-          "advanced": "Optionele bediening voor netmodus en netprofielbediening alleen voor installateurs."
+          "advanced": "Optionele bediening voor netmodus en netprofielbediening alleen voor installateurs.",
+          "features": "Configureer apparaatfuncties en geavanceerde bediening."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -573,7 +575,7 @@
       },
       "devices": {
         "title": "Apparaten selecteren",
-        "description": "Kies welke apparaatsgroepen je wilt toevoegen. Alle selecties delen hetzelfde polling-interval.",
+        "description": "Kies welke apparaatcategorieën u wilt opnemen.",
         "sections": {
           "devices": {
             "name": "Apparaten selecteren",
@@ -593,54 +595,16 @@
               "type_heatpump": "Bevat sensoren voor warmtepompstatus, diagnostiek en verbruik.",
               "type_microinverter": "Bevat sensoren voor micro-omvormerconnectiviteit, actief aantal en levensduurproductie."
             }
-          },
-          "device_features": {
-            "name": "Apparaatfuncties",
-            "data": {
-              "schedule_sync_enabled": "Schakel Scheduler-ondersteuning in",
-              "battery_schedules_enabled": "Schakel Batterijplanner in",
-              "system_event_repair_issues": "Reparatiemeldingen voor systeemgebeurtenissen inschakelen",
-              "pricing_edits_enabled": "Prijsbewerkingen inschakelen",
-              "weather_enabled": "Weer inschakelen",
-              "nominal_voltage": "Nominale spanning van EV-lader (V)",
-              "microinverter_lifetime_energy_enabled": "Levensduurenergie van micro-omvormers inschakelen",
-              "microinverter_power_enabled": "Vermogen van micro-omvormers inschakelen",
-              "vpp_events_enabled": "VPP-gebeurtenissen inschakelen",
-              "grid_profile_controls_enabled": "Installateursbediening voor netprofielen inschakelen"
-            },
-            "data_description": {
-              "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld.",
-              "pricing_edits_enabled": "Elektriciteitstarieven van IQ Gateway beheren",
-              "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is.",
-              "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is.",
-              "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger.",
-              "battery_schedules_enabled": "Beheer schema's voor de IQ Battery.",
-              "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in.",
-              "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is.",
-              "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld.",
-              "grid_profile_controls_enabled": "Haalt netprofielmetadata op die alleen voor installateurs beschikbaar zijn en schakelt profielacties in. Standaard uitgeschakeld."
-            }
           }
         },
         "data": {
           "devices": "Apparaten selecteren",
-          "device_features": "Apparaatfuncties",
           "type_envoy": "Gateway",
           "type_encharge": "Batterij",
           "type_ac_battery": "AC-batterij",
           "type_iqevse": "Laders",
           "type_heatpump": "Warmtepomp",
-          "type_microinverter": "Micro-omvormers",
-          "schedule_sync_enabled": "Schakel Scheduler-ondersteuning in",
-          "battery_schedules_enabled": "Schakel Batterijplanner in",
-          "system_event_repair_issues": "Reparatiemeldingen voor systeemgebeurtenissen inschakelen",
-          "pricing_edits_enabled": "Prijsbewerkingen inschakelen",
-          "weather_enabled": "Weer inschakelen",
-          "nominal_voltage": "Nominale spanning van EV-lader (V)",
-          "microinverter_lifetime_energy_enabled": "Levensduurenergie van micro-omvormers inschakelen",
-          "microinverter_power_enabled": "Vermogen van micro-omvormers inschakelen",
-          "vpp_events_enabled": "VPP-gebeurtenissen inschakelen",
-          "grid_profile_controls_enabled": "Installateursbediening voor netprofielen inschakelen"
+          "type_microinverter": "Micro-omvormers"
         },
         "data_description": {
           "type_envoy": "Bevat gateway-connectiviteit en meterdiagnostiek.",
@@ -648,17 +612,7 @@
           "type_ac_battery": "Bevat AC-batterijsensoren en slaapmodusbediening wanneer beschikbaar.",
           "type_iqevse": "Bevat EV-lader-entiteiten en bediening.",
           "type_heatpump": "Bevat sensoren voor warmtepompstatus, diagnostiek en verbruik.",
-          "type_microinverter": "Bevat sensoren voor micro-omvormerconnectiviteit, actief aantal en levensduurproductie.",
-          "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld.",
-          "pricing_edits_enabled": "Elektriciteitstarieven van IQ Gateway beheren",
-          "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is.",
-          "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is.",
-          "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger.",
-          "battery_schedules_enabled": "Beheer schema's voor de IQ Battery.",
-          "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in.",
-          "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is.",
-          "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld.",
-          "grid_profile_controls_enabled": "Haalt netprofielmetadata op die alleen voor installateurs beschikbaar zijn en schakelt profielacties in. Standaard uitgeschakeld."
+          "type_microinverter": "Bevat sensoren voor micro-omvormerconnectiviteit, actief aantal en levensduurproductie."
         }
       },
       "repair_notifications": {
@@ -787,6 +741,72 @@
       "grid_toggle_applied": {
         "title": "Wijziging netmodus geaccepteerd",
         "description": "Enphase accepteerde het verzoek om de netmodus te wijzigen in **{target_mode}**.\n\nHet fysieke relais is mogelijk nog steeds aan het veranderen. Gebruik de netmodus-sensor om de resulterende status te observeren."
+      },
+      "features": {
+        "title": "Functies",
+        "description": "Configureer apparaatfuncties en geavanceerde bediening.",
+        "sections": {
+          "device_features": {
+            "name": "Apparaatfuncties",
+            "data": {
+              "schedule_sync_enabled": "Schakel Scheduler-ondersteuning in",
+              "battery_schedules_enabled": "Schakel Batterijplanner in",
+              "system_event_repair_issues": "Reparatiemeldingen voor systeemgebeurtenissen inschakelen",
+              "pricing_edits_enabled": "Prijsbewerkingen inschakelen",
+              "weather_enabled": "Weer inschakelen",
+              "nominal_voltage": "Nominale spanning van EV-lader (V)",
+              "microinverter_lifetime_energy_enabled": "Levensduurenergie van micro-omvormers inschakelen",
+              "vpp_events_enabled": "VPP-gebeurtenissen inschakelen"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld.",
+              "pricing_edits_enabled": "Elektriciteitstarieven van IQ Gateway beheren",
+              "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is.",
+              "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is.",
+              "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger.",
+              "battery_schedules_enabled": "Beheer schema's voor de IQ Battery.",
+              "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in.",
+              "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld."
+            }
+          },
+          "advanced_features": {
+            "name": "Geavanceerde functies",
+            "data": {
+              "grid_profile_controls_enabled": "Installateursbediening voor netprofielen inschakelen",
+              "microinverter_power_enabled": "Vermogen van micro-omvormers inschakelen"
+            },
+            "data_description": {
+              "grid_profile_controls_enabled": "Haalt netprofielmetadata op die alleen voor installateurs beschikbaar zijn en schakelt profielacties in. Standaard uitgeschakeld.",
+              "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is."
+            }
+          }
+        },
+        "data": {
+          "device_features": "Apparaatfuncties",
+          "advanced_features": "Geavanceerde functies",
+          "schedule_sync_enabled": "Schakel Scheduler-ondersteuning in",
+          "battery_schedules_enabled": "Schakel Batterijplanner in",
+          "system_event_repair_issues": "Reparatiemeldingen voor systeemgebeurtenissen inschakelen",
+          "pricing_edits_enabled": "Prijsbewerkingen inschakelen",
+          "weather_enabled": "Weer inschakelen",
+          "nominal_voltage": "Nominale spanning van EV-lader (V)",
+          "microinverter_lifetime_energy_enabled": "Levensduurenergie van micro-omvormers inschakelen",
+          "microinverter_power_enabled": "Vermogen van micro-omvormers inschakelen",
+          "vpp_events_enabled": "VPP-gebeurtenissen inschakelen",
+          "grid_profile_controls_enabled": "Installateursbediening voor netprofielen inschakelen"
+        },
+        "data_description": {
+          "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld.",
+          "pricing_edits_enabled": "Elektriciteitstarieven van IQ Gateway beheren",
+          "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is.",
+          "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is.",
+          "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger.",
+          "battery_schedules_enabled": "Beheer schema's voor de IQ Battery.",
+          "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in.",
+          "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is.",
+          "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld.",
+          "grid_profile_controls_enabled": "Haalt netprofielmetadata op die alleen voor installateurs beschikbaar zijn en schakelt profielacties in. Standaard uitgeschakeld."
+        }
       }
     },
     "error": {
@@ -823,7 +843,8 @@
       "grid_profile_installer_required": "Netprofielbeheer vereist installateurstoegang tot Enphase Activation.",
       "grid_profile_no_regions": "Er zijn geen netprofielregio’s beschikbaar voor het land van deze locatie.",
       "grid_mode_unavailable": "Beheer van de netmodus is niet beschikbaar voor deze site.",
-      "grid_mode_blocked": "De netmodusbesturing is momenteel geblokkeerd: {reasons}."
+      "grid_mode_blocked": "De netmodusbesturing is momenteel geblokkeerd: {reasons}.",
+      "grid_profile_session_expired": "De Enlighten-sessie is verlopen of geweigerd. Open Authenticatie, meld u opnieuw aan en probeer het opnieuw."
     },
     "create_entry": {
       "migration_success": "Migratie voltooid. Enphase Energy bezit nu de geselecteerde bron-entiteits-ID's. Controleer het Energy-dashboard en Developer Tools > Statistics na de volgende vernieuwing.",

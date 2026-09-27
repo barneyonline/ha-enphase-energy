@@ -502,15 +502,17 @@
           "repair_notifications": "Varsler",
           "authentication_settings": "Autentisering",
           "migrate_envoy": "Migrer Envoy-historikk",
-          "advanced": "Avansert"
+          "advanced": "Avansert",
+          "features": "Funksjoner"
         },
         "menu_option_descriptions": {
           "settings": "Juster polling og oppførsel.",
-          "devices": "Velg hvilke enhetsgrupper som skal legges til. Alle valg deler samme pollingintervall.",
+          "devices": "Velg enhetskategoriene som skal inkluderes.",
           "repair_notifications": "Administrer reparasjonsvarsler i Home Assistant.",
           "authentication_settings": "Start innloggingsflyten for å oppdatere legitimasjon uten å fjerne integrasjonen.",
           "migrate_envoy": "Overta valgte Enphase Envoy-energi-enhets-ID-er slik at historikken i Home Assistant Energy fortsetter under denne integrasjonen.",
-          "advanced": "Valgfrie kontroller for nettmodus og nettprofilkontroller kun for installatører."
+          "advanced": "Valgfrie kontroller for nettmodus og nettprofilkontroller kun for installatører.",
+          "features": "Konfigurer enhetsfunksjoner og avanserte kontroller."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -573,7 +575,7 @@
       },
       "devices": {
         "title": "Velg enheter",
-        "description": "Velg hvilke enhetsgrupper som skal legges til. Alle valg deler samme pollingintervall.",
+        "description": "Velg enhetskategoriene som skal inkluderes.",
         "sections": {
           "devices": {
             "name": "Velg enheter",
@@ -593,54 +595,16 @@
               "type_heatpump": "Inkluderer sensorer for varmepumpens status, diagnostikk og forbruk.",
               "type_microinverter": "Inkluderer sensorer for mikrovekselretter-tilkobling, aktivt antall og livstidsproduksjon."
             }
-          },
-          "device_features": {
-            "name": "Enhetsfunksjoner",
-            "data": {
-              "schedule_sync_enabled": "Aktiver planleggerstøtte",
-              "battery_schedules_enabled": "Aktiver batteriplanlegger",
-              "system_event_repair_issues": "Aktiver reparasjonsvarsler for systemhendelser",
-              "pricing_edits_enabled": "Aktiver prisredigering",
-              "weather_enabled": "Aktiver vær",
-              "nominal_voltage": "EV-laderens nominelle spenning (V)",
-              "microinverter_lifetime_energy_enabled": "Aktiver mikroinverternes levetidsenergi",
-              "microinverter_power_enabled": "Aktiver mikroinvertereffekt",
-              "vpp_events_enabled": "Aktiver VPP-hendelser",
-              "grid_profile_controls_enabled": "Aktiver installatørstyring av nettprofil"
-            },
-            "data_description": {
-              "system_event_repair_issues": "Oppretter Home Assistant-reparasjoner for aktive stående Enphase-alarmer. Deaktivert som standard.",
-              "pricing_edits_enabled": "Administrer strømpriser for IQ Gateway",
-              "weather_enabled": "Henter gjeldende vær for anlegget fra Enphase og oppretter bare en værenhet når endepunktet er tilgjengelig.",
-              "nominal_voltage": "Typisk vekselspenning for å beregne effekten når sanntidsspenning ikke er tilgjengelig.",
-              "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger.",
-              "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery.",
-              "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter.",
-              "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig.",
-              "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og oppretter hendelsesenheter bare for påmeldte anlegg. Deaktivert som standard.",
-              "grid_profile_controls_enabled": "Henter nettprofilmetadata som bare er tilgjengelige for installatører, og aktiverer profilhandlinger. Deaktivert som standard."
-            }
           }
         },
         "data": {
           "devices": "Velg enheter",
-          "device_features": "Enhetsfunksjoner",
           "type_envoy": "Gateway",
           "type_encharge": "Batteri",
           "type_ac_battery": "AC-batteri",
           "type_iqevse": "Ladere",
           "type_heatpump": "Varmepumpe",
-          "type_microinverter": "Mikrovekselrettere",
-          "schedule_sync_enabled": "Aktiver planleggerstøtte",
-          "battery_schedules_enabled": "Aktiver batteriplanlegger",
-          "system_event_repair_issues": "Aktiver reparasjonsvarsler for systemhendelser",
-          "pricing_edits_enabled": "Aktiver prisredigering",
-          "weather_enabled": "Aktiver vær",
-          "nominal_voltage": "EV-laderens nominelle spenning (V)",
-          "microinverter_lifetime_energy_enabled": "Aktiver mikroinverternes levetidsenergi",
-          "microinverter_power_enabled": "Aktiver mikroinvertereffekt",
-          "vpp_events_enabled": "Aktiver VPP-hendelser",
-          "grid_profile_controls_enabled": "Aktiver installatørstyring av nettprofil"
+          "type_microinverter": "Mikrovekselrettere"
         },
         "data_description": {
           "type_envoy": "Inkluderer gateway-tilkobling og målerdiagnostikk.",
@@ -648,17 +612,7 @@
           "type_ac_battery": "Inkluderer AC-batterisensorer og kontroller for hvilemodus når de er tilgjengelige.",
           "type_iqevse": "Inkluderer EV-laderentiteter og kontroller.",
           "type_heatpump": "Inkluderer sensorer for varmepumpens status, diagnostikk og forbruk.",
-          "type_microinverter": "Inkluderer sensorer for mikrovekselretter-tilkobling, aktivt antall og livstidsproduksjon.",
-          "system_event_repair_issues": "Oppretter Home Assistant-reparasjoner for aktive stående Enphase-alarmer. Deaktivert som standard.",
-          "pricing_edits_enabled": "Administrer strømpriser for IQ Gateway",
-          "weather_enabled": "Henter gjeldende vær for anlegget fra Enphase og oppretter bare en værenhet når endepunktet er tilgjengelig.",
-          "nominal_voltage": "Typisk vekselspenning for å beregne effekten når sanntidsspenning ikke er tilgjengelig.",
-          "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger.",
-          "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery.",
-          "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter.",
-          "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig.",
-          "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og oppretter hendelsesenheter bare for påmeldte anlegg. Deaktivert som standard.",
-          "grid_profile_controls_enabled": "Henter nettprofilmetadata som bare er tilgjengelige for installatører, og aktiverer profilhandlinger. Deaktivert som standard."
+          "type_microinverter": "Inkluderer sensorer for mikrovekselretter-tilkobling, aktivt antall og livstidsproduksjon."
         }
       },
       "repair_notifications": {
@@ -787,6 +741,72 @@
       "grid_toggle_applied": {
         "title": "Endring av nettmodus akseptert",
         "description": "Enphase godtok forespørselen om å endre nettmodus til **{target_mode}**.\n\nDet fysiske releet kan fortsatt være i endring. Bruk sensoren for nettmodus for å observere den resulterende tilstanden."
+      },
+      "features": {
+        "title": "Funksjoner",
+        "description": "Konfigurer enhetsfunksjoner og avanserte kontroller.",
+        "sections": {
+          "device_features": {
+            "name": "Enhetsfunksjoner",
+            "data": {
+              "schedule_sync_enabled": "Aktiver planleggerstøtte",
+              "battery_schedules_enabled": "Aktiver batteriplanlegger",
+              "system_event_repair_issues": "Aktiver reparasjonsvarsler for systemhendelser",
+              "pricing_edits_enabled": "Aktiver prisredigering",
+              "weather_enabled": "Aktiver vær",
+              "nominal_voltage": "EV-laderens nominelle spenning (V)",
+              "microinverter_lifetime_energy_enabled": "Aktiver mikroinverternes levetidsenergi",
+              "vpp_events_enabled": "Aktiver VPP-hendelser"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Oppretter Home Assistant-reparasjoner for aktive stående Enphase-alarmer. Deaktivert som standard.",
+              "pricing_edits_enabled": "Administrer strømpriser for IQ Gateway",
+              "weather_enabled": "Henter gjeldende vær for anlegget fra Enphase og oppretter bare en værenhet når endepunktet er tilgjengelig.",
+              "nominal_voltage": "Typisk vekselspenning for å beregne effekten når sanntidsspenning ikke er tilgjengelig.",
+              "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger.",
+              "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery.",
+              "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter.",
+              "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og oppretter hendelsesenheter bare for påmeldte anlegg. Deaktivert som standard."
+            }
+          },
+          "advanced_features": {
+            "name": "Avanserte funksjoner",
+            "data": {
+              "grid_profile_controls_enabled": "Aktiver installatørstyring av nettprofil",
+              "microinverter_power_enabled": "Aktiver mikroinvertereffekt"
+            },
+            "data_description": {
+              "grid_profile_controls_enabled": "Henter nettprofilmetadata som bare er tilgjengelige for installatører, og aktiverer profilhandlinger. Deaktivert som standard.",
+              "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig."
+            }
+          }
+        },
+        "data": {
+          "device_features": "Enhetsfunksjoner",
+          "advanced_features": "Avanserte funksjoner",
+          "schedule_sync_enabled": "Aktiver planleggerstøtte",
+          "battery_schedules_enabled": "Aktiver batteriplanlegger",
+          "system_event_repair_issues": "Aktiver reparasjonsvarsler for systemhendelser",
+          "pricing_edits_enabled": "Aktiver prisredigering",
+          "weather_enabled": "Aktiver vær",
+          "nominal_voltage": "EV-laderens nominelle spenning (V)",
+          "microinverter_lifetime_energy_enabled": "Aktiver mikroinverternes levetidsenergi",
+          "microinverter_power_enabled": "Aktiver mikroinvertereffekt",
+          "vpp_events_enabled": "Aktiver VPP-hendelser",
+          "grid_profile_controls_enabled": "Aktiver installatørstyring av nettprofil"
+        },
+        "data_description": {
+          "system_event_repair_issues": "Oppretter Home Assistant-reparasjoner for aktive stående Enphase-alarmer. Deaktivert som standard.",
+          "pricing_edits_enabled": "Administrer strømpriser for IQ Gateway",
+          "weather_enabled": "Henter gjeldende vær for anlegget fra Enphase og oppretter bare en værenhet når endepunktet er tilgjengelig.",
+          "nominal_voltage": "Typisk vekselspenning for å beregne effekten når sanntidsspenning ikke er tilgjengelig.",
+          "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger.",
+          "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery.",
+          "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter.",
+          "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig.",
+          "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og oppretter hendelsesenheter bare for påmeldte anlegg. Deaktivert som standard.",
+          "grid_profile_controls_enabled": "Henter nettprofilmetadata som bare er tilgjengelige for installatører, og aktiverer profilhandlinger. Deaktivert som standard."
+        }
       }
     },
     "error": {
@@ -823,7 +843,8 @@
       "grid_profile_installer_required": "Nettprofilstyring krever installatørtilgang til Enphase Activation.",
       "grid_profile_no_regions": "Ingen nettprofilregioner er tilgjengelige for landet til dette anlegget.",
       "grid_mode_unavailable": "Styring av nettmodus er utilgjengelig for dette anlegget.",
-      "grid_mode_blocked": "Styring av nettmodus er for øyeblikket blokkert: {reasons}."
+      "grid_mode_blocked": "Styring av nettmodus er for øyeblikket blokkert: {reasons}.",
+      "grid_profile_session_expired": "Enlighten-økten er utløpt eller avvist. Åpne Autentisering, start ny autentisering og prøv igjen."
     },
     "create_entry": {
       "migration_success": "Migreringen er fullført. Enphase Energy eier nå de valgte kildeentitets-ID-ene. Kontroller Energy-oversikten og Developer Tools > Statistics etter neste oppdatering.",

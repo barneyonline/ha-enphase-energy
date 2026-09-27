@@ -502,15 +502,17 @@
           "repair_notifications": "Értesítések",
           "authentication_settings": "Hitelesítés",
           "migrate_envoy": "Envoy előzmények migrálása",
-          "advanced": "Speciális"
+          "advanced": "Speciális",
+          "features": "Funkciók"
         },
         "menu_option_descriptions": {
           "settings": "Lekérdezés és működés finomhangolása.",
-          "devices": "Válassza ki, mely eszközcsoportokat adja hozzá. Minden kiválasztás ugyanazt a lekérdezési időközt használja.",
+          "devices": "Válassza ki a bevonni kívánt eszközkategóriákat.",
           "repair_notifications": "A Home Assistant javítási értesítéseinek kezelése.",
           "authentication_settings": "Indítsa el a bejelentkezési folyamatot a hitelesítő adatok frissítéséhez az integráció eltávolítása nélkül.",
           "migrate_envoy": "Vegye át a kiválasztott Enphase Envoy energiaentitás-azonosítókat, hogy a Home Assistant Energy előzményei ennél az integrációnál folytatódjanak.",
-          "advanced": "Opcionális hálózati mód vezérlés és csak telepítőknek szánt hálózati profilvezérlés."
+          "advanced": "Opcionális hálózati mód vezérlés és csak telepítőknek szánt hálózati profilvezérlés.",
+          "features": "Állítsa be az eszközfunkciókat és a speciális vezérlőket."
         },
         "data": {
           "type_envoy": "Átjáró",
@@ -573,7 +575,7 @@
       },
       "devices": {
         "title": "Eszközök kiválasztása",
-        "description": "Válassza ki, mely eszközcsoportokat adja hozzá. Minden kiválasztás ugyanazt a lekérdezési időközt használja.",
+        "description": "Válassza ki a bevonni kívánt eszközkategóriákat.",
         "sections": {
           "devices": {
             "name": "Eszközök kiválasztása",
@@ -593,54 +595,16 @@
               "type_heatpump": "A hőszivattyú állapot-, diagnosztikai és fogyasztási érzékelőit tartalmazza.",
               "type_microinverter": "Tartalmazza a mikroinverter-kapcsolati, aktív darabszám és élettartam-termelési érzékelőket."
             }
-          },
-          "device_features": {
-            "name": "Eszközfunkciók",
-            "data": {
-              "schedule_sync_enabled": "Ütemező támogatás engedélyezése",
-              "battery_schedules_enabled": "Az akkumulátor ütemező engedélyezése",
-              "system_event_repair_issues": "Rendszeresemény-javítási értesítések engedélyezése",
-              "pricing_edits_enabled": "Árak szerkesztésének engedélyezése",
-              "weather_enabled": "Időjárás engedélyezése",
-              "nominal_voltage": "EV-töltő névleges feszültsége (V)",
-              "microinverter_lifetime_energy_enabled": "Mikroinverterek teljes élettartam-energiájának engedélyezése",
-              "microinverter_power_enabled": "Mikroinverterek teljesítményének engedélyezése",
-              "vpp_events_enabled": "VPP-események engedélyezése",
-              "grid_profile_controls_enabled": "Telepítői hálózati profilvezérlés engedélyezése"
-            },
-            "data_description": {
-              "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva.",
-              "pricing_edits_enabled": "Az IQ Gateway villamosenergia-díjainak kezelése",
-              "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető.",
-              "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat.",
-              "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése.",
-              "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése.",
-              "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
-              "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria.",
-              "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva.",
-              "grid_profile_controls_enabled": "Lekéri a csak telepítők számára elérhető hálózatiprofil-metaadatokat, és engedélyezi a profilműveleteket. Alapértelmezés szerint letiltva."
-            }
           }
         },
         "data": {
           "devices": "Eszközök kiválasztása",
-          "device_features": "Eszközfunkciók",
           "type_envoy": "Átjáró",
           "type_encharge": "Akkumulátor",
           "type_ac_battery": "AC akkumulátor",
           "type_iqevse": "Töltők",
           "type_heatpump": "Hőszivattyú",
-          "type_microinverter": "Mikroinverterek",
-          "schedule_sync_enabled": "Ütemező támogatás engedélyezése",
-          "battery_schedules_enabled": "Az akkumulátor ütemező engedélyezése",
-          "system_event_repair_issues": "Rendszeresemény-javítási értesítések engedélyezése",
-          "pricing_edits_enabled": "Árak szerkesztésének engedélyezése",
-          "weather_enabled": "Időjárás engedélyezése",
-          "nominal_voltage": "EV-töltő névleges feszültsége (V)",
-          "microinverter_lifetime_energy_enabled": "Mikroinverterek teljes élettartam-energiájának engedélyezése",
-          "microinverter_power_enabled": "Mikroinverterek teljesítményének engedélyezése",
-          "vpp_events_enabled": "VPP-események engedélyezése",
-          "grid_profile_controls_enabled": "Telepítői hálózati profilvezérlés engedélyezése"
+          "type_microinverter": "Mikroinverterek"
         },
         "data_description": {
           "type_envoy": "Tartalmazza az átjáró-kapcsolat és a mérők diagnosztikáját.",
@@ -648,17 +612,7 @@
           "type_ac_battery": "AC akkumulátor érzékelőket és alvó mód vezérlőket tartalmaz, ha elérhetők.",
           "type_iqevse": "Tartalmazza az EV töltők entitásait és vezérléseit.",
           "type_heatpump": "A hőszivattyú állapot-, diagnosztikai és fogyasztási érzékelőit tartalmazza.",
-          "type_microinverter": "Tartalmazza a mikroinverter-kapcsolati, aktív darabszám és élettartam-termelési érzékelőket.",
-          "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva.",
-          "pricing_edits_enabled": "Az IQ Gateway villamosenergia-díjainak kezelése",
-          "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető.",
-          "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat.",
-          "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése.",
-          "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése.",
-          "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
-          "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria.",
-          "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva.",
-          "grid_profile_controls_enabled": "Lekéri a csak telepítők számára elérhető hálózatiprofil-metaadatokat, és engedélyezi a profilműveleteket. Alapértelmezés szerint letiltva."
+          "type_microinverter": "Tartalmazza a mikroinverter-kapcsolati, aktív darabszám és élettartam-termelési érzékelőket."
         }
       },
       "repair_notifications": {
@@ -787,6 +741,72 @@
       "grid_toggle_applied": {
         "title": "A hálózati mód módosítása elfogadva",
         "description": "Az Enphase elfogadta a kérést, hogy módosítsa a hálózati módot **{target_mode}**-ra.\n\nA fizikai relé még változhat. Használja a hálózati mód érzékelőt a kapott állapot megfigyeléséhez."
+      },
+      "features": {
+        "title": "Funkciók",
+        "description": "Állítsa be az eszközfunkciókat és a speciális vezérlőket.",
+        "sections": {
+          "device_features": {
+            "name": "Eszközfunkciók",
+            "data": {
+              "schedule_sync_enabled": "Ütemező támogatás engedélyezése",
+              "battery_schedules_enabled": "Az akkumulátor ütemező engedélyezése",
+              "system_event_repair_issues": "Rendszeresemény-javítási értesítések engedélyezése",
+              "pricing_edits_enabled": "Árak szerkesztésének engedélyezése",
+              "weather_enabled": "Időjárás engedélyezése",
+              "nominal_voltage": "EV-töltő névleges feszültsége (V)",
+              "microinverter_lifetime_energy_enabled": "Mikroinverterek teljes élettartam-energiájának engedélyezése",
+              "vpp_events_enabled": "VPP-események engedélyezése"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva.",
+              "pricing_edits_enabled": "Az IQ Gateway villamosenergia-díjainak kezelése",
+              "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető.",
+              "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat.",
+              "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése.",
+              "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése.",
+              "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
+              "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva."
+            }
+          },
+          "advanced_features": {
+            "name": "Speciális funkciók",
+            "data": {
+              "grid_profile_controls_enabled": "Telepítői hálózati profilvezérlés engedélyezése",
+              "microinverter_power_enabled": "Mikroinverterek teljesítményének engedélyezése"
+            },
+            "data_description": {
+              "grid_profile_controls_enabled": "Lekéri a csak telepítők számára elérhető hálózatiprofil-metaadatokat, és engedélyezi a profilműveleteket. Alapértelmezés szerint letiltva.",
+              "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria."
+            }
+          }
+        },
+        "data": {
+          "device_features": "Eszközfunkciók",
+          "advanced_features": "Speciális funkciók",
+          "schedule_sync_enabled": "Ütemező támogatás engedélyezése",
+          "battery_schedules_enabled": "Az akkumulátor ütemező engedélyezése",
+          "system_event_repair_issues": "Rendszeresemény-javítási értesítések engedélyezése",
+          "pricing_edits_enabled": "Árak szerkesztésének engedélyezése",
+          "weather_enabled": "Időjárás engedélyezése",
+          "nominal_voltage": "EV-töltő névleges feszültsége (V)",
+          "microinverter_lifetime_energy_enabled": "Mikroinverterek teljes élettartam-energiájának engedélyezése",
+          "microinverter_power_enabled": "Mikroinverterek teljesítményének engedélyezése",
+          "vpp_events_enabled": "VPP-események engedélyezése",
+          "grid_profile_controls_enabled": "Telepítői hálózati profilvezérlés engedélyezése"
+        },
+        "data_description": {
+          "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva.",
+          "pricing_edits_enabled": "Az IQ Gateway villamosenergia-díjainak kezelése",
+          "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető.",
+          "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat.",
+          "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése.",
+          "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése.",
+          "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
+          "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria.",
+          "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva.",
+          "grid_profile_controls_enabled": "Lekéri a csak telepítők számára elérhető hálózatiprofil-metaadatokat, és engedélyezi a profilműveleteket. Alapértelmezés szerint letiltva."
+        }
       }
     },
     "error": {
@@ -823,7 +843,8 @@
       "grid_profile_installer_required": "A hálózati profil vezérléséhez telepítői hozzáférés szükséges az Enphase Activation szolgáltatáshoz.",
       "grid_profile_no_regions": "Ehhez a helyszínországhoz nem érhető el hálózati profil régió.",
       "grid_mode_unavailable": "A hálózati mód vezérlése nem érhető el ezen a helyszínen.",
-      "grid_mode_blocked": "A hálózati mód vezérlése jelenleg le van tiltva: {reasons}."
+      "grid_mode_blocked": "A hálózati mód vezérlése jelenleg le van tiltva: {reasons}.",
+      "grid_profile_session_expired": "Az Enlighten-munkamenet lejárt vagy elutasításra került. Nyissa meg a Hitelesítés menüt, jelentkezzen be újra, majd próbálja újra."
     },
     "create_entry": {
       "migration_success": "A migráció befejeződött. Az Enphase Energy most már a kiválasztott forrásentitás-azonosítókat használja. Ellenőrizze a következő frissítés után az Energy irányítópultot és a Developer Tools > Statistics oldalt.",

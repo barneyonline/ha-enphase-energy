@@ -502,15 +502,17 @@
           "repair_notifications": "Benachrichtigungen",
           "authentication_settings": "Authentifizierung",
           "migrate_envoy": "Envoy-Verlauf migrieren",
-          "advanced": "Erweitert"
+          "advanced": "Erweitert",
+          "features": "Funktionen"
         },
         "menu_option_descriptions": {
           "settings": "Abfrageintervalle und Verhalten anpassen.",
-          "devices": "Wählen Sie, welche Gerätegruppen hinzugefügt werden sollen. Alle Auswahlen teilen dasselbe Abfrageintervall.",
+          "devices": "Wählen Sie die einzubeziehenden Gerätekategorien.",
           "repair_notifications": "Home Assistant-Reparaturbenachrichtigungen verwalten.",
           "authentication_settings": "Startet den Login-Ablauf, um Zugangsdaten zu erneuern, ohne die Integration zu entfernen.",
           "migrate_envoy": "Übernehmen Sie ausgewählte Energie-Entitäts-IDs von Enphase Envoy, damit der Verlauf in Home Assistant Energy unter dieser Integration weiterläuft.",
-          "advanced": "Optionale Netzmodus-Steuerung und Netzprofilsteuerung nur für Installateure."
+          "advanced": "Optionale Netzmodus-Steuerung und Netzprofilsteuerung nur für Installateure.",
+          "features": "Gerätefunktionen und erweiterte Steuerungen konfigurieren."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -573,7 +575,7 @@
       },
       "devices": {
         "title": "Geräte auswählen",
-        "description": "Wählen Sie, welche Gerätegruppen hinzugefügt werden sollen. Alle Auswahlen teilen dasselbe Abfrageintervall.",
+        "description": "Wählen Sie die einzubeziehenden Gerätekategorien.",
         "sections": {
           "devices": {
             "name": "Geräte auswählen",
@@ -593,54 +595,16 @@
               "type_heatpump": "Enthält Sensoren für Wärmepumpenstatus, Diagnose und Verbrauch.",
               "type_microinverter": "Enthält Sensoren für Mikrowechselrichter-Konnektivität, aktive Anzahl und Lebenszeit-Erzeugung."
             }
-          },
-          "device_features": {
-            "name": "Gerätefunktionen",
-            "data": {
-              "schedule_sync_enabled": "Aktivieren Sie die Scheduler-Unterstützung",
-              "battery_schedules_enabled": "Aktivieren Sie den Batterieplaner",
-              "system_event_repair_issues": "Reparaturmeldungen für Systemereignisse aktivieren",
-              "pricing_edits_enabled": "Preisänderungen aktivieren",
-              "weather_enabled": "Wetter aktivieren",
-              "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)",
-              "microinverter_lifetime_energy_enabled": "Lebensdauerenergie der Mikro-Wechselrichter aktivieren",
-              "microinverter_power_enabled": "Leistung der Mikro-Wechselrichter aktivieren",
-              "vpp_events_enabled": "VPP-Ereignisse aktivieren",
-              "grid_profile_controls_enabled": "Installateursteuerung für Netzprofile aktivieren"
-            },
-            "data_description": {
-              "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert.",
-              "pricing_edits_enabled": "Stromtarife des IQ Gateway verwalten",
-              "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist.",
-              "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist.",
-              "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten.",
-              "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten.",
-              "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
-              "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist.",
-              "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert.",
-              "grid_profile_controls_enabled": "Ruft nur für Installateure verfügbare Netzprofil-Metadaten ab und aktiviert Profilaktionen. Standardmäßig deaktiviert."
-            }
           }
         },
         "data": {
           "devices": "Geräte auswählen",
-          "device_features": "Gerätefunktionen",
           "type_envoy": "Gateway",
           "type_encharge": "Batterie",
           "type_ac_battery": "AC-Batterie",
           "type_iqevse": "Ladegeräte",
           "type_heatpump": "Wärmepumpe",
-          "type_microinverter": "Mikrowechselrichter",
-          "schedule_sync_enabled": "Aktivieren Sie die Scheduler-Unterstützung",
-          "battery_schedules_enabled": "Aktivieren Sie den Batterieplaner",
-          "system_event_repair_issues": "Reparaturmeldungen für Systemereignisse aktivieren",
-          "pricing_edits_enabled": "Preisänderungen aktivieren",
-          "weather_enabled": "Wetter aktivieren",
-          "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)",
-          "microinverter_lifetime_energy_enabled": "Lebensdauerenergie der Mikro-Wechselrichter aktivieren",
-          "microinverter_power_enabled": "Leistung der Mikro-Wechselrichter aktivieren",
-          "vpp_events_enabled": "VPP-Ereignisse aktivieren",
-          "grid_profile_controls_enabled": "Installateursteuerung für Netzprofile aktivieren"
+          "type_microinverter": "Mikrowechselrichter"
         },
         "data_description": {
           "type_envoy": "Enthält Gateway-Konnektivitäts- und Zählerdiagnosen.",
@@ -648,17 +612,7 @@
           "type_ac_battery": "Enthält AC-Batterie-Sensoren und Steuerelemente für den Schlafmodus, wenn verfügbar.",
           "type_iqevse": "Enthält EV-Ladegeräte-Entitäten und Steuerungen.",
           "type_heatpump": "Enthält Sensoren für Wärmepumpenstatus, Diagnose und Verbrauch.",
-          "type_microinverter": "Enthält Sensoren für Mikrowechselrichter-Konnektivität, aktive Anzahl und Lebenszeit-Erzeugung.",
-          "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert.",
-          "pricing_edits_enabled": "Stromtarife des IQ Gateway verwalten",
-          "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist.",
-          "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist.",
-          "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten.",
-          "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten.",
-          "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
-          "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist.",
-          "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert.",
-          "grid_profile_controls_enabled": "Ruft nur für Installateure verfügbare Netzprofil-Metadaten ab und aktiviert Profilaktionen. Standardmäßig deaktiviert."
+          "type_microinverter": "Enthält Sensoren für Mikrowechselrichter-Konnektivität, aktive Anzahl und Lebenszeit-Erzeugung."
         }
       },
       "repair_notifications": {
@@ -787,6 +741,72 @@
       "grid_toggle_applied": {
         "title": "Änderung des Netzmodus akzeptiert",
         "description": "Enphase hat die Anfrage zur Änderung des Grid-Modus in **{target_mode}** angenommen.\n\nDas physische Relais ändert sich möglicherweise noch. Verwenden Sie den Grid-Modus-Sensor, um den resultierenden Zustand zu beobachten."
+      },
+      "features": {
+        "title": "Funktionen",
+        "description": "Gerätefunktionen und erweiterte Steuerungen konfigurieren.",
+        "sections": {
+          "device_features": {
+            "name": "Gerätefunktionen",
+            "data": {
+              "schedule_sync_enabled": "Aktivieren Sie die Scheduler-Unterstützung",
+              "battery_schedules_enabled": "Aktivieren Sie den Batterieplaner",
+              "system_event_repair_issues": "Reparaturmeldungen für Systemereignisse aktivieren",
+              "pricing_edits_enabled": "Preisänderungen aktivieren",
+              "weather_enabled": "Wetter aktivieren",
+              "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)",
+              "microinverter_lifetime_energy_enabled": "Lebensdauerenergie der Mikro-Wechselrichter aktivieren",
+              "vpp_events_enabled": "VPP-Ereignisse aktivieren"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert.",
+              "pricing_edits_enabled": "Stromtarife des IQ Gateway verwalten",
+              "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist.",
+              "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist.",
+              "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten.",
+              "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten.",
+              "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
+              "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert."
+            }
+          },
+          "advanced_features": {
+            "name": "Erweiterte Funktionen",
+            "data": {
+              "grid_profile_controls_enabled": "Installateursteuerung für Netzprofile aktivieren",
+              "microinverter_power_enabled": "Leistung der Mikro-Wechselrichter aktivieren"
+            },
+            "data_description": {
+              "grid_profile_controls_enabled": "Ruft nur für Installateure verfügbare Netzprofil-Metadaten ab und aktiviert Profilaktionen. Standardmäßig deaktiviert.",
+              "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist."
+            }
+          }
+        },
+        "data": {
+          "device_features": "Gerätefunktionen",
+          "advanced_features": "Erweiterte Funktionen",
+          "schedule_sync_enabled": "Aktivieren Sie die Scheduler-Unterstützung",
+          "battery_schedules_enabled": "Aktivieren Sie den Batterieplaner",
+          "system_event_repair_issues": "Reparaturmeldungen für Systemereignisse aktivieren",
+          "pricing_edits_enabled": "Preisänderungen aktivieren",
+          "weather_enabled": "Wetter aktivieren",
+          "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)",
+          "microinverter_lifetime_energy_enabled": "Lebensdauerenergie der Mikro-Wechselrichter aktivieren",
+          "microinverter_power_enabled": "Leistung der Mikro-Wechselrichter aktivieren",
+          "vpp_events_enabled": "VPP-Ereignisse aktivieren",
+          "grid_profile_controls_enabled": "Installateursteuerung für Netzprofile aktivieren"
+        },
+        "data_description": {
+          "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert.",
+          "pricing_edits_enabled": "Stromtarife des IQ Gateway verwalten",
+          "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist.",
+          "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist.",
+          "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten.",
+          "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten.",
+          "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
+          "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist.",
+          "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert.",
+          "grid_profile_controls_enabled": "Ruft nur für Installateure verfügbare Netzprofil-Metadaten ab und aktiviert Profilaktionen. Standardmäßig deaktiviert."
+        }
       }
     },
     "error": {
@@ -823,7 +843,8 @@
       "grid_profile_installer_required": "Die Netzprofil-Steuerung erfordert Installateurzugriff auf Enphase Activation.",
       "grid_profile_no_regions": "Für das Land dieses Standorts sind keine Netzprofilregionen verfügbar.",
       "grid_mode_unavailable": "Die Steuerung des Netzmodus ist für diese Site nicht verfügbar.",
-      "grid_mode_blocked": "Die Steuerung im Grid-Modus ist derzeit blockiert: {reasons}."
+      "grid_mode_blocked": "Die Steuerung im Grid-Modus ist derzeit blockiert: {reasons}.",
+      "grid_profile_session_expired": "Die Enlighten-Sitzung ist abgelaufen oder wurde abgelehnt. Öffnen Sie Authentifizierung, starten Sie die erneute Anmeldung und versuchen Sie es erneut."
     },
     "create_entry": {
       "migration_success": "Migration abgeschlossen. Enphase Energy besitzt nun die ausgewählten Quell-Entitäts-IDs. Prüfen Sie nach der nächsten Aktualisierung das Energy-Dashboard und Entwicklerwerkzeuge > Statistiken.",

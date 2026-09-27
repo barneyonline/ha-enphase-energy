@@ -16,7 +16,8 @@ All notable changes to this project will be documented in this file.
 - Resolve IQ Gateway Connection Method from serial-matched site-today transport flags when dashboard device details do not expose the connection method.
 
 ### 🔧 Improvements
-- None
+- Keep enabled Grid Profile Control visible during session failures and explain when to reauthenticate instead of reporting installer access denial. Session failures take precedence over mixed permission errors and stop pending-profile polling.
+- Move device feature options into a top-level Features menu, with installer Grid Profile and Microinverter Power toggles grouped under Advanced Features.
 
 ### 🔄 Other changes
 - None

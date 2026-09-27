@@ -502,15 +502,17 @@
           "repair_notifications": "Oznámení",
           "authentication_settings": "Ověření",
           "migrate_envoy": "Migrovat historii Envoy",
-          "advanced": "Pokročilé"
+          "advanced": "Pokročilé",
+          "features": "Funkce"
         },
         "menu_option_descriptions": {
           "settings": "Upravte intervaly a chování.",
-          "devices": "Vyberte, které skupiny zařízení chcete přidat. Všechny volby sdílejí stejný interval dotazování.",
+          "devices": "Vyberte kategorie zařízení, které chcete zahrnout.",
           "repair_notifications": "Správa oznámení oprav Home Assistant.",
           "authentication_settings": "Spusťte přihlašovací tok pro obnovení údajů bez odebrání integrace.",
           "migrate_envoy": "Převezměte vybraná ID energetických entit Enphase Envoy, aby historie v Home Assistant Energy pokračovala pod touto integrací.",
-          "advanced": "Volitelné ovládání režimu sítě a ovládání síťového profilu pouze pro instalační techniky."
+          "advanced": "Volitelné ovládání režimu sítě a ovládání síťového profilu pouze pro instalační techniky.",
+          "features": "Nastavte funkce zařízení a pokročilé ovládání."
         },
         "data": {
           "type_envoy": "Brána",
@@ -573,7 +575,7 @@
       },
       "devices": {
         "title": "Vyberte zařízení",
-        "description": "Vyberte, které skupiny zařízení chcete přidat. Všechny volby sdílejí stejný interval dotazování.",
+        "description": "Vyberte kategorie zařízení, které chcete zahrnout.",
         "sections": {
           "devices": {
             "name": "Vyberte zařízení",
@@ -593,54 +595,16 @@
               "type_heatpump": "Zahrnuje senzory stavu, diagnostiky a spotřeby tepelného čerpadla.",
               "type_microinverter": "Zahrnuje senzory konektivity mikroinvertorů, počtu aktivních zařízení a celoživotní výroby."
             }
-          },
-          "device_features": {
-            "name": "Funkce zařízení",
-            "data": {
-              "schedule_sync_enabled": "Povolit podporu plánovače",
-              "battery_schedules_enabled": "Povolit Plánovač baterie",
-              "system_event_repair_issues": "Povolit oznámení oprav systémových událostí",
-              "pricing_edits_enabled": "Povolit úpravy cen",
-              "weather_enabled": "Povolit počasí",
-              "nominal_voltage": "Jmenovité napětí nabíječky EV (V)",
-              "microinverter_lifetime_energy_enabled": "Povolit celoživotní energii mikrostřídačů",
-              "microinverter_power_enabled": "Povolit výkon mikrostřídačů",
-              "vpp_events_enabled": "Povolit události VPP",
-              "grid_profile_controls_enabled": "Povolit instalační ovládání síťového profilu"
-            },
-            "data_description": {
-              "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto.",
-              "pricing_edits_enabled": "Správa sazeb elektřiny IQ Gateway",
-              "weather_enabled": "Načte aktuální počasí lokality ze služby Enphase a vytvoří entitu počasí pouze tehdy, když je koncový bod dostupný.",
-              "nominal_voltage": "Typické střídavé napájecí napětí pro odhad výkonu, když není dostupné aktuální napětí.",
-              "schedule_sync_enabled": "Spravujte plány nabíječky IQ EV Charger.",
-              "battery_schedules_enabled": "Spravujte plány baterie IQ Battery.",
-              "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů.",
-              "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika.",
-              "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto.",
-              "grid_profile_controls_enabled": "Načte metadata síťového profilu dostupná pouze instalačnímu technikovi a povolí akce s profily. Ve výchozím nastavení je vypnuto."
-            }
           }
         },
         "data": {
           "devices": "Vyberte zařízení",
-          "device_features": "Funkce zařízení",
           "type_envoy": "Brána",
           "type_encharge": "Baterie",
           "type_ac_battery": "AC baterie",
           "type_iqevse": "Nabíječky",
           "type_heatpump": "Tepelné čerpadlo",
-          "type_microinverter": "Mikroinvertory",
-          "schedule_sync_enabled": "Povolit podporu plánovače",
-          "battery_schedules_enabled": "Povolit Plánovač baterie",
-          "system_event_repair_issues": "Povolit oznámení oprav systémových událostí",
-          "pricing_edits_enabled": "Povolit úpravy cen",
-          "weather_enabled": "Povolit počasí",
-          "nominal_voltage": "Jmenovité napětí nabíječky EV (V)",
-          "microinverter_lifetime_energy_enabled": "Povolit celoživotní energii mikrostřídačů",
-          "microinverter_power_enabled": "Povolit výkon mikrostřídačů",
-          "vpp_events_enabled": "Povolit události VPP",
-          "grid_profile_controls_enabled": "Povolit instalační ovládání síťového profilu"
+          "type_microinverter": "Mikroinvertory"
         },
         "data_description": {
           "type_envoy": "Zahrnuje diagnostiku konektivity brány a měřidel.",
@@ -648,17 +612,7 @@
           "type_ac_battery": "Zahrnuje senzory AC baterie a ovládání režimu spánku, pokud jsou k dispozici.",
           "type_iqevse": "Zahrnuje entity a ovládání EV nabíječek.",
           "type_heatpump": "Zahrnuje senzory stavu, diagnostiky a spotřeby tepelného čerpadla.",
-          "type_microinverter": "Zahrnuje senzory konektivity mikroinvertorů, počtu aktivních zařízení a celoživotní výroby.",
-          "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto.",
-          "pricing_edits_enabled": "Správa sazeb elektřiny IQ Gateway",
-          "weather_enabled": "Načte aktuální počasí lokality ze služby Enphase a vytvoří entitu počasí pouze tehdy, když je koncový bod dostupný.",
-          "nominal_voltage": "Typické střídavé napájecí napětí pro odhad výkonu, když není dostupné aktuální napětí.",
-          "schedule_sync_enabled": "Spravujte plány nabíječky IQ EV Charger.",
-          "battery_schedules_enabled": "Spravujte plány baterie IQ Battery.",
-          "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů.",
-          "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika.",
-          "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto.",
-          "grid_profile_controls_enabled": "Načte metadata síťového profilu dostupná pouze instalačnímu technikovi a povolí akce s profily. Ve výchozím nastavení je vypnuto."
+          "type_microinverter": "Zahrnuje senzory konektivity mikroinvertorů, počtu aktivních zařízení a celoživotní výroby."
         }
       },
       "repair_notifications": {
@@ -787,6 +741,72 @@
       "grid_toggle_applied": {
         "title": "Změna režimu sítě přijata",
         "description": "Společnost Enphase přijala požadavek na změnu režimu sítě na **{target_mode}**.\n\nFyzické relé se může stále měnit. Pomocí senzoru režimu sítě pozorujte výsledný stav."
+      },
+      "features": {
+        "title": "Funkce",
+        "description": "Nastavte funkce zařízení a pokročilé ovládání.",
+        "sections": {
+          "device_features": {
+            "name": "Funkce zařízení",
+            "data": {
+              "schedule_sync_enabled": "Povolit podporu plánovače",
+              "battery_schedules_enabled": "Povolit Plánovač baterie",
+              "system_event_repair_issues": "Povolit oznámení oprav systémových událostí",
+              "pricing_edits_enabled": "Povolit úpravy cen",
+              "weather_enabled": "Povolit počasí",
+              "nominal_voltage": "Jmenovité napětí nabíječky EV (V)",
+              "microinverter_lifetime_energy_enabled": "Povolit celoživotní energii mikrostřídačů",
+              "vpp_events_enabled": "Povolit události VPP"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto.",
+              "pricing_edits_enabled": "Správa sazeb elektřiny IQ Gateway",
+              "weather_enabled": "Načte aktuální počasí lokality ze služby Enphase a vytvoří entitu počasí pouze tehdy, když je koncový bod dostupný.",
+              "nominal_voltage": "Typické střídavé napájecí napětí pro odhad výkonu, když není dostupné aktuální napětí.",
+              "schedule_sync_enabled": "Spravujte plány nabíječky IQ EV Charger.",
+              "battery_schedules_enabled": "Spravujte plány baterie IQ Battery.",
+              "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů.",
+              "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto."
+            }
+          },
+          "advanced_features": {
+            "name": "Pokročilé funkce",
+            "data": {
+              "grid_profile_controls_enabled": "Povolit instalační ovládání síťového profilu",
+              "microinverter_power_enabled": "Povolit výkon mikrostřídačů"
+            },
+            "data_description": {
+              "grid_profile_controls_enabled": "Načte metadata síťového profilu dostupná pouze instalačnímu technikovi a povolí akce s profily. Ve výchozím nastavení je vypnuto.",
+              "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika."
+            }
+          }
+        },
+        "data": {
+          "device_features": "Funkce zařízení",
+          "advanced_features": "Pokročilé funkce",
+          "schedule_sync_enabled": "Povolit podporu plánovače",
+          "battery_schedules_enabled": "Povolit Plánovač baterie",
+          "system_event_repair_issues": "Povolit oznámení oprav systémových událostí",
+          "pricing_edits_enabled": "Povolit úpravy cen",
+          "weather_enabled": "Povolit počasí",
+          "nominal_voltage": "Jmenovité napětí nabíječky EV (V)",
+          "microinverter_lifetime_energy_enabled": "Povolit celoživotní energii mikrostřídačů",
+          "microinverter_power_enabled": "Povolit výkon mikrostřídačů",
+          "vpp_events_enabled": "Povolit události VPP",
+          "grid_profile_controls_enabled": "Povolit instalační ovládání síťového profilu"
+        },
+        "data_description": {
+          "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto.",
+          "pricing_edits_enabled": "Správa sazeb elektřiny IQ Gateway",
+          "weather_enabled": "Načte aktuální počasí lokality ze služby Enphase a vytvoří entitu počasí pouze tehdy, když je koncový bod dostupný.",
+          "nominal_voltage": "Typické střídavé napájecí napětí pro odhad výkonu, když není dostupné aktuální napětí.",
+          "schedule_sync_enabled": "Spravujte plány nabíječky IQ EV Charger.",
+          "battery_schedules_enabled": "Spravujte plány baterie IQ Battery.",
+          "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů.",
+          "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika.",
+          "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto.",
+          "grid_profile_controls_enabled": "Načte metadata síťového profilu dostupná pouze instalačnímu technikovi a povolí akce s profily. Ve výchozím nastavení je vypnuto."
+        }
       }
     },
     "error": {
@@ -823,7 +843,8 @@
       "grid_profile_installer_required": "Ovládání síťového profilu vyžaduje instalační přístup k Enphase Activation.",
       "grid_profile_no_regions": "Pro zemi tohoto místa nejsou dostupné žádné oblasti síťových profilů.",
       "grid_mode_unavailable": "Ovládání režimu sítě není pro tento systém k dispozici.",
-      "grid_mode_blocked": "Ovládání režimu sítě je aktuálně zablokováno: {reasons}."
+      "grid_mode_blocked": "Ovládání režimu sítě je aktuálně zablokováno: {reasons}.",
+      "grid_profile_session_expired": "Relace Enlighten vypršela nebo byla odmítnuta. Otevřete Ověřování, spusťte nové ověření a zkuste to znovu."
     },
     "create_entry": {
       "migration_success": "Migrace dokončena. Enphase Energy nyní vlastní vybraná ID zdrojových entit. Po příští aktualizaci zkontrolujte panel Energy a Developer Tools > Statistics.",

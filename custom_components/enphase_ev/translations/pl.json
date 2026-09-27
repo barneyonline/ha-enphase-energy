@@ -502,15 +502,17 @@
           "repair_notifications": "Powiadomienia",
           "authentication_settings": "Uwierzytelnianie",
           "migrate_envoy": "Migruj historię Envoy",
-          "advanced": "Zaawansowane"
+          "advanced": "Zaawansowane",
+          "features": "Funkcje"
         },
         "menu_option_descriptions": {
           "settings": "Dostosuj odpytywanie i działanie.",
-          "devices": "Wybierz, które grupy urządzeń dodać. Wszystkie wybory współdzielą ten sam interwał odpytywania.",
+          "devices": "Wybierz kategorie urządzeń do uwzględnienia.",
           "repair_notifications": "Zarządzaj powiadomieniami o naprawach Home Assistant.",
           "authentication_settings": "Uruchom proces logowania, aby odświeżyć dane uwierzytelniające bez usuwania integracji.",
           "migrate_envoy": "Przejmij wybrane identyfikatory encji energii Enphase Envoy, aby historia Home Assistant Energy była kontynuowana przez tę integrację.",
-          "advanced": "Opcjonalne sterowanie trybem sieci i sterowanie profilem tylko dla instalatora."
+          "advanced": "Opcjonalne sterowanie trybem sieci i sterowanie profilem tylko dla instalatora.",
+          "features": "Skonfiguruj funkcje urządzeń i zaawansowane sterowanie."
         },
         "data": {
           "type_envoy": "Brama",
@@ -573,7 +575,7 @@
       },
       "devices": {
         "title": "Wybierz urządzenia",
-        "description": "Wybierz, które grupy urządzeń dodać. Wszystkie wybory współdzielą ten sam interwał odpytywania.",
+        "description": "Wybierz kategorie urządzeń do uwzględnienia.",
         "sections": {
           "devices": {
             "name": "Wybierz urządzenia",
@@ -593,54 +595,16 @@
               "type_heatpump": "Zawiera czujniki stanu, diagnostyki i zużycia pompy ciepła.",
               "type_microinverter": "Zawiera czujniki łączności mikroinwerterów, liczby aktywnych i produkcji całkowitej."
             }
-          },
-          "device_features": {
-            "name": "Funkcje urządzeń",
-            "data": {
-              "schedule_sync_enabled": "Włącz obsługę harmonogramu",
-              "battery_schedules_enabled": "Włącz harmonogram baterii",
-              "system_event_repair_issues": "Włącz powiadomienia o naprawach zdarzeń systemowych",
-              "pricing_edits_enabled": "Włącz edycję cen",
-              "weather_enabled": "Włącz pogodę",
-              "nominal_voltage": "Napięcie znamionowe ładowarki EV (V)",
-              "microinverter_lifetime_energy_enabled": "Włącz energię całkowitą mikroinwerterów",
-              "microinverter_power_enabled": "Włącz moc mikroinwerterów",
-              "vpp_events_enabled": "Włącz zdarzenia VPP",
-              "grid_profile_controls_enabled": "Włącz sterowanie profilem sieci dla instalatora"
-            },
-            "data_description": {
-              "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone.",
-              "pricing_edits_enabled": "Zarządzaj taryfami energii elektrycznej IQ Gateway",
-              "weather_enabled": "Pobiera bieżącą pogodę dla lokalizacji z Enphase i tworzy encję pogody tylko wtedy, gdy punkt końcowy jest dostępny.",
-              "nominal_voltage": "Typowe napięcie zasilania AC używane do szacowania mocy, gdy napięcie bieżące jest niedostępne.",
-              "schedule_sync_enabled": "Zarządzaj harmonogramami IQ EV Charger.",
-              "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery.",
-              "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
-              "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna.",
-              "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone.",
-              "grid_profile_controls_enabled": "Pobiera metadane profilu sieci dostępne tylko dla instalatora i włącza działania na profilach. Domyślnie wyłączone."
-            }
           }
         },
         "data": {
           "devices": "Wybierz urządzenia",
-          "device_features": "Funkcje urządzeń",
           "type_envoy": "Brama",
           "type_encharge": "Bateria",
           "type_ac_battery": "Bateria AC",
           "type_iqevse": "Ładowarki",
           "type_heatpump": "Pompa ciepła",
-          "type_microinverter": "Mikrofalowniki",
-          "schedule_sync_enabled": "Włącz obsługę harmonogramu",
-          "battery_schedules_enabled": "Włącz harmonogram baterii",
-          "system_event_repair_issues": "Włącz powiadomienia o naprawach zdarzeń systemowych",
-          "pricing_edits_enabled": "Włącz edycję cen",
-          "weather_enabled": "Włącz pogodę",
-          "nominal_voltage": "Napięcie znamionowe ładowarki EV (V)",
-          "microinverter_lifetime_energy_enabled": "Włącz energię całkowitą mikroinwerterów",
-          "microinverter_power_enabled": "Włącz moc mikroinwerterów",
-          "vpp_events_enabled": "Włącz zdarzenia VPP",
-          "grid_profile_controls_enabled": "Włącz sterowanie profilem sieci dla instalatora"
+          "type_microinverter": "Mikrofalowniki"
         },
         "data_description": {
           "type_envoy": "Zawiera diagnostykę łączności bramy i liczników.",
@@ -648,17 +612,7 @@
           "type_ac_battery": "Obejmuje sensory baterii AC i sterowanie trybem uśpienia, gdy są dostępne.",
           "type_iqevse": "Zawiera encje i sterowanie ładowarkami EV.",
           "type_heatpump": "Zawiera czujniki stanu, diagnostyki i zużycia pompy ciepła.",
-          "type_microinverter": "Zawiera czujniki łączności mikroinwerterów, liczby aktywnych i produkcji całkowitej.",
-          "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone.",
-          "pricing_edits_enabled": "Zarządzaj taryfami energii elektrycznej IQ Gateway",
-          "weather_enabled": "Pobiera bieżącą pogodę dla lokalizacji z Enphase i tworzy encję pogody tylko wtedy, gdy punkt końcowy jest dostępny.",
-          "nominal_voltage": "Typowe napięcie zasilania AC używane do szacowania mocy, gdy napięcie bieżące jest niedostępne.",
-          "schedule_sync_enabled": "Zarządzaj harmonogramami IQ EV Charger.",
-          "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery.",
-          "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
-          "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna.",
-          "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone.",
-          "grid_profile_controls_enabled": "Pobiera metadane profilu sieci dostępne tylko dla instalatora i włącza działania na profilach. Domyślnie wyłączone."
+          "type_microinverter": "Zawiera czujniki łączności mikroinwerterów, liczby aktywnych i produkcji całkowitej."
         }
       },
       "repair_notifications": {
@@ -787,6 +741,72 @@
       "grid_toggle_applied": {
         "title": "Zmiana trybu sieci została zaakceptowana",
         "description": "Enphase zaakceptował żądanie zmiany trybu sieci na **{target_mode}**.\n\nPrzekaźnik fizyczny może wciąż się zmieniać. Użyj czujnika trybu sieci, aby obserwować wynikowy stan."
+      },
+      "features": {
+        "title": "Funkcje",
+        "description": "Skonfiguruj funkcje urządzeń i zaawansowane sterowanie.",
+        "sections": {
+          "device_features": {
+            "name": "Funkcje urządzeń",
+            "data": {
+              "schedule_sync_enabled": "Włącz obsługę harmonogramu",
+              "battery_schedules_enabled": "Włącz harmonogram baterii",
+              "system_event_repair_issues": "Włącz powiadomienia o naprawach zdarzeń systemowych",
+              "pricing_edits_enabled": "Włącz edycję cen",
+              "weather_enabled": "Włącz pogodę",
+              "nominal_voltage": "Napięcie znamionowe ładowarki EV (V)",
+              "microinverter_lifetime_energy_enabled": "Włącz energię całkowitą mikroinwerterów",
+              "vpp_events_enabled": "Włącz zdarzenia VPP"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone.",
+              "pricing_edits_enabled": "Zarządzaj taryfami energii elektrycznej IQ Gateway",
+              "weather_enabled": "Pobiera bieżącą pogodę dla lokalizacji z Enphase i tworzy encję pogody tylko wtedy, gdy punkt końcowy jest dostępny.",
+              "nominal_voltage": "Typowe napięcie zasilania AC używane do szacowania mocy, gdy napięcie bieżące jest niedostępne.",
+              "schedule_sync_enabled": "Zarządzaj harmonogramami IQ EV Charger.",
+              "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery.",
+              "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
+              "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone."
+            }
+          },
+          "advanced_features": {
+            "name": "Funkcje zaawansowane",
+            "data": {
+              "grid_profile_controls_enabled": "Włącz sterowanie profilem sieci dla instalatora",
+              "microinverter_power_enabled": "Włącz moc mikroinwerterów"
+            },
+            "data_description": {
+              "grid_profile_controls_enabled": "Pobiera metadane profilu sieci dostępne tylko dla instalatora i włącza działania na profilach. Domyślnie wyłączone.",
+              "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna."
+            }
+          }
+        },
+        "data": {
+          "device_features": "Funkcje urządzeń",
+          "advanced_features": "Funkcje zaawansowane",
+          "schedule_sync_enabled": "Włącz obsługę harmonogramu",
+          "battery_schedules_enabled": "Włącz harmonogram baterii",
+          "system_event_repair_issues": "Włącz powiadomienia o naprawach zdarzeń systemowych",
+          "pricing_edits_enabled": "Włącz edycję cen",
+          "weather_enabled": "Włącz pogodę",
+          "nominal_voltage": "Napięcie znamionowe ładowarki EV (V)",
+          "microinverter_lifetime_energy_enabled": "Włącz energię całkowitą mikroinwerterów",
+          "microinverter_power_enabled": "Włącz moc mikroinwerterów",
+          "vpp_events_enabled": "Włącz zdarzenia VPP",
+          "grid_profile_controls_enabled": "Włącz sterowanie profilem sieci dla instalatora"
+        },
+        "data_description": {
+          "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone.",
+          "pricing_edits_enabled": "Zarządzaj taryfami energii elektrycznej IQ Gateway",
+          "weather_enabled": "Pobiera bieżącą pogodę dla lokalizacji z Enphase i tworzy encję pogody tylko wtedy, gdy punkt końcowy jest dostępny.",
+          "nominal_voltage": "Typowe napięcie zasilania AC używane do szacowania mocy, gdy napięcie bieżące jest niedostępne.",
+          "schedule_sync_enabled": "Zarządzaj harmonogramami IQ EV Charger.",
+          "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery.",
+          "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
+          "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna.",
+          "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone.",
+          "grid_profile_controls_enabled": "Pobiera metadane profilu sieci dostępne tylko dla instalatora i włącza działania na profilach. Domyślnie wyłączone."
+        }
       }
     },
     "error": {
@@ -823,7 +843,8 @@
       "grid_profile_installer_required": "Sterowanie profilem sieci wymaga dostępu instalatora do Enphase Activation.",
       "grid_profile_no_regions": "Dla kraju tej instalacji nie ma dostępnych regionów profilu sieci.",
       "grid_mode_unavailable": "Sterowanie trybem sieci jest niedostępne dla tej instalacji.",
-      "grid_mode_blocked": "Kontrola trybu sieci jest obecnie zablokowana: {reasons}."
+      "grid_mode_blocked": "Kontrola trybu sieci jest obecnie zablokowana: {reasons}.",
+      "grid_profile_session_expired": "Sesja Enlighten wygasła lub została odrzucona. Otwórz Uwierzytelnianie, uwierzytelnij się ponownie i spróbuj jeszcze raz."
     },
     "create_entry": {
       "migration_success": "Migracja zakończona. Enphase Energy przejęło teraz wybrane identyfikatory encji źródłowych. Sprawdź panel Energy i Developer Tools > Statistics po następnym odświeżeniu.",

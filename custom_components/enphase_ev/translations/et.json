@@ -502,15 +502,17 @@
           "repair_notifications": "Teavitused",
           "authentication_settings": "Autentimine",
           "migrate_envoy": "Migreeri Envoy ajalugu",
-          "advanced": "Täpsem"
+          "advanced": "Täpsem",
+          "features": "Funktsioonid"
         },
         "menu_option_descriptions": {
           "settings": "Kohanda küsitlemist ja käitumist.",
-          "devices": "Vali, millised seadmerühmad lisada. Kõik valikud kasutavad sama päringuintervalli.",
+          "devices": "Valige kaasatavad seadmekategooriad.",
           "repair_notifications": "Halda Home Assistanti parandusteavitusi.",
           "authentication_settings": "Käivitage sisselogimisvoog, et uuendada mandaate ilma integratsiooni eemaldamata.",
           "migrate_envoy": "Võta üle valitud Enphase Envoy energiaüksuste ID-d, et Home Assistant Energy ajalugu jätkuks selle integratsiooni all.",
-          "advanced": "Valikulised võrgurežiimi juhtelemendid ja ainult paigaldajale mõeldud võrguprofiili juhtelemendid."
+          "advanced": "Valikulised võrgurežiimi juhtelemendid ja ainult paigaldajale mõeldud võrguprofiili juhtelemendid.",
+          "features": "Seadistage seadmete funktsioone ja täpsemaid juhtseadeid."
         },
         "data": {
           "type_envoy": "Lüüs",
@@ -573,7 +575,7 @@
       },
       "devices": {
         "title": "Vali seadmed",
-        "description": "Vali, millised seadmerühmad lisada. Kõik valikud kasutavad sama päringuintervalli.",
+        "description": "Valige kaasatavad seadmekategooriad.",
         "sections": {
           "devices": {
             "name": "Vali seadmed",
@@ -593,54 +595,16 @@
               "type_heatpump": "Sisaldab soojuspumba oleku-, diagnostika- ja tarbimisandureid.",
               "type_microinverter": "Sisaldab mikroinverterite ühenduvuse, aktiivse arvu ja eluaegse tootmise andureid."
             }
-          },
-          "device_features": {
-            "name": "Seadme funktsioonid",
-            "data": {
-              "schedule_sync_enabled": "Luba ajakava tugi",
-              "battery_schedules_enabled": "Luba aku ajastaja",
-              "system_event_repair_issues": "Luba süsteemisündmuste parandusteavitused",
-              "pricing_edits_enabled": "Luba hindade muutmine",
-              "weather_enabled": "Luba ilmateave",
-              "nominal_voltage": "EV-laadija nimipinge (V)",
-              "microinverter_lifetime_energy_enabled": "Luba mikroinverterite koguenergia",
-              "microinverter_power_enabled": "Luba mikroinverterite võimsus",
-              "vpp_events_enabled": "Luba VPP sündmused",
-              "grid_profile_controls_enabled": "Paigaldaja võrguprofiili juhtelementide lubamine"
-            },
-            "data_description": {
-              "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud.",
-              "pricing_edits_enabled": "IQ Gateway elektrihindade haldamine",
-              "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval.",
-              "nominal_voltage": "Tüüpiline vahelduvvoolu toitepinge võimsuse hindamiseks, kui reaalajas pinge pole saadaval.",
-              "schedule_sync_enabled": "Halda IQ EV Chargeri ajakavasid.",
-              "battery_schedules_enabled": "Halda IQ Battery ajakavasid.",
-              "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
-              "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval.",
-              "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud.",
-              "grid_profile_controls_enabled": "Hangib ainult paigaldajale mõeldud võrguprofiili metaandmed ja lubab profiilitoimingud. Vaikimisi keelatud."
-            }
           }
         },
         "data": {
           "devices": "Vali seadmed",
-          "device_features": "Seadme funktsioonid",
           "type_envoy": "Lüüs",
           "type_encharge": "Aku",
           "type_ac_battery": "AC-aku",
           "type_iqevse": "Laadijad",
           "type_heatpump": "Soojuspump",
-          "type_microinverter": "Mikroinverterid",
-          "schedule_sync_enabled": "Luba ajakava tugi",
-          "battery_schedules_enabled": "Luba aku ajastaja",
-          "system_event_repair_issues": "Luba süsteemisündmuste parandusteavitused",
-          "pricing_edits_enabled": "Luba hindade muutmine",
-          "weather_enabled": "Luba ilmateave",
-          "nominal_voltage": "EV-laadija nimipinge (V)",
-          "microinverter_lifetime_energy_enabled": "Luba mikroinverterite koguenergia",
-          "microinverter_power_enabled": "Luba mikroinverterite võimsus",
-          "vpp_events_enabled": "Luba VPP sündmused",
-          "grid_profile_controls_enabled": "Paigaldaja võrguprofiili juhtelementide lubamine"
+          "type_microinverter": "Mikroinverterid"
         },
         "data_description": {
           "type_envoy": "Sisaldab lüüsi ühenduvuse ja arvestite diagnostikat.",
@@ -648,17 +612,7 @@
           "type_ac_battery": "Sisaldab AC-aku andureid ja unerežiimi juhtnuppe, kui need on saadaval.",
           "type_iqevse": "Sisaldab EV-laadijate olemid ja juhtnuppe.",
           "type_heatpump": "Sisaldab soojuspumba oleku-, diagnostika- ja tarbimisandureid.",
-          "type_microinverter": "Sisaldab mikroinverterite ühenduvuse, aktiivse arvu ja eluaegse tootmise andureid.",
-          "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud.",
-          "pricing_edits_enabled": "IQ Gateway elektrihindade haldamine",
-          "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval.",
-          "nominal_voltage": "Tüüpiline vahelduvvoolu toitepinge võimsuse hindamiseks, kui reaalajas pinge pole saadaval.",
-          "schedule_sync_enabled": "Halda IQ EV Chargeri ajakavasid.",
-          "battery_schedules_enabled": "Halda IQ Battery ajakavasid.",
-          "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
-          "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval.",
-          "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud.",
-          "grid_profile_controls_enabled": "Hangib ainult paigaldajale mõeldud võrguprofiili metaandmed ja lubab profiilitoimingud. Vaikimisi keelatud."
+          "type_microinverter": "Sisaldab mikroinverterite ühenduvuse, aktiivse arvu ja eluaegse tootmise andureid."
         }
       },
       "repair_notifications": {
@@ -787,6 +741,72 @@
       "grid_toggle_applied": {
         "title": "Võrgurežiimi muudatus on vastu võetud",
         "description": "Enphase võttis vastu taotluse muuta võrgurežiimiks **{target_mode}**.\n\nFüüsiline relee võib endiselt muutuda. Tulemuse oleku jälgimiseks kasutage võrgurežiimi andurit."
+      },
+      "features": {
+        "title": "Funktsioonid",
+        "description": "Seadistage seadmete funktsioone ja täpsemaid juhtseadeid.",
+        "sections": {
+          "device_features": {
+            "name": "Seadme funktsioonid",
+            "data": {
+              "schedule_sync_enabled": "Luba ajakava tugi",
+              "battery_schedules_enabled": "Luba aku ajastaja",
+              "system_event_repair_issues": "Luba süsteemisündmuste parandusteavitused",
+              "pricing_edits_enabled": "Luba hindade muutmine",
+              "weather_enabled": "Luba ilmateave",
+              "nominal_voltage": "EV-laadija nimipinge (V)",
+              "microinverter_lifetime_energy_enabled": "Luba mikroinverterite koguenergia",
+              "vpp_events_enabled": "Luba VPP sündmused"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud.",
+              "pricing_edits_enabled": "IQ Gateway elektrihindade haldamine",
+              "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval.",
+              "nominal_voltage": "Tüüpiline vahelduvvoolu toitepinge võimsuse hindamiseks, kui reaalajas pinge pole saadaval.",
+              "schedule_sync_enabled": "Halda IQ EV Chargeri ajakavasid.",
+              "battery_schedules_enabled": "Halda IQ Battery ajakavasid.",
+              "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
+              "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud."
+            }
+          },
+          "advanced_features": {
+            "name": "Täpsemad funktsioonid",
+            "data": {
+              "grid_profile_controls_enabled": "Paigaldaja võrguprofiili juhtelementide lubamine",
+              "microinverter_power_enabled": "Luba mikroinverterite võimsus"
+            },
+            "data_description": {
+              "grid_profile_controls_enabled": "Hangib ainult paigaldajale mõeldud võrguprofiili metaandmed ja lubab profiilitoimingud. Vaikimisi keelatud.",
+              "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval."
+            }
+          }
+        },
+        "data": {
+          "device_features": "Seadme funktsioonid",
+          "advanced_features": "Täpsemad funktsioonid",
+          "schedule_sync_enabled": "Luba ajakava tugi",
+          "battery_schedules_enabled": "Luba aku ajastaja",
+          "system_event_repair_issues": "Luba süsteemisündmuste parandusteavitused",
+          "pricing_edits_enabled": "Luba hindade muutmine",
+          "weather_enabled": "Luba ilmateave",
+          "nominal_voltage": "EV-laadija nimipinge (V)",
+          "microinverter_lifetime_energy_enabled": "Luba mikroinverterite koguenergia",
+          "microinverter_power_enabled": "Luba mikroinverterite võimsus",
+          "vpp_events_enabled": "Luba VPP sündmused",
+          "grid_profile_controls_enabled": "Paigaldaja võrguprofiili juhtelementide lubamine"
+        },
+        "data_description": {
+          "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud.",
+          "pricing_edits_enabled": "IQ Gateway elektrihindade haldamine",
+          "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval.",
+          "nominal_voltage": "Tüüpiline vahelduvvoolu toitepinge võimsuse hindamiseks, kui reaalajas pinge pole saadaval.",
+          "schedule_sync_enabled": "Halda IQ EV Chargeri ajakavasid.",
+          "battery_schedules_enabled": "Halda IQ Battery ajakavasid.",
+          "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
+          "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval.",
+          "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud.",
+          "grid_profile_controls_enabled": "Hangib ainult paigaldajale mõeldud võrguprofiili metaandmed ja lubab profiilitoimingud. Vaikimisi keelatud."
+        }
       }
     },
     "error": {
@@ -823,7 +843,8 @@
       "grid_profile_installer_required": "Võrguprofiili juhtimine nõuab paigaldaja juurdepääsu Enphase Activationile.",
       "grid_profile_no_regions": "Selle asukoha riigi jaoks pole võrguprofiili piirkondi saadaval.",
       "grid_mode_unavailable": "Võrgurežiimi juhtimine pole selles asukohas saadaval.",
-      "grid_mode_blocked": "Võrgurežiimi juhtimine on praegu blokeeritud: {reasons}."
+      "grid_mode_blocked": "Võrgurežiimi juhtimine on praegu blokeeritud: {reasons}.",
+      "grid_profile_session_expired": "Enlighteni seanss on aegunud või tagasi lükatud. Avage Autentimine, autentige uuesti ja proovige uuesti."
     },
     "create_entry": {
       "migration_success": "Migratsioon on lõpule viidud. Enphase Energy omab nüüd valitud lähteolemite ID-sid. Kontrolli pärast järgmist värskendust Energy armatuurlauda ja Developer Tools > Statistics.",
