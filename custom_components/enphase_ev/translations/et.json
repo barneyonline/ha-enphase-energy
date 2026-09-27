@@ -481,6 +481,27 @@
     },
     "grid_profile_controls_disabled": {
       "message": "Enne selle toimingu kasutamist lubage integratsiooni suvandites paigaldaja võrguprofiili juhtelemendid."
+    },
+    "export_limit_unavailable": {
+      "message": "Ekspordipiirang pole saadaval. Vaja on paigaldaja ligipääsu ja toetatud ühe lüüsiga seadistust."
+    },
+    "export_limit_invalid": {
+      "message": "Sisesta täisarv vatte vahemikus 0 kuni 100000."
+    },
+    "export_limit_changed": {
+      "message": "Seadistus muutus. Kontrolli uuendatud seadistust ja kinnita uuesti."
+    },
+    "export_limit_pending": {
+      "message": "Oodatakse seadistuse kinnitamist. Enne uut muudatust värskenda olekut."
+    },
+    "export_limit_disabled": {
+      "message": "Luba ekspordipiirangu juhtimine (Funktsioonid → Seadme funktsioonid)."
+    },
+    "export_limit_confirmation": {
+      "message": "Kinnita see muudatus"
+    },
+    "export_limit_invalid_slew": {
+      "message": "Sisestage positiivne arv kuni kahe komakohaga."
     }
   },
   "options": {
@@ -503,7 +524,7 @@
           "repair_notifications": "Halda Home Assistanti parandusteavitusi.",
           "authentication_settings": "Käivitage sisselogimisvoog, et uuendada mandaate ilma integratsiooni eemaldamata.",
           "migrate_envoy": "Võta üle valitud Enphase Envoy energiaüksuste ID-d, et Home Assistant Energy ajalugu jätkuks selle integratsiooni all.",
-          "advanced": "Valikulised võrgurežiimi juhtelemendid ja ainult paigaldajale mõeldud võrguprofiili juhtelemendid.",
+          "advanced": "Paigaldaja ja hoolduse toimingud.",
           "features": "Seadistage seadmete funktsioone ja täpsemaid juhtseadeid."
         },
         "data": {
@@ -672,11 +693,13 @@
         "description": "Paigaldaja ja hoolduse toimingud.",
         "menu_options": {
           "grid_toggle": "Võrgurežiim",
-          "grid_profile": "Võrguprofiili juhtimine"
+          "grid_profile": "Võrguprofiili juhtimine",
+          "export_limit": "Ekspordipiirang"
         },
         "menu_option_descriptions": {
           "grid_toggle": "Seadista võrgurežiimi käsitsi juhtelemendid.",
-          "grid_profile": "Sirvi ja rakenda Activationi võrguprofiile ainult paigaldajatele."
+          "grid_profile": "Sirvi ja rakenda Activationi võrguprofiile ainult paigaldajatele.",
+          "export_limit": "Seadista süsteemi ekspordipiirangud."
         }
       },
       "grid_toggle": {
@@ -742,7 +765,8 @@
               "weather_enabled": "Luba ilmateave",
               "nominal_voltage": "EV-laadija nimipinge (V)",
               "microinverter_lifetime_energy_enabled": "Luba mikroinverterite koguenergia",
-              "vpp_events_enabled": "Luba VPP sündmused"
+              "vpp_events_enabled": "Luba VPP sündmused",
+              "export_limit_controls_enabled": "Luba ekspordipiirangu juhtimine"
             },
             "data_description": {
               "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud.",
@@ -752,7 +776,8 @@
               "schedule_sync_enabled": "Halda IQ EV Chargeri ajakavasid.",
               "battery_schedules_enabled": "Halda IQ Battery ajakavasid.",
               "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
-              "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud."
+              "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud.",
+              "export_limit_controls_enabled": "Seadista süsteemi ekspordipiirangud. Nõuab paigaldaja juurdepääsu."
             }
           },
           "advanced_features": {
@@ -779,7 +804,8 @@
           "microinverter_lifetime_energy_enabled": "Luba mikroinverterite koguenergia",
           "microinverter_power_enabled": "Luba mikroinverterite võimsus",
           "vpp_events_enabled": "Luba VPP sündmused",
-          "grid_profile_controls_enabled": "Paigaldaja võrguprofiili juhtelementide lubamine"
+          "grid_profile_controls_enabled": "Paigaldaja võrguprofiili juhtelementide lubamine",
+          "export_limit_controls_enabled": "Luba ekspordipiirangu juhtimine"
         },
         "data_description": {
           "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud.",
@@ -791,7 +817,52 @@
           "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
           "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval.",
           "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud.",
-          "grid_profile_controls_enabled": "Hangib ainult paigaldajale mõeldud võrguprofiili metaandmed ja lubab profiilitoimingud. Vaikimisi keelatud."
+          "grid_profile_controls_enabled": "Hangib ainult paigaldajale mõeldud võrguprofiili metaandmed ja lubab profiilitoimingud. Vaikimisi keelatud.",
+          "export_limit_controls_enabled": "Seadista süsteemi ekspordipiirangud. Nõuab paigaldaja juurdepääsu."
+        }
+      },
+      "export_limit": {
+        "title": "Ekspordipiirang",
+        "description": "Seadista süsteemi ekspordipiirangud."
+      },
+      "export_limit_action": {
+        "title": "Ekspordipiirang",
+        "description": "Seadista süsteemi ekspordipiirangud.\n\nPraegune seadistus: **{current}**\n\n{status}",
+        "menu_options": {
+          "export_limit_set": "Määra ekspordipiirang",
+          "export_limit_zero": "Määra nulleksport",
+          "export_limit_disable": "Keela ekspordipiirang",
+          "export_limit_defaults": "Vaikeseaded"
+        }
+      },
+      "export_limit_set": {
+        "title": "Määra ekspordipiirang",
+        "data": {
+          "limit_watts": "Ekspordipiirang (W)"
+        }
+      },
+      "export_limit_confirm": {
+        "title": "Ekspordipiirang",
+        "description": "Praegune seadistus: **{current}**\n\nTaotletud seadistus: **{requested}**\n\nMuutumiskiirus (W/sec): **{current_slew}** → **{requested_slew}**",
+        "data": {
+          "confirm": "Kinnita see muudatus"
+        }
+      },
+      "export_limit_submitted": {
+        "title": "Ekspordipiirang",
+        "description": "Seadista süsteemi ekspordipiirangud.\n\n**{status}**"
+      },
+      "export_limit_readonly": {
+        "title": "Ekspordipiirang",
+        "description": "Ekspordipiirang pole saadaval. Vaja on paigaldaja ligipääsu ja toetatud ühe lüüsiga seadistust.\n\nPraegune seadistus: **{current}**"
+      },
+      "export_limit_defaults": {
+        "title": "Vaikeseaded",
+        "description": "Salvestab piirangu lubamise vaikeväärtused lüüsi muutmata. Taastamine eemaldab salvestatud kiiruse ülekirjutuse.",
+        "data": {
+          "limit_watts": "Vaikimisi ekspordipiirang (W)",
+          "slew_rate": "Muutumiskiirus (W/sec)",
+          "restore_slew_rate": "Taasta muutumiskiirus lüüsist"
         }
       }
     },
@@ -819,7 +890,14 @@
       "grid_otp_required": "Sisestage ühekordne kood.",
       "grid_otp_invalid_format": "Ühekordne kood peab sisaldama täpselt nelja numbrit.",
       "grid_otp_invalid": "Ühekordne kood on kehtetu või aegunud.",
-      "grid_envoy_serial_missing": "Selle asukoha väravat ei õnnestunud määrata."
+      "grid_envoy_serial_missing": "Selle asukoha väravat ei õnnestunud määrata.",
+      "export_limit_unavailable": "Ekspordipiirang pole saadaval. Vaja on paigaldaja ligipääsu ja toetatud ühe lüüsiga seadistust.",
+      "export_limit_invalid": "Sisesta täisarv vatte vahemikus 0 kuni 100000.",
+      "export_limit_changed": "Seadistus muutus. Kontrolli uuendatud seadistust ja kinnita uuesti.",
+      "export_limit_pending": "Oodatakse seadistuse kinnitamist. Enne uut muudatust värskenda olekut.",
+      "export_limit_disabled": "Luba ekspordipiirangu juhtimine (Funktsioonid → Seadme funktsioonid).",
+      "export_limit_confirmation": "Kinnita see muudatus",
+      "export_limit_invalid_slew": "Sisestage positiivne arv kuni kahe komakohaga."
     },
     "abort": {
       "migration_no_envoy_sources": "Ühtegi Enphase Envoy energiaandurit pole migratsiooniks saadaval.",
@@ -1374,7 +1452,7 @@
         }
       },
       "system_profile_status": {
-        "name": "Süsteemiprofiili olek",
+        "name": "Süsteemi profiil",
         "state": {
           "pending": "Ootel"
         },
@@ -2024,6 +2102,57 @@
       },
       "vpp_next_event_status": {
         "name": "Järgmise VPP sündmuse olek"
+      },
+      "export_limit": {
+        "name": "Ekspordipiirang",
+        "state": {
+          "disabled": "Keelatud",
+          "zero_export": "Nulleksport",
+          "limited": "Piiratud",
+          "unsupported": "Toetamata",
+          "pending": "Ootel",
+          "unconfirmed": "Kinnitamata"
+        },
+        "state_attributes": {
+          "confirmed_watts": {
+            "name": "Praegune seadistus"
+          },
+          "requested_watts": {
+            "name": "Taotletud seadistus"
+          },
+          "requested_action": {
+            "name": "Taotletud seadistus",
+            "state": {
+              "set": "Määra ekspordipiirang",
+              "disable": "Keela ekspordipiirang"
+            }
+          },
+          "request_status": {
+            "name": "Taotluse olek",
+            "state": {
+              "idle": "Taotlus puudub",
+              "pending": "Ootab kinnitust",
+              "confirmed": "Seadistus kinnitatud",
+              "unconfirmed": "Kinnitamata",
+              "rejected": "Tagasi lükatud"
+            }
+          },
+          "last_successful_readback": {
+            "name": "Viimane edukas lugemine"
+          },
+          "slew_rate": {
+            "name": "Muutumiskiirus (W/sec)"
+          },
+          "requested_slew_rate": {
+            "name": "Taotletud seadistus · Muutumiskiirus (W/sec)"
+          },
+          "pending": {
+            "name": "Ootel"
+          },
+          "pending_requested_at": {
+            "name": "Ootel Taotletud aadressil"
+          }
+        }
       }
     },
     "number": {
@@ -2364,6 +2493,28 @@
       },
       "battery_schedule_selected": {
         "name": "Aku ajakava"
+      },
+      "export_limit": {
+        "name": "Ekspordipiirang",
+        "state": {
+          "enable_limit": "Luba piirang",
+          "disable_limit": "Keela piirang"
+        },
+        "state_attributes": {
+          "default_limit_watts": {
+            "name": "Vaikimisi ekspordipiirang (W)"
+          },
+          "default_slew_rate": {
+            "name": "Muutumiskiirus (W/sec)"
+          },
+          "slew_rate_source": {
+            "name": "Muutumiskiiruse allikas",
+            "state": {
+              "gateway": "Lüüs",
+              "saved_override": "Salvestatud ülekirjutus"
+            }
+          }
+        }
       }
     },
     "button": {
@@ -2540,6 +2691,10 @@
     "active_system_event": {
       "title": "Aktiivne suure mõjuga Enphase süsteemisündmus",
       "description": "Asukohas {site_id} on aktiivne {severity} sündmus, mis mõjutab seadet {device_type} ja millest teatati esimest korda {event_date}. Üksikasjade ja soovitatud toimingu jaoks vaadake Enlighteni. See parandus eemaldatakse automaatselt, kui Enphase märgib sündmuse lahendatuks."
+    },
+    "export_limit_pending": {
+      "title": "Ekspordipiirangu muudatus kinnitamata",
+      "description": "Muudatust pole {pending_timeout_minutes} minuti järel kinnitatud. Kontrollid jätkuvad tavapärase intervalliga. Kontrollige lüüsi seadistust; kirjutamist automaatselt ei korrata."
     }
   },
   "system_health": {
@@ -3177,6 +3332,72 @@
         "gateway_serial": {
           "name": "Gateway seerianumber",
           "description": "Valikuline Gateway seerianumber, kui Activationi kirje sisaldab mitut Gatewayd."
+        }
+      }
+    },
+    "set_export_limit": {
+      "name": "Määra ekspordipiirang",
+      "description": "Seadista süsteemi ekspordipiirangud.",
+      "fields": {
+        "limit_watts": {
+          "name": "Ekspordipiirang (W)",
+          "description": "Sisesta täisarv vatte vahemikus 0 kuni 100000."
+        },
+        "site_id": {
+          "name": "Koha ID",
+          "description": "Valikuline koha identifikaator; tuvastatakse automaatselt, kui koha seade on valitud."
+        },
+        "config_entry_id": {
+          "name": "Enphase konfiguratsiooni sisestus",
+          "description": "Enphase konfiguratsiooni sisestus"
+        },
+        "device_id": {
+          "name": "Seadmed",
+          "description": "Seadmed"
+        },
+        "slew_rate": {
+          "name": "Muutumiskiirus (W/sec)",
+          "description": "Valikuline. Puudumisel kasutatakse lüüsi praegust väärtust."
+        }
+      }
+    },
+    "disable_export_limit": {
+      "name": "Keela ekspordipiirang",
+      "description": "Seadista süsteemi ekspordipiirangud.",
+      "fields": {
+        "site_id": {
+          "name": "Koha ID",
+          "description": "Valikuline koha identifikaator; tuvastatakse automaatselt, kui koha seade on valitud."
+        },
+        "config_entry_id": {
+          "name": "Enphase konfiguratsiooni sisestus",
+          "description": "Enphase konfiguratsiooni sisestus"
+        },
+        "device_id": {
+          "name": "Seadmed",
+          "description": "Seadmed"
+        },
+        "slew_rate": {
+          "name": "Muutumiskiirus (W/sec)",
+          "description": "Valikuline. Puudumisel kasutatakse lüüsi praegust väärtust."
+        }
+      }
+    },
+    "refresh_export_limit": {
+      "name": "Värskenda ekspordipiirangut",
+      "description": "Seadista süsteemi ekspordipiirangud.",
+      "fields": {
+        "site_id": {
+          "name": "Koha ID",
+          "description": "Valikuline koha identifikaator; tuvastatakse automaatselt, kui koha seade on valitud."
+        },
+        "config_entry_id": {
+          "name": "Enphase konfiguratsiooni sisestus",
+          "description": "Enphase konfiguratsiooni sisestus"
+        },
+        "device_id": {
+          "name": "Seadmed",
+          "description": "Seadmed"
         }
       }
     }

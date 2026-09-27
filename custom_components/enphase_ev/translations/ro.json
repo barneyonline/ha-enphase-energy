@@ -481,6 +481,27 @@
     },
     "grid_profile_controls_disabled": {
       "message": "Activează comenzile profilului de rețea pentru instalator în opțiunile integrării înainte de a utiliza această acțiune."
+    },
+    "export_limit_unavailable": {
+      "message": "Limita de injecție nu este disponibilă. Sunt necesare acces de instalator și o configurație acceptată cu un singur gateway."
+    },
+    "export_limit_invalid": {
+      "message": "Introduceți wați întregi între 0 și 100000."
+    },
+    "export_limit_changed": {
+      "message": "Configurația s-a schimbat. Verificați setările actualizate și confirmați din nou."
+    },
+    "export_limit_pending": {
+      "message": "Se așteaptă confirmarea configurației. Actualizați starea înainte de altă modificare."
+    },
+    "export_limit_disabled": {
+      "message": "Activați comenzile pentru limita de injecție (Funcții → Funcții ale dispozitivului)."
+    },
+    "export_limit_confirmation": {
+      "message": "Confirmați această modificare"
+    },
+    "export_limit_invalid_slew": {
+      "message": "Introduceți un număr pozitiv cu cel mult două zecimale."
     }
   },
   "options": {
@@ -503,7 +524,7 @@
           "repair_notifications": "Gestionează notificările de reparații Home Assistant.",
           "authentication_settings": "Lansați fluxul de autentificare pentru a reîmprospăta credențialele fără a elimina integrarea.",
           "migrate_envoy": "Preluați ID-urile entităților de energie Enphase Envoy selectate pentru ca istoricul Home Assistant Energy să continue în această integrare.",
-          "advanced": "Comenzi opționale pentru modul de rețea și controale ale profilului numai pentru instalatori.",
+          "advanced": "Acțiuni pentru instalator și întreținere.",
           "features": "Configurați funcțiile dispozitivelor și comenzile avansate."
         },
         "data": {
@@ -672,11 +693,13 @@
         "description": "Acțiuni pentru instalator și întreținere.",
         "menu_options": {
           "grid_toggle": "Mod rețea",
-          "grid_profile": "Control profil rețea"
+          "grid_profile": "Control profil rețea",
+          "export_limit": "Limită de injecție"
         },
         "menu_option_descriptions": {
           "grid_toggle": "Configurează comenzile manuale pentru modul de rețea.",
-          "grid_profile": "Răsfoiește și aplică profiluri de rețea Activation disponibile doar pentru instalatori."
+          "grid_profile": "Răsfoiește și aplică profiluri de rețea Activation disponibile doar pentru instalatori.",
+          "export_limit": "Configurați limitele de injecție ale sistemului."
         }
       },
       "grid_toggle": {
@@ -742,7 +765,8 @@
               "weather_enabled": "Activează vremea",
               "nominal_voltage": "Tensiunea nominală a încărcătorului EV (V)",
               "microinverter_lifetime_energy_enabled": "Activează energia totală a microinvertoarelor",
-              "vpp_events_enabled": "Activează evenimentele VPP"
+              "vpp_events_enabled": "Activează evenimentele VPP",
+              "export_limit_controls_enabled": "Activați comenzile pentru limita de injecție"
             },
             "data_description": {
               "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit.",
@@ -752,7 +776,8 @@
               "schedule_sync_enabled": "Gestionați programele IQ EV Charger.",
               "battery_schedules_enabled": "Gestionați programele IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor.",
-              "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit."
+              "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit.",
+              "export_limit_controls_enabled": "Configurați limitele de injecție ale sistemului. Necesită acces de instalator."
             }
           },
           "advanced_features": {
@@ -779,7 +804,8 @@
           "microinverter_lifetime_energy_enabled": "Activează energia totală a microinvertoarelor",
           "microinverter_power_enabled": "Activează puterea microinvertoarelor",
           "vpp_events_enabled": "Activează evenimentele VPP",
-          "grid_profile_controls_enabled": "Activează comenzile profilului de rețea pentru instalator"
+          "grid_profile_controls_enabled": "Activează comenzile profilului de rețea pentru instalator",
+          "export_limit_controls_enabled": "Activați comenzile pentru limita de injecție"
         },
         "data_description": {
           "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit.",
@@ -791,7 +817,52 @@
           "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor.",
           "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă.",
           "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit.",
-          "grid_profile_controls_enabled": "Preia metadatele profilului de rețea disponibile numai instalatorului și activează acțiunile profilului. Dezactivat implicit."
+          "grid_profile_controls_enabled": "Preia metadatele profilului de rețea disponibile numai instalatorului și activează acțiunile profilului. Dezactivat implicit.",
+          "export_limit_controls_enabled": "Configurați limitele de injecție ale sistemului. Necesită acces de instalator."
+        }
+      },
+      "export_limit": {
+        "title": "Limită de injecție",
+        "description": "Configurați limitele de injecție ale sistemului."
+      },
+      "export_limit_action": {
+        "title": "Limită de injecție",
+        "description": "Configurați limitele de injecție ale sistemului.\n\nSetare actuală: **{current}**\n\n{status}",
+        "menu_options": {
+          "export_limit_set": "Setați limita de injecție",
+          "export_limit_zero": "Setați injecția zero",
+          "export_limit_disable": "Dezactivați limitarea injecției",
+          "export_limit_defaults": "Setări implicite"
+        }
+      },
+      "export_limit_set": {
+        "title": "Setați limita de injecție",
+        "data": {
+          "limit_watts": "Limită de injecție (W)"
+        }
+      },
+      "export_limit_confirm": {
+        "title": "Limită de injecție",
+        "description": "Setare actuală: **{current}**\n\nSetare solicitată: **{requested}**\n\nRata de variație (W/sec): **{current_slew}** → **{requested_slew}**",
+        "data": {
+          "confirm": "Confirmați această modificare"
+        }
+      },
+      "export_limit_submitted": {
+        "title": "Limită de injecție",
+        "description": "Configurați limitele de injecție ale sistemului.\n\n**{status}**"
+      },
+      "export_limit_readonly": {
+        "title": "Limită de injecție",
+        "description": "Limita de injecție nu este disponibilă. Sunt necesare acces de instalator și o configurație acceptată cu un singur gateway.\n\nSetare actuală: **{current}**"
+      },
+      "export_limit_defaults": {
+        "title": "Setări implicite",
+        "description": "Salvează valorile pentru activarea limitei fără a modifica gateway-ul. Restabilirea șterge rata personalizată salvată.",
+        "data": {
+          "limit_watts": "Limită de export implicită (W)",
+          "slew_rate": "Rata de variație (W/sec)",
+          "restore_slew_rate": "Restabilește rata din gateway"
         }
       }
     },
@@ -819,7 +890,14 @@
       "grid_otp_required": "Introduceți codul unic.",
       "grid_otp_invalid_format": "Codul unic trebuie să conțină exact patru cifre.",
       "grid_otp_invalid": "Codul unic este invalid sau a expirat.",
-      "grid_envoy_serial_missing": "Gateway-ul pentru această instalație nu a putut fi determinat."
+      "grid_envoy_serial_missing": "Gateway-ul pentru această instalație nu a putut fi determinat.",
+      "export_limit_unavailable": "Limita de injecție nu este disponibilă. Sunt necesare acces de instalator și o configurație acceptată cu un singur gateway.",
+      "export_limit_invalid": "Introduceți wați întregi între 0 și 100000.",
+      "export_limit_changed": "Configurația s-a schimbat. Verificați setările actualizate și confirmați din nou.",
+      "export_limit_pending": "Se așteaptă confirmarea configurației. Actualizați starea înainte de altă modificare.",
+      "export_limit_disabled": "Activați comenzile pentru limita de injecție (Funcții → Funcții ale dispozitivului).",
+      "export_limit_confirmation": "Confirmați această modificare",
+      "export_limit_invalid_slew": "Introduceți un număr pozitiv cu cel mult două zecimale."
     },
     "abort": {
       "migration_no_envoy_sources": "Nu există senzori de energie Enphase Envoy disponibili pentru migrare.",
@@ -1374,7 +1452,7 @@
         }
       },
       "system_profile_status": {
-        "name": "Starea profilului sistemului",
+        "name": "Profil de sistem",
         "state": {
           "pending": "În așteptare"
         },
@@ -2024,6 +2102,57 @@
       },
       "vpp_next_event_status": {
         "name": "Starea următorului eveniment VPP"
+      },
+      "export_limit": {
+        "name": "Limită de injecție",
+        "state": {
+          "disabled": "Dezactivată",
+          "zero_export": "Injecție zero",
+          "limited": "Limitată",
+          "unsupported": "Neacceptată",
+          "pending": "În așteptare",
+          "unconfirmed": "Neconfirmat"
+        },
+        "state_attributes": {
+          "confirmed_watts": {
+            "name": "Setare actuală"
+          },
+          "requested_watts": {
+            "name": "Setare solicitată"
+          },
+          "requested_action": {
+            "name": "Setare solicitată",
+            "state": {
+              "set": "Setați limita de injecție",
+              "disable": "Dezactivați limitarea injecției"
+            }
+          },
+          "request_status": {
+            "name": "Starea solicitării",
+            "state": {
+              "idle": "Nicio solicitare",
+              "pending": "În așteptarea confirmării",
+              "confirmed": "Configurație confirmată",
+              "unconfirmed": "Neconfirmat",
+              "rejected": "Respins"
+            }
+          },
+          "last_successful_readback": {
+            "name": "Ultima citire reușită"
+          },
+          "slew_rate": {
+            "name": "Rata de variație (W/sec)"
+          },
+          "requested_slew_rate": {
+            "name": "Setare solicitată · Rata de variație (W/sec)"
+          },
+          "pending": {
+            "name": "În așteptare"
+          },
+          "pending_requested_at": {
+            "name": "În așteptare Solicitat la"
+          }
+        }
       }
     },
     "number": {
@@ -2364,6 +2493,28 @@
       },
       "battery_schedule_selected": {
         "name": "Planificare baterie"
+      },
+      "export_limit": {
+        "name": "Limită de injecție",
+        "state": {
+          "enable_limit": "Activează limita",
+          "disable_limit": "Dezactivează limita"
+        },
+        "state_attributes": {
+          "default_limit_watts": {
+            "name": "Limită de export implicită (W)"
+          },
+          "default_slew_rate": {
+            "name": "Rata de variație (W/sec)"
+          },
+          "slew_rate_source": {
+            "name": "Sursa ratei de variație",
+            "state": {
+              "gateway": "Gateway",
+              "saved_override": "Valoare personalizată salvată"
+            }
+          }
+        }
       }
     },
     "button": {
@@ -2540,6 +2691,10 @@
     "active_system_event": {
       "title": "Eveniment de sistem Enphase cu impact ridicat activ",
       "description": "Instalația {site_id} are un eveniment {severity} activ care afectează {device_type}, raportat prima dată la {event_date}. Consultați Enlighten pentru detalii și acțiunea recomandată. Această reparație se elimină automat când Enphase raportează că evenimentul este rezolvat."
+    },
+    "export_limit_pending": {
+      "title": "Modificarea limitei de injecție este neconfirmată",
+      "description": "Modificarea nu este confirmată după {pending_timeout_minutes} minute. Verificările continuă la intervalul standard. Verificați configurația gateway-ului; scrierea nu va fi repetată automat."
     }
   },
   "system_health": {
@@ -3177,6 +3332,72 @@
         "gateway_serial": {
           "name": "Număr de serie Gateway",
           "description": "Număr de serie Gateway opțional când înregistrarea Activation conține mai multe Gateway-uri."
+        }
+      }
+    },
+    "set_export_limit": {
+      "name": "Setați limita de injecție",
+      "description": "Configurați limitele de injecție ale sistemului.",
+      "fields": {
+        "limit_watts": {
+          "name": "Limită de injecție (W)",
+          "description": "Introduceți wați întregi între 0 și 100000."
+        },
+        "site_id": {
+          "name": "ID locație",
+          "description": "Identificator opțional al locației; detectat automat când este selectat un dispozitiv de locație."
+        },
+        "config_entry_id": {
+          "name": "Intrare de configurare Enphase",
+          "description": "Intrare de configurare Enphase"
+        },
+        "device_id": {
+          "name": "Dispozitive",
+          "description": "Dispozitive"
+        },
+        "slew_rate": {
+          "name": "Rata de variație (W/sec)",
+          "description": "Opțional. Dacă lipsește, se folosește valoarea curentă a gateway-ului."
+        }
+      }
+    },
+    "disable_export_limit": {
+      "name": "Dezactivați limitarea injecției",
+      "description": "Configurați limitele de injecție ale sistemului.",
+      "fields": {
+        "site_id": {
+          "name": "ID locație",
+          "description": "Identificator opțional al locației; detectat automat când este selectat un dispozitiv de locație."
+        },
+        "config_entry_id": {
+          "name": "Intrare de configurare Enphase",
+          "description": "Intrare de configurare Enphase"
+        },
+        "device_id": {
+          "name": "Dispozitive",
+          "description": "Dispozitive"
+        },
+        "slew_rate": {
+          "name": "Rata de variație (W/sec)",
+          "description": "Opțional. Dacă lipsește, se folosește valoarea curentă a gateway-ului."
+        }
+      }
+    },
+    "refresh_export_limit": {
+      "name": "Actualizați limita de injecție",
+      "description": "Configurați limitele de injecție ale sistemului.",
+      "fields": {
+        "site_id": {
+          "name": "ID locație",
+          "description": "Identificator opțional al locației; detectat automat când este selectat un dispozitiv de locație."
+        },
+        "config_entry_id": {
+          "name": "Intrare de configurare Enphase",
+          "description": "Intrare de configurare Enphase"
+        },
+        "device_id": {
+          "name": "Dispozitive",
+          "description": "Dispozitive"
         }
       }
     }

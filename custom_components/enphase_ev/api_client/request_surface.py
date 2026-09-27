@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from typing import TYPE_CHECKING, Any
+from collections.abc import Awaitable, Callable, Sequence
+from typing import TYPE_CHECKING, Any, cast
 
 import aiohttp
 from yarl import URL
@@ -439,6 +440,24 @@ async def _json(
                         return payload
 
 
+def _single_attempt_middleware() -> aiohttp.ClientMiddlewareType:
+    """Stop aiohttp or another middleware from sending the same request twice."""
+    attempted = False
+
+    async def send_once(
+        request: aiohttp.ClientRequest,
+        handler: Callable[[aiohttp.ClientRequest], Awaitable[aiohttp.ClientResponse]],
+    ) -> aiohttp.ClientResponse:
+        nonlocal attempted
+        if attempted:
+            # A ClientConnectionError is not one of aiohttp's retryable subclasses.
+            raise aiohttp.ClientConnectionError("Automatic request replay disabled")
+        attempted = True
+        return await handler(request)
+
+    return send_once
+
+
 async def _text_response(
     self: EnphaseEVClient,
     method: str,
@@ -450,6 +469,17 @@ async def _text_response(
 ) -> TextResponse:
     """Perform an HTTP request returning text plus response metadata."""
 
+    allow_reauth = bool(kwargs.pop("allow_reauth", True))
+    if not kwargs.pop("allow_replay", True):
+        allow_reauth = False
+        middlewares = kwargs.get("middlewares")
+        if middlewares is None:
+            # aiohttp has no public accessor for the injected session's defaults.
+            middlewares = getattr(self._s, "_middlewares", ())
+        kwargs["middlewares"] = (
+            *cast(Sequence[aiohttp.ClientMiddlewareType], middlewares),
+            _single_attempt_middleware(),
+        )
     extra_headers = kwargs.pop("headers", None)
     attempt = 0
     request_label = _request_label(method, url)
@@ -481,7 +511,7 @@ async def _text_response(
                 ) as r:
                     if r.status == 401:
                         self._last_unauthorized_request = safe_request_label
-                        if self._reauth_cb and attempt == 0:
+                        if allow_reauth and self._reauth_cb and attempt == 0:
                             attempt += 1
                             with _enlighten_reauth_read_scope():
                                 reauth_ok = await self._reauth_cb()

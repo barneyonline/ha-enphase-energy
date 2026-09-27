@@ -481,6 +481,27 @@
     },
     "grid_profile_controls_disabled": {
       "message": "Przed użyciem tej czynności włącz sterowanie profilem sieci dla instalatora w opcjach integracji."
+    },
+    "export_limit_unavailable": {
+      "message": "Limit niedostępny. Wymagane są uprawnienia instalatora i obsługiwana konfiguracja z jedną bramą."
+    },
+    "export_limit_invalid": {
+      "message": "Wprowadź całkowitą liczbę watów od 0 do 100000."
+    },
+    "export_limit_changed": {
+      "message": "Konfiguracja uległa zmianie. Sprawdź aktualne ustawienia i potwierdź ponownie."
+    },
+    "export_limit_pending": {
+      "message": "Oczekiwanie na potwierdzenie konfiguracji. Odśwież stan przed kolejną zmianą."
+    },
+    "export_limit_disabled": {
+      "message": "Włącz sterowanie limitem oddawania energii (Funkcje → Funkcje urządzeń)."
+    },
+    "export_limit_confirmation": {
+      "message": "Potwierdź tę zmianę"
+    },
+    "export_limit_invalid_slew": {
+      "message": "Wprowadź liczbę dodatnią z maksymalnie dwoma miejscami po przecinku."
     }
   },
   "options": {
@@ -503,7 +524,7 @@
           "repair_notifications": "Zarządzaj powiadomieniami o naprawach Home Assistant.",
           "authentication_settings": "Uruchom proces logowania, aby odświeżyć dane uwierzytelniające bez usuwania integracji.",
           "migrate_envoy": "Przejmij wybrane identyfikatory encji energii Enphase Envoy, aby historia Home Assistant Energy była kontynuowana przez tę integrację.",
-          "advanced": "Opcjonalne sterowanie trybem sieci i sterowanie profilem tylko dla instalatora.",
+          "advanced": "Działania instalatora i konserwacji.",
           "features": "Skonfiguruj funkcje urządzeń i zaawansowane sterowanie."
         },
         "data": {
@@ -672,11 +693,13 @@
         "description": "Działania instalatora i konserwacji.",
         "menu_options": {
           "grid_toggle": "Tryb sieci",
-          "grid_profile": "Sterowanie profilem sieci"
+          "grid_profile": "Sterowanie profilem sieci",
+          "export_limit": "Limit oddawania energii"
         },
         "menu_option_descriptions": {
           "grid_toggle": "Skonfiguruj ręczne sterowanie trybem sieci.",
-          "grid_profile": "Przeglądanie i stosowanie profili sieci Activation tylko dla instalatorów."
+          "grid_profile": "Przeglądanie i stosowanie profili sieci Activation tylko dla instalatorów.",
+          "export_limit": "Skonfiguruj limity oddawania energii systemu."
         }
       },
       "grid_toggle": {
@@ -742,7 +765,8 @@
               "weather_enabled": "Włącz pogodę",
               "nominal_voltage": "Napięcie znamionowe ładowarki EV (V)",
               "microinverter_lifetime_energy_enabled": "Włącz energię całkowitą mikroinwerterów",
-              "vpp_events_enabled": "Włącz zdarzenia VPP"
+              "vpp_events_enabled": "Włącz zdarzenia VPP",
+              "export_limit_controls_enabled": "Włącz sterowanie limitem oddawania energii"
             },
             "data_description": {
               "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone.",
@@ -752,7 +776,8 @@
               "schedule_sync_enabled": "Zarządzaj harmonogramami IQ EV Charger.",
               "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
-              "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone."
+              "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone.",
+              "export_limit_controls_enabled": "Skonfiguruj limity oddawania energii systemu. Wymaga dostępu instalatora."
             }
           },
           "advanced_features": {
@@ -779,7 +804,8 @@
           "microinverter_lifetime_energy_enabled": "Włącz energię całkowitą mikroinwerterów",
           "microinverter_power_enabled": "Włącz moc mikroinwerterów",
           "vpp_events_enabled": "Włącz zdarzenia VPP",
-          "grid_profile_controls_enabled": "Włącz sterowanie profilem sieci dla instalatora"
+          "grid_profile_controls_enabled": "Włącz sterowanie profilem sieci dla instalatora",
+          "export_limit_controls_enabled": "Włącz sterowanie limitem oddawania energii"
         },
         "data_description": {
           "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone.",
@@ -791,7 +817,52 @@
           "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
           "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna.",
           "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone.",
-          "grid_profile_controls_enabled": "Pobiera metadane profilu sieci dostępne tylko dla instalatora i włącza działania na profilach. Domyślnie wyłączone."
+          "grid_profile_controls_enabled": "Pobiera metadane profilu sieci dostępne tylko dla instalatora i włącza działania na profilach. Domyślnie wyłączone.",
+          "export_limit_controls_enabled": "Skonfiguruj limity oddawania energii systemu. Wymaga dostępu instalatora."
+        }
+      },
+      "export_limit": {
+        "title": "Limit oddawania energii",
+        "description": "Skonfiguruj limity oddawania energii systemu."
+      },
+      "export_limit_action": {
+        "title": "Limit oddawania energii",
+        "description": "Skonfiguruj limity oddawania energii systemu.\n\nBieżące ustawienie: **{current}**\n\n{status}",
+        "menu_options": {
+          "export_limit_set": "Ustaw limit oddawania energii",
+          "export_limit_zero": "Ustaw zerowe oddawanie energii",
+          "export_limit_disable": "Wyłącz ograniczenie oddawania energii",
+          "export_limit_defaults": "Ustawienia domyślne"
+        }
+      },
+      "export_limit_set": {
+        "title": "Ustaw limit oddawania energii",
+        "data": {
+          "limit_watts": "Limit oddawania energii (W)"
+        }
+      },
+      "export_limit_confirm": {
+        "title": "Limit oddawania energii",
+        "description": "Bieżące ustawienie: **{current}**\n\nŻądane ustawienie: **{requested}**\n\nSzybkość zmiany (W/sec): **{current_slew}** → **{requested_slew}**",
+        "data": {
+          "confirm": "Potwierdź tę zmianę"
+        }
+      },
+      "export_limit_submitted": {
+        "title": "Limit oddawania energii",
+        "description": "Skonfiguruj limity oddawania energii systemu.\n\n**{status}**"
+      },
+      "export_limit_readonly": {
+        "title": "Limit oddawania energii",
+        "description": "Limit niedostępny. Wymagane są uprawnienia instalatora i obsługiwana konfiguracja z jedną bramą.\n\nBieżące ustawienie: **{current}**"
+      },
+      "export_limit_defaults": {
+        "title": "Ustawienia domyślne",
+        "description": "Zapisuje wartości włączania limitu bez zmiany bramy. Przywrócenie usuwa zapisane nadpisanie szybkości.",
+        "data": {
+          "limit_watts": "Domyślny limit eksportu (W)",
+          "slew_rate": "Szybkość zmiany (W/sec)",
+          "restore_slew_rate": "Przywróć szybkość z bramy"
         }
       }
     },
@@ -819,7 +890,14 @@
       "grid_otp_required": "Wprowadź kod jednorazowy.",
       "grid_otp_invalid_format": "Kod jednorazowy musi zawierać dokładnie cztery cyfry.",
       "grid_otp_invalid": "Kod jednorazowy jest nieprawidłowy lub wygasł.",
-      "grid_envoy_serial_missing": "Nie można określić bramy dla tej instalacji."
+      "grid_envoy_serial_missing": "Nie można określić bramy dla tej instalacji.",
+      "export_limit_unavailable": "Limit niedostępny. Wymagane są uprawnienia instalatora i obsługiwana konfiguracja z jedną bramą.",
+      "export_limit_invalid": "Wprowadź całkowitą liczbę watów od 0 do 100000.",
+      "export_limit_changed": "Konfiguracja uległa zmianie. Sprawdź aktualne ustawienia i potwierdź ponownie.",
+      "export_limit_pending": "Oczekiwanie na potwierdzenie konfiguracji. Odśwież stan przed kolejną zmianą.",
+      "export_limit_disabled": "Włącz sterowanie limitem oddawania energii (Funkcje → Funkcje urządzeń).",
+      "export_limit_confirmation": "Potwierdź tę zmianę",
+      "export_limit_invalid_slew": "Wprowadź liczbę dodatnią z maksymalnie dwoma miejscami po przecinku."
     },
     "abort": {
       "migration_no_envoy_sources": "Brak dostępnych sensorów energii Enphase Envoy do migracji.",
@@ -1374,7 +1452,7 @@
         }
       },
       "system_profile_status": {
-        "name": "Stan profilu systemowego",
+        "name": "Profil systemu",
         "state": {
           "pending": "Oczekujący"
         },
@@ -2024,6 +2102,57 @@
       },
       "vpp_next_event_status": {
         "name": "Stan następnego zdarzenia VPP"
+      },
+      "export_limit": {
+        "name": "Limit oddawania energii",
+        "state": {
+          "disabled": "Wyłączone",
+          "zero_export": "Zerowe oddawanie energii",
+          "limited": "Ograniczone",
+          "unsupported": "Nieobsługiwane",
+          "pending": "Oczekujący",
+          "unconfirmed": "Niepotwierdzone"
+        },
+        "state_attributes": {
+          "confirmed_watts": {
+            "name": "Bieżące ustawienie"
+          },
+          "requested_watts": {
+            "name": "Żądane ustawienie"
+          },
+          "requested_action": {
+            "name": "Żądane ustawienie",
+            "state": {
+              "set": "Ustaw limit oddawania energii",
+              "disable": "Wyłącz ograniczenie oddawania energii"
+            }
+          },
+          "request_status": {
+            "name": "Stan żądania",
+            "state": {
+              "idle": "Brak żądania",
+              "pending": "Oczekiwanie na potwierdzenie",
+              "confirmed": "Konfiguracja potwierdzona",
+              "unconfirmed": "Niepotwierdzone",
+              "rejected": "Odrzucone"
+            }
+          },
+          "last_successful_readback": {
+            "name": "Ostatni udany odczyt"
+          },
+          "slew_rate": {
+            "name": "Szybkość zmiany (W/sec)"
+          },
+          "requested_slew_rate": {
+            "name": "Żądane ustawienie · Szybkość zmiany (W/sec)"
+          },
+          "pending": {
+            "name": "Aż do"
+          },
+          "pending_requested_at": {
+            "name": "Oczekujące żądanie o godz"
+          }
+        }
       }
     },
     "number": {
@@ -2364,6 +2493,28 @@
       },
       "battery_schedule_selected": {
         "name": "Harmonogram baterii"
+      },
+      "export_limit": {
+        "name": "Limit oddawania energii",
+        "state": {
+          "enable_limit": "Włącz limit",
+          "disable_limit": "Wyłącz limit"
+        },
+        "state_attributes": {
+          "default_limit_watts": {
+            "name": "Domyślny limit eksportu (W)"
+          },
+          "default_slew_rate": {
+            "name": "Szybkość zmiany (W/sec)"
+          },
+          "slew_rate_source": {
+            "name": "Źródło szybkości zmiany",
+            "state": {
+              "gateway": "Brama",
+              "saved_override": "Zapisane nadpisanie"
+            }
+          }
+        }
       }
     },
     "button": {
@@ -2540,6 +2691,10 @@
     "active_system_event": {
       "title": "Aktywne zdarzenie systemowe Enphase o dużym wpływie",
       "description": "W lokalizacji {site_id} występuje aktywne zdarzenie {severity} dotyczące {device_type}, zgłoszone po raz pierwszy {event_date}. Szczegóły i zalecane działanie znajdziesz w Enlighten. Ta naprawa zostanie automatycznie usunięta, gdy Enphase zgłosi rozwiązanie zdarzenia."
+    },
+    "export_limit_pending": {
+      "title": "Zmiana limitu oddawania energii niepotwierdzona",
+      "description": "Zmiana nie została potwierdzona po {pending_timeout_minutes} minutach. Sprawdzanie trwa w standardowym interwale. Sprawdź konfigurację bramy; zapis nie będzie automatycznie ponawiany."
     }
   },
   "system_health": {
@@ -3177,6 +3332,72 @@
         "gateway_serial": {
           "name": "Numer seryjny Gateway",
           "description": "Opcjonalny numer seryjny Gateway, gdy rekord Activation zawiera wiele Gatewayów."
+        }
+      }
+    },
+    "set_export_limit": {
+      "name": "Ustaw limit oddawania energii",
+      "description": "Skonfiguruj limity oddawania energii systemu.",
+      "fields": {
+        "limit_watts": {
+          "name": "Limit oddawania energii (W)",
+          "description": "Wprowadź całkowitą liczbę watów od 0 do 100000."
+        },
+        "site_id": {
+          "name": "ID lokalizacji",
+          "description": "Opcjonalny identyfikator lokalizacji; wykrywany automatycznie po wybraniu urządzenia lokalizacji."
+        },
+        "config_entry_id": {
+          "name": "Wpis konfiguracji Enphase",
+          "description": "Wpis konfiguracji Enphase"
+        },
+        "device_id": {
+          "name": "Urządzenia",
+          "description": "Urządzenia"
+        },
+        "slew_rate": {
+          "name": "Szybkość zmiany (W/sec)",
+          "description": "Opcjonalnie. Jeśli pominięto, używana jest bieżąca wartość bramy."
+        }
+      }
+    },
+    "disable_export_limit": {
+      "name": "Wyłącz ograniczenie oddawania energii",
+      "description": "Skonfiguruj limity oddawania energii systemu.",
+      "fields": {
+        "site_id": {
+          "name": "ID lokalizacji",
+          "description": "Opcjonalny identyfikator lokalizacji; wykrywany automatycznie po wybraniu urządzenia lokalizacji."
+        },
+        "config_entry_id": {
+          "name": "Wpis konfiguracji Enphase",
+          "description": "Wpis konfiguracji Enphase"
+        },
+        "device_id": {
+          "name": "Urządzenia",
+          "description": "Urządzenia"
+        },
+        "slew_rate": {
+          "name": "Szybkość zmiany (W/sec)",
+          "description": "Opcjonalnie. Jeśli pominięto, używana jest bieżąca wartość bramy."
+        }
+      }
+    },
+    "refresh_export_limit": {
+      "name": "Odśwież limit oddawania energii",
+      "description": "Skonfiguruj limity oddawania energii systemu.",
+      "fields": {
+        "site_id": {
+          "name": "ID lokalizacji",
+          "description": "Opcjonalny identyfikator lokalizacji; wykrywany automatycznie po wybraniu urządzenia lokalizacji."
+        },
+        "config_entry_id": {
+          "name": "Wpis konfiguracji Enphase",
+          "description": "Wpis konfiguracji Enphase"
+        },
+        "device_id": {
+          "name": "Urządzenia",
+          "description": "Urządzenia"
         }
       }
     }

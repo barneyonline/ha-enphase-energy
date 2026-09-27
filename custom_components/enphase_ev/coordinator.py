@@ -150,6 +150,7 @@ from .evse_runtime import (
     evse_power_is_actively_charging,
 )
 from .evse_power import build_evse_power_snapshot
+from .export_limit_runtime import ExportLimitRuntime
 from .grid_profile_runtime import (
     ACTIVATION_GRID_PROFILE_FAMILY,
     SUPPORT_UNKNOWN,
@@ -299,6 +300,7 @@ COORDINATOR_RUNTIME_CLASSES: dict[str, type] = {
     "auth_refresh_runtime": AuthRefreshRuntime,
     "evse_feature_flags_runtime": EvseFeatureFlagsRuntime,
     "grid_profile_runtime": GridProfileRuntime,
+    "export_limit_runtime": ExportLimitRuntime,
     "tariff_runtime": TariffRuntime,
     "system_events_runtime": SystemEventsRuntime,
     "vpp_runtime": VppRuntime,
@@ -1092,6 +1094,7 @@ class EnphaseCoordinator(
         self._ensure_coordinator_runtime("auth_refresh_runtime")
         self._ensure_coordinator_runtime("evse_feature_flags_runtime")
         self._ensure_coordinator_runtime("grid_profile_runtime")
+        self._ensure_coordinator_runtime("export_limit_runtime")
         self._ensure_coordinator_runtime("tariff_runtime")
         self._ensure_coordinator_runtime("system_events_runtime")
         self._ensure_coordinator_runtime("vpp_runtime")
@@ -2411,6 +2414,11 @@ class EnphaseCoordinator(
             cancelled_tasks.extend(
                 task for task in enrichment_tasks if isinstance(task, asyncio.Future)
             )
+        export_limit_runtime = getattr(self, "export_limit_runtime", None)
+        if export_limit_runtime is not None:
+            export_task = export_limit_runtime.stop()
+            if export_task is not None:
+                cancelled_tasks.append(export_task)
         grid_profile_runtime = getattr(self, "grid_profile_runtime", None)
         cancel_grid_profile_pending = getattr(
             grid_profile_runtime, "cancel_pending_refresh", None

@@ -2331,6 +2331,7 @@ def test_advertised_entity_targets_pass_registered_schemas(
     fields = {
         "requested_message": "Heartbeat",
         "profile_id": "agf:test",
+        "limit_watts": 5000,
         "confirm": True,
         "schedule_type": "dtg",
         "schedule_id": "schedule-1",
@@ -2499,4 +2500,83 @@ async def test_validate_schedule_entity_target_routes_selected_site(
             {"schedule_type": "dtg"},
             target={"entity_id": [entity.entity_id for entity in entities]},
             blocking=True,
+        )
+
+
+@pytest.mark.asyncio
+async def test_export_limit_actions_route_to_selected_site(hass, monkeypatch):
+    handlers = _register_service_handlers(hass, monkeypatch)
+    coord = _fake_service_coordinator(site_id="export-site", serials=set())
+    coord.export_limit_runtime = SimpleNamespace(
+        async_apply=AsyncMock(return_value={"request_status": "pending"}),
+        async_refresh=AsyncMock(return_value={"request_status": "confirmed"}),
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={CONF_SITE_ID: "export-site", CONF_SITE_ONLY: True}
+    )
+    entry.add_to_hass(hass)
+    entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
+    runtime = coord.export_limit_runtime
+    for action, data in (
+        ("set_export_limit", {"limit_watts": 0}),
+        ("disable_export_limit", {}),
+        ("refresh_export_limit", {}),
+    ):
+        result = await handlers[(DOMAIN, action)](
+            SimpleNamespace(data={"site_id": "export-site", **data})
+        )
+        assert "request_status" in result
+        with pytest.raises(ServiceValidationError):
+            await handlers[(DOMAIN, action)](
+                SimpleNamespace(data={"site_id": "missing", **data})
+            )
+    assert runtime.async_apply.await_args_list[0].args == (0,)
+    assert runtime.async_apply.await_args_list[1].args == (None,)
+    assert all(
+        c.kwargs == {"confirm": True, "slew_rate": None}
+        for c in runtime.async_apply.await_args_list
+    )
+    runtime.async_refresh.assert_awaited_once()
+
+
+def test_export_limit_action_schema_and_selector(hass, monkeypatch):
+    registered = _register_service_metadata(hass, monkeypatch)
+    schema = registered[(DOMAIN, "set_export_limit")]["schema"]
+    for watts in (0, 1, 100000):
+        assert schema({"site_id": "123", "limit_watts": watts})["limit_watts"] == watts
+    for watts in (-1, 100001, 0.5, True, "5"):
+        with pytest.raises((ServiceValidationError, vol.Invalid)):
+            schema({"limit_watts": watts})
+    with pytest.raises(vol.Invalid):
+        schema({"limit_watts": 0, "confirm": True})
+    description = yaml.safe_load(SERVICES_YAML.read_text())
+    assert description["set_export_limit"]["fields"]["limit_watts"]["selector"][
+        "number"
+    ] == {"min": 0, "max": 100000, "step": 1, "unit_of_measurement": "W", "mode": "box"}
+
+    for action in ("set_export_limit", "disable_export_limit", "refresh_export_limit"):
+        assert "confirm" not in description[action]["fields"]
+    assert registered[(DOMAIN, "disable_export_limit")]["schema"](
+        {"site_id": "123"}
+    ) == {"site_id": "123"}
+
+
+async def test_export_limit_actions_optional_slew(hass, monkeypatch):
+    handlers = _register_service_handlers(hass, monkeypatch)
+    coord = _fake_service_coordinator(site_id="export-site", serials=set())
+    coord.export_limit_runtime = SimpleNamespace(async_apply=AsyncMock(return_value={}))
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={CONF_SITE_ID: "export-site", CONF_SITE_ONLY: True}
+    )
+    entry.add_to_hass(hass)
+    entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
+    for action, watts in (("set_export_limit", 3000), ("disable_export_limit", None)):
+        data = {"site_id": "export-site", "slew_rate": 12.25}
+        if watts is not None:
+            data["limit_watts"] = watts
+        await handlers[(DOMAIN, action)](SimpleNamespace(data=data))
+        coord.export_limit_runtime.async_apply.assert_awaited_with(
+            watts, confirm=True, slew_rate=12.25
         )

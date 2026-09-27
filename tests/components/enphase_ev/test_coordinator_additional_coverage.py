@@ -5475,3 +5475,13 @@ def test_ensure_serial_tracked_discovers(monkeypatch):
     assert coord._ensure_serial_tracked(" 12345 ") is True
     assert "12345" in coord.serials
     assert coord._ensure_serial_tracked("") is False
+
+
+async def test_cleanup_cancels_export_limit_verification(coordinator_factory):
+    coord = coordinator_factory(serials=["EV1"])
+    task = asyncio.create_task(asyncio.sleep(60))
+    coord.export_limit_runtime._task = task
+    cancelled = coord.cleanup_runtime_state()
+    assert task in cancelled
+    await asyncio.gather(task, return_exceptions=True)
+    assert task.cancelled()

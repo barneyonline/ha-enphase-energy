@@ -481,6 +481,27 @@
     },
     "grid_profile_controls_disabled": {
       "message": "Prieš naudodami šį veiksmą integracijos parinktyse įjunkite montuotojo tinklo profilio valdiklius."
+    },
+    "export_limit_unavailable": {
+      "message": "Eksporto riba nepasiekiama. Reikalinga montuotojo prieiga ir palaikoma konfigūracija su vienu šliuzu."
+    },
+    "export_limit_invalid": {
+      "message": "Įveskite sveikąjį vatų skaičių nuo 0 iki 100000."
+    },
+    "export_limit_changed": {
+      "message": "Konfigūracija pasikeitė. Peržiūrėkite atnaujintus nustatymus ir patvirtinkite dar kartą."
+    },
+    "export_limit_pending": {
+      "message": "Laukiama konfigūracijos patvirtinimo. Prieš kitą pakeitimą atnaujinkite būseną."
+    },
+    "export_limit_disabled": {
+      "message": "Įjungti eksporto ribos valdymą (Funkcijos → Įrenginio funkcijos)."
+    },
+    "export_limit_confirmation": {
+      "message": "Patvirtinti šį pakeitimą"
+    },
+    "export_limit_invalid_slew": {
+      "message": "Įveskite teigiamą skaičių su ne daugiau kaip dviem dešimtainiais skaitmenimis."
     }
   },
   "options": {
@@ -503,7 +524,7 @@
           "repair_notifications": "Tvarkyti „Home Assistant“ taisymo pranešimus.",
           "authentication_settings": "Paleiskite prisijungimo eigą, kad atnaujintumėte duomenis nepašalindami integracijos.",
           "migrate_envoy": "Perimkite pasirinktus Enphase Envoy energijos objektų ID, kad Home Assistant Energy istorija tęstųsi šioje integracijoje.",
-          "advanced": "Pasirenkami tinklo režimo valdikliai ir tik diegėjui skirti tinklo profilio valdikliai.",
+          "advanced": "Diegėjo ir priežiūros veiksmai.",
           "features": "Konfigūruokite įrenginių funkcijas ir išplėstinius valdiklius."
         },
         "data": {
@@ -672,11 +693,13 @@
         "description": "Diegėjo ir priežiūros veiksmai.",
         "menu_options": {
           "grid_toggle": "Tinklo režimas",
-          "grid_profile": "Tinklo profilio valdymas"
+          "grid_profile": "Tinklo profilio valdymas",
+          "export_limit": "Eksporto riba"
         },
         "menu_option_descriptions": {
           "grid_toggle": "Konfigūruoti rankinius tinklo režimo valdiklius.",
-          "grid_profile": "Naršykite ir taikykite tik diegėjams skirtus Activation tinklo profilius."
+          "grid_profile": "Naršykite ir taikykite tik diegėjams skirtus Activation tinklo profilius.",
+          "export_limit": "Konfigūruokite sistemos eksporto ribas."
         }
       },
       "grid_toggle": {
@@ -742,7 +765,8 @@
               "weather_enabled": "Įjungti orus",
               "nominal_voltage": "EV įkroviklio vardinė įtampa (V)",
               "microinverter_lifetime_energy_enabled": "Įjungti mikroinverterių viso veikimo energiją",
-              "vpp_events_enabled": "Įjungti VPP įvykius"
+              "vpp_events_enabled": "Įjungti VPP įvykius",
+              "export_limit_controls_enabled": "Įjungti eksporto ribos valdymą"
             },
             "data_description": {
               "system_event_repair_issues": "Kuria Home Assistant taisymus aktyviems nuolatiniams Enphase pavojaus signalams. Pagal numatytuosius išjungta.",
@@ -752,7 +776,8 @@
               "schedule_sync_enabled": "Tvarkykite „IQ EV Charger“ tvarkaraščius.",
               "battery_schedules_enabled": "Tvarkykite „IQ Battery“ tvarkaraščius.",
               "microinverter_lifetime_energy_enabled": "Įjungia visus kiekvieno mikroinverterio viso veikimo energijos jutiklius.",
-              "vpp_events_enabled": "Gauna VPP/ELRP tvarkaraščius iš „Enphase“ ir kuria įvykių esybes tik užregistruotoms vietoms. Pagal numatytuosius nustatymus išjungta."
+              "vpp_events_enabled": "Gauna VPP/ELRP tvarkaraščius iš „Enphase“ ir kuria įvykių esybes tik užregistruotoms vietoms. Pagal numatytuosius nustatymus išjungta.",
+              "export_limit_controls_enabled": "Konfigūruokite sistemos eksporto ribas. Reikalinga montuotojo prieiga."
             }
           },
           "advanced_features": {
@@ -779,7 +804,8 @@
           "microinverter_lifetime_energy_enabled": "Įjungti mikroinverterių viso veikimo energiją",
           "microinverter_power_enabled": "Įjungti mikroinverterių galią",
           "vpp_events_enabled": "Įjungti VPP įvykius",
-          "grid_profile_controls_enabled": "Įjungti montuotojo tinklo profilio valdiklius"
+          "grid_profile_controls_enabled": "Įjungti montuotojo tinklo profilio valdiklius",
+          "export_limit_controls_enabled": "Įjungti eksporto ribos valdymą"
         },
         "data_description": {
           "system_event_repair_issues": "Kuria Home Assistant taisymus aktyviems nuolatiniams Enphase pavojaus signalams. Pagal numatytuosius išjungta.",
@@ -791,7 +817,52 @@
           "microinverter_lifetime_energy_enabled": "Įjungia visus kiekvieno mikroinverterio viso veikimo energijos jutiklius.",
           "microinverter_power_enabled": "Įjungia visus kiekvieno mikroinverterio galios jutiklius, kai pasiekiama montuotojo telemetrija.",
           "vpp_events_enabled": "Gauna VPP/ELRP tvarkaraščius iš „Enphase“ ir kuria įvykių esybes tik užregistruotoms vietoms. Pagal numatytuosius nustatymus išjungta.",
-          "grid_profile_controls_enabled": "Gauna tik montuotojui skirtus tinklo profilio metaduomenis ir įjungia profilio veiksmus. Pagal numatytuosius nustatymus išjungta."
+          "grid_profile_controls_enabled": "Gauna tik montuotojui skirtus tinklo profilio metaduomenis ir įjungia profilio veiksmus. Pagal numatytuosius nustatymus išjungta.",
+          "export_limit_controls_enabled": "Konfigūruokite sistemos eksporto ribas. Reikalinga montuotojo prieiga."
+        }
+      },
+      "export_limit": {
+        "title": "Eksporto riba",
+        "description": "Konfigūruokite sistemos eksporto ribas."
+      },
+      "export_limit_action": {
+        "title": "Eksporto riba",
+        "description": "Konfigūruokite sistemos eksporto ribas.\n\nDabartinis nustatymas: **{current}**\n\n{status}",
+        "menu_options": {
+          "export_limit_set": "Nustatyti eksporto ribą",
+          "export_limit_zero": "Nustatyti nulinį eksportą",
+          "export_limit_disable": "Išjungti eksporto ribojimą",
+          "export_limit_defaults": "Numatytieji nustatymai"
+        }
+      },
+      "export_limit_set": {
+        "title": "Nustatyti eksporto ribą",
+        "data": {
+          "limit_watts": "Eksporto riba (W)"
+        }
+      },
+      "export_limit_confirm": {
+        "title": "Eksporto riba",
+        "description": "Dabartinis nustatymas: **{current}**\n\nPrašomas nustatymas: **{requested}**\n\nKitimo greitis (W/sec): **{current_slew}** → **{requested_slew}**",
+        "data": {
+          "confirm": "Patvirtinti šį pakeitimą"
+        }
+      },
+      "export_limit_submitted": {
+        "title": "Eksporto riba",
+        "description": "Konfigūruokite sistemos eksporto ribas.\n\n**{status}**"
+      },
+      "export_limit_readonly": {
+        "title": "Eksporto riba",
+        "description": "Eksporto riba nepasiekiama. Reikalinga montuotojo prieiga ir palaikoma konfigūracija su vienu šliuzu.\n\nDabartinis nustatymas: **{current}**"
+      },
+      "export_limit_defaults": {
+        "title": "Numatytieji nustatymai",
+        "description": "Išsaugo ribos įjungimo numatytąsias reikšmes nekeičiant šliuzo. Atkūrimas pašalina išsaugotą greičio pakeitimą.",
+        "data": {
+          "limit_watts": "Numatytoji eksporto riba (W)",
+          "slew_rate": "Kitimo greitis (W/sec)",
+          "restore_slew_rate": "Atkurti greitį iš šliuzo"
         }
       }
     },
@@ -819,7 +890,14 @@
       "grid_otp_required": "Įveskite vienkartinį kodą.",
       "grid_otp_invalid_format": "Vienkartinį kodą turi sudaryti tiksliai keturi skaitmenys.",
       "grid_otp_invalid": "Vienkartinis kodas neteisingas arba pasibaigęs.",
-      "grid_envoy_serial_missing": "Nepavyko nustatyti šios vietos vartų."
+      "grid_envoy_serial_missing": "Nepavyko nustatyti šios vietos vartų.",
+      "export_limit_unavailable": "Eksporto riba nepasiekiama. Reikalinga montuotojo prieiga ir palaikoma konfigūracija su vienu šliuzu.",
+      "export_limit_invalid": "Įveskite sveikąjį vatų skaičių nuo 0 iki 100000.",
+      "export_limit_changed": "Konfigūracija pasikeitė. Peržiūrėkite atnaujintus nustatymus ir patvirtinkite dar kartą.",
+      "export_limit_pending": "Laukiama konfigūracijos patvirtinimo. Prieš kitą pakeitimą atnaujinkite būseną.",
+      "export_limit_disabled": "Įjungti eksporto ribos valdymą (Funkcijos → Įrenginio funkcijos).",
+      "export_limit_confirmation": "Patvirtinti šį pakeitimą",
+      "export_limit_invalid_slew": "Įveskite teigiamą skaičių su ne daugiau kaip dviem dešimtainiais skaitmenimis."
     },
     "abort": {
       "migration_no_envoy_sources": "Nėra Enphase Envoy energijos jutiklių, kuriuos būtų galima migruoti.",
@@ -1374,7 +1452,7 @@
         }
       },
       "system_profile_status": {
-        "name": "Sistemos profilio būsena",
+        "name": "Sistemos profilis",
         "state": {
           "pending": "Laukiama"
         },
@@ -2024,6 +2102,57 @@
       },
       "vpp_next_event_status": {
         "name": "Kito VPP įvykio būsena"
+      },
+      "export_limit": {
+        "name": "Eksporto riba",
+        "state": {
+          "disabled": "Išjungta",
+          "zero_export": "Nulinis eksportas",
+          "limited": "Apribota",
+          "unsupported": "Nepalaikoma",
+          "pending": "Laukiama",
+          "unconfirmed": "Nepatvirtinta"
+        },
+        "state_attributes": {
+          "confirmed_watts": {
+            "name": "Dabartinis nustatymas"
+          },
+          "requested_watts": {
+            "name": "Prašomas nustatymas"
+          },
+          "requested_action": {
+            "name": "Prašomas nustatymas",
+            "state": {
+              "set": "Nustatyti eksporto ribą",
+              "disable": "Išjungti eksporto ribojimą"
+            }
+          },
+          "request_status": {
+            "name": "Užklausos būsena",
+            "state": {
+              "idle": "Nėra užklausos",
+              "pending": "Laukiama patvirtinimo",
+              "confirmed": "Konfigūracija patvirtinta",
+              "unconfirmed": "Nepatvirtinta",
+              "rejected": "Atmesta"
+            }
+          },
+          "last_successful_readback": {
+            "name": "Paskutinis sėkmingas nuskaitymas"
+          },
+          "slew_rate": {
+            "name": "Kitimo greitis (W/sec)"
+          },
+          "requested_slew_rate": {
+            "name": "Prašomas nustatymas · Kitimo greitis (W/sec)"
+          },
+          "pending": {
+            "name": "Laukiama"
+          },
+          "pending_requested_at": {
+            "name": "Laukiama Užklausa adresu"
+          }
+        }
       }
     },
     "number": {
@@ -2364,6 +2493,28 @@
       },
       "battery_schedule_selected": {
         "name": "Baterijos tvarkaraštis"
+      },
+      "export_limit": {
+        "name": "Eksporto riba",
+        "state": {
+          "enable_limit": "Įjungti ribą",
+          "disable_limit": "Išjungti ribą"
+        },
+        "state_attributes": {
+          "default_limit_watts": {
+            "name": "Numatytoji eksporto riba (W)"
+          },
+          "default_slew_rate": {
+            "name": "Kitimo greitis (W/sec)"
+          },
+          "slew_rate_source": {
+            "name": "Kitimo greičio šaltinis",
+            "state": {
+              "gateway": "Šliuzas",
+              "saved_override": "Išsaugotas pakeitimas"
+            }
+          }
+        }
       }
     },
     "button": {
@@ -2540,6 +2691,10 @@
     "active_system_event": {
       "title": "Aktyvus didelio poveikio Enphase sistemos įvykis",
       "description": "Vietoje {site_id} yra aktyvus {severity} įvykis, veikiantis {device_type}, pirmą kartą praneštas {event_date}. Išsamią informaciją ir rekomenduojamą veiksmą rasite Enlighten. Šis taisymas automatiškai pašalinamas, kai Enphase praneša, kad įvykis išspręstas."
+    },
+    "export_limit_pending": {
+      "title": "Eksporto ribos pakeitimas nepatvirtintas",
+      "description": "Pakeitimas nepatvirtintas po {pending_timeout_minutes} minučių. Tikrinimas tęsiamas įprastu intervalu. Patikrinkite šliuzo nustatymus; įrašymas automatiškai nekartojamas."
     }
   },
   "system_health": {
@@ -3177,6 +3332,72 @@
         "gateway_serial": {
           "name": "Gateway serijos numeris",
           "description": "Pasirinktinis Gateway serijos numeris, kai Activation įraše yra keli Gateway įrenginiai."
+        }
+      }
+    },
+    "set_export_limit": {
+      "name": "Nustatyti eksporto ribą",
+      "description": "Konfigūruokite sistemos eksporto ribas.",
+      "fields": {
+        "limit_watts": {
+          "name": "Eksporto riba (W)",
+          "description": "Įveskite sveikąjį vatų skaičių nuo 0 iki 100000."
+        },
+        "site_id": {
+          "name": "Vietos ID",
+          "description": "Pasirinktinis vietos identifikatorius; aptinkamas automatiškai pasirinkus vietos įrenginį."
+        },
+        "config_entry_id": {
+          "name": "Enphase konfigūracijos įrašas",
+          "description": "Enphase konfigūracijos įrašas"
+        },
+        "device_id": {
+          "name": "Įrenginiai",
+          "description": "Įrenginiai"
+        },
+        "slew_rate": {
+          "name": "Kitimo greitis (W/sec)",
+          "description": "Neprivaloma. Nenurodžius naudojama dabartinė šliuzo reikšmė."
+        }
+      }
+    },
+    "disable_export_limit": {
+      "name": "Išjungti eksporto ribojimą",
+      "description": "Konfigūruokite sistemos eksporto ribas.",
+      "fields": {
+        "site_id": {
+          "name": "Vietos ID",
+          "description": "Pasirinktinis vietos identifikatorius; aptinkamas automatiškai pasirinkus vietos įrenginį."
+        },
+        "config_entry_id": {
+          "name": "Enphase konfigūracijos įrašas",
+          "description": "Enphase konfigūracijos įrašas"
+        },
+        "device_id": {
+          "name": "Įrenginiai",
+          "description": "Įrenginiai"
+        },
+        "slew_rate": {
+          "name": "Kitimo greitis (W/sec)",
+          "description": "Neprivaloma. Nenurodžius naudojama dabartinė šliuzo reikšmė."
+        }
+      }
+    },
+    "refresh_export_limit": {
+      "name": "Atnaujinti eksporto ribą",
+      "description": "Konfigūruokite sistemos eksporto ribas.",
+      "fields": {
+        "site_id": {
+          "name": "Vietos ID",
+          "description": "Pasirinktinis vietos identifikatorius; aptinkamas automatiškai pasirinkus vietos įrenginį."
+        },
+        "config_entry_id": {
+          "name": "Enphase konfigūracijos įrašas",
+          "description": "Enphase konfigūracijos įrašas"
+        },
+        "device_id": {
+          "name": "Įrenginiai",
+          "description": "Įrenginiai"
         }
       }
     }

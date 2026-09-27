@@ -23,7 +23,8 @@ from .battery_schedule_editor import (
     battery_schedule_type_options,
     battery_scheduler_enabled,
 )
-from .const import DOMAIN
+from .const import DOMAIN, OPT_EXPORT_LIMIT_DEFAULT_WATTS, OPT_EXPORT_LIMIT_SLEW_RATE
+from .export_limit_runtime import ExportLimitRuntime, fail
 from .entity import battery_schedule_supported
 from .entity import (
     battery_write_access_explicitly_denied as _battery_write_access_explicitly_denied,
@@ -203,6 +204,7 @@ async def async_setup_entry(
     ent_reg = er.async_get(hass)
     known_serials: set[str] = set()
     site_entity_added = False
+    export_limit_added = False
     battery_schedule_editor_added = False
 
     def _system_profile_unique_id() -> str:
@@ -223,10 +225,18 @@ async def async_setup_entry(
     @callback
     def _async_sync_site_entities() -> None:
         nonlocal site_entity_added
+        nonlocal export_limit_added
         nonlocal battery_schedule_editor_added
         inventory_ready = bool(getattr(coord, "_devices_inventory_ready", False))
         retain_system_profile = _retain_system_profile(coord)
         retain_battery_schedule_editor = _retain_battery_schedule_editor(coord, entry)
+        export_runtime = getattr(coord, "export_limit_runtime", None)
+        retain_export_limit = (
+            isinstance(export_runtime, ExportLimitRuntime) and export_runtime.enabled
+        )
+        if retain_export_limit and not export_limit_added:
+            async_add_entities([ExportLimitSelect(coord)], update_before_add=False)
+            export_limit_added = True
         if not site_entity_added and retain_system_profile:
             async_add_entities([SystemProfileSelect(coord)], update_before_add=False)
             site_entity_added = True
@@ -261,6 +271,10 @@ async def async_setup_entry(
                 unique_id
                 for unique_id, retained in (
                     (
+                        f"{DOMAIN}_site_{coord.site_id}_export_limit",
+                        retain_export_limit,
+                    ),
+                    (
                         _system_profile_unique_id(),
                         retain_system_profile or system_profile_loaded,
                     ),
@@ -279,6 +293,7 @@ async def async_setup_entry(
             },
             is_managed=lambda unique_id: unique_id
             in {
+                f"{DOMAIN}_site_{coord.site_id}_export_limit",
                 _system_profile_unique_id(),
                 _battery_schedule_select_unique_id(),
                 _battery_new_schedule_type_unique_id(),
@@ -333,6 +348,76 @@ async def async_setup_entry(
         entry.async_on_unload(generic_listener(_async_sync_chargers))
     _async_sync_site_entities()
     _async_sync_chargers()
+
+
+class ExportLimitSelect(CoordinatorEntity, SelectEntity):  # type: ignore[misc]
+    """Enable the saved default limit or disable gateway export limiting."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "export_limit"
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_options = ["enable_limit", "disable_limit"]
+
+    def __init__(self, coord: EnphaseCoordinator) -> None:
+        super().__init__(coord)
+        self._coord = coord
+        self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_export_limit"
+
+    @property
+    def device_info(self) -> DeviceInfo | None:
+        return _type_device_info(self._coord, "envoy")
+
+    @property
+    def available(self) -> bool:
+        runtime = self._coord.export_limit_runtime
+        return bool(
+            runtime.enabled
+            and runtime.snapshot
+            and runtime.snapshot.supported
+            and not runtime.pending
+        )
+
+    @property
+    def current_option(self) -> str | None:
+        snapshot = self._coord.export_limit_runtime.snapshot
+        if snapshot is None or not snapshot.supported:
+            return None
+        return "enable_limit" if snapshot.enabled else "disable_limit"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        entry = self._coord.config_entry
+        options = entry.options if entry is not None else {}
+        snapshot = self._coord.export_limit_runtime.snapshot
+        override = options.get(OPT_EXPORT_LIMIT_SLEW_RATE)
+        return {
+            "default_limit_watts": options.get(OPT_EXPORT_LIMIT_DEFAULT_WATTS, 0),
+            "default_slew_rate": (
+                override
+                if override is not None
+                else snapshot.slew if snapshot else None
+            ),
+            "slew_rate_source": "saved_override" if override is not None else "gateway",
+        }
+
+    async def async_select_option(self, option: str) -> None:
+        if option not in self._attr_options:
+            fail("export_limit_invalid")
+        entry = self._coord.config_entry
+        options = entry.options if entry is not None else {}
+        await self._coord.export_limit_runtime.async_apply(
+            (
+                options.get(OPT_EXPORT_LIMIT_DEFAULT_WATTS, 0)
+                if option == "enable_limit"
+                else None
+            ),
+            confirm=True,
+            slew_rate=(
+                options.get(OPT_EXPORT_LIMIT_SLEW_RATE)
+                if option == "enable_limit"
+                else None
+            ),
+        )
 
 
 class SystemProfileSelect(CoordinatorEntity, SelectEntity):  # type: ignore[misc]

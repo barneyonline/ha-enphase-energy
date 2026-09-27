@@ -304,7 +304,7 @@ def test_pending_profile_timeout_issue_lifecycle(
     assert domain == DOMAIN
     assert issue_id == ISSUE_BATTERY_PROFILE_PENDING
     placeholders = payload["translation_placeholders"]
-    assert placeholders["pending_timeout_minutes"] == "15"
+    assert placeholders["pending_timeout_minutes"] == "10"
     assert not {key for key in placeholders if key.startswith("hems_")}
     assert {"failure_count", "reason"}.isdisjoint(placeholders)
     metrics = payload["data"]["site_metrics"]

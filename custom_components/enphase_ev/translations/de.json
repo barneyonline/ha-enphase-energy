@@ -481,6 +481,27 @@
     },
     "grid_profile_controls_disabled": {
       "message": "Aktiviere die Installateursteuerung für Netzprofile in den Integrationsoptionen, bevor du diese Aktion verwendest."
+    },
+    "export_limit_unavailable": {
+      "message": "Einspeisebegrenzung nicht verfügbar. Installateurzugriff und eine unterstützte Konfiguration mit einem Gateway sind erforderlich."
+    },
+    "export_limit_invalid": {
+      "message": "Ganze Wattzahlen von 0 bis 100000 eingeben."
+    },
+    "export_limit_changed": {
+      "message": "Konfiguration geändert. Aktualisierte Einstellungen prüfen und erneut bestätigen."
+    },
+    "export_limit_pending": {
+      "message": "Bestätigung der Konfiguration ausstehend. Vor einer weiteren Änderung den Status aktualisieren."
+    },
+    "export_limit_disabled": {
+      "message": "Steuerung der Einspeisebegrenzung aktivieren (Funktionen → Gerätefunktionen)."
+    },
+    "export_limit_confirmation": {
+      "message": "Diese Änderung bestätigen"
+    },
+    "export_limit_invalid_slew": {
+      "message": "Eine positive Zahl mit höchstens zwei Nachkommastellen eingeben."
     }
   },
   "options": {
@@ -503,7 +524,7 @@
           "repair_notifications": "Home Assistant-Reparaturbenachrichtigungen verwalten.",
           "authentication_settings": "Startet den Login-Ablauf, um Zugangsdaten zu erneuern, ohne die Integration zu entfernen.",
           "migrate_envoy": "Übernehmen Sie ausgewählte Energie-Entitäts-IDs von Enphase Envoy, damit der Verlauf in Home Assistant Energy unter dieser Integration weiterläuft.",
-          "advanced": "Optionale Netzmodus-Steuerung und Netzprofilsteuerung nur für Installateure.",
+          "advanced": "Installateur- und Wartungsaktionen.",
           "features": "Gerätefunktionen und erweiterte Steuerungen konfigurieren."
         },
         "data": {
@@ -672,11 +693,13 @@
         "description": "Installateur- und Wartungsaktionen.",
         "menu_options": {
           "grid_toggle": "Netzmodus",
-          "grid_profile": "Netzprofil-Steuerung"
+          "grid_profile": "Netzprofil-Steuerung",
+          "export_limit": "Einspeisebegrenzung"
         },
         "menu_option_descriptions": {
           "grid_toggle": "Manuelle Netzmodus-Steuerung konfigurieren.",
-          "grid_profile": "Nur für Installateure verfügbare Activation-Netzprofile durchsuchen und anwenden."
+          "grid_profile": "Nur für Installateure verfügbare Activation-Netzprofile durchsuchen und anwenden.",
+          "export_limit": "Einspeisegrenzen des Systems konfigurieren."
         }
       },
       "grid_toggle": {
@@ -742,7 +765,8 @@
               "weather_enabled": "Wetter aktivieren",
               "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)",
               "microinverter_lifetime_energy_enabled": "Lebensdauerenergie der Mikro-Wechselrichter aktivieren",
-              "vpp_events_enabled": "VPP-Ereignisse aktivieren"
+              "vpp_events_enabled": "VPP-Ereignisse aktivieren",
+              "export_limit_controls_enabled": "Steuerung der Einspeisebegrenzung aktivieren"
             },
             "data_description": {
               "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert.",
@@ -752,7 +776,8 @@
               "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten.",
               "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten.",
               "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
-              "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert."
+              "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert.",
+              "export_limit_controls_enabled": "Einspeisegrenzen des Systems konfigurieren. Erfordert Installateurzugriff."
             }
           },
           "advanced_features": {
@@ -779,7 +804,8 @@
           "microinverter_lifetime_energy_enabled": "Lebensdauerenergie der Mikro-Wechselrichter aktivieren",
           "microinverter_power_enabled": "Leistung der Mikro-Wechselrichter aktivieren",
           "vpp_events_enabled": "VPP-Ereignisse aktivieren",
-          "grid_profile_controls_enabled": "Installateursteuerung für Netzprofile aktivieren"
+          "grid_profile_controls_enabled": "Installateursteuerung für Netzprofile aktivieren",
+          "export_limit_controls_enabled": "Steuerung der Einspeisebegrenzung aktivieren"
         },
         "data_description": {
           "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert.",
@@ -791,7 +817,52 @@
           "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
           "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist.",
           "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert.",
-          "grid_profile_controls_enabled": "Ruft nur für Installateure verfügbare Netzprofil-Metadaten ab und aktiviert Profilaktionen. Standardmäßig deaktiviert."
+          "grid_profile_controls_enabled": "Ruft nur für Installateure verfügbare Netzprofil-Metadaten ab und aktiviert Profilaktionen. Standardmäßig deaktiviert.",
+          "export_limit_controls_enabled": "Einspeisegrenzen des Systems konfigurieren. Erfordert Installateurzugriff."
+        }
+      },
+      "export_limit": {
+        "title": "Einspeisebegrenzung",
+        "description": "Einspeisegrenzen des Systems konfigurieren."
+      },
+      "export_limit_action": {
+        "title": "Einspeisebegrenzung",
+        "description": "Einspeisegrenzen des Systems konfigurieren.\n\nAktuelle Einstellung: **{current}**\n\n{status}",
+        "menu_options": {
+          "export_limit_set": "Einspeisegrenze festlegen",
+          "export_limit_zero": "Nulleinspeisung festlegen",
+          "export_limit_disable": "Einspeisebegrenzung deaktivieren",
+          "export_limit_defaults": "Standardeinstellungen"
+        }
+      },
+      "export_limit_set": {
+        "title": "Einspeisegrenze festlegen",
+        "data": {
+          "limit_watts": "Einspeisegrenze (W)"
+        }
+      },
+      "export_limit_confirm": {
+        "title": "Einspeisebegrenzung",
+        "description": "Aktuelle Einstellung: **{current}**\n\nAngeforderte Einstellung: **{requested}**\n\nÄnderungsrate (W/sec): **{current_slew}** → **{requested_slew}**",
+        "data": {
+          "confirm": "Diese Änderung bestätigen"
+        }
+      },
+      "export_limit_submitted": {
+        "title": "Einspeisebegrenzung",
+        "description": "Einspeisegrenzen des Systems konfigurieren.\n\n**{status}**"
+      },
+      "export_limit_readonly": {
+        "title": "Einspeisebegrenzung",
+        "description": "Einspeisebegrenzung nicht verfügbar. Installateurzugriff und eine unterstützte Konfiguration mit einem Gateway sind erforderlich.\n\nAktuelle Einstellung: **{current}**"
+      },
+      "export_limit_defaults": {
+        "title": "Standardeinstellungen",
+        "description": "Standardwerte zum Aktivieren des Limits speichern, ohne das Gateway zu ändern. Wiederherstellen entfernt die gespeicherte Änderungsrate.",
+        "data": {
+          "limit_watts": "Standard-Einspeisegrenze (W)",
+          "slew_rate": "Änderungsrate (W/sec)",
+          "restore_slew_rate": "Änderungsrate vom Gateway wiederherstellen"
         }
       }
     },
@@ -819,7 +890,14 @@
       "grid_otp_required": "Geben Sie den Einmalcode ein.",
       "grid_otp_invalid_format": "Der Einmalcode muss genau vier Ziffern enthalten.",
       "grid_otp_invalid": "Der Einmalcode ist ungültig oder abgelaufen.",
-      "grid_envoy_serial_missing": "Das Gateway für diese Site konnte nicht ermittelt werden."
+      "grid_envoy_serial_missing": "Das Gateway für diese Site konnte nicht ermittelt werden.",
+      "export_limit_unavailable": "Einspeisebegrenzung nicht verfügbar. Installateurzugriff und eine unterstützte Konfiguration mit einem Gateway sind erforderlich.",
+      "export_limit_invalid": "Ganze Wattzahlen von 0 bis 100000 eingeben.",
+      "export_limit_changed": "Konfiguration geändert. Aktualisierte Einstellungen prüfen und erneut bestätigen.",
+      "export_limit_pending": "Bestätigung der Konfiguration ausstehend. Vor einer weiteren Änderung den Status aktualisieren.",
+      "export_limit_disabled": "Steuerung der Einspeisebegrenzung aktivieren (Funktionen → Gerätefunktionen).",
+      "export_limit_confirmation": "Diese Änderung bestätigen",
+      "export_limit_invalid_slew": "Eine positive Zahl mit höchstens zwei Nachkommastellen eingeben."
     },
     "abort": {
       "migration_no_envoy_sources": "Es sind keine Enphase-Envoy-Energiesensoren für die Migration verfügbar.",
@@ -1374,7 +1452,7 @@
         }
       },
       "system_profile_status": {
-        "name": "Systemprofilstatus",
+        "name": "Systemprofil",
         "state": {
           "pending": "Ausstehend"
         },
@@ -2024,6 +2102,57 @@
       },
       "vpp_next_event_status": {
         "name": "Status des nächsten VPP-Ereignisses"
+      },
+      "export_limit": {
+        "name": "Einspeisebegrenzung",
+        "state": {
+          "disabled": "Deaktiviert",
+          "zero_export": "Nulleinspeisung",
+          "limited": "Begrenzt",
+          "unsupported": "Nicht unterstützt",
+          "pending": "Ausstehend",
+          "unconfirmed": "Unbestätigt"
+        },
+        "state_attributes": {
+          "confirmed_watts": {
+            "name": "Aktuelle Einstellung"
+          },
+          "requested_watts": {
+            "name": "Angeforderte Einstellung"
+          },
+          "requested_action": {
+            "name": "Angeforderte Einstellung",
+            "state": {
+              "set": "Einspeisegrenze festlegen",
+              "disable": "Einspeisebegrenzung deaktivieren"
+            }
+          },
+          "request_status": {
+            "name": "Anfragestatus",
+            "state": {
+              "idle": "Keine Anfrage",
+              "pending": "Bestätigung ausstehend",
+              "confirmed": "Konfiguration bestätigt",
+              "unconfirmed": "Unbestätigt",
+              "rejected": "Abgelehnt"
+            }
+          },
+          "last_successful_readback": {
+            "name": "Letzte erfolgreiche Abfrage"
+          },
+          "slew_rate": {
+            "name": "Änderungsrate (W/sec)"
+          },
+          "requested_slew_rate": {
+            "name": "Angeforderte Einstellung · Änderungsrate (W/sec)"
+          },
+          "pending": {
+            "name": "Ausstehend"
+          },
+          "pending_requested_at": {
+            "name": "Ausstehend angefordert bei"
+          }
+        }
       }
     },
     "number": {
@@ -2364,6 +2493,28 @@
       },
       "battery_schedule_selected": {
         "name": "Batterieplan"
+      },
+      "export_limit": {
+        "name": "Einspeisebegrenzung",
+        "state": {
+          "enable_limit": "Limit aktivieren",
+          "disable_limit": "Limit deaktivieren"
+        },
+        "state_attributes": {
+          "default_limit_watts": {
+            "name": "Standard-Einspeisegrenze (W)"
+          },
+          "default_slew_rate": {
+            "name": "Änderungsrate (W/sec)"
+          },
+          "slew_rate_source": {
+            "name": "Quelle der Änderungsrate",
+            "state": {
+              "gateway": "Gateway",
+              "saved_override": "Gespeicherte Vorgabe"
+            }
+          }
+        }
       }
     },
     "button": {
@@ -2540,6 +2691,10 @@
     "active_system_event": {
       "title": "Schwerwiegendes Enphase-Systemereignis aktiv",
       "description": "Standort {site_id} hat ein aktives Ereignis des Schweregrads {severity}, das {device_type} betrifft und erstmals um {event_date} gemeldet wurde. Details und empfohlene Maßnahmen finden Sie in Enlighten. Diese Reparatur wird automatisch entfernt, sobald Enphase das Ereignis als behoben meldet."
+    },
+    "export_limit_pending": {
+      "title": "Änderung der Einspeisegrenze unbestätigt",
+      "description": "Die Änderung wurde nach {pending_timeout_minutes} Minuten nicht bestätigt. Prüfungen laufen im normalen Abfrageintervall weiter. Prüfen Sie die Gateway-Konfiguration; der Schreibvorgang wird nicht automatisch wiederholt."
     }
   },
   "system_health": {
@@ -3177,6 +3332,72 @@
         "gateway_serial": {
           "name": "Gateway-Seriennummer",
           "description": "Optionale Gateway-Seriennummer, wenn der Activation-Datensatz mehrere Gateways enthält."
+        }
+      }
+    },
+    "set_export_limit": {
+      "name": "Einspeisegrenze festlegen",
+      "description": "Einspeisegrenzen des Systems konfigurieren.",
+      "fields": {
+        "limit_watts": {
+          "name": "Einspeisegrenze (W)",
+          "description": "Ganze Wattzahlen von 0 bis 100000 eingeben."
+        },
+        "site_id": {
+          "name": "Standort-ID",
+          "description": "Optionaler Standortbezeichner; wird automatisch erkannt, wenn ein Standortgerät ausgewählt ist."
+        },
+        "config_entry_id": {
+          "name": "Enphase-Konfigurationseintrag",
+          "description": "Enphase-Konfigurationseintrag"
+        },
+        "device_id": {
+          "name": "Geräte",
+          "description": "Geräte"
+        },
+        "slew_rate": {
+          "name": "Änderungsrate (W/sec)",
+          "description": "Optional. Ohne Angabe wird der aktuelle Gateway-Wert verwendet."
+        }
+      }
+    },
+    "disable_export_limit": {
+      "name": "Einspeisebegrenzung deaktivieren",
+      "description": "Einspeisegrenzen des Systems konfigurieren.",
+      "fields": {
+        "site_id": {
+          "name": "Standort-ID",
+          "description": "Optionaler Standortbezeichner; wird automatisch erkannt, wenn ein Standortgerät ausgewählt ist."
+        },
+        "config_entry_id": {
+          "name": "Enphase-Konfigurationseintrag",
+          "description": "Enphase-Konfigurationseintrag"
+        },
+        "device_id": {
+          "name": "Geräte",
+          "description": "Geräte"
+        },
+        "slew_rate": {
+          "name": "Änderungsrate (W/sec)",
+          "description": "Optional. Ohne Angabe wird der aktuelle Gateway-Wert verwendet."
+        }
+      }
+    },
+    "refresh_export_limit": {
+      "name": "Einspeisegrenze aktualisieren",
+      "description": "Einspeisegrenzen des Systems konfigurieren.",
+      "fields": {
+        "site_id": {
+          "name": "Standort-ID",
+          "description": "Optionaler Standortbezeichner; wird automatisch erkannt, wenn ein Standortgerät ausgewählt ist."
+        },
+        "config_entry_id": {
+          "name": "Enphase-Konfigurationseintrag",
+          "description": "Enphase-Konfigurationseintrag"
+        },
+        "device_id": {
+          "name": "Geräte",
+          "description": "Geräte"
         }
       }
     }

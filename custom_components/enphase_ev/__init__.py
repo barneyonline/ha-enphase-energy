@@ -28,6 +28,7 @@ from .const import (
     CONF_SITE_ONLY,
     DOMAIN,
     DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
+    OPT_EXPORT_LIMIT_CONTROLS_ENABLED,
     OPT_GRID_PROFILE_CONTROLS_ENABLED,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_MICROINVERTER_POWER_ENABLED,
@@ -114,6 +115,7 @@ _LOGGER = logging.getLogger(__name__)
 _RUNTIME_HANDOFF_KEY = f"{DOMAIN}_runtime_handoffs"
 _RELOAD_REQUIRED_OPTION_KEYS = frozenset(
     {
+        OPT_EXPORT_LIMIT_CONTROLS_ENABLED,
         OPT_GRID_PROFILE_CONTROLS_ENABLED,
         OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
         OPT_MICROINVERTER_POWER_ENABLED,
@@ -657,6 +659,12 @@ async def _async_setup_entry_impl(
         _schedule_background_task(
             coord.async_request_refresh(),
             f"{DOMAIN}_reload_refresh",
+        )
+
+    export_runtime = getattr(coord, "export_limit_runtime", None)
+    if export_runtime is not None and export_runtime.enabled:
+        _schedule_background_task(
+            export_runtime.async_start(), f"{DOMAIN}_export_limit_start"
         )
 
     grid_profile_startup_probe = getattr(

@@ -481,6 +481,27 @@
     },
     "grid_profile_controls_disabled": {
       "message": "Pirms šīs darbības izmantošanas integrācijas opcijās iespējojiet uzstādītāja tīkla profila vadīklas."
+    },
+    "export_limit_unavailable": {
+      "message": "Eksporta ierobežojums nav pieejams. Nepieciešama uzstādītāja piekļuve un atbalstīta konfigurācija ar vienu vārteju."
+    },
+    "export_limit_invalid": {
+      "message": "Ievadiet veselus vatus no 0 līdz 100000."
+    },
+    "export_limit_changed": {
+      "message": "Konfigurācija ir mainījusies. Pārskatiet atjauninātos iestatījumus un apstipriniet vēlreiz."
+    },
+    "export_limit_pending": {
+      "message": "Gaida konfigurācijas apstiprinājumu. Pirms citas izmaiņas atjauniniet statusu."
+    },
+    "export_limit_disabled": {
+      "message": "Iespējot eksporta ierobežojuma vadību (Funkcijas → Ierīču funkcijas)."
+    },
+    "export_limit_confirmation": {
+      "message": "Apstiprināt šo izmaiņu"
+    },
+    "export_limit_invalid_slew": {
+      "message": "Ievadiet pozitīvu skaitli ar ne vairāk kā divām zīmēm aiz komata."
     }
   },
   "options": {
@@ -503,7 +524,7 @@
           "repair_notifications": "Pārvaldīt Home Assistant labošanas paziņojumus.",
           "authentication_settings": "Palaidiet pieteikšanās plūsmu, lai atjaunotu datus, nenoņemot integrāciju.",
           "migrate_envoy": "Pārņemiet izvēlētos Enphase Envoy enerģijas entītiju ID, lai Home Assistant Energy vēsture turpinātos šajā integrācijā.",
-          "advanced": "Izvēles tīkla režīma vadība un tikai uzstādītājam paredzēta tīkla profila vadība.",
+          "advanced": "Uzstādītāja un apkopes darbības.",
           "features": "Konfigurējiet ierīču funkcijas un papildu vadību."
         },
         "data": {
@@ -672,11 +693,13 @@
         "description": "Uzstādītāja un apkopes darbības.",
         "menu_options": {
           "grid_toggle": "Tīkla režīms",
-          "grid_profile": "Tīkla profila vadība"
+          "grid_profile": "Tīkla profila vadība",
+          "export_limit": "Eksporta ierobežojums"
         },
         "menu_option_descriptions": {
           "grid_toggle": "Konfigurēt manuālo tīkla režīma vadību.",
-          "grid_profile": "Pārlūkot un lietot tikai uzstādītājiem paredzētus Activation tīkla profilus."
+          "grid_profile": "Pārlūkot un lietot tikai uzstādītājiem paredzētus Activation tīkla profilus.",
+          "export_limit": "Konfigurējiet sistēmas eksporta ierobežojumus."
         }
       },
       "grid_toggle": {
@@ -742,7 +765,8 @@
               "weather_enabled": "Iespējot laikapstākļus",
               "nominal_voltage": "EV lādētāja nominālais spriegums (V)",
               "microinverter_lifetime_energy_enabled": "Iespējot mikroinvertoru kopējo enerģiju",
-              "vpp_events_enabled": "Iespējot VPP notikumus"
+              "vpp_events_enabled": "Iespējot VPP notikumus",
+              "export_limit_controls_enabled": "Iespējot eksporta ierobežojuma vadību"
             },
             "data_description": {
               "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts.",
@@ -752,7 +776,8 @@
               "schedule_sync_enabled": "Pārvaldiet IQ EV Charger grafikus.",
               "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus.",
               "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
-              "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts."
+              "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts.",
+              "export_limit_controls_enabled": "Konfigurējiet sistēmas eksporta ierobežojumus. Nepieciešama uzstādītāja piekļuve."
             }
           },
           "advanced_features": {
@@ -779,7 +804,8 @@
           "microinverter_lifetime_energy_enabled": "Iespējot mikroinvertoru kopējo enerģiju",
           "microinverter_power_enabled": "Iespējot mikroinvertoru jaudu",
           "vpp_events_enabled": "Iespējot VPP notikumus",
-          "grid_profile_controls_enabled": "Iespējot uzstādītāja tīkla profila vadīklas"
+          "grid_profile_controls_enabled": "Iespējot uzstādītāja tīkla profila vadīklas",
+          "export_limit_controls_enabled": "Iespējot eksporta ierobežojuma vadību"
         },
         "data_description": {
           "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts.",
@@ -791,7 +817,52 @@
           "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
           "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija.",
           "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts.",
-          "grid_profile_controls_enabled": "Iegūst tikai uzstādītājam pieejamos tīkla profila metadatus un iespējo profila darbības. Pēc noklusējuma atspējots."
+          "grid_profile_controls_enabled": "Iegūst tikai uzstādītājam pieejamos tīkla profila metadatus un iespējo profila darbības. Pēc noklusējuma atspējots.",
+          "export_limit_controls_enabled": "Konfigurējiet sistēmas eksporta ierobežojumus. Nepieciešama uzstādītāja piekļuve."
+        }
+      },
+      "export_limit": {
+        "title": "Eksporta ierobežojums",
+        "description": "Konfigurējiet sistēmas eksporta ierobežojumus."
+      },
+      "export_limit_action": {
+        "title": "Eksporta ierobežojums",
+        "description": "Konfigurējiet sistēmas eksporta ierobežojumus.\n\nPašreizējais iestatījums: **{current}**\n\n{status}",
+        "menu_options": {
+          "export_limit_set": "Iestatīt eksporta ierobežojumu",
+          "export_limit_zero": "Iestatīt nulles eksportu",
+          "export_limit_disable": "Atspējot eksporta ierobežošanu",
+          "export_limit_defaults": "Noklusējuma iestatījumi"
+        }
+      },
+      "export_limit_set": {
+        "title": "Iestatīt eksporta ierobežojumu",
+        "data": {
+          "limit_watts": "Eksporta ierobežojums (W)"
+        }
+      },
+      "export_limit_confirm": {
+        "title": "Eksporta ierobežojums",
+        "description": "Pašreizējais iestatījums: **{current}**\n\nPieprasītais iestatījums: **{requested}**\n\nIzmaiņu ātrums (W/sec): **{current_slew}** → **{requested_slew}**",
+        "data": {
+          "confirm": "Apstiprināt šo izmaiņu"
+        }
+      },
+      "export_limit_submitted": {
+        "title": "Eksporta ierobežojums",
+        "description": "Konfigurējiet sistēmas eksporta ierobežojumus.\n\n**{status}**"
+      },
+      "export_limit_readonly": {
+        "title": "Eksporta ierobežojums",
+        "description": "Eksporta ierobežojums nav pieejams. Nepieciešama uzstādītāja piekļuve un atbalstīta konfigurācija ar vienu vārteju.\n\nPašreizējais iestatījums: **{current}**"
+      },
+      "export_limit_defaults": {
+        "title": "Noklusējuma iestatījumi",
+        "description": "Saglabā ierobežojuma iespējošanas noklusējumus, nemainot vārteju. Atjaunošana dzēš saglabāto ātruma pārrakstījumu.",
+        "data": {
+          "limit_watts": "Noklusējuma eksporta ierobežojums (W)",
+          "slew_rate": "Izmaiņu ātrums (W/sec)",
+          "restore_slew_rate": "Atjaunot ātrumu no vārtejas"
         }
       }
     },
@@ -819,7 +890,14 @@
       "grid_otp_required": "Ievadiet vienreizējo kodu.",
       "grid_otp_invalid_format": "Vienreizējam kodam jābūt precīzi četriem cipariem.",
       "grid_otp_invalid": "Vienreizējais kods nav derīgs vai beidzies derīguma termiņš.",
-      "grid_envoy_serial_missing": "Šīs vietas vārteju nevarēja noteikt."
+      "grid_envoy_serial_missing": "Šīs vietas vārteju nevarēja noteikt.",
+      "export_limit_unavailable": "Eksporta ierobežojums nav pieejams. Nepieciešama uzstādītāja piekļuve un atbalstīta konfigurācija ar vienu vārteju.",
+      "export_limit_invalid": "Ievadiet veselus vatus no 0 līdz 100000.",
+      "export_limit_changed": "Konfigurācija ir mainījusies. Pārskatiet atjauninātos iestatījumus un apstipriniet vēlreiz.",
+      "export_limit_pending": "Gaida konfigurācijas apstiprinājumu. Pirms citas izmaiņas atjauniniet statusu.",
+      "export_limit_disabled": "Iespējot eksporta ierobežojuma vadību (Funkcijas → Ierīču funkcijas).",
+      "export_limit_confirmation": "Apstiprināt šo izmaiņu",
+      "export_limit_invalid_slew": "Ievadiet pozitīvu skaitli ar ne vairāk kā divām zīmēm aiz komata."
     },
     "abort": {
       "migration_no_envoy_sources": "Migrācijai nav pieejami Enphase Envoy enerģijas sensori.",
@@ -1374,7 +1452,7 @@
         }
       },
       "system_profile_status": {
-        "name": "Sistēmas profila statuss",
+        "name": "Sistēmas profils",
         "state": {
           "pending": "Gaida"
         },
@@ -2024,6 +2102,57 @@
       },
       "vpp_next_event_status": {
         "name": "Nākamā VPP notikuma statuss"
+      },
+      "export_limit": {
+        "name": "Eksporta ierobežojums",
+        "state": {
+          "disabled": "Atspējots",
+          "zero_export": "Nulles eksports",
+          "limited": "Ierobežots",
+          "unsupported": "Neatbalstīts",
+          "pending": "Gaida",
+          "unconfirmed": "Neapstiprināts"
+        },
+        "state_attributes": {
+          "confirmed_watts": {
+            "name": "Pašreizējais iestatījums"
+          },
+          "requested_watts": {
+            "name": "Pieprasītais iestatījums"
+          },
+          "requested_action": {
+            "name": "Pieprasītais iestatījums",
+            "state": {
+              "set": "Iestatīt eksporta ierobežojumu",
+              "disable": "Atspējot eksporta ierobežošanu"
+            }
+          },
+          "request_status": {
+            "name": "Pieprasījuma statuss",
+            "state": {
+              "idle": "Nav pieprasījuma",
+              "pending": "Gaida apstiprinājumu",
+              "confirmed": "Konfigurācija apstiprināta",
+              "unconfirmed": "Neapstiprināts",
+              "rejected": "Noraidīts"
+            }
+          },
+          "last_successful_readback": {
+            "name": "Pēdējā veiksmīgā nolasīšana"
+          },
+          "slew_rate": {
+            "name": "Izmaiņu ātrums (W/sec)"
+          },
+          "requested_slew_rate": {
+            "name": "Pieprasītais iestatījums · Izmaiņu ātrums (W/sec)"
+          },
+          "pending": {
+            "name": "Gaida"
+          },
+          "pending_requested_at": {
+            "name": "Gaida Pieprasīts plkst"
+          }
+        }
       }
     },
     "number": {
@@ -2364,6 +2493,28 @@
       },
       "battery_schedule_selected": {
         "name": "Akumulatora grafiks"
+      },
+      "export_limit": {
+        "name": "Eksporta ierobežojums",
+        "state": {
+          "enable_limit": "Iespējot ierobežojumu",
+          "disable_limit": "Atspējot ierobežojumu"
+        },
+        "state_attributes": {
+          "default_limit_watts": {
+            "name": "Noklusējuma eksporta ierobežojums (W)"
+          },
+          "default_slew_rate": {
+            "name": "Izmaiņu ātrums (W/sec)"
+          },
+          "slew_rate_source": {
+            "name": "Izmaiņu ātruma avots",
+            "state": {
+              "gateway": "Vārteja",
+              "saved_override": "Saglabāts pārrakstījums"
+            }
+          }
+        }
       }
     },
     "button": {
@@ -2540,6 +2691,10 @@
     "active_system_event": {
       "title": "Aktīvs augstas ietekmes Enphase sistēmas notikums",
       "description": "Vietā {site_id} ir aktīvs {severity} notikums, kas ietekmē {device_type} un pirmoreiz ziņots {event_date}. Informāciju un ieteicamo rīcību skatiet Enlighten. Šis labojums tiek automātiski noņemts, kad Enphase ziņo, ka notikums ir atrisināts."
+    },
+    "export_limit_pending": {
+      "title": "Eksporta ierobežojuma izmaiņa nav apstiprināta",
+      "description": "Izmaiņa nav apstiprināta pēc {pending_timeout_minutes} minūtēm. Pārbaudes turpinās standarta intervālā. Pārbaudiet vārtejas iestatījumus; ierakstīšana netiks automātiski atkārtota."
     }
   },
   "system_health": {
@@ -3177,6 +3332,72 @@
         "gateway_serial": {
           "name": "Gateway sērijas numurs",
           "description": "Neobligāts Gateway sērijas numurs, ja Activation ierakstā ir vairāki Gateway."
+        }
+      }
+    },
+    "set_export_limit": {
+      "name": "Iestatīt eksporta ierobežojumu",
+      "description": "Konfigurējiet sistēmas eksporta ierobežojumus.",
+      "fields": {
+        "limit_watts": {
+          "name": "Eksporta ierobežojums (W)",
+          "description": "Ievadiet veselus vatus no 0 līdz 100000."
+        },
+        "site_id": {
+          "name": "Vietas ID",
+          "description": "Izvēles vietas identifikators; tiek noteikts automātiski, kad izvēlēta vietas ierīce."
+        },
+        "config_entry_id": {
+          "name": "Enphase konfigurācijas ievade",
+          "description": "Enphase konfigurācijas ievade"
+        },
+        "device_id": {
+          "name": "Ierīces",
+          "description": "Ierīces"
+        },
+        "slew_rate": {
+          "name": "Izmaiņu ātrums (W/sec)",
+          "description": "Neobligāti. Ja nav norādīts, izmanto pašreizējo vārtejas vērtību."
+        }
+      }
+    },
+    "disable_export_limit": {
+      "name": "Atspējot eksporta ierobežošanu",
+      "description": "Konfigurējiet sistēmas eksporta ierobežojumus.",
+      "fields": {
+        "site_id": {
+          "name": "Vietas ID",
+          "description": "Izvēles vietas identifikators; tiek noteikts automātiski, kad izvēlēta vietas ierīce."
+        },
+        "config_entry_id": {
+          "name": "Enphase konfigurācijas ievade",
+          "description": "Enphase konfigurācijas ievade"
+        },
+        "device_id": {
+          "name": "Ierīces",
+          "description": "Ierīces"
+        },
+        "slew_rate": {
+          "name": "Izmaiņu ātrums (W/sec)",
+          "description": "Neobligāti. Ja nav norādīts, izmanto pašreizējo vārtejas vērtību."
+        }
+      }
+    },
+    "refresh_export_limit": {
+      "name": "Atjaunināt eksporta ierobežojumu",
+      "description": "Konfigurējiet sistēmas eksporta ierobežojumus.",
+      "fields": {
+        "site_id": {
+          "name": "Vietas ID",
+          "description": "Izvēles vietas identifikators; tiek noteikts automātiski, kad izvēlēta vietas ierīce."
+        },
+        "config_entry_id": {
+          "name": "Enphase konfigurācijas ievade",
+          "description": "Enphase konfigurācijas ievade"
+        },
+        "device_id": {
+          "name": "Ierīces",
+          "description": "Ierīces"
         }
       }
     }

@@ -481,6 +481,27 @@
     },
     "grid_profile_controls_disabled": {
       "message": "Před použitím této akce povolte v možnostech integrace instalační ovládání síťového profilu."
+    },
+    "export_limit_unavailable": {
+      "message": "Limit přetoků není dostupný. Je vyžadován přístup instalátora a podporovaná konfigurace s jedinou bránou."
+    },
+    "export_limit_invalid": {
+      "message": "Zadejte celé watty od 0 do 100000."
+    },
+    "export_limit_changed": {
+      "message": "Konfigurace se změnila. Zkontrolujte aktualizované nastavení a znovu potvrďte."
+    },
+    "export_limit_pending": {
+      "message": "Čeká se na potvrzení konfigurace. Před další změnou obnovte stav."
+    },
+    "export_limit_disabled": {
+      "message": "Povolit ovládání limitu přetoků (Funkce → Funkce zařízení)."
+    },
+    "export_limit_confirmation": {
+      "message": "Potvrdit tuto změnu"
+    },
+    "export_limit_invalid_slew": {
+      "message": "Zadejte kladné číslo s nejvýše dvěma desetinnými místy."
     }
   },
   "options": {
@@ -503,7 +524,7 @@
           "repair_notifications": "Správa oznámení oprav Home Assistant.",
           "authentication_settings": "Spusťte přihlašovací tok pro obnovení údajů bez odebrání integrace.",
           "migrate_envoy": "Převezměte vybraná ID energetických entit Enphase Envoy, aby historie v Home Assistant Energy pokračovala pod touto integrací.",
-          "advanced": "Volitelné ovládání režimu sítě a ovládání síťového profilu pouze pro instalační techniky.",
+          "advanced": "Instalační a servisní akce.",
           "features": "Nastavte funkce zařízení a pokročilé ovládání."
         },
         "data": {
@@ -672,11 +693,13 @@
         "description": "Instalační a servisní akce.",
         "menu_options": {
           "grid_toggle": "Režim sítě",
-          "grid_profile": "Ovládání síťového profilu"
+          "grid_profile": "Ovládání síťového profilu",
+          "export_limit": "Limit přetoků"
         },
         "menu_option_descriptions": {
           "grid_toggle": "Nastavit ruční ovládání režimu sítě.",
-          "grid_profile": "Procházení a použití síťových profilů Activation pouze pro instalátory."
+          "grid_profile": "Procházení a použití síťových profilů Activation pouze pro instalátory.",
+          "export_limit": "Nastavit limity přetoků systému."
         }
       },
       "grid_toggle": {
@@ -742,7 +765,8 @@
               "weather_enabled": "Povolit počasí",
               "nominal_voltage": "Jmenovité napětí nabíječky EV (V)",
               "microinverter_lifetime_energy_enabled": "Povolit celoživotní energii mikrostřídačů",
-              "vpp_events_enabled": "Povolit události VPP"
+              "vpp_events_enabled": "Povolit události VPP",
+              "export_limit_controls_enabled": "Povolit ovládání limitu přetoků"
             },
             "data_description": {
               "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto.",
@@ -752,7 +776,8 @@
               "schedule_sync_enabled": "Spravujte plány nabíječky IQ EV Charger.",
               "battery_schedules_enabled": "Spravujte plány baterie IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů.",
-              "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto."
+              "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto.",
+              "export_limit_controls_enabled": "Nastavit limity přetoků systému. Vyžaduje přístup instalátora."
             }
           },
           "advanced_features": {
@@ -779,7 +804,8 @@
           "microinverter_lifetime_energy_enabled": "Povolit celoživotní energii mikrostřídačů",
           "microinverter_power_enabled": "Povolit výkon mikrostřídačů",
           "vpp_events_enabled": "Povolit události VPP",
-          "grid_profile_controls_enabled": "Povolit instalační ovládání síťového profilu"
+          "grid_profile_controls_enabled": "Povolit instalační ovládání síťového profilu",
+          "export_limit_controls_enabled": "Povolit ovládání limitu přetoků"
         },
         "data_description": {
           "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto.",
@@ -791,7 +817,52 @@
           "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů.",
           "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika.",
           "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto.",
-          "grid_profile_controls_enabled": "Načte metadata síťového profilu dostupná pouze instalačnímu technikovi a povolí akce s profily. Ve výchozím nastavení je vypnuto."
+          "grid_profile_controls_enabled": "Načte metadata síťového profilu dostupná pouze instalačnímu technikovi a povolí akce s profily. Ve výchozím nastavení je vypnuto.",
+          "export_limit_controls_enabled": "Nastavit limity přetoků systému. Vyžaduje přístup instalátora."
+        }
+      },
+      "export_limit": {
+        "title": "Limit přetoků",
+        "description": "Nastavit limity přetoků systému."
+      },
+      "export_limit_action": {
+        "title": "Limit přetoků",
+        "description": "Nastavit limity přetoků systému.\n\nAktuální nastavení: **{current}**\n\n{status}",
+        "menu_options": {
+          "export_limit_set": "Nastavit limit přetoků",
+          "export_limit_zero": "Nastavit nulové přetoky",
+          "export_limit_disable": "Vypnout omezení přetoků",
+          "export_limit_defaults": "Výchozí nastavení"
+        }
+      },
+      "export_limit_set": {
+        "title": "Nastavit limit přetoků",
+        "data": {
+          "limit_watts": "Limit přetoků (W)"
+        }
+      },
+      "export_limit_confirm": {
+        "title": "Limit přetoků",
+        "description": "Aktuální nastavení: **{current}**\n\nPožadované nastavení: **{requested}**\n\nRychlost změny (W/sec): **{current_slew}** → **{requested_slew}**",
+        "data": {
+          "confirm": "Potvrdit tuto změnu"
+        }
+      },
+      "export_limit_submitted": {
+        "title": "Limit přetoků",
+        "description": "Nastavit limity přetoků systému.\n\n**{status}**"
+      },
+      "export_limit_readonly": {
+        "title": "Limit přetoků",
+        "description": "Limit přetoků není dostupný. Je vyžadován přístup instalátora a podporovaná konfigurace s jedinou bránou.\n\nAktuální nastavení: **{current}**"
+      },
+      "export_limit_defaults": {
+        "title": "Výchozí nastavení",
+        "description": "Uloží výchozí hodnoty pro zapnutí limitu bez změny brány. Obnovení odstraní uložené přepsání rychlosti.",
+        "data": {
+          "limit_watts": "Výchozí limit přetoků (W)",
+          "slew_rate": "Rychlost změny (W/sec)",
+          "restore_slew_rate": "Obnovit rychlost změny z brány"
         }
       }
     },
@@ -819,7 +890,14 @@
       "grid_otp_required": "Zadejte jednorázový kód.",
       "grid_otp_invalid_format": "Jednorázový kód musí obsahovat přesně čtyři číslice.",
       "grid_otp_invalid": "Jednorázový kód je neplatný nebo jeho platnost vypršela.",
-      "grid_envoy_serial_missing": "Bránu pro tento systém nelze určit."
+      "grid_envoy_serial_missing": "Bránu pro tento systém nelze určit.",
+      "export_limit_unavailable": "Limit přetoků není dostupný. Je vyžadován přístup instalátora a podporovaná konfigurace s jedinou bránou.",
+      "export_limit_invalid": "Zadejte celé watty od 0 do 100000.",
+      "export_limit_changed": "Konfigurace se změnila. Zkontrolujte aktualizované nastavení a znovu potvrďte.",
+      "export_limit_pending": "Čeká se na potvrzení konfigurace. Před další změnou obnovte stav.",
+      "export_limit_disabled": "Povolit ovládání limitu přetoků (Funkce → Funkce zařízení).",
+      "export_limit_confirmation": "Potvrdit tuto změnu",
+      "export_limit_invalid_slew": "Zadejte kladné číslo s nejvýše dvěma desetinnými místy."
     },
     "abort": {
       "migration_no_envoy_sources": "Nejsou k dispozici žádné energetické senzory Enphase Envoy pro migraci.",
@@ -1374,7 +1452,7 @@
         }
       },
       "system_profile_status": {
-        "name": "Stav profilu systému",
+        "name": "Systémový profil",
         "state": {
           "pending": "Čeká na vyřízení"
         },
@@ -2024,6 +2102,57 @@
       },
       "vpp_next_event_status": {
         "name": "Stav příští události VPP"
+      },
+      "export_limit": {
+        "name": "Limit přetoků",
+        "state": {
+          "disabled": "Vypnuto",
+          "zero_export": "Nulové přetoky",
+          "limited": "Omezeno",
+          "unsupported": "Nepodporováno",
+          "pending": "Čeká na vyřízení",
+          "unconfirmed": "Nepotvrzeno"
+        },
+        "state_attributes": {
+          "confirmed_watts": {
+            "name": "Aktuální nastavení"
+          },
+          "requested_watts": {
+            "name": "Požadované nastavení"
+          },
+          "requested_action": {
+            "name": "Požadované nastavení",
+            "state": {
+              "set": "Nastavit limit přetoků",
+              "disable": "Vypnout omezení přetoků"
+            }
+          },
+          "request_status": {
+            "name": "Stav požadavku",
+            "state": {
+              "idle": "Žádný požadavek",
+              "pending": "Čeká na potvrzení",
+              "confirmed": "Konfigurace potvrzena",
+              "unconfirmed": "Nepotvrzeno",
+              "rejected": "Odmítnuto"
+            }
+          },
+          "last_successful_readback": {
+            "name": "Poslední úspěšné načtení"
+          },
+          "slew_rate": {
+            "name": "Rychlost změny (W/sec)"
+          },
+          "requested_slew_rate": {
+            "name": "Požadované nastavení · Rychlost změny (W/sec)"
+          },
+          "pending": {
+            "name": "Čeká na vyřízení"
+          },
+          "pending_requested_at": {
+            "name": "Čeká na vyřízení Vyžádáno v"
+          }
+        }
       }
     },
     "number": {
@@ -2364,6 +2493,28 @@
       },
       "battery_schedule_selected": {
         "name": "Plán baterie"
+      },
+      "export_limit": {
+        "name": "Limit přetoků",
+        "state": {
+          "enable_limit": "Zapnout limit",
+          "disable_limit": "Vypnout limit"
+        },
+        "state_attributes": {
+          "default_limit_watts": {
+            "name": "Výchozí limit přetoků (W)"
+          },
+          "default_slew_rate": {
+            "name": "Rychlost změny (W/sec)"
+          },
+          "slew_rate_source": {
+            "name": "Zdroj rychlosti změny",
+            "state": {
+              "gateway": "Brána",
+              "saved_override": "Uložené přepsání"
+            }
+          }
+        }
       }
     },
     "button": {
@@ -2540,6 +2691,10 @@
     "active_system_event": {
       "title": "Aktivní systémová událost Enphase s vysokým dopadem",
       "description": "Lokalita {site_id} má aktivní událost {severity}, která ovlivňuje {device_type} a byla poprvé hlášena v {event_date}. Podrobnosti a doporučený postup najdete v Enlighten. Tato oprava se automaticky odstraní, jakmile Enphase označí událost za vyřešenou."
+    },
+    "export_limit_pending": {
+      "title": "Změna limitu přetoků nepotvrzena",
+      "description": "Změna nebyla potvrzena po {pending_timeout_minutes} minutách. Kontroly pokračují ve standardním intervalu. Ověřte nastavení brány; zápis se automaticky neopakuje."
     }
   },
   "system_health": {
@@ -3177,6 +3332,72 @@
         "gateway_serial": {
           "name": "Sériové číslo Gateway",
           "description": "Volitelné sériové číslo Gateway, pokud Activation záznam obsahuje více Gateway."
+        }
+      }
+    },
+    "set_export_limit": {
+      "name": "Nastavit limit přetoků",
+      "description": "Nastavit limity přetoků systému.",
+      "fields": {
+        "limit_watts": {
+          "name": "Limit přetoků (W)",
+          "description": "Zadejte celé watty od 0 do 100000."
+        },
+        "site_id": {
+          "name": "ID lokality",
+          "description": "Volitelný identifikátor lokality; automaticky detekován při výběru zařízení lokality."
+        },
+        "config_entry_id": {
+          "name": "Enphase konfigurační záznam",
+          "description": "Enphase konfigurační záznam"
+        },
+        "device_id": {
+          "name": "Zařízení",
+          "description": "Zařízení"
+        },
+        "slew_rate": {
+          "name": "Rychlost změny (W/sec)",
+          "description": "Volitelné. Při vynechání se použije aktuální hodnota brány."
+        }
+      }
+    },
+    "disable_export_limit": {
+      "name": "Vypnout omezení přetoků",
+      "description": "Nastavit limity přetoků systému.",
+      "fields": {
+        "site_id": {
+          "name": "ID lokality",
+          "description": "Volitelný identifikátor lokality; automaticky detekován při výběru zařízení lokality."
+        },
+        "config_entry_id": {
+          "name": "Enphase konfigurační záznam",
+          "description": "Enphase konfigurační záznam"
+        },
+        "device_id": {
+          "name": "Zařízení",
+          "description": "Zařízení"
+        },
+        "slew_rate": {
+          "name": "Rychlost změny (W/sec)",
+          "description": "Volitelné. Při vynechání se použije aktuální hodnota brány."
+        }
+      }
+    },
+    "refresh_export_limit": {
+      "name": "Obnovit limit přetoků",
+      "description": "Nastavit limity přetoků systému.",
+      "fields": {
+        "site_id": {
+          "name": "ID lokality",
+          "description": "Volitelný identifikátor lokality; automaticky detekován při výběru zařízení lokality."
+        },
+        "config_entry_id": {
+          "name": "Enphase konfigurační záznam",
+          "description": "Enphase konfigurační záznam"
+        },
+        "device_id": {
+          "name": "Zařízení",
+          "description": "Zařízení"
         }
       }
     }

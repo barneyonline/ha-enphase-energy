@@ -481,6 +481,27 @@
     },
     "grid_profile_region_invalid": {
       "message": "Selected grid profile region is not available."
+    },
+    "export_limit_unavailable": {
+      "message": "Export Limit is unavailable. Installer access and a supported single-gateway configuration are required."
+    },
+    "export_limit_invalid": {
+      "message": "Enter whole-number watts from 0 to 100000."
+    },
+    "export_limit_changed": {
+      "message": "Configuration changed. Review the updated settings and confirm again."
+    },
+    "export_limit_pending": {
+      "message": "Awaiting configuration confirmation. Refresh status before submitting another change."
+    },
+    "export_limit_disabled": {
+      "message": "Enable Export Limit controls (Features → Device Features)."
+    },
+    "export_limit_confirmation": {
+      "message": "Confirm this change"
+    },
+    "export_limit_invalid_slew": {
+      "message": "Enter a positive number with up to two decimal places."
     }
   },
   "options": {
@@ -502,7 +523,7 @@
           "devices": "Choose which device categories to include.",
           "repair_notifications": "Manage Home Assistant Repair notifications.",
           "authentication_settings": "Manage stored credentials and start reauthentication.",
-          "advanced": "Optional Grid Mode controls and installer-only grid profile controls.",
+          "advanced": "Installer and maintenance actions.",
           "migrate_envoy": "Take over selected Enphase Envoy energy entity IDs so Home Assistant Energy history continues under this integration.",
           "features": "Configure device features and advanced controls."
         },
@@ -630,11 +651,13 @@
         "description": "Installer and maintenance actions.",
         "menu_options": {
           "grid_toggle": "Grid Mode",
-          "grid_profile": "Grid Profile Control"
+          "grid_profile": "Grid Profile Control",
+          "export_limit": "Export Limit"
         },
         "menu_option_descriptions": {
           "grid_toggle": "Configure manual Grid Mode controls.",
-          "grid_profile": "Browse and apply installer-only Activation grid profiles."
+          "grid_profile": "Browse and apply installer-only Activation grid profiles.",
+          "export_limit": "Configure system export limits."
         }
       },
       "grid_toggle": {
@@ -742,7 +765,8 @@
               "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
               "weather_enabled": "Enable weather",
               "vpp_events_enabled": "Enable VPP events",
-              "nominal_voltage": "EV Charger nominal voltage (V)"
+              "nominal_voltage": "EV Charger nominal voltage (V)",
+              "export_limit_controls_enabled": "Enable Export Limit controls"
             },
             "data_description": {
               "schedule_sync_enabled": "Manage IQ EV Charger schedules.",
@@ -752,7 +776,8 @@
               "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
               "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
               "vpp_events_enabled": "Fetch VPP/ELRP schedules from Enphase and create event entities only for enrolled sites. Disabled by default.",
-              "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable."
+              "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable.",
+              "export_limit_controls_enabled": "Configure system export limits. Requires installer access."
             }
           },
           "advanced_features": {
@@ -779,7 +804,8 @@
           "weather_enabled": "Enable weather",
           "vpp_events_enabled": "Enable VPP events",
           "grid_profile_controls_enabled": "Enable installer Grid Profile controls",
-          "nominal_voltage": "EV Charger nominal voltage (V)"
+          "nominal_voltage": "EV Charger nominal voltage (V)",
+          "export_limit_controls_enabled": "Enable Export Limit controls"
         },
         "data_description": {
           "schedule_sync_enabled": "Manage IQ EV Charger schedules.",
@@ -791,7 +817,52 @@
           "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
           "vpp_events_enabled": "Fetch VPP/ELRP schedules from Enphase and create event entities only for enrolled sites. Disabled by default.",
           "grid_profile_controls_enabled": "Fetch installer-only Grid Profile metadata and enable profile actions. Disabled by default.",
-          "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable."
+          "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable.",
+          "export_limit_controls_enabled": "Configure system export limits. Requires installer access."
+        }
+      },
+      "export_limit": {
+        "title": "Export Limit",
+        "description": "Configure system export limits."
+      },
+      "export_limit_action": {
+        "title": "Export Limit",
+        "description": "Configure system export limits.\n\nCurrent setting: **{current}**\n\n{status}",
+        "menu_options": {
+          "export_limit_set": "Set export limit",
+          "export_limit_zero": "Set zero export",
+          "export_limit_disable": "Disable export limiting",
+          "export_limit_defaults": "Default settings"
+        }
+      },
+      "export_limit_set": {
+        "title": "Set export limit",
+        "data": {
+          "limit_watts": "Export limit (W)"
+        }
+      },
+      "export_limit_confirm": {
+        "title": "Export Limit",
+        "description": "Current setting: **{current}**\n\nRequested setting: **{requested}**\n\nSlew rate (W/sec): **{current_slew}** → **{requested_slew}**",
+        "data": {
+          "confirm": "Confirm this change"
+        }
+      },
+      "export_limit_submitted": {
+        "title": "Export Limit",
+        "description": "Configure system export limits.\n\n**{status}**"
+      },
+      "export_limit_readonly": {
+        "title": "Export Limit",
+        "description": "Export Limit is unavailable. Installer access and a supported single-gateway configuration are required.\n\nCurrent setting: **{current}**"
+      },
+      "export_limit_defaults": {
+        "title": "Default settings",
+        "description": "Save defaults for Enable Limit without changing the gateway. Restore clears the saved slew-rate override.",
+        "data": {
+          "limit_watts": "Default export limit (W)",
+          "slew_rate": "Slew rate (W/sec)",
+          "restore_slew_rate": "Restore slew rate from gateway"
         }
       }
     },
@@ -819,7 +890,14 @@
       "grid_otp_required": "Enter the one-time code.",
       "grid_otp_invalid_format": "The one-time code must contain exactly four digits.",
       "grid_otp_invalid": "The one-time code is invalid or expired.",
-      "grid_envoy_serial_missing": "The Gateway for this site could not be determined."
+      "grid_envoy_serial_missing": "The Gateway for this site could not be determined.",
+      "export_limit_unavailable": "Export Limit is unavailable. Installer access and a supported single-gateway configuration are required.",
+      "export_limit_invalid": "Enter whole-number watts from 0 to 100000.",
+      "export_limit_changed": "Configuration changed. Review the updated settings and confirm again.",
+      "export_limit_pending": "Awaiting configuration confirmation. Refresh status before submitting another change.",
+      "export_limit_disabled": "Enable Export Limit controls (Features → Device Features).",
+      "export_limit_confirmation": "Confirm this change",
+      "export_limit_invalid_slew": "Enter a positive number with up to two decimal places."
     },
     "abort": {
       "migration_no_envoy_sources": "No Enphase Envoy energy sensors are available to migrate.",
@@ -1227,7 +1305,7 @@
         }
       },
       "system_profile_status": {
-        "name": "System Profile Status",
+        "name": "System Profile",
         "state": {
           "pending": "Pending"
         },
@@ -2024,6 +2102,57 @@
       },
       "vpp_next_event_status": {
         "name": "Next VPP Event Status"
+      },
+      "export_limit": {
+        "name": "Export Limit",
+        "state": {
+          "disabled": "Disabled",
+          "zero_export": "Zero export",
+          "limited": "Limited",
+          "unsupported": "Unsupported",
+          "pending": "Pending",
+          "unconfirmed": "Unconfirmed"
+        },
+        "state_attributes": {
+          "confirmed_watts": {
+            "name": "Current setting"
+          },
+          "requested_watts": {
+            "name": "Requested setting"
+          },
+          "requested_action": {
+            "name": "Requested setting",
+            "state": {
+              "set": "Set export limit",
+              "disable": "Disable export limiting"
+            }
+          },
+          "request_status": {
+            "name": "Request status",
+            "state": {
+              "idle": "No request",
+              "pending": "Awaiting confirmation",
+              "confirmed": "Configuration confirmed",
+              "unconfirmed": "Unconfirmed",
+              "rejected": "Rejected"
+            }
+          },
+          "last_successful_readback": {
+            "name": "Last successful readback"
+          },
+          "slew_rate": {
+            "name": "Slew rate (W/sec)"
+          },
+          "requested_slew_rate": {
+            "name": "Requested setting · Slew rate (W/sec)"
+          },
+          "pending": {
+            "name": "Pending"
+          },
+          "pending_requested_at": {
+            "name": "Pending Requested At"
+          }
+        }
       }
     },
     "number": {
@@ -2413,6 +2542,28 @@
       },
       "evse_schedule_selected": {
         "name": "Schedule"
+      },
+      "export_limit": {
+        "name": "Export Limit",
+        "state": {
+          "enable_limit": "Enable Limit",
+          "disable_limit": "Disable Limit"
+        },
+        "state_attributes": {
+          "default_limit_watts": {
+            "name": "Default export limit (W)"
+          },
+          "default_slew_rate": {
+            "name": "Slew rate (W/sec)"
+          },
+          "slew_rate_source": {
+            "name": "Slew rate source",
+            "state": {
+              "gateway": "From gateway",
+              "saved_override": "Saved override"
+            }
+          }
+        }
       }
     },
     "button": {
@@ -2540,6 +2691,10 @@
     "active_system_event": {
       "title": "High-impact Enphase system event active",
       "description": "Site {site_id} has an active {severity} event affecting {device_type}, first reported at {event_date}. Check Enlighten for event details and recommended action. This repair clears automatically when Enphase reports the event resolved."
+    },
+    "export_limit_pending": {
+      "title": "Export Limit update unconfirmed",
+      "description": "The export limit change has not been confirmed after {pending_timeout_minutes} minutes. Checks continue at the standard polling interval. Verify the gateway configuration; the write will not be repeated automatically."
     }
   },
   "system_health": {
@@ -3177,6 +3332,72 @@
         "config_entry_id": {
           "name": "Config entry ID",
           "description": "Optional config entry identifier for the target site."
+        }
+      }
+    },
+    "set_export_limit": {
+      "name": "Set export limit",
+      "description": "Configure system export limits.",
+      "fields": {
+        "limit_watts": {
+          "name": "Export limit (W)",
+          "description": "Enter whole-number watts from 0 to 100000."
+        },
+        "site_id": {
+          "name": "Site ID",
+          "description": "Optional site identifier; detected automatically when a site device is selected."
+        },
+        "config_entry_id": {
+          "name": "Enphase config entry",
+          "description": "Enphase config entry"
+        },
+        "device_id": {
+          "name": "Devices",
+          "description": "Devices"
+        },
+        "slew_rate": {
+          "name": "Slew rate (W/sec)",
+          "description": "Optional. If omitted, use the current gateway value."
+        }
+      }
+    },
+    "disable_export_limit": {
+      "name": "Disable export limiting",
+      "description": "Configure system export limits.",
+      "fields": {
+        "site_id": {
+          "name": "Site ID",
+          "description": "Optional site identifier; detected automatically when a site device is selected."
+        },
+        "config_entry_id": {
+          "name": "Enphase config entry",
+          "description": "Enphase config entry"
+        },
+        "device_id": {
+          "name": "Devices",
+          "description": "Devices"
+        },
+        "slew_rate": {
+          "name": "Slew rate (W/sec)",
+          "description": "Optional. If omitted, use the current gateway value."
+        }
+      }
+    },
+    "refresh_export_limit": {
+      "name": "Refresh export limit",
+      "description": "Configure system export limits.",
+      "fields": {
+        "site_id": {
+          "name": "Site ID",
+          "description": "Optional site identifier; detected automatically when a site device is selected."
+        },
+        "config_entry_id": {
+          "name": "Enphase config entry",
+          "description": "Enphase config entry"
+        },
+        "device_id": {
+          "name": "Devices",
+          "description": "Devices"
         }
       }
     }

@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 - Removed legacy AC Battery discovery, sensors, sleep controls, and cloud polling. Existing AC Battery entities and empty device records are retired on upgrade; IQ Battery support is unchanged.
 
 ### ✨ New features
-- None
+- Add default-off installer Export Limit controls enabled under Device Features and configured in Advanced settings, with an IQ Gateway enable/disable selector, configurable default watts and slew rate exposed as control attributes, automation actions with optional slew rate, and a configuration status sensor that displays pending and unconfirmed updates.
 
 ### 🐛 Bug fixes
 - Preserve the discovered charger list across settings reloads so retired chargers from the original configuration do not reappear.
@@ -19,6 +19,11 @@ All notable changes to this project will be documented in this file.
 ### 🔧 Improvements
 - Keep enabled Grid Profile Control visible during session failures and explain when to reauthenticate instead of reporting installer access denial. Session failures take precedence over mixed permission errors and stop pending-profile polling.
 - Move device feature options into a top-level Features menu, with installer Grid Profile and Microinverter Power toggles grouped under Advanced Features.
+
+- Prevent automatic HTTP transport retries of Export Limit writes after uncertain connection failures.
+- Start and stop Export Limit polling with the feature toggle; reject incomplete or changed PEL forms, clear unsent pending requests, and remove pending repairs on unload.
+- Align System Profile and Export Limit readback to a 10-minute fast-polling window, followed by a repair warning and standard-interval checks.
+- Rename the System Profile Status sensor to System Profile, preserving its existing entity identity.
 
 ### 🔄 Other changes
 - None

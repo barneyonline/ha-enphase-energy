@@ -2162,3 +2162,43 @@ async def test_battery_runtime_async_set_grid_connection_uses_runtime_grid_mode(
     await runtime.async_set_grid_connection(True, otp="1234")
 
     runtime.async_set_grid_mode.assert_awaited_once_with("on_grid", "1234")
+
+
+def test_profile_readback_window_uses_configured_intervals(coordinator_factory):
+    from datetime import datetime, timedelta, timezone
+    from custom_components.enphase_ev.const import (
+        OPT_FAST_POLL_INTERVAL,
+        OPT_SLOW_POLL_INTERVAL,
+    )
+
+    coord = coordinator_factory()
+    coord.config_entry = SimpleNamespace(
+        options={OPT_FAST_POLL_INTERVAL: 45, OPT_SLOW_POLL_INTERVAL: 120}
+    )
+    runtime = coord.battery_runtime
+    assert not runtime.profile_readback_fast
+    runtime.set_battery_pending(profile="self-consumption", reserve=20, sub_type=None)
+    coord._fast_until = None
+    assert runtime.profile_readback_fast
+    assert coord.evse_runtime.determine_polling_state({})["target"] == 45
+    coord._battery_polling_interval_s = 900
+    assert runtime._battery_profile_refresh_cache_ttl_seconds(300) == 45
+    coord._battery_pending_requested_at = datetime.now(timezone.utc) - timedelta(
+        seconds=601
+    )
+    coord._battery_pending_requested_mono = time.monotonic() - 601
+    assert not runtime.profile_readback_fast
+    assert coord.evse_runtime.determine_polling_state({})["target"] == 120
+    assert runtime._battery_profile_refresh_cache_ttl_seconds(300) == 120
+    coord._battery_settings_cache_until = time.monotonic() + 100
+    coord._storm_guard_cache_until = time.monotonic() + 100
+    assert not runtime.battery_settings_refresh_due()
+    assert not runtime.storm_guard_refresh_due()
+    # Other activity can poll quickly while profile readback remains at standard cadence.
+    assert (
+        coord.evse_runtime.determine_polling_state({"charger": {"charging": True}})[
+            "target"
+        ]
+        == 45
+    )
+    assert not runtime.battery_settings_refresh_due()
