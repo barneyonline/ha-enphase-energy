@@ -444,7 +444,11 @@ def test_storm_alert_sensor_states():
     assert sensor.extra_state_attributes["storm_alert_count"] == 0
 
 
-def test_battery_overall_charge_sensor_states():
+@pytest.mark.parametrize(
+    ("charge_pct", "expected"),
+    [(20.5, 20), (47.8, 47), (20.99, 20), (20.0, 20), (0.0, 0), (100.0, 100)],
+)
+def test_battery_overall_charge_sensor_states(charge_pct, expected):
     from types import SimpleNamespace
 
     from homeassistant.components.sensor import SensorStateClass
@@ -459,7 +463,7 @@ def test_battery_overall_charge_sensor_states():
             has_type_for_entities=lambda key: key in {"envoy", "encharge"},
         ),
         site_id="site",
-        battery_aggregate_charge_pct=47.8,
+        battery_aggregate_charge_pct=charge_pct,
         battery_status_summary={
             "aggregate_status": "normal",
             "aggregate_charge_source": "computed",
@@ -494,7 +498,8 @@ def test_battery_overall_charge_sensor_states():
 
     sensor = EnphaseBatteryOverallChargeSensor(coord)
     assert sensor.available is True
-    assert sensor.native_value == 47.8
+    assert sensor.native_value == expected
+    assert isinstance(sensor.native_value, int)
     assert sensor.state_class == SensorStateClass.MEASUREMENT
     assert sensor.device_info["identifiers"] == {("enphase_ev", "type:site:encharge")}
     provided = {"identifiers": {("enphase_ev", "type:site:encharge")}}
