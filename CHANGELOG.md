@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- Preserve the discovered charger list across settings reloads so retired chargers from the original configuration do not reappear.
 - Round Battery Overall Charge down to a whole percentage to align with Enphase reporting (for example, 20.5% becomes 20%).
 - Calculate Current Power Consumption immediately from available production, grid, and battery power sensors, and recalculate whenever an input changes instead of waiting for a second consumption energy sample.
 - Resolve IQ Gateway Connection Method from serial-matched site-today transport flags when dashboard device details do not expose the connection method.

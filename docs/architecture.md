@@ -48,6 +48,10 @@ private session; the previous lifecycle fully cancels its tasks and shuts down.
 No session, manager, lock, or task crosses the reload. New option and device
 selections are applied before restored data is published, followed by a background
 refresh. Cold setup continues to require an authoritative first refresh.
+When the configured charger selection is unchanged, reload handoff preserves the
+previous discovered serial list (including an empty list) and drops telemetry for
+retired chargers. Historical config-entry serials cannot recreate devices while
+fresh inventory is pending; explicit selection changes still apply immediately.
 The default-off VPP Events device feature is one of those topology options. Its
 reload clears the VPP cache before optional warmup so disabling the feature cannot
 publish preserved event state or make requests to the VPP service.

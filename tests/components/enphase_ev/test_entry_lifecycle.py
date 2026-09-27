@@ -15,7 +15,7 @@ from homeassistant.helpers.aiohttp_client import (
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
-from custom_components.enphase_ev.const import DOMAIN
+from custom_components.enphase_ev.const import CONF_SERIALS, DOMAIN
 from custom_components.enphase_ev.coordinator import EnphaseCoordinator
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
 
@@ -94,6 +94,45 @@ async def test_framework_reload_recreates_sessions_and_keeps_polling(
             {"config_entry_id": config_entry.entry_id},
             blocking=True,
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("active_serials", [["replacement-charger"], []])
+async def test_reload_does_not_rediscover_retired_configured_charger(
+    hass, config_entry, lifecycle_cloud, monkeypatch, active_serials
+):
+    """Platform setup must see live discovery instead of historical entry serials."""
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    old = config_entry.runtime_data
+    old.coordinator._devices_inventory_ready = True
+    old.coordinator._status_charger_data_authoritative = True
+    old.coordinator._status_charger_data_serials = active_serials
+    # Include stale telemetry to ensure it cannot add the retired serial back.
+    old.coordinator.data = {
+        serial: {"sn": serial, "status": "available"}
+        for serial in [RANDOM_SERIAL, *active_serials]
+    }
+    assert config_entry.data[CONF_SERIALS] == [RANDOM_SERIAL]
+    assert old.coordinator.iter_serials() == active_serials
+    forwarded = []
+
+    async def forward(entry, platforms):
+        coord = entry.runtime_data.coordinator
+        forwarded.append(coord.iter_serials())
+        assert set(coord.data) == set(active_serials)
+        assert coord._configured_serials == {RANDOM_SERIAL}
+        assert not coord._devices_inventory_ready
+
+    monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", forward)
+    lifecycle_cloud.return_value = {
+        serial: {"sn": serial, "status": "available"} for serial in active_serials
+    }
+    old.preserve_for_reload = True
+    assert await hass.config_entries.async_reload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert forwarded == [active_serials]
+    assert config_entry.runtime_data.coordinator.iter_serials() == active_serials
+    assert await hass.config_entries.async_unload(config_entry.entry_id)
 
 
 @pytest.mark.asyncio
