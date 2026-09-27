@@ -70,8 +70,6 @@ from custom_components.enphase_ev.const import (
     CONF_ACCESS_TOKEN,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
-    DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
-    DEFAULT_MICROINVERTER_POWER_ENABLED,
     DEFAULT_PRICING_EDITS_ENABLED,
     DEFAULT_WEATHER_ENABLED,
     DEFAULT_VPP_EVENTS_ENABLED,
@@ -3620,13 +3618,8 @@ async def test_options_flow_devices_form_with_defaults(hass) -> None:
         features[OPT_GRID_PROFILE_CONTROLS_ENABLED]
         is DEFAULT_GRID_PROFILE_CONTROLS_ENABLED
     )
-    assert (
-        features[OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED]
-        is DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED
-    )
-    assert (
-        features[OPT_MICROINVERTER_POWER_ENABLED] is DEFAULT_MICROINVERTER_POWER_ENABLED
-    )
+    assert features[OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED] is False
+    assert features[OPT_MICROINVERTER_POWER_ENABLED] is False
     assert features[OPT_NOMINAL_VOLTAGE] == handler._default_nominal_voltage()
     assert OPT_SYSTEM_EVENT_REPAIR_ISSUES not in features
     assert OPT_FAST_POLL_INTERVAL not in features

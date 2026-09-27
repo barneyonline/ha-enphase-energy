@@ -188,6 +188,7 @@ from .sensor_gateway import (
     _gateway_terminal_values as _gateway_terminal_values,
     _is_dry_contact_type_key as _is_dry_contact_type_key,
 )
+from .sensor_array_capacity import EnphaseArrayCapacitySensor, capacity_sensor_keys
 from .sensor_inverter import (
     EnphaseInverterLifetimeEnergySensor as EnphaseInverterLifetimeEnergySensor,
     EnphaseInverterTelemetrySensor as EnphaseInverterTelemetrySensor,
@@ -706,6 +707,13 @@ async def async_setup_entry(
                 EnphaseSiteEnergySensor(coord, flow_key, translation_key, name),
             )
         if microinverter_available:
+            for capacity_key in capacity_sensor_keys(coord):
+                _add_site_entity(
+                    f"total_{capacity_key}",
+                    EnphaseArrayCapacitySensor(
+                        coord, inverter=capacity_key == "inverter_capacity"
+                    ),
+                )
             _add_site_entity(
                 "microinverter_connectivity_status",
                 EnphaseMicroinverterConnectivityStatusSensor(coord),
@@ -1127,6 +1135,7 @@ async def async_setup_entry(
             _type_available(coord, "envoy"),
             _type_available(coord, "encharge"),
             _type_available(coord, "microinverter"),
+            capacity_sensor_keys(coord),
             _type_available(coord, "heatpump"),
             _type_available(coord, "enpower"),
             _heatpump_runtime_device_uid(coord),

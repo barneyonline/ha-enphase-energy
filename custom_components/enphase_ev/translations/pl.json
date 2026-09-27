@@ -2153,6 +2153,12 @@
             "name": "Oczekujące żądanie o godz"
           }
         }
+      },
+      "total_array_size": {
+        "name": "Łączna moc pól fotowoltaicznych"
+      },
+      "total_inverter_capacity": {
+        "name": "Łączna moc falowników"
       }
     },
     "number": {

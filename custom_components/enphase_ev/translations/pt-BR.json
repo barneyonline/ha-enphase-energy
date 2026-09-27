@@ -2153,6 +2153,12 @@
             "name": "Pendente solicitado em"
           }
         }
+      },
+      "total_array_size": {
+        "name": "Potência total dos arranjos solares"
+      },
+      "total_inverter_capacity": {
+        "name": "Capacidade total dos inversores"
       }
     },
     "number": {

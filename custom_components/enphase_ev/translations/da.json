@@ -2153,6 +2153,12 @@
             "name": "Afventer anmodet kl"
           }
         }
+      },
+      "total_array_size": {
+        "name": "Samlet solcelleeffekt"
+      },
+      "total_inverter_capacity": {
+        "name": "Samlet inverterkapacitet"
       }
     },
     "number": {

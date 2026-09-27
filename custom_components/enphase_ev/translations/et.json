@@ -2153,6 +2153,12 @@
             "name": "Ootel Taotletud aadressil"
           }
         }
+      },
+      "total_array_size": {
+        "name": "Päikesepaneelide koguvõimsus"
+      },
+      "total_inverter_capacity": {
+        "name": "Inverterite koguvõimsus"
       }
     },
     "number": {

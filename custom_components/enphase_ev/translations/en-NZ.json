@@ -2153,6 +2153,12 @@
             "name": "Pending Requested At"
           }
         }
+      },
+      "total_array_size": {
+        "name": "Total Array Size"
+      },
+      "total_inverter_capacity": {
+        "name": "Total Inverter Capacity"
       }
     },
     "number": {

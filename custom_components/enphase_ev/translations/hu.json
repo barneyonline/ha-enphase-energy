@@ -2153,6 +2153,12 @@
             "name": "Függőben kérve"
           }
         }
+      },
+      "total_array_size": {
+        "name": "Napelemmezők teljes teljesítménye"
+      },
+      "total_inverter_capacity": {
+        "name": "Inverterek teljes kapacitása"
       }
     },
     "number": {

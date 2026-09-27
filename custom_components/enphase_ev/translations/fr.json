@@ -2153,6 +2153,12 @@
             "name": "En attente demandé à"
           }
         }
+      },
+      "total_array_size": {
+        "name": "Puissance totale des champs photovoltaïques"
+      },
+      "total_inverter_capacity": {
+        "name": "Puissance totale des micro-onduleurs"
       }
     },
     "number": {

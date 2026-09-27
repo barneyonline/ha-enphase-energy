@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 ### ✨ New features
 - Add default-off installer Export Limit controls enabled under Device Features and configured in Advanced settings, with an IQ Gateway enable/disable selector, configurable default watts and slew rate exposed as control attributes, automation actions with optional slew rate, and a configuration status sensor that displays pending and unconfirmed updates.
+- Add Total Array Size and Total Inverter Capacity diagnostic sensors with per-array capacity attributes for IQ Microinverters, discovered independently when the account can access their required data.
 
 ### 🐛 Bug fixes
 - Preserve the discovered charger list across settings reloads so retired chargers from the original configuration do not reappear.
@@ -24,6 +25,7 @@ All notable changes to this project will be documented in this file.
 - Start and stop Export Limit polling with the feature toggle; reject incomplete or changed PEL forms, clear unsent pending requests, and remove pending repairs on unload.
 - Align System Profile and Export Limit readback to a 10-minute fast-polling window, followed by a repair warning and standard-interval checks.
 - Rename the System Profile Status sensor to System Profile, preserving its existing entity identity.
+- Default both per-microinverter Lifetime Energy and Power Device Features to off, preserving saved user choices and independent total array capacity sensors.
 
 ### 🔄 Other changes
 - None

@@ -2153,6 +2153,12 @@
             "name": "Gaida Pieprasīts plkst"
           }
         }
+      },
+      "total_array_size": {
+        "name": "Saules paneļu masīvu kopējā jauda"
+      },
+      "total_inverter_capacity": {
+        "name": "Invertoru kopējā jauda"
       }
     },
     "number": {

@@ -60,6 +60,8 @@ def platform_cloud(monkeypatch, load_fixture):
             ]
         },
         "inverters_inventory": {"inverters": [], "total": 0},
+        "array_builder_inventory": {"arrays": [], "inventory_details": []},
+        "array_panel_ratings": {},
         "system_dashboard_envoy_inverters": {"inverters": []},
         "inverter_status": {},
         "charge_mode": "MANUAL_CHARGING",

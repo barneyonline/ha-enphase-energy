@@ -2153,6 +2153,12 @@
             "name": "In behandeling Aangevraagd om"
           }
         }
+      },
+      "total_array_size": {
+        "name": "Totaal vermogen van zonnepanelenvelden"
+      },
+      "total_inverter_capacity": {
+        "name": "Totale omvormercapaciteit"
       }
     },
     "number": {

@@ -1371,8 +1371,22 @@ async def test_async_setup_entry_ignores_empty_battery_serial_unique_id(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "feature_options",
+    [
+        {},
+        {
+            OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED: False,
+            OPT_MICROINVERTER_POWER_ENABLED: True,
+        },
+        {
+            OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED: True,
+            OPT_MICROINVERTER_POWER_ENABLED: False,
+        },
+    ],
+)
 async def test_async_setup_entry_adds_inverter_lifetime_sensors(
-    hass, config_entry, coordinator_factory
+    hass, config_entry, coordinator_factory, feature_options
 ):
     from custom_components.enphase_ev.sensor import (
         EnphaseInverterLifetimeEnergySensor,
@@ -1409,10 +1423,7 @@ async def test_async_setup_entry_adds_inverter_lifetime_sensors(
     object.__setattr__(
         config_entry,
         "options",
-        {
-            OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED: False,
-            OPT_MICROINVERTER_POWER_ENABLED: True,
-        },
+        feature_options,
     )
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
 
@@ -1430,8 +1441,12 @@ async def test_async_setup_entry_adds_inverter_lifetime_sensors(
         ent for ent in added if isinstance(ent, EnphaseInverterTelemetrySensor)
     )
     entity = inverter_entities[0]
-    assert entity.entity_registry_enabled_default is False
-    assert telemetry_entity.entity_registry_enabled_default is True
+    assert entity.entity_registry_enabled_default is feature_options.get(
+        OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED, False
+    )
+    assert telemetry_entity.entity_registry_enabled_default is feature_options.get(
+        OPT_MICROINVERTER_POWER_ENABLED, False
+    )
     assert entity.native_value == pytest.approx(1500.0)
     attrs = entity.extra_state_attributes
     assert attrs == {

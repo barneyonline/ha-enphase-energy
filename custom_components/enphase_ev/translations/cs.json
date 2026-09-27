@@ -2153,6 +2153,12 @@
             "name": "Čeká na vyřízení Vyžádáno v"
           }
         }
+      },
+      "total_array_size": {
+        "name": "Celkový výkon solárních polí"
+      },
+      "total_inverter_capacity": {
+        "name": "Celkový výkon střídačů"
       }
     },
     "number": {

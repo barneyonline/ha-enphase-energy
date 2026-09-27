@@ -1535,3 +1535,29 @@ async def session_history(
         if is_session_history_unavailable_error(err.message, err.status, url):
             raise SessionHistoryUnavailable(str(err)) from err
         raise
+
+
+async def array_builder_inventory(self: EnphaseEVClient) -> JsonDict:
+    """Read array membership and per-inverter continuous AC capacity."""
+    url = f"{BASE_URL}/service/builder/api/v3/systems/{self._site}/arrays"
+    data = await self._json(
+        "GET", url, headers=self._layout_headers, allow_reauth=False
+    )
+    if not isinstance(data, dict):
+        return {}
+    return data
+
+
+async def array_panel_ratings(self: EnphaseEVClient) -> dict[str, float | None]:
+    """Read configured per-array STC ratings without retaining sensitive HTML."""
+    from ..array_capacity import PanelRatingsParser
+
+    html = await self._text(
+        "GET",
+        f"{BASE_URL}/systems/{self._site}/details",
+        headers={"Accept": "text/html,application/xhtml+xml", "X-Requested-With": None},
+        allow_reauth=False,
+    )
+    parser = PanelRatingsParser()
+    parser.feed(html)
+    return parser.ratings

@@ -2153,6 +2153,12 @@
             "name": "Pendiente Solicitado en"
           }
         }
+      },
+      "total_array_size": {
+        "name": "Potencia total de los conjuntos solares"
+      },
+      "total_inverter_capacity": {
+        "name": "Capacidad total de los microinversores"
       }
     },
     "number": {

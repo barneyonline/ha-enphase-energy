@@ -2153,6 +2153,12 @@
             "name": "Väntande Begärd kl"
           }
         }
+      },
+      "total_array_size": {
+        "name": "Total solcellseffekt"
+      },
+      "total_inverter_capacity": {
+        "name": "Total växelriktarkapacitet"
       }
     },
     "number": {

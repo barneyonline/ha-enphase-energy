@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo
 from homeassistant.core import callback
 from homeassistant.util import dt as dt_util
 
+from .array_capacity import async_refresh_array_capacity
 from .api import OptionalEndpointUnavailable
 from .const import DEFAULT_FAST_POLL_INTERVAL, DOMAIN
 from .device_types import (
@@ -3544,6 +3545,7 @@ class InventoryRuntime:
 
     async def _async_refresh_inverters(self) -> None:
         """Refresh inverter metadata/status/production and build serial snapshots."""
+        await async_refresh_array_capacity(self)
         coord = self.coordinator
         now = time.monotonic()
         if not self.include_inverters:
