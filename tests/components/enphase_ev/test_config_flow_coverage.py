@@ -2950,6 +2950,7 @@ async def test_options_flow_init_shows_menu(hass) -> None:
     assert result["menu_options"] == [
         "settings",
         "devices",
+        "features",
         "repair_notifications",
         "authentication_settings",
         "advanced",
@@ -2974,6 +2975,7 @@ async def test_options_flow_advanced_shows_grid_profile_menu(hass) -> None:
     assert init_result["menu_options"] == [
         "settings",
         "devices",
+        "features",
         "repair_notifications",
         "authentication_settings",
         "advanced",
@@ -3005,6 +3007,7 @@ async def test_options_flow_keeps_grid_toggle_without_installer_access(hass) -> 
     assert result["menu_options"] == [
         "settings",
         "devices",
+        "features",
         "repair_notifications",
         "authentication_settings",
         "advanced",
@@ -3012,7 +3015,7 @@ async def test_options_flow_keeps_grid_toggle_without_installer_access(hass) -> 
     ]
     result = await handler.async_step_advanced()
     assert result["type"] is FlowResultType.MENU
-    assert result["menu_options"] == ["grid_toggle"]
+    assert result["menu_options"] == ["grid_toggle", "grid_profile"]
 
 
 @pytest.mark.asyncio
@@ -3031,6 +3034,7 @@ async def test_options_flow_keeps_grid_toggle_without_country_regions(hass) -> N
     assert result["menu_options"] == [
         "settings",
         "devices",
+        "features",
         "repair_notifications",
         "authentication_settings",
         "advanced",
@@ -3406,7 +3410,7 @@ async def test_options_flow_grid_profile_reports_activation_unavailable(hass) ->
     confirm = await handler.async_step_grid_profile_confirm()
 
     assert advanced["type"] is FlowResultType.MENU
-    assert advanced["menu_options"] == ["grid_toggle"]
+    assert advanced["menu_options"] == ["grid_toggle", "grid_profile"]
     for result in (grid_profile, select, confirm):
         assert result["type"] is FlowResultType.ABORT
         assert result["reason"] == "grid_profile_unavailable"
@@ -3779,28 +3783,18 @@ async def test_options_flow_devices_form_with_defaults(hass) -> None:
     schema_keys = list(result["data_schema"].schema.keys())
     assert [key.schema for key in schema_keys] == [
         CONF_DEVICE_CATEGORIES_SECTION,
-        CONF_DEVICE_FEATURES_SECTION,
     ]
-    feature_section = result["data_schema"].schema[schema_keys[1]]
-    assert [key.schema for key in feature_section.schema.schema] == [
-        OPT_SCHEDULE_SYNC_ENABLED,
-        OPT_BATTERY_SCHEDULES_ENABLED,
-        OPT_PRICING_EDITS_ENABLED,
-        OPT_WEATHER_ENABLED,
-        OPT_VPP_EVENTS_ENABLED,
-        OPT_GRID_PROFILE_CONTROLS_ENABLED,
-        OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
-        OPT_MICROINVERTER_POWER_ENABLED,
-        OPT_NOMINAL_VOLTAGE,
+    categories = result["data_schema"]({CONF_DEVICE_CATEGORIES_SECTION: {}})[
+        CONF_DEVICE_CATEGORIES_SECTION
     ]
-    validated = result["data_schema"](
-        {
-            CONF_DEVICE_CATEGORIES_SECTION: {},
-            CONF_DEVICE_FEATURES_SECTION: {},
-        }
+    feature_result = await handler.async_step_features()
+    validated = feature_result["data_schema"](
+        {CONF_DEVICE_FEATURES_SECTION: {}, "advanced_features": {}}
     )
-    categories = validated[CONF_DEVICE_CATEGORIES_SECTION]
-    features = validated[CONF_DEVICE_FEATURES_SECTION]
+    features = {
+        **validated[CONF_DEVICE_FEATURES_SECTION],
+        **validated["advanced_features"],
+    }
     assert categories[CONF_TYPE_ENVOY] is True
     assert categories[CONF_TYPE_ENCHARGE] is False
     assert categories[CONF_TYPE_IQEVSE] is True
@@ -3855,91 +3849,91 @@ async def test_options_flow_device_section_translations_load_at_runtime(hass) ->
     )
     assert (
         translations[
-            f"component.{DOMAIN}.options.step.devices.sections.device_features.name"
+            f"component.{DOMAIN}.options.step.features.sections.device_features.name"
         ]
         == "Device Features"
     )
     assert (
         translations[
-            f"component.{DOMAIN}.options.step.devices.sections.device_features.data.schedule_sync_enabled"
+            f"component.{DOMAIN}.options.step.features.sections.device_features.data.schedule_sync_enabled"
         ]
         == "Enable EV Charger Scheduler"
     )
     assert (
         translations[
-            f"component.{DOMAIN}.options.step.devices.sections.device_features.data_description.schedule_sync_enabled"
+            f"component.{DOMAIN}.options.step.features.sections.device_features.data_description.schedule_sync_enabled"
         ]
         == "Manage IQ EV Charger schedules."
     )
     assert (
         translations[
-            f"component.{DOMAIN}.options.step.devices.sections.device_features.data_description.battery_schedules_enabled"
+            f"component.{DOMAIN}.options.step.features.sections.device_features.data_description.battery_schedules_enabled"
         ]
         == "Manage IQ Battery schedules."
     )
     assert (
         translations[
-            f"component.{DOMAIN}.options.step.devices.sections.device_features.data.pricing_edits_enabled"
+            f"component.{DOMAIN}.options.step.features.sections.device_features.data.pricing_edits_enabled"
         ]
         == "Enable Pricing Edits"
     )
     assert (
         translations[
-            f"component.{DOMAIN}.options.step.devices.sections.device_features.data_description.pricing_edits_enabled"
+            f"component.{DOMAIN}.options.step.features.sections.device_features.data_description.pricing_edits_enabled"
         ]
         == "Manage IQ Gateway Electricity Rates"
     )
     assert (
         translations[
-            f"component.{DOMAIN}.options.step.devices.sections.device_features.data.weather_enabled"
+            f"component.{DOMAIN}.options.step.features.sections.device_features.data.weather_enabled"
         ]
         == "Enable weather"
     )
     assert (
         translations[
-            f"component.{DOMAIN}.options.step.devices.sections.device_features.data.vpp_events_enabled"
+            f"component.{DOMAIN}.options.step.features.sections.device_features.data.vpp_events_enabled"
         ]
         == "Enable VPP events"
     )
     assert (
         translations[
-            f"component.{DOMAIN}.options.step.devices.sections.device_features.data.grid_profile_controls_enabled"
+            f"component.{DOMAIN}.options.step.features.sections.advanced_features.data.grid_profile_controls_enabled"
         ]
         == "Enable installer Grid Profile controls"
     )
     assert (
         translations[
-            f"component.{DOMAIN}.options.step.devices.sections.device_features.data_description.grid_profile_controls_enabled"
+            f"component.{DOMAIN}.options.step.features.sections.advanced_features.data_description.grid_profile_controls_enabled"
         ]
         == "Fetch installer-only Grid Profile metadata and enable profile actions. Disabled by default."
     )
     assert (
         translations[
-            f"component.{DOMAIN}.options.step.devices.sections.device_features.data_description.vpp_events_enabled"
+            f"component.{DOMAIN}.options.step.features.sections.device_features.data_description.vpp_events_enabled"
         ]
         == "Fetch VPP/ELRP schedules from Enphase and create event entities only for enrolled sites. Disabled by default."
     )
     assert (
         translations[
-            f"component.{DOMAIN}.options.step.devices.sections.device_features.data.microinverter_lifetime_energy_enabled"
+            f"component.{DOMAIN}.options.step.features.sections.device_features.data.microinverter_lifetime_energy_enabled"
         ]
         == "Enable Microinverter Lifetime Energy"
     )
     assert (
         translations[
-            f"component.{DOMAIN}.options.step.devices.sections.device_features.data_description.microinverter_power_enabled"
+            f"component.{DOMAIN}.options.step.features.sections.advanced_features.data_description.microinverter_power_enabled"
         ]
         == "Enable all per-microinverter power sensors when installer telemetry is available."
     )
     assert (
         translations[
-            f"component.{DOMAIN}.options.step.devices.sections.device_features.data.nominal_voltage"
+            f"component.{DOMAIN}.options.step.features.sections.device_features.data.nominal_voltage"
         ]
         == "EV Charger nominal voltage (V)"
     )
     assert (
         translations[
-            f"component.{DOMAIN}.options.step.devices.sections.device_features.data_description.nominal_voltage"
+            f"component.{DOMAIN}.options.step.features.sections.device_features.data_description.nominal_voltage"
         ]
         == "Typical AC supply voltage used to estimate charger power when live voltage is unavailable."
     )
@@ -4095,14 +4089,17 @@ async def test_options_flow_sections_use_existing_options(hass) -> None:
     assert CONF_SITE_ONLY not in settings
 
     assert devices_result["type"] is FlowResultType.FORM
-    devices = devices_result["data_schema"](
-        {
-            CONF_DEVICE_CATEGORIES_SECTION: {},
-            CONF_DEVICE_FEATURES_SECTION: {},
-        }
+    categories = devices_result["data_schema"]({CONF_DEVICE_CATEGORIES_SECTION: {}})[
+        CONF_DEVICE_CATEGORIES_SECTION
+    ]
+    feature_result = await handler.async_step_features()
+    features_data = feature_result["data_schema"](
+        {CONF_DEVICE_FEATURES_SECTION: {}, "advanced_features": {}}
     )
-    categories = devices[CONF_DEVICE_CATEGORIES_SECTION]
-    features = devices[CONF_DEVICE_FEATURES_SECTION]
+    features = {
+        **features_data[CONF_DEVICE_FEATURES_SECTION],
+        **features_data["advanced_features"],
+    }
     assert categories[CONF_TYPE_ENVOY] is True
     assert categories[CONF_TYPE_ENCHARGE] is False
     assert categories[CONF_TYPE_IQEVSE] is False
@@ -4137,6 +4134,7 @@ async def test_options_flow_updates_repair_notifications(hass) -> None:
             OPT_WEATHER_ENABLED: True,
         },
     )
+    entry.add_to_hass(hass)
     handler = OptionsFlowHandler(entry)
     handler.hass = hass
 
@@ -4395,14 +4393,25 @@ async def test_options_flow_updates_selected_device_categories_in_data(hass) -> 
     assert CONF_TYPE_ENCHARGE not in result["data"]
     assert CONF_TYPE_IQEVSE not in result["data"]
     assert CONF_TYPE_MICROINVERTER not in result["data"]
-    assert result["data"][OPT_SCHEDULE_SYNC_ENABLED] is False
-    assert result["data"][OPT_BATTERY_SCHEDULES_ENABLED] is True
-    assert result["data"][OPT_PRICING_EDITS_ENABLED] is False
-    assert result["data"][OPT_WEATHER_ENABLED] is True
-    assert result["data"][OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED] is False
+    assert result["data"] == {OPT_SYSTEM_EVENT_REPAIR_ISSUES: True}
+    result = await handler.async_step_features(
+        {
+            CONF_DEVICE_FEATURES_SECTION: {
+                OPT_SCHEDULE_SYNC_ENABLED: False,
+                OPT_BATTERY_SCHEDULES_ENABLED: True,
+                OPT_WEATHER_ENABLED: True,
+                OPT_NOMINAL_VOLTAGE: 240,
+            },
+            "advanced_features": {
+                OPT_MICROINVERTER_POWER_ENABLED: True,
+                OPT_GRID_PROFILE_CONTROLS_ENABLED: True,
+            },
+        }
+    )
     assert result["data"][OPT_MICROINVERTER_POWER_ENABLED] is True
+    assert result["data"][OPT_GRID_PROFILE_CONTROLS_ENABLED] is True
     assert result["data"][OPT_NOMINAL_VOLTAGE] == 240
-    assert result["data"][OPT_SYSTEM_EVENT_REPAIR_ISSUES] is True
+    assert entry.data[CONF_SELECTED_TYPE_KEYS] == ["envoy", "encharge"]
 
 
 @pytest.mark.asyncio
@@ -6121,3 +6130,50 @@ async def test_options_flow_migrate_confirm_reports_envoy_reload_needed(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["description"] == "migration_success_reload_needed"
+
+
+async def test_grid_profile_session_failure_remains_visible_with_reauth_guidance(
+    hass,
+) -> None:
+    runtime = _options_flow_grid_profile_runtime(support_state="session_expired")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "12345"},
+        options={OPT_GRID_PROFILE_CONTROLS_ENABLED: True},
+    )
+    entry.runtime_data = SimpleNamespace(
+        coordinator=SimpleNamespace(grid_profile_runtime=runtime)
+    )
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+    menu = await handler.async_step_advanced()
+    assert "grid_profile" in menu["menu_options"]
+    result = await handler.async_step_grid_profile()
+    assert result["reason"] == "grid_profile_session_expired"
+
+
+async def test_features_sections_preserve_defaults_and_ignore_invalid_sections(
+    hass,
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "12345"},
+        options={OPT_GRID_PROFILE_CONTROLS_ENABLED: True},
+    )
+    entry.add_to_hass(hass)
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+    form = await handler.async_step_features()
+    assert [key.schema for key in form["data_schema"].schema] == [
+        CONF_DEVICE_FEATURES_SECTION,
+        "advanced_features",
+    ]
+    data = form["data_schema"](
+        {CONF_DEVICE_FEATURES_SECTION: {}, "advanced_features": {}}
+    )
+    assert set(data["advanced_features"]) == {
+        OPT_GRID_PROFILE_CONTROLS_ENABLED,
+        OPT_MICROINVERTER_POWER_ENABLED,
+    }
+    result = await handler.async_step_features({"advanced_features": None})
+    assert result["data"][OPT_GRID_PROFILE_CONTROLS_ENABLED] is True

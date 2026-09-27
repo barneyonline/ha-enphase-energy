@@ -275,7 +275,7 @@ async def test_activation_request_rebootstraps_rejected_cached_token(
 
 async def test_activation_auth_bootstrap_soft_fails_when_settings_unavailable() -> None:
     client = _make_api_client()
-    client._text = AsyncMock(side_effect=Unauthorized())  # noqa: SLF001
+    client._text = AsyncMock(side_effect=asyncio.TimeoutError())  # noqa: SLF001
 
     assert await client.async_prepare_activation_auth() is False
     assert (
@@ -2329,3 +2329,99 @@ async def test_grid_profile_runtime_pending_and_apply_error_paths() -> None:
     assert raised.value.translation_key == "grid_profile_apply_failed"
     with pytest.raises(ServiceValidationError):
         await runtime.async_apply_staged()
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        Unauthorized(),
+        EnphaseLoginWallUnauthorized(
+            endpoint="/settings", request_label="GET /settings"
+        ),
+        aiohttp.ClientResponseError(request_info=None, history=(), status=401),
+        aiohttp.ClientResponseError(request_info=None, history=(), status=403),
+    ],
+)
+async def test_settings_session_rejection_is_distinct_from_installer_denial(
+    error,
+) -> None:
+    from custom_components.enphase_ev.api_client.errors import ActivationSessionExpired
+
+    client = _make_api_client()
+    client._text = AsyncMock(side_effect=error)
+    with pytest.raises(ActivationSessionExpired):
+        await client.async_prepare_activation_auth()
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        "async_refresh",
+        "async_refresh_device_status",
+        "_async_refresh_read_only_settings",
+    ],
+)
+async def test_runtime_reports_session_rejection_without_installer_denial(
+    operation,
+) -> None:
+    from custom_components.enphase_ev.api_client.errors import ActivationSessionExpired
+
+    client = _FakeGridProfileClient()
+    client.async_prepare_activation_auth = AsyncMock(
+        side_effect=ActivationSessionExpired("session")
+    )
+    runtime = GridProfileRuntime(_FakeCoordinator(client))
+    result = await getattr(runtime, operation)()
+    assert result.support_state == "session_expired"
+    assert not runtime.installer_access_confirmed
+    assert client.reference_requests == 0
+
+
+async def test_runtime_reports_session_rejection_during_request_retry() -> None:
+    from custom_components.enphase_ev.api_client.errors import ActivationSessionExpired
+
+    client = _FakeGridProfileClient()
+    client.async_get_activation_record = AsyncMock(
+        side_effect=ActivationSessionExpired("session")
+    )
+    client.settings_grid_profiles = [("gateway", "Australia A")]
+    runtime = GridProfileRuntime(_FakeCoordinator(client))
+    result = await runtime.async_refresh()
+    assert result.support_state == "session_expired"
+
+
+async def test_session_failure_takes_precedence_over_installer_denial() -> None:
+    from custom_components.enphase_ev.api_client.errors import ActivationSessionExpired
+
+    client = _FakeGridProfileClient()
+    client.async_get_activation_reference_data = AsyncMock(
+        side_effect=ActivationAccessDenied("installer")
+    )
+    client.async_get_activation_record = AsyncMock(
+        side_effect=ActivationSessionExpired("session")
+    )
+    runtime = GridProfileRuntime(_FakeCoordinator(client))
+    result = await runtime.async_refresh()
+    assert result.support_state == "session_expired"
+
+
+@pytest.mark.parametrize("during_sleep", [False, True])
+async def test_pending_poll_stops_after_session_rejection(during_sleep) -> None:
+    runtime = GridProfileRuntime(_FakeCoordinator(_FakeGridProfileClient()))
+    runtime.pending_profile_id = "agf:pending"
+    runtime.support_state = SUPPORT_CONFIRMED if during_sleep else "session_expired"
+    runtime.async_refresh_device_status = AsyncMock()
+
+    async def reject_session(_delay: float) -> None:
+        runtime.support_state = "session_expired"
+
+    with patch(
+        "custom_components.enphase_ev.grid_profile_runtime.asyncio.sleep",
+        side_effect=reject_session,
+    ), patch(
+        "custom_components.enphase_ev.grid_profile_runtime.time.monotonic",
+        side_effect=[0, 1, 2, 100000, 100000],
+    ):
+        await runtime._async_poll_pending_profile("agf:pending")
+    runtime.async_refresh_device_status.assert_not_awaited()
+    assert runtime.pending_profile_id is None

@@ -502,15 +502,17 @@
           "repair_notifications": "Notifications",
           "authentication_settings": "Authentication",
           "migrate_envoy": "Migrate Envoy history",
-          "advanced": "Advanced"
+          "advanced": "Advanced",
+          "features": "Features"
         },
         "menu_option_descriptions": {
           "settings": "Tune polling and behavior.",
-          "devices": "Choose device categories and scheduler features.",
+          "devices": "Choose which device categories to include.",
           "repair_notifications": "Manage Home Assistant Repair notifications.",
           "authentication_settings": "Manage stored credentials and start reauthentication.",
           "migrate_envoy": "Take over selected Enphase Envoy energy entity IDs so Home Assistant Energy history continues under this integration.",
-          "advanced": "Optional Grid Mode controls and installer-only grid profile controls."
+          "advanced": "Optional Grid Mode controls and installer-only grid profile controls.",
+          "features": "Configure device features and advanced controls."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -573,7 +575,7 @@
       },
       "devices": {
         "title": "Devices",
-        "description": "Choose device categories and scheduler features.",
+        "description": "Choose which device categories to include.",
         "sections": {
           "devices": {
             "name": "Devices",
@@ -593,54 +595,16 @@
               "type_heatpump": "Includes heat pump status, diagnostics, and usage sensors.",
               "type_microinverter": "Includes microinverter connectivity, active count, and lifetime production sensors."
             }
-          },
-          "device_features": {
-            "name": "Device Features",
-            "data": {
-              "schedule_sync_enabled": "Enable EV Charger Scheduler",
-              "battery_schedules_enabled": "Enable Battery Scheduler",
-              "system_event_repair_issues": "Enable System Event Repair Notifications",
-              "pricing_edits_enabled": "Enable Pricing Edits",
-              "weather_enabled": "Enable weather",
-              "nominal_voltage": "EV Charger nominal voltage (V)",
-              "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
-              "microinverter_power_enabled": "Enable Microinverter Power",
-              "vpp_events_enabled": "Enable VPP events",
-              "grid_profile_controls_enabled": "Enable installer Grid Profile controls"
-            },
-            "data_description": {
-              "system_event_repair_issues": "Create Home Assistant Repairs for active Enphase standing alarms. Disabled by default.",
-              "pricing_edits_enabled": "Manage IQ Gateway Electricity Rates",
-              "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
-              "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable.",
-              "schedule_sync_enabled": "Manage IQ EV Charger schedules.",
-              "battery_schedules_enabled": "Manage IQ Battery schedules.",
-              "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
-              "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available.",
-              "vpp_events_enabled": "Fetch VPP/ELRP schedules from Enphase and create event entities only for enrolled sites. Disabled by default.",
-              "grid_profile_controls_enabled": "Fetch installer-only Grid Profile metadata and enable profile actions. Disabled by default."
-            }
           }
         },
         "data": {
           "devices": "Devices",
-          "device_features": "Device Features",
           "type_envoy": "Gateway",
           "type_encharge": "Battery",
           "type_ac_battery": "AC Battery",
           "type_iqevse": "EV Chargers",
           "type_heatpump": "Heat Pump",
-          "type_microinverter": "Microinverters",
-          "schedule_sync_enabled": "Enable EV Charger Scheduler",
-          "battery_schedules_enabled": "Enable Battery Scheduler",
-          "system_event_repair_issues": "Enable System Event Repair Notifications",
-          "pricing_edits_enabled": "Enable Pricing Edits",
-          "weather_enabled": "Enable weather",
-          "nominal_voltage": "EV Charger nominal voltage (V)",
-          "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
-          "microinverter_power_enabled": "Enable Microinverter Power",
-          "vpp_events_enabled": "Enable VPP events",
-          "grid_profile_controls_enabled": "Enable installer Grid Profile controls"
+          "type_microinverter": "Microinverters"
         },
         "data_description": {
           "type_envoy": "Includes gateway connectivity and meter diagnostics.",
@@ -648,17 +612,7 @@
           "type_ac_battery": "Includes AC Battery sensors and sleep mode controls when available.",
           "type_iqevse": "Includes EV charger entities and controls.",
           "type_heatpump": "Includes heat pump status, diagnostics, and usage sensors.",
-          "type_microinverter": "Includes microinverter connectivity, active count, and lifetime production sensors.",
-          "system_event_repair_issues": "Create Home Assistant Repairs for active Enphase standing alarms. Disabled by default.",
-          "pricing_edits_enabled": "Manage IQ Gateway Electricity Rates",
-          "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
-          "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable.",
-          "schedule_sync_enabled": "Manage IQ EV Charger schedules.",
-          "battery_schedules_enabled": "Manage IQ Battery schedules.",
-          "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
-          "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available.",
-          "vpp_events_enabled": "Fetch VPP/ELRP schedules from Enphase and create event entities only for enrolled sites. Disabled by default.",
-          "grid_profile_controls_enabled": "Fetch installer-only Grid Profile metadata and enable profile actions. Disabled by default."
+          "type_microinverter": "Includes microinverter connectivity, active count, and lifetime production sensors."
         }
       },
       "repair_notifications": {
@@ -732,7 +686,7 @@
         "description": "Installer and maintenance actions.",
         "menu_options": {
           "grid_toggle": "Grid Mode",
-          "grid_profile": "Grid profile control"
+          "grid_profile": "Grid Profile Control"
         },
         "menu_option_descriptions": {
           "grid_toggle": "Configure manual Grid Mode controls.",
@@ -787,6 +741,72 @@
       "grid_toggle_applied": {
         "title": "Grid Mode change accepted",
         "description": "Enphase accepted the request to change Grid Mode to **{target_mode}**.\n\nThe physical relay may still be changing. Use the Grid Mode sensor to observe the resulting state."
+      },
+      "features": {
+        "title": "Features",
+        "description": "Configure device features and advanced controls.",
+        "sections": {
+          "device_features": {
+            "name": "Device Features",
+            "data": {
+              "schedule_sync_enabled": "Enable EV Charger Scheduler",
+              "battery_schedules_enabled": "Enable Battery Scheduler",
+              "system_event_repair_issues": "Enable System Event Repair Notifications",
+              "pricing_edits_enabled": "Enable Pricing Edits",
+              "weather_enabled": "Enable weather",
+              "nominal_voltage": "EV Charger nominal voltage (V)",
+              "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
+              "vpp_events_enabled": "Enable VPP events"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Create Home Assistant Repairs for active Enphase standing alarms. Disabled by default.",
+              "pricing_edits_enabled": "Manage IQ Gateway Electricity Rates",
+              "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
+              "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable.",
+              "schedule_sync_enabled": "Manage IQ EV Charger schedules.",
+              "battery_schedules_enabled": "Manage IQ Battery schedules.",
+              "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
+              "vpp_events_enabled": "Fetch VPP/ELRP schedules from Enphase and create event entities only for enrolled sites. Disabled by default."
+            }
+          },
+          "advanced_features": {
+            "name": "Advanced Features",
+            "data": {
+              "grid_profile_controls_enabled": "Enable installer Grid Profile controls",
+              "microinverter_power_enabled": "Enable Microinverter Power"
+            },
+            "data_description": {
+              "grid_profile_controls_enabled": "Fetch installer-only Grid Profile metadata and enable profile actions. Disabled by default.",
+              "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available."
+            }
+          }
+        },
+        "data": {
+          "device_features": "Device Features",
+          "advanced_features": "Advanced Features",
+          "schedule_sync_enabled": "Enable EV Charger Scheduler",
+          "battery_schedules_enabled": "Enable Battery Scheduler",
+          "system_event_repair_issues": "Enable System Event Repair Notifications",
+          "pricing_edits_enabled": "Enable Pricing Edits",
+          "weather_enabled": "Enable weather",
+          "nominal_voltage": "EV Charger nominal voltage (V)",
+          "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
+          "microinverter_power_enabled": "Enable Microinverter Power",
+          "vpp_events_enabled": "Enable VPP events",
+          "grid_profile_controls_enabled": "Enable installer Grid Profile controls"
+        },
+        "data_description": {
+          "system_event_repair_issues": "Create Home Assistant Repairs for active Enphase standing alarms. Disabled by default.",
+          "pricing_edits_enabled": "Manage IQ Gateway Electricity Rates",
+          "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
+          "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable.",
+          "schedule_sync_enabled": "Manage IQ EV Charger schedules.",
+          "battery_schedules_enabled": "Manage IQ Battery schedules.",
+          "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
+          "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available.",
+          "vpp_events_enabled": "Fetch VPP/ELRP schedules from Enphase and create event entities only for enrolled sites. Disabled by default.",
+          "grid_profile_controls_enabled": "Fetch installer-only Grid Profile metadata and enable profile actions. Disabled by default."
+        }
       }
     },
     "error": {
@@ -823,7 +843,8 @@
       "grid_profile_installer_required": "Grid profile control requires installer-level Enphase Activation access.",
       "grid_profile_no_regions": "No grid profile regions are available for this site's country.",
       "grid_mode_unavailable": "Grid Mode control is unavailable for this site.",
-      "grid_mode_blocked": "Grid Mode control is currently blocked: {reasons}."
+      "grid_mode_blocked": "Grid Mode control is currently blocked: {reasons}.",
+      "grid_profile_session_expired": "The Enlighten session has expired or was rejected. Open Configure → Authentication, select Start reauthentication, complete the login, then try again."
     },
     "create_entry": {
       "migration_success": "Migration complete. Enphase Energy now owns the selected source entity IDs. Verify the Energy dashboard and Developer Tools > Statistics after the next refresh.",

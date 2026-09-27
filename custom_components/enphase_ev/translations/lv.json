@@ -502,15 +502,17 @@
           "repair_notifications": "Paziņojumi",
           "authentication_settings": "Autentifikācija",
           "migrate_envoy": "Migrēt Envoy vēsturi",
-          "advanced": "Papildu"
+          "advanced": "Papildu",
+          "features": "Funkcijas"
         },
         "menu_option_descriptions": {
           "settings": "Pielāgojiet aptauju un darbību.",
-          "devices": "Izvēlieties, kuras ierīču grupas pievienot. Visām izvēlēm ir vienāds aptaujas intervāls.",
+          "devices": "Izvēlieties iekļaujamās ierīču kategorijas.",
           "repair_notifications": "Pārvaldīt Home Assistant labošanas paziņojumus.",
           "authentication_settings": "Palaidiet pieteikšanās plūsmu, lai atjaunotu datus, nenoņemot integrāciju.",
           "migrate_envoy": "Pārņemiet izvēlētos Enphase Envoy enerģijas entītiju ID, lai Home Assistant Energy vēsture turpinātos šajā integrācijā.",
-          "advanced": "Izvēles tīkla režīma vadība un tikai uzstādītājam paredzēta tīkla profila vadība."
+          "advanced": "Izvēles tīkla režīma vadība un tikai uzstādītājam paredzēta tīkla profila vadība.",
+          "features": "Konfigurējiet ierīču funkcijas un papildu vadību."
         },
         "data": {
           "type_envoy": "Vārteja",
@@ -573,7 +575,7 @@
       },
       "devices": {
         "title": "Izvēlieties ierīces",
-        "description": "Izvēlieties, kuras ierīču grupas pievienot. Visām izvēlēm ir vienāds aptaujas intervāls.",
+        "description": "Izvēlieties iekļaujamās ierīču kategorijas.",
         "sections": {
           "devices": {
             "name": "Izvēlieties ierīces",
@@ -593,54 +595,16 @@
               "type_heatpump": "Ietver siltumsūkņa statusa, diagnostikas un patēriņa sensorus.",
               "type_microinverter": "Ietver mikroinvertoru savienojamības, aktīvā skaita un mūža ražošanas sensorus."
             }
-          },
-          "device_features": {
-            "name": "Ierīču funkcijas",
-            "data": {
-              "schedule_sync_enabled": "Iespējot plānotāja atbalstu",
-              "battery_schedules_enabled": "Iespējot akumulatora plānotāju",
-              "system_event_repair_issues": "Iespējot sistēmas notikumu labošanas paziņojumus",
-              "pricing_edits_enabled": "Iespējot cenu rediģēšanu",
-              "weather_enabled": "Iespējot laikapstākļus",
-              "nominal_voltage": "EV lādētāja nominālais spriegums (V)",
-              "microinverter_lifetime_energy_enabled": "Iespējot mikroinvertoru kopējo enerģiju",
-              "microinverter_power_enabled": "Iespējot mikroinvertoru jaudu",
-              "vpp_events_enabled": "Iespējot VPP notikumus",
-              "grid_profile_controls_enabled": "Iespējot uzstādītāja tīkla profila vadīklas"
-            },
-            "data_description": {
-              "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts.",
-              "pricing_edits_enabled": "Pārvaldīt IQ Gateway elektroenerģijas tarifus",
-              "weather_enabled": "Iegūst pašreizējos vietas laikapstākļus no Enphase un izveido laikapstākļu entītiju tikai tad, ja galapunkts ir pieejams.",
-              "nominal_voltage": "Tipisks maiņstrāvas padeves spriegums jaudas novērtēšanai, ja aktuālais spriegums nav pieejams.",
-              "schedule_sync_enabled": "Pārvaldiet IQ EV Charger grafikus.",
-              "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus.",
-              "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
-              "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija.",
-              "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts.",
-              "grid_profile_controls_enabled": "Iegūst tikai uzstādītājam pieejamos tīkla profila metadatus un iespējo profila darbības. Pēc noklusējuma atspējots."
-            }
           }
         },
         "data": {
           "devices": "Izvēlieties ierīces",
-          "device_features": "Ierīču funkcijas",
           "type_envoy": "Vārteja",
           "type_encharge": "Akumulators",
           "type_ac_battery": "AC baterija",
           "type_iqevse": "Lādētāji",
           "type_heatpump": "Siltumsūknis",
-          "type_microinverter": "Mikroinvertori",
-          "schedule_sync_enabled": "Iespējot plānotāja atbalstu",
-          "battery_schedules_enabled": "Iespējot akumulatora plānotāju",
-          "system_event_repair_issues": "Iespējot sistēmas notikumu labošanas paziņojumus",
-          "pricing_edits_enabled": "Iespējot cenu rediģēšanu",
-          "weather_enabled": "Iespējot laikapstākļus",
-          "nominal_voltage": "EV lādētāja nominālais spriegums (V)",
-          "microinverter_lifetime_energy_enabled": "Iespējot mikroinvertoru kopējo enerģiju",
-          "microinverter_power_enabled": "Iespējot mikroinvertoru jaudu",
-          "vpp_events_enabled": "Iespējot VPP notikumus",
-          "grid_profile_controls_enabled": "Iespējot uzstādītāja tīkla profila vadīklas"
+          "type_microinverter": "Mikroinvertori"
         },
         "data_description": {
           "type_envoy": "Ietver vārtejas savienojamības un skaitītāju diagnostiku.",
@@ -648,17 +612,7 @@
           "type_ac_battery": "Ietver AC baterijas sensorus un miega režīma vadīklas, kad tās ir pieejamas.",
           "type_iqevse": "Ietver EV lādētāju entītijas un vadību.",
           "type_heatpump": "Ietver siltumsūkņa statusa, diagnostikas un patēriņa sensorus.",
-          "type_microinverter": "Ietver mikroinvertoru savienojamības, aktīvā skaita un mūža ražošanas sensorus.",
-          "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts.",
-          "pricing_edits_enabled": "Pārvaldīt IQ Gateway elektroenerģijas tarifus",
-          "weather_enabled": "Iegūst pašreizējos vietas laikapstākļus no Enphase un izveido laikapstākļu entītiju tikai tad, ja galapunkts ir pieejams.",
-          "nominal_voltage": "Tipisks maiņstrāvas padeves spriegums jaudas novērtēšanai, ja aktuālais spriegums nav pieejams.",
-          "schedule_sync_enabled": "Pārvaldiet IQ EV Charger grafikus.",
-          "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus.",
-          "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
-          "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija.",
-          "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts.",
-          "grid_profile_controls_enabled": "Iegūst tikai uzstādītājam pieejamos tīkla profila metadatus un iespējo profila darbības. Pēc noklusējuma atspējots."
+          "type_microinverter": "Ietver mikroinvertoru savienojamības, aktīvā skaita un mūža ražošanas sensorus."
         }
       },
       "repair_notifications": {
@@ -787,6 +741,72 @@
       "grid_toggle_applied": {
         "title": "Tīkla režīma izmaiņas pieņemtas",
         "description": "Enphase pieņēma pieprasījumu mainīt tīkla režīmu uz **{target_mode}**.\n\nFiziskais relejs joprojām var mainīties. Izmantojiet tīkla režīma sensoru, lai novērotu iegūto stāvokli."
+      },
+      "features": {
+        "title": "Funkcijas",
+        "description": "Konfigurējiet ierīču funkcijas un papildu vadību.",
+        "sections": {
+          "device_features": {
+            "name": "Ierīču funkcijas",
+            "data": {
+              "schedule_sync_enabled": "Iespējot plānotāja atbalstu",
+              "battery_schedules_enabled": "Iespējot akumulatora plānotāju",
+              "system_event_repair_issues": "Iespējot sistēmas notikumu labošanas paziņojumus",
+              "pricing_edits_enabled": "Iespējot cenu rediģēšanu",
+              "weather_enabled": "Iespējot laikapstākļus",
+              "nominal_voltage": "EV lādētāja nominālais spriegums (V)",
+              "microinverter_lifetime_energy_enabled": "Iespējot mikroinvertoru kopējo enerģiju",
+              "vpp_events_enabled": "Iespējot VPP notikumus"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts.",
+              "pricing_edits_enabled": "Pārvaldīt IQ Gateway elektroenerģijas tarifus",
+              "weather_enabled": "Iegūst pašreizējos vietas laikapstākļus no Enphase un izveido laikapstākļu entītiju tikai tad, ja galapunkts ir pieejams.",
+              "nominal_voltage": "Tipisks maiņstrāvas padeves spriegums jaudas novērtēšanai, ja aktuālais spriegums nav pieejams.",
+              "schedule_sync_enabled": "Pārvaldiet IQ EV Charger grafikus.",
+              "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus.",
+              "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
+              "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts."
+            }
+          },
+          "advanced_features": {
+            "name": "Papildu funkcijas",
+            "data": {
+              "grid_profile_controls_enabled": "Iespējot uzstādītāja tīkla profila vadīklas",
+              "microinverter_power_enabled": "Iespējot mikroinvertoru jaudu"
+            },
+            "data_description": {
+              "grid_profile_controls_enabled": "Iegūst tikai uzstādītājam pieejamos tīkla profila metadatus un iespējo profila darbības. Pēc noklusējuma atspējots.",
+              "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija."
+            }
+          }
+        },
+        "data": {
+          "device_features": "Ierīču funkcijas",
+          "advanced_features": "Papildu funkcijas",
+          "schedule_sync_enabled": "Iespējot plānotāja atbalstu",
+          "battery_schedules_enabled": "Iespējot akumulatora plānotāju",
+          "system_event_repair_issues": "Iespējot sistēmas notikumu labošanas paziņojumus",
+          "pricing_edits_enabled": "Iespējot cenu rediģēšanu",
+          "weather_enabled": "Iespējot laikapstākļus",
+          "nominal_voltage": "EV lādētāja nominālais spriegums (V)",
+          "microinverter_lifetime_energy_enabled": "Iespējot mikroinvertoru kopējo enerģiju",
+          "microinverter_power_enabled": "Iespējot mikroinvertoru jaudu",
+          "vpp_events_enabled": "Iespējot VPP notikumus",
+          "grid_profile_controls_enabled": "Iespējot uzstādītāja tīkla profila vadīklas"
+        },
+        "data_description": {
+          "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts.",
+          "pricing_edits_enabled": "Pārvaldīt IQ Gateway elektroenerģijas tarifus",
+          "weather_enabled": "Iegūst pašreizējos vietas laikapstākļus no Enphase un izveido laikapstākļu entītiju tikai tad, ja galapunkts ir pieejams.",
+          "nominal_voltage": "Tipisks maiņstrāvas padeves spriegums jaudas novērtēšanai, ja aktuālais spriegums nav pieejams.",
+          "schedule_sync_enabled": "Pārvaldiet IQ EV Charger grafikus.",
+          "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus.",
+          "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
+          "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija.",
+          "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts.",
+          "grid_profile_controls_enabled": "Iegūst tikai uzstādītājam pieejamos tīkla profila metadatus un iespējo profila darbības. Pēc noklusējuma atspējots."
+        }
       }
     },
     "error": {
@@ -823,7 +843,8 @@
       "grid_profile_installer_required": "Tīkla profila vadībai nepieciešama uzstādītāja piekļuve Enphase Activation.",
       "grid_profile_no_regions": "Šīs vietas valstij nav pieejami tīkla profila reģioni.",
       "grid_mode_unavailable": "Tīkla režīma vadība šai vietai nav pieejama.",
-      "grid_mode_blocked": "Tīkla režīma vadība pašlaik ir bloķēta: {reasons}."
+      "grid_mode_blocked": "Tīkla režīma vadība pašlaik ir bloķēta: {reasons}.",
+      "grid_profile_session_expired": "Enlighten sesija ir beigusies vai noraidīta. Atveriet Autentifikācija, autentificējieties atkārtoti un mēģiniet vēlreiz."
     },
     "create_entry": {
       "migration_success": "Migrācija pabeigta. Enphase Energy tagad izmanto atlasītos avota entītiju ID. Pēc nākamās atjaunināšanas pārbaudiet Energy informācijas paneli un Developer Tools > Statistics.",

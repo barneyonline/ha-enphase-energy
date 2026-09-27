@@ -502,15 +502,17 @@
           "repair_notifications": "Notificações",
           "authentication_settings": "Autenticação",
           "migrate_envoy": "Migrar histórico do Envoy",
-          "advanced": "Avançado"
+          "advanced": "Avançado",
+          "features": "Recursos"
         },
         "menu_option_descriptions": {
           "settings": "Ajuste a consulta e o comportamento.",
-          "devices": "Escolha quais grupos de dispositivos adicionar. Todas as seleções compartilham o mesmo intervalo de polling.",
+          "devices": "Escolha as categorias de dispositivos a incluir.",
           "repair_notifications": "Gerencie as notificações de reparo do Home Assistant.",
           "authentication_settings": "Inicia o fluxo de login para renovar credenciais sem remover a integração.",
           "migrate_envoy": "Assuma os IDs de entidade de energia selecionados do Enphase Envoy para que o histórico do Home Assistant Energy continue nesta integração.",
-          "advanced": "Controles opcionais do modo de rede e controles de perfil exclusivos para instaladores."
+          "advanced": "Controles opcionais do modo de rede e controles de perfil exclusivos para instaladores.",
+          "features": "Configure os recursos dos dispositivos e os controles avançados."
         },
         "data": {
           "type_envoy": "Gateway",
@@ -573,7 +575,7 @@
       },
       "devices": {
         "title": "Selecionar dispositivos",
-        "description": "Escolha quais grupos de dispositivos adicionar. Todas as seleções compartilham o mesmo intervalo de polling.",
+        "description": "Escolha as categorias de dispositivos a incluir.",
         "sections": {
           "devices": {
             "name": "Selecionar dispositivos",
@@ -593,54 +595,16 @@
               "type_heatpump": "Inclui sensores de status, diagnóstico e consumo da bomba de calor.",
               "type_microinverter": "Inclui sensores de conectividade de microinversores, contagem ativa e produção vitalícia."
             }
-          },
-          "device_features": {
-            "name": "Recursos do dispositivo",
-            "data": {
-              "schedule_sync_enabled": "Habilitar suporte ao agendador",
-              "battery_schedules_enabled": "Ativar agendador da bateria",
-              "system_event_repair_issues": "Ativar notificações de reparo de eventos do sistema",
-              "pricing_edits_enabled": "Ativar edição de preços",
-              "weather_enabled": "Ativar clima",
-              "nominal_voltage": "Tensão nominal do carregador EV (V)",
-              "microinverter_lifetime_energy_enabled": "Ativar energia vitalícia dos microinversores",
-              "microinverter_power_enabled": "Ativar potência dos microinversores",
-              "vpp_events_enabled": "Ativar eventos VPP",
-              "grid_profile_controls_enabled": "Ativar controles do perfil de rede do instalador"
-            },
-            "data_description": {
-              "system_event_repair_issues": "Cria reparos do Home Assistant para alarmes permanentes ativos da Enphase. Desativado por padrão.",
-              "pricing_edits_enabled": "Gerenciar tarifas de eletricidade do IQ Gateway",
-              "weather_enabled": "Obtém o clima atual do local pela Enphase e cria uma entidade de clima somente quando o endpoint está disponível.",
-              "nominal_voltage": "Tensão de alimentação CA típica usada para estimar a potência quando a tensão em tempo real não está disponível.",
-              "schedule_sync_enabled": "Gerencie os agendamentos do IQ EV Charger.",
-              "battery_schedules_enabled": "Gerencie os agendamentos da IQ Battery.",
-              "microinverter_lifetime_energy_enabled": "Ativa todos os sensores de energia vitalícia de cada microinversor.",
-              "microinverter_power_enabled": "Ativa todos os sensores de potência de cada microinversor quando a telemetria do instalador está disponível.",
-              "vpp_events_enabled": "Obtém as programações VPP/ELRP da Enphase e cria entidades de evento somente para locais inscritos. Desativado por padrão.",
-              "grid_profile_controls_enabled": "Obtém metadados do perfil de rede exclusivos do instalador e ativa as ações de perfil. Desativado por padrão."
-            }
           }
         },
         "data": {
           "devices": "Selecionar dispositivos",
-          "device_features": "Recursos do dispositivo",
           "type_envoy": "Gateway",
           "type_encharge": "Bateria",
           "type_ac_battery": "Bateria CA",
           "type_iqevse": "Carregadores",
           "type_heatpump": "Bomba de calor",
-          "type_microinverter": "Microinversores",
-          "schedule_sync_enabled": "Habilitar suporte ao agendador",
-          "battery_schedules_enabled": "Ativar agendador da bateria",
-          "system_event_repair_issues": "Ativar notificações de reparo de eventos do sistema",
-          "pricing_edits_enabled": "Ativar edição de preços",
-          "weather_enabled": "Ativar clima",
-          "nominal_voltage": "Tensão nominal do carregador EV (V)",
-          "microinverter_lifetime_energy_enabled": "Ativar energia vitalícia dos microinversores",
-          "microinverter_power_enabled": "Ativar potência dos microinversores",
-          "vpp_events_enabled": "Ativar eventos VPP",
-          "grid_profile_controls_enabled": "Ativar controles do perfil de rede do instalador"
+          "type_microinverter": "Microinversores"
         },
         "data_description": {
           "type_envoy": "Inclui conectividade do gateway e diagnósticos dos medidores.",
@@ -648,17 +612,7 @@
           "type_ac_battery": "Inclui sensores da bateria CA e controles do modo de suspensão quando disponíveis.",
           "type_iqevse": "Inclui entidades e controles dos carregadores EV.",
           "type_heatpump": "Inclui sensores de status, diagnóstico e consumo da bomba de calor.",
-          "type_microinverter": "Inclui sensores de conectividade de microinversores, contagem ativa e produção vitalícia.",
-          "system_event_repair_issues": "Cria reparos do Home Assistant para alarmes permanentes ativos da Enphase. Desativado por padrão.",
-          "pricing_edits_enabled": "Gerenciar tarifas de eletricidade do IQ Gateway",
-          "weather_enabled": "Obtém o clima atual do local pela Enphase e cria uma entidade de clima somente quando o endpoint está disponível.",
-          "nominal_voltage": "Tensão de alimentação CA típica usada para estimar a potência quando a tensão em tempo real não está disponível.",
-          "schedule_sync_enabled": "Gerencie os agendamentos do IQ EV Charger.",
-          "battery_schedules_enabled": "Gerencie os agendamentos da IQ Battery.",
-          "microinverter_lifetime_energy_enabled": "Ativa todos os sensores de energia vitalícia de cada microinversor.",
-          "microinverter_power_enabled": "Ativa todos os sensores de potência de cada microinversor quando a telemetria do instalador está disponível.",
-          "vpp_events_enabled": "Obtém as programações VPP/ELRP da Enphase e cria entidades de evento somente para locais inscritos. Desativado por padrão.",
-          "grid_profile_controls_enabled": "Obtém metadados do perfil de rede exclusivos do instalador e ativa as ações de perfil. Desativado por padrão."
+          "type_microinverter": "Inclui sensores de conectividade de microinversores, contagem ativa e produção vitalícia."
         }
       },
       "repair_notifications": {
@@ -787,6 +741,72 @@
       "grid_toggle_applied": {
         "title": "Alteração do modo de rede aceita",
         "description": "A Enphase aceitou a solicitação para alterar o modo de rede para **{target_mode}**.\n\nO relé físico ainda pode estar mudando. Use o sensor de modo de rede para observar o estado resultante."
+      },
+      "features": {
+        "title": "Recursos",
+        "description": "Configure os recursos dos dispositivos e os controles avançados.",
+        "sections": {
+          "device_features": {
+            "name": "Recursos do dispositivo",
+            "data": {
+              "schedule_sync_enabled": "Habilitar suporte ao agendador",
+              "battery_schedules_enabled": "Ativar agendador da bateria",
+              "system_event_repair_issues": "Ativar notificações de reparo de eventos do sistema",
+              "pricing_edits_enabled": "Ativar edição de preços",
+              "weather_enabled": "Ativar clima",
+              "nominal_voltage": "Tensão nominal do carregador EV (V)",
+              "microinverter_lifetime_energy_enabled": "Ativar energia vitalícia dos microinversores",
+              "vpp_events_enabled": "Ativar eventos VPP"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Cria reparos do Home Assistant para alarmes permanentes ativos da Enphase. Desativado por padrão.",
+              "pricing_edits_enabled": "Gerenciar tarifas de eletricidade do IQ Gateway",
+              "weather_enabled": "Obtém o clima atual do local pela Enphase e cria uma entidade de clima somente quando o endpoint está disponível.",
+              "nominal_voltage": "Tensão de alimentação CA típica usada para estimar a potência quando a tensão em tempo real não está disponível.",
+              "schedule_sync_enabled": "Gerencie os agendamentos do IQ EV Charger.",
+              "battery_schedules_enabled": "Gerencie os agendamentos da IQ Battery.",
+              "microinverter_lifetime_energy_enabled": "Ativa todos os sensores de energia vitalícia de cada microinversor.",
+              "vpp_events_enabled": "Obtém as programações VPP/ELRP da Enphase e cria entidades de evento somente para locais inscritos. Desativado por padrão."
+            }
+          },
+          "advanced_features": {
+            "name": "Recursos avançados",
+            "data": {
+              "grid_profile_controls_enabled": "Ativar controles do perfil de rede do instalador",
+              "microinverter_power_enabled": "Ativar potência dos microinversores"
+            },
+            "data_description": {
+              "grid_profile_controls_enabled": "Obtém metadados do perfil de rede exclusivos do instalador e ativa as ações de perfil. Desativado por padrão.",
+              "microinverter_power_enabled": "Ativa todos os sensores de potência de cada microinversor quando a telemetria do instalador está disponível."
+            }
+          }
+        },
+        "data": {
+          "device_features": "Recursos do dispositivo",
+          "advanced_features": "Recursos avançados",
+          "schedule_sync_enabled": "Habilitar suporte ao agendador",
+          "battery_schedules_enabled": "Ativar agendador da bateria",
+          "system_event_repair_issues": "Ativar notificações de reparo de eventos do sistema",
+          "pricing_edits_enabled": "Ativar edição de preços",
+          "weather_enabled": "Ativar clima",
+          "nominal_voltage": "Tensão nominal do carregador EV (V)",
+          "microinverter_lifetime_energy_enabled": "Ativar energia vitalícia dos microinversores",
+          "microinverter_power_enabled": "Ativar potência dos microinversores",
+          "vpp_events_enabled": "Ativar eventos VPP",
+          "grid_profile_controls_enabled": "Ativar controles do perfil de rede do instalador"
+        },
+        "data_description": {
+          "system_event_repair_issues": "Cria reparos do Home Assistant para alarmes permanentes ativos da Enphase. Desativado por padrão.",
+          "pricing_edits_enabled": "Gerenciar tarifas de eletricidade do IQ Gateway",
+          "weather_enabled": "Obtém o clima atual do local pela Enphase e cria uma entidade de clima somente quando o endpoint está disponível.",
+          "nominal_voltage": "Tensão de alimentação CA típica usada para estimar a potência quando a tensão em tempo real não está disponível.",
+          "schedule_sync_enabled": "Gerencie os agendamentos do IQ EV Charger.",
+          "battery_schedules_enabled": "Gerencie os agendamentos da IQ Battery.",
+          "microinverter_lifetime_energy_enabled": "Ativa todos os sensores de energia vitalícia de cada microinversor.",
+          "microinverter_power_enabled": "Ativa todos os sensores de potência de cada microinversor quando a telemetria do instalador está disponível.",
+          "vpp_events_enabled": "Obtém as programações VPP/ELRP da Enphase e cria entidades de evento somente para locais inscritos. Desativado por padrão.",
+          "grid_profile_controls_enabled": "Obtém metadados do perfil de rede exclusivos do instalador e ativa as ações de perfil. Desativado por padrão."
+        }
       }
     },
     "error": {
@@ -823,7 +843,8 @@
       "grid_profile_installer_required": "O controle de perfil de rede requer acesso de instalador ao Enphase Activation.",
       "grid_profile_no_regions": "Não há regiões de perfil de rede disponíveis para o país deste local.",
       "grid_mode_unavailable": "O controle do modo de rede não está disponível para este site.",
-      "grid_mode_blocked": "O controle do modo de rede está atualmente bloqueado: {reasons}."
+      "grid_mode_blocked": "O controle do modo de rede está atualmente bloqueado: {reasons}.",
+      "grid_profile_session_expired": "A sessão do Enlighten expirou ou foi rejeitada. Abra Autenticação, autentique-se novamente e tente outra vez."
     },
     "create_entry": {
       "migration_success": "Migração concluída. O Enphase Energy agora possui os IDs das entidades de origem selecionadas. Verifique o painel Energy e Developer Tools > Statistics após a próxima atualização.",

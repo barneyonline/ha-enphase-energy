@@ -100,6 +100,7 @@ from .grid_profile_runtime import (
     ALL_PROFILES_OPTION,
     COMMONLY_USED_OPTION,
     SUPPORT_DENIED,
+    SUPPORT_SESSION_EXPIRED,
     SUPPORT_READ_ONLY,
     GridProfile,
     GridProfileRuntime,
@@ -276,6 +277,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             category_fields[
                 vol.Optional(field_key, default=type_key in default_selected_type_keys)
             ] = bool
+        return vol.Schema(
+            {
+                vol.Required(CONF_DEVICE_CATEGORIES_SECTION): section(
+                    vol.Schema(category_fields)
+                )
+            }
+        )
+
+    def _build_features_schema(self) -> vol.Schema:
         feature_fields: dict[vol.Marker, object] = {
             vol.Optional(
                 OPT_SCHEDULE_SYNC_ENABLED,
@@ -338,14 +348,18 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 default=self._default_nominal_voltage(),
             ): int,
         }
+        advanced_fields = {
+            key: feature_fields.pop(key)
+            for key in list(feature_fields)
+            if key.schema
+            in {OPT_GRID_PROFILE_CONTROLS_ENABLED, OPT_MICROINVERTER_POWER_ENABLED}
+        }
         return vol.Schema(
             {
-                vol.Required(CONF_DEVICE_CATEGORIES_SECTION): section(
-                    vol.Schema(category_fields)
-                ),
                 vol.Required(CONF_DEVICE_FEATURES_SECTION): section(
                     vol.Schema(feature_fields)
                 ),
+                vol.Required("advanced_features"): section(vol.Schema(advanced_fields)),
             }
         )
 
@@ -650,12 +664,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
 
     def _grid_profile_options_available(self) -> bool:
         runtime = self._grid_profile_runtime()
-        return bool(
-            self._grid_profile_controls_enabled()
-            and runtime is not None
-            and runtime.installer_access_confirmed
-            and runtime.regions
-        )
+        return bool(self._grid_profile_controls_enabled() and runtime is not None)
 
     def _grid_profile_controls_enabled(self) -> bool:
         """Return the option state, preserving pre-migration options-flow behavior."""
@@ -666,6 +675,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
 
     @staticmethod
     def _grid_profile_unavailable_reason(runtime: GridProfileRuntime) -> str:
+        if runtime.support_state == SUPPORT_SESSION_EXPIRED:
+            return "grid_profile_session_expired"
         return (
             "grid_profile_installer_required"
             if runtime.support_state in {SUPPORT_DENIED, SUPPORT_READ_ONLY}
@@ -851,6 +862,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         menu_options = [
             "settings",
             "devices",
+            "features",
             "repair_notifications",
             "authentication_settings",
             "advanced",
@@ -1204,7 +1216,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
 
             options = dict(self._entry.options)
             options.update(option_data)
-            return self.async_create_entry(data=options)
+            return self.async_create_entry(title="", data=options)
 
         return self.async_show_form(step_id="settings", data_schema=schema)
 
@@ -1218,10 +1230,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
 
         submitted_data = dict(user_input)
         category_data = submitted_data.pop(CONF_DEVICE_CATEGORIES_SECTION, None)
-        feature_data = submitted_data.pop(CONF_DEVICE_FEATURES_SECTION, None)
         device_data = dict(category_data) if isinstance(category_data, dict) else {}
-        if isinstance(feature_data, dict):
-            device_data.update(feature_data)
         device_data.update(submitted_data)
         selected_type_keys: list[str] = []
         default_selected_type_keys = self._default_selected_type_keys()
@@ -1257,6 +1266,23 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         new_data[CONF_SITE_ONLY] = site_only
         new_data[CONF_INCLUDE_INVERTERS] = "microinverter" in selected_type_keys
         new_data[CONF_SERIALS] = serials
+        options = dict(self._entry.options)
+        self.hass.config_entries.async_update_entry(
+            self._entry, data=new_data, options=options
+        )
+        return self.async_create_entry(title="", data=options)
+
+    async def async_step_features(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        schema = self._build_features_schema()
+        if user_input is None:
+            return self.async_show_form(step_id="features", data_schema=schema)
+        device_data = dict(user_input)
+        for section_key in (CONF_DEVICE_FEATURES_SECTION, "advanced_features"):
+            section_data = device_data.pop(section_key, None)
+            if isinstance(section_data, dict):
+                device_data.update(section_data)
         options = dict(self._entry.options)
         options[OPT_SCHEDULE_SYNC_ENABLED] = bool(
             device_data.get(
@@ -1338,11 +1364,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 )
             )
             or self._default_nominal_voltage()
-        )
-        self.hass.config_entries.async_update_entry(
-            self._entry,
-            data=new_data,
-            options=options,
         )
         return self.async_create_entry(title="", data=options)
 

@@ -502,15 +502,17 @@
           "repair_notifications": "Ilmoitukset",
           "authentication_settings": "Todennus",
           "migrate_envoy": "Siirrä Envoy-historia",
-          "advanced": "Lisäasetukset"
+          "advanced": "Lisäasetukset",
+          "features": "Ominaisuudet"
         },
         "menu_option_descriptions": {
           "settings": "Säädä kyselyä ja toimintaa.",
-          "devices": "Valitse lisättävät laitoryhmät. Kaikilla valinnoilla on sama kyselyväli.",
+          "devices": "Valitse mukaan otettavat laiteluokat.",
           "repair_notifications": "Hallitse Home Assistantin korjausilmoituksia.",
           "authentication_settings": "Käynnistä kirjautumiskulku päivittääksesi valtuustiedot poistamatta integraatiota.",
           "migrate_envoy": "Ota valitut Enphase Envoyn energiaentiteettien tunnukset käyttöön, jotta Home Assistant Energyn historia jatkuu tämän integraation alla.",
-          "advanced": "Valinnaiset verkkotilan ohjaimet ja vain asentajille tarkoitetut verkkoprofiilin ohjaimet."
+          "advanced": "Valinnaiset verkkotilan ohjaimet ja vain asentajille tarkoitetut verkkoprofiilin ohjaimet.",
+          "features": "Määritä laitteiden ominaisuudet ja lisäohjaimet."
         },
         "data": {
           "type_envoy": "Yhdyskäytävä",
@@ -573,7 +575,7 @@
       },
       "devices": {
         "title": "Valitse laitteet",
-        "description": "Valitse lisättävät laitoryhmät. Kaikilla valinnoilla on sama kyselyväli.",
+        "description": "Valitse mukaan otettavat laiteluokat.",
         "sections": {
           "devices": {
             "name": "Valitse laitteet",
@@ -593,54 +595,16 @@
               "type_heatpump": "Sisältää lämpöpumpun tila-, diagnostiikka- ja kulutusanturit.",
               "type_microinverter": "Sisältää mikroinvertterien yhteys-, aktiivinen määrä- ja elinkaarituotannon sensorit."
             }
-          },
-          "device_features": {
-            "name": "Laiteominaisuudet",
-            "data": {
-              "schedule_sync_enabled": "Ota ajoitustuki käyttöön",
-              "battery_schedules_enabled": "Ota akun aikataulutus käyttöön",
-              "system_event_repair_issues": "Ota järjestelmätapahtumien korjausilmoitukset käyttöön",
-              "pricing_edits_enabled": "Ota hintojen muokkaus käyttöön",
-              "weather_enabled": "Ota sää käyttöön",
-              "nominal_voltage": "EV-laturin nimellisjännite (V)",
-              "microinverter_lifetime_energy_enabled": "Ota mikroinvertterien elinkaarienergia käyttöön",
-              "microinverter_power_enabled": "Ota mikroinvertterien teho käyttöön",
-              "vpp_events_enabled": "Ota VPP-tapahtumat käyttöön",
-              "grid_profile_controls_enabled": "Ota asentajan verkkoprofiilin hallinta käyttöön"
-            },
-            "data_description": {
-              "system_event_repair_issues": "Luo Home Assistant -korjauksia aktiivisille Enphasen pysyville hälytyksille. Oletuksena pois käytöstä.",
-              "pricing_edits_enabled": "Hallitse IQ Gatewayn sähkötariffeja",
-              "weather_enabled": "Hakee kohteen nykyisen sään Enphaselta ja luo sääentiteetin vain, kun päätepiste on käytettävissä.",
-              "nominal_voltage": "Tyypillinen vaihtovirtasyöttöjännite tehon arviointiin, kun reaaliaikaista jännitettä ei ole saatavilla.",
-              "schedule_sync_enabled": "Hallitse IQ EV Chargerin aikatauluja.",
-              "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja.",
-              "microinverter_lifetime_energy_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset elinkaarienergia-anturit.",
-              "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla.",
-              "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä.",
-              "grid_profile_controls_enabled": "Hakee vain asentajalle tarkoitetut verkkoprofiilin metatiedot ja ottaa profiilitoiminnot käyttöön. Oletuksena poissa käytöstä."
-            }
           }
         },
         "data": {
           "devices": "Valitse laitteet",
-          "device_features": "Laiteominaisuudet",
           "type_envoy": "Yhdyskäytävä",
           "type_encharge": "Akku",
           "type_ac_battery": "AC-akku",
           "type_iqevse": "Laturit",
           "type_heatpump": "Lämpöpumppu",
-          "type_microinverter": "Mikroinvertterit",
-          "schedule_sync_enabled": "Ota ajoitustuki käyttöön",
-          "battery_schedules_enabled": "Ota akun aikataulutus käyttöön",
-          "system_event_repair_issues": "Ota järjestelmätapahtumien korjausilmoitukset käyttöön",
-          "pricing_edits_enabled": "Ota hintojen muokkaus käyttöön",
-          "weather_enabled": "Ota sää käyttöön",
-          "nominal_voltage": "EV-laturin nimellisjännite (V)",
-          "microinverter_lifetime_energy_enabled": "Ota mikroinvertterien elinkaarienergia käyttöön",
-          "microinverter_power_enabled": "Ota mikroinvertterien teho käyttöön",
-          "vpp_events_enabled": "Ota VPP-tapahtumat käyttöön",
-          "grid_profile_controls_enabled": "Ota asentajan verkkoprofiilin hallinta käyttöön"
+          "type_microinverter": "Mikroinvertterit"
         },
         "data_description": {
           "type_envoy": "Sisältää yhdyskäytävän yhteys- ja mittaridiagnostiikan.",
@@ -648,17 +612,7 @@
           "type_ac_battery": "Sisältää AC-akun anturit ja lepotilan ohjaukset, kun ne ovat saatavilla.",
           "type_iqevse": "Sisältää EV-laturien entiteetit ja ohjaukset.",
           "type_heatpump": "Sisältää lämpöpumpun tila-, diagnostiikka- ja kulutusanturit.",
-          "type_microinverter": "Sisältää mikroinvertterien yhteys-, aktiivinen määrä- ja elinkaarituotannon sensorit.",
-          "system_event_repair_issues": "Luo Home Assistant -korjauksia aktiivisille Enphasen pysyville hälytyksille. Oletuksena pois käytöstä.",
-          "pricing_edits_enabled": "Hallitse IQ Gatewayn sähkötariffeja",
-          "weather_enabled": "Hakee kohteen nykyisen sään Enphaselta ja luo sääentiteetin vain, kun päätepiste on käytettävissä.",
-          "nominal_voltage": "Tyypillinen vaihtovirtasyöttöjännite tehon arviointiin, kun reaaliaikaista jännitettä ei ole saatavilla.",
-          "schedule_sync_enabled": "Hallitse IQ EV Chargerin aikatauluja.",
-          "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja.",
-          "microinverter_lifetime_energy_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset elinkaarienergia-anturit.",
-          "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla.",
-          "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä.",
-          "grid_profile_controls_enabled": "Hakee vain asentajalle tarkoitetut verkkoprofiilin metatiedot ja ottaa profiilitoiminnot käyttöön. Oletuksena poissa käytöstä."
+          "type_microinverter": "Sisältää mikroinvertterien yhteys-, aktiivinen määrä- ja elinkaarituotannon sensorit."
         }
       },
       "repair_notifications": {
@@ -787,6 +741,72 @@
       "grid_toggle_applied": {
         "title": "Verkkotilan muutos hyväksytty",
         "description": "Enphase hyväksyi pyynnön muuttaa verkkotilaksi **{target_mode}**.\n\nFyysinen rele saattaa vielä muuttua. Käytä verkkotilan anturia seurataksesi tuloksena olevaa tilaa."
+      },
+      "features": {
+        "title": "Ominaisuudet",
+        "description": "Määritä laitteiden ominaisuudet ja lisäohjaimet.",
+        "sections": {
+          "device_features": {
+            "name": "Laiteominaisuudet",
+            "data": {
+              "schedule_sync_enabled": "Ota ajoitustuki käyttöön",
+              "battery_schedules_enabled": "Ota akun aikataulutus käyttöön",
+              "system_event_repair_issues": "Ota järjestelmätapahtumien korjausilmoitukset käyttöön",
+              "pricing_edits_enabled": "Ota hintojen muokkaus käyttöön",
+              "weather_enabled": "Ota sää käyttöön",
+              "nominal_voltage": "EV-laturin nimellisjännite (V)",
+              "microinverter_lifetime_energy_enabled": "Ota mikroinvertterien elinkaarienergia käyttöön",
+              "vpp_events_enabled": "Ota VPP-tapahtumat käyttöön"
+            },
+            "data_description": {
+              "system_event_repair_issues": "Luo Home Assistant -korjauksia aktiivisille Enphasen pysyville hälytyksille. Oletuksena pois käytöstä.",
+              "pricing_edits_enabled": "Hallitse IQ Gatewayn sähkötariffeja",
+              "weather_enabled": "Hakee kohteen nykyisen sään Enphaselta ja luo sääentiteetin vain, kun päätepiste on käytettävissä.",
+              "nominal_voltage": "Tyypillinen vaihtovirtasyöttöjännite tehon arviointiin, kun reaaliaikaista jännitettä ei ole saatavilla.",
+              "schedule_sync_enabled": "Hallitse IQ EV Chargerin aikatauluja.",
+              "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja.",
+              "microinverter_lifetime_energy_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset elinkaarienergia-anturit.",
+              "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä."
+            }
+          },
+          "advanced_features": {
+            "name": "Lisäominaisuudet",
+            "data": {
+              "grid_profile_controls_enabled": "Ota asentajan verkkoprofiilin hallinta käyttöön",
+              "microinverter_power_enabled": "Ota mikroinvertterien teho käyttöön"
+            },
+            "data_description": {
+              "grid_profile_controls_enabled": "Hakee vain asentajalle tarkoitetut verkkoprofiilin metatiedot ja ottaa profiilitoiminnot käyttöön. Oletuksena poissa käytöstä.",
+              "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla."
+            }
+          }
+        },
+        "data": {
+          "device_features": "Laiteominaisuudet",
+          "advanced_features": "Lisäominaisuudet",
+          "schedule_sync_enabled": "Ota ajoitustuki käyttöön",
+          "battery_schedules_enabled": "Ota akun aikataulutus käyttöön",
+          "system_event_repair_issues": "Ota järjestelmätapahtumien korjausilmoitukset käyttöön",
+          "pricing_edits_enabled": "Ota hintojen muokkaus käyttöön",
+          "weather_enabled": "Ota sää käyttöön",
+          "nominal_voltage": "EV-laturin nimellisjännite (V)",
+          "microinverter_lifetime_energy_enabled": "Ota mikroinvertterien elinkaarienergia käyttöön",
+          "microinverter_power_enabled": "Ota mikroinvertterien teho käyttöön",
+          "vpp_events_enabled": "Ota VPP-tapahtumat käyttöön",
+          "grid_profile_controls_enabled": "Ota asentajan verkkoprofiilin hallinta käyttöön"
+        },
+        "data_description": {
+          "system_event_repair_issues": "Luo Home Assistant -korjauksia aktiivisille Enphasen pysyville hälytyksille. Oletuksena pois käytöstä.",
+          "pricing_edits_enabled": "Hallitse IQ Gatewayn sähkötariffeja",
+          "weather_enabled": "Hakee kohteen nykyisen sään Enphaselta ja luo sääentiteetin vain, kun päätepiste on käytettävissä.",
+          "nominal_voltage": "Tyypillinen vaihtovirtasyöttöjännite tehon arviointiin, kun reaaliaikaista jännitettä ei ole saatavilla.",
+          "schedule_sync_enabled": "Hallitse IQ EV Chargerin aikatauluja.",
+          "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja.",
+          "microinverter_lifetime_energy_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset elinkaarienergia-anturit.",
+          "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla.",
+          "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä.",
+          "grid_profile_controls_enabled": "Hakee vain asentajalle tarkoitetut verkkoprofiilin metatiedot ja ottaa profiilitoiminnot käyttöön. Oletuksena poissa käytöstä."
+        }
       }
     },
     "error": {
@@ -823,7 +843,8 @@
       "grid_profile_installer_required": "Verkkoprofiilin hallinta edellyttää asentajan käyttöoikeutta Enphase Activationiin.",
       "grid_profile_no_regions": "Tämän kohteen maalle ei ole käytettävissä verkkoprofiilin alueita.",
       "grid_mode_unavailable": "Verkkotilan ohjaus ei ole saatavilla tälle kohteelle.",
-      "grid_mode_blocked": "Verkkotilan ohjaus on tällä hetkellä estetty: {reasons}."
+      "grid_mode_blocked": "Verkkotilan ohjaus on tällä hetkellä estetty: {reasons}.",
+      "grid_profile_session_expired": "Enlighten-istunto on vanhentunut tai hylätty. Avaa Tunnistautuminen, tunnistaudu uudelleen ja yritä sitten uudelleen."
     },
     "create_entry": {
       "migration_success": "Siirto valmis. Enphase Energy omistaa nyt valitut lähde-entiteettien tunnukset. Tarkista seuraavan päivityksen jälkeen Energy-koontinäyttö ja Developer Tools > Statistics.",

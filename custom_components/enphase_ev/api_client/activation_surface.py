@@ -18,6 +18,7 @@ from ..log_redaction import (
 )
 from .errors import (
     ActivationAccessDenied,
+    ActivationSessionExpired,
     EnphaseLoginWallUnauthorized,
     InvalidPayloadError,
     OptionalEndpointUnavailable,
@@ -127,6 +128,13 @@ async def async_prepare_activation_auth(
         EnphaseLoginWallUnauthorized,
         Unauthorized,
     ) as err:
+        if isinstance(err, (EnphaseLoginWallUnauthorized, Unauthorized)) or (
+            isinstance(err, aiohttp.ClientResponseError) and err.status in {401, 403}
+        ):
+            self._clear_activation_auth_context()
+            raise ActivationSessionExpired(
+                "Enlighten session requires reauthentication"
+            ) from err
         _LOGGER.debug(
             "Activation auth bootstrap unavailable for site %s: %s",
             redact_site_id(self._site),

@@ -48,7 +48,7 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - Site tariff visibility, editable rate entities, and tariff update actions
 - Optional installer-only Grid Profile Control through Enphase cloud Activation,
   with country-scoped profile selection and current profile monitoring. Enable it
-  under Options > Devices > Device Features; it is disabled by default and makes
+  under Options > Features > Advanced Features; it is disabled by default and makes
   no Grid Profile requests until enabled
 - Read-only Grid Mode monitoring with a guided, OTP-confirmed control workflow under Configure > Advanced > Grid Mode and admin-only actions for scripts
 - Administrator-only service actions for charger control, cloud reauthentication, live streaming, battery schedule changes, tariff updates, and Grid Profile application
@@ -60,7 +60,7 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
   localized descriptions, bounded on-demand pagination, and identifier redaction
 - Optional read-only VPP/ELRP monitoring for enrolled sites, with a VPP Events
   calendar and next-event start, end, type, subtype, and status sensors on the
-  Enphase Cloud device. Enable it under Options > Devices > Device Features;
+  Enphase Cloud device. Enable it under Options > Features > Device Features;
   it is disabled by default and makes no VPP service requests until enabled
 - Detailed diagnostic and inventory entities remain available but are disabled by default when they are mainly useful for troubleshooting
 - Restored discovery data creates known entities early during startup; live power
@@ -167,3 +167,14 @@ serial number, during the inventory refresh. Explicit per-gateway transport flag
 take precedence over dashboard details. The site-level connection type is not
 assigned to individual gateways, and `primary_gw_connectivity` describes a parent
 gateway connection rather than Ethernet, Wi-Fi, or cellular transport.
+
+### Features and Grid Profile access
+
+Use **Configure → Devices** to choose device categories and **Configure → Features**
+to configure Device Features and Advanced Features. Advanced Features contains
+**Enable installer Grid Profile controls** and **Enable Microinverter Power**.
+With Grid Profile controls enabled, **Configure → Advanced → Grid Profile Control**
+remains visible even when discovery fails. If the Enlighten session has expired or
+is rejected, use **Configure → Authentication → Start reauthentication**, complete
+the login, then reopen Grid Profile Control. Session failures are distinct from
+installer permission denials; enabling this feature does not apply a grid profile.
