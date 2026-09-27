@@ -68,24 +68,6 @@ def _mark_inverter_inventory_ready(coord: Any) -> None:
     coord._inverters_inventory_payload = {}  # noqa: SLF001
 
 
-def test_ac_battery_status_fallback_serials_guard_paths() -> None:
-    coord = SimpleNamespace(
-        battery_has_acb=True,
-        inventory_view=SimpleNamespace(has_type_for_entities=lambda _key: True),
-        ac_battery_status_summary={"status_source": "battery_status"},
-    )
-
-    assert sensor_mod._ac_battery_status_fallback_serials_for_setup(coord) is None
-
-    class BadSerial:
-        def __str__(self) -> str:
-            raise RuntimeError("boom")
-
-    coord.iter_ac_battery_serials = lambda: [BadSerial()]
-
-    assert sensor_mod._ac_battery_status_fallback_serials_for_setup(coord) is None
-
-
 @pytest.mark.asyncio
 async def test_async_setup_entry_registers_entities(
     hass, config_entry, coordinator_factory, monkeypatch
@@ -270,7 +252,6 @@ async def test_large_site_unchanged_update_skips_registry_reconciliation(
 
 def test_per_update_device_snapshots_are_reused(coordinator_factory) -> None:
     from custom_components.enphase_ev.sensor import (
-        EnphaseAcBatteryStorageChargeSensor,
         EnphaseBatteryStorageChargeSensor,
         EnphaseInverterLifetimeEnergySensor,
     )
@@ -282,18 +263,12 @@ def test_per_update_device_snapshots_are_reused(coordinator_factory) -> None:
     coord._inverter_data = {  # noqa: SLF001
         "INV-1": {"serial_number": "INV-1", "lifetime_production_wh": 1000}
     }
-    coord._ac_battery_data = {  # noqa: SLF001
-        "AC-1": {"serial_number": "AC-1", "current_charge_pct": 37}
-    }
     original_battery_storage = coord.battery_storage
     original_inverter_data = coord.inverter_data
-    original_ac_battery_storage = coord.ac_battery_storage
     coord.battery_storage = MagicMock(side_effect=original_battery_storage)  # type: ignore[method-assign]
     coord.inverter_data = MagicMock(side_effect=original_inverter_data)  # type: ignore[method-assign]
-    coord.ac_battery_storage = MagicMock(side_effect=original_ac_battery_storage)  # type: ignore[method-assign]
     battery = EnphaseBatteryStorageChargeSensor(coord, "BAT-1")
     inverter = EnphaseInverterLifetimeEnergySensor(coord, "INV-1")
-    ac_battery = EnphaseAcBatteryStorageChargeSensor(coord, "AC-1")
 
     assert battery.available is True
     assert battery.native_value == 42
@@ -301,19 +276,14 @@ def test_per_update_device_snapshots_are_reused(coordinator_factory) -> None:
     assert inverter.available is True
     assert inverter.native_value == 1
     assert inverter.extra_state_attributes["sampled_at_utc"] is None
-    assert ac_battery.native_value == 37
-    assert ac_battery.extra_state_attributes["battery_id"] is None
     assert coord.battery_storage.call_count == 1
     assert coord.inverter_data.call_count == 1
-    assert coord.ac_battery_storage.call_count == 1
 
     coord.data = dict(coord.data)
     assert battery.native_value == 42
     assert inverter.native_value == 1
-    assert ac_battery.native_value == 37
     assert coord.battery_storage.call_count == 2
     assert coord.inverter_data.call_count == 2
-    assert coord.ac_battery_storage.call_count == 2
 
     coord._battery_storage_data = {}  # noqa: SLF001
     coord.data = dict(coord.data)
@@ -1064,21 +1034,19 @@ async def test_async_setup_entry_waits_for_authoritative_serial_family_payloads_
     coord = coordinator_factory(serials=[RANDOM_SERIAL])
     coord._devices_inventory_ready = True  # noqa: SLF001
     coord._battery_status_payload = None  # noqa: SLF001
-    coord._ac_battery_devices_payload = None  # noqa: SLF001
     coord._inverters_inventory_payload = None  # noqa: SLF001
     coord._battery_has_acb = True  # noqa: SLF001
     coord.include_inverters = True
     coord.inventory_runtime._set_type_device_buckets(  # noqa: SLF001
         {
             "encharge": {"type_label": "Batteries", "count": 1, "devices": []},
-            "ac_battery": {"type_label": "AC Battery", "count": 1, "devices": []},
             "microinverter": {
                 "type_label": "Microinverters",
                 "count": 1,
                 "devices": [],
             },
         },
-        ["encharge", "ac_battery", "microinverter"],
+        ["encharge", "microinverter"],
     )
     coord.async_add_topology_listener = lambda _cb: (lambda: None)  # type: ignore[assignment]
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
@@ -1093,13 +1061,6 @@ async def test_async_setup_entry_waits_for_authoritative_serial_family_payloads_
                     domain="sensor",
                     platform=DOMAIN,
                     unique_id=f"{DOMAIN}_site_{coord.site_id}_battery_BAT-OLD_status",
-                    config_entry_id=config_entry.entry_id,
-                ),
-                "sensor.ac_bat_unknown": SimpleNamespace(
-                    entity_id="sensor.ac_bat_unknown",
-                    domain="sensor",
-                    platform=DOMAIN,
-                    unique_id=f"{DOMAIN}_site_{coord.site_id}_ac_battery_ACBAT-OLD_status",
                     config_entry_id=config_entry.entry_id,
                 ),
                 "sensor.inv_unknown": SimpleNamespace(
@@ -1126,75 +1087,6 @@ async def test_async_setup_entry_waits_for_authoritative_serial_family_payloads_
 
 
 @pytest.mark.asyncio
-async def test_async_setup_entry_adds_ac_battery_status_fallback_without_prune(
-    hass, config_entry, coordinator_factory, monkeypatch
-) -> None:
-    from custom_components.enphase_ev.const import DOMAIN
-    from custom_components.enphase_ev.sensor import async_setup_entry
-
-    coord = coordinator_factory(serials=[RANDOM_SERIAL])
-    coord._devices_inventory_ready = True  # noqa: SLF001
-    coord._battery_has_acb = True  # noqa: SLF001
-    coord._ac_battery_devices_payload = None  # noqa: SLF001
-    coord._ac_battery_data = {  # noqa: SLF001
-        "BAT-AC-1": {
-            "serial_number": "BAT-AC-1",
-            "current_charge_pct": 55.0,
-            "status_normalized": "normal",
-        }
-    }
-    coord._ac_battery_order = ["BAT-AC-1"]  # noqa: SLF001
-    coord._ac_battery_aggregate_status_details = {  # noqa: SLF001
-        "status_source": "battery_status"
-    }
-    coord.inventory_runtime._set_type_device_buckets(  # noqa: SLF001
-        {"ac_battery": {"type_label": "AC Battery", "count": 1, "devices": []}},
-        ["ac_battery"],
-    )
-    coord.async_add_topology_listener = lambda _cb: (lambda: None)  # type: ignore[assignment]
-    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
-
-    removed_ids: list[str] = []
-
-    class FakeRegistry:
-        def __init__(self) -> None:
-            self.entities = {
-                "sensor.ac_bat_old": SimpleNamespace(
-                    entity_id="sensor.ac_bat_old",
-                    domain="sensor",
-                    platform=DOMAIN,
-                    unique_id=f"{DOMAIN}_site_{coord.site_id}_ac_battery_ACBAT-OLD_status",
-                    config_entry_id=config_entry.entry_id,
-                )
-            }
-
-        def async_get_entity_id(self, *_args):
-            return None
-
-        def async_remove(self, entity_id):
-            removed_ids.append(entity_id)
-            self.entities.pop(entity_id, None)
-
-    monkeypatch.setattr(sensor_mod.er, "async_get", lambda _hass: FakeRegistry())
-
-    added: list[Any] = []
-
-    def _capture(entities, update_before_add=False):
-        added.extend(entities)
-
-    await async_setup_entry(hass, config_entry, _capture)
-
-    per_ac_prefix = f"{DOMAIN}_site_{coord.site_id}_ac_battery_BAT-AC-1"
-    per_ac_entities = [
-        entity
-        for entity in added
-        if getattr(entity, "unique_id", "").startswith(per_ac_prefix)
-    ]
-    assert len(per_ac_entities) == 6
-    assert removed_ids == []
-
-
-@pytest.mark.asyncio
 async def test_async_setup_entry_serial_family_sync_returns_when_source_becomes_unknown(
     hass, config_entry, coordinator_factory, monkeypatch
 ) -> None:
@@ -1204,7 +1096,6 @@ async def test_async_setup_entry_serial_family_sync_returns_when_source_becomes_
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
     responses = {
         "battery": [set(), None],
-        "ac_battery": [set(), None],
         "inverter": [set(), None],
     }
 
@@ -1219,18 +1110,13 @@ async def test_async_setup_entry_serial_family_sync_returns_when_source_becomes_
     )
     monkeypatch.setattr(
         sensor_mod,
-        "active_ac_battery_serials_for_cleanup",
-        lambda _coord: _next_response("ac_battery"),
-    )
-    monkeypatch.setattr(
-        sensor_mod,
         "active_inverter_serials_for_cleanup",
         lambda _coord: _next_response("inverter"),
     )
 
     await async_setup_entry(hass, config_entry, lambda *_args, **_kwargs: None)
 
-    assert responses == {"battery": [], "ac_battery": [], "inverter": []}
+    assert responses == {"battery": [], "inverter": []}
 
 
 @pytest.mark.asyncio
@@ -2404,7 +2290,6 @@ def test_last_reported_site_diagnostic_sensors_disabled_by_default(
     coordinator_factory,
 ) -> None:
     from custom_components.enphase_ev.sensor import (
-        EnphaseAcBatteryLastReportedSensor,
         EnphaseBatteryLastReportedSensor,
         EnphaseHeatPumpLastReportedSensor,
     )
@@ -2413,7 +2298,6 @@ def test_last_reported_site_diagnostic_sensors_disabled_by_default(
 
     for entity in (
         EnphaseBatteryLastReportedSensor(coord),
-        EnphaseAcBatteryLastReportedSensor(coord),
         EnphaseHeatPumpLastReportedSensor(coord),
     ):
         assert entity.entity_registry_enabled_default is False

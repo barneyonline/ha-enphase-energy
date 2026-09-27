@@ -43,8 +43,7 @@
           "type_iqevse": "Laadijad",
           "type_microinverter": "Mikroinverterid",
           "scan_interval": "Skaneerimisintervall (s)",
-          "type_heatpump": "Soojuspump",
-          "type_ac_battery": "AC-aku"
+          "type_heatpump": "Soojuspump"
         },
         "data_description": {
           "type_envoy": "Sisaldab lüüsi ühenduvuse ja arvestite diagnostikat.",
@@ -52,8 +51,7 @@
           "type_iqevse": "Sisaldab EV-laadijate olemid ja juhtnuppe.",
           "type_microinverter": "Sisaldab mikroinverterite ühenduvuse, aktiivse arvu ja eluaegse tootmise andureid.",
           "scan_interval": "Sekundid pilveoleku päringute vahel. Vaikimisi 60s.",
-          "type_heatpump": "Sisaldab soojuspumba oleku-, diagnostika- ja tarbimisandureid.",
-          "type_ac_battery": "Sisaldab AC-aku andureid ja unerežiimi juhtnuppe, kui need on saadaval."
+          "type_heatpump": "Sisaldab soojuspumba oleku-, diagnostika- ja tarbimisandureid."
         }
       }
     },
@@ -138,9 +136,6 @@
     },
     "battery_schedule_overlap": {
       "message": "Ajakava kattub olemasoleva {schedule_label}-ga. Kohanda või keela see ajakava enne."
-    },
-    "ac_battery_unavailable": {
-      "message": "Ühtegi AC Battery seadet pole praegu saadaval."
     },
     "auth_settings_service_unavailable": {
       "message": "Autentimisseaded pole saadaval, kui Enphase'i teenus on maas."
@@ -358,9 +353,6 @@
     "scheduler_service_unavailable": {
       "message": "Laadimisrežiimi valik pole saadaval, kui Enphase'i ajastusteenus on maas."
     },
-    "selected_ac_battery_target_state_of_charge_unavailable": {
-      "message": "Valitud AC-aku sihtlaetuse tase pole saadaval."
-    },
     "battery_schedule_day_required": {
       "message": "Vali ajakava jaoks vähemalt üks päev."
     },
@@ -527,7 +519,6 @@
           "session_history_interval": "Seansi ajaloo intervall (min)",
           "schedule_sync_enabled": "Luba ajakava tugi",
           "type_heatpump": "Soojuspump",
-          "type_ac_battery": "AC-aku",
           "battery_schedules_enabled": "Luba aku ajastaja",
           "degraded_service_repair_issues": "Luba halvenenud teenuste parandused",
           "weather_enabled": "Luba ilmateave",
@@ -546,7 +537,6 @@
           "nominal_voltage": "Tüüpiline vahelduvvoolu toitepinge võimsuse hindamiseks, kui reaalajas pinge pole saadaval.",
           "session_history_interval": "Minutid, mida oodata pilve seansiajaloo päringute vahel.",
           "type_heatpump": "Sisaldab soojuspumba oleku-, diagnostika- ja tarbimisandureid.",
-          "type_ac_battery": "Sisaldab AC-aku andureid ja unerežiimi juhtnuppe, kui need on saadaval.",
           "degraded_service_repair_issues": "Loob Repairsi probleemid, kui valikulised Enphase teenused on halvenenud.",
           "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval.",
           "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
@@ -582,7 +572,6 @@
             "data": {
               "type_envoy": "Lüüs",
               "type_encharge": "Aku",
-              "type_ac_battery": "AC-aku",
               "type_iqevse": "Laadijad",
               "type_heatpump": "Soojuspump",
               "type_microinverter": "Mikroinverterid"
@@ -590,7 +579,6 @@
             "data_description": {
               "type_envoy": "Sisaldab lüüsi ühenduvuse ja arvestite diagnostikat.",
               "type_encharge": "Sisaldab aku olekut ja juhtimisolemeid, kui need on saadaval.",
-              "type_ac_battery": "Sisaldab AC-aku andureid ja unerežiimi juhtnuppe, kui need on saadaval.",
               "type_iqevse": "Sisaldab EV-laadijate olemid ja juhtnuppe.",
               "type_heatpump": "Sisaldab soojuspumba oleku-, diagnostika- ja tarbimisandureid.",
               "type_microinverter": "Sisaldab mikroinverterite ühenduvuse, aktiivse arvu ja eluaegse tootmise andureid."
@@ -601,7 +589,6 @@
           "devices": "Vali seadmed",
           "type_envoy": "Lüüs",
           "type_encharge": "Aku",
-          "type_ac_battery": "AC-aku",
           "type_iqevse": "Laadijad",
           "type_heatpump": "Soojuspump",
           "type_microinverter": "Mikroinverterid"
@@ -609,7 +596,6 @@
         "data_description": {
           "type_envoy": "Sisaldab lüüsi ühenduvuse ja arvestite diagnostikat.",
           "type_encharge": "Sisaldab aku olekut ja juhtimisolemeid, kui need on saadaval.",
-          "type_ac_battery": "Sisaldab AC-aku andureid ja unerežiimi juhtnuppe, kui need on saadaval.",
           "type_iqevse": "Sisaldab EV-laadijate olemid ja juhtnuppe.",
           "type_heatpump": "Sisaldab soojuspumba oleku-, diagnostika- ja tarbimisandureid.",
           "type_microinverter": "Sisaldab mikroinverterite ühenduvuse, aktiivse arvu ja eluaegse tootmise andureid."
@@ -1855,45 +1841,6 @@
           "pairing": "Sidumine"
         }
       },
-      "ac_battery_overall_status": {
-        "name": "AC-aku üldine olek",
-        "state": {
-          "normal": "Tavaline",
-          "warning": "Hoiatus",
-          "error": "Viga",
-          "unknown": "Tundmatu"
-        }
-      },
-      "ac_battery_power": {
-        "name": "AC-aku võimsus"
-      },
-      "ac_battery_last_reported": {
-        "name": "AC-aku viimane raport"
-      },
-      "ac_battery_storage_charge": {
-        "name": "AC-aku laetuse tase"
-      },
-      "ac_battery_storage_status": {
-        "name": "{serial} olek",
-        "state": {
-          "normal": "Tavaline",
-          "warning": "Hoiatus",
-          "error": "Viga",
-          "unknown": "Tundmatu"
-        }
-      },
-      "ac_battery_storage_power": {
-        "name": "{serial} võimsus"
-      },
-      "ac_battery_storage_operating_mode": {
-        "name": "{serial} töörežiim"
-      },
-      "ac_battery_storage_cycle_count": {
-        "name": "{serial} tsüklite arv"
-      },
-      "ac_battery_storage_last_reported": {
-        "name": "{serial} viimane raport"
-      },
       "battery_cfg_schedules": {
         "name": "Aku CFG ajakavad"
       },
@@ -2338,9 +2285,6 @@
       "restrict_battery_discharge_schedule": {
         "name": "Aku tühjendamise piirangu ajakava"
       },
-      "ac_battery_sleep_mode": {
-        "name": "AC-aku unerežiim"
-      },
       "evse_schedule_edit_mon": {
         "name": "Esmaspäeva ajakava"
       },
@@ -2411,9 +2355,6 @@
       },
       "system_profile": {
         "name": "Süsteemi profiil"
-      },
-      "ac_battery_target_state_of_charge": {
-        "name": "AC-aku sihtlaetuse tase"
       },
       "evse_schedule_selected": {
         "name": "Ajakava"

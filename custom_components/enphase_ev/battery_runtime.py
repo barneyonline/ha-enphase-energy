@@ -16,7 +16,6 @@ import aiohttp
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.util import dt as dt_util
 
-from .ac_battery_runtime import AcBatteryRuntime
 from .battery_schedule_editor import (
     BatteryScheduleRecord,
     battery_schedule_overlap_message,
@@ -69,7 +68,6 @@ from .parsing_helpers import (
     coerce_optional_bool,
     coerce_optional_float,
     coerce_optional_text,
-    parse_inverter_last_report,
 )
 from .runtime_helpers import coerce_int, coerce_optional_int
 from .service_validation import raise_translated_service_validation
@@ -108,7 +106,6 @@ class BatteryRuntime:
     ) -> None:
         self.coordinator = coordinator
         self._state = state
-        self._ac_battery_runtime = AcBatteryRuntime(self)
 
     @property
     def battery_state(self) -> BatteryState:
@@ -191,37 +188,6 @@ class BatteryRuntime:
         if callable(func):
             return cast(str | None, func(value))
         return None
-
-    def parse_ac_battery_devices_page(self, html_text: object) -> None:
-        self._ac_battery_runtime.parse_ac_battery_devices_page(html_text)
-
-    def parse_ac_battery_show_stat_data(
-        self,
-        serial: str,
-        battery_id: str | None,
-        html_text: object,
-    ) -> dict[str, object]:
-        return self._ac_battery_runtime.parse_ac_battery_show_stat_data(
-            serial, battery_id, html_text
-        )
-
-    def _refresh_ac_battery_summary(self) -> None:
-        self._ac_battery_runtime.refresh_ac_battery_summary()
-
-    async def async_refresh_ac_battery_devices(self, *, force: bool = False) -> None:
-        await self._ac_battery_runtime.async_refresh_ac_battery_devices(force=force)
-
-    async def async_refresh_ac_battery_telemetry(self, *, force: bool = False) -> None:
-        await self._ac_battery_runtime.async_refresh_ac_battery_telemetry(force=force)
-
-    async def async_refresh_ac_battery_events(self, *, force: bool = False) -> None:
-        await self._ac_battery_runtime.async_refresh_ac_battery_events(force=force)
-
-    async def async_set_ac_battery_sleep_mode(self, enabled: bool) -> None:
-        await self._ac_battery_runtime.async_set_ac_battery_sleep_mode(enabled)
-
-    async def async_set_ac_battery_target_soc(self, value: int) -> None:
-        await self._ac_battery_runtime.async_set_ac_battery_target_soc(value)
 
     def _refresh_cached_topology(self) -> None:
         func = getattr(self.coordinator, "_refresh_cached_topology", None)
@@ -854,9 +820,6 @@ class BatteryRuntime:
         if not callable(fetcher):
             return False
         return coord._endpoint_family_should_run("storm_alert", force=force)
-
-    def ac_battery_devices_refresh_due(self, *, force: bool = False) -> bool:
-        return self._ac_battery_runtime.ac_battery_devices_refresh_due(force=force)
 
     def _battery_control_state_settling(self) -> bool:
         coord = self.coordinator
@@ -2859,163 +2822,12 @@ class BatteryRuntime:
                 payload.get("excluded_count")
             ),
         }
-        self._sync_ac_battery_from_battery_status(snapshots)
         self._refresh_cached_topology()
         if (
             self.effective_profile_matches_pending()
             and self._pending_authoritative_confirmation_received()
         ):
             self.confirm_battery_pending()
-
-    def _sync_ac_battery_from_battery_status(
-        self, snapshots: dict[str, dict[str, object]]
-    ) -> None:
-        """Seed AC Battery records from battery status when the HTML page is empty."""
-
-        coord = self.coordinator
-        state = self.battery_state
-        if getattr(coord, "battery_has_acb", None) is not True:
-            return
-        inventory_view = getattr(coord, "inventory_view", None)
-        has_type_for_entities = getattr(inventory_view, "has_type_for_entities", None)
-        if callable(has_type_for_entities) and not has_type_for_entities("ac_battery"):
-            return
-
-        existing = getattr(state, "_ac_battery_data", None)
-        rows: dict[str, dict[str, object]] = (
-            {
-                str(key): dict(value)
-                for key, value in existing.items()
-                if isinstance(value, dict)
-            }
-            if isinstance(existing, dict)
-            else {}
-        )
-
-        known_ids: set[str] = {
-            str(snapshot.get("battery_id"))
-            for snapshot in rows.values()
-            if snapshot.get("battery_id") is not None
-        }
-        known_serials: set[str] = {
-            str(snapshot.get("serial_number"))
-            for snapshot in rows.values()
-            if snapshot.get("serial_number") is not None
-        }
-        type_bucket = (
-            inventory_view.type_bucket("ac_battery")
-            if inventory_view is not None
-            and callable(getattr(inventory_view, "type_bucket", None))
-            else None
-        )
-        members = type_bucket.get("devices") if isinstance(type_bucket, dict) else None
-        if isinstance(members, list):
-            for member in members:
-                for key in ("id", "device_id", "device_uid", "uid"):
-                    value = member.get(key)
-                    if value is not None:
-                        known_ids.add(str(value))
-                for key in ("serial_number", "serial", "serialNumber"):
-                    value = member.get(key)
-                    if value is not None:
-                        known_serials.add(str(value))
-
-        acb_only_site = getattr(
-            coord, "battery_has_encharge", None
-        ) is not True and bool(snapshots)
-        if not acb_only_site and not known_ids and not known_serials:
-            return
-
-        order = list(getattr(state, "_ac_battery_order", []) or [])
-        status_map: dict[str, str] = {}
-        status_text_map: dict[str, str | None] = {}
-        worst_key: str | None = None
-        worst_status: str | None = None
-        worst_severity = self._battery_status_severity_value("normal")
-        synced_count = 0
-
-        for key, source in snapshots.items():
-            battery_id = self._normalize_battery_id(source.get("battery_id"))
-            serial = self._coerce_optional_text(source.get("serial_number")) or key
-            if (
-                not acb_only_site
-                and battery_id not in known_ids
-                and serial not in known_serials
-                and key not in known_serials
-            ):
-                continue
-
-            row = dict(rows.get(key, {}))
-            row.setdefault("serial_number", serial)
-            if battery_id is not None:
-                row["battery_id"] = battery_id
-            # Keep this fallback to inventory/status fields. The battery-status
-            # endpoint's available_power/max_power values describe capability,
-            # not the AC Battery's current live power.
-            for source_key, target_key in (
-                ("current_charge_pct", "current_charge_pct"),
-                ("cycle_count", "cycle_count"),
-                ("status_text", "status_text"),
-                ("status_normalized", "status_normalized"),
-                ("available_energy_kwh", "available_energy_kwh"),
-                ("max_capacity_kwh", "max_capacity_kwh"),
-                ("battery_mode", "battery_mode"),
-                ("rated_power", "rated_power"),
-                ("battery_phase_count", "battery_phase_count"),
-            ):
-                if source.get(source_key) is not None:
-                    row[target_key] = source[source_key]
-            if source.get("last_report") is not None:
-                parsed_last_report = parse_inverter_last_report(
-                    source.get("last_report")
-                )
-                if parsed_last_report is not None:
-                    row["last_reported"] = parsed_last_report
-            rows[key] = row
-            synced_count += 1
-            if key not in order:
-                order.append(key)
-
-            normalized_status = self._coerce_optional_text(row.get("status_normalized"))
-            if normalized_status is None:
-                normalized_status = "unknown"
-            status_map[key] = normalized_status
-            status_text_map[key] = self._coerce_optional_text(row.get("status_text"))
-            severity = self._battery_status_severity_value(normalized_status)
-            if severity > worst_severity or worst_status is None:
-                worst_severity = severity
-                worst_status = normalized_status
-                worst_key = key
-
-        if synced_count == 0:
-            return
-
-        state._ac_battery_data = rows
-        state._ac_battery_order = list(dict.fromkeys(order))
-        details = dict(getattr(state, "_ac_battery_aggregate_status_details", {}) or {})
-        details.update(
-            {
-                "battery_count": len(rows),
-                "status_source": "battery_status",
-                "per_battery_status": status_map,
-                "per_battery_status_text": status_text_map,
-                "worst_storage_key": worst_key,
-                "worst_status": worst_status,
-                "battery_ids": {
-                    serial_key: snapshot.get("battery_id")
-                    for serial_key, snapshot in rows.items()
-                },
-            }
-        )
-        if "sleep_state" not in details:
-            details["sleep_state"] = getattr(state, "_ac_battery_sleep_state", None)
-        if "selected_sleep_min_soc" not in details:
-            details["selected_sleep_min_soc"] = getattr(
-                state, "_ac_battery_selected_sleep_min_soc", None
-            )
-        state._ac_battery_aggregate_status_details = details
-        state._ac_battery_aggregate_status = worst_status or "unknown"
-        self._ac_battery_runtime.refresh_ac_battery_summary()
 
     def parse_battery_site_settings_payload(self, payload: object) -> None:
         state = self.battery_state

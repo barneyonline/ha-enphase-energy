@@ -369,22 +369,17 @@ class CoordinatorDiagnostics:
             return begin is not None and end is not None
 
         battery_type_available = _type_available_for_entities("encharge")
-        ac_battery_type_available = _type_available_for_entities("ac_battery")
         battery_write_access = _battery_write_access_confirmed()
         battery_sensor_base_available = _site_sensor_base_available("encharge")
-        ac_battery_sensor_base_available = _site_sensor_base_available("ac_battery")
         battery_status_summary = coord.battery_status_summary
-        ac_battery_status_summary = coord.ac_battery_status_summary
         battery_aggregate_charge = coord.battery_aggregate_charge_pct
         battery_aggregate_status = coord.battery_aggregate_status
-        ac_battery_aggregate_status = coord.ac_battery_aggregate_status
         battery_available_energy = _parsed_float(
             battery_status_summary.get("site_available_energy_kwh")
         )
         battery_available_power = _parsed_float(
             battery_status_summary.get("site_available_power_kw")
         )
-        ac_battery_power = _parsed_float(ac_battery_status_summary.get("power_w"))
         endpoint_family_health = self.endpoint_family_health_diagnostics()
         tariff_health = endpoint_family_health.get(TARIFF_ENDPOINT_FAMILY)
         tariff_service_status = "unknown"
@@ -782,51 +777,6 @@ class CoordinatorDiagnostics:
             "battery_status_details": dict(
                 getattr(coord, "_battery_aggregate_status_details", {}) or {}
             ),
-            "ac_battery_type_available_for_entities": ac_battery_type_available,
-            "ac_battery_overall_status_sensor_available": (
-                ac_battery_sensor_base_available
-                and ac_battery_aggregate_status is not None
-            ),
-            "ac_battery_power_sensor_available": (
-                ac_battery_sensor_base_available and ac_battery_power is not None
-            ),
-            "ac_battery_last_reported_sensor_available": (
-                ac_battery_sensor_base_available
-                and ac_battery_status_summary.get("latest_reported_utc") is not None
-            ),
-            "ac_battery_sleep_switch_available": (
-                _coordinator_available()
-                and ac_battery_type_available
-                and battery_write_access
-                and getattr(coord, "_battery_has_acb", None) is True
-                and coord.ac_battery_sleep_state is not None
-            ),
-            "ac_battery_target_soc_select_available": (
-                _coordinator_available()
-                and ac_battery_type_available
-                and battery_write_access
-                and getattr(coord, "_battery_has_acb", None) is True
-            ),
-            "ac_battery_status_aggregate_state": getattr(
-                coord, "_ac_battery_aggregate_status", None
-            ),
-            "ac_battery_count": len(getattr(coord, "_ac_battery_data", {}) or {}),
-            "ac_battery_selected_sleep_min_soc": coord.ac_battery_selected_sleep_min_soc,
-            "ac_battery_sleep_state": coord.ac_battery_sleep_state,
-            "ac_battery_control_pending": coord.ac_battery_control_pending,
-            "ac_battery_status_details": {
-                "battery_count": ac_battery_status_summary.get("battery_count"),
-                "sleep_state": ac_battery_status_summary.get("sleep_state"),
-                "selected_sleep_min_soc": ac_battery_status_summary.get(
-                    "selected_sleep_min_soc"
-                ),
-                "worst_status": ac_battery_status_summary.get("worst_status"),
-                "power_w": ac_battery_status_summary.get("power_w"),
-                "latest_reported_utc": ac_battery_status_summary.get(
-                    "latest_reported_utc"
-                ),
-            },
-            "ac_battery_last_command": getattr(coord, "_ac_battery_last_command", None),
             "battery_backup_history_count": len(
                 getattr(coord, "_battery_backup_history_events", []) or []
             ),

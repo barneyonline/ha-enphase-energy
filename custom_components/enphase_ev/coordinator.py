@@ -833,8 +833,7 @@ class EnphaseCoordinator(
                     selected_normalized = normalize_type_key(key)
                     if selected_normalized:
                         selected_keys.add(selected_normalized)
-                if selected_keys:
-                    self._selected_type_keys = selected_keys
+                self._selected_type_keys = selected_keys
 
         self.site_name = config.get(CONF_SITE_NAME)
         self._email = config.get(CONF_EMAIL)
@@ -921,7 +920,6 @@ class EnphaseCoordinator(
                 _topology_snapshot_cache=CoordinatorTopologySnapshot(
                     charger_serials=(),
                     battery_serials=(),
-                    ac_battery_serials=(),
                     inverter_serials=(),
                     active_type_keys=(),
                     gateway_iq_router_keys=(),
@@ -1409,7 +1407,7 @@ class EnphaseCoordinator(
             }
         elif isinstance(raw_selected, str):
             normalized_type = normalize_type_key(raw_selected)
-            selected = {normalized_type} if normalized_type else None
+            selected = {normalized_type} if normalized_type else set()
         self._selected_type_keys = selected
         self.site_name = config.get(CONF_SITE_NAME)
 
@@ -1574,33 +1572,6 @@ class EnphaseCoordinator(
                 stale_after_s=1800.0,
                 failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
                 max_backoff_s=3600.0,
-                support_state_on_success=True,
-            ),
-            "ac_battery_devices": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
-                stale_after_s=1800.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "ac_battery_telemetry": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
-                stale_after_s=1800.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "ac_battery_events": EndpointFamilyPolicy(
-                success_ttl_s=900.0,
-                stale_after_s=21600.0,
-                failure_backoff_schedule_s=(900.0, 1800.0, 3600.0, 7200.0),
-                max_backoff_s=7200.0,
-                optional=True,
-                suppress_after_failures=3,
                 support_state_on_success=True,
             ),
             "system_events": EndpointFamilyPolicy(
@@ -3306,15 +3277,6 @@ class EnphaseCoordinator(
             "devices_inventory_payload": getattr(
                 self, "_devices_inventory_payload", None
             ),
-            "ac_battery_devices_payload": getattr(
-                self, "_ac_battery_devices_payload", None
-            ),
-            "ac_battery_telemetry_payloads": getattr(
-                self, "_ac_battery_telemetry_payloads", None
-            ),
-            "ac_battery_events_payloads": getattr(
-                self, "_ac_battery_events_payloads", None
-            ),
         }
 
     def heatpump_runtime_diagnostics(self) -> dict[str, object]:
@@ -3840,7 +3802,7 @@ class EnphaseCoordinator(
         if getattr(self, "_battery_has_encharge", None) is False:
             return False
         selected = getattr(self, "_selected_type_keys", None)
-        if isinstance(selected, set) and selected:
+        if isinstance(selected, set):
             if self.site_only or not self.serials:
                 return "envoy" in selected
             return bool({"encharge", "envoy", "iqevse"} & selected)
@@ -6950,50 +6912,6 @@ class EnphaseCoordinator(
         return details
 
     @property
-    def ac_battery_aggregate_status(self) -> str | None:
-        value = getattr(self, "_ac_battery_aggregate_status", None)
-        if value is None:
-            return None
-        try:
-            text = str(value).strip().lower()
-        except Exception:  # noqa: BLE001
-            return None
-        return text or None
-
-    @property
-    def ac_battery_status_summary(self) -> dict[str, object]:
-        details = dict(getattr(self, "_ac_battery_aggregate_status_details", {}) or {})
-        details["aggregate_status"] = self.ac_battery_aggregate_status
-        details["battery_order"] = self.iter_ac_battery_serials()
-        details["power_w"] = getattr(self, "_ac_battery_power_w", None)
-        return details
-
-    @property
-    def ac_battery_summary_sample_utc(self) -> datetime | None:
-        value = getattr(self, "_ac_battery_summary_sample_utc", None)
-        return value if isinstance(value, datetime) else None
-
-    @property
-    def ac_battery_selected_sleep_min_soc(self) -> int | None:
-        value = getattr(self, "_ac_battery_selected_sleep_min_soc", None)
-        return helper_coerce_optional_int(value)
-
-    @property
-    def ac_battery_sleep_state(self) -> str | None:
-        value = getattr(self, "_ac_battery_sleep_state", None)
-        if value is None:
-            return None
-        try:
-            text = str(value).strip().lower()
-        except Exception:  # noqa: BLE001
-            return None
-        return text or None
-
-    @property
-    def ac_battery_control_pending(self) -> bool:
-        return bool(getattr(self, "_ac_battery_control_pending", False))
-
-    @property
     def battery_profile_option_keys(self) -> list[str]:
         options: list[str] = ["self-consumption"]
         if getattr(self, "_battery_show_savings_mode", None):
@@ -8383,24 +8301,6 @@ class EnphaseCoordinator(
             out.append(key)
         return out
 
-    def iter_ac_battery_serials(self) -> list[str]:
-        """Return active AC Battery identities in a stable order."""
-
-        order = getattr(self, "_ac_battery_order", None)
-        snapshots = getattr(self, "_ac_battery_data", None)
-        if not isinstance(order, list) or not isinstance(snapshots, dict):
-            return []
-        out: list[str] = []
-        for item in order:
-            try:
-                key = str(item).strip()
-            except Exception:  # noqa: BLE001
-                continue
-            if not key or key not in snapshots:
-                continue
-            out.append(key)
-        return out
-
     def battery_storage(
         self, serial: str
     ) -> dict[str, object] | None:  # pragma: no cover
@@ -8426,40 +8326,6 @@ class EnphaseCoordinator(
                     continue
                 out[detail_key] = detail_value
         return out
-
-    def ac_battery_storage(self, serial: str) -> dict[str, object] | None:
-        """Return normalized AC Battery snapshot for an active battery identity."""
-
-        snapshots = getattr(self, "_ac_battery_data", None)
-        if not isinstance(snapshots, dict):
-            return None
-        try:
-            key = str(serial).strip()
-        except Exception:  # noqa: BLE001
-            return None
-        if not key:
-            return None
-        payload = snapshots.get(key)
-        if not isinstance(payload, dict):
-            return None
-        return dict(payload)
-
-    async def async_ensure_ac_battery_diagnostics(self) -> None:
-        if (
-            isinstance(getattr(self, "_ac_battery_devices_payload", None), dict)
-            and isinstance(getattr(self, "_ac_battery_telemetry_payloads", None), dict)
-            and isinstance(getattr(self, "_ac_battery_events_payloads", None), dict)
-        ):
-            return
-        await self.battery_runtime.async_refresh_ac_battery_devices(force=True)
-        await self.battery_runtime.async_refresh_ac_battery_telemetry(force=True)
-        await self.battery_runtime.async_refresh_ac_battery_events(force=True)
-
-    async def async_set_ac_battery_sleep_mode(self, enabled: bool) -> None:
-        await self.battery_runtime.async_set_ac_battery_sleep_mode(enabled)
-
-    async def async_set_ac_battery_target_soc(self, value: int) -> None:
-        await self.battery_runtime.async_set_ac_battery_target_soc(value)
 
     def get_desired_charging(self, sn: str) -> bool | None:
         return self.evse_runtime.get_desired_charging(sn)

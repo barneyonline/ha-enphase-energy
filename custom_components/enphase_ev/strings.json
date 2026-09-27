@@ -40,7 +40,6 @@
         "data": {
           "type_envoy": "Gateway",
           "type_encharge": "Battery",
-          "type_ac_battery": "AC Battery",
           "type_iqevse": "EV Chargers",
           "type_heatpump": "Heat Pump",
           "type_microinverter": "Microinverters",
@@ -49,7 +48,6 @@
         "data_description": {
           "type_envoy": "Includes gateway connectivity and meter diagnostics.",
           "type_encharge": "Includes battery status and control entities when available.",
-          "type_ac_battery": "Includes AC Battery sensors and sleep mode controls when available.",
           "type_iqevse": "Includes EV charger entities and controls.",
           "type_heatpump": "Includes heat pump status, diagnostics, and usage sensors.",
           "type_microinverter": "Includes microinverter connectivity, active count, and lifetime production sensors.",
@@ -138,9 +136,6 @@
     },
     "battery_schedule_overlap": {
       "message": "Schedule overlaps with the existing {schedule_label}. Adjust or disable that schedule first."
-    },
-    "ac_battery_unavailable": {
-      "message": "No AC Battery devices are currently available."
     },
     "auth_settings_service_unavailable": {
       "message": "Authentication settings are unavailable while the Enphase service is down."
@@ -361,9 +356,6 @@
     "scheduler_service_unavailable": {
       "message": "Charging mode selection is unavailable while the Enphase scheduler service is down."
     },
-    "selected_ac_battery_target_state_of_charge_unavailable": {
-      "message": "Selected AC Battery target state of charge is not available."
-    },
     "battery_schedule_day_required": {
       "message": "Select at least one day for the schedule."
     },
@@ -517,7 +509,6 @@
         "data": {
           "type_envoy": "Gateway",
           "type_encharge": "Battery",
-          "type_ac_battery": "AC Battery",
           "type_iqevse": "EV Chargers",
           "type_heatpump": "Heat Pump",
           "type_microinverter": "Microinverters",
@@ -537,7 +528,6 @@
         "data_description": {
           "type_envoy": "Includes gateway connectivity and meter diagnostics.",
           "type_encharge": "Includes battery status and control entities when available.",
-          "type_ac_battery": "Includes AC Battery sensors and sleep mode controls when available.",
           "type_iqevse": "Includes EV charger entities and controls.",
           "type_heatpump": "Includes heat pump status, diagnostics, and usage sensors.",
           "type_microinverter": "Includes microinverter connectivity, active count, and lifetime production sensors.",
@@ -582,7 +572,6 @@
             "data": {
               "type_envoy": "Gateway",
               "type_encharge": "Battery",
-              "type_ac_battery": "AC Battery",
               "type_iqevse": "EV Chargers",
               "type_heatpump": "Heat Pump",
               "type_microinverter": "Microinverters"
@@ -590,7 +579,6 @@
             "data_description": {
               "type_envoy": "Includes gateway connectivity and meter diagnostics.",
               "type_encharge": "Includes battery status and control entities when available.",
-              "type_ac_battery": "Includes AC Battery sensors and sleep mode controls when available.",
               "type_iqevse": "Includes EV charger entities and controls.",
               "type_heatpump": "Includes heat pump status, diagnostics, and usage sensors.",
               "type_microinverter": "Includes microinverter connectivity, active count, and lifetime production sensors."
@@ -601,7 +589,6 @@
           "devices": "Devices",
           "type_envoy": "Gateway",
           "type_encharge": "Battery",
-          "type_ac_battery": "AC Battery",
           "type_iqevse": "EV Chargers",
           "type_heatpump": "Heat Pump",
           "type_microinverter": "Microinverters"
@@ -609,7 +596,6 @@
         "data_description": {
           "type_envoy": "Includes gateway connectivity and meter diagnostics.",
           "type_encharge": "Includes battery status and control entities when available.",
-          "type_ac_battery": "Includes AC Battery sensors and sleep mode controls when available.",
           "type_iqevse": "Includes EV charger entities and controls.",
           "type_heatpump": "Includes heat pump status, diagnostics, and usage sensors.",
           "type_microinverter": "Includes microinverter connectivity, active count, and lifetime production sensors."
@@ -1516,45 +1502,6 @@
       "battery_last_reported": {
         "name": "Battery Last Reported"
       },
-      "ac_battery_overall_status": {
-        "name": "AC Battery Overall Status",
-        "state": {
-          "normal": "Normal",
-          "warning": "Warning",
-          "error": "Error",
-          "unknown": "Unknown"
-        }
-      },
-      "ac_battery_power": {
-        "name": "AC Battery Power"
-      },
-      "ac_battery_last_reported": {
-        "name": "AC Battery Last Reported"
-      },
-      "ac_battery_storage_charge": {
-        "name": "AC Battery Charge Level"
-      },
-      "ac_battery_storage_status": {
-        "name": "{serial} Status",
-        "state": {
-          "normal": "Normal",
-          "warning": "Warning",
-          "error": "Error",
-          "unknown": "Unknown"
-        }
-      },
-      "ac_battery_storage_power": {
-        "name": "{serial} Power"
-      },
-      "ac_battery_storage_operating_mode": {
-        "name": "{serial} Operating Mode"
-      },
-      "ac_battery_storage_cycle_count": {
-        "name": "{serial} Cycle Count"
-      },
-      "ac_battery_storage_last_reported": {
-        "name": "{serial} Last Reported At"
-      },
       "system_controller_inventory": {
         "name": "System Controller"
       },
@@ -2338,9 +2285,6 @@
       "restrict_battery_discharge_schedule": {
         "name": "Restrict Battery Discharge Schedule"
       },
-      "ac_battery_sleep_mode": {
-        "name": "AC Battery Sleep Mode"
-      },
       "battery_schedule_edit_mon": {
         "name": "Battery Schedule Monday"
       },
@@ -2460,9 +2404,6 @@
       },
       "charge_mode": {
         "name": "Charge Mode"
-      },
-      "ac_battery_target_state_of_charge": {
-        "name": "AC Battery Target State of Charge"
       },
       "battery_schedule_selected": {
         "name": "Battery Schedule"

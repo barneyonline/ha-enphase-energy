@@ -26,7 +26,6 @@ from custom_components.enphase_ev.evse_schedule_editor import EvseScheduleEditor
 from custom_components.enphase_ev.evse_runtime import FAST_TOGGLE_POLL_HOLD_S
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from custom_components.enphase_ev.switch import (
-    AcBatterySleepModeSwitch,
     _is_disabled_by_integration,
     _migrated_switch_entity_id,
     _migrate_storm_guard_evse_entity_id,
@@ -211,8 +210,7 @@ def test_switch_helper_fallbacks_and_retained_site_keys() -> None:
     coord = SimpleNamespace(
         battery_has_encharge=True,
         inventory_view=SimpleNamespace(
-            has_type_for_entities=lambda type_key: type_key
-            in {"envoy", "encharge", "ac_battery"}
+            has_type_for_entities=lambda type_key: type_key in {"envoy", "encharge"}
         ),
         battery_write_access_confirmed=None,
         battery_user_is_owner=True,
@@ -237,7 +235,6 @@ def test_switch_helper_fallbacks_and_retained_site_keys() -> None:
         "charge_from_grid_schedule",
         "discharge_to_grid_schedule",
         "restrict_battery_discharge_schedule",
-        "ac_battery_sleep_mode",
     }
 
     coord.battery_write_access_confirmed = False
@@ -249,7 +246,6 @@ def test_switch_helper_fallbacks_and_retained_site_keys() -> None:
         "charge_from_grid_schedule",
         "discharge_to_grid_schedule",
         "restrict_battery_discharge_schedule",
-        "ac_battery_sleep_mode",
     }
 
     coord.battery_user_is_owner = False
@@ -373,87 +369,6 @@ def test_switch_pending_helper_edge_paths() -> None:
 
     coord._pending_charging = {RANDOM_SERIAL: (True, object())}  # noqa: SLF001
     assert switch_mod._pending_charging_state(coord, RANDOM_SERIAL) is None
-
-
-def test_ac_battery_sleep_mode_switch_state_and_attributes(coordinator_factory) -> None:
-    coord = coordinator_factory()
-    coord._battery_user_is_owner = True  # noqa: SLF001
-    coord._battery_has_acb = True  # noqa: SLF001
-    coord._selected_type_keys = {"ac_battery"}  # noqa: SLF001
-    coord._devices_inventory_ready = True  # noqa: SLF001
-    coord._ac_battery_sleep_state = "pending"  # noqa: SLF001
-    coord._ac_battery_control_pending = True  # noqa: SLF001
-    coord._ac_battery_selected_sleep_min_soc = 25  # noqa: SLF001
-    coord._ac_battery_aggregate_status_details = {  # noqa: SLF001
-        "sleep_state_raw": {"BAT-AC-1": "cancel"},
-        "sleep_state_map": {"BAT-AC-1": "pending"},
-    }
-    coord.async_set_ac_battery_sleep_mode = AsyncMock()
-
-    sw = AcBatterySleepModeSwitch(coord)
-
-    assert sw.available is True
-    assert sw.is_on is True
-    assert sw.extra_state_attributes["pending"] is True
-
-
-def test_ac_battery_sleep_mode_switch_edge_branches(coordinator_factory) -> None:
-    coord = coordinator_factory()
-    coord._battery_has_acb = False  # noqa: SLF001
-    coord._selected_type_keys = {"ac_battery"}  # noqa: SLF001
-    coord._devices_inventory_ready = True  # noqa: SLF001
-    coord._ac_battery_sleep_state = None  # noqa: SLF001
-
-    sw = AcBatterySleepModeSwitch(coord)
-
-    assert sw.suggested_object_id == "ac_battery_sleep_mode"
-    assert sw.available is False
-    assert sw.device_info["name"] == "AC Battery"
-
-    coord._battery_has_acb = True  # noqa: SLF001
-    coord.last_update_success = False
-    assert sw.available is False
-
-
-@pytest.mark.asyncio
-async def test_ac_battery_sleep_mode_switch_turn_on_off(coordinator_factory) -> None:
-    coord = coordinator_factory()
-    coord._battery_user_is_owner = True  # noqa: SLF001
-    coord._battery_has_acb = True  # noqa: SLF001
-    coord._selected_type_keys = {"ac_battery"}  # noqa: SLF001
-    coord._devices_inventory_ready = True  # noqa: SLF001
-    coord._ac_battery_sleep_state = "off"  # noqa: SLF001
-    coord.async_set_ac_battery_sleep_mode = AsyncMock()
-
-    sw = AcBatterySleepModeSwitch(coord)
-
-    await sw.async_turn_on()
-    coord.async_set_ac_battery_sleep_mode.assert_awaited_with(True)
-
-    await sw.async_turn_off()
-    coord.async_set_ac_battery_sleep_mode.assert_awaited_with(False)
-
-
-@pytest.mark.asyncio
-async def test_async_setup_entry_adds_ac_battery_sleep_mode_switch(
-    hass, config_entry, coordinator_factory
-) -> None:
-    coord = coordinator_factory()
-    coord._battery_user_is_owner = True  # noqa: SLF001
-    coord._battery_has_acb = True  # noqa: SLF001
-    coord._selected_type_keys = {"ac_battery"}  # noqa: SLF001
-    coord._devices_inventory_ready = True  # noqa: SLF001
-    coord._ac_battery_sleep_state = "on"  # noqa: SLF001
-    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
-
-    added: list = []
-
-    def _capture(entities, update_before_add=False):
-        added.extend(entities)
-
-    await async_setup_entry(hass, config_entry, _capture)
-
-    assert any(isinstance(entity, AcBatterySleepModeSwitch) for entity in added)
 
 
 @pytest.mark.asyncio

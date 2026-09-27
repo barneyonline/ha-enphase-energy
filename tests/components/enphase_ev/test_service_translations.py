@@ -63,8 +63,6 @@ def _intentional_identical_translation(
         and path.endswith(".state_attributes.source.name")
     ):
         return True
-    if locale == "de" and path == "entity.sensor.ac_battery_storage_status.name":
-        return value == "{serial} Status"
 
     shared_state_locales = {
         "Online": {"cs", "da", "de", "hu", "it", "nl", "pl", "pt-BR", "ro", "sv-SE"},
@@ -102,8 +100,6 @@ def _intentional_identical_translation(
         return locale in {"da", "de", "it", "nb-NO", "nl", "pt-BR", "ro", "sv-SE"}
 
     normal_paths = {
-        "entity.sensor.ac_battery_overall_status.state.normal",
-        "entity.sensor.ac_battery_storage_status.state.normal",
         "entity.sensor.battery_overall_status.state.normal",
         "entity.sensor.shared_labels.state.normal",
     }
@@ -111,8 +107,6 @@ def _intentional_identical_translation(
         return locale in {"da", "de", "es", "fr", "nb-NO", "pt-BR", "ro", "sv-SE"}
 
     error_paths = {
-        "entity.sensor.ac_battery_overall_status.state.error",
-        "entity.sensor.ac_battery_storage_status.state.error",
         "entity.sensor.battery_overall_status.state.error",
         "entity.sensor.battery_storage_status.state.error",
         "entity.sensor.shared_labels.state.error",
@@ -1494,7 +1488,6 @@ def test_translated_user_facing_errors_require_translation_keys() -> None:
         pathlib.Path(__file__).resolve().parents[3] / "custom_components" / "enphase_ev"
     )
     audited_files = [
-        "ac_battery_runtime.py",
         "battery_runtime.py",
         "evse_runtime.py",
         "select.py",
@@ -2244,7 +2237,6 @@ def test_options_device_category_strings_exist_for_all_locales() -> None:
         "options.step.devices.data_description.type_envoy",
         "options.step.devices.sections.devices.data.type_envoy",
         "options.step.devices.sections.devices.data.type_encharge",
-        "options.step.devices.sections.devices.data.type_ac_battery",
         "options.step.devices.sections.devices.data.type_iqevse",
         "options.step.devices.sections.devices.data.type_heatpump",
         "options.step.devices.sections.devices.data.type_microinverter",
@@ -2260,7 +2252,6 @@ def test_options_device_category_strings_exist_for_all_locales() -> None:
         "options.step.init.data.nominal_voltage",
         "options.step.devices.sections.devices.data_description.type_envoy",
         "options.step.devices.sections.devices.data_description.type_encharge",
-        "options.step.devices.sections.devices.data_description.type_ac_battery",
         "options.step.devices.sections.devices.data_description.type_iqevse",
         "options.step.devices.sections.devices.data_description.type_heatpump",
         "options.step.devices.sections.devices.data_description.type_microinverter",

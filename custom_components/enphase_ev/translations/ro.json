@@ -43,8 +43,7 @@
           "type_iqevse": "Încărcătoare",
           "type_microinverter": "Microinvertoare",
           "scan_interval": "Interval de scanare (s)",
-          "type_heatpump": "Pompă de căldură",
-          "type_ac_battery": "Baterie AC"
+          "type_heatpump": "Pompă de căldură"
         },
         "data_description": {
           "type_envoy": "Include conectivitatea gateway-ului și diagnosticul contoarelor.",
@@ -52,8 +51,7 @@
           "type_iqevse": "Include entități și controale pentru încărcătoarele EV.",
           "type_microinverter": "Include senzori pentru conectivitatea microinvertoarelor, numărul activ și producția pe durata de viață.",
           "scan_interval": "Secunde între interogările stării cloud. Implicit 60s.",
-          "type_heatpump": "Include senzori pentru starea, diagnosticarea și consumul pompei de căldură.",
-          "type_ac_battery": "Include senzori pentru bateria AC și controale pentru modul de repaus atunci când sunt disponibile."
+          "type_heatpump": "Include senzori pentru starea, diagnosticarea și consumul pompei de căldură."
         }
       }
     },
@@ -138,9 +136,6 @@
     },
     "battery_schedule_overlap": {
       "message": "Programul se suprapune peste {schedule_label} existent. Ajustați sau dezactivați mai întâi acel program."
-    },
-    "ac_battery_unavailable": {
-      "message": "În prezent, nu sunt disponibile dispozitive cu baterie AC."
     },
     "auth_settings_service_unavailable": {
       "message": "Setările de autentificare nu sunt disponibile în timp ce serviciul Enphase este oprit."
@@ -358,9 +353,6 @@
     "scheduler_service_unavailable": {
       "message": "Selectarea modului de încărcare nu este disponibilă cât timp serviciul de planificare Enphase este indisponibil."
     },
-    "selected_ac_battery_target_state_of_charge_unavailable": {
-      "message": "Starea de încărcare țintă a bateriei AC selectată nu este disponibilă."
-    },
     "battery_schedule_day_required": {
       "message": "Selectați cel puțin o zi pentru planificare."
     },
@@ -527,7 +519,6 @@
           "session_history_interval": "Interval istoric sesiuni (min)",
           "schedule_sync_enabled": "Activați asistența pentru programator",
           "type_heatpump": "Pompă de căldură",
-          "type_ac_battery": "Baterie AC",
           "battery_schedules_enabled": "Activați planificatorul bateriei",
           "degraded_service_repair_issues": "Activează reparațiile pentru servicii degradate",
           "weather_enabled": "Activează vremea",
@@ -546,7 +537,6 @@
           "nominal_voltage": "Tensiunea tipică de alimentare CA folosită pentru estimarea puterii când tensiunea în timp real nu este disponibilă.",
           "session_history_interval": "Minute de așteptare între preluările istoricului sesiunilor din cloud.",
           "type_heatpump": "Include senzori pentru starea, diagnosticarea și consumul pompei de căldură.",
-          "type_ac_battery": "Include senzori pentru bateria AC și controale pentru modul de repaus atunci când sunt disponibile.",
           "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate.",
           "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil.",
           "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor.",
@@ -582,7 +572,6 @@
             "data": {
               "type_envoy": "Gateway",
               "type_encharge": "Baterie",
-              "type_ac_battery": "Baterie AC",
               "type_iqevse": "Încărcătoare",
               "type_heatpump": "Pompă de căldură",
               "type_microinverter": "Microinvertoare"
@@ -590,7 +579,6 @@
             "data_description": {
               "type_envoy": "Include conectivitatea gateway-ului și diagnosticul contoarelor.",
               "type_encharge": "Include starea bateriei și entitățile de control când sunt disponibile.",
-              "type_ac_battery": "Include senzori pentru bateria AC și controale pentru modul de repaus atunci când sunt disponibile.",
               "type_iqevse": "Include entități și controale pentru încărcătoarele EV.",
               "type_heatpump": "Include senzori pentru starea, diagnosticarea și consumul pompei de căldură.",
               "type_microinverter": "Include senzori pentru conectivitatea microinvertoarelor, numărul activ și producția pe durata de viață."
@@ -601,7 +589,6 @@
           "devices": "Selectați dispozitive",
           "type_envoy": "Gateway",
           "type_encharge": "Baterie",
-          "type_ac_battery": "Baterie AC",
           "type_iqevse": "Încărcătoare",
           "type_heatpump": "Pompă de căldură",
           "type_microinverter": "Microinvertoare"
@@ -609,7 +596,6 @@
         "data_description": {
           "type_envoy": "Include conectivitatea gateway-ului și diagnosticul contoarelor.",
           "type_encharge": "Include starea bateriei și entitățile de control când sunt disponibile.",
-          "type_ac_battery": "Include senzori pentru bateria AC și controale pentru modul de repaus atunci când sunt disponibile.",
           "type_iqevse": "Include entități și controale pentru încărcătoarele EV.",
           "type_heatpump": "Include senzori pentru starea, diagnosticarea și consumul pompei de căldură.",
           "type_microinverter": "Include senzori pentru conectivitatea microinvertoarelor, numărul activ și producția pe durata de viață."
@@ -1855,45 +1841,6 @@
           "pairing": "Împerechere"
         }
       },
-      "ac_battery_overall_status": {
-        "name": "Starea generală a bateriei AC",
-        "state": {
-          "normal": "Normal",
-          "warning": "Avertizare",
-          "error": "Eroare",
-          "unknown": "Necunoscut"
-        }
-      },
-      "ac_battery_power": {
-        "name": "Puterea bateriei AC"
-      },
-      "ac_battery_last_reported": {
-        "name": "Ultimul raport al bateriei AC"
-      },
-      "ac_battery_storage_charge": {
-        "name": "Nivelul de încărcare al bateriei AC"
-      },
-      "ac_battery_storage_status": {
-        "name": "Starea {serial}",
-        "state": {
-          "normal": "Normal",
-          "warning": "Avertizare",
-          "error": "Eroare",
-          "unknown": "Necunoscut"
-        }
-      },
-      "ac_battery_storage_power": {
-        "name": "Puterea {serial}"
-      },
-      "ac_battery_storage_operating_mode": {
-        "name": "Modul de funcționare al {serial}"
-      },
-      "ac_battery_storage_cycle_count": {
-        "name": "Numărul de cicluri al {serial}"
-      },
-      "ac_battery_storage_last_reported": {
-        "name": "Ultimul raport pentru {serial}"
-      },
       "battery_cfg_schedules": {
         "name": "Planificări CFG baterie"
       },
@@ -2338,9 +2285,6 @@
       "restrict_battery_discharge_schedule": {
         "name": "Program de restricționare a descărcării bateriei"
       },
-      "ac_battery_sleep_mode": {
-        "name": "Modul de repaus al bateriei AC"
-      },
       "evse_schedule_edit_mon": {
         "name": "Programare luni"
       },
@@ -2411,9 +2355,6 @@
       },
       "system_profile": {
         "name": "Profil de sistem"
-      },
-      "ac_battery_target_state_of_charge": {
-        "name": "Starea de încărcare țintă a bateriei AC"
       },
       "evse_schedule_selected": {
         "name": "Programare"

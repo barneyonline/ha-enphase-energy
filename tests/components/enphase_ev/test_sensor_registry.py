@@ -80,12 +80,7 @@ def test_sensor_registry_serial_parsers_ignore_non_string_unique_ids() -> None:
         helper.battery_sensor_unique_id("BAT-1", "_status")
         == f"{DOMAIN}_site_{SITE_ID}_battery_BAT-1_status"
     )
-    assert (
-        helper.ac_battery_sensor_unique_id("ACBAT-1", "_status")
-        == f"{DOMAIN}_site_{SITE_ID}_ac_battery_ACBAT-1_status"
-    )
     assert helper.battery_serial_from_unique_id(None) is None
-    assert helper.ac_battery_serial_from_unique_id(None) is None
 
 
 def test_sensor_registry_syncs_microinverter_sensor_options() -> None:
@@ -357,7 +352,7 @@ def test_sensor_registry_prunes_removed_charger_sensor_entities() -> None:
     assert helper.charger_serial_from_unique_id(f"{DOMAIN}_EV_unknown") is None
 
 
-def test_sensor_registry_prunes_battery_ac_battery_and_inverter_entities() -> None:
+def test_sensor_registry_prunes_battery_and_inverter_entities() -> None:
     registry = FakeRegistry(
         {
             "sensor.battery_old_status": _entry(
@@ -375,14 +370,6 @@ def test_sensor_registry_prunes_battery_ac_battery_and_inverter_entities() -> No
             "sensor.battery_missing_status": _entry(
                 "sensor.battery_missing_status",
                 f"{DOMAIN}_site_{SITE_ID}_battery_MISSING_status",
-            ),
-            "sensor.ac_battery_old_status": _entry(
-                "sensor.ac_battery_old_status",
-                f"{DOMAIN}_site_{SITE_ID}_ac_battery_ACOLD_status",
-            ),
-            "sensor.ac_battery_missing_power": _entry(
-                "sensor.ac_battery_missing_power",
-                f"{DOMAIN}_site_{SITE_ID}_ac_battery_ACMISSING_power",
             ),
             "sensor.inverter_old_lifetime": _entry(
                 "sensor.inverter_old_lifetime",
@@ -405,13 +392,10 @@ def test_sensor_registry_prunes_battery_ac_battery_and_inverter_entities() -> No
     )
     helper = _helper(registry)
     helper.known_battery_serials.update({"KEEP", "MISSING"})
-    helper.known_ac_battery_serials.update({"ACKEEP", "ACMISSING"})
     helper.known_inverter_serials.update({"INVKEEP", "INVMISSING"})
 
     helper.prune_battery_registry_once({"KEEP"})
     helper.remove_missing_battery_entities({"KEEP"})
-    helper.prune_ac_battery_registry_once({"ACKEEP"})
-    helper.remove_missing_ac_battery_entities({"ACKEEP"})
     assert helper.inverter_lifetime_sensor_unique_id("INV") == (
         f"{DOMAIN}_inverter_INV_lifetime_energy"
     )
@@ -424,17 +408,13 @@ def test_sensor_registry_prunes_battery_ac_battery_and_inverter_entities() -> No
             "sensor.battery_old_status",
             "sensor.battery_retired_last_reported",
             "sensor.battery_missing_status",
-            "sensor.ac_battery_old_status",
-            "sensor.ac_battery_missing_power",
             "sensor.inverter_old_lifetime",
             "sensor.inverter_missing_lifetime",
         }
     )
     assert helper.known_battery_serials == {"KEEP"}
-    assert helper.known_ac_battery_serials == {"ACKEEP"}
     assert helper.known_inverter_serials == {"INVKEEP"}
     assert helper.battery_registry_pruned is True
-    assert helper.ac_battery_registry_pruned is True
     assert helper.inverter_registry_pruned is True
 
 

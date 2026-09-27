@@ -322,88 +322,6 @@ def test_explicit_charge_mode_handles_bad_data() -> None:
     assert _explicit_charge_mode(BadDataCoordinator(), RANDOM_SERIAL) is None
 
 
-def test_ac_battery_target_state_of_charge_select_state_and_options(
-    coordinator_factory,
-) -> None:
-    from custom_components.enphase_ev.select import AcBatteryTargetStateOfChargeSelect
-
-    coord = coordinator_factory()
-    coord._battery_user_is_owner = True  # noqa: SLF001
-    coord._battery_has_acb = True  # noqa: SLF001
-    coord._selected_type_keys = {"ac_battery"}  # noqa: SLF001
-    coord._devices_inventory_ready = True  # noqa: SLF001
-    coord._ac_battery_selected_sleep_min_soc = 25  # noqa: SLF001
-    coord._ac_battery_sleep_state = "pending"  # noqa: SLF001
-    coord._ac_battery_control_pending = True  # noqa: SLF001
-
-    sel = AcBatteryTargetStateOfChargeSelect(coord)
-
-    assert sel.available is True
-    assert "25-30%" in sel.options
-    assert sel.current_option == "25-30%"
-    assert sel.extra_state_attributes["selected_sleep_min_soc"] == 25
-
-
-@pytest.mark.asyncio
-async def test_ac_battery_target_state_of_charge_select_updates_runtime(
-    coordinator_factory,
-) -> None:
-    from custom_components.enphase_ev.select import AcBatteryTargetStateOfChargeSelect
-
-    coord = coordinator_factory()
-    coord._battery_user_is_owner = True  # noqa: SLF001
-    coord._battery_has_acb = True  # noqa: SLF001
-    coord._selected_type_keys = {"ac_battery"}  # noqa: SLF001
-    coord._devices_inventory_ready = True  # noqa: SLF001
-    coord.async_set_ac_battery_target_soc = AsyncMock()
-
-    sel = AcBatteryTargetStateOfChargeSelect(coord)
-
-    await sel.async_select_option("30-35%")
-    coord.async_set_ac_battery_target_soc.assert_awaited_once_with(30)
-
-
-def test_ac_battery_target_state_of_charge_select_edge_branches(
-    coordinator_factory,
-) -> None:
-    from custom_components.enphase_ev.select import AcBatteryTargetStateOfChargeSelect
-
-    coord = coordinator_factory()
-    coord._battery_has_acb = False  # noqa: SLF001
-    coord._selected_type_keys = {"ac_battery"}  # noqa: SLF001
-    coord._devices_inventory_ready = True  # noqa: SLF001
-    coord._ac_battery_selected_sleep_min_soc = 101  # noqa: SLF001
-
-    sel = AcBatteryTargetStateOfChargeSelect(coord)
-
-    assert sel.suggested_object_id == "ac_battery_target_state_of_charge"
-    assert sel.available is False
-    assert sel.current_option is None
-    assert sel.device_info["name"] == "AC Battery"
-
-    coord._battery_has_acb = True  # noqa: SLF001
-    coord.last_update_success = False
-    assert sel.available is False
-
-
-@pytest.mark.asyncio
-async def test_ac_battery_target_state_of_charge_select_rejects_invalid_option(
-    coordinator_factory,
-) -> None:
-    from custom_components.enphase_ev.select import AcBatteryTargetStateOfChargeSelect
-
-    coord = coordinator_factory()
-    coord._battery_user_is_owner = True  # noqa: SLF001
-    coord._battery_has_acb = True  # noqa: SLF001
-    coord._selected_type_keys = {"ac_battery"}  # noqa: SLF001
-    coord._devices_inventory_ready = True  # noqa: SLF001
-
-    sel = AcBatteryTargetStateOfChargeSelect(coord)
-
-    with pytest.raises(ServiceValidationError, match="not available"):
-        await sel.async_select_option("invalid")
-
-
 def test_charge_mode_select_current_option_paths(coordinator_factory):
     from custom_components.enphase_ev.const import STORM_GUARD_CACHE_TTL
     from custom_components.enphase_ev.select import ChargeModeSelect
@@ -895,50 +813,6 @@ async def test_select_platform_retains_system_profile_while_permission_unknown(
     assert sum(isinstance(entity, SystemProfileSelect) for entity in flat_added) == 1
     active_unique_ids = prune_spy.call_args.kwargs["active_unique_ids"]
     assert system_profile_unique_id in active_unique_ids
-
-
-@pytest.mark.asyncio
-async def test_select_platform_adds_ac_battery_target_soc_select(
-    hass, config_entry, coordinator_factory
-) -> None:
-    from custom_components.enphase_ev.select import (
-        AcBatteryTargetStateOfChargeSelect,
-        async_setup_entry,
-    )
-
-    coord = coordinator_factory(serials=["1111"])
-    coord._battery_has_acb = True  # noqa: SLF001
-    coord._battery_user_is_owner = True  # noqa: SLF001
-    coord._selected_type_keys = {"ac_battery"}  # noqa: SLF001
-    coord._devices_inventory_ready = True  # noqa: SLF001
-    added: list[list[object]] = []
-    topology_callbacks: list[object] = []
-    update_callbacks: list[object] = []
-
-    def capture_add(entities, update_before_add=False):
-        added.append(list(entities))
-
-    def capture_topology(callback, *, context=None):
-        topology_callbacks.append(callback)
-        return lambda: None
-
-    def capture_update(callback, *, context=None):
-        update_callbacks.append(callback)
-        return lambda: None
-
-    coord.async_add_topology_listener = capture_topology  # type: ignore[attr-defined]
-    coord.async_add_listener = capture_update  # type: ignore[attr-defined]
-    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
-
-    await async_setup_entry(hass, config_entry, capture_add)
-
-    assert any(
-        isinstance(entity, AcBatteryTargetStateOfChargeSelect)
-        for group in added
-        for entity in group
-    )
-    assert len(topology_callbacks) == 1
-    assert len(update_callbacks) == 1
 
 
 @pytest.mark.asyncio

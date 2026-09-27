@@ -16,7 +16,6 @@ from custom_components.enphase_ev import (
 )
 from custom_components.enphase_ev.const import CONF_SITE_ID
 from custom_components.enphase_ev.serial_discovery import (
-    active_ac_battery_serials_for_cleanup,
     active_battery_serials_for_cleanup,
     active_charger_serials_for_cleanup,
     active_inverter_serials_for_cleanup,
@@ -76,7 +75,6 @@ async def test_remove_empty_inactive_serial_devices_keeps_devices_with_entities(
         inventory_view=SimpleNamespace(has_type_for_entities=lambda _key: False),
         iter_serials=lambda: [active_serial],
         iter_battery_serials=lambda: [],
-        iter_ac_battery_serials=lambda: [],
         iter_inverter_serials=lambda: [],
     )
 
@@ -148,7 +146,6 @@ async def test_remove_empty_inactive_serial_devices_preserves_active_supported_d
         _inverters_inventory_payload={},
         iter_serials=lambda: [],
         iter_battery_serials=lambda: [active_battery],
-        iter_ac_battery_serials=lambda: [],
         iter_inverter_serials=lambda: [active_inverter],
     )
 
@@ -186,8 +183,6 @@ async def test_prune_inactive_serial_entities_removes_retired_charger_entities(
     inactive_serial = "EV-RETIRED"
     active_battery = "BAT-ACTIVE"
     inactive_battery = "BAT-RETIRED"
-    active_ac_battery = "ACBAT-ACTIVE"
-    inactive_ac_battery = "ACBAT-RETIRED"
     active_inverter = "INV-ACTIVE"
     inactive_inverter = "INV-RETIRED"
     coord = SimpleNamespace(
@@ -198,12 +193,10 @@ async def test_prune_inactive_serial_entities_removes_retired_charger_entities(
         ),
         _battery_status_payload={},
         battery_has_acb=True,
-        _ac_battery_devices_payload={},
         include_inverters=True,
         _inverters_inventory_payload={},
         iter_serials=lambda: [active_serial],
         iter_battery_serials=lambda: [active_battery],
-        iter_ac_battery_serials=lambda: [active_ac_battery],
         iter_inverter_serials=lambda: [active_inverter],
     )
 
@@ -261,18 +254,6 @@ async def test_prune_inactive_serial_entities_removes_retired_charger_entities(
         f"{DOMAIN}_site_{site_id}_battery_{active_battery}_status",
         config_entry=config_entry,
     )
-    stale_ac_battery_sensor = ent_reg.async_get_or_create(
-        "sensor",
-        DOMAIN,
-        f"{DOMAIN}_site_{site_id}_ac_battery_{inactive_ac_battery}_power",
-        config_entry=config_entry,
-    )
-    active_ac_battery_sensor = ent_reg.async_get_or_create(
-        "sensor",
-        DOMAIN,
-        f"{DOMAIN}_site_{site_id}_ac_battery_{active_ac_battery}_power",
-        config_entry=config_entry,
-    )
     stale_inverter_sensor = ent_reg.async_get_or_create(
         "sensor",
         DOMAIN,
@@ -280,18 +261,16 @@ async def test_prune_inactive_serial_entities_removes_retired_charger_entities(
         config_entry=config_entry,
     )
 
-    assert _prune_inactive_serial_entities(hass, config_entry, coord, site_id) == 5
+    assert _prune_inactive_serial_entities(hass, config_entry, coord, site_id) == 4
 
     assert ent_reg.async_get(stale_sensor.entity_id) is None
     assert ent_reg.async_get(stale_binary.entity_id) is None
     assert ent_reg.async_get(stale_battery_sensor.entity_id) is None
-    assert ent_reg.async_get(stale_ac_battery_sensor.entity_id) is None
     assert ent_reg.async_get(stale_inverter_sensor.entity_id) is None
     assert ent_reg.async_get(active_sensor.entity_id) is not None
     assert ent_reg.async_get(active_connector_sensor.entity_id) is not None
     assert ent_reg.async_get(active_authentication_sensor.entity_id) is not None
     assert ent_reg.async_get(active_battery_sensor.entity_id) is not None
-    assert ent_reg.async_get(active_ac_battery_sensor.entity_id) is not None
     assert ent_reg.async_get(site_sensor.entity_id) is not None
     assert ent_reg.async_get(inverter_sensor.entity_id) is not None
 
@@ -305,7 +284,6 @@ async def test_prune_inactive_serial_entities_skips_unknown_device_families(
     ent_reg = er.async_get(hass)
     inactive_serial = "EV-RETIRED"
     inactive_battery = "BAT-UNKNOWN"
-    inactive_ac_battery = "ACBAT-UNKNOWN"
     inactive_inverter = "INV-UNKNOWN"
     coord = SimpleNamespace(
         _devices_inventory_ready=True,
@@ -316,11 +294,9 @@ async def test_prune_inactive_serial_entities_skips_unknown_device_families(
         battery_has_acb=ac_capability,
         include_inverters=True,
         _battery_status_payload=None,
-        _ac_battery_devices_payload=None,
         _inverters_inventory_payload=None,
         iter_serials=lambda: [RANDOM_SERIAL],
         iter_battery_serials=lambda: [],
-        iter_ac_battery_serials=lambda: [],
         iter_inverter_serials=lambda: [],
     )
 
@@ -336,12 +312,6 @@ async def test_prune_inactive_serial_entities_skips_unknown_device_families(
         f"{DOMAIN}_site_{site_id}_battery_{inactive_battery}_status",
         config_entry=config_entry,
     )
-    stale_ac_battery_sensor = ent_reg.async_get_or_create(
-        "sensor",
-        DOMAIN,
-        f"{DOMAIN}_site_{site_id}_ac_battery_{inactive_ac_battery}_status",
-        config_entry=config_entry,
-    )
     stale_inverter_sensor = ent_reg.async_get_or_create(
         "sensor",
         DOMAIN,
@@ -352,14 +322,12 @@ async def test_prune_inactive_serial_entities_skips_unknown_device_families(
     assert active_serial_registry_identifiers(coord) == {
         "charger": {RANDOM_SERIAL},
         "battery": None,
-        "ac_battery": None,
         "inverter": None,
     }
     assert _prune_inactive_serial_entities(hass, config_entry, coord, site_id) == 1
 
     assert ent_reg.async_get(stale_charger_sensor.entity_id) is None
     assert ent_reg.async_get(stale_battery_sensor.entity_id) is not None
-    assert ent_reg.async_get(stale_ac_battery_sensor.entity_id) is not None
     assert ent_reg.async_get(stale_inverter_sensor.entity_id) is not None
 
 
@@ -385,11 +353,9 @@ async def test_remove_empty_inactive_serial_devices_waits_for_authoritative_fami
         battery_has_acb=True,
         include_inverters=True,
         _battery_status_payload=None,
-        _ac_battery_devices_payload=None,
         _inverters_inventory_payload=None,
         iter_serials=lambda: [],
         iter_battery_serials=lambda: [],
-        iter_ac_battery_serials=lambda: [],
         iter_inverter_serials=lambda: [],
     )
 
@@ -552,7 +518,6 @@ def test_serial_registry_identifier_helpers_cover_edge_paths(config_entry) -> No
     ) == {
         "charger": None,
         "battery": None,
-        "ac_battery": None,
         "inverter": None,
     }
     assert (
@@ -574,19 +539,6 @@ def test_serial_registry_identifier_helpers_cover_edge_paths(config_entry) -> No
             )
         )["charger"]
         is None
-    )
-    assert (
-        active_serial_registry_identifiers(
-            SimpleNamespace(
-                _devices_inventory_ready=True,
-                inventory_view=SimpleNamespace(
-                    has_type_for_entities=lambda key: key == "ac_battery"
-                ),
-                battery_has_acb=False,
-                iter_serials=lambda: [],
-            )
-        )["ac_battery"]
-        == set()
     )
     assert (
         active_serial_registry_identifiers(
@@ -691,58 +643,6 @@ def test_serial_registry_identifier_helpers_cover_edge_paths(config_entry) -> No
         )
         == set()
     )
-    assert active_ac_battery_serials_for_cleanup(
-        SimpleNamespace(
-            _devices_inventory_ready=True,
-            inventory_view=SimpleNamespace(
-                has_type_for_entities=lambda key: key == "ac_battery"
-            ),
-            battery_has_acb=True,
-            _ac_battery_devices_payload={},
-            iter_ac_battery_serials=lambda: ["ACBAT-1"],
-        )
-    ) == {"ACBAT-1"}
-    assert (
-        active_ac_battery_serials_for_cleanup(
-            SimpleNamespace(
-                _devices_inventory_ready=True,
-                inventory_view=SimpleNamespace(
-                    has_type_for_entities=lambda _key: False
-                ),
-                battery_has_acb=True,
-                iter_ac_battery_serials=lambda: ["ACBAT-STALE"],
-            )
-        )
-        is None
-    )
-    assert (
-        active_ac_battery_serials_for_cleanup(
-            SimpleNamespace(
-                _devices_inventory_ready=True,
-                _selected_type_keys={"iqevse"},
-                inventory_view=SimpleNamespace(
-                    has_type_for_entities=lambda _key: False
-                ),
-                battery_has_acb=True,
-                iter_ac_battery_serials=lambda: ["ACBAT-STALE"],
-            )
-        )
-        == set()
-    )
-    assert (
-        active_ac_battery_serials_for_cleanup(
-            SimpleNamespace(
-                _devices_inventory_ready=True,
-                inventory_view=SimpleNamespace(
-                    has_type_for_entities=lambda _key: False
-                ),
-                battery_has_acb=True,
-                _ac_battery_devices_payload={},
-                iter_ac_battery_serials=lambda: [],
-            )
-        )
-        == set()
-    )
     assert active_inverter_serials_for_cleanup(
         SimpleNamespace(
             _devices_inventory_ready=True,
@@ -804,7 +704,6 @@ def test_serial_registry_identifier_helpers_cover_edge_paths(config_entry) -> No
         _battery_status_payload={},
         iter_serials=lambda: BadIter(),
         iter_battery_serials=lambda: [None, " BAT-1 "],
-        iter_ac_battery_serials=lambda: [],
         iter_inverter_serials=lambda: [],
     )
 
@@ -861,7 +760,6 @@ def test_remove_empty_inactive_serial_devices_handles_guard_paths(
         inventory_view=SimpleNamespace(has_type_for_entities=lambda _key: False),
         iter_serials=lambda: [],
         iter_battery_serials=lambda: [],
-        iter_ac_battery_serials=lambda: [],
         iter_inverter_serials=lambda: [],
     )
     assert (
@@ -949,3 +847,122 @@ def test_remove_empty_inactive_serial_devices_handles_guard_paths(
         )
         == 0
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("keep_device", [False, True])
+async def test_retire_ac_battery_entities_preserves_other_families_and_owners(
+    hass: HomeAssistant, config_entry, keep_device: bool
+) -> None:
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.enphase_ev.registry_migrations import (
+        _remove_retired_ac_battery_entities,
+    )
+
+    site_id = config_entry.data[CONF_SITE_ID]
+    dev_reg = dr.async_get(hass)
+    ent_reg = er.async_get(hass)
+    device = dev_reg.async_get_or_create(
+        config_entry_id=config_entry.entry_id,
+        identifiers={(DOMAIN, f"type:{site_id}:ac_battery")},
+    )
+    other_entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "other"})
+    other_entry.add_to_hass(hass)
+    retired = [
+        ent_reg.async_get_or_create(
+            domain,
+            DOMAIN,
+            f"{DOMAIN}_site_{site_id}_{suffix}",
+            config_entry=config_entry,
+            device_id=device.id,
+        )
+        for domain, suffix in (
+            ("sensor", "ac_battery_overall_status"),
+            ("sensor", "ac_battery_BAT-1_charge_level"),
+            ("sensor", "ac_battery_BAT-1_last_reported_at"),
+            ("sensor", "type_ac_battery_inventory"),
+            ("switch", "ac_battery_sleep_mode"),
+            ("select", "ac_battery_target_state_of_charge"),
+        )
+    ]
+    retained = [
+        ent_reg.async_get_or_create(
+            "sensor",
+            platform,
+            unique_id,
+            config_entry=owner,
+        )
+        for platform, unique_id, owner in (
+            (
+                DOMAIN,
+                f"{DOMAIN}_site_{site_id}_battery_BAT-1_charge_level",
+                config_entry,
+            ),
+            (DOMAIN, f"{DOMAIN}_site_other_ac_battery_power", config_entry),
+            (DOMAIN, f"{DOMAIN}_site_{site_id}_ac_battery_other_entry", other_entry),
+            (
+                "other",
+                f"{DOMAIN}_site_{site_id}_ac_battery_other_platform",
+                config_entry,
+            ),
+        )
+    ]
+    if keep_device:
+        retained.append(
+            ent_reg.async_get_or_create(
+                "sensor",
+                "other",
+                "unrelated",
+                config_entry=config_entry,
+                device_id=device.id,
+            )
+        )
+
+    # Cleanup is idempotent and covers disabled/previously unavailable entities.
+    for _ in range(2):
+        _remove_retired_ac_battery_entities(hass, config_entry, dev_reg, site_id)
+    assert all(ent_reg.async_get(entity.entity_id) is None for entity in retired)
+    assert all(ent_reg.async_get(entity.entity_id) is not None for entity in retained)
+    assert (dev_reg.async_get(device.id) is not None) is keep_device
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("readiness", ["missing", "failed", "not_ready"])
+async def test_retire_ac_battery_without_successful_inventory(
+    hass: HomeAssistant, config_entry, readiness: str
+) -> None:
+    from custom_components.enphase_ev.registry_migrations import (
+        _complete_startup_migrations_if_ready,
+    )
+
+    site_id = config_entry.data[CONF_SITE_ID]
+    hass.config_entries.async_update_entry(
+        config_entry, data={**config_entry.data, "startup_migration_version": 6}
+    )
+    dev_reg = dr.async_get(hass)
+    ent_reg = er.async_get(hass)
+    device = dev_reg.async_get_or_create(
+        config_entry_id=config_entry.entry_id,
+        identifiers={(DOMAIN, f"type:{site_id}:ac_battery")},
+    )
+    entity = ent_reg.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{DOMAIN}_site_{site_id}_ac_battery_overall_status",
+        config_entry=config_entry,
+        device_id=device.id,
+    )
+    coord = SimpleNamespace()
+    if readiness == "failed":
+        coord.startup_migrations_ready = Mock(side_effect=RuntimeError("unavailable"))
+    elif readiness == "not_ready":
+        coord.startup_migrations_ready = Mock(return_value=False)
+    for _ in range(2):
+        _complete_startup_migrations_if_ready(
+            hass, config_entry, coord, dev_reg, site_id
+        )
+    assert ent_reg.async_get(entity.entity_id) is None
+    assert dev_reg.async_get(device.id) is None
+    # Inventory-dependent migrations must still run once inventory is available.
+    assert config_entry.data["startup_migration_version"] == 6

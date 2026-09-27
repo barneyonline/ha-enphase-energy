@@ -43,8 +43,7 @@
           "type_iqevse": "Ladegeräte",
           "type_microinverter": "Mikrowechselrichter",
           "scan_interval": "Abfrageintervall (s)",
-          "type_heatpump": "Wärmepumpe",
-          "type_ac_battery": "AC-Batterie"
+          "type_heatpump": "Wärmepumpe"
         },
         "data_description": {
           "type_envoy": "Enthält Gateway-Konnektivitäts- und Zählerdiagnosen.",
@@ -52,8 +51,7 @@
           "type_iqevse": "Enthält EV-Ladegeräte-Entitäten und Steuerungen.",
           "type_microinverter": "Enthält Sensoren für Mikrowechselrichter-Konnektivität, aktive Anzahl und Lebenszeit-Erzeugung.",
           "scan_interval": "Sekunden zwischen Cloud-Statusabfragen. Standard 60 s.",
-          "type_heatpump": "Enthält Sensoren für Wärmepumpenstatus, Diagnose und Verbrauch.",
-          "type_ac_battery": "Enthält AC-Batterie-Sensoren und Steuerelemente für den Schlafmodus, wenn verfügbar."
+          "type_heatpump": "Enthält Sensoren für Wärmepumpenstatus, Diagnose und Verbrauch."
         }
       }
     },
@@ -138,9 +136,6 @@
     },
     "battery_schedule_overlap": {
       "message": "Der Zeitplan überschneidet sich mit dem vorhandenen {schedule_label}. Passe diesen Zeitplan zuerst an oder deaktiviere ihn."
-    },
-    "ac_battery_unavailable": {
-      "message": "Derzeit sind keine Geräte mit Wechselstrombatterie verfügbar."
     },
     "auth_settings_service_unavailable": {
       "message": "Die Authentifizierungseinstellungen sind nicht verfügbar, während der Enphase-Dienst ausgefallen ist."
@@ -358,9 +353,6 @@
     "scheduler_service_unavailable": {
       "message": "Die Auswahl des Lademodus ist nicht verfügbar, solange der Enphase-Planungsdienst nicht verfügbar ist."
     },
-    "selected_ac_battery_target_state_of_charge_unavailable": {
-      "message": "Der ausgewählte Zielladezustand der Wechselstrombatterie ist nicht verfügbar."
-    },
     "battery_schedule_day_required": {
       "message": "Wählen Sie mindestens einen Tag für den Zeitplan aus."
     },
@@ -527,7 +519,6 @@
           "session_history_interval": "Intervall für Sitzungsverlauf (min)",
           "schedule_sync_enabled": "Aktivieren Sie den EV-Ladeplaner",
           "type_heatpump": "Wärmepumpe",
-          "type_ac_battery": "AC-Batterie",
           "battery_schedules_enabled": "Aktivieren Sie den Batterieplaner",
           "degraded_service_repair_issues": "Reparaturen für beeinträchtigte Dienste aktivieren",
           "weather_enabled": "Wetter aktivieren",
@@ -546,7 +537,6 @@
           "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist.",
           "session_history_interval": "Minuten zwischen Abrufen des Cloud-Sitzungsverlaufs.",
           "type_heatpump": "Enthält Sensoren für Wärmepumpenstatus, Diagnose und Verbrauch.",
-          "type_ac_battery": "Enthält AC-Batterie-Sensoren und Steuerelemente für den Schlafmodus, wenn verfügbar.",
           "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind.",
           "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist.",
           "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
@@ -582,7 +572,6 @@
             "data": {
               "type_envoy": "Gateway",
               "type_encharge": "Batterie",
-              "type_ac_battery": "AC-Batterie",
               "type_iqevse": "Ladegeräte",
               "type_heatpump": "Wärmepumpe",
               "type_microinverter": "Mikrowechselrichter"
@@ -590,7 +579,6 @@
             "data_description": {
               "type_envoy": "Enthält Gateway-Konnektivitäts- und Zählerdiagnosen.",
               "type_encharge": "Enthält Batterie-Status- und Steuerungs-Entitäten, wenn verfügbar.",
-              "type_ac_battery": "Enthält AC-Batterie-Sensoren und Steuerelemente für den Schlafmodus, wenn verfügbar.",
               "type_iqevse": "Enthält EV-Ladegeräte-Entitäten und Steuerungen.",
               "type_heatpump": "Enthält Sensoren für Wärmepumpenstatus, Diagnose und Verbrauch.",
               "type_microinverter": "Enthält Sensoren für Mikrowechselrichter-Konnektivität, aktive Anzahl und Lebenszeit-Erzeugung."
@@ -601,7 +589,6 @@
           "devices": "Geräte auswählen",
           "type_envoy": "Gateway",
           "type_encharge": "Batterie",
-          "type_ac_battery": "AC-Batterie",
           "type_iqevse": "Ladegeräte",
           "type_heatpump": "Wärmepumpe",
           "type_microinverter": "Mikrowechselrichter"
@@ -609,7 +596,6 @@
         "data_description": {
           "type_envoy": "Enthält Gateway-Konnektivitäts- und Zählerdiagnosen.",
           "type_encharge": "Enthält Batterie-Status- und Steuerungs-Entitäten, wenn verfügbar.",
-          "type_ac_battery": "Enthält AC-Batterie-Sensoren und Steuerelemente für den Schlafmodus, wenn verfügbar.",
           "type_iqevse": "Enthält EV-Ladegeräte-Entitäten und Steuerungen.",
           "type_heatpump": "Enthält Sensoren für Wärmepumpenstatus, Diagnose und Verbrauch.",
           "type_microinverter": "Enthält Sensoren für Mikrowechselrichter-Konnektivität, aktive Anzahl und Lebenszeit-Erzeugung."
@@ -1855,45 +1841,6 @@
           "pairing": "Wird gekoppelt"
         }
       },
-      "ac_battery_overall_status": {
-        "name": "Gesamtstatus der AC-Batterie",
-        "state": {
-          "normal": "Normal",
-          "warning": "Warnung",
-          "error": "Fehler",
-          "unknown": "Unbekannt"
-        }
-      },
-      "ac_battery_power": {
-        "name": "Leistung der AC-Batterie"
-      },
-      "ac_battery_last_reported": {
-        "name": "Zuletzt gemeldet von AC-Batterie"
-      },
-      "ac_battery_storage_charge": {
-        "name": "Ladezustand der AC-Batterie"
-      },
-      "ac_battery_storage_status": {
-        "name": "{serial} Status",
-        "state": {
-          "normal": "Normal",
-          "warning": "Warnung",
-          "error": "Fehler",
-          "unknown": "Unbekannt"
-        }
-      },
-      "ac_battery_storage_power": {
-        "name": "{serial} Leistung"
-      },
-      "ac_battery_storage_operating_mode": {
-        "name": "{serial} Betriebsmodus"
-      },
-      "ac_battery_storage_cycle_count": {
-        "name": "{serial} Ladezyklen"
-      },
-      "ac_battery_storage_last_reported": {
-        "name": "{serial} zuletzt gemeldet"
-      },
       "battery_cfg_schedules": {
         "name": "Batterie-CFG-Zeitpläne"
       },
@@ -2338,9 +2285,6 @@
       "restrict_battery_discharge_schedule": {
         "name": "Zeitplan für eingeschränkte Batterieentladung"
       },
-      "ac_battery_sleep_mode": {
-        "name": "Schlafmodus der AC-Batterie"
-      },
       "evse_schedule_edit_mon": {
         "name": "Zeitplan Montag"
       },
@@ -2411,9 +2355,6 @@
       },
       "system_profile": {
         "name": "Systemprofil"
-      },
-      "ac_battery_target_state_of_charge": {
-        "name": "Ziel-Ladezustand der AC-Batterie"
       },
       "evse_schedule_selected": {
         "name": "Zeitplan"

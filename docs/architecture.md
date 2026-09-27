@@ -172,7 +172,7 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
 - `evse_runtime.py` handles charger commands, fast polling, streaming, charge-mode cache, auth settings, and EVSE control side effects.
 - `inventory_runtime.py` handles topology, type buckets, HEMS inventory, and system-dashboard payloads.
 - `heatpump_runtime.py` handles HEMS heat-pump runtime state, daily consumption, and diagnostics snapshots.
-- `current_power_runtime.py`, `evse_feature_flags_runtime.py`, `auth_refresh_runtime.py`, and `ac_battery_runtime.py` handle smaller endpoint families.
+- `current_power_runtime.py`, `evse_feature_flags_runtime.py`, and `auth_refresh_runtime.py` handle smaller endpoint families.
 - `system_events.py` independently manages active System Dashboard events and the
   bounded, on-demand homeowner event-history cache used by the Cloud calendar.
 - `vpp_runtime.py` owns the opt-in VPP/ELRP enrollment state, singular enrolled

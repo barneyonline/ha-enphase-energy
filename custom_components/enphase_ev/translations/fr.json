@@ -43,8 +43,7 @@
           "type_iqevse": "Chargeurs",
           "type_microinverter": "Micro-onduleurs",
           "scan_interval": "Intervalle de scrutation (s)",
-          "type_heatpump": "Pompe à chaleur",
-          "type_ac_battery": "Batterie AC"
+          "type_heatpump": "Pompe à chaleur"
         },
         "data_description": {
           "type_envoy": "Inclut la connectivité de la passerelle et les diagnostics de compteurs.",
@@ -52,8 +51,7 @@
           "type_iqevse": "Inclut les entités et commandes des chargeurs EV.",
           "type_microinverter": "Inclut des capteurs de connectivité des micro-onduleurs, de nombre actif et de production à vie.",
           "scan_interval": "Secondes entre les interrogations du cloud. Par défaut 60s.",
-          "type_heatpump": "Inclut des capteurs d'état, de diagnostic et de consommation de la pompe à chaleur.",
-          "type_ac_battery": "Inclut les capteurs de batterie AC et les commandes du mode veille lorsqu’ils sont disponibles."
+          "type_heatpump": "Inclut des capteurs d'état, de diagnostic et de consommation de la pompe à chaleur."
         }
       }
     },
@@ -138,9 +136,6 @@
     },
     "battery_schedule_overlap": {
       "message": "Le planning chevauche le {schedule_label} existant. Ajustez ou désactivez d’abord ce planning."
-    },
-    "ac_battery_unavailable": {
-      "message": "Aucun appareil de batterie AC n’est actuellement disponible."
     },
     "auth_settings_service_unavailable": {
       "message": "Les paramètres d’authentification ne sont pas disponibles tant que le service Enphase est indisponible."
@@ -358,9 +353,6 @@
     "scheduler_service_unavailable": {
       "message": "La sélection du mode de charge n'est pas disponible lorsque le service de planification Enphase est en panne."
     },
-    "selected_ac_battery_target_state_of_charge_unavailable": {
-      "message": "L’état de charge cible sélectionné de la batterie AC n’est pas disponible."
-    },
     "battery_schedule_day_required": {
       "message": "Sélectionnez au moins un jour pour le planning."
     },
@@ -527,7 +519,6 @@
           "session_history_interval": "Intervalle d'historique de session (min)",
           "schedule_sync_enabled": "Activer le planificateur de chargeur EV",
           "type_heatpump": "Pompe à chaleur",
-          "type_ac_battery": "Batterie AC",
           "battery_schedules_enabled": "Activer le planificateur de batterie",
           "degraded_service_repair_issues": "Activer les réparations des services dégradés",
           "weather_enabled": "Activer la météo",
@@ -546,7 +537,6 @@
           "nominal_voltage": "Tension d’alimentation CA habituelle utilisée pour estimer la puissance lorsque la tension en direct est indisponible.",
           "session_history_interval": "Minutes d'attente entre les récupérations de l'historique de session depuis le cloud.",
           "type_heatpump": "Inclut des capteurs d'état, de diagnostic et de consommation de la pompe à chaleur.",
-          "type_ac_battery": "Inclut les capteurs de batterie AC et les commandes du mode veille lorsqu’ils sont disponibles.",
           "degraded_service_repair_issues": "Crée des problèmes Repairs lorsque des services Enphase facultatifs sont dégradés.",
           "weather_enabled": "Récupère la météo actuelle du site depuis Enphase et crée une entité météo uniquement lorsque le point de terminaison est disponible.",
           "microinverter_lifetime_energy_enabled": "Active tous les capteurs d’énergie totale par micro-onduleur.",
@@ -582,7 +572,6 @@
             "data": {
               "type_envoy": "Passerelle",
               "type_encharge": "Batterie",
-              "type_ac_battery": "Batterie AC",
               "type_iqevse": "Chargeurs",
               "type_heatpump": "Pompe à chaleur",
               "type_microinverter": "Micro-onduleurs"
@@ -590,7 +579,6 @@
             "data_description": {
               "type_envoy": "Inclut la connectivité de la passerelle et les diagnostics de compteurs.",
               "type_encharge": "Inclut l’état des batteries et les entités de contrôle lorsque disponibles.",
-              "type_ac_battery": "Inclut les capteurs de batterie AC et les commandes du mode veille lorsqu’ils sont disponibles.",
               "type_iqevse": "Inclut les entités et commandes des chargeurs EV.",
               "type_heatpump": "Inclut des capteurs d'état, de diagnostic et de consommation de la pompe à chaleur.",
               "type_microinverter": "Inclut des capteurs de connectivité des micro-onduleurs, de nombre actif et de production à vie."
@@ -601,7 +589,6 @@
           "devices": "Sélectionner les appareils",
           "type_envoy": "Passerelle",
           "type_encharge": "Batterie",
-          "type_ac_battery": "Batterie AC",
           "type_iqevse": "Chargeurs",
           "type_heatpump": "Pompe à chaleur",
           "type_microinverter": "Micro-onduleurs"
@@ -609,7 +596,6 @@
         "data_description": {
           "type_envoy": "Inclut la connectivité de la passerelle et les diagnostics de compteurs.",
           "type_encharge": "Inclut l’état des batteries et les entités de contrôle lorsque disponibles.",
-          "type_ac_battery": "Inclut les capteurs de batterie AC et les commandes du mode veille lorsqu’ils sont disponibles.",
           "type_iqevse": "Inclut les entités et commandes des chargeurs EV.",
           "type_heatpump": "Inclut des capteurs d'état, de diagnostic et de consommation de la pompe à chaleur.",
           "type_microinverter": "Inclut des capteurs de connectivité des micro-onduleurs, de nombre actif et de production à vie."
@@ -1855,45 +1841,6 @@
           "pairing": "Appairage"
         }
       },
-      "ac_battery_overall_status": {
-        "name": "État global de la batterie AC",
-        "state": {
-          "normal": "Normal",
-          "warning": "Avertissement",
-          "error": "Erreur",
-          "unknown": "Inconnu"
-        }
-      },
-      "ac_battery_power": {
-        "name": "Puissance de la batterie AC"
-      },
-      "ac_battery_last_reported": {
-        "name": "Dernier relevé de la batterie AC"
-      },
-      "ac_battery_storage_charge": {
-        "name": "Niveau de charge de la batterie AC"
-      },
-      "ac_battery_storage_status": {
-        "name": "État de {serial}",
-        "state": {
-          "normal": "Normal",
-          "warning": "Avertissement",
-          "error": "Erreur",
-          "unknown": "Inconnu"
-        }
-      },
-      "ac_battery_storage_power": {
-        "name": "Puissance de {serial}"
-      },
-      "ac_battery_storage_operating_mode": {
-        "name": "Mode de fonctionnement de {serial}"
-      },
-      "ac_battery_storage_cycle_count": {
-        "name": "Nombre de cycles de {serial}"
-      },
-      "ac_battery_storage_last_reported": {
-        "name": "Dernier relevé de {serial}"
-      },
       "battery_cfg_schedules": {
         "name": "Plannings CFG de la batterie"
       },
@@ -2338,9 +2285,6 @@
       "restrict_battery_discharge_schedule": {
         "name": "Programme de restriction de décharge de la batterie"
       },
-      "ac_battery_sleep_mode": {
-        "name": "Mode veille de la batterie AC"
-      },
       "evse_schedule_edit_mon": {
         "name": "Programmation du lundi"
       },
@@ -2411,9 +2355,6 @@
       },
       "system_profile": {
         "name": "Profil système"
-      },
-      "ac_battery_target_state_of_charge": {
-        "name": "État de charge cible de la batterie AC"
       },
       "evse_schedule_selected": {
         "name": "Programmation"

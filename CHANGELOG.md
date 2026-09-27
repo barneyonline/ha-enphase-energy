@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
-- None
+- Removed legacy AC Battery discovery, sensors, sleep controls, and cloud polling. Existing AC Battery entities and empty device records are retired on upgrade; IQ Battery support is unchanged.
 
 ### ✨ New features
 - None

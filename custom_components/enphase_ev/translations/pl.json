@@ -43,8 +43,7 @@
           "type_iqevse": "Ładowarki",
           "type_microinverter": "Mikrofalowniki",
           "scan_interval": "Interwał skanowania (s)",
-          "type_heatpump": "Pompa ciepła",
-          "type_ac_battery": "Bateria AC"
+          "type_heatpump": "Pompa ciepła"
         },
         "data_description": {
           "type_envoy": "Zawiera diagnostykę łączności bramy i liczników.",
@@ -52,8 +51,7 @@
           "type_iqevse": "Zawiera encje i sterowanie ładowarkami EV.",
           "type_microinverter": "Zawiera czujniki łączności mikroinwerterów, liczby aktywnych i produkcji całkowitej.",
           "scan_interval": "Sekundy między odpytywaniem stanu chmury. Domyślnie 60s.",
-          "type_heatpump": "Zawiera czujniki stanu, diagnostyki i zużycia pompy ciepła.",
-          "type_ac_battery": "Obejmuje sensory baterii AC i sterowanie trybem uśpienia, gdy są dostępne."
+          "type_heatpump": "Zawiera czujniki stanu, diagnostyki i zużycia pompy ciepła."
         }
       }
     },
@@ -138,9 +136,6 @@
     },
     "battery_schedule_overlap": {
       "message": "Harmonogram nakłada się z istniejącym {schedule_label}. Najpierw dostosuj lub wyłącz ten harmonogram."
-    },
-    "ac_battery_unavailable": {
-      "message": "Obecnie nie są dostępne żadne urządzenia AC Battery."
     },
     "auth_settings_service_unavailable": {
       "message": "Ustawienia uwierzytelniania są niedostępne, gdy usługa Enphase jest niedostępna."
@@ -358,9 +353,6 @@
     "scheduler_service_unavailable": {
       "message": "Wybór trybu ładowania jest niedostępny, gdy usługa harmonogramu Enphase jest wyłączona."
     },
-    "selected_ac_battery_target_state_of_charge_unavailable": {
-      "message": "Wybrany docelowy poziom naładowania AC Battery jest niedostępny."
-    },
     "battery_schedule_day_required": {
       "message": "Wybierz co najmniej jeden dzień dla harmonogramu."
     },
@@ -527,7 +519,6 @@
           "session_history_interval": "Interwał historii sesji (min)",
           "schedule_sync_enabled": "Włącz harmonogram ładowania pojazdów elektrycznych",
           "type_heatpump": "Pompa ciepła",
-          "type_ac_battery": "Bateria AC",
           "battery_schedules_enabled": "Włącz harmonogram baterii",
           "degraded_service_repair_issues": "Włącz naprawy usług zdegradowanych",
           "weather_enabled": "Włącz pogodę",
@@ -546,7 +537,6 @@
           "nominal_voltage": "Typowe napięcie zasilania AC używane do szacowania mocy, gdy napięcie bieżące jest niedostępne.",
           "session_history_interval": "Minuty oczekiwania między pobieraniem historii sesji z chmury.",
           "type_heatpump": "Zawiera czujniki stanu, diagnostyki i zużycia pompy ciepła.",
-          "type_ac_battery": "Obejmuje sensory baterii AC i sterowanie trybem uśpienia, gdy są dostępne.",
           "degraded_service_repair_issues": "Tworzy problemy w Repairs, gdy opcjonalne usługi Enphase są zdegradowane.",
           "weather_enabled": "Pobiera bieżącą pogodę dla lokalizacji z Enphase i tworzy encję pogody tylko wtedy, gdy punkt końcowy jest dostępny.",
           "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
@@ -582,7 +572,6 @@
             "data": {
               "type_envoy": "Brama",
               "type_encharge": "Bateria",
-              "type_ac_battery": "Bateria AC",
               "type_iqevse": "Ładowarki",
               "type_heatpump": "Pompa ciepła",
               "type_microinverter": "Mikrofalowniki"
@@ -590,7 +579,6 @@
             "data_description": {
               "type_envoy": "Zawiera diagnostykę łączności bramy i liczników.",
               "type_encharge": "Zawiera stan baterii i encje sterujące, gdy są dostępne.",
-              "type_ac_battery": "Obejmuje sensory baterii AC i sterowanie trybem uśpienia, gdy są dostępne.",
               "type_iqevse": "Zawiera encje i sterowanie ładowarkami EV.",
               "type_heatpump": "Zawiera czujniki stanu, diagnostyki i zużycia pompy ciepła.",
               "type_microinverter": "Zawiera czujniki łączności mikroinwerterów, liczby aktywnych i produkcji całkowitej."
@@ -601,7 +589,6 @@
           "devices": "Wybierz urządzenia",
           "type_envoy": "Brama",
           "type_encharge": "Bateria",
-          "type_ac_battery": "Bateria AC",
           "type_iqevse": "Ładowarki",
           "type_heatpump": "Pompa ciepła",
           "type_microinverter": "Mikrofalowniki"
@@ -609,7 +596,6 @@
         "data_description": {
           "type_envoy": "Zawiera diagnostykę łączności bramy i liczników.",
           "type_encharge": "Zawiera stan baterii i encje sterujące, gdy są dostępne.",
-          "type_ac_battery": "Obejmuje sensory baterii AC i sterowanie trybem uśpienia, gdy są dostępne.",
           "type_iqevse": "Zawiera encje i sterowanie ładowarkami EV.",
           "type_heatpump": "Zawiera czujniki stanu, diagnostyki i zużycia pompy ciepła.",
           "type_microinverter": "Zawiera czujniki łączności mikroinwerterów, liczby aktywnych i produkcji całkowitej."
@@ -1855,45 +1841,6 @@
           "pairing": "Parowanie"
         }
       },
-      "ac_battery_overall_status": {
-        "name": "Ogólny stan baterii AC",
-        "state": {
-          "normal": "Normalna",
-          "warning": "Ostrzeżenie",
-          "error": "Błąd",
-          "unknown": "Nieznany"
-        }
-      },
-      "ac_battery_power": {
-        "name": "Moc baterii AC"
-      },
-      "ac_battery_last_reported": {
-        "name": "Ostatni raport baterii AC"
-      },
-      "ac_battery_storage_charge": {
-        "name": "Poziom naładowania baterii AC"
-      },
-      "ac_battery_storage_status": {
-        "name": "Stan {serial}",
-        "state": {
-          "normal": "Normalna",
-          "warning": "Ostrzeżenie",
-          "error": "Błąd",
-          "unknown": "Nieznany"
-        }
-      },
-      "ac_battery_storage_power": {
-        "name": "Moc {serial}"
-      },
-      "ac_battery_storage_operating_mode": {
-        "name": "Tryb pracy {serial}"
-      },
-      "ac_battery_storage_cycle_count": {
-        "name": "Liczba cykli {serial}"
-      },
-      "ac_battery_storage_last_reported": {
-        "name": "Ostatni raport {serial}"
-      },
       "battery_cfg_schedules": {
         "name": "Harmonogramy CFG baterii"
       },
@@ -2338,9 +2285,6 @@
       "restrict_battery_discharge_schedule": {
         "name": "Harmonogram ograniczenia rozładowania baterii"
       },
-      "ac_battery_sleep_mode": {
-        "name": "Tryb uśpienia baterii AC"
-      },
       "evse_schedule_edit_mon": {
         "name": "Harmonogram na poniedziałek"
       },
@@ -2411,9 +2355,6 @@
       },
       "system_profile": {
         "name": "Profil systemu"
-      },
-      "ac_battery_target_state_of_charge": {
-        "name": "Docelowy stan naładowania baterii AC"
       },
       "evse_schedule_selected": {
         "name": "Harmonogram"

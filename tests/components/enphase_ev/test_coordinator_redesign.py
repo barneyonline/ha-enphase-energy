@@ -326,7 +326,6 @@ class _RefreshOwner:
             grid_outage_context_refresh_due=lambda: True,
             dry_contact_settings_refresh_due=lambda: True,
             battery_status_refresh_due=lambda: True,
-            ac_battery_devices_refresh_due=lambda: True,
         )
         self.inventory_runtime = SimpleNamespace(
             _async_refresh_devices_inventory=self._async_refresh_devices_inventory,
@@ -495,13 +494,12 @@ def test_followup_refresh_stage_binds_zero_arg_calls() -> None:
         "dry_contact_settings_s",
         "current_power_s",
     ]
+
     assert [call[0] for call in bound.ordered_calls] == [
         "battery_status_s",
-        "ac_battery_devices_s",
         "devices_inventory_s",
         "hems_devices_s",
     ]
-
     assert bound.parallel_calls[1][2]() == "vpp"
     assert bound.parallel_calls[2][2]() == "site-settings"
     assert bound.ordered_calls[-1][2]() == "hems-devices"
@@ -621,7 +619,6 @@ def test_dynamic_followup_plan_skips_up_to_date_tasks() -> None:
     owner.battery_runtime.grid_outage_context_refresh_due = lambda: False
     owner.battery_runtime.dry_contact_settings_refresh_due = lambda: False
     owner.battery_runtime.battery_status_refresh_due = lambda: False
-    owner.battery_runtime.ac_battery_devices_refresh_due = lambda: False
     owner.inventory_runtime.devices_inventory_refresh_due = lambda: False
     owner.inventory_runtime.hems_devices_refresh_due = lambda: False
     owner.current_power_runtime.refresh_due = lambda: False
@@ -641,7 +638,6 @@ def test_dynamic_followup_plan_selects_due_subset() -> None:
     owner.battery_runtime.storm_alert_refresh_due = lambda: False
     owner.battery_runtime.grid_control_check_refresh_due = lambda: False
     owner.battery_runtime.dry_contact_settings_refresh_due = lambda: False
-    owner.battery_runtime.ac_battery_devices_refresh_due = lambda: False
     owner.inventory_runtime.devices_inventory_refresh_due = lambda: False
     owner.current_power_runtime.refresh_due = lambda: False
     owner.evse_feature_flags_runtime.refresh_due = lambda: False
@@ -693,7 +689,6 @@ def test_dynamic_site_only_followup_plan_creates_inverter_stage_without_base_fol
     owner.battery_runtime.grid_outage_context_refresh_due = lambda: False
     owner.battery_runtime.dry_contact_settings_refresh_due = lambda: False
     owner.battery_runtime.battery_status_refresh_due = lambda: False
-    owner.battery_runtime.ac_battery_devices_refresh_due = lambda: False
     owner.inventory_runtime.devices_inventory_refresh_due = lambda: False
     owner.inventory_runtime.hems_devices_refresh_due = lambda: False
     owner.current_power_runtime.refresh_due = lambda: False
@@ -726,7 +721,6 @@ def test_dynamic_followup_plan_includes_due_evse_feature_flags() -> None:
     owner.battery_runtime.grid_outage_context_refresh_due = lambda: False
     owner.battery_runtime.dry_contact_settings_refresh_due = lambda: False
     owner.battery_runtime.battery_status_refresh_due = lambda: False
-    owner.battery_runtime.ac_battery_devices_refresh_due = lambda: False
     owner.inventory_runtime.devices_inventory_refresh_due = lambda: False
     owner.inventory_runtime.hems_devices_refresh_due = lambda: False
     owner.current_power_runtime.refresh_due = lambda: False
@@ -756,7 +750,6 @@ def test_dynamic_followup_plan_includes_due_system_event_history() -> None:
         "grid_outage_context_refresh_due",
         "dry_contact_settings_refresh_due",
         "battery_status_refresh_due",
-        "ac_battery_devices_refresh_due",
     ):
         setattr(owner.battery_runtime, method_name, lambda: False)
     owner.inventory_runtime.devices_inventory_refresh_due = lambda: False
@@ -788,7 +781,6 @@ def test_dynamic_followup_plan_includes_due_vpp_events() -> None:
         "grid_outage_context_refresh_due",
         "dry_contact_settings_refresh_due",
         "battery_status_refresh_due",
-        "ac_battery_devices_refresh_due",
     ):
         setattr(owner.battery_runtime, method_name, lambda: False)
     owner.inventory_runtime.devices_inventory_refresh_due = lambda: False
@@ -932,7 +924,7 @@ async def test_coordinator_refresh_plan_runner_executes_each_stage(
     await coord.refresh_runner.async_run_refresh_plan({}, plan=FOLLOWUP_PLAN)
 
     assert seen == [
-        (None, True, 14, 4),
+        (None, True, 14, 3),
     ]
 
 

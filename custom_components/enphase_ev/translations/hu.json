@@ -43,8 +43,7 @@
           "type_iqevse": "Töltők",
           "type_microinverter": "Mikroinverterek",
           "scan_interval": "Lekérdezési intervallum (s)",
-          "type_heatpump": "Hőszivattyú",
-          "type_ac_battery": "AC akkumulátor"
+          "type_heatpump": "Hőszivattyú"
         },
         "data_description": {
           "type_envoy": "Tartalmazza az átjáró-kapcsolat és a mérők diagnosztikáját.",
@@ -52,8 +51,7 @@
           "type_iqevse": "Tartalmazza az EV töltők entitásait és vezérléseit.",
           "type_microinverter": "Tartalmazza a mikroinverter-kapcsolati, aktív darabszám és élettartam-termelési érzékelőket.",
           "scan_interval": "Másodpercek a cloud állapotlekérdezések között. Alapértelmezett 60s.",
-          "type_heatpump": "A hőszivattyú állapot-, diagnosztikai és fogyasztási érzékelőit tartalmazza.",
-          "type_ac_battery": "AC akkumulátor érzékelőket és alvó mód vezérlőket tartalmaz, ha elérhetők."
+          "type_heatpump": "A hőszivattyú állapot-, diagnosztikai és fogyasztási érzékelőit tartalmazza."
         }
       }
     },
@@ -138,9 +136,6 @@
     },
     "battery_schedule_overlap": {
       "message": "Az ütemezés átfedésben van a meglévő {schedule_label} elemmel. Először módosítsa vagy tiltsa le azt az ütemezést."
-    },
-    "ac_battery_unavailable": {
-      "message": "Jelenleg nem érhetők el AC akkumulátoros eszközök."
     },
     "auth_settings_service_unavailable": {
       "message": "A hitelesítési beállítások nem érhetők el, amíg az Enphase szolgáltatás nem működik."
@@ -358,9 +353,6 @@
     "scheduler_service_unavailable": {
       "message": "A töltési mód kiválasztása nem érhető el, amíg az Enphase ütemező szolgáltatás nem működik."
     },
-    "selected_ac_battery_target_state_of_charge_unavailable": {
-      "message": "A kiválasztott AC akkumulátor cél töltöttségi szintje nem érhető el."
-    },
     "battery_schedule_day_required": {
       "message": "Válasszon legalább egy napot az ütemezéshez."
     },
@@ -527,7 +519,6 @@
           "session_history_interval": "Munkamenet előzmény intervallum (min)",
           "schedule_sync_enabled": "Az EV Charger Scheduler engedélyezése",
           "type_heatpump": "Hőszivattyú",
-          "type_ac_battery": "AC akkumulátor",
           "battery_schedules_enabled": "Az akkumulátor ütemező engedélyezése",
           "degraded_service_repair_issues": "Csökkent működésű szolgáltatások javításainak engedélyezése",
           "weather_enabled": "Időjárás engedélyezése",
@@ -546,7 +537,6 @@
           "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat.",
           "session_history_interval": "Várakozási percek a felhő munkamenet-előzmények lekérései között.",
           "type_heatpump": "A hőszivattyú állapot-, diagnosztikai és fogyasztási érzékelőit tartalmazza.",
-          "type_ac_battery": "AC akkumulátor érzékelőket és alvó mód vezérlőket tartalmaz, ha elérhetők.",
           "degraded_service_repair_issues": "Repairs-problémákat hoz létre, amikor az opcionális Enphase-szolgáltatások csökkent működésűek.",
           "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető.",
           "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
@@ -582,7 +572,6 @@
             "data": {
               "type_envoy": "Átjáró",
               "type_encharge": "Akkumulátor",
-              "type_ac_battery": "AC akkumulátor",
               "type_iqevse": "Töltők",
               "type_heatpump": "Hőszivattyú",
               "type_microinverter": "Mikroinverterek"
@@ -590,7 +579,6 @@
             "data_description": {
               "type_envoy": "Tartalmazza az átjáró-kapcsolat és a mérők diagnosztikáját.",
               "type_encharge": "Tartalmazza az akkumulátorok állapotát és vezérlő entitásokat, ha elérhetők.",
-              "type_ac_battery": "AC akkumulátor érzékelőket és alvó mód vezérlőket tartalmaz, ha elérhetők.",
               "type_iqevse": "Tartalmazza az EV töltők entitásait és vezérléseit.",
               "type_heatpump": "A hőszivattyú állapot-, diagnosztikai és fogyasztási érzékelőit tartalmazza.",
               "type_microinverter": "Tartalmazza a mikroinverter-kapcsolati, aktív darabszám és élettartam-termelési érzékelőket."
@@ -601,7 +589,6 @@
           "devices": "Eszközök kiválasztása",
           "type_envoy": "Átjáró",
           "type_encharge": "Akkumulátor",
-          "type_ac_battery": "AC akkumulátor",
           "type_iqevse": "Töltők",
           "type_heatpump": "Hőszivattyú",
           "type_microinverter": "Mikroinverterek"
@@ -609,7 +596,6 @@
         "data_description": {
           "type_envoy": "Tartalmazza az átjáró-kapcsolat és a mérők diagnosztikáját.",
           "type_encharge": "Tartalmazza az akkumulátorok állapotát és vezérlő entitásokat, ha elérhetők.",
-          "type_ac_battery": "AC akkumulátor érzékelőket és alvó mód vezérlőket tartalmaz, ha elérhetők.",
           "type_iqevse": "Tartalmazza az EV töltők entitásait és vezérléseit.",
           "type_heatpump": "A hőszivattyú állapot-, diagnosztikai és fogyasztási érzékelőit tartalmazza.",
           "type_microinverter": "Tartalmazza a mikroinverter-kapcsolati, aktív darabszám és élettartam-termelési érzékelőket."
@@ -1855,45 +1841,6 @@
           "pairing": "Párosítás"
         }
       },
-      "ac_battery_overall_status": {
-        "name": "AC akkumulátor összesített állapota",
-        "state": {
-          "normal": "Normál",
-          "warning": "Figyelmeztetés",
-          "error": "Hiba",
-          "unknown": "Ismeretlen"
-        }
-      },
-      "ac_battery_power": {
-        "name": "AC akkumulátor teljesítménye"
-      },
-      "ac_battery_last_reported": {
-        "name": "AC akkumulátor utolsó jelentése"
-      },
-      "ac_battery_storage_charge": {
-        "name": "AC akkumulátor töltöttségi szintje"
-      },
-      "ac_battery_storage_status": {
-        "name": "{serial} állapota",
-        "state": {
-          "normal": "Normál",
-          "warning": "Figyelmeztetés",
-          "error": "Hiba",
-          "unknown": "Ismeretlen"
-        }
-      },
-      "ac_battery_storage_power": {
-        "name": "{serial} teljesítménye"
-      },
-      "ac_battery_storage_operating_mode": {
-        "name": "{serial} működési módja"
-      },
-      "ac_battery_storage_cycle_count": {
-        "name": "{serial} ciklusszáma"
-      },
-      "ac_battery_storage_last_reported": {
-        "name": "{serial} utolsó jelentése"
-      },
       "battery_cfg_schedules": {
         "name": "Akkumulátor CFG ütemezések"
       },
@@ -2338,9 +2285,6 @@
       "restrict_battery_discharge_schedule": {
         "name": "Akkumulátorkisütés-korlátozási ütemezés"
       },
-      "ac_battery_sleep_mode": {
-        "name": "AC akkumulátor alvó módja"
-      },
       "evse_schedule_edit_mon": {
         "name": "Hétfői ütemezés"
       },
@@ -2411,9 +2355,6 @@
       },
       "system_profile": {
         "name": "Rendszerprofil"
-      },
-      "ac_battery_target_state_of_charge": {
-        "name": "AC akkumulátor cél töltöttségi szintje"
       },
       "evse_schedule_selected": {
         "name": "Ütemezés"

@@ -213,19 +213,6 @@ def _layout_headers(self: EnphaseEVClient) -> dict[str, str]:
     return headers
 
 
-def _systems_html_headers(
-    self: EnphaseEVClient, referer: str | None = None
-) -> dict[str, str]:
-    """Return browser-style headers for site-scoped HTML /systems routes."""
-
-    headers = dict(self._h)
-    headers["Accept"] = (
-        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-    )
-    headers["Referer"] = referer or f"{BASE_URL}/systems/{self._site}/devices"
-    return headers
-
-
 def _systems_json_headers(self: EnphaseEVClient) -> dict[str, str]:
     """Return headers for site-scoped /systems JSON endpoints."""
 

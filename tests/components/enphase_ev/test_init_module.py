@@ -1154,6 +1154,16 @@ async def test_async_setup_entry_records_startup_migration_version(
     hass: HomeAssistant, config_entry, monkeypatch
 ) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
+    hass.config_entries.async_update_entry(
+        config_entry, data={**config_entry.data, "startup_migration_version": 6}
+    )
+    ent_reg = er.async_get(hass)
+    retired_entity = ent_reg.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{DOMAIN}_site_{site_id}_ac_battery_power",
+        config_entry=config_entry,
+    )
 
     class DummyCoordinator:
         def __init__(self) -> None:
@@ -1198,7 +1208,8 @@ async def test_async_setup_entry_records_startup_migration_version(
     migrate_gateway.assert_called_once()
     migrate_updates.assert_called_once()
     migrate_cloud.assert_called_once()
-    assert config_entry.data["startup_migration_version"] == 6
+    assert config_entry.data["startup_migration_version"] == 7
+    assert ent_reg.async_get(retired_entity.entity_id) is None
 
 
 @pytest.mark.asyncio
@@ -1254,7 +1265,7 @@ async def test_async_setup_entry_skips_legacy_cleanup_when_migration_current(
     site_id = config_entry.data[CONF_SITE_ID]
     hass.config_entries.async_update_entry(
         config_entry,
-        data={**config_entry.data, "startup_migration_version": 6},
+        data={**config_entry.data, "startup_migration_version": 7},
     )
     dev_reg = dr.async_get(hass)
     legacy_site_device = dev_reg.async_get_or_create(
@@ -3660,12 +3671,7 @@ def test_inactive_device_cleanup_only_removes_owned_duplicate(
     monkeypatch.setattr(
         registry_sync,
         "active_serial_registry_identifiers",
-        lambda _coord: {
-            "charger": set(),
-            "battery": set(),
-            "ac_battery": set(),
-            "inverter": set(),
-        },
+        lambda _coord: {"charger": set(), "battery": set(), "inverter": set()},
     )
     coord = SimpleNamespace(_devices_inventory_ready=True)
 
@@ -5921,7 +5927,7 @@ async def test_async_setup_entry_registry_sync_runs_only_for_topology_updates(
     assert migrate.call_count == 1
     assert migrate_updates.call_count == 1
     assert migrate_cloud.call_count == 1
-    assert config_entry.data["startup_migration_version"] == 6
+    assert config_entry.data["startup_migration_version"] == 7
 
     for listener in state_listeners:
         listener()

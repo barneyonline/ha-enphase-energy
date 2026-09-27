@@ -203,7 +203,10 @@ async def test_endpoint_policy_rebuilt_after_authentication(family):
     if family == "scheduler":
         await client.get_schedules("EVSE")
     elif family == "text":
-        assert await client.ac_battery_detail_page("BATTERY") == "telemetry"
+        response = await client._text_response(
+            "GET", "https://enlighten.enphaseenergy.com/test"
+        )
+        assert response.text == "telemetry"
     elif family == "tariff":
         await client.site_tariff_billing_details()
     else:

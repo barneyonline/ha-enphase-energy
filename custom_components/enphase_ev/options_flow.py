@@ -15,7 +15,6 @@ from homeassistant.helpers.translation import (
 from .api import (
     AuthTokens,
     async_fetch_devices_inventory,
-    async_fetch_battery_site_settings,
     async_fetch_chargers,
 )
 from .const import (
@@ -119,7 +118,6 @@ from .config_flow_support import (
     CONF_RESEND_CODE as CONF_RESEND_CODE,
     CONF_TYPE_ENVOY as CONF_TYPE_ENVOY,
     CONF_TYPE_ENCHARGE as CONF_TYPE_ENCHARGE,
-    CONF_TYPE_AC_BATTERY as CONF_TYPE_AC_BATTERY,
     CONF_TYPE_IQEVSE as CONF_TYPE_IQEVSE,
     CONF_TYPE_HEATPUMP as CONF_TYPE_HEATPUMP,
     CONF_TYPE_MICROINVERTER as CONF_TYPE_MICROINVERTER,
@@ -141,7 +139,6 @@ from .config_flow_support import (
     _GRID_MODE_LABEL_PREFIX as _GRID_MODE_LABEL_PREFIX,
     _GRID_CONTROL_BLOCK_REASON_LABEL_PREFIX as _GRID_CONTROL_BLOCK_REASON_LABEL_PREFIX,
     _TYPE_FIELD_BY_KEY as _TYPE_FIELD_BY_KEY,
-    _battery_site_settings_has_acb as _battery_site_settings_has_acb,
     _site_entry_title as _site_entry_title,
     _coerce_int_value as _coerce_int_value,
     _bounded_int as _bounded_int,
@@ -227,42 +224,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
 
         return int(resolve_nominal_voltage_for_hass(self.hass))
 
-    def _entry_auth_tokens(self) -> AuthTokens | None:
-        site_id = str(self._entry.data.get(CONF_SITE_ID, "") or "").strip()
-        access_token = self._entry.data.get(CONF_EAUTH) or self._entry.data.get(
-            CONF_ACCESS_TOKEN
-        )
-        cookie = self._entry.data.get(CONF_COOKIE)
-        if not site_id or not access_token or not cookie:
-            return None
-        return AuthTokens(
-            cookie=str(cookie),
-            session_id=self._entry.data.get(CONF_SESSION_ID),
-            access_token=access_token,
-            token_expires_at=self._entry.data.get(CONF_TOKEN_EXPIRES_AT),
-        )
-
-    async def _ac_battery_supported_for_options(self) -> bool:
-        selected = set(self._stored_selected_type_keys())
-        if "ac_battery" in selected:
-            return True
-        tokens = self._entry_auth_tokens()
-        site_id = str(self._entry.data.get(CONF_SITE_ID, "") or "").strip()
-        if tokens is None or not site_id:
-            return False
-        payload = await async_fetch_battery_site_settings(
-            await async_get_clientsession(self.hass),
-            site_id,
-            tokens,
-        )
-        return _battery_site_settings_has_acb(payload)
-
     async def _settings_type_keys(self) -> list[str]:
         visible: list[str] = []
-        ac_battery_supported = await self._ac_battery_supported_for_options()
         for type_key in ONBOARDING_SUPPORTED_TYPE_KEYS:
-            if type_key == "ac_battery" and not ac_battery_supported:
-                continue
             if type_key in _TYPE_FIELD_BY_KEY:
                 visible.append(type_key)
         return visible

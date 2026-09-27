@@ -25,7 +25,7 @@ def inventory_type_selected_for_cleanup(coord: object, type_key: str) -> bool:
     if not normalized:
         return False
     selected = getattr(coord, "_selected_type_keys", None)
-    if selected is None or not selected:
+    if selected is None:
         return True
     try:
         return normalized in {normalize_type_key(key) for key in selected}
@@ -132,30 +132,6 @@ def active_battery_serials_for_cleanup(coord: object) -> set[str] | None:
     return serials_from_getter(getattr(coord, "iter_battery_serials", None))
 
 
-def active_ac_battery_serials_for_cleanup(coord: object) -> set[str] | None:
-    """Return active AC Battery serials when AC Battery discovery is authoritative."""
-
-    if not bool(getattr(coord, "_devices_inventory_ready", False)):
-        return None
-    ac_capability = getattr(coord, "battery_has_acb", None)
-    if ac_capability is False:
-        return set()
-    ac_type_available = inventory_type_available_for_cleanup(coord, "ac_battery")
-    if ac_type_available is False:
-        if inventory_type_known_absent_for_cleanup(coord, "ac_battery"):
-            return set()
-        if isinstance(getattr(coord, "_ac_battery_devices_payload", None), dict):
-            return serials_from_getter(getattr(coord, "iter_ac_battery_serials", None))
-        return None
-    if ac_type_available is True and ac_capability is not True:
-        return None
-    if ac_type_available is True and not isinstance(
-        getattr(coord, "_ac_battery_devices_payload", None), dict
-    ):
-        return None
-    return serials_from_getter(getattr(coord, "iter_ac_battery_serials", None))
-
-
 def active_inverter_serials_for_cleanup(coord: object) -> set[str] | None:
     """Return active inverter serials when inverter inventory is authoritative."""
 
@@ -187,7 +163,6 @@ def active_serial_registry_identifiers(
     return {
         "charger": active_charger_serials_for_cleanup(coord),
         "battery": active_battery_serials_for_cleanup(coord),
-        "ac_battery": active_ac_battery_serials_for_cleanup(coord),
         "inverter": active_inverter_serials_for_cleanup(coord),
     }
 

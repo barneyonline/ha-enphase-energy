@@ -25,7 +25,6 @@ from .api import (
     async_authenticate,
     async_fetch_hems_devices,
     async_fetch_devices_inventory,
-    async_fetch_battery_site_settings,
     async_fetch_inverters_inventory,
     async_fetch_chargers,
     async_resend_login_otp,
@@ -79,7 +78,6 @@ from .config_flow_support import (
     CONF_RESEND_CODE as CONF_RESEND_CODE,
     CONF_TYPE_ENVOY as CONF_TYPE_ENVOY,
     CONF_TYPE_ENCHARGE as CONF_TYPE_ENCHARGE,
-    CONF_TYPE_AC_BATTERY as CONF_TYPE_AC_BATTERY,
     CONF_TYPE_IQEVSE as CONF_TYPE_IQEVSE,
     CONF_TYPE_HEATPUMP as CONF_TYPE_HEATPUMP,
     CONF_TYPE_MICROINVERTER as CONF_TYPE_MICROINVERTER,
@@ -101,7 +99,6 @@ from .config_flow_support import (
     _GRID_MODE_LABEL_PREFIX as _GRID_MODE_LABEL_PREFIX,
     _GRID_CONTROL_BLOCK_REASON_LABEL_PREFIX as _GRID_CONTROL_BLOCK_REASON_LABEL_PREFIX,
     _TYPE_FIELD_BY_KEY as _TYPE_FIELD_BY_KEY,
-    _battery_site_settings_has_acb as _battery_site_settings_has_acb,
     _site_entry_title as _site_entry_title,
     _coerce_int_value as _coerce_int_value,
     _bounded_int as _bounded_int,
@@ -701,9 +698,6 @@ class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
             async_fetch_hems_devices(
                 session, self._selected_site_id, self._auth_tokens, refresh_data=False
             ),
-            async_fetch_battery_site_settings(
-                session, self._selected_site_id, self._auth_tokens
-            ),
             async_fetch_inverters_inventory(
                 session, self._selected_site_id, self._auth_tokens
             ),
@@ -711,8 +705,7 @@ class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
         )
         payload: object = discovery_results[0]
         hems_payload: object = discovery_results[1]
-        battery_site_settings: object = discovery_results[2]
-        legacy_inverters: object = discovery_results[3]
+        legacy_inverters: object = discovery_results[2]
         if isinstance(payload, Exception):
             _LOGGER.debug(
                 "Failed to fetch device inventory during setup for site %s: %s",
@@ -727,13 +720,6 @@ class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
                 redact_text(hems_payload, site_ids=(self._selected_site_id,)),
             )
             hems_payload = None
-        if isinstance(battery_site_settings, Exception):
-            _LOGGER.debug(
-                "Failed to fetch battery site settings during setup for site %s: %s",
-                redact_site_id(self._selected_site_id),
-                redact_text(battery_site_settings, site_ids=(self._selected_site_id,)),
-            )
-            battery_site_settings = None
         if isinstance(legacy_inverters, Exception):
             _LOGGER.debug(
                 "Failed to fetch legacy inverter inventory during setup for site %s: %s",
@@ -764,9 +750,6 @@ class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
         if _hems_heatpump_available(hems_payload) and "heatpump" in _TYPE_FIELD_BY_KEY:
             if "heatpump" not in self._available_type_keys:
                 self._available_type_keys.append("heatpump")
-        if _battery_site_settings_has_acb(battery_site_settings):
-            if "ac_battery" not in self._available_type_keys:
-                self._available_type_keys.append("ac_battery")
         self._available_type_keys = [
             key
             for key in ONBOARDING_SUPPORTED_TYPE_KEYS
@@ -949,8 +932,6 @@ class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
         if selected:
             return selected
         fallback = ["envoy", "encharge"]
-        if "ac_battery" in self._available_type_keys:
-            fallback.append("ac_battery")
         if discovered_serials:
             fallback.append("iqevse")
         if self._default_include_inverters():
