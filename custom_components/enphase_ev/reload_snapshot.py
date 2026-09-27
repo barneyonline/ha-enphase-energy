@@ -32,6 +32,7 @@ class ReloadSnapshot:
     site_id: str
     discovery: Mapping[str, object]
     chargers: Mapping[str, object]
+    configured_serials: frozenset[str]
     last_success_utc: datetime | None
     last_update_success: bool
 
@@ -41,6 +42,7 @@ class ReloadSnapshot:
             site_id=coordinator.site_id,
             discovery=freeze_snapshot_mapping(coordinator.discovery_snapshot.capture()),
             chargers=freeze_snapshot_mapping(coordinator.data or {}),
+            configured_serials=frozenset(coordinator._configured_serials),
             last_success_utc=coordinator.last_success_utc,
             last_update_success=coordinator.last_update_success,
         )
@@ -51,19 +53,30 @@ class ReloadSnapshot:
         if coordinator.site_id != self.site_id:
             raise ValueError("Cannot restore reload state for a different site")
         configured_serials = set(coordinator.serials)
+        configured_order = list(coordinator._serial_order)
         coordinator.discovery_snapshot.apply(_mutable_value(self.discovery))
         coordinator._discovery_snapshot_loaded = True
         if coordinator.config_entry is not None:
             coordinator.apply_config_entry_data(coordinator.config_entry.data)
-        chargers = cast(dict[str, dict[str, object]], _mutable_value(self.chargers))
+        # Entry serials can still contain retired chargers. An unchanged selection
+        # must retain the previous lifecycle's discovery, including an empty list,
+        # while waiting for fresh inventory. Explicit selection changes take effect
+        # immediately and are subsequently reconciled by live discovery.
+        if configured_serials == self.configured_serials:
+            serial_order = list(cast(tuple[str, ...], self.discovery["serial_order"]))
+        else:
+            serial_order = configured_order
         if coordinator.site_only:
-            chargers = {}
-        elif configured_serials:
-            chargers = {
-                serial: payload
-                for serial, payload in chargers.items()
-                if serial in configured_serials
-            }
+            serial_order = []
+        coordinator._serial_order = serial_order
+        coordinator.serials = set(serial_order)
+        coordinator.always_update = coordinator.site_only or not coordinator.serials
+        chargers = cast(dict[str, dict[str, object]], _mutable_value(self.chargers))
+        chargers = {
+            serial: payload
+            for serial, payload in chargers.items()
+            if serial in coordinator.serials
+        }
         coordinator.last_success_utc = self.last_success_utc
         coordinator._has_successful_refresh = True
         coordinator.async_set_updated_data(chargers)
