@@ -10395,3 +10395,20 @@ async def test_text_mutation_disables_auth_replay() -> None:
     assert len(session.calls) == 1
     client._reauth_cb.assert_not_awaited()
     assert "allow_reauth" not in session.calls[0][2]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", ["array_builder_inventory", "array_panel_ratings"])
+@pytest.mark.parametrize("status", [401, 403])
+async def test_capacity_optional_access_does_not_reauthenticate(method, status):
+    session = _FakeSession(
+        [_FakeResponse(status=status, json_body={}, text_body="denied")]
+    )
+    client = _make_client(session)
+    client._reauth_cb = AsyncMock(return_value=True)
+    expected = api.Unauthorized if status == 401 else aiohttp.ClientResponseError
+    with pytest.raises(expected):
+        await getattr(client, method)()
+    client._reauth_cb.assert_not_awaited()
+    assert len(session.calls) == 1
+    assert "allow_reauth" not in session.calls[0][2]

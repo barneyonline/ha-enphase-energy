@@ -2518,6 +2518,14 @@ class EnphaseEVClient(MqttStreamSurface):
 
         return await api_dashboard_surface.dry_contacts_settings(self)
 
+    async def array_builder_inventory(self) -> JsonDict:
+        """Read array layout and inverter capacity metadata."""
+        return await api_dashboard_surface.array_builder_inventory(self)
+
+    async def array_panel_ratings(self) -> dict[str, float | None]:
+        """Read selected panel STC ratings keyed by array ID."""
+        return await api_dashboard_surface.array_panel_ratings(self)
+
     async def inverters_inventory(
         self,
         *,

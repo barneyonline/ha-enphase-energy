@@ -181,6 +181,9 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
 - `battery_runtime.py` handles BatteryConfig controls, profile state, schedules, pending writes, and battery diagnostics payloads.
 - `evse_runtime.py` handles charger commands, fast polling, streaming, charge-mode cache, auth settings, and EVSE control side effects.
 - `inventory_runtime.py` handles topology, type buckets, HEMS inventory, and system-dashboard payloads.
+  Its inverter refresh uses `array_capacity.py` for optional six-hour nameplate
+  metadata reads. Only normalized per-array capacities enter `InventoryState`;
+  Settings HTML and credentials are never retained by this helper.
 - `heatpump_runtime.py` handles HEMS heat-pump runtime state, daily consumption, and diagnostics snapshots.
 - `current_power_runtime.py`, `evse_feature_flags_runtime.py`, and `auth_refresh_runtime.py` handle smaller endpoint families.
 - `system_events.py` independently manages active System Dashboard events and the

@@ -171,6 +171,10 @@ Status labels:
 | Grid eligibility | `GET` | `/app-api/<site_id>/grid_control_check.json` | `e-auth-token` + cookies | Runtime |
 | Dry contact settings | `GET` | `/pv/settings/<site_id>/dry_contacts` | `e-auth-token` + cookies | Runtime |
 | Microinverter inventory | `GET` | `/app-api/<site_id>/inverters.json` | `e-auth-token` + cookies | Runtime |
+| Array Builder capacity inventory | `GET` | `/service/builder/api/v3/systems/<site_id>/arrays?locale=<locale>` | authenticated session cookies; general homeowner access unverified | Runtime |
+| Array panel STC ratings | `GET` | `/systems/<site_id>/details` | authenticated session cookies; HTML selected panel options | Runtime |
+| Array panel model catalog | `GET` | `/enlm_internal/pv_module_models/<array_id>/<manufacturer_id>` | authenticated session cookies | Browser capture only |
+| Array Builder site context | `GET` | `/service/builder/api/v3/systems/<site_id>/site_info?locale=<locale>` | authenticated session cookies | Browser capture only |
 | Microinverter array layout | `GET` | `/systems/<site_id>/site_array_layout_x` | authenticated Enlighten session cookies | Browser capture only |
 | Microinverter jellyfish bootstrap | `GET` | `/systems/<site_id>/jellyfish_initializer?range=<range>&view=<view>` | authenticated Enlighten session cookies | Browser capture only |
 | EV supported-country catalog | `GET` | `/service/evse_management/api/v1/config/supported_countries` | authenticated session cookies | Browser capture only |
@@ -4032,7 +4036,9 @@ Observed property values from the capture:
 
 Additional panel-metadata evidence (supplied specification v0.3.6, 2026-09-27):
 - The bootstrap endpoint in 2.9.3.b also exposes `module.detail.array_details`;
-  its complete per-array schema was not retained.
+  the 2026-09-27 capture returned `name`, localized `tilt`/`azimuth`/`modules`
+  strings, and `inverter_count`, but no numeric panel rating. See 2.15.4 for
+  the verified per-array STC rating source.
 - For a homogeneous installation, a verified panel count times panel STC rating
   can derive DC nameplate capacity. Mixed arrays require per-array/module ratings;
   inverter count alone is not a universal panel count.
@@ -4252,6 +4258,117 @@ Observed behavior:
 - The observed capture used `range=today` and `view=energy_production`; the exported browser text showed `amp;view` in the query-parameter dump, which is an HTML-escaping artifact rather than a separate API parameter.
 
 ### 2.E Site Battery Runtime Status
+
+### 2.15.3 Array Builder Inventory and Inverter Capacity
+```
+GET /service/builder/api/v3/systems/<site_id>/arrays?locale=<locale>
+Headers:
+  Accept: application/json
+  Cookie: <authenticated Enlighten session cookies>
+```
+Returns array membership and per-inverter nameplate capacity. Observed through
+Safari Array Builder on 2026-09-27. `locale=en-AU` was used by the browser;
+capacity fields are numeric. Runtime uses the same route without a locale override.
+
+Example response excerpt (anonymized):
+```json
+{
+  "system_id": 1234567,
+  "arrays": [
+    {
+      "id": 9000001,
+      "label": "Array A",
+      "angle": 188,
+      "tilt": "22.0",
+      "modules": [{"id": 9100001, "serial_num": "12XXXXXXXXXX"}]
+    }
+  ],
+  "inventory_details": [
+    {"type": "IQ7A", "count": 1, "serialNum": "12XXXXXXXXXX", "label_name": null, "capacity": 349}
+  ]
+}
+```
+
+Observed structure and interpretation:
+- Top-level keys also include `created_at`, `updated_at`, `angle`, `inventory`,
+  and `layers`. Array records also contain layout coordinates and gateway references.
+- Join `arrays[].modules[].serial_num` to `inventory_details[].serialNum`.
+  Array `id` joins to the Settings form's `pv_module_model_<array_id>` selector.
+- Sixteen IQ7A records each returned `count: 1` and `capacity: 349`.
+  The field has no explicit unit. The value matches the IQ7A maximum continuous
+  AC output rating of 349 VA in the [Enphase ANZ datasheet](https://enphase.com/es-mx/media/3361).
+  This establishes the observed IQ7A interpretation, not a universal contract
+  for every future inverter family. Do not substitute peak output or measured power.
+- Runtime totals unique inverter records in VA, converts to kVA, and exposes
+  per-array values in the same unit. Duplicate or incomplete membership must not
+  yield a partial total. The observed `count` was one; other values are unsupported.
+- Access succeeded with the existing Enlighten session and no separately supplied
+  installer token. General homeowner entitlement remains unverified.
+- Runtime reads this optional static metadata no more often than every six hours
+  after complete success or HTTP 401/403 denial; other incomplete/failed reads
+  retry no sooner than one hour. These optional reads disable stored-credential
+  reauthentication so missing endpoint permissions do not trigger login attempts.
+- Capacity entities are discovered individually only after complete usable data.
+  Denied builder access creates neither entity; denied Settings access can still
+  create Total Inverter Capacity. Later success discovers sensors dynamically.
+  Existing entities become unavailable on failed reads and retain their history;
+  unrelated telemetry and core authentication remain independent.
+
+### 2.15.4 Array Panel Ratings and Model Catalog
+```
+GET /systems/<site_id>/details
+Headers:
+  Accept: text/html,application/xhtml+xml
+  Cookie: <authenticated Enlighten session cookies>
+```
+The existing Settings HTML also supplies array-specific panel selections. The
+runtime extracts only selected panel STC ratings; it does not retain the raw HTML,
+which contains personal information and short-lived authentication material.
+
+Minimal HTML shape:
+```html
+<select id="pv_module_model_9000001" name="device_group[pv_module_model_id]">
+  <option value="14969" data-stc-rating="435" selected="selected">SPR-MAX6-435-E3-AC</option>
+</select>
+```
+
+- The selector suffix is the array ID. Only the selected option establishes its
+  configured panel rating; unselected catalog options are not installed equipment.
+- `data-stc-rating` is panel DC nameplate power in watts. Multiply by the matched
+  layout's module count and sum complete arrays to derive Total Array Size in kW
+  (DC nameplate, conventionally kWp). No power-measurement state class is assigned.
+- This is configured metadata, not independent verification of installed hardware.
+- The capture selected 435 W panels in both arrays, while the site's legacy
+  `inverters.json` `panel_info` reported a different model and `"425 W"`.
+  Consequently, runtime uses per-array Settings ratings and never falls back to a
+  conflicting site-wide rating or parses wattage from a model name.
+- Settings' editable PVWatts DC Array Size is rounded to one decimal place by the
+  frontend. It is a production-estimate input, not the precise nameplate source.
+
+The Settings page's `site_arrays.js` loads panel models using:
+```
+GET /enlm_internal/pv_module_models/<array_id>/<manufacturer_id>
+Headers:
+  Cookie: <authenticated Enlighten session cookies>
+```
+Observed HTTP `200`, `Content-Type: text/html; charset=utf-8`. The response contains
+`<option>` elements with model IDs, names, `data-stc-rating`, and the selected model.
+For the observed SunPower manufacturer, the selected model had `data-stc-rating="435"`.
+The route is documented only; runtime already obtains the selected rating from
+Settings and does not request every manufacturer's catalog.
+
+### 2.15.5 Array Builder Site Context
+```
+GET /service/builder/api/v3/systems/<site_id>/site_info?locale=<locale>
+Headers:
+  Cookie: <authenticated Enlighten session cookies>
+```
+Observed alongside the Array Builder inventory request. Returns `stage`, `type`,
+`name`, `installer`, `user_id`, and feature flags such as
+`array_builder_button_change`, `array_builder_sn_validation`,
+`array_builder_module_bulk_scan`, `array_builder_grouping_mode`, and
+`array_builder_backend_service`. No panel STC rating or inverter capacity was
+returned in this capture. This route is documentation-only. Redact names and IDs.
 
 ### 2.16 Battery Status (Site Battery Card)
 ```
@@ -5765,7 +5882,8 @@ value, not an explicit aggregate-capacity field or measured production peak.
 Confirm the panel count and units before using it; mixed installations require
 per-array/module ratings. Missing or null panel metadata cannot supply this
 recommendation. The bootstrap `module.detail.array_details` metadata (2.9.3.b)
-may provide array context, but its complete schema remains unverified.
+provides array descriptions and inverter counts, but no numeric panel rating
+in the 2026-09-27 capture. Prefer the per-array Settings ratings in 2.15.4.
 
 Zero export requires enabled limiting, an export target and an effective target of zero. In absolute mode, use `free_limit_value`; `limit_value=0` alone cannot identify zero export. A stored zero target does not constrain export when limiting is disabled.
 

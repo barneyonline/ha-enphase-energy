@@ -2153,6 +2153,12 @@
             "name": "In attesa di richiesta a"
           }
         }
+      },
+      "total_array_size": {
+        "name": "Potenza totale dei campi fotovoltaici"
+      },
+      "total_inverter_capacity": {
+        "name": "Capacità totale degli inverter"
       }
     },
     "number": {

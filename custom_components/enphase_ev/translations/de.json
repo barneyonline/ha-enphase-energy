@@ -2153,6 +2153,12 @@
             "name": "Ausstehend angefordert bei"
           }
         }
+      },
+      "total_array_size": {
+        "name": "Gesamte PV-Anlagenleistung"
+      },
+      "total_inverter_capacity": {
+        "name": "Gesamte Wechselrichterleistung"
       }
     },
     "number": {

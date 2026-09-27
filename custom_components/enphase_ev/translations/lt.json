@@ -2153,6 +2153,12 @@
             "name": "Laukiama Užklausa adresu"
           }
         }
+      },
+      "total_array_size": {
+        "name": "Bendra saulės modulių masyvų galia"
+      },
+      "total_inverter_capacity": {
+        "name": "Bendra inverterių galia"
       }
     },
     "number": {

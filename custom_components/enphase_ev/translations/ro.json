@@ -2153,6 +2153,12 @@
             "name": "În așteptare Solicitat la"
           }
         }
+      },
+      "total_array_size": {
+        "name": "Putere totală a câmpurilor fotovoltaice"
+      },
+      "total_inverter_capacity": {
+        "name": "Capacitate totală a invertoarelor"
       }
     },
     "number": {

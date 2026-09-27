@@ -30,6 +30,7 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - IQ Battery telemetry and BatteryConfig controls (where supported); Battery Overall Charge rounds down to a whole percentage (for example, 20.5% becomes 20%) to align with Enphase reporting
 - IQ EV Charger controls and session telemetry
 - IQ Microinverter connectivity, inventory, lifetime production, and optional installer-level parameter telemetry
+- **Total Array Size** (kW DC nameplate) and **Total Inverter Capacity** (kVA continuous AC rating) under IQ Microinverters, each with an `arrays` attribute containing per-array values in the sensor's unit. Panel size uses configured per-array panel STC ratings, not rounded production estimates or site-wide panel metadata. Sensors are created only after complete data is available for each total. Denied Array Builder access (401/403) creates neither sensor; denied Settings access still permits Total Inverter Capacity. Optional metadata refreshes every six hours, including access-denied retries. Transient failures retry after one hour and make existing sensors unavailable without deleting their history. Access depends on the Enlighten account; general homeowner access to these metadata routes has not been verified.
 - Site and cloud energy telemetry (including supported HEMS channels such as Heat Pump and Water Heater lifetime energy)
 
 Legacy AC Battery devices are no longer supported. Upgrading removes their sensors,
@@ -48,7 +49,7 @@ does not enable other device categories on upgrade. IQ Battery support is unchan
 - Optional IQ Battery Scheduler controls and CFG, DTG, and RBD schedule sensors
 - Capability-gated PowerMatch cloud control for supported IQ Battery sites with permitted BatteryConfig write access
 - Optional current site weather on the Enphase Cloud device, created only when the authenticated Enphase weather endpoint is available
-- Independent Microinverter Lifetime Energy and optional installer-level power telemetry
+- Independent per-microinverter Lifetime Energy and optional installer-level Power sensors are both disabled by default. Enable them under Options > Devices > Device Features; saved choices are preserved. These switches do not control the total array capacity sensors.
 - Site tariff visibility, editable rate entities, and tariff update actions
 - Optional installer-only Grid Profile Control through Enphase cloud Activation,
   with country-scoped profile selection and current profile monitoring. Enable it
