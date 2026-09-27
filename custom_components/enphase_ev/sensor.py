@@ -3694,7 +3694,7 @@ class EnphaseBatteryOverallChargeSensor(_SiteBaseEntity):
         if value is None:
             return None
         try:
-            return round(float(value), 1)
+            return math.floor(float(value))
         except Exception:  # noqa: BLE001
             return None
 

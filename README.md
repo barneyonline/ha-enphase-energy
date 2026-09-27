@@ -27,7 +27,7 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 ## Supported device categories
 
 - IQ Gateway / System Controller entities and controls
-- IQ Battery telemetry and BatteryConfig controls (where supported)
+- IQ Battery telemetry and BatteryConfig controls (where supported); Battery Overall Charge rounds down to a whole percentage (for example, 20.5% becomes 20%) to align with Enphase reporting
 - IQ EV Charger controls and session telemetry
 - IQ Microinverter connectivity, inventory, lifetime production, and optional installer-level parameter telemetry
 - Site and cloud energy telemetry (including supported HEMS channels such as Heat Pump and Water Heater lifetime energy)
