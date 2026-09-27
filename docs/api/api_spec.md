@@ -54,10 +54,10 @@ Example response:
 
 ### 1.2 Endpoint Families (Quick Layout)
 
-- **Auth and discovery:** `1.1`, `6.1`-`6.6`
+- **Auth and discovery:** `1.1`, `6.1`-`6.8`
 - **Site/system inventory and telemetry:** `2.9`-`2.21`
 - **VPP/ELRP enrollment and events:** `2.10.2`
-- **Enlighten Manager and installer diagnostics:** `2.24`-`2.29`
+- **Enlighten Manager and installer diagnostics:** `2.24`-`2.30` (installer PEL contracts in `2.30`)
 - **EV charger telemetry and metadata:** `2.1`-`2.8`
 - **EV charger controls and scheduling:** `3.1`-`3.3`, `4.1`-`4.5`
 - **BatteryConfig controls:** `5.1`-`5.11`
@@ -111,6 +111,15 @@ Status labels:
 | EV lifetime timeseries | `GET` | `/service/timeseries/evse/timeseries/lifetime_energy?site_id=<site_id>&source=evse&requestId=<uuid>[&username=<user_id>]` | bearer token + session headers | Runtime |
 | Site inventory | `GET` | `/app-api/<site_id>/devices.json` | `e-auth-token` + cookies | Runtime |
 | Multi-gateway phase map | `GET` | `/app-api/<site_id>/phase_map_multiple_envoy` | authenticated session cookies + `e-auth-token` | Runtime |
+| Installer Grid Services eligibility | `GET` | `https://gs.enphaseenergy.com/enrollment-mgr/api/v1/enrollment/site/<site_id>` | installer access; see `2.10.3` | Browser capture only |
+| Installer Grid Services battery context | `GET` | `https://gs.enphaseenergy.com/site-mgr/api/v1/site/<site_id>/battery_info` | installer access; standalone auth unverified | Not implemented; frontend source only |
+| Installer Grid Services notifications | `GET` / `PUT` | `https://gs.enphaseenergy.com/enrollment-mgr/api/v1/notification/site/<site_id>` | installer access; standalone auth unverified | Not implemented; frontend source only |
+| Installer application authorizations | `GET` | `/app_user_auth` | installer session | Browser capture only |
+| Installer Grid Services application authorizations | `GET` | `https://gs.enphaseenergy.com/enrollment-mgr/api/v1/app_user_auths/<site_id>` | installer access; standalone auth unverified | Not implemented; frontend source only |
+| Installer PEL summary | `GET` | `/app-api/<site_id>/get_pel_details` | authenticated session; installer-only feature policy; see `2.30` | Browser capture only |
+| Installer gateway settings read | `POST` | `/service/site-device/api/v1/<site_id>/site-device-settings` (JSON `{}`) | authenticated session; installer-only feature policy | Browser capture only |
+| Installer PEL form | `GET` | `/site_pel_settings/<site_id>/edit?settings_view=true` | authenticated session; installer-only feature policy | Browser capture only |
+| Installer PEL form write | `PUT` / `POST` with `_method=put` | `/site_pel_settings/<site_id>` | authenticated session + live form authenticity token; installer-only feature policy | Browser capture only; supplied source reports verified configuration readback |
 | Site bootstrap payload | `GET` | `/app-api/<site_id>/data.json?app=<id>&device_status=non_retired&is_mobile=<id>` | authenticated session cookies + `e-auth-token` | Browser capture only |
 | Filtered site-device inventory | `POST` | `/service/site-device/api/v2/devices/list` | `e-auth-token` + cookies | Browser capture only |
 | Site live-stream flags | `GET` | `/app-api/<site_id>/show_livestream` | authenticated session cookies | Runtime |
@@ -3689,6 +3698,57 @@ A changed program invalidates previously cached events. Entity timers publish
 calendar and next-event transitions and one-hour cache expiry even when polling
 is paused.
 
+### 2.10.3 Installer Grid Services Eligibility
+
+```http
+GET https://gs.enphaseenergy.com/enrollment-mgr/api/v1/enrollment/site/<site_id>
+Headers:
+  Authorization: <manager_token>
+  e-auth-token: <session_value>
+```
+
+Auth: installer access required. Observed in the supplied specification v0.3.6
+(2026-09-27); documentation only. No request body. Other observed header names
+were `Accept`, `Content-Type`, `Referer`, and `User-Agent`. Frontend source supplies
+the token/session values above; a `Bearer` prefix and minimum standalone
+credential recipe were not established.
+
+Response fields:
+
+| Field | Observed shape |
+| --- | --- |
+| `meta.serverTimeStamp` | Envelope timestamp. |
+| `data` | Eligibility data including `eligible_programs`, `program_key`, and `eligible`; complete nesting/types were not retained. |
+| `error` | Error envelope; representative error payloads unverified. |
+
+Eligibility does not establish enrollment or partner dispatch access. This
+capture does not replace the runtime enrollment endpoints or their isolated
+authentication policy in 2.10.2, and is not a runtime enrollment fallback.
+
+### 2.10.4 Installer Grid Services Battery Context
+
+```http
+GET https://gs.enphaseenergy.com/site-mgr/api/v1/site/<site_id>/battery_info
+```
+
+Auth: installer access required; standalone header requirements unverified.
+Source evidence: frontend route reported in the supplied specification v0.3.6
+(2026-09-27), not an executed request. No request-body contract was retained.
+Response consumers reference `lock_profile` and `reserved_soc`; full schema,
+access behavior, and semantics remain unverified.
+
+### 2.10.5 Installer Grid Services Notification Preferences
+
+```http
+GET https://gs.enphaseenergy.com/enrollment-mgr/api/v1/notification/site/<site_id>
+PUT https://gs.enphaseenergy.com/enrollment-mgr/api/v1/notification/site/<site_id>
+```
+
+Auth: installer access required; standalone header requirements unverified.
+Source evidence: frontend routes reported in the supplied specification v0.3.6
+(2026-09-27), not executed requests. PUT request body and response schemas were
+not retained. These routes concern notification preferences, not DR activation.
+
 ### 2.11 Battery Backup History
 ```
 GET /app-api/<site_id>/battery_backup_history.json
@@ -3975,6 +4035,19 @@ Observed property values from the capture:
 - `part_num`: `800-01395-r03`, `800-01391-r03`
 - `fw1`: `521-00005-r06-v08.13.01`
 - `fw2`: `549-00071-r01-v08.13.01`, `549-00047-r01-v08.13.01`
+
+Additional panel-metadata evidence (supplied specification v0.3.6, 2026-09-27):
+- The bootstrap endpoint in 2.9.3.b also exposes `module.detail.array_details`;
+  its complete per-array schema was not retained.
+- For a homogeneous installation, a verified panel count times panel STC rating
+  can derive DC nameplate capacity. Mixed arrays require per-array/module ratings;
+  inverter count alone is not a universal panel count.
+- Panel metadata is editable in Manager Settings / Array Details. DC Array Size
+  and System Losses under Estimated Production configure PVWatts estimates,
+  not gateway export targets. No panel-metadata write API is established here.
+- Panel capacity is power in W; the slew-rate setting uses W/sec. The recommended
+  numerical setting is described in 2.30.2. PEL `installed_capacity` is a
+  reference setting, not a verified nameplate source.
 
 ### 2.14 Inverter Production by Date Range
 ```
@@ -5531,6 +5604,298 @@ Potentially stateful diagnostic `GET` routes (such as meter CT verification) and
 
 ---
 
+### 2.30 Installer Gateway Export Limiting (PEL)
+
+Observed: supplied observational specification v0.3.6, dated 2026-09-27.
+These contracts are documentation only. Reported write verification means
+configuration readback in that investigation, not physical export-ceiling
+verification. Initial feature policy requires installer access; these browser
+captures do not establish an installer-only server entitlement rule. Activation
+installer access alone does not prove PEL entitlement. An actual integration-session
+PEL write, minimum required headers, entitlement errors, and cross-site
+compatibility remain unverified.
+
+Additional evidence: read-only PEL implementation supplement, 2026-09-27. That
+investigation made no PEL writes or energy-setting changes. Named JSON excerpt
+files were referenced but not included with the supplied text; the structural
+example below is illustrative, not a captured full response.
+
+#### 2.30.1 PEL Summary
+
+```http
+GET /app-api/<site_id>/get_pel_details
+Headers:
+  Cookie: <authenticated_installer_session_cookies>
+```
+
+Auth: authenticated Enlighten session; installer-only feature policy. No request body.
+
+Response fields:
+
+| Field | Observed meaning |
+| --- | --- |
+| `pel_type` | PEL type label; exhaustive values unverified. |
+| `export_limit` | Summary label; not a numerical target or the gateway settings boolean of the same name. |
+
+Literal values and a complete response snapshot were not retained. This summary
+does not establish instantaneous curtailment or the active watt target.
+
+#### 2.30.2 Gateway Settings Read
+
+```http
+POST /service/site-device/api/v1/<site_id>/site-device-settings
+Headers:
+  Content-Type: application/json
+  Cookie: <authenticated_installer_session_cookies>
+Body: {}
+```
+
+Auth: authenticated Enlighten session; installer-only feature policy. This POST reads settings.
+
+Response structure: `data.gateway_settings[]` contains gateway records identified
+by `device_id` (a string). Historical records may omit `pel_settings_infos`;
+absence must not be interpreted as disabled limiting. Match the active gateway
+by identity when interpreting readback. Writes target the site, not a selectable
+gateway; behavior with multiple active gateways remains unknown.
+
+Illustrative sanitized response structure (selected fields only):
+
+```json
+{
+  "type": "site-device-settings",
+  "timestamp": "<response_timestamp>",
+  "data": {
+    "site_settings": {},
+    "gateway_settings": [
+      {
+        "device_id": "<gateway_device_id>",
+        "site_id": "<site_id>",
+        "device_type": "ENVOY",
+        "pel_settings_infos": {}
+      },
+      {
+        "device_id": "<historical_gateway_device_id>",
+        "site_id": "<site_id>",
+        "device_type": "ENVOY"
+      }
+    ],
+    "device_settings": {}
+  },
+  "errors": null
+}
+```
+
+Only the envelope keys and gateway structure are established here; empty objects
+for `site_settings`, `device_settings`, and `pel_settings_infos` stand in for
+omitted contents, not observed empty values. The timestamp placeholder does not
+assert the original JSON type.
+
+Observed response types:
+
+| Field | JSON type observed |
+| --- | --- |
+| `device_id`, `site_id`, `device_type` | String; inspected gateway type was `ENVOY`. |
+| `enable`, `export_limit`, `enable_dynamic_limiting` | Boolean. |
+| `reference_value`, `free_limit_value`, `limit_value` | Number. |
+| `slew_rate`, `max_power_export`, `installed_capacity` | Number. |
+| `relays_count`, `levels_count`, `default_pct_limit` | Number. |
+| `created_at`, `updated_at` | Number, consistent with epoch seconds. |
+| `pct_limits`, `limit_levels` | Object; empty objects observed. |
+| `agg_power_export_limit`, `max_back_feed`, various breaker fields | Null observed; non-null schemas unverified. |
+
+No numeric strings were observed in these PEL fields; cross-version consistency
+is unverified. Missing PEL objects mean unavailable, not disabled. Do not coerce
+null/missing numbers to zero or use generic truthiness for string `"false"`.
+
+No top-level `active`, `retired`, or serial field was present in inspected gateway
+records. An independently known active serial from bootstrap
+`state.devices[].serialNumber` also appeared inside
+`data.gateway_settings[].der_if_report.DevCert`, allowing a device-ID cross-check.
+This observed certificate-path association is not a general identity resolver;
+certificate URLs may be absent and must not enter diagnostics unredacted.
+A replacement-flow frontend helper reads
+`gateway_settings[0].power_export_limiting.pel_power_ctrl_set_point`; this separate
+flow does not make index zero a valid selector for PEL control.
+
+Observed unauthenticated response: HTTP `401`, empty body, no `Content-Type`
+header when the settings POST omitted credentials. Handle status before JSON
+parsing. Permission-denial and expired-token variants remain uncaptured.
+
+Settings fields and corresponding form semantics:
+
+| Field | Meaning / boundary |
+| --- | --- |
+| `enable` | Overall gateway limiting gate. |
+| `export_limit` | Export target when true; production target when false while limiting is enabled. Not an independent disable command. |
+| `reference_value` | Form mapping: `1` DC installed capacity [Wp], `2` AC installed capacity [W], `3` absolute watts. Availability depends on mode. |
+| `free_limit_value` | Active absolute-watt target in reference mode `3`. |
+| `limit_value` | Form label Installed DC Capacity [Wp]; must not be assumed to hold the active absolute export target. |
+| `max_power_export` | Form percentage relative to DC installed capacity; nonzero backend conversion unverified. |
+| `installed_capacity` | Relay reference maximum capacity [Wp or W], depending on reference. Not a verified source of panel capacity or slew rate. |
+| `slew_rate` | Power-change rate in W/sec, not a power ceiling. Recommended numerical value: the installation's maximum panel production in W (see guidance below). Preserve the existing valid value during unrelated limit changes. |
+| `enable_dynamic_limiting` | Form `false` selects ordinary gateway limiting; `true` selects digital-input relay limiting; `disable_settings` requests disablement. Distinct from response `enable`. |
+| `relays_count` | Form options 1–4 digital-input relays; electrical polarity unverified. |
+| `levels_count` | Source adjusts levels to `2 ** relays_count`; backend bounds unverified. |
+| `limit_levels` | Relay-state combinations; backend serialization unverified. |
+| `pct_limits` | Form percentage per relay level; frontend inputs specify 0–100. Backend representation unverified. |
+| `default_pct_limit` | Default Power Limit [%]; fallback trigger/fault behavior unverified. |
+| `updated_at` | Settings timestamp; not a proven command-execution acknowledgement. |
+
+Slew-rate recommendation (contributor guidance): set the numerical `slew_rate`
+value to the installation's maximum total panel production in W. For example,
+a maximum panel production of 6,000 W gives a recommended setting of
+6,000 W/sec. This is configuration guidance, not a verified API default or
+server requirement. Preserve the gateway's existing valid slew rate when only
+changing the export limit or disabling limiting, unless intentionally applying
+this recommendation.
+
+Panel-rating source: `GET /app-api/<site_id>/inverters.json` (2.13) returns
+`panel_info.stc_rating` and the inventory `total`. For a homogeneous installation
+with one panel per microinverter, derive maximum total panel production by
+multiplying `total` by the panel STC rating in W. This is a derived DC nameplate
+value, not an explicit aggregate-capacity field or measured production peak.
+Confirm the panel count and units before using it; mixed installations require
+per-array/module ratings. Missing or null panel metadata cannot supply this
+recommendation. The bootstrap `module.detail.array_details` metadata (2.9.3.b)
+may provide array context, but its complete schema remains unverified.
+
+Zero export requires enabled limiting, an export target and an effective target of zero. In absolute mode, use `free_limit_value`; `limit_value=0` alone cannot identify zero export. A stored zero target does not constrain export when limiting is disabled.
+
+Zero export still permits solar to supply local loads and charging. Configuration alone does not establish instantaneous curtailment or curtailed watts. DR flags, PV mode and separate `PEL`/`Hard_PEL`/`Soft_PEL` objects must not substitute for this gateway configuration.
+
+#### 2.30.3 PEL Settings Form
+
+```http
+GET /site_pel_settings/<site_id>/edit?settings_view=true
+Headers:
+  Cookie: <authenticated_installer_session_cookies>
+```
+
+Auth: authenticated Enlighten session; installer-only feature policy. No request body.
+
+Observed unauthenticated response outside the browser, with redirects disabled:
+HTTP `302`, `Location: /login`, and no `Content-Type` header. In-browser manual
+redirect handling with credentials omitted returned `opaqueredirect`, status 0,
+and an empty body. Neither result establishes successful form retrieval.
+
+Response: authenticated HTML form containing `authenticity_token`, hidden fields,
+and `info_pel_settings_info[...]` controls. There is no gateway selector; the
+write targets the site. No device/serial identifier input was present. Do not
+invent a `device_id` write field. Initial control support should require an
+unambiguous supported gateway configuration; multiple-active-gateway selection
+or fan-out remains unverified. Field semantics are listed in 2.30.2;
+relay serialization and complete response placement remain unverified. Preserve
+live hidden fields when constructing a write; redact tokens and identifiers
+before sharing form captures.
+
+#### 2.30.4 Update PEL Settings
+
+```http
+PUT /site_pel_settings/<site_id>
+Headers:
+  Content-Type: application/x-www-form-urlencoded
+  Cookie: <authenticated_installer_session_cookies>
+Body (form, retaining other live form fields):
+  authenticity_token=<authenticity_token>
+  commit=Save
+  info_pel_settings_info[enable_dynamic_limiting]=false
+  info_pel_settings_info[export_limit]=true
+  info_pel_settings_info[reference_value]=3
+  info_pel_settings_info[free_limit_value]=<export_limit_watts>
+  info_pel_settings_info[slew_rate]=<existing_slew_rate_watts_per_second>
+```
+
+Auth: the same authenticated Enlighten session and live form authenticity token
+are required; installer-only feature policy. An Activation JWT-only PEL contract
+has not been established.
+The native form alternative is `POST /site_pel_settings/<site_id>` with
+`_method=put`; direct PUT omits `_method`. The minimum standalone body is unknown.
+
+Observed UI validation: absolute export limits allow **0–100,000 W**, in
+**1 W** steps. Detached validation rejects negative values, fractions, and
+values above that maximum. These are confirmed UI constraints; server bounds
+and server-validation response bodies remain unverified. The input has
+`min="0"`, `max="100000"`, and no explicit `step`; detached browser validation
+confirmed the effective whole-number step. Inputs -1, 0.5, and 100001 failed;
+0, 1, and 100000 passed. No detached form was submitted. This UI maximum is not
+a site's permitted grid-export capacity or proof of server acceptance at the
+maximum. Panel capacity is not the API upper bound.
+
+Implementation note: `api_client/request_surface.py` supports authenticated HTML
+requests through `_text_response`. On HTTP `401`, it can invoke reauthentication
+and automatically replay the request once. PEL writes need explicit retry
+handling so a generic helper does not silently resubmit a mutation. Existing
+HTML transport support does not verify an actual integration-session PEL write;
+permission-denial and expired-token behavior still need validation.
+`_text_response` does not consume an `allow_reauth` keyword as `_json` does;
+passing `allow_reauth=False` is not a supported way to disable replay. Reacquire
+a fresh form/token after session renewal and distinguish definite auth rejection
+from an uncertain submitted write. Activation's JSON transport also retries and
+is not a verified PEL transport.
+
+Use the integration's own session for validation; do not copy browser credentials.
+Fetch the form with redirects disabled and verify the intended form/action,
+nonempty authenticity token, and absence of login-wall markers before any write.
+HTTP 200 HTML alone does not prove that the intended form was returned.
+
+Observed write sequence:
+
+1. Open the PEL settings form (2.30.3) in the signed-in browser and obtain its live form and authenticity token.
+2. Read gateway settings (2.30.2) to identify the gateway and preserve its valid slew rate.
+3. Build `URLSearchParams` from the form's `FormData`, retaining authentication,
+   unrelated successful controls, repeated names, and exact bracket spelling.
+   Unchecked radios, disabled controls, and ordinary submit buttons are excluded;
+   explicitly add `commit=Save`. URL-encoded values are strings, including
+   `"false"`, `"true"`, `"3"`, and watt values.
+4. For direct PUT, remove `_method` and set `commit=Save`.
+5. Apply only the intended enable/target or disable overrides.
+6. Send once with `redirect: 'manual'`, then verify through gateway settings (2.30.2).
+
+The request example above enables an absolute export limit. Set
+`<export_limit_watts>` to `0` for zero export. The supplied investigation reports
+configuration readback for both nonzero targets and zero export.
+
+Disable existing gateway limiting:
+
+```text
+info_pel_settings_info[enable_dynamic_limiting]=disable_settings
+info_pel_settings_info[slew_rate]=<existing_slew_rate_watts_per_second>
+```
+
+Disablement has been verified through response `enable=false`. The tested requests retained other form values; a minimum standalone payload has not been isolated. For native POST submission, retain `_method=put`. Preserve `info_pel_settings_info[settings_view]` where supplied by the form.
+
+The form can display a zero slew-rate default inconsistent with gateway readback. Frontend validation requires a positive value, including on disablement. It uses `parseFloat`, checks for NaN and nonpositive input, normalizes negative input and rounds excess decimal places to two. The slew input itself has `min="0"`, `step="0.01"`, and no maximum; the separate
+script enforces positivity. Other UI inputs: `limit_value` has minimum 0,
+maximum 100000, step 1; `installed_capacity` has minimum 0 and maximum 100000;
+percentage fields have minimum 0 and maximum 100. These are not complete server
+validation contracts.
+
+Response and verification:
+
+No JSON success body or exact redirect status/location was retained.
+Manual browser redirect handling can return `opaqueredirect` with status zero. Automatic redirect following can produce a downstream error even when the gateway write succeeds. Neither an opaque redirect nor an HTTP redirect proves application. Inspect
+`Location`: a redirect to `/login` is an authentication failure, not success.
+An empty 401 must not become a JSON parsing error classified as pending.
+Expired-session, invalid-authenticity-token, installer permission-denial, and
+server-validation responses remain uncaptured. No authenticated malformed or
+out-of-range write was attempted in the supplement.
+
+A gateway-sent banner indicates submission, not completion. Absence of that text is also insufficient to declare failure. Verify the intended fields through gateway settings (2.30.2):
+
+- Enable/target change: compare `enable`, `export_limit`, `reference_value` and `free_limit_value`.
+- Disablement: verify `enable=false`.
+- Confirm the slew rate remains the intended preserved value.
+
+Propagation takes minutes; an immediate unchanged response is inconclusive. Suggested client behavior: poll about once per minute over a five-minute observation window before investigating an unchanged result. This is an operational starting point, not a rate-limit contract or guaranteed maximum latency. Compare actual fields, not only `updated_at`. Report timeout as pending/unconfirmed; do not automatically repeat writes without a verified idempotency contract.
+
+Limitations:
+
+An inactive legacy inline handler references absent controls and a nonexistent `#save` element. Its computed limit and relay serialization are not the working form contract. Do not use those calculations as verified write DTOs.
+
+No explicit instantaneous solar-curtailment flag or curtailed-watts field was established. Configuration confirmation does not prove physical ceiling enforcement under all conditions. Other grid-profile or utility constraints can remain when gateway limiting is disabled.
+
+---
+
 ## 3. EV Charger Control Operations
 
 Observed request variants differ across regions. All payloads shown below are the canonical request.
@@ -6721,6 +7086,18 @@ Example response (anonymized):
 Observed structure:
 - The captured site returned an empty `data` object, so field semantics remain unknown.
 
+Observed DR interpretation (supplied specification v0.3.6, 2026-09-27):
+
+Legacy DR fields (`dr_event_active`, `dr_event_mode`) and modern fields
+(`drEventActive`, `drEventMode`) can disagree. Preserve source and freshness;
+missing/failed reads are unknown. Frontend display precedence was Storm Guard,
+then a `TPC`-prefixed context, then active DR with the feature flag, then the base
+profile. Outside Live Status, TPC context displays External Control; in Live
+Status exact `TPC` displays Self-Consumption and other TPC-prefixed modes display
+Event Active. This source-derived display logic is not a dispatch enum or
+mode-to-watts contract. No homeowner DR-activation setter was established.
+
+
 ### 5.8 Battery Schedules
 ```
 GET /service/batteryConfig/api/v1/battery/sites/<site_id>/schedules
@@ -7636,6 +8013,31 @@ There is no single universal header set; the implementation varies headers by en
   - preserve the original cookies and fall back to the stored Manager-cookie JWT, then the stored Enlighten access token, if bootstrap is temporarily unavailable
   - on `401`/`403` for a bootstrapped JWT, clear the cached context, force one bootstrap, rebuild the request headers, and retry once
   - requires installer-level Activation access in the observed capture
+
+---
+
+### 6.7 Installer Application Authorizations
+
+```http
+GET /app_user_auth
+```
+
+Auth: authenticated installer session required. Observed in the supplied
+specification v0.3.6 (2026-09-27); no request body.
+
+Response: HTML containing an `app_list` element. It is not JSON, and an empty
+list does not establish a complete inventory of partner authorizations.
+
+### 6.8 Installer Grid Services Application Authorizations
+
+```http
+GET https://gs.enphaseenergy.com/enrollment-mgr/api/v1/app_user_auths/<site_id>
+```
+
+Auth: installer access required; standalone header requirements unverified.
+Source evidence: frontend route reported in the supplied specification v0.3.6
+(2026-09-27), not an executed request. Request-body and response schemas were not
+retained; access has not been verified by this capture.
 
 ---
 
