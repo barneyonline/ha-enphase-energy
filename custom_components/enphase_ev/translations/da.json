@@ -481,6 +481,27 @@
     },
     "grid_profile_controls_disabled": {
       "message": "Aktivér installatørstyring af netprofil i integrationsindstillingerne, før du bruger denne handling."
+    },
+    "export_limit_unavailable": {
+      "message": "Eksportgrænsen er utilgængelig. Installatøradgang og en understøttet konfiguration med én gateway kræves."
+    },
+    "export_limit_invalid": {
+      "message": "Indtast hele watt fra 0 til 100000."
+    },
+    "export_limit_changed": {
+      "message": "Konfigurationen er ændret. Kontrollér de opdaterede indstillinger, og bekræft igen."
+    },
+    "export_limit_pending": {
+      "message": "Afventer bekræftelse af konfigurationen. Opdatér status før en ny ændring."
+    },
+    "export_limit_disabled": {
+      "message": "Aktivér styring af eksportgrænser (Funktioner → Enhedsfunktioner)."
+    },
+    "export_limit_confirmation": {
+      "message": "Bekræft denne ændring"
+    },
+    "export_limit_invalid_slew": {
+      "message": "Indtast et positivt tal med højst to decimaler."
     }
   },
   "options": {
@@ -503,7 +524,7 @@
           "repair_notifications": "Administrer Home Assistant-reparationsnotifikationer.",
           "authentication_settings": "Start loginflowet for at opdatere legitimationsoplysninger uden at fjerne integrationen.",
           "migrate_envoy": "Overtag valgte Enphase Envoy-energi-entitets-id'er, så Home Assistant Energy-historikken fortsætter under denne integration.",
-          "advanced": "Valgfri styring af nettilstand og netprofilstyring kun for installatører.",
+          "advanced": "Installatør- og vedligeholdelseshandlinger.",
           "features": "Konfigurer enhedsfunktioner og avancerede kontroller."
         },
         "data": {
@@ -672,11 +693,13 @@
         "description": "Installatør- og vedligeholdelseshandlinger.",
         "menu_options": {
           "grid_toggle": "Nettilstand",
-          "grid_profile": "Netprofilstyring"
+          "grid_profile": "Netprofilstyring",
+          "export_limit": "Eksportgrænse"
         },
         "menu_option_descriptions": {
           "grid_toggle": "Konfigurer manuel styring af nettilstand.",
-          "grid_profile": "Gennemse og anvend Activation-netprofiler kun for installatører."
+          "grid_profile": "Gennemse og anvend Activation-netprofiler kun for installatører.",
+          "export_limit": "Konfigurer systemets eksportgrænser."
         }
       },
       "grid_toggle": {
@@ -742,7 +765,8 @@
               "weather_enabled": "Aktivér vejr",
               "nominal_voltage": "EV-opladerens nominelle spænding (V)",
               "microinverter_lifetime_energy_enabled": "Aktivér mikroinverteres levetidsenergi",
-              "vpp_events_enabled": "Aktivér VPP-hændelser"
+              "vpp_events_enabled": "Aktivér VPP-hændelser",
+              "export_limit_controls_enabled": "Aktivér styring af eksportgrænser"
             },
             "data_description": {
               "system_event_repair_issues": "Opretter Home Assistant-reparationer for aktive stående Enphase-alarmer. Deaktiveret som standard.",
@@ -752,7 +776,8 @@
               "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger.",
               "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi pr. mikroinverter.",
-              "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og opretter kun hændelsesenheder for tilmeldte anlæg. Deaktiveret som standard."
+              "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og opretter kun hændelsesenheder for tilmeldte anlæg. Deaktiveret som standard.",
+              "export_limit_controls_enabled": "Konfigurer systemets eksportgrænser. Kræver installatøradgang."
             }
           },
           "advanced_features": {
@@ -779,7 +804,8 @@
           "microinverter_lifetime_energy_enabled": "Aktivér mikroinverteres levetidsenergi",
           "microinverter_power_enabled": "Aktivér mikroinvertereffekt",
           "vpp_events_enabled": "Aktivér VPP-hændelser",
-          "grid_profile_controls_enabled": "Aktivér installatørstyring af netprofil"
+          "grid_profile_controls_enabled": "Aktivér installatørstyring af netprofil",
+          "export_limit_controls_enabled": "Aktivér styring af eksportgrænser"
         },
         "data_description": {
           "system_event_repair_issues": "Opretter Home Assistant-reparationer for aktive stående Enphase-alarmer. Deaktiveret som standard.",
@@ -791,7 +817,52 @@
           "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi pr. mikroinverter.",
           "microinverter_power_enabled": "Aktiverer alle effektsensorer pr. mikroinverter, når installatørtelemetri er tilgængelig.",
           "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og opretter kun hændelsesenheder for tilmeldte anlæg. Deaktiveret som standard.",
-          "grid_profile_controls_enabled": "Henter metadata for netprofiler, som kun er tilgængelige for installatører, og aktiverer profilhandlinger. Deaktiveret som standard."
+          "grid_profile_controls_enabled": "Henter metadata for netprofiler, som kun er tilgængelige for installatører, og aktiverer profilhandlinger. Deaktiveret som standard.",
+          "export_limit_controls_enabled": "Konfigurer systemets eksportgrænser. Kræver installatøradgang."
+        }
+      },
+      "export_limit": {
+        "title": "Eksportgrænse",
+        "description": "Konfigurer systemets eksportgrænser."
+      },
+      "export_limit_action": {
+        "title": "Eksportgrænse",
+        "description": "Konfigurer systemets eksportgrænser.\n\nAktuel indstilling: **{current}**\n\n{status}",
+        "menu_options": {
+          "export_limit_set": "Indstil eksportgrænse",
+          "export_limit_zero": "Indstil nuleksport",
+          "export_limit_disable": "Deaktivér eksportbegrænsning",
+          "export_limit_defaults": "Standardindstillinger"
+        }
+      },
+      "export_limit_set": {
+        "title": "Indstil eksportgrænse",
+        "data": {
+          "limit_watts": "Eksportgrænse (W)"
+        }
+      },
+      "export_limit_confirm": {
+        "title": "Eksportgrænse",
+        "description": "Aktuel indstilling: **{current}**\n\nAnmodet indstilling: **{requested}**\n\nÆndringshastighed (W/sec): **{current_slew}** → **{requested_slew}**",
+        "data": {
+          "confirm": "Bekræft denne ændring"
+        }
+      },
+      "export_limit_submitted": {
+        "title": "Eksportgrænse",
+        "description": "Konfigurer systemets eksportgrænser.\n\n**{status}**"
+      },
+      "export_limit_readonly": {
+        "title": "Eksportgrænse",
+        "description": "Eksportgrænsen er utilgængelig. Installatøradgang og en understøttet konfiguration med én gateway kræves.\n\nAktuel indstilling: **{current}**"
+      },
+      "export_limit_defaults": {
+        "title": "Standardindstillinger",
+        "description": "Gem standarder til aktivering af grænsen uden at ændre gatewayen. Gendannelse fjerner den gemte hastighed.",
+        "data": {
+          "limit_watts": "Standardeksportgrænse (W)",
+          "slew_rate": "Ændringshastighed (W/sec)",
+          "restore_slew_rate": "Gendan ændringshastighed fra gateway"
         }
       }
     },
@@ -819,7 +890,14 @@
       "grid_otp_required": "Indtast engangskoden.",
       "grid_otp_invalid_format": "Engangskoden skal indeholde præcis fire cifre.",
       "grid_otp_invalid": "Engangskoden er ugyldig eller udløbet.",
-      "grid_envoy_serial_missing": "Gatewayen for dette anlæg kunne ikke bestemmes."
+      "grid_envoy_serial_missing": "Gatewayen for dette anlæg kunne ikke bestemmes.",
+      "export_limit_unavailable": "Eksportgrænsen er utilgængelig. Installatøradgang og en understøttet konfiguration med én gateway kræves.",
+      "export_limit_invalid": "Indtast hele watt fra 0 til 100000.",
+      "export_limit_changed": "Konfigurationen er ændret. Kontrollér de opdaterede indstillinger, og bekræft igen.",
+      "export_limit_pending": "Afventer bekræftelse af konfigurationen. Opdatér status før en ny ændring.",
+      "export_limit_disabled": "Aktivér styring af eksportgrænser (Funktioner → Enhedsfunktioner).",
+      "export_limit_confirmation": "Bekræft denne ændring",
+      "export_limit_invalid_slew": "Indtast et positivt tal med højst to decimaler."
     },
     "abort": {
       "migration_no_envoy_sources": "Ingen Enphase Envoy-energisensorer er tilgængelige til migrering.",
@@ -1374,7 +1452,7 @@
         }
       },
       "system_profile_status": {
-        "name": "Systemprofilstatus",
+        "name": "Systemprofil",
         "state": {
           "pending": "Afventer"
         },
@@ -2024,6 +2102,57 @@
       },
       "vpp_next_event_status": {
         "name": "Status for næste VPP-hændelse"
+      },
+      "export_limit": {
+        "name": "Eksportgrænse",
+        "state": {
+          "disabled": "Deaktiveret",
+          "zero_export": "Nuleksport",
+          "limited": "Begrænset",
+          "unsupported": "Ikke understøttet",
+          "pending": "Afventer",
+          "unconfirmed": "Ubekræftet"
+        },
+        "state_attributes": {
+          "confirmed_watts": {
+            "name": "Aktuel indstilling"
+          },
+          "requested_watts": {
+            "name": "Anmodet indstilling"
+          },
+          "requested_action": {
+            "name": "Anmodet indstilling",
+            "state": {
+              "set": "Indstil eksportgrænse",
+              "disable": "Deaktivér eksportbegrænsning"
+            }
+          },
+          "request_status": {
+            "name": "Anmodningsstatus",
+            "state": {
+              "idle": "Ingen anmodning",
+              "pending": "Afventer bekræftelse",
+              "confirmed": "Konfiguration bekræftet",
+              "unconfirmed": "Ubekræftet",
+              "rejected": "Afvist"
+            }
+          },
+          "last_successful_readback": {
+            "name": "Seneste vellykkede aflæsning"
+          },
+          "slew_rate": {
+            "name": "Ændringshastighed (W/sec)"
+          },
+          "requested_slew_rate": {
+            "name": "Anmodet indstilling · Ændringshastighed (W/sec)"
+          },
+          "pending": {
+            "name": "Indtil"
+          },
+          "pending_requested_at": {
+            "name": "Afventer anmodet kl"
+          }
+        }
       }
     },
     "number": {
@@ -2364,6 +2493,28 @@
       },
       "battery_schedule_selected": {
         "name": "Batteritidsplan"
+      },
+      "export_limit": {
+        "name": "Eksportgrænse",
+        "state": {
+          "enable_limit": "Aktivér grænse",
+          "disable_limit": "Deaktivér grænse"
+        },
+        "state_attributes": {
+          "default_limit_watts": {
+            "name": "Standardeksportgrænse (W)"
+          },
+          "default_slew_rate": {
+            "name": "Ændringshastighed (W/sec)"
+          },
+          "slew_rate_source": {
+            "name": "Kilde til ændringshastighed",
+            "state": {
+              "gateway": "Gateway",
+              "saved_override": "Gemt tilsidesættelse"
+            }
+          }
+        }
       }
     },
     "button": {
@@ -2540,6 +2691,10 @@
     "active_system_event": {
       "title": "Aktiv Enphase-systemhændelse med stor påvirkning",
       "description": "Anlæg {site_id} har en aktiv {severity}-hændelse, som påvirker {device_type}, første gang rapporteret {event_date}. Se Enlighten for detaljer og anbefalet handling. Denne reparation ryddes automatisk, når Enphase melder hændelsen løst."
+    },
+    "export_limit_pending": {
+      "title": "Ændring af eksportgrænse er ikke bekræftet",
+      "description": "Ændringen er ikke bekræftet efter {pending_timeout_minutes} minutter. Kontroller fortsætter med standardintervallet. Kontrollér gatewayens indstillinger; skrivningen gentages ikke automatisk."
     }
   },
   "system_health": {
@@ -3177,6 +3332,72 @@
         "gateway_serial": {
           "name": "Gateway-serienummer",
           "description": "Valgfrit Gateway-serienummer, når Activation-posten indeholder flere Gateways."
+        }
+      }
+    },
+    "set_export_limit": {
+      "name": "Indstil eksportgrænse",
+      "description": "Konfigurer systemets eksportgrænser.",
+      "fields": {
+        "limit_watts": {
+          "name": "Eksportgrænse (W)",
+          "description": "Indtast hele watt fra 0 til 100000."
+        },
+        "site_id": {
+          "name": "Site-id",
+          "description": "Valgfrit site-id; registreres automatisk når en site-enhed er valgt."
+        },
+        "config_entry_id": {
+          "name": "Enphase config-indgang",
+          "description": "Enphase config-indgang"
+        },
+        "device_id": {
+          "name": "Enheder",
+          "description": "Enheder"
+        },
+        "slew_rate": {
+          "name": "Ændringshastighed (W/sec)",
+          "description": "Valgfrit. Hvis udeladt bruges gatewayens aktuelle værdi."
+        }
+      }
+    },
+    "disable_export_limit": {
+      "name": "Deaktivér eksportbegrænsning",
+      "description": "Konfigurer systemets eksportgrænser.",
+      "fields": {
+        "site_id": {
+          "name": "Site-id",
+          "description": "Valgfrit site-id; registreres automatisk når en site-enhed er valgt."
+        },
+        "config_entry_id": {
+          "name": "Enphase config-indgang",
+          "description": "Enphase config-indgang"
+        },
+        "device_id": {
+          "name": "Enheder",
+          "description": "Enheder"
+        },
+        "slew_rate": {
+          "name": "Ændringshastighed (W/sec)",
+          "description": "Valgfrit. Hvis udeladt bruges gatewayens aktuelle værdi."
+        }
+      }
+    },
+    "refresh_export_limit": {
+      "name": "Opdatér eksportgrænse",
+      "description": "Konfigurer systemets eksportgrænser.",
+      "fields": {
+        "site_id": {
+          "name": "Site-id",
+          "description": "Valgfrit site-id; registreres automatisk når en site-enhed er valgt."
+        },
+        "config_entry_id": {
+          "name": "Enphase config-indgang",
+          "description": "Enphase config-indgang"
+        },
+        "device_id": {
+          "name": "Enheder",
+          "description": "Enheder"
         }
       }
     }

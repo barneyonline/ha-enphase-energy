@@ -48,6 +48,10 @@ from .const import (
     DRY_CONTACT_SETTINGS_FAILURE_CACHE_TTL,
     DRY_CONTACT_SETTINGS_STALE_AFTER_S,
     DOMAIN,
+    DEFAULT_FAST_POLL_INTERVAL,
+    DEFAULT_SLOW_POLL_INTERVAL,
+    OPT_FAST_POLL_INTERVAL,
+    OPT_SLOW_POLL_INTERVAL,
     FAST_TOGGLE_POLL_HOLD_S,
     GRID_CONTROL_CHECK_CACHE_TTL,
     GRID_CONTROL_CHECK_STALE_AFTER_S,
@@ -61,6 +65,7 @@ from .const import (
     STORM_GUARD_CACHE_TTL,
     STORM_GUARD_PENDING_HOLD_S,
 )
+from .runtime_helpers import normalize_poll_intervals
 from .device_types import member_is_retired, sanitize_member
 from .labels import battery_profile_label as translated_battery_profile_label
 from .log_redaction import redact_identifier, redact_site_id, redact_text
@@ -593,6 +598,15 @@ class BatteryRuntime:
         self.set_battery_optimistic_profile(profile, reserve, sub_type)
         self._sync_battery_profile_pending_issue()
 
+    @property
+    def profile_readback_fast(self) -> bool:
+        """Use the configured fast interval only within the confirmation window."""
+        age = getattr(self.coordinator, "battery_pending_age_seconds", None)
+        return bool(
+            getattr(self.battery_state, "_battery_pending_profile", None)
+            and (age is None or age < BATTERY_PROFILE_PENDING_TIMEOUT_S)
+        )
+
     def _backend_not_pending_clear_grace_seconds(self) -> int:
         polling_interval = self._coerce_optional_int(
             getattr(self.battery_state, "_battery_polling_interval_s", None)
@@ -602,6 +616,21 @@ class BatteryRuntime:
         return max(int(polling_interval), FAST_TOGGLE_POLL_HOLD_S)
 
     def _battery_profile_refresh_cache_ttl_seconds(self, default_ttl: float) -> float:
+        if getattr(self.battery_state, "_battery_pending_profile", None):
+            entry = getattr(self.coordinator, "config_entry", None)
+            options = entry.options if entry is not None else {}
+            fast, slow = normalize_poll_intervals(
+                options.get(OPT_FAST_POLL_INTERVAL, DEFAULT_FAST_POLL_INTERVAL),
+                options.get(
+                    OPT_SLOW_POLL_INTERVAL,
+                    getattr(
+                        self.coordinator,
+                        "_configured_slow_poll_interval",
+                        DEFAULT_SLOW_POLL_INTERVAL,
+                    ),
+                ),
+            )
+            return float(fast if self.profile_readback_fast else slow)
         current_interval = None
         update_interval = getattr(self.coordinator, "update_interval", None)
         total_seconds = getattr(update_interval, "total_seconds", None)
@@ -655,7 +684,7 @@ class BatteryRuntime:
     def battery_settings_refresh_due(self, *, force: bool = False) -> bool:
         coord = self.coordinator
         state = self.battery_state
-        pending_profile = getattr(state, "_battery_pending_profile", None)
+        pending_profile = self.profile_readback_fast
         now = time.monotonic()
         if not force and not pending_profile and state._battery_settings_cache_until:
             if now < state._battery_settings_cache_until:
@@ -796,7 +825,7 @@ class BatteryRuntime:
     def storm_guard_refresh_due(self, *, force: bool = False) -> bool:
         coord = self.coordinator
         state = self.battery_state
-        pending_profile = getattr(state, "_battery_pending_profile", None)
+        pending_profile = self.profile_readback_fast
         now = time.monotonic()
         if not force and not pending_profile and state._storm_guard_cache_until:
             if now < state._storm_guard_cache_until:
@@ -3511,7 +3540,7 @@ class BatteryRuntime:
         state = self.battery_state
         now = time.monotonic()
         family = "battery_settings"
-        pending_profile = getattr(state, "_battery_pending_profile", None)
+        pending_profile = self.profile_readback_fast
         if not force and not pending_profile and state._battery_settings_cache_until:
             if now < state._battery_settings_cache_until:
                 return True
@@ -4000,7 +4029,7 @@ class BatteryRuntime:
         state = self.battery_state
         now = time.monotonic()
         family = "storm_guard"
-        pending_profile = getattr(state, "_battery_pending_profile", None)
+        pending_profile = self.profile_readback_fast
         if not force and not pending_profile and state._storm_guard_cache_until:
             if now < state._storm_guard_cache_until:
                 return
@@ -4036,7 +4065,12 @@ class BatteryRuntime:
         state._storm_guard_cache_until = now + (
             self._battery_profile_refresh_cache_ttl_seconds(STORM_GUARD_CACHE_TTL)
         )
-        coord._note_endpoint_family_success(family)
+        coord._note_endpoint_family_success(
+            family,
+            success_ttl_s=self._battery_profile_refresh_cache_ttl_seconds(
+                STORM_GUARD_CACHE_TTL
+            ),
+        )
 
     async def async_refresh_storm_alert(
         self,

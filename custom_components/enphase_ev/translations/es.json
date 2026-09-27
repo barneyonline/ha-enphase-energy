@@ -481,6 +481,27 @@
     },
     "grid_profile_controls_disabled": {
       "message": "Activa los controles de perfil de red para instaladores en las opciones de la integración antes de usar esta acción."
+    },
+    "export_limit_unavailable": {
+      "message": "Límite de vertido no disponible. Se requiere acceso de instalador y una configuración compatible con una sola pasarela."
+    },
+    "export_limit_invalid": {
+      "message": "Introduzca vatios enteros entre 0 y 100000."
+    },
+    "export_limit_changed": {
+      "message": "La configuración ha cambiado. Revise los ajustes y confirme de nuevo."
+    },
+    "export_limit_pending": {
+      "message": "Esperando confirmación de la configuración. Actualice el estado antes de otro cambio."
+    },
+    "export_limit_disabled": {
+      "message": "Activar controles del límite de vertido (Funciones → Funciones del dispositivo)."
+    },
+    "export_limit_confirmation": {
+      "message": "Confirmar este cambio"
+    },
+    "export_limit_invalid_slew": {
+      "message": "Introduzca un número positivo con hasta dos decimales."
     }
   },
   "options": {
@@ -503,7 +524,7 @@
           "repair_notifications": "Gestiona las notificaciones de reparaciones de Home Assistant.",
           "authentication_settings": "Inicia el flujo de inicio de sesión para actualizar credenciales sin eliminar la integración.",
           "migrate_envoy": "Asume los identificadores de entidad de energía seleccionados de Enphase Envoy para que el historial de Home Assistant Energy continúe con esta integración.",
-          "advanced": "Controles opcionales del modo de red y controles de perfil solo para instaladores.",
+          "advanced": "Acciones de instalador y mantenimiento.",
           "features": "Configure las funciones de los dispositivos y los controles avanzados."
         },
         "data": {
@@ -672,11 +693,13 @@
         "description": "Acciones de instalador y mantenimiento.",
         "menu_options": {
           "grid_toggle": "Modo de red",
-          "grid_profile": "Control de perfil de red"
+          "grid_profile": "Control de perfil de red",
+          "export_limit": "Límite de vertido"
         },
         "menu_option_descriptions": {
           "grid_toggle": "Configura los controles manuales del modo de red.",
-          "grid_profile": "Explorar y aplicar perfiles de red de Activation solo para instaladores."
+          "grid_profile": "Explorar y aplicar perfiles de red de Activation solo para instaladores.",
+          "export_limit": "Configurar los límites de vertido del sistema."
         }
       },
       "grid_toggle": {
@@ -742,7 +765,8 @@
               "weather_enabled": "Activar el tiempo",
               "nominal_voltage": "Tensión nominal del cargador EV (V)",
               "microinverter_lifetime_energy_enabled": "Activar energía de por vida de los microinversores",
-              "vpp_events_enabled": "Activar eventos VPP"
+              "vpp_events_enabled": "Activar eventos VPP",
+              "export_limit_controls_enabled": "Activar controles del límite de vertido"
             },
             "data_description": {
               "system_event_repair_issues": "Crea reparaciones de Home Assistant para alarmas permanentes activas de Enphase. Desactivado de forma predeterminada.",
@@ -752,7 +776,8 @@
               "schedule_sync_enabled": "Gestiona los horarios del IQ EV Charger.",
               "battery_schedules_enabled": "Gestiona los horarios de la IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Activa todos los sensores de energía de por vida de cada microinversor.",
-              "vpp_events_enabled": "Obtiene los horarios VPP/ELRP de Enphase y crea entidades de eventos solo para sitios inscritos. Desactivado de forma predeterminada."
+              "vpp_events_enabled": "Obtiene los horarios VPP/ELRP de Enphase y crea entidades de eventos solo para sitios inscritos. Desactivado de forma predeterminada.",
+              "export_limit_controls_enabled": "Configurar los límites de vertido del sistema. Requiere acceso de instalador."
             }
           },
           "advanced_features": {
@@ -779,7 +804,8 @@
           "microinverter_lifetime_energy_enabled": "Activar energía de por vida de los microinversores",
           "microinverter_power_enabled": "Activar potencia de los microinversores",
           "vpp_events_enabled": "Activar eventos VPP",
-          "grid_profile_controls_enabled": "Activar controles de perfil de red para instaladores"
+          "grid_profile_controls_enabled": "Activar controles de perfil de red para instaladores",
+          "export_limit_controls_enabled": "Activar controles del límite de vertido"
         },
         "data_description": {
           "system_event_repair_issues": "Crea reparaciones de Home Assistant para alarmas permanentes activas de Enphase. Desactivado de forma predeterminada.",
@@ -791,7 +817,52 @@
           "microinverter_lifetime_energy_enabled": "Activa todos los sensores de energía de por vida de cada microinversor.",
           "microinverter_power_enabled": "Activa todos los sensores de potencia de cada microinversor cuando la telemetría del instalador está disponible.",
           "vpp_events_enabled": "Obtiene los horarios VPP/ELRP de Enphase y crea entidades de eventos solo para sitios inscritos. Desactivado de forma predeterminada.",
-          "grid_profile_controls_enabled": "Obtiene metadatos del perfil de red exclusivos para instaladores y activa las acciones de perfil. Desactivado de forma predeterminada."
+          "grid_profile_controls_enabled": "Obtiene metadatos del perfil de red exclusivos para instaladores y activa las acciones de perfil. Desactivado de forma predeterminada.",
+          "export_limit_controls_enabled": "Configurar los límites de vertido del sistema. Requiere acceso de instalador."
+        }
+      },
+      "export_limit": {
+        "title": "Límite de vertido",
+        "description": "Configurar los límites de vertido del sistema."
+      },
+      "export_limit_action": {
+        "title": "Límite de vertido",
+        "description": "Configurar los límites de vertido del sistema.\n\nConfiguración actual: **{current}**\n\n{status}",
+        "menu_options": {
+          "export_limit_set": "Establecer límite de vertido",
+          "export_limit_zero": "Establecer vertido cero",
+          "export_limit_disable": "Desactivar limitación de vertido",
+          "export_limit_defaults": "Valores predeterminados"
+        }
+      },
+      "export_limit_set": {
+        "title": "Establecer límite de vertido",
+        "data": {
+          "limit_watts": "Límite de vertido (W)"
+        }
+      },
+      "export_limit_confirm": {
+        "title": "Límite de vertido",
+        "description": "Configuración actual: **{current}**\n\nConfiguración solicitada: **{requested}**\n\nTasa de variación (W/sec): **{current_slew}** → **{requested_slew}**",
+        "data": {
+          "confirm": "Confirmar este cambio"
+        }
+      },
+      "export_limit_submitted": {
+        "title": "Límite de vertido",
+        "description": "Configurar los límites de vertido del sistema.\n\n**{status}**"
+      },
+      "export_limit_readonly": {
+        "title": "Límite de vertido",
+        "description": "Límite de vertido no disponible. Se requiere acceso de instalador y una configuración compatible con una sola pasarela.\n\nConfiguración actual: **{current}**"
+      },
+      "export_limit_defaults": {
+        "title": "Valores predeterminados",
+        "description": "Guarda valores para activar el límite sin cambiar la puerta de enlace. Restaurar elimina la tasa guardada.",
+        "data": {
+          "limit_watts": "Límite de exportación predeterminado (W)",
+          "slew_rate": "Tasa de variación (W/sec)",
+          "restore_slew_rate": "Restaurar la tasa desde la puerta de enlace"
         }
       }
     },
@@ -819,7 +890,14 @@
       "grid_otp_required": "Ingrese el código de un solo uso.",
       "grid_otp_invalid_format": "El código de un solo uso debe contener exactamente cuatro dígitos.",
       "grid_otp_invalid": "El código de un solo uso no es válido o ha caducado.",
-      "grid_envoy_serial_missing": "No se pudo determinar la puerta de enlace para este sitio."
+      "grid_envoy_serial_missing": "No se pudo determinar la puerta de enlace para este sitio.",
+      "export_limit_unavailable": "Límite de vertido no disponible. Se requiere acceso de instalador y una configuración compatible con una sola pasarela.",
+      "export_limit_invalid": "Introduzca vatios enteros entre 0 y 100000.",
+      "export_limit_changed": "La configuración ha cambiado. Revise los ajustes y confirme de nuevo.",
+      "export_limit_pending": "Esperando confirmación de la configuración. Actualice el estado antes de otro cambio.",
+      "export_limit_disabled": "Activar controles del límite de vertido (Funciones → Funciones del dispositivo).",
+      "export_limit_confirmation": "Confirmar este cambio",
+      "export_limit_invalid_slew": "Introduzca un número positivo con hasta dos decimales."
     },
     "abort": {
       "migration_no_envoy_sources": "No hay sensores de energía de Enphase Envoy disponibles para migrar.",
@@ -1374,7 +1452,7 @@
         }
       },
       "system_profile_status": {
-        "name": "Estado del perfil del sistema",
+        "name": "Perfil del sistema",
         "state": {
           "pending": "Pendiente"
         },
@@ -2024,6 +2102,57 @@
       },
       "vpp_next_event_status": {
         "name": "Estado del próximo evento VPP"
+      },
+      "export_limit": {
+        "name": "Límite de vertido",
+        "state": {
+          "disabled": "Desactivado",
+          "zero_export": "Vertido cero",
+          "limited": "Limitado",
+          "unsupported": "No compatible",
+          "pending": "Pendiente",
+          "unconfirmed": "Sin confirmar"
+        },
+        "state_attributes": {
+          "confirmed_watts": {
+            "name": "Configuración actual"
+          },
+          "requested_watts": {
+            "name": "Configuración solicitada"
+          },
+          "requested_action": {
+            "name": "Configuración solicitada",
+            "state": {
+              "set": "Establecer límite de vertido",
+              "disable": "Desactivar limitación de vertido"
+            }
+          },
+          "request_status": {
+            "name": "Estado de la solicitud",
+            "state": {
+              "idle": "Sin solicitud",
+              "pending": "Esperando confirmación",
+              "confirmed": "Configuración confirmada",
+              "unconfirmed": "Sin confirmar",
+              "rejected": "Rechazado"
+            }
+          },
+          "last_successful_readback": {
+            "name": "Última lectura correcta"
+          },
+          "slew_rate": {
+            "name": "Tasa de variación (W/sec)"
+          },
+          "requested_slew_rate": {
+            "name": "Configuración solicitada · Tasa de variación (W/sec)"
+          },
+          "pending": {
+            "name": "Pendiente"
+          },
+          "pending_requested_at": {
+            "name": "Pendiente Solicitado en"
+          }
+        }
       }
     },
     "number": {
@@ -2364,6 +2493,28 @@
       },
       "battery_schedule_selected": {
         "name": "Horario de la batería"
+      },
+      "export_limit": {
+        "name": "Límite de vertido",
+        "state": {
+          "enable_limit": "Activar límite",
+          "disable_limit": "Desactivar límite"
+        },
+        "state_attributes": {
+          "default_limit_watts": {
+            "name": "Límite de exportación predeterminado (W)"
+          },
+          "default_slew_rate": {
+            "name": "Tasa de variación (W/sec)"
+          },
+          "slew_rate_source": {
+            "name": "Origen de la tasa de variación",
+            "state": {
+              "gateway": "Puerta de enlace",
+              "saved_override": "Valor personalizado guardado"
+            }
+          }
+        }
       }
     },
     "button": {
@@ -2540,6 +2691,10 @@
     "active_system_event": {
       "title": "Evento del sistema Enphase de alto impacto activo",
       "description": "El sitio {site_id} tiene un evento {severity} activo que afecta a {device_type}, notificado por primera vez el {event_date}. Consulta Enlighten para ver los detalles y la acción recomendada. Esta reparación se elimina automáticamente cuando Enphase informa que el evento está resuelto."
+    },
+    "export_limit_pending": {
+      "title": "Cambio del límite de vertido sin confirmar",
+      "description": "El cambio no se ha confirmado tras {pending_timeout_minutes} minutos. Las comprobaciones continúan con el intervalo normal. Revise la configuración de la puerta de enlace; la escritura no se repetirá automáticamente."
     }
   },
   "system_health": {
@@ -3177,6 +3332,72 @@
         "gateway_serial": {
           "name": "Número de serie Gateway",
           "description": "Número de serie Gateway opcional cuando el registro Activation contiene varios Gateways."
+        }
+      }
+    },
+    "set_export_limit": {
+      "name": "Establecer límite de vertido",
+      "description": "Configurar los límites de vertido del sistema.",
+      "fields": {
+        "limit_watts": {
+          "name": "Límite de vertido (W)",
+          "description": "Introduzca vatios enteros entre 0 y 100000."
+        },
+        "site_id": {
+          "name": "ID del sitio",
+          "description": "Identificador de sitio opcional; se detecta automáticamente cuando se selecciona un dispositivo de sitio."
+        },
+        "config_entry_id": {
+          "name": "Entrada de configuración de Enphase",
+          "description": "Entrada de configuración de Enphase"
+        },
+        "device_id": {
+          "name": "Dispositivos",
+          "description": "Dispositivos"
+        },
+        "slew_rate": {
+          "name": "Tasa de variación (W/sec)",
+          "description": "Opcional. Si se omite, se usa el valor actual de la puerta de enlace."
+        }
+      }
+    },
+    "disable_export_limit": {
+      "name": "Desactivar limitación de vertido",
+      "description": "Configurar los límites de vertido del sistema.",
+      "fields": {
+        "site_id": {
+          "name": "ID del sitio",
+          "description": "Identificador de sitio opcional; se detecta automáticamente cuando se selecciona un dispositivo de sitio."
+        },
+        "config_entry_id": {
+          "name": "Entrada de configuración de Enphase",
+          "description": "Entrada de configuración de Enphase"
+        },
+        "device_id": {
+          "name": "Dispositivos",
+          "description": "Dispositivos"
+        },
+        "slew_rate": {
+          "name": "Tasa de variación (W/sec)",
+          "description": "Opcional. Si se omite, se usa el valor actual de la puerta de enlace."
+        }
+      }
+    },
+    "refresh_export_limit": {
+      "name": "Actualizar límite de vertido",
+      "description": "Configurar los límites de vertido del sistema.",
+      "fields": {
+        "site_id": {
+          "name": "ID del sitio",
+          "description": "Identificador de sitio opcional; se detecta automáticamente cuando se selecciona un dispositivo de sitio."
+        },
+        "config_entry_id": {
+          "name": "Entrada de configuración de Enphase",
+          "description": "Entrada de configuración de Enphase"
+        },
+        "device_id": {
+          "name": "Dispositivos",
+          "description": "Dispositivos"
         }
       }
     }

@@ -481,6 +481,27 @@
     },
     "grid_profile_controls_disabled": {
       "message": "Ative os controles do perfil de rede do instalador nas opções da integração antes de usar esta ação."
+    },
+    "export_limit_unavailable": {
+      "message": "Limite de injeção indisponível. São necessários acesso de instalador e uma configuração compatível com um único gateway."
+    },
+    "export_limit_invalid": {
+      "message": "Insira watts inteiros de 0 a 100000."
+    },
+    "export_limit_changed": {
+      "message": "A configuração mudou. Revise os ajustes atualizados e confirme novamente."
+    },
+    "export_limit_pending": {
+      "message": "Aguardando confirmação da configuração. Atualize o estado antes de outra alteração."
+    },
+    "export_limit_disabled": {
+      "message": "Ativar controles do limite de injeção (Recursos → Recursos do dispositivo)."
+    },
+    "export_limit_confirmation": {
+      "message": "Confirmar esta alteração"
+    },
+    "export_limit_invalid_slew": {
+      "message": "Insira um número positivo com até duas casas decimais."
     }
   },
   "options": {
@@ -503,7 +524,7 @@
           "repair_notifications": "Gerencie as notificações de reparo do Home Assistant.",
           "authentication_settings": "Inicia o fluxo de login para renovar credenciais sem remover a integração.",
           "migrate_envoy": "Assuma os IDs de entidade de energia selecionados do Enphase Envoy para que o histórico do Home Assistant Energy continue nesta integração.",
-          "advanced": "Controles opcionais do modo de rede e controles de perfil exclusivos para instaladores.",
+          "advanced": "Ações de instalador e manutenção.",
           "features": "Configure os recursos dos dispositivos e os controles avançados."
         },
         "data": {
@@ -672,11 +693,13 @@
         "description": "Ações de instalador e manutenção.",
         "menu_options": {
           "grid_toggle": "Modo de rede",
-          "grid_profile": "Controle de perfil de rede"
+          "grid_profile": "Controle de perfil de rede",
+          "export_limit": "Limite de injeção"
         },
         "menu_option_descriptions": {
           "grid_toggle": "Configura os controles manuais do modo de rede.",
-          "grid_profile": "Navegue e aplique perfis de rede do Activation apenas para instaladores."
+          "grid_profile": "Navegue e aplique perfis de rede do Activation apenas para instaladores.",
+          "export_limit": "Configurar os limites de injeção do sistema."
         }
       },
       "grid_toggle": {
@@ -742,7 +765,8 @@
               "weather_enabled": "Ativar clima",
               "nominal_voltage": "Tensão nominal do carregador EV (V)",
               "microinverter_lifetime_energy_enabled": "Ativar energia vitalícia dos microinversores",
-              "vpp_events_enabled": "Ativar eventos VPP"
+              "vpp_events_enabled": "Ativar eventos VPP",
+              "export_limit_controls_enabled": "Ativar controles do limite de injeção"
             },
             "data_description": {
               "system_event_repair_issues": "Cria reparos do Home Assistant para alarmes permanentes ativos da Enphase. Desativado por padrão.",
@@ -752,7 +776,8 @@
               "schedule_sync_enabled": "Gerencie os agendamentos do IQ EV Charger.",
               "battery_schedules_enabled": "Gerencie os agendamentos da IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Ativa todos os sensores de energia vitalícia de cada microinversor.",
-              "vpp_events_enabled": "Obtém as programações VPP/ELRP da Enphase e cria entidades de evento somente para locais inscritos. Desativado por padrão."
+              "vpp_events_enabled": "Obtém as programações VPP/ELRP da Enphase e cria entidades de evento somente para locais inscritos. Desativado por padrão.",
+              "export_limit_controls_enabled": "Configurar os limites de injeção do sistema. Requer acesso de instalador."
             }
           },
           "advanced_features": {
@@ -779,7 +804,8 @@
           "microinverter_lifetime_energy_enabled": "Ativar energia vitalícia dos microinversores",
           "microinverter_power_enabled": "Ativar potência dos microinversores",
           "vpp_events_enabled": "Ativar eventos VPP",
-          "grid_profile_controls_enabled": "Ativar controles do perfil de rede do instalador"
+          "grid_profile_controls_enabled": "Ativar controles do perfil de rede do instalador",
+          "export_limit_controls_enabled": "Ativar controles do limite de injeção"
         },
         "data_description": {
           "system_event_repair_issues": "Cria reparos do Home Assistant para alarmes permanentes ativos da Enphase. Desativado por padrão.",
@@ -791,7 +817,52 @@
           "microinverter_lifetime_energy_enabled": "Ativa todos os sensores de energia vitalícia de cada microinversor.",
           "microinverter_power_enabled": "Ativa todos os sensores de potência de cada microinversor quando a telemetria do instalador está disponível.",
           "vpp_events_enabled": "Obtém as programações VPP/ELRP da Enphase e cria entidades de evento somente para locais inscritos. Desativado por padrão.",
-          "grid_profile_controls_enabled": "Obtém metadados do perfil de rede exclusivos do instalador e ativa as ações de perfil. Desativado por padrão."
+          "grid_profile_controls_enabled": "Obtém metadados do perfil de rede exclusivos do instalador e ativa as ações de perfil. Desativado por padrão.",
+          "export_limit_controls_enabled": "Configurar os limites de injeção do sistema. Requer acesso de instalador."
+        }
+      },
+      "export_limit": {
+        "title": "Limite de injeção",
+        "description": "Configurar os limites de injeção do sistema."
+      },
+      "export_limit_action": {
+        "title": "Limite de injeção",
+        "description": "Configurar os limites de injeção do sistema.\n\nConfiguração atual: **{current}**\n\n{status}",
+        "menu_options": {
+          "export_limit_set": "Definir limite de injeção",
+          "export_limit_zero": "Definir injeção zero",
+          "export_limit_disable": "Desativar limitação de injeção",
+          "export_limit_defaults": "Configurações padrão"
+        }
+      },
+      "export_limit_set": {
+        "title": "Definir limite de injeção",
+        "data": {
+          "limit_watts": "Limite de injeção (W)"
+        }
+      },
+      "export_limit_confirm": {
+        "title": "Limite de injeção",
+        "description": "Configuração atual: **{current}**\n\nConfiguração solicitada: **{requested}**\n\nTaxa de variação (W/sec): **{current_slew}** → **{requested_slew}**",
+        "data": {
+          "confirm": "Confirmar esta alteração"
+        }
+      },
+      "export_limit_submitted": {
+        "title": "Limite de injeção",
+        "description": "Configurar os limites de injeção do sistema.\n\n**{status}**"
+      },
+      "export_limit_readonly": {
+        "title": "Limite de injeção",
+        "description": "Limite de injeção indisponível. São necessários acesso de instalador e uma configuração compatível com um único gateway.\n\nConfiguração atual: **{current}**"
+      },
+      "export_limit_defaults": {
+        "title": "Configurações padrão",
+        "description": "Salva valores para ativar o limite sem alterar o gateway. Restaurar remove a taxa personalizada salva.",
+        "data": {
+          "limit_watts": "Limite de exportação padrão (W)",
+          "slew_rate": "Taxa de variação (W/sec)",
+          "restore_slew_rate": "Restaurar taxa do gateway"
         }
       }
     },
@@ -819,7 +890,14 @@
       "grid_otp_required": "Digite o código único.",
       "grid_otp_invalid_format": "O código único deve conter exatamente quatro dígitos.",
       "grid_otp_invalid": "O código único é inválido ou expirou.",
-      "grid_envoy_serial_missing": "Não foi possível determinar o gateway deste site."
+      "grid_envoy_serial_missing": "Não foi possível determinar o gateway deste site.",
+      "export_limit_unavailable": "Limite de injeção indisponível. São necessários acesso de instalador e uma configuração compatível com um único gateway.",
+      "export_limit_invalid": "Insira watts inteiros de 0 a 100000.",
+      "export_limit_changed": "A configuração mudou. Revise os ajustes atualizados e confirme novamente.",
+      "export_limit_pending": "Aguardando confirmação da configuração. Atualize o estado antes de outra alteração.",
+      "export_limit_disabled": "Ativar controles do limite de injeção (Recursos → Recursos do dispositivo).",
+      "export_limit_confirmation": "Confirmar esta alteração",
+      "export_limit_invalid_slew": "Insira um número positivo com até duas casas decimais."
     },
     "abort": {
       "migration_no_envoy_sources": "Nenhum sensor de energia do Enphase Envoy está disponível para migração.",
@@ -1374,7 +1452,7 @@
         }
       },
       "system_profile_status": {
-        "name": "Status do perfil do sistema",
+        "name": "Perfil do sistema",
         "state": {
           "pending": "Pendente"
         },
@@ -2024,6 +2102,57 @@
       },
       "vpp_next_event_status": {
         "name": "Status do próximo evento VPP"
+      },
+      "export_limit": {
+        "name": "Limite de injeção",
+        "state": {
+          "disabled": "Desativado",
+          "zero_export": "Injeção zero",
+          "limited": "Limitado",
+          "unsupported": "Não suportado",
+          "pending": "Pendente",
+          "unconfirmed": "Não confirmado"
+        },
+        "state_attributes": {
+          "confirmed_watts": {
+            "name": "Configuração atual"
+          },
+          "requested_watts": {
+            "name": "Configuração solicitada"
+          },
+          "requested_action": {
+            "name": "Configuração solicitada",
+            "state": {
+              "set": "Definir limite de injeção",
+              "disable": "Desativar limitação de injeção"
+            }
+          },
+          "request_status": {
+            "name": "Estado da solicitação",
+            "state": {
+              "idle": "Nenhuma solicitação",
+              "pending": "Aguardando confirmação",
+              "confirmed": "Configuração confirmada",
+              "unconfirmed": "Não confirmado",
+              "rejected": "Rejeitado"
+            }
+          },
+          "last_successful_readback": {
+            "name": "Última leitura bem-sucedida"
+          },
+          "slew_rate": {
+            "name": "Taxa de variação (W/sec)"
+          },
+          "requested_slew_rate": {
+            "name": "Configuração solicitada · Taxa de variação (W/sec)"
+          },
+          "pending": {
+            "name": "Pendente"
+          },
+          "pending_requested_at": {
+            "name": "Pendente solicitado em"
+          }
+        }
       }
     },
     "number": {
@@ -2364,6 +2493,28 @@
       },
       "battery_schedule_selected": {
         "name": "Agendamento da bateria"
+      },
+      "export_limit": {
+        "name": "Limite de injeção",
+        "state": {
+          "enable_limit": "Ativar limite",
+          "disable_limit": "Desativar limite"
+        },
+        "state_attributes": {
+          "default_limit_watts": {
+            "name": "Limite de exportação padrão (W)"
+          },
+          "default_slew_rate": {
+            "name": "Taxa de variação (W/sec)"
+          },
+          "slew_rate_source": {
+            "name": "Origem da taxa de variação",
+            "state": {
+              "gateway": "Gateway",
+              "saved_override": "Valor personalizado salvo"
+            }
+          }
+        }
       }
     },
     "button": {
@@ -2540,6 +2691,10 @@
     "active_system_event": {
       "title": "Evento de sistema Enphase de alto impacto ativo",
       "description": "O local {site_id} tem um evento {severity} ativo afetando {device_type}, relatado pela primeira vez em {event_date}. Consulte o Enlighten para ver os detalhes e a ação recomendada. Este reparo é removido automaticamente quando a Enphase informa que o evento foi resolvido."
+    },
+    "export_limit_pending": {
+      "title": "Alteração do limite de injeção não confirmada",
+      "description": "A alteração não foi confirmada após {pending_timeout_minutes} minutos. As verificações continuam no intervalo padrão. Verifique a configuração do gateway; a gravação não será repetida automaticamente."
     }
   },
   "system_health": {
@@ -3177,6 +3332,72 @@
         "gateway_serial": {
           "name": "Número de série do Gateway",
           "description": "Número de série opcional do Gateway quando o registro do Activation contém vários Gateways."
+        }
+      }
+    },
+    "set_export_limit": {
+      "name": "Definir limite de injeção",
+      "description": "Configurar os limites de injeção do sistema.",
+      "fields": {
+        "limit_watts": {
+          "name": "Limite de injeção (W)",
+          "description": "Insira watts inteiros de 0 a 100000."
+        },
+        "site_id": {
+          "name": "ID do site",
+          "description": "Identificador de site opcional; detectado automaticamente quando um dispositivo de site é selecionado."
+        },
+        "config_entry_id": {
+          "name": "Enphase entrada de configuração",
+          "description": "Enphase entrada de configuração"
+        },
+        "device_id": {
+          "name": "Dispositivos",
+          "description": "Dispositivos"
+        },
+        "slew_rate": {
+          "name": "Taxa de variação (W/sec)",
+          "description": "Opcional. Se omitido, usa o valor atual do gateway."
+        }
+      }
+    },
+    "disable_export_limit": {
+      "name": "Desativar limitação de injeção",
+      "description": "Configurar os limites de injeção do sistema.",
+      "fields": {
+        "site_id": {
+          "name": "ID do site",
+          "description": "Identificador de site opcional; detectado automaticamente quando um dispositivo de site é selecionado."
+        },
+        "config_entry_id": {
+          "name": "Enphase entrada de configuração",
+          "description": "Enphase entrada de configuração"
+        },
+        "device_id": {
+          "name": "Dispositivos",
+          "description": "Dispositivos"
+        },
+        "slew_rate": {
+          "name": "Taxa de variação (W/sec)",
+          "description": "Opcional. Se omitido, usa o valor atual do gateway."
+        }
+      }
+    },
+    "refresh_export_limit": {
+      "name": "Atualizar limite de injeção",
+      "description": "Configurar os limites de injeção do sistema.",
+      "fields": {
+        "site_id": {
+          "name": "ID do site",
+          "description": "Identificador de site opcional; detectado automaticamente quando um dispositivo de site é selecionado."
+        },
+        "config_entry_id": {
+          "name": "Enphase entrada de configuração",
+          "description": "Enphase entrada de configuração"
+        },
+        "device_id": {
+          "name": "Dispositivos",
+          "description": "Dispositivos"
         }
       }
     }

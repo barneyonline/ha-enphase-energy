@@ -88,6 +88,7 @@ from custom_components.enphase_ev.const import (
     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
     OPT_FAST_POLL_INTERVAL,
     OPT_FAST_WHILE_STREAMING,
+    OPT_EXPORT_LIMIT_CONTROLS_ENABLED,
     OPT_GRID_PROFILE_CONTROLS_ENABLED,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_MICROINVERTER_POWER_ENABLED,
@@ -2793,6 +2794,7 @@ async def test_options_flow_advanced_shows_grid_profile_menu(hass) -> None:
     assert result["step_id"] == "advanced"
     assert result["menu_options"] == [
         "grid_toggle",
+        "export_limit",
         "grid_profile",
     ]
 
@@ -2823,7 +2825,7 @@ async def test_options_flow_keeps_grid_toggle_without_installer_access(hass) -> 
     ]
     result = await handler.async_step_advanced()
     assert result["type"] is FlowResultType.MENU
-    assert result["menu_options"] == ["grid_toggle", "grid_profile"]
+    assert result["menu_options"] == ["grid_toggle", "export_limit", "grid_profile"]
 
 
 @pytest.mark.asyncio
@@ -3136,7 +3138,7 @@ async def test_options_flow_grid_profile_aborts_without_runtime(hass) -> None:
 
     result = await handler.async_step_advanced()
     assert result["type"] is FlowResultType.MENU
-    assert result["menu_options"] == ["grid_toggle"]
+    assert result["menu_options"] == ["grid_toggle", "export_limit"]
 
     result = await handler.async_step_grid_profile()
 
@@ -3218,7 +3220,7 @@ async def test_options_flow_grid_profile_reports_activation_unavailable(hass) ->
     confirm = await handler.async_step_grid_profile_confirm()
 
     assert advanced["type"] is FlowResultType.MENU
-    assert advanced["menu_options"] == ["grid_toggle", "grid_profile"]
+    assert advanced["menu_options"] == ["grid_toggle", "export_limit", "grid_profile"]
     for result in (grid_profile, select, confirm):
         assert result["type"] is FlowResultType.ABORT
         assert result["reason"] == "grid_profile_unavailable"
@@ -3612,6 +3614,7 @@ async def test_options_flow_devices_form_with_defaults(hass) -> None:
     assert features[OPT_BATTERY_SCHEDULES_ENABLED] is True
     assert features[OPT_PRICING_EDITS_ENABLED] is DEFAULT_PRICING_EDITS_ENABLED
     assert features[OPT_WEATHER_ENABLED] is DEFAULT_WEATHER_ENABLED
+    assert features[OPT_EXPORT_LIMIT_CONTROLS_ENABLED] is False
     assert features[OPT_VPP_EVENTS_ENABLED] is DEFAULT_VPP_EVENTS_ENABLED
     assert (
         features[OPT_GRID_PROFILE_CONTROLS_ENABLED]

@@ -51,6 +51,12 @@ refresh. Cold setup continues to require an authoritative first refresh.
 The default-off VPP Events device feature is one of those topology options. Its
 reload clears the VPP cache before optional warmup so disabling the feature cannot
 publish preserved event state or make requests to the VPP service.
+Export Limit controls are a default-off topology option. Toggling them reloads
+the entry to start or stop the dedicated PEL runtime and reconcile its entities.
+The runtime persists pending intent, never form tokens, and resumes readback
+after reload. It polls at the configured fast interval for ten minutes after a
+write, then at the standard interval; an unconfirmed-request repair is owned by
+that runtime and cleared on unload or matching readback.
 The options menu separates device category selection (Devices) from feature
 configuration (Features). Features contains Device Features and Advanced Features;
 the latter groups installer Grid Profile controls and Microinverter Power.

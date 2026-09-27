@@ -62,6 +62,7 @@ from .entity import (
     evse_resolved_charge_mode,
 )
 from .log_redaction import redact_text
+from .export_limit_runtime import ExportLimitRuntime
 from .grid_profile_runtime import (
     SUPPORT_READ_ONLY,
     SUPPORT_UNKNOWN,
@@ -514,6 +515,11 @@ async def async_setup_entry(
                     state_attr=state_attr,
                 ),
             )
+        export_runtime = getattr(coord, "export_limit_runtime", None)
+        if export_runtime is not None and export_runtime.enabled:
+            _add_site_entity("export_limit", EnphaseExportLimitSensor(coord))
+        else:
+            _async_remove_site_sensor_entity("export_limit")
         if _retain_grid_profile_sensors(coord):
             _add_site_entity(
                 "current_grid_profile",
@@ -3214,6 +3220,48 @@ class EnphaseAuthRefreshCounterSensor(_SiteBaseEntity):
         return _cloud_device_info(self._coord.site_id)  # pragma: no cover
 
 
+class EnphaseExportLimitSensor(_SiteBaseEntity):
+    """Show pending updates while retaining separate confirmed/requested details."""
+
+    _attr_translation_key = "export_limit"
+    _attr_icon = "mdi:transmission-tower-export"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = [
+        "disabled",
+        "zero_export",
+        "limited",
+        "unsupported",
+        "pending",
+        "unconfirmed",
+    ]
+
+    def __init__(self, coord: EnphaseCoordinator) -> None:
+        super().__init__(coord, "export_limit", "Export Limit", type_key="envoy")
+
+    @property
+    def available(self) -> bool:
+        runtime = self._coord.export_limit_runtime
+        return bool(
+            super().available
+            and runtime.enabled
+            and (runtime.snapshot is not None or runtime.pending is not None)
+        )
+
+    @property
+    def native_value(self) -> str | None:
+        runtime = self._coord.export_limit_runtime
+        if runtime.pending is not None:
+            return (
+                "unconfirmed" if runtime.request_status == "unconfirmed" else "pending"
+            )
+        snapshot = runtime.snapshot
+        return snapshot.state if snapshot else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        return cast(ExportLimitRuntime, self._coord.export_limit_runtime).attributes()
+
+
 class _GridProfileSensor(_SiteBaseEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
@@ -3967,7 +4015,7 @@ class EnphaseSystemProfileStatusSensor(_SiteBaseEntity):
         super().__init__(
             coord,
             "system_profile_status",
-            "System Profile Status",
+            "System Profile",
             type_key="envoy",
         )
 

@@ -182,3 +182,71 @@ remains visible even when discovery fails. If the Enlighten session has expired 
 is rejected, use **Configure → Authentication → Start reauthentication**, complete
 the login, then reopen Grid Profile Control. Session failures are distinct from
 installer permission denials; enabling this feature does not apply a grid profile.
+
+### Export Limit (installer access)
+
+Under **Configure → Features → Device Features**, enable **Enable Export Limit
+controls** to configure system export limits. This feature is off by default;
+enabling or disabling it never changes the gateway's existing configuration.
+After enabling, open **Configure → Advanced → Export Limit** to set an absolute
+watt limit, request zero export, or disable gateway export limiting. Changes in
+this guided workflow require confirmation; automation actions have no confirmation field.
+
+The first version supports an unambiguous single-gateway configuration using
+absolute export watts, including compatible disabled configurations. Percentage,
+production-limit, and digital-input relay configurations are read-only. Missing
+settings or an invalid existing slew rate block writes. Existing slew rate is
+preserved unless explicitly overridden. Installer access and access to the live PEL
+form are both required. Writes also require a complete, unambiguous form whose
+current mode, watts, and slew rate match gateway readback; reload the settings
+if another client has changed them.
+
+The IQ Gateway **Export Limit** selector provides **Enable Limit** and **Disable
+Limit**. Enable applies the saved default limit (initially **0 W**, zero export).
+Under **Advanced → Export Limit → Default settings**, save the default watts and
+**Slew rate (W/sec)**. Slew rate initially comes from the gateway. Saving defaults
+does not change gateway configuration. **Restore slew rate from gateway** clears
+the saved override and uses a fresh gateway reading, not a factory default.
+Disable Limit preserves the current gateway slew rate. The control’s attributes
+show the default limit, effective default slew rate, and whether the rate comes
+from the gateway or a saved override.
+
+Automations and scripts can use:
+
+```yaml
+action: enphase_ev.set_export_limit
+data:
+  site_id: "YOUR_SITE_ID"
+  limit_watts: 5000
+```
+
+The range is 0–100,000 whole watts; this API input range does not establish your
+site's permitted export capacity. Set `limit_watts: 0` for zero export, which
+still allows solar to supply local loads and charging. Use
+`enphase_ev.disable_export_limit` with the same site target
+to disable gateway limiting. Other utility or grid-profile constraints may remain.
+Use `enphase_ev.refresh_export_limit` with the site target to refresh status.
+Actions are also available in Home Assistant's action picker and support existing
+integration entity/device/config-entry target routing.
+Both write actions accept optional `slew_rate` in W/sec, a positive finite number
+with up to two decimal places. Omit it to preserve the current gateway reading
+independently of the selector’s saved default. Refresh has no slew-rate input.
+
+The **Export Limit** sensor displays **Pending** while a submitted change awaits
+matching gateway readback, or **Unconfirmed** when the result remains uncertain.
+Like System Profile, its attributes include `pending`, `pending_requested_at`,
+and requested settings alongside confirmed watts and slew rate. Once confirmed,
+the sensor returns to Disabled, Zero export, Limited, or Unsupported. Readback is
+checked immediately and at the configured fast polling interval for 10 minutes.
+If still unresolved, a repair warning is raised and checks continue at the
+configured standard (slow) polling interval. System Profile uses the same
+10-minute readback window and polling policy.
+Unconfirmed requests block further writes until matching readback is observed.
+Reloads resume verification without resending a command. No write is automatically
+replayed after an uncertain response, including connection failures that the HTTP
+client would normally retry. Disabling this feature stops polling and
+blocks its actions without disabling the gateway's limit.
+
+Cloud configuration confirmation is not proof of physical export enforcement.
+The integration-session write contract still requires validation on an authorized
+supported site; browser-observed success alone does not establish compatibility.

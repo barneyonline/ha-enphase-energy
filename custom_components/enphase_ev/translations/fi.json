@@ -481,6 +481,27 @@
     },
     "grid_profile_controls_disabled": {
       "message": "Ota asentajan verkkoprofiilin hallinta käyttöön integraation asetuksissa ennen tämän toiminnon käyttämistä."
+    },
+    "export_limit_unavailable": {
+      "message": "Syöttöraja ei ole käytettävissä. Tarvitaan asentajan käyttöoikeus ja tuettu yhden yhdyskäytävän kokoonpano."
+    },
+    "export_limit_invalid": {
+      "message": "Anna kokonaisluku watteina väliltä 0–100000."
+    },
+    "export_limit_changed": {
+      "message": "Asetukset muuttuivat. Tarkista päivitetyt asetukset ja vahvista uudelleen."
+    },
+    "export_limit_pending": {
+      "message": "Odotetaan asetusten vahvistusta. Päivitä tila ennen uutta muutosta."
+    },
+    "export_limit_disabled": {
+      "message": "Ota syöttörajan ohjaus käyttöön (Ominaisuudet → Laiteominaisuudet)."
+    },
+    "export_limit_confirmation": {
+      "message": "Vahvista tämä muutos"
+    },
+    "export_limit_invalid_slew": {
+      "message": "Anna positiivinen luku enintään kahdella desimaalilla."
     }
   },
   "options": {
@@ -503,7 +524,7 @@
           "repair_notifications": "Hallitse Home Assistantin korjausilmoituksia.",
           "authentication_settings": "Käynnistä kirjautumiskulku päivittääksesi valtuustiedot poistamatta integraatiota.",
           "migrate_envoy": "Ota valitut Enphase Envoyn energiaentiteettien tunnukset käyttöön, jotta Home Assistant Energyn historia jatkuu tämän integraation alla.",
-          "advanced": "Valinnaiset verkkotilan ohjaimet ja vain asentajille tarkoitetut verkkoprofiilin ohjaimet.",
+          "advanced": "Asentajan ja huollon toiminnot.",
           "features": "Määritä laitteiden ominaisuudet ja lisäohjaimet."
         },
         "data": {
@@ -672,11 +693,13 @@
         "description": "Asentajan ja huollon toiminnot.",
         "menu_options": {
           "grid_toggle": "Verkkotila",
-          "grid_profile": "Verkkoprofiilin hallinta"
+          "grid_profile": "Verkkoprofiilin hallinta",
+          "export_limit": "Syöttöraja"
         },
         "menu_option_descriptions": {
           "grid_toggle": "Määritä verkkotilan manuaaliset ohjaimet.",
-          "grid_profile": "Selaa ja ota käyttöön asentajille tarkoitettuja Activation-verkkoprofiileja."
+          "grid_profile": "Selaa ja ota käyttöön asentajille tarkoitettuja Activation-verkkoprofiileja.",
+          "export_limit": "Määritä järjestelmän verkkosyötön rajat."
         }
       },
       "grid_toggle": {
@@ -742,7 +765,8 @@
               "weather_enabled": "Ota sää käyttöön",
               "nominal_voltage": "EV-laturin nimellisjännite (V)",
               "microinverter_lifetime_energy_enabled": "Ota mikroinvertterien elinkaarienergia käyttöön",
-              "vpp_events_enabled": "Ota VPP-tapahtumat käyttöön"
+              "vpp_events_enabled": "Ota VPP-tapahtumat käyttöön",
+              "export_limit_controls_enabled": "Ota syöttörajan ohjaus käyttöön"
             },
             "data_description": {
               "system_event_repair_issues": "Luo Home Assistant -korjauksia aktiivisille Enphasen pysyville hälytyksille. Oletuksena pois käytöstä.",
@@ -752,7 +776,8 @@
               "schedule_sync_enabled": "Hallitse IQ EV Chargerin aikatauluja.",
               "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja.",
               "microinverter_lifetime_energy_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset elinkaarienergia-anturit.",
-              "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä."
+              "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä.",
+              "export_limit_controls_enabled": "Määritä järjestelmän verkkosyötön rajat. Edellyttää asentajan käyttöoikeuksia."
             }
           },
           "advanced_features": {
@@ -779,7 +804,8 @@
           "microinverter_lifetime_energy_enabled": "Ota mikroinvertterien elinkaarienergia käyttöön",
           "microinverter_power_enabled": "Ota mikroinvertterien teho käyttöön",
           "vpp_events_enabled": "Ota VPP-tapahtumat käyttöön",
-          "grid_profile_controls_enabled": "Ota asentajan verkkoprofiilin hallinta käyttöön"
+          "grid_profile_controls_enabled": "Ota asentajan verkkoprofiilin hallinta käyttöön",
+          "export_limit_controls_enabled": "Ota syöttörajan ohjaus käyttöön"
         },
         "data_description": {
           "system_event_repair_issues": "Luo Home Assistant -korjauksia aktiivisille Enphasen pysyville hälytyksille. Oletuksena pois käytöstä.",
@@ -791,7 +817,52 @@
           "microinverter_lifetime_energy_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset elinkaarienergia-anturit.",
           "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla.",
           "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä.",
-          "grid_profile_controls_enabled": "Hakee vain asentajalle tarkoitetut verkkoprofiilin metatiedot ja ottaa profiilitoiminnot käyttöön. Oletuksena poissa käytöstä."
+          "grid_profile_controls_enabled": "Hakee vain asentajalle tarkoitetut verkkoprofiilin metatiedot ja ottaa profiilitoiminnot käyttöön. Oletuksena poissa käytöstä.",
+          "export_limit_controls_enabled": "Määritä järjestelmän verkkosyötön rajat. Edellyttää asentajan käyttöoikeuksia."
+        }
+      },
+      "export_limit": {
+        "title": "Syöttöraja",
+        "description": "Määritä järjestelmän verkkosyötön rajat."
+      },
+      "export_limit_action": {
+        "title": "Syöttöraja",
+        "description": "Määritä järjestelmän verkkosyötön rajat.\n\nNykyinen asetus: **{current}**\n\n{status}",
+        "menu_options": {
+          "export_limit_set": "Aseta syöttöraja",
+          "export_limit_zero": "Aseta nollasyöttö",
+          "export_limit_disable": "Poista syöttörajoitus käytöstä",
+          "export_limit_defaults": "Oletusasetukset"
+        }
+      },
+      "export_limit_set": {
+        "title": "Aseta syöttöraja",
+        "data": {
+          "limit_watts": "Syöttöraja (W)"
+        }
+      },
+      "export_limit_confirm": {
+        "title": "Syöttöraja",
+        "description": "Nykyinen asetus: **{current}**\n\nPyydetty asetus: **{requested}**\n\nMuutosnopeus (W/sec): **{current_slew}** → **{requested_slew}**",
+        "data": {
+          "confirm": "Vahvista tämä muutos"
+        }
+      },
+      "export_limit_submitted": {
+        "title": "Syöttöraja",
+        "description": "Määritä järjestelmän verkkosyötön rajat.\n\n**{status}**"
+      },
+      "export_limit_readonly": {
+        "title": "Syöttöraja",
+        "description": "Syöttöraja ei ole käytettävissä. Tarvitaan asentajan käyttöoikeus ja tuettu yhden yhdyskäytävän kokoonpano.\n\nNykyinen asetus: **{current}**"
+      },
+      "export_limit_defaults": {
+        "title": "Oletusasetukset",
+        "description": "Tallenna rajan käyttöönoton oletukset muuttamatta yhdyskäytävää. Palautus poistaa tallennetun nopeuden ohituksen.",
+        "data": {
+          "limit_watts": "Viennin oletusraja (W)",
+          "slew_rate": "Muutosnopeus (W/sec)",
+          "restore_slew_rate": "Palauta muutosnopeus yhdyskäytävästä"
         }
       }
     },
@@ -819,7 +890,14 @@
       "grid_otp_required": "Syötä kertakoodi.",
       "grid_otp_invalid_format": "Kertakoodin tulee sisältää täsmälleen neljä numeroa.",
       "grid_otp_invalid": "Kertakäyttöinen koodi on virheellinen tai vanhentunut.",
-      "grid_envoy_serial_missing": "Tämän kohteen yhdyskäytävää ei voitu määrittää."
+      "grid_envoy_serial_missing": "Tämän kohteen yhdyskäytävää ei voitu määrittää.",
+      "export_limit_unavailable": "Syöttöraja ei ole käytettävissä. Tarvitaan asentajan käyttöoikeus ja tuettu yhden yhdyskäytävän kokoonpano.",
+      "export_limit_invalid": "Anna kokonaisluku watteina väliltä 0–100000.",
+      "export_limit_changed": "Asetukset muuttuivat. Tarkista päivitetyt asetukset ja vahvista uudelleen.",
+      "export_limit_pending": "Odotetaan asetusten vahvistusta. Päivitä tila ennen uutta muutosta.",
+      "export_limit_disabled": "Ota syöttörajan ohjaus käyttöön (Ominaisuudet → Laiteominaisuudet).",
+      "export_limit_confirmation": "Vahvista tämä muutos",
+      "export_limit_invalid_slew": "Anna positiivinen luku enintään kahdella desimaalilla."
     },
     "abort": {
       "migration_no_envoy_sources": "Yhtään Enphase Envoy -energia-anturia ei ole saatavilla siirtoon.",
@@ -1374,7 +1452,7 @@
         }
       },
       "system_profile_status": {
-        "name": "Järjestelmäprofiilin tila",
+        "name": "Järjestelmäprofiili",
         "state": {
           "pending": "Odottaa"
         },
@@ -2024,6 +2102,57 @@
       },
       "vpp_next_event_status": {
         "name": "Seuraavan VPP-tapahtuman tila"
+      },
+      "export_limit": {
+        "name": "Syöttöraja",
+        "state": {
+          "disabled": "Poistettu käytöstä",
+          "zero_export": "Nollasyöttö",
+          "limited": "Rajoitettu",
+          "unsupported": "Ei tuettu",
+          "pending": "Odottaa",
+          "unconfirmed": "Vahvistamaton"
+        },
+        "state_attributes": {
+          "confirmed_watts": {
+            "name": "Nykyinen asetus"
+          },
+          "requested_watts": {
+            "name": "Pyydetty asetus"
+          },
+          "requested_action": {
+            "name": "Pyydetty asetus",
+            "state": {
+              "set": "Aseta syöttöraja",
+              "disable": "Poista syöttörajoitus käytöstä"
+            }
+          },
+          "request_status": {
+            "name": "Pyynnön tila",
+            "state": {
+              "idle": "Ei pyyntöä",
+              "pending": "Odottaa vahvistusta",
+              "confirmed": "Asetukset vahvistettu",
+              "unconfirmed": "Vahvistamaton",
+              "rejected": "Hylätty"
+            }
+          },
+          "last_successful_readback": {
+            "name": "Viimeisin onnistunut luku"
+          },
+          "slew_rate": {
+            "name": "Muutosnopeus (W/sec)"
+          },
+          "requested_slew_rate": {
+            "name": "Pyydetty asetus · Muutosnopeus (W/sec)"
+          },
+          "pending": {
+            "name": "Odottaa"
+          },
+          "pending_requested_at": {
+            "name": "Odottaa Pyydetty klo"
+          }
+        }
       }
     },
     "number": {
@@ -2364,6 +2493,28 @@
       },
       "battery_schedule_selected": {
         "name": "Akun aikataulu"
+      },
+      "export_limit": {
+        "name": "Syöttöraja",
+        "state": {
+          "enable_limit": "Ota raja käyttöön",
+          "disable_limit": "Poista raja käytöstä"
+        },
+        "state_attributes": {
+          "default_limit_watts": {
+            "name": "Viennin oletusraja (W)"
+          },
+          "default_slew_rate": {
+            "name": "Muutosnopeus (W/sec)"
+          },
+          "slew_rate_source": {
+            "name": "Muutosnopeuden lähde",
+            "state": {
+              "gateway": "Yhdyskäytävä",
+              "saved_override": "Tallennettu ohitus"
+            }
+          }
+        }
       }
     },
     "button": {
@@ -2540,6 +2691,10 @@
     "active_system_event": {
       "title": "Vakava Enphase-järjestelmätapahtuma aktiivinen",
       "description": "Kohteessa {site_id} on aktiivinen {severity}-tapahtuma, joka vaikuttaa laitteeseen {device_type} ja ilmoitettiin ensimmäisen kerran {event_date}. Katso lisätiedot ja suositeltu toimi Enlightenista. Tämä korjaus poistuu automaattisesti, kun Enphase ilmoittaa tapahtuman ratkaistuksi."
+    },
+    "export_limit_pending": {
+      "title": "Syöttörajan muutos vahvistamatta",
+      "description": "Muutosta ei ole vahvistettu {pending_timeout_minutes} minuutissa. Tarkistukset jatkuvat normaalilla kyselyvälillä. Tarkista yhdyskäytävän asetukset; kirjoitusta ei toisteta automaattisesti."
     }
   },
   "system_health": {
@@ -3177,6 +3332,72 @@
         "gateway_serial": {
           "name": "Gateway-sarjanumero",
           "description": "Valinnainen Gateway-sarjanumero, kun Activation-tietue sisältää useita Gateway-laitteita."
+        }
+      }
+    },
+    "set_export_limit": {
+      "name": "Aseta syöttöraja",
+      "description": "Määritä järjestelmän verkkosyötön rajat.",
+      "fields": {
+        "limit_watts": {
+          "name": "Syöttöraja (W)",
+          "description": "Anna kokonaisluku watteina väliltä 0–100000."
+        },
+        "site_id": {
+          "name": "Kohteen tunnus",
+          "description": "Valinnainen kohteen tunniste; havaitaan automaattisesti, kun kohteen laite valitaan."
+        },
+        "config_entry_id": {
+          "name": "Enphase-asetusten syöttö",
+          "description": "Enphase-asetusten syöttö"
+        },
+        "device_id": {
+          "name": "Laitteet",
+          "description": "Laitteet"
+        },
+        "slew_rate": {
+          "name": "Muutosnopeus (W/sec)",
+          "description": "Valinnainen. Jos jätetään pois, käytetään yhdyskäytävän nykyistä arvoa."
+        }
+      }
+    },
+    "disable_export_limit": {
+      "name": "Poista syöttörajoitus käytöstä",
+      "description": "Määritä järjestelmän verkkosyötön rajat.",
+      "fields": {
+        "site_id": {
+          "name": "Kohteen tunnus",
+          "description": "Valinnainen kohteen tunniste; havaitaan automaattisesti, kun kohteen laite valitaan."
+        },
+        "config_entry_id": {
+          "name": "Enphase-asetusten syöttö",
+          "description": "Enphase-asetusten syöttö"
+        },
+        "device_id": {
+          "name": "Laitteet",
+          "description": "Laitteet"
+        },
+        "slew_rate": {
+          "name": "Muutosnopeus (W/sec)",
+          "description": "Valinnainen. Jos jätetään pois, käytetään yhdyskäytävän nykyistä arvoa."
+        }
+      }
+    },
+    "refresh_export_limit": {
+      "name": "Päivitä syöttöraja",
+      "description": "Määritä järjestelmän verkkosyötön rajat.",
+      "fields": {
+        "site_id": {
+          "name": "Kohteen tunnus",
+          "description": "Valinnainen kohteen tunniste; havaitaan automaattisesti, kun kohteen laite valitaan."
+        },
+        "config_entry_id": {
+          "name": "Enphase-asetusten syöttö",
+          "description": "Enphase-asetusten syöttö"
+        },
+        "device_id": {
+          "name": "Laitteet",
+          "description": "Laitteet"
         }
       }
     }

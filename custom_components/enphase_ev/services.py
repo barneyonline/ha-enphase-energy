@@ -34,6 +34,7 @@ from .const import (
 )
 from .log_redaction import redact_site_id
 from .parsing_helpers import coerce_optional_bool
+from .export_limit_runtime import ExportLimitRuntime, validate_watts, validate_slew_rate
 from .grid_profile_runtime import SUPPORT_DENIED, SUPPORT_READ_ONLY, GridProfileRuntime
 from .service_routing import ServiceRouter
 from .service_validation import raise_translated_service_validation
@@ -923,6 +924,24 @@ def async_setup_services(
             commonly_used=call.data.get("commonly_used", True),
         )
 
+    async def _svc_set_export_limit(call: ServiceCall) -> dict[str, object]:
+        coord = await _resolve_single_site_coordinator(call)
+        return await cast(ExportLimitRuntime, coord.export_limit_runtime).async_apply(
+            call.data["limit_watts"], confirm=True, slew_rate=call.data.get("slew_rate")
+        )
+
+    async def _svc_disable_export_limit(call: ServiceCall) -> dict[str, object]:
+        coord = await _resolve_single_site_coordinator(call)
+        return await cast(ExportLimitRuntime, coord.export_limit_runtime).async_apply(
+            None, confirm=True, slew_rate=call.data.get("slew_rate")
+        )
+
+    async def _svc_refresh_export_limit(call: ServiceCall) -> dict[str, object]:
+        coord = await _resolve_single_site_coordinator(call)
+        return await cast(
+            ExportLimitRuntime, coord.export_limit_runtime
+        ).async_refresh()
+
     async def _svc_set_grid_profile(call: ServiceCall) -> dict[str, object]:
         if not call.data.get("confirm"):
             _raise_service_validation(
@@ -1453,6 +1472,38 @@ def async_setup_services(
     hass.services.async_register(
         DOMAIN, "force_refresh", _svc_force_refresh, schema=FORCE_REFRESH_SCHEMA
     )
+    for action, handler, fields in (
+        (
+            "set_export_limit",
+            _svc_set_export_limit,
+            {
+                vol.Required("limit_watts"): validate_watts,
+                vol.Optional("slew_rate"): validate_slew_rate,
+            },
+        ),
+        (
+            "disable_export_limit",
+            _svc_disable_export_limit,
+            {vol.Optional("slew_rate"): validate_slew_rate},
+        ),
+        ("refresh_export_limit", _svc_refresh_export_limit, {}),
+    ):
+        async_register_admin_service(
+            hass,
+            DOMAIN,
+            action,
+            handler,
+            _target_schema(
+                {
+                    **ENTRY_SCHEMA,
+                    vol.Optional("device_id"): DEVICE_ID_LIST,
+                    vol.Optional("site_id"): cv.string,
+                    **fields,
+                }
+            ),
+            supports_response=supports_response.OPTIONAL,
+        )
+
     grid_profile_browse_kwargs: dict[str, object] = {
         "schema": BROWSE_GRID_PROFILES_SCHEMA,
         "supports_response": supports_response.OPTIONAL,

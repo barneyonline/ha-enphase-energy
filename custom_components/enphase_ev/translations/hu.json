@@ -481,6 +481,27 @@
     },
     "grid_profile_controls_disabled": {
       "message": "A művelet használata előtt engedélyezze a telepítői hálózati profilvezérlést az integráció beállításaiban."
+    },
+    "export_limit_unavailable": {
+      "message": "A betáplálási korlát nem érhető el. Telepítői hozzáférés és támogatott, egyetlen átjárós konfiguráció szükséges."
+    },
+    "export_limit_invalid": {
+      "message": "Adjon meg egész wattértéket 0 és 100000 között."
+    },
+    "export_limit_changed": {
+      "message": "A konfiguráció megváltozott. Ellenőrizze a frissített beállításokat, és erősítse meg újra."
+    },
+    "export_limit_pending": {
+      "message": "A konfiguráció megerősítésére vár. Újabb módosítás előtt frissítse az állapotot."
+    },
+    "export_limit_disabled": {
+      "message": "A betáplálási korlát vezérlésének engedélyezése (Funkciók → Eszközfunkciók)."
+    },
+    "export_limit_confirmation": {
+      "message": "Módosítás megerősítése"
+    },
+    "export_limit_invalid_slew": {
+      "message": "Adjon meg pozitív számot legfeljebb két tizedesjeggyel."
     }
   },
   "options": {
@@ -503,7 +524,7 @@
           "repair_notifications": "A Home Assistant javítási értesítéseinek kezelése.",
           "authentication_settings": "Indítsa el a bejelentkezési folyamatot a hitelesítő adatok frissítéséhez az integráció eltávolítása nélkül.",
           "migrate_envoy": "Vegye át a kiválasztott Enphase Envoy energiaentitás-azonosítókat, hogy a Home Assistant Energy előzményei ennél az integrációnál folytatódjanak.",
-          "advanced": "Opcionális hálózati mód vezérlés és csak telepítőknek szánt hálózati profilvezérlés.",
+          "advanced": "Telepítői és karbantartási műveletek.",
           "features": "Állítsa be az eszközfunkciókat és a speciális vezérlőket."
         },
         "data": {
@@ -672,11 +693,13 @@
         "description": "Telepítői és karbantartási műveletek.",
         "menu_options": {
           "grid_toggle": "Hálózati mód",
-          "grid_profile": "Hálózati profil vezérlése"
+          "grid_profile": "Hálózati profil vezérlése",
+          "export_limit": "Betáplálási korlát"
         },
         "menu_option_descriptions": {
           "grid_toggle": "A kézi hálózati mód vezérlésének beállítása.",
-          "grid_profile": "Csak telepítőknek elérhető Activation hálózati profilok böngészése és alkalmazása."
+          "grid_profile": "Csak telepítőknek elérhető Activation hálózati profilok böngészése és alkalmazása.",
+          "export_limit": "A rendszer betáplálási korlátainak beállítása."
         }
       },
       "grid_toggle": {
@@ -742,7 +765,8 @@
               "weather_enabled": "Időjárás engedélyezése",
               "nominal_voltage": "EV-töltő névleges feszültsége (V)",
               "microinverter_lifetime_energy_enabled": "Mikroinverterek teljes élettartam-energiájának engedélyezése",
-              "vpp_events_enabled": "VPP-események engedélyezése"
+              "vpp_events_enabled": "VPP-események engedélyezése",
+              "export_limit_controls_enabled": "A betáplálási korlát vezérlésének engedélyezése"
             },
             "data_description": {
               "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva.",
@@ -752,7 +776,8 @@
               "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése.",
               "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése.",
               "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
-              "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva."
+              "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva.",
+              "export_limit_controls_enabled": "A rendszer betáplálási korlátainak beállítása. Telepítői hozzáférést igényel."
             }
           },
           "advanced_features": {
@@ -779,7 +804,8 @@
           "microinverter_lifetime_energy_enabled": "Mikroinverterek teljes élettartam-energiájának engedélyezése",
           "microinverter_power_enabled": "Mikroinverterek teljesítményének engedélyezése",
           "vpp_events_enabled": "VPP-események engedélyezése",
-          "grid_profile_controls_enabled": "Telepítői hálózati profilvezérlés engedélyezése"
+          "grid_profile_controls_enabled": "Telepítői hálózati profilvezérlés engedélyezése",
+          "export_limit_controls_enabled": "A betáplálási korlát vezérlésének engedélyezése"
         },
         "data_description": {
           "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva.",
@@ -791,7 +817,52 @@
           "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
           "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria.",
           "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva.",
-          "grid_profile_controls_enabled": "Lekéri a csak telepítők számára elérhető hálózatiprofil-metaadatokat, és engedélyezi a profilműveleteket. Alapértelmezés szerint letiltva."
+          "grid_profile_controls_enabled": "Lekéri a csak telepítők számára elérhető hálózatiprofil-metaadatokat, és engedélyezi a profilműveleteket. Alapértelmezés szerint letiltva.",
+          "export_limit_controls_enabled": "A rendszer betáplálási korlátainak beállítása. Telepítői hozzáférést igényel."
+        }
+      },
+      "export_limit": {
+        "title": "Betáplálási korlát",
+        "description": "A rendszer betáplálási korlátainak beállítása."
+      },
+      "export_limit_action": {
+        "title": "Betáplálási korlát",
+        "description": "A rendszer betáplálási korlátainak beállítása.\n\nJelenlegi beállítás: **{current}**\n\n{status}",
+        "menu_options": {
+          "export_limit_set": "Betáplálási korlát beállítása",
+          "export_limit_zero": "Nulla betáplálás beállítása",
+          "export_limit_disable": "Betáplálás korlátozásának kikapcsolása",
+          "export_limit_defaults": "Alapértelmezett beállítások"
+        }
+      },
+      "export_limit_set": {
+        "title": "Betáplálási korlát beállítása",
+        "data": {
+          "limit_watts": "Betáplálási korlát (W)"
+        }
+      },
+      "export_limit_confirm": {
+        "title": "Betáplálási korlát",
+        "description": "Jelenlegi beállítás: **{current}**\n\nKért beállítás: **{requested}**\n\nVáltozási sebesség (W/sec): **{current_slew}** → **{requested_slew}**",
+        "data": {
+          "confirm": "Módosítás megerősítése"
+        }
+      },
+      "export_limit_submitted": {
+        "title": "Betáplálási korlát",
+        "description": "A rendszer betáplálási korlátainak beállítása.\n\n**{status}**"
+      },
+      "export_limit_readonly": {
+        "title": "Betáplálási korlát",
+        "description": "A betáplálási korlát nem érhető el. Telepítői hozzáférés és támogatott, egyetlen átjárós konfiguráció szükséges.\n\nJelenlegi beállítás: **{current}**"
+      },
+      "export_limit_defaults": {
+        "title": "Alapértelmezett beállítások",
+        "description": "Menti az engedélyezés alapértékeit az átjáró módosítása nélkül. A visszaállítás törli a mentett sebességfelülírást.",
+        "data": {
+          "limit_watts": "Alapértelmezett betáplálási korlát (W)",
+          "slew_rate": "Változási sebesség (W/sec)",
+          "restore_slew_rate": "Sebesség visszaállítása az átjáróról"
         }
       }
     },
@@ -819,7 +890,14 @@
       "grid_otp_required": "Írja be az egyszeri kódot.",
       "grid_otp_invalid_format": "Az egyszeri kódnak pontosan négy számjegyből kell állnia.",
       "grid_otp_invalid": "Az egyszeri kód érvénytelen vagy lejárt.",
-      "grid_envoy_serial_missing": "A helyszín átjárója nem határozható meg."
+      "grid_envoy_serial_missing": "A helyszín átjárója nem határozható meg.",
+      "export_limit_unavailable": "A betáplálási korlát nem érhető el. Telepítői hozzáférés és támogatott, egyetlen átjárós konfiguráció szükséges.",
+      "export_limit_invalid": "Adjon meg egész wattértéket 0 és 100000 között.",
+      "export_limit_changed": "A konfiguráció megváltozott. Ellenőrizze a frissített beállításokat, és erősítse meg újra.",
+      "export_limit_pending": "A konfiguráció megerősítésére vár. Újabb módosítás előtt frissítse az állapotot.",
+      "export_limit_disabled": "A betáplálási korlát vezérlésének engedélyezése (Funkciók → Eszközfunkciók).",
+      "export_limit_confirmation": "Módosítás megerősítése",
+      "export_limit_invalid_slew": "Adjon meg pozitív számot legfeljebb két tizedesjeggyel."
     },
     "abort": {
       "migration_no_envoy_sources": "Nincsenek elérhető Enphase Envoy energiaérzékelők a migrációhoz.",
@@ -1374,7 +1452,7 @@
         }
       },
       "system_profile_status": {
-        "name": "Rendszerprofil állapota",
+        "name": "Rendszerprofil",
         "state": {
           "pending": "Függőben levő"
         },
@@ -2024,6 +2102,57 @@
       },
       "vpp_next_event_status": {
         "name": "Következő VPP-esemény állapota"
+      },
+      "export_limit": {
+        "name": "Betáplálási korlát",
+        "state": {
+          "disabled": "Kikapcsolva",
+          "zero_export": "Nulla betáplálás",
+          "limited": "Korlátozva",
+          "unsupported": "Nem támogatott",
+          "pending": "Függőben levő",
+          "unconfirmed": "Nem megerősített"
+        },
+        "state_attributes": {
+          "confirmed_watts": {
+            "name": "Jelenlegi beállítás"
+          },
+          "requested_watts": {
+            "name": "Kért beállítás"
+          },
+          "requested_action": {
+            "name": "Kért beállítás",
+            "state": {
+              "set": "Betáplálási korlát beállítása",
+              "disable": "Betáplálás korlátozásának kikapcsolása"
+            }
+          },
+          "request_status": {
+            "name": "Kérés állapota",
+            "state": {
+              "idle": "Nincs kérés",
+              "pending": "Megerősítésre vár",
+              "confirmed": "Konfiguráció megerősítve",
+              "unconfirmed": "Nem megerősített",
+              "rejected": "Elutasítva"
+            }
+          },
+          "last_successful_readback": {
+            "name": "Utolsó sikeres kiolvasás"
+          },
+          "slew_rate": {
+            "name": "Változási sebesség (W/sec)"
+          },
+          "requested_slew_rate": {
+            "name": "Kért beállítás · Változási sebesség (W/sec)"
+          },
+          "pending": {
+            "name": "Függőben levő"
+          },
+          "pending_requested_at": {
+            "name": "Függőben kérve"
+          }
+        }
       }
     },
     "number": {
@@ -2364,6 +2493,28 @@
       },
       "battery_schedule_selected": {
         "name": "Akkumulátor ütemezése"
+      },
+      "export_limit": {
+        "name": "Betáplálási korlát",
+        "state": {
+          "enable_limit": "Korlát engedélyezése",
+          "disable_limit": "Korlát letiltása"
+        },
+        "state_attributes": {
+          "default_limit_watts": {
+            "name": "Alapértelmezett betáplálási korlát (W)"
+          },
+          "default_slew_rate": {
+            "name": "Változási sebesség (W/sec)"
+          },
+          "slew_rate_source": {
+            "name": "Változási sebesség forrása",
+            "state": {
+              "gateway": "Átjáró",
+              "saved_override": "Mentett felülírás"
+            }
+          }
+        }
       }
     },
     "button": {
@@ -2540,6 +2691,10 @@
     "active_system_event": {
       "title": "Aktív, nagy hatású Enphase rendszeresemény",
       "description": "A(z) {site_id} helyszínen aktív {severity} esemény érinti ezt: {device_type}; első jelentése: {event_date}. A részletekért és a javasolt műveletért tekintse meg az Enlightent. Ez a javítás automatikusan eltűnik, amikor az Enphase megoldottként jelenti az eseményt."
+    },
+    "export_limit_pending": {
+      "title": "A betáplálási korlát módosítása nincs megerősítve",
+      "description": "A módosítás {pending_timeout_minutes} perc után sincs megerősítve. Az ellenőrzések a szokásos időközzel folytatódnak. Ellenőrizze az átjáró beállításait; az írás nem ismétlődik meg automatikusan."
     }
   },
   "system_health": {
@@ -3177,6 +3332,72 @@
         "gateway_serial": {
           "name": "Gateway sorozatszáma",
           "description": "Opcionális Gateway-sorozatszám, ha az Activation rekord több Gatewayt tartalmaz."
+        }
+      }
+    },
+    "set_export_limit": {
+      "name": "Betáplálási korlát beállítása",
+      "description": "A rendszer betáplálási korlátainak beállítása.",
+      "fields": {
+        "limit_watts": {
+          "name": "Betáplálási korlát (W)",
+          "description": "Adjon meg egész wattértéket 0 és 100000 között."
+        },
+        "site_id": {
+          "name": "Helyszín ID",
+          "description": "Opcionális helyszín azonosító; automatikusan észlelve, ha helyszín eszköz van kiválasztva."
+        },
+        "config_entry_id": {
+          "name": "Enphase konfigurációs bejegyzés",
+          "description": "Enphase konfigurációs bejegyzés"
+        },
+        "device_id": {
+          "name": "Eszközök",
+          "description": "Eszközök"
+        },
+        "slew_rate": {
+          "name": "Változási sebesség (W/sec)",
+          "description": "Opcionális. Ha nincs megadva, az átjáró aktuális értékét használja."
+        }
+      }
+    },
+    "disable_export_limit": {
+      "name": "Betáplálás korlátozásának kikapcsolása",
+      "description": "A rendszer betáplálási korlátainak beállítása.",
+      "fields": {
+        "site_id": {
+          "name": "Helyszín ID",
+          "description": "Opcionális helyszín azonosító; automatikusan észlelve, ha helyszín eszköz van kiválasztva."
+        },
+        "config_entry_id": {
+          "name": "Enphase konfigurációs bejegyzés",
+          "description": "Enphase konfigurációs bejegyzés"
+        },
+        "device_id": {
+          "name": "Eszközök",
+          "description": "Eszközök"
+        },
+        "slew_rate": {
+          "name": "Változási sebesség (W/sec)",
+          "description": "Opcionális. Ha nincs megadva, az átjáró aktuális értékét használja."
+        }
+      }
+    },
+    "refresh_export_limit": {
+      "name": "Betáplálási korlát frissítése",
+      "description": "A rendszer betáplálási korlátainak beállítása.",
+      "fields": {
+        "site_id": {
+          "name": "Helyszín ID",
+          "description": "Opcionális helyszín azonosító; automatikusan észlelve, ha helyszín eszköz van kiválasztva."
+        },
+        "config_entry_id": {
+          "name": "Enphase konfigurációs bejegyzés",
+          "description": "Enphase konfigurációs bejegyzés"
+        },
+        "device_id": {
+          "name": "Eszközök",
+          "description": "Eszközök"
         }
       }
     }

@@ -62,6 +62,15 @@
     },
     "validate_schedule": {
       "service": "mdi:calendar-check"
+    },
+    "set_export_limit": {
+      "service": "mdi:transmission-tower-export"
+    },
+    "disable_export_limit": {
+      "service": "mdi:transmission-tower-off"
+    },
+    "refresh_export_limit": {
+      "service": "mdi:refresh"
     }
   },
   "entity": {
@@ -837,6 +846,11 @@
       },
       "storm_alert_opt_out": {
         "default": "mdi:shield-off-outline"
+      }
+    },
+    "select": {
+      "export_limit": {
+        "default": "mdi:transmission-tower-export"
       }
     }
   }

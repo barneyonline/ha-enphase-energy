@@ -750,6 +750,10 @@ async def test_async_setup_entry_updates_existing_device(
             return "EV Chargers (1)"
 
     dummy_coord = _with_inventory_view(DummyCoordinator())
+    dummy_coord.export_limit_runtime = SimpleNamespace(
+        enabled=True, async_start=AsyncMock()
+    )
+
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
         lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
@@ -764,6 +768,7 @@ async def test_async_setup_entry_updates_existing_device(
     assert kwargs["auto_cleanup"] is True
     assert isinstance(kwargs["cookie_jar"], aiohttp.DummyCookieJar)
     dummy_coord.schedule_sync.async_start.assert_awaited_once()
+    dummy_coord.export_limit_runtime.async_start.assert_awaited_once()
     forward.assert_awaited_once()
 
     updated = get_device_by_identifier(
@@ -6027,3 +6032,31 @@ def test_service_registration_is_idempotent(hass):
     first = hass.services._services[DOMAIN]["start_charging"]
     async_setup_services(hass)
     assert hass.services._services[DOMAIN]["start_charging"] is first
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+async def test_export_limit_feature_toggle_reloads_runtime(
+    hass, config_entry, monkeypatch, enabled
+):
+    from custom_components.enphase_ev.const import OPT_EXPORT_LIMIT_CONTROLS_ENABLED
+
+    coord = SimpleNamespace(
+        apply_auth_storage_config=MagicMock(),
+        async_apply_config_entry_options=AsyncMock(),
+    )
+    runtime = EnphaseRuntimeData(
+        coordinator=coord,
+        applied_data=dict(config_entry.data),
+        applied_options={OPT_EXPORT_LIMIT_CONTROLS_ENABLED: not enabled},
+    )
+    config_entry.runtime_data = runtime
+    hass.config_entries.async_update_entry(
+        config_entry, options={OPT_EXPORT_LIMIT_CONTROLS_ENABLED: enabled}
+    )
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
+    reload_entry = AsyncMock(return_value=True)
+    monkeypatch.setattr(hass.config_entries, "async_reload", reload_entry)
+    await _async_update_listener(hass, config_entry)
+    reload_entry.assert_awaited_once_with(config_entry.entry_id)
+    coord.async_apply_config_entry_options.assert_not_awaited()
+    assert runtime.preserve_for_reload is True

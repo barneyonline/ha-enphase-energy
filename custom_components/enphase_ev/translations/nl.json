@@ -481,6 +481,27 @@
     },
     "grid_profile_controls_disabled": {
       "message": "Schakel de installateursbediening voor netprofielen in bij de integratieopties voordat u deze actie gebruikt."
+    },
+    "export_limit_unavailable": {
+      "message": "Terugleverlimiet niet beschikbaar. Installateurstoegang en een ondersteunde configuratie met één gateway zijn vereist."
+    },
+    "export_limit_invalid": {
+      "message": "Voer gehele watts in van 0 tot 100000."
+    },
+    "export_limit_changed": {
+      "message": "Configuratie gewijzigd. Controleer de bijgewerkte instellingen en bevestig opnieuw."
+    },
+    "export_limit_pending": {
+      "message": "Wachten op bevestiging van de configuratie. Vernieuw de status voordat u nog een wijziging indient."
+    },
+    "export_limit_disabled": {
+      "message": "Bediening voor terugleverlimieten inschakelen (Functies → Apparaatfuncties)."
+    },
+    "export_limit_confirmation": {
+      "message": "Deze wijziging bevestigen"
+    },
+    "export_limit_invalid_slew": {
+      "message": "Voer een positief getal met maximaal twee decimalen in."
     }
   },
   "options": {
@@ -503,7 +524,7 @@
           "repair_notifications": "Beheer Home Assistant-reparatiemeldingen.",
           "authentication_settings": "Start de login-flow om inloggegevens te vernieuwen zonder de integratie te verwijderen.",
           "migrate_envoy": "Neem geselecteerde energie-entiteit-ID's van Enphase Envoy over zodat de Home Assistant Energy-geschiedenis onder deze integratie doorgaat.",
-          "advanced": "Optionele bediening voor netmodus en netprofielbediening alleen voor installateurs.",
+          "advanced": "Installateurs- en onderhoudsacties.",
           "features": "Configureer apparaatfuncties en geavanceerde bediening."
         },
         "data": {
@@ -672,11 +693,13 @@
         "description": "Installateurs- en onderhoudsacties.",
         "menu_options": {
           "grid_toggle": "Netmodus",
-          "grid_profile": "Netprofielbeheer"
+          "grid_profile": "Netprofielbeheer",
+          "export_limit": "Terugleverlimiet"
         },
         "menu_option_descriptions": {
           "grid_toggle": "Configureer handmatige bediening voor de netmodus.",
-          "grid_profile": "Activation-netprofielen voor installateurs bekijken en toepassen."
+          "grid_profile": "Activation-netprofielen voor installateurs bekijken en toepassen.",
+          "export_limit": "Terugleverlimieten van het systeem configureren."
         }
       },
       "grid_toggle": {
@@ -742,7 +765,8 @@
               "weather_enabled": "Weer inschakelen",
               "nominal_voltage": "Nominale spanning van EV-lader (V)",
               "microinverter_lifetime_energy_enabled": "Levensduurenergie van micro-omvormers inschakelen",
-              "vpp_events_enabled": "VPP-gebeurtenissen inschakelen"
+              "vpp_events_enabled": "VPP-gebeurtenissen inschakelen",
+              "export_limit_controls_enabled": "Bediening voor terugleverlimieten inschakelen"
             },
             "data_description": {
               "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld.",
@@ -752,7 +776,8 @@
               "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger.",
               "battery_schedules_enabled": "Beheer schema's voor de IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in.",
-              "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld."
+              "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld.",
+              "export_limit_controls_enabled": "Terugleverlimieten van het systeem configureren. Vereist installateurstoegang."
             }
           },
           "advanced_features": {
@@ -779,7 +804,8 @@
           "microinverter_lifetime_energy_enabled": "Levensduurenergie van micro-omvormers inschakelen",
           "microinverter_power_enabled": "Vermogen van micro-omvormers inschakelen",
           "vpp_events_enabled": "VPP-gebeurtenissen inschakelen",
-          "grid_profile_controls_enabled": "Installateursbediening voor netprofielen inschakelen"
+          "grid_profile_controls_enabled": "Installateursbediening voor netprofielen inschakelen",
+          "export_limit_controls_enabled": "Bediening voor terugleverlimieten inschakelen"
         },
         "data_description": {
           "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld.",
@@ -791,7 +817,52 @@
           "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in.",
           "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is.",
           "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld.",
-          "grid_profile_controls_enabled": "Haalt netprofielmetadata op die alleen voor installateurs beschikbaar zijn en schakelt profielacties in. Standaard uitgeschakeld."
+          "grid_profile_controls_enabled": "Haalt netprofielmetadata op die alleen voor installateurs beschikbaar zijn en schakelt profielacties in. Standaard uitgeschakeld.",
+          "export_limit_controls_enabled": "Terugleverlimieten van het systeem configureren. Vereist installateurstoegang."
+        }
+      },
+      "export_limit": {
+        "title": "Terugleverlimiet",
+        "description": "Terugleverlimieten van het systeem configureren."
+      },
+      "export_limit_action": {
+        "title": "Terugleverlimiet",
+        "description": "Terugleverlimieten van het systeem configureren.\n\nHuidige instelling: **{current}**\n\n{status}",
+        "menu_options": {
+          "export_limit_set": "Terugleverlimiet instellen",
+          "export_limit_zero": "Nulteruglevering instellen",
+          "export_limit_disable": "Terugleverbegrenzing uitschakelen",
+          "export_limit_defaults": "Standaardinstellingen"
+        }
+      },
+      "export_limit_set": {
+        "title": "Terugleverlimiet instellen",
+        "data": {
+          "limit_watts": "Terugleverlimiet (W)"
+        }
+      },
+      "export_limit_confirm": {
+        "title": "Terugleverlimiet",
+        "description": "Huidige instelling: **{current}**\n\nAangevraagde instelling: **{requested}**\n\nVeranderingssnelheid (W/sec): **{current_slew}** → **{requested_slew}**",
+        "data": {
+          "confirm": "Deze wijziging bevestigen"
+        }
+      },
+      "export_limit_submitted": {
+        "title": "Terugleverlimiet",
+        "description": "Terugleverlimieten van het systeem configureren.\n\n**{status}**"
+      },
+      "export_limit_readonly": {
+        "title": "Terugleverlimiet",
+        "description": "Terugleverlimiet niet beschikbaar. Installateurstoegang en een ondersteunde configuratie met één gateway zijn vereist.\n\nHuidige instelling: **{current}**"
+      },
+      "export_limit_defaults": {
+        "title": "Standaardinstellingen",
+        "description": "Sla standaardwaarden voor inschakelen op zonder de gateway te wijzigen. Herstellen verwijdert de opgeslagen snelheidsoverschrijving.",
+        "data": {
+          "limit_watts": "Standaard exportlimiet (W)",
+          "slew_rate": "Veranderingssnelheid (W/sec)",
+          "restore_slew_rate": "Herstel snelheid van gateway"
         }
       }
     },
@@ -819,7 +890,14 @@
       "grid_otp_required": "Voer de eenmalige code in.",
       "grid_otp_invalid_format": "De eenmalige code moet exact vier cijfers bevatten.",
       "grid_otp_invalid": "De eenmalige code is ongeldig of verlopen.",
-      "grid_envoy_serial_missing": "De gateway voor deze site kan niet worden bepaald."
+      "grid_envoy_serial_missing": "De gateway voor deze site kan niet worden bepaald.",
+      "export_limit_unavailable": "Terugleverlimiet niet beschikbaar. Installateurstoegang en een ondersteunde configuratie met één gateway zijn vereist.",
+      "export_limit_invalid": "Voer gehele watts in van 0 tot 100000.",
+      "export_limit_changed": "Configuratie gewijzigd. Controleer de bijgewerkte instellingen en bevestig opnieuw.",
+      "export_limit_pending": "Wachten op bevestiging van de configuratie. Vernieuw de status voordat u nog een wijziging indient.",
+      "export_limit_disabled": "Bediening voor terugleverlimieten inschakelen (Functies → Apparaatfuncties).",
+      "export_limit_confirmation": "Deze wijziging bevestigen",
+      "export_limit_invalid_slew": "Voer een positief getal met maximaal twee decimalen in."
     },
     "abort": {
       "migration_no_envoy_sources": "Er zijn geen Enphase Envoy-energiesensoren beschikbaar om te migreren.",
@@ -1374,7 +1452,7 @@
         }
       },
       "system_profile_status": {
-        "name": "Systeemprofielstatus",
+        "name": "Systeemprofiel",
         "state": {
           "pending": "In behandeling"
         },
@@ -2024,6 +2102,57 @@
       },
       "vpp_next_event_status": {
         "name": "Status van volgende VPP-gebeurtenis"
+      },
+      "export_limit": {
+        "name": "Terugleverlimiet",
+        "state": {
+          "disabled": "Uitgeschakeld",
+          "zero_export": "Nulteruglevering",
+          "limited": "Begrensd",
+          "unsupported": "Niet ondersteund",
+          "pending": "In behandeling",
+          "unconfirmed": "Onbevestigd"
+        },
+        "state_attributes": {
+          "confirmed_watts": {
+            "name": "Huidige instelling"
+          },
+          "requested_watts": {
+            "name": "Aangevraagde instelling"
+          },
+          "requested_action": {
+            "name": "Aangevraagde instelling",
+            "state": {
+              "set": "Terugleverlimiet instellen",
+              "disable": "Terugleverbegrenzing uitschakelen"
+            }
+          },
+          "request_status": {
+            "name": "Aanvraagstatus",
+            "state": {
+              "idle": "Geen verzoek",
+              "pending": "Wacht op bevestiging",
+              "confirmed": "Configuratie bevestigd",
+              "unconfirmed": "Onbevestigd",
+              "rejected": "Afgewezen"
+            }
+          },
+          "last_successful_readback": {
+            "name": "Laatste geslaagde uitlezing"
+          },
+          "slew_rate": {
+            "name": "Veranderingssnelheid (W/sec)"
+          },
+          "requested_slew_rate": {
+            "name": "Aangevraagde instelling · Veranderingssnelheid (W/sec)"
+          },
+          "pending": {
+            "name": "In behandeling"
+          },
+          "pending_requested_at": {
+            "name": "In behandeling Aangevraagd om"
+          }
+        }
       }
     },
     "number": {
@@ -2364,6 +2493,28 @@
       },
       "battery_schedule_selected": {
         "name": "Batterijschema"
+      },
+      "export_limit": {
+        "name": "Terugleverlimiet",
+        "state": {
+          "enable_limit": "Limiet inschakelen",
+          "disable_limit": "Limiet uitschakelen"
+        },
+        "state_attributes": {
+          "default_limit_watts": {
+            "name": "Standaard exportlimiet (W)"
+          },
+          "default_slew_rate": {
+            "name": "Veranderingssnelheid (W/sec)"
+          },
+          "slew_rate_source": {
+            "name": "Bron van veranderingssnelheid",
+            "state": {
+              "gateway": "Gateway",
+              "saved_override": "Opgeslagen overschrijving"
+            }
+          }
+        }
       }
     },
     "button": {
@@ -2540,6 +2691,10 @@
     "active_system_event": {
       "title": "Actieve Enphase-systeemgebeurtenis met hoge impact",
       "description": "Locatie {site_id} heeft een actieve gebeurtenis met ernst {severity} die {device_type} beïnvloedt en voor het eerst is gemeld op {event_date}. Bekijk Enlighten voor details en de aanbevolen actie. Deze reparatie verdwijnt automatisch wanneer Enphase meldt dat de gebeurtenis is opgelost."
+    },
+    "export_limit_pending": {
+      "title": "Wijziging terugleverlimiet onbevestigd",
+      "description": "De wijziging is na {pending_timeout_minutes} minuten niet bevestigd. Controles gaan verder met het standaardinterval. Controleer de gatewayconfiguratie; het schrijven wordt niet automatisch herhaald."
     }
   },
   "system_health": {
@@ -3177,6 +3332,72 @@
         "gateway_serial": {
           "name": "Gateway-serienummer",
           "description": "Optioneel Gateway-serienummer wanneer de Activation-record meerdere Gateways bevat."
+        }
+      }
+    },
+    "set_export_limit": {
+      "name": "Terugleverlimiet instellen",
+      "description": "Terugleverlimieten van het systeem configureren.",
+      "fields": {
+        "limit_watts": {
+          "name": "Terugleverlimiet (W)",
+          "description": "Voer gehele watts in van 0 tot 100000."
+        },
+        "site_id": {
+          "name": "Site-ID",
+          "description": "Optionele site-id; automatisch gedetecteerd wanneer een site-apparaat is geselecteerd."
+        },
+        "config_entry_id": {
+          "name": "Enphase-configuratie-invoer",
+          "description": "Enphase-configuratie-invoer"
+        },
+        "device_id": {
+          "name": "Apparaten",
+          "description": "Apparaten"
+        },
+        "slew_rate": {
+          "name": "Veranderingssnelheid (W/sec)",
+          "description": "Optioneel. Indien weggelaten wordt de huidige gatewaywaarde gebruikt."
+        }
+      }
+    },
+    "disable_export_limit": {
+      "name": "Terugleverbegrenzing uitschakelen",
+      "description": "Terugleverlimieten van het systeem configureren.",
+      "fields": {
+        "site_id": {
+          "name": "Site-ID",
+          "description": "Optionele site-id; automatisch gedetecteerd wanneer een site-apparaat is geselecteerd."
+        },
+        "config_entry_id": {
+          "name": "Enphase-configuratie-invoer",
+          "description": "Enphase-configuratie-invoer"
+        },
+        "device_id": {
+          "name": "Apparaten",
+          "description": "Apparaten"
+        },
+        "slew_rate": {
+          "name": "Veranderingssnelheid (W/sec)",
+          "description": "Optioneel. Indien weggelaten wordt de huidige gatewaywaarde gebruikt."
+        }
+      }
+    },
+    "refresh_export_limit": {
+      "name": "Terugleverlimiet vernieuwen",
+      "description": "Terugleverlimieten van het systeem configureren.",
+      "fields": {
+        "site_id": {
+          "name": "Site-ID",
+          "description": "Optionele site-id; automatisch gedetecteerd wanneer een site-apparaat is geselecteerd."
+        },
+        "config_entry_id": {
+          "name": "Enphase-configuratie-invoer",
+          "description": "Enphase-configuratie-invoer"
+        },
+        "device_id": {
+          "name": "Apparaten",
+          "description": "Apparaten"
         }
       }
     }

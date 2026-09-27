@@ -10378,3 +10378,20 @@ async def test_json_login_wall_respects_refresh_policy(
         allow_reauth and not client._is_hems_api_endpoint(endpoint)
     )
     assert len(session.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_text_mutation_disables_auth_replay() -> None:
+    session = _FakeSession([_FakeResponse(status=401, json_body={}, text_body="")])
+    client = _make_client(session)
+    client._reauth_cb = AsyncMock(return_value=True)
+    with pytest.raises(api.Unauthorized):
+        await client._text_response(
+            "PUT",
+            f"{api.BASE_URL}/site_pel_settings/123",
+            allow_reauth=False,
+            allow_redirects=False,
+        )
+    assert len(session.calls) == 1
+    client._reauth_cb.assert_not_awaited()
+    assert "allow_reauth" not in session.calls[0][2]

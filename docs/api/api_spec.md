@@ -117,9 +117,9 @@ Status labels:
 | Installer application authorizations | `GET` | `/app_user_auth` | installer session | Browser capture only |
 | Installer Grid Services application authorizations | `GET` | `https://gs.enphaseenergy.com/enrollment-mgr/api/v1/app_user_auths/<site_id>` | installer access; standalone auth unverified | Not implemented; frontend source only |
 | Installer PEL summary | `GET` | `/app-api/<site_id>/get_pel_details` | authenticated session; installer-only feature policy; see `2.30` | Browser capture only |
-| Installer gateway settings read | `POST` | `/service/site-device/api/v1/<site_id>/site-device-settings` (JSON `{}`) | authenticated session; installer-only feature policy | Browser capture only |
-| Installer PEL form | `GET` | `/site_pel_settings/<site_id>/edit?settings_view=true` | authenticated session; installer-only feature policy | Browser capture only |
-| Installer PEL form write | `PUT` / `POST` with `_method=put` | `/site_pel_settings/<site_id>` | authenticated session + live form authenticity token; installer-only feature policy | Browser capture only; supplied source reports verified configuration readback |
+| Installer gateway settings read | `POST` | `/service/site-device/api/v1/<site_id>/site-device-settings` (JSON `{}`) | authenticated session; installer-only feature policy | Runtime (opt-in) |
+| Installer PEL form | `GET` | `/site_pel_settings/<site_id>/edit?settings_view=true` | authenticated session; installer-only feature policy | Runtime (opt-in) |
+| Installer PEL form write | `PUT` / `POST` with `_method=put` | `/site_pel_settings/<site_id>` | authenticated session + live form authenticity token; installer-only feature policy | Runtime (opt-in); integration-session validation pending |
 | Site bootstrap payload | `GET` | `/app-api/<site_id>/data.json?app=<id>&device_status=non_retired&is_mobile=<id>` | authenticated session cookies + `e-auth-token` | Browser capture only |
 | Filtered site-device inventory | `POST` | `/service/site-device/api/v2/devices/list` | `e-auth-token` + cookies | Browser capture only |
 | Site live-stream flags | `GET` | `/app-api/<site_id>/show_livestream` | authenticated session cookies | Runtime |
@@ -5601,7 +5601,21 @@ Potentially stateful diagnostic `GET` routes (such as meter CT verification) and
 ### 2.30 Installer Gateway Export Limiting (PEL)
 
 Observed: supplied observational specification v0.3.6, dated 2026-09-27.
-These contracts are documentation only. Reported write verification means
+The integration implements an opt-in Export Limit surface based on these contracts.
+The IQ Gateway selector enables the saved default watts (initially zero) or disables
+limiting. Advanced defaults include an optional slew-rate override; restoring it
+clears the override after fresh gateway readback. Saving defaults is local only.
+Automation writes accept an optional positive `slew_rate` (W/sec, up to two decimal
+places); omission preserves the live gateway value. Readback must match the
+requested slew rate as well as the requested limit. The Export Limit sensor
+shows `pending` or `unconfirmed` while a write is unresolved; confirmed and
+requested settings remain separate attributes. Runtime readback uses the configured
+fast polling interval for 10 minutes, then raises a repair warning and uses the
+configured standard interval without repeating the write.
+PEL writes reject incomplete or ambiguous live forms and require their current
+mode, watts, and slew rate to match the fresh gateway readback. Required controls
+must occur once; unrelated repeated successful controls are preserved.
+Integration-session writes still require live validation. Reported write verification means
 configuration readback in that investigation, not physical export-ceiling
 verification. Initial feature policy requires installer access; these browser
 captures do not establish an installer-only server entitlement rule. Activation
@@ -5821,8 +5835,10 @@ and automatically replay the request once. PEL writes need explicit retry
 handling so a generic helper does not silently resubmit a mutation. Existing
 HTML transport support does not verify an actual integration-session PEL write;
 permission-denial and expired-token behavior still need validation.
-`_text_response` does not consume an `allow_reauth` keyword as `_json` does;
-passing `allow_reauth=False` is not a supported way to disable replay. Reacquire
+`_text_response` now consumes `allow_reauth`; PEL writes explicitly pass
+`allow_reauth=False` and `allow_replay=False`. The latter installs a per-request
+single-attempt guard because aiohttp can otherwise replay a PUT after a dropped
+connection. Existing callers retain their default retry behavior. Reacquire
 a fresh form/token after session renewal and distinguish definite auth rejection
 from an uncertain submitted write. Activation's JSON transport also retries and
 is not a verified PEL transport.

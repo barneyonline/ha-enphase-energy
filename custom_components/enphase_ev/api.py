@@ -74,6 +74,7 @@ from .api_client.errors import (
     _is_hems_invalid_site_error as _is_hems_invalid_site_error,
 )
 from .api_client import site_surface as api_site_surface
+from .api_client import export_limit_surface
 from .api_client import vpp_surface as api_vpp_surface
 from .api_models import (
     AuthTokens as AuthTokens,
@@ -1752,6 +1753,17 @@ class EnphaseEVClient(MqttStreamSurface):
         "Return Activation device inventory and current grid-profile status."
 
         return await api_activation_surface.async_get_activation_device_list(self)
+
+    async def async_get_export_limit_settings(self) -> object:
+        return await export_limit_surface.read_settings(self)
+
+    async def async_get_export_limit_form(self) -> list[tuple[str, str]]:
+        return await export_limit_surface.read_form(self)
+
+    async def async_set_export_limit(
+        self, fields: list[tuple[str, str]], watts: int | None, slew_rate: float
+    ) -> None:
+        await export_limit_surface.write_settings(self, fields, watts, slew_rate)
 
     async def async_get_grid_profiles_filtered(
         self,

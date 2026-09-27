@@ -595,7 +595,12 @@ class EvseRuntime:
     ) -> dict[str, object]:
         coord = self.coordinator
         charging_now = any(v.get("charging") for v in data.values()) if data else False
-        want_fast = charging_now
+        want_fast = charging_now or (
+            getattr(
+                getattr(coord, "battery_runtime", None), "profile_readback_fast", False
+            )
+            is True
+        )
         now_mono = time.monotonic()
         if coord._fast_until and now_mono < coord._fast_until:
             want_fast = True

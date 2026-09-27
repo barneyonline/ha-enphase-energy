@@ -865,3 +865,78 @@ update_cfg_schedule:
             text:
               multiline: false
           example: "1234567"
+
+set_export_limit:
+  target:
+    entity:
+      integration: enphase_ev
+  fields:
+    limit_watts:
+      required: true
+      example: 5000
+      selector:
+        number:
+          min: 0
+          max: 100000
+          step: 1
+          unit_of_measurement: W
+          mode: box
+    slew_rate:
+      selector:
+        number:
+          min: 0.01
+          step: 0.01
+          mode: box
+          unit_of_measurement: W/sec
+    site_id:
+      selector:
+        text:
+    config_entry_id:
+      selector:
+        text:
+    device_id:
+      selector:
+        device:
+          integration: enphase_ev
+          multiple: true
+
+disable_export_limit:
+  target:
+    entity:
+      integration: enphase_ev
+  fields:
+    slew_rate:
+      selector:
+        number:
+          min: 0.01
+          step: 0.01
+          mode: box
+          unit_of_measurement: W/sec
+    site_id:
+      selector:
+        text:
+    config_entry_id:
+      selector:
+        text:
+    device_id:
+      selector:
+        device:
+          integration: enphase_ev
+          multiple: true
+
+refresh_export_limit:
+  target:
+    entity:
+      integration: enphase_ev
+  fields:
+    site_id:
+      selector:
+        text:
+    config_entry_id:
+      selector:
+        text:
+    device_id:
+      selector:
+        device:
+          integration: enphase_ev
+          multiple: true

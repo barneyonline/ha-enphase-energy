@@ -481,6 +481,27 @@
     },
     "grid_profile_controls_disabled": {
       "message": "Abilita i controlli del profilo di rete per installatori nelle opzioni dell'integrazione prima di usare questa azione."
+    },
+    "export_limit_unavailable": {
+      "message": "Limite di immissione non disponibile. Sono necessari accesso installatore e una configurazione supportata con un solo gateway."
+    },
+    "export_limit_invalid": {
+      "message": "Inserisci watt interi da 0 a 100000."
+    },
+    "export_limit_changed": {
+      "message": "Configurazione modificata. Controlla le impostazioni aggiornate e conferma di nuovo."
+    },
+    "export_limit_pending": {
+      "message": "In attesa di conferma della configurazione. Aggiorna lo stato prima di un’altra modifica."
+    },
+    "export_limit_disabled": {
+      "message": "Abilita i controlli del limite di immissione (Funzionalità → Funzionalità del dispositivo)."
+    },
+    "export_limit_confirmation": {
+      "message": "Conferma questa modifica"
+    },
+    "export_limit_invalid_slew": {
+      "message": "Inserisci un numero positivo con al massimo due decimali."
     }
   },
   "options": {
@@ -503,7 +524,7 @@
           "repair_notifications": "Gestisci le notifiche di riparazione di Home Assistant.",
           "authentication_settings": "Avvia il flusso di accesso per aggiornare le credenziali senza rimuovere l'integrazione.",
           "migrate_envoy": "Riassegna gli ID entità energia selezionati di Enphase Envoy in modo che la cronologia di Home Assistant Energy continui con questa integrazione.",
-          "advanced": "Controlli facoltativi della modalità di rete e controlli del profilo riservati agli installatori.",
+          "advanced": "Azioni per installatore e manutenzione.",
           "features": "Configura le funzionalità dei dispositivi e i controlli avanzati."
         },
         "data": {
@@ -672,11 +693,13 @@
         "description": "Azioni per installatore e manutenzione.",
         "menu_options": {
           "grid_toggle": "Modalità di rete",
-          "grid_profile": "Controllo profilo di rete"
+          "grid_profile": "Controllo profilo di rete",
+          "export_limit": "Limite di immissione"
         },
         "menu_option_descriptions": {
           "grid_toggle": "Configura i controlli manuali della modalità di rete.",
-          "grid_profile": "Sfoglia e applica profili di rete Activation riservati agli installatori."
+          "grid_profile": "Sfoglia e applica profili di rete Activation riservati agli installatori.",
+          "export_limit": "Configurare i limiti di immissione del sistema."
         }
       },
       "grid_toggle": {
@@ -742,7 +765,8 @@
               "weather_enabled": "Abilita meteo",
               "nominal_voltage": "Tensione nominale del caricatore EV (V)",
               "microinverter_lifetime_energy_enabled": "Abilita energia totale dei microinverter",
-              "vpp_events_enabled": "Abilita eventi VPP"
+              "vpp_events_enabled": "Abilita eventi VPP",
+              "export_limit_controls_enabled": "Abilita i controlli del limite di immissione"
             },
             "data_description": {
               "system_event_repair_issues": "Crea riparazioni di Home Assistant per gli allarmi Enphase permanenti attivi. Disabilitato per impostazione predefinita.",
@@ -752,7 +776,8 @@
               "schedule_sync_enabled": "Gestisci le pianificazioni di IQ EV Charger.",
               "battery_schedules_enabled": "Gestisci le pianificazioni di IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Abilita tutti i sensori di energia totale per ciascun microinverter.",
-              "vpp_events_enabled": "Recupera le pianificazioni VPP/ELRP da Enphase e crea entità evento solo per i siti iscritti. Disabilitato per impostazione predefinita."
+              "vpp_events_enabled": "Recupera le pianificazioni VPP/ELRP da Enphase e crea entità evento solo per i siti iscritti. Disabilitato per impostazione predefinita.",
+              "export_limit_controls_enabled": "Configurare i limiti di immissione del sistema. Richiede l’accesso installatore."
             }
           },
           "advanced_features": {
@@ -779,7 +804,8 @@
           "microinverter_lifetime_energy_enabled": "Abilita energia totale dei microinverter",
           "microinverter_power_enabled": "Abilita potenza dei microinverter",
           "vpp_events_enabled": "Abilita eventi VPP",
-          "grid_profile_controls_enabled": "Abilita i controlli del profilo di rete per installatori"
+          "grid_profile_controls_enabled": "Abilita i controlli del profilo di rete per installatori",
+          "export_limit_controls_enabled": "Abilita i controlli del limite di immissione"
         },
         "data_description": {
           "system_event_repair_issues": "Crea riparazioni di Home Assistant per gli allarmi Enphase permanenti attivi. Disabilitato per impostazione predefinita.",
@@ -791,7 +817,52 @@
           "microinverter_lifetime_energy_enabled": "Abilita tutti i sensori di energia totale per ciascun microinverter.",
           "microinverter_power_enabled": "Abilita tutti i sensori di potenza per ciascun microinverter quando è disponibile la telemetria dell’installatore.",
           "vpp_events_enabled": "Recupera le pianificazioni VPP/ELRP da Enphase e crea entità evento solo per i siti iscritti. Disabilitato per impostazione predefinita.",
-          "grid_profile_controls_enabled": "Recupera i metadati del profilo di rete riservati agli installatori e abilita le azioni del profilo. Disabilitato per impostazione predefinita."
+          "grid_profile_controls_enabled": "Recupera i metadati del profilo di rete riservati agli installatori e abilita le azioni del profilo. Disabilitato per impostazione predefinita.",
+          "export_limit_controls_enabled": "Configurare i limiti di immissione del sistema. Richiede l’accesso installatore."
+        }
+      },
+      "export_limit": {
+        "title": "Limite di immissione",
+        "description": "Configurare i limiti di immissione del sistema."
+      },
+      "export_limit_action": {
+        "title": "Limite di immissione",
+        "description": "Configurare i limiti di immissione del sistema.\n\nImpostazione attuale: **{current}**\n\n{status}",
+        "menu_options": {
+          "export_limit_set": "Imposta limite di immissione",
+          "export_limit_zero": "Imposta immissione zero",
+          "export_limit_disable": "Disabilita limitazione di immissione",
+          "export_limit_defaults": "Impostazioni predefinite"
+        }
+      },
+      "export_limit_set": {
+        "title": "Imposta limite di immissione",
+        "data": {
+          "limit_watts": "Limite di immissione (W)"
+        }
+      },
+      "export_limit_confirm": {
+        "title": "Limite di immissione",
+        "description": "Impostazione attuale: **{current}**\n\nImpostazione richiesta: **{requested}**\n\nVelocità di variazione (W/sec): **{current_slew}** → **{requested_slew}**",
+        "data": {
+          "confirm": "Conferma questa modifica"
+        }
+      },
+      "export_limit_submitted": {
+        "title": "Limite di immissione",
+        "description": "Configurare i limiti di immissione del sistema.\n\n**{status}**"
+      },
+      "export_limit_readonly": {
+        "title": "Limite di immissione",
+        "description": "Limite di immissione non disponibile. Sono necessari accesso installatore e una configurazione supportata con un solo gateway.\n\nImpostazione attuale: **{current}**"
+      },
+      "export_limit_defaults": {
+        "title": "Impostazioni predefinite",
+        "description": "Salva i valori per abilitare il limite senza modificare il gateway. Il ripristino elimina la velocità personalizzata salvata.",
+        "data": {
+          "limit_watts": "Limite di esportazione predefinito (W)",
+          "slew_rate": "Velocità di variazione (W/sec)",
+          "restore_slew_rate": "Ripristina la velocità dal gateway"
         }
       }
     },
@@ -819,7 +890,14 @@
       "grid_otp_required": "Inserisci il codice monouso.",
       "grid_otp_invalid_format": "Il codice monouso deve contenere esattamente quattro cifre.",
       "grid_otp_invalid": "Il codice monouso non è valido o è scaduto.",
-      "grid_envoy_serial_missing": "Impossibile determinare il gateway per questo sito."
+      "grid_envoy_serial_missing": "Impossibile determinare il gateway per questo sito.",
+      "export_limit_unavailable": "Limite di immissione non disponibile. Sono necessari accesso installatore e una configurazione supportata con un solo gateway.",
+      "export_limit_invalid": "Inserisci watt interi da 0 a 100000.",
+      "export_limit_changed": "Configurazione modificata. Controlla le impostazioni aggiornate e conferma di nuovo.",
+      "export_limit_pending": "In attesa di conferma della configurazione. Aggiorna lo stato prima di un’altra modifica.",
+      "export_limit_disabled": "Abilita i controlli del limite di immissione (Funzionalità → Funzionalità del dispositivo).",
+      "export_limit_confirmation": "Conferma questa modifica",
+      "export_limit_invalid_slew": "Inserisci un numero positivo con al massimo due decimali."
     },
     "abort": {
       "migration_no_envoy_sources": "Non sono disponibili sensori energia Enphase Envoy da migrare.",
@@ -1374,7 +1452,7 @@
         }
       },
       "system_profile_status": {
-        "name": "Stato del profilo di sistema",
+        "name": "Profilo del sistema",
         "state": {
           "pending": "In attesa"
         },
@@ -2024,6 +2102,57 @@
       },
       "vpp_next_event_status": {
         "name": "Stato del prossimo evento VPP"
+      },
+      "export_limit": {
+        "name": "Limite di immissione",
+        "state": {
+          "disabled": "Disabilitato",
+          "zero_export": "Immissione zero",
+          "limited": "Limitato",
+          "unsupported": "Non supportato",
+          "pending": "In attesa",
+          "unconfirmed": "Non confermato"
+        },
+        "state_attributes": {
+          "confirmed_watts": {
+            "name": "Impostazione attuale"
+          },
+          "requested_watts": {
+            "name": "Impostazione richiesta"
+          },
+          "requested_action": {
+            "name": "Impostazione richiesta",
+            "state": {
+              "set": "Imposta limite di immissione",
+              "disable": "Disabilita limitazione di immissione"
+            }
+          },
+          "request_status": {
+            "name": "Stato della richiesta",
+            "state": {
+              "idle": "Nessuna richiesta",
+              "pending": "In attesa di conferma",
+              "confirmed": "Configurazione confermata",
+              "unconfirmed": "Non confermato",
+              "rejected": "Rifiutato"
+            }
+          },
+          "last_successful_readback": {
+            "name": "Ultima lettura riuscita"
+          },
+          "slew_rate": {
+            "name": "Velocità di variazione (W/sec)"
+          },
+          "requested_slew_rate": {
+            "name": "Impostazione richiesta · Velocità di variazione (W/sec)"
+          },
+          "pending": {
+            "name": "In attesa di"
+          },
+          "pending_requested_at": {
+            "name": "In attesa di richiesta a"
+          }
+        }
       }
     },
     "number": {
@@ -2364,6 +2493,28 @@
       },
       "battery_schedule_selected": {
         "name": "Pianificazione batteria"
+      },
+      "export_limit": {
+        "name": "Limite di immissione",
+        "state": {
+          "enable_limit": "Abilita limite",
+          "disable_limit": "Disabilita limite"
+        },
+        "state_attributes": {
+          "default_limit_watts": {
+            "name": "Limite di esportazione predefinito (W)"
+          },
+          "default_slew_rate": {
+            "name": "Velocità di variazione (W/sec)"
+          },
+          "slew_rate_source": {
+            "name": "Origine della velocità di variazione",
+            "state": {
+              "gateway": "Gateway",
+              "saved_override": "Valore personalizzato salvato"
+            }
+          }
+        }
       }
     },
     "button": {
@@ -2540,6 +2691,10 @@
     "active_system_event": {
       "title": "Evento di sistema Enphase ad alto impatto attivo",
       "description": "Il sito {site_id} presenta un evento {severity} attivo che interessa {device_type}, segnalato per la prima volta il {event_date}. Consulta Enlighten per i dettagli e la procedura consigliata. Questa riparazione viene rimossa automaticamente quando Enphase segnala che evento è risolto."
+    },
+    "export_limit_pending": {
+      "title": "Modifica del limite di immissione non confermata",
+      "description": "La modifica non è confermata dopo {pending_timeout_minutes} minuti. I controlli continuano all’intervallo normale. Verifica la configurazione del gateway; la scrittura non verrà ripetuta automaticamente."
     }
   },
   "system_health": {
@@ -3177,6 +3332,72 @@
         "gateway_serial": {
           "name": "Numero di serie Gateway",
           "description": "Numero di serie Gateway facoltativo quando il record Activation contiene più Gateway."
+        }
+      }
+    },
+    "set_export_limit": {
+      "name": "Imposta limite di immissione",
+      "description": "Configurare i limiti di immissione del sistema.",
+      "fields": {
+        "limit_watts": {
+          "name": "Limite di immissione (W)",
+          "description": "Inserisci watt interi da 0 a 100000."
+        },
+        "site_id": {
+          "name": "ID sito",
+          "description": "Identificatore sito facoltativo; rilevato automaticamente quando è selezionato un dispositivo sito."
+        },
+        "config_entry_id": {
+          "name": "Voce di configurazione Enphase",
+          "description": "Voce di configurazione Enphase"
+        },
+        "device_id": {
+          "name": "Dispositivi",
+          "description": "Dispositivi"
+        },
+        "slew_rate": {
+          "name": "Velocità di variazione (W/sec)",
+          "description": "Facoltativo. Se omesso, usa il valore attuale del gateway."
+        }
+      }
+    },
+    "disable_export_limit": {
+      "name": "Disabilita limitazione di immissione",
+      "description": "Configurare i limiti di immissione del sistema.",
+      "fields": {
+        "site_id": {
+          "name": "ID sito",
+          "description": "Identificatore sito facoltativo; rilevato automaticamente quando è selezionato un dispositivo sito."
+        },
+        "config_entry_id": {
+          "name": "Voce di configurazione Enphase",
+          "description": "Voce di configurazione Enphase"
+        },
+        "device_id": {
+          "name": "Dispositivi",
+          "description": "Dispositivi"
+        },
+        "slew_rate": {
+          "name": "Velocità di variazione (W/sec)",
+          "description": "Facoltativo. Se omesso, usa il valore attuale del gateway."
+        }
+      }
+    },
+    "refresh_export_limit": {
+      "name": "Aggiorna limite di immissione",
+      "description": "Configurare i limiti di immissione del sistema.",
+      "fields": {
+        "site_id": {
+          "name": "ID sito",
+          "description": "Identificatore sito facoltativo; rilevato automaticamente quando è selezionato un dispositivo sito."
+        },
+        "config_entry_id": {
+          "name": "Voce di configurazione Enphase",
+          "description": "Voce di configurazione Enphase"
+        },
+        "device_id": {
+          "name": "Dispositivi",
+          "description": "Dispositivi"
         }
       }
     }

@@ -97,6 +97,7 @@ async def test_async_setup_entry_registers_entities(
             return_value={"profile_id": "agf:current"}
         ),
     )
+    coord.export_limit_runtime = SimpleNamespace(enabled=True)
     callbacks: list[Any] = []
 
     def fake_add_listener(cb):
@@ -112,6 +113,7 @@ async def test_async_setup_entry_registers_entities(
         added.extend(entities)
 
     await async_setup_entry(hass, config_entry, _async_add_entities)
+    assert any(ent.unique_id.endswith("_export_limit") for ent in added)
     assert any(ent.unique_id.endswith("_energy_today") for ent in added)
     assert any(ent.unique_id.endswith("_last_rpt") for ent in added)
     assert any(ent.unique_id.endswith("_electrical_phase") for ent in added)
