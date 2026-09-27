@@ -43,8 +43,7 @@
           "type_iqevse": "Įkrovikliai",
           "type_microinverter": "Mikroinverteriai",
           "scan_interval": "Skenavimo intervalas (s)",
-          "type_heatpump": "Šilumos siurblys",
-          "type_ac_battery": "AC baterija"
+          "type_heatpump": "Šilumos siurblys"
         },
         "data_description": {
           "type_envoy": "Apima šliuzo ryšio ir skaitiklių diagnostiką.",
@@ -52,8 +51,7 @@
           "type_iqevse": "Apima EV įkroviklių esybes ir valdiklius.",
           "type_microinverter": "Apima mikroinverterių junglumo, aktyvaus skaičiaus ir viso laikotarpio gamybos jutiklius.",
           "scan_interval": "Sekundės tarp debesies būsenos apklausų. Numatyta 60s.",
-          "type_heatpump": "Apima šilumos siurblio būsenos, diagnostikos ir vartojimo jutiklius.",
-          "type_ac_battery": "Apima AC baterijos jutiklius ir miego režimo valdiklius, kai jie prieinami."
+          "type_heatpump": "Apima šilumos siurblio būsenos, diagnostikos ir vartojimo jutiklius."
         }
       }
     },
@@ -138,9 +136,6 @@
     },
     "battery_schedule_overlap": {
       "message": "Tvarkaraštis persidengia su esamu {schedule_label}. Pirmiausia pakoreguokite arba išjunkite tą tvarkaraštį."
-    },
-    "ac_battery_unavailable": {
-      "message": "Šiuo metu nėra pasiekiamų AC baterijos įrenginių."
     },
     "auth_settings_service_unavailable": {
       "message": "Autentifikavimo nustatymai nepasiekiami, kol Enphase paslauga neveikia."
@@ -358,9 +353,6 @@
     "scheduler_service_unavailable": {
       "message": "Įkrovimo režimo pasirinkimas nepasiekiamas, kol Enphase planavimo paslauga neveikia."
     },
-    "selected_ac_battery_target_state_of_charge_unavailable": {
-      "message": "Pasirinktas AC baterijos tikslinis įkrovos lygis nepasiekiamas."
-    },
     "battery_schedule_day_required": {
       "message": "Pasirinkite bent vieną tvarkaraščio dieną."
     },
@@ -527,7 +519,6 @@
           "session_history_interval": "Sesijos istorijos intervalas (min)",
           "schedule_sync_enabled": "Įgalinti planuoklio palaikymą",
           "type_heatpump": "Šilumos siurblys",
-          "type_ac_battery": "AC baterija",
           "battery_schedules_enabled": "Įjungti baterijos planuoklį",
           "degraded_service_repair_issues": "Įgalinti suprastėjusių paslaugų taisymus",
           "weather_enabled": "Įjungti orus",
@@ -546,7 +537,6 @@
           "nominal_voltage": "Tipinė kintamosios srovės maitinimo įtampa galiai įvertinti, kai tiesioginės įtampos nėra.",
           "session_history_interval": "Minutės, kurias reikia palaukti tarp debesies sesijų istorijos užklausų.",
           "type_heatpump": "Apima šilumos siurblio būsenos, diagnostikos ir vartojimo jutiklius.",
-          "type_ac_battery": "Apima AC baterijos jutiklius ir miego režimo valdiklius, kai jie prieinami.",
           "degraded_service_repair_issues": "Sukuria Repairs problemas, kai pasirenkamos Enphase paslaugos veikia suprastėjusiai.",
           "weather_enabled": "Gauna dabartinius vietovės orus iš „Enphase“ ir sukuria orų objektą tik tada, kai galinis taškas pasiekiamas.",
           "microinverter_lifetime_energy_enabled": "Įjungia visus kiekvieno mikroinverterio viso veikimo energijos jutiklius.",
@@ -582,7 +572,6 @@
             "data": {
               "type_envoy": "Šliuzas",
               "type_encharge": "Baterija",
-              "type_ac_battery": "AC baterija",
               "type_iqevse": "Įkrovikliai",
               "type_heatpump": "Šilumos siurblys",
               "type_microinverter": "Mikroinverteriai"
@@ -590,7 +579,6 @@
             "data_description": {
               "type_envoy": "Apima šliuzo ryšio ir skaitiklių diagnostiką.",
               "type_encharge": "Apima baterijų būseną ir valdymo esybes, kai jos pasiekiamos.",
-              "type_ac_battery": "Apima AC baterijos jutiklius ir miego režimo valdiklius, kai jie prieinami.",
               "type_iqevse": "Apima EV įkroviklių esybes ir valdiklius.",
               "type_heatpump": "Apima šilumos siurblio būsenos, diagnostikos ir vartojimo jutiklius.",
               "type_microinverter": "Apima mikroinverterių junglumo, aktyvaus skaičiaus ir viso laikotarpio gamybos jutiklius."
@@ -601,7 +589,6 @@
           "devices": "Pasirinkite įrenginius",
           "type_envoy": "Šliuzas",
           "type_encharge": "Baterija",
-          "type_ac_battery": "AC baterija",
           "type_iqevse": "Įkrovikliai",
           "type_heatpump": "Šilumos siurblys",
           "type_microinverter": "Mikroinverteriai"
@@ -609,7 +596,6 @@
         "data_description": {
           "type_envoy": "Apima šliuzo ryšio ir skaitiklių diagnostiką.",
           "type_encharge": "Apima baterijų būseną ir valdymo esybes, kai jos pasiekiamos.",
-          "type_ac_battery": "Apima AC baterijos jutiklius ir miego režimo valdiklius, kai jie prieinami.",
           "type_iqevse": "Apima EV įkroviklių esybes ir valdiklius.",
           "type_heatpump": "Apima šilumos siurblio būsenos, diagnostikos ir vartojimo jutiklius.",
           "type_microinverter": "Apima mikroinverterių junglumo, aktyvaus skaičiaus ir viso laikotarpio gamybos jutiklius."
@@ -1855,45 +1841,6 @@
           "pairing": "Poravimas"
         }
       },
-      "ac_battery_overall_status": {
-        "name": "Bendra AC baterijos būsena",
-        "state": {
-          "normal": "Normalus",
-          "warning": "Įspėjimas",
-          "error": "Klaida",
-          "unknown": "Nežinoma"
-        }
-      },
-      "ac_battery_power": {
-        "name": "AC baterijos galia"
-      },
-      "ac_battery_last_reported": {
-        "name": "Paskutinė AC baterijos ataskaita"
-      },
-      "ac_battery_storage_charge": {
-        "name": "AC baterijos įkrovos lygis"
-      },
-      "ac_battery_storage_status": {
-        "name": "{serial} būsena",
-        "state": {
-          "normal": "Normalus",
-          "warning": "Įspėjimas",
-          "error": "Klaida",
-          "unknown": "Nežinoma"
-        }
-      },
-      "ac_battery_storage_power": {
-        "name": "{serial} galia"
-      },
-      "ac_battery_storage_operating_mode": {
-        "name": "{serial} veikimo režimas"
-      },
-      "ac_battery_storage_cycle_count": {
-        "name": "{serial} ciklų skaičius"
-      },
-      "ac_battery_storage_last_reported": {
-        "name": "Paskutinė {serial} ataskaita"
-      },
       "battery_cfg_schedules": {
         "name": "Baterijos CFG tvarkaraščiai"
       },
@@ -2338,9 +2285,6 @@
       "restrict_battery_discharge_schedule": {
         "name": "Baterijos iškrovimo ribojimo tvarkaraštis"
       },
-      "ac_battery_sleep_mode": {
-        "name": "AC baterijos miego režimas"
-      },
       "evse_schedule_edit_mon": {
         "name": "Pirmadienio tvarkaraštis"
       },
@@ -2411,9 +2355,6 @@
       },
       "system_profile": {
         "name": "Sistemos profilis"
-      },
-      "ac_battery_target_state_of_charge": {
-        "name": "Tikslinis AC baterijos įkrovos lygis"
       },
       "evse_schedule_selected": {
         "name": "Tvarkaraštis"

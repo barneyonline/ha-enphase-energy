@@ -43,8 +43,7 @@
           "type_iqevse": "Caricatori",
           "type_microinverter": "Microinverter",
           "scan_interval": "Intervallo di scansione (s)",
-          "type_heatpump": "Pompa di calore",
-          "type_ac_battery": "Batteria AC"
+          "type_heatpump": "Pompa di calore"
         },
         "data_description": {
           "type_envoy": "Include connettività del gateway e diagnostica dei contatori.",
@@ -52,8 +51,7 @@
           "type_iqevse": "Include entità e controlli dei caricatori EV.",
           "type_microinverter": "Include sensori di connettività dei microinverter, conteggio attivi e produzione cumulata.",
           "scan_interval": "Secondi tra i poll di stato cloud. Predefinito 60s.",
-          "type_heatpump": "Include sensori di stato, diagnostica e consumo della pompa di calore.",
-          "type_ac_battery": "Include sensori della batteria AC e controlli della modalità sospensione quando disponibili."
+          "type_heatpump": "Include sensori di stato, diagnostica e consumo della pompa di calore."
         }
       }
     },
@@ -138,9 +136,6 @@
     },
     "battery_schedule_overlap": {
       "message": "La pianificazione si sovrappone alla {schedule_label} esistente. Regola o disattiva prima quella pianificazione."
-    },
-    "ac_battery_unavailable": {
-      "message": "Al momento non è disponibile alcun dispositivo batteria AC."
     },
     "auth_settings_service_unavailable": {
       "message": "Le impostazioni di autenticazione non sono disponibili mentre il servizio Enphase non è operativo."
@@ -358,9 +353,6 @@
     "scheduler_service_unavailable": {
       "message": "La selezione della modalità di ricarica non è disponibile mentre il servizio di pianificazione Enphase non è disponibile."
     },
-    "selected_ac_battery_target_state_of_charge_unavailable": {
-      "message": "Lo stato di carica target selezionato della batteria AC non è disponibile."
-    },
     "battery_schedule_day_required": {
       "message": "Seleziona almeno un giorno per la pianificazione."
     },
@@ -527,7 +519,6 @@
           "session_history_interval": "Intervallo cronologia sessioni (min)",
           "schedule_sync_enabled": "Abilita il supporto dello scheduler",
           "type_heatpump": "Pompa di calore",
-          "type_ac_battery": "Batteria AC",
           "battery_schedules_enabled": "Attiva pianificatore batteria",
           "degraded_service_repair_issues": "Abilita riparazioni per servizi degradati",
           "weather_enabled": "Abilita meteo",
@@ -546,7 +537,6 @@
           "nominal_voltage": "Tensione di alimentazione CA tipica usata per stimare la potenza quando la tensione in tempo reale non è disponibile.",
           "session_history_interval": "Minuti di attesa tra i recuperi della cronologia sessioni cloud.",
           "type_heatpump": "Include sensori di stato, diagnostica e consumo della pompa di calore.",
-          "type_ac_battery": "Include sensori della batteria AC e controlli della modalità sospensione quando disponibili.",
           "degraded_service_repair_issues": "Crea problemi in Repairs quando i servizi Enphase opzionali sono degradati.",
           "weather_enabled": "Recupera il meteo attuale del sito da Enphase e crea un’entità meteo solo quando l’endpoint è disponibile.",
           "microinverter_lifetime_energy_enabled": "Abilita tutti i sensori di energia totale per ciascun microinverter.",
@@ -582,7 +572,6 @@
             "data": {
               "type_envoy": "Gateway",
               "type_encharge": "Batteria",
-              "type_ac_battery": "Batteria AC",
               "type_iqevse": "Caricatori",
               "type_heatpump": "Pompa di calore",
               "type_microinverter": "Microinverter"
@@ -590,7 +579,6 @@
             "data_description": {
               "type_envoy": "Include connettività del gateway e diagnostica dei contatori.",
               "type_encharge": "Include stato della batteria ed entità di controllo quando disponibili.",
-              "type_ac_battery": "Include sensori della batteria AC e controlli della modalità sospensione quando disponibili.",
               "type_iqevse": "Include entità e controlli dei caricatori EV.",
               "type_heatpump": "Include sensori di stato, diagnostica e consumo della pompa di calore.",
               "type_microinverter": "Include sensori di connettività dei microinverter, conteggio attivi e produzione cumulata."
@@ -601,7 +589,6 @@
           "devices": "Seleziona dispositivi",
           "type_envoy": "Gateway",
           "type_encharge": "Batteria",
-          "type_ac_battery": "Batteria AC",
           "type_iqevse": "Caricatori",
           "type_heatpump": "Pompa di calore",
           "type_microinverter": "Microinverter"
@@ -609,7 +596,6 @@
         "data_description": {
           "type_envoy": "Include connettività del gateway e diagnostica dei contatori.",
           "type_encharge": "Include stato della batteria ed entità di controllo quando disponibili.",
-          "type_ac_battery": "Include sensori della batteria AC e controlli della modalità sospensione quando disponibili.",
           "type_iqevse": "Include entità e controlli dei caricatori EV.",
           "type_heatpump": "Include sensori di stato, diagnostica e consumo della pompa di calore.",
           "type_microinverter": "Include sensori di connettività dei microinverter, conteggio attivi e produzione cumulata."
@@ -1855,45 +1841,6 @@
           "pairing": "Associazione in corso"
         }
       },
-      "ac_battery_overall_status": {
-        "name": "Stato complessivo della batteria AC",
-        "state": {
-          "normal": "Normale",
-          "warning": "Avvertimento",
-          "error": "Errore",
-          "unknown": "Sconosciuto"
-        }
-      },
-      "ac_battery_power": {
-        "name": "Potenza della batteria AC"
-      },
-      "ac_battery_last_reported": {
-        "name": "Ultimo report della batteria AC"
-      },
-      "ac_battery_storage_charge": {
-        "name": "Livello di carica della batteria AC"
-      },
-      "ac_battery_storage_status": {
-        "name": "Stato di {serial}",
-        "state": {
-          "normal": "Normale",
-          "warning": "Avvertimento",
-          "error": "Errore",
-          "unknown": "Sconosciuto"
-        }
-      },
-      "ac_battery_storage_power": {
-        "name": "Potenza di {serial}"
-      },
-      "ac_battery_storage_operating_mode": {
-        "name": "Modalità operativa di {serial}"
-      },
-      "ac_battery_storage_cycle_count": {
-        "name": "Conteggio cicli di {serial}"
-      },
-      "ac_battery_storage_last_reported": {
-        "name": "Ultimo report di {serial}"
-      },
       "battery_cfg_schedules": {
         "name": "Pianificazioni CFG batteria"
       },
@@ -2338,9 +2285,6 @@
       "restrict_battery_discharge_schedule": {
         "name": "Programma di restrizione della scarica della batteria"
       },
-      "ac_battery_sleep_mode": {
-        "name": "Modalità sospensione della batteria AC"
-      },
       "evse_schedule_edit_mon": {
         "name": "Pianificazione lunedì"
       },
@@ -2411,9 +2355,6 @@
       },
       "system_profile": {
         "name": "Profilo del sistema"
-      },
-      "ac_battery_target_state_of_charge": {
-        "name": "Stato di carica obiettivo della batteria AC"
       },
       "evse_schedule_selected": {
         "name": "Pianificazione"

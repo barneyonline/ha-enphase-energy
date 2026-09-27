@@ -73,8 +73,6 @@ class InventoryView:
             inferred.append("iqevse")
         if getattr(self.coordinator, "_battery_has_encharge", None) is True:
             inferred.append("encharge")
-        if getattr(self.coordinator, "_battery_has_acb", None) is True:
-            inferred.append("ac_battery")
         return [key for key in inferred if self._type_is_selected(key)]
 
     def _type_is_selected(self, type_key: object) -> bool:
@@ -82,7 +80,7 @@ class InventoryView:
         if not normalized:
             return False
         selected = getattr(self.coordinator, "_selected_type_keys", None)
-        if selected is None or not selected:
+        if selected is None:
             return True
         return normalized in selected
 
@@ -127,8 +125,6 @@ class InventoryView:
                     return False
         if normalized == "encharge":
             return getattr(self.coordinator, "_battery_has_encharge", None) is True
-        if normalized == "ac_battery":
-            return getattr(self.coordinator, "_battery_has_acb", None) is True
         if normalized == "iqevse":
             return self._has_known_chargers()
         return False
@@ -187,7 +183,7 @@ class InventoryView:
         if self.has_type(normalized):
             identifier = type_identifier(self.site_id, normalized)
             return identifier if isinstance(identifier, tuple) else None
-        if normalized not in {"encharge", "ac_battery"}:
+        if normalized != "encharge":
             return None
         # Battery controls can be discovered through BatteryConfig before the
         # generic devices inventory exposes a concrete member bucket.
@@ -243,7 +239,6 @@ class InventoryView:
         return {
             "envoy": "IQ Gateway",
             "encharge": "IQ Battery",
-            "ac_battery": "AC Battery",
             "iqevse": "IQ EV Charger",
             "heatpump": "Heat Pump",
             "microinverter": "IQ Microinverters",

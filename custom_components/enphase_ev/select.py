@@ -23,13 +23,6 @@ from .battery_schedule_editor import (
     battery_schedule_type_options,
     battery_scheduler_enabled,
 )
-from .ac_battery_support import (
-    AC_BATTERY_SOC_OPTIONS,
-    ac_battery_control_available,
-    ac_battery_device_info,
-    ac_battery_entities_available,
-    ac_battery_soc_option_label,
-)
 from .const import DOMAIN
 from .entity import battery_schedule_supported
 from .entity import (
@@ -161,10 +154,6 @@ def _retain_system_profile(coord: EnphaseCoordinator) -> bool:
     return True
 
 
-def _retain_ac_battery_target_soc(coord: EnphaseCoordinator) -> bool:
-    return ac_battery_control_available(coord)
-
-
 def _retain_battery_schedule_editor(
     coord: EnphaseCoordinator, entry: EnphaseConfigEntry
 ) -> bool:
@@ -214,7 +203,6 @@ async def async_setup_entry(
     ent_reg = er.async_get(hass)
     known_serials: set[str] = set()
     site_entity_added = False
-    ac_battery_select_added = False
     battery_schedule_editor_added = False
 
     def _system_profile_unique_id() -> str:
@@ -235,20 +223,13 @@ async def async_setup_entry(
     @callback
     def _async_sync_site_entities() -> None:
         nonlocal site_entity_added
-        nonlocal ac_battery_select_added
         nonlocal battery_schedule_editor_added
         inventory_ready = bool(getattr(coord, "_devices_inventory_ready", False))
         retain_system_profile = _retain_system_profile(coord)
-        retain_ac_battery_target_soc = _retain_ac_battery_target_soc(coord)
         retain_battery_schedule_editor = _retain_battery_schedule_editor(coord, entry)
         if not site_entity_added and retain_system_profile:
             async_add_entities([SystemProfileSelect(coord)], update_before_add=False)
             site_entity_added = True
-        if not ac_battery_select_added and retain_ac_battery_target_soc:
-            async_add_entities(
-                [AcBatteryTargetStateOfChargeSelect(coord)], update_before_add=False
-            )
-            ac_battery_select_added = True
         if not battery_schedule_editor_added and retain_battery_schedule_editor:
             async_add_entities(
                 [
@@ -261,14 +242,11 @@ async def async_setup_entry(
         if not inventory_ready:
             return
         # Site-level selects are dynamic because BatteryConfig permissions and
-        # AC Battery support are learned after setup.
+        # battery capabilities are learned after setup.
         system_profile_loaded = (
             site_entity_added
             and _site_has_battery(coord)
             and _type_available(coord, "envoy")
-        )
-        ac_battery_target_soc_loaded = (
-            ac_battery_select_added and ac_battery_entities_available(coord)
         )
         battery_schedule_editor_loaded = (
             battery_schedule_editor_added
@@ -287,10 +265,6 @@ async def async_setup_entry(
                         retain_system_profile or system_profile_loaded,
                     ),
                     (
-                        f"{DOMAIN}_site_{coord.site_id}_ac_battery_target_state_of_charge",
-                        retain_ac_battery_target_soc or ac_battery_target_soc_loaded,
-                    ),
-                    (
                         _battery_schedule_select_unique_id(),
                         retain_battery_schedule_editor
                         or battery_schedule_editor_loaded,
@@ -306,7 +280,6 @@ async def async_setup_entry(
             is_managed=lambda unique_id: unique_id
             in {
                 _system_profile_unique_id(),
-                f"{DOMAIN}_site_{coord.site_id}_ac_battery_target_state_of_charge",
                 _battery_schedule_select_unique_id(),
                 _battery_new_schedule_type_unique_id(),
             },
@@ -754,64 +727,3 @@ class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):  # type: ignore[misc]
                     translation_key="schedule_required",
                 )
             raise
-
-
-class AcBatteryTargetStateOfChargeSelect(CoordinatorEntity, SelectEntity):  # type: ignore[misc]
-    _attr_has_entity_name = True
-    _attr_translation_key = "ac_battery_target_state_of_charge"
-
-    def __init__(self, coord: EnphaseCoordinator) -> None:
-        super().__init__(coord)
-        self._coord = coord
-        self._attr_unique_id = (
-            f"{DOMAIN}_site_{coord.site_id}_ac_battery_target_state_of_charge"
-        )
-
-    @property
-    def suggested_object_id(self) -> str | None:
-        return "ac_battery_target_state_of_charge"
-
-    @property
-    def options(self) -> list[str]:
-        return [label for _value, label in AC_BATTERY_SOC_OPTIONS]
-
-    @property
-    def available(self) -> bool:
-        if not super().available:
-            return False
-        if getattr(self._coord, "battery_has_acb", None) is not True:
-            return False
-        return ac_battery_control_available(self._coord)
-
-    @property
-    def current_option(self) -> str | None:
-        return ac_battery_soc_option_label(
-            self._coord.ac_battery_selected_sleep_min_soc
-        )
-
-    @property
-    def extra_state_attributes(self) -> dict[str, object]:
-        return {
-            "selected_sleep_min_soc": self._coord.ac_battery_selected_sleep_min_soc,
-        }
-
-    async def async_select_option(self, option: str) -> None:
-        selected_value = None
-        for value, label in AC_BATTERY_SOC_OPTIONS:
-            if label == option:
-                selected_value = value
-                break
-        if selected_value is None:
-            raise_translated_service_validation(
-                translation_domain=DOMAIN,
-                translation_key=(
-                    "selected_ac_battery_target_state_of_charge_unavailable"
-                ),
-                message="Selected AC Battery target state of charge is not available.",
-            )
-            return  # pragma: no cover - validation helper always raises
-        await self._coord.async_set_ac_battery_target_soc(selected_value)
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return ac_battery_device_info(self._coord)

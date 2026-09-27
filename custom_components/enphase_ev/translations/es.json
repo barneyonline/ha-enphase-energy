@@ -43,8 +43,7 @@
           "type_iqevse": "Cargadores",
           "type_microinverter": "Microinversores",
           "scan_interval": "Intervalo de sondeo (s)",
-          "type_heatpump": "Bomba de calor",
-          "type_ac_battery": "Batería CA"
+          "type_heatpump": "Bomba de calor"
         },
         "data_description": {
           "type_envoy": "Incluye conectividad de la puerta de enlace y diagnósticos de medidores.",
@@ -52,8 +51,7 @@
           "type_iqevse": "Incluye entidades y controles de cargadores EV.",
           "type_microinverter": "Incluye sensores de conectividad de microinversores, recuento de activos y producción acumulada.",
           "scan_interval": "Segundos entre consultas al estado en la nube. Predeterminado 60 s.",
-          "type_heatpump": "Incluye sensores de estado, diagnóstico y consumo de la bomba de calor.",
-          "type_ac_battery": "Incluye sensores de batería CA y controles del modo de reposo cuando están disponibles."
+          "type_heatpump": "Incluye sensores de estado, diagnóstico y consumo de la bomba de calor."
         }
       }
     },
@@ -138,9 +136,6 @@
     },
     "battery_schedule_overlap": {
       "message": "El horario se superpone con el {schedule_label} existente. Ajusta o desactiva primero ese horario."
-    },
-    "ac_battery_unavailable": {
-      "message": "No hay dispositivos AC Battery disponibles en este momento."
     },
     "auth_settings_service_unavailable": {
       "message": "Los ajustes de autenticación no están disponibles mientras el servicio de Enphase esté caído."
@@ -358,9 +353,6 @@
     "scheduler_service_unavailable": {
       "message": "La selección del modo de carga no está disponible mientras el servicio de programación de Enphase no esté disponible."
     },
-    "selected_ac_battery_target_state_of_charge_unavailable": {
-      "message": "El estado de carga objetivo seleccionado de la batería CA no está disponible."
-    },
     "battery_schedule_day_required": {
       "message": "Selecciona al menos un día para el horario."
     },
@@ -527,7 +519,6 @@
           "session_history_interval": "Intervalo del historial de sesiones (min)",
           "schedule_sync_enabled": "Habilitar la compatibilidad con el programador",
           "type_heatpump": "Bomba de calor",
-          "type_ac_battery": "Batería CA",
           "battery_schedules_enabled": "Activar programador de batería",
           "degraded_service_repair_issues": "Activar reparaciones por servicios degradados",
           "weather_enabled": "Activar el tiempo",
@@ -546,7 +537,6 @@
           "nominal_voltage": "Tensión de alimentación de CA típica para estimar la potencia cuando no hay tensión en tiempo real.",
           "session_history_interval": "Minutos de espera entre obtenciones del historial de sesiones en la nube.",
           "type_heatpump": "Incluye sensores de estado, diagnóstico y consumo de la bomba de calor.",
-          "type_ac_battery": "Incluye sensores de batería CA y controles del modo de reposo cuando están disponibles.",
           "degraded_service_repair_issues": "Crea problemas de Repairs cuando los servicios opcionales de Enphase están degradados.",
           "weather_enabled": "Obtiene el tiempo actual del sitio desde Enphase y crea una entidad meteorológica solo cuando el punto de conexión está disponible.",
           "microinverter_lifetime_energy_enabled": "Activa todos los sensores de energía de por vida de cada microinversor.",
@@ -582,7 +572,6 @@
             "data": {
               "type_envoy": "Puerta de enlace",
               "type_encharge": "Batería",
-              "type_ac_battery": "Batería CA",
               "type_iqevse": "Cargadores",
               "type_heatpump": "Bomba de calor",
               "type_microinverter": "Microinversores"
@@ -590,7 +579,6 @@
             "data_description": {
               "type_envoy": "Incluye conectividad de la puerta de enlace y diagnósticos de medidores.",
               "type_encharge": "Incluye estado de baterías y entidades de control cuando estén disponibles.",
-              "type_ac_battery": "Incluye sensores de batería CA y controles del modo de reposo cuando están disponibles.",
               "type_iqevse": "Incluye entidades y controles de cargadores EV.",
               "type_heatpump": "Incluye sensores de estado, diagnóstico y consumo de la bomba de calor.",
               "type_microinverter": "Incluye sensores de conectividad de microinversores, recuento de activos y producción acumulada."
@@ -601,7 +589,6 @@
           "devices": "Seleccionar dispositivos",
           "type_envoy": "Puerta de enlace",
           "type_encharge": "Batería",
-          "type_ac_battery": "Batería CA",
           "type_iqevse": "Cargadores",
           "type_heatpump": "Bomba de calor",
           "type_microinverter": "Microinversores"
@@ -609,7 +596,6 @@
         "data_description": {
           "type_envoy": "Incluye conectividad de la puerta de enlace y diagnósticos de medidores.",
           "type_encharge": "Incluye estado de baterías y entidades de control cuando estén disponibles.",
-          "type_ac_battery": "Incluye sensores de batería CA y controles del modo de reposo cuando están disponibles.",
           "type_iqevse": "Incluye entidades y controles de cargadores EV.",
           "type_heatpump": "Incluye sensores de estado, diagnóstico y consumo de la bomba de calor.",
           "type_microinverter": "Incluye sensores de conectividad de microinversores, recuento de activos y producción acumulada."
@@ -1855,45 +1841,6 @@
           "pairing": "Emparejamiento"
         }
       },
-      "ac_battery_overall_status": {
-        "name": "Estado general de la batería CA",
-        "state": {
-          "normal": "Normal",
-          "warning": "Advertencia",
-          "error": "Error",
-          "unknown": "Desconocido"
-        }
-      },
-      "ac_battery_power": {
-        "name": "Potencia de la batería CA"
-      },
-      "ac_battery_last_reported": {
-        "name": "Último informe de la batería CA"
-      },
-      "ac_battery_storage_charge": {
-        "name": "Nivel de carga de la batería CA"
-      },
-      "ac_battery_storage_status": {
-        "name": "Estado de {serial}",
-        "state": {
-          "normal": "Normal",
-          "warning": "Advertencia",
-          "error": "Error",
-          "unknown": "Desconocido"
-        }
-      },
-      "ac_battery_storage_power": {
-        "name": "Potencia de {serial}"
-      },
-      "ac_battery_storage_operating_mode": {
-        "name": "Modo de funcionamiento de {serial}"
-      },
-      "ac_battery_storage_cycle_count": {
-        "name": "Recuento de ciclos de {serial}"
-      },
-      "ac_battery_storage_last_reported": {
-        "name": "Último informe de {serial}"
-      },
       "battery_cfg_schedules": {
         "name": "Horarios CFG de la batería"
       },
@@ -2338,9 +2285,6 @@
       "restrict_battery_discharge_schedule": {
         "name": "Horario de restricción de descarga de la batería"
       },
-      "ac_battery_sleep_mode": {
-        "name": "Modo de reposo de la batería CA"
-      },
       "evse_schedule_edit_mon": {
         "name": "Horario del lunes"
       },
@@ -2411,9 +2355,6 @@
       },
       "system_profile": {
         "name": "Perfil del sistema"
-      },
-      "ac_battery_target_state_of_charge": {
-        "name": "Estado de carga objetivo de la batería CA"
       },
       "evse_schedule_selected": {
         "name": "Horario"

@@ -43,8 +43,7 @@
           "type_iqevse": "Ladere",
           "type_microinverter": "Mikroinvertere",
           "scan_interval": "Scan-interval (s)",
-          "type_heatpump": "Varmepumpe",
-          "type_ac_battery": "AC-batteri"
+          "type_heatpump": "Varmepumpe"
         },
         "data_description": {
           "type_envoy": "Inkluderer gateway-forbindelse og målerdiagnostik.",
@@ -52,8 +51,7 @@
           "type_iqevse": "Inkluderer EV-lader-entiteter og styringer.",
           "type_microinverter": "Inkluderer sensorer for mikroinverter-tilslutning, aktivt antal og livstidsproduktion.",
           "scan_interval": "Sekunder mellem cloud-statuspolls. Standard 60s.",
-          "type_heatpump": "Inkluderer sensorer for varmepumpens status, diagnostik og forbrug.",
-          "type_ac_battery": "Omfatter AC-batterisensorer og styring af dvaletilstand, når de er tilgængelige."
+          "type_heatpump": "Inkluderer sensorer for varmepumpens status, diagnostik og forbrug."
         }
       }
     },
@@ -138,9 +136,6 @@
     },
     "battery_schedule_overlap": {
       "message": "Tidsplanen overlapper den eksisterende {schedule_label}. Juster eller deaktiver først den pågældende tidsplan."
-    },
-    "ac_battery_unavailable": {
-      "message": "Ingen AC-batterienheder er tilgængelige i øjeblikket."
     },
     "auth_settings_service_unavailable": {
       "message": "Godkendelsesindstillinger er ikke tilgængelige, mens Enphase-tjenesten er nede."
@@ -358,9 +353,6 @@
     "scheduler_service_unavailable": {
       "message": "Valg af opladningstilstand er ikke tilgængelig, mens Enphase-planlægningstjenesten er nede."
     },
-    "selected_ac_battery_target_state_of_charge_unavailable": {
-      "message": "Den valgte opladningstilstand for AC-batteri er ikke tilgængelig."
-    },
     "battery_schedule_day_required": {
       "message": "Vælg mindst én dag til tidsplanen."
     },
@@ -527,7 +519,6 @@
           "session_history_interval": "Sessionshistorik-interval (min)",
           "schedule_sync_enabled": "Aktiver EV Charger Scheduler",
           "type_heatpump": "Varmepumpe",
-          "type_ac_battery": "AC-batteri",
           "battery_schedules_enabled": "Aktiver Battery Scheduler",
           "degraded_service_repair_issues": "Aktivér reparationer for forringede tjenester",
           "weather_enabled": "Aktivér vejr",
@@ -546,7 +537,6 @@
           "nominal_voltage": "Typisk vekselspænding til beregning af effekten, når den aktuelle spænding ikke er tilgængelig.",
           "session_history_interval": "Minutter at vente mellem hentninger af cloud-sessionhistorik.",
           "type_heatpump": "Inkluderer sensorer for varmepumpens status, diagnostik og forbrug.",
-          "type_ac_battery": "Omfatter AC-batterisensorer og styring af dvaletilstand, når de er tilgængelige.",
           "degraded_service_repair_issues": "Opretter Repairs-problemer, når valgfrie Enphase-tjenester er forringede.",
           "weather_enabled": "Henter det aktuelle vejr for anlægget fra Enphase og opretter kun en vejrenhed, når slutpunktet er tilgængeligt.",
           "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi pr. mikroinverter.",
@@ -582,7 +572,6 @@
             "data": {
               "type_envoy": "Gateway",
               "type_encharge": "Batteri",
-              "type_ac_battery": "AC-batteri",
               "type_iqevse": "Ladere",
               "type_heatpump": "Varmepumpe",
               "type_microinverter": "Mikroinvertere"
@@ -590,7 +579,6 @@
             "data_description": {
               "type_envoy": "Inkluderer gateway-forbindelse og målerdiagnostik.",
               "type_encharge": "Inkluderer batteristatus og styringsentiteter, når de er tilgængelige.",
-              "type_ac_battery": "Omfatter AC-batterisensorer og styring af dvaletilstand, når de er tilgængelige.",
               "type_iqevse": "Inkluderer EV-lader-entiteter og styringer.",
               "type_heatpump": "Inkluderer sensorer for varmepumpens status, diagnostik og forbrug.",
               "type_microinverter": "Inkluderer sensorer for mikroinverter-tilslutning, aktivt antal og livstidsproduktion."
@@ -601,7 +589,6 @@
           "devices": "Vælg enheder",
           "type_envoy": "Gateway",
           "type_encharge": "Batteri",
-          "type_ac_battery": "AC-batteri",
           "type_iqevse": "Ladere",
           "type_heatpump": "Varmepumpe",
           "type_microinverter": "Mikroinvertere"
@@ -609,7 +596,6 @@
         "data_description": {
           "type_envoy": "Inkluderer gateway-forbindelse og målerdiagnostik.",
           "type_encharge": "Inkluderer batteristatus og styringsentiteter, når de er tilgængelige.",
-          "type_ac_battery": "Omfatter AC-batterisensorer og styring af dvaletilstand, når de er tilgængelige.",
           "type_iqevse": "Inkluderer EV-lader-entiteter og styringer.",
           "type_heatpump": "Inkluderer sensorer for varmepumpens status, diagnostik og forbrug.",
           "type_microinverter": "Inkluderer sensorer for mikroinverter-tilslutning, aktivt antal og livstidsproduktion."
@@ -1855,45 +1841,6 @@
           "pairing": "Parring"
         }
       },
-      "ac_battery_overall_status": {
-        "name": "Samlet status for AC-batteri",
-        "state": {
-          "normal": "Normal",
-          "warning": "Advarsel",
-          "error": "Fejl",
-          "unknown": "Ukendt"
-        }
-      },
-      "ac_battery_power": {
-        "name": "AC-batterieffekt"
-      },
-      "ac_battery_last_reported": {
-        "name": "Senest rapporteret fra AC-batteri"
-      },
-      "ac_battery_storage_charge": {
-        "name": "AC-batteriets ladeniveau"
-      },
-      "ac_battery_storage_status": {
-        "name": "{serial} status",
-        "state": {
-          "normal": "Normal",
-          "warning": "Advarsel",
-          "error": "Fejl",
-          "unknown": "Ukendt"
-        }
-      },
-      "ac_battery_storage_power": {
-        "name": "{serial} effekt"
-      },
-      "ac_battery_storage_operating_mode": {
-        "name": "{serial} driftstilstand"
-      },
-      "ac_battery_storage_cycle_count": {
-        "name": "{serial} antal cyklusser"
-      },
-      "ac_battery_storage_last_reported": {
-        "name": "{serial} sidst rapporteret"
-      },
       "battery_cfg_schedules": {
         "name": "Batteri CFG skemaer"
       },
@@ -2338,9 +2285,6 @@
       "restrict_battery_discharge_schedule": {
         "name": "Tidsplan for begrænset batteriafladning"
       },
-      "ac_battery_sleep_mode": {
-        "name": "AC-batteriets dvaletilstand"
-      },
       "evse_schedule_edit_mon": {
         "name": "Tidsplan mandag"
       },
@@ -2411,9 +2355,6 @@
       },
       "system_profile": {
         "name": "Systemprofil"
-      },
-      "ac_battery_target_state_of_charge": {
-        "name": "AC-batteriets mål for ladeniveau"
       },
       "evse_schedule_selected": {
         "name": "Tidsplan"

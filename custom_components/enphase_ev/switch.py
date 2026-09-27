@@ -18,11 +18,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .ac_battery_support import (
-    ac_battery_control_available,
-    ac_battery_device_info,
-    ac_battery_entities_available,
-)
 from .api import AuthSettingsUnavailable
 from .battery_schedule_editor import (
     BatteryScheduleEditorEntity,
@@ -276,8 +271,6 @@ def _retained_site_switch_keys(
             is not False
         ):
             retained.add("restrict_battery_discharge_schedule")
-    if ac_battery_control_available(coord):
-        retained.add("ac_battery_sleep_mode")
     if (
         battery_scheduler_enabled(entry)
         and _site_has_battery(coord)
@@ -396,13 +389,6 @@ async def async_setup_entry(
             ):
                 site_entities.append(RestrictBatteryDischargeScheduleSwitch(coord))
                 site_entity_keys.add("restrict_battery_discharge_schedule")
-        if (
-            "ac_battery_sleep_mode" in retain_site_entity_keys
-            and "ac_battery_sleep_mode" not in site_entity_keys
-            and ac_battery_entities_available(coord)
-        ):
-            site_entities.append(AcBatterySleepModeSwitch(coord))
-            site_entity_keys.add("ac_battery_sleep_mode")
         if _site_has_battery(coord) and _type_available(coord, "encharge"):
             for day_key, _ in DAY_ORDER:
                 edit_key = f"battery_schedule_edit_{day_key}"
@@ -446,8 +432,6 @@ async def async_setup_entry(
                     *(f"battery_schedule_edit_{day_key}" for day_key, _ in DAY_ORDER),
                 }
             )
-        if not ac_battery_entities_available(coord):
-            site_entity_keys.discard("ac_battery_sleep_mode")
         if not _type_available(coord, "envoy"):
             site_entity_keys.discard("storm_guard")
         if not inventory_ready:
@@ -468,7 +452,6 @@ async def async_setup_entry(
                 f"{DOMAIN}_site_{coord.site_id}_charge_from_grid_schedule",
                 f"{DOMAIN}_site_{coord.site_id}_discharge_to_grid_schedule",
                 f"{DOMAIN}_site_{coord.site_id}_restrict_battery_discharge_schedule",
-                f"{DOMAIN}_site_{coord.site_id}_ac_battery_sleep_mode",
                 *(
                     f"{DOMAIN}_site_{coord.site_id}_battery_schedule_edit_{day_key}"
                     for day_key, _ in DAY_ORDER
@@ -961,50 +944,6 @@ class RestrictBatteryDischargeScheduleSwitch(_BaseBatteryScheduleSwitch):
             "schedule_enabled": self._coord.battery_restrict_battery_discharge_schedule_enabled,
             "schedule_limit": self._coord.battery_rbd_schedule_limit,
         }
-
-
-class AcBatterySleepModeSwitch(CoordinatorEntity, SwitchEntity):  # type: ignore[misc]
-    _attr_has_entity_name = True
-    _attr_translation_key = "ac_battery_sleep_mode"
-
-    def __init__(self, coord: EnphaseCoordinator) -> None:
-        super().__init__(coord)
-        self._coord = coord
-        self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_ac_battery_sleep_mode"
-
-    @property
-    def suggested_object_id(self) -> str | None:
-        return "ac_battery_sleep_mode"
-
-    @property
-    def available(self) -> bool:
-        if not super().available:
-            return False
-        if not ac_battery_control_available(self._coord):
-            return False
-        return self._coord.ac_battery_sleep_state is not None
-
-    @property
-    def is_on(self) -> bool:
-        return self._coord.ac_battery_sleep_state in {"on", "pending", "mixed"}
-
-    @property
-    def extra_state_attributes(self) -> dict[str, object]:
-        return {
-            "sleep_state": self._coord.ac_battery_sleep_state,
-            "pending": self._coord.ac_battery_control_pending,
-            "last_command": getattr(self._coord, "_ac_battery_last_command", None),
-        }
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        await self._coord.async_set_ac_battery_sleep_mode(True)
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        await self._coord.async_set_ac_battery_sleep_mode(False)
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        return ac_battery_device_info(self._coord)
 
 
 class ChargingSwitch(EnphaseBaseEntity, RestoreEntity, SwitchEntity):  # type: ignore[misc]

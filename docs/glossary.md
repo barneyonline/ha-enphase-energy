@@ -46,7 +46,7 @@ The Enphase controller used for backup and grid-control capabilities on supporte
 The current Enphase battery family. Code often uses the legacy product key `encharge` because that is how many cloud payloads identify battery devices.
 
 **AC Battery**  
-An older Enphase battery family with separate control and telemetry paths. Some AC Battery data is exposed through HTML pages rather than JSON endpoints.
+An older Enphase battery family that is no longer supported by this integration. IQ Battery support is separate.
 
 **IQ EV Charger / EVSE**  
 The Enphase EV charger family. EVSE means electric vehicle supply equipment and is the common API term for charger devices.
@@ -107,7 +107,7 @@ A delay before retrying a failing endpoint family. Backoff protects Enphase serv
 ## Integration Terms
 
 **Type key**  
-A canonical inventory category such as `envoy`, `encharge`, `ac_battery`, `iqevse`, `heatpump`, `microinverter`, or `dry_contact`.
+A canonical inventory category such as `envoy`, `encharge`, `iqevse`, `heatpump`, `microinverter`, or `dry_contact`.
 
 **Type bucket**  
 The normalized inventory group for one type key. It contains count, label, member devices, and selected metadata.

@@ -455,22 +455,6 @@ class BatteryState:
     _battery_aggregate_status: str | None = None
     _battery_aggregate_status_details: PayloadMap = field(default_factory=dict)
     _battery_summary_sample_utc: datetime | None = None
-    _ac_battery_devices_cache_until: float | None = None
-    _ac_battery_devices_payload: PayloadMap | None = None
-    _ac_battery_devices_html_payload: PayloadMap | None = None
-    _ac_battery_telemetry_cache_until: float | None = None
-    _ac_battery_telemetry_payloads: PayloadMap = field(default_factory=dict)
-    _ac_battery_events_payloads: PayloadMap = field(default_factory=dict)
-    _ac_battery_data: PayloadMapByKey = field(default_factory=dict)
-    _ac_battery_order: list[str] = field(default_factory=list)
-    _ac_battery_aggregate_status: str | None = None
-    _ac_battery_aggregate_status_details: PayloadMap = field(default_factory=dict)
-    _ac_battery_power_w: float | None = None
-    _ac_battery_summary_sample_utc: datetime | None = None
-    _ac_battery_selected_sleep_min_soc: int | None = None
-    _ac_battery_sleep_state: str | None = None
-    _ac_battery_control_pending: bool = False
-    _ac_battery_last_command: PayloadMap | None = None
 
 
 type CoordinatorState = (

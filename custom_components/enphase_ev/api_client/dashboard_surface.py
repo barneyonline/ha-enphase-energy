@@ -12,9 +12,6 @@ from typing import TYPE_CHECKING, Any, cast
 import aiohttp
 from yarl import URL
 
-from ..api_models import (
-    TextResponse,
-)
 from ..const import (
     BASE_URL,
 )
@@ -1380,98 +1377,6 @@ async def battery_status(self: EnphaseEVClient) -> JsonDict:
     if isinstance(data, dict):
         return data
     return {}
-
-
-async def ac_battery_devices_page(
-    self: EnphaseEVClient, *, status: str = "active"
-) -> str:
-    """Return the AC Battery devices page HTML for the site."""
-
-    url = str(
-        URL(f"{BASE_URL}/systems/{self._site}/devices").update_query({"status": status})
-    )
-    headers = partial(
-        self._systems_html_headers,
-        f"{BASE_URL}/systems/{self._site}/devices?status={status}",
-    )
-    return await self._text("GET", url, headers=headers)
-
-
-async def ac_battery_detail_page(self: EnphaseEVClient, battery_id: str) -> str:
-    """Return the AC Battery detail page HTML."""
-
-    url = f"{BASE_URL}/systems/{self._site}/ac_batteries/{battery_id}"
-    headers = partial(
-        self._systems_html_headers,
-        f"{BASE_URL}/systems/{self._site}/devices?status=active",
-    )
-    return await self._text("GET", url, headers=headers)
-
-
-async def ac_battery_events_page(self: EnphaseEVClient, battery_id: str) -> str:
-    """Return the AC Battery events page HTML."""
-
-    url = f"{BASE_URL}/systems/{self._site}/ac_batteries/{battery_id}/events"
-    headers = partial(
-        self._systems_html_headers,
-        f"{BASE_URL}/systems/{self._site}/ac_batteries/{battery_id}",
-    )
-    return await self._text("GET", url, headers=headers)
-
-
-async def ac_battery_show_stat_data(self: EnphaseEVClient, battery_id: str) -> str:
-    """Return the AC Battery telemetry HTML fragment."""
-
-    url = f"{BASE_URL}/systems/{self._site}/ac_batteries/{battery_id}/show_stat_data"
-
-    def headers() -> dict[str, str]:
-        return {
-            **self._layout_headers(),
-            "Accept": "*/*",
-            "Referer": f"{BASE_URL}/systems/{self._site}/ac_batteries/{battery_id}",
-        }
-
-    return await self._text("GET", url, headers=headers)
-
-
-async def set_ac_battery_sleep(
-    self: EnphaseEVClient, battery_id: str, sleep_min_soc: int
-) -> TextResponse:
-    """Request AC Battery sleep mode using the Enlighten web route."""
-
-    url = str(
-        URL(
-            f"{BASE_URL}/systems/{self._site}/ac_batteries/{battery_id}/sleep"
-        ).update_query({"sleep_min_soc": int(sleep_min_soc)})
-    )
-    headers = partial(
-        self._systems_html_headers,
-        f"{BASE_URL}/systems/{self._site}/devices?status=active",
-    )
-    return await self._text_response(
-        "GET",
-        url,
-        headers=headers,
-        allow_redirects=False,
-        expected_statuses=(302,),
-    )
-
-
-async def set_ac_battery_wake(self: EnphaseEVClient, battery_id: str) -> TextResponse:
-    """Request AC Battery wake/cancel using the Enlighten web route."""
-
-    url = f"{BASE_URL}/systems/{self._site}/ac_batteries/{battery_id}/wake"
-    headers = partial(
-        self._systems_html_headers,
-        f"{BASE_URL}/systems/{self._site}/devices?status=active",
-    )
-    return await self._text_response(
-        "GET",
-        url,
-        headers=headers,
-        allow_redirects=False,
-        expected_statuses=(302,),
-    )
 
 
 async def dry_contacts_settings(self: EnphaseEVClient) -> JsonDict:

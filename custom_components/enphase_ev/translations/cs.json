@@ -43,8 +43,7 @@
           "type_iqevse": "Nabíječky",
           "type_microinverter": "Mikroinvertory",
           "scan_interval": "Interval skenování (s)",
-          "type_heatpump": "Tepelné čerpadlo",
-          "type_ac_battery": "AC baterie"
+          "type_heatpump": "Tepelné čerpadlo"
         },
         "data_description": {
           "type_envoy": "Zahrnuje diagnostiku konektivity brány a měřidel.",
@@ -52,8 +51,7 @@
           "type_iqevse": "Zahrnuje entity a ovládání EV nabíječek.",
           "type_microinverter": "Zahrnuje senzory konektivity mikroinvertorů, počtu aktivních zařízení a celoživotní výroby.",
           "scan_interval": "Sekundy mezi dotazy na stav cloudu. Výchozí 60s.",
-          "type_heatpump": "Zahrnuje senzory stavu, diagnostiky a spotřeby tepelného čerpadla.",
-          "type_ac_battery": "Zahrnuje senzory AC baterie a ovládání režimu spánku, pokud jsou k dispozici."
+          "type_heatpump": "Zahrnuje senzory stavu, diagnostiky a spotřeby tepelného čerpadla."
         }
       }
     },
@@ -138,9 +136,6 @@
     },
     "battery_schedule_overlap": {
       "message": "Plán se překrývá se stávajícím {schedule_label}. Nejprve tento plán upravte nebo deaktivujte."
-    },
-    "ac_battery_unavailable": {
-      "message": "Aktuálně nejsou k dispozici žádná zařízení AC Battery."
     },
     "auth_settings_service_unavailable": {
       "message": "Když je služba Enphase mimo provoz, nastavení ověřování není k dispozici."
@@ -358,9 +353,6 @@
     "scheduler_service_unavailable": {
       "message": "Výběr režimu nabíjení není dostupný, pokud je služba plánovače Enphase mimo provoz."
     },
-    "selected_ac_battery_target_state_of_charge_unavailable": {
-      "message": "Vybraný cílový stav nabití AC baterie není k dispozici."
-    },
     "battery_schedule_day_required": {
       "message": "Vyberte pro rozvrh alespoň jeden den."
     },
@@ -527,7 +519,6 @@
           "session_history_interval": "Interval historie relací (min)",
           "schedule_sync_enabled": "Povolit plánovač EV Charger Scheduler",
           "type_heatpump": "Tepelné čerpadlo",
-          "type_ac_battery": "AC baterie",
           "battery_schedules_enabled": "Povolit Plánovač baterie",
           "degraded_service_repair_issues": "Povolit opravy zhoršených služeb",
           "weather_enabled": "Povolit počasí",
@@ -546,7 +537,6 @@
           "nominal_voltage": "Typické střídavé napájecí napětí pro odhad výkonu, když není dostupné aktuální napětí.",
           "session_history_interval": "Minuty čekání mezi načítáním historie relací z cloudu.",
           "type_heatpump": "Zahrnuje senzory stavu, diagnostiky a spotřeby tepelného čerpadla.",
-          "type_ac_battery": "Zahrnuje senzory AC baterie a ovládání režimu spánku, pokud jsou k dispozici.",
           "degraded_service_repair_issues": "Vytváří problémy v Repairs, když jsou volitelné služby Enphase zhoršené.",
           "weather_enabled": "Načte aktuální počasí lokality ze služby Enphase a vytvoří entitu počasí pouze tehdy, když je koncový bod dostupný.",
           "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů.",
@@ -582,7 +572,6 @@
             "data": {
               "type_envoy": "Brána",
               "type_encharge": "Baterie",
-              "type_ac_battery": "AC baterie",
               "type_iqevse": "Nabíječky",
               "type_heatpump": "Tepelné čerpadlo",
               "type_microinverter": "Mikroinvertory"
@@ -590,7 +579,6 @@
             "data_description": {
               "type_envoy": "Zahrnuje diagnostiku konektivity brány a měřidel.",
               "type_encharge": "Zahrnuje stav a ovládací entity baterií, pokud jsou dostupné.",
-              "type_ac_battery": "Zahrnuje senzory AC baterie a ovládání režimu spánku, pokud jsou k dispozici.",
               "type_iqevse": "Zahrnuje entity a ovládání EV nabíječek.",
               "type_heatpump": "Zahrnuje senzory stavu, diagnostiky a spotřeby tepelného čerpadla.",
               "type_microinverter": "Zahrnuje senzory konektivity mikroinvertorů, počtu aktivních zařízení a celoživotní výroby."
@@ -601,7 +589,6 @@
           "devices": "Vyberte zařízení",
           "type_envoy": "Brána",
           "type_encharge": "Baterie",
-          "type_ac_battery": "AC baterie",
           "type_iqevse": "Nabíječky",
           "type_heatpump": "Tepelné čerpadlo",
           "type_microinverter": "Mikroinvertory"
@@ -609,7 +596,6 @@
         "data_description": {
           "type_envoy": "Zahrnuje diagnostiku konektivity brány a měřidel.",
           "type_encharge": "Zahrnuje stav a ovládací entity baterií, pokud jsou dostupné.",
-          "type_ac_battery": "Zahrnuje senzory AC baterie a ovládání režimu spánku, pokud jsou k dispozici.",
           "type_iqevse": "Zahrnuje entity a ovládání EV nabíječek.",
           "type_heatpump": "Zahrnuje senzory stavu, diagnostiky a spotřeby tepelného čerpadla.",
           "type_microinverter": "Zahrnuje senzory konektivity mikroinvertorů, počtu aktivních zařízení a celoživotní výroby."
@@ -1855,45 +1841,6 @@
           "pairing": "Párování"
         }
       },
-      "ac_battery_overall_status": {
-        "name": "Celkový stav AC baterie",
-        "state": {
-          "normal": "Normální",
-          "warning": "Varování",
-          "error": "Chyba",
-          "unknown": "Neznámý"
-        }
-      },
-      "ac_battery_power": {
-        "name": "Výkon AC baterie"
-      },
-      "ac_battery_last_reported": {
-        "name": "Naposledy hlášeno AC baterií"
-      },
-      "ac_battery_storage_charge": {
-        "name": "Úroveň nabití AC baterie"
-      },
-      "ac_battery_storage_status": {
-        "name": "Stav {serial}",
-        "state": {
-          "normal": "Normální",
-          "warning": "Varování",
-          "error": "Chyba",
-          "unknown": "Neznámý"
-        }
-      },
-      "ac_battery_storage_power": {
-        "name": "Výkon {serial}"
-      },
-      "ac_battery_storage_operating_mode": {
-        "name": "Provozní režim {serial}"
-      },
-      "ac_battery_storage_cycle_count": {
-        "name": "Počet cyklů {serial}"
-      },
-      "ac_battery_storage_last_reported": {
-        "name": "Naposledy hlášeno u {serial}"
-      },
       "battery_cfg_schedules": {
         "name": "Plány CFG baterií"
       },
@@ -2338,9 +2285,6 @@
       "restrict_battery_discharge_schedule": {
         "name": "Plán omezení vybíjení baterie"
       },
-      "ac_battery_sleep_mode": {
-        "name": "Režim spánku AC baterie"
-      },
       "evse_schedule_edit_mon": {
         "name": "Harmonogram pondělí"
       },
@@ -2411,9 +2355,6 @@
       },
       "system_profile": {
         "name": "Systémový profil"
-      },
-      "ac_battery_target_state_of_charge": {
-        "name": "Cílový stav nabití AC baterie"
       },
       "evse_schedule_selected": {
         "name": "Harmonogram"

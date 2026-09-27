@@ -32,7 +32,6 @@ CONF_TYPE_ENVOY = "type_envoy"
 
 CONF_TYPE_ENCHARGE = "type_encharge"
 
-CONF_TYPE_AC_BATTERY = "type_ac_battery"
 
 CONF_TYPE_IQEVSE = "type_iqevse"
 
@@ -95,29 +94,10 @@ _GRID_CONTROL_BLOCK_REASON_LABEL_PREFIX = (
 _TYPE_FIELD_BY_KEY: dict[str, str] = {
     "envoy": CONF_TYPE_ENVOY,
     "encharge": CONF_TYPE_ENCHARGE,
-    "ac_battery": CONF_TYPE_AC_BATTERY,
     "iqevse": CONF_TYPE_IQEVSE,
     "heatpump": CONF_TYPE_HEATPUMP,
     "microinverter": CONF_TYPE_MICROINVERTER,
 }
-
-
-def _battery_site_settings_has_acb(payload: object) -> bool:
-    if not isinstance(payload, dict):
-        return False
-    data = payload.get("data")
-    if isinstance(data, dict):
-        payload = data
-    value = payload.get("hasAcb")
-    if isinstance(value, bool):
-        return value
-    if value is None:
-        return False
-    try:
-        text = str(value).strip().lower()
-    except Exception:  # noqa: BLE001
-        return False
-    return text in {"1", "true", "yes", "on"}
 
 
 def _site_entry_title(site_id: str) -> str:

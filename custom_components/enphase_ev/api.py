@@ -252,39 +252,6 @@ async def async_fetch_devices_inventory(
     return None
 
 
-async def async_fetch_battery_site_settings(
-    session: aiohttp.ClientSession,
-    site_id: str,
-    tokens: AuthTokens,
-    *,
-    timeout: int = DEFAULT_AUTH_TIMEOUT,
-) -> dict[str, object] | None:
-    """Fetch BatteryConfig site settings for config-flow category selection."""
-
-    if not site_id:
-        return {}
-
-    client = EnphaseEVClient(
-        session,
-        site_id,
-        tokens.access_token,
-        tokens.cookie,
-        timeout=timeout,
-    )
-    try:
-        payload = await client.battery_site_settings()
-    except Exception as err:  # noqa: BLE001 - best-effort for flow UX
-        _LOGGER.debug(
-            "Failed to fetch battery site settings for site %s: %s",
-            redact_site_id(site_id),
-            redact_text(err, site_ids=(site_id,)),
-        )
-        return None
-    if isinstance(payload, dict):
-        return payload
-    return None
-
-
 async def async_fetch_inverters_inventory(
     session: aiohttp.ClientSession,
     site_id: str,
@@ -637,11 +604,6 @@ class EnphaseEVClient(MqttStreamSurface):
         "Return headers for systems/layout-family requests."
 
         return api_header_surface._layout_headers(self)
-
-    def _systems_html_headers(self, referer: str | None = None) -> dict[str, str]:
-        "Return browser-style headers for site-scoped HTML /systems routes."
-
-        return api_header_surface._systems_html_headers(self, referer)
 
     def _systems_json_headers(self) -> dict[str, str]:
         "Return headers for site-scoped /systems JSON endpoints."
@@ -2538,40 +2500,6 @@ class EnphaseEVClient(MqttStreamSurface):
         "Return battery status payload used by the Enlighten battery card."
 
         return await api_dashboard_surface.battery_status(self)
-
-    async def ac_battery_devices_page(self, *, status: str = "active") -> str:
-        "Return the AC Battery devices page HTML for the site."
-
-        return await api_dashboard_surface.ac_battery_devices_page(self, status=status)
-
-    async def ac_battery_detail_page(self, battery_id: str) -> str:
-        "Return the AC Battery detail page HTML."
-
-        return await api_dashboard_surface.ac_battery_detail_page(self, battery_id)
-
-    async def ac_battery_events_page(self, battery_id: str) -> str:
-        "Return the AC Battery events page HTML."
-
-        return await api_dashboard_surface.ac_battery_events_page(self, battery_id)
-
-    async def ac_battery_show_stat_data(self, battery_id: str) -> str:
-        "Return the AC Battery telemetry HTML fragment."
-
-        return await api_dashboard_surface.ac_battery_show_stat_data(self, battery_id)
-
-    async def set_ac_battery_sleep(
-        self, battery_id: str, sleep_min_soc: int
-    ) -> TextResponse:
-        "Request AC Battery sleep mode using the Enlighten web route."
-
-        return await api_dashboard_surface.set_ac_battery_sleep(
-            self, battery_id, sleep_min_soc
-        )
-
-    async def set_ac_battery_wake(self, battery_id: str) -> TextResponse:
-        "Request AC Battery wake/cancel using the Enlighten web route."
-
-        return await api_dashboard_surface.set_ac_battery_wake(self, battery_id)
 
     async def dry_contacts_settings(self) -> JsonDict:
         "Return dry-contact settings payload used by site settings views."

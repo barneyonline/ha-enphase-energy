@@ -32,6 +32,10 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - IQ Microinverter connectivity, inventory, lifetime production, and optional installer-level parameter telemetry
 - Site and cloud energy telemetry (including supported HEMS channels such as Heat Pump and Water Heater lifetime energy)
 
+Legacy AC Battery devices are no longer supported. Upgrading removes their sensors,
+sleep controls, and empty AC Battery device record. An AC-Battery-only selection
+does not enable other device categories on upgrade. IQ Battery support is unchanged.
+
 ## Key features
 
 - Guided onboarding for site selection and device-category enablement

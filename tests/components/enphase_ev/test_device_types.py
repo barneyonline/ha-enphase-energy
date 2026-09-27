@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from custom_components.enphase_ev.device_types import (
     active_type_serials_from_inventory,
     active_type_keys_from_inventory,
@@ -25,8 +27,8 @@ def test_normalize_type_key_handles_aliases_and_unknown_tokens() -> None:
     assert normalize_type_key("systemcontroller") == "envoy"
     assert normalize_type_key("storage") == "encharge"
     assert normalize_type_key("storages") == "encharge"
-    assert normalize_type_key("AC Battery") == "ac_battery"
-    assert normalize_type_key("acbattery") == "ac_battery"
+    assert normalize_type_key("AC Battery") is None
+    assert normalize_type_key("acbattery") is None
     assert normalize_type_key("heat-pump") == "heatpump"
     assert normalize_type_key("heat_pump") == "heatpump"
     assert normalize_type_key("Heat Pump") == "heatpump"
@@ -49,7 +51,7 @@ def test_normalize_type_key_handles_bad_string_conversion() -> None:
 
 def test_type_display_label_uses_known_and_title_case_defaults() -> None:
     assert type_display_label("envoy") == "Gateway"
-    assert type_display_label("ac_battery") == "AC Battery"
+    assert type_display_label("ac_battery") is None
     assert type_display_label("heatpump") == "Heat Pump"
     assert type_display_label("dry_contact") == "Dry Contacts"
     assert type_display_label("wind_turbine") == "Wind Turbine"
@@ -94,7 +96,7 @@ def test_known_type_order_places_heatpump_after_iqevse() -> None:
 
 def test_onboarding_supported_type_keys_include_heatpump() -> None:
     assert "heatpump" in device_types_mod.ONBOARDING_SUPPORTED_TYPE_KEYS
-    assert "ac_battery" in device_types_mod.ONBOARDING_SUPPORTED_TYPE_KEYS
+    assert "ac_battery" not in device_types_mod.ONBOARDING_SUPPORTED_TYPE_KEYS
 
 
 def test_type_identifier_round_trip_parsing() -> None:
@@ -311,3 +313,22 @@ def test_active_type_serials_from_inventory_covers_remaining_branches() -> None:
 
     assert active_type_serials_from_inventory(payload, type_key="iqevse") == ["EV6"]
     assert active_type_serials_from_inventory(payload, type_key=None) == []
+
+
+@pytest.mark.parametrize(
+    "legacy_type",
+    ["AC Battery", "AC Batteries", "ac_battery", "ac_batteries", "acbattery"],
+)
+def test_retired_battery_family_is_ignored_in_inventory_and_selection(legacy_type):
+    from custom_components.enphase_ev.config_selection import (
+        normalize_selected_type_keys,
+    )
+
+    payload = {
+        "result": [
+            {"type": legacy_type, "devices": [{"serial_number": "AC-1"}]},
+            {"type": "encharge", "devices": [{"serial_number": "IQ-1"}]},
+        ]
+    }
+    assert active_type_keys_from_inventory(payload) == ["encharge"]
+    assert normalize_selected_type_keys([legacy_type, "encharge"]) == ["encharge"]

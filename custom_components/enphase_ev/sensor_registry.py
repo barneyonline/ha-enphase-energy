@@ -11,22 +11,17 @@ from .const import DOMAIN
 from .device_types import is_dry_contact_type_key
 from .runtime_helpers import coerce_optional_text as _clean_text
 from .serial_entity_metadata import (
-    AC_BATTERY_ENTITY_UNIQUE_SUFFIXES,
-    AC_BATTERY_RETIRED_UNIQUE_SUFFIXES,
     BATTERY_ENTITY_UNIQUE_SUFFIXES,
     BATTERY_RETIRED_UNIQUE_SUFFIXES,
     CHARGER_SENSOR_UNIQUE_SUFFIXES,
     HISTORICAL_CHARGER_SENSOR_UNIQUE_SUFFIXES,
     INVERTER_ENTITY_UNIQUE_SUFFIXES,
-    ac_battery_entity_serial_from_unique_id,
     battery_entity_serial_from_unique_id,
     charger_entity_serial_from_unique_id,
     charger_entity_unique_id,
     charger_entity_unique_ids,
     inverter_entity_unique_id,
     inverter_entity_serial_from_unique_id,
-    site_ac_battery_entity_unique_id,
-    site_ac_battery_entity_unique_ids,
     site_battery_entity_unique_id,
     site_battery_entity_unique_ids,
 )
@@ -46,11 +41,9 @@ class EnphaseSensorRegistrySetup:
         self.known_gateway_iq_router_keys: set[str] = set()
         self.known_charger_serials: set[str] = set()
         self.known_battery_serials: set[str] = set()
-        self.known_ac_battery_serials: set[str] = set()
         self.known_inverter_serials: set[str] = set()
         self.known_inverter_telemetry_serials: set[str] = set()
         self.battery_registry_pruned = False
-        self.ac_battery_registry_pruned = False
         self.inverter_registry_pruned = False
 
     def site_sensor_unique_id(self, key: str) -> str:
@@ -86,25 +79,6 @@ class EnphaseSensorRegistrySetup:
 
         return site_battery_entity_unique_ids(
             self._site_id, serial, BATTERY_RETIRED_UNIQUE_SUFFIXES
-        )
-
-    def ac_battery_sensor_unique_id(self, serial: str, suffix: str) -> str:
-        """Return the unique ID for a per-AC-battery sensor."""
-
-        return site_ac_battery_entity_unique_id(self._site_id, serial, suffix)
-
-    def ac_battery_sensor_unique_ids(self, serial: str) -> tuple[str, ...]:
-        """Return active unique IDs for a per-AC-battery sensor set."""
-
-        return site_ac_battery_entity_unique_ids(
-            self._site_id, serial, AC_BATTERY_ENTITY_UNIQUE_SUFFIXES
-        )
-
-    def ac_battery_retired_sensor_unique_ids(self, serial: str) -> tuple[str, ...]:
-        """Return retired unique IDs for a per-AC-battery sensor set."""
-
-        return site_ac_battery_entity_unique_ids(
-            self._site_id, serial, AC_BATTERY_RETIRED_UNIQUE_SUFFIXES
         )
 
     @staticmethod
@@ -400,43 +374,6 @@ class EnphaseSensorRegistrySetup:
             ),
         )
 
-    def prune_ac_battery_registry_once(self, current_set: set[str]) -> None:
-        """Prune stale AC battery registry entries after startup."""
-
-        if self.ac_battery_registry_pruned:
-            return
-        for reg_entry in list(self._entity_registry_values()):
-            if not self._registry_entry_matches_sensor(reg_entry):
-                continue
-            unique_id = getattr(reg_entry, "unique_id", None) or ""
-            serial = self.ac_battery_serial_from_unique_id(unique_id)
-            if serial is None:
-                continue
-            if any(
-                unique_id.endswith(suffix)
-                for suffix in AC_BATTERY_RETIRED_UNIQUE_SUFFIXES
-            ):
-                self._ent_reg.async_remove(reg_entry.entity_id)
-                self.known_ac_battery_serials.discard(serial)
-                continue
-            if serial in current_set:
-                continue
-            self._ent_reg.async_remove(reg_entry.entity_id)
-            self.known_ac_battery_serials.discard(serial)
-        self.ac_battery_registry_pruned = True
-
-    def remove_missing_ac_battery_entities(self, current_set: set[str]) -> None:
-        """Remove known AC battery entities no longer in the current set."""
-
-        self._remove_missing_serial_entities(
-            self.known_ac_battery_serials,
-            current_set,
-            lambda serial: (
-                *self.ac_battery_sensor_unique_ids(serial),
-                *self.ac_battery_retired_sensor_unique_ids(serial),
-            ),
-        )
-
     def prune_inverter_registry_once(self, current_set: set[str]) -> None:
         """Prune stale inverter registry entries after startup."""
 
@@ -483,18 +420,6 @@ class EnphaseSensorRegistrySetup:
             suffixes=(
                 *BATTERY_ENTITY_UNIQUE_SUFFIXES,
                 *BATTERY_RETIRED_UNIQUE_SUFFIXES,
-            ),
-        )
-
-    def ac_battery_serial_from_unique_id(self, unique_id: object) -> str | None:
-        """Return an AC battery serial parsed from a known unique ID."""
-
-        return ac_battery_entity_serial_from_unique_id(
-            unique_id,
-            site_id=self._site_id,
-            suffixes=(
-                *AC_BATTERY_ENTITY_UNIQUE_SUFFIXES,
-                *AC_BATTERY_RETIRED_UNIQUE_SUFFIXES,
             ),
         )
 

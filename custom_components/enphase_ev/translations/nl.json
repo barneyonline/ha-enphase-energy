@@ -43,8 +43,7 @@
           "type_iqevse": "Laders",
           "type_microinverter": "Micro-omvormers",
           "scan_interval": "Scaninterval (s)",
-          "type_heatpump": "Warmtepomp",
-          "type_ac_battery": "AC-batterij"
+          "type_heatpump": "Warmtepomp"
         },
         "data_description": {
           "type_envoy": "Bevat gateway-connectiviteit en meterdiagnostiek.",
@@ -52,8 +51,7 @@
           "type_iqevse": "Bevat EV-lader-entiteiten en bediening.",
           "type_microinverter": "Bevat sensoren voor micro-omvormerconnectiviteit, actief aantal en levensduurproductie.",
           "scan_interval": "Seconden tussen cloudstatuspolls. Standaard 60s.",
-          "type_heatpump": "Bevat sensoren voor warmtepompstatus, diagnostiek en verbruik.",
-          "type_ac_battery": "Bevat AC-batterijsensoren en slaapmodusbediening wanneer beschikbaar."
+          "type_heatpump": "Bevat sensoren voor warmtepompstatus, diagnostiek en verbruik."
         }
       }
     },
@@ -138,9 +136,6 @@
     },
     "battery_schedule_overlap": {
       "message": "Het schema overlapt met het bestaande {schedule_label}. Pas dat schema eerst aan of schakel het uit."
-    },
-    "ac_battery_unavailable": {
-      "message": "Er zijn momenteel geen AC Battery-apparaten beschikbaar."
     },
     "auth_settings_service_unavailable": {
       "message": "Authenticatie-instellingen zijn niet beschikbaar zolang de Enphase-service niet beschikbaar is."
@@ -358,9 +353,6 @@
     "scheduler_service_unavailable": {
       "message": "Selectie van de oplaadmodus is niet beschikbaar terwijl de Enphase-plannerservice niet beschikbaar is."
     },
-    "selected_ac_battery_target_state_of_charge_unavailable": {
-      "message": "De geselecteerde doel-laadtoestand voor AC Battery is niet beschikbaar."
-    },
     "battery_schedule_day_required": {
       "message": "Selecteer minimaal één dag voor het schema."
     },
@@ -527,7 +519,6 @@
           "session_history_interval": "Sessieverleden-interval (min)",
           "schedule_sync_enabled": "Schakel EV Charger Scheduler in",
           "type_heatpump": "Warmtepomp",
-          "type_ac_battery": "AC-batterij",
           "battery_schedules_enabled": "Schakel Batterijplanner in",
           "degraded_service_repair_issues": "Reparaties voor verminderde diensten inschakelen",
           "weather_enabled": "Weer inschakelen",
@@ -546,7 +537,6 @@
           "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is.",
           "session_history_interval": "Minuten om te wachten tussen het ophalen van cloudsessiegeschiedenis.",
           "type_heatpump": "Bevat sensoren voor warmtepompstatus, diagnostiek en verbruik.",
-          "type_ac_battery": "Bevat AC-batterijsensoren en slaapmodusbediening wanneer beschikbaar.",
           "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken.",
           "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is.",
           "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in.",
@@ -582,7 +572,6 @@
             "data": {
               "type_envoy": "Gateway",
               "type_encharge": "Batterij",
-              "type_ac_battery": "AC-batterij",
               "type_iqevse": "Laders",
               "type_heatpump": "Warmtepomp",
               "type_microinverter": "Micro-omvormers"
@@ -590,7 +579,6 @@
             "data_description": {
               "type_envoy": "Bevat gateway-connectiviteit en meterdiagnostiek.",
               "type_encharge": "Bevat batterijstatus en bedieningsentiteiten wanneer beschikbaar.",
-              "type_ac_battery": "Bevat AC-batterijsensoren en slaapmodusbediening wanneer beschikbaar.",
               "type_iqevse": "Bevat EV-lader-entiteiten en bediening.",
               "type_heatpump": "Bevat sensoren voor warmtepompstatus, diagnostiek en verbruik.",
               "type_microinverter": "Bevat sensoren voor micro-omvormerconnectiviteit, actief aantal en levensduurproductie."
@@ -601,7 +589,6 @@
           "devices": "Apparaten selecteren",
           "type_envoy": "Gateway",
           "type_encharge": "Batterij",
-          "type_ac_battery": "AC-batterij",
           "type_iqevse": "Laders",
           "type_heatpump": "Warmtepomp",
           "type_microinverter": "Micro-omvormers"
@@ -609,7 +596,6 @@
         "data_description": {
           "type_envoy": "Bevat gateway-connectiviteit en meterdiagnostiek.",
           "type_encharge": "Bevat batterijstatus en bedieningsentiteiten wanneer beschikbaar.",
-          "type_ac_battery": "Bevat AC-batterijsensoren en slaapmodusbediening wanneer beschikbaar.",
           "type_iqevse": "Bevat EV-lader-entiteiten en bediening.",
           "type_heatpump": "Bevat sensoren voor warmtepompstatus, diagnostiek en verbruik.",
           "type_microinverter": "Bevat sensoren voor micro-omvormerconnectiviteit, actief aantal en levensduurproductie."
@@ -1855,45 +1841,6 @@
           "pairing": "Koppelen"
         }
       },
-      "ac_battery_overall_status": {
-        "name": "Algemene status van AC-batterij",
-        "state": {
-          "normal": "Normaal",
-          "warning": "Waarschuwing",
-          "error": "Fout",
-          "unknown": "Onbekend"
-        }
-      },
-      "ac_battery_power": {
-        "name": "Vermogen van AC-batterij"
-      },
-      "ac_battery_last_reported": {
-        "name": "Laatst gerapporteerd door AC-batterij"
-      },
-      "ac_battery_storage_charge": {
-        "name": "Laadniveau van AC-batterij"
-      },
-      "ac_battery_storage_status": {
-        "name": "Status van {serial}",
-        "state": {
-          "normal": "Normaal",
-          "warning": "Waarschuwing",
-          "error": "Fout",
-          "unknown": "Onbekend"
-        }
-      },
-      "ac_battery_storage_power": {
-        "name": "Vermogen van {serial}"
-      },
-      "ac_battery_storage_operating_mode": {
-        "name": "Bedrijfsmodus van {serial}"
-      },
-      "ac_battery_storage_cycle_count": {
-        "name": "Cyclusaantal van {serial}"
-      },
-      "ac_battery_storage_last_reported": {
-        "name": "Laatst gerapporteerd door {serial}"
-      },
       "battery_cfg_schedules": {
         "name": "Batterij CFG-schema's"
       },
@@ -2338,9 +2285,6 @@
       "restrict_battery_discharge_schedule": {
         "name": "Schema voor beperkte batterijontlading"
       },
-      "ac_battery_sleep_mode": {
-        "name": "Slaapmodus van AC-batterij"
-      },
       "evse_schedule_edit_mon": {
         "name": "Schema maandag"
       },
@@ -2411,9 +2355,6 @@
       },
       "system_profile": {
         "name": "Systeemprofiel"
-      },
-      "ac_battery_target_state_of_charge": {
-        "name": "Doel-laadniveau van AC-batterij"
       },
       "evse_schedule_selected": {
         "name": "Schema"

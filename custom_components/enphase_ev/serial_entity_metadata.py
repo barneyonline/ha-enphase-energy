@@ -59,15 +59,6 @@ BATTERY_RETIRED_UNIQUE_SUFFIXES: tuple[str, ...] = (
     "_last_reported",
     "_last_reported_at",
 )
-AC_BATTERY_ENTITY_UNIQUE_SUFFIXES: tuple[str, ...] = (
-    "_charge_level",
-    "_status",
-    "_power",
-    "_operating_mode",
-    "_cycle_count",
-    "_last_reported",
-)
-AC_BATTERY_RETIRED_UNIQUE_SUFFIXES: tuple[str, ...] = ("_last_reported_at",)
 INVERTER_ENTITY_UNIQUE_SUFFIXES: tuple[str, ...] = (
     "_lifetime_energy",
     "_telemetry",
@@ -104,24 +95,6 @@ def site_battery_entity_unique_ids(
 
     return tuple(
         site_battery_entity_unique_id(site_id, serial, suffix) for suffix in suffixes
-    )
-
-
-def site_ac_battery_entity_unique_id(site_id: str, serial: str, suffix: str) -> str:
-    """Return a per-AC-battery unique ID."""
-
-    return f"{DOMAIN}_site_{site_id}_ac_battery_{serial}{suffix}"
-
-
-def site_ac_battery_entity_unique_ids(
-    site_id: str,
-    serial: str,
-    suffixes: tuple[str, ...] = AC_BATTERY_ENTITY_UNIQUE_SUFFIXES,
-) -> tuple[str, ...]:
-    """Return per-AC-battery unique IDs for suffixes."""
-
-    return tuple(
-        site_ac_battery_entity_unique_id(site_id, serial, suffix) for suffix in suffixes
     )
 
 
@@ -191,27 +164,6 @@ def battery_entity_serial_from_unique_id(
         blocked_unique_ids={
             f"{DOMAIN}_site_{site_id}_battery_overall_status",
             f"{DOMAIN}_site_{site_id}_battery_last_reported",
-        },
-    )
-
-
-def ac_battery_entity_serial_from_unique_id(
-    unique_id: object,
-    *,
-    site_id: str,
-    suffixes: tuple[str, ...],
-) -> str | None:
-    """Return an AC Battery serial parsed from a managed unique ID."""
-
-    prefix = f"{DOMAIN}_site_{site_id}_ac_battery_"
-    return prefixed_serial_from_unique_id(
-        unique_id,
-        prefix=prefix,
-        suffixes=suffixes,
-        blocked_unique_ids={
-            f"{DOMAIN}_site_{site_id}_ac_battery_overall_status",
-            f"{DOMAIN}_site_{site_id}_ac_battery_last_reported",
-            f"{DOMAIN}_site_{site_id}_ac_battery_power",
         },
     )
 

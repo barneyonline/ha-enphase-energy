@@ -17,6 +17,7 @@ from .device_info_helpers import (
 )
 from .device_registry_compat import (
     device_belongs_to_config_entry,
+    device_config_entry_ids,
     get_device_by_identifier,
 )
 from .device_types import (
@@ -67,7 +68,7 @@ _LEGACY_CLOUD_ENTITY_SUFFIX_ALIASES_BY_DOMAIN: dict[str, tuple[str, ...]] = {
         "cloud_last_error_code",
     ),
 }
-_STARTUP_MIGRATION_VERSION = 6
+_STARTUP_MIGRATION_VERSION = 7
 _STARTUP_MIGRATION_VERSION_KEY = "startup_migration_version"
 
 
@@ -768,6 +769,33 @@ def _remove_evse_type_device_and_entities(
         )
 
 
+def _remove_retired_ac_battery_entities(
+    hass: HomeAssistant,
+    entry: EnphaseConfigEntry,
+    dev_reg: dr.DeviceRegistry,
+    site_id: object,
+) -> None:
+    """Retire this entry's AC Battery entities and its empty type device."""
+    ent_reg = er.async_get(hass)
+    prefix = f"{DOMAIN}_site_{site_id}_ac_battery_"
+    inventory_id = f"{DOMAIN}_site_{site_id}_type_ac_battery_inventory"
+    for entity in list(er.async_entries_for_config_entry(ent_reg, entry.entry_id)):
+        if entity.platform == DOMAIN and (
+            entity.unique_id.startswith(prefix) or entity.unique_id == inventory_id
+        ):
+            ent_reg.async_remove(entity.entity_id)
+    device = get_device_by_identifier(
+        dev_reg, (DOMAIN, f"type:{site_id}:ac_battery"), entry.entry_id
+    )
+    if (
+        device is not None
+        and device_config_entry_ids(device, device_registry=dev_reg)
+        == (entry.entry_id,)
+        and not entries_for_device(ent_reg, device.id)
+    ):
+        dev_reg.async_remove_device(device.id)
+
+
 def _complete_startup_migrations_if_ready(
     hass: HomeAssistant,
     entry: EnphaseConfigEntry,
@@ -777,6 +805,8 @@ def _complete_startup_migrations_if_ready(
 ) -> None:
     if _startup_migration_version(entry) >= _STARTUP_MIGRATION_VERSION:
         return
+    # Retired entities require no live inventory to identify safely.
+    _remove_retired_ac_battery_entities(hass, entry, dev_reg, site_id)
     ready_check = getattr(coord, "startup_migrations_ready", None)
     if not callable(ready_check):
         return

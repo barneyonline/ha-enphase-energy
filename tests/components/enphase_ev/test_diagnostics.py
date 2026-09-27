@@ -121,7 +121,6 @@ def test_gateway_diagnostics_helper_branches() -> None:
     assert diagnostics._microinverter_summary({"count": 2})["connectivity"] == "unknown"
     assert diagnostics._microinverter_summary({})["connectivity"] is None
     assert diagnostics._battery_status_summary_for_diagnostics(None) == {}
-    assert diagnostics._ac_battery_status_summary_for_diagnostics(None) == {}
 
 
 def test_diagnostics_redacts_numeric_site_ids_in_nested_payloads() -> None:
@@ -236,34 +235,6 @@ class DummyCoordinator(SimpleNamespace):
             "current_charge": "48%",
             "storages": [{"serial_number": "BT0001", "status": "normal"}],
         }
-        self._ac_battery_devices_payload = {
-            "battery_count": 1,
-            "records": [
-                {
-                    "serial_number": "ACB0001",
-                    "battery_id": "67890",
-                    "status_text": "Warning",
-                }
-            ],
-        }
-        self._ac_battery_telemetry_payloads = {
-            "records": [
-                {
-                    "serial_number": "ACB0001",
-                    "battery_id": "67890",
-                    "power_w": 260.0,
-                }
-            ]
-        }
-        self._ac_battery_events_payloads = {
-            "records": [
-                {
-                    "serial_number": "ACB0001",
-                    "battery_id": "67890",
-                    "location": "/systems/9990001/ac_batteries/67890/events",
-                }
-            ]
-        }
         self.battery_status_summary = {
             "aggregate_charge_pct": 48.0,
             "aggregate_status": "normal",
@@ -278,19 +249,6 @@ class DummyCoordinator(SimpleNamespace):
             "per_battery_status": {"BT0001": "normal"},
             "worst_storage_key": "BT0001",
         }
-        self.ac_battery_status_summary = {
-            "aggregate_status": "warning",
-            "battery_count": 1,
-            "sleep_state": "pending",
-            "selected_sleep_min_soc": 25,
-            "worst_status": "warning",
-            "power_w": 260.0,
-            "latest_reported_utc": "2026-03-01T00:00:00+00:00",
-        }
-        self.ac_battery_aggregate_status = "warning"
-        self.ac_battery_sleep_state = "pending"
-        self.ac_battery_selected_sleep_min_soc = 25
-        self.ac_battery_control_pending = True
         self.battery_dtg_control = {
             "show": True,
             "enabled": False,
@@ -704,18 +662,12 @@ class DummyCoordinator(SimpleNamespace):
             "backup_history_payload": self._battery_backup_history_payload,
             "hems_devices_payload": self._hems_devices_payload,
             "devices_inventory_payload": self._devices_inventory_payload,
-            "ac_battery_devices_payload": self._ac_battery_devices_payload,
-            "ac_battery_telemetry_payloads": self._ac_battery_telemetry_payloads,
-            "ac_battery_events_payloads": self._ac_battery_events_payloads,
         }
 
     async def async_ensure_heatpump_runtime_diagnostics(self):
         return None
 
     async def async_ensure_battery_status_diagnostics(self):
-        return None
-
-    async def async_ensure_ac_battery_diagnostics(self):
         return None
 
     def heatpump_runtime_diagnostics(self):
@@ -1828,64 +1780,6 @@ async def test_device_diagnostics_heatpump_includes_runtime_payloads(
 
 
 @pytest.mark.asyncio
-async def test_config_diagnostics_include_redacted_ac_battery_payloads(
-    hass, config_entry
-) -> None:
-    coord = DummyCoordinator()
-    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
-
-    diag = await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
-
-    battery_config = diag["coordinator"]["battery_config"]
-    assert (
-        battery_config["ac_battery_devices_payload"]["records"][0]["serial_number"]
-        == "**REDACTED**"
-    )
-    assert (
-        battery_config["ac_battery_devices_payload"]["records"][0]["battery_id"]
-        == "**REDACTED**"
-    )
-    assert (
-        battery_config["ac_battery_events_payloads"]["records"][0]["location"]
-        == "**REDACTED**"
-    )
-
-
-@pytest.mark.asyncio
-async def test_device_diagnostics_ac_battery_type_includes_payloads(
-    hass, config_entry
-) -> None:
-    coord = DummyCoordinator()
-    coord.inventory_view.type_bucket = lambda type_key: (  # type: ignore[attr-defined]
-        {
-            "type_label": "AC Battery",
-            "count": 1,
-            "devices": [{"serial_number": "ACB0001"}],
-        }
-        if type_key == "ac_battery"
-        else None
-    )
-    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
-
-    dev_reg = dr.async_get(hass)
-    device = dev_reg.async_get_or_create(
-        config_entry_id=config_entry.entry_id,
-        identifiers={(DOMAIN, f"type:{RANDOM_SITE_ID}:ac_battery")},
-        manufacturer="Enphase",
-        name="AC Battery",
-    )
-
-    result = await diagnostics.async_get_device_diagnostics(hass, config_entry, device)
-
-    assert result["type_key"] == "ac_battery"
-    assert result["ac_battery_status_summary"]["aggregate_status"] == "warning"
-    assert (
-        result["ac_battery_devices_payload"]["records"][0]["serial_number"]
-        == "**REDACTED**"
-    )
-
-
-@pytest.mark.asyncio
 async def test_config_entry_diagnostics_heatpump_runtime_errors_fallback_to_empty(
     hass, config_entry
 ) -> None:
@@ -1904,21 +1798,6 @@ async def test_config_entry_diagnostics_heatpump_runtime_errors_fallback_to_empt
 
 
 @pytest.mark.asyncio
-async def test_config_entry_diagnostics_ac_battery_capture_errors_are_swallowed(
-    hass, config_entry
-) -> None:
-    coord = DummyCoordinator()
-    coord.async_ensure_ac_battery_diagnostics = AsyncMock(
-        side_effect=RuntimeError("capture failed")
-    )
-    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
-
-    diag = await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
-
-    assert diag["coordinator"]["battery_config"]["ac_battery_devices_payload"]
-
-
-@pytest.mark.asyncio
 async def test_config_entry_diagnostics_skips_optional_type_prefetch(
     hass, config_entry
 ) -> None:
@@ -1929,21 +1808,16 @@ async def test_config_entry_diagnostics_skips_optional_type_prefetch(
         iter_type_keys=lambda: ["envoy", "encharge"],
         type_bucket=lambda type_key: None,
     )
-    coord._ac_battery_devices_payload = None  # noqa: SLF001
-    coord._ac_battery_telemetry_payloads = None  # noqa: SLF001
-    coord._ac_battery_events_payloads = None  # noqa: SLF001
     coord._heatpump_runtime_state = None  # noqa: SLF001
     coord._heatpump_daily_consumption = None  # noqa: SLF001
     coord._show_livestream_payload = None  # noqa: SLF001
     coord._heatpump_events_payloads = []  # noqa: SLF001
     coord._heatpump_power_snapshot = None  # noqa: SLF001
-    coord.async_ensure_ac_battery_diagnostics = AsyncMock()
     coord.async_ensure_heatpump_runtime_diagnostics = AsyncMock()
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
 
     await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
 
-    coord.async_ensure_ac_battery_diagnostics.assert_not_awaited()
     coord.async_ensure_heatpump_runtime_diagnostics.assert_not_awaited()
 
 
@@ -1981,40 +1855,6 @@ async def test_device_diagnostics_heatpump_runtime_errors_are_swallowed(
 
     coord.async_ensure_heatpump_runtime_diagnostics.assert_not_awaited()
     assert "heatpump_runtime" not in result
-
-
-@pytest.mark.asyncio
-async def test_device_diagnostics_ac_battery_capture_errors_are_swallowed(
-    hass, config_entry
-) -> None:
-    coord = DummyCoordinator()
-    coord.inventory_view.type_bucket = lambda type_key: (  # type: ignore[attr-defined]
-        {
-            "type_label": "AC Battery",
-            "count": 1,
-            "devices": [{"serial_number": "ACB0001"}],
-        }
-        if type_key == "ac_battery"
-        else None
-    )
-    coord.async_ensure_ac_battery_diagnostics = AsyncMock(
-        side_effect=RuntimeError("capture failed")
-    )
-    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
-
-    dev_reg = dr.async_get(hass)
-    device = dev_reg.async_get_or_create(
-        config_entry_id=config_entry.entry_id,
-        identifiers={(DOMAIN, f"type:{RANDOM_SITE_ID}:ac_battery")},
-        manufacturer="Enphase",
-        name="AC Battery",
-    )
-
-    result = await diagnostics.async_get_device_diagnostics(hass, config_entry, device)
-
-    coord.async_ensure_ac_battery_diagnostics.assert_not_awaited()
-    assert result["type_key"] == "ac_battery"
-    assert result["ac_battery_status_summary"]["aggregate_status"] == "warning"
 
 
 @pytest.mark.asyncio

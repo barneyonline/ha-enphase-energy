@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from custom_components.enphase_ev.const import DOMAIN
+
 import asyncio
 import time
 from datetime import datetime, timezone
@@ -81,7 +83,6 @@ def test_inventory_runtime_helper_paths(coordinator_factory) -> None:
         "hems_inventory_ready": False,
         "charger_count": 0,
         "battery_count": 0,
-        "ac_battery_count": 0,
         "inverter_count": 0,
         "inverter_telemetry_count": 0,
         "active_type_keys": [],
@@ -865,22 +866,6 @@ def test_devices_inventory_runtime_parser_shapes_and_buckets(
     )
     assert valid is True
     assert grouped["encharge"]["model_summary"] == "IQ Battery 5P x1"
-
-
-def test_inventory_view_iter_type_keys_infers_ac_battery_when_no_buckets(
-    coordinator_factory,
-) -> None:
-    coord = coordinator_factory()
-    coord.serials = set()
-    coord.data = {}
-    coord.iter_serials = lambda: []
-    coord._type_device_order = None  # noqa: SLF001
-    coord._type_device_buckets = None  # noqa: SLF001
-    coord._selected_type_keys = None  # noqa: SLF001
-    coord._battery_has_encharge = False  # noqa: SLF001
-    coord._battery_has_acb = True  # noqa: SLF001
-
-    assert coord.inventory_view.iter_type_keys() == ["envoy", "ac_battery"]
 
 
 def test_devices_inventory_runtime_dry_contact_dedupe_and_helpers(
@@ -3980,3 +3965,67 @@ def test_inventory_runtime_refresh_cached_topology_handles_snapshot_errors(
     runtime._current_topology_snapshot = _boom  # type: ignore[method-assign]  # noqa: SLF001
 
     assert runtime._refresh_cached_topology() is False  # noqa: SLF001
+
+
+def test_iq_battery_identifier_requires_confirmed_capability_without_inventory(
+    coordinator_factory,
+):
+    coord = coordinator_factory()
+    coord._selected_type_keys = {"encharge"}
+    coord._devices_inventory_ready = True
+    coord._type_device_buckets = {}
+    coord._battery_has_encharge = False
+    assert coord.inventory_view.type_identifier("encharge") is None
+    coord._battery_has_encharge = True
+    assert coord.inventory_view.type_identifier("encharge") == (
+        DOMAIN,
+        f"type:{coord.site_id}:encharge",
+    )
+    coord._battery_has_acb = True
+    assert coord.inventory_view.type_identifier("ac_battery") is None
+    assert "ac_battery" not in coord.inventory_view.iter_type_keys()
+
+
+@pytest.mark.parametrize("selection", [["ac_battery"], "AC Battery"])
+def test_retired_only_selection_does_not_enable_other_device_families(
+    coordinator_factory, selection
+) -> None:
+    from custom_components.enphase_ev import _migrate_selected_type_keys
+    from custom_components.enphase_ev.const import (
+        CONF_INCLUDE_INVERTERS,
+        CONF_SELECTED_TYPE_KEYS,
+        CONF_SERIALS,
+        CONF_SITE_ID,
+        CONF_SITE_ONLY,
+    )
+    from custom_components.enphase_ev.serial_discovery import (
+        inventory_type_selected_for_cleanup,
+    )
+
+    config = {
+        CONF_SITE_ID: "site-1",
+        CONF_SERIALS: [],
+        CONF_SITE_ONLY: True,
+        CONF_INCLUDE_INVERTERS: False,
+        CONF_SELECTED_TYPE_KEYS: selection,
+    }
+    migrated = _migrate_selected_type_keys(SimpleNamespace(data=config))
+    assert migrated[CONF_SELECTED_TYPE_KEYS] == []
+    for entry_data in (config, migrated):
+        coord = coordinator_factory(config=entry_data, serials=[])
+        # Exercise both initial setup and application of updated entry data.
+        for apply_data in (False, True):
+            if apply_data:
+                coord.apply_config_entry_data(entry_data)
+            assert coord.inventory_view.iter_type_keys() == []
+            for type_key in (
+                "envoy",
+                "encharge",
+                "heatpump",
+                "microinverter",
+                "iqevse",
+            ):
+                assert not coord.inventory_view.has_type_for_entities(type_key)
+                assert not inventory_type_selected_for_cleanup(coord, type_key)
+            assert not coord._first_refresh_storm_guard_followups_needed()
+            assert not coord._heatpump_hems_polling_enabled()

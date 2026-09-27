@@ -38,13 +38,10 @@ from .serial_discovery import (
     active_serial_registry_identifiers,
 )
 from .serial_entity_metadata import (
-    AC_BATTERY_ENTITY_UNIQUE_SUFFIXES,
-    AC_BATTERY_RETIRED_UNIQUE_SUFFIXES,
     BATTERY_ENTITY_UNIQUE_SUFFIXES,
     BATTERY_RETIRED_UNIQUE_SUFFIXES,
     CHARGER_BINARY_SENSOR_UNIQUE_SUFFIXES,
     CHARGER_SENSOR_UNIQUE_SUFFIXES,
-    ac_battery_entity_serial_from_unique_id,
     battery_entity_serial_from_unique_id,
     charger_entity_serial_from_unique_id,
     inverter_entity_serial_from_unique_id,
@@ -278,17 +275,6 @@ def _serial_entity_group_from_unique_id(
         )
         if battery_serial is not None:
             return ("battery", battery_serial)
-
-        ac_battery_serial = ac_battery_entity_serial_from_unique_id(
-            unique_id,
-            site_id=site_text,
-            suffixes=(
-                *AC_BATTERY_ENTITY_UNIQUE_SUFFIXES,
-                *AC_BATTERY_RETIRED_UNIQUE_SUFFIXES,
-            ),
-        )
-        if ac_battery_serial is not None:
-            return ("ac_battery", ac_battery_serial)
 
     inverter_serial = inverter_entity_serial_from_unique_id(unique_id)
     if inverter_serial is not None:
