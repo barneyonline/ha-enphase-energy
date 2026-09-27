@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Bendra inverterių galia"
+      },
+      "account_access": {
+        "name": "Paskyros prieiga",
+        "state": {
+          "administrator": "Administratorius",
+          "installer": "Montuotojas",
+          "owner": "Savininkas",
+          "host": "Šeimininkas",
+          "consumption_data": "Vartojimo duomenys",
+          "viewer": "Stebėtojas"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Administratorius"
+          },
+          "installer": {
+            "name": "Montuotojas"
+          },
+          "owner": {
+            "name": "Savininkas"
+          },
+          "host": {
+            "name": "Šeimininkas"
+          },
+          "consumption_data": {
+            "name": "Vartojimo duomenys"
+          },
+          "viewer": {
+            "name": "Stebėtojas"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Objekto informacija",
+        "state_attributes": {
+          "site_id": {
+            "name": "Objekto ID"
+          },
+          "timezone": {
+            "name": "Laiko juosta"
+          },
+          "country": {
+            "name": "Šalis"
+          },
+          "currency": {
+            "name": "Valiuta"
+          }
+        }
       }
     },
     "number": {

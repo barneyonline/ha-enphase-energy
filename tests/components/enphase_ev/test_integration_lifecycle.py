@@ -12,6 +12,7 @@ from freezegun import freeze_time
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import callback
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import (
     async_create_clientsession,
     async_get_clientsession,
@@ -47,6 +48,20 @@ def platform_cloud(monkeypatch, load_fixture):
         async_get_clientsession,
     )
     responses = {
+        "site_bootstrap": {
+            "app": {
+                "timezone": "Australia/Melbourne",
+                "user": {
+                    "id": 1,
+                    "isAdmin": False,
+                    "isInstaller": True,
+                    "isHost": False,
+                    "hasConsumptionDataAccess": True,
+                },
+                "owner": {"id": 1},
+            }
+        },
+        "system_dashboard_summary": {"country_code": "AU", "currency_unit": "AUD"},
         "status": load_fixture("status_idle.json"),
         "summary_v2": [],
         "site_tariff_bundle": ({}, {}),
@@ -149,6 +164,19 @@ async def test_real_platform_setup_reload_and_unload(
         e for e in entries if e.unique_id.endswith("_current_production_power")
     )
     assert hass.states.get(power.entity_id).state == "1250"
+    access = next(e for e in entries if e.unique_id.endswith("_account_access"))
+    site_info = next(e for e in entries if e.unique_id.endswith("_site_information"))
+    access_state = hass.states.get(access.entity_id)
+    assert access_state.state == "installer"
+    assert access_state.attributes["administrator"] is False
+    assert access_state.attributes["installer"] is True
+    assert access_state.attributes["owner"] is True
+    info_state = hass.states.get(site_info.entity_id)
+    assert info_state.attributes["timezone"] == "Australia/Melbourne"
+    assert info_state.attributes["country"] == "AU"
+    assert info_state.attributes["currency"] == "AUD"
+    assert dr.async_get(hass).async_get(access.device_id).sw_version is None
+
     assert bool([e for e in entries if RANDOM_SERIAL in e.unique_id]) is not site_only
     if not site_only:
         assert hass.states.get("binary_sensor.garage_ev_charging").state == "off"

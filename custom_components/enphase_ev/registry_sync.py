@@ -13,6 +13,7 @@ from .const import (
 )
 from .device_info_helpers import (
     _compose_charger_model_display,
+    _site_configuration_url,
     _is_redundant_model_id,
     _normalize_evse_display_name,
     _normalize_evse_model_name as _normalize_evse_model_name,
@@ -111,6 +112,7 @@ def _sync_type_devices(
             "config_entry_id": entry.entry_id,
             "identifiers": {ident},
             "manufacturer": "Enphase",
+            "configuration_url": _site_configuration_url(site_id),
             "name": name,
             "model": model,
         }
@@ -191,6 +193,7 @@ def _sync_charger_devices(
             "config_entry_id": entry.entry_id,
             "identifiers": {(DOMAIN, sn)},
             "manufacturer": "Enphase",
+            "configuration_url": _site_configuration_url(site_id),
             "name": dev_name,
             "serial_number": str(sn),
             "via_device_id": None,
@@ -203,6 +206,10 @@ def _sync_charger_devices(
         )
         if model_display:
             kwargs["model"] = model_display
+        model_id = _clean_optional_text(d.get("model_id") or model_name_raw)
+        kwargs["model_id"] = (
+            None if _is_redundant_model_id(model_display, model_id) else model_id
+        )
         hw = d.get("hw_version")
         if hw:
             kwargs["hw_version"] = str(hw)
@@ -221,6 +228,8 @@ def _sync_charger_devices(
                 changes.append("manufacturer")
             if model_display and existing.model != model_display:
                 changes.append("model")
+            if getattr(existing, "model_id", None) != kwargs["model_id"]:
+                changes.append("model_id")
             if hw and existing.hw_version != str(hw):
                 changes.append("hw_version")
             if sw and existing.sw_version != str(sw):
@@ -512,7 +521,7 @@ def _registry_charger_metadata_signature(
                 str(sn),
                 device_name,
                 _clean_optional_text(model_display),
-                _clean_optional_text(payload.get("model_id")),
+                _clean_optional_text(payload.get("model_id") or model_name_raw),
                 _clean_optional_text(payload.get("hw_version")),
                 _clean_optional_text(payload.get("sw_version")),
             )

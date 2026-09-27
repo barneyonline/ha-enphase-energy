@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Totale omvormercapaciteit"
+      },
+      "account_access": {
+        "name": "Accounttoegang",
+        "state": {
+          "administrator": "Beheerder",
+          "installer": "Installateur",
+          "owner": "Eigenaar",
+          "host": "Gastheer",
+          "consumption_data": "Verbruiksgegevens",
+          "viewer": "Waarnemer"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Beheerder"
+          },
+          "installer": {
+            "name": "Installateur"
+          },
+          "owner": {
+            "name": "Eigenaar"
+          },
+          "host": {
+            "name": "Gastheer"
+          },
+          "consumption_data": {
+            "name": "Verbruiksgegevens"
+          },
+          "viewer": {
+            "name": "Waarnemer"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Locatiegegevens",
+        "state_attributes": {
+          "site_id": {
+            "name": "Locatie-ID"
+          },
+          "timezone": {
+            "name": "Tijdzone"
+          },
+          "country": {
+            "name": "Land"
+          },
+          "currency": {
+            "name": "Valuta"
+          }
+        }
       }
     },
     "number": {

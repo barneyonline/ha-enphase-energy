@@ -190,3 +190,94 @@ def test_inventory_incomplete_heatpump_metadata(coordinator_factory, monkeypatch
         "heatpump",
     )
     assert view.parse_type_identifier("invalid") is None
+
+
+@pytest.mark.parametrize("name", ["IQ Battery 5P", None, ""])
+def test_battery_friendly_model_preserves_sku(coordinator_factory, name):
+    coord = coordinator_factory()
+    sku = "B05-T02-ROW00-1-2"
+    coord._type_device_buckets = {
+        "encharge": {
+            "type_label": "IQ Battery",
+            "count": 2,
+            "devices": [{"name": name, "sku_id": sku}] * 2,
+        }
+    }
+    view = coord.inventory_view
+    assert view.type_device_model("encharge") == (name or sku)
+    assert view.type_device_model_id("encharge") == (sku if name else None)
+    info = view.type_device_info("encharge")
+    assert info["model"] == (name or sku)
+    assert info.get("model_id") == (sku if name else None)
+
+
+@pytest.mark.parametrize("kind", ["encharge", "microinverter"])
+def test_grouped_cards_keep_models_firmware_and_serials_unambiguous(
+    coordinator_factory, kind
+):
+    coord = coordinator_factory()
+    coord._type_device_buckets = {
+        kind: {
+            "type_label": "Equipment",
+            "count": 2,
+            "devices": [
+                {
+                    "name": "Model A",
+                    "sku_id": "SKU-A",
+                    "serial_number": "A",
+                    "sw_version": "520-long-release-1",
+                },
+                {
+                    "name": "Model B",
+                    "sku_id": "SKU-B",
+                    "serial_number": "B",
+                    "sw_version": "520-long-release-2",
+                },
+            ],
+        }
+    }
+    info = coord.inventory_view.type_device_info(kind)
+    assert info["model"] == "Model A x1, Model B x1"
+    assert info["sw_version"] == "520-long-release-1 x1, 520-long-release-2 x1"
+    assert "serial_number" not in info
+    assert "model_id" not in info
+    assert "hw_version" not in info
+    assert (
+        info["configuration_url"]
+        == f"https://enlighten.enphaseenergy.com/app/system_dashboard/sites/{coord.site_id}/summary"
+    )
+    coord._type_device_buckets[kind]["devices"] = [
+        {
+            "name": "IQ7A",
+            "sku_id": "IQ7A-72-E-ACM-INT",
+            "serial_number": "A",
+            "hw_version": "Rev A",
+            "sw_version": "520-long-release-1",
+        }
+    ]
+    info = coord.inventory_view.type_device_info(kind)
+    assert info["model"] == "IQ7A"
+    assert info["model_id"] == "IQ7A-72-E-ACM-INT"
+    assert info["serial_number"] == "A"
+    assert info["hw_version"] == "Rev A"
+    assert info["sw_version"] == "520-long-release-1"
+
+
+@pytest.mark.parametrize("kind", ["encharge", "microinverter"])
+def test_partial_friendly_names_preserve_other_models(coordinator_factory, kind):
+    coord = coordinator_factory()
+    coord._type_device_buckets = {
+        kind: {
+            "type_label": "Equipment",
+            "devices": [
+                {"name": "Model A", "sku_id": "SKU-A"},
+                {"name": " ", "sku_id": "SKU-B"},
+                {"model": "Model C"},
+            ],
+        }
+    }
+    assert (
+        coord.inventory_view.type_device_model(kind)
+        == "Model A x1, Model C x1, SKU-B x1"
+    )
+    assert coord.inventory_view.type_device_model_id(kind) is None

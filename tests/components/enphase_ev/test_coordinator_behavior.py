@@ -568,7 +568,7 @@ def test_type_bucket_includes_extra_summary_fields(hass, monkeypatch) -> None:
     assert bucket["model_summary"] == "IQ7A x1"
     assert "status_counts" in bucket
     assert coord.inventory_view.type_device_model("microinverter") == "IQ7A-SKU"
-    assert coord.inventory_view.type_device_hw_version("microinverter") == "IQ7A-SKU"
+    assert coord.inventory_view.type_device_hw_version("microinverter") is None
 
 
 def test_type_device_envoy_prefers_system_controller_metadata(
@@ -3233,6 +3233,12 @@ async def test_fast_poll_kicked_on_external_toggle(hass, monkeypatch, load_fixtu
     charging_payload = load_fixture("status_charging.json")
 
     class StubClient:
+        async def site_bootstrap(self):
+            return {}
+
+        async def system_dashboard_summary(self, **kwargs):
+            return {}
+
         def __init__(self, payload):
             self.payload = payload
 
@@ -3274,6 +3280,12 @@ async def test_fast_poll_not_triggered_by_expectation_only(
     idle_payload = load_fixture("status_idle.json")
 
     class StubClient:
+        async def site_bootstrap(self):
+            return {}
+
+        async def system_dashboard_summary(self, **kwargs):
+            return {}
+
         def __init__(self, payload):
             self.payload = payload
 
@@ -5729,6 +5741,12 @@ async def test_dynamic_poll_switch(hass, monkeypatch):
     coord = EnphaseCoordinator(hass, cfg, config_entry=entry)
 
     class StubClient:
+        async def site_bootstrap(self):
+            return {}
+
+        async def system_dashboard_summary(self, **kwargs):
+            return {}
+
         def __init__(self, payload):
             self._payload = payload
 
@@ -5922,6 +5940,12 @@ async def test_charging_expectation_hold(monkeypatch, hass):
     coord = EnphaseCoordinator(hass, cfg)
 
     class StubClient:
+        async def site_bootstrap(self):
+            return {}
+
+        async def system_dashboard_summary(self, **kwargs):
+            return {}
+
         def __init__(self, payload):
             self.payload = payload
 
@@ -6097,6 +6121,12 @@ async def test_summary_refresh_speed_up_when_charging(hass, monkeypatch):
     coord = EnphaseCoordinator(hass, cfg, config_entry=entry)
 
     class StubClient:
+        async def site_bootstrap(self):
+            return {}
+
+        async def system_dashboard_summary(self, **kwargs):
+            return {}
+
         def __init__(self):
             self.summary_calls = 0
 
@@ -6259,6 +6289,12 @@ async def test_streaming_reverts_to_configured_scan_interval(hass, monkeypatch):
     coord = EnphaseCoordinator(hass, cfg, config_entry=entry)
 
     class StubClient:
+        async def site_bootstrap(self):
+            return {}
+
+        async def system_dashboard_summary(self, **kwargs):
+            return {}
+
         def __init__(self, payload):
             self._payload = payload
 
@@ -6322,6 +6358,12 @@ async def test_session_history_enrichment(hass, monkeypatch):
     coord = EnphaseCoordinator(hass, cfg, config_entry=DummyEntry())
 
     class StubClient:
+        async def site_bootstrap(self):
+            return {}
+
+        async def system_dashboard_summary(self, **kwargs):
+            return {}
+
         async def status(self):
             return {
                 "evChargerData": [
@@ -6759,6 +6801,12 @@ async def test_session_history_inflight_session_counts_energy(hass, monkeypatch)
     monkeypatch.setattr(dt_util, "now", lambda: now_local)
 
     class StubClient:
+        async def site_bootstrap(self):
+            return {}
+
+        async def system_dashboard_summary(self, **kwargs):
+            return {}
+
         async def status(self):
             return {
                 "evChargerData": [

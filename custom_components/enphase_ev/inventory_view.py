@@ -8,7 +8,7 @@ from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 from homeassistant.helpers.entity import DeviceInfo
 
 from .device_info_helpers import _cloud_device_info
-from .device_info_helpers import _is_redundant_model_id
+from .device_info_helpers import _is_redundant_model_id, _site_configuration_url
 from .device_types import (
     normalize_type_key,
     parse_type_identifier,
@@ -508,6 +508,21 @@ class InventoryView:
                 return summary_model
             return self.type_device_name(normalized) or self.type_label(normalized)
         members = self._type_bucket_members(normalized)
+        if normalized in ("encharge", "microinverter"):
+            model_keys = (
+                "name",
+                "model",
+                "sku_id",
+                "model_id",
+                "part_num",
+                "part_number",
+                "channel_type",
+            )
+            friendly_model = self._type_member_single_value(
+                members, *model_keys
+            ) or self._type_member_summary(members, *model_keys)
+            if friendly_model:
+                return friendly_model
         model = self._type_member_single_value(
             members,
             "model",
@@ -712,10 +727,6 @@ class InventoryView:
                 "hw_version",
                 "hardware_version",
                 "hardwareVersion",
-                "hardware_sku",
-                "part_num",
-                "part_number",
-                "sku_id",
             )
             if hw_version:
                 return hw_version
@@ -724,10 +735,6 @@ class InventoryView:
                 "hw_version",
                 "hardware_version",
                 "hardwareVersion",
-                "hardware_sku",
-                "part_num",
-                "part_number",
-                "sku_id",
             )
             if hw_version:
                 return hw_version
@@ -736,10 +743,6 @@ class InventoryView:
                 "hw_version",
                 "hardware_version",
                 "hardwareVersion",
-                "hardware_sku",
-                "part_num",
-                "part_number",
-                "sku_id",
             )
         if normalized in ("microinverter", "encharge", "iqevse", "generator"):
             return self._type_member_single_value(
@@ -747,9 +750,6 @@ class InventoryView:
                 "hw_version",
                 "hardware_version",
                 "hardwareVersion",
-                "part_num",
-                "part_number",
-                "sku_id",
             )
         return None
 
@@ -772,6 +772,7 @@ class InventoryView:
             "manufacturer": "Enphase",
             "model": model,
             "name": name,
+            "configuration_url": _site_configuration_url(self.site_id),
         }
         serial_number = self.type_device_serial_number(type_key)
         if serial_number:

@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Capacitate totală a invertoarelor"
+      },
+      "account_access": {
+        "name": "Accesul contului",
+        "state": {
+          "administrator": "Administrator de cont",
+          "installer": "Instalator",
+          "owner": "Proprietar",
+          "host": "Gazdă",
+          "consumption_data": "Date de consum",
+          "viewer": "Observator"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Administrator de cont"
+          },
+          "installer": {
+            "name": "Instalator"
+          },
+          "owner": {
+            "name": "Proprietar"
+          },
+          "host": {
+            "name": "Gazdă"
+          },
+          "consumption_data": {
+            "name": "Date de consum"
+          },
+          "viewer": {
+            "name": "Observator"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Informații despre amplasament",
+        "state_attributes": {
+          "site_id": {
+            "name": "ID amplasament"
+          },
+          "timezone": {
+            "name": "Fus orar"
+          },
+          "country": {
+            "name": "Țară"
+          },
+          "currency": {
+            "name": "Monedă"
+          }
+        }
       }
     },
     "number": {

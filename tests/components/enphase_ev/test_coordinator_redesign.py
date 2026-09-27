@@ -300,6 +300,10 @@ class _RefreshOwner:
         self.evse_feature_flags_runtime = SimpleNamespace(
             refresh_due=lambda: True,
         )
+        self.cloud_metadata_runtime = SimpleNamespace(
+            refresh_due=lambda: False,
+            async_refresh=lambda: self._record("cloud_metadata"),
+        )
         self.system_events_runtime = SimpleNamespace(
             refresh_due=lambda: True,
             async_refresh=lambda: self._record("system_events"),
@@ -479,6 +483,7 @@ def test_followup_refresh_stage_binds_zero_arg_calls() -> None:
 
     assert bound.defer_topology is True
     assert [call[0] for call in bound.parallel_calls] == [
+        "cloud_metadata_s",
         "system_events_s",
         "vpp_s",
         "battery_site_settings_s",
@@ -500,10 +505,10 @@ def test_followup_refresh_stage_binds_zero_arg_calls() -> None:
         "devices_inventory_s",
         "hems_devices_s",
     ]
-    assert bound.parallel_calls[1][2]() == "vpp"
-    assert bound.parallel_calls[2][2]() == "site-settings"
+    assert bound.parallel_calls[2][2]() == "vpp"
+    assert bound.parallel_calls[3][2]() == "site-settings"
     assert bound.ordered_calls[-1][2]() == "hems-devices"
-    assert bound.parallel_calls[2][3] == "battery_site_settings"
+    assert bound.parallel_calls[3][3] == "battery_site_settings"
     assert bound.ordered_calls[-1][3] == "inventory_topology"
     assert owner.calls == ["vpp", "battery_site_settings", "hems_devices"]
 
@@ -532,10 +537,10 @@ def test_refresh_plans_bind_dynamic_followup_and_warmup_calls() -> None:
         "energy",
     ]
     assert bound_warmup.stages[0].parallel_calls[0][2]() == "warmup-summary"
-    assert bound_warmup.stages[1].parallel_calls[0][0] == "system_events_s"
-    assert bound_warmup.stages[1].parallel_calls[0][2]() == "system_events"
-    assert bound_warmup.stages[1].parallel_calls[1][0] == "system_event_history_s"
-    assert bound_warmup.stages[1].parallel_calls[1][2]() == "system_event_history"
+    assert bound_warmup.stages[1].parallel_calls[0][0] == "cloud_metadata_s"
+    assert bound_warmup.stages[1].parallel_calls[0][2]() == "cloud_metadata"
+    assert bound_warmup.stages[1].parallel_calls[2][0] == "system_event_history_s"
+    assert bound_warmup.stages[1].parallel_calls[2][2]() == "system_event_history"
     assert "tariff_s" in [call[0] for call in bound_warmup.stages[1].parallel_calls]
     assert bound_warmup.stages[2].ordered_calls[0][2]() == "heatpump-runtime"
     assert bound_warmup.stages[3].parallel_calls[0][2]() == "warmup-site-energy"
@@ -924,7 +929,7 @@ async def test_coordinator_refresh_plan_runner_executes_each_stage(
     await coord.refresh_runner.async_run_refresh_plan({}, plan=FOLLOWUP_PLAN)
 
     assert seen == [
-        (None, True, 14, 3),
+        (None, True, 15, 3),
     ]
 
 

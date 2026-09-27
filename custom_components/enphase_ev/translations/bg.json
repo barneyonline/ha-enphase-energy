@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Обща мощност на инверторите"
+      },
+      "account_access": {
+        "name": "Достъп на акаунта",
+        "state": {
+          "administrator": "Администратор",
+          "installer": "Инсталатор",
+          "owner": "Собственик",
+          "host": "Домакин",
+          "consumption_data": "Данни за потреблението",
+          "viewer": "Наблюдател"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Администратор"
+          },
+          "installer": {
+            "name": "Инсталатор"
+          },
+          "owner": {
+            "name": "Собственик"
+          },
+          "host": {
+            "name": "Домакин"
+          },
+          "consumption_data": {
+            "name": "Данни за потреблението"
+          },
+          "viewer": {
+            "name": "Наблюдател"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Информация за обекта",
+        "state_attributes": {
+          "site_id": {
+            "name": "Идентификатор на обекта"
+          },
+          "timezone": {
+            "name": "Часова зона"
+          },
+          "country": {
+            "name": "Държава"
+          },
+          "currency": {
+            "name": "Валута"
+          }
+        }
       }
     },
     "number": {

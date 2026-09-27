@@ -1561,3 +1561,17 @@ async def array_panel_ratings(self: EnphaseEVClient) -> dict[str, float | None]:
     parser = PanelRatingsParser()
     parser.feed(html)
     return parser.ratings
+
+
+async def site_bootstrap(self: EnphaseEVClient) -> JsonDict:
+    """Read site context; callers must discard personal bootstrap fields."""
+    data = await self._json(
+        "GET",
+        f"{BASE_URL}/app-api/{self._site}/data.json?app=1&device_status=non_retired&is_mobile=0",
+        headers=self._system_dashboard_headers,
+        allow_reauth=False,
+    )
+
+    if not isinstance(data, dict):
+        raise ValueError("Invalid site bootstrap response")
+    return dict(data)

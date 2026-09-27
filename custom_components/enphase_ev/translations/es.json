@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Capacidad total de los microinversores"
+      },
+      "account_access": {
+        "name": "Acceso de la cuenta",
+        "state": {
+          "administrator": "Administrador",
+          "installer": "Instalador",
+          "owner": "Propietario",
+          "host": "Anfitrión",
+          "consumption_data": "Datos de consumo",
+          "viewer": "Observador"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Administrador"
+          },
+          "installer": {
+            "name": "Instalador"
+          },
+          "owner": {
+            "name": "Propietario"
+          },
+          "host": {
+            "name": "Anfitrión"
+          },
+          "consumption_data": {
+            "name": "Datos de consumo"
+          },
+          "viewer": {
+            "name": "Observador"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Información de la instalación",
+        "state_attributes": {
+          "site_id": {
+            "name": "ID de instalación"
+          },
+          "timezone": {
+            "name": "Zona horaria"
+          },
+          "country": {
+            "name": "País"
+          },
+          "currency": {
+            "name": "Moneda"
+          }
+        }
       }
     },
     "number": {

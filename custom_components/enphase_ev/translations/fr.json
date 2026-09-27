@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Puissance totale des micro-onduleurs"
+      },
+      "account_access": {
+        "name": "Accès du compte",
+        "state": {
+          "administrator": "Administrateur",
+          "installer": "Installateur",
+          "owner": "Propriétaire",
+          "host": "Hôte",
+          "consumption_data": "Données de consommation",
+          "viewer": "Observateur"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Administrateur"
+          },
+          "installer": {
+            "name": "Installateur"
+          },
+          "owner": {
+            "name": "Propriétaire"
+          },
+          "host": {
+            "name": "Hôte"
+          },
+          "consumption_data": {
+            "name": "Données de consommation"
+          },
+          "viewer": {
+            "name": "Observateur"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Informations du site",
+        "state_attributes": {
+          "site_id": {
+            "name": "Identifiant du site"
+          },
+          "timezone": {
+            "name": "Fuseau horaire"
+          },
+          "country": {
+            "name": "Pays"
+          },
+          "currency": {
+            "name": "Devise"
+          }
+        }
       }
     },
     "number": {

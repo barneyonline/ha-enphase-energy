@@ -252,7 +252,7 @@ def test_inventory_runtime_summary_and_inverter_helper_paths(
 
     info = coord.inventory_view.type_device_info("microinverter")
     assert info is not None
-    assert info["hw_version"] == "IQ7A-SKU"
+    assert "hw_version" not in info
     assert info.get("model_id") is None
     assert coord.inventory_view.type_device_model_id("microinverter") is None
     assert coord.inventory_view.type_device_model(None) is None

@@ -180,6 +180,7 @@ class RefreshHealthState:
 class InventoryState:
     array_capacity: dict[str, Any] = field(default_factory=dict)
     array_capacity_next_refresh: float = 0.0
+    cloud_metadata: dict[str, object] = field(default_factory=dict)
     _gateway_today_connections: dict[str, dict[str, bool]] = field(default_factory=dict)
     _inverters_inventory_cache_until: float | None = None
     _devices_inventory_cache_until: float | None = None

@@ -277,6 +277,7 @@ def _migrate_cloud_entities_to_cloud_device(
         manufacturer="Enphase",
         name="Enphase Cloud",
         model=cloud_model,
+        configuration_url=cloud_info.get("configuration_url"),
         sw_version=cloud_sw_version,
         entry_type=getattr(getattr(dr, "DeviceEntryType", None), "SERVICE", None),
     )

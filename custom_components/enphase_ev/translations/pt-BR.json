@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Capacidade total dos inversores"
+      },
+      "account_access": {
+        "name": "Acesso da conta",
+        "state": {
+          "administrator": "Administrador",
+          "installer": "Instalador",
+          "owner": "Proprietário",
+          "host": "Anfitrião",
+          "consumption_data": "Dados de consumo",
+          "viewer": "Observador"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Administrador"
+          },
+          "installer": {
+            "name": "Instalador"
+          },
+          "owner": {
+            "name": "Proprietário"
+          },
+          "host": {
+            "name": "Anfitrião"
+          },
+          "consumption_data": {
+            "name": "Dados de consumo"
+          },
+          "viewer": {
+            "name": "Observador"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Informações do local",
+        "state_attributes": {
+          "site_id": {
+            "name": "ID do local"
+          },
+          "timezone": {
+            "name": "Fuso horário"
+          },
+          "country": {
+            "name": "País"
+          },
+          "currency": {
+            "name": "Moeda"
+          }
+        }
       }
     },
     "number": {

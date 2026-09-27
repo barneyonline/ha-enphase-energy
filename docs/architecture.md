@@ -180,6 +180,7 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
 
 - `battery_runtime.py` handles BatteryConfig controls, profile state, schedules, pending writes, and battery diagnostics payloads.
 - `evse_runtime.py` handles charger commands, fast polling, streaming, charge-mode cache, auth settings, and EVSE control side effects.
+- `cloud_metadata.py` reads optional bootstrap and site-summary metadata during warmup and normal follow-up refreshes. It retains only timezone, site country/currency, and complete boolean access flags in `InventoryState`, so metadata changes participate in snapshot equality. Reads cannot trigger reauthentication, retry after 15 minutes on incomplete responses, and refresh after six hours on success. Account identities are compared only to determine ownership and are not retained.
 - `inventory_runtime.py` handles topology, type buckets, HEMS inventory, and system-dashboard payloads.
   Its inverter refresh uses `array_capacity.py` for optional six-hour nameplate
   metadata reads. Only normalized per-array capacities enter `InventoryState`;

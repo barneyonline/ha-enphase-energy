@@ -777,7 +777,8 @@ async def test_async_setup_entry_updates_existing_device(
     assert updated is not None
     assert updated.name == "Garage Charger"
     assert updated.manufacturer == "Enphase"
-    assert updated.model == "Garage Charger (IQ EVSE)"
+    assert updated.model == "Garage Charger"
+    assert updated.model_id == "ignored"
     assert updated.hw_version == "321"
     assert updated.sw_version == "654"
     ev_type_device = get_device_by_identifier(
@@ -4253,7 +4254,8 @@ def test_sync_charger_devices_dedupes_extended_evse_model_display(config_entry) 
     )
     assert charger is not None
     assert charger.name == "IQ EV Charger (IQ-EVSE-EU-3032)"
-    assert charger.model == "IQ EV Charger (IQ-EVSE-EU-3032)"
+    assert charger.model == "IQ EV Charger"
+    assert charger.model_id == "IQ-EVSE-EU-3032-0105-1300"
 
 
 def test_remove_evse_type_device_and_entities_handles_guard_paths(

@@ -2373,6 +2373,10 @@ class EnphaseEVClient(MqttStreamSurface):
             gs_base_url=GS_BASE_URL,
         )
 
+    async def site_bootstrap(self) -> JsonDict:
+        """Return optional site bootstrap metadata."""
+        return await api_dashboard_surface.site_bootstrap(self)
+
     async def system_dashboard_summary(
         self, *, allow_reauth: bool = True
     ) -> JsonDict | None:

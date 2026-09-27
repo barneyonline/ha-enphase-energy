@@ -24,6 +24,8 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 >
 > The integration relies on undocumented Enphase APIs. Those APIs may change or stop working without notice, which can break features until the integration is updated.
 
+IQ Battery, microinverter, and EV charger device models use friendly names when available. The Device info card shows a shared SKU in brackets, matching IQ Gateway presentation; mixed models use a summary. Hardware is shown only when a hardware revision is reported, rather than repeating the SKU. Grouped devices retain full firmware versions with counts when versions differ, and omit a single serial number when members have different serials. Device and cloud service cards link to the site in Enlighten.
+
 ## Supported device categories
 
 - IQ Gateway / System Controller entities and controls
@@ -36,6 +38,13 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 Legacy AC Battery devices are no longer supported. Upgrading removes their sensors,
 sleep controls, and empty AC Battery device record. An AC-Battery-only selection
 does not enable other device categories on upgrade. IQ Battery support is unchanged.
+
+Enphase Cloud includes two diagnostic sensors:
+
+- **Site information** uses the site ID as its state and exposes site ID, timezone, country, and currency as attributes. Country and currency come from the installation summary, not the account profile.
+- **Account access** summarizes the highest observed role using this display priority: Administrator, Installer, Owner, Host, Consumption data, then Viewer. Its attributes expose each role as a boolean. This is descriptive account information, not a guarantee that every API operation is authorized. Viewer means no elevated role was reported; it is not a separate Enphase role flag. Missing or failed access metadata makes the sensor unavailable rather than reporting false permissions.
+
+Metadata refreshes every six hours, with a 15-minute retry interval for missing or failed responses. A manual integration refresh bypasses these intervals. Raw account identifiers and personal details are discarded. The Service info card no longer displays the integration version; the integration page continues to show it.
 
 ## Key features
 

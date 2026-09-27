@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Invertoru kopējā jauda"
+      },
+      "account_access": {
+        "name": "Konta piekļuve",
+        "state": {
+          "administrator": "Administrators",
+          "installer": "Uzstādītājs",
+          "owner": "Īpašnieks",
+          "host": "Saimnieks",
+          "consumption_data": "Patēriņa dati",
+          "viewer": "Skatītājs"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Administrators"
+          },
+          "installer": {
+            "name": "Uzstādītājs"
+          },
+          "owner": {
+            "name": "Īpašnieks"
+          },
+          "host": {
+            "name": "Saimnieks"
+          },
+          "consumption_data": {
+            "name": "Patēriņa dati"
+          },
+          "viewer": {
+            "name": "Skatītājs"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Objekta informācija",
+        "state_attributes": {
+          "site_id": {
+            "name": "Objekta ID"
+          },
+          "timezone": {
+            "name": "Laika josla"
+          },
+          "country": {
+            "name": "Valsts"
+          },
+          "currency": {
+            "name": "Valūta"
+          }
+        }
       }
     },
     "number": {

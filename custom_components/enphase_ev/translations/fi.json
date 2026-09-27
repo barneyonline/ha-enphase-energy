@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Invertterien kokonaiskapasiteetti"
+      },
+      "account_access": {
+        "name": "Tilin käyttöoikeudet",
+        "state": {
+          "administrator": "Ylläpitäjä",
+          "installer": "Asentaja",
+          "owner": "Omistaja",
+          "host": "Isäntä",
+          "consumption_data": "Kulutustiedot",
+          "viewer": "Katselija"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Ylläpitäjä"
+          },
+          "installer": {
+            "name": "Asentaja"
+          },
+          "owner": {
+            "name": "Omistaja"
+          },
+          "host": {
+            "name": "Isäntä"
+          },
+          "consumption_data": {
+            "name": "Kulutustiedot"
+          },
+          "viewer": {
+            "name": "Katselija"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Laitoksen tiedot",
+        "state_attributes": {
+          "site_id": {
+            "name": "Laitoksen tunnus"
+          },
+          "timezone": {
+            "name": "Aikavyöhyke"
+          },
+          "country": {
+            "name": "Maa"
+          },
+          "currency": {
+            "name": "Valuutta"
+          }
+        }
       }
     },
     "number": {

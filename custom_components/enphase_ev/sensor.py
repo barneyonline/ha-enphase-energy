@@ -74,6 +74,10 @@ from .scalar_helpers import (
 )
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
 from .sensor_snapshot_helpers import restore_power_w
+from .sensor_cloud_metadata import (
+    EnphaseAccountAccessSensor,
+    EnphaseSiteInformationSensor,
+)
 from .sensor_base import EnphaseSiteSensorEntity as _SiteBaseEntity
 from .sensor_battery import (
     BATTERY_LED_STATUS_STATE_MAP as BATTERY_LED_STATUS_STATE_MAP,
@@ -490,6 +494,8 @@ async def async_setup_entry(
 
         _add_site_entity("site_last_update", EnphaseSiteLastUpdateSensor(coord))
         _add_site_entity("site_cloud_latency", EnphaseCloudLatencySensor(coord))
+        _add_site_entity("site_information", EnphaseSiteInformationSensor(coord))
+        _add_site_entity("account_access", EnphaseAccountAccessSensor(coord))
         for counter_key, translation_key, state_attr in (
             (
                 "auth_refresh_attempts",

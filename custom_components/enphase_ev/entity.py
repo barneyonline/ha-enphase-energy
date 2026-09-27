@@ -15,11 +15,13 @@ from .scalar_helpers import coerce_snapshot_bool
 from .coordinator import EnphaseCoordinator
 from .device_info_helpers import (
     _compose_charger_model_display,
+    _site_configuration_url,
     _is_redundant_model_id,
     _normalize_evse_display_name,
     _normalize_evse_model_name,
 )
 from .log_redaction import redact_identifier, redact_text
+from .runtime_helpers import coerce_optional_text as _clean_text
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -193,11 +195,12 @@ class EnphaseBaseEntity(
             "manufacturer": "Enphase",
             "name": dev_name,
             "serial_number": str(self._sn),
+            "configuration_url": _site_configuration_url(self._coord.site_id),
         }
         # Optional enrichment when available
         if model_display:
             info_kwargs["model"] = model_display
-        model_id_value = d.get("model_id")
+        model_id_value = _clean_text(d.get("model_id") or model_name_raw)
         if model_id_value and not _is_redundant_model_id(
             info_kwargs.get("model"), model_id_value
         ):

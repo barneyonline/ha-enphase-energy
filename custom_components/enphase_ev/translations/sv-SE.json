@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Total växelriktarkapacitet"
+      },
+      "account_access": {
+        "name": "Kontoåtkomst",
+        "state": {
+          "administrator": "Administratör",
+          "installer": "Installatör",
+          "owner": "Ägare",
+          "host": "Värd",
+          "consumption_data": "Förbrukningsdata",
+          "viewer": "Läsbehörighet"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Administratör"
+          },
+          "installer": {
+            "name": "Installatör"
+          },
+          "owner": {
+            "name": "Ägare"
+          },
+          "host": {
+            "name": "Värd"
+          },
+          "consumption_data": {
+            "name": "Förbrukningsdata"
+          },
+          "viewer": {
+            "name": "Läsbehörighet"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Anläggningsinformation",
+        "state_attributes": {
+          "site_id": {
+            "name": "Anläggnings-ID"
+          },
+          "timezone": {
+            "name": "Tidszon"
+          },
+          "country": {
+            "name": "Land"
+          },
+          "currency": {
+            "name": "Valuta"
+          }
+        }
       }
     },
     "number": {

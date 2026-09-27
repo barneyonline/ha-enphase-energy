@@ -221,6 +221,7 @@ from .refresh_plan import (
 from .refresh_runner import RefreshRunner
 from .tariff import TARIFF_SUCCESS_TTL_S, TariffRuntime
 from .service_validation import raise_translated_service_validation
+from .cloud_metadata import CloudMetadataRuntime
 from .feature_snapshot import capture_feature_snapshot
 from .scalar_helpers import (
     coerce_snapshot_bool,
@@ -1098,6 +1099,7 @@ class EnphaseCoordinator(
         self._ensure_coordinator_runtime("tariff_runtime")
         self._ensure_coordinator_runtime("system_events_runtime")
         self._ensure_coordinator_runtime("vpp_runtime")
+        self.cloud_metadata_runtime = CloudMetadataRuntime(self)
         self.inventory_runtime = InventoryRuntime(self, state=self.inventory_state)
         self.discovery_snapshot = DiscoverySnapshotManager(self)
         self.inventory_view = InventoryView(self)

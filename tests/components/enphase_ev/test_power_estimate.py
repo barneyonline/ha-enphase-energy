@@ -111,6 +111,12 @@ async def test_missing_report_time_does_not_synthesize_sampled_at_utc(
     coord = EnphaseCoordinator(hass, cfg, config_entry=DummyEntry())
 
     class StubClient:
+        async def site_bootstrap(self):
+            return {}
+
+        async def system_dashboard_summary(self, **kwargs):
+            return {}
+
         def __init__(self, payloads):
             self._payloads = list(payloads)
 
@@ -192,6 +198,12 @@ async def test_missing_lifetime_consumption_preserves_previous_evse_baseline(
     coord = EnphaseCoordinator(hass, cfg, config_entry=DummyEntry())
 
     class StubClient:
+        async def site_bootstrap(self):
+            return {}
+
+        async def system_dashboard_summary(self, **kwargs):
+            return {}
+
         def __init__(self, payloads):
             self._payloads = list(payloads)
 
@@ -290,6 +302,12 @@ async def test_same_sample_timestamp_still_drops_power_when_charging_stops(
     coord = EnphaseCoordinator(hass, cfg, config_entry=DummyEntry())
 
     class StubClient:
+        async def site_bootstrap(self):
+            return {}
+
+        async def system_dashboard_summary(self, **kwargs):
+            return {}
+
         def __init__(self, payloads):
             self._payloads = list(payloads)
 
@@ -383,6 +401,12 @@ async def test_suspended_ev_status_zeroes_power_and_charging(hass, monkeypatch):
     coord = EnphaseCoordinator(hass, cfg, config_entry=DummyEntry())
 
     class StubClient:
+        async def site_bootstrap(self):
+            return {}
+
+        async def system_dashboard_summary(self, **kwargs):
+            return {}
+
         def __init__(self, payloads):
             self._payloads = list(payloads)
 
@@ -483,6 +507,12 @@ async def test_power_snapshot_reseeds_when_charging_resumes(hass, monkeypatch):
     coord = EnphaseCoordinator(hass, cfg, config_entry=DummyEntry())
 
     class StubClient:
+        async def site_bootstrap(self):
+            return {}
+
+        async def system_dashboard_summary(self, **kwargs):
+            return {}
+
         def __init__(self, payloads):
             self._payloads = list(payloads)
 

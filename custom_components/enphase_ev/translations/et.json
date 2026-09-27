@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Inverterite koguvõimsus"
+      },
+      "account_access": {
+        "name": "Konto juurdepääs",
+        "state": {
+          "administrator": "Administraator",
+          "installer": "Paigaldaja",
+          "owner": "Omanik",
+          "host": "Võõrustaja",
+          "consumption_data": "Tarbimisandmed",
+          "viewer": "Vaataja"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Administraator"
+          },
+          "installer": {
+            "name": "Paigaldaja"
+          },
+          "owner": {
+            "name": "Omanik"
+          },
+          "host": {
+            "name": "Võõrustaja"
+          },
+          "consumption_data": {
+            "name": "Tarbimisandmed"
+          },
+          "viewer": {
+            "name": "Vaataja"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Paigaldise teave",
+        "state_attributes": {
+          "site_id": {
+            "name": "Paigaldise ID"
+          },
+          "timezone": {
+            "name": "Ajavöönd"
+          },
+          "country": {
+            "name": "Riik"
+          },
+          "currency": {
+            "name": "Valuuta"
+          }
+        }
       }
     },
     "number": {

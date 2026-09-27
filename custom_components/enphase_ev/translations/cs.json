@@ -2159,6 +2159,54 @@
       },
       "total_inverter_capacity": {
         "name": "Celkový výkon střídačů"
+      },
+      "account_access": {
+        "name": "Přístup účtu",
+        "state": {
+          "administrator": "Správce",
+          "installer": "Instalační technik",
+          "owner": "Vlastník",
+          "host": "Hostitel",
+          "consumption_data": "Údaje o spotřebě",
+          "viewer": "Pozorovatel"
+        },
+        "state_attributes": {
+          "administrator": {
+            "name": "Správce"
+          },
+          "installer": {
+            "name": "Instalační technik"
+          },
+          "owner": {
+            "name": "Vlastník"
+          },
+          "host": {
+            "name": "Hostitel"
+          },
+          "consumption_data": {
+            "name": "Údaje o spotřebě"
+          },
+          "viewer": {
+            "name": "Pozorovatel"
+          }
+        }
+      },
+      "site_information": {
+        "name": "Informace o lokalitě",
+        "state_attributes": {
+          "site_id": {
+            "name": "ID lokality"
+          },
+          "timezone": {
+            "name": "Časové pásmo"
+          },
+          "country": {
+            "name": "Země"
+          },
+          "currency": {
+            "name": "Měna"
+          }
+        }
       }
     },
     "number": {

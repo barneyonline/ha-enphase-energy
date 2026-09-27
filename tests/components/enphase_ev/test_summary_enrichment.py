@@ -82,6 +82,12 @@ async def test_summary_v2_enrichment(hass, monkeypatch):
     ]
 
     class StubClient:
+        async def site_bootstrap(self):
+            return {}
+
+        async def system_dashboard_summary(self, **kwargs):
+            return {}
+
         async def status(self):
             return status_payload
 
