@@ -40,11 +40,14 @@ def test_cloud_latency_sensor_value():
     assert s.native_value == 123
 
 
-def test_current_power_consumption_sensor_value_and_attributes():
+def test_current_power_consumption_sensor_value_and_attributes(monkeypatch):
     from custom_components.enphase_ev.sensor import EnphaseCurrentPowerConsumptionSensor
 
+    monkeypatch.setattr(
+        dt_util, "utcnow", lambda: datetime(2026, 3, 11, 5, 40, 10, tzinfo=timezone.utc)
+    )
     coord = _make_site_coord()
-    coord.last_success_utc = datetime(2026, 3, 11, 5, 41, tzinfo=timezone.utc)
+    coord.last_success_utc = datetime(2026, 3, 11, 5, 40, 10, tzinfo=timezone.utc)
     coord._current_power_consumption_w = 752.0
     coord._current_power_consumption_sample_utc = datetime(
         2026, 3, 11, 5, 40, tzinfo=timezone.utc
@@ -179,7 +182,7 @@ def test_current_power_consumption_sensor_expires_stale_cached_sample(monkeypatc
 
     assert sensor.available is True
 
-    stale_now = now + timedelta(seconds=6)
+    stale_now = now + timedelta(seconds=886)
     coord.last_success_utc = stale_now
     monkeypatch.setattr(sensor_mod.dt_util, "utcnow", lambda: stale_now)
 
@@ -199,7 +202,7 @@ def test_current_power_consumption_sensor_freshness_fallback_paths(monkeypatch):
     monkeypatch.setattr(sensor_mod.dt_util, "utcnow", lambda: now)
 
     sensor = EnphaseCurrentPowerConsumptionSensor(coord)
-    assert sensor._cache_ttl() == timedelta(minutes=2)  # noqa: SLF001
+    assert sensor._cache_ttl() == timedelta(minutes=15)  # noqa: SLF001
     assert sensor._freshness_reference_utc() == now  # noqa: SLF001
 
     sensor._last_good_value = 1.0  # noqa: SLF001
@@ -341,7 +344,7 @@ async def test_current_power_consumption_sensor_discards_extreme_restored_state(
 
 
 @pytest.mark.asyncio
-async def test_current_power_consumption_sensor_restore_prefers_cached_at_freshness(
+async def test_current_power_consumption_sensor_restore_bounds_freshness_by_source(
     monkeypatch,
 ) -> None:
     from custom_components.enphase_ev.sensor import EnphaseCurrentPowerConsumptionSensor
@@ -371,7 +374,7 @@ async def test_current_power_consumption_sensor_restore_prefers_cached_at_freshn
             (),
             {
                 "attributes": {
-                    "sampled_at_utc": "2026-03-11T05:35:00+00:00",
+                    "sampled_at_utc": "2026-03-11T05:20:00+00:00",
                     "cached_at_utc": "2026-03-11T05:40:45+00:00",
                     "source": "app-api:get_latest_power",
                     "reported_units": "W",
@@ -383,16 +386,8 @@ async def test_current_power_consumption_sensor_restore_prefers_cached_at_freshn
 
     await sensor.async_added_to_hass()
 
-    assert sensor.available is True
-    assert sensor.native_value == 752
-    assert sensor.extra_state_attributes == {
-        "sampled_at_utc": "2026-03-11T05:35:00+00:00",
-        "cached_at_utc": "2026-03-11T05:40:45+00:00",
-        "source": "app-api:get_latest_power",
-        "reported_units": "W",
-        "reported_precision": 0,
-        "using_stale": False,
-    }
+    assert sensor.available is False
+    assert sensor.native_value is None
 
 
 def test_site_cloud_reachable_binary_sensor_states():

@@ -167,6 +167,10 @@ class ScheduleSync:
                     len(pending),
                 )
 
+    def _lifecycle_active(self, generation: int) -> bool:
+        """Reject work resumed after stop, including an intervening restart."""
+        return not self._stopping and generation == self._lifecycle_generation
+
     def diagnostics(self) -> dict[str, Any]:
         return {
             "enabled": self._sync_enabled(),
@@ -213,12 +217,17 @@ class ScheduleSync:
 
     @callback
     def _schedule_post_patch_refresh(self, sn: str) -> None:
+        if self._stopping:
+            return
+        generation = self._lifecycle_generation
         if sn in self._pending_patch_refresh:
             return
         self._pending_patch_refresh.add(sn)
 
         @callback
         def _run(_now: datetime) -> None:
+            if not self._lifecycle_active(generation):
+                return
             self._pending_patch_refresh_cancels.pop(sn, None)
             coro = self.async_refresh(reason="patch", serials=[sn])
             try:
@@ -412,23 +421,26 @@ class ScheduleSync:
 
     async def async_set_slot_enabled(
         self, sn: str, slot_id: str, enabled: bool
-    ) -> None:
+    ) -> bool:
+        if self._stopping:
+            return False
+        generation = self._lifecycle_generation
         if not self._sync_enabled():
-            return
+            return False
         if self._scheduler_backoff_active():
             self._last_status = "scheduler_unavailable"
             self._last_error = getattr(self._coordinator, "scheduler_last_error", None)
-            return
+            return False
         slot = self._slot_cache.get(sn, {}).get(slot_id)
         if not slot:
-            return
+            return False
         schedule_type = str(slot.get("scheduleType") or "")
         if schedule_type == "OFF_PEAK" and not self.is_off_peak_eligible(sn):
             _LOGGER.debug(
                 "Skipping OFF_PEAK toggle for %s: not eligible for off-peak schedules",
                 redact_identifier(sn),
             )
-            return
+            return False
         slot_states: dict[str, bool] = {}
         for cached_id, cached_slot in self._slot_cache.get(sn, {}).items():
             desired = bool(cached_slot.get("enabled", True))
@@ -436,16 +448,22 @@ class ScheduleSync:
                 desired = bool(enabled)
             slot_states[str(cached_id)] = desired
         if not slot_states:
-            return
+            return False
         try:
             response = await self._coordinator.client.patch_schedule_states(
                 sn, slot_states=slot_states
             )
+            if not self._lifecycle_active(generation):
+                return True
             self._mark_scheduler_available()
         except EnphaseLoginWallUnauthorized as err:
+            if not self._lifecycle_active(generation):
+                return False
             self._note_login_wall_unauthorized(err)
-            return
+            return False
         except SchedulerUnavailable as err:
+            if not self._lifecycle_active(generation):
+                return False
             self._last_error = redact_text(
                 err,
                 site_ids=(getattr(self._coordinator, "site_id", None),),
@@ -453,8 +471,10 @@ class ScheduleSync:
             )
             self._last_status = "scheduler_unavailable"
             self._note_scheduler_unavailable(err)
-            return
+            return False
         except Exception as err:  # noqa: BLE001
+            if not self._lifecycle_active(generation):
+                return False
             _LOGGER.warning(
                 "Schedule state PATCH failed for %s: %s",
                 redact_identifier(sn),
@@ -464,7 +484,7 @@ class ScheduleSync:
                     identifiers=(sn,),
                 ),
             )
-            return
+            return False
         for cached_id, desired in slot_states.items():
             updated_slot = self._slot_cache.get(sn, {}).get(cached_id)
             if updated_slot is not None:
@@ -507,6 +527,7 @@ class ScheduleSync:
         if needs_refresh:
             self._schedule_post_patch_refresh(sn)
         self._notify_listeners()
+        return True
 
     @callback
     def _handle_interval(self, *_args: object) -> None:
@@ -567,6 +588,9 @@ class ScheduleSync:
     async def _async_refresh_impl(
         self, *, reason: str, serials: Iterable[str] | None
     ) -> None:
+        if self._stopping:
+            return
+        generation = self._lifecycle_generation
         if not self._sync_enabled():
             self._last_status = "disabled"
             await self._disable_support()
@@ -608,6 +632,8 @@ class ScheduleSync:
                                 name=f"{DOMAIN}_schedule_fetch_{redact_identifier(sn)}",
                             )
                         )
+                if not self._lifecycle_active(generation):
+                    return
                 results = [task.result() for task in tasks]
                 auth_result = next(
                     (
@@ -631,24 +657,33 @@ class ScheduleSync:
 
     async def _patch_slot(
         self, sn: str, slot_id: str, slot_patch: dict[str, Any]
-    ) -> None:
+    ) -> bool:
+        if self._stopping:
+            return False
+        generation = self._lifecycle_generation
         if slot_id not in self._slot_cache.get(sn, {}):
-            return
+            return False
         if self._scheduler_backoff_active():
             self._last_status = "scheduler_unavailable"
             self._last_error = getattr(self._coordinator, "scheduler_last_error", None)
-            return
+            return False
         try:
             slot_patch = normalize_slot_payload(slot_patch)
             slot_patch["id"] = str(slot_id)
             response = await self._coordinator.client.patch_schedule(
                 sn, slot_id, slot_patch
             )
+            if not self._lifecycle_active(generation):
+                return True
             self._mark_scheduler_available()
         except EnphaseLoginWallUnauthorized as err:
+            if not self._lifecycle_active(generation):
+                return False
             self._note_login_wall_unauthorized(err)
-            return
+            return False
         except SchedulerUnavailable as err:
+            if not self._lifecycle_active(generation):
+                return False
             self._last_error = redact_text(
                 err,
                 site_ids=(getattr(self._coordinator, "site_id", None),),
@@ -656,8 +691,10 @@ class ScheduleSync:
             )
             self._last_status = "scheduler_unavailable"
             self._note_scheduler_unavailable(err)
-            return
+            return False
         except Exception as err:  # noqa: BLE001
+            if not self._lifecycle_active(generation):
+                return False
             _LOGGER.warning(
                 "Schedule PATCH failed for %s: %s",
                 redact_identifier(sn),
@@ -667,7 +704,7 @@ class ScheduleSync:
                     identifiers=(sn,),
                 ),
             )
-            return
+            return False
         new_timestamp = None
         if isinstance(response, dict):
             meta = response.get("meta")
@@ -683,8 +720,12 @@ class ScheduleSync:
         self._slot_cache.setdefault(sn, {})[slot_id] = slot_patch
         self._schedule_post_patch_refresh(sn)
         self._notify_listeners()
+        return True
 
     async def _create_slot(self, sn: str, slot: dict[str, Any]) -> bool:
+        if self._stopping:
+            return False
+        generation = self._lifecycle_generation
         if self._scheduler_backoff_active():
             self._last_status = "scheduler_unavailable"
             self._last_error = getattr(self._coordinator, "scheduler_last_error", None)
@@ -692,8 +733,17 @@ class ScheduleSync:
         slot_payload = normalize_slot_payload(slot)
         try:
             response = await self._coordinator.client.create_schedule(sn, slot_payload)
+            if not self._lifecycle_active(generation):
+                return True
             self._mark_scheduler_available()
+        except EnphaseLoginWallUnauthorized as err:
+            if not self._lifecycle_active(generation):
+                return False
+            self._note_login_wall_unauthorized(err)
+            return False
         except SchedulerUnavailable as err:
+            if not self._lifecycle_active(generation):
+                return False
             self._last_error = redact_text(
                 err,
                 site_ids=(getattr(self._coordinator, "site_id", None),),
@@ -703,6 +753,8 @@ class ScheduleSync:
             self._note_scheduler_unavailable(err)
             return False
         except Exception as err:  # noqa: BLE001
+            if not self._lifecycle_active(generation):
+                return False
             _LOGGER.warning(
                 "Schedule create failed for %s: %s",
                 redact_identifier(sn),
@@ -820,19 +872,24 @@ class ScheduleSync:
     def _default_server_timestamp(self) -> str:
         return cast(str, dt_util.utcnow().isoformat(timespec="milliseconds"))
 
-    async def async_replace_slots(self, sn: str, slots: list[dict[str, Any]]) -> None:
+    async def async_replace_slots(self, sn: str, slots: list[dict[str, Any]]) -> bool:
+        if self._stopping:
+            return False
+        generation = self._lifecycle_generation
         if not self._sync_enabled():
-            return
+            return False
         if self._scheduler_backoff_active():
             self._last_status = "scheduler_unavailable"
             self._last_error = getattr(self._coordinator, "scheduler_last_error", None)
-            return
+            return False
         server_timestamp = self._meta_cache.get(sn)
         if not server_timestamp:
             # Collection writes need the server timestamp as optimistic
             # concurrency metadata.
             await self.async_refresh(reason="replace_prepare", serials=[sn])
             server_timestamp = self._meta_cache.get(sn)
+            if not self._lifecycle_active(generation):
+                return False
         payload_slots: list[dict[str, Any]] = []
         for slot in slots:
             if not isinstance(slot, dict):
@@ -844,8 +901,17 @@ class ScheduleSync:
                 server_timestamp=server_timestamp or self._default_server_timestamp(),
                 slots=payload_slots,
             )
+            if not self._lifecycle_active(generation):
+                return True
             self._mark_scheduler_available()
+        except EnphaseLoginWallUnauthorized as err:
+            if not self._lifecycle_active(generation):
+                return False
+            self._note_login_wall_unauthorized(err)
+            return False
         except SchedulerUnavailable as err:
+            if not self._lifecycle_active(generation):
+                return False
             self._last_error = redact_text(
                 err,
                 site_ids=(getattr(self._coordinator, "site_id", None),),
@@ -853,8 +919,10 @@ class ScheduleSync:
             )
             self._last_status = "scheduler_unavailable"
             self._note_scheduler_unavailable(err)
-            return
+            return False
         except Exception as err:  # noqa: BLE001
+            if not self._lifecycle_active(generation):
+                return False
             _LOGGER.warning(
                 "Schedule collection PATCH failed for %s: %s",
                 redact_identifier(sn),
@@ -864,7 +932,7 @@ class ScheduleSync:
                     identifiers=(sn,),
                 ),
             )
-            return
+            return False
 
         new_timestamp = None
         response_slots: list[dict[str, Any]] | None = None
@@ -898,25 +966,37 @@ class ScheduleSync:
         }
         self._schedule_post_patch_refresh(sn)
         self._notify_listeners()
+        return True
 
     async def async_upsert_slot(self, sn: str, slot: dict[str, Any]) -> bool:
         slot_id = str(slot.get("id") or "")
         if slot_id and slot_id in self._slot_cache.get(sn, {}):
-            await self._patch_slot(sn, slot_id, slot)
-            return True
+            return await self._patch_slot(sn, slot_id, slot)
         return await self._create_slot(sn, slot)
 
-    async def async_delete_slot(self, sn: str, slot_id: str) -> None:
+    async def async_delete_slot(self, sn: str, slot_id: str) -> bool:
+        if self._stopping:
+            return False
+        generation = self._lifecycle_generation
         if slot_id not in self._slot_cache.get(sn, {}):
-            return
+            return False
         if self._scheduler_backoff_active():
             self._last_status = "scheduler_unavailable"
             self._last_error = getattr(self._coordinator, "scheduler_last_error", None)
-            return
+            return False
         try:
             response = await self._coordinator.client.delete_schedule(sn, slot_id)
+            if not self._lifecycle_active(generation):
+                return True
             self._mark_scheduler_available()
+        except EnphaseLoginWallUnauthorized as err:
+            if not self._lifecycle_active(generation):
+                return False
+            self._note_login_wall_unauthorized(err)
+            return False
         except SchedulerUnavailable as err:
+            if not self._lifecycle_active(generation):
+                return False
             self._last_error = redact_text(
                 err,
                 site_ids=(getattr(self._coordinator, "site_id", None),),
@@ -924,8 +1004,10 @@ class ScheduleSync:
             )
             self._last_status = "scheduler_unavailable"
             self._note_scheduler_unavailable(err)
-            return
+            return False
         except Exception as err:  # noqa: BLE001
+            if not self._lifecycle_active(generation):
+                return False
             _LOGGER.warning(
                 "Schedule delete failed for %s: %s",
                 redact_identifier(sn),
@@ -935,7 +1017,7 @@ class ScheduleSync:
                     identifiers=(sn,),
                 ),
             )
-            return
+            return False
 
         new_timestamp = None
         if isinstance(response, dict):
@@ -952,6 +1034,7 @@ class ScheduleSync:
         self._slot_cache.get(sn, {}).pop(slot_id, None)
         self._schedule_post_patch_refresh(sn)
         self._notify_listeners()
+        return True
 
     async def _ensure_storage_collection(self) -> ScheduleStorageCollection | None:
         if self._storage_collection is not None:

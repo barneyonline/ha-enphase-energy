@@ -2120,7 +2120,7 @@ async def test_tariff_runtime_updates_full_structural_payload_and_rates(
     coordinator_factory,
 ) -> None:
     coord = coordinator_factory()
-    coord.client.site_tariff = AsyncMock()
+    coord.client.site_tariff = AsyncMock(return_value={})
     coord.client.site_tariff_update = AsyncMock(return_value={"message": "success"})
     coord.client.notify_tariff_change = AsyncMock(return_value={"data": "ok"})
     coord.tariff_runtime.async_refresh = AsyncMock()
@@ -2164,7 +2164,7 @@ async def test_tariff_runtime_updates_full_structural_payload_and_rates(
         ],
     )
 
-    coord.client.site_tariff.assert_not_awaited()
+    coord.client.site_tariff.assert_awaited_once_with()
     update_payload = coord.client.site_tariff_update.await_args.args[0]
     assert update_payload["purchase"]["seasons"][0]["offPeak"] == "0.05"
     assert payload["purchase"]["seasons"][0]["offPeak"] == "0.03"
@@ -4051,3 +4051,624 @@ async def test_tariff_rate_structure_change_skips_retired_entity_rescan(
     )
     assert new_unique_id not in {entity.unique_id for entity in added}
     assert ent_reg.async_get_entity_id("sensor", DOMAIN, old_unique_id) is not None
+
+
+def _write_test_branch(rate: str) -> dict:
+    return {
+        "typeId": "flat",
+        "typeKind": "single",
+        "seasons": [
+            {
+                "id": "default",
+                "days": [{"id": "all", "periods": [{"id": "flat", "rate": rate}]}],
+            }
+        ],
+    }
+
+
+def test_merge_acknowledged_tariff_preserves_external_changes() -> None:
+    baseline = {"purchase": {"rate": "0.1", "old": True}, "currency": "$", "list": [1]}
+    desired = {"purchase": {"rate": "0.3", "new": True}, "currency": "$", "list": [2]}
+    cloud = {"purchase": {"rate": "0.1", "old": True}, "currency": "AUD", "list": [3]}
+    assert tariff_mod._merge_acknowledged_tariff(baseline, desired, cloud) == {
+        "purchase": {"rate": "0.3", "new": True},
+        "currency": "AUD",
+        "list": [3],
+    }
+
+
+@pytest.mark.asyncio
+async def test_tariff_writes_serialize_and_preserve_lagging_acknowledged_rates(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.tariff_runtime
+    payload = {
+        "purchase": _write_test_branch("0.1"),
+        "buyback": _write_test_branch("0.2"),
+    }
+    coord.client.site_tariff = AsyncMock(return_value=payload)
+    started = asyncio.Event()
+    release = asyncio.Event()
+    writes = []
+
+    async def write(value):
+        writes.append(value)
+        if len(writes) == 1:
+            started.set()
+            await release.wait()
+        return {"message": "success"}
+
+    coord.client.site_tariff_update = AsyncMock(side_effect=write)
+    coord.client.notify_tariff_change = AsyncMock()
+    runtime.async_refresh = AsyncMock()
+    runtime._schedule_post_write_reconciliation = Mock()
+    first = asyncio.create_task(
+        runtime.async_update_tariff(purchase_tariff=_write_test_branch("0.3"))
+    )
+    await asyncio.wait_for(started.wait(), 5)
+    second = asyncio.create_task(
+        runtime.async_update_tariff(buyback_tariff=_write_test_branch("0.4"))
+    )
+    await asyncio.sleep(0)
+    assert coord.client.site_tariff.await_count == 1
+    release.set()
+    await asyncio.gather(first, second)
+    assert (
+        writes[-1]["purchase"]["seasons"][0]["days"][0]["periods"][0]["rate"] == "0.3"
+    )
+    assert writes[-1]["buyback"]["seasons"][0]["days"][0]["periods"][0]["rate"] == "0.4"
+    assert payload["purchase"]["seasons"][0]["days"][0]["periods"][0]["rate"] == "0.1"
+    coord.client.site_tariff.return_value = writes[-1]
+    await runtime.async_update_tariff(purchase_tariff=_write_test_branch("0.5"))
+    assert writes[-1]["buyback"]["seasons"][0]["days"][0]["periods"][0]["rate"] == "0.4"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", [TimeoutError(), asyncio.CancelledError()])
+async def test_tariff_failed_writes_do_not_poison_next_write(
+    coordinator_factory, failure
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.tariff_runtime
+    coord.client.site_tariff = AsyncMock(
+        return_value={
+            "purchase": _write_test_branch("0.1"),
+            "buyback": _write_test_branch("0.2"),
+        }
+    )
+    coord.client.site_tariff_update = AsyncMock(
+        side_effect=[failure, {"message": "success"}]
+    )
+    coord.client.notify_tariff_change = AsyncMock()
+    runtime.async_refresh = AsyncMock()
+    runtime._schedule_post_write_reconciliation = Mock()
+    with pytest.raises(type(failure)):
+        await runtime.async_update_tariff(purchase_tariff=_write_test_branch("0.3"))
+    await runtime.async_update_tariff(buyback_tariff=_write_test_branch("0.4"))
+    assert (
+        coord.client.site_tariff_update.await_args.args[0]["purchase"]["seasons"][0][
+            "days"
+        ][0]["periods"][0]["rate"]
+        == "0.1"
+    )
+
+
+@pytest.mark.asyncio
+async def test_tariff_notification_logs_are_redacted(
+    coordinator_factory, caplog
+) -> None:
+    coord = coordinator_factory()
+    coord.client.site_tariff_billing_update = AsyncMock(return_value={})
+    coord.client.notify_tariff_change = AsyncMock(
+        side_effect=aiohttp.ClientError(
+            f"site {coord.site_id} token=secret-token person@example.com"
+        )
+    )
+    coord.tariff_runtime.async_refresh = AsyncMock()
+    with caplog.at_level("DEBUG", logger=tariff_mod.__name__):
+        await coord.tariff_runtime.async_update_tariff(
+            billing={
+                "billing_frequency": "MONTH",
+                "billing_interval_value": 1,
+                "billing_start_date": "2026-01-01",
+            }
+        )
+    assert "notification failed" in caplog.text
+    assert str(coord.site_id) not in caplog.text
+    assert "secret-token" not in caplog.text
+    assert "person@example.com" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_tariff_full_write_then_granular_write_preserves_pending_structure(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.tariff_runtime
+    coord.client.site_tariff = AsyncMock(
+        return_value={
+            "purchase": _write_test_branch("0.1"),
+            "buyback": _write_test_branch("0.2"),
+        }
+    )
+    coord.client.site_tariff_update = AsyncMock(return_value={})
+    coord.client.notify_tariff_change = AsyncMock()
+    runtime.async_refresh = AsyncMock()
+    runtime._schedule_post_write_reconciliation = Mock()
+    await runtime.async_update_tariff(
+        tariff_payload={
+            "purchase": _write_test_branch("0.3"),
+            "buyback": _write_test_branch("0.4"),
+        }
+    )
+    await runtime.async_set_tariff_rate(
+        {
+            "branch": "buyback",
+            "kind": "period",
+            "season_index": 1,
+            "day_index": 1,
+            "period_index": 1,
+        },
+        0.5,
+    )
+    payload = coord.client.site_tariff_update.await_args.args[0]
+    assert payload["purchase"]["seasons"][0]["days"][0]["periods"][0]["rate"] == "0.3"
+    assert payload["buyback"]["seasons"][0]["days"][0]["periods"][0]["rate"] == "0.5"
+
+
+@pytest.mark.asyncio
+async def test_tariff_acknowledgements_expire_and_refresh_uses_observed_state(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.tariff_runtime
+    old = {"purchase": _write_test_branch("0.1")}
+    new = {"purchase": _write_test_branch("0.3")}
+    coord.client.site_tariff = AsyncMock(return_value=old)
+    coord.client.site_tariff_update = AsyncMock(return_value={})
+    coord.client.notify_tariff_change = AsyncMock()
+    coord.client.site_tariff_bundle = AsyncMock(return_value=({}, old))
+    runtime._schedule_post_write_reconciliation = Mock()
+    now = [1000.0]
+    monkeypatch.setattr(tariff_mod, "monotonic", lambda: now[0])
+    await runtime.async_update_tariff(purchase_tariff=new["purchase"])
+    assert coord.tariff_import_rate is not None
+    assert tariff_rate_sensor_specs(coord.tariff_import_rate)[0]["state"] == 0.1
+    deadline = runtime._acknowledged_tariff_deadline
+    now[0] += 30
+    await runtime.async_refresh(force=True)
+    assert runtime._acknowledged_tariff_deadline == deadline
+    coord.client.site_tariff_bundle.return_value = ({}, new)
+    await runtime.async_refresh(force=True)
+    assert runtime._acknowledged_tariff is None
+    coord.client.site_tariff_bundle.return_value = ({}, old)
+    await runtime.async_update_tariff(purchase_tariff=new["purchase"])
+    now[0] += tariff_mod.TARIFF_WRITE_ACKNOWLEDGEMENT_TTL_S
+    await runtime.async_refresh(force=True)
+    assert runtime._acknowledged_tariff is None
+
+
+def test_merge_tariff_keeps_external_period_edits_and_structural_changes() -> None:
+    baseline = {
+        "periods": [{"id": "peak", "rate": "0.1"}, {"id": "offpeak", "rate": "0.2"}]
+    }
+    desired = {
+        "periods": [{"id": "peak", "rate": "0.3"}, {"id": "offpeak", "rate": "0.2"}]
+    }
+    cloud = {
+        "periods": [{"id": "peak", "rate": "0.1"}, {"id": "offpeak", "rate": "0.4"}]
+    }
+    assert tariff_mod._merge_acknowledged_tariff(baseline, desired, cloud) == {
+        "periods": [{"id": "peak", "rate": "0.3"}, {"id": "offpeak", "rate": "0.4"}]
+    }
+    reordered = {"periods": list(reversed(cloud["periods"]))}
+    assert (
+        tariff_mod._merge_acknowledged_tariff(baseline, desired, reordered) == reordered
+    )
+
+
+@pytest.mark.asyncio
+async def test_tariff_dated_failure_logs_are_redacted(
+    coordinator_factory, caplog
+) -> None:
+    coord = coordinator_factory()
+    coord.client.site_tariff_bundle = AsyncMock(
+        return_value=(
+            {},
+            {"buyback": {"typeKind": "single", "typeId": "tou", "seasons": []}},
+        )
+    )
+    coord.client.site_tariff_rates = AsyncMock(
+        side_effect=aiohttp.ClientError(
+            f"site {coord.site_id} token=dated-secret person@example.com"
+        )
+    )
+    with caplog.at_level("DEBUG", logger=tariff_mod.__name__):
+        await coord.tariff_runtime.async_refresh()
+    assert "Dated export tariff rates are unavailable" in caplog.text
+    assert str(coord.site_id) not in caplog.text
+    assert "dated-secret" not in caplog.text
+    assert "person@example.com" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_tariff_cancelled_waiter_never_writes(coordinator_factory) -> None:
+    coord = coordinator_factory()
+    runtime = coord.tariff_runtime
+    coord.client.site_tariff = AsyncMock(
+        return_value={"purchase": _write_test_branch("0.1")}
+    )
+    coord.client.site_tariff_update = AsyncMock(return_value={})
+    async with runtime._write_lock:
+        waiter = asyncio.create_task(
+            runtime.async_update_tariff(purchase_tariff=_write_test_branch("0.3"))
+        )
+        await asyncio.sleep(0)
+        waiter.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await waiter
+    coord.client.site_tariff.assert_not_awaited()
+    coord.client.site_tariff_update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_tariff_failure_preserves_prior_acknowledgement_only(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.tariff_runtime
+    coord.client.site_tariff = AsyncMock(
+        return_value={
+            "purchase": _write_test_branch("0.1"),
+            "buyback": _write_test_branch("0.2"),
+        }
+    )
+    coord.client.site_tariff_update = AsyncMock(side_effect=[{}, TimeoutError(), {}])
+    coord.client.notify_tariff_change = AsyncMock()
+    runtime.async_refresh = AsyncMock()
+    runtime._schedule_post_write_reconciliation = Mock()
+    await runtime.async_update_tariff(purchase_tariff=_write_test_branch("0.3"))
+    deadline = runtime._acknowledged_tariff_deadline
+    with pytest.raises(TimeoutError):
+        await runtime.async_update_tariff(purchase_tariff=_write_test_branch("0.4"))
+    assert runtime._acknowledged_tariff_deadline == deadline
+    await runtime.async_update_tariff(buyback_tariff=_write_test_branch("0.5"))
+    payload = coord.client.site_tariff_update.await_args.args[0]
+    assert payload["purchase"]["seasons"][0]["days"][0]["periods"][0]["rate"] == "0.3"
+
+
+def test_merge_tariff_distinguishes_null_from_absent_keys() -> None:
+    assert tariff_mod._merge_acknowledged_tariff(
+        {"removed": None}, {"added": None}, {"removed": None}
+    ) == {"added": None}
+    assert tariff_mod._merge_acknowledged_tariff(
+        {"removed": None}, {"added": None}, {"added": "external"}
+    ) == {"added": "external"}
+
+
+def _pending_tariff_test_runtime(coordinator_factory):
+    coord = coordinator_factory()
+    payload = {
+        "purchase": _write_test_branch("0.1"),
+        "buyback": _write_test_branch("0.2"),
+    }
+    coord.client.site_tariff = AsyncMock(return_value=payload)
+    coord.client.site_tariff_bundle = AsyncMock(return_value=({}, payload))
+    coord.client.site_tariff_update = AsyncMock(return_value={"message": "success"})
+    coord.client.site_tariff_billing_update = AsyncMock(return_value={})
+    coord.client.notify_tariff_change = AsyncMock()
+    coord.tariff_runtime._schedule_post_write_reconciliation = Mock()
+    return coord, coord.tariff_runtime
+
+
+def _tariff_test_rate(payload, branch="purchase"):
+    return payload[branch]["seasons"][0]["days"][0]["periods"][0]["rate"]
+
+
+@pytest.mark.asyncio
+async def test_tariff_own_intermediate_readback_preserves_latest_write(
+    coordinator_factory,
+):
+    coord, runtime = _pending_tariff_test_runtime(coordinator_factory)
+    await runtime.async_update_tariff(purchase_tariff=_write_test_branch("0.3"))
+    intermediate = coord.client.site_tariff_update.await_args.args[0]
+    coord.client.site_tariff_bundle.return_value = ({}, intermediate)
+    await runtime.async_update_tariff(purchase_tariff=_write_test_branch("0.4"))
+    latest = coord.client.site_tariff_update.await_args.args[0]
+    coord.client.site_tariff.return_value = intermediate
+    await runtime.async_update_tariff(buyback_tariff=_write_test_branch("0.5"))
+    assert (
+        _tariff_test_rate(coord.client.site_tariff_update.await_args.args[0]) == "0.4"
+    )
+    # A confirmed latest read followed by an older replica must also be safe.
+    coord.client.site_tariff_bundle.return_value = ({}, latest)
+    await runtime.async_refresh(force=True)
+    coord.client.site_tariff.return_value = intermediate
+    await runtime.async_update_tariff(buyback_tariff=_write_test_branch("0.6"))
+    assert (
+        _tariff_test_rate(coord.client.site_tariff_update.await_args.args[0]) == "0.4"
+    )
+    external = {
+        "purchase": _write_test_branch("0.9"),
+        "buyback": _write_test_branch("0.2"),
+    }
+    coord.client.site_tariff.return_value = external
+    await runtime.async_update_tariff(buyback_tariff=_write_test_branch("0.7"))
+    assert (
+        _tariff_test_rate(coord.client.site_tariff_update.await_args.args[0]) == "0.9"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "malformed",
+    [
+        {},
+        {"purchase": _write_test_branch("0.1")},
+        {"purchase": {}, "buyback": _write_test_branch("0.2")},
+        {"purchase": _write_test_branch("0.1"), "buyback": None},
+    ],
+)
+async def test_tariff_incomplete_readback_preserves_acknowledgements(
+    coordinator_factory, malformed
+):
+    coord, runtime = _pending_tariff_test_runtime(coordinator_factory)
+    await runtime.async_update_tariff(purchase_tariff=_write_test_branch("0.3"))
+    previous = coord.tariff_import_rate
+    deadline = runtime._acknowledged_tariff_deadline
+    coord.client.site_tariff_bundle.return_value = ({}, malformed)
+    await runtime.async_refresh(force=True)
+    assert coord.tariff_import_rate is previous
+    assert runtime._acknowledged_tariff_deadline == deadline
+    coord.client.site_tariff.return_value = malformed
+    with pytest.raises(OptionalEndpointUnavailable):
+        await runtime.async_update_tariff(buyback_tariff=_write_test_branch("0.4"))
+    assert coord.client.site_tariff_update.await_count == 1
+    complete = {
+        "purchase": _write_test_branch("0.1"),
+        "buyback": _write_test_branch("0.2"),
+    }
+    coord.client.site_tariff.return_value = complete
+    coord.client.site_tariff_bundle.return_value = ({}, complete)
+    await runtime.async_update_tariff(buyback_tariff=_write_test_branch("0.4"))
+    assert (
+        _tariff_test_rate(coord.client.site_tariff_update.await_args.args[0]) == "0.3"
+    )
+
+
+@pytest.mark.asyncio
+async def test_tariff_explicit_branch_deletion_can_be_confirmed(coordinator_factory):
+    coord, runtime = _pending_tariff_test_runtime(coordinator_factory)
+    replacement = {"purchase": _write_test_branch("0.3")}
+    await runtime.async_update_tariff(tariff_payload=replacement)
+    coord.client.site_tariff.return_value = replacement
+    coord.client.site_tariff_bundle.return_value = ({}, replacement)
+    await runtime.async_refresh(force=True)
+    assert runtime._acknowledged_tariff is None
+    await runtime.async_update_tariff(purchase_tariff=_write_test_branch("0.4"))
+    assert "buyback" not in coord.client.site_tariff_update.await_args.args[0]
+    assert _tariff_test_rate(replacement) == "0.3"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "failure",
+    [TimeoutError("billing rejected"), asyncio.CancelledError("billing cancelled")],
+)
+async def test_tariff_partial_write_runs_followup_preserves_original_error(
+    coordinator_factory, failure
+):
+    coord, runtime = _pending_tariff_test_runtime(coordinator_factory)
+    coord.client.site_tariff_billing_update.side_effect = failure
+    with pytest.raises(type(failure)) as caught:
+        await runtime.async_update_tariff(
+            purchase_tariff=_write_test_branch("0.3"),
+            billing={
+                "billing_start_date": "2026-09-01",
+                "billing_frequency": "MONTH",
+                "billing_interval_value": 1,
+            },
+        )
+    assert caught.value is failure
+    assert runtime.diagnostics()["last_write_partial"] is True
+    coord.client.notify_tariff_change.assert_awaited_once()
+    coord.client.site_tariff_bundle.assert_awaited_once()
+    if isinstance(failure, asyncio.CancelledError):
+        runtime._schedule_post_write_reconciliation.assert_not_called()
+    else:
+        runtime._schedule_post_write_reconciliation.assert_called_once()
+    assert tariff_rate_sensor_specs(coord.tariff_import_rate)[0]["state"] == 0.1
+    coord.client.site_tariff_billing_update.side_effect = None
+    await runtime.async_update_tariff(buyback_tariff=_write_test_branch("0.4"))
+    assert runtime.diagnostics()["last_write_partial"] is False
+
+
+@pytest.mark.asyncio
+async def test_tariff_partial_write_followup_timeout_preserves_billing_error(
+    coordinator_factory, monkeypatch
+):
+    coord, runtime = _pending_tariff_test_runtime(coordinator_factory)
+    failure = TimeoutError("original billing error")
+    coord.client.site_tariff_billing_update.side_effect = failure
+    coord.client.notify_tariff_change.side_effect = lambda: None
+
+    async def blocked_notification():
+        await asyncio.Event().wait()
+
+    coord.client.notify_tariff_change.side_effect = blocked_notification
+    monkeypatch.setattr(tariff_mod, "TARIFF_PARTIAL_WRITE_FOLLOWUP_TIMEOUT_S", 0.01)
+    with pytest.raises(TimeoutError) as caught:
+        await runtime.async_update_tariff(
+            purchase_tariff=_write_test_branch("0.3"),
+            billing={
+                "billing_start_date": "2026-09-01",
+                "billing_frequency": "MONTH",
+                "billing_interval_value": 1,
+            },
+        )
+    assert caught.value is failure
+    assert runtime.diagnostics()["last_write_partial"] is True
+    runtime._schedule_post_write_reconciliation.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_tariff_billing_only_failure_does_not_claim_partial_write(
+    coordinator_factory,
+):
+    coord, runtime = _pending_tariff_test_runtime(coordinator_factory)
+    coord.client.site_tariff_billing_update.side_effect = TimeoutError()
+    with pytest.raises(TimeoutError):
+        await runtime.async_update_tariff(
+            billing={
+                "billing_start_date": "2026-09-01",
+                "billing_frequency": "MONTH",
+                "billing_interval_value": 1,
+            }
+        )
+    assert runtime.diagnostics()["last_write_partial"] is False
+    coord.client.notify_tariff_change.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_tariff_partial_followup_failure_never_masks_original(
+    coordinator_factory,
+):
+    coord, runtime = _pending_tariff_test_runtime(coordinator_factory)
+    failure = TimeoutError("billing failed")
+    coord.client.site_tariff_billing_update.side_effect = failure
+    coord.client.site_tariff_bundle.side_effect = RuntimeError("readback failed")
+    runtime._schedule_post_write_reconciliation.side_effect = RuntimeError(
+        "hass stopped"
+    )
+    with pytest.raises(TimeoutError) as caught:
+        await runtime.async_update_tariff(
+            purchase_tariff=_write_test_branch("0.3"),
+            billing={
+                "billing_start_date": "2026-09-01",
+                "billing_frequency": "MONTH",
+                "billing_interval_value": 1,
+            },
+        )
+    assert caught.value is failure
+    assert runtime.diagnostics()["last_write_partial"] is True
+
+
+@pytest.mark.asyncio
+async def test_tariff_real_billing_task_cancellation_runs_followup(coordinator_factory):
+    coord, runtime = _pending_tariff_test_runtime(coordinator_factory)
+    entered = asyncio.Event()
+
+    async def billing(_payload):
+        entered.set()
+        await asyncio.Event().wait()
+
+    coord.client.site_tariff_billing_update.side_effect = billing
+    task = asyncio.create_task(
+        runtime.async_update_tariff(
+            purchase_tariff=_write_test_branch("0.3"),
+            billing={
+                "billing_start_date": "2026-09-01",
+                "billing_frequency": "MONTH",
+                "billing_interval_value": 1,
+            },
+        )
+    )
+    await asyncio.wait_for(entered.wait(), 1)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    coord.client.notify_tariff_change.assert_awaited_once()
+    coord.client.site_tariff_bundle.assert_awaited_once()
+    assert runtime.diagnostics()["last_write_partial"] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "write_failure", [TimeoutError("billing"), asyncio.CancelledError("billing")]
+)
+async def test_tariff_cancellation_during_followup_does_not_spawn_work(
+    coordinator_factory, write_failure
+):
+    coord, runtime = _pending_tariff_test_runtime(coordinator_factory)
+    coord.client.site_tariff_billing_update.side_effect = write_failure
+    coord.client.notify_tariff_change.side_effect = asyncio.CancelledError("shutdown")
+    with pytest.raises(type(write_failure)) as caught:
+        await runtime.async_update_tariff(
+            purchase_tariff=_write_test_branch("0.3"),
+            billing={
+                "billing_start_date": "2026-09-01",
+                "billing_frequency": "MONTH",
+                "billing_interval_value": 1,
+            },
+        )
+    assert caught.value is write_failure
+    runtime._schedule_post_write_reconciliation.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_tariff_each_acknowledged_transition_expires_independently(
+    coordinator_factory, monkeypatch
+):
+    coord, runtime = _pending_tariff_test_runtime(coordinator_factory)
+    now = [1000.0]
+    monkeypatch.setattr(tariff_mod, "monotonic", lambda: now[0])
+    await runtime.async_update_tariff(purchase_tariff=_write_test_branch("0.3"))
+    intermediate = coord.client.site_tariff_update.await_args.args[0]
+    now[0] += 10
+    await runtime.async_update_tariff(purchase_tariff=_write_test_branch("0.4"))
+    now[0] = 1060
+    coord.client.site_tariff_bundle.return_value = ({}, intermediate)
+    await runtime.async_refresh(force=True)
+    assert len(runtime._acknowledged_history) == 1
+    assert (
+        _tariff_test_rate(runtime._reconcile_acknowledged_tariff(intermediate)) == "0.4"
+    )
+    now[0] = 1070
+    assert (
+        _tariff_test_rate(runtime._reconcile_acknowledged_tariff(intermediate)) == "0.3"
+    )
+    assert runtime._acknowledged_history == ()
+
+
+@pytest.mark.asyncio
+async def test_tariff_nontransport_notifier_error_does_not_skip_readback(
+    coordinator_factory,
+):
+    coord, runtime = _pending_tariff_test_runtime(coordinator_factory)
+    coord.client.notify_tariff_change.side_effect = RuntimeError("notifier failure")
+    await runtime.async_update_tariff(purchase_tariff=_write_test_branch("0.3"))
+    coord.client.site_tariff_bundle.assert_awaited_once()
+    runtime._schedule_post_write_reconciliation.assert_called_once()
+
+
+def test_tariff_observed_baseline_alias_does_not_renew_unchanged_fields():
+    original = {
+        "periods": [{"id": "peak", "rate": "0.1"}, {"id": "offpeak", "rate": "0.2"}]
+    }
+    before = {
+        "periods": [{"id": "peak", "rate": "0.3"}, {"id": "offpeak", "rate": "0.25"}]
+    }
+    after = {
+        "periods": [{"id": "peak", "rate": "0.4"}, {"id": "offpeak", "rate": "0.25"}]
+    }
+    assert tariff_mod._merge_acknowledged_tariff(before, after, original, original) == {
+        "periods": [{"id": "peak", "rate": "0.4"}, {"id": "offpeak", "rate": "0.2"}]
+    }
+
+
+@pytest.mark.asyncio
+async def test_tariff_latest_transition_recognizes_original_read_after_older_expiry(
+    coordinator_factory, monkeypatch
+):
+    coord, runtime = _pending_tariff_test_runtime(coordinator_factory)
+    now = [1000.0]
+    monkeypatch.setattr(tariff_mod, "monotonic", lambda: now[0])
+    await runtime.async_update_tariff(purchase_tariff=_write_test_branch("0.3"))
+    now[0] = 1030
+    await runtime.async_update_tariff(purchase_tariff=_write_test_branch("0.4"))
+    now[0] = 1065
+    await runtime.async_update_tariff(buyback_tariff=_write_test_branch("0.5"))
+    assert (
+        _tariff_test_rate(coord.client.site_tariff_update.await_args.args[0]) == "0.4"
+    )

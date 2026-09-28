@@ -7,18 +7,37 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from datetime import timezone as _tz
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
+
+from homeassistant.util import dt as dt_util
 
 from .api import InvalidPayloadError
+from .const import CURRENT_POWER_STALE_AFTER_S
 from .log_redaction import redact_site_id, redact_text
 from .power_validation import ExtremePowerValidator
 
 if TYPE_CHECKING:
-    from .coordinator import EnphaseCoordinator
+    from .api import EnphaseEVClient
 
 _LOGGER = logging.getLogger(__name__)
 CURRENT_POWER_CACHE_TTL_S = 60.0
 CURRENT_POWER_ENDPOINT_FAMILY = "current_power"
+
+
+class CurrentPowerHost(Protocol):
+    """Public host services required by the current-power endpoint runtime."""
+
+    @property
+    def client(self) -> EnphaseEVClient: ...
+
+    @property
+    def site_id(self) -> str: ...
+
+    def endpoint_family_should_run(self, family: str) -> bool: ...
+
+    def note_endpoint_family_success(self, family: str) -> None: ...
+
+    def note_endpoint_family_failure(self, family: str, err: Exception) -> bool: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,14 +49,16 @@ class CurrentPowerSample:
     reported_units: str | None = None
     reported_precision: int | None = None
     source: str | None = None
+    freshness_revision: int = 0
 
 
 class CurrentPowerRuntime:
     """Fetch and cache site current power consumption from the app API."""
 
-    def __init__(self, coordinator: EnphaseCoordinator) -> None:
+    def __init__(self, coordinator: CurrentPowerHost) -> None:
         self.coordinator = coordinator
         self._sample = CurrentPowerSample()
+        self.received_utc: datetime | None = None
         self._cache_until_mono: float | None = None
         self.using_stale = False
         self._extreme_validator = ExtremePowerValidator()
@@ -83,12 +104,14 @@ class CurrentPowerRuntime:
                 else None
             ),
             source=values["source"] if isinstance(values["source"], str) else None,
+            freshness_revision=self._sample.freshness_revision,
         )
 
     def clear(self) -> None:
         """Reset cached current power consumption samples."""
 
         self._cache_until_mono = None
+        self.received_utc = None
         self.using_stale = False
         self._extreme_validator.clear()
         self._last_observed_value = None
@@ -168,7 +191,7 @@ class CurrentPowerRuntime:
 
         fetcher = getattr(self.coordinator.client, "latest_power", None)
         if callable(fetcher):
-            if not self.coordinator._endpoint_family_should_run(
+            if not self.coordinator.endpoint_family_should_run(
                 CURRENT_POWER_ENDPOINT_FAMILY
             ):
                 return False
@@ -190,14 +213,14 @@ class CurrentPowerRuntime:
         cache_until = self._cache_until_mono
         if cache_until is not None and now < cache_until:
             return
-        if not coord._endpoint_family_should_run(CURRENT_POWER_ENDPOINT_FAMILY):
+        if not coord.endpoint_family_should_run(CURRENT_POWER_ENDPOINT_FAMILY):
             self.using_stale = self._cached_state_present()
             return
 
         try:
             payload = await fetcher()
         except Exception as err:  # noqa: BLE001
-            coord._note_endpoint_family_failure(CURRENT_POWER_ENDPOINT_FAMILY, err)
+            coord.note_endpoint_family_failure(CURRENT_POWER_ENDPOINT_FAMILY, err)
             self.using_stale = self._cached_state_present()
             _LOGGER.debug(
                 "Skipping current power consumption refresh for site %s: %s",
@@ -257,11 +280,28 @@ class CurrentPowerRuntime:
         if not validation.accepted:
             self._cache_until_mono = now + CURRENT_POWER_CACHE_TTL_S
             self.using_stale = self._cached_state_present()
-            coord._note_endpoint_family_success(CURRENT_POWER_ENDPOINT_FAMILY)
+            coord.note_endpoint_family_success(CURRENT_POWER_ENDPOINT_FAMILY)
             return
 
+        received_utc = dt_util.utcnow()
+        freshness_revision = self._sample.freshness_revision
+        if sampled_at is None or sampled_at != self._sample.sample_utc:
+            # A timestamp-less sample can recover with an identical value after
+            # expiry. Publish that transition without notifying on every fetch.
+            if (
+                self.received_utc is not None
+                and (received_utc - self.received_utc).total_seconds()
+                >= CURRENT_POWER_STALE_AFTER_S
+            ):
+                freshness_revision += 1
+            self.received_utc = received_utc
+        elif self.received_utc is None:
+            self.received_utc = received_utc
+        # Repeated timestamped responses keep their original receipt bound;
+        # even a source clock in the future cannot perpetually renew freshness.
         self._sample = CurrentPowerSample(
             w=normalized_w,
+            freshness_revision=freshness_revision,
             sample_utc=sampled_at,
             reported_units=units,
             reported_precision=precision,
@@ -269,7 +309,7 @@ class CurrentPowerRuntime:
         )
         self._cache_until_mono = now + CURRENT_POWER_CACHE_TTL_S
         self.using_stale = False
-        coord._note_endpoint_family_success(CURRENT_POWER_ENDPOINT_FAMILY)
+        coord.note_endpoint_family_success(CURRENT_POWER_ENDPOINT_FAMILY)
 
     def _note_invalid_payload(self, summary: str) -> None:
         """Back off malformed responses while retaining the last valid sample."""
@@ -280,7 +320,7 @@ class CurrentPowerRuntime:
             endpoint="get_latest_power",
             failure_kind="invalid_current_power_payload",
         )
-        self.coordinator._note_endpoint_family_failure(
+        self.coordinator.note_endpoint_family_failure(
             CURRENT_POWER_ENDPOINT_FAMILY, error
         )
         self.using_stale = self._cached_state_present()

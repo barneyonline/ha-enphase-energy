@@ -32,6 +32,7 @@ from custom_components.enphase_ev.evse_schedule_editor import (
     evse_scheduler_enabled,
 )
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
+from custom_components.enphase_ev.schedule_sync import ScheduleSync
 from custom_components.enphase_ev.select import EvseScheduleSelect
 from custom_components.enphase_ev.switch import EvseScheduleEditorDaySwitch
 from custom_components.enphase_ev.time import (
@@ -702,3 +703,53 @@ async def test_evse_schedule_save_raises_when_backend_rejects_create(
 
     with pytest.raises(ServiceValidationError, match="rejected the schedule change"):
         await save.async_press()
+
+
+async def test_evse_schedule_delete_raises_when_backend_rejects(
+    config_entry, coordinator_factory
+) -> None:
+    coord = coordinator_factory()
+    _prepare_evse_schedule_coord(coord)
+    _attach_editor_runtime(config_entry, coord)
+    coord.schedule_sync.async_delete_slot = AsyncMock(return_value=False)
+    editor = config_entry.runtime_data.evse_schedule_editor
+    editor.select_schedule(RANDOM_SERIAL, "slot-1")
+    button = EvseScheduleDeleteButton(coord, config_entry, RANDOM_SERIAL)
+
+    with pytest.raises(ServiceValidationError, match="rejected the schedule change"):
+        await button.async_press()
+
+    coord.schedule_sync.async_delete_slot.assert_awaited_once_with(
+        RANDOM_SERIAL, "slot-1"
+    )
+    assert editor.current_selection(RANDOM_SERIAL) == "slot-1"
+
+
+@pytest.mark.parametrize("action", ["save", "delete"])
+async def test_evse_schedule_buttons_surface_existing_schedule_write_failure(
+    hass, config_entry, coordinator_factory, action
+) -> None:
+    """Exercise the real editor-to-scheduler path with a failing cloud request."""
+    coord = coordinator_factory()
+    slots = _prepare_evse_schedule_coord(coord)
+    coord.schedule_sync = ScheduleSync(hass, coord, config_entry)
+    coord.schedule_sync._slot_cache = slots
+    editor = _attach_editor_runtime(config_entry, coord)
+    editor.select_schedule(RANDOM_SERIAL, "slot-1")
+    editor.set_edit_time(RANDOM_SERIAL, "start_time", dt_time(6, 0))
+    editor.set_edit_time(RANDOM_SERIAL, "end_time", dt_time(7, 0))
+    request = AsyncMock(side_effect=TimeoutError("schedule request timed out"))
+    if action == "save":
+        coord.client.patch_schedule = request
+        button = EvseScheduleSaveButton(coord, config_entry, RANDOM_SERIAL)
+    else:
+        coord.client.delete_schedule = request
+        button = EvseScheduleDeleteButton(coord, config_entry, RANDOM_SERIAL)
+
+    with pytest.raises(ServiceValidationError) as exc:
+        await button.async_press()
+
+    assert exc.value.translation_key == "evse_schedule_change_rejected"
+    request.assert_awaited_once()
+    assert coord.schedule_sync._slot_cache == _slot_cache()
+    assert editor.current_selection(RANDOM_SERIAL) == "slot-1"

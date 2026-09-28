@@ -1,4 +1,4 @@
-"""Read-only tariff parsing and refresh helpers for Enphase sites."""
+"""Tariff parsing, refresh, and serialized write helpers for Enphase sites."""
 
 from __future__ import annotations
 
@@ -10,14 +10,16 @@ from datetime import date, datetime, time as dt_time, timedelta
 import logging
 import math
 import re
+from time import monotonic
 from typing import TYPE_CHECKING, NoReturn
 
 import aiohttp
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.util import dt as dt_util
 
 from .api import InvalidPayloadError, OptionalEndpointUnavailable
 from .const import DOMAIN
-from .log_redaction import redact_text
+from .log_redaction import redact_site_id, redact_text
 from .service_validation import raise_translated_service_validation
 
 if TYPE_CHECKING:
@@ -27,6 +29,8 @@ TARIFF_ENDPOINT_FAMILY = "tariff"
 TARIFF_DATED_RATES_ENDPOINT_FAMILY = "tariff_dated_rates"
 TARIFF_SUCCESS_TTL_S = 300.0
 TARIFF_WRITE_RECONCILE_DELAYS_S = (5.0, 15.0, 30.0)
+TARIFF_WRITE_ACKNOWLEDGEMENT_TTL_S = 60.0
+TARIFF_PARTIAL_WRITE_FOLLOWUP_TIMEOUT_S = 10.0
 TARIFF_BRANCH_KEYS = frozenset({"purchase", "buyback"})
 TARIFF_TYPE_IDS = frozenset({"flat", "tou", "tiered"})
 TARIFF_TYPE_KINDS = frozenset(
@@ -1302,11 +1306,101 @@ def _endpoint_family_diagnostics(
     }
 
 
+def _merge_acknowledged_tariff(
+    baseline: dict[str, object],
+    acknowledged: dict[str, object],
+    observed: dict[str, object],
+    observed_baseline: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Carry unobserved writes forward without replacing unrelated cloud changes.
+
+    Each transition recognizes its effective and actual read baselines, only
+    for fields changed by that transition. This keeps a later write independent
+    of earlier transitions expiring without renewing unrelated older edits.
+    A third value is an external edit and wins. Only lists whose dictionary
+    items retain the same explicit IDs can be merged recursively; structural
+    changes are atomic so a rate cannot migrate to a different tariff period.
+    """
+
+    merged = copy.deepcopy(observed)
+    for key in baseline.keys() | acknowledged.keys():
+        before = baseline.get(key)
+        after = acknowledged.get(key)
+        current = observed.get(key)
+        alternative = (
+            observed_baseline.get(key) if observed_baseline is not None else None
+        )
+        if before == after and (key in baseline) == (key in acknowledged):
+            continue
+        if (
+            isinstance(before, dict)
+            and isinstance(after, dict)
+            and isinstance(current, dict)
+        ):
+            merged[key] = _merge_acknowledged_tariff(
+                before,
+                after,
+                current,
+                alternative if isinstance(alternative, dict) else None,
+            )
+        elif (
+            isinstance(before, list)
+            and isinstance(after, list)
+            and isinstance(current, list)
+            and len(before) == len(after) == len(current)
+            and all(
+                isinstance(old, dict)
+                and isinstance(new, dict)
+                and isinstance(now, dict)
+                and old.get("id") is not None
+                and old.get("id") == new.get("id") == now.get("id")
+                for old, new, now in zip(before, after, current, strict=True)
+            )
+        ):
+            alternative_items = alternative if isinstance(alternative, list) else []
+            merged[key] = [
+                _merge_acknowledged_tariff(
+                    old,
+                    new,
+                    now,
+                    (
+                        alternative_items[index]
+                        if index < len(alternative_items)
+                        and isinstance(alternative_items[index], dict)
+                        and alternative_items[index].get("id") == old.get("id")
+                        else None
+                    ),
+                )
+                for index, (old, new, now) in enumerate(
+                    zip(before, after, current, strict=True)
+                )
+            ]
+        elif (current == before and (key in observed) == (key in baseline)) or (
+            observed_baseline is not None
+            and current == alternative
+            and (key in observed) == (key in observed_baseline)
+        ):
+            if key in acknowledged:
+                merged[key] = copy.deepcopy(after)
+            else:
+                merged.pop(key, None)
+    return merged
+
+
 class TariffRuntime:
     """Fetch, normalize, and update site tariff data."""
 
     def __init__(self, coordinator: EnphaseCoordinator) -> None:
         self.coordinator = coordinator
+        self._write_lock = asyncio.Lock()
+        self._last_write_partial = False
+        self._acknowledged_history: tuple[
+            tuple[float, dict[str, object], dict[str, object], dict[str, object]], ...
+        ] = ()
+        self._acknowledged_tariff_deadline = 0.0
+        self._acknowledged_tariff: (
+            tuple[dict[str, object], dict[str, object]] | None
+        ) = None
         self._post_write_reconcile_task: asyncio.Task[None] | None = None
 
     def _rate_signature(self) -> tuple[tuple[object, ...], ...]:
@@ -1355,7 +1449,10 @@ class TariffRuntime:
                 )
                 return
             self._publish_tariff_update()
-            if self._rate_signature() != previous_signature:
+            if (
+                self._acknowledged_tariff is None
+                and self._rate_signature() != previous_signature
+            ):
                 return
 
     def _schedule_post_write_reconciliation(
@@ -1395,7 +1492,14 @@ class TariffRuntime:
             site_tariff_bundle = getattr(coord.client, "site_tariff_bundle", None)
             if not callable(site_tariff_bundle):
                 raise OptionalEndpointUnavailable("Tariff API is unavailable")
+            pending = self._acknowledged_history
             billing_payload, tariff_payload = await site_tariff_bundle()
+            if (
+                pending
+                and self._acknowledged_history is pending
+                and isinstance(tariff_payload, dict)
+            ):
+                self._reconcile_acknowledged_tariff(tariff_payload)
             billing = parse_tariff_billing(billing_payload)
             import_rate = parse_tariff_rate(tariff_payload, "purchase")
             export_rate = parse_tariff_rate(tariff_payload, "buyback")
@@ -1465,8 +1569,8 @@ class TariffRuntime:
             coord._note_endpoint_family_failure(TARIFF_DATED_RATES_ENDPOINT_FAMILY, err)
             _LOGGER.debug(
                 "Dated export tariff rates are unavailable for site %s: %s",
-                getattr(coord, "site_id", None),
-                err,
+                redact_site_id(coord.site_id),
+                redact_text(err, site_ids=(coord.site_id,)),
             )
             previous = getattr(coord, "tariff_export_rate", None)
             if tariff_rate_sensor_specs(previous):
@@ -1501,7 +1605,70 @@ class TariffRuntime:
         tariff = result.get("tariff")
         return tariff if isinstance(tariff, dict) else {}
 
+    def _reconcile_acknowledged_tariff(
+        self, payload: dict[str, object]
+    ) -> dict[str, object]:
+        """Rebase pending acknowledged changes onto the latest cloud response."""
+
+        now = monotonic()
+        self._acknowledged_history = tuple(
+            record for record in self._acknowledged_history if record[0] > now
+        )
+        if not self._acknowledged_history:
+            self._acknowledged_tariff = None
+            return copy.deepcopy(payload)
+        # Missing branches are not evidence of a newer external configuration.
+        # A deliberate full replacement may remove a branch; only require the
+        # branches in the latest acknowledged target and validate observed ones.
+        required = TARIFF_BRANCH_KEYS.intersection(self._acknowledged_history[-1][2])
+        try:
+            if not required.issubset(payload):
+                raise ValueError("missing tariff branch")
+            for branch in TARIFF_BRANCH_KEYS.intersection(payload):
+                _validated_tariff_branch(payload[branch])
+        except (ValueError, ServiceValidationError) as err:
+            raise OptionalEndpointUnavailable("Tariff readback is incomplete") from err
+        merged = copy.deepcopy(payload)
+        for (
+            _deadline,
+            baseline,
+            acknowledged,
+            observed_baseline,
+        ) in self._acknowledged_history:
+            merged = _merge_acknowledged_tariff(
+                baseline, acknowledged, merged, observed_baseline
+            )
+        self._acknowledged_tariff = (
+            (copy.deepcopy(payload), copy.deepcopy(merged))
+            if merged != payload
+            else None
+        )
+        return merged
+
     async def async_update_tariff(
+        self,
+        *,
+        billing: TariffBillingUpdate | dict[str, object] | None = None,
+        rate_updates: (
+            tuple[TariffRateUpdate | dict[str, object], ...]
+            | list[TariffRateUpdate | dict[str, object]]
+        ) = (),
+        tariff_payload: dict[str, object] | None = None,
+        purchase_tariff: dict[str, object] | None = None,
+        buyback_tariff: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        """Serialize site writes, including readback and billing side effects."""
+
+        async with self._write_lock:
+            return await self._async_update_tariff(
+                billing=billing,
+                rate_updates=rate_updates,
+                tariff_payload=tariff_payload,
+                purchase_tariff=purchase_tariff,
+                buyback_tariff=buyback_tariff,
+            )
+
+    async def _async_update_tariff(
         self,
         *,
         billing: TariffBillingUpdate | dict[str, object] | None = None,
@@ -1566,11 +1733,7 @@ class TariffRuntime:
         coord = self.coordinator
         site_tariff = getattr(coord.client, "site_tariff", None)
         site_tariff_update = getattr(coord.client, "site_tariff_update", None)
-        needs_current_tariff = payload_update is None and (
-            parsed_rate_updates
-            or purchase_update is not None
-            or buyback_update is not None
-        )
+        needs_current_tariff = tariff_write_requested
         if tariff_write_requested and not callable(site_tariff_update):
             _raise_tariff_validation(
                 "tariff_rate_api_unavailable",
@@ -1594,21 +1757,23 @@ class TariffRuntime:
         tariff_result: dict[str, object] | None = None
         billing_result: dict[str, object] | None = None
         if tariff_write_requested:
-            if payload_update is not None:
-                update_payload = payload_update
-            else:
-                if not callable(site_tariff):  # pragma: no cover - narrowed above
-                    _raise_tariff_validation(
-                        "tariff_rate_api_unavailable",
-                        message="Tariff write API is unavailable.",
-                    )
-                payload = await site_tariff()
-                if not isinstance(payload, dict):
-                    _raise_tariff_validation(
-                        "tariff_rate_api_unavailable",
-                        message="Tariff write API is unavailable.",
-                    )
-                update_payload = copy.deepcopy(payload)
+            if not callable(site_tariff):  # pragma: no cover - narrowed above
+                _raise_tariff_validation(
+                    "tariff_rate_api_unavailable",
+                    message="Tariff write API is unavailable.",
+                )
+            payload = await site_tariff()
+            if not isinstance(payload, dict):
+                _raise_tariff_validation(
+                    "tariff_rate_api_unavailable",
+                    message="Tariff write API is unavailable.",
+                )
+            baseline = self._reconcile_acknowledged_tariff(payload)
+            update_payload = (
+                payload_update
+                if payload_update is not None
+                else copy.deepcopy(baseline)
+            )
             if purchase_update is not None:
                 update_payload["purchase"] = purchase_update
             if buyback_update is not None:
@@ -1625,7 +1790,22 @@ class TariffRuntime:
                     "tariff_rate_api_unavailable",
                     message="Tariff write API is unavailable.",
                 )
+            # Retain only acknowledged writes. Failed/cancelled requests must
+            # never become the baseline for a later edit.
+            observed_baseline = copy.deepcopy(payload)
             tariff_result = await site_tariff_update(update_payload)
+            self._acknowledged_tariff = (baseline, copy.deepcopy(update_payload))
+            self._acknowledged_tariff_deadline = (
+                monotonic() + TARIFF_WRITE_ACKNOWLEDGEMENT_TTL_S
+            )
+            self._acknowledged_history += (
+                (
+                    self._acknowledged_tariff_deadline,
+                    baseline,
+                    copy.deepcopy(update_payload),
+                    observed_baseline,
+                ),
+            )
 
         if billing_update is not None:
             if not callable(
@@ -1635,23 +1815,81 @@ class TariffRuntime:
                     "tariff_billing_api_unavailable",
                     message="Tariff billing write API is unavailable.",
                 )
-            billing_result = await site_tariff_billing_update(billing_update.payload)
+            try:
+                billing_result = await site_tariff_billing_update(
+                    billing_update.payload
+                )
+            except (Exception, asyncio.CancelledError) as write_error:
+                if tariff_write_requested:
+                    self._last_write_partial = True
+                    _LOGGER.warning(
+                        "Tariff configuration was accepted but billing update did not complete"
+                    )
+                    try:
+                        async with asyncio.timeout(
+                            TARIFF_PARTIAL_WRITE_FOLLOWUP_TIMEOUT_S
+                        ):
+                            await self._async_finish_write(
+                                previous_rate_signature,
+                                tariff_write_requested=True,
+                                schedule_reconciliation=not isinstance(
+                                    write_error, asyncio.CancelledError
+                                ),
+                            )
+                    except asyncio.CancelledError:
+                        # Unload/cancellation must not enqueue new background work.
+                        pass
+                    except Exception:  # noqa: BLE001
+                        # Cleanup is bounded and must never replace the original
+                        # write failure or cancellation delivered to the caller.
+                        if not isinstance(write_error, asyncio.CancelledError):
+                            try:
+                                self._schedule_post_write_reconciliation(
+                                    previous_rate_signature
+                                )
+                            except Exception:  # noqa: BLE001
+                                _LOGGER.debug(
+                                    "Unable to schedule partial tariff write readback"
+                                )
+                raise
 
+        self._last_write_partial = False
+        await self._async_finish_write(
+            previous_rate_signature, tariff_write_requested=tariff_write_requested
+        )
+        return {"tariff": tariff_result, "billing": billing_result}
+
+    async def _async_finish_write(
+        self,
+        previous_rate_signature: tuple[tuple[object, ...], ...],
+        *,
+        tariff_write_requested: bool,
+        schedule_reconciliation: bool = True,
+    ) -> None:
+        """Notify dependent services and publish authoritative readback only."""
+
+        coord = self.coordinator
         notifier = getattr(coord.client, "notify_tariff_change", None)
         if callable(notifier):
             try:
                 await notifier()
-            except (aiohttp.ClientError, AttributeError, TimeoutError) as err:
+            except Exception as err:  # noqa: BLE001
                 _LOGGER.debug(
                     "Tariff change notification failed for site %s: %s",
-                    getattr(coord, "site_id", None),
-                    err,
+                    redact_site_id(coord.site_id),
+                    redact_text(err, site_ids=(coord.site_id,)),
                 )
         await self.async_refresh(force=True)
         self._publish_tariff_update()
-        if tariff_write_requested and self._rate_signature() == previous_rate_signature:
+        if (
+            schedule_reconciliation
+            and tariff_write_requested
+            and (
+                self._acknowledged_tariff is not None
+                or self._rate_signature() == previous_rate_signature
+            )
+        ):
             self._schedule_post_write_reconciliation(previous_rate_signature)
-        return {"tariff": tariff_result, "billing": billing_result}
 
     def _has_stale_data(self) -> bool:
         """Return whether a prior tariff snapshot can stay visible."""
@@ -1670,6 +1908,7 @@ class TariffRuntime:
         last_refresh_utc = getattr(coord, "tariff_last_refresh_utc", None)
         rates_last_refresh_utc = getattr(coord, "tariff_rates_last_refresh_utc", None)
         return {
+            "last_write_partial": self._last_write_partial,
             "billing_available": getattr(coord, "tariff_billing", None) is not None,
             "import_rate_available": (
                 getattr(coord, "tariff_import_rate", None) is not None

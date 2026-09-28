@@ -105,9 +105,7 @@ from .const import (
     DRY_CONTACT_SETTINGS_STALE_AFTER_S,
     DOMAIN,
     GRID_CONTROL_CHECK_STALE_AFTER_S,
-    GRID_MODE_STATUS_CACHE_TTL,
     GRID_MODE_STATUS_STALE_AFTER_S,
-    GRID_OUTAGE_CONTEXT_CACHE_TTL,
     GRID_OUTAGE_CONTEXT_STALE_AFTER_S,
     HEMS_AUTH_BACKOFF_STEPS_S,
     HEMS_AUTH_MANUAL_CLEAR_COOLDOWN_S,
@@ -134,6 +132,7 @@ from .device_types import (
     normalize_type_key,
     parse_type_identifier,
 )
+from .endpoint_policies import EndpointFamilyPolicy, build_endpoint_family_policies
 from .energy import EnergyManager
 from .evse_timeseries import EVSETimeseriesManager
 from .evse_feature_flags_runtime import (
@@ -219,7 +218,7 @@ from .refresh_plan import (
     build_site_only_followup_plan,
 )
 from .refresh_runner import RefreshRunner
-from .tariff import TARIFF_SUCCESS_TTL_S, TariffRuntime
+from .tariff import TariffRuntime
 from .service_validation import raise_translated_service_validation
 from .cloud_metadata import CloudMetadataRuntime
 from .feature_snapshot import capture_feature_snapshot
@@ -526,19 +525,6 @@ class ChargerState:
     connector_status: str | None
     session_kwh: float | None
     session_start: int | None
-
-
-@dataclass(frozen=True, slots=True)
-class EndpointFamilyPolicy:
-    """Coordinator policy for read-only Enlighten endpoint families."""
-
-    success_ttl_s: float | None = None
-    stale_after_s: float | None = None
-    failure_backoff_schedule_s: tuple[float, ...] = ()
-    max_backoff_s: float | None = None
-    optional: bool = False
-    suppress_after_failures: int | None = None
-    support_state_on_success: bool = False
 
 
 @dataclass(slots=True)
@@ -1158,6 +1144,33 @@ class EnphaseCoordinator(
                 charger_serial_count=0,
             )
         )
+        # Acquisition clocks do not normally define equality. A first success
+        # or a return after the entity grace period is a semantic recovery,
+        # even when the normalized family measurements have not changed.
+        family_success = cast(
+            "dict[str, datetime]",
+            self.__dict__.setdefault("_published_family_success", {}),
+        )
+        battery_health = self._endpoint_family_health.get("battery_status")
+        for family, success in (
+            (
+                "battery_status",
+                battery_health.last_success_utc if battery_health else None,
+            ),
+            ("heatpump_power", self.heatpump_state._heatpump_power_last_success_utc),
+        ):
+            if not isinstance(success, datetime):
+                continue
+            previous_success = family_success.get(family)
+            if previous_success is None or success - previous_success >= timedelta(
+                minutes=30
+            ):
+                key = f"freshness:{family}"
+                self._runtime_publication_revisions[key] = (
+                    self._runtime_publication_revisions.get(key, 0) + 1
+                )
+            family_success[family] = success
+
         candidate = IntegrationSnapshot(
             chargers=freeze_charger_data(data),
             evse_feature_flags=feature_flags,
@@ -1556,235 +1569,9 @@ class EnphaseCoordinator(
             await asyncio.gather(task, return_exceptions=True)
 
     def _build_endpoint_family_policies(self) -> dict[str, EndpointFamilyPolicy]:
-        """Return cooldown/cache policies for read-only endpoint families."""
+        """Return an entry-local mapping of immutable endpoint policies."""
 
-        return {
-            "core_realtime": EndpointFamilyPolicy(
-                failure_backoff_schedule_s=(60.0, 120.0, 300.0, 600.0),
-                max_backoff_s=600.0,
-            ),
-            "current_power": EndpointFamilyPolicy(
-                success_ttl_s=60.0,
-                stale_after_s=900.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "battery_status": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
-                stale_after_s=1800.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                support_state_on_success=True,
-            ),
-            "system_events": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
-                stale_after_s=21600.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "system_event_history": EndpointFamilyPolicy(
-                success_ttl_s=900.0,
-                stale_after_s=86400.0,
-                failure_backoff_schedule_s=(900.0, 1800.0, 3600.0, 7200.0),
-                max_backoff_s=7200.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "vpp_enrollment": EndpointFamilyPolicy(
-                success_ttl_s=21600.0,
-                stale_after_s=604800.0,
-                failure_backoff_schedule_s=(900.0, 1800.0, 3600.0, 7200.0),
-                max_backoff_s=7200.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "vpp_events": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
-                stale_after_s=3600.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "grid_control_check": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
-                stale_after_s=GRID_CONTROL_CHECK_STALE_AFTER_S,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "grid_mode_status": EndpointFamilyPolicy(
-                success_ttl_s=GRID_MODE_STATUS_CACHE_TTL,
-                stale_after_s=GRID_MODE_STATUS_STALE_AFTER_S,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "grid_outage_context": EndpointFamilyPolicy(
-                success_ttl_s=GRID_OUTAGE_CONTEXT_CACHE_TTL,
-                stale_after_s=GRID_OUTAGE_CONTEXT_STALE_AFTER_S,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "activation_grid_profile": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
-                stale_after_s=3600.0,
-                failure_backoff_schedule_s=(3600.0, 21600.0, 86400.0),
-                max_backoff_s=86400.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "dry_contact_settings": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
-                stale_after_s=900.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "battery_backup_history": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                support_state_on_success=True,
-            ),
-            "battery_settings": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                support_state_on_success=True,
-            ),
-            "battery_site_settings": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                support_state_on_success=True,
-            ),
-            "battery_schedules": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                support_state_on_success=True,
-            ),
-            "storm_guard": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                support_state_on_success=True,
-            ),
-            "storm_alert": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                support_state_on_success=True,
-            ),
-            "tariff": EndpointFamilyPolicy(
-                success_ttl_s=TARIFF_SUCCESS_TTL_S,
-                stale_after_s=86400.0,
-                failure_backoff_schedule_s=(60.0, 60.0, 60.0, 60.0),
-                max_backoff_s=60.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "tariff_dated_rates": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
-                stale_after_s=86400.0,
-                failure_backoff_schedule_s=(3600.0, 21600.0, 86400.0),
-                max_backoff_s=86400.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "inventory_topology": EndpointFamilyPolicy(
-                success_ttl_s=21600.0,
-                failure_backoff_schedule_s=(1800.0, 3600.0, 7200.0, 21600.0),
-                max_backoff_s=21600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "hems_inventory": EndpointFamilyPolicy(
-                success_ttl_s=None,
-                stale_after_s=900.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "inverter_inventory": EndpointFamilyPolicy(
-                success_ttl_s=21600.0,
-                failure_backoff_schedule_s=(1800.0, 3600.0, 7200.0, 21600.0),
-                max_backoff_s=21600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "inverter_status": EndpointFamilyPolicy(
-                success_ttl_s=300.0,
-                stale_after_s=1800.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "inverter_production": EndpointFamilyPolicy(
-                success_ttl_s=600.0,
-                stale_after_s=1800.0,
-                failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
-                max_backoff_s=3600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "inverter_dashboard_inventory": EndpointFamilyPolicy(
-                success_ttl_s=21600.0,
-                stale_after_s=86400.0,
-                failure_backoff_schedule_s=(1800.0, 3600.0, 7200.0, 21600.0),
-                max_backoff_s=21600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "inverter_parameter_catalog": EndpointFamilyPolicy(
-                success_ttl_s=21600.0,
-                stale_after_s=86400.0,
-                failure_backoff_schedule_s=(1800.0, 3600.0, 7200.0, 21600.0),
-                max_backoff_s=21600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-            "inverter_parameter_telemetry": EndpointFamilyPolicy(
-                success_ttl_s=900.0,
-                stale_after_s=1800.0,
-                failure_backoff_schedule_s=(3600.0, 7200.0, 14400.0, 21600.0),
-                max_backoff_s=21600.0,
-                optional=True,
-                suppress_after_failures=3,
-                support_state_on_success=True,
-            ),
-        }
+        return build_endpoint_family_policies()
 
     async def async_request_refresh(self) -> None:
         """Request a coordinator refresh and allow one cooldown-bypass cycle."""
@@ -1796,6 +1583,23 @@ class EnphaseCoordinator(
         finally:
             self._endpoint_manual_bypass_requested = False
             self._endpoint_manual_bypass_active = False
+
+    def endpoint_family_should_run(self, family: str, *, force: bool = False) -> bool:
+        """Expose endpoint admission to feature runtimes without private state access."""
+
+        return self._endpoint_family_should_run(family, force=force)
+
+    def note_endpoint_family_success(
+        self, family: str, *, success_ttl_s: float | None = None
+    ) -> None:
+        """Record a runtime-owned endpoint success using the shared health policy."""
+
+        self._note_endpoint_family_success(family, success_ttl_s=success_ttl_s)
+
+    def note_endpoint_family_failure(self, family: str, err: Exception) -> bool:
+        """Record a runtime-owned endpoint failure and apply shared backoff."""
+
+        return self._note_endpoint_family_failure(family, err)
 
     def _endpoint_family_policy(self, family: str) -> EndpointFamilyPolicy | None:
         return self._endpoint_family_policies.get(family)
@@ -2372,6 +2176,7 @@ class EnphaseCoordinator(
                 self._battery_profile_recovery_restore_task.cancel()
                 cancelled_tasks.append(self._battery_profile_recovery_restore_task)
             self._battery_profile_recovery_restore_task = None
+        self.evse_runtime.invalidate_amp_restart_intents()
         for task in list(self._amp_restart_tasks.values()):
             if task is not None and not _task_done(task):
                 task.cancel()
@@ -2464,6 +2269,10 @@ class EnphaseCoordinator(
             ):
                 task.cancel()
                 cancelled_tasks.add(task)
+
+        self.evse_runtime.invalidate_amp_restart_intents()
+        for task in tuple(self._amp_restart_tasks.values()):
+            _cancel(task)
 
         reload_task_attrs = {
             attr_name: getattr(self, attr_name, None)
@@ -6312,8 +6121,19 @@ class EnphaseCoordinator(
             allow_unplugged=allow_unplugged,
         )
 
-    def schedule_amp_restart(self, sn: str, delay: float = AMP_RESTART_DELAY_S) -> None:
-        self.evse_runtime.schedule_amp_restart(sn, delay)
+    def charging_command_token(self, sn: str) -> object:
+        """Capture charger command ordering across an awaited setpoint refresh."""
+
+        return self.evse_runtime.charging_command_token(sn)
+
+    def schedule_amp_restart(
+        self,
+        sn: str,
+        delay: float = AMP_RESTART_DELAY_S,
+        *,
+        expected_token: object | None = None,
+    ) -> None:
+        self.evse_runtime.schedule_amp_restart(sn, delay, expected_token=expected_token)
 
     async def _async_restart_after_amp_change(self, sn: str, delay: float) -> None:
         await self.evse_runtime.async_restart_after_amp_change(sn, delay)
