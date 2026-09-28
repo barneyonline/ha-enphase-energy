@@ -458,11 +458,14 @@ async def test_charging_number_set_value_records_and_restarts_when_active(
     coord.schedule_amp_restart = MagicMock()
 
     number = ChargingAmpsNumber(coord, RANDOM_SERIAL)
+    intent = coord.charging_command_token(RANDOM_SERIAL)
     await number.async_set_native_value(24)
 
     coord.set_last_set_amps.assert_called_once_with(RANDOM_SERIAL, 24)
     coord.async_request_refresh.assert_awaited_once()
-    coord.schedule_amp_restart.assert_called_once_with(RANDOM_SERIAL)
+    coord.schedule_amp_restart.assert_called_once_with(
+        RANDOM_SERIAL, expected_token=intent
+    )
 
 
 def test_charging_number_uses_pick_start_for_non_applicable_and_safe_limit(
@@ -1122,3 +1125,44 @@ async def test_tariff_rate_number_is_removed_when_loaded_spec_disappears(
     assert any(isinstance(entity, EnphaseTariffRateNumber) for entity in added)
     active_unique_ids = prune_spy.call_args.kwargs["active_unique_ids"]
     assert unique_id in active_unique_ids
+
+
+@pytest.mark.parametrize("command", ["start", "stop"])
+async def test_amp_change_does_not_restart_after_newer_charging_command(
+    hass, config_entry, command
+):
+    """A command arriving during the amp edit's refresh supersedes its restart."""
+    import asyncio
+
+    coord = _make_coordinator(
+        hass,
+        config_entry,
+        {RANDOM_SERIAL: {"charging": True, "plugged": True, "charging_level": 20}},
+    )
+    coord.client.stop_charging = AsyncMock(return_value={"status": "ok"})
+    coord.client.start_charging = AsyncMock(return_value={"status": "ok"})
+    coord.async_start_streaming = AsyncMock()
+    refresh_entered = asyncio.Event()
+    release_refresh = asyncio.Event()
+    first_refresh = True
+
+    async def refresh():
+        nonlocal first_refresh
+        if first_refresh:
+            first_refresh = False
+            refresh_entered.set()
+            await release_refresh.wait()
+
+    coord.async_request_refresh = AsyncMock(side_effect=refresh)
+    number = ChargingAmpsNumber(coord, RANDOM_SERIAL)
+    task = asyncio.create_task(number.async_set_native_value(24))
+    await asyncio.wait_for(refresh_entered.wait(), 1)
+    await getattr(coord, f"async_{command}_charging")(RANDOM_SERIAL)
+    release_refresh.set()
+    await asyncio.wait_for(task, 1)
+
+    assert coord._amp_restart_tasks == {}
+    assert coord.last_set_amps[RANDOM_SERIAL] == 24
+    assert coord.get_desired_charging(RANDOM_SERIAL) is (command == "start")
+    assert coord.client.stop_charging.await_count == (1 if command == "stop" else 0)
+    coord.client.start_charging.assert_not_awaited()

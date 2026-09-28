@@ -1319,7 +1319,7 @@ async def test_schedule_sync_upsert_delete_and_default_timestamp(hass) -> None:
     timestamp = sync._default_server_timestamp()
     assert "." in timestamp
 
-    sync._patch_slot = AsyncMock()
+    sync._patch_slot = AsyncMock(return_value=True)
     client.create_schedule = AsyncMock(
         return_value={
             "meta": {"serverTimeStamp": "2025-01-03T00:00:00.000+00:00"},
@@ -2542,3 +2542,276 @@ def test_schedule_sync_has_scheduler_bearer_edge_cases(hass) -> None:
         hass, SimpleNamespace(client=bearer_awaitable), None
     )
     assert sync_bearer_awaitable._has_scheduler_bearer() is False
+
+
+@pytest.mark.parametrize("operation", ["update", "delete", "toggle", "replace"])
+@pytest.mark.parametrize("failed", [False, True])
+async def test_schedule_writes_report_result_and_preserve_cache_on_failure(
+    hass, operation, failed
+):
+    """Cloud write failures remain visible to callers without optimistic changes."""
+    slot = _slot("slot-result")
+    payload = {"meta": {"serverTimeStamp": "initial"}, "slots": [slot]}
+    entry = MockConfigEntry(domain=DOMAIN, data={"site_id": RANDOM_SITE_ID})
+    sync, client = await _setup_sync(hass, entry, payload)
+    sync._schedule_post_patch_refresh = MagicMock()
+    endpoint = {
+        "update": "patch_schedule",
+        "delete": "delete_schedule",
+        "toggle": "patch_schedule_states",
+        "replace": "patch_schedules",
+    }[operation]
+    request = AsyncMock(
+        side_effect=TimeoutError("write timed out") if failed else None,
+        return_value={"meta": {"serverTimeStamp": "updated"}},
+    )
+    setattr(client, endpoint, request)
+    if operation == "update":
+        result = await sync.async_upsert_slot(
+            RANDOM_SERIAL, _slot("slot-result", startTime="10:00")
+        )
+    elif operation == "delete":
+        result = await sync.async_delete_slot(RANDOM_SERIAL, "slot-result")
+    elif operation == "toggle":
+        result = await sync.async_set_slot_enabled(RANDOM_SERIAL, "slot-result", False)
+    else:
+        result = await sync.async_replace_slots(RANDOM_SERIAL, [_slot("replacement")])
+    assert result is (not failed)
+    request.assert_awaited_once()
+    if failed:
+        assert sync._slot_cache[RANDOM_SERIAL] == {"slot-result": _slot("slot-result")}
+        assert sync._meta_cache[RANDOM_SERIAL] == "initial"
+        sync._schedule_post_patch_refresh.assert_not_called()
+    else:
+        assert sync._meta_cache[RANDOM_SERIAL] == "updated"
+        if operation == "update":
+            assert (
+                sync._slot_cache[RANDOM_SERIAL]["slot-result"]["startTime"] == "10:00"
+            )
+        elif operation == "delete":
+            assert sync._slot_cache[RANDOM_SERIAL] == {}
+        elif operation == "toggle":
+            assert sync._slot_cache[RANDOM_SERIAL]["slot-result"]["enabled"] is False
+        else:
+            assert set(sync._slot_cache[RANDOM_SERIAL]) == {"replacement"}
+
+
+@pytest.mark.parametrize(
+    "operation", ["update", "create", "delete", "toggle", "replace"]
+)
+@pytest.mark.parametrize("outcome", ["success", "login_wall", "unavailable", "timeout"])
+async def test_inflight_schedule_write_cannot_revive_stopped_runtime(
+    hass, operation, outcome
+):
+    """Accepted writes may finish, but an old lifecycle cannot publish or poll."""
+    entry = MockConfigEntry(domain=DOMAIN, data={"site_id": RANDOM_SITE_ID})
+    sync, client = await _setup_sync(
+        hass,
+        entry,
+        {"meta": {"serverTimeStamp": "original"}, "slots": [_slot("slot-1")]},
+    )
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    failure = {
+        "success": None,
+        "login_wall": EnphaseLoginWallUnauthorized(
+            endpoint="/schedules",
+            request_label="schedule write",
+            status=200,
+            content_type="application/json",
+        ),
+        "unavailable": SchedulerUnavailable("down"),
+        "timeout": TimeoutError("write timed out"),
+    }[outcome]
+
+    async def write(*_args, **_kwargs):
+        entered.set()
+        await release.wait()
+        if failure is not None:
+            raise failure
+        return {"meta": {"serverTimeStamp": "updated"}, "data": "new-slot"}
+
+    endpoint = {
+        "update": "patch_schedule",
+        "create": "create_schedule",
+        "delete": "delete_schedule",
+        "toggle": "patch_schedule_states",
+        "replace": "patch_schedules",
+    }[operation]
+    request = AsyncMock(side_effect=write)
+    setattr(client, endpoint, request)
+    coord = sync._coordinator
+    coord._activate_auth_block_from_login_wall = MagicMock(return_value=True)
+    listener = MagicMock()
+    sync.async_add_listener(listener)
+
+    async def invoke():
+        if operation in {"create", "update"}:
+            return await sync.async_upsert_slot(
+                RANDOM_SERIAL,
+                _slot(
+                    "new-slot" if operation == "create" else "slot-1", startTime="10:00"
+                ),
+            )
+        if operation == "delete":
+            return await sync.async_delete_slot(RANDOM_SERIAL, "slot-1")
+        if operation == "toggle":
+            return await sync.async_set_slot_enabled(RANDOM_SERIAL, "slot-1", False)
+        return await sync.async_replace_slots(RANDOM_SERIAL, [_slot("new-slot")])
+
+    pending = asyncio.create_task(invoke())
+    await asyncio.wait_for(entered.wait(), 1)
+    await sync.async_stop()
+    original_status = sync._last_status
+    release.set()
+    assert await pending is (outcome == "success")
+    assert sync._slot_cache[RANDOM_SERIAL] == {"slot-1": _slot("slot-1")}
+    assert sync._meta_cache[RANDOM_SERIAL] == "original"
+    assert sync._last_status == original_status
+    assert sync._pending_patch_refresh_cancels == {}
+    assert sync._pending_patch_refresh_tasks == {}
+    listener.assert_not_called()
+    coord._activate_auth_block_from_login_wall.assert_not_called()
+    request.assert_awaited_once()
+    # Direct calls on the stopped runtime must not begin another cloud write.
+    assert await invoke() is False
+    request.assert_awaited_once()
+
+
+@pytest.mark.parametrize("operation", ["create", "delete", "replace"])
+async def test_all_schedule_writes_classify_login_wall_consistently(hass, operation):
+    entry = MockConfigEntry(domain=DOMAIN, data={"site_id": RANDOM_SITE_ID})
+    sync, client = await _setup_sync(
+        hass,
+        entry,
+        {"meta": {"serverTimeStamp": "initial"}, "slots": [_slot("slot-1")]},
+    )
+    error = EnphaseLoginWallUnauthorized(
+        endpoint="/schedules",
+        request_label="schedule write",
+        status=200,
+        content_type="application/json",
+    )
+    sync._coordinator._activate_auth_block_from_login_wall = MagicMock(
+        return_value=True
+    )
+    if operation == "create":
+        client.create_schedule = AsyncMock(side_effect=error)
+        result = await sync.async_upsert_slot(RANDOM_SERIAL, _slot("new-slot"))
+    elif operation == "delete":
+        client.delete_schedule = AsyncMock(side_effect=error)
+        result = await sync.async_delete_slot(RANDOM_SERIAL, "slot-1")
+    else:
+        client.patch_schedules = AsyncMock(side_effect=error)
+        result = await sync.async_replace_slots(RANDOM_SERIAL, [_slot("new-slot")])
+    assert result is False
+    assert sync._last_status == "auth_blocked"
+    sync._coordinator._activate_auth_block_from_login_wall.assert_called_once_with(
+        error
+    )
+    assert sync._slot_cache[RANDOM_SERIAL] == {"slot-1": _slot("slot-1")}
+
+
+@pytest.mark.parametrize("replace", [False, True])
+async def test_refresh_completion_after_stop_cannot_publish_or_prepare_write(
+    hass, replace
+):
+    entry = MockConfigEntry(domain=DOMAIN, data={"site_id": RANDOM_SITE_ID})
+    sync, client = await _setup_sync(hass, entry, {"slots": [_slot("slot-1")]})
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def fetch(*_args):
+        entered.set()
+        await release.wait()
+        return {
+            "meta": {"serverTimeStamp": "old-request"},
+            "slots": [_slot("stale-slot")],
+        }
+
+    client.get_schedules = AsyncMock(side_effect=fetch)
+    client.patch_schedules = AsyncMock()
+    pending = asyncio.create_task(
+        sync.async_replace_slots(RANDOM_SERIAL, [_slot("replacement")])
+        if replace
+        else sync.async_refresh(reason="manual")
+    )
+    await asyncio.wait_for(entered.wait(), 1)
+    await sync.async_stop()
+    release.set()
+    await pending
+    await sync.async_refresh(reason="manual_after_stop")
+    assert sync._slot_cache[RANDOM_SERIAL] == {"slot-1": _slot("slot-1")}
+    assert not sync._meta_cache.get(RANDOM_SERIAL)
+    client.get_schedules.assert_awaited_once()
+    client.patch_schedules.assert_not_awaited()
+
+
+async def test_stopped_schedule_runtime_ignores_late_timer_callback(hass, monkeypatch):
+    entry = MockConfigEntry(domain=DOMAIN, data={"site_id": RANDOM_SITE_ID})
+    sync, client = await _setup_sync(hass, entry, {"slots": [_slot("slot-1")]})
+    callbacks = []
+
+    def timer(_hass, _delay, callback):
+        callbacks.append(callback)
+        return MagicMock()
+
+    monkeypatch.setattr(schedule_sync_mod, "async_call_later", timer)
+    sync._schedule_post_patch_refresh(RANDOM_SERIAL)
+    await sync.async_stop()
+    client.get_schedules.reset_mock()
+    callbacks[0](dt_util.utcnow())
+    sync._schedule_post_patch_refresh(RANDOM_SERIAL)
+    await hass.async_block_till_done()
+    assert len(callbacks) == 1
+    assert sync._pending_patch_refresh_cancels == {}
+    client.get_schedules.assert_not_awaited()
+
+
+async def test_prior_lifecycle_write_cannot_overwrite_restarted_schedule_state(hass):
+    entry = MockConfigEntry(domain=DOMAIN, data={"site_id": RANDOM_SITE_ID})
+    sync, client = await _setup_sync(hass, entry, {"slots": [_slot("slot-1")]})
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def patch(*_args):
+        entered.set()
+        await release.wait()
+        return {"meta": {"serverTimeStamp": "obsolete"}}
+
+    client.patch_schedule = AsyncMock(side_effect=patch)
+    pending = asyncio.create_task(
+        sync.async_upsert_slot(RANDOM_SERIAL, _slot("slot-1", startTime="10:00"))
+    )
+    await asyncio.wait_for(entered.wait(), 1)
+    await sync.async_stop()
+    client.get_schedules = AsyncMock(
+        return_value={"slots": [_slot("slot-1", startTime="12:00")]}
+    )
+    await sync.async_start()
+    release.set()
+    assert await pending is True
+    assert sync._slot_cache[RANDOM_SERIAL]["slot-1"]["startTime"] == "12:00"
+    assert sync._pending_patch_refresh_cancels == {}
+
+
+async def test_collection_write_rejects_newly_disabled_option_before_runtime_stop(hass):
+    """A live option update must block writes before the stop callback runs."""
+    entry = MockConfigEntry(domain=DOMAIN, data={"site_id": RANDOM_SITE_ID})
+    sync, client = await _setup_sync(hass, entry, {"slots": [_slot("slot-1")]})
+    client.patch_schedules = AsyncMock()
+    client.get_schedules.reset_mock()
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, OPT_SCHEDULE_SYNC_ENABLED: False}
+    )
+
+    assert sync._stopping is False
+    assert (
+        await sync.async_replace_slots(RANDOM_SERIAL, [_slot("replacement")]) is False
+    )
+
+    client.patch_schedules.assert_not_awaited()
+    client.get_schedules.assert_not_awaited()
+    assert sync._slot_cache[RANDOM_SERIAL] == {"slot-1": _slot("slot-1")}
+    assert sync._pending_patch_refresh_cancels == {}
+    assert sync._pending_patch_refresh_tasks == {}

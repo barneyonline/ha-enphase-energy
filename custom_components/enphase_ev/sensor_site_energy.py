@@ -21,7 +21,7 @@ from homeassistant.util.unit_conversion import PowerConverter
 from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import DOMAIN, CURRENT_POWER_STALE_AFTER_S
 from .coordinator import EnphaseCoordinator
 from .device_info_helpers import _cloud_device_info
 from .energy import SiteEnergyFlow
@@ -40,6 +40,7 @@ from .sensor_common import (
 )
 from .sensor_snapshot_helpers import restore_power_w
 
+# Legacy sensor facade export; freshness now follows the endpoint-family policy.
 CURRENT_POWER_CACHE_TTL_MULTIPLIER = 2
 
 
@@ -676,6 +677,7 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
             if flow_key in self._flow_signs
         }
         self._restore_live_history()
+        self._schedule_freshness_expiry()
 
     def _restore_live_history(self) -> None:
         """Restore a valid two-sample live history when available."""
@@ -1090,6 +1092,42 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
         if not interval_minutes_values:
             return None
         return max(interval_minutes_values) * 60.0
+
+    def _freshness_deadline(self) -> datetime | None:
+        """Bound derived watts by the oldest contributing source sample."""
+
+        core_deadline: datetime | None = super()._freshness_deadline()
+        now: datetime = dt_util.utcnow()
+        timestamps: list[float] = []
+        flows = self._site_energy_flows()
+        meta_timestamp = self._site_energy_meta().get("last_report_date")
+        current_values, _synthetic_zero_flows = self._current_flow_values()
+        for flow_key in current_values:
+            entry = flows.get(flow_key)
+            if isinstance(entry, SiteEnergyFlow):
+                source = entry.last_report_date
+            elif isinstance(entry, dict):
+                source = entry.get("last_report_date")
+            else:
+                source = None
+            timestamp = self._parse_sample_timestamp(source or meta_timestamp)
+            if timestamp is None:
+                # A missing clock cannot be renewed by unrelated core polls.
+                if self._source_first_observed is None:
+                    self._source_first_observed = now
+                timestamp = min(
+                    self._source_first_observed.timestamp(),
+                    self._last_sample_ts or self._source_first_observed.timestamp(),
+                )
+            if not math.isfinite(timestamp) or timestamp > now.timestamp() + 60:
+                return now
+            timestamps.append(timestamp)
+        if not timestamps:
+            return core_deadline
+        deadline = datetime.fromtimestamp(min(timestamps), tz=timezone.utc) + timedelta(
+            seconds=CURRENT_POWER_STALE_AFTER_S
+        )
+        return min(deadline, core_deadline) if core_deadline is not None else deadline
 
     @property
     def available(self) -> bool:
@@ -1907,12 +1945,10 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
                 self._last_good_reported_precision = int(precision)
         except Exception:  # noqa: BLE001
             self._last_good_reported_precision = None
+        self._schedule_freshness_expiry()
 
     def _cache_ttl(self) -> timedelta:
-        interval = getattr(self._coord, "update_interval", None)
-        if isinstance(interval, timedelta) and interval.total_seconds() > 0:
-            return interval * CURRENT_POWER_CACHE_TTL_MULTIPLIER
-        return timedelta(minutes=CURRENT_POWER_CACHE_TTL_MULTIPLIER)
+        return timedelta(seconds=CURRENT_POWER_STALE_AFTER_S)
 
     def _freshness_reference_utc(self) -> datetime:
         success_utc = _normalize_utc_datetime(
@@ -1931,11 +1967,31 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
         return datetime.now(timezone.utc)
 
     def _cached_sample_is_fresh(self) -> bool:
-        sample_utc = self._last_good_cached_at_utc or self._last_good_sample_utc
+        sample_utc = self._sample_freshness_utc()
         if sample_utc is None:
             return False
-        reference_utc = self._freshness_reference_utc()
-        return reference_utc - sample_utc <= self._cache_ttl()
+        age = self._freshness_reference_utc() - sample_utc
+        return timedelta(0) <= age < self._cache_ttl()
+
+    def _sample_freshness_utc(self) -> datetime | None:
+        """Bound freshness by both acquisition and the source timestamp."""
+
+        timestamps = [
+            stamp
+            for stamp in (
+                self._last_good_cached_at_utc,
+                self._last_good_sample_utc,
+            )
+            if stamp is not None
+        ]
+        return min(timestamps) if timestamps else None
+
+    def _freshness_deadline(self) -> datetime | None:
+        """Expire this endpoint independently of successful core polling."""
+
+        self._current_or_cached_snapshot()
+        sample_utc = self._sample_freshness_utc()
+        return sample_utc + self._cache_ttl() if sample_utc is not None else None
 
     def _clear_last_good_sample(self) -> None:
         self._last_good_value = None
@@ -1957,23 +2013,18 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
         if value is not None:
             self._last_good_value = float(value)
             self._last_good_sample_utc = _normalize_utc_datetime(sample_utc)
-            self._last_good_cached_at_utc = (
-                self._last_good_sample_utc
-                or _normalize_utc_datetime(
-                    getattr(self._coord, "last_success_utc", None)
-                )
-                or self._freshness_reference_utc()
+            if self._source_first_observed is None:
+                self._source_first_observed = self._freshness_reference_utc()
+            received_utc = (
+                self._coord.current_power_runtime.received_utc
+                or self._source_first_observed
+            )
+            self._last_good_cached_at_utc = min(
+                self._last_good_sample_utc or received_utc, received_utc
             )
             self._last_good_source = source
             self._last_good_reported_units = units
             self._last_good_reported_precision = precision
-            return (
-                float(value),
-                self._last_good_sample_utc,
-                source,
-                units,
-                precision,
-            )
 
         if self._last_good_value is not None and not self._cached_sample_is_fresh():
             self._clear_last_good_sample()

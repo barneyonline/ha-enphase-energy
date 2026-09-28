@@ -2216,7 +2216,13 @@ def test_site_grid_power_sensor_uses_interval_floor_for_tiny_timestamp_gap(
 
 def test_site_grid_power_sensor_stays_available_at_zero_when_channel_known(
     coordinator_factory,
+    monkeypatch,
 ) -> None:
+    monkeypatch.setattr(
+        sensor_mod.dt_util,
+        "utcnow",
+        lambda: datetime(2024, 1, 2, 0, 10, tzinfo=timezone.utc),
+    )
     coord = coordinator_factory()
     coord.energy.site_energy = {}
     coord.energy._site_energy_meta = {  # noqa: SLF001
@@ -2232,7 +2238,13 @@ def test_site_grid_power_sensor_stays_available_at_zero_when_channel_known(
 
 def test_site_battery_power_sensor_stays_available_at_zero_when_channel_known(
     coordinator_factory,
+    monkeypatch,
 ) -> None:
+    monkeypatch.setattr(
+        sensor_mod.dt_util,
+        "utcnow",
+        lambda: datetime(2024, 1, 2, 0, 10, tzinfo=timezone.utc),
+    )
     coord = coordinator_factory()
     coord.energy.site_energy = {}
     coord.energy._site_energy_meta = {  # noqa: SLF001
@@ -2254,7 +2266,13 @@ def test_site_battery_power_sensor_stays_available_at_zero_when_channel_known(
 
 def test_site_lifetime_power_sensor_waits_for_first_real_lifetime_sample(
     coordinator_factory,
+    monkeypatch,
 ) -> None:
+    monkeypatch.setattr(
+        sensor_mod.dt_util,
+        "utcnow",
+        lambda: datetime(2024, 1, 2, 0, 10, tzinfo=timezone.utc),
+    )
     coord = coordinator_factory()
     coord.energy.site_energy = {}
     base_ts = datetime(2024, 1, 2, tzinfo=timezone.utc)
@@ -2404,8 +2422,13 @@ async def test_site_lifetime_power_sensor_restores_and_handles_resets(
 
 @pytest.mark.asyncio
 async def test_site_lifetime_power_sensor_clears_stale_restore_when_zero_channel_known(
-    hass, coordinator_factory
+    hass, coordinator_factory, monkeypatch
 ) -> None:
+    monkeypatch.setattr(
+        sensor_mod.dt_util,
+        "utcnow",
+        lambda: datetime(2024, 1, 2, 0, 10, tzinfo=timezone.utc),
+    )
     coord = coordinator_factory()
     coord.energy.site_energy = {}
     coord.energy._site_energy_meta = {  # noqa: SLF001
@@ -2413,6 +2436,9 @@ async def test_site_lifetime_power_sensor_clears_stale_restore_when_zero_channel
         "last_report_date": datetime(2024, 1, 2, tzinfo=timezone.utc),
     }
     sensor = EnphaseGridPowerSensor(coord)
+    # This parser test uses a manually attached entity and a historical clock;
+    # platform timer behavior is covered by test_site_power_freshness.
+    monkeypatch.setattr(sensor, "_schedule_freshness_expiry", lambda: None)
     sensor.hass = hass
 
     class LastState:
@@ -2469,8 +2495,13 @@ async def test_site_lifetime_power_sensor_clears_stale_restore_when_zero_channel
 
 @pytest.mark.asyncio
 async def test_site_lifetime_power_sensor_ignores_restored_non_live_history_on_startup(
-    hass, coordinator_factory
+    hass, coordinator_factory, monkeypatch
 ) -> None:
+    monkeypatch.setattr(
+        sensor_mod.dt_util,
+        "utcnow",
+        lambda: datetime(2024, 1, 2, 0, 10, tzinfo=timezone.utc),
+    )
     coord = coordinator_factory()
     sensor = EnphaseGridPowerSensor(coord)
     sensor.hass = hass
@@ -2576,8 +2607,13 @@ async def test_site_lifetime_power_sensor_ignores_restored_non_live_history_on_s
 
 @pytest.mark.asyncio
 async def test_site_lifetime_power_sensor_ignores_legacy_zeroed_history_on_startup(
-    hass, coordinator_factory
+    hass, coordinator_factory, monkeypatch
 ) -> None:
+    monkeypatch.setattr(
+        sensor_mod.dt_util,
+        "utcnow",
+        lambda: datetime(2024, 1, 2, 0, 10, tzinfo=timezone.utc),
+    )
     coord = coordinator_factory()
     sensor = EnphaseGridPowerSensor(coord)
     sensor.hass = hass
@@ -2656,8 +2692,13 @@ async def test_site_lifetime_power_sensor_ignores_legacy_zeroed_history_on_start
 
 @pytest.mark.asyncio
 async def test_site_lifetime_power_sensor_restores_two_live_samples_for_same_bucket(
-    hass, coordinator_factory
+    hass, coordinator_factory, monkeypatch
 ) -> None:
+    monkeypatch.setattr(
+        sensor_mod.dt_util,
+        "utcnow",
+        lambda: datetime(2024, 1, 2, 0, 10, tzinfo=timezone.utc),
+    )
     coord = coordinator_factory()
     sensor = EnphaseGridPowerSensor(coord)
     sensor.hass = hass
@@ -2710,8 +2751,13 @@ async def test_site_lifetime_power_sensor_restores_two_live_samples_for_same_buc
 
 @pytest.mark.asyncio
 async def test_site_lifetime_power_sensor_restore_uses_interval_floor_for_tiny_gap(
-    hass, coordinator_factory
+    hass, coordinator_factory, monkeypatch
 ) -> None:
+    monkeypatch.setattr(
+        sensor_mod.dt_util,
+        "utcnow",
+        lambda: datetime(2024, 1, 2, 0, 10, tzinfo=timezone.utc),
+    )
     coord = coordinator_factory()
     sensor = EnphaseGridPowerSensor(coord)
     sensor.hass = hass
@@ -2765,8 +2811,13 @@ async def test_site_lifetime_power_sensor_restore_uses_interval_floor_for_tiny_g
 
 @pytest.mark.asyncio
 async def test_site_lifetime_power_sensor_does_not_reuse_same_bucket_restore_without_extra_history(
-    hass, coordinator_factory
+    hass, coordinator_factory, monkeypatch
 ) -> None:
+    monkeypatch.setattr(
+        sensor_mod.dt_util,
+        "utcnow",
+        lambda: datetime(2024, 1, 2, 0, 10, tzinfo=timezone.utc),
+    )
     coord = coordinator_factory()
     sensor = EnphaseGridPowerSensor(coord)
     sensor.hass = hass
@@ -2808,8 +2859,13 @@ async def test_site_lifetime_power_sensor_does_not_reuse_same_bucket_restore_wit
 
 @pytest.mark.asyncio
 async def test_site_lifetime_power_sensor_ignores_same_bucket_restore_with_tiny_window_without_extra_history(
-    hass, coordinator_factory
+    hass, coordinator_factory, monkeypatch
 ) -> None:
+    monkeypatch.setattr(
+        sensor_mod.dt_util,
+        "utcnow",
+        lambda: datetime(2024, 1, 2, 0, 10, tzinfo=timezone.utc),
+    )
     coord = coordinator_factory()
     sensor = EnphaseGridPowerSensor(coord)
     sensor.hass = hass
@@ -2851,8 +2907,13 @@ async def test_site_lifetime_power_sensor_ignores_same_bucket_restore_with_tiny_
 
 @pytest.mark.asyncio
 async def test_site_lifetime_power_sensor_ignores_zeroed_previous_restore_history(
-    hass, coordinator_factory
+    hass, coordinator_factory, monkeypatch
 ) -> None:
+    monkeypatch.setattr(
+        sensor_mod.dt_util,
+        "utcnow",
+        lambda: datetime(2024, 1, 2, 0, 10, tzinfo=timezone.utc),
+    )
     coord = coordinator_factory()
     sensor = EnphaseGridPowerSensor(coord)
     sensor.hass = hass
@@ -2930,8 +2991,13 @@ async def test_site_lifetime_power_sensor_ignores_zeroed_previous_restore_histor
 
 @pytest.mark.asyncio
 async def test_site_lifetime_power_sensor_discards_restored_power_when_extra_history_is_invalid(
-    hass, coordinator_factory
+    hass, coordinator_factory, monkeypatch
 ) -> None:
+    monkeypatch.setattr(
+        sensor_mod.dt_util,
+        "utcnow",
+        lambda: datetime(2024, 1, 2, 0, 10, tzinfo=timezone.utc),
+    )
     coord = coordinator_factory()
     sensor = EnphaseGridPowerSensor(coord)
     sensor.hass = hass

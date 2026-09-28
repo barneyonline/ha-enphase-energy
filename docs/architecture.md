@@ -106,6 +106,13 @@ The coordinator distinguishes core failures from optional endpoint failures:
 - Rate limits and cloud outages enter bounded backoff and expose diagnostic sensors.
 - Optional endpoint failures mark that family stale, preserve recent useful data where safe, and report repairs when needed.
 
+`endpoint_policies.py` defines immutable cache and cooldown policies separately
+from the coordinator. Each config entry receives its own policy mapping and
+health state. Feature runtimes can use the public `endpoint_family_should_run`,
+`note_endpoint_family_success`, and `note_endpoint_family_failure` services;
+`CurrentPowerHost` is the narrow typed contract used by the current-power runtime.
+Existing private coordinator entry points remain available for compatibility.
+
 Authentication refresh uses its own lock and one shared, cancellation-shielded
 login task, so a 401 during a poll cannot reacquire the poll lock. JSON login-wall
 responses use the same shared refresh, including reuse of a recent success, and
@@ -180,6 +187,11 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
 
 - `battery_runtime.py` handles BatteryConfig controls, profile state, schedules, pending writes, and battery diagnostics payloads.
 - `evse_runtime.py` handles charger commands, fast polling, streaming, charge-mode cache, auth settings, and EVSE control side effects.
+  Start, Stop, and automatic resume share a per-charger command lock. Explicit
+  intent is recorded before waiting, so a newer Stop follows an already-issued
+  Start and obsolete retries or state updates cannot override it. A newer command
+  cancels any queued amp-change restart; the restart verifies ownership before
+  its delayed Start and bypasses stale charging telemetry after its own Stop.
 - `cloud_metadata.py` reads optional bootstrap and site-summary metadata during warmup and normal follow-up refreshes. It retains only timezone, site country/currency, and complete boolean access flags in `InventoryState`, so metadata changes participate in snapshot equality. Reads cannot trigger reauthentication, retry after 15 minutes on incomplete responses, and refresh after six hours on success. Account identities are compared only to determine ownership and are not retained.
 - `inventory_runtime.py` handles topology, type buckets, HEMS inventory, and system-dashboard payloads.
   Its inverter refresh uses `array_capacity.py` for optional six-hour nameplate
@@ -255,6 +267,19 @@ source-specific policies. Cumulative energy totals remain available as historica
 measurements. Daily heat-pump totals expose a source-day `last_reset` so recorder
 handles midnight and within-day corrections correctly.
 
+Current Grid Power and Current Battery Power expire when their contributing
+source samples exceed a 15-minute freshness window, even if core polling remains
+healthy. Battery and heat-pump family recovery is published when freshness is
+restored, including when the measurement itself has not changed. This restores
+availability and expiry timers without publishing every identical successful poll.
+
+Current Production Power checks its source timestamp even when the runtime still
+holds a numeric value and core polling remains healthy. Its acquisition time caps
+future source timestamps and provides a fallback when a timestamp is absent.
+The endpoint's 15-minute stale window also drives entity-owned expiry timers,
+independently of changes to core polling cadence. Current Power Consumption's
+separate derived-power behavior is unchanged.
+
 Inverter discovery uses `inverter_inventory.py` for bounded pagination with an
 explicit completeness result. Partial, repeated, or malformed inventory cannot
 authorize pruning previously known devices.
@@ -297,6 +322,30 @@ entry to another site. Platform setup uses a separate runtime accessor.
 ## Schedule Editing And Sync
 
 EVSE schedules use Home Assistant schedule helpers through `schedule_sync.py`. The sync layer mirrors Enphase scheduler slots into helper entities and pushes helper changes back to Enphase. It keeps server timestamps as optimistic concurrency metadata and refreshes shortly after writes because scheduler reads can lag writes.
+
+Schedule write helpers return an explicit success result, including existing-slot
+updates, toggles, collection replacements, and deletion. Save and Delete buttons
+surface rejection with the same translated error instead of treating a swallowed
+transport failure as a successful action. Lifecycle checks prevent writes that
+finish after shutdown from publishing stale state or restarting refresh timers.
+All schedule mutations use the same authentication-failure handling.
+
+Tariff writes are serialized per config-entry runtime across read, modification,
+write, and immediate reconciliation. Recently acknowledged changes are retained
+for at most 60 seconds per accepted transition while cloud reads lag. The ordered
+history distinguishes intermediate readback of the integration's own writes from
+external edits, and incomplete responses cannot erase pending acknowledgements.
+Stable item identifiers allow independent period edits to be merged; external
+conflicting values and structural changes remain authoritative. Failed writes do
+not become acknowledged state or extend its deadline. If a tariff write succeeds
+but the following billing update fails, bounded best-effort notification and
+reconciliation still run while the original error is preserved. Diagnostics expose
+partial completion without including tariff payloads. Readback continues to
+determine visible tariff values, and failure logs use shared redaction helpers.
+Cancelled writes perform bounded follow-up inline without creating new delayed
+reconciliation tasks. Without cloud version tokens, an external edit matching a
+recent acknowledged value cannot be distinguished from lagging readback; each
+transition's 60-second expiry bounds that ambiguity.
 
 Battery schedule editing is separate and lives in `battery_schedule_editor.py`. It normalizes BatteryConfig schedule families (`cfg`, `dtg`, `rbd`) into one editor model while preserving schedule type, days, limits, and fallback state from coordinator scalar fields.
 

@@ -435,6 +435,7 @@ class ChargingAmpsNumber(EnphaseBaseEntity, NumberEntity):  # type: ignore[misc]
 
     async def async_set_native_value(self, value: float) -> None:
         amps = int(value)
+        intent = self._coord.charging_command_token(self._sn)
         # Store desired setpoint locally; do not start charging here.
         # Start actions (switch/button/service) will use this setpoint.
         self._coord.set_last_set_amps(self._sn, amps)
@@ -443,7 +444,7 @@ class ChargingAmpsNumber(EnphaseBaseEntity, NumberEntity):  # type: ignore[misc]
             self._coord, self._sn
         ):
             # Restart the active session so the updated amps take effect
-            self._coord.schedule_amp_restart(self._sn)
+            self._coord.schedule_amp_restart(self._sn, expected_token=intent)
 
 
 class DefaultChargeLevelNumber(EnphaseBaseEntity, NumberEntity):  # type: ignore[misc]

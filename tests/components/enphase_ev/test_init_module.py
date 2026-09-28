@@ -2043,6 +2043,7 @@ async def test_async_unload_entry_cancels_background_lifecycle_tasks(
             self._topology_listeners = [Mock()]
             self.schedule_sync = schedule_sync
             self.evse_runtime = SimpleNamespace(
+                invalidate_amp_restart_intents=Mock(),
                 prune_runtime_caches=Mock(),
             )
 

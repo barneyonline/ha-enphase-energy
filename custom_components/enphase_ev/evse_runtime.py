@@ -100,6 +100,13 @@ class ChargeModeResolution:
     source: str | None = None
 
 
+@dataclass(slots=True)
+class _AmpRestartIntent:
+    """Own a restart before Home Assistant eagerly executes its task."""
+
+    owner: object | None = None
+
+
 def evse_power_is_actively_charging(
     connector_status: object,
     charging: object,
@@ -137,6 +144,9 @@ class EvseRuntime:
         self.coordinator = coordinator
         self.state = EVSEState()
         self._lookup_semaphore = asyncio.Semaphore(EVSE_LOOKUP_CONCURRENCY)
+        self._amp_restart_intents: dict[str, _AmpRestartIntent] = {}
+        self._charging_command_tokens: dict[str, object] = {}
+        self._charging_command_locks: dict[str, asyncio.Lock] = {}
 
     @property
     def snapshot(self) -> EvseControlSnapshot:
@@ -415,6 +425,13 @@ class EvseRuntime:
         else:
             coord._serial_order = [sn for sn in keep_serials]
         self.state.prune(keep_serials)
+        for sn in tuple(self._charging_command_tokens):
+            if sn not in keep_serials:
+                self._charging_command_tokens.pop(sn)
+        for sn in tuple(getattr(coord, "_amp_restart_tasks", {})):
+            if sn not in keep_serials:
+                self._amp_restart_intents.pop(sn, None)
+                self._cancel_pending_amp_restart(sn)
         for attr_name in (
             "last_set_amps",
             "_operating_v",
@@ -533,14 +550,23 @@ class EvseRuntime:
     async def async_auto_resume(
         self, sn: str, snapshot: dict[str, object] | None = None
     ) -> None:
+        sn_str = str(sn)
+        token = self.charging_command_token(sn_str)
         with request_metrics_scope("write_followup"):
-            await self._async_auto_resume_impl(sn, snapshot)
+            async with self._charging_command_lock(sn_str):
+                if (
+                    not self._charging_command_is_current(sn_str, token)
+                    or self.get_desired_charging(sn_str) is False
+                ):
+                    return
+                await self._async_auto_resume_impl(sn_str, snapshot)
 
     async def _async_auto_resume_impl(
         self, sn: str, snapshot: dict[str, object] | None = None
     ) -> None:
         coord = self.coordinator
         sn_str = str(sn)
+        token = self.charging_command_token(sn_str)
         try:
             current = (coord.data or {}).get(sn_str, {})
         except Exception:  # noqa: BLE001
@@ -565,6 +591,7 @@ class EvseRuntime:
                 amps,
                 prefs,
                 requested_amps=None,
+                expected_token=token,
             )
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug(
@@ -572,6 +599,8 @@ class EvseRuntime:
                 redact_identifier(sn_str),
                 redact_text(err, site_ids=(coord.site_id,), identifiers=(sn_str,)),
             )
+            return
+        if not self._charging_command_is_current(sn_str, token):
             return
         coord.set_last_set_amps(sn_str, amps)
         if isinstance(result, dict) and result.get("status") == "not_ready":
@@ -582,6 +611,8 @@ class EvseRuntime:
             return
         if prefs.enforce_mode:
             await coord._ensure_charge_mode(sn_str, prefs.enforce_mode)
+        if not self._charging_command_is_current(sn_str, token):
+            return
         _LOGGER.info(
             "Auto-resume start_charging issued for charger %s after suspension",
             redact_identifier(sn_str),
@@ -697,50 +728,68 @@ class EvseRuntime:
     ) -> object:
         coord = self.coordinator
         sn_str = str(sn)
-        if not allow_unplugged:
-            coord.require_plugged(sn_str)
-        try:
-            data = (coord.data or {}).get(sn_str, {})
-        except Exception:
-            data = {}
-        if requested_amps is None and evse_power_is_actively_charging(
-            data.get("connector_status"),
-            data.get("charging"),
-            suspended_by_evse=data.get("suspended_by_evse", False),
-        ):
+        superseded_command = self._begin_charging_command(sn_str)
+        token = self.charging_command_token(sn_str)
+        async with self._charging_command_lock(sn_str):
+            if not self._charging_command_is_current(sn_str, token):
+                return {"status": "superseded"}
+            if not allow_unplugged:
+                coord.require_plugged(sn_str)
+            try:
+                data = (coord.data or {}).get(sn_str, {})
+            except Exception:
+                data = {}
+            if (
+                requested_amps is None
+                and not superseded_command
+                and not self._is_amp_restart_owner(sn_str)
+                and self.get_desired_charging(sn_str) is not False
+                and evse_power_is_actively_charging(
+                    data.get("connector_status"),
+                    data.get("charging"),
+                    suspended_by_evse=data.get("suspended_by_evse", False),
+                )
+            ):
+                coord.set_desired_charging(sn_str, True)
+                coord.set_charging_expectation(sn_str, True, hold_for=hold_seconds)
+                return {"status": "already_charging"}
+            if data.get("auth_required") is True:
+                display = data.get("display_name") or data.get("name") or sn_str
+                _LOGGER.warning(
+                    "Start charging requested for %s but session authentication is required; charging will begin after app/RFID auth completes.",
+                    redact_identifier(display),
+                )
+            fallback = int(fallback_amps) if fallback_amps is not None else 32
+            amps = coord.pick_start_amps(sn_str, requested_amps, fallback=fallback)
+            prefs = coord._charge_mode_start_preferences(sn_str)
+            result = await self.async_issue_start_charging(
+                sn_str,
+                amps,
+                prefs,
+                connector_id=connector_id,
+                requested_amps=requested_amps,
+                expected_token=token,
+            )
+            if not self._charging_command_is_current(sn_str, token):
+                return {"status": "superseded"}
+            coord.set_last_set_amps(sn_str, amps)
+            if isinstance(result, dict) and result.get("status") == "not_ready":
+                coord.set_desired_charging(sn_str, False)
+                return result
+            await coord.async_start_streaming(
+                manual=False, serial=sn_str, expected_state=True
+            )
+            if not self._charging_command_is_current(sn_str, token):
+                return {"status": "superseded"}
             coord.set_desired_charging(sn_str, True)
             coord.set_charging_expectation(sn_str, True, hold_for=hold_seconds)
-            return {"status": "already_charging"}
-        if data.get("auth_required") is True:
-            display = data.get("display_name") or data.get("name") or sn_str
-            _LOGGER.warning(
-                "Start charging requested for %s but session authentication is required; charging will begin after app/RFID auth completes.",
-                redact_identifier(display),
-            )
-        fallback = int(fallback_amps) if fallback_amps is not None else 32
-        amps = coord.pick_start_amps(sn_str, requested_amps, fallback=fallback)
-        prefs = coord._charge_mode_start_preferences(sn_str)
-        result = await self.async_issue_start_charging(
-            sn_str,
-            amps,
-            prefs,
-            connector_id=connector_id,
-            requested_amps=requested_amps,
-        )
-        coord.set_last_set_amps(sn_str, amps)
-        if isinstance(result, dict) and result.get("status") == "not_ready":
-            coord.set_desired_charging(sn_str, False)
+            coord.kick_fast(int(hold_seconds))
+            if prefs.enforce_mode:
+                await coord._ensure_charge_mode(sn_str, prefs.enforce_mode)
+            if not self._charging_command_is_current(sn_str, token):
+                return {"status": "superseded"}
+            await coord.async_request_refresh()
             return result
-        await coord.async_start_streaming(
-            manual=False, serial=sn_str, expected_state=True
-        )
-        coord.set_desired_charging(sn_str, True)
-        coord.set_charging_expectation(sn_str, True, hold_for=hold_seconds)
-        coord.kick_fast(int(hold_seconds))
-        if prefs.enforce_mode:
-            await coord._ensure_charge_mode(sn_str, prefs.enforce_mode)
-        await coord.async_request_refresh()
-        return result
 
     async def async_issue_start_charging(
         self,
@@ -750,6 +799,7 @@ class EvseRuntime:
         *,
         connector_id: int | None = 1,
         requested_amps: int | float | str | None = None,
+        expected_token: object | None = None,
     ) -> object:
         coord = self.coordinator
         sn_str = str(sn)
@@ -779,6 +829,10 @@ class EvseRuntime:
                 strict_preference=strict_preference,
             )
         except aiohttp.ClientResponseError as err:
+            if expected_token is not None and not self._charging_command_is_current(
+                sn_str, expected_token
+            ):
+                return {"status": "superseded"}
             if (
                 requested_amps is None
                 and include_level is True
@@ -826,27 +880,100 @@ class EvseRuntime:
     ) -> object:
         coord = self.coordinator
         sn_str = str(sn)
-        prefs = coord._charge_mode_start_preferences(sn_str)
-        if not allow_unplugged:
-            coord.require_plugged(sn_str)
-        result = await coord.client.stop_charging(sn_str)
-        await coord.async_start_streaming(
-            manual=False, serial=sn_str, expected_state=False
-        )
-        coord.set_desired_charging(sn_str, False)
-        coord.set_charging_expectation(sn_str, False, hold_for=hold_seconds)
-        coord.kick_fast(fast_seconds)
-        if prefs.enforce_mode == "SCHEDULED_CHARGING":
-            await coord._ensure_charge_mode(sn_str, prefs.enforce_mode)
-        await coord.async_request_refresh()
-        return result
+        self._begin_charging_command(sn_str)
+        token = self.charging_command_token(sn_str)
+        async with self._charging_command_lock(sn_str):
+            if not self._charging_command_is_current(sn_str, token):
+                return {"status": "superseded"}
+            prefs = coord._charge_mode_start_preferences(sn_str)
+            if not allow_unplugged:
+                coord.require_plugged(sn_str)
+            result = await coord.client.stop_charging(sn_str)
+            if not self._charging_command_is_current(sn_str, token):
+                return {"status": "superseded"}
+            await coord.async_start_streaming(
+                manual=False, serial=sn_str, expected_state=False
+            )
+            if not self._charging_command_is_current(sn_str, token):
+                return {"status": "superseded"}
+            coord.set_desired_charging(sn_str, False)
+            coord.set_charging_expectation(sn_str, False, hold_for=hold_seconds)
+            coord.kick_fast(fast_seconds)
+            if prefs.enforce_mode == "SCHEDULED_CHARGING":
+                await coord._ensure_charge_mode(sn_str, prefs.enforce_mode)
+            if not self._charging_command_is_current(sn_str, token):
+                return {"status": "superseded"}
+            await coord.async_request_refresh()
+            return result
 
-    def schedule_amp_restart(self, sn: str, delay: float = AMP_RESTART_DELAY_S) -> None:
+    def invalidate_amp_restart_intents(self) -> None:
+        """Invalidate delayed commands before lifecycle task cancellation."""
+        self._amp_restart_intents.clear()
+        self._charging_command_tokens.clear()
+
+    def charging_command_token(self, sn: str) -> object:
+        """Identify the latest explicit command for one charger."""
+        return self._charging_command_tokens.setdefault(str(sn), object())
+
+    def _charging_command_lock(self, sn: str) -> asyncio.Lock:
+        """Serialize cloud commands, retaining locks while older calls may wait."""
+        return self._charging_command_locks.setdefault(sn, asyncio.Lock())
+
+    def _charging_command_active(self, sn: str) -> bool:
+        lock = self._charging_command_locks.get(sn)
+        return lock is not None and lock.locked()
+
+    def _charging_command_is_current(self, sn: str, token: object) -> bool:
+        return self._charging_command_tokens.get(sn) is token
+
+    def _is_amp_restart_owner(self, sn: str) -> bool:
+        intent = self._amp_restart_intents.get(sn)
+        return intent is not None and intent.owner is asyncio.current_task()
+
+    def _begin_charging_command(self, sn: str) -> bool:
+        """Record explicit intent without counting a restart's own commands."""
+        if self._is_amp_restart_owner(sn):
+            return False
+        self._charging_command_tokens[sn] = object()
+        superseded_restart = self._cancel_pending_amp_restart(sn)
+        return superseded_restart or self._charging_command_active(sn)
+
+    def _cancel_pending_amp_restart(self, sn: str) -> bool:
+        """Let a newer explicit command supersede a queued amp restart."""
+        task = getattr(self.coordinator, "_amp_restart_tasks", {}).get(sn)
+        # The restart's own stop/start commands belong to the same intent.
+        if task is None or task is asyncio.current_task():
+            return False
+        self.coordinator._amp_restart_tasks.pop(sn, None)
+        self._amp_restart_intents.pop(sn, None)
+        if not task.done() and not self._charging_command_active(sn):
+            task.cancel()
+        return True
+
+    def schedule_amp_restart(
+        self,
+        sn: str,
+        delay: float = AMP_RESTART_DELAY_S,
+        *,
+        expected_token: object | None = None,
+    ) -> None:
         coord = self.coordinator
         sn_str = str(sn)
+        if (
+            expected_token is not None
+            and self.charging_command_token(sn_str) is not expected_token
+        ):
+            return
         existing = coord._amp_restart_tasks.pop(sn_str, None)
-        if existing and not existing.done():
+        if (
+            existing
+            and not existing.done()
+            and not self._charging_command_active(sn_str)
+        ):
             existing.cancel()
+        # HA may start tasks eagerly, before async_create_task returns.
+        # Publish intent before creating the task so its first await can see it.
+        self._amp_restart_intents[sn_str] = _AmpRestartIntent()
         restart = self._instance_override("_async_restart_after_amp_change")
         if not callable(restart):
             restart = self.async_restart_after_amp_change
@@ -858,17 +985,22 @@ class EvseRuntime:
         except TypeError:
             task = coord.hass.async_create_task(restart(sn_str, delay))
         coord._amp_restart_tasks[sn_str] = task
+        coord.track_entry_background_task(task)
 
         def _cleanup(_: object) -> None:
             stored = coord._amp_restart_tasks.get(sn_str)
             if stored is task:
                 coord._amp_restart_tasks.pop(sn_str, None)
+                self._amp_restart_intents.pop(sn_str, None)
 
         task.add_done_callback(_cleanup)
 
     async def async_restart_after_amp_change(self, sn: str, delay: float) -> None:
         coord = self.coordinator
         sn_str = str(sn)
+        intent = self._amp_restart_intents.get(sn_str)
+        if intent is not None:
+            intent.owner = asyncio.current_task()
         try:
             delay_s = max(0.0, float(delay))
         except Exception:  # noqa: BLE001
@@ -892,6 +1024,8 @@ class EvseRuntime:
                 redact_text(err, site_ids=(coord.site_id,), identifiers=(sn_str,)),
             )
             return
+        if intent is not None and self._amp_restart_intents.get(sn_str) is not intent:
+            return
         if delay_s:
             try:
                 await asyncio.sleep(delay_s)
@@ -899,6 +1033,9 @@ class EvseRuntime:
                 raise
             except Exception:  # noqa: BLE001
                 return
+        # Recheck ownership even if a dependency suppressed task cancellation.
+        if intent is not None and self._amp_restart_intents.get(sn_str) is not intent:
+            return
         try:
             await coord.async_start_charging(sn_str)
         except asyncio.CancelledError:

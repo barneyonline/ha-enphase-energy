@@ -642,4 +642,9 @@ class EvseScheduleDeleteButton(_EvseScheduleButton):
         schedule_sync = getattr(self._coord, "schedule_sync", None)
         if schedule_sync is None:
             return
-        await schedule_sync.async_delete_slot(self._sn, slot_id)
+        if not await schedule_sync.async_delete_slot(self._sn, slot_id):
+            raise ServiceValidationError(
+                "Enphase rejected the schedule change.",
+                translation_domain=DOMAIN,
+                translation_key="evse_schedule_change_rejected",
+            )

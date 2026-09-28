@@ -936,3 +936,407 @@ async def test_replacing_amp_restart_cancels_old_sequence(
     await original_sleep(0)
     coord.async_start_charging.assert_awaited_once_with("EV1")
     assert coord._amp_restart_tasks == {}
+
+
+@pytest.mark.parametrize("command", ["start", "stop"])
+@pytest.mark.parametrize("phase", ["stop", "delay"])
+async def test_explicit_charging_intent_supersedes_amp_restart(
+    coordinator_factory, monkeypatch, command, phase
+):
+    """New commands cancel the actual restart during either stop or delay."""
+    coord = coordinator_factory(serials=["EV1"])
+    coord.data = {"EV1": {"plugged": True, "charging": True}}
+    coord.async_start_streaming = AsyncMock()
+    coord.async_request_refresh = AsyncMock()
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    calls = []
+
+    async def stop(_sn):
+        calls.append("stop")
+        if phase == "stop" and len(calls) == 1:
+            entered.set()
+            await release.wait()
+        return {"status": "ok"}
+
+    async def start(*_args, **_kwargs):
+        calls.append("start")
+        return {"status": "ok"}
+
+    async def delay(_seconds):
+        entered.set()
+        await asyncio.Event().wait()
+
+    coord.client.stop_charging = AsyncMock(side_effect=stop)
+    coord.client.start_charging = AsyncMock(side_effect=start)
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.evse_runtime.asyncio",
+        SimpleNamespace(**(vars(asyncio) | {"sleep": delay})),
+    )
+    coord.schedule_amp_restart("EV1")
+    restart = coord._amp_restart_tasks["EV1"]
+    await asyncio.wait_for(entered.wait(), 1)
+    latest = asyncio.create_task(getattr(coord, f"async_{command}_charging")("EV1"))
+    await asyncio.sleep(0)
+    if phase == "stop":
+        assert not latest.done()
+        release.set()
+        await restart
+    else:
+        with pytest.raises(asyncio.CancelledError):
+            await restart
+    await latest
+    assert calls == ["stop", command]
+    assert coord.get_desired_charging("EV1") is (command == "start")
+    assert coord._amp_restart_tasks == {}
+
+
+@pytest.mark.parametrize("action", ["stop", "cleanup", "prune"])
+async def test_amp_restart_rechecks_ownership_after_suppressed_cancellation(
+    coordinator_factory, monkeypatch, action
+):
+    """A dependency suppressing cancellation cannot revive obsolete intent."""
+    coord = coordinator_factory(serials=["EV1"])
+    coord.data = {"EV1": {"plugged": True, "charging": False}}
+    coord.client.stop_charging = AsyncMock(return_value={"status": "ok"})
+    coord.client.start_charging = AsyncMock()
+    coord.async_start_streaming = AsyncMock()
+    coord.async_request_refresh = AsyncMock()
+    entered = asyncio.Event()
+
+    async def delay(_seconds):
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            return
+
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.evse_runtime.asyncio",
+        SimpleNamespace(**(vars(asyncio) | {"sleep": delay})),
+    )
+    coord.schedule_amp_restart("EV1")
+    restart = coord._amp_restart_tasks["EV1"]
+    await asyncio.wait_for(entered.wait(), 1)
+    if action == "cleanup":
+        await coord.async_cleanup_runtime_state()
+    elif action == "prune":
+        coord._devices_inventory_ready = True
+        # A retained charger must keep its pending intent until removal.
+        coord.evse_runtime.prune_serial_runtime_state(["EV1"])
+        assert coord._amp_restart_tasks["EV1"] is restart
+        coord.evse_runtime.prune_serial_runtime_state([])
+    else:
+        await coord.async_stop_charging("EV1")
+    await asyncio.wait_for(restart, 1)
+    coord.client.start_charging.assert_not_awaited()
+    assert coord.get_desired_charging("EV1") is not True
+    assert coord.evse_runtime._amp_restart_intents == {}
+
+
+async def test_explicit_stop_clears_completed_amp_restart(coordinator_factory):
+    """A finished task awaiting its cleanup callback is safe to discard."""
+    coord = coordinator_factory(serials=["EV1"])
+    coord.client.stop_charging = AsyncMock()
+    coord.async_start_streaming = AsyncMock()
+    coord.async_request_refresh = AsyncMock()
+    completed = asyncio.create_task(asyncio.sleep(0))
+    await completed
+    coord._amp_restart_tasks["EV1"] = completed
+    await coord.async_stop_charging("EV1")
+    assert coord._amp_restart_tasks == {}
+
+
+async def test_amp_restart_preserves_command_token_for_same_intent_retry(
+    coordinator_factory, monkeypatch
+):
+    """Internal stops/starts must not invalidate a later amp edit's valid token."""
+    coord = coordinator_factory(serials=["EV1"])
+    coord.data = {"EV1": {"plugged": True, "charging": False}}
+    coord.client.stop_charging = AsyncMock(return_value={"status": "ok"})
+    coord.client.start_charging = AsyncMock(return_value={"status": "ok"})
+    coord.async_start_streaming = AsyncMock()
+    coord.async_request_refresh = AsyncMock()
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def delay(_seconds):
+        entered.set()
+        await release.wait()
+
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.evse_runtime.asyncio",
+        SimpleNamespace(**(vars(asyncio) | {"sleep": delay})),
+    )
+    token = coord.charging_command_token("EV1")
+    coord.schedule_amp_restart("EV1", expected_token=token)
+    original = coord._amp_restart_tasks["EV1"]
+    await asyncio.wait_for(entered.wait(), 1)
+    assert coord.charging_command_token("EV1") is token
+    coord.set_last_set_amps("EV1", 24)
+    coord.schedule_amp_restart("EV1", expected_token=token)
+    replacement = coord._amp_restart_tasks["EV1"]
+    with pytest.raises(asyncio.CancelledError):
+        await original
+    release.set()
+    await asyncio.wait_for(replacement, 1)
+
+    assert coord.client.stop_charging.await_count == 2
+    coord.client.start_charging.assert_awaited_once()
+    assert coord.client.start_charging.await_args.args[:2] == ("EV1", 24)
+    assert coord.charging_command_token("EV1") is token
+
+
+async def test_removed_charger_rejects_deferred_amp_restart_without_affecting_retained(
+    coordinator_factory,
+):
+    """Inventory pruning invalidates deferred writes only for retired chargers."""
+    coord = coordinator_factory(serials=["EV1", "EV2"])
+    coord._devices_inventory_ready = True
+    coord.data = {
+        "EV1": {"plugged": True, "charging": False},
+        "EV2": {"plugged": True, "charging": False},
+    }
+    coord.client.stop_charging = AsyncMock(return_value={"status": "ok"})
+    coord.client.start_charging = AsyncMock(return_value={"status": "ok"})
+    coord.async_start_streaming = AsyncMock()
+    coord.async_request_refresh = AsyncMock()
+    removed_token = coord.charging_command_token("EV1")
+    retained_token = coord.charging_command_token("EV2")
+
+    coord.evse_runtime.prune_serial_runtime_state(["EV2"])
+    coord.schedule_amp_restart("EV1", delay=0, expected_token=removed_token)
+
+    assert coord._amp_restart_tasks == {}
+    coord.client.stop_charging.assert_not_awaited()
+    coord.client.start_charging.assert_not_awaited()
+    assert coord.charging_command_token("EV2") is retained_token
+
+    coord.schedule_amp_restart("EV2", delay=0, expected_token=retained_token)
+    await coord._amp_restart_tasks["EV2"]
+
+    coord.client.stop_charging.assert_awaited_once_with("EV2")
+    coord.client.start_charging.assert_awaited_once()
+    assert coord.client.start_charging.await_args.args[0] == "EV2"
+    assert coord.charging_command_token("EV2") is retained_token
+
+
+@pytest.mark.parametrize("older", ["start", "stop"])
+@pytest.mark.parametrize("phase", ["cloud", "streaming", "mode"])
+async def test_newer_command_waits_for_inflight_io_and_owns_side_effects(
+    coordinator_factory, older, phase
+):
+    """Newer intent sends last and stale completion cannot republish its state."""
+    coord = coordinator_factory(serials=["EV1"])
+    coord.data = {"EV1": {"plugged": True, "charging": older == "stop"}}
+    coord._charge_mode_start_preferences = lambda _sn: ChargeModeStartPreferences(
+        enforce_mode="SCHEDULED_CHARGING"
+    )
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    cloud_order = []
+
+    async def cloud(command, *_args, **_kwargs):
+        if phase == "cloud" and command == older:
+            entered.set()
+            await release.wait()
+        cloud_order.append(command)
+        return {"status": "ok"}
+
+    async def followup(*_args, **_kwargs):
+        if not entered.is_set():
+            entered.set()
+            await release.wait()
+
+    async def start(*args, **kwargs):
+        return await cloud("start", *args, **kwargs)
+
+    async def stop(*args, **kwargs):
+        return await cloud("stop", *args, **kwargs)
+
+    coord.client.start_charging = AsyncMock(side_effect=start)
+    coord.client.stop_charging = AsyncMock(side_effect=stop)
+    coord.async_start_streaming = AsyncMock(
+        side_effect=followup if phase == "streaming" else None
+    )
+    coord._ensure_charge_mode = AsyncMock(
+        side_effect=followup if phase == "mode" else None
+    )
+    coord.async_request_refresh = AsyncMock()
+    first = asyncio.create_task(getattr(coord, f"async_{older}_charging")("EV1"))
+    await asyncio.wait_for(entered.wait(), 1)
+    newer = "stop" if older == "start" else "start"
+    latest = asyncio.create_task(getattr(coord, f"async_{newer}_charging")("EV1"))
+    await asyncio.sleep(0)
+    assert not latest.done()
+    release.set()
+    assert await first == {"status": "superseded"}
+    await latest
+    assert cloud_order == [older, newer]
+    assert coord.get_desired_charging("EV1") is (newer == "start")
+    assert coord.evse_runtime.state._pending_charging["EV1"][0] is (newer == "start")
+    coord.async_request_refresh.assert_awaited_once()
+
+
+@pytest.mark.parametrize("automatic", [False, True])
+async def test_newer_stop_prevents_start_fallback_retry(coordinator_factory, automatic):
+    """A failed old Start must never retry after Stop takes ownership."""
+    coord = coordinator_factory(serials=["EV1"])
+    coord.data = {"EV1": {"plugged": True, "charging": False}}
+    coord.set_desired_charging("EV1", True)
+    coord._charge_mode_start_preferences = lambda _sn: ChargeModeStartPreferences(
+        include_level=True
+    )
+    coord.async_start_streaming = AsyncMock()
+    coord.async_request_refresh = AsyncMock()
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def start(*_args, **_kwargs):
+        entered.set()
+        await release.wait()
+        raise _client_response_error(500, message="invalid charge level")
+
+    coord.client.start_charging = AsyncMock(side_effect=start)
+    coord.client.stop_charging = AsyncMock(return_value={"status": "ok"})
+    first = asyncio.create_task(
+        coord.evse_runtime.async_auto_resume("EV1")
+        if automatic
+        else coord.async_start_charging("EV1")
+    )
+    await asyncio.wait_for(entered.wait(), 1)
+    latest = asyncio.create_task(coord.async_stop_charging("EV1"))
+    await asyncio.sleep(0)
+    coord.client.stop_charging.assert_not_awaited()
+    release.set()
+    await first
+    await latest
+    coord.client.start_charging.assert_awaited_once()
+    coord.client.stop_charging.assert_awaited_once()
+    assert coord.get_desired_charging("EV1") is False
+    assert coord.evse_runtime.state._pending_charging["EV1"][0] is False
+
+
+async def test_amp_restart_starts_despite_stale_charging_telemetry(coordinator_factory):
+    coord = coordinator_factory(serials=["EV1"])
+    coord.data = {"EV1": {"plugged": True, "charging": True}}
+    coord.client.stop_charging = AsyncMock(return_value={"status": "ok"})
+    coord.client.start_charging = AsyncMock(return_value={"status": "ok"})
+    coord.async_start_streaming = AsyncMock()
+    coord.async_request_refresh = AsyncMock()
+    coord.schedule_amp_restart("EV1", delay=0)
+    await coord._amp_restart_tasks["EV1"]
+    coord.client.stop_charging.assert_awaited_once_with("EV1")
+    coord.client.start_charging.assert_awaited_once()
+
+
+@pytest.mark.parametrize("queued", ["start", "stop", "auto_resume"])
+async def test_newer_intent_supersedes_queued_command(coordinator_factory, queued):
+    """A queued operation rechecks intent only after acquiring its own lock."""
+    coord = coordinator_factory(serials=["EV1"])
+    coord.data = {"EV1": {"plugged": True, "charging": False}}
+    coord.set_desired_charging("EV1", True)
+    coord.client.start_charging = AsyncMock(return_value={"status": "ok"})
+    coord.client.stop_charging = AsyncMock(return_value={"status": "ok"})
+    coord.async_start_streaming = AsyncMock()
+    coord.async_request_refresh = AsyncMock()
+    lock = coord.evse_runtime._charging_command_lock("EV1")
+    await lock.acquire()
+    first = asyncio.create_task(
+        coord.evse_runtime.async_auto_resume("EV1")
+        if queued == "auto_resume"
+        else getattr(coord, f"async_{queued}_charging")("EV1")
+    )
+    await asyncio.sleep(0)
+    latest = asyncio.create_task(coord.async_stop_charging("EV1"))
+    await asyncio.sleep(0)
+    lock.release()
+    await first
+    await latest
+    coord.client.start_charging.assert_not_awaited()
+    coord.client.stop_charging.assert_awaited_once()
+    assert coord.get_desired_charging("EV1") is False
+    # Even without a changed token, the stopped intent must prevent auto-resume.
+    await coord.evse_runtime.async_auto_resume("EV1")
+    coord.client.start_charging.assert_not_awaited()
+
+
+async def test_cancelled_waiter_keeps_other_command_lock_and_other_chargers_free(
+    coordinator_factory,
+):
+    coord = coordinator_factory(serials=["EV1", "EV2"])
+    coord.data = {sn: {"plugged": True, "charging": False} for sn in ["EV1", "EV2"]}
+    coord.client.stop_charging = AsyncMock(return_value={"status": "ok"})
+    coord.async_start_streaming = AsyncMock()
+    coord.async_request_refresh = AsyncMock()
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def start(*_args, **_kwargs):
+        entered.set()
+        await release.wait()
+        return {"status": "ok"}
+
+    coord.client.start_charging = AsyncMock(side_effect=start)
+    owner = asyncio.create_task(coord.async_start_charging("EV1"))
+    await asyncio.wait_for(entered.wait(), 1)
+    waiting = asyncio.create_task(coord.async_stop_charging("EV1"))
+    await asyncio.sleep(0)
+    waiting.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiting
+    assert coord.evse_runtime._charging_command_lock("EV1").locked()
+    await asyncio.wait_for(coord.async_stop_charging("EV2"), 1)
+    coord.client.stop_charging.assert_awaited_once_with("EV2")
+    release.set()
+    await owner
+    assert not coord.evse_runtime._charging_command_lock("EV1").locked()
+
+
+async def test_auto_resume_mode_completion_cannot_override_newer_stop(
+    coordinator_factory,
+):
+    coord = coordinator_factory(serials=["EV1"])
+    coord.data = {"EV1": {"plugged": True, "charging": False}}
+    coord.set_desired_charging("EV1", True)
+    coord._charge_mode_start_preferences = lambda _sn: ChargeModeStartPreferences(
+        enforce_mode="SCHEDULED_CHARGING"
+    )
+    coord.client.start_charging = AsyncMock(return_value={"status": "ok"})
+    coord.client.stop_charging = AsyncMock(return_value={"status": "ok"})
+    coord.async_start_streaming = AsyncMock()
+    coord.async_request_refresh = AsyncMock()
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def mode(*_args, **_kwargs):
+        if not entered.is_set():
+            entered.set()
+            await release.wait()
+
+    coord._ensure_charge_mode = AsyncMock(side_effect=mode)
+    first = asyncio.create_task(coord.evse_runtime.async_auto_resume("EV1"))
+    await asyncio.wait_for(entered.wait(), 1)
+    latest = asyncio.create_task(coord.async_stop_charging("EV1"))
+    await asyncio.sleep(0)
+    release.set()
+    await first
+    await latest
+    assert coord.get_desired_charging("EV1") is False
+    coord.async_request_refresh.assert_awaited_once()
+
+
+async def test_start_after_completed_stop_ignores_stale_charging_telemetry(
+    coordinator_factory,
+):
+    coord = coordinator_factory(serials=["EV1"])
+    coord.data = {"EV1": {"plugged": True, "charging": True}}
+    coord.client.stop_charging = AsyncMock(return_value={"status": "ok"})
+    coord.client.start_charging = AsyncMock(return_value={"status": "ok"})
+    coord.async_start_streaming = AsyncMock()
+    coord.async_request_refresh = AsyncMock()
+    await coord.async_stop_charging("EV1")
+    await coord.async_start_charging("EV1")
+    coord.client.stop_charging.assert_awaited_once_with("EV1")
+    coord.client.start_charging.assert_awaited_once()
+    assert coord.get_desired_charging("EV1") is True

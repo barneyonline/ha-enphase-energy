@@ -13,12 +13,22 @@ All notable changes to this project will be documented in this file.
 - Add Enphase Cloud Site information and Account access diagnostic sensors with site metadata and explicit account-role flags.
 
 ### 🐛 Bug fixes
+- Serialize EV charger commands and supersede obsolete starts, retries, auto-resume, and amp-change restarts when newer charging intent arrives.
+- Require an actual Start after an amp-change Stop even when charging telemetry has not caught up.
+- Preserve acknowledged tariff edits through intermediate and incomplete cloud readback, and reconcile successful tariff writes when a later billing update fails.
+- Report rejected EV charger schedule edits and deletions to Home Assistant instead of completing the action silently.
+- Prevent schedule writes completing during unload from restarting background polling, and handle expired authentication consistently across schedule writes.
+- Expire stale Current Production Power readings independently of successful polling for other endpoint families.
+- Expire stale Current Grid Power and Current Battery Power source readings, and restore battery-family availability after unchanged successful recovery.
 - Preserve the discovered charger list across settings reloads so retired chargers from the original configuration do not reappear.
 - Round Battery Overall Charge down to a whole percentage to align with Enphase reporting (for example, 20.5% becomes 20%).
 - Calculate Current Power Consumption immediately from available production, grid, and battery power sensors, and recalculate whenever an input changes instead of waiting for a second consumption energy sample.
 - Resolve IQ Gateway Connection Method from serial-matched site-today transport flags when dashboard device details do not expose the connection method.
 
 ### 🔧 Improvements
+- Add behavioral regression coverage for overlapping commands, superseded charging intent, failed schedule writes, stale endpoint data, and tariff log redaction.
+- Separate immutable endpoint policies from the coordinator and give the current-power runtime an explicit typed interface for shared endpoint health services.
+- Redact site identifiers and cloud exception text consistently in tariff failure logs.
 - Remove the integration version from the Enphase Cloud Service info card.
 - Align IQ Battery, microinverter, and EV charger cards with friendly model names and full shared SKUs in brackets; summarize mixed models, omit SKU-only Hardware rows, and link device and cloud service cards to the Enlighten site.
 - Keep enabled Grid Profile Control visible during session failures and explain when to reauthenticate instead of reporting installer access denial. Session failures take precedence over mixed permission errors and stop pending-profile polling.
