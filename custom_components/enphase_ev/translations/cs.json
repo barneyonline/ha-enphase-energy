@@ -2227,6 +2227,12 @@
             "name": "Měna"
           }
         }
+      },
+      "inverter_array_energy": {
+        "name": "{array} Celoživotní energie"
+      },
+      "inverter_array_power": {
+        "name": "{array} Aktuální výkon"
       }
     },
     "number": {

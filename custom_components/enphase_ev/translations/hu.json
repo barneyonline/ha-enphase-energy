@@ -2227,6 +2227,12 @@
             "name": "Pénznem"
           }
         }
+      },
+      "inverter_array_energy": {
+        "name": "{array} Összes energia"
+      },
+      "inverter_array_power": {
+        "name": "{array} Pillanatnyi teljesítmény"
       }
     },
     "number": {

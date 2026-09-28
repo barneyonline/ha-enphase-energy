@@ -8,13 +8,13 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
-- None
+- Add per-array Lifetime Energy and Current Power sensors under IQ Microinverters, using existing inverter readings with complete-member validation and power freshness expiry. Array energy is independent of individual inverter sensor switches; array power uses the existing telemetry opt-in.
 
 ### 🐛 Bug fixes
 - None
 
 ### 🔧 Improvements
-- None
+- Move the IQ Gateway Export Limit selector from Configuration to Controls.
 
 ### 🔄 Other changes
 - None

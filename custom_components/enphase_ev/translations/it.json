@@ -2227,6 +2227,12 @@
             "name": "Valuta"
           }
         }
+      },
+      "inverter_array_energy": {
+        "name": "{array} Energia totale"
+      },
+      "inverter_array_power": {
+        "name": "{array} Potenza attuale"
       }
     },
     "number": {

@@ -306,6 +306,19 @@ entity creation. Switching a feature off removes its registered entities, includ
 previously disabled entries, without waiting for cloud inventory. Switching it on
 allows discovery again. Total capacity and connectivity sensors are unaffected.
 
+`sensor_inverter_array.py` discovers per-array production sensors from authoritative
+inverter inventory on coordinator updates, including array-name changes with
+unchanged serials. Trimmed array names determine collision-resistant site-scoped
+entity identities; unnamed members are excluded. Array energy is independent of
+individual energy sensor enablement. Array power follows the telemetry feature
+and is removed when it is disabled. Removed or renamed arrays remain unavailable
+instead of losing their registry history. A total requires valid values from every
+member; an entity-owned timer expires power at the oldest member's telemetry
+deadline, bounded by the provider measurement timestamp when present as well as
+the successful fetch time. Refetching an old measurement does not renew it.
+Lifetime sums use `total`, rather than `total_increasing`, because an
+inventory change can lower the sum without representing a meter reset.
+
 Inverter discovery uses `inverter_inventory.py` for bounded pagination with an
 explicit completeness result. Partial, repeated, or malformed inventory cannot
 authorize pruning previously known devices.

@@ -355,7 +355,6 @@ class ExportLimitSelect(CoordinatorEntity, SelectEntity):  # type: ignore[misc]
 
     _attr_has_entity_name = True
     _attr_translation_key = "export_limit"
-    _attr_entity_category = EntityCategory.CONFIG
     _attr_options = ["enable_limit", "disable_limit"]
 
     def __init__(self, coord: EnphaseCoordinator) -> None:

@@ -32,6 +32,7 @@ IQ Battery, microinverter, and EV charger device models use friendly names when 
 - IQ Battery telemetry and BatteryConfig controls (where supported); Battery Overall Charge rounds down to a whole percentage (for example, 20.5% becomes 20%) to align with Enphase reporting
 - IQ EV Charger controls and session telemetry
 - IQ Microinverter connectivity, inventory, lifetime production, and optional installer-level parameter telemetry
+- Per-array **Lifetime Energy** (kWh) and **Current Power** (W) under IQ Microinverters. Energy totals are independent of the individual inverter sensor switches; power totals require **Enable Microinverter Power**. Both sum existing inverter data without additional cloud requests. Every member must have a valid reading; power expires when any member's telemetry is older than 30 minutes. Arrays use their Enlighten names: unnamed inverters are not grouped, and renaming an array creates a new entity while the old entity remains unavailable to preserve its history. Energy is the sum of the current members' lifetime production, so moving or replacing inverters can change that total.
 - **Total Array Size** (kW DC nameplate) and **Total Inverter Capacity** (kVA continuous AC rating) under IQ Microinverters, each with an `arrays` attribute containing per-array values in the sensor's unit. Panel size uses configured per-array panel STC ratings, not rounded production estimates or site-wide panel metadata. Sensors are created only after complete data is available for each total. Denied Array Builder access (401/403) creates neither sensor; denied Settings access still permits Total Inverter Capacity. Optional metadata refreshes every six hours, including access-denied retries. Transient failures retry after one hour and make existing sensors unavailable without deleting their history. Access depends on the Enlighten account; general homeowner access to these metadata routes has not been verified.
 - Site and cloud energy telemetry (including supported HEMS channels such as Heat Pump and Water Heater lifetime energy)
 
@@ -237,7 +238,7 @@ Nonzero disagreements remain blocked. This exception is not used by the selector
 or automation actions, and accepted submissions still require matching gateway
 readback before they are confirmed.
 
-The IQ Gateway **Export Limit** selector provides **Enable Limit** and **Disable
+The IQ Gateway **Export Limit** selector under **Controls** provides **Enable Limit** and **Disable
 Limit**. Enable applies the saved default limit (initially **0 W**, zero export).
 Under **Advanced → Export Limit → Default settings**, save the default watts and
 **Slew rate (W/sec)**. Slew rate initially comes from the gateway. Saving defaults

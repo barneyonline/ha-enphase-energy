@@ -2227,6 +2227,12 @@
             "name": "Valuta"
           }
         }
+      },
+      "inverter_array_energy": {
+        "name": "{array} Samlet energi"
+      },
+      "inverter_array_power": {
+        "name": "{array} Aktuel effekt"
       }
     },
     "number": {

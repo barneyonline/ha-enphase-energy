@@ -2227,6 +2227,12 @@
             "name": "Waluta"
           }
         }
+      },
+      "inverter_array_energy": {
+        "name": "{array} Energia całkowita"
+      },
+      "inverter_array_power": {
+        "name": "{array} Bieżąca moc"
       }
     },
     "number": {

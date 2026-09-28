@@ -2227,6 +2227,12 @@
             "name": "Valuutta"
           }
         }
+      },
+      "inverter_array_energy": {
+        "name": "{array} Kokonaisenergia"
+      },
+      "inverter_array_power": {
+        "name": "{array} Nykyinen teho"
       }
     },
     "number": {

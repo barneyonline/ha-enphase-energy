@@ -2227,6 +2227,12 @@
             "name": "Νόμισμα"
           }
         }
+      },
+      "inverter_array_energy": {
+        "name": "{array} Συνολική ενέργεια"
+      },
+      "inverter_array_power": {
+        "name": "{array} Τρέχουσα ισχύς"
       }
     },
     "number": {

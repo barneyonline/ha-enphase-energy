@@ -2227,6 +2227,12 @@
             "name": "Currency"
           }
         }
+      },
+      "inverter_array_energy": {
+        "name": "{array} Lifetime Energy"
+      },
+      "inverter_array_power": {
+        "name": "{array} Current Power"
       }
     },
     "number": {

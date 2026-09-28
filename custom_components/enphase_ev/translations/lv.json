@@ -2227,6 +2227,12 @@
             "name": "Valūta"
           }
         }
+      },
+      "inverter_array_energy": {
+        "name": "{array} Kopējā enerģija"
+      },
+      "inverter_array_power": {
+        "name": "{array} Pašreizējā jauda"
       }
     },
     "number": {
