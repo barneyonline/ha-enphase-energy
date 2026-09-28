@@ -58,7 +58,8 @@ Metadata refreshes every six hours, with a 15-minute retry interval for missing 
 - Optional IQ Battery Scheduler controls and CFG, DTG, and RBD schedule sensors
 - Capability-gated PowerMatch cloud control for supported IQ Battery sites with permitted BatteryConfig write access
 - Optional current site weather on the Enphase Cloud device, created only when the authenticated Enphase weather endpoint is available
-- Independent per-microinverter Lifetime Energy and optional installer-level Power sensors are both disabled by default. Enable them under Options > Devices > Device Features; saved choices are preserved. These switches do not control the total array capacity sensors.
+- Independent per-microinverter Lifetime Energy and optional installer-level Power sensors are both off by default. Enable Lifetime Energy under Configure > Features > Device Features and Power under Advanced Features. Turning either feature off removes its per-inverter entities; turning it on discovers them again. These switches do not control the total array capacity sensors.
+- Microinverter power requests run before diagnostic parameters and are paced to avoid bursts. Power refreshes every 15 minutes; diagnostic parameters refresh hourly. A rate-limit response stops the remaining requests.
 - Site tariff visibility, editable rate entities, and tariff update actions
 - Optional installer-only Grid Profile Control through Enphase cloud Activation,
   with country-scoped profile selection and current profile monitoring. Enable it
@@ -186,16 +187,27 @@ gateway connection rather than Ethernet, Wi-Fi, or cellular transport.
 
 Use **Configure → Devices** to choose device categories and **Configure → Features**
 to configure Device Features and Advanced Features. Advanced Features contains
-**Enable installer Grid Profile controls** and **Enable Microinverter Power**.
+**Enable installer Grid Profile controls**, **Enable Export Limit controls**, and
+**Enable Microinverter Power**.
+
+When Enphase rate-limits microinverter power telemetry, open **Microinverter
+Connectivity Status** to see **Power telemetry status** and **Next power telemetry
+retry**. The retry deadline survives integration reloads and Home Assistant
+restarts; restarting does not make Enphase accept requests sooner. These
+attributes are available even before individual microinverter power sensors
+have been discovered.
+
 With Grid Profile controls enabled, **Configure → Advanced → Grid Profile Control**
-remains visible even when discovery fails. If the Enlighten session has expired or
-is rejected, use **Configure → Authentication → Start reauthentication**, complete
-the login, then reopen Grid Profile Control. Session failures are distinct from
-installer permission denials; enabling this feature does not apply a grid profile.
+remains visible even when discovery fails. Expired Enlighten sessions use the
+shared automatic refresh when remembered credentials are available. If installer
+session recovery fails, Home Assistant prompts for reauthentication; you can also
+start it under **Configure → Authentication → Start reauthentication**. Permission
+denials do not trigger login prompts. Enabling this feature does not apply a grid
+profile.
 
 ### Export Limit (installer access)
 
-Under **Configure → Features → Device Features**, enable **Enable Export Limit
+Under **Configure → Features → Advanced Features**, enable **Enable Export Limit
 controls** to configure system export limits. This feature is off by default;
 enabling or disabling it never changes the gateway's existing configuration.
 After enabling, open **Configure → Advanced → Export Limit** to set an absolute
@@ -203,13 +215,27 @@ watt limit, request zero export, or disable gateway export limiting. Changes in
 this guided workflow require confirmation; automation actions have no confirmation field.
 
 The first version supports an unambiguous single-gateway configuration using
-absolute export watts, including compatible disabled configurations. Percentage,
-production-limit, and digital-input relay configurations are read-only. Missing
+absolute export watts, including compatible disabled configurations that retain
+production or percentage defaults. Replaced gateway records are matched to the
+single current gateway by its dashboard device ID; ambiguous identity blocks
+control. Enabled percentage or production limits and digital-input relay
+configurations remain read-only. Missing
 settings or an invalid existing slew rate block writes. Existing slew rate is
 preserved unless explicitly overridden. Installer access and access to the live PEL
 form are both required. Writes also require a complete, unambiguous form whose
 current mode, watts, and slew rate match gateway readback; reload the settings
 if another client has changed them.
+
+When Enphase's form contains a zero slew-rate default,
+the guided confirmation page offers **Restore slew rate from gateway**. This
+explicit choice preserves the positive gateway rate shown on that page, provided
+fresh gateway identity and every other setting still match. It is unavailable
+when enabling or changing a limit with a different saved slew-rate override;
+restore the default first if needed. Disabling a limit always preserves the current
+gateway rate. This reconciliation supports enabling, changing, and disabling a limit.
+Nonzero disagreements remain blocked. This exception is not used by the selector
+or automation actions, and accepted submissions still require matching gateway
+readback before they are confirmed.
 
 The IQ Gateway **Export Limit** selector provides **Enable Limit** and **Disable
 Limit**. Enable applies the saved default limit (initially **0 W**, zero export).

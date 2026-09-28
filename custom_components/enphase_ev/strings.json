@@ -495,13 +495,16 @@
       "message": "Awaiting configuration confirmation. Refresh status before submitting another change."
     },
     "export_limit_disabled": {
-      "message": "Enable Export Limit controls (Features → Device Features)."
+      "message": "Enable Export Limit controls (Features → Advanced Features)."
     },
     "export_limit_confirmation": {
       "message": "Confirm this change"
     },
     "export_limit_invalid_slew": {
       "message": "Enter a positive number with up to two decimal places."
+    },
+    "export_limit_session_expired": {
+      "message": "The Enlighten session has expired or was rejected. Open Configure → Authentication, select Start reauthentication, complete the login, then try again."
     }
   },
   "options": {
@@ -765,8 +768,7 @@
               "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
               "weather_enabled": "Enable weather",
               "vpp_events_enabled": "Enable VPP events",
-              "nominal_voltage": "EV Charger nominal voltage (V)",
-              "export_limit_controls_enabled": "Enable Export Limit controls"
+              "nominal_voltage": "EV Charger nominal voltage (V)"
             },
             "data_description": {
               "schedule_sync_enabled": "Manage IQ EV Charger schedules.",
@@ -776,19 +778,20 @@
               "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
               "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
               "vpp_events_enabled": "Fetch VPP/ELRP schedules from Enphase and create event entities only for enrolled sites. Disabled by default.",
-              "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable.",
-              "export_limit_controls_enabled": "Configure system export limits. Requires installer access."
+              "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable."
             }
           },
           "advanced_features": {
             "name": "Advanced Features",
             "data": {
               "grid_profile_controls_enabled": "Enable installer Grid Profile controls",
-              "microinverter_power_enabled": "Enable Microinverter Power"
+              "microinverter_power_enabled": "Enable Microinverter Power",
+              "export_limit_controls_enabled": "Enable Export Limit controls"
             },
             "data_description": {
               "grid_profile_controls_enabled": "Fetch installer-only Grid Profile metadata and enable profile actions. Disabled by default.",
-              "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available."
+              "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available.",
+              "export_limit_controls_enabled": "Configure system export limits. Requires installer access."
             }
           }
         },
@@ -845,7 +848,8 @@
         "title": "Export Limit",
         "description": "Current setting: **{current}**\n\nRequested setting: **{requested}**\n\nSlew rate (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Confirm this change"
+          "confirm": "Confirm this change",
+          "restore_slew_rate": "Restore slew rate from gateway"
         }
       },
       "export_limit_submitted": {
@@ -895,9 +899,11 @@
       "export_limit_invalid": "Enter whole-number watts from 0 to 100000.",
       "export_limit_changed": "Configuration changed. Review the updated settings and confirm again.",
       "export_limit_pending": "Awaiting configuration confirmation. Refresh status before submitting another change.",
-      "export_limit_disabled": "Enable Export Limit controls (Features → Device Features).",
+      "export_limit_disabled": "Enable Export Limit controls (Features → Advanced Features).",
       "export_limit_confirmation": "Confirm this change",
-      "export_limit_invalid_slew": "Enter a positive number with up to two decimal places."
+      "export_limit_invalid_slew": "Enter a positive number with up to two decimal places.",
+      "grid_profile_session_expired": "The Enlighten session has expired or was rejected. Open Configure → Authentication, select Start reauthentication, complete the login, then try again.",
+      "export_limit_session_expired": "The Enlighten session has expired or was rejected. Open Configure → Authentication, select Start reauthentication, complete the login, then try again."
     },
     "abort": {
       "migration_no_envoy_sources": "No Enphase Envoy energy sensors are available to migrate.",
@@ -1812,7 +1818,21 @@
         }
       },
       "microinverter_connectivity_status": {
-        "name": "Microinverter Connectivity Status"
+        "name": "Microinverter Connectivity Status",
+        "state_attributes": {
+          "power_telemetry_status": {
+            "name": "Power telemetry status",
+            "state": {
+              "disabled": "Disabled",
+              "pending": "Pending",
+              "ready": "Available",
+              "rate_limited": "Rate limited"
+            }
+          },
+          "power_telemetry_next_retry": {
+            "name": "Next power telemetry retry"
+          }
+        }
       },
       "microinverter_reporting_count": {
         "name": "Active Microinverters"

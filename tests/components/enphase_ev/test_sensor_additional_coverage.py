@@ -197,6 +197,9 @@ async def test_large_site_unchanged_update_skips_registry_reconciliation(
         lambda callback, *args, **kwargs: coordinator_callbacks.append(callback)
         or (lambda: None)
     )
+    object.__setattr__(
+        config_entry, "options", {OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED: True}
+    )
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
 
     class CountingEntities(dict[str, object]):
@@ -364,6 +367,7 @@ async def test_inverter_power_entity_is_added_after_delayed_telemetry(
         ["microinverter"],
     )
     coord.inventory_runtime._refresh_cached_topology()  # noqa: SLF001
+    object.__setattr__(config_entry, "options", {OPT_MICROINVERTER_POWER_ENABLED: True})
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
     added: list[Any] = []
 
@@ -1051,6 +1055,9 @@ async def test_async_setup_entry_waits_for_authoritative_serial_family_payloads_
         ["encharge", "microinverter"],
     )
     coord.async_add_topology_listener = lambda _cb: (lambda: None)  # type: ignore[assignment]
+    object.__setattr__(
+        config_entry, "options", {OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED: True}
+    )
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
 
     removed_ids: list[str] = []
@@ -1436,17 +1443,22 @@ async def test_async_setup_entry_adds_inverter_lifetime_sensors(
     inverter_entities = [
         ent for ent in added if isinstance(ent, EnphaseInverterLifetimeEnergySensor)
     ]
-    assert len(inverter_entities) == 1
-    telemetry_entity = next(
+    assert len(inverter_entities) == int(
+        feature_options.get(OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED, False)
+    )
+    telemetry_entities = [
         ent for ent in added if isinstance(ent, EnphaseInverterTelemetrySensor)
+    ]
+    assert len(telemetry_entities) == int(
+        feature_options.get(OPT_MICROINVERTER_POWER_ENABLED, False)
     )
+    assert all(
+        ent.entity_registry_enabled_default
+        for ent in inverter_entities + telemetry_entities
+    )
+    if not inverter_entities:
+        return
     entity = inverter_entities[0]
-    assert entity.entity_registry_enabled_default is feature_options.get(
-        OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED, False
-    )
-    assert telemetry_entity.entity_registry_enabled_default is feature_options.get(
-        OPT_MICROINVERTER_POWER_ENABLED, False
-    )
     assert entity.native_value == pytest.approx(1500.0)
     attrs = entity.extra_state_attributes
     assert attrs == {
@@ -1530,6 +1542,9 @@ async def test_async_setup_entry_removes_deleted_inverter_entity(
         return lambda: None
 
     coord.async_add_topology_listener = _add_listener  # type: ignore[assignment]
+    object.__setattr__(
+        config_entry, "options", {OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED: True}
+    )
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
 
     removed_ids: list[str] = []
@@ -2269,6 +2284,8 @@ def test_microinverter_diagnostic_sensors_expose_inventory_summary(
     assert status_attrs["not_reporting_inverters"] == 1
     assert status_attrs["unknown_inverters"] == 0
     assert set(status_attrs) == {
+        "power_telemetry_status",
+        "power_telemetry_next_retry",
         "total_inverters",
         "reporting_inverters",
         "not_reporting_inverters",
@@ -7424,3 +7441,99 @@ def test_session_metadata_attributes_formats_fields(monkeypatch):
     assert attrs["session_cost"] == pytest.approx(2.5)
     assert attrs["session_charge_level"] == 20
     assert attrs["session_duration_min"] == 90
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("disabled_by", [None, "integration", "user"])
+async def test_inverter_feature_opt_out_removes_registry_before_inventory_and_rediscovers(
+    hass, config_entry, coordinator_factory, disabled_by
+) -> None:
+    """Opt-out deletes old entries immediately and re-enabling rediscovers them."""
+    from homeassistant.helpers import entity_registry as er
+
+    from custom_components.enphase_ev.const import DOMAIN
+    from custom_components.enphase_ev.sensor import (
+        EnphaseInverterLifetimeEnergySensor,
+        EnphaseInverterTelemetrySensor,
+        EnphaseMicroinverterConnectivityStatusSensor,
+        async_setup_entry,
+    )
+
+    coord = coordinator_factory(serials=[RANDOM_SERIAL])
+    coord._inverters_inventory_payload = None  # noqa: SLF001
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    registry = er.async_get(hass)
+    old_entities = [
+        registry.async_get_or_create(
+            "sensor",
+            DOMAIN,
+            f"{DOMAIN}_inverter_INV-A_{suffix}",
+            config_entry=config_entry,
+            disabled_by=er.RegistryEntryDisabler(disabled_by) if disabled_by else None,
+        )
+        for suffix in ("lifetime_energy", "telemetry")
+    ]
+    connectivity = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{DOMAIN}_site_{coord.site_id}_microinverter_connectivity_status",
+        config_entry=config_entry,
+    )
+    added = []
+    await async_setup_entry(
+        hass, config_entry, lambda entities, **kwargs: added.extend(entities)
+    )
+    assert all(registry.async_get(entity.entity_id) is None for entity in old_entities)
+    assert registry.async_get(connectivity.entity_id) is not None
+
+    # Fresh inventory must not recreate the opted-out entries on the next load.
+    coord._inverter_data = {  # noqa: SLF001
+        "INV-A": {"serial_number": "INV-A", "telemetry": {"power": 123.0}}
+    }
+    coord._inverter_order = ["INV-A"]  # noqa: SLF001
+    _mark_inverter_inventory_ready(coord)
+    coord.inventory_runtime._set_type_device_buckets(  # noqa: SLF001
+        {
+            "microinverter": {
+                "type_key": "microinverter",
+                "count": 1,
+                "devices": [{"serial_number": "INV-A"}],
+            }
+        },
+        ["microinverter"],
+    )
+    added.clear()
+    await async_setup_entry(
+        hass, config_entry, lambda entities, **kwargs: added.extend(entities)
+    )
+    assert not any(
+        isinstance(
+            entity,
+            (EnphaseInverterLifetimeEnergySensor, EnphaseInverterTelemetrySensor),
+        )
+        for entity in added
+    )
+    assert any(
+        isinstance(entity, EnphaseMicroinverterConnectivityStatusSensor)
+        for entity in added
+    )
+
+    object.__setattr__(
+        config_entry,
+        "options",
+        {
+            OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED: True,
+            OPT_MICROINVERTER_POWER_ENABLED: True,
+        },
+    )
+    added.clear()
+    await async_setup_entry(
+        hass, config_entry, lambda entities, **kwargs: added.extend(entities)
+    )
+    assert (
+        sum(isinstance(entity, EnphaseInverterLifetimeEnergySensor) for entity in added)
+        == 1
+    )
+    assert (
+        sum(isinstance(entity, EnphaseInverterTelemetrySensor) for entity in added) == 1
+    )

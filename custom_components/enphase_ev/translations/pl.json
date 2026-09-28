@@ -495,13 +495,16 @@
       "message": "Oczekiwanie na potwierdzenie konfiguracji. Odśwież stan przed kolejną zmianą."
     },
     "export_limit_disabled": {
-      "message": "Włącz sterowanie limitem oddawania energii (Funkcje → Funkcje urządzeń)."
+      "message": "Włącz sterowanie limitem oddawania energii (Funkcje → Funkcje zaawansowane)."
     },
     "export_limit_confirmation": {
       "message": "Potwierdź tę zmianę"
     },
     "export_limit_invalid_slew": {
       "message": "Wprowadź liczbę dodatnią z maksymalnie dwoma miejscami po przecinku."
+    },
+    "export_limit_session_expired": {
+      "message": "Sesja Enlighten wygasła lub została odrzucona. Otwórz Uwierzytelnianie, uwierzytelnij się ponownie i spróbuj jeszcze raz."
     }
   },
   "options": {
@@ -765,8 +768,7 @@
               "weather_enabled": "Włącz pogodę",
               "nominal_voltage": "Napięcie znamionowe ładowarki EV (V)",
               "microinverter_lifetime_energy_enabled": "Włącz energię całkowitą mikroinwerterów",
-              "vpp_events_enabled": "Włącz zdarzenia VPP",
-              "export_limit_controls_enabled": "Włącz sterowanie limitem oddawania energii"
+              "vpp_events_enabled": "Włącz zdarzenia VPP"
             },
             "data_description": {
               "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone.",
@@ -776,19 +778,20 @@
               "schedule_sync_enabled": "Zarządzaj harmonogramami IQ EV Charger.",
               "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
-              "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone.",
-              "export_limit_controls_enabled": "Skonfiguruj limity oddawania energii systemu. Wymaga dostępu instalatora."
+              "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone."
             }
           },
           "advanced_features": {
             "name": "Funkcje zaawansowane",
             "data": {
               "grid_profile_controls_enabled": "Włącz sterowanie profilem sieci dla instalatora",
-              "microinverter_power_enabled": "Włącz moc mikroinwerterów"
+              "microinverter_power_enabled": "Włącz moc mikroinwerterów",
+              "export_limit_controls_enabled": "Włącz sterowanie limitem oddawania energii"
             },
             "data_description": {
               "grid_profile_controls_enabled": "Pobiera metadane profilu sieci dostępne tylko dla instalatora i włącza działania na profilach. Domyślnie wyłączone.",
-              "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna."
+              "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna.",
+              "export_limit_controls_enabled": "Skonfiguruj limity oddawania energii systemu. Wymaga dostępu instalatora."
             }
           }
         },
@@ -845,7 +848,8 @@
         "title": "Limit oddawania energii",
         "description": "Bieżące ustawienie: **{current}**\n\nŻądane ustawienie: **{requested}**\n\nSzybkość zmiany (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Potwierdź tę zmianę"
+          "confirm": "Potwierdź tę zmianę",
+          "restore_slew_rate": "Przywróć szybkość z bramy"
         }
       },
       "export_limit_submitted": {
@@ -895,9 +899,11 @@
       "export_limit_invalid": "Wprowadź całkowitą liczbę watów od 0 do 100000.",
       "export_limit_changed": "Konfiguracja uległa zmianie. Sprawdź aktualne ustawienia i potwierdź ponownie.",
       "export_limit_pending": "Oczekiwanie na potwierdzenie konfiguracji. Odśwież stan przed kolejną zmianą.",
-      "export_limit_disabled": "Włącz sterowanie limitem oddawania energii (Funkcje → Funkcje urządzeń).",
+      "export_limit_disabled": "Włącz sterowanie limitem oddawania energii (Funkcje → Funkcje zaawansowane).",
       "export_limit_confirmation": "Potwierdź tę zmianę",
-      "export_limit_invalid_slew": "Wprowadź liczbę dodatnią z maksymalnie dwoma miejscami po przecinku."
+      "export_limit_invalid_slew": "Wprowadź liczbę dodatnią z maksymalnie dwoma miejscami po przecinku.",
+      "grid_profile_session_expired": "Sesja Enlighten wygasła lub została odrzucona. Otwórz Uwierzytelnianie, uwierzytelnij się ponownie i spróbuj jeszcze raz.",
+      "export_limit_session_expired": "Sesja Enlighten wygasła lub została odrzucona. Otwórz Uwierzytelnianie, uwierzytelnij się ponownie i spróbuj jeszcze raz."
     },
     "abort": {
       "migration_no_envoy_sources": "Brak dostępnych sensorów energii Enphase Envoy do migracji.",
@@ -1812,7 +1818,21 @@
         }
       },
       "microinverter_connectivity_status": {
-        "name": "Stan łączności mikroinwerterów"
+        "name": "Stan łączności mikroinwerterów",
+        "state_attributes": {
+          "power_telemetry_status": {
+            "name": "Stan telemetrii mocy",
+            "state": {
+              "disabled": "Wyłączone",
+              "pending": "Oczekujący",
+              "ready": "Dostępny",
+              "rate_limited": "Ograniczenie częstotliwości"
+            }
+          },
+          "power_telemetry_next_retry": {
+            "name": "Następna próba telemetrii mocy"
+          }
+        }
       },
       "microinverter_reporting_count": {
         "name": "Aktywne mikroinwertery"

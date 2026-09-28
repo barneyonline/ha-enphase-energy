@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from homeassistant.exceptions import ServiceValidationError
@@ -14,6 +14,9 @@ from .api import ActivationAccessDenied, OptionalEndpointUnavailable, Unauthoriz
 from .api_client.errors import ActivationSessionExpired
 from .const import DOMAIN
 from .service_validation import raise_translated_service_validation
+
+if TYPE_CHECKING:
+    from .coordinator import EnphaseCoordinator
 
 ACTIVATION_GRID_PROFILE_FAMILY = "activation_grid_profile"
 SUPPORT_SESSION_EXPIRED = "session_expired"
@@ -27,6 +30,13 @@ ALL_PROFILES_OPTION = "all_profiles"
 PROFILE_MODE_OPTIONS = (COMMONLY_USED_OPTION, ALL_PROFILES_OPTION)
 PENDING_PROFILE_POLL_INTERVAL_S = 60.0
 PENDING_PROFILE_POLL_WINDOW_S = 300.0
+
+
+def request_session_reauthentication(coordinator: EnphaseCoordinator) -> None:
+    """Surface exhausted Enlighten session recovery without failing other families."""
+    entry = getattr(coordinator, "config_entry", None)
+    if entry is not None:
+        entry.async_start_reauth(coordinator.hass)
 
 
 @dataclass(slots=True, frozen=True)
@@ -986,6 +996,7 @@ class GridProfileRuntime:
     def _mark_denied(self, err: Exception) -> None:
         if isinstance(err, ActivationSessionExpired):
             self.support_state = SUPPORT_SESSION_EXPIRED
+            request_session_reauthentication(self.coordinator)
         elif self._is_access_denied(err):
             self.support_state = SUPPORT_DENIED
         else:

@@ -119,7 +119,7 @@ def test_sensor_registry_syncs_microinverter_sensor_options() -> None:
     helper = _helper(registry)
     assert helper._is_disabled_by_integration(None) is False  # noqa: SLF001
 
-    helper.sync_inverter_sensor_enabled_defaults(
+    helper.sync_inverter_sensor_options(
         lifetime_energy_enabled=None,
         power_enabled=None,
     )
@@ -128,26 +128,29 @@ def test_sensor_registry_syncs_microinverter_sensor_options() -> None:
     assert registry.entities["sensor.lifetime"].disabled_by is disabler.INTEGRATION
     assert registry.entities["sensor.power"].disabled_by is None
 
-    helper.sync_inverter_sensor_enabled_defaults(
+    helper.sync_inverter_sensor_options(
         lifetime_energy_enabled=True,
         power_enabled=False,
     )
 
     assert registry.entities["sensor.lifetime"].disabled_by is None
-    assert registry.entities["sensor.power"].disabled_by is disabler.INTEGRATION
+    assert registry.removed == ["sensor.power"]
     assert registry.entities["sensor.user_disabled"].disabled_by is disabler.USER
     assert registry.entities["sensor.other_entry"].disabled_by is None
     assert registry.entities["sensor.unrelated"].disabled_by is None
     assert registry.entities["sensor.other_inverter_sensor"].disabled_by is None
 
-    helper.sync_inverter_sensor_enabled_defaults(
+    helper.sync_inverter_sensor_options(
         lifetime_energy_enabled=False,
         power_enabled=True,
     )
 
-    assert registry.entities["sensor.lifetime"].disabled_by is disabler.INTEGRATION
+    assert registry.removed == [
+        "sensor.power",
+        "sensor.lifetime",
+        "sensor.user_disabled",
+    ]
     assert registry.entities["sensor.power"].disabled_by is None
-    assert registry.entities["sensor.user_disabled"].disabled_by is disabler.USER
 
 
 def test_sensor_registry_get_entity_id_without_registry_method() -> None:

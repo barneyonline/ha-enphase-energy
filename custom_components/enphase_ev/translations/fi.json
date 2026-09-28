@@ -495,13 +495,16 @@
       "message": "Odotetaan asetusten vahvistusta. Päivitä tila ennen uutta muutosta."
     },
     "export_limit_disabled": {
-      "message": "Ota syöttörajan ohjaus käyttöön (Ominaisuudet → Laiteominaisuudet)."
+      "message": "Ota syöttörajan ohjaus käyttöön (Ominaisuudet → Lisäominaisuudet)."
     },
     "export_limit_confirmation": {
       "message": "Vahvista tämä muutos"
     },
     "export_limit_invalid_slew": {
       "message": "Anna positiivinen luku enintään kahdella desimaalilla."
+    },
+    "export_limit_session_expired": {
+      "message": "Enlighten-istunto on vanhentunut tai hylätty. Avaa Tunnistautuminen, tunnistaudu uudelleen ja yritä sitten uudelleen."
     }
   },
   "options": {
@@ -765,8 +768,7 @@
               "weather_enabled": "Ota sää käyttöön",
               "nominal_voltage": "EV-laturin nimellisjännite (V)",
               "microinverter_lifetime_energy_enabled": "Ota mikroinvertterien elinkaarienergia käyttöön",
-              "vpp_events_enabled": "Ota VPP-tapahtumat käyttöön",
-              "export_limit_controls_enabled": "Ota syöttörajan ohjaus käyttöön"
+              "vpp_events_enabled": "Ota VPP-tapahtumat käyttöön"
             },
             "data_description": {
               "system_event_repair_issues": "Luo Home Assistant -korjauksia aktiivisille Enphasen pysyville hälytyksille. Oletuksena pois käytöstä.",
@@ -776,19 +778,20 @@
               "schedule_sync_enabled": "Hallitse IQ EV Chargerin aikatauluja.",
               "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja.",
               "microinverter_lifetime_energy_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset elinkaarienergia-anturit.",
-              "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä.",
-              "export_limit_controls_enabled": "Määritä järjestelmän verkkosyötön rajat. Edellyttää asentajan käyttöoikeuksia."
+              "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä."
             }
           },
           "advanced_features": {
             "name": "Lisäominaisuudet",
             "data": {
               "grid_profile_controls_enabled": "Ota asentajan verkkoprofiilin hallinta käyttöön",
-              "microinverter_power_enabled": "Ota mikroinvertterien teho käyttöön"
+              "microinverter_power_enabled": "Ota mikroinvertterien teho käyttöön",
+              "export_limit_controls_enabled": "Ota syöttörajan ohjaus käyttöön"
             },
             "data_description": {
               "grid_profile_controls_enabled": "Hakee vain asentajalle tarkoitetut verkkoprofiilin metatiedot ja ottaa profiilitoiminnot käyttöön. Oletuksena poissa käytöstä.",
-              "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla."
+              "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla.",
+              "export_limit_controls_enabled": "Määritä järjestelmän verkkosyötön rajat. Edellyttää asentajan käyttöoikeuksia."
             }
           }
         },
@@ -845,7 +848,8 @@
         "title": "Syöttöraja",
         "description": "Nykyinen asetus: **{current}**\n\nPyydetty asetus: **{requested}**\n\nMuutosnopeus (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Vahvista tämä muutos"
+          "confirm": "Vahvista tämä muutos",
+          "restore_slew_rate": "Palauta muutosnopeus yhdyskäytävästä"
         }
       },
       "export_limit_submitted": {
@@ -895,9 +899,11 @@
       "export_limit_invalid": "Anna kokonaisluku watteina väliltä 0–100000.",
       "export_limit_changed": "Asetukset muuttuivat. Tarkista päivitetyt asetukset ja vahvista uudelleen.",
       "export_limit_pending": "Odotetaan asetusten vahvistusta. Päivitä tila ennen uutta muutosta.",
-      "export_limit_disabled": "Ota syöttörajan ohjaus käyttöön (Ominaisuudet → Laiteominaisuudet).",
+      "export_limit_disabled": "Ota syöttörajan ohjaus käyttöön (Ominaisuudet → Lisäominaisuudet).",
       "export_limit_confirmation": "Vahvista tämä muutos",
-      "export_limit_invalid_slew": "Anna positiivinen luku enintään kahdella desimaalilla."
+      "export_limit_invalid_slew": "Anna positiivinen luku enintään kahdella desimaalilla.",
+      "grid_profile_session_expired": "Enlighten-istunto on vanhentunut tai hylätty. Avaa Tunnistautuminen, tunnistaudu uudelleen ja yritä sitten uudelleen.",
+      "export_limit_session_expired": "Enlighten-istunto on vanhentunut tai hylätty. Avaa Tunnistautuminen, tunnistaudu uudelleen ja yritä sitten uudelleen."
     },
     "abort": {
       "migration_no_envoy_sources": "Yhtään Enphase Envoy -energia-anturia ei ole saatavilla siirtoon.",
@@ -1812,7 +1818,21 @@
         }
       },
       "microinverter_connectivity_status": {
-        "name": "Mikroinvertterien yhteystila"
+        "name": "Mikroinvertterien yhteystila",
+        "state_attributes": {
+          "power_telemetry_status": {
+            "name": "Tehotelemetrian tila",
+            "state": {
+              "disabled": "Poistettu käytöstä",
+              "pending": "Odottaa",
+              "ready": "Saatavilla",
+              "rate_limited": "Kutsutiheyttä rajoitettu"
+            }
+          },
+          "power_telemetry_next_retry": {
+            "name": "Tehotelemetrian seuraava yritys"
+          }
+        }
       },
       "microinverter_reporting_count": {
         "name": "Aktiiviset mikroinvertterit"

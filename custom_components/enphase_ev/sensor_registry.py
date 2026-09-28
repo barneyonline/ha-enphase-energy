@@ -5,8 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from typing import Any, cast
 
-from homeassistant.helpers import entity_registry as er
-
 from .const import DOMAIN
 from .device_types import is_dry_contact_type_key
 from .runtime_helpers import coerce_optional_text as _clean_text
@@ -93,13 +91,13 @@ class EnphaseSensorRegistrySetup:
 
         return inverter_entity_unique_id(serial, "_telemetry")
 
-    def sync_inverter_sensor_enabled_defaults(
+    def sync_inverter_sensor_options(
         self,
         *,
         lifetime_energy_enabled: bool | None,
         power_enabled: bool | None,
     ) -> None:
-        """Apply integration options to registered microinverter sensors."""
+        """Remove opted-out sensors and restore integration-disabled enabled ones."""
 
         for reg_entry in list(self._entity_registry_values()):
             if not self._registry_entry_matches_sensor(reg_entry):
@@ -115,19 +113,15 @@ class EnphaseSensorRegistrySetup:
                 continue
             if enabled is None:
                 continue
+            if not enabled:
+                self._ent_reg.async_remove(reg_entry.entity_id)
+                continue
             disabled_by = getattr(reg_entry, "disabled_by", None)
-            if enabled:
-                if not self._is_disabled_by_integration(disabled_by):
-                    continue
-                new_disabled_by = None
-            else:
-                if disabled_by is not None:
-                    continue
-                new_disabled_by = er.RegistryEntryDisabler.INTEGRATION
-            self._ent_reg.async_update_entity(
-                reg_entry.entity_id,
-                disabled_by=new_disabled_by,
-            )
+            if self._is_disabled_by_integration(disabled_by):
+                self._ent_reg.async_update_entity(
+                    reg_entry.entity_id,
+                    disabled_by=None,
+                )
 
     def remove_site_sensor_entity(self, key: str) -> None:
         """Remove a site-level sensor entity by setup key."""

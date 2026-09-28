@@ -222,6 +222,18 @@ def _sync_charger_devices(
         if existing is None:
             changes.append("new_device")
         else:
+            # Update this entry's device only; other integrations may retain their
+            # own MAC connections on the same physical charger.
+            mac_connections = {
+                connection
+                for connection in getattr(existing, "connections", set())
+                if connection[0] == dr.CONNECTION_NETWORK_MAC
+            }
+            if mac_connections:
+                dev_reg.async_update_device(
+                    existing.id, new_connections=existing.connections - mac_connections
+                )
+                changes.append("connections")
             if existing.name != dev_name:
                 changes.append("name")
             if existing.manufacturer != "Enphase":

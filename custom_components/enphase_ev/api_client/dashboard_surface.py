@@ -1557,6 +1557,7 @@ async def array_panel_ratings(self: EnphaseEVClient) -> dict[str, float | None]:
         f"{BASE_URL}/systems/{self._site}/details",
         headers={"Accept": "text/html,application/xhtml+xml", "X-Requested-With": None},
         allow_reauth=False,
+        use_cookie_header_only=True,
     )
     parser = PanelRatingsParser()
     parser.feed(html)

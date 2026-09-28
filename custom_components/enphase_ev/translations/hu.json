@@ -495,13 +495,16 @@
       "message": "A konfiguráció megerősítésére vár. Újabb módosítás előtt frissítse az állapotot."
     },
     "export_limit_disabled": {
-      "message": "A betáplálási korlát vezérlésének engedélyezése (Funkciók → Eszközfunkciók)."
+      "message": "A betáplálási korlát vezérlésének engedélyezése (Funkciók → Speciális funkciók)."
     },
     "export_limit_confirmation": {
       "message": "Módosítás megerősítése"
     },
     "export_limit_invalid_slew": {
       "message": "Adjon meg pozitív számot legfeljebb két tizedesjeggyel."
+    },
+    "export_limit_session_expired": {
+      "message": "Az Enlighten-munkamenet lejárt vagy elutasításra került. Nyissa meg a Hitelesítés menüt, jelentkezzen be újra, majd próbálja újra."
     }
   },
   "options": {
@@ -765,8 +768,7 @@
               "weather_enabled": "Időjárás engedélyezése",
               "nominal_voltage": "EV-töltő névleges feszültsége (V)",
               "microinverter_lifetime_energy_enabled": "Mikroinverterek teljes élettartam-energiájának engedélyezése",
-              "vpp_events_enabled": "VPP-események engedélyezése",
-              "export_limit_controls_enabled": "A betáplálási korlát vezérlésének engedélyezése"
+              "vpp_events_enabled": "VPP-események engedélyezése"
             },
             "data_description": {
               "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva.",
@@ -776,19 +778,20 @@
               "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése.",
               "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése.",
               "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
-              "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva.",
-              "export_limit_controls_enabled": "A rendszer betáplálási korlátainak beállítása. Telepítői hozzáférést igényel."
+              "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva."
             }
           },
           "advanced_features": {
             "name": "Speciális funkciók",
             "data": {
               "grid_profile_controls_enabled": "Telepítői hálózati profilvezérlés engedélyezése",
-              "microinverter_power_enabled": "Mikroinverterek teljesítményének engedélyezése"
+              "microinverter_power_enabled": "Mikroinverterek teljesítményének engedélyezése",
+              "export_limit_controls_enabled": "A betáplálási korlát vezérlésének engedélyezése"
             },
             "data_description": {
               "grid_profile_controls_enabled": "Lekéri a csak telepítők számára elérhető hálózatiprofil-metaadatokat, és engedélyezi a profilműveleteket. Alapértelmezés szerint letiltva.",
-              "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria."
+              "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria.",
+              "export_limit_controls_enabled": "A rendszer betáplálási korlátainak beállítása. Telepítői hozzáférést igényel."
             }
           }
         },
@@ -845,7 +848,8 @@
         "title": "Betáplálási korlát",
         "description": "Jelenlegi beállítás: **{current}**\n\nKért beállítás: **{requested}**\n\nVáltozási sebesség (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Módosítás megerősítése"
+          "confirm": "Módosítás megerősítése",
+          "restore_slew_rate": "Sebesség visszaállítása az átjáróról"
         }
       },
       "export_limit_submitted": {
@@ -895,9 +899,11 @@
       "export_limit_invalid": "Adjon meg egész wattértéket 0 és 100000 között.",
       "export_limit_changed": "A konfiguráció megváltozott. Ellenőrizze a frissített beállításokat, és erősítse meg újra.",
       "export_limit_pending": "A konfiguráció megerősítésére vár. Újabb módosítás előtt frissítse az állapotot.",
-      "export_limit_disabled": "A betáplálási korlát vezérlésének engedélyezése (Funkciók → Eszközfunkciók).",
+      "export_limit_disabled": "A betáplálási korlát vezérlésének engedélyezése (Funkciók → Speciális funkciók).",
       "export_limit_confirmation": "Módosítás megerősítése",
-      "export_limit_invalid_slew": "Adjon meg pozitív számot legfeljebb két tizedesjeggyel."
+      "export_limit_invalid_slew": "Adjon meg pozitív számot legfeljebb két tizedesjeggyel.",
+      "grid_profile_session_expired": "Az Enlighten-munkamenet lejárt vagy elutasításra került. Nyissa meg a Hitelesítés menüt, jelentkezzen be újra, majd próbálja újra.",
+      "export_limit_session_expired": "Az Enlighten-munkamenet lejárt vagy elutasításra került. Nyissa meg a Hitelesítés menüt, jelentkezzen be újra, majd próbálja újra."
     },
     "abort": {
       "migration_no_envoy_sources": "Nincsenek elérhető Enphase Envoy energiaérzékelők a migrációhoz.",
@@ -1812,7 +1818,21 @@
         }
       },
       "microinverter_connectivity_status": {
-        "name": "Mikroinverterek kapcsolati állapota"
+        "name": "Mikroinverterek kapcsolati állapota",
+        "state_attributes": {
+          "power_telemetry_status": {
+            "name": "Teljesítménytelemetria állapota",
+            "state": {
+              "disabled": "Kikapcsolva",
+              "pending": "Függőben levő",
+              "ready": "Elérhető",
+              "rate_limited": "Kérésszám korlátozva"
+            }
+          },
+          "power_telemetry_next_retry": {
+            "name": "Teljesítménytelemetria következő újrapróbálása"
+          }
+        }
       },
       "microinverter_reporting_count": {
         "name": "Aktív mikroinverterek"

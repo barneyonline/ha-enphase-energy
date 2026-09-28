@@ -3613,6 +3613,10 @@ async def test_options_flow_devices_form_with_defaults(hass) -> None:
     assert features[OPT_PRICING_EDITS_ENABLED] is DEFAULT_PRICING_EDITS_ENABLED
     assert features[OPT_WEATHER_ENABLED] is DEFAULT_WEATHER_ENABLED
     assert features[OPT_EXPORT_LIMIT_CONTROLS_ENABLED] is False
+    assert (
+        OPT_EXPORT_LIMIT_CONTROLS_ENABLED not in validated[CONF_DEVICE_FEATURES_SECTION]
+    )
+    assert validated["advanced_features"][OPT_EXPORT_LIMIT_CONTROLS_ENABLED] is False
     assert features[OPT_VPP_EVENTS_ENABLED] is DEFAULT_VPP_EVENTS_ENABLED
     assert (
         features[OPT_GRID_PROFILE_CONTROLS_ENABLED]
@@ -5973,8 +5977,20 @@ async def test_features_sections_preserve_defaults_and_ignore_invalid_sections(
         {CONF_DEVICE_FEATURES_SECTION: {}, "advanced_features": {}}
     )
     assert set(data["advanced_features"]) == {
+        OPT_EXPORT_LIMIT_CONTROLS_ENABLED,
         OPT_GRID_PROFILE_CONTROLS_ENABLED,
         OPT_MICROINVERTER_POWER_ENABLED,
     }
     result = await handler.async_step_features({"advanced_features": None})
     assert result["data"][OPT_GRID_PROFILE_CONTROLS_ENABLED] is True
+
+
+async def test_features_saves_export_limit_from_advanced_section(hass) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
+    entry.add_to_hass(hass)
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+    result = await handler.async_step_features(
+        {"advanced_features": {OPT_EXPORT_LIMIT_CONTROLS_ENABLED: True}}
+    )
+    assert result["data"][OPT_EXPORT_LIMIT_CONTROLS_ENABLED] is True

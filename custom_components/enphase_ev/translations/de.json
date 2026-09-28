@@ -495,13 +495,16 @@
       "message": "Bestätigung der Konfiguration ausstehend. Vor einer weiteren Änderung den Status aktualisieren."
     },
     "export_limit_disabled": {
-      "message": "Steuerung der Einspeisebegrenzung aktivieren (Funktionen → Gerätefunktionen)."
+      "message": "Steuerung der Einspeisebegrenzung aktivieren (Funktionen → Erweiterte Funktionen)."
     },
     "export_limit_confirmation": {
       "message": "Diese Änderung bestätigen"
     },
     "export_limit_invalid_slew": {
       "message": "Eine positive Zahl mit höchstens zwei Nachkommastellen eingeben."
+    },
+    "export_limit_session_expired": {
+      "message": "Die Enlighten-Sitzung ist abgelaufen oder wurde abgelehnt. Öffnen Sie Authentifizierung, starten Sie die erneute Anmeldung und versuchen Sie es erneut."
     }
   },
   "options": {
@@ -765,8 +768,7 @@
               "weather_enabled": "Wetter aktivieren",
               "nominal_voltage": "Nennspannung des EV-Ladegeräts (V)",
               "microinverter_lifetime_energy_enabled": "Lebensdauerenergie der Mikro-Wechselrichter aktivieren",
-              "vpp_events_enabled": "VPP-Ereignisse aktivieren",
-              "export_limit_controls_enabled": "Steuerung der Einspeisebegrenzung aktivieren"
+              "vpp_events_enabled": "VPP-Ereignisse aktivieren"
             },
             "data_description": {
               "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert.",
@@ -776,19 +778,20 @@
               "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten.",
               "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten.",
               "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
-              "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert.",
-              "export_limit_controls_enabled": "Einspeisegrenzen des Systems konfigurieren. Erfordert Installateurzugriff."
+              "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert."
             }
           },
           "advanced_features": {
             "name": "Erweiterte Funktionen",
             "data": {
               "grid_profile_controls_enabled": "Installateursteuerung für Netzprofile aktivieren",
-              "microinverter_power_enabled": "Leistung der Mikro-Wechselrichter aktivieren"
+              "microinverter_power_enabled": "Leistung der Mikro-Wechselrichter aktivieren",
+              "export_limit_controls_enabled": "Steuerung der Einspeisebegrenzung aktivieren"
             },
             "data_description": {
               "grid_profile_controls_enabled": "Ruft nur für Installateure verfügbare Netzprofil-Metadaten ab und aktiviert Profilaktionen. Standardmäßig deaktiviert.",
-              "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist."
+              "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist.",
+              "export_limit_controls_enabled": "Einspeisegrenzen des Systems konfigurieren. Erfordert Installateurzugriff."
             }
           }
         },
@@ -845,7 +848,8 @@
         "title": "Einspeisebegrenzung",
         "description": "Aktuelle Einstellung: **{current}**\n\nAngeforderte Einstellung: **{requested}**\n\nÄnderungsrate (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Diese Änderung bestätigen"
+          "confirm": "Diese Änderung bestätigen",
+          "restore_slew_rate": "Änderungsrate vom Gateway wiederherstellen"
         }
       },
       "export_limit_submitted": {
@@ -895,9 +899,11 @@
       "export_limit_invalid": "Ganze Wattzahlen von 0 bis 100000 eingeben.",
       "export_limit_changed": "Konfiguration geändert. Aktualisierte Einstellungen prüfen und erneut bestätigen.",
       "export_limit_pending": "Bestätigung der Konfiguration ausstehend. Vor einer weiteren Änderung den Status aktualisieren.",
-      "export_limit_disabled": "Steuerung der Einspeisebegrenzung aktivieren (Funktionen → Gerätefunktionen).",
+      "export_limit_disabled": "Steuerung der Einspeisebegrenzung aktivieren (Funktionen → Erweiterte Funktionen).",
       "export_limit_confirmation": "Diese Änderung bestätigen",
-      "export_limit_invalid_slew": "Eine positive Zahl mit höchstens zwei Nachkommastellen eingeben."
+      "export_limit_invalid_slew": "Eine positive Zahl mit höchstens zwei Nachkommastellen eingeben.",
+      "grid_profile_session_expired": "Die Enlighten-Sitzung ist abgelaufen oder wurde abgelehnt. Öffnen Sie Authentifizierung, starten Sie die erneute Anmeldung und versuchen Sie es erneut.",
+      "export_limit_session_expired": "Die Enlighten-Sitzung ist abgelaufen oder wurde abgelehnt. Öffnen Sie Authentifizierung, starten Sie die erneute Anmeldung und versuchen Sie es erneut."
     },
     "abort": {
       "migration_no_envoy_sources": "Es sind keine Enphase-Envoy-Energiesensoren für die Migration verfügbar.",
@@ -1812,7 +1818,21 @@
         }
       },
       "microinverter_connectivity_status": {
-        "name": "Konnektivitätsstatus der Mikrowechselrichter"
+        "name": "Konnektivitätsstatus der Mikrowechselrichter",
+        "state_attributes": {
+          "power_telemetry_status": {
+            "name": "Status der Leistungstelemetrie",
+            "state": {
+              "disabled": "Deaktiviert",
+              "pending": "Ausstehend",
+              "ready": "Verfügbar",
+              "rate_limited": "Durch Ratenlimit begrenzt"
+            }
+          },
+          "power_telemetry_next_retry": {
+            "name": "Nächster Versuch der Leistungstelemetrie"
+          }
+        }
       },
       "microinverter_reporting_count": {
         "name": "Aktive Mikrowechselrichter"

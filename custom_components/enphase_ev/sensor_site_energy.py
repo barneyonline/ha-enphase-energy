@@ -719,6 +719,7 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
         if self._restored_method_explicit and self._last_method in {
             "seeded",
             "no_live_data",
+            "source_changed_reseed",
         }:
             self._clear_restored_live_history(discard_power=True)
             return
@@ -1160,10 +1161,23 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
                 synthetic_zero_flows.add(flow_key)
 
         current_sources = self._current_flow_sources(flows, current_values)
+        synthetic_flow_changed = any(
+            flow_key in self._last_flow_kwh
+            and (
+                (flow_key in synthetic_zero_flows)
+                != (flow_key in self._synthetic_zero_flows)
+            )
+            for flow_key in self._flow_signs
+        )
         self._synthetic_zero_flows = synthetic_zero_flows
         if not current_values:
             return None
         if not has_live_flow_values:
+            # Missing channels are placeholders, never a cumulative-energy
+            # baseline. Warmup/reload can temporarily publish no lifetime data.
+            self._live_flow_sample_count = 0
+            self._clear_restored_live_history(discard_power=True)
+            self._extreme_power_validator.clear()
             if self._last_flow_kwh:
                 self._last_flow_kwh.update(current_values)
                 self._last_energy_ts = sample_ts
@@ -1211,7 +1225,9 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
         prior_last_power_w = self._last_power_w
         prior_live_sample_count = self._live_flow_sample_count
 
-        if self._flow_source_changed(current_values, current_sources):
+        if synthetic_flow_changed or self._flow_source_changed(
+            current_values, current_sources
+        ):
             self._previous_live_flow_kwh = dict(self._last_flow_kwh)
             self._previous_live_energy_ts = self._last_energy_ts
             self._previous_live_sample_ts = self._last_sample_ts
@@ -1238,8 +1254,6 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
                 continue
             previous = self._last_flow_kwh.get(flow_key)
             if previous is None:
-                continue
-            if flow_key in synthetic_zero_flows and current <= 0 and previous > 0:
                 continue
             delta, flow_reset = _lifetime_energy_delta(
                 current_kwh=current,

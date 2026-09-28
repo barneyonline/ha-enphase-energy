@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlencode, urljoin, urlsplit
 
 from ..const import BASE_URL
-from .errors import Unauthorized
+from .errors import ActivationSessionExpired, Unauthorized
 
 if TYPE_CHECKING:
     from ..api import EnphaseEVClient
@@ -26,6 +26,7 @@ class _FormParser(HTMLParser):
         self.matches = 0
         self.inside = False
         self.fields: list[tuple[str, str]] = []
+        self.radio_fields: dict[str, tuple[str, str]] = {}
         self.textarea: str | None = None
         self.text = ""
         self.select: str | None = None
@@ -51,8 +52,18 @@ class _FormParser(HTMLParser):
             self.invalid |= "disabled" in attr
         disabled = "disabled" in attr
         name = attr.get("name")
-        if tag == "input" and name and not disabled:
+        if tag == "input" and name:
             kind = (attr.get("type") or "text").lower()
+            if kind == "radio" and "checked" in attr:
+                # HTML radio groups select the last checked control, including
+                # disabled controls (which are then omitted from submission).
+                previous = self.radio_fields.pop(name, None)
+                if previous is not None:
+                    self.fields = [
+                        field for field in self.fields if field is not previous
+                    ]
+            if disabled:
+                return
             if kind in {"submit", "button", "reset", "image"}:
                 return
             if kind in {"checkbox", "radio"} and "checked" not in attr:
@@ -60,16 +71,17 @@ class _FormParser(HTMLParser):
             if kind in {"password", "file"}:
                 self.invalid = True
                 return
-            self.fields.append(
+            field = (
+                name,
                 (
-                    name,
-                    (
-                        (attr.get("value") or "")
-                        if "value" in attr
-                        else ("on" if kind in {"checkbox", "radio"} else "")
-                    ),
-                )
+                    (attr.get("value") or "")
+                    if "value" in attr
+                    else ("on" if kind in {"checkbox", "radio"} else "")
+                ),
             )
+            self.fields.append(field)
+            if kind == "radio":
+                self.radio_fields[name] = field
         elif tag == "textarea" and name and not disabled:
             self.textarea, self.text = name, ""
         elif tag == "select" and name and not disabled:
@@ -136,7 +148,14 @@ def _required_fields(fields: list[tuple[str, str]]) -> dict[str, str]:
 
 
 def form_matches_configuration(
-    fields: list[tuple[str, str]], *, enabled: bool, watts: float, slew: float
+    fields: list[tuple[str, str]],
+    *,
+    enabled: bool,
+    watts: float,
+    slew: float,
+    export_target: bool = True,
+    reference: float = 3,
+    allow_zero_slew: bool = False,
 ) -> bool:
     """Block a stale or unsupported live form before recording a write intent."""
     values = _required_fields(fields)
@@ -144,11 +163,15 @@ def form_matches_configuration(
     try:
         return (
             values[f"{prefix}[enable_dynamic_limiting]"]
-            == ("false" if enabled else "disable_settings")
-            and values[f"{prefix}[export_limit]"] == "true"
-            and float(values[f"{prefix}[reference_value]"]) == 3
+            in ({"false"} if enabled else {"false", "disable_settings"})
+            and values[f"{prefix}[export_limit]"]
+            == ("true" if export_target else "false")
+            and float(values[f"{prefix}[reference_value]"]) == reference
             and float(values[f"{prefix}[free_limit_value]"]) == watts
-            and float(values[f"{prefix}[slew_rate]"]) == slew
+            and (
+                float(values[f"{prefix}[slew_rate]"]) == slew
+                or (allow_zero_slew and float(values[f"{prefix}[slew_rate]"]) == 0)
+            )
         )
     except ValueError:
         return False
@@ -177,15 +200,23 @@ async def read_settings(client: EnphaseEVClient) -> object:
 
 async def read_form(client: EnphaseEVClient) -> list[tuple[str, str]]:
     """Fetch a fresh form, without following login redirects."""
-    response = await client._text_response(
-        "GET",
-        f"{BASE_URL}/site_pel_settings/{client._site}/edit?settings_view=true",
-        headers=client._system_dashboard_headers,
-        allow_redirects=False,
-        mark_payload_success=False,
-    )
+    try:
+        response = await client._text_response(
+            "GET",
+            f"{BASE_URL}/site_pel_settings/{client._site}/edit?settings_view=true",
+            headers={
+                "Accept": "text/html,application/xhtml+xml",
+                "X-Requested-With": None,
+            },
+            allow_redirects=False,
+            use_cookie_header_only=True,
+            mark_payload_success=False,
+        )
+    except Unauthorized as err:
+        raise ActivationSessionExpired("PEL session rejected") from err
+
     if response.location and urlsplit(response.location).path.startswith("/login"):
-        raise Unauthorized()
+        raise ActivationSessionExpired("PEL form redirected to login")
     if response.status != 200:
         raise InvalidExportLimitForm("Export Limit form unavailable")
     return parse_form(response.text, str(client._site))
@@ -216,18 +247,24 @@ async def write_settings(
         )
     body = [(k, v) for k, v in fields if k not in overrides and k != "_method"]
     body.extend(overrides.items())
-    response = await client._text_response(
-        "PUT",
-        f"{BASE_URL}/site_pel_settings/{client._site}",
-        data=urlencode(body),
-        headers={
-            **client._system_dashboard_headers(),
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-        allow_redirects=False,
-        allow_reauth=False,
-        allow_replay=False,
-        mark_payload_success=False,
-    )
+    try:
+        response = await client._text_response(
+            "PUT",
+            f"{BASE_URL}/site_pel_settings/{client._site}",
+            data=urlencode(body),
+            headers={
+                "Accept": "text/html,application/xhtml+xml",
+                "X-Requested-With": None,
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            allow_redirects=False,
+            allow_reauth=False,
+            allow_replay=False,
+            use_cookie_header_only=True,
+            mark_payload_success=False,
+        )
+    except Unauthorized as err:
+        raise ActivationSessionExpired("PEL session rejected") from err
+
     if response.location and urlsplit(response.location).path.startswith("/login"):
-        raise Unauthorized()
+        raise ActivationSessionExpired("PEL form redirected to login")

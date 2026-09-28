@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Callable
 
 import aiohttp
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from yarl import URL
 
 from ..const import (
@@ -116,6 +117,7 @@ async def async_prepare_activation_auth(
         payload = await self._text(
             "GET",
             url,
+            use_cookie_header_only=True,
             headers={
                 "Accept": "text/html,application/xhtml+xml",
                 "Referer": f"{BASE_URL}/systems/{self._site}",
@@ -127,14 +129,17 @@ async def async_prepare_activation_auth(
         asyncio.TimeoutError,
         EnphaseLoginWallUnauthorized,
         Unauthorized,
+        ConfigEntryAuthFailed,
     ) as err:
-        if isinstance(err, (EnphaseLoginWallUnauthorized, Unauthorized)) or (
-            isinstance(err, aiohttp.ClientResponseError) and err.status in {401, 403}
+        if isinstance(err, (Unauthorized, ConfigEntryAuthFailed)) or (
+            isinstance(err, aiohttp.ClientResponseError) and err.status == 401
         ):
             self._clear_activation_auth_context()
             raise ActivationSessionExpired(
                 "Enlighten session requires reauthentication"
             ) from err
+        if isinstance(err, aiohttp.ClientResponseError) and err.status == 403:
+            raise ActivationAccessDenied("Activation access denied") from err
         _LOGGER.debug(
             "Activation auth bootstrap unavailable for site %s: %s",
             redact_site_id(self._site),
@@ -166,6 +171,7 @@ async def _activation_payload(
     """Return Activation JSON, mapping denied access to optional unavailable."""
 
     auth_retry_attempted = False
+    can_retry = method.upper() in {"GET", "HEAD"}
     while True:
         request_headers = headers() if callable(headers) else headers
         try:
@@ -178,9 +184,18 @@ async def _activation_payload(
                 **kwargs,
             )
         except EnphaseLoginWallUnauthorized as err:
-            raise ActivationAccessDenied("Activation login wall") from err
+            if can_retry and not auth_retry_attempted:
+                auth_retry_attempted = True
+                self._clear_activation_auth_context()
+                await self.async_prepare_activation_auth(force=True)
+                continue
+            raise ActivationSessionExpired("Activation login wall") from err
         except Unauthorized as err:
-            if not auth_retry_attempted and self._activation_token is not None:
+            if (
+                can_retry
+                and not auth_retry_attempted
+                and self._activation_token is not None
+            ):
                 auth_retry_attempted = True
                 self._clear_activation_auth_context()
                 await self.async_prepare_activation_auth(force=True)
@@ -190,7 +205,8 @@ async def _activation_payload(
             raise OptionalEndpointUnavailable("Activation payload unavailable") from err
         except aiohttp.ClientResponseError as err:
             if (
-                err.status in {401, 403}
+                can_retry
+                and err.status in {401, 403}
                 and not auth_retry_attempted
                 and self._activation_token is not None
             ):

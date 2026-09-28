@@ -495,13 +495,16 @@
       "message": "Väntar på bekräftelse av konfigurationen. Uppdatera status före en ny ändring."
     },
     "export_limit_disabled": {
-      "message": "Aktivera styrning av exportgränser (Funktioner → Enhetsfunktioner)."
+      "message": "Aktivera styrning av exportgränser (Funktioner → Avancerade funktioner)."
     },
     "export_limit_confirmation": {
       "message": "Bekräfta denna ändring"
     },
     "export_limit_invalid_slew": {
       "message": "Ange ett positivt tal med högst två decimaler."
+    },
+    "export_limit_session_expired": {
+      "message": "Enlighten-sessionen har gått ut eller avvisats. Öppna Autentisering, autentisera igen och försök sedan på nytt."
     }
   },
   "options": {
@@ -765,8 +768,7 @@
               "weather_enabled": "Aktivera väder",
               "nominal_voltage": "EV-laddarens nominella spänning (V)",
               "microinverter_lifetime_energy_enabled": "Aktivera mikroväxelriktarnas livstidsenergi",
-              "vpp_events_enabled": "Aktivera VPP-händelser",
-              "export_limit_controls_enabled": "Aktivera styrning av exportgränser"
+              "vpp_events_enabled": "Aktivera VPP-händelser"
             },
             "data_description": {
               "system_event_repair_issues": "Skapar Home Assistant-reparationer för aktiva stående Enphase-larm. Inaktiverat som standard.",
@@ -776,19 +778,20 @@
               "schedule_sync_enabled": "Hantera scheman för IQ EV Charger.",
               "battery_schedules_enabled": "Hantera scheman för IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Aktiverar alla sensorer för livstidsenergi per mikroväxelriktare.",
-              "vpp_events_enabled": "Hämtar VPP/ELRP-scheman från Enphase och skapar endast händelseentiteter för anslutna anläggningar. Inaktiverat som standard.",
-              "export_limit_controls_enabled": "Konfigurera systemets exportgränser. Kräver installatörsåtkomst."
+              "vpp_events_enabled": "Hämtar VPP/ELRP-scheman från Enphase och skapar endast händelseentiteter för anslutna anläggningar. Inaktiverat som standard."
             }
           },
           "advanced_features": {
             "name": "Avancerade funktioner",
             "data": {
               "grid_profile_controls_enabled": "Aktivera installatörskontroller för nätprofil",
-              "microinverter_power_enabled": "Aktivera mikroväxelriktarnas effekt"
+              "microinverter_power_enabled": "Aktivera mikroväxelriktarnas effekt",
+              "export_limit_controls_enabled": "Aktivera styrning av exportgränser"
             },
             "data_description": {
               "grid_profile_controls_enabled": "Hämtar nätprofilmetadata som endast är tillgängliga för installatörer och aktiverar profilåtgärder. Inaktiverat som standard.",
-              "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig."
+              "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig.",
+              "export_limit_controls_enabled": "Konfigurera systemets exportgränser. Kräver installatörsåtkomst."
             }
           }
         },
@@ -845,7 +848,8 @@
         "title": "Exportgräns",
         "description": "Aktuell inställning: **{current}**\n\nBegärd inställning: **{requested}**\n\nÄndringshastighet (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Bekräfta denna ändring"
+          "confirm": "Bekräfta denna ändring",
+          "restore_slew_rate": "Återställ hastighet från gateway"
         }
       },
       "export_limit_submitted": {
@@ -895,9 +899,11 @@
       "export_limit_invalid": "Ange hela watt från 0 till 100000.",
       "export_limit_changed": "Konfigurationen har ändrats. Granska de uppdaterade inställningarna och bekräfta igen.",
       "export_limit_pending": "Väntar på bekräftelse av konfigurationen. Uppdatera status före en ny ändring.",
-      "export_limit_disabled": "Aktivera styrning av exportgränser (Funktioner → Enhetsfunktioner).",
+      "export_limit_disabled": "Aktivera styrning av exportgränser (Funktioner → Avancerade funktioner).",
       "export_limit_confirmation": "Bekräfta denna ändring",
-      "export_limit_invalid_slew": "Ange ett positivt tal med högst två decimaler."
+      "export_limit_invalid_slew": "Ange ett positivt tal med högst två decimaler.",
+      "grid_profile_session_expired": "Enlighten-sessionen har gått ut eller avvisats. Öppna Autentisering, autentisera igen och försök sedan på nytt.",
+      "export_limit_session_expired": "Enlighten-sessionen har gått ut eller avvisats. Öppna Autentisering, autentisera igen och försök sedan på nytt."
     },
     "abort": {
       "migration_no_envoy_sources": "Inga Enphase Envoy-energisensorer är tillgängliga för migrering.",
@@ -1812,7 +1818,21 @@
         }
       },
       "microinverter_connectivity_status": {
-        "name": "Anslutningsstatus för mikroväxelriktare"
+        "name": "Anslutningsstatus för mikroväxelriktare",
+        "state_attributes": {
+          "power_telemetry_status": {
+            "name": "Status för effekttelemetri",
+            "state": {
+              "disabled": "Inaktiverad",
+              "pending": "Väntar",
+              "ready": "Tillgänglig",
+              "rate_limited": "Frekvensbegränsad"
+            }
+          },
+          "power_telemetry_next_retry": {
+            "name": "Nästa försök för effekttelemetri"
+          }
+        }
       },
       "microinverter_reporting_count": {
         "name": "Aktiva mikroväxelriktare"

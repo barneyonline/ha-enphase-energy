@@ -495,13 +495,16 @@
       "message": "Venter på bekreftelse av konfigurasjonen. Oppdater status før en ny endring."
     },
     "export_limit_disabled": {
-      "message": "Aktiver styring av eksportgrenser (Funksjoner → Enhetsfunksjoner)."
+      "message": "Aktiver styring av eksportgrenser (Funksjoner → Avanserte funksjoner)."
     },
     "export_limit_confirmation": {
       "message": "Bekreft denne endringen"
     },
     "export_limit_invalid_slew": {
       "message": "Skriv inn et positivt tall med opptil to desimaler."
+    },
+    "export_limit_session_expired": {
+      "message": "Enlighten-økten er utløpt eller avvist. Åpne Autentisering, start ny autentisering og prøv igjen."
     }
   },
   "options": {
@@ -765,8 +768,7 @@
               "weather_enabled": "Aktiver vær",
               "nominal_voltage": "EV-laderens nominelle spenning (V)",
               "microinverter_lifetime_energy_enabled": "Aktiver mikroinverternes levetidsenergi",
-              "vpp_events_enabled": "Aktiver VPP-hendelser",
-              "export_limit_controls_enabled": "Aktiver styring av eksportgrenser"
+              "vpp_events_enabled": "Aktiver VPP-hendelser"
             },
             "data_description": {
               "system_event_repair_issues": "Oppretter Home Assistant-reparasjoner for aktive stående Enphase-alarmer. Deaktivert som standard.",
@@ -776,19 +778,20 @@
               "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger.",
               "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter.",
-              "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og oppretter hendelsesenheter bare for påmeldte anlegg. Deaktivert som standard.",
-              "export_limit_controls_enabled": "Konfigurer systemets eksportgrenser. Krever installatørtilgang."
+              "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og oppretter hendelsesenheter bare for påmeldte anlegg. Deaktivert som standard."
             }
           },
           "advanced_features": {
             "name": "Avanserte funksjoner",
             "data": {
               "grid_profile_controls_enabled": "Aktiver installatørstyring av nettprofil",
-              "microinverter_power_enabled": "Aktiver mikroinvertereffekt"
+              "microinverter_power_enabled": "Aktiver mikroinvertereffekt",
+              "export_limit_controls_enabled": "Aktiver styring av eksportgrenser"
             },
             "data_description": {
               "grid_profile_controls_enabled": "Henter nettprofilmetadata som bare er tilgjengelige for installatører, og aktiverer profilhandlinger. Deaktivert som standard.",
-              "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig."
+              "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig.",
+              "export_limit_controls_enabled": "Konfigurer systemets eksportgrenser. Krever installatørtilgang."
             }
           }
         },
@@ -845,7 +848,8 @@
         "title": "Eksportgrense",
         "description": "Gjeldende innstilling: **{current}**\n\nForespurt innstilling: **{requested}**\n\nEndringshastighet (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Bekreft denne endringen"
+          "confirm": "Bekreft denne endringen",
+          "restore_slew_rate": "Gjenopprett hastighet fra gateway"
         }
       },
       "export_limit_submitted": {
@@ -895,9 +899,11 @@
       "export_limit_invalid": "Angi hele watt fra 0 til 100000.",
       "export_limit_changed": "Konfigurasjonen er endret. Kontroller de oppdaterte innstillingene og bekreft igjen.",
       "export_limit_pending": "Venter på bekreftelse av konfigurasjonen. Oppdater status før en ny endring.",
-      "export_limit_disabled": "Aktiver styring av eksportgrenser (Funksjoner → Enhetsfunksjoner).",
+      "export_limit_disabled": "Aktiver styring av eksportgrenser (Funksjoner → Avanserte funksjoner).",
       "export_limit_confirmation": "Bekreft denne endringen",
-      "export_limit_invalid_slew": "Skriv inn et positivt tall med opptil to desimaler."
+      "export_limit_invalid_slew": "Skriv inn et positivt tall med opptil to desimaler.",
+      "grid_profile_session_expired": "Enlighten-økten er utløpt eller avvist. Åpne Autentisering, start ny autentisering og prøv igjen.",
+      "export_limit_session_expired": "Enlighten-økten er utløpt eller avvist. Åpne Autentisering, start ny autentisering og prøv igjen."
     },
     "abort": {
       "migration_no_envoy_sources": "Ingen Enphase Envoy-energisensorer er tilgjengelige for migrering.",
@@ -1812,7 +1818,21 @@
         }
       },
       "microinverter_connectivity_status": {
-        "name": "Tilkoblingsstatus for mikroinvertere"
+        "name": "Tilkoblingsstatus for mikroinvertere",
+        "state_attributes": {
+          "power_telemetry_status": {
+            "name": "Status for effekttelemetri",
+            "state": {
+              "disabled": "Deaktivert",
+              "pending": "Venter",
+              "ready": "Tilgjengelig",
+              "rate_limited": "Frekvensbegrenset"
+            }
+          },
+          "power_telemetry_next_retry": {
+            "name": "Neste forsøk på effekttelemetri"
+          }
+        }
       },
       "microinverter_reporting_count": {
         "name": "Aktive mikrovekselrettere"

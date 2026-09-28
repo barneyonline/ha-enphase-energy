@@ -329,17 +329,9 @@ async def async_setup_entry(
             DEFAULT_MICROINVERTER_POWER_ENABLED,
         )
     )
-    registry_setup.sync_inverter_sensor_enabled_defaults(
-        lifetime_energy_enabled=(
-            microinverter_lifetime_energy_enabled
-            if OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED in entry.options
-            else None
-        ),
-        power_enabled=(
-            microinverter_power_enabled
-            if OPT_MICROINVERTER_POWER_ENABLED in entry.options
-            else None
-        ),
+    registry_setup.sync_inverter_sensor_options(
+        lifetime_energy_enabled=microinverter_lifetime_energy_enabled,
+        power_enabled=microinverter_power_enabled,
     )
     known_site_entity_keys = registry_setup.known_site_entity_keys
     known_type_keys = registry_setup.known_type_keys
@@ -1002,7 +994,8 @@ async def async_setup_entry(
         serials = [
             sn
             for sn in current_serials
-            if sn not in registry_setup.known_inverter_serials
+            if microinverter_lifetime_energy_enabled
+            and sn not in registry_setup.known_inverter_serials
         ]
         if serials:
             entities = [
@@ -1018,7 +1011,8 @@ async def async_setup_entry(
         telemetry_serials = [
             sn
             for sn in current_serials
-            if sn not in registry_setup.known_inverter_telemetry_serials
+            if microinverter_power_enabled
+            and sn not in registry_setup.known_inverter_telemetry_serials
             and isinstance(coord.inverter_data(sn), dict)
             and bool((coord.inverter_data(sn) or {}).get("telemetry"))
         ]

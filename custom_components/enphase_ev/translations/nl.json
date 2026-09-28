@@ -495,13 +495,16 @@
       "message": "Wachten op bevestiging van de configuratie. Vernieuw de status voordat u nog een wijziging indient."
     },
     "export_limit_disabled": {
-      "message": "Bediening voor terugleverlimieten inschakelen (Functies → Apparaatfuncties)."
+      "message": "Bediening voor terugleverlimieten inschakelen (Functies → Geavanceerde functies)."
     },
     "export_limit_confirmation": {
       "message": "Deze wijziging bevestigen"
     },
     "export_limit_invalid_slew": {
       "message": "Voer een positief getal met maximaal twee decimalen in."
+    },
+    "export_limit_session_expired": {
+      "message": "De Enlighten-sessie is verlopen of geweigerd. Open Authenticatie, meld u opnieuw aan en probeer het opnieuw."
     }
   },
   "options": {
@@ -765,8 +768,7 @@
               "weather_enabled": "Weer inschakelen",
               "nominal_voltage": "Nominale spanning van EV-lader (V)",
               "microinverter_lifetime_energy_enabled": "Levensduurenergie van micro-omvormers inschakelen",
-              "vpp_events_enabled": "VPP-gebeurtenissen inschakelen",
-              "export_limit_controls_enabled": "Bediening voor terugleverlimieten inschakelen"
+              "vpp_events_enabled": "VPP-gebeurtenissen inschakelen"
             },
             "data_description": {
               "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld.",
@@ -776,19 +778,20 @@
               "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger.",
               "battery_schedules_enabled": "Beheer schema's voor de IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in.",
-              "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld.",
-              "export_limit_controls_enabled": "Terugleverlimieten van het systeem configureren. Vereist installateurstoegang."
+              "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld."
             }
           },
           "advanced_features": {
             "name": "Geavanceerde functies",
             "data": {
               "grid_profile_controls_enabled": "Installateursbediening voor netprofielen inschakelen",
-              "microinverter_power_enabled": "Vermogen van micro-omvormers inschakelen"
+              "microinverter_power_enabled": "Vermogen van micro-omvormers inschakelen",
+              "export_limit_controls_enabled": "Bediening voor terugleverlimieten inschakelen"
             },
             "data_description": {
               "grid_profile_controls_enabled": "Haalt netprofielmetadata op die alleen voor installateurs beschikbaar zijn en schakelt profielacties in. Standaard uitgeschakeld.",
-              "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is."
+              "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is.",
+              "export_limit_controls_enabled": "Terugleverlimieten van het systeem configureren. Vereist installateurstoegang."
             }
           }
         },
@@ -845,7 +848,8 @@
         "title": "Terugleverlimiet",
         "description": "Huidige instelling: **{current}**\n\nAangevraagde instelling: **{requested}**\n\nVeranderingssnelheid (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Deze wijziging bevestigen"
+          "confirm": "Deze wijziging bevestigen",
+          "restore_slew_rate": "Herstel snelheid van gateway"
         }
       },
       "export_limit_submitted": {
@@ -895,9 +899,11 @@
       "export_limit_invalid": "Voer gehele watts in van 0 tot 100000.",
       "export_limit_changed": "Configuratie gewijzigd. Controleer de bijgewerkte instellingen en bevestig opnieuw.",
       "export_limit_pending": "Wachten op bevestiging van de configuratie. Vernieuw de status voordat u nog een wijziging indient.",
-      "export_limit_disabled": "Bediening voor terugleverlimieten inschakelen (Functies → Apparaatfuncties).",
+      "export_limit_disabled": "Bediening voor terugleverlimieten inschakelen (Functies → Geavanceerde functies).",
       "export_limit_confirmation": "Deze wijziging bevestigen",
-      "export_limit_invalid_slew": "Voer een positief getal met maximaal twee decimalen in."
+      "export_limit_invalid_slew": "Voer een positief getal met maximaal twee decimalen in.",
+      "grid_profile_session_expired": "De Enlighten-sessie is verlopen of geweigerd. Open Authenticatie, meld u opnieuw aan en probeer het opnieuw.",
+      "export_limit_session_expired": "De Enlighten-sessie is verlopen of geweigerd. Open Authenticatie, meld u opnieuw aan en probeer het opnieuw."
     },
     "abort": {
       "migration_no_envoy_sources": "Er zijn geen Enphase Envoy-energiesensoren beschikbaar om te migreren.",
@@ -1812,7 +1818,21 @@
         }
       },
       "microinverter_connectivity_status": {
-        "name": "Verbindingsstatus micro-omvormers"
+        "name": "Verbindingsstatus micro-omvormers",
+        "state_attributes": {
+          "power_telemetry_status": {
+            "name": "Status van vermogenstelemetrie",
+            "state": {
+              "disabled": "Uitgeschakeld",
+              "pending": "In behandeling",
+              "ready": "Beschikbaar",
+              "rate_limited": "Verzoekfrequentie beperkt"
+            }
+          },
+          "power_telemetry_next_retry": {
+            "name": "Volgende poging voor vermogenstelemetrie"
+          }
+        }
       },
       "microinverter_reporting_count": {
         "name": "Actieve micro-omvormers"

@@ -495,13 +495,16 @@
       "message": "Oodatakse seadistuse kinnitamist. Enne uut muudatust värskenda olekut."
     },
     "export_limit_disabled": {
-      "message": "Luba ekspordipiirangu juhtimine (Funktsioonid → Seadme funktsioonid)."
+      "message": "Luba ekspordipiirangu juhtimine (Funktsioonid → Täpsemad funktsioonid)."
     },
     "export_limit_confirmation": {
       "message": "Kinnita see muudatus"
     },
     "export_limit_invalid_slew": {
       "message": "Sisestage positiivne arv kuni kahe komakohaga."
+    },
+    "export_limit_session_expired": {
+      "message": "Enlighteni seanss on aegunud või tagasi lükatud. Avage Autentimine, autentige uuesti ja proovige uuesti."
     }
   },
   "options": {
@@ -765,8 +768,7 @@
               "weather_enabled": "Luba ilmateave",
               "nominal_voltage": "EV-laadija nimipinge (V)",
               "microinverter_lifetime_energy_enabled": "Luba mikroinverterite koguenergia",
-              "vpp_events_enabled": "Luba VPP sündmused",
-              "export_limit_controls_enabled": "Luba ekspordipiirangu juhtimine"
+              "vpp_events_enabled": "Luba VPP sündmused"
             },
             "data_description": {
               "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud.",
@@ -776,19 +778,20 @@
               "schedule_sync_enabled": "Halda IQ EV Chargeri ajakavasid.",
               "battery_schedules_enabled": "Halda IQ Battery ajakavasid.",
               "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
-              "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud.",
-              "export_limit_controls_enabled": "Seadista süsteemi ekspordipiirangud. Nõuab paigaldaja juurdepääsu."
+              "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud."
             }
           },
           "advanced_features": {
             "name": "Täpsemad funktsioonid",
             "data": {
               "grid_profile_controls_enabled": "Paigaldaja võrguprofiili juhtelementide lubamine",
-              "microinverter_power_enabled": "Luba mikroinverterite võimsus"
+              "microinverter_power_enabled": "Luba mikroinverterite võimsus",
+              "export_limit_controls_enabled": "Luba ekspordipiirangu juhtimine"
             },
             "data_description": {
               "grid_profile_controls_enabled": "Hangib ainult paigaldajale mõeldud võrguprofiili metaandmed ja lubab profiilitoimingud. Vaikimisi keelatud.",
-              "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval."
+              "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval.",
+              "export_limit_controls_enabled": "Seadista süsteemi ekspordipiirangud. Nõuab paigaldaja juurdepääsu."
             }
           }
         },
@@ -845,7 +848,8 @@
         "title": "Ekspordipiirang",
         "description": "Praegune seadistus: **{current}**\n\nTaotletud seadistus: **{requested}**\n\nMuutumiskiirus (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Kinnita see muudatus"
+          "confirm": "Kinnita see muudatus",
+          "restore_slew_rate": "Taasta muutumiskiirus lüüsist"
         }
       },
       "export_limit_submitted": {
@@ -895,9 +899,11 @@
       "export_limit_invalid": "Sisesta täisarv vatte vahemikus 0 kuni 100000.",
       "export_limit_changed": "Seadistus muutus. Kontrolli uuendatud seadistust ja kinnita uuesti.",
       "export_limit_pending": "Oodatakse seadistuse kinnitamist. Enne uut muudatust värskenda olekut.",
-      "export_limit_disabled": "Luba ekspordipiirangu juhtimine (Funktsioonid → Seadme funktsioonid).",
+      "export_limit_disabled": "Luba ekspordipiirangu juhtimine (Funktsioonid → Täpsemad funktsioonid).",
       "export_limit_confirmation": "Kinnita see muudatus",
-      "export_limit_invalid_slew": "Sisestage positiivne arv kuni kahe komakohaga."
+      "export_limit_invalid_slew": "Sisestage positiivne arv kuni kahe komakohaga.",
+      "grid_profile_session_expired": "Enlighteni seanss on aegunud või tagasi lükatud. Avage Autentimine, autentige uuesti ja proovige uuesti.",
+      "export_limit_session_expired": "Enlighteni seanss on aegunud või tagasi lükatud. Avage Autentimine, autentige uuesti ja proovige uuesti."
     },
     "abort": {
       "migration_no_envoy_sources": "Ühtegi Enphase Envoy energiaandurit pole migratsiooniks saadaval.",
@@ -1812,7 +1818,21 @@
         }
       },
       "microinverter_connectivity_status": {
-        "name": "Mikroinverterite ühenduvuse olek"
+        "name": "Mikroinverterite ühenduvuse olek",
+        "state_attributes": {
+          "power_telemetry_status": {
+            "name": "Võimsuse telemeetria olek",
+            "state": {
+              "disabled": "Keelatud",
+              "pending": "Ootel",
+              "ready": "Saadaval",
+              "rate_limited": "Sagedus piiratud"
+            }
+          },
+          "power_telemetry_next_retry": {
+            "name": "Järgmine võimsuse telemeetria katse"
+          }
+        }
       },
       "microinverter_reporting_count": {
         "name": "Aktiivsed mikroinverterid"

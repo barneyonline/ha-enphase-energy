@@ -495,13 +495,16 @@
       "message": "Laukiama konfigūracijos patvirtinimo. Prieš kitą pakeitimą atnaujinkite būseną."
     },
     "export_limit_disabled": {
-      "message": "Įjungti eksporto ribos valdymą (Funkcijos → Įrenginio funkcijos)."
+      "message": "Įjungti eksporto ribos valdymą (Funkcijos → Išplėstinės funkcijos)."
     },
     "export_limit_confirmation": {
       "message": "Patvirtinti šį pakeitimą"
     },
     "export_limit_invalid_slew": {
       "message": "Įveskite teigiamą skaičių su ne daugiau kaip dviem dešimtainiais skaitmenimis."
+    },
+    "export_limit_session_expired": {
+      "message": "Enlighten seansas baigėsi arba buvo atmestas. Atidarykite Autentifikavimas, autentifikuokitės iš naujo ir bandykite dar kartą."
     }
   },
   "options": {
@@ -765,8 +768,7 @@
               "weather_enabled": "Įjungti orus",
               "nominal_voltage": "EV įkroviklio vardinė įtampa (V)",
               "microinverter_lifetime_energy_enabled": "Įjungti mikroinverterių viso veikimo energiją",
-              "vpp_events_enabled": "Įjungti VPP įvykius",
-              "export_limit_controls_enabled": "Įjungti eksporto ribos valdymą"
+              "vpp_events_enabled": "Įjungti VPP įvykius"
             },
             "data_description": {
               "system_event_repair_issues": "Kuria Home Assistant taisymus aktyviems nuolatiniams Enphase pavojaus signalams. Pagal numatytuosius išjungta.",
@@ -776,19 +778,20 @@
               "schedule_sync_enabled": "Tvarkykite „IQ EV Charger“ tvarkaraščius.",
               "battery_schedules_enabled": "Tvarkykite „IQ Battery“ tvarkaraščius.",
               "microinverter_lifetime_energy_enabled": "Įjungia visus kiekvieno mikroinverterio viso veikimo energijos jutiklius.",
-              "vpp_events_enabled": "Gauna VPP/ELRP tvarkaraščius iš „Enphase“ ir kuria įvykių esybes tik užregistruotoms vietoms. Pagal numatytuosius nustatymus išjungta.",
-              "export_limit_controls_enabled": "Konfigūruokite sistemos eksporto ribas. Reikalinga montuotojo prieiga."
+              "vpp_events_enabled": "Gauna VPP/ELRP tvarkaraščius iš „Enphase“ ir kuria įvykių esybes tik užregistruotoms vietoms. Pagal numatytuosius nustatymus išjungta."
             }
           },
           "advanced_features": {
             "name": "Išplėstinės funkcijos",
             "data": {
               "grid_profile_controls_enabled": "Įjungti montuotojo tinklo profilio valdiklius",
-              "microinverter_power_enabled": "Įjungti mikroinverterių galią"
+              "microinverter_power_enabled": "Įjungti mikroinverterių galią",
+              "export_limit_controls_enabled": "Įjungti eksporto ribos valdymą"
             },
             "data_description": {
               "grid_profile_controls_enabled": "Gauna tik montuotojui skirtus tinklo profilio metaduomenis ir įjungia profilio veiksmus. Pagal numatytuosius nustatymus išjungta.",
-              "microinverter_power_enabled": "Įjungia visus kiekvieno mikroinverterio galios jutiklius, kai pasiekiama montuotojo telemetrija."
+              "microinverter_power_enabled": "Įjungia visus kiekvieno mikroinverterio galios jutiklius, kai pasiekiama montuotojo telemetrija.",
+              "export_limit_controls_enabled": "Konfigūruokite sistemos eksporto ribas. Reikalinga montuotojo prieiga."
             }
           }
         },
@@ -845,7 +848,8 @@
         "title": "Eksporto riba",
         "description": "Dabartinis nustatymas: **{current}**\n\nPrašomas nustatymas: **{requested}**\n\nKitimo greitis (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Patvirtinti šį pakeitimą"
+          "confirm": "Patvirtinti šį pakeitimą",
+          "restore_slew_rate": "Atkurti greitį iš šliuzo"
         }
       },
       "export_limit_submitted": {
@@ -895,9 +899,11 @@
       "export_limit_invalid": "Įveskite sveikąjį vatų skaičių nuo 0 iki 100000.",
       "export_limit_changed": "Konfigūracija pasikeitė. Peržiūrėkite atnaujintus nustatymus ir patvirtinkite dar kartą.",
       "export_limit_pending": "Laukiama konfigūracijos patvirtinimo. Prieš kitą pakeitimą atnaujinkite būseną.",
-      "export_limit_disabled": "Įjungti eksporto ribos valdymą (Funkcijos → Įrenginio funkcijos).",
+      "export_limit_disabled": "Įjungti eksporto ribos valdymą (Funkcijos → Išplėstinės funkcijos).",
       "export_limit_confirmation": "Patvirtinti šį pakeitimą",
-      "export_limit_invalid_slew": "Įveskite teigiamą skaičių su ne daugiau kaip dviem dešimtainiais skaitmenimis."
+      "export_limit_invalid_slew": "Įveskite teigiamą skaičių su ne daugiau kaip dviem dešimtainiais skaitmenimis.",
+      "grid_profile_session_expired": "Enlighten seansas baigėsi arba buvo atmestas. Atidarykite Autentifikavimas, autentifikuokitės iš naujo ir bandykite dar kartą.",
+      "export_limit_session_expired": "Enlighten seansas baigėsi arba buvo atmestas. Atidarykite Autentifikavimas, autentifikuokitės iš naujo ir bandykite dar kartą."
     },
     "abort": {
       "migration_no_envoy_sources": "Nėra Enphase Envoy energijos jutiklių, kuriuos būtų galima migruoti.",
@@ -1812,7 +1818,21 @@
         }
       },
       "microinverter_connectivity_status": {
-        "name": "Mikroinverterių ryšio būsena"
+        "name": "Mikroinverterių ryšio būsena",
+        "state_attributes": {
+          "power_telemetry_status": {
+            "name": "Galios telemetrijos būsena",
+            "state": {
+              "disabled": "Išjungta",
+              "pending": "Laukiama",
+              "ready": "Pasiekiama",
+              "rate_limited": "Ribojamas užklausų dažnis"
+            }
+          },
+          "power_telemetry_next_retry": {
+            "name": "Kitas galios telemetrijos bandymas"
+          }
+        }
       },
       "microinverter_reporting_count": {
         "name": "Aktyvūs mikroinverteriai"
