@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v5.0.0b1 - 2026-09-28
+
+### 🚧 Breaking changes
 - Removed legacy AC Battery discovery, sensors, sleep controls, and cloud polling. Existing AC Battery entities and empty device records are retired on upgrade; IQ Battery support is unchanged.
 
 ### ✨ New features
@@ -33,7 +50,6 @@ All notable changes to this project will be documented in this file.
 - Align IQ Battery, microinverter, and EV charger cards with friendly model names and full shared SKUs in brackets; summarize mixed models, omit SKU-only Hardware rows, and link device and cloud service cards to the Enlighten site.
 - Keep enabled Grid Profile Control visible during session failures and explain when to reauthenticate instead of reporting installer access denial. Session failures take precedence over mixed permission errors and stop pending-profile polling.
 - Move device feature options into a top-level Features menu, with installer Grid Profile and Microinverter Power toggles grouped under Advanced Features.
-
 - Prevent automatic HTTP transport retries of Export Limit writes after uncertain connection failures.
 - Start and stop Export Limit polling with the feature toggle; reject incomplete or changed PEL forms, clear unsent pending requests, and remove pending repairs on unload.
 - Align System Profile and Export Limit readback to a 10-minute fast-polling window, followed by a repair warning and standard-interval checks.
@@ -41,7 +57,8 @@ All notable changes to this project will be documented in this file.
 - Default both per-microinverter Lifetime Energy and Power Device Features to off, preserving saved user choices and independent total array capacity sensors.
 
 ### 🔄 Other changes
-- None
+- Updated the CI setup-uv action from `10.1.0` to `10.2.0`. (#888)
+- Bumped the integration manifest version to `5.0.0b1`.
 
 ## v4.3.5 - 2026-09-25
 
