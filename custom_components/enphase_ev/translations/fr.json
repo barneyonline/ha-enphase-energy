@@ -495,13 +495,16 @@
       "message": "En attente de confirmation de la configuration. Actualisez l’état avant une autre modification."
     },
     "export_limit_disabled": {
-      "message": "Activer les commandes de limite d’injection (Fonctionnalités → Fonctionnalités des appareils)."
+      "message": "Activer les commandes de limite d’injection (Fonctionnalités → Fonctionnalités avancées)."
     },
     "export_limit_confirmation": {
       "message": "Confirmer cette modification"
     },
     "export_limit_invalid_slew": {
       "message": "Saisissez un nombre positif avec au plus deux décimales."
+    },
+    "export_limit_session_expired": {
+      "message": "La session Enlighten a expiré ou a été refusée. Ouvrez Authentification, relancez l’authentification, puis réessayez."
     }
   },
   "options": {
@@ -765,8 +768,7 @@
               "weather_enabled": "Activer la météo",
               "nominal_voltage": "Tension nominale du chargeur EV (V)",
               "microinverter_lifetime_energy_enabled": "Activer l’énergie totale des micro-onduleurs",
-              "vpp_events_enabled": "Activer les événements VPP",
-              "export_limit_controls_enabled": "Activer les commandes de limite d’injection"
+              "vpp_events_enabled": "Activer les événements VPP"
             },
             "data_description": {
               "system_event_repair_issues": "Crée des réparations Home Assistant pour les alarmes permanentes Enphase actives. Désactivé par défaut.",
@@ -776,19 +778,20 @@
               "schedule_sync_enabled": "Gérer les plannings de l’IQ EV Charger.",
               "battery_schedules_enabled": "Gérer les programmes de l’IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Active tous les capteurs d’énergie totale par micro-onduleur.",
-              "vpp_events_enabled": "Récupère les calendriers VPP/ELRP auprès d’Enphase et crée des entités d’événement uniquement pour les sites inscrits. Désactivé par défaut.",
-              "export_limit_controls_enabled": "Configurer les limites d’injection du système. Nécessite un accès installateur."
+              "vpp_events_enabled": "Récupère les calendriers VPP/ELRP auprès d’Enphase et crée des entités d’événement uniquement pour les sites inscrits. Désactivé par défaut."
             }
           },
           "advanced_features": {
             "name": "Fonctionnalités avancées",
             "data": {
               "grid_profile_controls_enabled": "Activer les contrôles du profil réseau installateur",
-              "microinverter_power_enabled": "Activer la puissance des micro-onduleurs"
+              "microinverter_power_enabled": "Activer la puissance des micro-onduleurs",
+              "export_limit_controls_enabled": "Activer les commandes de limite d’injection"
             },
             "data_description": {
               "grid_profile_controls_enabled": "Récupère les métadonnées du profil réseau réservées aux installateurs et active les actions de profil. Désactivé par défaut.",
-              "microinverter_power_enabled": "Active tous les capteurs de puissance par micro-onduleur lorsque la télémétrie installateur est disponible."
+              "microinverter_power_enabled": "Active tous les capteurs de puissance par micro-onduleur lorsque la télémétrie installateur est disponible.",
+              "export_limit_controls_enabled": "Configurer les limites d’injection du système. Nécessite un accès installateur."
             }
           }
         },
@@ -845,7 +848,8 @@
         "title": "Limite d’injection",
         "description": "Réglage actuel: **{current}**\n\nRéglage demandé: **{requested}**\n\nVitesse de variation (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Confirmer cette modification"
+          "confirm": "Confirmer cette modification",
+          "restore_slew_rate": "Restaurer la vitesse depuis la passerelle"
         }
       },
       "export_limit_submitted": {
@@ -895,9 +899,11 @@
       "export_limit_invalid": "Saisissez un nombre entier de watts entre 0 et 100000.",
       "export_limit_changed": "Configuration modifiée. Vérifiez les réglages actualisés et confirmez à nouveau.",
       "export_limit_pending": "En attente de confirmation de la configuration. Actualisez l’état avant une autre modification.",
-      "export_limit_disabled": "Activer les commandes de limite d’injection (Fonctionnalités → Fonctionnalités des appareils).",
+      "export_limit_disabled": "Activer les commandes de limite d’injection (Fonctionnalités → Fonctionnalités avancées).",
       "export_limit_confirmation": "Confirmer cette modification",
-      "export_limit_invalid_slew": "Saisissez un nombre positif avec au plus deux décimales."
+      "export_limit_invalid_slew": "Saisissez un nombre positif avec au plus deux décimales.",
+      "grid_profile_session_expired": "La session Enlighten a expiré ou a été refusée. Ouvrez Authentification, relancez l’authentification, puis réessayez.",
+      "export_limit_session_expired": "La session Enlighten a expiré ou a été refusée. Ouvrez Authentification, relancez l’authentification, puis réessayez."
     },
     "abort": {
       "migration_no_envoy_sources": "Aucun capteur d’énergie Enphase Envoy n’est disponible pour la migration.",
@@ -1812,7 +1818,21 @@
         }
       },
       "microinverter_connectivity_status": {
-        "name": "État de connectivité des micro-onduleurs"
+        "name": "État de connectivité des micro-onduleurs",
+        "state_attributes": {
+          "power_telemetry_status": {
+            "name": "État de la télémétrie de puissance",
+            "state": {
+              "disabled": "Désactivée",
+              "pending": "En attente",
+              "ready": "Disponible",
+              "rate_limited": "Débit limité"
+            }
+          },
+          "power_telemetry_next_retry": {
+            "name": "Prochaine tentative de télémétrie de puissance"
+          }
+        }
       },
       "microinverter_reporting_count": {
         "name": "Micro-onduleurs actifs"

@@ -3600,8 +3600,8 @@ def test_site_grid_power_sensor_rebases_missing_flow_to_zero_before_first_interv
             interval_minutes=5,
         )
     }
-    assert sensor.native_value == -2400
-    assert sensor.extra_state_attributes["method"] == "lifetime_energy_window"
+    assert sensor.native_value is None
+    assert sensor.extra_state_attributes["method"] == "seeded"
 
 
 def test_site_battery_power_sensor_ignores_missing_component_flow_in_delta(
@@ -3822,7 +3822,7 @@ def test_site_lifetime_power_sensor_helper_edge_cases(
             interval_minutes=5,
         )
     }
-    assert battery_sensor.native_value == 0
+    assert battery_sensor.native_value is None
 
 
 def test_site_lifetime_power_restore_data_helper_edges() -> None:
@@ -5529,3 +5529,132 @@ async def test_site_energy_future_source_does_not_poison_progress(
     assert diag["source_progress"] == "advanced"
     diag = await refresh(now[0] + timedelta(seconds=61))
     assert diag["source_progress"] == "future"
+
+
+@pytest.mark.parametrize(
+    "missing_flows", [("grid_import", "grid_export"), ("grid_export",)]
+)
+@pytest.mark.asyncio
+@pytest.mark.parametrize("restored", [False, True])
+async def test_grid_power_reseeds_after_lifetime_data_disappears(
+    hass, coordinator_factory, monkeypatch, missing_flows, restored
+) -> None:
+    """Reload placeholders must not turn cumulative totals into instantaneous watts."""
+    coord = coordinator_factory()
+    sensor = EnphaseGridPowerSensor(coord)
+    base_ts = datetime(2026, 9, 28, 11, 0, tzinfo=timezone.utc)
+
+    def sample(minutes, import_kwh, export_kwh):
+        coord.energy._site_energy_meta = {  # noqa: SLF001
+            "last_report_date": base_ts + timedelta(minutes=minutes),
+            "bucket_lengths": {"import": 1511, "solar_grid": 1511},
+        }
+        coord.energy.site_energy = {
+            flow: SiteEnergyFlow(
+                value_kwh=value,
+                bucket_count=1511,
+                fields_used=[source],
+                start_date="2022-08-10",
+                last_report_date=base_ts + timedelta(minutes=minutes),
+                update_pending=False,
+                source_unit="Wh",
+                last_reset_at=None,
+                interval_minutes=5,
+            )
+            for flow, value, source in (
+                ("grid_import", import_kwh, "import"),
+                ("grid_export", export_kwh, "solar_grid"),
+            )
+        }
+
+    sample(0, 19814.67, 19864.17)
+    assert sensor.native_value is None
+    sample(5, 19814.77, 19864.17)
+    assert sensor.native_value == 1200
+    if restored:
+        previous_state = SimpleNamespace(
+            state="1200", attributes=sensor.extra_state_attributes
+        )
+        previous_extra = sensor.extra_restore_state_data
+        sensor = EnphaseGridPowerSensor(coord)
+        sensor.hass = hass
+        monkeypatch.setattr(sensor, "_schedule_freshness_expiry", lambda: None)
+        sensor.async_get_last_state = AsyncMock(return_value=previous_state)
+        sensor.async_get_last_extra_data = AsyncMock(return_value=previous_extra)
+        await sensor.async_added_to_hass()
+        assert sensor.native_value == 1200
+    sample(10, 19814.77, 19864.17)
+    for flow in missing_flows:
+        del coord.energy.site_energy[flow]
+    sensor.native_value
+    sample(15, 19814.776, 19864.176)
+    assert sensor.native_value in (None, 1200)
+    assert sensor.native_value != -592800
+    sample(20, 19814.876, 19864.176)
+    assert sensor.native_value == 1200
+
+
+def test_grid_power_does_not_difference_newly_discovered_flow(
+    coordinator_factory,
+) -> None:
+    """A newly discovered lifetime channel needs its own initial baseline."""
+    coord = coordinator_factory()
+    sensor = EnphaseGridPowerSensor(coord)
+    coord.energy.site_energy = {
+        "grid_import": {"value_kwh": 100, "last_report_date": 1_700_000_000}
+    }
+    assert sensor.native_value is None
+    coord.energy.site_energy = {
+        "grid_import": {"value_kwh": 100.1, "last_report_date": 1_700_000_300},
+        "grid_export": {"value_kwh": 20000, "last_report_date": 1_700_000_300},
+    }
+    assert sensor.native_value == 1200
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("restore_after_recovery", [False, True])
+async def test_grid_power_restore_does_not_reconstruct_reseeded_partial_history(
+    hass, coordinator_factory, monkeypatch, restore_after_recovery
+) -> None:
+    """A source transition is not a valid interval even with matching field names."""
+    coord = coordinator_factory()
+    sensor = EnphaseGridPowerSensor(coord)
+
+    def sample(timestamp, export):
+        coord.energy.site_energy = {
+            "grid_import": {
+                "value_kwh": 19814.776,
+                "fields_used": ["import"],
+                "last_report_date": timestamp,
+            },
+            "grid_export": {
+                "value_kwh": export,
+                "fields_used": ["solar_grid"],
+                "last_report_date": timestamp,
+            },
+        }
+
+    sample(1_700_000_000, 49.3)
+    assert sensor.native_value is None
+    sample(1_700_000_300, 49.4)
+    assert sensor.native_value == -1200
+    sample(1_700_000_600, None)
+    assert sensor.native_value == -1200
+    if restore_after_recovery:
+        sample(1_700_000_900, 49.4)
+        assert sensor.native_value == -1200
+    previous_state = SimpleNamespace(
+        state="-1200", attributes=sensor.extra_state_attributes
+    )
+    previous_extra = sensor.extra_restore_state_data
+    sensor = EnphaseGridPowerSensor(coord)
+    sensor.hass = hass
+    monkeypatch.setattr(sensor, "_schedule_freshness_expiry", lambda: None)
+    sensor.async_get_last_state = AsyncMock(return_value=previous_state)
+    sensor.async_get_last_extra_data = AsyncMock(return_value=previous_extra)
+    await sensor.async_added_to_hass()
+    assert sensor.native_value is None
+    sample(1_700_001_200, 49.4)
+    assert sensor.native_value is None
+    sample(1_700_001_500, 49.5)
+    assert sensor.native_value == -1200

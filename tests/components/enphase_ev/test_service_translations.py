@@ -2379,7 +2379,7 @@ def test_grid_profile_description_warns_about_malfunction_for_all_locales() -> N
 def test_features_and_session_guidance_are_localized() -> None:
     root = ROOT
     english = json.loads((root / "strings.json").read_text())
-    for path in (root / "translations").glob("*.json"):
+    for path in [root / "strings.json", *(root / "translations").glob("*.json")]:
         data = json.loads(path.read_text())
         steps = data["options"]["step"]
         assert set(steps["devices"]["sections"]) == {"devices"}
@@ -2390,12 +2390,34 @@ def test_features_and_session_guidance_are_localized() -> None:
         assert set(steps["features"]["sections"]["advanced_features"]["data"]) == {
             "grid_profile_controls_enabled",
             "microinverter_power_enabled",
+            "export_limit_controls_enabled",
         }
         assert steps["init"]["menu_options"]["features"]
         assert steps["init"]["menu_option_descriptions"]["features"]
         message = data["options"]["abort"]["grid_profile_session_expired"]
         assert message
-        if not path.stem.startswith("en"):
+        assert data["options"]["error"]["grid_profile_session_expired"] == message
+        assert data["options"]["error"]["export_limit_session_expired"] == message
+        assert data["exceptions"]["export_limit_session_expired"]["message"] == message
+        sections = steps["features"]["sections"]
+        for guidance in (
+            data["exceptions"]["export_limit_disabled"]["message"],
+            data["options"]["error"]["export_limit_disabled"],
+        ):
+            assert sections["advanced_features"]["name"] in guidance
+            assert sections["device_features"]["name"] not in guidance
+        for key in ("data", "data_description"):
+            assert (
+                "export_limit_controls_enabled"
+                not in steps["features"]["sections"]["device_features"][key]
+            )
+            assert (
+                steps["features"]["sections"]["advanced_features"][key][
+                    "export_limit_controls_enabled"
+                ]
+                == steps["features"][key]["export_limit_controls_enabled"]
+            )
+        if path.name != "strings.json" and not path.stem.startswith("en"):
             assert (
                 message != english["options"]["abort"]["grid_profile_session_expired"]
             )

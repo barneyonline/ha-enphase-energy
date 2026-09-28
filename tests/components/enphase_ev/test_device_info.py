@@ -5,7 +5,6 @@ import pytest
 
 def test_device_info_uses_display_name_and_model():
     from custom_components.enphase_ev.entity import EnphaseBaseEntity
-    from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 
     entity = object.__new__(EnphaseBaseEntity)
     entity._coord = SimpleNamespace(
@@ -30,7 +29,7 @@ def test_device_info_uses_display_name_and_model():
     assert info["model_id"] == "IQ-EVSE-EU-3032-01"
     assert info["serial_number"] == "555555555555"
     assert info["sw_version"] == "3.1"
-    assert info["connections"] == {(CONNECTION_NETWORK_MAC, "00:11:22:33:44:55")}
+    assert "connections" not in info
 
 
 def test_device_info_keeps_non_redundant_model_id():
@@ -309,3 +308,53 @@ def test_site_management_link(site, suffix):
     expected = "https://enlighten.enphaseenergy.com" + suffix
     assert _site_configuration_url(site) == expected
     assert _cloud_device_info(site)["configuration_url"] == expected
+
+
+@pytest.mark.asyncio
+async def test_charger_registry_refresh_removes_only_its_mac_connections(
+    hass, config_entry
+):
+    from homeassistant.helpers import device_registry as dr
+
+    from custom_components.enphase_ev.const import DOMAIN
+    from custom_components.enphase_ev.registry_sync import _sync_charger_devices
+
+    registry = dr.async_get(hass)
+    macs = {
+        (dr.CONNECTION_NETWORK_MAC, "00:11:22:33:44:55"),
+        (dr.CONNECTION_NETWORK_MAC, "00:11:22:33:44:66"),
+    }
+    other_connection = ("serial", "charger-transport")
+    device = registry.async_get_or_create(
+        config_entry_id=config_entry.entry_id,
+        identifiers={(DOMAIN, "charger-mac-test")},
+        connections=macs | {other_connection},
+        name="Garage charger",
+    )
+    unrelated = registry.async_get_or_create(
+        config_entry_id=config_entry.entry_id,
+        identifiers={(DOMAIN, "gateway-mac-test")},
+        connections={(dr.CONNECTION_NETWORK_MAC, "00:11:22:33:44:77")},
+    )
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    other_entry = MockConfigEntry(domain="other_integration")
+    other_entry.add_to_hass(hass)
+    other_device = registry.async_get_or_create(
+        config_entry_id=other_entry.entry_id,
+        identifiers={(DOMAIN, "charger-mac-test")},
+        connections=macs,
+    )
+    registry.async_update_device(device.id, name_by_user="Garage")
+    coord = SimpleNamespace(
+        iter_serials=lambda: ["charger-mac-test"],
+        data={"charger-mac-test": {"mac_address": "00:11:22:33:44:55"}},
+    )
+    for _ in range(2):
+        _sync_charger_devices(config_entry, coord, registry, "site-test", {})
+        updated = registry.async_get(device.id)
+        assert updated.connections == {other_connection}
+        assert updated.identifiers == {(DOMAIN, "charger-mac-test")}
+        assert updated.name_by_user == "Garage"
+        assert registry.async_get(unrelated.id).connections == unrelated.connections
+        assert registry.async_get(other_device.id).connections == macs

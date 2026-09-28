@@ -19,6 +19,37 @@ All notable changes to this project will be documented in this file.
 ### 🔄 Other changes
 - None
 
+## v5.0.0b2 - 2026-09-28
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Show localized reauthentication guidance when an Enlighten session expires while confirming an Export Limit change or restoring defaults.
+- Parse Export Limit radio groups using browser selection rules when Enphase marks multiple choices checked, allowing enabled configurations to be read and disabled again.
+- Allow explicit restoration of an Export Limit form's zero slew-rate default from the current gateway when enabling, changing, or disabling a limit, with fresh identity checks and unchanged-setting confirmation.
+- Preserve microinverter power telemetry rate-limit deadlines across settings reloads and Home Assistant restarts. Expose telemetry status and the next retry time on Microinverter Connectivity Status, even before individual power sensors are discovered.
+- Fix the Export Limit action menu failing to open in Home Assistant options.
+- Fetch the installer Export Limit form with HTML request headers so valid installer sessions do not receive a misleading not-found redirect.
+- Resolve Export Limit settings for a single current gateway when replaced gateways remain in cloud history, and recognize compatible disabled configurations with retained default settings.
+- Restore per-device IQ Battery and enabled microinverter sensors after settings reloads, including when refreshed inventory contains the same devices as the restored discovery cache.
+- Stop treating valid Enlighten settings pages as expired sessions and prevent shared-session cookies from overriding current installer credentials.
+- Reseed grid and battery power baselines after missing lifetime data returns, preventing lifetime totals from becoming short-window power spikes during reauthentication or reload.
+- Recover expired Enlighten HTML sessions through the shared automatic authentication refresh and request Home Assistant reauthentication when installer-session recovery fails. Preserve permission-denial errors separately from expired sessions.
+- Explain expired sessions in Export Limit settings instead of reporting a generic installer or gateway configuration error.
+- Remove per-microinverter Lifetime Energy and Power entities when their respective feature is off, and discover them again when enabled without affecting total capacity or connectivity sensors.
+
+### 🔧 Improvements
+- Pace microinverter telemetry requests, fetch power first, update diagnostic parameters hourly, and stop remaining requests immediately after a rate-limit response.
+- Group Enable Export Limit controls under Features > Advanced Features, including localized enablement guidance in options and service errors.
+- Remove MAC addresses from charger device information and clean up previously registered charger MAC connections.
+
+### 🔄 Other changes
+- None
+
 ## v5.0.0b1 - 2026-09-28
 
 ### 🚧 Breaking changes

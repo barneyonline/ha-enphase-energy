@@ -6,7 +6,6 @@ from datetime import time as dt_time
 from typing import Any, TypeVar, cast
 
 from homeassistant.core import callback as ha_callback
-from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -209,14 +208,6 @@ class EnphaseBaseEntity(
             info_kwargs["hw_version"] = str(d.get("hw_version"))
         if d.get("sw_version"):
             info_kwargs["sw_version"] = str(d.get("sw_version"))
-        mac_address = d.get("mac_address")
-        if mac_address is not None:
-            try:
-                mac_clean = str(mac_address).strip().lower().replace("-", ":")
-            except Exception:  # noqa: BLE001
-                mac_clean = None
-            if mac_clean:
-                info_kwargs["connections"] = {(CONNECTION_NETWORK_MAC, mac_clean)}
         return DeviceInfo(**info_kwargs)
 
 

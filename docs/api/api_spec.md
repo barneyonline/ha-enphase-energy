@@ -5831,7 +5831,10 @@ Observed response types:
 | `agg_power_export_limit`, `max_back_feed`, various breaker fields | Null observed; non-null schemas unverified. |
 
 No numeric strings were observed in these PEL fields; cross-version consistency
-is unverified. Missing PEL objects mean unavailable, not disabled. Do not coerce
+is unverified. Missing PEL objects mean unavailable, not disabled. A disabled gateway can retain
+`export_limit=false` and `reference_value=1`; these retained defaults do not mean
+an active production limit. A known reference mode and positive existing slew
+rate are still required before allowing configuration. Do not coerce
 null/missing numbers to zero or use generic truthiness for string `"false"`.
 
 No top-level `active`, `retired`, or serial field was present in inspected gateway
@@ -5840,6 +5843,13 @@ records. An independently known active serial from bootstrap
 `data.gateway_settings[].der_if_report.DevCert`, allowing a device-ID cross-check.
 This observed certificate-path association is not a general identity resolver;
 certificate URLs may be absent and must not enter diagnostics unredacted.
+The 2026-09-28 integration-session read verified that
+`devices_details?type=envoy` returned one current `envoys[]` entry with a numeric
+`id`, `serial_number`, and normal status. Its `id` matched exactly one settings
+`device_id` among three retained gateway records. Runtime uses this independent
+current-device ID when historical records are present; it rejects missing,
+multiple, retired, or unmatched current identities rather than selecting by
+record ordering or PEL values.
 A replacement-flow frontend helper reads
 `gateway_settings[0].power_export_limiting.pel_power_ctrl_set_point`; this separate
 flow does not make index zero a valid selector for PEL control.
@@ -5905,6 +5915,22 @@ Observed unauthenticated response outside the browser, with redirects disabled:
 HTTP `302`, `Location: /login`, and no `Content-Type` header. In-browser manual
 redirect handling with credentials omitted returned `opaqueredirect`, status 0,
 and an empty body. Neither result establishes successful form retrieval.
+
+Integration-session verification on 2026-09-28 required browser HTML headers:
+`Accept: text/html,application/xhtml+xml` and no `X-Requested-With`, using the
+stored cookies without shared-session cookie merging. Dashboard JSON/AJAX
+headers redirected this route to `/public/not_found` despite valid installer
+access; HTML headers returned HTTP 200 and the expected form. The disabled form
+retained `enable_dynamic_limiting=false`, `export_limit=false`, and
+`reference_value=1`. Its slew rate differed from current gateway readback, so
+ordinary writes remain blocked by the form/readback consistency check; no write
+was performed during this verification. The guided confirmation flow may
+explicitly restore this zero form default from a positive gateway slew rate only
+while limiting is disabled and non-dynamic. It requires an independently verified
+single current gateway, an unchanged expected snapshot, matching remaining form
+settings, and no requested slew override. The preserved rate is displayed before
+confirmation and included in the single submission. Nonzero disagreements and
+service/selector calls retain the strict consistency check.
 
 Response: authenticated HTML form containing `authenticity_token`, hidden fields,
 and `info_pel_settings_info[...]` controls. There is no gateway selector; the
@@ -5993,6 +6019,15 @@ info_pel_settings_info[slew_rate]=<existing_slew_rate_watts_per_second>
 ```
 
 Disablement has been verified through response `enable=false`. The tested requests retained other form values; a minimum standalone payload has not been isolated. For native POST submission, retain `_method=put`. Preserve `info_pel_settings_info[settings_view]` where supplied by the form.
+
+Live verification on 2026-09-28 confirmed zero export followed by restoration to
+disabled, preserving the gateway's 6,980 W/s slew rate in both readbacks. The
+enabled form marked both production/export radios and both percentage/absolute
+reference radios as checked. Browser radio-group semantics select the last
+checked control; parsing must reproduce that selection without accepting
+duplicate hidden or other successful controls. The form continued to show a
+zero slew rate while limiting was enabled, so explicit gateway-rate restoration
+is needed for disablement as well as enablement on this site.
 
 The form can display a zero slew-rate default inconsistent with gateway readback. Frontend validation requires a positive value, including on disablement. It uses `parseFloat`, checks for NaN and nonpositive input, normalizes negative input and rounds excess decimal places to two. The slew input itself has `min="0"`, `step="0.01"`, and no maximum; the separate
 script enforces positivity. Other UI inputs: `limit_value` has minimum 0,

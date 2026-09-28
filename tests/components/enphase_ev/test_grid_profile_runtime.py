@@ -9,10 +9,11 @@ from unittest.mock import AsyncMock, patch
 
 import aiohttp
 import pytest
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import ConfigEntryAuthFailed, ServiceValidationError
 
 from custom_components.enphase_ev import api
 from custom_components.enphase_ev.api_client import common as api_common
+from custom_components.enphase_ev.api_client.errors import ActivationSessionExpired
 from custom_components.enphase_ev.api import (
     ActivationAccessDenied,
     EnphaseLoginWallUnauthorized,
@@ -456,7 +457,7 @@ async def test_activation_api_distinguishes_access_denial_from_payload_failure(
                 endpoint="/activation",
                 request_label="GET /activation",
             ),
-            ActivationAccessDenied,
+            ActivationSessionExpired,
         ),
         (
             aiohttp.ClientResponseError(None, (), status=403),
@@ -474,6 +475,7 @@ async def test_activation_api_classifies_http_access_failures(
 ) -> None:
     client = _make_api_client()
     client._json = AsyncMock(side_effect=error)
+    client.async_prepare_activation_auth = AsyncMock(return_value=True)
 
     with pytest.raises(expected_exception):
         await client.async_get_activation_record()
@@ -2339,7 +2341,7 @@ async def test_grid_profile_runtime_pending_and_apply_error_paths() -> None:
             endpoint="/settings", request_label="GET /settings"
         ),
         aiohttp.ClientResponseError(request_info=None, history=(), status=401),
-        aiohttp.ClientResponseError(request_info=None, history=(), status=403),
+        ConfigEntryAuthFailed(),
     ],
 )
 async def test_settings_session_rejection_is_distinct_from_installer_denial(
@@ -2425,3 +2427,50 @@ async def test_pending_poll_stops_after_session_rejection(during_sleep) -> None:
         await runtime._async_poll_pending_profile("agf:pending")
     runtime.async_refresh_device_status.assert_not_awaited()
     assert runtime.pending_profile_id is None
+
+
+async def test_settings_permission_denial_does_not_request_reauthentication():
+    client = _make_api_client()
+    client._text = AsyncMock(
+        side_effect=aiohttp.ClientResponseError(
+            request_info=None, history=(), status=403
+        )
+    )
+    with pytest.raises(ActivationAccessDenied):
+        await client.async_prepare_activation_auth()
+
+
+async def test_grid_session_failure_starts_entry_reauth(hass):
+    from unittest.mock import MagicMock
+    from custom_components.enphase_ev.api_client.errors import ActivationSessionExpired
+
+    coordinator = _FakeCoordinator(_FakeGridProfileClient())
+    coordinator.hass = hass
+    coordinator.config_entry = SimpleNamespace(async_start_reauth=MagicMock())
+    coordinator.client.async_prepare_activation_auth = AsyncMock(
+        side_effect=ActivationSessionExpired("expired")
+    )
+    runtime = GridProfileRuntime(coordinator)
+    result = await runtime.async_refresh()
+    assert result.support_state == "session_expired"
+    coordinator.config_entry.async_start_reauth.assert_called_once_with(hass)
+
+
+@pytest.mark.parametrize("method", ["GET", "PUT"])
+async def test_activation_login_wall_recovery_never_replays_write(method):
+    client = _make_api_client()
+    error = EnphaseLoginWallUnauthorized(
+        endpoint="/activation", request_label="request"
+    )
+    client._json = AsyncMock(side_effect=[error, {"recovered": True}])
+    client.async_prepare_activation_auth = AsyncMock(return_value=True)
+    if method == "GET":
+        assert await client._activation_payload(method, "url", headers={}) == {
+            "recovered": True
+        }
+        client.async_prepare_activation_auth.assert_awaited_once_with(force=True)
+    else:
+        with pytest.raises(ActivationSessionExpired):
+            await client._activation_payload(method, "url", headers={})
+        client.async_prepare_activation_auth.assert_not_awaited()
+    assert client._json.await_count == (2 if method == "GET" else 1)

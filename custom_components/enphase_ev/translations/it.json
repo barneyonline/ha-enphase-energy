@@ -495,13 +495,16 @@
       "message": "In attesa di conferma della configurazione. Aggiorna lo stato prima di un’altra modifica."
     },
     "export_limit_disabled": {
-      "message": "Abilita i controlli del limite di immissione (Funzionalità → Funzionalità del dispositivo)."
+      "message": "Abilita i controlli del limite di immissione (Funzionalità → Funzionalità avanzate)."
     },
     "export_limit_confirmation": {
       "message": "Conferma questa modifica"
     },
     "export_limit_invalid_slew": {
       "message": "Inserisci un numero positivo con al massimo due decimali."
+    },
+    "export_limit_session_expired": {
+      "message": "La sessione Enlighten è scaduta o è stata rifiutata. Apri Autenticazione, avvia una nuova autenticazione e riprova."
     }
   },
   "options": {
@@ -765,8 +768,7 @@
               "weather_enabled": "Abilita meteo",
               "nominal_voltage": "Tensione nominale del caricatore EV (V)",
               "microinverter_lifetime_energy_enabled": "Abilita energia totale dei microinverter",
-              "vpp_events_enabled": "Abilita eventi VPP",
-              "export_limit_controls_enabled": "Abilita i controlli del limite di immissione"
+              "vpp_events_enabled": "Abilita eventi VPP"
             },
             "data_description": {
               "system_event_repair_issues": "Crea riparazioni di Home Assistant per gli allarmi Enphase permanenti attivi. Disabilitato per impostazione predefinita.",
@@ -776,19 +778,20 @@
               "schedule_sync_enabled": "Gestisci le pianificazioni di IQ EV Charger.",
               "battery_schedules_enabled": "Gestisci le pianificazioni di IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Abilita tutti i sensori di energia totale per ciascun microinverter.",
-              "vpp_events_enabled": "Recupera le pianificazioni VPP/ELRP da Enphase e crea entità evento solo per i siti iscritti. Disabilitato per impostazione predefinita.",
-              "export_limit_controls_enabled": "Configurare i limiti di immissione del sistema. Richiede l’accesso installatore."
+              "vpp_events_enabled": "Recupera le pianificazioni VPP/ELRP da Enphase e crea entità evento solo per i siti iscritti. Disabilitato per impostazione predefinita."
             }
           },
           "advanced_features": {
             "name": "Funzionalità avanzate",
             "data": {
               "grid_profile_controls_enabled": "Abilita i controlli del profilo di rete per installatori",
-              "microinverter_power_enabled": "Abilita potenza dei microinverter"
+              "microinverter_power_enabled": "Abilita potenza dei microinverter",
+              "export_limit_controls_enabled": "Abilita i controlli del limite di immissione"
             },
             "data_description": {
               "grid_profile_controls_enabled": "Recupera i metadati del profilo di rete riservati agli installatori e abilita le azioni del profilo. Disabilitato per impostazione predefinita.",
-              "microinverter_power_enabled": "Abilita tutti i sensori di potenza per ciascun microinverter quando è disponibile la telemetria dell’installatore."
+              "microinverter_power_enabled": "Abilita tutti i sensori di potenza per ciascun microinverter quando è disponibile la telemetria dell’installatore.",
+              "export_limit_controls_enabled": "Configurare i limiti di immissione del sistema. Richiede l’accesso installatore."
             }
           }
         },
@@ -845,7 +848,8 @@
         "title": "Limite di immissione",
         "description": "Impostazione attuale: **{current}**\n\nImpostazione richiesta: **{requested}**\n\nVelocità di variazione (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Conferma questa modifica"
+          "confirm": "Conferma questa modifica",
+          "restore_slew_rate": "Ripristina la velocità dal gateway"
         }
       },
       "export_limit_submitted": {
@@ -895,9 +899,11 @@
       "export_limit_invalid": "Inserisci watt interi da 0 a 100000.",
       "export_limit_changed": "Configurazione modificata. Controlla le impostazioni aggiornate e conferma di nuovo.",
       "export_limit_pending": "In attesa di conferma della configurazione. Aggiorna lo stato prima di un’altra modifica.",
-      "export_limit_disabled": "Abilita i controlli del limite di immissione (Funzionalità → Funzionalità del dispositivo).",
+      "export_limit_disabled": "Abilita i controlli del limite di immissione (Funzionalità → Funzionalità avanzate).",
       "export_limit_confirmation": "Conferma questa modifica",
-      "export_limit_invalid_slew": "Inserisci un numero positivo con al massimo due decimali."
+      "export_limit_invalid_slew": "Inserisci un numero positivo con al massimo due decimali.",
+      "grid_profile_session_expired": "La sessione Enlighten è scaduta o è stata rifiutata. Apri Autenticazione, avvia una nuova autenticazione e riprova.",
+      "export_limit_session_expired": "La sessione Enlighten è scaduta o è stata rifiutata. Apri Autenticazione, avvia una nuova autenticazione e riprova."
     },
     "abort": {
       "migration_no_envoy_sources": "Non sono disponibili sensori energia Enphase Envoy da migrare.",
@@ -1812,7 +1818,21 @@
         }
       },
       "microinverter_connectivity_status": {
-        "name": "Stato connettività microinverter"
+        "name": "Stato connettività microinverter",
+        "state_attributes": {
+          "power_telemetry_status": {
+            "name": "Stato della telemetria di potenza",
+            "state": {
+              "disabled": "Disabilitato",
+              "pending": "In attesa",
+              "ready": "Disponibile",
+              "rate_limited": "Limite di frequenza"
+            }
+          },
+          "power_telemetry_next_retry": {
+            "name": "Prossimo tentativo di telemetria di potenza"
+          }
+        }
       },
       "microinverter_reporting_count": {
         "name": "Microinverter attivi"

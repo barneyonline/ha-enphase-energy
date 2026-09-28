@@ -20,6 +20,11 @@ from custom_components.enphase_ev.inventory_runtime import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _skip_parameter_pacing_delay(monkeypatch):
+    monkeypatch.setattr(inventory_runtime_mod, "INVERTER_PARAMETER_REQUEST_GAP_S", 0.0)
+
+
 def _clear_hems_inventory_endpoint_family(coord) -> None:
     health = coord._endpoint_family_state(
         HEMS_INVENTORY_ENDPOINT_FAMILY
@@ -1591,6 +1596,9 @@ async def test_inventory_runtime_optional_batch_has_bounded_concurrency(
     assert results == labels
     assert order == labels
     assert max_active == 2
+    assert await runtime._async_run_bounded_optional_batch(
+        [lambda: _request("unbounded")], timeout_s=None
+    ) == ["unbounded"]
 
     bounded = await runtime._async_run_bounded_optional_batch(  # noqa: SLF001
         [lambda: _request("too-late")],
@@ -1716,7 +1724,7 @@ async def test_inventory_runtime_full_parameter_failures_use_fresh_cache_until_s
         assert health.consecutive_failures == failure_count
         assert health.degraded is False
         assert health.successful_items == 0
-        assert health.total_items == 2
+        assert health.total_items == (2 if failure_count == 1 else 1)
         assert health.using_cached_data is True
         assert health.cache_stale is False
         assert "9633674" not in (health.last_error or "")
@@ -1920,7 +1928,7 @@ async def test_inventory_runtime_stale_parameter_cache_degrades_partial_result(
         _inverter_parameter_telemetry={"INV-A": {"power": 250.0, "temperature": 42.0}},
         _inverter_parameter_success_mono={
             "power": time.monotonic(),
-            "temperature": time.monotonic() - 1_801.0,
+            "temperature": time.monotonic() - 7_201.0,
         },
     )
     monkeypatch.setattr(
@@ -4029,3 +4037,137 @@ def test_retired_only_selection_does_not_enable_other_device_families(
                 assert not inventory_type_selected_for_cleanup(coord, type_key)
             assert not coord._first_refresh_storm_guard_followups_needed()
             assert not coord._heatpump_hems_polling_enabled()
+
+
+@pytest.mark.asyncio
+async def test_parameter_requests_prioritize_power_pace_pages_and_stop_on_429(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.inventory_runtime
+    runtime._set_shared_state_attr(
+        "_inverter_parameter_ids", ["temperature", "ac_voltage", "ac_power"]
+    )
+    monkeypatch.setattr(
+        coord,
+        "_endpoint_family_should_run",
+        lambda family: family == "inverter_parameter_telemetry",
+    )
+    clock = [1000.0]
+    monkeypatch.setattr(
+        inventory_runtime_mod, "time", SimpleNamespace(monotonic=lambda: clock[0])
+    )
+    monkeypatch.setattr(inventory_runtime_mod, "INVERTER_PARAMETER_REQUEST_GAP_S", 1.0)
+    sleeps = []
+
+    async def sleep(delay):
+        sleeps.append(delay)
+        clock[0] += delay
+
+    monkeypatch.setattr(inventory_runtime_mod.asyncio, "sleep", sleep)
+    requests = []
+
+    async def fetch(serials, parameter, *, per_page, page):
+        requests.append((parameter, page, clock[0]))
+        if parameter == "temperature":
+            raise api.InvalidPayloadError("rate limited", status=429)
+        return {
+            "intervals": [{"serial_number": serials[page - 1], "value": 200}],
+            "has_next": page == 1,
+        }
+
+    coord.client.system_dashboard_parameter_view = AsyncMock(side_effect=fetch)
+    result = await runtime._async_refresh_inverter_parameter_telemetry(
+        ["INV-A", "INV-B"]
+    )
+    assert requests == [
+        ("ac_power", 1, 1000),
+        ("ac_power", 2, 1001),
+        ("temperature", 1, 1002),
+    ]
+    assert sleeps == [1.0, 1.0]
+    assert result["INV-A"]["power"] == 200
+    assert result["INV-B"]["power"] == 200
+    health = coord._endpoint_family_state("inverter_parameter_telemetry")
+    assert health.last_status == 429
+    assert health.partial_success is True
+    assert health.total_items == 3
+    assert health.successful_items == 1
+
+
+@pytest.mark.asyncio
+async def test_parameter_429_takes_priority_over_prior_failure_and_stops_queue(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.inventory_runtime
+    runtime._set_shared_state_attr(
+        "_inverter_parameter_ids", ["power", "temperature", "ac_voltage"]
+    )
+    monkeypatch.setattr(
+        coord,
+        "_endpoint_family_should_run",
+        lambda family: family == "inverter_parameter_telemetry",
+    )
+    coord.client.system_dashboard_parameter_view = AsyncMock(
+        side_effect=[
+            RuntimeError("temporary failure"),
+            api.InvalidPayloadError("rate limited", status=429),
+        ]
+    )
+    assert await runtime._async_refresh_inverter_parameter_telemetry(["INV-A"]) == {}
+    assert coord.client.system_dashboard_parameter_view.await_count == 2
+    health = coord._endpoint_family_state("inverter_parameter_telemetry")
+    assert health.last_status == 429
+    assert health.last_error == "Enphase rate limit (HTTP 429)"
+    assert health.cooldown_active is True
+    # Even a forced should-run decision cannot bypass the active server cooldown.
+    assert await runtime._async_refresh_inverter_parameter_telemetry(["INV-A"]) == {}
+    assert coord.client.system_dashboard_parameter_view.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_parameter_diagnostics_poll_hourly_and_retain_two_hour_cache(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.inventory_runtime
+    runtime._set_shared_state_attr("_inverter_parameter_ids", ["temperature", "power"])
+    monkeypatch.setattr(
+        coord,
+        "_endpoint_family_should_run",
+        lambda family: family == "inverter_parameter_telemetry",
+    )
+    clock = [1000.0]
+    monkeypatch.setattr(
+        inventory_runtime_mod, "time", SimpleNamespace(monotonic=lambda: clock[0])
+    )
+    coord.client.system_dashboard_parameter_view = AsyncMock(
+        return_value={"intervals": [{"serial_number": "INV-A", "value": 42}]}
+    )
+    await runtime._async_refresh_inverter_parameter_telemetry(["INV-A"])
+    assert [
+        call.args[1]
+        for call in coord.client.system_dashboard_parameter_view.await_args_list
+    ] == ["power", "temperature"]
+    coord.client.system_dashboard_parameter_view.reset_mock()
+    clock[0] += 1801
+    result = await runtime._async_refresh_inverter_parameter_telemetry(["INV-A"])
+    assert result["INV-A"]["temperature"] == 42
+    assert [
+        call.args[1]
+        for call in coord.client.system_dashboard_parameter_view.await_args_list
+    ] == ["power"]
+    runtime._set_shared_state_attr("_inverter_parameter_ids", ["temperature"])
+    coord.client.system_dashboard_parameter_view.reset_mock()
+    await runtime._async_refresh_inverter_parameter_telemetry(["INV-A"])
+    coord.client.system_dashboard_parameter_view.assert_not_awaited()
+    clock[0] = 4600
+    await runtime._async_refresh_inverter_parameter_telemetry(["INV-A"])
+    coord.client.system_dashboard_parameter_view.assert_awaited_once()
+    clock[0] += 7201
+    coord.client.system_dashboard_parameter_view.side_effect = RuntimeError(
+        "unavailable"
+    )
+    result = await runtime._async_refresh_inverter_parameter_telemetry(["INV-A"])
+    assert result == {}

@@ -335,7 +335,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             key: feature_fields.pop(key)
             for key in list(feature_fields)
             if key.schema
-            in {OPT_GRID_PROFILE_CONTROLS_ENABLED, OPT_MICROINVERTER_POWER_ENABLED}
+            in {
+                OPT_EXPORT_LIMIT_CONTROLS_ENABLED,
+                OPT_GRID_PROFILE_CONTROLS_ENABLED,
+                OPT_MICROINVERTER_POWER_ENABLED,
+            }
         }
         return vol.Schema(
             {
@@ -906,8 +910,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         if enabled:
             try:
                 self._export_snapshot = await self._export_runtime().async_prepare()
-            except ServiceValidationError:
-                errors["base"] = "export_limit_unavailable"
+            except ServiceValidationError as err:
+                errors["base"] = (
+                    "grid_profile_session_expired"
+                    if err.translation_key == "export_limit_session_expired"
+                    else "export_limit_unavailable"
+                )
             else:
                 if not self._export_snapshot.supported:
                     return self.async_show_form(
@@ -917,26 +925,32 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                             "current": await self._export_current_label()
                         },
                     )
-                status = self._export_runtime().request_status
-                return self.async_show_menu(
-                    step_id="export_limit_action",
-                    description_placeholders={
-                        "current": await self._export_current_label(),
-                        "status": await self._export_label(
-                            f"state_attributes.request_status.state.{status}", status
-                        ),
-                    },
-                    menu_options=[
-                        "export_limit_defaults",
-                        "export_limit_set",
-                        "export_limit_zero",
-                        "export_limit_disable",
-                    ],
-                )
+                return await self.async_step_export_limit_action()
         else:
             errors["base"] = "export_limit_disabled"
         return self.async_show_form(
             step_id="export_limit", data_schema=vol.Schema({}), errors=errors
+        )
+
+    async def async_step_export_limit_action(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Expose the action menu as a registered Home Assistant flow step."""
+        status = self._export_runtime().request_status
+        return self.async_show_menu(
+            step_id="export_limit_action",
+            description_placeholders={
+                "current": await self._export_current_label(),
+                "status": await self._export_label(
+                    f"state_attributes.request_status.state.{status}", status
+                ),
+            },
+            menu_options=[
+                "export_limit_defaults",
+                "export_limit_set",
+                "export_limit_zero",
+                "export_limit_disable",
+            ],
         )
 
     async def async_step_export_limit_defaults(
@@ -1067,6 +1081,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                     self._export_watts,
                     confirm=user_input.get("confirm") is True,
                     expected=self._export_snapshot,
+                    reconcile_zero_slew=user_input.get("restore_slew_rate") is True,
                     slew_rate=(
                         self._entry.options.get(OPT_EXPORT_LIMIT_SLEW_RATE)
                         if self._export_watts is not None
@@ -1091,7 +1106,23 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 )
         return self.async_show_form(
             step_id="export_limit_confirm",
-            data_schema=vol.Schema({vol.Required("confirm", default=False): bool}),
+            data_schema=vol.Schema(
+                {
+                    vol.Required("confirm", default=False): bool,
+                    **(
+                        {vol.Optional("restore_slew_rate", default=False): bool}
+                        if not self._export_snapshot.dynamic
+                        and (
+                            self._export_watts is None
+                            or self._entry.options.get(
+                                OPT_EXPORT_LIMIT_SLEW_RATE, self._export_snapshot.slew
+                            )
+                            == self._export_snapshot.slew
+                        )
+                        else {}
+                    ),
+                }
+            ),
             errors=errors,
             description_placeholders={
                 "current": await self._export_current_label(),

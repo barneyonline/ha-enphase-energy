@@ -30,6 +30,10 @@ from .device_types import (
 from .log_redaction import redact_site_id, redact_text
 from .inventory_payload_helpers import hems_devices_groups
 from .inverter_inventory import async_fetch_inverter_pages
+from .inverter_telemetry_cooldown import (
+    async_restore_inverter_telemetry_cooldown,
+    async_save_inverter_telemetry_cooldown,
+)
 from .payload_debug import debug_field_keys, debug_render_summary, debug_sorted_keys
 from .parsing_helpers import heatpump_worst_status_text
 from .parsing_helpers import (
@@ -116,6 +120,9 @@ INVERTER_PARAMETER_ALIASES: dict[str, str] = {
     "sw_version": "firmware",
 }
 INVERTER_PARAMETER_REQUEST_TIMEOUT_S = 15.0
+INVERTER_PARAMETER_REQUEST_GAP_S = 1.0
+INVERTER_DIAGNOSTIC_INTERVAL_S = 3600.0
+INVERTER_DIAGNOSTIC_STALE_AFTER_S = 7200.0
 INVERTER_PARAMETER_BATCH_CONCURRENCY = 2
 INVERTER_PARAMETER_MIN_PAGE_SIZE = 50
 INVERTER_PARAMETER_MAX_PAGE_SIZE = 500
@@ -133,6 +140,9 @@ class CoordinatorTopologySnapshot:
     gateway_iq_router_keys: tuple[str, ...]
     inventory_ready: bool
     inverter_telemetry_serials: tuple[str, ...] = ()
+    # Restored serials alone cannot authorize per-device entity discovery.
+    battery_status_ready: bool = False
+    inverter_inventory_ready: bool = False
 
 
 @dataclass(frozen=True)
@@ -183,6 +193,8 @@ class InventoryRuntime:
         self, coordinator: EnphaseCoordinator, *, state: InventoryState | None = None
     ) -> None:
         self.coordinator = coordinator
+        self._inverter_parameter_last_request_mono: float | None = None
+        self._inverter_diagnostic_attempts: dict[str, float] = {}
         self.discovery_state = coordinator.discovery_state
         self.refresh_state = coordinator.refresh_state
         self.inventory_state = (
@@ -838,7 +850,13 @@ class InventoryRuntime:
         return CoordinatorTopologySnapshot(
             charger_serials=tuple(self.iter_serials()),
             battery_serials=tuple(self.iter_battery_serials()),
+            battery_status_ready=isinstance(
+                getattr(self.coordinator, "_battery_status_payload", None), dict
+            ),
             inverter_serials=inverter_serials,
+            inverter_inventory_ready=isinstance(
+                getattr(self.coordinator, "_inverters_inventory_payload", None), dict
+            ),
             active_type_keys=tuple(self.iter_type_keys()),
             gateway_iq_router_keys=router_keys,
             inventory_ready=bool(
@@ -3115,12 +3133,22 @@ class InventoryRuntime:
         for page in range(1, INVERTER_PARAMETER_MAX_PAGES + 1):
             try:
                 async with asyncio.timeout(max(0.0, deadline - time.monotonic())):
-                    payload = await fetcher(
-                        serials,
-                        parameter_id,
-                        per_page=per_page,
-                        page=page,
-                    )
+                    last_request = self._inverter_parameter_last_request_mono
+                    if last_request is not None:
+                        delay = INVERTER_PARAMETER_REQUEST_GAP_S - (
+                            time.monotonic() - last_request
+                        )
+                        if delay > 0:
+                            await asyncio.sleep(delay)
+                    try:
+                        payload = await fetcher(
+                            serials,
+                            parameter_id,
+                            per_page=per_page,
+                            page=page,
+                        )
+                    finally:
+                        self._inverter_parameter_last_request_mono = time.monotonic()
             except Exception as err:  # noqa: BLE001 - retain completed serials
                 if not readings:
                     raise
@@ -3204,6 +3232,7 @@ class InventoryRuntime:
         """Refresh supported parameters in bulk, preserving stale optional data."""
 
         coord = self.coordinator
+        await async_restore_inverter_telemetry_cooldown(coord)
         cached = getattr(self, "_inverter_parameter_telemetry", None)
         cached_items = cached.items() if isinstance(cached, dict) else ()
         cached_by_serial = {
@@ -3257,8 +3286,14 @@ class InventoryRuntime:
                     canonical,
                     telemetry_health.last_success_mono,
                 )
-                if last_success is not None and now_mono - last_success > float(
-                    stale_after_s
+                parameter_stale_after = (
+                    float(stale_after_s)
+                    if canonical == "power"
+                    else INVERTER_DIAGNOSTIC_STALE_AFTER_S
+                )
+                if (
+                    last_success is not None
+                    and now_mono - last_success > parameter_stale_after
                 ):
                     stale_pairs.add((serial, canonical))
             for serial, canonical in stale_pairs:
@@ -3282,6 +3317,12 @@ class InventoryRuntime:
                 telemetry_health.cache_stale = True
                 telemetry_health.using_cached_data = bool(cached_by_serial)
         if not serials:
+            return cached_by_serial
+        if (
+            telemetry_health.last_status == 429
+            and telemetry_health.cooldown_active
+            and coord._endpoint_family_wait_active(telemetry_family)
+        ):
             return cached_by_serial
 
         master_fetcher = getattr(self.client, "system_dashboard_master_data", None)
@@ -3383,19 +3424,47 @@ class InventoryRuntime:
             INVERTER_PARAMETER_MAX_PAGE_SIZE,
             max(INVERTER_PARAMETER_MIN_PAGE_SIZE, len(serials) * 2),
         )
-        results = await self._async_run_bounded_optional_batch(
-            [
-                partial(
-                    self._async_fetch_complete_inverter_parameter,
+        # Power is operational telemetry; slower diagnostic fields must not
+        # consume its request budget or renew on every power poll.
+        parameter_ids = [
+            parameter_id
+            for parameter_id in sorted(
+                parameter_ids,
+                key=lambda item: INVERTER_PARAMETER_ALIASES[item.lower()] != "power",
+            )
+            if INVERTER_PARAMETER_ALIASES[parameter_id.lower()] == "power"
+            or now_mono
+            - self._inverter_diagnostic_attempts.get(parameter_id, -math.inf)
+            >= INVERTER_DIAGNOSTIC_INTERVAL_S
+        ]
+        if not parameter_ids:
+            return cached_by_serial
+        results: list[InverterParameterFetchResult | Exception] = []
+        throttled_error: Exception | None = None
+        for parameter_id in parameter_ids:
+            if throttled_error is not None:
+                # Do not send the remaining queued requests after a rate limit.
+                # Treat their existing samples as retained, nonauthoritative data.
+                results.append(throttled_error)
+                continue
+            if INVERTER_PARAMETER_ALIASES[parameter_id.lower()] != "power":
+                self._inverter_diagnostic_attempts[parameter_id] = time.monotonic()
+            try:
+                result = await self._async_fetch_complete_inverter_parameter(
                     typed_parameter_fetcher,
                     serials,
                     parameter_id,
                     per_page=parameter_page_size,
                 )
-                for parameter_id in parameter_ids
-            ],
-            timeout_s=None,
-        )
+            except Exception as err:  # noqa: BLE001 - preserve optional results
+                result = err
+            results.append(result)
+            error = result if isinstance(result, Exception) else result.error
+            if (
+                error is not None
+                and coord._endpoint_family_status_from_error(error) == 429
+            ):
+                throttled_error = error
         successful_parameter_count = 0
         updated_parameter_count = 0
         first_error: Exception | None = None
@@ -3479,8 +3548,10 @@ class InventoryRuntime:
             telemetry_health.using_cached_data = False
             telemetry_health.cache_stale = False
             return telemetry_by_serial
-        batch_error = first_error or ValueError(
-            "Dashboard parameter readings were unavailable"
+        batch_error = (
+            rate_limit_error
+            or first_error
+            or ValueError("Dashboard parameter readings were unavailable")
         )
         reported_error = (
             rate_limit_error
@@ -3514,6 +3585,8 @@ class InventoryRuntime:
             telemetry_health.last_error = safe_batch_error
             telemetry_health.degraded = bool(failed_cache_stale or not useful_telemetry)
             telemetry_health.partial_success = False
+        if rate_limit_error is not None:
+            await async_save_inverter_telemetry_cooldown(coord)
         telemetry_health.successful_items = successful_parameter_count
         telemetry_health.total_items = len(parameter_ids)
         telemetry_health.using_cached_data = using_cached_data

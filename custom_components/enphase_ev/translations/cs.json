@@ -495,13 +495,16 @@
       "message": "Čeká se na potvrzení konfigurace. Před další změnou obnovte stav."
     },
     "export_limit_disabled": {
-      "message": "Povolit ovládání limitu přetoků (Funkce → Funkce zařízení)."
+      "message": "Povolit ovládání limitu přetoků (Funkce → Pokročilé funkce)."
     },
     "export_limit_confirmation": {
       "message": "Potvrdit tuto změnu"
     },
     "export_limit_invalid_slew": {
       "message": "Zadejte kladné číslo s nejvýše dvěma desetinnými místy."
+    },
+    "export_limit_session_expired": {
+      "message": "Relace Enlighten vypršela nebo byla odmítnuta. Otevřete Ověřování, spusťte nové ověření a zkuste to znovu."
     }
   },
   "options": {
@@ -765,8 +768,7 @@
               "weather_enabled": "Povolit počasí",
               "nominal_voltage": "Jmenovité napětí nabíječky EV (V)",
               "microinverter_lifetime_energy_enabled": "Povolit celoživotní energii mikrostřídačů",
-              "vpp_events_enabled": "Povolit události VPP",
-              "export_limit_controls_enabled": "Povolit ovládání limitu přetoků"
+              "vpp_events_enabled": "Povolit události VPP"
             },
             "data_description": {
               "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto.",
@@ -776,19 +778,20 @@
               "schedule_sync_enabled": "Spravujte plány nabíječky IQ EV Charger.",
               "battery_schedules_enabled": "Spravujte plány baterie IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů.",
-              "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto.",
-              "export_limit_controls_enabled": "Nastavit limity přetoků systému. Vyžaduje přístup instalátora."
+              "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto."
             }
           },
           "advanced_features": {
             "name": "Pokročilé funkce",
             "data": {
               "grid_profile_controls_enabled": "Povolit instalační ovládání síťového profilu",
-              "microinverter_power_enabled": "Povolit výkon mikrostřídačů"
+              "microinverter_power_enabled": "Povolit výkon mikrostřídačů",
+              "export_limit_controls_enabled": "Povolit ovládání limitu přetoků"
             },
             "data_description": {
               "grid_profile_controls_enabled": "Načte metadata síťového profilu dostupná pouze instalačnímu technikovi a povolí akce s profily. Ve výchozím nastavení je vypnuto.",
-              "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika."
+              "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika.",
+              "export_limit_controls_enabled": "Nastavit limity přetoků systému. Vyžaduje přístup instalátora."
             }
           }
         },
@@ -845,7 +848,8 @@
         "title": "Limit přetoků",
         "description": "Aktuální nastavení: **{current}**\n\nPožadované nastavení: **{requested}**\n\nRychlost změny (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Potvrdit tuto změnu"
+          "confirm": "Potvrdit tuto změnu",
+          "restore_slew_rate": "Obnovit rychlost změny z brány"
         }
       },
       "export_limit_submitted": {
@@ -895,9 +899,11 @@
       "export_limit_invalid": "Zadejte celé watty od 0 do 100000.",
       "export_limit_changed": "Konfigurace se změnila. Zkontrolujte aktualizované nastavení a znovu potvrďte.",
       "export_limit_pending": "Čeká se na potvrzení konfigurace. Před další změnou obnovte stav.",
-      "export_limit_disabled": "Povolit ovládání limitu přetoků (Funkce → Funkce zařízení).",
+      "export_limit_disabled": "Povolit ovládání limitu přetoků (Funkce → Pokročilé funkce).",
       "export_limit_confirmation": "Potvrdit tuto změnu",
-      "export_limit_invalid_slew": "Zadejte kladné číslo s nejvýše dvěma desetinnými místy."
+      "export_limit_invalid_slew": "Zadejte kladné číslo s nejvýše dvěma desetinnými místy.",
+      "grid_profile_session_expired": "Relace Enlighten vypršela nebo byla odmítnuta. Otevřete Ověřování, spusťte nové ověření a zkuste to znovu.",
+      "export_limit_session_expired": "Relace Enlighten vypršela nebo byla odmítnuta. Otevřete Ověřování, spusťte nové ověření a zkuste to znovu."
     },
     "abort": {
       "migration_no_envoy_sources": "Nejsou k dispozici žádné energetické senzory Enphase Envoy pro migraci.",
@@ -1812,7 +1818,21 @@
         }
       },
       "microinverter_connectivity_status": {
-        "name": "Stav připojení mikroinvertorů"
+        "name": "Stav připojení mikroinvertorů",
+        "state_attributes": {
+          "power_telemetry_status": {
+            "name": "Stav telemetrie výkonu",
+            "state": {
+              "disabled": "Vypnuto",
+              "pending": "Čeká na vyřízení",
+              "ready": "Dostupné",
+              "rate_limited": "Omezení četnosti"
+            }
+          },
+          "power_telemetry_next_retry": {
+            "name": "Další pokus o telemetrii výkonu"
+          }
+        }
       },
       "microinverter_reporting_count": {
         "name": "Aktivní mikroinvertory"

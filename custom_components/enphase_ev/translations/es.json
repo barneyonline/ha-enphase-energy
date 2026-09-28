@@ -495,13 +495,16 @@
       "message": "Esperando confirmación de la configuración. Actualice el estado antes de otro cambio."
     },
     "export_limit_disabled": {
-      "message": "Activar controles del límite de vertido (Funciones → Funciones del dispositivo)."
+      "message": "Activar controles del límite de vertido (Funciones → Funciones avanzadas)."
     },
     "export_limit_confirmation": {
       "message": "Confirmar este cambio"
     },
     "export_limit_invalid_slew": {
       "message": "Introduzca un número positivo con hasta dos decimales."
+    },
+    "export_limit_session_expired": {
+      "message": "La sesión de Enlighten ha caducado o ha sido rechazada. Abra Autenticación, vuelva a autenticarse e inténtelo de nuevo."
     }
   },
   "options": {
@@ -765,8 +768,7 @@
               "weather_enabled": "Activar el tiempo",
               "nominal_voltage": "Tensión nominal del cargador EV (V)",
               "microinverter_lifetime_energy_enabled": "Activar energía de por vida de los microinversores",
-              "vpp_events_enabled": "Activar eventos VPP",
-              "export_limit_controls_enabled": "Activar controles del límite de vertido"
+              "vpp_events_enabled": "Activar eventos VPP"
             },
             "data_description": {
               "system_event_repair_issues": "Crea reparaciones de Home Assistant para alarmas permanentes activas de Enphase. Desactivado de forma predeterminada.",
@@ -776,19 +778,20 @@
               "schedule_sync_enabled": "Gestiona los horarios del IQ EV Charger.",
               "battery_schedules_enabled": "Gestiona los horarios de la IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Activa todos los sensores de energía de por vida de cada microinversor.",
-              "vpp_events_enabled": "Obtiene los horarios VPP/ELRP de Enphase y crea entidades de eventos solo para sitios inscritos. Desactivado de forma predeterminada.",
-              "export_limit_controls_enabled": "Configurar los límites de vertido del sistema. Requiere acceso de instalador."
+              "vpp_events_enabled": "Obtiene los horarios VPP/ELRP de Enphase y crea entidades de eventos solo para sitios inscritos. Desactivado de forma predeterminada."
             }
           },
           "advanced_features": {
             "name": "Funciones avanzadas",
             "data": {
               "grid_profile_controls_enabled": "Activar controles de perfil de red para instaladores",
-              "microinverter_power_enabled": "Activar potencia de los microinversores"
+              "microinverter_power_enabled": "Activar potencia de los microinversores",
+              "export_limit_controls_enabled": "Activar controles del límite de vertido"
             },
             "data_description": {
               "grid_profile_controls_enabled": "Obtiene metadatos del perfil de red exclusivos para instaladores y activa las acciones de perfil. Desactivado de forma predeterminada.",
-              "microinverter_power_enabled": "Activa todos los sensores de potencia de cada microinversor cuando la telemetría del instalador está disponible."
+              "microinverter_power_enabled": "Activa todos los sensores de potencia de cada microinversor cuando la telemetría del instalador está disponible.",
+              "export_limit_controls_enabled": "Configurar los límites de vertido del sistema. Requiere acceso de instalador."
             }
           }
         },
@@ -845,7 +848,8 @@
         "title": "Límite de vertido",
         "description": "Configuración actual: **{current}**\n\nConfiguración solicitada: **{requested}**\n\nTasa de variación (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Confirmar este cambio"
+          "confirm": "Confirmar este cambio",
+          "restore_slew_rate": "Restaurar la tasa desde la puerta de enlace"
         }
       },
       "export_limit_submitted": {
@@ -895,9 +899,11 @@
       "export_limit_invalid": "Introduzca vatios enteros entre 0 y 100000.",
       "export_limit_changed": "La configuración ha cambiado. Revise los ajustes y confirme de nuevo.",
       "export_limit_pending": "Esperando confirmación de la configuración. Actualice el estado antes de otro cambio.",
-      "export_limit_disabled": "Activar controles del límite de vertido (Funciones → Funciones del dispositivo).",
+      "export_limit_disabled": "Activar controles del límite de vertido (Funciones → Funciones avanzadas).",
       "export_limit_confirmation": "Confirmar este cambio",
-      "export_limit_invalid_slew": "Introduzca un número positivo con hasta dos decimales."
+      "export_limit_invalid_slew": "Introduzca un número positivo con hasta dos decimales.",
+      "grid_profile_session_expired": "La sesión de Enlighten ha caducado o ha sido rechazada. Abra Autenticación, vuelva a autenticarse e inténtelo de nuevo.",
+      "export_limit_session_expired": "La sesión de Enlighten ha caducado o ha sido rechazada. Abra Autenticación, vuelva a autenticarse e inténtelo de nuevo."
     },
     "abort": {
       "migration_no_envoy_sources": "No hay sensores de energía de Enphase Envoy disponibles para migrar.",
@@ -1812,7 +1818,21 @@
         }
       },
       "microinverter_connectivity_status": {
-        "name": "Estado de conectividad de microinversores"
+        "name": "Estado de conectividad de microinversores",
+        "state_attributes": {
+          "power_telemetry_status": {
+            "name": "Estado de telemetría de potencia",
+            "state": {
+              "disabled": "Desactivado",
+              "pending": "Pendiente",
+              "ready": "Disponible",
+              "rate_limited": "Frecuencia limitada"
+            }
+          },
+          "power_telemetry_next_retry": {
+            "name": "Próximo reintento de telemetría de potencia"
+          }
+        }
       },
       "microinverter_reporting_count": {
         "name": "Microinversores activos"

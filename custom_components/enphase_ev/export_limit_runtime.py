@@ -10,11 +10,13 @@ import time
 from typing import Any, NoReturn, cast
 
 import aiohttp
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import ConfigEntryAuthFailed, ServiceValidationError
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers import issue_registry as ir
 
 from .api import ActivationAccessDenied, Unauthorized
+from .api_client.errors import ActivationSessionExpired, EnphaseLoginWallUnauthorized
+from .grid_profile_runtime import request_session_reauthentication
 from .api_client.export_limit_surface import form_matches_configuration
 from .const import (
     DOMAIN,
@@ -74,12 +76,17 @@ class ExportLimitSnapshot:
     @property
     def supported(self) -> bool:
         return (
-            self.export
-            and not self.dynamic
-            and self.reference == 3
-            and self.watts.is_integer()
-            and 0 <= self.watts <= 100000
+            not self.dynamic
             and self.slew > 0
+            and (
+                (not self.enabled and self.reference in {1, 2, 3})
+                or (
+                    self.export
+                    and self.reference == 3
+                    and self.watts.is_integer()
+                    and 0 <= self.watts <= 100000
+                )
+            )
         )
 
     @property
@@ -91,13 +98,23 @@ class ExportLimitSnapshot:
         return "zero_export" if self.watts == 0 else "limited"
 
 
-def parse_settings(payload: object, site_id: str) -> ExportLimitSnapshot | None:
+def parse_settings(
+    payload: object, site_id: str, *, gateway_id: str | None = None
+) -> ExportLimitSnapshot | None:
     """Require a single identified gateway; never guess from array ordering."""
     if not isinstance(payload, dict) or payload.get("errors"):
         return None
     data = payload.get("data")
     records = data.get("gateway_settings") if isinstance(data, dict) else None
-    if not isinstance(records, list) or len(records) != 1:
+    if not isinstance(records, list):
+        return None
+    if gateway_id is not None:
+        records = [
+            record
+            for record in records
+            if isinstance(record, dict) and record.get("device_id") == gateway_id
+        ]
+    if len(records) != 1:
         return None
     record = records[0]
     if (
@@ -276,7 +293,7 @@ class ExportLimitRuntime:
     async def _save(self) -> None:
         await self._store.async_save({"pending": self.pending})
 
-    async def _read(self) -> None:
+    async def _read(self, *, require_gateway_identity: bool = False) -> None:
         self._require_enabled()
         try:
             payload = await self.coordinator.client.async_get_export_limit_settings()
@@ -284,7 +301,40 @@ class ExportLimitRuntime:
             self.snapshot = None
             self._publish()
             raise
-        self.snapshot = parse_settings(payload, str(self.coordinator.site_id))
+        self.snapshot = None
+        gateway_id = None
+        records = (
+            (payload.get("data") or {}).get("gateway_settings")
+            if isinstance(payload, dict) and isinstance(payload.get("data"), dict)
+            else None
+        )
+        if require_gateway_identity or (isinstance(records, list) and len(records) > 1):
+            # Settings retain replaced gateways. Resolve the active identity from
+            # the current dashboard inventory, never from ordering or PEL values.
+            try:
+                details = await self.coordinator.client.devices_details("envoy")
+            except Exception:
+                self._publish()
+                raise
+            envoys = details.get("envoys") if isinstance(details, dict) else None
+            if isinstance(envoys, list) and len(envoys) == 1:
+                envoy = envoys[0]
+                if (
+                    isinstance(envoy, dict)
+                    and envoy.get("status") != "retired"
+                    and isinstance(envoy.get("serial_number"), str)
+                    and envoy["serial_number"].strip()
+                    and type(envoy.get("id")) in (int, str)
+                    and str(envoy["id"]).isdigit()
+                    and int(envoy["id"]) > 0
+                ):
+                    gateway_id = str(envoy["id"])
+            if require_gateway_identity and gateway_id is None:
+                self._publish()
+                fail("export_limit_unavailable")
+        self.snapshot = parse_settings(
+            payload, str(self.coordinator.site_id), gateway_id=gateway_id
+        )
         if self.snapshot is not None:
             self.last_readback = time.time()
         snapshot, pending = self.snapshot, self.pending
@@ -324,11 +374,31 @@ class ExportLimitRuntime:
                 await self.coordinator.client.async_get_activation_device_list()
                 await self._read()
             except Exception as err:
+                if isinstance(
+                    err,
+                    (
+                        ActivationSessionExpired,
+                        EnphaseLoginWallUnauthorized,
+                        ConfigEntryAuthFailed,
+                    ),
+                ):
+                    request_session_reauthentication(self.coordinator)
                 self.snapshot = None
                 self._publish()
                 raise ServiceValidationError(
                     translation_domain=DOMAIN,
-                    translation_key="export_limit_unavailable",
+                    translation_key=(
+                        "export_limit_session_expired"
+                        if isinstance(
+                            err,
+                            (
+                                ActivationSessionExpired,
+                                EnphaseLoginWallUnauthorized,
+                                ConfigEntryAuthFailed,
+                            ),
+                        )
+                        else "export_limit_unavailable"
+                    ),
                 ) from err
             self._schedule()
             return self.attributes()
@@ -339,9 +409,34 @@ class ExportLimitRuntime:
         try:
             await self.async_refresh()
             await self.coordinator.client.async_get_export_limit_form()
+        except ServiceValidationError:
+            raise
         except Exception as err:
+            if isinstance(
+                err,
+                (
+                    ActivationSessionExpired,
+                    EnphaseLoginWallUnauthorized,
+                    ConfigEntryAuthFailed,
+                ),
+            ):
+                self.snapshot = None
+                self._publish()
+                request_session_reauthentication(self.coordinator)
             raise ServiceValidationError(
-                translation_domain=DOMAIN, translation_key="export_limit_unavailable"
+                translation_domain=DOMAIN,
+                translation_key=(
+                    "export_limit_session_expired"
+                    if isinstance(
+                        err,
+                        (
+                            ActivationSessionExpired,
+                            EnphaseLoginWallUnauthorized,
+                            ConfigEntryAuthFailed,
+                        ),
+                    )
+                    else "export_limit_unavailable"
+                ),
             ) from err
         if self.snapshot is None:
             fail("export_limit_unavailable")
@@ -355,6 +450,7 @@ class ExportLimitRuntime:
         confirm: bool,
         expected: ExportLimitSnapshot | None = None,
         slew_rate: float | None = None,
+        reconcile_zero_slew: bool = False,
     ) -> dict[str, object]:
         if confirm is not True:
             fail("export_limit_confirmation")
@@ -368,7 +464,7 @@ class ExportLimitRuntime:
             try:
                 await self.coordinator.client.async_prepare_activation_auth()
                 await self.coordinator.client.async_get_activation_device_list()
-                await self._read()
+                await self._read(require_gateway_identity=reconcile_zero_slew)
                 if self.pending is not None:
                     fail("export_limit_pending")
                 # Acquire the token after any read-side session renewal.
@@ -376,9 +472,25 @@ class ExportLimitRuntime:
             except ServiceValidationError:
                 raise
             except Exception as err:
+                session_expired = isinstance(
+                    err,
+                    (
+                        ActivationSessionExpired,
+                        EnphaseLoginWallUnauthorized,
+                        ConfigEntryAuthFailed,
+                    ),
+                )
+                if session_expired:
+                    self.snapshot = None
+                    self._publish()
+                    request_session_reauthentication(self.coordinator)
                 raise ServiceValidationError(
                     translation_domain=DOMAIN,
-                    translation_key="export_limit_unavailable",
+                    translation_key=(
+                        "export_limit_session_expired"
+                        if session_expired
+                        else "export_limit_unavailable"
+                    ),
                 ) from err
             snapshot = self.snapshot
             if snapshot is None or not snapshot.supported:
@@ -387,6 +499,14 @@ class ExportLimitRuntime:
             if expected is not None and snapshot != expected:
                 fail("export_limit_changed")
             requested_slew = snapshot.slew if slew_rate is None else slew_rate
+            # Only the guided flow can explicitly opt into repairing a zero
+            # form default, preserving the exact gateway rate shown to the user.
+            allow_zero_slew = (
+                reconcile_zero_slew is True
+                and expected is not None
+                and not snapshot.dynamic
+                and requested_slew == snapshot.slew
+            )
             if requested_slew == snapshot.slew and (
                 (watts is None and not snapshot.enabled)
                 or (watts is not None and snapshot.enabled and snapshot.watts == watts)
@@ -397,6 +517,9 @@ class ExportLimitRuntime:
                 enabled=snapshot.enabled,
                 watts=snapshot.watts,
                 slew=snapshot.slew,
+                export_target=snapshot.export,
+                reference=snapshot.reference,
+                allow_zero_slew=allow_zero_slew,
             ):
                 fail("export_limit_changed")
             self.pending = {
@@ -438,11 +561,22 @@ class ExportLimitRuntime:
             except asyncio.CancelledError:
                 self.request_status = "unconfirmed"
                 raise
-            except (Unauthorized, ActivationAccessDenied):
+            except (Unauthorized, ActivationAccessDenied) as err:
+                session_expired = isinstance(
+                    err, (ActivationSessionExpired, EnphaseLoginWallUnauthorized)
+                )
+                if session_expired:
+                    self.snapshot = None
+                    self._publish()
+                    request_session_reauthentication(self.coordinator)
                 self.pending = None
                 self.request_status = "rejected"
                 await self._save()
-                fail("export_limit_unavailable")
+                fail(
+                    "export_limit_session_expired"
+                    if session_expired
+                    else "export_limit_unavailable"
+                )
             except aiohttp.ClientResponseError as err:
                 if err.status in (400, 403, 422):
                     self.pending = None

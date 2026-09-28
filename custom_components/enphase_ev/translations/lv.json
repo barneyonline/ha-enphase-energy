@@ -495,13 +495,16 @@
       "message": "Gaida konfigurācijas apstiprinājumu. Pirms citas izmaiņas atjauniniet statusu."
     },
     "export_limit_disabled": {
-      "message": "Iespējot eksporta ierobežojuma vadību (Funkcijas → Ierīču funkcijas)."
+      "message": "Iespējot eksporta ierobežojuma vadību (Funkcijas → Papildu funkcijas)."
     },
     "export_limit_confirmation": {
       "message": "Apstiprināt šo izmaiņu"
     },
     "export_limit_invalid_slew": {
       "message": "Ievadiet pozitīvu skaitli ar ne vairāk kā divām zīmēm aiz komata."
+    },
+    "export_limit_session_expired": {
+      "message": "Enlighten sesija ir beigusies vai noraidīta. Atveriet Autentifikācija, autentificējieties atkārtoti un mēģiniet vēlreiz."
     }
   },
   "options": {
@@ -765,8 +768,7 @@
               "weather_enabled": "Iespējot laikapstākļus",
               "nominal_voltage": "EV lādētāja nominālais spriegums (V)",
               "microinverter_lifetime_energy_enabled": "Iespējot mikroinvertoru kopējo enerģiju",
-              "vpp_events_enabled": "Iespējot VPP notikumus",
-              "export_limit_controls_enabled": "Iespējot eksporta ierobežojuma vadību"
+              "vpp_events_enabled": "Iespējot VPP notikumus"
             },
             "data_description": {
               "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts.",
@@ -776,19 +778,20 @@
               "schedule_sync_enabled": "Pārvaldiet IQ EV Charger grafikus.",
               "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus.",
               "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
-              "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts.",
-              "export_limit_controls_enabled": "Konfigurējiet sistēmas eksporta ierobežojumus. Nepieciešama uzstādītāja piekļuve."
+              "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts."
             }
           },
           "advanced_features": {
             "name": "Papildu funkcijas",
             "data": {
               "grid_profile_controls_enabled": "Iespējot uzstādītāja tīkla profila vadīklas",
-              "microinverter_power_enabled": "Iespējot mikroinvertoru jaudu"
+              "microinverter_power_enabled": "Iespējot mikroinvertoru jaudu",
+              "export_limit_controls_enabled": "Iespējot eksporta ierobežojuma vadību"
             },
             "data_description": {
               "grid_profile_controls_enabled": "Iegūst tikai uzstādītājam pieejamos tīkla profila metadatus un iespējo profila darbības. Pēc noklusējuma atspējots.",
-              "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija."
+              "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija.",
+              "export_limit_controls_enabled": "Konfigurējiet sistēmas eksporta ierobežojumus. Nepieciešama uzstādītāja piekļuve."
             }
           }
         },
@@ -845,7 +848,8 @@
         "title": "Eksporta ierobežojums",
         "description": "Pašreizējais iestatījums: **{current}**\n\nPieprasītais iestatījums: **{requested}**\n\nIzmaiņu ātrums (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Apstiprināt šo izmaiņu"
+          "confirm": "Apstiprināt šo izmaiņu",
+          "restore_slew_rate": "Atjaunot ātrumu no vārtejas"
         }
       },
       "export_limit_submitted": {
@@ -895,9 +899,11 @@
       "export_limit_invalid": "Ievadiet veselus vatus no 0 līdz 100000.",
       "export_limit_changed": "Konfigurācija ir mainījusies. Pārskatiet atjauninātos iestatījumus un apstipriniet vēlreiz.",
       "export_limit_pending": "Gaida konfigurācijas apstiprinājumu. Pirms citas izmaiņas atjauniniet statusu.",
-      "export_limit_disabled": "Iespējot eksporta ierobežojuma vadību (Funkcijas → Ierīču funkcijas).",
+      "export_limit_disabled": "Iespējot eksporta ierobežojuma vadību (Funkcijas → Papildu funkcijas).",
       "export_limit_confirmation": "Apstiprināt šo izmaiņu",
-      "export_limit_invalid_slew": "Ievadiet pozitīvu skaitli ar ne vairāk kā divām zīmēm aiz komata."
+      "export_limit_invalid_slew": "Ievadiet pozitīvu skaitli ar ne vairāk kā divām zīmēm aiz komata.",
+      "grid_profile_session_expired": "Enlighten sesija ir beigusies vai noraidīta. Atveriet Autentifikācija, autentificējieties atkārtoti un mēģiniet vēlreiz.",
+      "export_limit_session_expired": "Enlighten sesija ir beigusies vai noraidīta. Atveriet Autentifikācija, autentificējieties atkārtoti un mēģiniet vēlreiz."
     },
     "abort": {
       "migration_no_envoy_sources": "Migrācijai nav pieejami Enphase Envoy enerģijas sensori.",
@@ -1812,7 +1818,21 @@
         }
       },
       "microinverter_connectivity_status": {
-        "name": "Mikroinvertoru savienojuma statuss"
+        "name": "Mikroinvertoru savienojuma statuss",
+        "state_attributes": {
+          "power_telemetry_status": {
+            "name": "Jaudas telemetrijas statuss",
+            "state": {
+              "disabled": "Atspējots",
+              "pending": "Gaida",
+              "ready": "Pieejams",
+              "rate_limited": "Ierobežots pieprasījumu biežums"
+            }
+          },
+          "power_telemetry_next_retry": {
+            "name": "Nākamais jaudas telemetrijas mēģinājums"
+          }
+        }
       },
       "microinverter_reporting_count": {
         "name": "Aktīvie mikroinvertori"

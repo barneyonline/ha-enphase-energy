@@ -525,7 +525,7 @@ async def test_devices_tree_login_wall_raises_unauthorized() -> None:
                     '<!DOCTYPE html><html lang="en"><head>'
                     '<meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=IE8">'
                     "<script>window.OptanonWrapper = function () {};</script>"
-                    "</head></html>"
+                    "</head><body><form action='/login/login'><input type='password'></form></body></html>"
                 ),
             )
         ]
@@ -581,7 +581,7 @@ async def test_text_response_expected_status_login_wall_raises_unauthorized() ->
             '<!DOCTYPE html><html lang="en"><head>'
             '<meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=IE8">'
             '<script>var otLang = "en"; window.OptanonWrapper = function () {};</script>'
-            "</head></html>"
+            "</head><body><form action='/login/login'><input type='password'></form></body></html>"
         ),
     )
     response.headers["Content-Type"] = "text/html; charset=utf-8"
@@ -652,7 +652,7 @@ async def test_text_response_success_login_wall_raises_unauthorized() -> None:
             '<!DOCTYPE html><html lang="en"><head>'
             '<meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=IE8">'
             "<script>window.OptanonWrapper = function () {};</script>"
-            "</head></html>"
+            "</head><body><form action='/login/login'><input type='password'></form></body></html>"
         ),
     )
     response.headers["Content-Type"] = "text/html; charset=utf-8"
@@ -1630,7 +1630,7 @@ async def test_json_login_wall_raises_login_wall_unauthorized() -> None:
                     '<!DOCTYPE html><html lang="en"><head>'
                     '<meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=IE8">'
                     '<script>var otLang = "en"; window.OptanonWrapper = function () {};</script>'
-                    "</head></html>"
+                    "</head><body><form action='/login/login'><input type='password'></form></body></html>"
                 ),
             )
         ]
@@ -1656,7 +1656,7 @@ async def test_evse_feature_flags_login_wall_raises_unauthorized() -> None:
                     '<!DOCTYPE html><html lang="en"><head>'
                     '<meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=IE8">'
                     "<script>window.OptanonWrapper = function () {};</script>"
-                    "</head></html>"
+                    "</head><body><form action='/login/login'><input type='password'></form></body></html>"
                 ),
             )
         ]
@@ -1678,7 +1678,7 @@ async def test_optional_heat_pump_events_login_wall_raises_auth_failure() -> Non
                 text_body=(
                     "<!DOCTYPE html><html><head>"
                     "<script>window.OptanonWrapper = function () {};</script>"
-                    "</head></html>"
+                    "</head><body><form action='/login/login'><input type='password'></form></body></html>"
                 ),
             )
         ]
@@ -10319,7 +10319,7 @@ def _login_wall_response() -> _FakeResponse:
     return _FakeResponse(
         status=200,
         json_body=ValueError("invalid-json"),
-        text_body="<html><script>window.OptanonWrapper = function () {};</script></html>",
+        text_body="<html><form action='/login/login'><input type='password'></form></html>",
     )
 
 
@@ -10404,6 +10404,7 @@ async def test_capacity_optional_access_does_not_reauthenticate(method, status):
     session = _FakeSession(
         [_FakeResponse(status=status, json_body={}, text_body="denied")]
     )
+    session.cookie_jar = aiohttp.DummyCookieJar()
     client = _make_client(session)
     client._reauth_cb = AsyncMock(return_value=True)
     expected = api.Unauthorized if status == 401 else aiohttp.ClientResponseError
@@ -10412,3 +10413,136 @@ async def test_capacity_optional_access_does_not_reauthenticate(method, status):
     client._reauth_cb.assert_not_awaited()
     assert len(session.calls) == 1
     assert "allow_reauth" not in session.calls[0][2]
+
+
+@pytest.mark.parametrize("expected_statuses", [None, (200,)])
+@pytest.mark.parametrize(
+    "outcome",
+    ["success", "wall", "unauthorized", "failed", "rejected", "disabled", "write"],
+)
+async def test_text_login_wall_recovers_once(expected_statuses, outcome):
+    from homeassistant.exceptions import ConfigEntryAuthFailed
+
+    responses = [_login_wall_response()]
+    if outcome in {"success", "wall", "unauthorized"}:
+        responses.append(
+            _login_wall_response()
+            if outcome == "wall"
+            else _FakeResponse(
+                status=401 if outcome == "unauthorized" else 200,
+                json_body={},
+                text_body="settings",
+            )
+        )
+    session = _FakeSession(responses)
+    client = _make_client(session)
+    refresh = AsyncMock(return_value=outcome != "failed")
+    if outcome == "rejected":
+        refresh.side_effect = ConfigEntryAuthFailed()
+    client.set_reauth_callback(refresh)
+    kwargs = dict(
+        expected_statuses=expected_statuses,
+        allow_reauth=outcome != "disabled",
+        allow_replay=outcome != "write",
+    )
+    if outcome == "success":
+        result = await client._text_response(
+            "GET", "https://example.test/systems/123/details", **kwargs
+        )
+        assert result.text == "settings"
+    else:
+        with pytest.raises(api.Unauthorized):
+            await client._text_response(
+                "GET", "https://example.test/systems/123/details", **kwargs
+            )
+    assert refresh.await_count == int(outcome not in {"disabled", "write"})
+    assert len(session.calls) == (
+        2 if outcome in {"success", "wall", "unauthorized"} else 1
+    )
+
+
+@pytest.mark.parametrize("method", ["GET", "PUT"])
+async def test_text_cookie_header_policy_prevents_stale_session_override(method):
+    captured = []
+
+    class CaptureRequest(aiohttp.ClientRequest):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            captured.append(self.headers["Cookie"])
+            raise RuntimeError("captured before network")
+
+    async with aiohttp.ClientSession(request_class=CaptureRequest) as shared:
+        shared.cookie_jar.update_cookies(
+            {"session": "stale"}, response_url=URL("https://example.test/")
+        )
+        async with aiohttp.ClientSession(
+            cookie_jar=aiohttp.DummyCookieJar(), request_class=CaptureRequest
+        ) as stateless:
+            client = api.EnphaseEVClient(
+                shared, "123", None, "session=fresh", cookie_header_session=stateless
+            )
+            for isolated in (False, True):
+                with pytest.raises(RuntimeError, match="captured before network"):
+                    await client._text_response(
+                        method,
+                        "https://example.test/systems/123/details",
+                        use_cookie_header_only=isolated,
+                        allow_replay=method != "PUT",
+                    )
+    assert captured == ["session=stale", "session=fresh"]
+
+
+@pytest.mark.parametrize("expected_statuses", [None, (200,)])
+async def test_authenticated_html_does_not_trigger_session_recovery(expected_statuses):
+    html = (
+        "<!doctype html><html><head><meta http-equiv='X-UA-Compatible'>"
+        "<script>window.OptanonWrapper=function(){};</script></head><body>"
+        "<script>const url='https://activations-ui.enphaseenergy.com/?token=valid';</script>"
+        "</body></html>"
+    )
+    session = _FakeSession([_FakeResponse(status=200, json_body={}, text_body=html)])
+    client = _make_client(session)
+    refresh = AsyncMock()
+    client.set_reauth_callback(refresh)
+    result = await client._text_response(
+        "GET",
+        "https://example.test/systems/123/details",
+        expected_statuses=expected_statuses,
+    )
+    assert result.text == html
+    assert client.last_unauthorized_request is None
+    refresh.assert_not_awaited()
+
+
+@pytest.mark.parametrize("method", ["GET", "PUT"])
+@pytest.mark.parametrize("recovery", [True, False])
+async def test_text_login_redirect_refreshes_reads_without_replaying_writes(
+    method, recovery
+):
+    redirected = _FakeResponse(status=302, json_body={}, text_body="")
+    redirected.headers["Location"] = "/login"
+    responses = [redirected]
+    if method == "GET" and recovery:
+        responses.append(_FakeResponse(status=200, json_body={}, text_body="form"))
+    session = _FakeSession(responses)
+    client = _make_client(session)
+    refresh = AsyncMock(return_value=recovery)
+    client.set_reauth_callback(refresh)
+    if method == "GET" and recovery:
+        result = await client._text_response(
+            method,
+            "https://example.test/site_pel_settings/123/edit",
+            allow_redirects=False,
+            allow_replay=True,
+        )
+        assert result.text == "form"
+    else:
+        with pytest.raises(api.EnphaseLoginWallUnauthorized):
+            await client._text_response(
+                method,
+                "https://example.test/site_pel_settings/123/edit",
+                allow_redirects=False,
+                allow_replay=method == "GET",
+            )
+    assert refresh.await_count == int(method == "GET")
+    assert len(session.calls) == (2 if method == "GET" and recovery else 1)

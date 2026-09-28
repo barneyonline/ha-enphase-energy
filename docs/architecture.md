@@ -48,6 +48,12 @@ private session; the previous lifecycle fully cancels its tasks and shuts down.
 No session, manager, lock, or task crosses the reload. New option and device
 selections are applied before restored data is published, followed by a background
 refresh. Cold setup continues to require an authoritative first refresh.
+Battery status and inverter inventory readiness also participate in topology
+comparison. Restored discovery metadata preserves device identities without
+restoring authoritative endpoint payloads. The first successful refresh must
+notify entity discovery even when those identities have not changed, so
+per-device battery and enabled inverter sensors are created after a reload.
+
 When the configured charger selection is unchanged, reload handoff preserves the
 previous discovered serial list (including an empty list) and drops telemetry for
 retired chargers. Historical config-entry serials cannot recreate devices while
@@ -61,16 +67,27 @@ The runtime persists pending intent, never form tokens, and resumes readback
 after reload. It polls at the configured fast interval for ten minutes after a
 write, then at the standard interval; an unconfirmed-request repair is owned by
 that runtime and cleared on unload or matching readback.
+The guided Export Limit confirmation can explicitly reconcile a zero form slew-rate
+default against fresh gateway readback when enabling, changing, or disabling a limit.
+It requires the exact confirmed snapshot, fresh gateway identity, no dynamic mode,
+and preservation of the positive gateway slew rate. Any nonzero disagreement or
+other form mismatch remains blocked; selector and service writes do not opt in.
 The options menu separates device category selection (Devices) from feature
 configuration (Features). Features contains Device Features and Advanced Features;
-the latter groups installer Grid Profile controls and Microinverter Power.
+the latter groups installer Grid Profile controls, Export Limit controls, and
+Microinverter Power.
 Installer Grid Profile controls are also a default-off topology option. Disabled
 entries skip both the startup Activation probe and steady metadata refreshes;
 config-entry migration enables the option only when an existing Current Grid
 Profile entity demonstrates prior use.
 When enabled, the Grid Profile Control menu remains visible during discovery
-failures. Rejected Settings-page sessions produce `session_expired` and direct
-users to reauthenticate; this state is distinct from installer access denial.
+failures. Rejected Settings-page sessions first use shared, bounded authentication recovery.
+Exhausted recovery produces `session_expired` and starts Home Assistant reauth
+without failing unrelated endpoint families; permission denial does not start reauth.
+Expected HTML pages require actual login controls for login-wall detection, rather
+than branding or consent scripts shared by valid pages. Installer bootstrap and
+array panel-rating reads use the private cookie-header session so shared-session
+cookies cannot override the current saved credentials.
 
 `registry_migrations.py` owns versioned migrations and `registry_sync.py` owns
 ongoing reconciliation. Device and entity registry cleanup is intentionally conservative. Startup migrations
@@ -114,7 +131,7 @@ health state. Feature runtimes can use the public `endpoint_family_should_run`,
 Existing private coordinator entry points remain available for compatibility.
 
 Authentication refresh uses its own lock and one shared, cancellation-shielded
-login task, so a 401 during a poll cannot reacquire the poll lock. JSON login-wall
+login task, so a 401 during a poll cannot reacquire the poll lock. JSON and HTML login-wall
 responses use the same shared refresh, including reuse of a recent success, and
 retry once before surfacing an authentication failure. Both paths preserve
 endpoint policies that disable stored-credential refresh. Failed login-wall
@@ -267,6 +284,10 @@ source-specific policies. Cumulative energy totals remain available as historica
 measurements. Daily heat-pump totals expose a source-day `last_reset` so recorder
 handles midnight and within-day corrections correctly.
 
+Current Grid Power and Current Battery Power reseed their cumulative-energy
+baselines when missing source channels return, including during reload or reauth.
+Synthetic zero placeholders never authorize a delta from zero to a lifetime total.
+
 Current Grid Power and Current Battery Power expire when their contributing
 source samples exceed a 15-minute freshness window, even if core polling remains
 healthy. Battery and heat-pump family recovery is published when freshness is
@@ -279,6 +300,11 @@ future source timestamps and provides a fallback when a timestamp is absent.
 The endpoint's 15-minute stale window also drives entity-owned expiry timers,
 independently of changes to core polling cadence. Current Power Consumption's
 separate derived-power behavior is unchanged.
+
+The per-inverter Lifetime Energy and Power feature switches independently gate
+entity creation. Switching a feature off removes its registered entities, including
+previously disabled entries, without waiting for cloud inventory. Switching it on
+allows discovery again. Total capacity and connectivity sensors are unaffected.
 
 Inverter discovery uses `inverter_inventory.py` for bounded pagination with an
 explicit completeness result. Partial, repeated, or malformed inventory cannot
@@ -403,3 +429,13 @@ Responses with no usable energy flows are recorded as invalid payloads, leaving
 the last successful cache and source-progress timestamps intact. These fetch diagnostics remain available
 before any successful payload, independently of the existing service/backoff
 policy. They contain no raw payloads or exception messages.
+
+### Microinverter Telemetry Rate Limits
+
+`inverter_telemetry_cooldown.py` persists the telemetry endpoint's HTTP 429 retry
+deadline as UTC, scoped to the config entry. The optional telemetry refresh
+restores it before making requests and rebuilds a process-local monotonic
+deadline. Reloads and restarts therefore cannot reset an active retry window.
+Expired records are ignored; no account credentials or telemetry are stored.
+The existing Microinverter Connectivity Status sensor exposes power telemetry
+status and the next retry timestamp, including before any power entities exist.

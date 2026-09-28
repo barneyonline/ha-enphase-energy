@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import EnphaseCoordinator
+from .inverter_telemetry_cooldown import inverter_telemetry_status_attributes
 from .parsing_helpers import coerce_optional_float
 from .runtime_helpers import (
     coerce_optional_text as _gateway_clean_text,
@@ -446,6 +447,7 @@ class EnphaseMicroinverterConnectivityStatusSensor(_SiteBaseEntity):
     def extra_state_attributes(self) -> Any:
         snapshot = _microinverter_inventory_snapshot(self._coord)
         return {
+            **inverter_telemetry_status_attributes(self._coord),
             "total_inverters": snapshot.get("total_inverters"),
             "reporting_inverters": snapshot.get("reporting_inverters"),
             "not_reporting_inverters": snapshot.get("not_reporting_inverters"),

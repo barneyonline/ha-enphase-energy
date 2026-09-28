@@ -495,13 +495,16 @@
       "message": "Se așteaptă confirmarea configurației. Actualizați starea înainte de altă modificare."
     },
     "export_limit_disabled": {
-      "message": "Activați comenzile pentru limita de injecție (Funcții → Funcții ale dispozitivului)."
+      "message": "Activați comenzile pentru limita de injecție (Funcții → Funcții avansate)."
     },
     "export_limit_confirmation": {
       "message": "Confirmați această modificare"
     },
     "export_limit_invalid_slew": {
       "message": "Introduceți un număr pozitiv cu cel mult două zecimale."
+    },
+    "export_limit_session_expired": {
+      "message": "Sesiunea Enlighten a expirat sau a fost respinsă. Deschideți Autentificare, autentificați-vă din nou și reîncercați."
     }
   },
   "options": {
@@ -765,8 +768,7 @@
               "weather_enabled": "Activează vremea",
               "nominal_voltage": "Tensiunea nominală a încărcătorului EV (V)",
               "microinverter_lifetime_energy_enabled": "Activează energia totală a microinvertoarelor",
-              "vpp_events_enabled": "Activează evenimentele VPP",
-              "export_limit_controls_enabled": "Activați comenzile pentru limita de injecție"
+              "vpp_events_enabled": "Activează evenimentele VPP"
             },
             "data_description": {
               "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit.",
@@ -776,19 +778,20 @@
               "schedule_sync_enabled": "Gestionați programele IQ EV Charger.",
               "battery_schedules_enabled": "Gestionați programele IQ Battery.",
               "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor.",
-              "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit.",
-              "export_limit_controls_enabled": "Configurați limitele de injecție ale sistemului. Necesită acces de instalator."
+              "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit."
             }
           },
           "advanced_features": {
             "name": "Funcții avansate",
             "data": {
               "grid_profile_controls_enabled": "Activează comenzile profilului de rețea pentru instalator",
-              "microinverter_power_enabled": "Activează puterea microinvertoarelor"
+              "microinverter_power_enabled": "Activează puterea microinvertoarelor",
+              "export_limit_controls_enabled": "Activați comenzile pentru limita de injecție"
             },
             "data_description": {
               "grid_profile_controls_enabled": "Preia metadatele profilului de rețea disponibile numai instalatorului și activează acțiunile profilului. Dezactivat implicit.",
-              "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă."
+              "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă.",
+              "export_limit_controls_enabled": "Configurați limitele de injecție ale sistemului. Necesită acces de instalator."
             }
           }
         },
@@ -845,7 +848,8 @@
         "title": "Limită de injecție",
         "description": "Setare actuală: **{current}**\n\nSetare solicitată: **{requested}**\n\nRata de variație (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Confirmați această modificare"
+          "confirm": "Confirmați această modificare",
+          "restore_slew_rate": "Restabilește rata din gateway"
         }
       },
       "export_limit_submitted": {
@@ -895,9 +899,11 @@
       "export_limit_invalid": "Introduceți wați întregi între 0 și 100000.",
       "export_limit_changed": "Configurația s-a schimbat. Verificați setările actualizate și confirmați din nou.",
       "export_limit_pending": "Se așteaptă confirmarea configurației. Actualizați starea înainte de altă modificare.",
-      "export_limit_disabled": "Activați comenzile pentru limita de injecție (Funcții → Funcții ale dispozitivului).",
+      "export_limit_disabled": "Activați comenzile pentru limita de injecție (Funcții → Funcții avansate).",
       "export_limit_confirmation": "Confirmați această modificare",
-      "export_limit_invalid_slew": "Introduceți un număr pozitiv cu cel mult două zecimale."
+      "export_limit_invalid_slew": "Introduceți un număr pozitiv cu cel mult două zecimale.",
+      "grid_profile_session_expired": "Sesiunea Enlighten a expirat sau a fost respinsă. Deschideți Autentificare, autentificați-vă din nou și reîncercați.",
+      "export_limit_session_expired": "Sesiunea Enlighten a expirat sau a fost respinsă. Deschideți Autentificare, autentificați-vă din nou și reîncercați."
     },
     "abort": {
       "migration_no_envoy_sources": "Nu există senzori de energie Enphase Envoy disponibili pentru migrare.",
@@ -1812,7 +1818,21 @@
         }
       },
       "microinverter_connectivity_status": {
-        "name": "Stare conectivitate microinvertoare"
+        "name": "Stare conectivitate microinvertoare",
+        "state_attributes": {
+          "power_telemetry_status": {
+            "name": "Starea telemetriei puterii",
+            "state": {
+              "disabled": "Dezactivată",
+              "pending": "În așteptare",
+              "ready": "Disponibil",
+              "rate_limited": "Frecvență limitată"
+            }
+          },
+          "power_telemetry_next_retry": {
+            "name": "Următoarea încercare de telemetrie a puterii"
+          }
+        }
       },
       "microinverter_reporting_count": {
         "name": "Microinvertoare active"
