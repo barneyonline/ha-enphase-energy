@@ -3255,6 +3255,28 @@ async def test_status_normalizes_charger_payload() -> None:
 
 
 @pytest.mark.asyncio
+async def test_status_preserves_missing_charger_connection() -> None:
+    client = _make_client()
+    client._json = _RequestMock(
+        return_value={
+            "data": {
+                "chargers": [
+                    {"sn": "EV123", "connectors": []},
+                    {"sn": "EV124", "connected": False, "connectors": []},
+                ]
+            }
+        }
+    )
+
+    data = await client.status()
+
+    assert [charger["connected"] for charger in data["evChargerData"]] == [
+        None,
+        False,
+    ]
+
+
+@pytest.mark.asyncio
 async def test_status_normalizes_start_time_variants() -> None:
     client = _make_client()
     huge = 1_700_000_000_123

@@ -12,7 +12,7 @@ from typing import Any, cast
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, OPT_MICROINVERTER_POWER_ENABLED
+from .const import DOMAIN
 
 FAMILY = "inverter_parameter_telemetry"
 _LOGGER = logging.getLogger(__name__)
@@ -101,10 +101,6 @@ def _power_available(coord: Any) -> bool:
 
 def inverter_telemetry_status_attributes(coord: Any) -> dict[str, object]:
     """Expose polling status on inventory entities even before power discovery."""
-    entry = getattr(coord, "config_entry", None)
-    enabled = bool(
-        getattr(entry, "options", {}).get(OPT_MICROINVERTER_POWER_ENABLED, False)
-    )
     health = getattr(coord, "_endpoint_family_health", {}).get(FAMILY)
     deadline = getattr(health, "next_retry_utc", None)
     rate_limited = bool(
@@ -115,13 +111,9 @@ def inverter_telemetry_status_attributes(coord: Any) -> dict[str, object]:
     )
     return {
         "power_telemetry_status": (
-            "disabled"
-            if not enabled
-            else (
-                "rate_limited"
-                if rate_limited
-                else ("ready" if _power_available(coord) else "pending")
-            )
+            "rate_limited"
+            if rate_limited
+            else ("ready" if _power_available(coord) else "pending")
         ),
         "power_telemetry_next_retry": (
             cast(datetime, deadline).isoformat() if rate_limited else None

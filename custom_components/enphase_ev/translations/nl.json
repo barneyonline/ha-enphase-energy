@@ -1194,7 +1194,7 @@
         "name": "Mislukte aanmeldingen met opgeslagen inloggegevens"
       },
       "current_production_power": {
-        "name": "Huidig productievermogen",
+        "name": "Productievermogen",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Gemeten om (UTC)"
@@ -1259,7 +1259,7 @@
         }
       },
       "last_reported": {
-        "name": "Laatst gerapporteerd op",
+        "name": "Laatst gerapporteerd",
         "state_attributes": {
           "reporting_interval": {
             "name": "Rapporteringsinterval (s)"
@@ -1332,7 +1332,7 @@
         }
       },
       "site_consumption_power": {
-        "name": "Huidig stroomverbruik",
+        "name": "Verbruiksvermogen",
         "state_attributes": {
           "last_window_seconds": {
             "name": "Laatste venster (s)"
@@ -1346,7 +1346,7 @@
         }
       },
       "site_grid_power": {
-        "name": "Huidig netvermogen",
+        "name": "Netvermogen",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Laatste stroom kWh"
@@ -1411,7 +1411,7 @@
         }
       },
       "site_battery_power": {
-        "name": "Huidig batterijvermogen",
+        "name": "Batterijvermogen",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Laatste stroom kWh"
@@ -1596,7 +1596,7 @@
         "name": "Verbruiksmeter"
       },
       "gateway_connectivity_status": {
-        "name": "Gateway-status",
+        "name": "Connectiviteit",
         "state_attributes": {
           "ip_address": {
             "name": "IP-adres"
@@ -1607,7 +1607,7 @@
         }
       },
       "gateway_last_reported": {
-        "name": "Gateway Laatst gerapporteerd"
+        "name": "Laatst gerapporteerd"
       },
       "tariff_billing_cycle": {
         "name": "Volgende factuurdatum",
@@ -2405,7 +2405,7 @@
     },
     "binary_sensor": {
       "plugged_in": {
-        "name": "Ingeplugd"
+        "name": "Voertuigaansluiting"
       },
       "charging": {
         "name": "Laden"
@@ -2420,7 +2420,7 @@
         "name": "Connectiviteit",
         "state_attributes": {
           "connection": {
-            "name": "Verbinding"
+            "name": "Verbindingsmethode"
           },
           "ip_address": {
             "name": "IP-adres"
@@ -2577,8 +2577,8 @@
       "export_limit": {
         "name": "Terugleverlimiet",
         "state": {
-          "enable_limit": "Limiet inschakelen",
-          "disable_limit": "Limiet uitschakelen"
+          "enable_limit": "Ingeschakeld",
+          "disable_limit": "Uitgeschakeld"
         },
         "state_attributes": {
           "default_limit_watts": {
@@ -2598,12 +2598,6 @@
       }
     },
     "button": {
-      "start_charging": {
-        "name": "Laden starten"
-      },
-      "stop_charging": {
-        "name": "Laden stoppen"
-      },
       "cancel_pending_profile_change": {
         "name": "Annuleer lopende profielwijziging"
       },

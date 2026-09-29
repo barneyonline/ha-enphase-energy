@@ -14,12 +14,10 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .entity import callback
-from .const import OPT_MICROINVERTER_POWER_ENABLED
 from .coordinator import EnphaseCoordinator
 from .runtime_data import EnphaseConfigEntry
 from .sensor_base import EnphaseSiteSensorEntity
 from .serial_discovery import active_inverter_serials_for_cleanup
-from .sensor_registry import EnphaseSensorRegistrySetup
 from .sensor_snapshot_helpers import parse_gateway_timestamp
 
 
@@ -149,12 +147,8 @@ def setup_array_sensors(
     entry: EnphaseConfigEntry,
     coord: EnphaseCoordinator,
     async_add_entities: AddEntitiesCallback,
-    registry: EnphaseSensorRegistrySetup,
 ) -> None:
     """Discover arrays independently of individual inverter entities."""
-    power_enabled = bool(entry.options.get(OPT_MICROINVERTER_POWER_ENABLED, False))
-    if not power_enabled:
-        registry.remove_site_sensor_entities_with_prefix("inverter_array_power_")
     known: set[str] = set()
 
     @callback
@@ -165,7 +159,7 @@ def setup_array_sensors(
                 [
                     EnphaseInverterArraySensor(coord, name, power=power)
                     for name in sorted(names)
-                    for power in ((False, True) if power_enabled else (False,))
+                    for power in (False, True)
                 ]
             )
             known.update(names)

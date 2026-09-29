@@ -1194,7 +1194,7 @@
         "name": "Logins com credenciais salvas que falharam"
       },
       "current_production_power": {
-        "name": "Potência atual de produção",
+        "name": "Potência de produção",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Amostrado em (UTC)"
@@ -1332,7 +1332,7 @@
         }
       },
       "site_consumption_power": {
-        "name": "Consumo de potência atual",
+        "name": "Consumo de potência",
         "state_attributes": {
           "last_window_seconds": {
             "name": "Última janela (s)"
@@ -1346,7 +1346,7 @@
         }
       },
       "site_grid_power": {
-        "name": "Potência atual da rede",
+        "name": "Potência da rede",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Último fluxo em kWh"
@@ -1411,7 +1411,7 @@
         }
       },
       "site_battery_power": {
-        "name": "Potência atual da bateria",
+        "name": "Potência da bateria",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Último fluxo em kWh"
@@ -1596,7 +1596,7 @@
         "name": "Medidor de Consumo"
       },
       "gateway_connectivity_status": {
-        "name": "Status do gateway",
+        "name": "Conectividade",
         "state_attributes": {
           "ip_address": {
             "name": "Endereço IP"
@@ -1607,7 +1607,7 @@
         }
       },
       "gateway_last_reported": {
-        "name": "Gateway relatado pela última vez"
+        "name": "Último relatório"
       },
       "tariff_billing_cycle": {
         "name": "Proxima data de faturamento",
@@ -2405,7 +2405,7 @@
     },
     "binary_sensor": {
       "plugged_in": {
-        "name": "Conectado"
+        "name": "Conexão do veículo"
       },
       "charging": {
         "name": "Carregando"
@@ -2420,7 +2420,7 @@
         "name": "Conectividade",
         "state_attributes": {
           "connection": {
-            "name": "Conexão"
+            "name": "Método de conexão"
           },
           "ip_address": {
             "name": "Endereço IP"
@@ -2577,8 +2577,8 @@
       "export_limit": {
         "name": "Limite de injeção",
         "state": {
-          "enable_limit": "Ativar limite",
-          "disable_limit": "Desativar limite"
+          "enable_limit": "Habilitado",
+          "disable_limit": "Desativado"
         },
         "state_attributes": {
           "default_limit_watts": {
@@ -2598,12 +2598,6 @@
       }
     },
     "button": {
-      "start_charging": {
-        "name": "Iniciar carga"
-      },
-      "stop_charging": {
-        "name": "Parar carga"
-      },
       "cancel_pending_profile_change": {
         "name": "Cancelar alteração de perfil pendente"
       },

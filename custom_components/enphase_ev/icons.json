@@ -838,12 +838,6 @@
       }
     },
     "button": {
-      "start_charging": {
-        "default": "mdi:play"
-      },
-      "stop_charging": {
-        "default": "mdi:stop"
-      },
       "storm_alert_opt_out": {
         "default": "mdi:shield-off-outline"
       }

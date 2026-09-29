@@ -1194,7 +1194,7 @@
         "name": "Неуспешни влизания със запазени идентификационни данни"
       },
       "current_production_power": {
-        "name": "Текуща производствена мощност",
+        "name": "Производствена мощност",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Измерено в (UTC)"
@@ -1332,7 +1332,7 @@
         }
       },
       "site_consumption_power": {
-        "name": "Текуща консумация на мощност",
+        "name": "Консумация на мощност",
         "state_attributes": {
           "last_window_seconds": {
             "name": "Последен прозорец (s)"
@@ -1346,7 +1346,7 @@
         }
       },
       "site_grid_power": {
-        "name": "Текуща мощност на мрежата",
+        "name": "Мощност на мрежата",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Последен поток kWh"
@@ -1411,7 +1411,7 @@
         }
       },
       "site_battery_power": {
-        "name": "Текуща мощност на батерията",
+        "name": "Мощност на батерията",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Последен поток kWh"
@@ -1596,7 +1596,7 @@
         "name": "Разходомер"
       },
       "gateway_connectivity_status": {
-        "name": "Състояние на шлюза",
+        "name": "Свързаност",
         "state_attributes": {
           "ip_address": {
             "name": "IP адрес"
@@ -1607,7 +1607,7 @@
         }
       },
       "gateway_last_reported": {
-        "name": "Последно докладван шлюз"
+        "name": "Последно отчетено"
       },
       "tariff_billing_cycle": {
         "name": "Следваща дата на фактуриране",
@@ -2405,7 +2405,7 @@
     },
     "binary_sensor": {
       "plugged_in": {
-        "name": "Свързан"
+        "name": "Връзка с автомобила"
       },
       "charging": {
         "name": "Зареждане"
@@ -2420,7 +2420,7 @@
         "name": "Свързаност",
         "state_attributes": {
           "connection": {
-            "name": "Връзка"
+            "name": "Метод на свързване"
           },
           "ip_address": {
             "name": "IP адрес"
@@ -2577,8 +2577,8 @@
       "export_limit": {
         "name": "Лимит на отдаване",
         "state": {
-          "enable_limit": "Включване на лимита",
-          "disable_limit": "Изключване на лимита"
+          "enable_limit": "Активирано",
+          "disable_limit": "Деактивирано"
         },
         "state_attributes": {
           "default_limit_watts": {
@@ -2598,12 +2598,6 @@
       }
     },
     "button": {
-      "start_charging": {
-        "name": "Стартиране на зареждане"
-      },
-      "stop_charging": {
-        "name": "Спиране на зареждане"
-      },
       "cancel_pending_profile_change": {
         "name": "Отказ Предстояща промяна на профил"
       },

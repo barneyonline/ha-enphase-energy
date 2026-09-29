@@ -1647,7 +1647,7 @@ class EnphaseGatewayConnectivityStatusSensor(_SiteBaseEntity):
         super().__init__(
             coord,
             "gateway_connectivity_status",
-            "Gateway Status",
+            "Connectivity",
             type_key="envoy",
         )
 
@@ -1719,7 +1719,7 @@ class EnphaseGatewayLastReportedSensor(_SiteBaseEntity):
         super().__init__(
             coord,
             "gateway_last_reported",
-            "Gateway Last Reported",
+            "Last Reported",
             type_key="envoy",
         )
 

@@ -1028,7 +1028,7 @@ def test_ev_bool_sensors_reflect_coordinator_state(
     assert connected.device_class == BinarySensorDeviceClass.CONNECTIVITY
     assert connected.entity_category == EntityCategory.DIAGNOSTIC
     attrs = connected.extra_state_attributes
-    assert attrs["connection"] == "wifi"
+    assert attrs["connection"] == "Wi-Fi"
     assert attrs["ip_address"] == "192.0.2.10"
 
 

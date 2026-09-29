@@ -2363,6 +2363,15 @@ def test_advertised_entity_targets_pass_registered_schemas(
             schema({**data, "entity_id": "sensor.enphase_target", "unknown": True})
 
 
+def test_charger_actions_target_the_charging_switch() -> None:
+    descriptions = yaml.safe_load(SERVICES_YAML.read_text())
+    for action in ("start_charging", "stop_charging", "trigger_message"):
+        assert descriptions[action]["target"]["entity"] == {
+            "integration": DOMAIN,
+            "domain": "switch",
+        }
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "target_kind", ["entity_id", "device_id", "area_id", "floor_id", "label_id"]
@@ -2404,7 +2413,11 @@ async def test_charging_service_routes_ui_targets(
             unrelated.id, area_id=area.id, labels={label.label_id}
         )
     entity = er.async_get(hass).async_get_or_create(
-        "button", DOMAIN, "charger-start", config_entry=entry, device_id=device.id
+        "switch",
+        DOMAIN,
+        f"{DOMAIN}_charger-1_charging_switch",
+        config_entry=entry,
+        device_id=device.id,
     )
     targets = {
         "entity_id": entity.entity_id,

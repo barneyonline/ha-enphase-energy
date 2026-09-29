@@ -310,8 +310,9 @@ allows discovery again. Total capacity and connectivity sensors are unaffected.
 inverter inventory on coordinator updates, including array-name changes with
 unchanged serials. Trimmed array names determine collision-resistant site-scoped
 entity identities; unnamed members are excluded. Array energy is independent of
-individual energy sensor enablement. Array power follows the telemetry feature
-and is removed when it is disabled. Removed or renamed arrays remain unavailable
+individual energy sensor enablement. Array power is also created independently
+of the individual microinverter power option and remains registered when that
+option is disabled. Removed or renamed arrays remain unavailable
 instead of losing their registry history. A total requires valid values from every
 member; an entity-owned timer expires power at the oldest member's telemetry
 deadline, bounded by the provider measurement timestamp when present as well as

@@ -1194,7 +1194,7 @@
         "name": "Sikertelen bejelentkezések mentett hitelesítő adatokkal"
       },
       "current_production_power": {
-        "name": "Aktuális termelési teljesítmény",
+        "name": "Termelési teljesítmény",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Mintavételezve ekkor (UTC)"
@@ -1332,7 +1332,7 @@
         }
       },
       "site_consumption_power": {
-        "name": "Aktuális teljesítményfelvétel",
+        "name": "Teljesítményfelvétel",
         "state_attributes": {
           "last_window_seconds": {
             "name": "Utolsó ablak (s)"
@@ -1346,7 +1346,7 @@
         }
       },
       "site_grid_power": {
-        "name": "Aktuális hálózati teljesítmény",
+        "name": "Hálózati teljesítmény",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Utolsó áramlás kWh"
@@ -1411,7 +1411,7 @@
         }
       },
       "site_battery_power": {
-        "name": "Aktuális akkumulátor teljesítménye",
+        "name": "Akkumulátor teljesítménye",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Utolsó áramlás kWh"
@@ -1596,7 +1596,7 @@
         "name": "Fogyasztásmérő"
       },
       "gateway_connectivity_status": {
-        "name": "Átjáró állapota",
+        "name": "Kapcsolat",
         "state_attributes": {
           "ip_address": {
             "name": "IP-cím"
@@ -1607,7 +1607,7 @@
         }
       },
       "gateway_last_reported": {
-        "name": "A Gateway legutóbbi jelentése"
+        "name": "Utoljára jelentve"
       },
       "tariff_billing_cycle": {
         "name": "Kovetkezo szamlazasi datum",
@@ -2405,7 +2405,7 @@
     },
     "binary_sensor": {
       "plugged_in": {
-        "name": "Csatlakoztatva"
+        "name": "Jármű csatlakozása"
       },
       "charging": {
         "name": "Töltés"
@@ -2420,7 +2420,7 @@
         "name": "Kapcsolat",
         "state_attributes": {
           "connection": {
-            "name": "Kapcsolat"
+            "name": "Kapcsolódási mód"
           },
           "ip_address": {
             "name": "IP-cím"
@@ -2577,8 +2577,8 @@
       "export_limit": {
         "name": "Betáplálási korlát",
         "state": {
-          "enable_limit": "Korlát engedélyezése",
-          "disable_limit": "Korlát letiltása"
+          "enable_limit": "Engedélyezve",
+          "disable_limit": "Letiltva"
         },
         "state_attributes": {
           "default_limit_watts": {
@@ -2598,12 +2598,6 @@
       }
     },
     "button": {
-      "start_charging": {
-        "name": "Töltés indítása"
-      },
-      "stop_charging": {
-        "name": "Töltés leállítása"
-      },
       "cancel_pending_profile_change": {
         "name": "A függőben lévő profilmódosítás visszavonása"
       },

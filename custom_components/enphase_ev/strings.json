@@ -1197,7 +1197,7 @@
         "name": "Failed Stored-Credential Logins"
       },
       "current_production_power": {
-        "name": "Current Production Power",
+        "name": "Production Power",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Sampled At (UTC)"
@@ -1367,7 +1367,7 @@
         }
       },
       "last_reported": {
-        "name": "Last Reported At",
+        "name": "Last Reported",
         "state_attributes": {
           "reporting_interval": {
             "name": "Reporting Interval (s)"
@@ -1440,7 +1440,7 @@
         }
       },
       "site_consumption_power": {
-        "name": "Current Power Consumption",
+        "name": "Consumption Power",
         "state_attributes": {
           "last_window_seconds": {
             "name": "Last Window (s)"
@@ -1454,7 +1454,7 @@
         }
       },
       "site_grid_power": {
-        "name": "Current Grid Power",
+        "name": "Grid Power",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Last Flow kWh"
@@ -1519,7 +1519,7 @@
         }
       },
       "site_battery_power": {
-        "name": "Current Battery Power",
+        "name": "Battery Power",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Last Flow kWh"
@@ -1596,7 +1596,7 @@
         "name": "Consumption Meter"
       },
       "gateway_connectivity_status": {
-        "name": "Gateway Status",
+        "name": "Connectivity",
         "state_attributes": {
           "ip_address": {
             "name": "IP Address"
@@ -1607,7 +1607,7 @@
         }
       },
       "gateway_last_reported": {
-        "name": "Gateway Last Reported"
+        "name": "Last Reported"
       },
       "tariff_billing_cycle": {
         "name": "Next Billing Date",
@@ -2405,7 +2405,7 @@
     },
     "binary_sensor": {
       "plugged_in": {
-        "name": "Plugged In"
+        "name": "Vehicle Connection"
       },
       "charging": {
         "name": "Charging"
@@ -2452,7 +2452,7 @@
         "name": "Connectivity",
         "state_attributes": {
           "connection": {
-            "name": "Connection"
+            "name": "Connection Method"
           },
           "ip_address": {
             "name": "IP Address"
@@ -2626,8 +2626,8 @@
       "export_limit": {
         "name": "Export Limit",
         "state": {
-          "enable_limit": "Enable Limit",
-          "disable_limit": "Disable Limit"
+          "enable_limit": "Enabled",
+          "disable_limit": "Disabled"
         },
         "state_attributes": {
           "default_limit_watts": {
@@ -2649,12 +2649,6 @@
     "button": {
       "cancel_pending_profile_change": {
         "name": "Cancel Pending Profile Change"
-      },
-      "start_charging": {
-        "name": "Start Charging"
-      },
-      "stop_charging": {
-        "name": "Stop Charging"
       },
       "storm_alert_opt_out": {
         "name": "Storm Alert Opt Out"

@@ -5,16 +5,21 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
-- None
+- Remove the EV charger Start Charging and Stop Charging button entities. Use the charger switch or the Enphase charging actions; automations using `button.press` on the retired buttons need updating.
 
 ### ✨ New features
 - None
 
 ### 🐛 Bug fixes
-- None
+- Keep per-array Current Power sensors enabled independently of the individual Microinverter Power feature setting when account telemetry is available.
+- Report microinverter power telemetry status independently of the individual sensor option, and remove retired charger buttons without waiting for inventory refresh.
 
 ### 🔧 Improvements
-- None
+- Align the Enphase Cloud live power sensor names as Battery Power, Grid Power, Consumption Power, and Production Power in every locale.
+- Label the Export Limit selector states as Enabled and Disabled in every locale.
+- Show Battery Available Power and Battery Mode under Diagnostics on the IQ Battery device.
+- Rename the charger Plugged In sensor to Vehicle Connection in every locale.
+- Align charger and gateway Connectivity and Last Reported names, show Connection Method on both, and leave charger connectivity unavailable when its reported state is missing.
 
 ### 🔄 Other changes
 - None

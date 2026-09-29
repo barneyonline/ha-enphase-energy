@@ -1194,7 +1194,7 @@
         "name": "Misslyckade inloggningar med sparade autentiseringsuppgifter"
       },
       "current_production_power": {
-        "name": "Aktuell produktionskraft",
+        "name": "Produktionseffekt",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Samplad kl. (UTC)"
@@ -1332,7 +1332,7 @@
         }
       },
       "site_consumption_power": {
-        "name": "Aktuell effektförbrukning",
+        "name": "Effektförbrukning",
         "state_attributes": {
           "last_window_seconds": {
             "name": "Senaste fönster (s)"
@@ -1346,7 +1346,7 @@
         }
       },
       "site_grid_power": {
-        "name": "Aktuell näteffekt",
+        "name": "Näteffekt",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Senaste flöde kWh"
@@ -1411,7 +1411,7 @@
         }
       },
       "site_battery_power": {
-        "name": "Aktuell batterieffekt",
+        "name": "Batterieffekt",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Senaste flöde kWh"
@@ -1596,7 +1596,7 @@
         "name": "Förbrukningsmätare"
       },
       "gateway_connectivity_status": {
-        "name": "Gateway-status",
+        "name": "Anslutning",
         "state_attributes": {
           "ip_address": {
             "name": "IP-adress"
@@ -1607,7 +1607,7 @@
         }
       },
       "gateway_last_reported": {
-        "name": "Gateway senast rapporterad"
+        "name": "Senast rapporterad"
       },
       "tariff_billing_cycle": {
         "name": "Nasta faktureringsdatum",
@@ -2405,7 +2405,7 @@
     },
     "binary_sensor": {
       "plugged_in": {
-        "name": "Ansluten"
+        "name": "Fordonsanslutning"
       },
       "charging": {
         "name": "Laddar"
@@ -2420,7 +2420,7 @@
         "name": "Anslutning",
         "state_attributes": {
           "connection": {
-            "name": "Anslutning"
+            "name": "Anslutningsmetod"
           },
           "ip_address": {
             "name": "IP-adress"
@@ -2577,8 +2577,8 @@
       "export_limit": {
         "name": "Exportgräns",
         "state": {
-          "enable_limit": "Aktivera gräns",
-          "disable_limit": "Inaktivera gräns"
+          "enable_limit": "Aktiverad",
+          "disable_limit": "Inaktiverad"
         },
         "state_attributes": {
           "default_limit_watts": {
@@ -2598,12 +2598,6 @@
       }
     },
     "button": {
-      "start_charging": {
-        "name": "Starta laddning"
-      },
-      "stop_charging": {
-        "name": "Stoppa laddning"
-      },
       "cancel_pending_profile_change": {
         "name": "Avbryt väntande profiländring"
       },

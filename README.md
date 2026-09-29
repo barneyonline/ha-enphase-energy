@@ -32,7 +32,7 @@ IQ Battery, microinverter, and EV charger device models use friendly names when 
 - IQ Battery telemetry and BatteryConfig controls (where supported); Battery Overall Charge rounds down to a whole percentage (for example, 20.5% becomes 20%) to align with Enphase reporting
 - IQ EV Charger controls and session telemetry
 - IQ Microinverter connectivity, inventory, lifetime production, and optional installer-level parameter telemetry
-- Per-array **Lifetime Energy** (kWh) and **Current Power** (W) under IQ Microinverters. Energy totals are independent of the individual inverter sensor switches; power totals require **Enable Microinverter Power**. Both sum existing inverter data without additional cloud requests. Every member must have a valid reading; power expires when any member's telemetry is older than 30 minutes. Arrays use their Enlighten names: unnamed inverters are not grouped, and renaming an array creates a new entity while the old entity remains unavailable to preserve its history. Energy is the sum of the current members' lifetime production, so moving or replacing inverters can change that total.
+- Per-array **Lifetime Energy** (kWh) and **Current Power** (W) under IQ Microinverters. Both are enabled independently of the individual inverter sensor switches, including **Enable Microinverter Power**. They sum existing inverter data without additional cloud requests. Array power is available when the account can provide valid power telemetry for every member; it expires when any member's telemetry is older than 30 minutes. Arrays use their Enlighten names: unnamed inverters are not grouped, and renaming an array creates a new entity while the old entity remains unavailable to preserve its history. Energy is the sum of the current members' lifetime production, so moving or replacing inverters can change that total.
 - **Total Array Size** (kW DC nameplate) and **Total Inverter Capacity** (kVA continuous AC rating) under IQ Microinverters, each with an `arrays` attribute containing per-array values in the sensor's unit. Panel size uses configured per-array panel STC ratings, not rounded production estimates or site-wide panel metadata. Sensors are created only after complete data is available for each total. Denied Array Builder access (401/403) creates neither sensor; denied Settings access still permits Total Inverter Capacity. Optional metadata refreshes every six hours, including access-denied retries. Transient failures retry after one hour and make existing sensors unavailable without deleting their history. Access depends on the Enlighten account; general homeowner access to these metadata routes has not been verified.
 - Site and cloud energy telemetry (including supported HEMS channels such as Heat Pump and Water Heater lifetime energy)
 
@@ -52,10 +52,10 @@ Metadata refreshes every six hours, with a 15-minute retry interval for missing 
 - Guided onboarding for site selection and device-category enablement
 - Unified support for EV chargers, gateway, battery, and microinverter entities
 - Multi-gateway topology awareness for primary/default Gateway and phase selection
-- EV charging controls and session telemetry, including charge-mode aware behavior and persistent default charge-level controls when exposed by Enphase
+- EV charging switch and session telemetry, including charge-mode aware behavior and persistent default charge-level controls when exposed by Enphase. Use the switch to start or stop charging, or the `enphase_ev.start_charging` and `enphase_ev.stop_charging` actions in automations. The Start Charging and Stop Charging button entities have been removed; replace `button.press` calls with `switch.turn_on` or `switch.turn_off`.
 - Advisory firmware update entities for gateway and EV charger devices with locale-aware release-note links; the gateway entity also monitors read-only live update progress, percentage, timing, and sanitized component status when Enphase exposes it
 - Heat-pump runtime status, connectivity, SG-Ready mode, power, and current-day consumption details sourced from HEMS endpoints
-- Site and battery energy telemetry, including Current Power Consumption calculated from the available power sensors, plus derived grid-import, grid-export, and battery power sensors for Home Assistant Energy Dashboard use
+- Site and battery energy telemetry, including Consumption Power calculated from the available power sensors, plus derived grid-import, grid-export, and battery power sensors for Home Assistant Energy Dashboard use
 - Optional IQ Battery Scheduler controls and CFG, DTG, and RBD schedule sensors
 - Capability-gated PowerMatch cloud control for supported IQ Battery sites with permitted BatteryConfig write access
 - Optional current site weather on the Enphase Cloud device, created only when the authenticated Enphase weather endpoint is available
@@ -158,9 +158,9 @@ Sign in with your Enlighten credentials; MFA is supported. See the wiki for deta
 Refer to the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki) for setup,
 configuration, and troubleshooting guidance.
 
-### Current Power Consumption calculation
+### Consumption Power calculation
 
-Current Power Consumption uses **production + grid power + battery power**,
+Consumption Power uses **production + grid power + battery power**,
 where grid import and battery discharge are positive, and export and charging
 are negative. It becomes available as soon as the input sensors have numeric
 readings, including after startup, and updates whenever any input changes.
@@ -176,7 +176,14 @@ use its existing consumption-energy calculation. Once a power balance has been
 calculated, it retains that result if an input becomes unavailable and marks it
 `using_cached`, until all required power inputs are available again.
 
-### Gateway connection method
+### Connectivity and connection method
+
+The charger and IQ Gateway devices both show a **Connectivity** diagnostic with
+**Connection Method** and **IP Address** details. Charger connectivity uses the
+charger's reported connected state and is unavailable when that state is missing;
+its method comes from the EVSE configuration. Gateway connectivity summarizes
+its inventory devices as Online, Offline, Degraded, or Unknown. Both devices have
+a separate **Last Reported** diagnostic.
 
 Gateway Connection Method also uses the site-today response, matched by gateway
 serial number, during the inventory refresh. Explicit per-gateway transport flags

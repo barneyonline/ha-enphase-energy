@@ -1378,7 +1378,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         super().__init__(
             coord,
             "site_consumption_power",
-            "Current Power Consumption",
+            "Consumption Power",
             type_key=None,
         )
         self._balance_power_w: int | None = None
@@ -1873,7 +1873,7 @@ class EnphaseGridPowerSensor(_EnphaseSiteLifetimePowerSensor):
         super().__init__(
             coord,
             "grid_power",
-            "Current Grid Power",
+            "Grid Power",
             translation_key="site_grid_power",
             flow_signs={"grid_import": 1, "grid_export": -1},
             type_key=None,
@@ -1885,7 +1885,7 @@ class EnphaseBatteryPowerSensor(_EnphaseSiteLifetimePowerSensor):
         super().__init__(
             coord,
             "battery_power",
-            "Current Battery Power",
+            "Battery Power",
             translation_key="site_battery_power",
             flow_signs={"battery_discharge": 1, "battery_charge": -1},
             type_key=None,
@@ -1903,7 +1903,7 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
         super().__init__(
             coord,
             "current_production_power",
-            "Current Production Power",
+            "Production Power",
             type_key=None,
         )
         self._last_good_value: float | None = None

@@ -4725,7 +4725,7 @@ class EnphaseCoordinator(
                 "sn": sn,
                 "name": obj.get("name"),
                 "display_name": display_name,
-                "connected": _as_bool(obj.get("connected")),
+                "connected": _as_optional_bool(obj.get("connected")),
                 "plugged": _as_bool(obj.get("pluggedIn")),
                 "charging": charging_now_flag,
                 "actual_charging": actual_charging_flag,

@@ -1900,8 +1900,8 @@ def test_site_device_lifetime_strings_localized_for_non_english_locales() -> Non
                 ), f"{name} should localize {path} (still matches English)"
 
 
-def test_gateway_status_string_localized_for_non_english_locales() -> None:
-    """Ensure gateway status label remains localized for non-English locales."""
+def test_gateway_connectivity_string_localized_for_non_english_locales() -> None:
+    """Ensure gateway connectivity label remains localized for non-English locales."""
 
     translations_dir = (
         pathlib.Path(__file__).resolve().parents[3]
@@ -1945,7 +1945,7 @@ def test_cloud_current_power_string_localized_for_non_english_locales() -> None:
 
 
 def test_site_power_strings_localized_for_non_english_locales() -> None:
-    """Ensure site-power labels are translated for non-English locales."""
+    """Ensure the four live-power labels are translated in every locale."""
 
     translations_dir = (
         pathlib.Path(__file__).resolve().parents[3]
@@ -1956,6 +1956,8 @@ def test_site_power_strings_localized_for_non_english_locales() -> None:
     paths = (
         "entity.sensor.site_consumption_power.name",
         "entity.sensor.site_grid_power.name",
+        "entity.sensor.site_battery_power.name",
+        "entity.sensor.current_production_power.name",
     )
     en_data = json.loads((translations_dir / "en.json").read_text(encoding="utf-8"))
     for locale in translations_dir.glob("*.json"):
@@ -1968,6 +1970,41 @@ def test_site_power_strings_localized_for_non_english_locales() -> None:
                 assert value != _at_path(
                     en_data, path
                 ), f"{name} should localize {path} (still matches English)"
+
+
+def test_live_power_sensor_names_align_in_english_locales() -> None:
+    """Keep the four live-power labels consistent in English locales."""
+
+    translations_dir = (
+        pathlib.Path(__file__).resolve().parents[3]
+        / "custom_components"
+        / "enphase_ev"
+        / "translations"
+    )
+    expected = {
+        "site_battery_power": "Battery Power",
+        "site_grid_power": "Grid Power",
+        "site_consumption_power": "Consumption Power",
+        "current_production_power": "Production Power",
+    }
+    files = (
+        translations_dir.parent / "strings.json",
+        *translations_dir.glob("en*.json"),
+    )
+    for file in files:
+        sensors = json.loads(file.read_text(encoding="utf-8"))["entity"]["sensor"]
+        for key, name in expected.items():
+            assert sensors[key]["name"] == name, f"{file.name}: {key}"
+
+
+def test_retired_charging_buttons_are_absent_in_all_locales() -> None:
+    paths = [ROOT / "strings.json", *(ROOT / "translations").glob("*.json")]
+    for path in paths:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        buttons = data["entity"]["button"]
+        for action in ("start_charging", "stop_charging"):
+            assert action not in buttons, path.name
+            assert action in data["services"], path.name
 
 
 def test_site_power_state_attribute_strings_exist_for_all_locales() -> None:
@@ -2443,3 +2480,76 @@ def test_array_production_sensor_names_are_localized() -> None:
             assert "{array}" in name
             if path.name != "strings.json" and not path.stem.startswith("en"):
                 assert name != english
+
+
+def test_export_limit_selector_states_are_localized() -> None:
+    expected = {
+        "bg": ("Активирано", "Деактивирано"),
+        "cs": ("Povoleno", "Deaktivováno"),
+        "da": ("Aktiveret", "Deaktiveret"),
+        "de": ("Aktiviert", "Deaktiviert"),
+        "el": ("Ενεργοποιημένο", "Απενεργοποιημένο"),
+        "en": ("Enabled", "Disabled"),
+        "en-AU": ("Enabled", "Disabled"),
+        "en-CA": ("Enabled", "Disabled"),
+        "en-IE": ("Enabled", "Disabled"),
+        "en-NZ": ("Enabled", "Disabled"),
+        "en-US": ("Enabled", "Disabled"),
+        "es": ("Activado", "Desactivado"),
+        "et": ("Lubatud", "Keelatud"),
+        "fi": ("Käytössä", "Ei käytössä"),
+        "fr": ("Activé", "Désactivé"),
+        "hu": ("Engedélyezve", "Letiltva"),
+        "it": ("Abilitato", "Disattivato"),
+        "lt": ("Įjungta", "Išjungta"),
+        "lv": ("Iespējots", "Atspējots"),
+        "nb-NO": ("Aktivert", "Deaktivert"),
+        "nl": ("Ingeschakeld", "Uitgeschakeld"),
+        "pl": ("Włączony", "Wyłączony"),
+        "pt-BR": ("Habilitado", "Desativado"),
+        "ro": ("Activat", "Dezactivat"),
+        "sv-SE": ("Aktiverad", "Inaktiverad"),
+    }
+    paths = [ROOT / "strings.json", *(ROOT / "translations").glob("*.json")]
+    assert {path.stem for path in paths if path.name != "strings.json"} == set(expected)
+    for path in paths:
+        locale = "en" if path.name == "strings.json" else path.stem
+        state = json.loads(path.read_text())["entity"]["select"]["export_limit"][
+            "state"
+        ]
+        assert state == dict(
+            zip(("enable_limit", "disable_limit"), expected[locale], strict=True)
+        )
+
+
+def test_vehicle_connection_binary_sensor_name_is_localized() -> None:
+    for path in [ROOT / "strings.json", *(ROOT / "translations").glob("*.json")]:
+        name = json.loads(path.read_text())["entity"]["binary_sensor"]["plugged_in"][
+            "name"
+        ]
+        if path.name == "strings.json" or path.stem.startswith("en"):
+            assert name == "Vehicle Connection"
+        else:
+            assert name and name != "Vehicle Connection"
+
+
+def test_charger_and_gateway_connectivity_labels_match() -> None:
+    for path in [ROOT / "strings.json", *(ROOT / "translations").glob("*.json")]:
+        entity = json.loads(path.read_text())["entity"]
+        charger = entity["binary_sensor"]["connected"]
+        gateway = entity["sensor"]["gateway_connectivity_status"]
+        assert charger["name"] == gateway["name"]
+        assert (
+            charger["state_attributes"]["connection"]["name"]
+            == gateway["state_attributes"]["connection_method"]["name"]
+        )
+        assert (
+            entity["sensor"]["last_reported"]["name"]
+            == entity["sensor"]["gateway_last_reported"]["name"]
+        )
+        if path.name == "strings.json" or path.stem.startswith("en"):
+            assert charger["name"] == "Connectivity"
+            assert charger["state_attributes"]["connection"]["name"] == (
+                "Connection Method"
+            )
+            assert entity["sensor"]["last_reported"]["name"] == "Last Reported"

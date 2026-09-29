@@ -1194,7 +1194,7 @@
         "name": "Nieudane logowania zapisanymi poświadczeniami"
       },
       "current_production_power": {
-        "name": "Bieżąca moc produkcji",
+        "name": "Moc produkcji",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Próbka z godz. (UTC)"
@@ -1332,7 +1332,7 @@
         }
       },
       "site_consumption_power": {
-        "name": "Bieżący pobór mocy",
+        "name": "Pobór mocy",
         "state_attributes": {
           "last_window_seconds": {
             "name": "Ostatnie okno (s)"
@@ -1346,7 +1346,7 @@
         }
       },
       "site_grid_power": {
-        "name": "Bieżąca moc sieci",
+        "name": "Moc sieci",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Ostatni przepływ kWh"
@@ -1411,7 +1411,7 @@
         }
       },
       "site_battery_power": {
-        "name": "Bieżąca moc baterii",
+        "name": "Moc baterii",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Ostatni przepływ kWh"
@@ -1596,7 +1596,7 @@
         "name": "Licznik zużycia"
       },
       "gateway_connectivity_status": {
-        "name": "Stan bramy",
+        "name": "Łączność",
         "state_attributes": {
           "ip_address": {
             "name": "Adres IP"
@@ -1607,7 +1607,7 @@
         }
       },
       "gateway_last_reported": {
-        "name": "Ostatni raport dotyczący bramy"
+        "name": "Ostatnio zgłoszono"
       },
       "tariff_billing_cycle": {
         "name": "Nastepna data rozliczenia",
@@ -2405,7 +2405,7 @@
     },
     "binary_sensor": {
       "plugged_in": {
-        "name": "Podłączono"
+        "name": "Podłączenie pojazdu"
       },
       "charging": {
         "name": "Ładowanie"
@@ -2420,7 +2420,7 @@
         "name": "Łączność",
         "state_attributes": {
           "connection": {
-            "name": "Połączenie"
+            "name": "Sposób połączenia"
           },
           "ip_address": {
             "name": "Adres IP"
@@ -2577,8 +2577,8 @@
       "export_limit": {
         "name": "Limit oddawania energii",
         "state": {
-          "enable_limit": "Włącz limit",
-          "disable_limit": "Wyłącz limit"
+          "enable_limit": "Włączony",
+          "disable_limit": "Wyłączony"
         },
         "state_attributes": {
           "default_limit_watts": {
@@ -2598,12 +2598,6 @@
       }
     },
     "button": {
-      "start_charging": {
-        "name": "Rozpocznij ładowanie"
-      },
-      "stop_charging": {
-        "name": "Zatrzymaj ładowanie"
-      },
       "cancel_pending_profile_change": {
         "name": "Anuluj oczekującą zmianę profilu"
       },

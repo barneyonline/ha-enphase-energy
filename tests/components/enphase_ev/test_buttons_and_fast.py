@@ -49,8 +49,8 @@ def test_button_site_has_battery_branches() -> None:
 
 
 @pytest.mark.asyncio
-async def test_start_stop_buttons_press(hass, monkeypatch):
-    from custom_components.enphase_ev.button import StartChargeButton, StopChargeButton
+async def test_start_stop_charging_switch_commands(hass, monkeypatch):
+    from custom_components.enphase_ev.switch import ChargingSwitch
     from custom_components.enphase_ev.const import (
         CONF_COOKIE,
         CONF_EAUTH,
@@ -120,21 +120,20 @@ async def test_start_stop_buttons_press(hass, monkeypatch):
 
     coord.async_request_refresh = _noop  # type: ignore
 
-    start_btn = StartChargeButton(coord, sn)
-    stop_btn = StopChargeButton(coord, sn)
+    charging_switch = ChargingSwitch(coord, sn)
 
-    # Start button clamps to device max when no prior setpoint exists
-    await start_btn.async_press()
+    # Starting clamps to device max when no prior setpoint exists
+    await charging_switch.async_turn_on()
     assert coord.client.start_calls[-1] == (sn, 16, 1)
     assert coord.last_set_amps[sn] == 16
-    # Stop button calls API
-    await stop_btn.async_press()
+    # Stopping calls the API
+    await charging_switch.async_turn_off()
     assert coord.client.stop_calls[-1] == sn
 
 
 @pytest.mark.asyncio
-async def test_start_button_requires_plugged(hass, monkeypatch):
-    from custom_components.enphase_ev.button import StartChargeButton
+async def test_charging_switch_requires_plugged(hass, monkeypatch):
+    from custom_components.enphase_ev.switch import ChargingSwitch
     from custom_components.enphase_ev.const import (
         CONF_COOKIE,
         CONF_EAUTH,
@@ -193,16 +192,16 @@ async def test_start_button_requires_plugged(hass, monkeypatch):
 
     coord.async_request_refresh = _noop  # type: ignore
 
-    start_btn = StartChargeButton(coord, sn)
+    charging_switch = ChargingSwitch(coord, sn)
 
     with pytest.raises(ServiceValidationError):
-        await start_btn.async_press()
+        await charging_switch.async_turn_on()
     assert coord.client.start_calls == []
 
 
 @pytest.mark.asyncio
-async def test_start_button_warns_when_auth_required(hass, monkeypatch, caplog):
-    from custom_components.enphase_ev.button import StartChargeButton
+async def test_charging_switch_warns_when_auth_required(hass, monkeypatch, caplog):
+    from custom_components.enphase_ev.switch import ChargingSwitch
     from custom_components.enphase_ev.const import (
         CONF_COOKIE,
         CONF_EAUTH,
@@ -262,10 +261,10 @@ async def test_start_button_warns_when_auth_required(hass, monkeypatch, caplog):
 
     coord.async_request_refresh = _noop  # type: ignore
 
-    start_btn = StartChargeButton(coord, sn)
+    charging_switch = ChargingSwitch(coord, sn)
 
     with caplog.at_level(logging.WARNING):
-        await start_btn.async_press()
+        await charging_switch.async_turn_on()
     assert coord.client.start_calls == [(sn, 16, 1)]
     assert any(
         "session authentication is required" in record.message
@@ -274,8 +273,10 @@ async def test_start_button_warns_when_auth_required(hass, monkeypatch, caplog):
 
 
 @pytest.mark.asyncio
-async def test_start_button_skips_expectation_when_not_ready(hass, monkeypatch):
-    from custom_components.enphase_ev.button import StartChargeButton
+async def test_charging_switch_refreshes_after_not_ready_without_expectation(
+    hass, monkeypatch
+):
+    from custom_components.enphase_ev.switch import ChargingSwitch
     from custom_components.enphase_ev.const import (
         CONF_COOKIE,
         CONF_EAUTH,
@@ -347,13 +348,15 @@ async def test_start_button_skips_expectation_when_not_ready(hass, monkeypatch):
     coord.kick_fast = _kick_fast  # type: ignore
     coord.async_request_refresh = _refresh  # type: ignore
 
-    start_btn = StartChargeButton(coord, sn)
-    await start_btn.async_press()
+    charging_switch = ChargingSwitch(coord, sn)
+    charging_switch.hass = hass
+    await charging_switch.async_turn_on()
+    await hass.async_block_till_done()
 
     assert coord.client.start_calls == [(sn, 16, 1)]
     assert expectation_calls == []
-    assert flags["kick"] is False
-    assert flags["refresh"] is False
+    assert flags["kick"] is True
+    assert flags["refresh"] is True
 
 
 @pytest.mark.asyncio
@@ -433,8 +436,6 @@ async def test_button_platform_async_setup_entry_filters_known_serials(
         EvseScheduleRefreshButton,
         EvseScheduleSaveButton,
         StormAlertOptOutButton,
-        StartChargeButton,
-        StopChargeButton,
         async_setup_entry,
     )
 
@@ -463,15 +464,8 @@ async def test_button_platform_async_setup_entry_filters_known_serials(
     assert any(isinstance(entity, BatteryForceRefreshButton) for entity in added[0])
     assert any(isinstance(entity, BatteryScheduleSaveButton) for entity in added[0])
     assert any(isinstance(entity, BatteryScheduleDeleteButton) for entity in added[0])
-    start_entity = next(
-        entity for entity in added[1] if isinstance(entity, StartChargeButton)
-    )
-    stop_entity = next(
-        entity for entity in added[1] if isinstance(entity, StopChargeButton)
-    )
-    assert isinstance(start_entity, StartChargeButton)
-    assert isinstance(stop_entity, StopChargeButton)
-    assert start_entity._sn == stop_entity._sn == "5555"
+    assert len(added[1]) == 3
+    assert all(entity._sn == "5555" for entity in added[1])
     assert any(isinstance(entity, EvseScheduleRefreshButton) for entity in added[1])
     assert any(isinstance(entity, EvseScheduleSaveButton) for entity in added[1])
     assert any(isinstance(entity, EvseScheduleDeleteButton) for entity in added[1])
@@ -503,7 +497,7 @@ async def test_button_platform_async_setup_entry_filters_known_serials(
 
 
 @pytest.mark.asyncio
-async def test_button_platform_prunes_stale_buttons_when_inventory_ready(
+async def test_button_platform_removes_retired_charging_buttons_when_inventory_ready(
     hass, config_entry, coordinator_factory, monkeypatch
 ) -> None:
     from homeassistant.helpers import entity_registry as er
@@ -525,10 +519,16 @@ async def test_button_platform_prunes_stale_buttons_when_inventory_ready(
     coord.async_add_listener = capture_listener  # type: ignore[attr-defined]
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
     ent_reg = er.async_get(hass)
-    stale = ent_reg.async_get_or_create(
+    old_start = ent_reg.async_get_or_create(
         "button",
         "enphase_ev",
         "enphase_ev_5555_start_charging",
+        config_entry=config_entry,
+    )
+    old_stop = ent_reg.async_get_or_create(
+        "button",
+        "enphase_ev",
+        "enphase_ev_5555_stop_charging",
         config_entry=config_entry,
     )
     remove_spy = MagicMock(wraps=ent_reg.async_remove)
@@ -536,11 +536,15 @@ async def test_button_platform_prunes_stale_buttons_when_inventory_ready(
 
     await async_setup_entry(hass, config_entry, capture_add)
 
-    coord.data.pop("5555", None)
-    coord.iter_serials = lambda: []
-    listeners[0]()
-
-    remove_spy.assert_called_with(stale.entity_id)
+    remove_spy.assert_any_call(old_start.entity_id)
+    remove_spy.assert_any_call(old_stop.entity_id)
+    assert ent_reg.async_get(old_start.entity_id) is None
+    assert ent_reg.async_get(old_stop.entity_id) is None
+    assert all(
+        entity.unique_id not in {old_start.unique_id, old_stop.unique_id}
+        for batch in added
+        for entity in batch
+    )
 
 
 @pytest.mark.asyncio
@@ -739,7 +743,13 @@ async def test_async_setup_entry_button_cleanup_waits_for_inventory_ready(
     stale = ent_reg.async_get_or_create(
         "button",
         "enphase_ev",
-        "enphase_ev_site_123456_cancel_pending_profile_change",
+        "enphase_ev_site_123456_battery_schedule_add",
+        config_entry=config_entry,
+    )
+    retired = ent_reg.async_get_or_create(
+        "button",
+        "enphase_ev",
+        "enphase_ev_5555_start_charging",
         config_entry=config_entry,
     )
     remove_spy = MagicMock(wraps=ent_reg.async_remove)
@@ -747,7 +757,8 @@ async def test_async_setup_entry_button_cleanup_waits_for_inventory_ready(
 
     await async_setup_entry(hass, config_entry, lambda *_args, **_kwargs: None)
 
-    remove_spy.assert_not_called()
+    remove_spy.assert_called_once_with(retired.entity_id)
+    assert ent_reg.async_get(retired.entity_id) is None
     assert ent_reg.async_get(stale.entity_id) is not None
 
 

@@ -129,8 +129,12 @@ def test_polling_status_available_before_power_entities_exist(coordinator_factor
     )
     coord.config_entry.options = {}
     assert (
+        inverter_telemetry_status_attributes(coord)["power_telemetry_status"] == "ready"
+    )
+    coord._inverter_parameter_telemetry = {}
+    assert (
         inverter_telemetry_status_attributes(coord)["power_telemetry_status"]
-        == "disabled"
+        == "pending"
     )
 
 

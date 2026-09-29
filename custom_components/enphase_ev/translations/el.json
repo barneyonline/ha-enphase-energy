@@ -1194,7 +1194,7 @@
         "name": "Αποτυχημένες συνδέσεις με αποθηκευμένα διαπιστευτήρια"
       },
       "current_production_power": {
-        "name": "Τρέχουσα ισχύς παραγωγής",
+        "name": "Ισχύς παραγωγής",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Δειγματοληψία στις (UTC)"
@@ -1332,7 +1332,7 @@
         }
       },
       "site_consumption_power": {
-        "name": "Τρέχουσα κατανάλωση ισχύος",
+        "name": "Κατανάλωση ισχύος",
         "state_attributes": {
           "last_window_seconds": {
             "name": "Τελευταίο παράθυρο (s)"
@@ -1346,7 +1346,7 @@
         }
       },
       "site_grid_power": {
-        "name": "Τρέχουσα ισχύς δικτύου",
+        "name": "Ισχύς δικτύου",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Τελευταία ροή kWh"
@@ -1411,7 +1411,7 @@
         }
       },
       "site_battery_power": {
-        "name": "Τρέχουσα ισχύς μπαταρίας",
+        "name": "Ισχύς μπαταρίας",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Τελευταία ροή kWh"
@@ -1596,7 +1596,7 @@
         "name": "Μετρητής Κατανάλωσης"
       },
       "gateway_connectivity_status": {
-        "name": "Κατάσταση πύλης",
+        "name": "Συνδεσιμότητα",
         "state_attributes": {
           "ip_address": {
             "name": "Διεύθυνση IP"
@@ -1607,7 +1607,7 @@
         }
       },
       "gateway_last_reported": {
-        "name": "Τελευταία αναφορά Gateway"
+        "name": "Τελευταία αναφορά"
       },
       "tariff_billing_cycle": {
         "name": "Επόμενη ημερομηνία χρέωσης",
@@ -2405,7 +2405,7 @@
     },
     "binary_sensor": {
       "plugged_in": {
-        "name": "Συνδεδεμένο"
+        "name": "Σύνδεση οχήματος"
       },
       "charging": {
         "name": "Φόρτιση"
@@ -2420,7 +2420,7 @@
         "name": "Συνδεσιμότητα",
         "state_attributes": {
           "connection": {
-            "name": "Σύνδεση"
+            "name": "Μέθοδος σύνδεσης"
           },
           "ip_address": {
             "name": "Διεύθυνση IP"
@@ -2577,8 +2577,8 @@
       "export_limit": {
         "name": "Όριο εξαγωγής",
         "state": {
-          "enable_limit": "Ενεργοποίηση ορίου",
-          "disable_limit": "Απενεργοποίηση ορίου"
+          "enable_limit": "Ενεργοποιημένο",
+          "disable_limit": "Απενεργοποιημένο"
         },
         "state_attributes": {
           "default_limit_watts": {
@@ -2598,12 +2598,6 @@
       }
     },
     "button": {
-      "start_charging": {
-        "name": "Έναρξη φόρτισης"
-      },
-      "stop_charging": {
-        "name": "Διακοπή φόρτισης"
-      },
       "cancel_pending_profile_change": {
         "name": "Ακύρωση αλλαγής προφίλ σε εκκρεμότητα"
       },

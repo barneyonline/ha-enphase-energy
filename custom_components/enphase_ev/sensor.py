@@ -1195,7 +1195,7 @@ async def async_setup_entry(
     registry_setup.prune_historical_charger_sensor_entities()
     registry_setup.prune_removed_site_entities()
     _async_sync_topology()
-    setup_array_sensors(entry, coord, async_add_entities, registry_setup)
+    setup_array_sensors(entry, coord, async_add_entities)
 
 
 class _BaseEVSensor(EnphaseBaseEntity, SensorEntity):  # type: ignore[misc]
@@ -3816,6 +3816,7 @@ class EnphaseBatteryAvailablePowerSensor(_SiteBaseEntity):
     _attr_device_class = SensorDeviceClass.POWER
     _attr_native_unit_of_measurement = UnitOfPower.KILO_WATT
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(
@@ -3893,6 +3894,7 @@ class EnphaseBatteryLastReportedSensor(_SiteBaseEntity):
 class EnphaseBatteryModeSensor(_SiteBaseEntity):
     _attr_translation_key = "battery_mode"
     _attr_icon = "mdi:battery"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(coord, "battery_mode", "Battery Mode", type_key="encharge")
