@@ -728,6 +728,7 @@ async def test_export_limit_select(runtime, hass):
 
     coord = runtime.coordinator
     entity = ExportLimitSelect(coord)
+    assert entity.entity_category is None
     assert entity.current_option is None and not entity.available
     assert entity.extra_state_attributes == {
         "default_limit_watts": 0,

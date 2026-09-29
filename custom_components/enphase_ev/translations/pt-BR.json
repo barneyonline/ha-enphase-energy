@@ -2227,6 +2227,12 @@
             "name": "Moeda"
           }
         }
+      },
+      "inverter_array_energy": {
+        "name": "{array} Energia total"
+      },
+      "inverter_array_power": {
+        "name": "{array} Potência atual"
       }
     },
     "number": {

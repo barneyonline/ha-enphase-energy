@@ -2227,6 +2227,12 @@
             "name": "Devise"
           }
         }
+      },
+      "inverter_array_energy": {
+        "name": "{array} Énergie totale"
+      },
+      "inverter_array_power": {
+        "name": "{array} Puissance actuelle"
       }
     },
     "number": {

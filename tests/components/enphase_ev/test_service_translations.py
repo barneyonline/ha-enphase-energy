@@ -2430,3 +2430,16 @@ def test_features_and_session_guidance_are_localized() -> None:
                 steps["advanced"]["menu_options"]["grid_profile"]
                 == "Grid Profile Control"
             )
+
+
+def test_array_production_sensor_names_are_localized() -> None:
+    for path in [ROOT / "strings.json", *(ROOT / "translations").glob("*.json")]:
+        data = json.loads(path.read_text())
+        for key, english in (
+            ("inverter_array_energy", "{array} Lifetime Energy"),
+            ("inverter_array_power", "{array} Current Power"),
+        ):
+            name = data["entity"]["sensor"][key]["name"]
+            assert "{array}" in name
+            if path.name != "strings.json" and not path.stem.startswith("en"):
+                assert name != english

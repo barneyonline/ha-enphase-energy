@@ -2227,6 +2227,12 @@
             "name": "Valuta"
           }
         }
+      },
+      "inverter_array_energy": {
+        "name": "{array} Totale energie"
+      },
+      "inverter_array_power": {
+        "name": "{array} Huidig vermogen"
       }
     },
     "number": {

@@ -2227,6 +2227,12 @@
             "name": "Валута"
           }
         }
+      },
+      "inverter_array_energy": {
+        "name": "{array} Енергия за целия период"
+      },
+      "inverter_array_power": {
+        "name": "{array} Текуща мощност"
       }
     },
     "number": {

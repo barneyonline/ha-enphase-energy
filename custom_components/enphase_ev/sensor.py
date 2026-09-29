@@ -79,6 +79,7 @@ from .sensor_cloud_metadata import (
     EnphaseSiteInformationSensor,
 )
 from .sensor_base import EnphaseSiteSensorEntity as _SiteBaseEntity
+from .sensor_inverter_array import setup_array_sensors
 from .sensor_battery import (
     BATTERY_LED_STATUS_STATE_MAP as BATTERY_LED_STATUS_STATE_MAP,
     EnphaseBatteryStorageChargeSensor,
@@ -1194,6 +1195,7 @@ async def async_setup_entry(
     registry_setup.prune_historical_charger_sensor_entities()
     registry_setup.prune_removed_site_entities()
     _async_sync_topology()
+    setup_array_sensors(entry, coord, async_add_entities, registry_setup)
 
 
 class _BaseEVSensor(EnphaseBaseEntity, SensorEntity):  # type: ignore[misc]

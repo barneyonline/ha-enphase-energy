@@ -2227,6 +2227,12 @@
             "name": "Monedă"
           }
         }
+      },
+      "inverter_array_energy": {
+        "name": "{array} Energie totală"
+      },
+      "inverter_array_power": {
+        "name": "{array} Putere curentă"
       }
     },
     "number": {
