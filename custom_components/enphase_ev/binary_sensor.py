@@ -240,10 +240,22 @@ class ConnectedBinarySensor(_EVBoolSensor):
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
+    def available(self) -> bool:
+        return super().available and isinstance(self.data.get("connected"), bool)
+
+    @property
     def extra_state_attributes(self) -> dict[str, object]:
         connection = self.data.get("connection")
         if isinstance(connection, str):
-            connection = connection.strip() or None
+            connection = connection.strip()
+            connection = {
+                "ethernet": "Ethernet",
+                "wifi": "Wi-Fi",
+                "wi-fi": "Wi-Fi",
+                "cellular": "Cellular",
+            }.get(connection.casefold(), connection or None)
+        else:
+            connection = None
         ip_attr = self.data.get("ip_address")
         if isinstance(ip_attr, str):
             ip_attr = ip_attr.strip() or None

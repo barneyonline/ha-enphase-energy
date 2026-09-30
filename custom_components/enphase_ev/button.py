@@ -23,7 +23,6 @@ from .battery_schedule_editor import (
 )
 from .const import DOMAIN
 from .coordinator import EnphaseCoordinator
-from .entity import EnphaseBaseEntity
 from .entity_cleanup import prune_managed_entities
 from .evse_schedule_editor import (
     EvseScheduleEditorEntity,
@@ -97,6 +96,19 @@ async def async_setup_entry(
 ) -> None:
     coord: EnphaseCoordinator = get_runtime_data(entry).coordinator
     ent_reg = er.async_get(hass)
+    # These buttons are retired for every charger, so their registry cleanup
+    # does not depend on a successful inventory refresh.
+    prune_managed_entities(
+        ent_reg,
+        entry.entry_id,
+        domain="button",
+        active_unique_ids=(),
+        is_managed=lambda unique_id: (
+            unique_id.startswith(f"{DOMAIN}_")
+            and not unique_id.startswith(f"{DOMAIN}_site_")
+            and unique_id.endswith(("_start_charging", "_stop_charging"))
+        ),
+    )
     known_serials: set[str] = set()
     site_entity_keys: set[str] = set()
 
@@ -155,8 +167,6 @@ async def async_setup_entry(
         else:
             serial_entities = []
             for sn in serials:
-                serial_entities.append(StartChargeButton(coord, sn))
-                serial_entities.append(StopChargeButton(coord, sn))
                 if evse_schedule_editor_active(coord, entry):
                     serial_entities.append(EvseScheduleRefreshButton(coord, entry, sn))
                     serial_entities.append(EvseScheduleSaveButton(coord, entry, sn))
@@ -174,12 +184,6 @@ async def async_setup_entry(
         # not remove user-customized entity registry entries.
         active_charger_unique_ids = set()
         for sn in current_serials:
-            active_charger_unique_ids.update(
-                {
-                    _charger_button_unique_id(sn, "start_charging"),
-                    _charger_button_unique_id(sn, "stop_charging"),
-                }
-            )
             if evse_schedule_editor_active(coord, entry):
                 active_charger_unique_ids.update(
                     {
@@ -208,8 +212,6 @@ async def async_setup_entry(
                 }
                 or unique_id.endswith(
                     (
-                        "_start_charging",
-                        "_stop_charging",
                         "_schedule_refresh",
                         "_schedule_save",
                         "_schedule_delete",
@@ -495,30 +497,6 @@ class BatteryScheduleDeleteButton(_BatteryScheduleButton):
             blocking=True,
         )
         self._show_success_notification(action="delete", body=success_label)
-
-
-class _BaseButton(EnphaseBaseEntity, ButtonEntity):  # type: ignore[misc]
-    def __init__(self, coord: EnphaseCoordinator, sn: str, name_suffix: str) -> None:
-        super().__init__(coord, sn)
-        self._attr_unique_id = f"{DOMAIN}_{sn}_{name_suffix.replace(' ', '_').lower()}"
-
-
-class StartChargeButton(_BaseButton):
-    def __init__(self, coord: EnphaseCoordinator, sn: str) -> None:
-        super().__init__(coord, sn, "Start Charging")
-        self._attr_translation_key = "start_charging"
-
-    async def async_press(self) -> None:
-        await self._coord.async_start_charging(self._sn)
-
-
-class StopChargeButton(_BaseButton):
-    def __init__(self, coord: EnphaseCoordinator, sn: str) -> None:
-        super().__init__(coord, sn, "Stop Charging")
-        self._attr_translation_key = "stop_charging"
-
-    async def async_press(self) -> None:
-        await self._coord.async_stop_charging(self._sn)
 
 
 class _EvseScheduleButton(EvseScheduleEditorEntity, ButtonEntity):  # type: ignore[misc]

@@ -870,6 +870,7 @@ def test_battery_site_summary_sensors_state_and_attributes():
     from datetime import datetime, timezone
 
     from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+    from homeassistant.helpers.entity import EntityCategory
 
     from custom_components.enphase_ev.sensor import (
         EnphaseBatteryAvailableEnergySensor,
@@ -920,6 +921,8 @@ def test_battery_site_summary_sensors_state_and_attributes():
     )
 
     assert power.available is True
+    assert power.entity_category is EntityCategory.DIAGNOSTIC
+    assert power.entity_registry_enabled_default is True
     assert power.native_value == 7.68
     assert power.extra_state_attributes["sampled_at_utc"] == "2026-03-11T05:40:00+00:00"
 
@@ -1093,6 +1096,8 @@ def test_battery_overall_sensors_unavailable_paths():
 def test_battery_mode_sensor_states():
     from types import SimpleNamespace
 
+    from homeassistant.helpers.entity import EntityCategory
+
     from custom_components.enphase_ev.sensor import EnphaseBatteryModeSensor
 
     coord = SimpleNamespace(
@@ -1129,6 +1134,8 @@ def test_battery_mode_sensor_states():
     )
     sensor = EnphaseBatteryModeSensor(coord)
     assert sensor.available is True
+    assert sensor.entity_category is EntityCategory.DIAGNOSTIC
+    assert sensor.entity_registry_enabled_default is True
     assert sensor.native_value == "Import and Export"
     assert sensor.icon == "mdi:battery"
     attrs = sensor.extra_state_attributes

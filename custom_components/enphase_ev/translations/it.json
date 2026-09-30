@@ -1194,7 +1194,7 @@
         "name": "Accessi non riusciti con credenziali salvate"
       },
       "current_production_power": {
-        "name": "Potenza attuale di produzione",
+        "name": "Potenza di produzione",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Campionato alle (UTC)"
@@ -1259,7 +1259,7 @@
         }
       },
       "last_reported": {
-        "name": "Ultimo aggiornamento",
+        "name": "Ultima segnalazione",
         "state_attributes": {
           "reporting_interval": {
             "name": "Intervallo di reporting (s)"
@@ -1332,7 +1332,7 @@
         }
       },
       "site_consumption_power": {
-        "name": "Consumo di potenza attuale",
+        "name": "Potenza assorbita",
         "state_attributes": {
           "last_window_seconds": {
             "name": "Ultima finestra (s)"
@@ -1346,7 +1346,7 @@
         }
       },
       "site_grid_power": {
-        "name": "Potenza attuale della rete",
+        "name": "Potenza della rete",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Ultimo flusso kWh"
@@ -1411,7 +1411,7 @@
         }
       },
       "site_battery_power": {
-        "name": "Potenza attuale della batteria",
+        "name": "Potenza della batteria",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Ultimo flusso kWh"
@@ -1596,7 +1596,7 @@
         "name": "Misuratore di consumo"
       },
       "gateway_connectivity_status": {
-        "name": "Stato del gateway",
+        "name": "Connettività",
         "state_attributes": {
           "ip_address": {
             "name": "Indirizzo IP"
@@ -1607,7 +1607,7 @@
         }
       },
       "gateway_last_reported": {
-        "name": "Ultimo gateway segnalato"
+        "name": "Ultima segnalazione"
       },
       "tariff_billing_cycle": {
         "name": "Prossima data di fatturazione",
@@ -2405,7 +2405,7 @@
     },
     "binary_sensor": {
       "plugged_in": {
-        "name": "Collegato"
+        "name": "Collegamento del veicolo"
       },
       "charging": {
         "name": "In ricarica"
@@ -2420,7 +2420,7 @@
         "name": "Connettività",
         "state_attributes": {
           "connection": {
-            "name": "Connessione"
+            "name": "Metodo di connessione"
           },
           "ip_address": {
             "name": "Indirizzo IP"
@@ -2577,8 +2577,8 @@
       "export_limit": {
         "name": "Limite di immissione",
         "state": {
-          "enable_limit": "Abilita limite",
-          "disable_limit": "Disabilita limite"
+          "enable_limit": "Abilitato",
+          "disable_limit": "Disattivato"
         },
         "state_attributes": {
           "default_limit_watts": {
@@ -2598,12 +2598,6 @@
       }
     },
     "button": {
-      "start_charging": {
-        "name": "Avvia ricarica"
-      },
-      "stop_charging": {
-        "name": "Interrompi ricarica"
-      },
       "cancel_pending_profile_change": {
         "name": "Annulla la modifica del profilo in sospeso"
       },

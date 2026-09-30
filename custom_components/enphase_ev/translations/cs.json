@@ -1194,7 +1194,7 @@
         "name": "Neúspěšná přihlášení uloženými přihlašovacími údaji"
       },
       "current_production_power": {
-        "name": "Aktuální výrobní výkon",
+        "name": "Výrobní výkon",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Čas vzorku (UTC)"
@@ -1332,7 +1332,7 @@
         }
       },
       "site_consumption_power": {
-        "name": "Aktuální příkon",
+        "name": "Příkon",
         "state_attributes": {
           "last_window_seconds": {
             "name": "Poslední okno (s)"
@@ -1346,7 +1346,7 @@
         }
       },
       "site_grid_power": {
-        "name": "Aktuální výkon sítě",
+        "name": "Výkon sítě",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Poslední tok kWh"
@@ -1411,7 +1411,7 @@
         }
       },
       "site_battery_power": {
-        "name": "Aktuální výkon baterie",
+        "name": "Výkon baterie",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Poslední tok kWh"
@@ -1596,7 +1596,7 @@
         "name": "Měřič spotřeby"
       },
       "gateway_connectivity_status": {
-        "name": "Stav brány",
+        "name": "Konektivita",
         "state_attributes": {
           "ip_address": {
             "name": "IP adresa"
@@ -1607,7 +1607,7 @@
         }
       },
       "gateway_last_reported": {
-        "name": "Brána naposledy hlášena"
+        "name": "Naposledy hlášeno"
       },
       "tariff_billing_cycle": {
         "name": "Pristi datum fakturace",
@@ -2405,7 +2405,7 @@
     },
     "binary_sensor": {
       "plugged_in": {
-        "name": "Připojeno"
+        "name": "Připojení vozidla"
       },
       "charging": {
         "name": "Nabíjení"
@@ -2420,7 +2420,7 @@
         "name": "Konektivita",
         "state_attributes": {
           "connection": {
-            "name": "Připojení"
+            "name": "Způsob připojení"
           },
           "ip_address": {
             "name": "IP adresa"
@@ -2577,8 +2577,8 @@
       "export_limit": {
         "name": "Limit přetoků",
         "state": {
-          "enable_limit": "Zapnout limit",
-          "disable_limit": "Vypnout limit"
+          "enable_limit": "Povoleno",
+          "disable_limit": "Deaktivováno"
         },
         "state_attributes": {
           "default_limit_watts": {
@@ -2598,12 +2598,6 @@
       }
     },
     "button": {
-      "start_charging": {
-        "name": "Spustit nabíjení"
-      },
-      "stop_charging": {
-        "name": "Zastavit nabíjení"
-      },
       "cancel_pending_profile_change": {
         "name": "Zrušit čekající změnu profilu"
       },

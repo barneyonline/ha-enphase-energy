@@ -1209,6 +1209,7 @@ async def test_async_update_data_continues_when_heatpump_refresh_raises(
 
     result = await coord._async_update_data()  # noqa: SLF001
     assert RANDOM_SERIAL in result
+    assert result[RANDOM_SERIAL]["connected"] is None
 
 
 @pytest.mark.asyncio

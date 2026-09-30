@@ -1194,7 +1194,7 @@
         "name": "Mislykkede login med gemte legitimationsoplysninger"
       },
       "current_production_power": {
-        "name": "Aktuel produktionskraft",
+        "name": "Produktionseffekt",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Målt kl. (UTC)"
@@ -1332,7 +1332,7 @@
         }
       },
       "site_consumption_power": {
-        "name": "Aktuelt strømforbrug",
+        "name": "Effektforbrug",
         "state_attributes": {
           "last_window_seconds": {
             "name": "Seneste vindue (s)"
@@ -1346,7 +1346,7 @@
         }
       },
       "site_grid_power": {
-        "name": "Aktuel neteffekt",
+        "name": "Neteffekt",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Seneste flow kWh"
@@ -1411,7 +1411,7 @@
         }
       },
       "site_battery_power": {
-        "name": "Aktuel batterieffekt",
+        "name": "Batterieffekt",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Seneste flow kWh"
@@ -1596,7 +1596,7 @@
         "name": "Forbrugsmåler"
       },
       "gateway_connectivity_status": {
-        "name": "Gateway-status",
+        "name": "Forbindelse",
         "state_attributes": {
           "ip_address": {
             "name": "IP-adresse"
@@ -1607,7 +1607,7 @@
         }
       },
       "gateway_last_reported": {
-        "name": "Gateway sidst rapporteret"
+        "name": "Senest rapporteret"
       },
       "tariff_billing_cycle": {
         "name": "Naeste faktureringsdato",
@@ -2405,7 +2405,7 @@
     },
     "binary_sensor": {
       "plugged_in": {
-        "name": "Tilsluttet"
+        "name": "Forbindelse til køretøj"
       },
       "charging": {
         "name": "Opladning"
@@ -2420,7 +2420,7 @@
         "name": "Forbindelse",
         "state_attributes": {
           "connection": {
-            "name": "Forbindelse"
+            "name": "Forbindelsesmetode"
           },
           "ip_address": {
             "name": "IP-adresse"
@@ -2577,8 +2577,8 @@
       "export_limit": {
         "name": "Eksportgrænse",
         "state": {
-          "enable_limit": "Aktivér grænse",
-          "disable_limit": "Deaktivér grænse"
+          "enable_limit": "Aktiveret",
+          "disable_limit": "Deaktiveret"
         },
         "state_attributes": {
           "default_limit_watts": {
@@ -2598,12 +2598,6 @@
       }
     },
     "button": {
-      "start_charging": {
-        "name": "Start opladning"
-      },
-      "stop_charging": {
-        "name": "Stop opladning"
-      },
       "cancel_pending_profile_change": {
         "name": "Annuller afventende profilændring"
       },

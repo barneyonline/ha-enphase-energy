@@ -11,7 +11,6 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 from custom_components.enphase_ev.const import DOMAIN, OPT_MICROINVERTER_POWER_ENABLED
-from custom_components.enphase_ev.sensor_registry import EnphaseSensorRegistrySetup
 from custom_components.enphase_ev.sensor_inverter_array import (
     EnphaseInverterArraySensor,
     array_members,
@@ -126,7 +125,7 @@ def test_names_and_authoritative_inventory(array_coord):
 
 
 @pytest.mark.parametrize("power_enabled", [False, True])
-async def test_discovery_independent_of_individual_energy_entities(
+async def test_discovery_independent_of_microinverter_power_option(
     hass, config_entry, array_coord, power_enabled
 ):
     hass.config_entries.async_update_entry(
@@ -139,24 +138,24 @@ async def test_discovery_independent_of_individual_energy_entities(
         config_entry,
         array_coord,
         added.extend,
-        EnphaseSensorRegistrySetup(
-            er.async_get(hass),
-            config_entry_id=config_entry.entry_id,
-            site_id=array_coord.site_id,
-        ),
     )
-    assert len(added) == (4 if power_enabled else 2)
+    assert len(added) == 4
+    assert {entity._power for entity in added} == {False, True}
+    assert all(entity.entity_registry_enabled_default for entity in added)
     callbacks[0]()
-    assert len(added) == (4 if power_enabled else 2)
+    assert len(added) == 4
     array_coord._inverter_data["C"]["array_name"] = "East"
     callbacks[0]()
-    assert len(added) == (6 if power_enabled else 3)
+    assert len(added) == 6
     assert {entity._array_name for entity in added} == {"North", "West", "East"}
 
 
-async def test_power_opt_out_removes_only_this_entry_array_power(
+async def test_power_opt_out_preserves_registered_array_power(
     hass, config_entry, array_coord
 ):
+    hass.config_entries.async_update_entry(
+        config_entry, options={OPT_MICROINVERTER_POWER_ENABLED: False}
+    )
     registry = er.async_get(hass)
     power = EnphaseInverterArraySensor(array_coord, "North", power=True)
     energy = EnphaseInverterArraySensor(array_coord, "North")
@@ -168,12 +167,8 @@ async def test_power_opt_out_removes_only_this_entry_array_power(
         config_entry,
         array_coord,
         Mock(),
-        EnphaseSensorRegistrySetup(
-            registry, config_entry_id=config_entry.entry_id, site_id=array_coord.site_id
-        ),
     )
-    assert registry.async_get(entries[0].entity_id) is None
-    assert all(registry.async_get(entry.entity_id) for entry in entries[1:])
+    assert all(registry.async_get(entry.entity_id) for entry in entries)
 
 
 @pytest.mark.parametrize("provider_timestamp", [False, True])

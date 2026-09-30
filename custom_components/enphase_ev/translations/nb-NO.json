@@ -1194,7 +1194,7 @@
         "name": "Mislykkede pålogginger med lagret legitimasjon"
       },
       "current_production_power": {
-        "name": "Nåværende produksjonseffekt",
+        "name": "Produksjonseffekt",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Målt kl. (UTC)"
@@ -1332,7 +1332,7 @@
         }
       },
       "site_consumption_power": {
-        "name": "Nåværende effektforbruk",
+        "name": "Effektforbruk",
         "state_attributes": {
           "last_window_seconds": {
             "name": "Siste vindu (s)"
@@ -1346,7 +1346,7 @@
         }
       },
       "site_grid_power": {
-        "name": "Nåværende netteffekt",
+        "name": "Netteffekt",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Siste flyt kWh"
@@ -1411,7 +1411,7 @@
         }
       },
       "site_battery_power": {
-        "name": "Nåværende batterieffekt",
+        "name": "Batterieffekt",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Siste flyt kWh"
@@ -1596,7 +1596,7 @@
         "name": "Forbruksmåler"
       },
       "gateway_connectivity_status": {
-        "name": "Gateway-status",
+        "name": "Tilkobling",
         "state_attributes": {
           "ip_address": {
             "name": "IP-adresse"
@@ -1607,7 +1607,7 @@
         }
       },
       "gateway_last_reported": {
-        "name": "Gateway sist rapportert"
+        "name": "Sist rapportert"
       },
       "tariff_billing_cycle": {
         "name": "Neste faktureringsdato",
@@ -2405,7 +2405,7 @@
     },
     "binary_sensor": {
       "plugged_in": {
-        "name": "Tilkoblet"
+        "name": "Tilkobling av kjøretøy"
       },
       "charging": {
         "name": "Lading"
@@ -2420,7 +2420,7 @@
         "name": "Tilkobling",
         "state_attributes": {
           "connection": {
-            "name": "Tilkobling"
+            "name": "Tilkoblingsmetode"
           },
           "ip_address": {
             "name": "IP-adresse"
@@ -2577,8 +2577,8 @@
       "export_limit": {
         "name": "Eksportgrense",
         "state": {
-          "enable_limit": "Aktiver grense",
-          "disable_limit": "Deaktiver grense"
+          "enable_limit": "Aktivert",
+          "disable_limit": "Deaktivert"
         },
         "state_attributes": {
           "default_limit_watts": {
@@ -2598,12 +2598,6 @@
       }
     },
     "button": {
-      "start_charging": {
-        "name": "Start lading"
-      },
-      "stop_charging": {
-        "name": "Stopp lading"
-      },
       "cancel_pending_profile_change": {
         "name": "Avbryt ventende profilendring"
       },

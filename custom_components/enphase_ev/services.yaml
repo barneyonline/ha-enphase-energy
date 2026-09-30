@@ -3,7 +3,7 @@ start_charging:
   target:
     entity:
       integration: enphase_ev
-      domain: button
+      domain: switch
   fields:
     advanced:
       collapsed: true
@@ -27,13 +27,13 @@ stop_charging:
   target:
     entity:
       integration: enphase_ev
-      domain: button
+      domain: switch
 
 trigger_message:
   target:
     entity:
       integration: enphase_ev
-      domain: button
+      domain: switch
   fields:
     requested_message:
       required: true

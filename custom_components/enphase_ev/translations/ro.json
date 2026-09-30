@@ -1194,7 +1194,7 @@
         "name": "Autentificări eșuate cu credențiale salvate"
       },
       "current_production_power": {
-        "name": "Puterea instantanee de producție",
+        "name": "Puterea de producție",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Eșantionat la (UTC)"
@@ -1332,7 +1332,7 @@
         }
       },
       "site_consumption_power": {
-        "name": "Consum curent de putere",
+        "name": "Puterea consumată",
         "state_attributes": {
           "last_window_seconds": {
             "name": "Ultima fereastră (s)"
@@ -1346,7 +1346,7 @@
         }
       },
       "site_grid_power": {
-        "name": "Puterea instantanee a rețelei",
+        "name": "Puterea rețelei",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Ultimul flux kWh"
@@ -1411,7 +1411,7 @@
         }
       },
       "site_battery_power": {
-        "name": "Puterea instantanee a bateriei",
+        "name": "Puterea bateriei",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Ultimul flux kWh"
@@ -1596,7 +1596,7 @@
         "name": "Contor de consum"
       },
       "gateway_connectivity_status": {
-        "name": "Stare gateway",
+        "name": "Conectivitate",
         "state_attributes": {
           "ip_address": {
             "name": "Adresă IP"
@@ -1607,7 +1607,7 @@
         }
       },
       "gateway_last_reported": {
-        "name": "Gateway Raportat ultima dată"
+        "name": "Ultima raportare"
       },
       "tariff_billing_cycle": {
         "name": "Urmatoarea data de facturare",
@@ -2405,7 +2405,7 @@
     },
     "binary_sensor": {
       "plugged_in": {
-        "name": "Conectat"
+        "name": "Conectarea vehiculului"
       },
       "charging": {
         "name": "Încărcare"
@@ -2420,7 +2420,7 @@
         "name": "Conectivitate",
         "state_attributes": {
           "connection": {
-            "name": "Conexiune"
+            "name": "Metodă de conectare"
           },
           "ip_address": {
             "name": "Adresă IP"
@@ -2577,8 +2577,8 @@
       "export_limit": {
         "name": "Limită de injecție",
         "state": {
-          "enable_limit": "Activează limita",
-          "disable_limit": "Dezactivează limita"
+          "enable_limit": "Activat",
+          "disable_limit": "Dezactivat"
         },
         "state_attributes": {
           "default_limit_watts": {
@@ -2598,12 +2598,6 @@
       }
     },
     "button": {
-      "start_charging": {
-        "name": "Pornește încărcarea"
-      },
-      "stop_charging": {
-        "name": "Oprește încărcarea"
-      },
       "cancel_pending_profile_change": {
         "name": "Anulați modificarea profilului în așteptare"
       },

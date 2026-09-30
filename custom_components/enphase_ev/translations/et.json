@@ -1194,7 +1194,7 @@
         "name": "Ebaõnnestunud sisselogimised salvestatud mandaatidega"
       },
       "current_production_power": {
-        "name": "Praegune tootmisvõimsus",
+        "name": "Tootmisvõimsus",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Mõõdetud kell (UTC)"
@@ -1332,7 +1332,7 @@
         }
       },
       "site_consumption_power": {
-        "name": "Praegune võimsustarve",
+        "name": "Võimsustarve",
         "state_attributes": {
           "last_window_seconds": {
             "name": "Viimane aken (s)"
@@ -1346,7 +1346,7 @@
         }
       },
       "site_grid_power": {
-        "name": "Praegune võrguvõimsus",
+        "name": "Võrguvõimsus",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Viimane voo kWh"
@@ -1411,7 +1411,7 @@
         }
       },
       "site_battery_power": {
-        "name": "Praegune aku võimsus",
+        "name": "Aku võimsus",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Viimane voo kWh"
@@ -1596,7 +1596,7 @@
         "name": "Tarbimismõõtur"
       },
       "gateway_connectivity_status": {
-        "name": "Lüüsi olek",
+        "name": "Ühenduvus",
         "state_attributes": {
           "ip_address": {
             "name": "IP-aadress"
@@ -1607,7 +1607,7 @@
         }
       },
       "gateway_last_reported": {
-        "name": "Gateway viimati teatatud"
+        "name": "Viimati raporteeritud"
       },
       "tariff_billing_cycle": {
         "name": "Jargmine arvelduskuupaev",
@@ -2405,7 +2405,7 @@
     },
     "binary_sensor": {
       "plugged_in": {
-        "name": "Ühendatud"
+        "name": "Sõiduki ühendus"
       },
       "charging": {
         "name": "Laadimine"
@@ -2420,7 +2420,7 @@
         "name": "Ühenduvus",
         "state_attributes": {
           "connection": {
-            "name": "Ühendus"
+            "name": "Ühendusviis"
           },
           "ip_address": {
             "name": "IP-aadress"
@@ -2577,8 +2577,8 @@
       "export_limit": {
         "name": "Ekspordipiirang",
         "state": {
-          "enable_limit": "Luba piirang",
-          "disable_limit": "Keela piirang"
+          "enable_limit": "Lubatud",
+          "disable_limit": "Keelatud"
         },
         "state_attributes": {
           "default_limit_watts": {
@@ -2598,12 +2598,6 @@
       }
     },
     "button": {
-      "start_charging": {
-        "name": "Alusta laadimist"
-      },
-      "stop_charging": {
-        "name": "Peata laadimine"
-      },
       "cancel_pending_profile_change": {
         "name": "Tühista ootel profiilimuudatus"
       },

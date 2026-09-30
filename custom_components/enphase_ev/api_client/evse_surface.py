@@ -115,7 +115,7 @@ async def status(self: EnphaseEVClient) -> JsonDict:
                         "sn": c.get("sn"),
                         "name": c.get("name"),
                         "displayName": c.get("displayName"),
-                        "connected": bool(c.get("connected")),
+                        "connected": c.get("connected"),
                         "pluggedIn": bool(c.get("pluggedIn") or conn.get("pluggedIn")),
                         "charging": bool(c.get("charging")),
                         "faulted": bool(c.get("faulted")),

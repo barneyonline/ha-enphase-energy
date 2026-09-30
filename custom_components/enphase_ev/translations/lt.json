@@ -1194,7 +1194,7 @@
         "name": "Nepavykę prisijungimai naudojant išsaugotus kredencialus"
       },
       "current_production_power": {
-        "name": "Dabartinė gamybos galia",
+        "name": "Gamybos galia",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Matuota (UTC)"
@@ -1332,7 +1332,7 @@
         }
       },
       "site_consumption_power": {
-        "name": "Dabartinis galios suvartojimas",
+        "name": "Galios suvartojimas",
         "state_attributes": {
           "last_window_seconds": {
             "name": "Paskutinis langas (s)"
@@ -1346,7 +1346,7 @@
         }
       },
       "site_grid_power": {
-        "name": "Dabartinė tinklo galia",
+        "name": "Tinklo galia",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Paskutinis srautas kWh"
@@ -1411,7 +1411,7 @@
         }
       },
       "site_battery_power": {
-        "name": "Dabartinė akumuliatoriaus galia",
+        "name": "Akumuliatoriaus galia",
         "state_attributes": {
           "last_flow_kwh": {
             "name": "Paskutinis srautas kWh"
@@ -1596,7 +1596,7 @@
         "name": "Vartojimo matuoklis"
       },
       "gateway_connectivity_status": {
-        "name": "Vartų būsena",
+        "name": "Ryšys",
         "state_attributes": {
           "ip_address": {
             "name": "IP adresas"
@@ -1607,7 +1607,7 @@
         }
       },
       "gateway_last_reported": {
-        "name": "Vartai paskutinį kartą pranešta"
+        "name": "Paskutinį kartą pranešta"
       },
       "tariff_billing_cycle": {
         "name": "Kita saskaitos data",
@@ -2405,7 +2405,7 @@
     },
     "binary_sensor": {
       "plugged_in": {
-        "name": "Prijungta"
+        "name": "Transporto priemonės prijungimas"
       },
       "charging": {
         "name": "Įkrovimas"
@@ -2420,7 +2420,7 @@
         "name": "Ryšys",
         "state_attributes": {
           "connection": {
-            "name": "Ryšys"
+            "name": "Prisijungimo būdas"
           },
           "ip_address": {
             "name": "IP adresas"
@@ -2577,8 +2577,8 @@
       "export_limit": {
         "name": "Eksporto riba",
         "state": {
-          "enable_limit": "Įjungti ribą",
-          "disable_limit": "Išjungti ribą"
+          "enable_limit": "Įjungta",
+          "disable_limit": "Išjungta"
         },
         "state_attributes": {
           "default_limit_watts": {
@@ -2598,12 +2598,6 @@
       }
     },
     "button": {
-      "start_charging": {
-        "name": "Pradėti įkrovimą"
-      },
-      "stop_charging": {
-        "name": "Sustabdyti įkrovimą"
-      },
       "cancel_pending_profile_change": {
         "name": "Atšaukti laukiantį profilio pakeitimą"
       },
