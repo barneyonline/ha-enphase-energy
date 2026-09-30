@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v5.0.0b4 - 2026-09-30
+
+### 🚧 Breaking changes
 - Remove the EV charger Start Charging and Stop Charging button entities. Use the charger switch or the Enphase charging actions; automations using `button.press` on the retired buttons need updating.
 
 ### ✨ New features
@@ -32,7 +49,7 @@ All notable changes to this project will be documented in this file.
 - Align charger and gateway Connectivity and Last Reported names, show Connection Method on both, and leave charger connectivity unavailable when its reported state is missing.
 
 ### 🔄 Other changes
-- None
+- Bumped the integration manifest version to `5.0.0b4`.
 
 ## v5.0.0b3 - 2026-09-29
 
