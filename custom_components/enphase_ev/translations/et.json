@@ -554,17 +554,17 @@
           "type_encharge": "Sisaldab aku olekut ja juhtimisolemeid, kui need on saadaval.",
           "type_iqevse": "Sisaldab EV-laadijate olemid ja juhtnuppe.",
           "type_microinverter": "Sisaldab mikroinverterite ühenduvuse, aktiivse arvu ja eluaegse tootmise andureid.",
-          "fast_poll_interval": "Intervall, mida kasutada laadimise või voogedastuse ajal.",
-          "slow_poll_interval": "Intervall, kui seade on jõude.",
-          "fast_while_streaming": "Kui lubatud, kiire küsitlus aktiivse pilvevoo ajal.",
-          "api_timeout": "Sekundid enne API-päringute aegumist.",
-          "nominal_voltage": "Tüüpiline vahelduvvoolu toitepinge võimsuse hindamiseks, kui reaalajas pinge pole saadaval.",
-          "session_history_interval": "Minutid, mida oodata pilve seansiajaloo päringute vahel.",
+          "fast_poll_interval": "Intervall, mida kasutada laadimise või voogedastuse ajal. Vaikimisi: 30 s.",
+          "slow_poll_interval": "Intervall, kui seade on jõude. Vaikimisi: 60 s.",
+          "fast_while_streaming": "Kui lubatud, kiire küsitlus aktiivse pilvevoo ajal. Vaikimisi: Lubatud.",
+          "api_timeout": "Sekundid enne API-päringute aegumist. Vaikimisi: 15 s.",
+          "nominal_voltage": "Tüüpiline vahelduvvoolu toitepinge võimsuse hindamiseks, kui reaalajas pinge pole saadaval. Vaikimisi: Laadija telemeetria põhjal, kui see on saadaval; muidu Home Assistanti piirkonna järgi, varuväärtusega 230 V.",
+          "session_history_interval": "Minutid, mida oodata pilve seansiajaloo päringute vahel. Vaikimisi: 10 min.",
           "type_heatpump": "Sisaldab soojuspumba oleku-, diagnostika- ja tarbimisandureid.",
-          "degraded_service_repair_issues": "Loob Repairsi probleemid, kui valikulised Enphase teenused on halvenenud.",
-          "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval.",
-          "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
-          "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval."
+          "degraded_service_repair_issues": "Loob Repairsi probleemid, kui valikulised Enphase teenused on halvenenud. Vaikimisi: Keelatud.",
+          "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval. Vaikimisi: Keelatud.",
+          "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid. Vaikimisi: Keelatud.",
+          "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval. Nõuab paigaldaja juurdepääsu. Vaikimisi: Keelatud."
         }
       },
       "settings": {
@@ -579,12 +579,12 @@
           "degraded_service_repair_issues": "Luba halvenenud teenuste parandused"
         },
         "data_description": {
-          "fast_poll_interval": "Intervall, mida kasutada laadimise või voogedastuse ajal.",
-          "slow_poll_interval": "Intervall, kui seade on jõude.",
-          "fast_while_streaming": "Kui lubatud, kiire küsitlus aktiivse pilvevoo ajal.",
-          "api_timeout": "Sekundid enne API-päringute aegumist.",
-          "session_history_interval": "Minutid, mida oodata pilve seansiajaloo päringute vahel.",
-          "degraded_service_repair_issues": "Loob Repairsi probleemid, kui valikulised Enphase teenused on halvenenud."
+          "fast_poll_interval": "Intervall, mida kasutada laadimise või voogedastuse ajal. Vaikimisi: 30 s.",
+          "slow_poll_interval": "Intervall, kui seade on jõude. Vaikimisi: 60 s.",
+          "fast_while_streaming": "Kui lubatud, kiire küsitlus aktiivse pilvevoo ajal. Vaikimisi: Lubatud.",
+          "api_timeout": "Sekundid enne API-päringute aegumist. Vaikimisi: 15 s.",
+          "session_history_interval": "Minutid, mida oodata pilve seansiajaloo päringute vahel. Vaikimisi: 10 min.",
+          "degraded_service_repair_issues": "Loob Repairsi probleemid, kui valikulised Enphase teenused on halvenenud. Vaikimisi: Keelatud."
         }
       },
       "devices": {
@@ -633,8 +633,8 @@
           "system_event_repair_issues": "Luba süsteemisündmuste parandusteavitused"
         },
         "data_description": {
-          "degraded_service_repair_issues": "Loob Repairsi probleemid, kui valikulised Enphase teenused on halvenenud.",
-          "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud."
+          "degraded_service_repair_issues": "Loob Repairsi probleemid, kui valikulised Enphase teenused on halvenenud. Vaikimisi: Keelatud.",
+          "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud. Vaikimisi: Keelatud."
         }
       },
       "authentication_settings": {
@@ -771,14 +771,14 @@
               "vpp_events_enabled": "Luba VPP sündmused"
             },
             "data_description": {
-              "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud.",
-              "pricing_edits_enabled": "IQ Gateway elektrihindade haldamine",
-              "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval.",
-              "nominal_voltage": "Tüüpiline vahelduvvoolu toitepinge võimsuse hindamiseks, kui reaalajas pinge pole saadaval.",
-              "schedule_sync_enabled": "Halda IQ EV Chargeri ajakavasid.",
-              "battery_schedules_enabled": "Halda IQ Battery ajakavasid.",
-              "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
-              "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud."
+              "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud. Vaikimisi: Keelatud.",
+              "pricing_edits_enabled": "IQ Gateway elektrihindade haldamine. Vaikimisi: Lubatud.",
+              "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval. Vaikimisi: Keelatud.",
+              "nominal_voltage": "Tüüpiline vahelduvvoolu toitepinge võimsuse hindamiseks, kui reaalajas pinge pole saadaval. Vaikimisi: Laadija telemeetria põhjal, kui see on saadaval; muidu Home Assistanti piirkonna järgi, varuväärtusega 230 V.",
+              "schedule_sync_enabled": "Halda IQ EV Chargeri ajakavasid. Vaikimisi: Lubatud.",
+              "battery_schedules_enabled": "Halda IQ Battery ajakavasid. Vaikimisi: Lubatud.",
+              "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid. Vaikimisi: Keelatud.",
+              "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud. Vaikimisi: Keelatud."
             }
           },
           "advanced_features": {
@@ -789,9 +789,9 @@
               "export_limit_controls_enabled": "Luba ekspordipiirangu juhtimine"
             },
             "data_description": {
-              "grid_profile_controls_enabled": "Hangib ainult paigaldajale mõeldud võrguprofiili metaandmed ja lubab profiilitoimingud. Vaikimisi keelatud.",
-              "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval.",
-              "export_limit_controls_enabled": "Seadista süsteemi ekspordipiirangud. Nõuab paigaldaja juurdepääsu."
+              "grid_profile_controls_enabled": "Hangib ainult paigaldajale mõeldud võrguprofiili metaandmed ja lubab profiilitoimingud. Vaikimisi keelatud. Nõuab paigaldaja juurdepääsu. Vaikimisi: Keelatud.",
+              "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval. Nõuab paigaldaja juurdepääsu. Vaikimisi: Keelatud.",
+              "export_limit_controls_enabled": "Seadista süsteemi ekspordipiirangud. Nõuab paigaldaja juurdepääsu. Vaikimisi: Keelatud."
             }
           }
         },
@@ -811,17 +811,17 @@
           "export_limit_controls_enabled": "Luba ekspordipiirangu juhtimine"
         },
         "data_description": {
-          "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud.",
-          "pricing_edits_enabled": "IQ Gateway elektrihindade haldamine",
-          "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval.",
-          "nominal_voltage": "Tüüpiline vahelduvvoolu toitepinge võimsuse hindamiseks, kui reaalajas pinge pole saadaval.",
-          "schedule_sync_enabled": "Halda IQ EV Chargeri ajakavasid.",
-          "battery_schedules_enabled": "Halda IQ Battery ajakavasid.",
-          "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid.",
-          "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval.",
-          "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud.",
-          "grid_profile_controls_enabled": "Hangib ainult paigaldajale mõeldud võrguprofiili metaandmed ja lubab profiilitoimingud. Vaikimisi keelatud.",
-          "export_limit_controls_enabled": "Seadista süsteemi ekspordipiirangud. Nõuab paigaldaja juurdepääsu."
+          "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud. Vaikimisi: Keelatud.",
+          "pricing_edits_enabled": "IQ Gateway elektrihindade haldamine. Vaikimisi: Lubatud.",
+          "weather_enabled": "Hangib Enphase’ist asukoha praeguse ilma ja loob ilmaolemi ainult siis, kui lõpp-punkt on saadaval. Vaikimisi: Keelatud.",
+          "nominal_voltage": "Tüüpiline vahelduvvoolu toitepinge võimsuse hindamiseks, kui reaalajas pinge pole saadaval. Vaikimisi: Laadija telemeetria põhjal, kui see on saadaval; muidu Home Assistanti piirkonna järgi, varuväärtusega 230 V.",
+          "schedule_sync_enabled": "Halda IQ EV Chargeri ajakavasid. Vaikimisi: Lubatud.",
+          "battery_schedules_enabled": "Halda IQ Battery ajakavasid. Vaikimisi: Lubatud.",
+          "microinverter_lifetime_energy_enabled": "Lubab kõik iga mikroinverteri koguenergia andurid. Vaikimisi: Keelatud.",
+          "microinverter_power_enabled": "Lubab kõik iga mikroinverteri võimsusandurid, kui paigaldaja telemeetria on saadaval. Nõuab paigaldaja juurdepääsu. Vaikimisi: Keelatud.",
+          "vpp_events_enabled": "Hangib Enphaseist VPP/ELRP ajakavad ja loob sündmiolemid ainult liitunud asukohtadele. Vaikimisi välja lülitatud. Vaikimisi: Keelatud.",
+          "grid_profile_controls_enabled": "Hangib ainult paigaldajale mõeldud võrguprofiili metaandmed ja lubab profiilitoimingud. Vaikimisi keelatud. Nõuab paigaldaja juurdepääsu. Vaikimisi: Keelatud.",
+          "export_limit_controls_enabled": "Seadista süsteemi ekspordipiirangud. Nõuab paigaldaja juurdepääsu. Vaikimisi: Keelatud."
         }
       },
       "export_limit": {

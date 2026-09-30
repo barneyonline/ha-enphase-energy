@@ -554,17 +554,17 @@
           "type_encharge": "Ietver akumulatoru statusu un vadības entītijas, kad pieejamas.",
           "type_iqevse": "Ietver EV lādētāju entītijas un vadību.",
           "type_microinverter": "Ietver mikroinvertoru savienojamības, aktīvā skaita un mūža ražošanas sensorus.",
-          "fast_poll_interval": "Intervāls, ko izmantot uzlādes vai straumēšanas laikā.",
-          "slow_poll_interval": "Intervāls, ko izmantot dīkstāvē.",
-          "fast_while_streaming": "Ja iespējots, ātra aptauja aktīvas mākoņa straumes laikā.",
-          "api_timeout": "Sekundes līdz API pieprasījumu noildzei.",
-          "nominal_voltage": "Tipisks maiņstrāvas padeves spriegums jaudas novērtēšanai, ja aktuālais spriegums nav pieejams.",
-          "session_history_interval": "Minūtes starp mākoņa sesiju vēstures pieprasījumiem.",
+          "fast_poll_interval": "Intervāls, ko izmantot uzlādes vai straumēšanas laikā. Noklusējums: 30 s.",
+          "slow_poll_interval": "Intervāls, ko izmantot dīkstāvē. Noklusējums: 60 s.",
+          "fast_while_streaming": "Ja iespējots, ātra aptauja aktīvas mākoņa straumes laikā. Noklusējums: Ieslēgts.",
+          "api_timeout": "Sekundes līdz API pieprasījumu noildzei. Noklusējums: 15 s.",
+          "nominal_voltage": "Tipisks maiņstrāvas padeves spriegums jaudas novērtēšanai, ja aktuālais spriegums nav pieejams. Noklusējums: No lādētāja telemetrijas, ja tā ir pieejama; citādi atbilstoši Home Assistant reģionam, ar rezerves vērtību 230 V.",
+          "session_history_interval": "Minūtes starp mākoņa sesiju vēstures pieprasījumiem. Noklusējums: 10 min.",
           "type_heatpump": "Ietver siltumsūkņa statusa, diagnostikas un patēriņa sensorus.",
-          "degraded_service_repair_issues": "Izveido Repairs problēmas, kad izvēles Enphase pakalpojumi darbojas pasliktināti.",
-          "weather_enabled": "Iegūst pašreizējos vietas laikapstākļus no Enphase un izveido laikapstākļu entītiju tikai tad, ja galapunkts ir pieejams.",
-          "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
-          "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija."
+          "degraded_service_repair_issues": "Izveido Repairs problēmas, kad izvēles Enphase pakalpojumi darbojas pasliktināti. Noklusējums: Izslēgts.",
+          "weather_enabled": "Iegūst pašreizējos vietas laikapstākļus no Enphase un izveido laikapstākļu entītiju tikai tad, ja galapunkts ir pieejams. Noklusējums: Izslēgts.",
+          "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus. Noklusējums: Izslēgts.",
+          "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija. Nepieciešama uzstādītāja piekļuve. Noklusējums: Izslēgts."
         }
       },
       "settings": {
@@ -579,12 +579,12 @@
           "degraded_service_repair_issues": "Iespējot degradētu pakalpojumu labojumus"
         },
         "data_description": {
-          "fast_poll_interval": "Intervāls, ko izmantot uzlādes vai straumēšanas laikā.",
-          "slow_poll_interval": "Intervāls, ko izmantot dīkstāvē.",
-          "fast_while_streaming": "Ja iespējots, ātra aptauja aktīvas mākoņa straumes laikā.",
-          "api_timeout": "Sekundes līdz API pieprasījumu noildzei.",
-          "session_history_interval": "Minūtes starp mākoņa sesiju vēstures pieprasījumiem.",
-          "degraded_service_repair_issues": "Izveido Repairs problēmas, kad izvēles Enphase pakalpojumi darbojas pasliktināti."
+          "fast_poll_interval": "Intervāls, ko izmantot uzlādes vai straumēšanas laikā. Noklusējums: 30 s.",
+          "slow_poll_interval": "Intervāls, ko izmantot dīkstāvē. Noklusējums: 60 s.",
+          "fast_while_streaming": "Ja iespējots, ātra aptauja aktīvas mākoņa straumes laikā. Noklusējums: Ieslēgts.",
+          "api_timeout": "Sekundes līdz API pieprasījumu noildzei. Noklusējums: 15 s.",
+          "session_history_interval": "Minūtes starp mākoņa sesiju vēstures pieprasījumiem. Noklusējums: 10 min.",
+          "degraded_service_repair_issues": "Izveido Repairs problēmas, kad izvēles Enphase pakalpojumi darbojas pasliktināti. Noklusējums: Izslēgts."
         }
       },
       "devices": {
@@ -633,8 +633,8 @@
           "system_event_repair_issues": "Iespējot sistēmas notikumu labošanas paziņojumus"
         },
         "data_description": {
-          "degraded_service_repair_issues": "Izveido Repairs problēmas, kad izvēles Enphase pakalpojumi darbojas pasliktināti.",
-          "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts."
+          "degraded_service_repair_issues": "Izveido Repairs problēmas, kad izvēles Enphase pakalpojumi darbojas pasliktināti. Noklusējums: Izslēgts.",
+          "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts. Noklusējums: Izslēgts."
         }
       },
       "authentication_settings": {
@@ -771,14 +771,14 @@
               "vpp_events_enabled": "Iespējot VPP notikumus"
             },
             "data_description": {
-              "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts.",
-              "pricing_edits_enabled": "Pārvaldīt IQ Gateway elektroenerģijas tarifus",
-              "weather_enabled": "Iegūst pašreizējos vietas laikapstākļus no Enphase un izveido laikapstākļu entītiju tikai tad, ja galapunkts ir pieejams.",
-              "nominal_voltage": "Tipisks maiņstrāvas padeves spriegums jaudas novērtēšanai, ja aktuālais spriegums nav pieejams.",
-              "schedule_sync_enabled": "Pārvaldiet IQ EV Charger grafikus.",
-              "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus.",
-              "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
-              "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts."
+              "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts. Noklusējums: Izslēgts.",
+              "pricing_edits_enabled": "Pārvaldīt IQ Gateway elektroenerģijas tarifus. Noklusējums: Ieslēgts.",
+              "weather_enabled": "Iegūst pašreizējos vietas laikapstākļus no Enphase un izveido laikapstākļu entītiju tikai tad, ja galapunkts ir pieejams. Noklusējums: Izslēgts.",
+              "nominal_voltage": "Tipisks maiņstrāvas padeves spriegums jaudas novērtēšanai, ja aktuālais spriegums nav pieejams. Noklusējums: No lādētāja telemetrijas, ja tā ir pieejama; citādi atbilstoši Home Assistant reģionam, ar rezerves vērtību 230 V.",
+              "schedule_sync_enabled": "Pārvaldiet IQ EV Charger grafikus. Noklusējums: Ieslēgts.",
+              "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus. Noklusējums: Ieslēgts.",
+              "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus. Noklusējums: Izslēgts.",
+              "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts. Noklusējums: Izslēgts."
             }
           },
           "advanced_features": {
@@ -789,9 +789,9 @@
               "export_limit_controls_enabled": "Iespējot eksporta ierobežojuma vadību"
             },
             "data_description": {
-              "grid_profile_controls_enabled": "Iegūst tikai uzstādītājam pieejamos tīkla profila metadatus un iespējo profila darbības. Pēc noklusējuma atspējots.",
-              "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija.",
-              "export_limit_controls_enabled": "Konfigurējiet sistēmas eksporta ierobežojumus. Nepieciešama uzstādītāja piekļuve."
+              "grid_profile_controls_enabled": "Iegūst tikai uzstādītājam pieejamos tīkla profila metadatus un iespējo profila darbības. Pēc noklusējuma atspējots. Nepieciešama uzstādītāja piekļuve. Noklusējums: Izslēgts.",
+              "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija. Nepieciešama uzstādītāja piekļuve. Noklusējums: Izslēgts.",
+              "export_limit_controls_enabled": "Konfigurējiet sistēmas eksporta ierobežojumus. Nepieciešama uzstādītāja piekļuve. Noklusējums: Izslēgts."
             }
           }
         },
@@ -811,17 +811,17 @@
           "export_limit_controls_enabled": "Iespējot eksporta ierobežojuma vadību"
         },
         "data_description": {
-          "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts.",
-          "pricing_edits_enabled": "Pārvaldīt IQ Gateway elektroenerģijas tarifus",
-          "weather_enabled": "Iegūst pašreizējos vietas laikapstākļus no Enphase un izveido laikapstākļu entītiju tikai tad, ja galapunkts ir pieejams.",
-          "nominal_voltage": "Tipisks maiņstrāvas padeves spriegums jaudas novērtēšanai, ja aktuālais spriegums nav pieejams.",
-          "schedule_sync_enabled": "Pārvaldiet IQ EV Charger grafikus.",
-          "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus.",
-          "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus.",
-          "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija.",
-          "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts.",
-          "grid_profile_controls_enabled": "Iegūst tikai uzstādītājam pieejamos tīkla profila metadatus un iespējo profila darbības. Pēc noklusējuma atspējots.",
-          "export_limit_controls_enabled": "Konfigurējiet sistēmas eksporta ierobežojumus. Nepieciešama uzstādītāja piekļuve."
+          "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts. Noklusējums: Izslēgts.",
+          "pricing_edits_enabled": "Pārvaldīt IQ Gateway elektroenerģijas tarifus. Noklusējums: Ieslēgts.",
+          "weather_enabled": "Iegūst pašreizējos vietas laikapstākļus no Enphase un izveido laikapstākļu entītiju tikai tad, ja galapunkts ir pieejams. Noklusējums: Izslēgts.",
+          "nominal_voltage": "Tipisks maiņstrāvas padeves spriegums jaudas novērtēšanai, ja aktuālais spriegums nav pieejams. Noklusējums: No lādētāja telemetrijas, ja tā ir pieejama; citādi atbilstoši Home Assistant reģionam, ar rezerves vērtību 230 V.",
+          "schedule_sync_enabled": "Pārvaldiet IQ EV Charger grafikus. Noklusējums: Ieslēgts.",
+          "battery_schedules_enabled": "Pārvaldiet IQ Battery grafikus. Noklusējums: Ieslēgts.",
+          "microinverter_lifetime_energy_enabled": "Iespējo visus katra mikroinvertora kopējās enerģijas sensorus. Noklusējums: Izslēgts.",
+          "microinverter_power_enabled": "Iespējo visus katra mikroinvertora jaudas sensorus, kad ir pieejama uzstādītāja telemetrija. Nepieciešama uzstādītāja piekļuve. Noklusējums: Izslēgts.",
+          "vpp_events_enabled": "Iegūst VPP/ELRP grafikus no Enphase un izveido notikumu entītijas tikai reģistrētām vietām. Pēc noklusējuma izslēgts. Noklusējums: Izslēgts.",
+          "grid_profile_controls_enabled": "Iegūst tikai uzstādītājam pieejamos tīkla profila metadatus un iespējo profila darbības. Pēc noklusējuma atspējots. Nepieciešama uzstādītāja piekļuve. Noklusējums: Izslēgts.",
+          "export_limit_controls_enabled": "Konfigurējiet sistēmas eksporta ierobežojumus. Nepieciešama uzstādītāja piekļuve. Noklusējums: Izslēgts."
         }
       },
       "export_limit": {

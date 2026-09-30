@@ -554,17 +554,17 @@
           "type_encharge": "Inkluderer batteristatus og kontrollentiteter når tilgjengelig.",
           "type_iqevse": "Inkluderer EV-laderentiteter og kontroller.",
           "type_microinverter": "Inkluderer sensorer for mikrovekselretter-tilkobling, aktivt antall og livstidsproduksjon.",
-          "fast_poll_interval": "Intervall som brukes under lading eller strømming.",
-          "slow_poll_interval": "Intervall som brukes når inaktiv.",
-          "fast_while_streaming": "Når aktivert, rask oppdatering under aktiv skystrømming.",
-          "api_timeout": "Sekunder før API-forespørsler får tidsavbrudd.",
-          "nominal_voltage": "Typisk vekselspenning for å beregne effekten når sanntidsspenning ikke er tilgjengelig.",
-          "session_history_interval": "Minutter å vente mellom henting av sky-øktshistorikk.",
+          "fast_poll_interval": "Intervall som brukes under lading eller strømming. Standard: 30 s.",
+          "slow_poll_interval": "Intervall som brukes når inaktiv. Standard: 60 s.",
+          "fast_while_streaming": "Når aktivert, rask oppdatering under aktiv skystrømming. Standard: Aktivert.",
+          "api_timeout": "Sekunder før API-forespørsler får tidsavbrudd. Standard: 15 s.",
+          "nominal_voltage": "Typisk vekselspenning for å beregne effekten når sanntidsspenning ikke er tilgjengelig. Standard: Fra laderens telemetri når den er tilgjengelig; ellers basert på Home Assistant-regionen, med en reserveverdi på 230 V.",
+          "session_history_interval": "Minutter å vente mellom henting av sky-øktshistorikk. Standard: 10 min.",
           "type_heatpump": "Inkluderer sensorer for varmepumpens status, diagnostikk og forbruk.",
-          "degraded_service_repair_issues": "Oppretter Repairs-problemer når valgfrie Enphase-tjenester er degraderte.",
-          "weather_enabled": "Henter gjeldende vær for anlegget fra Enphase og oppretter bare en værenhet når endepunktet er tilgjengelig.",
-          "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter.",
-          "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig."
+          "degraded_service_repair_issues": "Oppretter Repairs-problemer når valgfrie Enphase-tjenester er degraderte. Standard: Deaktivert.",
+          "weather_enabled": "Henter gjeldende vær for anlegget fra Enphase og oppretter bare en værenhet når endepunktet er tilgjengelig. Standard: Deaktivert.",
+          "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter. Standard: Deaktivert.",
+          "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig. Krever installatørtilgang. Standard: Deaktivert."
         }
       },
       "settings": {
@@ -579,12 +579,12 @@
           "degraded_service_repair_issues": "Aktiver reparasjoner for degraderte tjenester"
         },
         "data_description": {
-          "fast_poll_interval": "Intervall som brukes under lading eller strømming.",
-          "slow_poll_interval": "Intervall som brukes når inaktiv.",
-          "fast_while_streaming": "Når aktivert, rask oppdatering under aktiv skystrømming.",
-          "api_timeout": "Sekunder før API-forespørsler får tidsavbrudd.",
-          "session_history_interval": "Minutter å vente mellom henting av sky-øktshistorikk.",
-          "degraded_service_repair_issues": "Oppretter Repairs-problemer når valgfrie Enphase-tjenester er degraderte."
+          "fast_poll_interval": "Intervall som brukes under lading eller strømming. Standard: 30 s.",
+          "slow_poll_interval": "Intervall som brukes når inaktiv. Standard: 60 s.",
+          "fast_while_streaming": "Når aktivert, rask oppdatering under aktiv skystrømming. Standard: Aktivert.",
+          "api_timeout": "Sekunder før API-forespørsler får tidsavbrudd. Standard: 15 s.",
+          "session_history_interval": "Minutter å vente mellom henting av sky-øktshistorikk. Standard: 10 min.",
+          "degraded_service_repair_issues": "Oppretter Repairs-problemer når valgfrie Enphase-tjenester er degraderte. Standard: Deaktivert."
         }
       },
       "devices": {
@@ -633,8 +633,8 @@
           "system_event_repair_issues": "Aktiver reparasjonsvarsler for systemhendelser"
         },
         "data_description": {
-          "degraded_service_repair_issues": "Oppretter Repairs-problemer når valgfrie Enphase-tjenester er degraderte.",
-          "system_event_repair_issues": "Oppretter Home Assistant-reparasjoner for aktive stående Enphase-alarmer. Deaktivert som standard."
+          "degraded_service_repair_issues": "Oppretter Repairs-problemer når valgfrie Enphase-tjenester er degraderte. Standard: Deaktivert.",
+          "system_event_repair_issues": "Oppretter Home Assistant-reparasjoner for aktive stående Enphase-alarmer. Deaktivert som standard. Standard: Deaktivert."
         }
       },
       "authentication_settings": {
@@ -771,14 +771,14 @@
               "vpp_events_enabled": "Aktiver VPP-hendelser"
             },
             "data_description": {
-              "system_event_repair_issues": "Oppretter Home Assistant-reparasjoner for aktive stående Enphase-alarmer. Deaktivert som standard.",
-              "pricing_edits_enabled": "Administrer strømpriser for IQ Gateway",
-              "weather_enabled": "Henter gjeldende vær for anlegget fra Enphase og oppretter bare en værenhet når endepunktet er tilgjengelig.",
-              "nominal_voltage": "Typisk vekselspenning for å beregne effekten når sanntidsspenning ikke er tilgjengelig.",
-              "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger.",
-              "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery.",
-              "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter.",
-              "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og oppretter hendelsesenheter bare for påmeldte anlegg. Deaktivert som standard."
+              "system_event_repair_issues": "Oppretter Home Assistant-reparasjoner for aktive stående Enphase-alarmer. Deaktivert som standard. Standard: Deaktivert.",
+              "pricing_edits_enabled": "Administrer strømpriser for IQ Gateway. Standard: Aktivert.",
+              "weather_enabled": "Henter gjeldende vær for anlegget fra Enphase og oppretter bare en værenhet når endepunktet er tilgjengelig. Standard: Deaktivert.",
+              "nominal_voltage": "Typisk vekselspenning for å beregne effekten når sanntidsspenning ikke er tilgjengelig. Standard: Fra laderens telemetri når den er tilgjengelig; ellers basert på Home Assistant-regionen, med en reserveverdi på 230 V.",
+              "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger. Standard: Aktivert.",
+              "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery. Standard: Aktivert.",
+              "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter. Standard: Deaktivert.",
+              "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og oppretter hendelsesenheter bare for påmeldte anlegg. Deaktivert som standard. Standard: Deaktivert."
             }
           },
           "advanced_features": {
@@ -789,9 +789,9 @@
               "export_limit_controls_enabled": "Aktiver styring av eksportgrenser"
             },
             "data_description": {
-              "grid_profile_controls_enabled": "Henter nettprofilmetadata som bare er tilgjengelige for installatører, og aktiverer profilhandlinger. Deaktivert som standard.",
-              "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig.",
-              "export_limit_controls_enabled": "Konfigurer systemets eksportgrenser. Krever installatørtilgang."
+              "grid_profile_controls_enabled": "Henter nettprofilmetadata som bare er tilgjengelige for installatører, og aktiverer profilhandlinger. Deaktivert som standard. Krever installatørtilgang. Standard: Deaktivert.",
+              "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig. Krever installatørtilgang. Standard: Deaktivert.",
+              "export_limit_controls_enabled": "Konfigurer systemets eksportgrenser. Krever installatørtilgang. Standard: Deaktivert."
             }
           }
         },
@@ -811,17 +811,17 @@
           "export_limit_controls_enabled": "Aktiver styring av eksportgrenser"
         },
         "data_description": {
-          "system_event_repair_issues": "Oppretter Home Assistant-reparasjoner for aktive stående Enphase-alarmer. Deaktivert som standard.",
-          "pricing_edits_enabled": "Administrer strømpriser for IQ Gateway",
-          "weather_enabled": "Henter gjeldende vær for anlegget fra Enphase og oppretter bare en værenhet når endepunktet er tilgjengelig.",
-          "nominal_voltage": "Typisk vekselspenning for å beregne effekten når sanntidsspenning ikke er tilgjengelig.",
-          "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger.",
-          "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery.",
-          "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter.",
-          "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig.",
-          "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og oppretter hendelsesenheter bare for påmeldte anlegg. Deaktivert som standard.",
-          "grid_profile_controls_enabled": "Henter nettprofilmetadata som bare er tilgjengelige for installatører, og aktiverer profilhandlinger. Deaktivert som standard.",
-          "export_limit_controls_enabled": "Konfigurer systemets eksportgrenser. Krever installatørtilgang."
+          "system_event_repair_issues": "Oppretter Home Assistant-reparasjoner for aktive stående Enphase-alarmer. Deaktivert som standard. Standard: Deaktivert.",
+          "pricing_edits_enabled": "Administrer strømpriser for IQ Gateway. Standard: Aktivert.",
+          "weather_enabled": "Henter gjeldende vær for anlegget fra Enphase og oppretter bare en værenhet når endepunktet er tilgjengelig. Standard: Deaktivert.",
+          "nominal_voltage": "Typisk vekselspenning for å beregne effekten når sanntidsspenning ikke er tilgjengelig. Standard: Fra laderens telemetri når den er tilgjengelig; ellers basert på Home Assistant-regionen, med en reserveverdi på 230 V.",
+          "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger. Standard: Aktivert.",
+          "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery. Standard: Aktivert.",
+          "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter. Standard: Deaktivert.",
+          "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig. Krever installatørtilgang. Standard: Deaktivert.",
+          "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og oppretter hendelsesenheter bare for påmeldte anlegg. Deaktivert som standard. Standard: Deaktivert.",
+          "grid_profile_controls_enabled": "Henter nettprofilmetadata som bare er tilgjengelige for installatører, og aktiverer profilhandlinger. Deaktivert som standard. Krever installatørtilgang. Standard: Deaktivert.",
+          "export_limit_controls_enabled": "Konfigurer systemets eksportgrenser. Krever installatørtilgang. Standard: Deaktivert."
         }
       },
       "export_limit": {

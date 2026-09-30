@@ -554,17 +554,17 @@
           "type_encharge": "Zahrnuje stav a ovládací entity baterií, pokud jsou dostupné.",
           "type_iqevse": "Zahrnuje entity a ovládání EV nabíječek.",
           "type_microinverter": "Zahrnuje senzory konektivity mikroinvertorů, počtu aktivních zařízení a celoživotní výroby.",
-          "fast_poll_interval": "Interval používaný při nabíjení nebo streamování.",
-          "slow_poll_interval": "Interval používaný při nečinnosti.",
-          "fast_while_streaming": "Když je povoleno, rychlé dotazování během aktivního cloudového streamu.",
-          "api_timeout": "Sekundy, než požadavky API vyprší.",
-          "nominal_voltage": "Typické střídavé napájecí napětí pro odhad výkonu, když není dostupné aktuální napětí.",
-          "session_history_interval": "Minuty čekání mezi načítáním historie relací z cloudu.",
+          "fast_poll_interval": "Interval používaný při nabíjení nebo streamování. Výchozí: 30 s.",
+          "slow_poll_interval": "Interval používaný při nečinnosti. Výchozí: 60 s.",
+          "fast_while_streaming": "Když je povoleno, rychlé dotazování během aktivního cloudového streamu. Výchozí: Zapnuto.",
+          "api_timeout": "Sekundy, než požadavky API vyprší. Výchozí: 15 s.",
+          "nominal_voltage": "Typické střídavé napájecí napětí pro odhad výkonu, když není dostupné aktuální napětí. Výchozí: Z telemetrie nabíječky, pokud je dostupná; jinak podle oblasti Home Assistant, s náhradní hodnotou 230 V.",
+          "session_history_interval": "Minuty čekání mezi načítáním historie relací z cloudu. Výchozí: 10 min.",
           "type_heatpump": "Zahrnuje senzory stavu, diagnostiky a spotřeby tepelného čerpadla.",
-          "degraded_service_repair_issues": "Vytváří problémy v Repairs, když jsou volitelné služby Enphase zhoršené.",
-          "weather_enabled": "Načte aktuální počasí lokality ze služby Enphase a vytvoří entitu počasí pouze tehdy, když je koncový bod dostupný.",
-          "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů.",
-          "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika."
+          "degraded_service_repair_issues": "Vytváří problémy v Repairs, když jsou volitelné služby Enphase zhoršené. Výchozí: Vypnuto.",
+          "weather_enabled": "Načte aktuální počasí lokality ze služby Enphase a vytvoří entitu počasí pouze tehdy, když je koncový bod dostupný. Výchozí: Vypnuto.",
+          "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů. Výchozí: Vypnuto.",
+          "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika. Vyžaduje přístup instalátora. Výchozí: Vypnuto."
         }
       },
       "settings": {
@@ -579,12 +579,12 @@
           "degraded_service_repair_issues": "Povolit opravy zhoršených služeb"
         },
         "data_description": {
-          "fast_poll_interval": "Interval používaný při nabíjení nebo streamování.",
-          "slow_poll_interval": "Interval používaný při nečinnosti.",
-          "fast_while_streaming": "Když je povoleno, rychlé dotazování během aktivního cloudového streamu.",
-          "api_timeout": "Sekundy, než požadavky API vyprší.",
-          "session_history_interval": "Minuty čekání mezi načítáním historie relací z cloudu.",
-          "degraded_service_repair_issues": "Vytváří problémy v Repairs, když jsou volitelné služby Enphase zhoršené."
+          "fast_poll_interval": "Interval používaný při nabíjení nebo streamování. Výchozí: 30 s.",
+          "slow_poll_interval": "Interval používaný při nečinnosti. Výchozí: 60 s.",
+          "fast_while_streaming": "Když je povoleno, rychlé dotazování během aktivního cloudového streamu. Výchozí: Zapnuto.",
+          "api_timeout": "Sekundy, než požadavky API vyprší. Výchozí: 15 s.",
+          "session_history_interval": "Minuty čekání mezi načítáním historie relací z cloudu. Výchozí: 10 min.",
+          "degraded_service_repair_issues": "Vytváří problémy v Repairs, když jsou volitelné služby Enphase zhoršené. Výchozí: Vypnuto."
         }
       },
       "devices": {
@@ -633,8 +633,8 @@
           "system_event_repair_issues": "Povolit oznámení oprav systémových událostí"
         },
         "data_description": {
-          "degraded_service_repair_issues": "Vytváří problémy v Repairs, když jsou volitelné služby Enphase zhoršené.",
-          "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto."
+          "degraded_service_repair_issues": "Vytváří problémy v Repairs, když jsou volitelné služby Enphase zhoršené. Výchozí: Vypnuto.",
+          "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto. Výchozí: Vypnuto."
         }
       },
       "authentication_settings": {
@@ -771,14 +771,14 @@
               "vpp_events_enabled": "Povolit události VPP"
             },
             "data_description": {
-              "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto.",
-              "pricing_edits_enabled": "Správa sazeb elektřiny IQ Gateway",
-              "weather_enabled": "Načte aktuální počasí lokality ze služby Enphase a vytvoří entitu počasí pouze tehdy, když je koncový bod dostupný.",
-              "nominal_voltage": "Typické střídavé napájecí napětí pro odhad výkonu, když není dostupné aktuální napětí.",
-              "schedule_sync_enabled": "Spravujte plány nabíječky IQ EV Charger.",
-              "battery_schedules_enabled": "Spravujte plány baterie IQ Battery.",
-              "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů.",
-              "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto."
+              "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto. Výchozí: Vypnuto.",
+              "pricing_edits_enabled": "Správa sazeb elektřiny IQ Gateway. Výchozí: Zapnuto.",
+              "weather_enabled": "Načte aktuální počasí lokality ze služby Enphase a vytvoří entitu počasí pouze tehdy, když je koncový bod dostupný. Výchozí: Vypnuto.",
+              "nominal_voltage": "Typické střídavé napájecí napětí pro odhad výkonu, když není dostupné aktuální napětí. Výchozí: Z telemetrie nabíječky, pokud je dostupná; jinak podle oblasti Home Assistant, s náhradní hodnotou 230 V.",
+              "schedule_sync_enabled": "Spravujte plány nabíječky IQ EV Charger. Výchozí: Zapnuto.",
+              "battery_schedules_enabled": "Spravujte plány baterie IQ Battery. Výchozí: Zapnuto.",
+              "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů. Výchozí: Vypnuto.",
+              "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto. Výchozí: Vypnuto."
             }
           },
           "advanced_features": {
@@ -789,9 +789,9 @@
               "export_limit_controls_enabled": "Povolit ovládání limitu přetoků"
             },
             "data_description": {
-              "grid_profile_controls_enabled": "Načte metadata síťového profilu dostupná pouze instalačnímu technikovi a povolí akce s profily. Ve výchozím nastavení je vypnuto.",
-              "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika.",
-              "export_limit_controls_enabled": "Nastavit limity přetoků systému. Vyžaduje přístup instalátora."
+              "grid_profile_controls_enabled": "Načte metadata síťového profilu dostupná pouze instalačnímu technikovi a povolí akce s profily. Ve výchozím nastavení je vypnuto. Vyžaduje přístup instalátora. Výchozí: Vypnuto.",
+              "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika. Vyžaduje přístup instalátora. Výchozí: Vypnuto.",
+              "export_limit_controls_enabled": "Nastavit limity přetoků systému. Vyžaduje přístup instalátora. Výchozí: Vypnuto."
             }
           }
         },
@@ -811,17 +811,17 @@
           "export_limit_controls_enabled": "Povolit ovládání limitu přetoků"
         },
         "data_description": {
-          "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto.",
-          "pricing_edits_enabled": "Správa sazeb elektřiny IQ Gateway",
-          "weather_enabled": "Načte aktuální počasí lokality ze služby Enphase a vytvoří entitu počasí pouze tehdy, když je koncový bod dostupný.",
-          "nominal_voltage": "Typické střídavé napájecí napětí pro odhad výkonu, když není dostupné aktuální napětí.",
-          "schedule_sync_enabled": "Spravujte plány nabíječky IQ EV Charger.",
-          "battery_schedules_enabled": "Spravujte plány baterie IQ Battery.",
-          "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů.",
-          "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika.",
-          "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto.",
-          "grid_profile_controls_enabled": "Načte metadata síťového profilu dostupná pouze instalačnímu technikovi a povolí akce s profily. Ve výchozím nastavení je vypnuto.",
-          "export_limit_controls_enabled": "Nastavit limity přetoků systému. Vyžaduje přístup instalátora."
+          "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto. Výchozí: Vypnuto.",
+          "pricing_edits_enabled": "Správa sazeb elektřiny IQ Gateway. Výchozí: Zapnuto.",
+          "weather_enabled": "Načte aktuální počasí lokality ze služby Enphase a vytvoří entitu počasí pouze tehdy, když je koncový bod dostupný. Výchozí: Vypnuto.",
+          "nominal_voltage": "Typické střídavé napájecí napětí pro odhad výkonu, když není dostupné aktuální napětí. Výchozí: Z telemetrie nabíječky, pokud je dostupná; jinak podle oblasti Home Assistant, s náhradní hodnotou 230 V.",
+          "schedule_sync_enabled": "Spravujte plány nabíječky IQ EV Charger. Výchozí: Zapnuto.",
+          "battery_schedules_enabled": "Spravujte plány baterie IQ Battery. Výchozí: Zapnuto.",
+          "microinverter_lifetime_energy_enabled": "Povolí všechny senzory celoživotní energie jednotlivých mikrostřídačů. Výchozí: Vypnuto.",
+          "microinverter_power_enabled": "Povolí všechny senzory výkonu jednotlivých mikrostřídačů, když je dostupná telemetrie instalačního technika. Vyžaduje přístup instalátora. Výchozí: Vypnuto.",
+          "vpp_events_enabled": "Načítá plány VPP/ELRP ze služby Enphase a vytváří entity událostí jen pro zapojené lokality. Ve výchozím nastavení vypnuto. Výchozí: Vypnuto.",
+          "grid_profile_controls_enabled": "Načte metadata síťového profilu dostupná pouze instalačnímu technikovi a povolí akce s profily. Ve výchozím nastavení je vypnuto. Vyžaduje přístup instalátora. Výchozí: Vypnuto.",
+          "export_limit_controls_enabled": "Nastavit limity přetoků systému. Vyžaduje přístup instalátora. Výchozí: Vypnuto."
         }
       },
       "export_limit": {

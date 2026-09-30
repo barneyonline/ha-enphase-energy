@@ -554,17 +554,17 @@
           "type_encharge": "Enthält Batterie-Status- und Steuerungs-Entitäten, wenn verfügbar.",
           "type_iqevse": "Enthält EV-Ladegeräte-Entitäten und Steuerungen.",
           "type_microinverter": "Enthält Sensoren für Mikrowechselrichter-Konnektivität, aktive Anzahl und Lebenszeit-Erzeugung.",
-          "fast_poll_interval": "Intervall während des Ladevorgangs oder Streams.",
-          "slow_poll_interval": "Intervall, wenn das Gerät im Leerlauf ist.",
-          "fast_while_streaming": "Wenn aktiviert, wird während eines aktiven Cloud-Streams schnell abgefragt.",
-          "api_timeout": "Sekunden, bevor API-Anfragen abbrechen.",
-          "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist.",
-          "session_history_interval": "Minuten zwischen Abrufen des Cloud-Sitzungsverlaufs.",
+          "fast_poll_interval": "Intervall während des Ladevorgangs oder Streams. Standard: 30 s.",
+          "slow_poll_interval": "Intervall, wenn das Gerät im Leerlauf ist. Standard: 60 s.",
+          "fast_while_streaming": "Wenn aktiviert, wird während eines aktiven Cloud-Streams schnell abgefragt. Standard: Aktiviert.",
+          "api_timeout": "Sekunden, bevor API-Anfragen abbrechen. Standard: 15 s.",
+          "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist. Standard: Aus der Telemetrie des Ladegeräts, sofern verfügbar; andernfalls anhand der Home Assistant-Region, mit 230 V als Ersatzwert.",
+          "session_history_interval": "Minuten zwischen Abrufen des Cloud-Sitzungsverlaufs. Standard: 10 min.",
           "type_heatpump": "Enthält Sensoren für Wärmepumpenstatus, Diagnose und Verbrauch.",
-          "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind.",
-          "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist.",
-          "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
-          "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist."
+          "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind. Standard: Deaktiviert.",
+          "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist. Standard: Deaktiviert.",
+          "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter. Standard: Deaktiviert.",
+          "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist. Erfordert Installateurzugriff. Standard: Deaktiviert."
         }
       },
       "settings": {
@@ -579,12 +579,12 @@
           "degraded_service_repair_issues": "Reparaturen für beeinträchtigte Dienste aktivieren"
         },
         "data_description": {
-          "fast_poll_interval": "Intervall während des Ladevorgangs oder Streams.",
-          "slow_poll_interval": "Intervall, wenn das Gerät im Leerlauf ist.",
-          "fast_while_streaming": "Wenn aktiviert, wird während eines aktiven Cloud-Streams schnell abgefragt.",
-          "api_timeout": "Sekunden, bevor API-Anfragen abbrechen.",
-          "session_history_interval": "Minuten zwischen Abrufen des Cloud-Sitzungsverlaufs.",
-          "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind."
+          "fast_poll_interval": "Intervall während des Ladevorgangs oder Streams. Standard: 30 s.",
+          "slow_poll_interval": "Intervall, wenn das Gerät im Leerlauf ist. Standard: 60 s.",
+          "fast_while_streaming": "Wenn aktiviert, wird während eines aktiven Cloud-Streams schnell abgefragt. Standard: Aktiviert.",
+          "api_timeout": "Sekunden, bevor API-Anfragen abbrechen. Standard: 15 s.",
+          "session_history_interval": "Minuten zwischen Abrufen des Cloud-Sitzungsverlaufs. Standard: 10 min.",
+          "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind. Standard: Deaktiviert."
         }
       },
       "devices": {
@@ -633,8 +633,8 @@
           "system_event_repair_issues": "Reparaturmeldungen für Systemereignisse aktivieren"
         },
         "data_description": {
-          "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind.",
-          "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert."
+          "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind. Standard: Deaktiviert.",
+          "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert. Standard: Deaktiviert."
         }
       },
       "authentication_settings": {
@@ -771,14 +771,14 @@
               "vpp_events_enabled": "VPP-Ereignisse aktivieren"
             },
             "data_description": {
-              "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert.",
-              "pricing_edits_enabled": "Stromtarife des IQ Gateway verwalten",
-              "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist.",
-              "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist.",
-              "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten.",
-              "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten.",
-              "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
-              "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert."
+              "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert. Standard: Deaktiviert.",
+              "pricing_edits_enabled": "Stromtarife des IQ Gateway verwalten. Standard: Aktiviert.",
+              "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist. Standard: Deaktiviert.",
+              "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist. Standard: Aus der Telemetrie des Ladegeräts, sofern verfügbar; andernfalls anhand der Home Assistant-Region, mit 230 V als Ersatzwert.",
+              "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten. Standard: Aktiviert.",
+              "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten. Standard: Aktiviert.",
+              "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter. Standard: Deaktiviert.",
+              "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert. Standard: Deaktiviert."
             }
           },
           "advanced_features": {
@@ -789,9 +789,9 @@
               "export_limit_controls_enabled": "Steuerung der Einspeisebegrenzung aktivieren"
             },
             "data_description": {
-              "grid_profile_controls_enabled": "Ruft nur für Installateure verfügbare Netzprofil-Metadaten ab und aktiviert Profilaktionen. Standardmäßig deaktiviert.",
-              "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist.",
-              "export_limit_controls_enabled": "Einspeisegrenzen des Systems konfigurieren. Erfordert Installateurzugriff."
+              "grid_profile_controls_enabled": "Ruft nur für Installateure verfügbare Netzprofil-Metadaten ab und aktiviert Profilaktionen. Standardmäßig deaktiviert. Erfordert Installateurzugriff. Standard: Deaktiviert.",
+              "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist. Erfordert Installateurzugriff. Standard: Deaktiviert.",
+              "export_limit_controls_enabled": "Einspeisegrenzen des Systems konfigurieren. Erfordert Installateurzugriff. Standard: Deaktiviert."
             }
           }
         },
@@ -811,17 +811,17 @@
           "export_limit_controls_enabled": "Steuerung der Einspeisebegrenzung aktivieren"
         },
         "data_description": {
-          "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert.",
-          "pricing_edits_enabled": "Stromtarife des IQ Gateway verwalten",
-          "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist.",
-          "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist.",
-          "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten.",
-          "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten.",
-          "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter.",
-          "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist.",
-          "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert.",
-          "grid_profile_controls_enabled": "Ruft nur für Installateure verfügbare Netzprofil-Metadaten ab und aktiviert Profilaktionen. Standardmäßig deaktiviert.",
-          "export_limit_controls_enabled": "Einspeisegrenzen des Systems konfigurieren. Erfordert Installateurzugriff."
+          "system_event_repair_issues": "Erstellt Home-Assistant-Reparaturen für aktive Enphase-Daueralarme. Standardmäßig deaktiviert. Standard: Deaktiviert.",
+          "pricing_edits_enabled": "Stromtarife des IQ Gateway verwalten. Standard: Aktiviert.",
+          "weather_enabled": "Ruft das aktuelle Standortwetter von Enphase ab und erstellt die Wetterentität nur, wenn der Endpunkt verfügbar ist. Standard: Deaktiviert.",
+          "nominal_voltage": "Typische AC-Versorgungsspannung zur Leistungsschätzung, wenn keine aktuelle Spannung verfügbar ist. Standard: Aus der Telemetrie des Ladegeräts, sofern verfügbar; andernfalls anhand der Home Assistant-Region, mit 230 V als Ersatzwert.",
+          "schedule_sync_enabled": "Zeitpläne für IQ EV Charger verwalten. Standard: Aktiviert.",
+          "battery_schedules_enabled": "Zeitpläne für IQ Battery verwalten. Standard: Aktiviert.",
+          "microinverter_lifetime_energy_enabled": "Aktiviert alle Lebensdauerenergiesensoren der einzelnen Mikro-Wechselrichter. Standard: Deaktiviert.",
+          "microinverter_power_enabled": "Aktiviert alle Leistungssensoren der einzelnen Mikro-Wechselrichter, wenn Installateur-Telemetrie verfügbar ist. Erfordert Installateurzugriff. Standard: Deaktiviert.",
+          "vpp_events_enabled": "Ruft VPP/ELRP-Zeitpläne von Enphase ab und erstellt Ereignisentitäten nur für teilnehmende Standorte. Standardmäßig deaktiviert. Standard: Deaktiviert.",
+          "grid_profile_controls_enabled": "Ruft nur für Installateure verfügbare Netzprofil-Metadaten ab und aktiviert Profilaktionen. Standardmäßig deaktiviert. Erfordert Installateurzugriff. Standard: Deaktiviert.",
+          "export_limit_controls_enabled": "Einspeisegrenzen des Systems konfigurieren. Erfordert Installateurzugriff. Standard: Deaktiviert."
         }
       },
       "export_limit": {

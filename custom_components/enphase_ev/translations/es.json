@@ -554,17 +554,17 @@
           "type_encharge": "Incluye estado de baterías y entidades de control cuando estén disponibles.",
           "type_iqevse": "Incluye entidades y controles de cargadores EV.",
           "type_microinverter": "Incluye sensores de conectividad de microinversores, recuento de activos y producción acumulada.",
-          "fast_poll_interval": "Intervalo que se usa durante la carga o cuando hay streaming.",
-          "slow_poll_interval": "Intervalo que se usa cuando está inactivo.",
-          "fast_while_streaming": "Si se activa, realiza sondeo rápido durante el streaming en la nube.",
-          "api_timeout": "Segundos antes de que las solicitudes a la API agoten el tiempo de espera.",
-          "nominal_voltage": "Tensión de alimentación de CA típica para estimar la potencia cuando no hay tensión en tiempo real.",
-          "session_history_interval": "Minutos de espera entre obtenciones del historial de sesiones en la nube.",
+          "fast_poll_interval": "Intervalo que se usa durante la carga o cuando hay streaming. Valor predeterminado: 30 s.",
+          "slow_poll_interval": "Intervalo que se usa cuando está inactivo. Valor predeterminado: 60 s.",
+          "fast_while_streaming": "Si se activa, realiza sondeo rápido durante el streaming en la nube. Valor predeterminado: Activado.",
+          "api_timeout": "Segundos antes de que las solicitudes a la API agoten el tiempo de espera. Valor predeterminado: 15 s.",
+          "nominal_voltage": "Tensión de alimentación de CA típica para estimar la potencia cuando no hay tensión en tiempo real. Valor predeterminado: Obtenido de la telemetría del cargador cuando está disponible; de lo contrario, según la región de Home Assistant, con un valor alternativo de 230 V.",
+          "session_history_interval": "Minutos de espera entre obtenciones del historial de sesiones en la nube. Valor predeterminado: 10 min.",
           "type_heatpump": "Incluye sensores de estado, diagnóstico y consumo de la bomba de calor.",
-          "degraded_service_repair_issues": "Crea problemas de Repairs cuando los servicios opcionales de Enphase están degradados.",
-          "weather_enabled": "Obtiene el tiempo actual del sitio desde Enphase y crea una entidad meteorológica solo cuando el punto de conexión está disponible.",
-          "microinverter_lifetime_energy_enabled": "Activa todos los sensores de energía de por vida de cada microinversor.",
-          "microinverter_power_enabled": "Activa todos los sensores de potencia de cada microinversor cuando la telemetría del instalador está disponible."
+          "degraded_service_repair_issues": "Crea problemas de Repairs cuando los servicios opcionales de Enphase están degradados. Valor predeterminado: Desactivado.",
+          "weather_enabled": "Obtiene el tiempo actual del sitio desde Enphase y crea una entidad meteorológica solo cuando el punto de conexión está disponible. Valor predeterminado: Desactivado.",
+          "microinverter_lifetime_energy_enabled": "Activa todos los sensores de energía de por vida de cada microinversor. Valor predeterminado: Desactivado.",
+          "microinverter_power_enabled": "Activa todos los sensores de potencia de cada microinversor cuando la telemetría del instalador está disponible. Requiere acceso de instalador. Valor predeterminado: Desactivado."
         }
       },
       "settings": {
@@ -579,12 +579,12 @@
           "degraded_service_repair_issues": "Activar reparaciones por servicios degradados"
         },
         "data_description": {
-          "fast_poll_interval": "Intervalo que se usa durante la carga o cuando hay streaming.",
-          "slow_poll_interval": "Intervalo que se usa cuando está inactivo.",
-          "fast_while_streaming": "Si se activa, realiza sondeo rápido durante el streaming en la nube.",
-          "api_timeout": "Segundos antes de que las solicitudes a la API agoten el tiempo de espera.",
-          "session_history_interval": "Minutos de espera entre obtenciones del historial de sesiones en la nube.",
-          "degraded_service_repair_issues": "Crea problemas de Repairs cuando los servicios opcionales de Enphase están degradados."
+          "fast_poll_interval": "Intervalo que se usa durante la carga o cuando hay streaming. Valor predeterminado: 30 s.",
+          "slow_poll_interval": "Intervalo que se usa cuando está inactivo. Valor predeterminado: 60 s.",
+          "fast_while_streaming": "Si se activa, realiza sondeo rápido durante el streaming en la nube. Valor predeterminado: Activado.",
+          "api_timeout": "Segundos antes de que las solicitudes a la API agoten el tiempo de espera. Valor predeterminado: 15 s.",
+          "session_history_interval": "Minutos de espera entre obtenciones del historial de sesiones en la nube. Valor predeterminado: 10 min.",
+          "degraded_service_repair_issues": "Crea problemas de Repairs cuando los servicios opcionales de Enphase están degradados. Valor predeterminado: Desactivado."
         }
       },
       "devices": {
@@ -633,8 +633,8 @@
           "system_event_repair_issues": "Activar notificaciones de reparación de eventos del sistema"
         },
         "data_description": {
-          "degraded_service_repair_issues": "Crea problemas de Repairs cuando los servicios opcionales de Enphase están degradados.",
-          "system_event_repair_issues": "Crea reparaciones de Home Assistant para alarmas permanentes activas de Enphase. Desactivado de forma predeterminada."
+          "degraded_service_repair_issues": "Crea problemas de Repairs cuando los servicios opcionales de Enphase están degradados. Valor predeterminado: Desactivado.",
+          "system_event_repair_issues": "Crea reparaciones de Home Assistant para alarmas permanentes activas de Enphase. Desactivado de forma predeterminada. Valor predeterminado: Desactivado."
         }
       },
       "authentication_settings": {
@@ -771,14 +771,14 @@
               "vpp_events_enabled": "Activar eventos VPP"
             },
             "data_description": {
-              "system_event_repair_issues": "Crea reparaciones de Home Assistant para alarmas permanentes activas de Enphase. Desactivado de forma predeterminada.",
-              "pricing_edits_enabled": "Gestionar las tarifas eléctricas de IQ Gateway",
-              "weather_enabled": "Obtiene el tiempo actual del sitio desde Enphase y crea una entidad meteorológica solo cuando el punto de conexión está disponible.",
-              "nominal_voltage": "Tensión de alimentación de CA típica para estimar la potencia cuando no hay tensión en tiempo real.",
-              "schedule_sync_enabled": "Gestiona los horarios del IQ EV Charger.",
-              "battery_schedules_enabled": "Gestiona los horarios de la IQ Battery.",
-              "microinverter_lifetime_energy_enabled": "Activa todos los sensores de energía de por vida de cada microinversor.",
-              "vpp_events_enabled": "Obtiene los horarios VPP/ELRP de Enphase y crea entidades de eventos solo para sitios inscritos. Desactivado de forma predeterminada."
+              "system_event_repair_issues": "Crea reparaciones de Home Assistant para alarmas permanentes activas de Enphase. Desactivado de forma predeterminada. Valor predeterminado: Desactivado.",
+              "pricing_edits_enabled": "Gestionar las tarifas eléctricas de IQ Gateway. Valor predeterminado: Activado.",
+              "weather_enabled": "Obtiene el tiempo actual del sitio desde Enphase y crea una entidad meteorológica solo cuando el punto de conexión está disponible. Valor predeterminado: Desactivado.",
+              "nominal_voltage": "Tensión de alimentación de CA típica para estimar la potencia cuando no hay tensión en tiempo real. Valor predeterminado: Obtenido de la telemetría del cargador cuando está disponible; de lo contrario, según la región de Home Assistant, con un valor alternativo de 230 V.",
+              "schedule_sync_enabled": "Gestiona los horarios del IQ EV Charger. Valor predeterminado: Activado.",
+              "battery_schedules_enabled": "Gestiona los horarios de la IQ Battery. Valor predeterminado: Activado.",
+              "microinverter_lifetime_energy_enabled": "Activa todos los sensores de energía de por vida de cada microinversor. Valor predeterminado: Desactivado.",
+              "vpp_events_enabled": "Obtiene los horarios VPP/ELRP de Enphase y crea entidades de eventos solo para sitios inscritos. Desactivado de forma predeterminada. Valor predeterminado: Desactivado."
             }
           },
           "advanced_features": {
@@ -789,9 +789,9 @@
               "export_limit_controls_enabled": "Activar controles del límite de vertido"
             },
             "data_description": {
-              "grid_profile_controls_enabled": "Obtiene metadatos del perfil de red exclusivos para instaladores y activa las acciones de perfil. Desactivado de forma predeterminada.",
-              "microinverter_power_enabled": "Activa todos los sensores de potencia de cada microinversor cuando la telemetría del instalador está disponible.",
-              "export_limit_controls_enabled": "Configurar los límites de vertido del sistema. Requiere acceso de instalador."
+              "grid_profile_controls_enabled": "Obtiene metadatos del perfil de red exclusivos para instaladores y activa las acciones de perfil. Desactivado de forma predeterminada. Requiere acceso de instalador. Valor predeterminado: Desactivado.",
+              "microinverter_power_enabled": "Activa todos los sensores de potencia de cada microinversor cuando la telemetría del instalador está disponible. Requiere acceso de instalador. Valor predeterminado: Desactivado.",
+              "export_limit_controls_enabled": "Configurar los límites de vertido del sistema. Requiere acceso de instalador. Valor predeterminado: Desactivado."
             }
           }
         },
@@ -811,17 +811,17 @@
           "export_limit_controls_enabled": "Activar controles del límite de vertido"
         },
         "data_description": {
-          "system_event_repair_issues": "Crea reparaciones de Home Assistant para alarmas permanentes activas de Enphase. Desactivado de forma predeterminada.",
-          "pricing_edits_enabled": "Gestionar las tarifas eléctricas de IQ Gateway",
-          "weather_enabled": "Obtiene el tiempo actual del sitio desde Enphase y crea una entidad meteorológica solo cuando el punto de conexión está disponible.",
-          "nominal_voltage": "Tensión de alimentación de CA típica para estimar la potencia cuando no hay tensión en tiempo real.",
-          "schedule_sync_enabled": "Gestiona los horarios del IQ EV Charger.",
-          "battery_schedules_enabled": "Gestiona los horarios de la IQ Battery.",
-          "microinverter_lifetime_energy_enabled": "Activa todos los sensores de energía de por vida de cada microinversor.",
-          "microinverter_power_enabled": "Activa todos los sensores de potencia de cada microinversor cuando la telemetría del instalador está disponible.",
-          "vpp_events_enabled": "Obtiene los horarios VPP/ELRP de Enphase y crea entidades de eventos solo para sitios inscritos. Desactivado de forma predeterminada.",
-          "grid_profile_controls_enabled": "Obtiene metadatos del perfil de red exclusivos para instaladores y activa las acciones de perfil. Desactivado de forma predeterminada.",
-          "export_limit_controls_enabled": "Configurar los límites de vertido del sistema. Requiere acceso de instalador."
+          "system_event_repair_issues": "Crea reparaciones de Home Assistant para alarmas permanentes activas de Enphase. Desactivado de forma predeterminada. Valor predeterminado: Desactivado.",
+          "pricing_edits_enabled": "Gestionar las tarifas eléctricas de IQ Gateway. Valor predeterminado: Activado.",
+          "weather_enabled": "Obtiene el tiempo actual del sitio desde Enphase y crea una entidad meteorológica solo cuando el punto de conexión está disponible. Valor predeterminado: Desactivado.",
+          "nominal_voltage": "Tensión de alimentación de CA típica para estimar la potencia cuando no hay tensión en tiempo real. Valor predeterminado: Obtenido de la telemetría del cargador cuando está disponible; de lo contrario, según la región de Home Assistant, con un valor alternativo de 230 V.",
+          "schedule_sync_enabled": "Gestiona los horarios del IQ EV Charger. Valor predeterminado: Activado.",
+          "battery_schedules_enabled": "Gestiona los horarios de la IQ Battery. Valor predeterminado: Activado.",
+          "microinverter_lifetime_energy_enabled": "Activa todos los sensores de energía de por vida de cada microinversor. Valor predeterminado: Desactivado.",
+          "microinverter_power_enabled": "Activa todos los sensores de potencia de cada microinversor cuando la telemetría del instalador está disponible. Requiere acceso de instalador. Valor predeterminado: Desactivado.",
+          "vpp_events_enabled": "Obtiene los horarios VPP/ELRP de Enphase y crea entidades de eventos solo para sitios inscritos. Desactivado de forma predeterminada. Valor predeterminado: Desactivado.",
+          "grid_profile_controls_enabled": "Obtiene metadatos del perfil de red exclusivos para instaladores y activa las acciones de perfil. Desactivado de forma predeterminada. Requiere acceso de instalador. Valor predeterminado: Desactivado.",
+          "export_limit_controls_enabled": "Configurar los límites de vertido del sistema. Requiere acceso de instalador. Valor predeterminado: Desactivado."
         }
       },
       "export_limit": {
