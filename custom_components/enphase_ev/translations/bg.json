@@ -524,7 +524,7 @@
         "menu_option_descriptions": {
           "settings": "Настройте опресняването и поведението.",
           "devices": "Изберете категориите устройства за включване.",
-          "repair_notifications": "Управление на известията за поправки в Home Assistant.",
+          "repair_notifications": "Управление на известията за поправки и описателните записи за активност в Home Assistant.",
           "authentication_settings": "Стартирайте процеса на вход за обновяване на данните без да премахвате интеграцията.",
           "migrate_envoy": "Поемете избрани идентификатори на енергийни обекти на Enphase Envoy, за да продължи историята в Home Assistant Energy под тази интеграция.",
           "advanced": "Действия за инсталатор и поддръжка.",
@@ -627,14 +627,16 @@
       },
       "repair_notifications": {
         "title": "Известия",
-        "description": "Изберете кои условия на Enphase да създават поправки в Home Assistant.",
+        "description": "Управление на известията за поправки и описателните записи за активност в Home Assistant.",
         "data": {
           "degraded_service_repair_issues": "Активиране на поправки за влошени услуги",
-          "system_event_repair_issues": "Активиране на известията за поправки при системни събития"
+          "system_event_repair_issues": "Активиране на известията за поправки при системни събития",
+          "descriptive_activity_entries": "Активиране на описателни записи за активност"
         },
         "data_description": {
           "degraded_service_repair_issues": "Създава проблеми в Repairs, когато незадължителни услуги на Enphase са влошени. По подразбиране: Изключено.",
-          "system_event_repair_issues": "Създава поправки в Home Assistant за активни постоянни аларми на Enphase. По подразбиране е изключено. По подразбиране: Изключено."
+          "system_event_repair_issues": "Създава поправки в Home Assistant за активни постоянни аларми на Enphase. По подразбиране е изключено. По подразбиране: Изключено.",
+          "descriptive_activity_entries": "Добавя описателни записи в активността на Home Assistant при промяна на отчетените условия. Те се показват наред с обичайните записи за промяна на състоянието. Изключено по подразбиране."
         }
       },
       "authentication_settings": {
@@ -1941,7 +1943,46 @@
           "error": "Грешка",
           "unknown": "Неизвестен",
           "unpaired": "Несдвоен",
-          "pairing": "Сдвояване"
+          "pairing": "Сдвояване",
+          "activity_status": "Състояние",
+          "activity_unknown": "Неизвестно",
+          "activity_yes": "Да",
+          "activity_no": "Не",
+          "activity_more": "Още елементи",
+          "activity_battery": "Батерия",
+          "activity_charger_problem": "Отчетена неизправност",
+          "activity_suspended_by_evse": "Преустановено от зарядното",
+          "activity_offline_since": "Офлайн от",
+          "activity_connected_devices": "Свързани шлюзове",
+          "activity_disconnected_devices": "Прекъснати шлюзове",
+          "activity_unknown_connection_devices": "Шлюзове с неизвестно състояние",
+          "activity_connection_method": "Метод на свързване",
+          "activity_latest_reported_utc": "Последен отчет",
+          "activity_reporting_inverters": "Отчитащи инвертори",
+          "activity_not_reporting_inverters": "Неотчитащи инвертори",
+          "activity_unknown_inverters": "Инвертори с неизвестно състояние",
+          "activity_power_telemetry_status": "Телеметрия на мощността",
+          "activity_power_telemetry_next_retry": "Повторен опит за телеметрия",
+          "activity_sg_ready_mode_raw": "Режим SG Ready",
+          "activity_sg_ready_contact_state": "Състояние на контактите",
+          "activity_vpp_sgready_mode_override": "Отчетено заместване от VPP",
+          "activity_confirmed_watts": "Потвърден лимит (W)",
+          "activity_requested_watts": "Заявен лимит (W)",
+          "activity_requested_action": "Заявено действие",
+          "activity_request_status": "Състояние на заявката",
+          "activity_active_count": "Активни проблеми",
+          "activity_type": "Тип събитие",
+          "activity_device_type": "Тип устройство",
+          "activity_severity": "Сериозност",
+          "activity_description": "Описание",
+          "activity_event_date": "Първи отчет",
+          "activity_reason": "Причина",
+          "activity_http_status": "HTTP състояние",
+          "activity_retry": "Следващ опит",
+          "activity_worst_battery": "Най-лошо състояние на батерия",
+          "activity_reachable": "Облакът е достъпен",
+          "activity_last_success": "Последно успешно обновяване",
+          "activity_standing_alarm": "Постоянна аларма"
         }
       },
       "battery_cfg_schedules": {
@@ -2433,7 +2474,7 @@
         }
       },
       "active_system_events": {
-        "name": "Активни системни събития",
+        "name": "Системни събития",
         "state_attributes": {
           "available": {
             "name": "Услугата за събития е достъпна"

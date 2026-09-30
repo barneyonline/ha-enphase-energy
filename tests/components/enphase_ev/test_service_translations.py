@@ -64,6 +64,21 @@ def _intentional_identical_translation(
     ):
         return True
 
+    activity_cognates = {
+        "entity.sensor.shared_labels.state.activity_status": (
+            "Status",
+            {"da", "de", "nb-NO", "nl", "sv-SE"},
+        ),
+        "entity.sensor.shared_labels.state.activity_no": ("No", {"es", "it"}),
+        "entity.sensor.shared_labels.state.activity_description": (
+            "Description",
+            {"fr"},
+        ),
+    }
+    if path in activity_cognates:
+        expected, locales = activity_cognates[path]
+        return value == expected and locale in locales
+
     shared_state_locales = {
         "Online": {"cs", "da", "de", "hu", "it", "nl", "pl", "pt-BR", "ro", "sv-SE"},
         "Offline": {
@@ -2553,3 +2568,25 @@ def test_charger_and_gateway_connectivity_labels_match() -> None:
                 "Connection Method"
             )
             assert entity["sensor"]["last_reported"]["name"] == "Last Reported"
+
+
+def test_descriptive_activity_option_is_localized_in_all_locales() -> None:
+    root = (
+        pathlib.Path(__file__).resolve().parents[3] / "custom_components" / "enphase_ev"
+    )
+    source = json.loads((root / "strings.json").read_text())["options"]["step"][
+        "repair_notifications"
+    ]
+    key = "descriptive_activity_entries"
+    assert source["data"][key] == "Enable Descriptive Activity Entries"
+    assert source["data_description"][key].endswith("Disabled by default.")
+    for locale in (root / "translations").glob("*.json"):
+        strings = json.loads(locale.read_text())["options"]["step"][
+            "repair_notifications"
+        ]
+        for category in ("data", "data_description"):
+            assert strings[category][key].strip()
+            if not locale.stem.startswith("en"):
+                assert strings[category][key] != source[category][key]
+            else:
+                assert strings[category][key] == source[category][key]

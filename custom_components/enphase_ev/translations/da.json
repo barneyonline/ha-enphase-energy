@@ -524,7 +524,7 @@
         "menu_option_descriptions": {
           "settings": "Juster polling og adfærd.",
           "devices": "Vælg de enhedskategorier, der skal medtages.",
-          "repair_notifications": "Administrer Home Assistant-reparationsnotifikationer.",
+          "repair_notifications": "Administrer Home Assistant-reparationsnotifikationer og beskrivende aktivitetsposter.",
           "authentication_settings": "Start loginflowet for at opdatere legitimationsoplysninger uden at fjerne integrationen.",
           "migrate_envoy": "Overtag valgte Enphase Envoy-energi-entitets-id'er, så Home Assistant Energy-historikken fortsætter under denne integration.",
           "advanced": "Installatør- og vedligeholdelseshandlinger.",
@@ -627,14 +627,16 @@
       },
       "repair_notifications": {
         "title": "Notifikationer",
-        "description": "Vælg, hvilke Enphase-forhold der opretter Home Assistant-reparationer.",
+        "description": "Administrer Home Assistant-reparationsnotifikationer og beskrivende aktivitetsposter.",
         "data": {
           "degraded_service_repair_issues": "Aktivér reparationer for forringede tjenester",
-          "system_event_repair_issues": "Aktivér reparationsmeddelelser for systemhændelser"
+          "system_event_repair_issues": "Aktivér reparationsmeddelelser for systemhændelser",
+          "descriptive_activity_entries": "Aktivér beskrivende aktivitetsposter"
         },
         "data_description": {
           "degraded_service_repair_issues": "Opretter Repairs-problemer, når valgfrie Enphase-tjenester er forringede. Standard: Deaktiveret.",
-          "system_event_repair_issues": "Opretter Home Assistant-reparationer for aktive stående Enphase-alarmer. Deaktiveret som standard. Standard: Deaktiveret."
+          "system_event_repair_issues": "Opretter Home Assistant-reparationer for aktive stående Enphase-alarmer. Deaktiveret som standard. Standard: Deaktiveret.",
+          "descriptive_activity_entries": "Tilføj beskrivende poster til Home Assistants aktivitet, når rapporterede forhold ændres. De vises sammen med almindelige poster om tilstandsændringer. Deaktiveret som standard."
         }
       },
       "authentication_settings": {
@@ -1941,7 +1943,46 @@
           "error": "Fejl",
           "unknown": "Ukendt",
           "unpaired": "Ikke parret",
-          "pairing": "Parring"
+          "pairing": "Parring",
+          "activity_status": "Status",
+          "activity_unknown": "Ukendt",
+          "activity_yes": "Ja",
+          "activity_no": "Nej",
+          "activity_more": "Flere elementer",
+          "activity_battery": "Batteri",
+          "activity_charger_problem": "Rapporteret fejl",
+          "activity_suspended_by_evse": "Sat på pause af opladeren",
+          "activity_offline_since": "Offline siden",
+          "activity_connected_devices": "Tilsluttede gateways",
+          "activity_disconnected_devices": "Afbrudte gateways",
+          "activity_unknown_connection_devices": "Gateways med ukendt status",
+          "activity_connection_method": "Forbindelsesmetode",
+          "activity_latest_reported_utc": "Senest rapporteret",
+          "activity_reporting_inverters": "Rapporterende invertere",
+          "activity_not_reporting_inverters": "Ikke-rapporterende invertere",
+          "activity_unknown_inverters": "Invertere med ukendt status",
+          "activity_power_telemetry_status": "Effekttelemetri",
+          "activity_power_telemetry_next_retry": "Nyt forsøg på telemetri",
+          "activity_sg_ready_mode_raw": "SG Ready-tilstand",
+          "activity_sg_ready_contact_state": "Kontakttilstand",
+          "activity_vpp_sgready_mode_override": "Rapporteret VPP-tilsidesættelse",
+          "activity_confirmed_watts": "Bekræftet grænse (W)",
+          "activity_requested_watts": "Anmodet grænse (W)",
+          "activity_requested_action": "Anmodet handling",
+          "activity_request_status": "Anmodningsstatus",
+          "activity_active_count": "Aktive problemer",
+          "activity_type": "Hændelsestype",
+          "activity_device_type": "Enhedstype",
+          "activity_severity": "Alvorlighed",
+          "activity_description": "Beskrivelse",
+          "activity_event_date": "Først rapporteret",
+          "activity_reason": "Årsag",
+          "activity_http_status": "HTTP-status",
+          "activity_retry": "Næste forsøg",
+          "activity_worst_battery": "Værste batteristatus",
+          "activity_reachable": "Cloud tilgængelig",
+          "activity_last_success": "Seneste vellykkede opdatering",
+          "activity_standing_alarm": "Vedvarende alarm"
         }
       },
       "battery_cfg_schedules": {
@@ -2433,7 +2474,7 @@
         }
       },
       "active_system_events": {
-        "name": "Aktive systemhændelser",
+        "name": "Systemhændelser",
         "state_attributes": {
           "available": {
             "name": "Hændelsestjeneste tilgængelig"

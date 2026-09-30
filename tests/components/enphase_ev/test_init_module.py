@@ -68,6 +68,7 @@ from custom_components.enphase_ev.const import (
     ISSUE_AUTH_BLOCKED,
     ISSUE_TOO_MANY_ACTIVE_SESSIONS,
     OPT_API_TIMEOUT,
+    OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
     OPT_GRID_PROFILE_CONTROLS_ENABLED,
     OPT_WEATHER_ENABLED,
     OPT_VPP_EVENTS_ENABLED,
@@ -893,9 +894,14 @@ async def test_async_setup_entry_restores_discovery_before_first_refresh(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("activity_enabled", [None, False, True])
 async def test_async_setup_entry_restores_handoff_without_blocking_refresh(
-    hass: HomeAssistant, config_entry, monkeypatch
+    hass: HomeAssistant, config_entry, monkeypatch, activity_enabled
 ) -> None:
+    if activity_enabled is not None:
+        hass.config_entries.async_update_entry(
+            config_entry, options={OPT_DESCRIPTIVE_ACTIVITY_ENTRIES: activity_enabled}
+        )
     first_refresh = Mock()
 
     async def _first_refresh(coord) -> None:
@@ -938,6 +944,9 @@ async def test_async_setup_entry_restores_handoff_without_blocking_refresh(
 
     assert await async_setup_entry(hass, config_entry)
     original_runtime = config_entry.runtime_data
+    assert (original_runtime.activity_publisher is not None) is (
+        activity_enabled is True
+    )
     refresh = AsyncMock()
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.EnphaseCoordinator.async_request_refresh",
@@ -946,8 +955,14 @@ async def test_async_setup_entry_restores_handoff_without_blocking_refresh(
     original_runtime.preserve_for_reload = True
 
     assert await async_unload_entry(hass, config_entry)
+    if original_runtime.activity_publisher is not None:
+        assert original_runtime.activity_publisher._stopped
+        assert not original_runtime.activity_publisher._unsubscribers
     assert config_entry.runtime_data is None
     assert await async_setup_entry(hass, config_entry)
+    assert (config_entry.runtime_data.activity_publisher is not None) is (
+        activity_enabled is True
+    )
     await hass.async_block_till_done()
 
     assert config_entry.runtime_data is not original_runtime
@@ -6038,11 +6053,12 @@ def test_service_registration_is_idempotent(hass):
 
 
 @pytest.mark.parametrize("enabled", [True, False])
-async def test_export_limit_feature_toggle_reloads_runtime(
-    hass, config_entry, monkeypatch, enabled
+@pytest.mark.parametrize(
+    "option", ["export_limit_controls_enabled", OPT_DESCRIPTIVE_ACTIVITY_ENTRIES]
+)
+async def test_feature_toggle_reloads_runtime(
+    hass, config_entry, monkeypatch, enabled, option
 ):
-    from custom_components.enphase_ev.const import OPT_EXPORT_LIMIT_CONTROLS_ENABLED
-
     coord = SimpleNamespace(
         apply_auth_storage_config=MagicMock(),
         async_apply_config_entry_options=AsyncMock(),
@@ -6050,12 +6066,10 @@ async def test_export_limit_feature_toggle_reloads_runtime(
     runtime = EnphaseRuntimeData(
         coordinator=coord,
         applied_data=dict(config_entry.data),
-        applied_options={OPT_EXPORT_LIMIT_CONTROLS_ENABLED: not enabled},
+        applied_options={option: not enabled},
     )
     config_entry.runtime_data = runtime
-    hass.config_entries.async_update_entry(
-        config_entry, options={OPT_EXPORT_LIMIT_CONTROLS_ENABLED: enabled}
-    )
+    hass.config_entries.async_update_entry(config_entry, options={option: enabled})
     object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
     reload_entry = AsyncMock(return_value=True)
     monkeypatch.setattr(hass.config_entries, "async_reload", reload_entry)
@@ -6063,3 +6077,34 @@ async def test_export_limit_feature_toggle_reloads_runtime(
     reload_entry.assert_awaited_once_with(config_entry.entry_id)
     coord.async_apply_config_entry_options.assert_not_awaited()
     assert runtime.preserve_for_reload is True
+
+
+@pytest.mark.parametrize(
+    "previous,target",
+    [
+        ({}, {OPT_DESCRIPTIVE_ACTIVITY_ENTRIES: False}),
+        ({OPT_DESCRIPTIVE_ACTIVITY_ENTRIES: False}, {}),
+    ],
+)
+async def test_activity_default_normalization_does_not_reload(
+    hass, config_entry, monkeypatch, previous, target
+):
+    coord = SimpleNamespace(
+        apply_auth_storage_config=MagicMock(),
+        async_apply_config_entry_options=AsyncMock(),
+    )
+    runtime = EnphaseRuntimeData(
+        coordinator=coord,
+        applied_data=dict(config_entry.data),
+        applied_options=previous,
+    )
+    config_entry.runtime_data = runtime
+    hass.config_entries.async_update_entry(config_entry, options=target)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
+    reload_entry = AsyncMock(return_value=True)
+    monkeypatch.setattr(hass.config_entries, "async_reload", reload_entry)
+    await _async_update_listener(hass, config_entry)
+    reload_entry.assert_not_awaited()
+    coord.async_apply_config_entry_options.assert_awaited_once_with(previous)
+    assert runtime.applied_options == target
+    assert config_entry.runtime_data is runtime

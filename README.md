@@ -142,3 +142,10 @@ Sign in with your Enlighten credentials; MFA is supported. See the wiki for deta
 
 Refer to the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki) for setup,
 configuration, and troubleshooting guidance.
+
+### Descriptive Activity entries
+
+Enable **Configure → Notifications → Enable Descriptive Activity Entries** to
+add reported condition details alongside normal Home Assistant Activity entries.
+The feature is **disabled by default**. See [Descriptive Activity entries](docs/descriptive_activity.md)
+for supported entities and behavior.

@@ -7,10 +7,20 @@ from collections.abc import Iterable
 
 _EMAIL_RE = re.compile(r"(?i)\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b")
 _IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+_IPV6_RE = re.compile(
+    r"(?i)(?<![\w:])(?=[0-9a-f:.]*::|(?:[0-9a-f]{1,4}:){7})"
+    r"(?:[0-9a-f]{0,4}:){1,7}(?:(?:\d{1,3}\.){3}\d{1,3}|[0-9a-f]{0,4})"
+    r"(?:%[\w.-]+)?(?![\w:])"
+)
 _MAC_RE = re.compile(r"(?i)\b(?:[0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b")
 _DEBUG_KV_RE = re.compile(
     r"(?P<key>[A-Za-z][A-Za-z0-9_\-]*)(?P<sep>\s*[=:]\s*)(?P<value>[^,&\s)]+)"
 )
+_QUOTED_KV_RE = re.compile(
+    r"(?P<key>[A-Za-z][A-Za-z0-9_\-]*)(?P<sep>[\"']?\s*[=:]\s*)"
+    r"(?P<value>\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|[^,&\s)]+)"
+)
+_BEARER_RE = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/-]+=*")
 _SITE_URL_PATH_RE = re.compile(
     r"(?P<prefix>/(?:systems|sites|hems|app-api|fwDetails)/)"
     r"(?P<site>\d+)(?=$|[/?#\s])"
@@ -122,6 +132,28 @@ def _redact_kv_match(match: re.Match[str]) -> str:
     return f"{key}{sep}{safe_value}"
 
 
+def _redact_quoted_match(match: re.Match[str]) -> str:
+    """Redact quoted sensitive fields while retaining their string delimiters."""
+    kind = _key_kind(match.group("key"))
+    if kind == "text":
+        return match.group(0)
+    value = match.group("value")
+    quote = value[0] if value[0] in {'"', "'"} else ""
+    value = value[1:-1] if quote else value
+    if kind == "site":
+        safe_value = "[site]"
+    elif kind == "truncate":
+        safe_value = (
+            value
+            if "..." in value or value in {"[redacted]", "**REDACTED**"}
+            else redact_identifier(value)
+        )
+    else:
+        safe_value = "[redacted]"
+    safe_value = f"{quote}{safe_value}{quote}"
+    return f"{match.group('key')}{match.group('sep')}{safe_value}"
+
+
 def _redact_site_path_match(match: re.Match[str]) -> str:
     prefix = (
         match.group("prefix")
@@ -172,8 +204,11 @@ def redact_text(
 
     text = _SITE_URL_PATH_RE.sub(_redact_site_path_match, text)
     text = _EMAIL_RE.sub("[redacted]", text)
+    text = _IPV6_RE.sub("[redacted]", text)
     text = _IPV4_RE.sub("[redacted]", text)
     text = _MAC_RE.sub("[redacted]", text)
+    text = _BEARER_RE.sub("Bearer [redacted]", text)
+    text = _QUOTED_KV_RE.sub(_redact_quoted_match, text)
     text = _DEBUG_KV_RE.sub(_redact_kv_match, text)
     if len(text) > max_length:
         text = f"{text[:max_length]}..."

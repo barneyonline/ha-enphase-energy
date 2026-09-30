@@ -1104,6 +1104,8 @@ def test_site_active_system_events_binary_sensor_metadata(
     runtime._events = (  # noqa: SLF001
         SimpleNamespace(
             high_impact=True,
+            fingerprint="event",
+            description=None,
             severity="critical",
             device_type="IQ Gateway",
             event_type="Gateway fault",
@@ -1123,6 +1125,8 @@ def test_site_active_system_events_binary_sensor_metadata(
     assert attrs["active_events"] == (
         {
             "type": "Gateway fault",
+            "severity": "critical",
+            "description": None,
             "device_type": "IQ Gateway",
             "state": "open",
             "event_date": "2026-07-11T01:02:03Z",
@@ -1135,6 +1139,8 @@ def test_site_active_system_events_binary_sensor_metadata(
     runtime._events = (  # noqa: SLF001
         SimpleNamespace(
             high_impact=False,
+            fingerprint="routine",
+            description=None,
             severity="unknown",
             device_type="IQ Gateway",
             event_type="Routine state change",
@@ -1149,6 +1155,8 @@ def test_site_active_system_events_binary_sensor_metadata(
             severity="4",
             device_type="Gateway",
             first_set="2026-07-11T02:03:04Z",
+            fingerprint="alarm",
+            description=None,
         ),
     )
     assert sensor.is_on is True
@@ -1158,6 +1166,8 @@ def test_site_active_system_events_binary_sensor_metadata(
     assert standing_attrs["active_events"] == (
         {
             "type": "Standing Alarm",
+            "severity": "4",
+            "description": None,
             "device_type": "Gateway",
             "state": "active",
             "event_date": "2026-07-11T02:03:04Z",

@@ -524,7 +524,7 @@
         "menu_option_descriptions": {
           "settings": "Lekérdezés és működés finomhangolása.",
           "devices": "Válassza ki a bevonni kívánt eszközkategóriákat.",
-          "repair_notifications": "A Home Assistant javítási értesítéseinek kezelése.",
+          "repair_notifications": "A Home Assistant javítási értesítéseinek és leíró tevékenységbejegyzéseinek kezelése.",
           "authentication_settings": "Indítsa el a bejelentkezési folyamatot a hitelesítő adatok frissítéséhez az integráció eltávolítása nélkül.",
           "migrate_envoy": "Vegye át a kiválasztott Enphase Envoy energiaentitás-azonosítókat, hogy a Home Assistant Energy előzményei ennél az integrációnál folytatódjanak.",
           "advanced": "Telepítői és karbantartási műveletek.",
@@ -627,14 +627,16 @@
       },
       "repair_notifications": {
         "title": "Értesítések",
-        "description": "Válassza ki, mely Enphase-állapotok hozzanak létre Home Assistant-javításokat.",
+        "description": "A Home Assistant javítási értesítéseinek és leíró tevékenységbejegyzéseinek kezelése.",
         "data": {
           "degraded_service_repair_issues": "Csökkent működésű szolgáltatások javításainak engedélyezése",
-          "system_event_repair_issues": "Rendszeresemény-javítási értesítések engedélyezése"
+          "system_event_repair_issues": "Rendszeresemény-javítási értesítések engedélyezése",
+          "descriptive_activity_entries": "Leíró tevékenységbejegyzések engedélyezése"
         },
         "data_description": {
           "degraded_service_repair_issues": "Repairs-problémákat hoz létre, amikor az opcionális Enphase-szolgáltatások csökkent működésűek. Alapértelmezés: Kikapcsolva.",
-          "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva. Alapértelmezés: Kikapcsolva."
+          "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva. Alapértelmezés: Kikapcsolva.",
+          "descriptive_activity_entries": "Leíró bejegyzéseket ad a Home Assistant tevékenységnaplójához, amikor a jelentett körülmények változnak. Ezek a szokásos állapotváltozási bejegyzések mellett jelennek meg. Alapértelmezés szerint kikapcsolva."
         }
       },
       "authentication_settings": {
@@ -1941,7 +1943,46 @@
           "error": "Hiba",
           "unknown": "Ismeretlen",
           "unpaired": "Nincs párosítva",
-          "pairing": "Párosítás"
+          "pairing": "Párosítás",
+          "activity_status": "Állapot",
+          "activity_unknown": "Ismeretlen",
+          "activity_yes": "Igen",
+          "activity_no": "Nem",
+          "activity_more": "További elemek",
+          "activity_battery": "Akkumulátor",
+          "activity_charger_problem": "Jelentett hiba",
+          "activity_suspended_by_evse": "A töltő felfüggesztette",
+          "activity_offline_since": "Offline ettől",
+          "activity_connected_devices": "Csatlakoztatott átjárók",
+          "activity_disconnected_devices": "Leválasztott átjárók",
+          "activity_unknown_connection_devices": "Ismeretlen állapotú átjárók",
+          "activity_connection_method": "Csatlakozási mód",
+          "activity_latest_reported_utc": "Utoljára jelentve",
+          "activity_reporting_inverters": "Jelentő inverterek",
+          "activity_not_reporting_inverters": "Nem jelentő inverterek",
+          "activity_unknown_inverters": "Ismeretlen állapotú inverterek",
+          "activity_power_telemetry_status": "Teljesítménytelemetria",
+          "activity_power_telemetry_next_retry": "Telemetria újrapróbálása",
+          "activity_sg_ready_mode_raw": "SG Ready mód",
+          "activity_sg_ready_contact_state": "Érintkezők állapota",
+          "activity_vpp_sgready_mode_override": "Jelentett VPP-felülbírálás",
+          "activity_confirmed_watts": "Megerősített korlát (W)",
+          "activity_requested_watts": "Kért korlát (W)",
+          "activity_requested_action": "Kért művelet",
+          "activity_request_status": "Kérés állapota",
+          "activity_active_count": "Aktív problémák",
+          "activity_type": "Eseménytípus",
+          "activity_device_type": "Eszköztípus",
+          "activity_severity": "Súlyosság",
+          "activity_description": "Leírás",
+          "activity_event_date": "Első jelentés",
+          "activity_reason": "Ok",
+          "activity_http_status": "HTTP-állapot",
+          "activity_retry": "Következő próbálkozás",
+          "activity_worst_battery": "Legrosszabb akkumulátorállapot",
+          "activity_reachable": "Felhő elérhető",
+          "activity_last_success": "Utolsó sikeres frissítés",
+          "activity_standing_alarm": "Fennálló riasztás"
         }
       },
       "battery_cfg_schedules": {
@@ -2433,7 +2474,7 @@
         }
       },
       "active_system_events": {
-        "name": "Aktív rendszeresemények",
+        "name": "Rendszeresemények",
         "state_attributes": {
           "available": {
             "name": "Az eseményszolgáltatás elérhető"

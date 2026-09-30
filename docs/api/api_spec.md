@@ -3549,7 +3549,7 @@ Implementation note:
   Raw IDs, serials, impacted-device lists, message parameters, CSV links, and
   continuation cursors are discarded after descriptions and recommended actions
   are sanitized. The separate System Dashboard table below remains authoritative
-  for Active System Events and standing-alarm monitoring.
+  for System Events and standing-alarm monitoring.
 
 ### 2.10.1 System Dashboard Active Events
 
@@ -3590,10 +3590,12 @@ Runtime safety rules:
   rows explicitly classified as `error`, `critical`, `fatal`, `emergency`, or
   `severe` set Problem.
 - Up to 20 active rows are exposed as an identifier-free entity attribute with
-  event type, device type, state, event date, and update time. The attribute is
-  excluded from Recorder history.
-- Event IDs, alarm IDs, device serials, device links, details, and CSV links are
-  discarded.
+  event type, device type, state, severity, sanitized description, event date,
+  and update time. The attribute is excluded from Recorder history.
+- Event IDs, alarm IDs, device serials, device links, and CSV links are discarded.
+  Free-text details are bounded and redacted before retention. Complete sanitized
+  event snapshots feed descriptive Activity entries, including changes beyond
+  the entity attribute limit; comparison fingerprints are never shown.
 - Repairs are synchronized from Standing Alarms rather than event-history rows. A
   transient endpoint failure never clears a last-known active repair.
 

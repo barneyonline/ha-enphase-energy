@@ -524,7 +524,7 @@
         "menu_option_descriptions": {
           "settings": "Ajuster la scrutation et le comportement.",
           "devices": "Choisissez les catégories d’appareils à inclure.",
-          "repair_notifications": "Gérer les notifications de réparation de Home Assistant.",
+          "repair_notifications": "Gérer les notifications de réparation et les entrées descriptives d’activité de Home Assistant.",
           "authentication_settings": "Lancer le processus de connexion pour rafraîchir les identifiants sans supprimer l'intégration.",
           "migrate_envoy": "Récupérez les identifiants d’entité d’énergie Enphase Envoy sélectionnés afin que l’historique Home Assistant Energy continue sous cette intégration.",
           "advanced": "Actions installateur et maintenance.",
@@ -627,14 +627,16 @@
       },
       "repair_notifications": {
         "title": "Notifications",
-        "description": "Choisissez les conditions Enphase qui créent des réparations Home Assistant.",
+        "description": "Gérer les notifications de réparation et les entrées descriptives d’activité de Home Assistant.",
         "data": {
           "degraded_service_repair_issues": "Activer les réparations des services dégradés",
-          "system_event_repair_issues": "Activer les notifications de réparation des événements système"
+          "system_event_repair_issues": "Activer les notifications de réparation des événements système",
+          "descriptive_activity_entries": "Activer les entrées descriptives d’activité"
         },
         "data_description": {
           "degraded_service_repair_issues": "Crée des problèmes Repairs lorsque des services Enphase facultatifs sont dégradés. Par défaut: Désactivé.",
-          "system_event_repair_issues": "Crée des réparations Home Assistant pour les alarmes permanentes Enphase actives. Désactivé par défaut. Par défaut: Désactivé."
+          "system_event_repair_issues": "Crée des réparations Home Assistant pour les alarmes permanentes Enphase actives. Désactivé par défaut. Par défaut: Désactivé.",
+          "descriptive_activity_entries": "Ajoute des entrées descriptives à l’activité de Home Assistant lorsque les conditions signalées changent. Elles apparaissent à côté des entrées habituelles de changement d’état. Désactivé par défaut."
         }
       },
       "authentication_settings": {
@@ -1941,7 +1943,46 @@
           "error": "Erreur",
           "unknown": "Inconnu",
           "unpaired": "Non appairé",
-          "pairing": "Appairage"
+          "pairing": "Appairage",
+          "activity_status": "État",
+          "activity_unknown": "Inconnu",
+          "activity_yes": "Oui",
+          "activity_no": "Non",
+          "activity_more": "Éléments supplémentaires",
+          "activity_battery": "Batterie",
+          "activity_charger_problem": "Défaut signalé",
+          "activity_suspended_by_evse": "Suspendu par le chargeur",
+          "activity_offline_since": "Hors ligne depuis",
+          "activity_connected_devices": "Passerelles connectées",
+          "activity_disconnected_devices": "Passerelles déconnectées",
+          "activity_unknown_connection_devices": "Passerelles à l’état inconnu",
+          "activity_connection_method": "Méthode de connexion",
+          "activity_latest_reported_utc": "Dernier signalement",
+          "activity_reporting_inverters": "Micro-onduleurs communicants",
+          "activity_not_reporting_inverters": "Micro-onduleurs non communicants",
+          "activity_unknown_inverters": "Micro-onduleurs à l’état inconnu",
+          "activity_power_telemetry_status": "Télémétrie de puissance",
+          "activity_power_telemetry_next_retry": "Nouvelle tentative de télémétrie",
+          "activity_sg_ready_mode_raw": "Mode SG Ready",
+          "activity_sg_ready_contact_state": "État des contacts",
+          "activity_vpp_sgready_mode_override": "Dérogation VPP signalée",
+          "activity_confirmed_watts": "Limite confirmée (W)",
+          "activity_requested_watts": "Limite demandée (W)",
+          "activity_requested_action": "Action demandée",
+          "activity_request_status": "État de la demande",
+          "activity_active_count": "Problèmes actifs",
+          "activity_type": "Type d’événement",
+          "activity_device_type": "Type d’appareil",
+          "activity_severity": "Gravité",
+          "activity_description": "Description",
+          "activity_event_date": "Premier signalement",
+          "activity_reason": "Motif",
+          "activity_http_status": "Statut HTTP",
+          "activity_retry": "Prochaine tentative",
+          "activity_worst_battery": "État de batterie le plus dégradé",
+          "activity_reachable": "Cloud accessible",
+          "activity_last_success": "Dernière actualisation réussie",
+          "activity_standing_alarm": "Alarme persistante"
         }
       },
       "battery_cfg_schedules": {
@@ -2433,7 +2474,7 @@
         }
       },
       "active_system_events": {
-        "name": "Événements système actifs",
+        "name": "Événements système",
         "state_attributes": {
           "available": {
             "name": "Service des événements disponible"

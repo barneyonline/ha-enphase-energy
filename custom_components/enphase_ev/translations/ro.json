@@ -524,7 +524,7 @@
         "menu_option_descriptions": {
           "settings": "Ajustați interogarea și comportamentul.",
           "devices": "Alegeți categoriile de dispozitive de inclus.",
-          "repair_notifications": "Gestionează notificările de reparații Home Assistant.",
+          "repair_notifications": "Gestionează notificările de reparații și intrările descriptive de activitate din Home Assistant.",
           "authentication_settings": "Lansați fluxul de autentificare pentru a reîmprospăta credențialele fără a elimina integrarea.",
           "migrate_envoy": "Preluați ID-urile entităților de energie Enphase Envoy selectate pentru ca istoricul Home Assistant Energy să continue în această integrare.",
           "advanced": "Acțiuni pentru instalator și întreținere.",
@@ -627,14 +627,16 @@
       },
       "repair_notifications": {
         "title": "Notificări",
-        "description": "Alege ce condiții Enphase creează reparații în Home Assistant.",
+        "description": "Gestionează notificările de reparații și intrările descriptive de activitate din Home Assistant.",
         "data": {
           "degraded_service_repair_issues": "Activează reparațiile pentru servicii degradate",
-          "system_event_repair_issues": "Activează notificările de reparație pentru evenimentele sistemului"
+          "system_event_repair_issues": "Activează notificările de reparație pentru evenimentele sistemului",
+          "descriptive_activity_entries": "Activează intrările descriptive de activitate"
         },
         "data_description": {
           "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate. Implicit: Dezactivat.",
-          "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit. Implicit: Dezactivat."
+          "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit. Implicit: Dezactivat.",
+          "descriptive_activity_entries": "Adaugă intrări descriptive în activitatea Home Assistant când se schimbă condițiile raportate. Acestea apar alături de intrările obișnuite de schimbare a stării. Dezactivat implicit."
         }
       },
       "authentication_settings": {
@@ -1941,7 +1943,46 @@
           "error": "Eroare",
           "unknown": "Necunoscut",
           "unpaired": "Neperecheat",
-          "pairing": "Împerechere"
+          "pairing": "Împerechere",
+          "activity_status": "Stare",
+          "activity_unknown": "Necunoscut",
+          "activity_yes": "Da",
+          "activity_no": "Nu",
+          "activity_more": "Mai multe elemente",
+          "activity_battery": "Baterie",
+          "activity_charger_problem": "Defecțiune raportată",
+          "activity_suspended_by_evse": "Suspendat de încărcător",
+          "activity_offline_since": "Offline din",
+          "activity_connected_devices": "Gateway-uri conectate",
+          "activity_disconnected_devices": "Gateway-uri deconectate",
+          "activity_unknown_connection_devices": "Gateway-uri cu stare necunoscută",
+          "activity_connection_method": "Metodă de conectare",
+          "activity_latest_reported_utc": "Ultima raportare",
+          "activity_reporting_inverters": "Invertoare care raportează",
+          "activity_not_reporting_inverters": "Invertoare care nu raportează",
+          "activity_unknown_inverters": "Invertoare cu stare necunoscută",
+          "activity_power_telemetry_status": "Telemetrie de putere",
+          "activity_power_telemetry_next_retry": "Reîncercare telemetrie",
+          "activity_sg_ready_mode_raw": "Mod SG Ready",
+          "activity_sg_ready_contact_state": "Starea contactelor",
+          "activity_vpp_sgready_mode_override": "Suprascriere VPP raportată",
+          "activity_confirmed_watts": "Limită confirmată (W)",
+          "activity_requested_watts": "Limită solicitată (W)",
+          "activity_requested_action": "Acțiune solicitată",
+          "activity_request_status": "Starea solicitării",
+          "activity_active_count": "Probleme active",
+          "activity_type": "Tip de eveniment",
+          "activity_device_type": "Tip de dispozitiv",
+          "activity_severity": "Severitate",
+          "activity_description": "Descriere",
+          "activity_event_date": "Prima raportare",
+          "activity_reason": "Motiv",
+          "activity_http_status": "Stare HTTP",
+          "activity_retry": "Următoarea încercare",
+          "activity_worst_battery": "Cea mai slabă stare a bateriei",
+          "activity_reachable": "Cloud accesibil",
+          "activity_last_success": "Ultima actualizare reușită",
+          "activity_standing_alarm": "Alarmă persistentă"
         }
       },
       "battery_cfg_schedules": {
@@ -2433,7 +2474,7 @@
         }
       },
       "active_system_events": {
-        "name": "Evenimente de sistem active",
+        "name": "Evenimente de sistem",
         "state_attributes": {
           "available": {
             "name": "Serviciul de evenimente este disponibil"

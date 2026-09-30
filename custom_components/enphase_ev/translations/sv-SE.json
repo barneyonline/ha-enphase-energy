@@ -524,7 +524,7 @@
         "menu_option_descriptions": {
           "settings": "Justera polling och beteende.",
           "devices": "Välj vilka enhetskategorier som ska inkluderas.",
-          "repair_notifications": "Hantera reparationsaviseringar i Home Assistant.",
+          "repair_notifications": "Hantera Home Assistant-reparationsaviseringar och beskrivande aktivitetsposter.",
           "authentication_settings": "Starta inloggningsflödet för att uppdatera inloggningsuppgifter utan att ta bort integrationen.",
           "migrate_envoy": "Ta över valda energi-entitets-ID:n från Enphase Envoy så att historiken i Home Assistant Energy fortsätter under denna integration.",
           "advanced": "Installatörs- och underhållsåtgärder.",
@@ -627,14 +627,16 @@
       },
       "repair_notifications": {
         "title": "Aviseringar",
-        "description": "Välj vilka Enphase-förhållanden som skapar reparationer i Home Assistant.",
+        "description": "Hantera Home Assistant-reparationsaviseringar och beskrivande aktivitetsposter.",
         "data": {
           "degraded_service_repair_issues": "Aktivera reparationer för degraderade tjänster",
-          "system_event_repair_issues": "Aktivera reparationsaviseringar för systemhändelser"
+          "system_event_repair_issues": "Aktivera reparationsaviseringar för systemhändelser",
+          "descriptive_activity_entries": "Aktivera beskrivande aktivitetsposter"
         },
         "data_description": {
           "degraded_service_repair_issues": "Skapar Repairs-problem när valfria Enphase-tjänster är degraderade. Standard: Inaktiverat.",
-          "system_event_repair_issues": "Skapar Home Assistant-reparationer för aktiva stående Enphase-larm. Inaktiverat som standard. Standard: Inaktiverat."
+          "system_event_repair_issues": "Skapar Home Assistant-reparationer för aktiva stående Enphase-larm. Inaktiverat som standard. Standard: Inaktiverat.",
+          "descriptive_activity_entries": "Lägg till beskrivande poster i Home Assistants aktivitet när rapporterade förhållanden ändras. De visas tillsammans med vanliga poster om tillståndsändringar. Inaktiverat som standard."
         }
       },
       "authentication_settings": {
@@ -1941,7 +1943,46 @@
           "error": "Fel",
           "unknown": "Okänd",
           "unpaired": "Inte parkopplad",
-          "pairing": "Parkoppling"
+          "pairing": "Parkoppling",
+          "activity_status": "Status",
+          "activity_unknown": "Okänd",
+          "activity_yes": "Ja",
+          "activity_no": "Nej",
+          "activity_more": "Fler poster",
+          "activity_battery": "Batteri",
+          "activity_charger_problem": "Rapporterat fel",
+          "activity_suspended_by_evse": "Pausad av laddaren",
+          "activity_offline_since": "Offline sedan",
+          "activity_connected_devices": "Anslutna gateways",
+          "activity_disconnected_devices": "Frånkopplade gateways",
+          "activity_unknown_connection_devices": "Gateways med okänd status",
+          "activity_connection_method": "Anslutningsmetod",
+          "activity_latest_reported_utc": "Senast rapporterat",
+          "activity_reporting_inverters": "Rapporterande växelriktare",
+          "activity_not_reporting_inverters": "Växelriktare som inte rapporterar",
+          "activity_unknown_inverters": "Växelriktare med okänd status",
+          "activity_power_telemetry_status": "Effekttelemetri",
+          "activity_power_telemetry_next_retry": "Nytt telemetriförsök",
+          "activity_sg_ready_mode_raw": "SG Ready-läge",
+          "activity_sg_ready_contact_state": "Kontaktstatus",
+          "activity_vpp_sgready_mode_override": "Rapporterad VPP-åsidosättning",
+          "activity_confirmed_watts": "Bekräftad gräns (W)",
+          "activity_requested_watts": "Begärd gräns (W)",
+          "activity_requested_action": "Begärd åtgärd",
+          "activity_request_status": "Begärans status",
+          "activity_active_count": "Aktiva problem",
+          "activity_type": "Händelsetyp",
+          "activity_device_type": "Enhetstyp",
+          "activity_severity": "Allvarlighetsgrad",
+          "activity_description": "Beskrivning",
+          "activity_event_date": "Först rapporterat",
+          "activity_reason": "Orsak",
+          "activity_http_status": "HTTP-status",
+          "activity_retry": "Nästa försök",
+          "activity_worst_battery": "Sämsta batteristatus",
+          "activity_reachable": "Molnet nåbart",
+          "activity_last_success": "Senaste lyckade uppdatering",
+          "activity_standing_alarm": "Kvarstående larm"
         }
       },
       "battery_cfg_schedules": {
@@ -2433,7 +2474,7 @@
         }
       },
       "active_system_events": {
-        "name": "Aktiva systemhändelser",
+        "name": "Systemhändelser",
         "state_attributes": {
           "available": {
             "name": "Händelsetjänsten är tillgänglig"

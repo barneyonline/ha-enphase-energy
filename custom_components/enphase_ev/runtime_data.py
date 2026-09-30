@@ -14,6 +14,7 @@ from .const import DOMAIN
 if TYPE_CHECKING:  # pragma: no cover
     from homeassistant.core import HomeAssistant
 
+    from .activity import ActivityPublisher
     from .battery_schedule_editor import BatteryScheduleEditorManager
     from .coordinator import EnphaseCoordinator
     from .evse_schedule_editor import EvseScheduleEditorManager
@@ -28,6 +29,7 @@ class EnphaseRuntimeData:
     """Runtime objects attached to a loaded config entry."""
 
     coordinator: EnphaseCoordinator
+    activity_publisher: ActivityPublisher | None = None
     firmware_catalog: FirmwareCatalogManager | None = None
     evse_firmware_details: EvseFirmwareDetailsManager | None = None
     gateway_software_update: GatewaySoftwareUpdateManager | None = None

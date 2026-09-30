@@ -9845,7 +9845,7 @@ def test_payload_preview_and_hash_handles_bytes_and_fallback_branches(
     length, digest, preview = api._payload_preview_and_hash('{"site":"SITE"}')
     assert length == len(b'{"site":"SITE"}')
     assert digest == hashlib.sha256(b'{"site":"SITE"}').hexdigest()
-    assert preview == '{"site":"SITE"}'
+    assert preview == '{"site":"[site]"}'
 
 
 def test_is_hems_invalid_site_error_handles_invalid_status_value() -> None:
