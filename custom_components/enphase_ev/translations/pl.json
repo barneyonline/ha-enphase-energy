@@ -554,17 +554,17 @@
           "type_encharge": "Zawiera stan baterii i encje sterujące, gdy są dostępne.",
           "type_iqevse": "Zawiera encje i sterowanie ładowarkami EV.",
           "type_microinverter": "Zawiera czujniki łączności mikroinwerterów, liczby aktywnych i produkcji całkowitej.",
-          "fast_poll_interval": "Interwał używany podczas ładowania lub strumieniowania.",
-          "slow_poll_interval": "Interwał używany w stanie bezczynności.",
-          "fast_while_streaming": "Gdy włączone, szybkie odpytywanie podczas aktywnego strumienia chmury.",
-          "api_timeout": "Liczba sekund przed przekroczeniem limitu czasu żądań API.",
-          "nominal_voltage": "Typowe napięcie zasilania AC używane do szacowania mocy, gdy napięcie bieżące jest niedostępne.",
-          "session_history_interval": "Minuty oczekiwania między pobieraniem historii sesji z chmury.",
+          "fast_poll_interval": "Interwał używany podczas ładowania lub strumieniowania. Domyślnie: 30 s.",
+          "slow_poll_interval": "Interwał używany w stanie bezczynności. Domyślnie: 60 s.",
+          "fast_while_streaming": "Gdy włączone, szybkie odpytywanie podczas aktywnego strumienia chmury. Domyślnie: Włączone.",
+          "api_timeout": "Liczba sekund przed przekroczeniem limitu czasu żądań API. Domyślnie: 15 s.",
+          "nominal_voltage": "Typowe napięcie zasilania AC używane do szacowania mocy, gdy napięcie bieżące jest niedostępne. Domyślnie: Na podstawie telemetrii ładowarki, jeśli jest dostępna; w przeciwnym razie według regionu Home Assistant, z wartością zastępczą 230 V.",
+          "session_history_interval": "Minuty oczekiwania między pobieraniem historii sesji z chmury. Domyślnie: 10 min.",
           "type_heatpump": "Zawiera czujniki stanu, diagnostyki i zużycia pompy ciepła.",
-          "degraded_service_repair_issues": "Tworzy problemy w Repairs, gdy opcjonalne usługi Enphase są zdegradowane.",
-          "weather_enabled": "Pobiera bieżącą pogodę dla lokalizacji z Enphase i tworzy encję pogody tylko wtedy, gdy punkt końcowy jest dostępny.",
-          "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
-          "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna."
+          "degraded_service_repair_issues": "Tworzy problemy w Repairs, gdy opcjonalne usługi Enphase są zdegradowane. Domyślnie: Wyłączone.",
+          "weather_enabled": "Pobiera bieżącą pogodę dla lokalizacji z Enphase i tworzy encję pogody tylko wtedy, gdy punkt końcowy jest dostępny. Domyślnie: Wyłączone.",
+          "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów. Domyślnie: Wyłączone.",
+          "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna. Wymaga dostępu instalatora. Domyślnie: Wyłączone."
         }
       },
       "settings": {
@@ -579,12 +579,12 @@
           "degraded_service_repair_issues": "Włącz naprawy usług zdegradowanych"
         },
         "data_description": {
-          "fast_poll_interval": "Interwał używany podczas ładowania lub strumieniowania.",
-          "slow_poll_interval": "Interwał używany w stanie bezczynności.",
-          "fast_while_streaming": "Gdy włączone, szybkie odpytywanie podczas aktywnego strumienia chmury.",
-          "api_timeout": "Liczba sekund przed przekroczeniem limitu czasu żądań API.",
-          "session_history_interval": "Minuty oczekiwania między pobieraniem historii sesji z chmury.",
-          "degraded_service_repair_issues": "Tworzy problemy w Repairs, gdy opcjonalne usługi Enphase są zdegradowane."
+          "fast_poll_interval": "Interwał używany podczas ładowania lub strumieniowania. Domyślnie: 30 s.",
+          "slow_poll_interval": "Interwał używany w stanie bezczynności. Domyślnie: 60 s.",
+          "fast_while_streaming": "Gdy włączone, szybkie odpytywanie podczas aktywnego strumienia chmury. Domyślnie: Włączone.",
+          "api_timeout": "Liczba sekund przed przekroczeniem limitu czasu żądań API. Domyślnie: 15 s.",
+          "session_history_interval": "Minuty oczekiwania między pobieraniem historii sesji z chmury. Domyślnie: 10 min.",
+          "degraded_service_repair_issues": "Tworzy problemy w Repairs, gdy opcjonalne usługi Enphase są zdegradowane. Domyślnie: Wyłączone."
         }
       },
       "devices": {
@@ -633,8 +633,8 @@
           "system_event_repair_issues": "Włącz powiadomienia o naprawach zdarzeń systemowych"
         },
         "data_description": {
-          "degraded_service_repair_issues": "Tworzy problemy w Repairs, gdy opcjonalne usługi Enphase są zdegradowane.",
-          "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone."
+          "degraded_service_repair_issues": "Tworzy problemy w Repairs, gdy opcjonalne usługi Enphase są zdegradowane. Domyślnie: Wyłączone.",
+          "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone. Domyślnie: Wyłączone."
         }
       },
       "authentication_settings": {
@@ -771,14 +771,14 @@
               "vpp_events_enabled": "Włącz zdarzenia VPP"
             },
             "data_description": {
-              "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone.",
-              "pricing_edits_enabled": "Zarządzaj taryfami energii elektrycznej IQ Gateway",
-              "weather_enabled": "Pobiera bieżącą pogodę dla lokalizacji z Enphase i tworzy encję pogody tylko wtedy, gdy punkt końcowy jest dostępny.",
-              "nominal_voltage": "Typowe napięcie zasilania AC używane do szacowania mocy, gdy napięcie bieżące jest niedostępne.",
-              "schedule_sync_enabled": "Zarządzaj harmonogramami IQ EV Charger.",
-              "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery.",
-              "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
-              "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone."
+              "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone. Domyślnie: Wyłączone.",
+              "pricing_edits_enabled": "Zarządzaj taryfami energii elektrycznej IQ Gateway. Domyślnie: Włączone.",
+              "weather_enabled": "Pobiera bieżącą pogodę dla lokalizacji z Enphase i tworzy encję pogody tylko wtedy, gdy punkt końcowy jest dostępny. Domyślnie: Wyłączone.",
+              "nominal_voltage": "Typowe napięcie zasilania AC używane do szacowania mocy, gdy napięcie bieżące jest niedostępne. Domyślnie: Na podstawie telemetrii ładowarki, jeśli jest dostępna; w przeciwnym razie według regionu Home Assistant, z wartością zastępczą 230 V.",
+              "schedule_sync_enabled": "Zarządzaj harmonogramami IQ EV Charger. Domyślnie: Włączone.",
+              "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery. Domyślnie: Włączone.",
+              "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów. Domyślnie: Wyłączone.",
+              "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone. Domyślnie: Wyłączone."
             }
           },
           "advanced_features": {
@@ -789,9 +789,9 @@
               "export_limit_controls_enabled": "Włącz sterowanie limitem oddawania energii"
             },
             "data_description": {
-              "grid_profile_controls_enabled": "Pobiera metadane profilu sieci dostępne tylko dla instalatora i włącza działania na profilach. Domyślnie wyłączone.",
-              "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna.",
-              "export_limit_controls_enabled": "Skonfiguruj limity oddawania energii systemu. Wymaga dostępu instalatora."
+              "grid_profile_controls_enabled": "Pobiera metadane profilu sieci dostępne tylko dla instalatora i włącza działania na profilach. Domyślnie wyłączone. Wymaga dostępu instalatora. Domyślnie: Wyłączone.",
+              "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna. Wymaga dostępu instalatora. Domyślnie: Wyłączone.",
+              "export_limit_controls_enabled": "Skonfiguruj limity oddawania energii systemu. Wymaga dostępu instalatora. Domyślnie: Wyłączone."
             }
           }
         },
@@ -811,17 +811,17 @@
           "export_limit_controls_enabled": "Włącz sterowanie limitem oddawania energii"
         },
         "data_description": {
-          "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone.",
-          "pricing_edits_enabled": "Zarządzaj taryfami energii elektrycznej IQ Gateway",
-          "weather_enabled": "Pobiera bieżącą pogodę dla lokalizacji z Enphase i tworzy encję pogody tylko wtedy, gdy punkt końcowy jest dostępny.",
-          "nominal_voltage": "Typowe napięcie zasilania AC używane do szacowania mocy, gdy napięcie bieżące jest niedostępne.",
-          "schedule_sync_enabled": "Zarządzaj harmonogramami IQ EV Charger.",
-          "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery.",
-          "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów.",
-          "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna.",
-          "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone.",
-          "grid_profile_controls_enabled": "Pobiera metadane profilu sieci dostępne tylko dla instalatora i włącza działania na profilach. Domyślnie wyłączone.",
-          "export_limit_controls_enabled": "Skonfiguruj limity oddawania energii systemu. Wymaga dostępu instalatora."
+          "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone. Domyślnie: Wyłączone.",
+          "pricing_edits_enabled": "Zarządzaj taryfami energii elektrycznej IQ Gateway. Domyślnie: Włączone.",
+          "weather_enabled": "Pobiera bieżącą pogodę dla lokalizacji z Enphase i tworzy encję pogody tylko wtedy, gdy punkt końcowy jest dostępny. Domyślnie: Wyłączone.",
+          "nominal_voltage": "Typowe napięcie zasilania AC używane do szacowania mocy, gdy napięcie bieżące jest niedostępne. Domyślnie: Na podstawie telemetrii ładowarki, jeśli jest dostępna; w przeciwnym razie według regionu Home Assistant, z wartością zastępczą 230 V.",
+          "schedule_sync_enabled": "Zarządzaj harmonogramami IQ EV Charger. Domyślnie: Włączone.",
+          "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery. Domyślnie: Włączone.",
+          "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów. Domyślnie: Wyłączone.",
+          "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna. Wymaga dostępu instalatora. Domyślnie: Wyłączone.",
+          "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone. Domyślnie: Wyłączone.",
+          "grid_profile_controls_enabled": "Pobiera metadane profilu sieci dostępne tylko dla instalatora i włącza działania na profilach. Domyślnie wyłączone. Wymaga dostępu instalatora. Domyślnie: Wyłączone.",
+          "export_limit_controls_enabled": "Skonfiguruj limity oddawania energii systemu. Wymaga dostępu instalatora. Domyślnie: Wyłączone."
         }
       },
       "export_limit": {

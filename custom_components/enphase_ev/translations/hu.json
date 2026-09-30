@@ -554,17 +554,17 @@
           "type_encharge": "Tartalmazza az akkumulátorok állapotát és vezérlő entitásokat, ha elérhetők.",
           "type_iqevse": "Tartalmazza az EV töltők entitásait és vezérléseit.",
           "type_microinverter": "Tartalmazza a mikroinverter-kapcsolati, aktív darabszám és élettartam-termelési érzékelőket.",
-          "fast_poll_interval": "Intervallum töltés vagy streamelés közben.",
-          "slow_poll_interval": "Intervallum üresjárat esetén.",
-          "fast_while_streaming": "Engedélyezve gyors lekérdezés aktív cloud stream közben.",
-          "api_timeout": "Ennyi másodperc után jár le az API-kérések időkorlátja.",
-          "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat.",
-          "session_history_interval": "Várakozási percek a felhő munkamenet-előzmények lekérései között.",
+          "fast_poll_interval": "Intervallum töltés vagy streamelés közben. Alapértelmezés: 30 s.",
+          "slow_poll_interval": "Intervallum üresjárat esetén. Alapértelmezés: 60 s.",
+          "fast_while_streaming": "Engedélyezve gyors lekérdezés aktív cloud stream közben. Alapértelmezés: Bekapcsolva.",
+          "api_timeout": "Ennyi másodperc után jár le az API-kérések időkorlátja. Alapértelmezés: 15 s.",
+          "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat. Alapértelmezés: A töltő telemetriájából, ha elérhető; egyébként a Home Assistant régiója alapján, 230 V tartalékértékkel.",
+          "session_history_interval": "Várakozási percek a felhő munkamenet-előzmények lekérései között. Alapértelmezés: 10 min.",
           "type_heatpump": "A hőszivattyú állapot-, diagnosztikai és fogyasztási érzékelőit tartalmazza.",
-          "degraded_service_repair_issues": "Repairs-problémákat hoz létre, amikor az opcionális Enphase-szolgáltatások csökkent működésűek.",
-          "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető.",
-          "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
-          "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria."
+          "degraded_service_repair_issues": "Repairs-problémákat hoz létre, amikor az opcionális Enphase-szolgáltatások csökkent működésűek. Alapértelmezés: Kikapcsolva.",
+          "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető. Alapértelmezés: Kikapcsolva.",
+          "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt. Alapértelmezés: Kikapcsolva.",
+          "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria. Telepítői hozzáférést igényel. Alapértelmezés: Kikapcsolva."
         }
       },
       "settings": {
@@ -579,12 +579,12 @@
           "degraded_service_repair_issues": "Csökkent működésű szolgáltatások javításainak engedélyezése"
         },
         "data_description": {
-          "fast_poll_interval": "Intervallum töltés vagy streamelés közben.",
-          "slow_poll_interval": "Intervallum üresjárat esetén.",
-          "fast_while_streaming": "Engedélyezve gyors lekérdezés aktív cloud stream közben.",
-          "api_timeout": "Ennyi másodperc után jár le az API-kérések időkorlátja.",
-          "session_history_interval": "Várakozási percek a felhő munkamenet-előzmények lekérései között.",
-          "degraded_service_repair_issues": "Repairs-problémákat hoz létre, amikor az opcionális Enphase-szolgáltatások csökkent működésűek."
+          "fast_poll_interval": "Intervallum töltés vagy streamelés közben. Alapértelmezés: 30 s.",
+          "slow_poll_interval": "Intervallum üresjárat esetén. Alapértelmezés: 60 s.",
+          "fast_while_streaming": "Engedélyezve gyors lekérdezés aktív cloud stream közben. Alapértelmezés: Bekapcsolva.",
+          "api_timeout": "Ennyi másodperc után jár le az API-kérések időkorlátja. Alapértelmezés: 15 s.",
+          "session_history_interval": "Várakozási percek a felhő munkamenet-előzmények lekérései között. Alapértelmezés: 10 min.",
+          "degraded_service_repair_issues": "Repairs-problémákat hoz létre, amikor az opcionális Enphase-szolgáltatások csökkent működésűek. Alapértelmezés: Kikapcsolva."
         }
       },
       "devices": {
@@ -633,8 +633,8 @@
           "system_event_repair_issues": "Rendszeresemény-javítási értesítések engedélyezése"
         },
         "data_description": {
-          "degraded_service_repair_issues": "Repairs-problémákat hoz létre, amikor az opcionális Enphase-szolgáltatások csökkent működésűek.",
-          "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva."
+          "degraded_service_repair_issues": "Repairs-problémákat hoz létre, amikor az opcionális Enphase-szolgáltatások csökkent működésűek. Alapértelmezés: Kikapcsolva.",
+          "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva. Alapértelmezés: Kikapcsolva."
         }
       },
       "authentication_settings": {
@@ -771,14 +771,14 @@
               "vpp_events_enabled": "VPP-események engedélyezése"
             },
             "data_description": {
-              "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva.",
-              "pricing_edits_enabled": "Az IQ Gateway villamosenergia-díjainak kezelése",
-              "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető.",
-              "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat.",
-              "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése.",
-              "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése.",
-              "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
-              "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva."
+              "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva. Alapértelmezés: Kikapcsolva.",
+              "pricing_edits_enabled": "Az IQ Gateway villamosenergia-díjainak kezelése. Alapértelmezés: Bekapcsolva.",
+              "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető. Alapértelmezés: Kikapcsolva.",
+              "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat. Alapértelmezés: A töltő telemetriájából, ha elérhető; egyébként a Home Assistant régiója alapján, 230 V tartalékértékkel.",
+              "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése. Alapértelmezés: Bekapcsolva.",
+              "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése. Alapértelmezés: Bekapcsolva.",
+              "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt. Alapértelmezés: Kikapcsolva.",
+              "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva. Alapértelmezés: Kikapcsolva."
             }
           },
           "advanced_features": {
@@ -789,9 +789,9 @@
               "export_limit_controls_enabled": "A betáplálási korlát vezérlésének engedélyezése"
             },
             "data_description": {
-              "grid_profile_controls_enabled": "Lekéri a csak telepítők számára elérhető hálózatiprofil-metaadatokat, és engedélyezi a profilműveleteket. Alapértelmezés szerint letiltva.",
-              "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria.",
-              "export_limit_controls_enabled": "A rendszer betáplálási korlátainak beállítása. Telepítői hozzáférést igényel."
+              "grid_profile_controls_enabled": "Lekéri a csak telepítők számára elérhető hálózatiprofil-metaadatokat, és engedélyezi a profilműveleteket. Alapértelmezés szerint letiltva. Telepítői hozzáférést igényel. Alapértelmezés: Kikapcsolva.",
+              "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria. Telepítői hozzáférést igényel. Alapértelmezés: Kikapcsolva.",
+              "export_limit_controls_enabled": "A rendszer betáplálási korlátainak beállítása. Telepítői hozzáférést igényel. Alapértelmezés: Kikapcsolva."
             }
           }
         },
@@ -811,17 +811,17 @@
           "export_limit_controls_enabled": "A betáplálási korlát vezérlésének engedélyezése"
         },
         "data_description": {
-          "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva.",
-          "pricing_edits_enabled": "Az IQ Gateway villamosenergia-díjainak kezelése",
-          "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető.",
-          "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat.",
-          "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése.",
-          "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése.",
-          "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt.",
-          "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria.",
-          "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva.",
-          "grid_profile_controls_enabled": "Lekéri a csak telepítők számára elérhető hálózatiprofil-metaadatokat, és engedélyezi a profilműveleteket. Alapértelmezés szerint letiltva.",
-          "export_limit_controls_enabled": "A rendszer betáplálási korlátainak beállítása. Telepítői hozzáférést igényel."
+          "system_event_repair_issues": "Home Assistant javításokat hoz létre az aktív Enphase állandó riasztásokhoz. Alapértelmezés szerint kikapcsolva. Alapértelmezés: Kikapcsolva.",
+          "pricing_edits_enabled": "Az IQ Gateway villamosenergia-díjainak kezelése. Alapértelmezés: Bekapcsolva.",
+          "weather_enabled": "Lekéri a helyszín aktuális időjárását az Enphase-től, és csak akkor hoz létre időjárás-entitást, ha a végpont elérhető. Alapértelmezés: Kikapcsolva.",
+          "nominal_voltage": "A teljesítmény becsléséhez használt tipikus váltóáramú tápfeszültség, ha nincs élő feszültségadat. Alapértelmezés: A töltő telemetriájából, ha elérhető; egyébként a Home Assistant régiója alapján, 230 V tartalékértékkel.",
+          "schedule_sync_enabled": "Az IQ EV Charger ütemezéseinek kezelése. Alapértelmezés: Bekapcsolva.",
+          "battery_schedules_enabled": "Az IQ Battery ütemezéseinek kezelése. Alapértelmezés: Bekapcsolva.",
+          "microinverter_lifetime_energy_enabled": "Engedélyezi az összes mikroinverterenkénti élettartamenergia-érzékelőt. Alapértelmezés: Kikapcsolva.",
+          "microinverter_power_enabled": "Engedélyezi az összes mikroinverterenkénti teljesítményérzékelőt, ha elérhető a telepítői telemetria. Telepítői hozzáférést igényel. Alapértelmezés: Kikapcsolva.",
+          "vpp_events_enabled": "Lekéri a VPP/ELRP ütemezéseket az Enphase-től, és csak a részt vevő helyszínekhez hoz létre eseményentitásokat. Alapértelmezés szerint kikapcsolva. Alapértelmezés: Kikapcsolva.",
+          "grid_profile_controls_enabled": "Lekéri a csak telepítők számára elérhető hálózatiprofil-metaadatokat, és engedélyezi a profilműveleteket. Alapértelmezés szerint letiltva. Telepítői hozzáférést igényel. Alapértelmezés: Kikapcsolva.",
+          "export_limit_controls_enabled": "A rendszer betáplálási korlátainak beállítása. Telepítői hozzáférést igényel. Alapértelmezés: Kikapcsolva."
         }
       },
       "export_limit": {

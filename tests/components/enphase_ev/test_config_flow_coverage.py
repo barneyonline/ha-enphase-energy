@@ -3671,13 +3671,13 @@ async def test_options_flow_device_section_translations_load_at_runtime(hass) ->
         translations[
             f"component.{DOMAIN}.options.step.features.sections.device_features.data_description.schedule_sync_enabled"
         ]
-        == "Manage IQ EV Charger schedules."
+        == "Enable controls to view and manage IQ EV Charger charging schedules. Default: Enabled."
     )
     assert (
         translations[
             f"component.{DOMAIN}.options.step.features.sections.device_features.data_description.battery_schedules_enabled"
         ]
-        == "Manage IQ Battery schedules."
+        == "Enable controls to view and manage IQ Battery schedules. Default: Enabled."
     )
     assert (
         translations[
@@ -3689,37 +3689,37 @@ async def test_options_flow_device_section_translations_load_at_runtime(hass) ->
         translations[
             f"component.{DOMAIN}.options.step.features.sections.device_features.data_description.pricing_edits_enabled"
         ]
-        == "Manage IQ Gateway Electricity Rates"
+        == "Enable controls to edit electricity rates used by the IQ Gateway. Default: Enabled."
     )
     assert (
         translations[
             f"component.{DOMAIN}.options.step.features.sections.device_features.data.weather_enabled"
         ]
-        == "Enable weather"
+        == "Enable Weather"
     )
     assert (
         translations[
             f"component.{DOMAIN}.options.step.features.sections.device_features.data.vpp_events_enabled"
         ]
-        == "Enable VPP events"
+        == "Enable VPP Events"
     )
     assert (
         translations[
             f"component.{DOMAIN}.options.step.features.sections.advanced_features.data.grid_profile_controls_enabled"
         ]
-        == "Enable installer Grid Profile controls"
+        == "Enable Installer Grid Profile Controls"
     )
     assert (
         translations[
             f"component.{DOMAIN}.options.step.features.sections.advanced_features.data_description.grid_profile_controls_enabled"
         ]
-        == "Fetch installer-only Grid Profile metadata and enable profile actions. Disabled by default."
+        == "Fetch installer-only grid profile details and enable controls to browse and apply profiles. Requires installer access. Default: Disabled."
     )
     assert (
         translations[
             f"component.{DOMAIN}.options.step.features.sections.device_features.data_description.vpp_events_enabled"
         ]
-        == "Fetch VPP/ELRP schedules from Enphase and create event entities only for enrolled sites. Disabled by default."
+        == "Fetch Virtual Power Plant (VPP) and Emergency Load Reduction Program (ELRP) schedules and create event entities for enrolled sites. Default: Disabled."
     )
     assert (
         translations[
@@ -3731,19 +3731,19 @@ async def test_options_flow_device_section_translations_load_at_runtime(hass) ->
         translations[
             f"component.{DOMAIN}.options.step.features.sections.advanced_features.data_description.microinverter_power_enabled"
         ]
-        == "Enable all per-microinverter power sensors when installer telemetry is available."
+        == "Enable individual current power sensors for each microinverter when installer telemetry is available. Requires installer access. Default: Disabled."
     )
     assert (
         translations[
             f"component.{DOMAIN}.options.step.features.sections.device_features.data.nominal_voltage"
         ]
-        == "EV Charger nominal voltage (V)"
+        == "EV Charger Nominal Voltage (V)"
     )
     assert (
         translations[
             f"component.{DOMAIN}.options.step.features.sections.device_features.data_description.nominal_voltage"
         ]
-        == "Typical AC supply voltage used to estimate charger power when live voltage is unavailable."
+        == "AC supply voltage used to estimate charger power when live voltage is unavailable. Default: Learned from charger telemetry when available; otherwise based on the Home Assistant region, with a 230 V fallback."
     )
     for removed_path in (
         "sections.devices.description",
@@ -3800,13 +3800,13 @@ async def test_options_flow_device_section_translations_load_at_runtime(hass) ->
         translations[
             f"component.{DOMAIN}.options.step.authentication_settings.data.reauth"
         ]
-        == "Start reauthentication"
+        == "Start Reauthentication"
     )
     assert (
         translations[
             f"component.{DOMAIN}.options.step.authentication_settings.data_description.reauth"
         ]
-        == "Launch the login flow to refresh credentials without removing the integration."
+        == "Start the login flow to refresh credentials without removing the integration. This is a one-time action when submitted."
     )
     assert (
         translations[
@@ -3828,7 +3828,7 @@ async def test_options_flow_device_section_translations_load_at_runtime(hass) ->
         translations[
             f"component.{DOMAIN}.options.step.repair_notifications.data.degraded_service_repair_issues"
         ]
-        == "Enable degraded service repairs"
+        == "Enable Degraded Service Repairs"
     )
     assert (
         translations[

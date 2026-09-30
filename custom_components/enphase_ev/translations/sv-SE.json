@@ -554,17 +554,17 @@
           "type_encharge": "Inkluderar batteristatus och styrentiteter när de är tillgängliga.",
           "type_iqevse": "Inkluderar EV-laddarentiteter och styrning.",
           "type_microinverter": "Inkluderar sensorer för mikroväxelriktaranslutning, aktivt antal och livstidsproduktion.",
-          "fast_poll_interval": "Intervall att använda under laddning eller strömning.",
-          "slow_poll_interval": "Intervall att använda när inaktiv.",
-          "fast_while_streaming": "När aktiverad, snabb pollning under aktiv molnströmning.",
-          "api_timeout": "Sekunder innan API-begäranden får timeout.",
-          "nominal_voltage": "Typisk växelspänning som används för att uppskatta effekten när aktuell spänning inte är tillgänglig.",
-          "session_history_interval": "Minuter att vänta mellan hämtningar av moln-sessionshistorik.",
+          "fast_poll_interval": "Intervall att använda under laddning eller strömning. Standard: 30 s.",
+          "slow_poll_interval": "Intervall att använda när inaktiv. Standard: 60 s.",
+          "fast_while_streaming": "När aktiverad, snabb pollning under aktiv molnströmning. Standard: Aktiverat.",
+          "api_timeout": "Sekunder innan API-begäranden får timeout. Standard: 15 s.",
+          "nominal_voltage": "Typisk växelspänning som används för att uppskatta effekten när aktuell spänning inte är tillgänglig. Standard: Från laddarens telemetri när den är tillgänglig; annars baserat på Home Assistant-regionen, med ett reservvärde på 230 V.",
+          "session_history_interval": "Minuter att vänta mellan hämtningar av moln-sessionshistorik. Standard: 10 min.",
           "type_heatpump": "Inkluderar sensorer för värmepumpens status, diagnostik och förbrukning.",
-          "degraded_service_repair_issues": "Skapar Repairs-problem när valfria Enphase-tjänster är degraderade.",
-          "weather_enabled": "Hämtar aktuellt väder för platsen från Enphase och skapar endast en väderentitet när slutpunkten är tillgänglig.",
-          "microinverter_lifetime_energy_enabled": "Aktiverar alla sensorer för livstidsenergi per mikroväxelriktare.",
-          "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig."
+          "degraded_service_repair_issues": "Skapar Repairs-problem när valfria Enphase-tjänster är degraderade. Standard: Inaktiverat.",
+          "weather_enabled": "Hämtar aktuellt väder för platsen från Enphase och skapar endast en väderentitet när slutpunkten är tillgänglig. Standard: Inaktiverat.",
+          "microinverter_lifetime_energy_enabled": "Aktiverar alla sensorer för livstidsenergi per mikroväxelriktare. Standard: Inaktiverat.",
+          "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig. Kräver installatörsåtkomst. Standard: Inaktiverat."
         }
       },
       "settings": {
@@ -579,12 +579,12 @@
           "degraded_service_repair_issues": "Aktivera reparationer för degraderade tjänster"
         },
         "data_description": {
-          "fast_poll_interval": "Intervall att använda under laddning eller strömning.",
-          "slow_poll_interval": "Intervall att använda när inaktiv.",
-          "fast_while_streaming": "När aktiverad, snabb pollning under aktiv molnströmning.",
-          "api_timeout": "Sekunder innan API-begäranden får timeout.",
-          "session_history_interval": "Minuter att vänta mellan hämtningar av moln-sessionshistorik.",
-          "degraded_service_repair_issues": "Skapar Repairs-problem när valfria Enphase-tjänster är degraderade."
+          "fast_poll_interval": "Intervall att använda under laddning eller strömning. Standard: 30 s.",
+          "slow_poll_interval": "Intervall att använda när inaktiv. Standard: 60 s.",
+          "fast_while_streaming": "När aktiverad, snabb pollning under aktiv molnströmning. Standard: Aktiverat.",
+          "api_timeout": "Sekunder innan API-begäranden får timeout. Standard: 15 s.",
+          "session_history_interval": "Minuter att vänta mellan hämtningar av moln-sessionshistorik. Standard: 10 min.",
+          "degraded_service_repair_issues": "Skapar Repairs-problem när valfria Enphase-tjänster är degraderade. Standard: Inaktiverat."
         }
       },
       "devices": {
@@ -633,8 +633,8 @@
           "system_event_repair_issues": "Aktivera reparationsaviseringar för systemhändelser"
         },
         "data_description": {
-          "degraded_service_repair_issues": "Skapar Repairs-problem när valfria Enphase-tjänster är degraderade.",
-          "system_event_repair_issues": "Skapar Home Assistant-reparationer för aktiva stående Enphase-larm. Inaktiverat som standard."
+          "degraded_service_repair_issues": "Skapar Repairs-problem när valfria Enphase-tjänster är degraderade. Standard: Inaktiverat.",
+          "system_event_repair_issues": "Skapar Home Assistant-reparationer för aktiva stående Enphase-larm. Inaktiverat som standard. Standard: Inaktiverat."
         }
       },
       "authentication_settings": {
@@ -771,14 +771,14 @@
               "vpp_events_enabled": "Aktivera VPP-händelser"
             },
             "data_description": {
-              "system_event_repair_issues": "Skapar Home Assistant-reparationer för aktiva stående Enphase-larm. Inaktiverat som standard.",
-              "pricing_edits_enabled": "Hantera elpriser för IQ Gateway",
-              "weather_enabled": "Hämtar aktuellt väder för platsen från Enphase och skapar endast en väderentitet när slutpunkten är tillgänglig.",
-              "nominal_voltage": "Typisk växelspänning som används för att uppskatta effekten när aktuell spänning inte är tillgänglig.",
-              "schedule_sync_enabled": "Hantera scheman för IQ EV Charger.",
-              "battery_schedules_enabled": "Hantera scheman för IQ Battery.",
-              "microinverter_lifetime_energy_enabled": "Aktiverar alla sensorer för livstidsenergi per mikroväxelriktare.",
-              "vpp_events_enabled": "Hämtar VPP/ELRP-scheman från Enphase och skapar endast händelseentiteter för anslutna anläggningar. Inaktiverat som standard."
+              "system_event_repair_issues": "Skapar Home Assistant-reparationer för aktiva stående Enphase-larm. Inaktiverat som standard. Standard: Inaktiverat.",
+              "pricing_edits_enabled": "Hantera elpriser för IQ Gateway. Standard: Aktiverat.",
+              "weather_enabled": "Hämtar aktuellt väder för platsen från Enphase och skapar endast en väderentitet när slutpunkten är tillgänglig. Standard: Inaktiverat.",
+              "nominal_voltage": "Typisk växelspänning som används för att uppskatta effekten när aktuell spänning inte är tillgänglig. Standard: Från laddarens telemetri när den är tillgänglig; annars baserat på Home Assistant-regionen, med ett reservvärde på 230 V.",
+              "schedule_sync_enabled": "Hantera scheman för IQ EV Charger. Standard: Aktiverat.",
+              "battery_schedules_enabled": "Hantera scheman för IQ Battery. Standard: Aktiverat.",
+              "microinverter_lifetime_energy_enabled": "Aktiverar alla sensorer för livstidsenergi per mikroväxelriktare. Standard: Inaktiverat.",
+              "vpp_events_enabled": "Hämtar VPP/ELRP-scheman från Enphase och skapar endast händelseentiteter för anslutna anläggningar. Inaktiverat som standard. Standard: Inaktiverat."
             }
           },
           "advanced_features": {
@@ -789,9 +789,9 @@
               "export_limit_controls_enabled": "Aktivera styrning av exportgränser"
             },
             "data_description": {
-              "grid_profile_controls_enabled": "Hämtar nätprofilmetadata som endast är tillgängliga för installatörer och aktiverar profilåtgärder. Inaktiverat som standard.",
-              "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig.",
-              "export_limit_controls_enabled": "Konfigurera systemets exportgränser. Kräver installatörsåtkomst."
+              "grid_profile_controls_enabled": "Hämtar nätprofilmetadata som endast är tillgängliga för installatörer och aktiverar profilåtgärder. Inaktiverat som standard. Kräver installatörsåtkomst. Standard: Inaktiverat.",
+              "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig. Kräver installatörsåtkomst. Standard: Inaktiverat.",
+              "export_limit_controls_enabled": "Konfigurera systemets exportgränser. Kräver installatörsåtkomst. Standard: Inaktiverat."
             }
           }
         },
@@ -811,17 +811,17 @@
           "export_limit_controls_enabled": "Aktivera styrning av exportgränser"
         },
         "data_description": {
-          "system_event_repair_issues": "Skapar Home Assistant-reparationer för aktiva stående Enphase-larm. Inaktiverat som standard.",
-          "pricing_edits_enabled": "Hantera elpriser för IQ Gateway",
-          "weather_enabled": "Hämtar aktuellt väder för platsen från Enphase och skapar endast en väderentitet när slutpunkten är tillgänglig.",
-          "nominal_voltage": "Typisk växelspänning som används för att uppskatta effekten när aktuell spänning inte är tillgänglig.",
-          "schedule_sync_enabled": "Hantera scheman för IQ EV Charger.",
-          "battery_schedules_enabled": "Hantera scheman för IQ Battery.",
-          "microinverter_lifetime_energy_enabled": "Aktiverar alla sensorer för livstidsenergi per mikroväxelriktare.",
-          "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig.",
-          "vpp_events_enabled": "Hämtar VPP/ELRP-scheman från Enphase och skapar endast händelseentiteter för anslutna anläggningar. Inaktiverat som standard.",
-          "grid_profile_controls_enabled": "Hämtar nätprofilmetadata som endast är tillgängliga för installatörer och aktiverar profilåtgärder. Inaktiverat som standard.",
-          "export_limit_controls_enabled": "Konfigurera systemets exportgränser. Kräver installatörsåtkomst."
+          "system_event_repair_issues": "Skapar Home Assistant-reparationer för aktiva stående Enphase-larm. Inaktiverat som standard. Standard: Inaktiverat.",
+          "pricing_edits_enabled": "Hantera elpriser för IQ Gateway. Standard: Aktiverat.",
+          "weather_enabled": "Hämtar aktuellt väder för platsen från Enphase och skapar endast en väderentitet när slutpunkten är tillgänglig. Standard: Inaktiverat.",
+          "nominal_voltage": "Typisk växelspänning som används för att uppskatta effekten när aktuell spänning inte är tillgänglig. Standard: Från laddarens telemetri när den är tillgänglig; annars baserat på Home Assistant-regionen, med ett reservvärde på 230 V.",
+          "schedule_sync_enabled": "Hantera scheman för IQ EV Charger. Standard: Aktiverat.",
+          "battery_schedules_enabled": "Hantera scheman för IQ Battery. Standard: Aktiverat.",
+          "microinverter_lifetime_energy_enabled": "Aktiverar alla sensorer för livstidsenergi per mikroväxelriktare. Standard: Inaktiverat.",
+          "microinverter_power_enabled": "Aktiverar alla effektsensorer per mikroväxelriktare när installatörstelemetri är tillgänglig. Kräver installatörsåtkomst. Standard: Inaktiverat.",
+          "vpp_events_enabled": "Hämtar VPP/ELRP-scheman från Enphase och skapar endast händelseentiteter för anslutna anläggningar. Inaktiverat som standard. Standard: Inaktiverat.",
+          "grid_profile_controls_enabled": "Hämtar nätprofilmetadata som endast är tillgängliga för installatörer och aktiverar profilåtgärder. Inaktiverat som standard. Kräver installatörsåtkomst. Standard: Inaktiverat.",
+          "export_limit_controls_enabled": "Konfigurera systemets exportgränser. Kräver installatörsåtkomst. Standard: Inaktiverat."
         }
       },
       "export_limit": {

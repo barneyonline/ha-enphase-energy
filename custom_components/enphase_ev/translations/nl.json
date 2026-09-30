@@ -554,17 +554,17 @@
           "type_encharge": "Bevat batterijstatus en bedieningsentiteiten wanneer beschikbaar.",
           "type_iqevse": "Bevat EV-lader-entiteiten en bediening.",
           "type_microinverter": "Bevat sensoren voor micro-omvormerconnectiviteit, actief aantal en levensduurproductie.",
-          "fast_poll_interval": "Interval voor gebruik tijdens laden of streamen.",
-          "slow_poll_interval": "Interval voor gebruik bij inactiviteit.",
-          "fast_while_streaming": "Wanneer ingeschakeld, snelle polling tijdens actieve cloudstreaming.",
-          "api_timeout": "Seconden voordat API-aanvragen een time-out krijgen.",
-          "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is.",
-          "session_history_interval": "Minuten om te wachten tussen het ophalen van cloudsessiegeschiedenis.",
+          "fast_poll_interval": "Interval voor gebruik tijdens laden of streamen. Standaard: 30 s.",
+          "slow_poll_interval": "Interval voor gebruik bij inactiviteit. Standaard: 60 s.",
+          "fast_while_streaming": "Wanneer ingeschakeld, snelle polling tijdens actieve cloudstreaming. Standaard: Ingeschakeld.",
+          "api_timeout": "Seconden voordat API-aanvragen een time-out krijgen. Standaard: 15 s.",
+          "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is. Standaard: Afgeleid van de telemetrie van de lader indien beschikbaar; anders gebaseerd op de Home Assistant-regio, met een terugvalwaarde van 230 V.",
+          "session_history_interval": "Minuten om te wachten tussen het ophalen van cloudsessiegeschiedenis. Standaard: 10 min.",
           "type_heatpump": "Bevat sensoren voor warmtepompstatus, diagnostiek en verbruik.",
-          "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken.",
-          "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is.",
-          "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in.",
-          "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is."
+          "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken. Standaard: Uitgeschakeld.",
+          "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is. Standaard: Uitgeschakeld.",
+          "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in. Standaard: Uitgeschakeld.",
+          "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is. Vereist installateurstoegang. Standaard: Uitgeschakeld."
         }
       },
       "settings": {
@@ -579,12 +579,12 @@
           "degraded_service_repair_issues": "Reparaties voor verminderde diensten inschakelen"
         },
         "data_description": {
-          "fast_poll_interval": "Interval voor gebruik tijdens laden of streamen.",
-          "slow_poll_interval": "Interval voor gebruik bij inactiviteit.",
-          "fast_while_streaming": "Wanneer ingeschakeld, snelle polling tijdens actieve cloudstreaming.",
-          "api_timeout": "Seconden voordat API-aanvragen een time-out krijgen.",
-          "session_history_interval": "Minuten om te wachten tussen het ophalen van cloudsessiegeschiedenis.",
-          "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken."
+          "fast_poll_interval": "Interval voor gebruik tijdens laden of streamen. Standaard: 30 s.",
+          "slow_poll_interval": "Interval voor gebruik bij inactiviteit. Standaard: 60 s.",
+          "fast_while_streaming": "Wanneer ingeschakeld, snelle polling tijdens actieve cloudstreaming. Standaard: Ingeschakeld.",
+          "api_timeout": "Seconden voordat API-aanvragen een time-out krijgen. Standaard: 15 s.",
+          "session_history_interval": "Minuten om te wachten tussen het ophalen van cloudsessiegeschiedenis. Standaard: 10 min.",
+          "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken. Standaard: Uitgeschakeld."
         }
       },
       "devices": {
@@ -633,8 +633,8 @@
           "system_event_repair_issues": "Reparatiemeldingen voor systeemgebeurtenissen inschakelen"
         },
         "data_description": {
-          "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken.",
-          "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld."
+          "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken. Standaard: Uitgeschakeld.",
+          "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld. Standaard: Uitgeschakeld."
         }
       },
       "authentication_settings": {
@@ -771,14 +771,14 @@
               "vpp_events_enabled": "VPP-gebeurtenissen inschakelen"
             },
             "data_description": {
-              "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld.",
-              "pricing_edits_enabled": "Elektriciteitstarieven van IQ Gateway beheren",
-              "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is.",
-              "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is.",
-              "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger.",
-              "battery_schedules_enabled": "Beheer schema's voor de IQ Battery.",
-              "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in.",
-              "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld."
+              "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld. Standaard: Uitgeschakeld.",
+              "pricing_edits_enabled": "Elektriciteitstarieven van IQ Gateway beheren. Standaard: Ingeschakeld.",
+              "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is. Standaard: Uitgeschakeld.",
+              "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is. Standaard: Afgeleid van de telemetrie van de lader indien beschikbaar; anders gebaseerd op de Home Assistant-regio, met een terugvalwaarde van 230 V.",
+              "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger. Standaard: Ingeschakeld.",
+              "battery_schedules_enabled": "Beheer schema's voor de IQ Battery. Standaard: Ingeschakeld.",
+              "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in. Standaard: Uitgeschakeld.",
+              "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld. Standaard: Uitgeschakeld."
             }
           },
           "advanced_features": {
@@ -789,9 +789,9 @@
               "export_limit_controls_enabled": "Bediening voor terugleverlimieten inschakelen"
             },
             "data_description": {
-              "grid_profile_controls_enabled": "Haalt netprofielmetadata op die alleen voor installateurs beschikbaar zijn en schakelt profielacties in. Standaard uitgeschakeld.",
-              "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is.",
-              "export_limit_controls_enabled": "Terugleverlimieten van het systeem configureren. Vereist installateurstoegang."
+              "grid_profile_controls_enabled": "Haalt netprofielmetadata op die alleen voor installateurs beschikbaar zijn en schakelt profielacties in. Standaard uitgeschakeld. Vereist installateurstoegang. Standaard: Uitgeschakeld.",
+              "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is. Vereist installateurstoegang. Standaard: Uitgeschakeld.",
+              "export_limit_controls_enabled": "Terugleverlimieten van het systeem configureren. Vereist installateurstoegang. Standaard: Uitgeschakeld."
             }
           }
         },
@@ -811,17 +811,17 @@
           "export_limit_controls_enabled": "Bediening voor terugleverlimieten inschakelen"
         },
         "data_description": {
-          "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld.",
-          "pricing_edits_enabled": "Elektriciteitstarieven van IQ Gateway beheren",
-          "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is.",
-          "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is.",
-          "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger.",
-          "battery_schedules_enabled": "Beheer schema's voor de IQ Battery.",
-          "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in.",
-          "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is.",
-          "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld.",
-          "grid_profile_controls_enabled": "Haalt netprofielmetadata op die alleen voor installateurs beschikbaar zijn en schakelt profielacties in. Standaard uitgeschakeld.",
-          "export_limit_controls_enabled": "Terugleverlimieten van het systeem configureren. Vereist installateurstoegang."
+          "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld. Standaard: Uitgeschakeld.",
+          "pricing_edits_enabled": "Elektriciteitstarieven van IQ Gateway beheren. Standaard: Ingeschakeld.",
+          "weather_enabled": "Haalt het actuele weer voor de locatie op bij Enphase en maakt alleen een weerentiteit wanneer het eindpunt beschikbaar is. Standaard: Uitgeschakeld.",
+          "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is. Standaard: Afgeleid van de telemetrie van de lader indien beschikbaar; anders gebaseerd op de Home Assistant-regio, met een terugvalwaarde van 230 V.",
+          "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger. Standaard: Ingeschakeld.",
+          "battery_schedules_enabled": "Beheer schema's voor de IQ Battery. Standaard: Ingeschakeld.",
+          "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in. Standaard: Uitgeschakeld.",
+          "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is. Vereist installateurstoegang. Standaard: Uitgeschakeld.",
+          "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld. Standaard: Uitgeschakeld.",
+          "grid_profile_controls_enabled": "Haalt netprofielmetadata op die alleen voor installateurs beschikbaar zijn en schakelt profielacties in. Standaard uitgeschakeld. Vereist installateurstoegang. Standaard: Uitgeschakeld.",
+          "export_limit_controls_enabled": "Terugleverlimieten van het systeem configureren. Vereist installateurstoegang. Standaard: Uitgeschakeld."
         }
       },
       "export_limit": {

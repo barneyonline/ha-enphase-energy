@@ -554,17 +554,17 @@
           "type_encharge": "Include starea bateriei și entitățile de control când sunt disponibile.",
           "type_iqevse": "Include entități și controale pentru încărcătoarele EV.",
           "type_microinverter": "Include senzori pentru conectivitatea microinvertoarelor, numărul activ și producția pe durata de viață.",
-          "fast_poll_interval": "Interval de folosit în timpul încărcării sau streamingului.",
-          "slow_poll_interval": "Interval de folosit când este inactiv.",
-          "fast_while_streaming": "Când este activat, interogare rapidă în timpul fluxului cloud activ.",
-          "api_timeout": "Secunde până la expirarea solicitărilor API.",
-          "nominal_voltage": "Tensiunea tipică de alimentare CA folosită pentru estimarea puterii când tensiunea în timp real nu este disponibilă.",
-          "session_history_interval": "Minute de așteptare între preluările istoricului sesiunilor din cloud.",
+          "fast_poll_interval": "Interval de folosit în timpul încărcării sau streamingului. Implicit: 30 s.",
+          "slow_poll_interval": "Interval de folosit când este inactiv. Implicit: 60 s.",
+          "fast_while_streaming": "Când este activat, interogare rapidă în timpul fluxului cloud activ. Implicit: Activat.",
+          "api_timeout": "Secunde până la expirarea solicitărilor API. Implicit: 15 s.",
+          "nominal_voltage": "Tensiunea tipică de alimentare CA folosită pentru estimarea puterii când tensiunea în timp real nu este disponibilă. Implicit: Din telemetria încărcătorului, când este disponibilă; altfel în funcție de regiunea Home Assistant, cu o valoare de rezervă de 230 V.",
+          "session_history_interval": "Minute de așteptare între preluările istoricului sesiunilor din cloud. Implicit: 10 min.",
           "type_heatpump": "Include senzori pentru starea, diagnosticarea și consumul pompei de căldură.",
-          "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate.",
-          "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil.",
-          "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor.",
-          "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă."
+          "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate. Implicit: Dezactivat.",
+          "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil. Implicit: Dezactivat.",
+          "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor. Implicit: Dezactivat.",
+          "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă. Necesită acces de instalator. Implicit: Dezactivat."
         }
       },
       "settings": {
@@ -579,12 +579,12 @@
           "degraded_service_repair_issues": "Activează reparațiile pentru servicii degradate"
         },
         "data_description": {
-          "fast_poll_interval": "Interval de folosit în timpul încărcării sau streamingului.",
-          "slow_poll_interval": "Interval de folosit când este inactiv.",
-          "fast_while_streaming": "Când este activat, interogare rapidă în timpul fluxului cloud activ.",
-          "api_timeout": "Secunde până la expirarea solicitărilor API.",
-          "session_history_interval": "Minute de așteptare între preluările istoricului sesiunilor din cloud.",
-          "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate."
+          "fast_poll_interval": "Interval de folosit în timpul încărcării sau streamingului. Implicit: 30 s.",
+          "slow_poll_interval": "Interval de folosit când este inactiv. Implicit: 60 s.",
+          "fast_while_streaming": "Când este activat, interogare rapidă în timpul fluxului cloud activ. Implicit: Activat.",
+          "api_timeout": "Secunde până la expirarea solicitărilor API. Implicit: 15 s.",
+          "session_history_interval": "Minute de așteptare între preluările istoricului sesiunilor din cloud. Implicit: 10 min.",
+          "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate. Implicit: Dezactivat."
         }
       },
       "devices": {
@@ -633,8 +633,8 @@
           "system_event_repair_issues": "Activează notificările de reparație pentru evenimentele sistemului"
         },
         "data_description": {
-          "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate.",
-          "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit."
+          "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate. Implicit: Dezactivat.",
+          "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit. Implicit: Dezactivat."
         }
       },
       "authentication_settings": {
@@ -771,14 +771,14 @@
               "vpp_events_enabled": "Activează evenimentele VPP"
             },
             "data_description": {
-              "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit.",
-              "pricing_edits_enabled": "Gestionează tarifele de electricitate IQ Gateway",
-              "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil.",
-              "nominal_voltage": "Tensiunea tipică de alimentare CA folosită pentru estimarea puterii când tensiunea în timp real nu este disponibilă.",
-              "schedule_sync_enabled": "Gestionați programele IQ EV Charger.",
-              "battery_schedules_enabled": "Gestionați programele IQ Battery.",
-              "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor.",
-              "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit."
+              "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit. Implicit: Dezactivat.",
+              "pricing_edits_enabled": "Gestionează tarifele de electricitate IQ Gateway. Implicit: Activat.",
+              "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil. Implicit: Dezactivat.",
+              "nominal_voltage": "Tensiunea tipică de alimentare CA folosită pentru estimarea puterii când tensiunea în timp real nu este disponibilă. Implicit: Din telemetria încărcătorului, când este disponibilă; altfel în funcție de regiunea Home Assistant, cu o valoare de rezervă de 230 V.",
+              "schedule_sync_enabled": "Gestionați programele IQ EV Charger. Implicit: Activat.",
+              "battery_schedules_enabled": "Gestionați programele IQ Battery. Implicit: Activat.",
+              "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor. Implicit: Dezactivat.",
+              "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit. Implicit: Dezactivat."
             }
           },
           "advanced_features": {
@@ -789,9 +789,9 @@
               "export_limit_controls_enabled": "Activați comenzile pentru limita de injecție"
             },
             "data_description": {
-              "grid_profile_controls_enabled": "Preia metadatele profilului de rețea disponibile numai instalatorului și activează acțiunile profilului. Dezactivat implicit.",
-              "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă.",
-              "export_limit_controls_enabled": "Configurați limitele de injecție ale sistemului. Necesită acces de instalator."
+              "grid_profile_controls_enabled": "Preia metadatele profilului de rețea disponibile numai instalatorului și activează acțiunile profilului. Dezactivat implicit. Necesită acces de instalator. Implicit: Dezactivat.",
+              "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă. Necesită acces de instalator. Implicit: Dezactivat.",
+              "export_limit_controls_enabled": "Configurați limitele de injecție ale sistemului. Necesită acces de instalator. Implicit: Dezactivat."
             }
           }
         },
@@ -811,17 +811,17 @@
           "export_limit_controls_enabled": "Activați comenzile pentru limita de injecție"
         },
         "data_description": {
-          "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit.",
-          "pricing_edits_enabled": "Gestionează tarifele de electricitate IQ Gateway",
-          "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil.",
-          "nominal_voltage": "Tensiunea tipică de alimentare CA folosită pentru estimarea puterii când tensiunea în timp real nu este disponibilă.",
-          "schedule_sync_enabled": "Gestionați programele IQ EV Charger.",
-          "battery_schedules_enabled": "Gestionați programele IQ Battery.",
-          "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor.",
-          "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă.",
-          "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit.",
-          "grid_profile_controls_enabled": "Preia metadatele profilului de rețea disponibile numai instalatorului și activează acțiunile profilului. Dezactivat implicit.",
-          "export_limit_controls_enabled": "Configurați limitele de injecție ale sistemului. Necesită acces de instalator."
+          "system_event_repair_issues": "Creează reparații Home Assistant pentru alarmele Enphase permanente active. Dezactivat implicit. Implicit: Dezactivat.",
+          "pricing_edits_enabled": "Gestionează tarifele de electricitate IQ Gateway. Implicit: Activat.",
+          "weather_enabled": "Preia vremea curentă a locației de la Enphase și creează o entitate meteo numai când punctul final este disponibil. Implicit: Dezactivat.",
+          "nominal_voltage": "Tensiunea tipică de alimentare CA folosită pentru estimarea puterii când tensiunea în timp real nu este disponibilă. Implicit: Din telemetria încărcătorului, când este disponibilă; altfel în funcție de regiunea Home Assistant, cu o valoare de rezervă de 230 V.",
+          "schedule_sync_enabled": "Gestionați programele IQ EV Charger. Implicit: Activat.",
+          "battery_schedules_enabled": "Gestionați programele IQ Battery. Implicit: Activat.",
+          "microinverter_lifetime_energy_enabled": "Activează toți senzorii de energie totală pentru fiecare microinvertor. Implicit: Dezactivat.",
+          "microinverter_power_enabled": "Activează toți senzorii de putere pentru fiecare microinvertor când telemetria instalatorului este disponibilă. Necesită acces de instalator. Implicit: Dezactivat.",
+          "vpp_events_enabled": "Preia programările VPP/ELRP de la Enphase și creează entități de eveniment numai pentru locațiile înscrise. Dezactivat în mod implicit. Implicit: Dezactivat.",
+          "grid_profile_controls_enabled": "Preia metadatele profilului de rețea disponibile numai instalatorului și activează acțiunile profilului. Dezactivat implicit. Necesită acces de instalator. Implicit: Dezactivat.",
+          "export_limit_controls_enabled": "Configurați limitele de injecție ale sistemului. Necesită acces de instalator. Implicit: Dezactivat."
         }
       },
       "export_limit": {

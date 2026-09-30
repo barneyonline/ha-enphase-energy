@@ -2227,12 +2227,12 @@ def test_pricing_edit_strings_exist_for_all_locales() -> None:
         )
         == "Enable Pricing Edits"
     )
-    assert (
-        _at_path(
-            english,
-            "options.step.features.sections.device_features.data_description.pricing_edits_enabled",
-        )
-        == "Manage IQ Gateway Electricity Rates"
+    assert _at_path(
+        english,
+        "options.step.features.sections.device_features.data_description.pricing_edits_enabled",
+    ) == (
+        "Enable controls to edit electricity rates used by the IQ Gateway. "
+        "Default: Enabled."
     )
     for locale in translations_dir.glob("*.json"):
         data = json.loads(locale.read_text(encoding="utf-8"))

@@ -536,16 +536,16 @@
           "type_iqevse": "EV Chargers",
           "type_heatpump": "Heat Pump",
           "type_microinverter": "Microinverters",
-          "fast_poll_interval": "Fast poll interval (s)",
-          "slow_poll_interval": "Slow poll interval (s)",
-          "fast_while_streaming": "Prefer fast polling while cloud stream active",
-          "api_timeout": "API timeout (s)",
-          "nominal_voltage": "EV Charger nominal voltage (V)",
-          "session_history_interval": "Session history interval (min)",
+          "fast_poll_interval": "Fast Poll Interval (s)",
+          "slow_poll_interval": "Slow Poll Interval (s)",
+          "fast_while_streaming": "Prefer Fast Polling While Cloud Stream Active",
+          "api_timeout": "API Timeout (s)",
+          "nominal_voltage": "EV Charger Nominal Voltage (V)",
+          "session_history_interval": "Session History Interval (min)",
           "schedule_sync_enabled": "Enable EV Charger Scheduler",
           "battery_schedules_enabled": "Enable Battery Scheduler",
-          "degraded_service_repair_issues": "Enable degraded service repairs",
-          "weather_enabled": "Enable weather",
+          "degraded_service_repair_issues": "Enable Degraded Service Repairs",
+          "weather_enabled": "Enable Weather",
           "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
           "microinverter_power_enabled": "Enable Microinverter Power"
         },
@@ -555,36 +555,36 @@
           "type_iqevse": "Includes EV charger entities and controls.",
           "type_heatpump": "Includes heat pump status, diagnostics, and usage sensors.",
           "type_microinverter": "Includes microinverter connectivity, active count, and lifetime production sensors.",
-          "fast_poll_interval": "Interval to use while charging or streaming.",
-          "slow_poll_interval": "Interval to use when idle.",
-          "fast_while_streaming": "When enabled, fast poll during active cloud streaming.",
-          "api_timeout": "Seconds before API requests time out.",
-          "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable.",
-          "session_history_interval": "Minutes to wait between cloud session history fetches.",
-          "degraded_service_repair_issues": "Raise Repairs issues when optional Enphase services are degraded.",
-          "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
-          "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
-          "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available."
+          "fast_poll_interval": "Time between updates while charging or using fast cloud-stream polling. Default: 30 s.",
+          "slow_poll_interval": "Time between updates when chargers are idle and fast cloud-stream polling is inactive. Default: 60 s.",
+          "fast_while_streaming": "Use the fast polling interval while an Enphase cloud stream is active, even when chargers are idle. Default: Enabled.",
+          "api_timeout": "Maximum time to wait for an Enphase API request before it times out. Default: 15 s.",
+          "nominal_voltage": "AC supply voltage used to estimate charger power when live voltage is unavailable. Default: Learned from charger telemetry when available; otherwise based on the Home Assistant region, with a 230 V fallback.",
+          "session_history_interval": "Minimum time between cloud charging-session history requests. Default: 10 min.",
+          "degraded_service_repair_issues": "Create Home Assistant Repairs issues when optional Enphase cloud services are degraded. Default: Disabled.",
+          "weather_enabled": "Fetch site weather from Enphase and create a weather entity when the service is available. Default: Disabled.",
+          "microinverter_lifetime_energy_enabled": "Enable individual lifetime energy sensors for each microinverter. Default: Disabled.",
+          "microinverter_power_enabled": "Enable individual current power sensors for each microinverter when installer telemetry is available. Requires installer access. Default: Disabled."
         }
       },
       "settings": {
         "title": "Polling",
         "description": "Tune polling and behavior.",
         "data": {
-          "fast_poll_interval": "Fast poll interval (s)",
-          "slow_poll_interval": "Slow poll interval (s)",
-          "fast_while_streaming": "Prefer fast polling while cloud stream active",
-          "api_timeout": "API timeout (s)",
-          "session_history_interval": "Session history interval (min)",
-          "degraded_service_repair_issues": "Enable degraded service repairs"
+          "fast_poll_interval": "Fast Poll Interval (s)",
+          "slow_poll_interval": "Slow Poll Interval (s)",
+          "fast_while_streaming": "Prefer Fast Polling While Cloud Stream Active",
+          "api_timeout": "API Timeout (s)",
+          "session_history_interval": "Session History Interval (min)",
+          "degraded_service_repair_issues": "Enable Degraded Service Repairs"
         },
         "data_description": {
-          "fast_poll_interval": "Interval to use while charging or streaming.",
-          "slow_poll_interval": "Interval to use when idle.",
-          "fast_while_streaming": "When enabled, fast poll during active cloud streaming.",
-          "api_timeout": "Seconds before API requests time out.",
-          "session_history_interval": "Minutes to wait between cloud session history fetches.",
-          "degraded_service_repair_issues": "Raise Repairs issues when optional Enphase services are degraded."
+          "fast_poll_interval": "Time between updates while charging or using fast cloud-stream polling. Default: 30 s.",
+          "slow_poll_interval": "Time between updates when chargers are idle and fast cloud-stream polling is inactive. Default: 60 s.",
+          "fast_while_streaming": "Use the fast polling interval while an Enphase cloud stream is active, even when chargers are idle. Default: Enabled.",
+          "api_timeout": "Maximum time to wait for an Enphase API request before it times out. Default: 15 s.",
+          "session_history_interval": "Minimum time between cloud charging-session history requests. Default: 10 min.",
+          "degraded_service_repair_issues": "Create Home Assistant Repairs issues when optional Enphase cloud services are degraded. Default: Disabled."
         }
       },
       "devices": {
@@ -629,24 +629,24 @@
         "title": "Notifications",
         "description": "Choose which Enphase conditions create Home Assistant Repairs.",
         "data": {
-          "degraded_service_repair_issues": "Enable degraded service repairs",
+          "degraded_service_repair_issues": "Enable Degraded Service Repairs",
           "system_event_repair_issues": "Enable System Event Repair Notifications"
         },
         "data_description": {
-          "degraded_service_repair_issues": "Raise Repairs issues when optional Enphase services are degraded.",
-          "system_event_repair_issues": "Create Home Assistant Repairs for active Enphase standing alarms. Disabled by default."
+          "degraded_service_repair_issues": "Create Home Assistant Repairs issues when optional Enphase cloud services are degraded. Default: Disabled.",
+          "system_event_repair_issues": "Create Home Assistant Repairs issues for active system alarms reported by Enphase. Default: Disabled."
         }
       },
       "authentication_settings": {
         "title": "Authentication",
         "description": "Manage stored credentials and start reauthentication.",
         "data": {
-          "reauth": "Start reauthentication",
-          "forget_password": "Forget stored password"
+          "reauth": "Start Reauthentication",
+          "forget_password": "Forget Stored Password"
         },
         "data_description": {
-          "reauth": "Launch the login flow to refresh credentials without removing the integration.",
-          "forget_password": "Removes the stored password. Automatic refresh will no longer be attempted."
+          "reauth": "Start the login flow to refresh credentials without removing the integration. This is a one-time action when submitted.",
+          "forget_password": "Delete the saved password and stop automatic password-based credential refresh. This is a one-time action when submitted."
         }
       },
       "migrate_envoy_source": {
@@ -700,9 +700,9 @@
           "export_limit": "Export Limit"
         },
         "menu_option_descriptions": {
-          "grid_toggle": "Configure manual Grid Mode controls.",
-          "grid_profile": "Browse and apply installer-only Activation grid profiles.",
-          "export_limit": "Configure system export limits."
+          "grid_toggle": "Request a manual change between on-grid and off-grid operation, then confirm with a one-time code.",
+          "grid_profile": "Browse and apply installer-only grid profiles. Requires Grid Profile Controls.",
+          "export_limit": "Set or disable system export limits. Requires installer access and Export Limit Controls."
         }
       },
       "grid_toggle": {
@@ -765,33 +765,33 @@
               "battery_schedules_enabled": "Enable Battery Scheduler",
               "system_event_repair_issues": "Enable System Event Repair Notifications",
               "pricing_edits_enabled": "Enable Pricing Edits",
-              "weather_enabled": "Enable weather",
-              "nominal_voltage": "EV Charger nominal voltage (V)",
+              "weather_enabled": "Enable Weather",
+              "nominal_voltage": "EV Charger Nominal Voltage (V)",
               "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
-              "vpp_events_enabled": "Enable VPP events"
+              "vpp_events_enabled": "Enable VPP Events"
             },
             "data_description": {
-              "system_event_repair_issues": "Create Home Assistant Repairs for active Enphase standing alarms. Disabled by default.",
-              "pricing_edits_enabled": "Manage IQ Gateway Electricity Rates",
-              "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
-              "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable.",
-              "schedule_sync_enabled": "Manage IQ EV Charger schedules.",
-              "battery_schedules_enabled": "Manage IQ Battery schedules.",
-              "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
-              "vpp_events_enabled": "Fetch VPP/ELRP schedules from Enphase and create event entities only for enrolled sites. Disabled by default."
+              "system_event_repair_issues": "Create Home Assistant Repairs issues for active system alarms reported by Enphase. Default: Disabled.",
+              "pricing_edits_enabled": "Enable controls to edit electricity rates used by the IQ Gateway. Default: Enabled.",
+              "weather_enabled": "Fetch site weather from Enphase and create a weather entity when the service is available. Default: Disabled.",
+              "nominal_voltage": "AC supply voltage used to estimate charger power when live voltage is unavailable. Default: Learned from charger telemetry when available; otherwise based on the Home Assistant region, with a 230 V fallback.",
+              "schedule_sync_enabled": "Enable controls to view and manage IQ EV Charger charging schedules. Default: Enabled.",
+              "battery_schedules_enabled": "Enable controls to view and manage IQ Battery schedules. Default: Enabled.",
+              "microinverter_lifetime_energy_enabled": "Enable individual lifetime energy sensors for each microinverter. Default: Disabled.",
+              "vpp_events_enabled": "Fetch Virtual Power Plant (VPP) and Emergency Load Reduction Program (ELRP) schedules and create event entities for enrolled sites. Default: Disabled."
             }
           },
           "advanced_features": {
             "name": "Advanced Features",
             "data": {
-              "grid_profile_controls_enabled": "Enable installer Grid Profile controls",
+              "grid_profile_controls_enabled": "Enable Installer Grid Profile Controls",
               "microinverter_power_enabled": "Enable Microinverter Power",
-              "export_limit_controls_enabled": "Enable Export Limit controls"
+              "export_limit_controls_enabled": "Enable Export Limit Controls"
             },
             "data_description": {
-              "grid_profile_controls_enabled": "Fetch installer-only Grid Profile metadata and enable profile actions. Disabled by default.",
-              "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available.",
-              "export_limit_controls_enabled": "Configure system export limits. Requires installer access."
+              "grid_profile_controls_enabled": "Fetch installer-only grid profile details and enable controls to browse and apply profiles. Requires installer access. Default: Disabled.",
+              "microinverter_power_enabled": "Enable individual current power sensors for each microinverter when installer telemetry is available. Requires installer access. Default: Disabled.",
+              "export_limit_controls_enabled": "Enable controls to set or disable system export limits. Requires installer access. Default: Disabled."
             }
           }
         },
@@ -802,26 +802,26 @@
           "battery_schedules_enabled": "Enable Battery Scheduler",
           "system_event_repair_issues": "Enable System Event Repair Notifications",
           "pricing_edits_enabled": "Enable Pricing Edits",
-          "weather_enabled": "Enable weather",
-          "nominal_voltage": "EV Charger nominal voltage (V)",
+          "weather_enabled": "Enable Weather",
+          "nominal_voltage": "EV Charger Nominal Voltage (V)",
           "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
           "microinverter_power_enabled": "Enable Microinverter Power",
-          "vpp_events_enabled": "Enable VPP events",
-          "grid_profile_controls_enabled": "Enable installer Grid Profile controls",
-          "export_limit_controls_enabled": "Enable Export Limit controls"
+          "vpp_events_enabled": "Enable VPP Events",
+          "grid_profile_controls_enabled": "Enable Installer Grid Profile Controls",
+          "export_limit_controls_enabled": "Enable Export Limit Controls"
         },
         "data_description": {
-          "system_event_repair_issues": "Create Home Assistant Repairs for active Enphase standing alarms. Disabled by default.",
-          "pricing_edits_enabled": "Manage IQ Gateway Electricity Rates",
-          "weather_enabled": "Fetch current site weather from Enphase and create a weather entity only when the endpoint is available.",
-          "nominal_voltage": "Typical AC supply voltage used to estimate charger power when live voltage is unavailable.",
-          "schedule_sync_enabled": "Manage IQ EV Charger schedules.",
-          "battery_schedules_enabled": "Manage IQ Battery schedules.",
-          "microinverter_lifetime_energy_enabled": "Enable all per-microinverter lifetime energy sensors.",
-          "microinverter_power_enabled": "Enable all per-microinverter power sensors when installer telemetry is available.",
-          "vpp_events_enabled": "Fetch VPP/ELRP schedules from Enphase and create event entities only for enrolled sites. Disabled by default.",
-          "grid_profile_controls_enabled": "Fetch installer-only Grid Profile metadata and enable profile actions. Disabled by default.",
-          "export_limit_controls_enabled": "Configure system export limits. Requires installer access."
+          "system_event_repair_issues": "Create Home Assistant Repairs issues for active system alarms reported by Enphase. Default: Disabled.",
+          "pricing_edits_enabled": "Enable controls to edit electricity rates used by the IQ Gateway. Default: Enabled.",
+          "weather_enabled": "Fetch site weather from Enphase and create a weather entity when the service is available. Default: Disabled.",
+          "nominal_voltage": "AC supply voltage used to estimate charger power when live voltage is unavailable. Default: Learned from charger telemetry when available; otherwise based on the Home Assistant region, with a 230 V fallback.",
+          "schedule_sync_enabled": "Enable controls to view and manage IQ EV Charger charging schedules. Default: Enabled.",
+          "battery_schedules_enabled": "Enable controls to view and manage IQ Battery schedules. Default: Enabled.",
+          "microinverter_lifetime_energy_enabled": "Enable individual lifetime energy sensors for each microinverter. Default: Disabled.",
+          "microinverter_power_enabled": "Enable individual current power sensors for each microinverter when installer telemetry is available. Requires installer access. Default: Disabled.",
+          "vpp_events_enabled": "Fetch Virtual Power Plant (VPP) and Emergency Load Reduction Program (ELRP) schedules and create event entities for enrolled sites. Default: Disabled.",
+          "grid_profile_controls_enabled": "Fetch installer-only grid profile details and enable controls to browse and apply profiles. Requires installer access. Default: Disabled.",
+          "export_limit_controls_enabled": "Enable controls to set or disable system export limits. Requires installer access. Default: Disabled."
         }
       },
       "export_limit": {

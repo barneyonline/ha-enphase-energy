@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - Report microinverter power telemetry status independently of the individual sensor option, and remove retired charger buttons without waiting for inventory refresh.
 
 ### 🔧 Improvements
+- Capitalize options labels and clarify feature, polling, device, notification, authentication, and advanced-control descriptions, including default states for settings and features in every locale.
 - Align the Enphase Cloud live power sensor names as Battery Power, Grid Power, Consumption Power, and Production Power in every locale.
 - Label the Export Limit selector states as Enabled and Disabled in every locale.
 - Show Battery Available Power and Battery Mode under Diagnostics on the IQ Battery device.
