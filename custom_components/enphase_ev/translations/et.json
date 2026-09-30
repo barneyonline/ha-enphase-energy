@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Ekspordipiirang",
-        "description": "Seadista süsteemi ekspordipiirangud.\n\nPraegune seadistus: **{current}**\n\n{status}",
+        "description": "Määrake, kui palju võimsust teie süsteem võrku edastab. Taotluse olek näitab selle integratsiooni kaudu saadetud muudatuste seisu.\n\nPraegune seadistus: **{current}**\n\nOotel seadistus: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Määra ekspordipiirang",
-          "export_limit_zero": "Määra nulleksport",
+          "export_limit_set": "Luba ekspordipiirang",
           "export_limit_disable": "Keela ekspordipiirang",
           "export_limit_defaults": "Vaikeseaded"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Salvestage ekspordipiirangu juhtimise vaikeväärtused.",
+          "export_limit_set": "Määrake suurim võrku edastatav võimsus, sealhulgas null.",
+          "export_limit_disable": "Lubage võrku edastamine ilma määratud piiranguta."
         }
       },
       "export_limit_set": {
-        "title": "Määra ekspordipiirang",
+        "title": "Luba ekspordipiirang",
         "data": {
           "limit_watts": "Ekspordipiirang (W)"
-        }
+        },
+        "description": "Määrake piiranguks 0 W, et vältida elektri võrku edastamist. Muud väärtused määravad suurima võimsuse, mida süsteem võib võrku edastada."
       },
       "export_limit_confirm": {
         "title": "Ekspordipiirang",
@@ -862,7 +867,7 @@
       },
       "export_limit_defaults": {
         "title": "Vaikeseaded",
-        "description": "Salvestab piirangu lubamise vaikeväärtused lüüsi muutmata. Taastamine eemaldab salvestatud kiiruse ülekirjutuse.",
+        "description": "Salvestage vaikeväärtused, mida kasutatakse ekspordipiirangu juhtnupus valiku Lubatud valimisel. Nende salvestamine ei muuda lüüsi. Taastamine eemaldab salvestatud kiiruse ülekirjutuse.",
         "data": {
           "limit_watts": "Vaikimisi ekspordipiirang (W)",
           "slew_rate": "Muutumiskiirus (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "Taotluse olek",
             "state": {
-              "idle": "Taotlus puudub",
+              "idle": "Puudub",
               "pending": "Ootab kinnitust",
               "confirmed": "Seadistus kinnitatud",
               "unconfirmed": "Kinnitamata",

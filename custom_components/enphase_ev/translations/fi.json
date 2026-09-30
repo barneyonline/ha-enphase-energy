@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Syöttöraja",
-        "description": "Määritä järjestelmän verkkosyötön rajat.\n\nNykyinen asetus: **{current}**\n\n{status}",
+        "description": "Määritä, kuinka paljon tehoa järjestelmäsi syöttää sähköverkkoon. Pyynnön tila seuraa tämän integraation kautta lähetettyjä muutoksia.\n\nNykyinen asetus: **{current}**\n\nOdottava asetus: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Aseta syöttöraja",
-          "export_limit_zero": "Aseta nollasyöttö",
+          "export_limit_set": "Ota syöttöraja käyttöön",
           "export_limit_disable": "Poista syöttörajoitus käytöstä",
           "export_limit_defaults": "Oletusasetukset"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Tallenna syöttörajan ohjaimen oletusarvot.",
+          "export_limit_set": "Aseta suurin verkkosyöttö, mukaan lukien nollasyöttö.",
+          "export_limit_disable": "Salli syöttö verkkoon ilman määritettyä rajaa."
         }
       },
       "export_limit_set": {
-        "title": "Aseta syöttöraja",
+        "title": "Ota syöttöraja käyttöön",
         "data": {
           "limit_watts": "Syöttöraja (W)"
-        }
+        },
+        "description": "Aseta rajaksi 0 W estääksesi syötön sähköverkkoon. Muut arvot määrittävät suurimman tehon, jonka järjestelmä saa syöttää verkkoon."
       },
       "export_limit_confirm": {
         "title": "Syöttöraja",
@@ -862,7 +867,7 @@
       },
       "export_limit_defaults": {
         "title": "Oletusasetukset",
-        "description": "Tallenna rajan käyttöönoton oletukset muuttamatta yhdyskäytävää. Palautus poistaa tallennetun nopeuden ohituksen.",
+        "description": "Tallenna oletusarvot, joita käytetään, kun valitset syöttörajan ohjaimesta Käytössä. Oletusarvojen tallentaminen ei muuta yhdyskäytävää. Palautus poistaa tallennetun nopeuden ohituksen.",
         "data": {
           "limit_watts": "Viennin oletusraja (W)",
           "slew_rate": "Muutosnopeus (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "Pyynnön tila",
             "state": {
-              "idle": "Ei pyyntöä",
+              "idle": "Ei mitään",
               "pending": "Odottaa vahvistusta",
               "confirmed": "Asetukset vahvistettu",
               "unconfirmed": "Vahvistamaton",

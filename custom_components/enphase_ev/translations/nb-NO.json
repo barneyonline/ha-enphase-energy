@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Eksportgrense",
-        "description": "Konfigurer systemets eksportgrenser.\n\nGjeldende innstilling: **{current}**\n\n{status}",
+        "description": "Styr hvor mye effekt systemet ditt leverer til strømnettet. Forespørselsstatus viser endringer sendt gjennom denne integrasjonen.\n\nGjeldende innstilling: **{current}**\n\nVentende innstilling: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Angi eksportgrense",
-          "export_limit_zero": "Angi nulleksport",
+          "export_limit_set": "Aktiver eksportgrense",
           "export_limit_disable": "Deaktiver eksportbegrensning",
           "export_limit_defaults": "Standardinnstillinger"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Lagre standardverdier for kontrollen for eksportgrense.",
+          "export_limit_set": "Angi maksimal eksport til strømnettet, inkludert null eksport.",
+          "export_limit_disable": "Tillat eksport til strømnettet uten en angitt grense."
         }
       },
       "export_limit_set": {
-        "title": "Angi eksportgrense",
+        "title": "Aktiver eksportgrense",
         "data": {
           "limit_watts": "Eksportgrense (W)"
-        }
+        },
+        "description": "Sett grensen til 0 W for å hindre eksport til strømnettet. Andre verdier angir den maksimale effekten systemet kan levere til strømnettet."
       },
       "export_limit_confirm": {
         "title": "Eksportgrense",
@@ -862,7 +867,7 @@
       },
       "export_limit_defaults": {
         "title": "Standardinnstillinger",
-        "description": "Lagre standarder for aktivering uten å endre gatewayen. Gjenoppretting fjerner den lagrede hastighetsoverstyringen.",
+        "description": "Lagre standardverdiene som brukes når du velger Aktivert i kontrollen for eksportgrense. Lagring av verdiene endrer ikke gatewayen. Gjenoppretting fjerner den lagrede hastighetsoverstyringen.",
         "data": {
           "limit_watts": "Standard eksportgrense (W)",
           "slew_rate": "Endringshastighet (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "Forespørselsstatus",
             "state": {
-              "idle": "Ingen forespørsel",
+              "idle": "Ingen",
               "pending": "Venter på bekreftelse",
               "confirmed": "Konfigurasjon bekreftet",
               "unconfirmed": "Ubekreftet",

@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Limită de injecție",
-        "description": "Configurați limitele de injecție ale sistemului.\n\nSetare actuală: **{current}**\n\n{status}",
+        "description": "Controlați câtă putere livrează sistemul în rețea. Starea solicitării urmărește modificările trimise prin această integrare.\n\nSetare actuală: **{current}**\n\nSetare în așteptare: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Setați limita de injecție",
-          "export_limit_zero": "Setați injecția zero",
+          "export_limit_set": "Activează limita de export",
           "export_limit_disable": "Dezactivați limitarea injecției",
           "export_limit_defaults": "Setări implicite"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Salvați valorile implicite pentru controlul limitei de export.",
+          "export_limit_set": "Setați exportul maxim în rețea, inclusiv exportul zero.",
+          "export_limit_disable": "Permiteți exportul în rețea fără o limită configurată."
         }
       },
       "export_limit_set": {
-        "title": "Setați limita de injecție",
+        "title": "Activează limita de export",
         "data": {
           "limit_watts": "Limită de injecție (W)"
-        }
+        },
+        "description": "Setați limita la 0 W pentru a împiedica livrarea în rețea. Alte valori stabilesc puterea maximă pe care sistemul o poate livra în rețea."
       },
       "export_limit_confirm": {
         "title": "Limită de injecție",
@@ -862,7 +867,7 @@
       },
       "export_limit_defaults": {
         "title": "Setări implicite",
-        "description": "Salvează valorile pentru activarea limitei fără a modifica gateway-ul. Restabilirea șterge rata personalizată salvată.",
+        "description": "Salvați valorile implicite folosite când selectați Activat în controlul limitei de export. Salvarea acestor valori nu modifică gateway-ul. Restabilirea șterge rata personalizată salvată.",
         "data": {
           "limit_watts": "Limită de export implicită (W)",
           "slew_rate": "Rata de variație (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "Starea solicitării",
             "state": {
-              "idle": "Nicio solicitare",
+              "idle": "Niciuna",
               "pending": "În așteptarea confirmării",
               "confirmed": "Configurație confirmată",
               "unconfirmed": "Neconfirmat",

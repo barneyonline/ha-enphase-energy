@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Limite de injeção",
-        "description": "Configurar os limites de injeção do sistema.\n\nConfiguração atual: **{current}**\n\n{status}",
+        "description": "Controle quanta potência seu sistema exporta para a rede. O status da solicitação acompanha as alterações enviadas por esta integração.\n\nConfiguração atual: **{current}**\n\nConfiguração pendente: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Definir limite de injeção",
-          "export_limit_zero": "Definir injeção zero",
+          "export_limit_set": "Habilitar limite de exportação",
           "export_limit_disable": "Desativar limitação de injeção",
           "export_limit_defaults": "Configurações padrão"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Salve os valores padrão do controle de limite de exportação.",
+          "export_limit_set": "Defina a exportação máxima para a rede, incluindo exportação zero.",
+          "export_limit_disable": "Permita exportações para a rede sem um limite configurado."
         }
       },
       "export_limit_set": {
-        "title": "Definir limite de injeção",
+        "title": "Habilitar limite de exportação",
         "data": {
           "limit_watts": "Limite de injeção (W)"
-        }
+        },
+        "description": "Defina o limite como 0 W para impedir a exportação para a rede. Outros valores definem a potência máxima que seu sistema pode exportar."
       },
       "export_limit_confirm": {
         "title": "Limite de injeção",
@@ -862,7 +867,7 @@
       },
       "export_limit_defaults": {
         "title": "Configurações padrão",
-        "description": "Salva valores para ativar o limite sem alterar o gateway. Restaurar remove a taxa personalizada salva.",
+        "description": "Salve os valores padrão usados ao selecionar Habilitado no controle de limite de exportação. Salvar esses valores não altera o gateway. Restaurar remove a taxa personalizada salva.",
         "data": {
           "limit_watts": "Limite de exportação padrão (W)",
           "slew_rate": "Taxa de variação (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "Estado da solicitação",
             "state": {
-              "idle": "Nenhuma solicitação",
+              "idle": "Nenhuma",
               "pending": "Aguardando confirmação",
               "confirmed": "Configuração confirmada",
               "unconfirmed": "Não confirmado",

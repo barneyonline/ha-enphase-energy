@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Límite de vertido",
-        "description": "Configurar los límites de vertido del sistema.\n\nConfiguración actual: **{current}**\n\n{status}",
+        "description": "Controla cuánta potencia exporta tu sistema a la red. El estado de la solicitud permite seguir los cambios enviados a través de esta integración.\n\nConfiguración actual: **{current}**\n\nConfiguración pendiente: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Establecer límite de vertido",
-          "export_limit_zero": "Establecer vertido cero",
+          "export_limit_set": "Activar límite de exportación",
           "export_limit_disable": "Desactivar limitación de vertido",
           "export_limit_defaults": "Valores predeterminados"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Guarda los valores predeterminados del control de límite de exportación.",
+          "export_limit_set": "Establece la exportación máxima a la red, incluida la exportación cero.",
+          "export_limit_disable": "Permite exportar a la red sin un límite configurado."
         }
       },
       "export_limit_set": {
-        "title": "Establecer límite de vertido",
+        "title": "Activar límite de exportación",
         "data": {
           "limit_watts": "Límite de vertido (W)"
-        }
+        },
+        "description": "Establece el límite en 0 W para impedir la exportación a la red. Otros valores fijan la potencia máxima que tu sistema puede exportar."
       },
       "export_limit_confirm": {
         "title": "Límite de vertido",
@@ -862,7 +867,7 @@
       },
       "export_limit_defaults": {
         "title": "Valores predeterminados",
-        "description": "Guarda valores para activar el límite sin cambiar la puerta de enlace. Restaurar elimina la tasa guardada.",
+        "description": "Guarda los valores predeterminados que se usan al seleccionar Activado en el control de límite de exportación. Guardarlos no modifica la puerta de enlace. Restaurar elimina la tasa guardada.",
         "data": {
           "limit_watts": "Límite de exportación predeterminado (W)",
           "slew_rate": "Tasa de variación (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "Estado de la solicitud",
             "state": {
-              "idle": "Sin solicitud",
+              "idle": "Ninguna",
               "pending": "Esperando confirmación",
               "confirmed": "Configuración confirmada",
               "unconfirmed": "Sin confirmar",

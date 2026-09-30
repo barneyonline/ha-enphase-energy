@@ -936,19 +936,24 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Expose the action menu as a registered Home Assistant flow step."""
-        status = self._export_runtime().request_status
+        pending = self._export_runtime().pending
+        if pending is None:
+            pending_label = await self._export_label(
+                "state_attributes.request_status.state.idle", "None"
+            )
+        elif pending["watts"] is None:
+            pending_label = await self._export_label("state.disabled", "Disabled")
+        else:
+            pending_label = f"{pending['watts']} W"
         return self.async_show_menu(
             step_id="export_limit_action",
             description_placeholders={
                 "current": await self._export_current_label(),
-                "status": await self._export_label(
-                    f"state_attributes.request_status.state.{status}", status
-                ),
+                "pending": pending_label,
             },
             menu_options=[
                 "export_limit_defaults",
                 "export_limit_set",
-                "export_limit_zero",
                 "export_limit_disable",
             ],
         )
@@ -1033,6 +1038,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 return await self.async_step_export_limit_confirm()
         return self.async_show_form(
             step_id="export_limit_set",
+            last_step=False,
             data_schema=vol.Schema(
                 {
                     vol.Required(
@@ -1055,12 +1061,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             ),
             errors=errors,
         )
-
-    async def async_step_export_limit_zero(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        self._export_watts = 0
-        return await self.async_step_export_limit_confirm()
 
     async def async_step_export_limit_disable(
         self, user_input: dict[str, Any] | None = None
@@ -1207,6 +1207,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
 
         return self.async_show_form(
             step_id="grid_toggle",
+            last_step=False,
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_GRID_MODE): selector(
@@ -1317,6 +1318,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
 
         return self.async_show_form(
             step_id="grid_profile",
+            last_step=False,
             data_schema=self._grid_profile_filter_schema(runtime),
             errors=errors,
         )
@@ -1353,6 +1355,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
 
         return self.async_show_form(
             step_id="grid_profile_select",
+            last_step=False,
             data_schema=self._grid_profile_select_schema(profiles),
             errors=errors,
         )
@@ -1713,6 +1716,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
 
         return self.async_show_form(
             step_id="migrate_envoy_source",
+            last_step=False,
             data_schema=self._build_migration_source_schema(sources),
         )
 
@@ -1730,6 +1734,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
 
         return self.async_show_form(
             step_id="migrate_envoy_intro",
+            last_step=False,
             data_schema=self._build_migration_intro_schema(),
             errors=errors,
             description_placeholders={
@@ -1777,6 +1782,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
 
         return self.async_show_form(
             step_id="migrate_envoy_mapping",
+            last_step=False,
             data_schema=self._build_migration_mapping_schema(
                 source,
                 extra_candidates,

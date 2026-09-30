@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Limit oddawania energii",
-        "description": "Skonfiguruj limity oddawania energii systemu.\n\nBieżące ustawienie: **{current}**\n\n{status}",
+        "description": "Kontroluj, ile mocy system oddaje do sieci. Status żądania pokazuje postęp zmian przesłanych przez tę integrację.\n\nBieżące ustawienie: **{current}**\n\nOczekujące ustawienie: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Ustaw limit oddawania energii",
-          "export_limit_zero": "Ustaw zerowe oddawanie energii",
+          "export_limit_set": "Włącz limit eksportu",
           "export_limit_disable": "Wyłącz ograniczenie oddawania energii",
           "export_limit_defaults": "Ustawienia domyślne"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Zapisz wartości domyślne sterowania limitem eksportu.",
+          "export_limit_set": "Ustaw maksymalne oddawanie energii do sieci, w tym zero.",
+          "export_limit_disable": "Zezwól na oddawanie energii do sieci bez ustawionego limitu."
         }
       },
       "export_limit_set": {
-        "title": "Ustaw limit oddawania energii",
+        "title": "Włącz limit eksportu",
         "data": {
           "limit_watts": "Limit oddawania energii (W)"
-        }
+        },
+        "description": "Ustaw limit na 0 W, aby uniemożliwić oddawanie energii do sieci. Inne wartości określają maksymalną moc, którą system może oddawać do sieci."
       },
       "export_limit_confirm": {
         "title": "Limit oddawania energii",
@@ -862,7 +867,7 @@
       },
       "export_limit_defaults": {
         "title": "Ustawienia domyślne",
-        "description": "Zapisuje wartości włączania limitu bez zmiany bramy. Przywrócenie usuwa zapisane nadpisanie szybkości.",
+        "description": "Zapisz wartości domyślne używane po wybraniu opcji Włączony w sterowaniu limitem eksportu. Ich zapisanie nie zmienia ustawień bramy. Przywrócenie usuwa zapisane nadpisanie szybkości.",
         "data": {
           "limit_watts": "Domyślny limit eksportu (W)",
           "slew_rate": "Szybkość zmiany (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "Stan żądania",
             "state": {
-              "idle": "Brak żądania",
+              "idle": "Brak",
               "pending": "Oczekiwanie na potwierdzenie",
               "confirmed": "Konfiguracja potwierdzona",
               "unconfirmed": "Niepotwierdzone",

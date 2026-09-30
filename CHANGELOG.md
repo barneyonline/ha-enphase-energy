@@ -11,10 +11,16 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- Show the actual pending Export Limit setting, or None when no request remains, independently of the last request status.
 - Keep per-array Current Power sensors enabled independently of the individual Microinverter Power feature setting when account telemetry is available.
 - Report microinverter power telemetry status independently of the individual sensor option, and remove retired charger buttons without waiting for inventory refresh.
 
 ### 🔧 Improvements
+- Show Home Assistant’s translated Next button on intermediate options forms for Export Limit, Grid Mode, Grid Profile, and Envoy history migration.
+- Add short descriptions below Export Limit menu headings and align their capitalisation with the other options menus in every locale.
+- Combine export-limit and zero-export actions into Enable Export Limit, explaining zero and nonzero limits in every locale.
+- Explain that saved Export Limit defaults apply when selecting Enabled in the Export Limit control.
+- Clarify the Export Limit dialog description and show “Pending setting: None” when no request is active in every locale.
 - Capitalize options labels and clarify feature, polling, device, notification, authentication, and advanced-control descriptions, including default states for settings and features in every locale.
 - Align the Enphase Cloud live power sensor names as Battery Power, Grid Power, Consumption Power, and Production Power in every locale.
 - Label the Export Limit selector states as Enabled and Disabled in every locale.

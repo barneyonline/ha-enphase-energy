@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Limit přetoků",
-        "description": "Nastavit limity přetoků systému.\n\nAktuální nastavení: **{current}**\n\n{status}",
+        "description": "Nastavte, kolik výkonu váš systém dodává do sítě. Stav požadavku sleduje změny odeslané prostřednictvím této integrace.\n\nAktuální nastavení: **{current}**\n\nČekající nastavení: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Nastavit limit přetoků",
-          "export_limit_zero": "Nastavit nulové přetoky",
+          "export_limit_set": "Povolit limit dodávky do sítě",
           "export_limit_disable": "Vypnout omezení přetoků",
           "export_limit_defaults": "Výchozí nastavení"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Uložte výchozí hodnoty pro ovládání limitu dodávky.",
+          "export_limit_set": "Nastavte maximální dodávku do sítě, včetně nulové.",
+          "export_limit_disable": "Povolte dodávku do sítě bez nastaveného limitu."
         }
       },
       "export_limit_set": {
-        "title": "Nastavit limit přetoků",
+        "title": "Povolit limit dodávky do sítě",
         "data": {
           "limit_watts": "Limit přetoků (W)"
-        }
+        },
+        "description": "Nastavením limitu na 0 W zabráníte dodávce do sítě. Jiné hodnoty určují maximální výkon, který může systém dodávat do sítě."
       },
       "export_limit_confirm": {
         "title": "Limit přetoků",
@@ -862,7 +867,7 @@
       },
       "export_limit_defaults": {
         "title": "Výchozí nastavení",
-        "description": "Uloží výchozí hodnoty pro zapnutí limitu bez změny brány. Obnovení odstraní uložené přepsání rychlosti.",
+        "description": "Uložte výchozí hodnoty používané při výběru možnosti Povoleno v ovládání limitu dodávky do sítě. Uložení těchto hodnot nemění nastavení brány. Obnovení odstraní uložené přepsání rychlosti.",
         "data": {
           "limit_watts": "Výchozí limit přetoků (W)",
           "slew_rate": "Rychlost změny (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "Stav požadavku",
             "state": {
-              "idle": "Žádný požadavek",
+              "idle": "Žádné",
               "pending": "Čeká na potvrzení",
               "confirmed": "Konfigurace potvrzena",
               "unconfirmed": "Nepotvrzeno",

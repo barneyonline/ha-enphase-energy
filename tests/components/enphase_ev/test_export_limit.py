@@ -402,6 +402,42 @@ async def test_immediate_read_failure(runtime):
     assert runtime.request_status == "unconfirmed" and runtime.snapshot is None
 
 
+@pytest.mark.parametrize(
+    "status", ["idle", "pending", "confirmed", "unconfirmed", "rejected"]
+)
+@pytest.mark.parametrize(
+    "pending", [None, {"watts": 0}, {"watts": 3000}, {"watts": None}]
+)
+async def test_options_menu_shows_pending_setting(runtime, hass, status, pending):
+    flow = OptionsFlowHandler(runtime.coordinator.config_entry)
+    flow.hass = hass
+    runtime.request_status = status
+    runtime.pending = pending
+    result = await flow.async_step_export_limit_action()
+    expected = (
+        "None"
+        if pending is None
+        else "Disabled" if pending["watts"] is None else f"{pending['watts']} W"
+    )
+    assert result["description_placeholders"]["pending"] == expected
+
+
+async def test_options_menu_clears_pending_setting_after_readback(runtime, hass):
+    flow = OptionsFlowHandler(runtime.coordinator.config_entry)
+    flow.hass = hass
+    await runtime.async_apply(0, confirm=True)
+    result = await flow.async_step_export_limit_action()
+    assert result["description_placeholders"]["pending"] == "0 W"
+    runtime.coordinator.client.async_get_export_limit_settings.return_value = payload(
+        free_limit_value=0
+    )
+    await runtime.async_refresh()
+    assert runtime.request_status == "confirmed"
+    assert runtime.pending is None
+    result = await flow.async_step_export_limit_action()
+    assert result["description_placeholders"]["pending"] == "None"
+
+
 async def test_options_flow(runtime, hass):
     entry = runtime.coordinator.config_entry
     flow = OptionsFlowHandler(entry)
@@ -410,11 +446,11 @@ async def test_options_flow(runtime, hass):
     assert menu["menu_options"] == [
         "export_limit_defaults",
         "export_limit_set",
-        "export_limit_zero",
         "export_limit_disable",
     ]
     result = await flow.async_step_export_limit_set()
     assert result["step_id"] == "export_limit_set"
+    assert result["last_step"] is False
     result = await flow.async_step_export_limit_set({"limit_watts": 0.5})
     assert result["errors"]["base"] == "export_limit_invalid"
     result = await flow.async_step_export_limit_set({"limit_watts": 3000})
@@ -424,7 +460,9 @@ async def test_options_flow(runtime, hass):
     result = await flow.async_step_export_limit_confirm({"confirm": True})
     assert result["step_id"] == "export_limit_submitted"
     assert (await flow.async_step_export_limit_submitted({}))["type"] == "create_entry"
-    await flow.async_step_export_limit_zero()
+    result = await flow.async_step_export_limit_set({"limit_watts": 0})
+    assert result["step_id"] == "export_limit_confirm"
+    assert result["description_placeholders"]["requested"] == "0 W"
     assert flow._export_watts == 0
     await flow.async_step_export_limit_disable()
     assert flow._export_watts is None
@@ -1194,7 +1232,9 @@ async def test_export_options_session_expiry_has_localized_recovery(runtime, ste
     flow = OptionsFlowHandler(runtime.coordinator.config_entry)
     flow.hass = runtime.coordinator.hass
     await flow.async_step_export_limit()
-    await flow.async_step_export_limit_zero()
+    result = await flow.async_step_export_limit_set({"limit_watts": 0})
+    assert result["step_id"] == "export_limit_confirm"
+    assert result["description_placeholders"]["requested"] == "0 W"
     runtime.coordinator.client.async_prepare_activation_auth.side_effect = (
         ActivationSessionExpired("expired")
     )
