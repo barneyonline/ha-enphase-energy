@@ -524,7 +524,7 @@
         "menu_option_descriptions": {
           "settings": "Säädä kyselyä ja toimintaa.",
           "devices": "Valitse mukaan otettavat laiteluokat.",
-          "repair_notifications": "Hallitse Home Assistantin korjausilmoituksia.",
+          "repair_notifications": "Hallitse Home Assistantin korjausilmoituksia ja kuvailevia toimintamerkintöjä.",
           "authentication_settings": "Käynnistä kirjautumiskulku päivittääksesi valtuustiedot poistamatta integraatiota.",
           "migrate_envoy": "Ota valitut Enphase Envoyn energiaentiteettien tunnukset käyttöön, jotta Home Assistant Energyn historia jatkuu tämän integraation alla.",
           "advanced": "Asentajan ja huollon toiminnot.",
@@ -627,14 +627,16 @@
       },
       "repair_notifications": {
         "title": "Ilmoitukset",
-        "description": "Valitse, mitkä Enphase-tilanteet luovat Home Assistant -korjauksia.",
+        "description": "Hallitse Home Assistantin korjausilmoituksia ja kuvailevia toimintamerkintöjä.",
         "data": {
           "degraded_service_repair_issues": "Ota heikentyneiden palvelujen korjaukset käyttöön",
-          "system_event_repair_issues": "Ota järjestelmätapahtumien korjausilmoitukset käyttöön"
+          "system_event_repair_issues": "Ota järjestelmätapahtumien korjausilmoitukset käyttöön",
+          "descriptive_activity_entries": "Ota kuvailevat toimintamerkinnät käyttöön"
         },
         "data_description": {
           "degraded_service_repair_issues": "Luo Repairs-ongelmia, kun valinnaiset Enphase-palvelut ovat heikentyneet. Oletus: Pois käytöstä.",
-          "system_event_repair_issues": "Luo Home Assistant -korjauksia aktiivisille Enphasen pysyville hälytyksille. Oletuksena pois käytöstä. Oletus: Pois käytöstä."
+          "system_event_repair_issues": "Luo Home Assistant -korjauksia aktiivisille Enphasen pysyville hälytyksille. Oletuksena pois käytöstä. Oletus: Pois käytöstä.",
+          "descriptive_activity_entries": "Lisää kuvailevia merkintöjä Home Assistantin toimintaan, kun ilmoitetut olosuhteet muuttuvat. Ne näkyvät tavallisten tilanmuutosmerkintöjen rinnalla. Oletuksena pois käytöstä."
         }
       },
       "authentication_settings": {
@@ -1941,7 +1943,46 @@
           "error": "Virhe",
           "unknown": "Tuntematon",
           "unpaired": "Ei paritettu",
-          "pairing": "Pariliitos"
+          "pairing": "Pariliitos",
+          "activity_status": "Tila",
+          "activity_unknown": "Tuntematon",
+          "activity_yes": "Kyllä",
+          "activity_no": "Ei",
+          "activity_more": "Muut kohteet",
+          "activity_battery": "Akku",
+          "activity_charger_problem": "Ilmoitettu vika",
+          "activity_suspended_by_evse": "Laturin keskeyttämä",
+          "activity_offline_since": "Poissa verkosta alkaen",
+          "activity_connected_devices": "Yhdistetyt yhdyskäytävät",
+          "activity_disconnected_devices": "Irrotetut yhdyskäytävät",
+          "activity_unknown_connection_devices": "Yhdyskäytävät, joiden tila on tuntematon",
+          "activity_connection_method": "Yhteystapa",
+          "activity_latest_reported_utc": "Viimeksi ilmoitettu",
+          "activity_reporting_inverters": "Raportoivat invertterit",
+          "activity_not_reporting_inverters": "Raportoimattomat invertterit",
+          "activity_unknown_inverters": "Invertterit, joiden tila on tuntematon",
+          "activity_power_telemetry_status": "Tehotelemetria",
+          "activity_power_telemetry_next_retry": "Telemetrian uudelleenyritys",
+          "activity_sg_ready_mode_raw": "SG Ready -tila",
+          "activity_sg_ready_contact_state": "Kosketintila",
+          "activity_vpp_sgready_mode_override": "Ilmoitettu VPP-ohitus",
+          "activity_confirmed_watts": "Vahvistettu raja (W)",
+          "activity_requested_watts": "Pyydetty raja (W)",
+          "activity_requested_action": "Pyydetty toiminto",
+          "activity_request_status": "Pyynnön tila",
+          "activity_active_count": "Aktiiviset ongelmat",
+          "activity_type": "Tapahtumatyyppi",
+          "activity_device_type": "Laitetyyppi",
+          "activity_severity": "Vakavuus",
+          "activity_description": "Kuvaus",
+          "activity_event_date": "Ensimmäinen ilmoitus",
+          "activity_reason": "Syy",
+          "activity_http_status": "HTTP-tila",
+          "activity_retry": "Seuraava yritys",
+          "activity_worst_battery": "Akun huonoin tila",
+          "activity_reachable": "Pilvi tavoitettavissa",
+          "activity_last_success": "Viimeisin onnistunut päivitys",
+          "activity_standing_alarm": "Pysyvä hälytys"
         }
       },
       "battery_cfg_schedules": {
@@ -2433,7 +2474,7 @@
         }
       },
       "active_system_events": {
-        "name": "Aktiiviset järjestelmätapahtumat",
+        "name": "Järjestelmätapahtumat",
         "state_attributes": {
           "available": {
             "name": "Tapahtumapalvelu käytettävissä"

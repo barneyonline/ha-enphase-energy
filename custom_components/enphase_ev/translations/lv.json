@@ -524,7 +524,7 @@
         "menu_option_descriptions": {
           "settings": "Pielāgojiet aptauju un darbību.",
           "devices": "Izvēlieties iekļaujamās ierīču kategorijas.",
-          "repair_notifications": "Pārvaldīt Home Assistant labošanas paziņojumus.",
+          "repair_notifications": "Pārvaldīt Home Assistant labošanas paziņojumus un aprakstošos aktivitātes ierakstus.",
           "authentication_settings": "Palaidiet pieteikšanās plūsmu, lai atjaunotu datus, nenoņemot integrāciju.",
           "migrate_envoy": "Pārņemiet izvēlētos Enphase Envoy enerģijas entītiju ID, lai Home Assistant Energy vēsture turpinātos šajā integrācijā.",
           "advanced": "Uzstādītāja un apkopes darbības.",
@@ -627,14 +627,16 @@
       },
       "repair_notifications": {
         "title": "Paziņojumi",
-        "description": "Izvēlieties, kuri Enphase apstākļi izveido Home Assistant labojumus.",
+        "description": "Pārvaldīt Home Assistant labošanas paziņojumus un aprakstošos aktivitātes ierakstus.",
         "data": {
           "degraded_service_repair_issues": "Iespējot degradētu pakalpojumu labojumus",
-          "system_event_repair_issues": "Iespējot sistēmas notikumu labošanas paziņojumus"
+          "system_event_repair_issues": "Iespējot sistēmas notikumu labošanas paziņojumus",
+          "descriptive_activity_entries": "Iespējot aprakstošus aktivitātes ierakstus"
         },
         "data_description": {
           "degraded_service_repair_issues": "Izveido Repairs problēmas, kad izvēles Enphase pakalpojumi darbojas pasliktināti. Noklusējums: Izslēgts.",
-          "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts. Noklusējums: Izslēgts."
+          "system_event_repair_issues": "Izveido Home Assistant labojumus aktīviem Enphase pastāvīgajiem trauksmes signāliem. Pēc noklusējuma izslēgts. Noklusējums: Izslēgts.",
+          "descriptive_activity_entries": "Pievieno aprakstošus ierakstus Home Assistant aktivitātei, kad mainās ziņotie apstākļi. Tie tiek rādīti līdzās parastajiem stāvokļa maiņas ierakstiem. Pēc noklusējuma atspējots."
         }
       },
       "authentication_settings": {
@@ -1941,7 +1943,46 @@
           "error": "Kļūda",
           "unknown": "Nezināms",
           "unpaired": "Nesapārots",
-          "pairing": "Sapārošana"
+          "pairing": "Sapārošana",
+          "activity_status": "Statuss",
+          "activity_unknown": "Nezināms",
+          "activity_yes": "Jā",
+          "activity_no": "Nē",
+          "activity_more": "Vairāk ierakstu",
+          "activity_battery": "Akumulators",
+          "activity_charger_problem": "Ziņota kļūme",
+          "activity_suspended_by_evse": "Lādētāja apturēts",
+          "activity_offline_since": "Bezsaistē kopš",
+          "activity_connected_devices": "Pievienotās vārtejas",
+          "activity_disconnected_devices": "Atvienotās vārtejas",
+          "activity_unknown_connection_devices": "Vārtejas ar nezināmu statusu",
+          "activity_connection_method": "Savienojuma veids",
+          "activity_latest_reported_utc": "Pēdējais ziņojums",
+          "activity_reporting_inverters": "Invertori, kas ziņo",
+          "activity_not_reporting_inverters": "Invertori, kas neziņo",
+          "activity_unknown_inverters": "Invertori ar nezināmu statusu",
+          "activity_power_telemetry_status": "Jaudas telemetrija",
+          "activity_power_telemetry_next_retry": "Telemetrijas atkārtots mēģinājums",
+          "activity_sg_ready_mode_raw": "SG Ready režīms",
+          "activity_sg_ready_contact_state": "Kontaktu stāvoklis",
+          "activity_vpp_sgready_mode_override": "Ziņota VPP ignorēšana",
+          "activity_confirmed_watts": "Apstiprinātais limits (W)",
+          "activity_requested_watts": "Pieprasītais limits (W)",
+          "activity_requested_action": "Pieprasītā darbība",
+          "activity_request_status": "Pieprasījuma statuss",
+          "activity_active_count": "Aktīvās problēmas",
+          "activity_type": "Notikuma veids",
+          "activity_device_type": "Ierīces veids",
+          "activity_severity": "Nopietnība",
+          "activity_description": "Apraksts",
+          "activity_event_date": "Pirmais ziņojums",
+          "activity_reason": "Iemesls",
+          "activity_http_status": "HTTP statuss",
+          "activity_retry": "Nākamais mēģinājums",
+          "activity_worst_battery": "Sliktākais akumulatora statuss",
+          "activity_reachable": "Mākonis sasniedzams",
+          "activity_last_success": "Pēdējais veiksmīgais atjauninājums",
+          "activity_standing_alarm": "Pastāvīgs trauksmes signāls"
         }
       },
       "battery_cfg_schedules": {
@@ -2433,7 +2474,7 @@
         }
       },
       "active_system_events": {
-        "name": "Aktīvi sistēmas notikumi",
+        "name": "Sistēmas notikumi",
         "state_attributes": {
           "available": {
             "name": "Notikumu pakalpojums pieejams"

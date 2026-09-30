@@ -48,6 +48,7 @@ _HIGH_IMPACT_SEVERITIES = frozenset(
     {"critical", "emergency", "error", "fatal", "severe"}
 )
 _INFORMATIONAL_LABELS = frozenset({"info", "informational"})
+_PRIVATE_URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 _HISTORY_SERIAL_RE = re.compile(
     r"(?i)(?:sno\.?|serial(?:\s+number)?)\s*[:#=-]?\s*\(?([A-Z0-9-]{6,})"
 )
@@ -201,6 +202,7 @@ class SystemEvent:
     event_date: str | None
     updated_at: str | None
     high_impact: bool
+    description: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,6 +213,7 @@ class StandingAlarm:
     severity: str
     device_type: str
     first_set: str | None
+    description: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -366,7 +369,7 @@ def parse_active_system_events(
     *,
     site_id: str,
 ) -> tuple[SystemEvent, ...]:
-    """Parse active events while discarding raw identifiers and message details."""
+    """Parse active events while discarding raw identifiers."""
 
     events, _resolved = _parse_system_event_snapshot(payload, site_id=site_id)
     return events
@@ -377,7 +380,7 @@ def parse_standing_alarms(
     *,
     site_id: str,
 ) -> tuple[StandingAlarm, ...]:
-    """Parse standing alarms while discarding identifiers and free-form details."""
+    """Parse standing alarms and redact bounded descriptions."""
 
     if not isinstance(payload, dict):
         return ()
@@ -431,6 +434,15 @@ def parse_standing_alarms(
                 severity=severity,
                 device_type=device_type or "unknown",
                 first_set=first_set or None,
+                description=redact_text(
+                    _PRIVATE_URL_RE.sub(
+                        "[redacted]", _text(row.get("description")) or ""
+                    ),
+                    site_ids=(site_id,),
+                    identifiers=serials,
+                    max_length=160,
+                )
+                or None,
             )
         )
     return tuple(alarms)
@@ -506,6 +518,13 @@ def _parse_system_event_snapshot(
                 event_date=_timestamp(row.get("event_date")),
                 updated_at=_timestamp(row.get("updated_at")),
                 high_impact=severity in _HIGH_IMPACT_SEVERITIES,
+                description=redact_text(
+                    _PRIVATE_URL_RE.sub("[redacted]", _text(row.get("details")) or ""),
+                    site_ids=(site_id,),
+                    identifiers=serials,
+                    max_length=160,
+                )
+                or None,
             )
         )
     return tuple(events), frozenset(resolved)
@@ -576,31 +595,45 @@ class SystemEventsRuntime:
         return self.standing_alarm_count > 0 or self.high_impact_count > 0
 
     @property
-    def active_event_attributes(self) -> tuple[dict[str, object], ...]:
-        """Return bounded identifier-free events that drive the Problem state."""
+    def activity_events(self) -> tuple[dict[str, object], ...]:
+        """Return complete sanitized rows with internal comparison fingerprints."""
 
         summaries: list[dict[str, object]] = [
             {
+                "fingerprint": alarm.fingerprint,
                 "type": "Standing Alarm",
                 "device_type": alarm.device_type,
                 "state": "active",
                 "event_date": alarm.first_set,
                 "updated_at": None,
+                "severity": alarm.severity,
+                "description": alarm.description,
             }
             for alarm in self._standing_alarms
         ]
         summaries.extend(
             {
+                "fingerprint": event.fingerprint,
                 "type": event.event_type,
                 "device_type": event.device_type,
                 "state": event.state,
                 "event_date": event.event_date,
                 "updated_at": event.updated_at,
+                "severity": event.severity,
+                "description": event.description,
             }
             for event in self._events
             if event.high_impact
         )
-        return tuple(summaries[:ACTIVE_EVENTS_ATTRIBUTE_LIMIT])
+        return tuple(summaries)
+
+    @property
+    def active_event_attributes(self) -> tuple[dict[str, object], ...]:
+        """Expose bounded rows without their internal comparison fingerprints."""
+        return tuple(
+            {key: value for key, value in row.items() if key != "fingerprint"}
+            for row in self.activity_events[:ACTIVE_EVENTS_ATTRIBUTE_LIMIT]
+        )
 
     def refresh_due(self) -> bool:
         """Return whether the optional event endpoint may be polled now."""

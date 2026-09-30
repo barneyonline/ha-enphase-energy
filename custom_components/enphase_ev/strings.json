@@ -524,7 +524,7 @@
         "menu_option_descriptions": {
           "settings": "Tune polling and behavior.",
           "devices": "Choose which device categories to include.",
-          "repair_notifications": "Manage Home Assistant Repair notifications.",
+          "repair_notifications": "Manage Home Assistant Repair notifications and descriptive Activity entries.",
           "authentication_settings": "Manage stored credentials and start reauthentication.",
           "advanced": "Installer and maintenance actions.",
           "migrate_envoy": "Take over selected Enphase Envoy energy entity IDs so Home Assistant Energy history continues under this integration.",
@@ -627,14 +627,16 @@
       },
       "repair_notifications": {
         "title": "Notifications",
-        "description": "Choose which Enphase conditions create Home Assistant Repairs.",
+        "description": "Manage Home Assistant Repair notifications and descriptive Activity entries.",
         "data": {
           "degraded_service_repair_issues": "Enable Degraded Service Repairs",
-          "system_event_repair_issues": "Enable System Event Repair Notifications"
+          "system_event_repair_issues": "Enable System Event Repair Notifications",
+          "descriptive_activity_entries": "Enable Descriptive Activity Entries"
         },
         "data_description": {
           "degraded_service_repair_issues": "Create Home Assistant Repairs issues when optional Enphase cloud services are degraded. Default: Disabled.",
-          "system_event_repair_issues": "Create Home Assistant Repairs issues for active system alarms reported by Enphase. Default: Disabled."
+          "system_event_repair_issues": "Create Home Assistant Repairs issues for active system alarms reported by Enphase. Default: Disabled.",
+          "descriptive_activity_entries": "Add descriptive entries to Home Assistant Activity when reported conditions change. These appear alongside normal state-change entries. Disabled by default."
         }
       },
       "authentication_settings": {
@@ -1941,7 +1943,46 @@
           "error": "Error",
           "unknown": "Unknown",
           "unpaired": "Unpaired",
-          "pairing": "Pairing"
+          "pairing": "Pairing",
+          "activity_status": "Status",
+          "activity_unknown": "Unknown",
+          "activity_yes": "Yes",
+          "activity_no": "No",
+          "activity_more": "More items",
+          "activity_battery": "Battery",
+          "activity_charger_problem": "Reported fault",
+          "activity_suspended_by_evse": "Suspended by charger",
+          "activity_offline_since": "Offline since",
+          "activity_connected_devices": "Connected gateways",
+          "activity_disconnected_devices": "Disconnected gateways",
+          "activity_unknown_connection_devices": "Unknown gateways",
+          "activity_connection_method": "Connection method",
+          "activity_latest_reported_utc": "Last reported",
+          "activity_reporting_inverters": "Reporting inverters",
+          "activity_not_reporting_inverters": "Non-reporting inverters",
+          "activity_unknown_inverters": "Unknown inverters",
+          "activity_power_telemetry_status": "Power telemetry",
+          "activity_power_telemetry_next_retry": "Telemetry retry",
+          "activity_sg_ready_mode_raw": "SG Ready mode",
+          "activity_sg_ready_contact_state": "Contact state",
+          "activity_vpp_sgready_mode_override": "Reported VPP override",
+          "activity_confirmed_watts": "Confirmed limit (W)",
+          "activity_requested_watts": "Requested limit (W)",
+          "activity_requested_action": "Requested action",
+          "activity_request_status": "Request status",
+          "activity_active_count": "Active problems",
+          "activity_type": "Event type",
+          "activity_device_type": "Device type",
+          "activity_severity": "Severity",
+          "activity_description": "Description",
+          "activity_event_date": "First reported",
+          "activity_reason": "Reason",
+          "activity_http_status": "HTTP status",
+          "activity_retry": "Next retry",
+          "activity_worst_battery": "Worst battery status",
+          "activity_reachable": "Cloud reachable",
+          "activity_last_success": "Last successful refresh",
+          "activity_standing_alarm": "Standing alarm"
         }
       },
       "battery_schedule_summary": {
@@ -2422,7 +2463,7 @@
         "name": "Cloud Reachable"
       },
       "active_system_events": {
-        "name": "Active System Events",
+        "name": "System Events",
         "state_attributes": {
           "available": {
             "name": "Event Service Available"

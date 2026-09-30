@@ -524,7 +524,7 @@
         "menu_option_descriptions": {
           "settings": "Reguliuokite apklausą ir veikimą.",
           "devices": "Pasirinkite įtraukiamas įrenginių kategorijas.",
-          "repair_notifications": "Tvarkyti „Home Assistant“ taisymo pranešimus.",
+          "repair_notifications": "Tvarkyti Home Assistant taisymo pranešimus ir aprašomuosius veiklos įrašus.",
           "authentication_settings": "Paleiskite prisijungimo eigą, kad atnaujintumėte duomenis nepašalindami integracijos.",
           "migrate_envoy": "Perimkite pasirinktus Enphase Envoy energijos objektų ID, kad Home Assistant Energy istorija tęstųsi šioje integracijoje.",
           "advanced": "Diegėjo ir priežiūros veiksmai.",
@@ -627,14 +627,16 @@
       },
       "repair_notifications": {
         "title": "Pranešimai",
-        "description": "Pasirinkite, kurios „Enphase“ sąlygos kuria „Home Assistant“ taisymus.",
+        "description": "Tvarkyti Home Assistant taisymo pranešimus ir aprašomuosius veiklos įrašus.",
         "data": {
           "degraded_service_repair_issues": "Įgalinti suprastėjusių paslaugų taisymus",
-          "system_event_repair_issues": "Įgalinti sistemos įvykių taisymo pranešimus"
+          "system_event_repair_issues": "Įgalinti sistemos įvykių taisymo pranešimus",
+          "descriptive_activity_entries": "Įjungti aprašomuosius veiklos įrašus"
         },
         "data_description": {
           "degraded_service_repair_issues": "Sukuria Repairs problemas, kai pasirenkamos Enphase paslaugos veikia suprastėjusiai. Numatytoji reikšmė: Išjungta.",
-          "system_event_repair_issues": "Kuria Home Assistant taisymus aktyviems nuolatiniams Enphase pavojaus signalams. Pagal numatytuosius išjungta. Numatytoji reikšmė: Išjungta."
+          "system_event_repair_issues": "Kuria Home Assistant taisymus aktyviems nuolatiniams Enphase pavojaus signalams. Pagal numatytuosius išjungta. Numatytoji reikšmė: Išjungta.",
+          "descriptive_activity_entries": "Prideda aprašomuosius įrašus į Home Assistant veiklą, kai pasikeičia praneštos sąlygos. Jie rodomi šalia įprastų būsenos pasikeitimo įrašų. Pagal numatytuosius nustatymus išjungta."
         }
       },
       "authentication_settings": {
@@ -1941,7 +1943,46 @@
           "error": "Klaida",
           "unknown": "Nežinoma",
           "unpaired": "Nesuporuotas",
-          "pairing": "Poravimas"
+          "pairing": "Poravimas",
+          "activity_status": "Būsena",
+          "activity_unknown": "Nežinoma",
+          "activity_yes": "Taip",
+          "activity_no": "Ne",
+          "activity_more": "Daugiau įrašų",
+          "activity_battery": "Baterija",
+          "activity_charger_problem": "Praneštas gedimas",
+          "activity_suspended_by_evse": "Sustabdyta įkroviklio",
+          "activity_offline_since": "Neprisijungęs nuo",
+          "activity_connected_devices": "Prijungti šliuzai",
+          "activity_disconnected_devices": "Atjungti šliuzai",
+          "activity_unknown_connection_devices": "Nežinomos būsenos šliuzai",
+          "activity_connection_method": "Prisijungimo būdas",
+          "activity_latest_reported_utc": "Paskutinis pranešimas",
+          "activity_reporting_inverters": "Duomenis teikiantys inverteriai",
+          "activity_not_reporting_inverters": "Duomenų neteikiantys inverteriai",
+          "activity_unknown_inverters": "Nežinomos būsenos inverteriai",
+          "activity_power_telemetry_status": "Galios telemetrija",
+          "activity_power_telemetry_next_retry": "Telemetrijos kartojimas",
+          "activity_sg_ready_mode_raw": "SG Ready režimas",
+          "activity_sg_ready_contact_state": "Kontaktų būsena",
+          "activity_vpp_sgready_mode_override": "Praneštas VPP pakeitimas",
+          "activity_confirmed_watts": "Patvirtintas limitas (W)",
+          "activity_requested_watts": "Prašomas limitas (W)",
+          "activity_requested_action": "Prašomas veiksmas",
+          "activity_request_status": "Užklausos būsena",
+          "activity_active_count": "Aktyvios problemos",
+          "activity_type": "Įvykio tipas",
+          "activity_device_type": "Įrenginio tipas",
+          "activity_severity": "Svarba",
+          "activity_description": "Aprašymas",
+          "activity_event_date": "Pirmasis pranešimas",
+          "activity_reason": "Priežastis",
+          "activity_http_status": "HTTP būsena",
+          "activity_retry": "Kitas bandymas",
+          "activity_worst_battery": "Blogiausia baterijos būsena",
+          "activity_reachable": "Debesija pasiekiama",
+          "activity_last_success": "Paskutinis sėkmingas atnaujinimas",
+          "activity_standing_alarm": "Nuolatinis pavojaus signalas"
         }
       },
       "battery_cfg_schedules": {
@@ -2433,7 +2474,7 @@
         }
       },
       "active_system_events": {
-        "name": "Aktyvūs sistemos įvykiai",
+        "name": "Sistemos įvykiai",
         "state_attributes": {
           "available": {
             "name": "Įvykių paslauga pasiekiama"

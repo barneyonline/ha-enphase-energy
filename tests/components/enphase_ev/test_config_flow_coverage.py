@@ -84,6 +84,7 @@ from custom_components.enphase_ev.const import (
     OPT_API_TIMEOUT,
     OPT_BATTERY_SCHEDULES_ENABLED,
     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
+    OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
     OPT_FAST_POLL_INTERVAL,
     OPT_FAST_WHILE_STREAMING,
     OPT_EXPORT_LIMIT_CONTROLS_ENABLED,
@@ -3825,7 +3826,7 @@ async def test_options_flow_device_section_translations_load_at_runtime(hass) ->
         translations[
             f"component.{DOMAIN}.options.step.init.menu_option_descriptions.repair_notifications"
         ]
-        == "Manage Home Assistant Repair notifications."
+        == "Manage Home Assistant Repair notifications and descriptive Activity entries."
     )
     assert (
         translations[f"component.{DOMAIN}.options.step.repair_notifications.title"]
@@ -3982,6 +3983,7 @@ async def test_options_flow_repair_notifications_default_off(hass) -> None:
     values = result["data_schema"]({})
     assert values[OPT_DEGRADED_SERVICE_REPAIR_ISSUES] is False
     assert values[OPT_SYSTEM_EVENT_REPAIR_ISSUES] is False
+    assert values[OPT_DESCRIPTIVE_ACTIVITY_ENTRIES] is False
 
 
 @pytest.mark.asyncio
@@ -6008,3 +6010,41 @@ async def test_features_saves_export_limit_from_advanced_section(hass) -> None:
         {"advanced_features": {OPT_EXPORT_LIMIT_CONTROLS_ENABLED: True}}
     )
     assert result["data"][OPT_EXPORT_LIMIT_CONTROLS_ENABLED] is True
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+async def test_descriptive_activity_notification_option_saves_and_preserves_other_settings(
+    hass, enabled
+):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_SITE_ID: "12345"},
+        options={
+            OPT_DESCRIPTIVE_ACTIVITY_ENTRIES: not enabled,
+            OPT_WEATHER_ENABLED: True,
+        },
+    )
+    entry.add_to_hass(hass)
+    handler = OptionsFlowHandler(entry)
+    handler.hass = hass
+    form = await handler.async_step_repair_notifications()
+    assert form["data_schema"]({})[OPT_DESCRIPTIVE_ACTIVITY_ENTRIES] is (not enabled)
+    result = await handler.async_step_repair_notifications(
+        {OPT_DESCRIPTIVE_ACTIVITY_ENTRIES: enabled}
+    )
+    assert result["data"][OPT_DESCRIPTIVE_ACTIVITY_ENTRIES] is enabled
+    assert result["data"][OPT_WEATHER_ENABLED] is True
+    hass.config_entries.async_update_entry(entry, options=result["data"])
+    other_update = await handler.async_step_repair_notifications(
+        {OPT_SYSTEM_EVENT_REPAIR_ISSUES: True}
+    )
+    assert other_update["data"][OPT_DESCRIPTIVE_ACTIVITY_ENTRIES] is enabled
+    settings = await handler.async_step_settings()
+    assert OPT_DESCRIPTIVE_ACTIVITY_ENTRIES not in settings["data_schema"]({})
+    features = await handler.async_step_features()
+    sections = features["data_schema"](
+        {CONF_DEVICE_FEATURES_SECTION: {}, "advanced_features": {}}
+    )
+    assert all(
+        OPT_DESCRIPTIVE_ACTIVITY_ENTRIES not in fields for fields in sections.values()
+    )

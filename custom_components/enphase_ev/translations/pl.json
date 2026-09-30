@@ -524,7 +524,7 @@
         "menu_option_descriptions": {
           "settings": "Dostosuj odpytywanie i działanie.",
           "devices": "Wybierz kategorie urządzeń do uwzględnienia.",
-          "repair_notifications": "Zarządzaj powiadomieniami o naprawach Home Assistant.",
+          "repair_notifications": "Zarządzaj powiadomieniami o naprawach i opisowymi wpisami aktywności w Home Assistant.",
           "authentication_settings": "Uruchom proces logowania, aby odświeżyć dane uwierzytelniające bez usuwania integracji.",
           "migrate_envoy": "Przejmij wybrane identyfikatory encji energii Enphase Envoy, aby historia Home Assistant Energy była kontynuowana przez tę integrację.",
           "advanced": "Działania instalatora i konserwacji.",
@@ -627,14 +627,16 @@
       },
       "repair_notifications": {
         "title": "Powiadomienia",
-        "description": "Wybierz, które warunki Enphase tworzą naprawy Home Assistant.",
+        "description": "Zarządzaj powiadomieniami o naprawach i opisowymi wpisami aktywności w Home Assistant.",
         "data": {
           "degraded_service_repair_issues": "Włącz naprawy usług zdegradowanych",
-          "system_event_repair_issues": "Włącz powiadomienia o naprawach zdarzeń systemowych"
+          "system_event_repair_issues": "Włącz powiadomienia o naprawach zdarzeń systemowych",
+          "descriptive_activity_entries": "Włącz opisowe wpisy aktywności"
         },
         "data_description": {
           "degraded_service_repair_issues": "Tworzy problemy w Repairs, gdy opcjonalne usługi Enphase są zdegradowane. Domyślnie: Wyłączone.",
-          "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone. Domyślnie: Wyłączone."
+          "system_event_repair_issues": "Tworzy naprawy Home Assistant dla aktywnych trwałych alarmów Enphase. Domyślnie wyłączone. Domyślnie: Wyłączone.",
+          "descriptive_activity_entries": "Dodaje opisowe wpisy do aktywności Home Assistant, gdy zmieniają się zgłaszane warunki. Pojawiają się obok zwykłych wpisów zmian stanu. Domyślnie wyłączone."
         }
       },
       "authentication_settings": {
@@ -1941,7 +1943,46 @@
           "error": "Błąd",
           "unknown": "Nieznany",
           "unpaired": "Nie sparowano",
-          "pairing": "Parowanie"
+          "pairing": "Parowanie",
+          "activity_status": "Stan",
+          "activity_unknown": "Nieznany",
+          "activity_yes": "Tak",
+          "activity_no": "Nie",
+          "activity_more": "Więcej pozycji",
+          "activity_battery": "Bateria",
+          "activity_charger_problem": "Zgłoszona usterka",
+          "activity_suspended_by_evse": "Wstrzymane przez ładowarkę",
+          "activity_offline_since": "Offline od",
+          "activity_connected_devices": "Połączone bramy",
+          "activity_disconnected_devices": "Rozłączone bramy",
+          "activity_unknown_connection_devices": "Bramy o nieznanym stanie",
+          "activity_connection_method": "Metoda połączenia",
+          "activity_latest_reported_utc": "Ostatnio zgłoszone",
+          "activity_reporting_inverters": "Raportujące falowniki",
+          "activity_not_reporting_inverters": "Nieraportujące falowniki",
+          "activity_unknown_inverters": "Falowniki o nieznanym stanie",
+          "activity_power_telemetry_status": "Telemetria mocy",
+          "activity_power_telemetry_next_retry": "Ponowienie telemetrii",
+          "activity_sg_ready_mode_raw": "Tryb SG Ready",
+          "activity_sg_ready_contact_state": "Stan styków",
+          "activity_vpp_sgready_mode_override": "Zgłoszone nadpisanie VPP",
+          "activity_confirmed_watts": "Potwierdzony limit (W)",
+          "activity_requested_watts": "Żądany limit (W)",
+          "activity_requested_action": "Żądana akcja",
+          "activity_request_status": "Stan żądania",
+          "activity_active_count": "Aktywne problemy",
+          "activity_type": "Typ zdarzenia",
+          "activity_device_type": "Typ urządzenia",
+          "activity_severity": "Waga",
+          "activity_description": "Opis",
+          "activity_event_date": "Pierwsze zgłoszenie",
+          "activity_reason": "Powód",
+          "activity_http_status": "Stan HTTP",
+          "activity_retry": "Następna próba",
+          "activity_worst_battery": "Najgorszy stan baterii",
+          "activity_reachable": "Chmura dostępna",
+          "activity_last_success": "Ostatnie pomyślne odświeżenie",
+          "activity_standing_alarm": "Utrzymujący się alarm"
         }
       },
       "battery_cfg_schedules": {
@@ -2433,7 +2474,7 @@
         }
       },
       "active_system_events": {
-        "name": "Aktywne zdarzenia systemowe",
+        "name": "Zdarzenia systemowe",
         "state_attributes": {
           "available": {
             "name": "Usługa zdarzeń dostępna"

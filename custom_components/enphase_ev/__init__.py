@@ -28,6 +28,8 @@ from .const import (
     CONF_SITE_ONLY,
     DOMAIN,
     DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
+    DEFAULT_DESCRIPTIVE_ACTIVITY_ENTRIES,
+    OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
     OPT_EXPORT_LIMIT_CONTROLS_ENABLED,
     OPT_GRID_PROFILE_CONTROLS_ENABLED,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
@@ -115,6 +117,7 @@ _LOGGER = logging.getLogger(__name__)
 _RUNTIME_HANDOFF_KEY = f"{DOMAIN}_runtime_handoffs"
 _RELOAD_REQUIRED_OPTION_KEYS = frozenset(
     {
+        OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
         OPT_EXPORT_LIMIT_CONTROLS_ENABLED,
         OPT_GRID_PROFILE_CONTROLS_ENABLED,
         OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
@@ -321,9 +324,23 @@ async def _async_update_listener_locked(
             }
             if not changed_data_keys and not changed_option_keys:
                 return
+            changed_reload_options = changed_option_keys & _RELOAD_REQUIRED_OPTION_KEYS
+            # Saving Notifications adds the default-off key to older entries.
+            # Only changing its effective value needs a publisher restart.
+            if bool(
+                previous_options.get(
+                    OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
+                    DEFAULT_DESCRIPTIVE_ACTIVITY_ENTRIES,
+                )
+            ) == bool(
+                target_options.get(
+                    OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
+                    DEFAULT_DESCRIPTIVE_ACTIVITY_ENTRIES,
+                )
+            ):
+                changed_reload_options.discard(OPT_DESCRIPTIVE_ACTIVITY_ENTRIES)
             reload_required = bool(
-                changed_data_keys - _HOT_APPLY_DATA_KEYS
-                or changed_option_keys & _RELOAD_REQUIRED_OPTION_KEYS
+                changed_data_keys - _HOT_APPLY_DATA_KEYS or changed_reload_options
             )
             preserve_runtime = not bool(
                 changed_data_keys - _HOT_APPLY_DATA_KEYS - _RUNTIME_HANDOFF_DATA_KEYS
@@ -633,6 +650,14 @@ async def _async_setup_entry_impl(
 
     platform_started = _time.monotonic()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    if entry.options.get(
+        OPT_DESCRIPTIVE_ACTIVITY_ENTRIES, DEFAULT_DESCRIPTIVE_ACTIVITY_ENTRIES
+    ):
+        from .activity import ActivityPublisher
+
+        publisher = ActivityPublisher(hass, entry, coord)
+        entry.runtime_data.activity_publisher = publisher
+        entry.async_on_unload(publisher.stop)
     _record_phase("platform_forward_s", platform_started)
     mark_setup_milestone = getattr(coord, "mark_setup_milestone", None)
     if callable(mark_setup_milestone):
@@ -708,6 +733,7 @@ async def _async_cleanup_failed_runtime(
 
     coord = runtime_data.coordinator
     cleanup_steps = (
+        getattr(runtime_data.activity_publisher, "stop", None),
         runtime_data.async_stop_weather,
         getattr(getattr(coord, "schedule_sync", None), "async_stop", None),
         getattr(coord, "async_cleanup_runtime_state", None),
@@ -758,6 +784,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> 
     unload_ok = await _async_unload_platforms_safe(hass, entry)
     if unload_ok:
         if runtime_data is not None:
+            if runtime_data.activity_publisher is not None:
+                runtime_data.activity_publisher.stop()
             await runtime_data.async_stop_weather()
         if coord is not None and hasattr(coord, "schedule_sync"):
             await coord.schedule_sync.async_stop()

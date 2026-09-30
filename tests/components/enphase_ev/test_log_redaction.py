@@ -125,3 +125,46 @@ def test_key_kind_covers_non_stringable_and_empty_compact_keys() -> None:
 
     assert _key_kind(_BadStr()) == "text"
     assert _key_kind("---") == "text"
+
+
+def test_redact_ipv6_addresses_without_losing_reported_times() -> None:
+    addresses = (
+        "2001:db8:1234:5678:9abc:def0:1234:5678",
+        "2001:db8::1",
+        "fe80::abcd%en0",
+        "::1",
+        "::ffff:192.168.1.25",
+    )
+    for address in addresses:
+        assert redact_text(f"Gateway [{address}] at 05:12:00 UTC") == (
+            "Gateway [[redacted]] at 05:12:00 UTC"
+        )
+
+
+def test_redact_quoted_credentials_and_bearer_headers() -> None:
+    text = (
+        '{"token": "private secret", "password": "escaped \\"secret\\"", '
+        "'cookie': 'private cookie', \"reason\": \"connection lost\"} "
+        "Authorization: Bearer secret-token.with.dots"
+    )
+    redacted = redact_text(text)
+    assert "private" not in redacted
+    assert "secret" not in redacted
+    assert "connection lost" in redacted
+
+
+def test_redact_quoted_identifiers_preserves_already_redacted_values() -> None:
+    text = (
+        '{"device_id": "DEVICE-PRIVATE-9999", "serial_number": "OTHER-SERIAL-PRIVATE", '
+        '"site_id": "9876543", "serial": "SERI...5678", "uid": "[redacted]", '
+        '"uuid": "**REDACTED**", "reason": "connection lost"}'
+    )
+    redacted = redact_text(text)
+    for private in ("DEVICE-PRIVATE-9999", "OTHER-SERIAL-PRIVATE", "9876543"):
+        assert private not in redacted
+    assert '"site_id": "[site]"' in redacted
+    assert '"serial": "SERI...5678"' in redacted
+    assert '"uid": "[redacted]"' in redacted
+    assert '"uuid": "**REDACTED**"' in redacted
+    assert '"reason": "connection lost"' in redacted
+    assert redact_text(redacted) == redacted

@@ -524,7 +524,7 @@
         "menu_option_descriptions": {
           "settings": "Pas polling en gedrag aan.",
           "devices": "Kies welke apparaatcategorieën u wilt opnemen.",
-          "repair_notifications": "Beheer Home Assistant-reparatiemeldingen.",
+          "repair_notifications": "Beheer Home Assistant-reparatiemeldingen en beschrijvende activiteitsitems.",
           "authentication_settings": "Start de login-flow om inloggegevens te vernieuwen zonder de integratie te verwijderen.",
           "migrate_envoy": "Neem geselecteerde energie-entiteit-ID's van Enphase Envoy over zodat de Home Assistant Energy-geschiedenis onder deze integratie doorgaat.",
           "advanced": "Installateurs- en onderhoudsacties.",
@@ -627,14 +627,16 @@
       },
       "repair_notifications": {
         "title": "Meldingen",
-        "description": "Kies welke Enphase-condities Home Assistant-reparaties aanmaken.",
+        "description": "Beheer Home Assistant-reparatiemeldingen en beschrijvende activiteitsitems.",
         "data": {
           "degraded_service_repair_issues": "Reparaties voor verminderde diensten inschakelen",
-          "system_event_repair_issues": "Reparatiemeldingen voor systeemgebeurtenissen inschakelen"
+          "system_event_repair_issues": "Reparatiemeldingen voor systeemgebeurtenissen inschakelen",
+          "descriptive_activity_entries": "Beschrijvende activiteitsitems inschakelen"
         },
         "data_description": {
           "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken. Standaard: Uitgeschakeld.",
-          "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld. Standaard: Uitgeschakeld."
+          "system_event_repair_issues": "Maakt Home Assistant-reparaties voor actieve permanente Enphase-alarmen. Standaard uitgeschakeld. Standaard: Uitgeschakeld.",
+          "descriptive_activity_entries": "Voegt beschrijvende items toe aan de activiteit van Home Assistant wanneer gemelde omstandigheden veranderen. Ze verschijnen naast de normale items voor statuswijzigingen. Standaard uitgeschakeld."
         }
       },
       "authentication_settings": {
@@ -1941,7 +1943,46 @@
           "error": "Fout",
           "unknown": "Onbekend",
           "unpaired": "Niet gekoppeld",
-          "pairing": "Koppelen"
+          "pairing": "Koppelen",
+          "activity_status": "Status",
+          "activity_unknown": "Onbekend",
+          "activity_yes": "Ja",
+          "activity_no": "Nee",
+          "activity_more": "Meer items",
+          "activity_battery": "Batterij",
+          "activity_charger_problem": "Gemelde storing",
+          "activity_suspended_by_evse": "Gepauzeerd door lader",
+          "activity_offline_since": "Offline sinds",
+          "activity_connected_devices": "Verbonden gateways",
+          "activity_disconnected_devices": "Niet-verbonden gateways",
+          "activity_unknown_connection_devices": "Gateways met onbekende status",
+          "activity_connection_method": "Verbindingsmethode",
+          "activity_latest_reported_utc": "Laatst gemeld",
+          "activity_reporting_inverters": "Rapporterende omvormers",
+          "activity_not_reporting_inverters": "Niet-rapporterende omvormers",
+          "activity_unknown_inverters": "Omvormers met onbekende status",
+          "activity_power_telemetry_status": "Vermogenstelemetrie",
+          "activity_power_telemetry_next_retry": "Telemetrie opnieuw proberen",
+          "activity_sg_ready_mode_raw": "SG Ready-modus",
+          "activity_sg_ready_contact_state": "Contactstatus",
+          "activity_vpp_sgready_mode_override": "Gemelde VPP-overschrijving",
+          "activity_confirmed_watts": "Bevestigde limiet (W)",
+          "activity_requested_watts": "Aangevraagde limiet (W)",
+          "activity_requested_action": "Aangevraagde actie",
+          "activity_request_status": "Aanvraagstatus",
+          "activity_active_count": "Actieve problemen",
+          "activity_type": "Gebeurtenistype",
+          "activity_device_type": "Apparaattype",
+          "activity_severity": "Ernst",
+          "activity_description": "Beschrijving",
+          "activity_event_date": "Eerst gemeld",
+          "activity_reason": "Reden",
+          "activity_http_status": "HTTP-status",
+          "activity_retry": "Volgende poging",
+          "activity_worst_battery": "Slechtste batterijstatus",
+          "activity_reachable": "Cloud bereikbaar",
+          "activity_last_success": "Laatste geslaagde verversing",
+          "activity_standing_alarm": "Aanhoudend alarm"
         }
       },
       "battery_cfg_schedules": {
@@ -2433,7 +2474,7 @@
         }
       },
       "active_system_events": {
-        "name": "Actieve systeemgebeurtenissen",
+        "name": "Systeemgebeurtenissen",
         "state_attributes": {
           "available": {
             "name": "Gebeurtenisservice beschikbaar"

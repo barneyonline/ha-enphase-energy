@@ -524,7 +524,7 @@
         "menu_option_descriptions": {
           "settings": "Upravte intervaly a chování.",
           "devices": "Vyberte kategorie zařízení, které chcete zahrnout.",
-          "repair_notifications": "Správa oznámení oprav Home Assistant.",
+          "repair_notifications": "Správa oznámení oprav a popisných záznamů aktivity v Home Assistant.",
           "authentication_settings": "Spusťte přihlašovací tok pro obnovení údajů bez odebrání integrace.",
           "migrate_envoy": "Převezměte vybraná ID energetických entit Enphase Envoy, aby historie v Home Assistant Energy pokračovala pod touto integrací.",
           "advanced": "Instalační a servisní akce.",
@@ -627,14 +627,16 @@
       },
       "repair_notifications": {
         "title": "Oznámení",
-        "description": "Vyberte, které stavy Enphase vytvoří opravy Home Assistant.",
+        "description": "Správa oznámení oprav a popisných záznamů aktivity v Home Assistant.",
         "data": {
           "degraded_service_repair_issues": "Povolit opravy zhoršených služeb",
-          "system_event_repair_issues": "Povolit oznámení oprav systémových událostí"
+          "system_event_repair_issues": "Povolit oznámení oprav systémových událostí",
+          "descriptive_activity_entries": "Povolit popisné záznamy aktivity"
         },
         "data_description": {
           "degraded_service_repair_issues": "Vytváří problémy v Repairs, když jsou volitelné služby Enphase zhoršené. Výchozí: Vypnuto.",
-          "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto. Výchozí: Vypnuto."
+          "system_event_repair_issues": "Vytváří opravy Home Assistant pro aktivní trvalé alarmy Enphase. Ve výchozím nastavení vypnuto. Výchozí: Vypnuto.",
+          "descriptive_activity_entries": "Přidává popisné záznamy do aktivity Home Assistant při změně hlášených podmínek. Zobrazují se vedle běžných záznamů změn stavu. Ve výchozím nastavení vypnuto."
         }
       },
       "authentication_settings": {
@@ -1941,7 +1943,46 @@
           "error": "Chyba",
           "unknown": "Neznámý",
           "unpaired": "Nespárováno",
-          "pairing": "Párování"
+          "pairing": "Párování",
+          "activity_status": "Stav",
+          "activity_unknown": "Neznámé",
+          "activity_yes": "Ano",
+          "activity_no": "Ne",
+          "activity_more": "Další položky",
+          "activity_battery": "Baterie",
+          "activity_charger_problem": "Hlášená porucha",
+          "activity_suspended_by_evse": "Pozastaveno nabíječkou",
+          "activity_offline_since": "Offline od",
+          "activity_connected_devices": "Připojené brány",
+          "activity_disconnected_devices": "Odpojené brány",
+          "activity_unknown_connection_devices": "Brány s neznámým stavem",
+          "activity_connection_method": "Způsob připojení",
+          "activity_latest_reported_utc": "Poslední hlášení",
+          "activity_reporting_inverters": "Hlásící střídače",
+          "activity_not_reporting_inverters": "Nehlásící střídače",
+          "activity_unknown_inverters": "Střídače s neznámým stavem",
+          "activity_power_telemetry_status": "Telemetrie výkonu",
+          "activity_power_telemetry_next_retry": "Opakování telemetrie",
+          "activity_sg_ready_mode_raw": "Režim SG Ready",
+          "activity_sg_ready_contact_state": "Stav kontaktů",
+          "activity_vpp_sgready_mode_override": "Hlášené přepsání VPP",
+          "activity_confirmed_watts": "Potvrzený limit (W)",
+          "activity_requested_watts": "Požadovaný limit (W)",
+          "activity_requested_action": "Požadovaná akce",
+          "activity_request_status": "Stav požadavku",
+          "activity_active_count": "Aktivní problémy",
+          "activity_type": "Typ události",
+          "activity_device_type": "Typ zařízení",
+          "activity_severity": "Závažnost",
+          "activity_description": "Popis",
+          "activity_event_date": "První hlášení",
+          "activity_reason": "Důvod",
+          "activity_http_status": "Stav HTTP",
+          "activity_retry": "Další pokus",
+          "activity_worst_battery": "Nejhorší stav baterie",
+          "activity_reachable": "Cloud dostupný",
+          "activity_last_success": "Poslední úspěšná aktualizace",
+          "activity_standing_alarm": "Trvající alarm"
         }
       },
       "battery_cfg_schedules": {
@@ -2433,7 +2474,7 @@
         }
       },
       "active_system_events": {
-        "name": "Aktivní systémové události",
+        "name": "Systémové události",
         "state_attributes": {
           "available": {
             "name": "Služba událostí je dostupná"

@@ -55,6 +55,7 @@ from .const import (
     SAFE_LIMIT_AMPS,
 )
 from .coordinator import EnphaseCoordinator
+from .cloud_errors import cloud_error_code
 from .device_info_helpers import _cloud_device_info
 from .entity import (
     EnphaseBaseEntity,
@@ -3322,62 +3323,9 @@ class EnphaseSiteLastErrorCodeSensor(_SiteBaseEntity):
     def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(coord, "last_error_code", "Cloud Error Code", type_key=None)
 
-    def _auth_block_is_active(self) -> bool:
-        """Return True when auth is currently blocked without mutating coordinator state."""
-
-        if getattr(self._coord, "_last_error", None) == "auth_blocked":
-            return True
-        blocked_until = getattr(self._coord, "_auth_blocked_until_utc", None)
-        if isinstance(blocked_until, datetime):
-            return blocked_until > dt_util.utcnow()  # type: ignore[no-any-return]
-        return False
-
     @property
     def native_value(self) -> Any:
-        failure_ts = self._coord.last_failure_utc
-        success_ts = self._coord.last_success_utc
-        failure_active = bool(
-            failure_ts and (success_ts is None or failure_ts > success_ts)
-        )
-        if not failure_active:
-            return STATE_NONE
-        failure_source = getattr(self._coord, "last_failure_source", None)
-        if (
-            failure_source == "payload"
-            or getattr(self._coord, "payload_failure_kind", None) is not None
-        ):
-            return "invalid_payload"
-        if failure_source == "auth" and self._auth_block_is_active():
-            return "auth_blocked"
-        code = getattr(self._coord, "last_failure_status", None)
-        if code is None:
-            if failure_source == "auth":
-                return "authentication_error"
-            description = (
-                getattr(self._coord, "last_failure_description", None) or ""
-            ).lower()
-            if failure_source == "network":
-                dns_tokens = (
-                    "dns",
-                    "name or service not known",
-                    "temporary failure in name resolution",
-                    "resolv",
-                )
-                if any(token in description for token in dns_tokens):
-                    return "dns_error"
-                return "network_error"
-            return STATE_NONE
-        try:
-            status = int(code)
-        except (TypeError, ValueError):
-            return "request_error"
-        if status == 429:
-            return "rate_limited"
-        if status in (401, 403):
-            return "authentication_error"
-        if 500 <= status < 600:
-            return "service_unavailable"
-        return "request_error"
+        return cloud_error_code(self._coord)
 
     @property
     def extra_state_attributes(self) -> Any:

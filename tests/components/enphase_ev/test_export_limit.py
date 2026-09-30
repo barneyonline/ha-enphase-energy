@@ -1806,3 +1806,24 @@ async def test_guided_disable_preserves_gateway_slew_despite_saved_override(runt
         None,
         6980.0,
     )
+
+
+async def test_saved_pending_intent_published_before_write(runtime):
+    """Activity can capture the target before immediate readback clears it."""
+    observations = []
+    runtime.coordinator.async_update_listeners.side_effect = (
+        lambda: observations.append(dict(runtime.attributes()))
+    )
+
+    async def write(*_args):
+        assert runtime._store.async_save.await_count == 1
+        assert observations[-1]["request_status"] == "pending"
+        assert observations[-1]["requested_watts"] == 0
+        runtime.coordinator.client.async_get_export_limit_settings.return_value = (
+            payload(free_limit_value=0)
+        )
+
+    runtime.coordinator.client.async_set_export_limit.side_effect = write
+    await runtime.async_apply(0, confirm=True)
+    assert observations[-1]["request_status"] == "confirmed"
+    assert observations[-1]["requested_watts"] is None

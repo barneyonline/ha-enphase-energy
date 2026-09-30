@@ -524,7 +524,7 @@
         "menu_option_descriptions": {
           "settings": "Kohanda küsitlemist ja käitumist.",
           "devices": "Valige kaasatavad seadmekategooriad.",
-          "repair_notifications": "Halda Home Assistanti parandusteavitusi.",
+          "repair_notifications": "Halda Home Assistanti parandusteavitusi ja kirjeldavaid tegevuskirjeid.",
           "authentication_settings": "Käivitage sisselogimisvoog, et uuendada mandaate ilma integratsiooni eemaldamata.",
           "migrate_envoy": "Võta üle valitud Enphase Envoy energiaüksuste ID-d, et Home Assistant Energy ajalugu jätkuks selle integratsiooni all.",
           "advanced": "Paigaldaja ja hoolduse toimingud.",
@@ -627,14 +627,16 @@
       },
       "repair_notifications": {
         "title": "Teavitused",
-        "description": "Valige, millised Enphase'i tingimused loovad Home Assistanti parandusi.",
+        "description": "Halda Home Assistanti parandusteavitusi ja kirjeldavaid tegevuskirjeid.",
         "data": {
           "degraded_service_repair_issues": "Luba halvenenud teenuste parandused",
-          "system_event_repair_issues": "Luba süsteemisündmuste parandusteavitused"
+          "system_event_repair_issues": "Luba süsteemisündmuste parandusteavitused",
+          "descriptive_activity_entries": "Luba kirjeldavad tegevuskirjed"
         },
         "data_description": {
           "degraded_service_repair_issues": "Loob Repairsi probleemid, kui valikulised Enphase teenused on halvenenud. Vaikimisi: Keelatud.",
-          "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud. Vaikimisi: Keelatud."
+          "system_event_repair_issues": "Loob Home Assistanti parandused aktiivsete Enphase püsihoiatuste jaoks. Vaikimisi keelatud. Vaikimisi: Keelatud.",
+          "descriptive_activity_entries": "Lisab Home Assistanti tegevusse kirjeldavad kirjed, kui teatatud tingimused muutuvad. Need kuvatakse tavaliste olekumuutuste kirjete kõrval. Vaikimisi keelatud."
         }
       },
       "authentication_settings": {
@@ -1941,7 +1943,46 @@
           "error": "Viga",
           "unknown": "Tundmatu",
           "unpaired": "Sidumata",
-          "pairing": "Sidumine"
+          "pairing": "Sidumine",
+          "activity_status": "Olek",
+          "activity_unknown": "Teadmata",
+          "activity_yes": "Jah",
+          "activity_no": "Ei",
+          "activity_more": "Veel kirjeid",
+          "activity_battery": "Aku",
+          "activity_charger_problem": "Teatatud rike",
+          "activity_suspended_by_evse": "Laadija peatatud",
+          "activity_offline_since": "Võrguühenduseta alates",
+          "activity_connected_devices": "Ühendatud lüüsid",
+          "activity_disconnected_devices": "Ühenduseta lüüsid",
+          "activity_unknown_connection_devices": "Teadmata olekuga lüüsid",
+          "activity_connection_method": "Ühendusviis",
+          "activity_latest_reported_utc": "Viimati teatatud",
+          "activity_reporting_inverters": "Andmeid edastavad inverterid",
+          "activity_not_reporting_inverters": "Andmeid mitteedastavad inverterid",
+          "activity_unknown_inverters": "Teadmata olekuga inverterid",
+          "activity_power_telemetry_status": "Võimsuse telemeetria",
+          "activity_power_telemetry_next_retry": "Telemeetria korduskatse",
+          "activity_sg_ready_mode_raw": "SG Ready režiim",
+          "activity_sg_ready_contact_state": "Kontaktide olek",
+          "activity_vpp_sgready_mode_override": "Teatatud VPP alistus",
+          "activity_confirmed_watts": "Kinnitatud piir (W)",
+          "activity_requested_watts": "Taotletud piir (W)",
+          "activity_requested_action": "Taotletud toiming",
+          "activity_request_status": "Taotluse olek",
+          "activity_active_count": "Aktiivsed probleemid",
+          "activity_type": "Sündmuse tüüp",
+          "activity_device_type": "Seadme tüüp",
+          "activity_severity": "Tõsidus",
+          "activity_description": "Kirjeldus",
+          "activity_event_date": "Esmane teade",
+          "activity_reason": "Põhjus",
+          "activity_http_status": "HTTP olek",
+          "activity_retry": "Järgmine katse",
+          "activity_worst_battery": "Aku halvim olek",
+          "activity_reachable": "Pilv kättesaadav",
+          "activity_last_success": "Viimane edukas värskendus",
+          "activity_standing_alarm": "Püsiv häire"
         }
       },
       "battery_cfg_schedules": {
@@ -2433,7 +2474,7 @@
         }
       },
       "active_system_events": {
-        "name": "Aktiivsed süsteemisündmused",
+        "name": "Süsteemi sündmused",
         "state_attributes": {
           "available": {
             "name": "Sündmuste teenus on saadaval"

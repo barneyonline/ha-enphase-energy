@@ -546,6 +546,7 @@ class ExportLimitRuntime:
                     translation_domain=DOMAIN,
                     translation_key="export_limit_unavailable",
                 ) from err
+            self._publish()
             try:
                 self._require_enabled()
             except ServiceValidationError:

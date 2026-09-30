@@ -524,7 +524,7 @@
         "menu_option_descriptions": {
           "settings": "Ρυθμίστε τον ρυθμό ελέγχου και τη συμπεριφορά.",
           "devices": "Επιλέξτε τις κατηγορίες συσκευών που θα συμπεριληφθούν.",
-          "repair_notifications": "Διαχείριση ειδοποιήσεων επισκευών του Home Assistant.",
+          "repair_notifications": "Διαχείριση ειδοποιήσεων επισκευών και περιγραφικών καταχωρίσεων δραστηριότητας του Home Assistant.",
           "authentication_settings": "Εκκινήστε τη ροή σύνδεσης για ανανέωση διαπιστευτηρίων χωρίς αφαίρεση της ενσωμάτωσης.",
           "migrate_envoy": "Αναλάβετε επιλεγμένα αναγνωριστικά ενεργειακών οντοτήτων του Enphase Envoy ώστε το ιστορικό του Home Assistant Energy να συνεχιστεί σε αυτή την ενσωμάτωση.",
           "advanced": "Ενέργειες εγκαταστάτη και συντήρησης.",
@@ -627,14 +627,16 @@
       },
       "repair_notifications": {
         "title": "Ειδοποιήσεις",
-        "description": "Επιλέξτε ποιες συνθήκες Enphase δημιουργούν επισκευές στο Home Assistant.",
+        "description": "Διαχείριση ειδοποιήσεων επισκευών και περιγραφικών καταχωρίσεων δραστηριότητας του Home Assistant.",
         "data": {
           "degraded_service_repair_issues": "Ενεργοποίηση επιδιορθώσεων υποβαθμισμένων υπηρεσιών",
-          "system_event_repair_issues": "Ενεργοποίηση ειδοποιήσεων επισκευών συμβάντων συστήματος"
+          "system_event_repair_issues": "Ενεργοποίηση ειδοποιήσεων επισκευών συμβάντων συστήματος",
+          "descriptive_activity_entries": "Ενεργοποίηση περιγραφικών καταχωρίσεων δραστηριότητας"
         },
         "data_description": {
           "degraded_service_repair_issues": "Δημιουργεί ζητήματα Repairs όταν προαιρετικές υπηρεσίες Enphase είναι υποβαθμισμένες. Προεπιλογή: Ανενεργό.",
-          "system_event_repair_issues": "Δημιουργεί Επισκευές Home Assistant για ενεργούς μόνιμους συναγερμούς Enphase. Απενεργοποιημένο από προεπιλογή. Προεπιλογή: Ανενεργό."
+          "system_event_repair_issues": "Δημιουργεί Επισκευές Home Assistant για ενεργούς μόνιμους συναγερμούς Enphase. Απενεργοποιημένο από προεπιλογή. Προεπιλογή: Ανενεργό.",
+          "descriptive_activity_entries": "Προσθέτει περιγραφικές καταχωρίσεις στη δραστηριότητα του Home Assistant όταν αλλάζουν οι αναφερόμενες συνθήκες. Εμφανίζονται μαζί με τις κανονικές καταχωρίσεις αλλαγής κατάστασης. Απενεργοποιημένο από προεπιλογή."
         }
       },
       "authentication_settings": {
@@ -1941,7 +1943,46 @@
           "error": "Σφάλμα",
           "unknown": "Άγνωστο",
           "unpaired": "Μη συζευγμένο",
-          "pairing": "Σύζευξη"
+          "pairing": "Σύζευξη",
+          "activity_status": "Κατάσταση",
+          "activity_unknown": "Άγνωστο",
+          "activity_yes": "Ναι",
+          "activity_no": "Όχι",
+          "activity_more": "Περισσότερα στοιχεία",
+          "activity_battery": "Μπαταρία",
+          "activity_charger_problem": "Αναφερόμενη βλάβη",
+          "activity_suspended_by_evse": "Παύση από τον φορτιστή",
+          "activity_offline_since": "Εκτός σύνδεσης από",
+          "activity_connected_devices": "Συνδεδεμένες πύλες",
+          "activity_disconnected_devices": "Αποσυνδεδεμένες πύλες",
+          "activity_unknown_connection_devices": "Πύλες άγνωστης κατάστασης",
+          "activity_connection_method": "Μέθοδος σύνδεσης",
+          "activity_latest_reported_utc": "Τελευταία αναφορά",
+          "activity_reporting_inverters": "Μετατροπείς που αναφέρουν",
+          "activity_not_reporting_inverters": "Μετατροπείς χωρίς αναφορά",
+          "activity_unknown_inverters": "Μετατροπείς άγνωστης κατάστασης",
+          "activity_power_telemetry_status": "Τηλεμετρία ισχύος",
+          "activity_power_telemetry_next_retry": "Επανάληψη τηλεμετρίας",
+          "activity_sg_ready_mode_raw": "Λειτουργία SG Ready",
+          "activity_sg_ready_contact_state": "Κατάσταση επαφών",
+          "activity_vpp_sgready_mode_override": "Αναφερόμενη παράκαμψη VPP",
+          "activity_confirmed_watts": "Επιβεβαιωμένο όριο (W)",
+          "activity_requested_watts": "Ζητούμενο όριο (W)",
+          "activity_requested_action": "Ζητούμενη ενέργεια",
+          "activity_request_status": "Κατάσταση αιτήματος",
+          "activity_active_count": "Ενεργά προβλήματα",
+          "activity_type": "Τύπος συμβάντος",
+          "activity_device_type": "Τύπος συσκευής",
+          "activity_severity": "Σοβαρότητα",
+          "activity_description": "Περιγραφή",
+          "activity_event_date": "Πρώτη αναφορά",
+          "activity_reason": "Αιτία",
+          "activity_http_status": "Κατάσταση HTTP",
+          "activity_retry": "Επόμενη προσπάθεια",
+          "activity_worst_battery": "Χειρότερη κατάσταση μπαταρίας",
+          "activity_reachable": "Προσβάσιμο νέφος",
+          "activity_last_success": "Τελευταία επιτυχής ενημέρωση",
+          "activity_standing_alarm": "Επίμονος συναγερμός"
         }
       },
       "battery_cfg_schedules": {
@@ -2433,7 +2474,7 @@
         }
       },
       "active_system_events": {
-        "name": "Ενεργά συμβάντα συστήματος",
+        "name": "Συμβάντα συστήματος",
         "state_attributes": {
           "available": {
             "name": "Η υπηρεσία συμβάντων είναι διαθέσιμη"

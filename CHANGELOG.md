@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 - Remove the EV charger Start Charging and Stop Charging button entities. Use the charger switch or the Enphase charging actions; automations using `button.press` on the retired buttons need updating.
 
 ### ✨ New features
-- None
+- Add localized descriptive Activity entries for system events, service and cloud health, charger status, gateway and microinverter connectivity, battery status, Export Limit outcomes, and heat-pump SG Ready changes without changing entity states. Enable them in Configure → Notifications; the feature is disabled by default.
 
 ### 🐛 Bug fixes
 - Show the actual pending Export Limit setting, or None when no request remains, independently of the last request status.
@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 - Explain that saved Export Limit defaults apply when selecting Enabled in the Export Limit control.
 - Clarify the Export Limit dialog description and show “Pending setting: None” when no request is active in every locale.
 - Capitalize options labels and clarify feature, polling, device, notification, authentication, and advanced-control descriptions, including default states for settings and features in every locale.
+- Rename Active System Events to System Events in every locale and retain sanitized Enphase fault descriptions for event details.
 - Align the Enphase Cloud live power sensor names as Battery Power, Grid Power, Consumption Power, and Production Power in every locale.
 - Label the Export Limit selector states as Enabled and Disabled in every locale.
 - Show Battery Available Power and Battery Mode under Diagnostics on the IQ Battery device.

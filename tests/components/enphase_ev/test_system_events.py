@@ -351,7 +351,7 @@ def test_standing_alarm_parser_normalizes_redacts_and_deduplicates() -> None:
     assert alarm.device_type == "Gateway SERI...TE-1"
     assert alarm.first_set == "2026/07/11 01:02:03 +0000 (UTC)"
     assert "SERIAL-PRIVATE-1" not in repr(alarm)
-    assert "Private diagnostic details" not in repr(alarm)
+    assert alarm.description == "Private diagnostic details"
     assert parse_standing_alarms(None, site_id="1") == ()
     assert parse_standing_alarms({"alarms": {}}, site_id="1") == ()
 
@@ -1100,6 +1100,8 @@ async def test_runtime_bounds_active_event_attributes(hass, monkeypatch) -> None
         "state",
         "event_date",
         "updated_at",
+        "severity",
+        "description",
     }
     assert runtime.active_event_attributes[0]["event_date"] == (
         "2026-07-11T01:02:03+00:00"
@@ -1276,3 +1278,80 @@ async def test_runtime_persists_last_seen_checkpoint_across_reload(
     await reloaded.async_refresh()
 
     assert deleted == [issue_id]
+
+
+def test_activity_descriptions_are_sanitized_and_bounded():
+    text = (
+        'Site 1234567 SERIAL-PRIVATE-1 at 192.168.1.1 {"token": "private secret"} '
+        "token=secret https://example.invalid/private?token=secret " + "x" * 200
+    )
+    event = parse_active_system_events(
+        {
+            "events": [
+                {
+                    "id": "one",
+                    "event_type": "Fault",
+                    "severity": "error",
+                    "serial_number": "SERIAL-PRIVATE-1",
+                    "details": text,
+                }
+            ]
+        },
+        site_id="1234567",
+    )[0]
+    alarm = parse_standing_alarms(
+        {
+            "alarms": [
+                {"id": "one", "serial_num": "SERIAL-PRIVATE-1", "description": text}
+            ]
+        },
+        site_id="1234567",
+    )[0]
+    for item in (event, alarm):
+        assert item.description is not None
+        assert len(item.description) <= 163
+        for private in (
+            "1234567",
+            "SERIAL-PRIVATE-1",
+            "192.168.1.1",
+            "secret",
+            "https://",
+        ):
+            assert private not in item.description
+
+
+def test_activity_descriptions_redact_identifiers_from_other_devices():
+    details = (
+        'Fault {"device_id": "DEVICE-PRIVATE-9999", '
+        '"serial_number": "OTHER-SERIAL-PRIVATE", "reason": "offline"}'
+    )
+    event = parse_active_system_events(
+        {
+            "events": [
+                {
+                    "id": "one",
+                    "event_type": "Fault",
+                    "severity": "error",
+                    "serial_number": "REPORTED-SERIAL",
+                    "details": details,
+                }
+            ]
+        },
+        site_id="1234567",
+    )[0]
+    alarm = parse_standing_alarms(
+        {
+            "alarms": [
+                {
+                    "id": "one",
+                    "serial_num": "REPORTED-SERIAL",
+                    "description": details,
+                }
+            ]
+        },
+        site_id="1234567",
+    )[0]
+    for item in (event, alarm):
+        assert "DEVICE-PRIVATE-9999" not in item.description
+        assert "OTHER-SERIAL-PRIVATE" not in item.description
+        assert "offline" in item.description
