@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Eksporto riba",
-        "description": "Konfigūruokite sistemos eksporto ribas.\n\nDabartinis nustatymas: **{current}**\n\n{status}",
+        "description": "Valdykite, kiek galios jūsų sistema perduoda į tinklą. Užklausos būsena rodo per šią integraciją pateiktų pakeitimų eigą.\n\nDabartinis nustatymas: **{current}**\n\nLaukiantis nustatymas: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Nustatyti eksporto ribą",
-          "export_limit_zero": "Nustatyti nulinį eksportą",
+          "export_limit_set": "Įjungti eksporto ribą",
           "export_limit_disable": "Išjungti eksporto ribojimą",
           "export_limit_defaults": "Numatytieji nustatymai"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Išsaugokite eksporto ribos valdiklio numatytąsias reikšmes.",
+          "export_limit_set": "Nustatykite didžiausią perdavimą į tinklą, įskaitant nulį.",
+          "export_limit_disable": "Leiskite perdavimą į tinklą be nustatytos ribos."
         }
       },
       "export_limit_set": {
-        "title": "Nustatyti eksporto ribą",
+        "title": "Įjungti eksporto ribą",
         "data": {
           "limit_watts": "Eksporto riba (W)"
-        }
+        },
+        "description": "Nustatykite 0 W ribą, kad elektra nebūtų perduodama į tinklą. Kitos reikšmės nustato didžiausią galią, kurią sistema gali perduoti į tinklą."
       },
       "export_limit_confirm": {
         "title": "Eksporto riba",
@@ -862,7 +867,7 @@
       },
       "export_limit_defaults": {
         "title": "Numatytieji nustatymai",
-        "description": "Išsaugo ribos įjungimo numatytąsias reikšmes nekeičiant šliuzo. Atkūrimas pašalina išsaugotą greičio pakeitimą.",
+        "description": "Išsaugokite numatytąsias reikšmes, naudojamas eksporto ribos valdiklyje pasirinkus Įjungta. Jų išsaugojimas nekeičia šliuzo. Atkūrimas pašalina išsaugotą greičio pakeitimą.",
         "data": {
           "limit_watts": "Numatytoji eksporto riba (W)",
           "slew_rate": "Kitimo greitis (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "Užklausos būsena",
             "state": {
-              "idle": "Nėra užklausos",
+              "idle": "Nėra",
               "pending": "Laukiama patvirtinimo",
               "confirmed": "Konfigūracija patvirtinta",
               "unconfirmed": "Nepatvirtinta",

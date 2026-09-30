@@ -2876,6 +2876,7 @@ async def test_options_flow_grid_toggle_completes_otp_workflow(hass) -> None:
     form = await handler.async_step_grid_toggle()
     assert form["type"] is FlowResultType.FORM
     assert form["step_id"] == "grid_toggle"
+    assert form["last_step"] is False
     coordinator.battery_runtime.async_refresh_grid_control_check.assert_awaited_once_with(
         force=True
     )
@@ -3294,6 +3295,7 @@ async def test_options_flow_grid_profile_empty_and_stale_selection_paths(hass) -
     result = await handler.async_step_grid_profile_select()
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "grid_profile"
+    assert result["last_step"] is False
 
     runtime = _options_flow_grid_profile_runtime()
     entry.runtime_data = SimpleNamespace(
@@ -3302,6 +3304,7 @@ async def test_options_flow_grid_profile_empty_and_stale_selection_paths(hass) -
     result = await handler.async_step_grid_profile_confirm()
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "grid_profile_select"
+    assert result["last_step"] is False
 
 
 @pytest.mark.asyncio
@@ -3343,6 +3346,7 @@ async def test_options_flow_grid_profile_form_does_not_fetch_profiles(hass) -> N
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "grid_profile"
+    assert result["last_step"] is False
     runtime.async_refresh.assert_not_awaited()
     runtime.async_load_profiles.assert_not_awaited()
 
@@ -3366,6 +3370,7 @@ async def test_options_flow_grid_profile_stages_profile_before_confirm(hass) -> 
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "grid_profile_select"
+    assert result["last_step"] is False
     runtime.async_refresh.assert_not_awaited()
     runtime.async_load_profiles.assert_awaited_once_with(
         region_code="ACT",
@@ -3429,6 +3434,7 @@ async def test_options_flow_grid_profile_rejects_profile_from_cached_other_regio
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "grid_profile_select"
+    assert result["last_step"] is False
     assert result["errors"] == {CONF_GRID_PROFILE_ID: "grid_profile_profile_invalid"}
 
 
@@ -3511,6 +3517,7 @@ async def test_options_flow_grid_profile_reports_empty_filter(hass) -> None:
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "grid_profile"
+    assert result["last_step"] is False
     assert result["errors"] == {"base": "grid_profile_no_profiles"}
 
 
@@ -4497,6 +4504,7 @@ async def test_options_flow_migrate_envoy_shows_source_step_for_multiple_entries
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "migrate_envoy_source"
+    assert result["last_step"] is False
 
 
 @pytest.mark.asyncio
@@ -4582,6 +4590,7 @@ async def test_options_flow_migrate_envoy_uses_statistics_for_unloaded_sources(
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "migrate_envoy_intro"
+    assert result["last_step"] is False
 
 
 @pytest.mark.asyncio
@@ -4630,6 +4639,7 @@ async def test_options_flow_migrate_envoy_source_accepts_selected_entry(
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "migrate_envoy_intro"
+    assert result["last_step"] is False
     assert handler._selected_migration_source_id == "envoy-a"
     assert handler._migration_selection == {}
 
@@ -4679,6 +4689,7 @@ async def test_options_flow_migrate_envoy_intro_requires_backup(
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "migrate_envoy_intro"
+    assert result["last_step"] is False
     assert result["errors"] == {"base": "backup_required"}
 
 
@@ -4740,6 +4751,7 @@ async def test_options_flow_migrate_intro_advances_when_backup_confirmed(
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "migrate_envoy_mapping"
+    assert result["last_step"] is False
 
 
 @pytest.mark.asyncio
@@ -4803,6 +4815,7 @@ async def test_options_flow_migrate_mapping_preselects_candidates(
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "migrate_envoy_mapping"
+    assert result["last_step"] is False
     validated = result["data_schema"]({})
     assert validated["solar_production"] == prod_entity
     assert validated["consumption"] == cons_entity
@@ -5178,6 +5191,7 @@ async def test_options_flow_migrate_confirm_redirects_when_source_or_selection_m
     result = await handler.async_step_migrate_envoy_confirm()
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "migrate_envoy_mapping"
+    assert result["last_step"] is False
 
 
 @pytest.mark.asyncio

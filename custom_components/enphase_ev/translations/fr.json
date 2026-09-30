@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Limite d’injection",
-        "description": "Configurer les limites d’injection du système.\n\nRéglage actuel: **{current}**\n\n{status}",
+        "description": "Contrôlez la puissance que votre système injecte dans le réseau. Le statut de la demande permet de suivre les modifications envoyées via cette intégration.\n\nRéglage actuel: **{current}**\n\nRéglage en attente: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Définir la limite d’injection",
-          "export_limit_zero": "Définir une injection nulle",
+          "export_limit_set": "Activer la limite d’injection",
           "export_limit_disable": "Désactiver la limitation d’injection",
           "export_limit_defaults": "Valeurs par défaut"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Enregistrez les valeurs par défaut de la commande de limite d’injection.",
+          "export_limit_set": "Définissez l’injection maximale dans le réseau, y compris zéro.",
+          "export_limit_disable": "Autorisez l’injection dans le réseau sans limite configurée."
         }
       },
       "export_limit_set": {
-        "title": "Définir la limite d’injection",
+        "title": "Activer la limite d’injection",
         "data": {
           "limit_watts": "Limite d’injection (W)"
-        }
+        },
+        "description": "Réglez la limite sur 0 W pour empêcher toute injection dans le réseau. Les autres valeurs définissent la puissance maximale que votre système peut injecter."
       },
       "export_limit_confirm": {
         "title": "Limite d’injection",
@@ -862,7 +867,7 @@
       },
       "export_limit_defaults": {
         "title": "Valeurs par défaut",
-        "description": "Enregistre les valeurs d’activation sans modifier la passerelle. La restauration supprime la vitesse personnalisée enregistrée.",
+        "description": "Enregistrez les valeurs par défaut utilisées lorsque vous sélectionnez Activé dans la commande de limite d’injection. Leur enregistrement ne modifie pas la passerelle. La restauration supprime la vitesse personnalisée enregistrée.",
         "data": {
           "limit_watts": "Limite d’exportation par défaut (W)",
           "slew_rate": "Vitesse de variation (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "État de la demande",
             "state": {
-              "idle": "Aucune demande",
+              "idle": "Aucun",
               "pending": "En attente de confirmation",
               "confirmed": "Configuration confirmée",
               "unconfirmed": "Non confirmé",

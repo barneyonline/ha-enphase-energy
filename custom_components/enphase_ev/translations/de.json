@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Einspeisebegrenzung",
-        "description": "Einspeisegrenzen des Systems konfigurieren.\n\nAktuelle Einstellung: **{current}**\n\n{status}",
+        "description": "Steuern Sie, wie viel Leistung Ihr System ins Netz einspeist. Der Anfragestatus zeigt Änderungen, die über diese Integration angefordert wurden.\n\nAktuelle Einstellung: **{current}**\n\nAusstehende Einstellung: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Einspeisegrenze festlegen",
-          "export_limit_zero": "Nulleinspeisung festlegen",
+          "export_limit_set": "Einspeiselimit aktivieren",
           "export_limit_disable": "Einspeisebegrenzung deaktivieren",
           "export_limit_defaults": "Standardeinstellungen"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Standardwerte für die Steuerung des Einspeiselimits speichern.",
+          "export_limit_set": "Maximale Netzeinspeisung festlegen, einschließlich Nulleinspeisung.",
+          "export_limit_disable": "Netzeinspeisung ohne konfiguriertes Limit zulassen."
         }
       },
       "export_limit_set": {
-        "title": "Einspeisegrenze festlegen",
+        "title": "Einspeiselimit aktivieren",
         "data": {
           "limit_watts": "Einspeisegrenze (W)"
-        }
+        },
+        "description": "Setzen Sie das Limit auf 0 W, um die Einspeisung ins Netz zu verhindern. Andere Werte legen die maximale Leistung fest, die Ihr System einspeisen darf."
       },
       "export_limit_confirm": {
         "title": "Einspeisebegrenzung",
@@ -862,7 +867,7 @@
       },
       "export_limit_defaults": {
         "title": "Standardeinstellungen",
-        "description": "Standardwerte zum Aktivieren des Limits speichern, ohne das Gateway zu ändern. Wiederherstellen entfernt die gespeicherte Änderungsrate.",
+        "description": "Speichern Sie die Standardwerte, die bei Auswahl von Aktiviert in der Steuerung für das Einspeiselimit verwendet werden. Das Speichern dieser Werte ändert das Gateway nicht. Wiederherstellen entfernt die gespeicherte Änderungsrate.",
         "data": {
           "limit_watts": "Standard-Einspeisegrenze (W)",
           "slew_rate": "Änderungsrate (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "Anfragestatus",
             "state": {
-              "idle": "Keine Anfrage",
+              "idle": "Keine",
               "pending": "Bestätigung ausstehend",
               "confirmed": "Konfiguration bestätigt",
               "unconfirmed": "Unbestätigt",

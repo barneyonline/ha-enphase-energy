@@ -67,11 +67,19 @@ The runtime persists pending intent, never form tokens, and resumes readback
 after reload. It polls at the configured fast interval for ten minutes after a
 write, then at the standard interval; an unconfirmed-request repair is owned by
 that runtime and cleared on unload or matching readback.
+The guided Export Limit menu uses one Enable Export Limit action for both zero
+and nonzero limits: 0 W requests no grid export, and a positive value sets the
+maximum permitted export power. Both proceed through the same confirmation step.
+The menu shows the pending request’s wattage or Disabled while a request remains,
+and None when it has been cleared, regardless of the last request status.
 The guided Export Limit confirmation can explicitly reconcile a zero form slew-rate
 default against fresh gateway readback when enabling, changing, or disabling a limit.
 It requires the exact confirmed snapshot, fresh gateway identity, no dynamic mode,
 and preservation of the positive gateway slew rate. Any nonzero disagreement or
 other form mismatch remains blocked; selector and service writes do not opt in.
+Options forms that navigate to another input or confirmation step set
+`last_step=False` to show Home Assistant’s translated Next button. Forms that
+save options or apply gateway changes retain Submit.
 The options menu separates device category selection (Devices) from feature
 configuration (Features). Features contains Device Features and Advanced Features;
 the latter groups installer Grid Profile controls, Export Limit controls, and

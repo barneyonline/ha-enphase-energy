@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Limite di immissione",
-        "description": "Configurare i limiti di immissione del sistema.\n\nImpostazione attuale: **{current}**\n\n{status}",
+        "description": "Controlla quanta potenza il tuo sistema immette nella rete. Lo stato della richiesta tiene traccia delle modifiche inviate tramite questa integrazione.\n\nImpostazione attuale: **{current}**\n\nImpostazione in attesa: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Imposta limite di immissione",
-          "export_limit_zero": "Imposta immissione zero",
+          "export_limit_set": "Abilita limite di esportazione",
           "export_limit_disable": "Disabilita limitazione di immissione",
           "export_limit_defaults": "Impostazioni predefinite"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Salva i valori predefiniti del controllo del limite di esportazione.",
+          "export_limit_set": "Imposta l’immissione massima nella rete, anche a zero.",
+          "export_limit_disable": "Consenti l’immissione nella rete senza un limite configurato."
         }
       },
       "export_limit_set": {
-        "title": "Imposta limite di immissione",
+        "title": "Abilita limite di esportazione",
         "data": {
           "limit_watts": "Limite di immissione (W)"
-        }
+        },
+        "description": "Imposta il limite a 0 W per impedire l’immissione nella rete. Gli altri valori definiscono la potenza massima che il sistema può immettere."
       },
       "export_limit_confirm": {
         "title": "Limite di immissione",
@@ -862,7 +867,7 @@
       },
       "export_limit_defaults": {
         "title": "Impostazioni predefinite",
-        "description": "Salva i valori per abilitare il limite senza modificare il gateway. Il ripristino elimina la velocità personalizzata salvata.",
+        "description": "Salva i valori predefiniti utilizzati quando selezioni Abilitato nel controllo del limite di esportazione. Il salvataggio non modifica il gateway. Il ripristino elimina la velocità personalizzata salvata.",
         "data": {
           "limit_watts": "Limite di esportazione predefinito (W)",
           "slew_rate": "Velocità di variazione (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "Stato della richiesta",
             "state": {
-              "idle": "Nessuna richiesta",
+              "idle": "Nessuna",
               "pending": "In attesa di conferma",
               "confirmed": "Configurazione confermata",
               "unconfirmed": "Non confermato",

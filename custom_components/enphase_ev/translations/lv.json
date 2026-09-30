@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Eksporta ierobežojums",
-        "description": "Konfigurējiet sistēmas eksporta ierobežojumus.\n\nPašreizējais iestatījums: **{current}**\n\n{status}",
+        "description": "Nosakiet, cik daudz jaudas jūsu sistēma nodod elektrotīklā. Pieprasījuma statuss rāda ar šo integrāciju nosūtīto izmaiņu norisi.\n\nPašreizējais iestatījums: **{current}**\n\nGaidošais iestatījums: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Iestatīt eksporta ierobežojumu",
-          "export_limit_zero": "Iestatīt nulles eksportu",
+          "export_limit_set": "Iespējot eksporta ierobežojumu",
           "export_limit_disable": "Atspējot eksporta ierobežošanu",
           "export_limit_defaults": "Noklusējuma iestatījumi"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Saglabājiet eksporta ierobežojuma vadīklas noklusējuma vērtības.",
+          "export_limit_set": "Iestatiet maksimālo nodošanu tīklā, tostarp nulli.",
+          "export_limit_disable": "Atļaujiet nodošanu tīklā bez iestatīta ierobežojuma."
         }
       },
       "export_limit_set": {
-        "title": "Iestatīt eksporta ierobežojumu",
+        "title": "Iespējot eksporta ierobežojumu",
         "data": {
           "limit_watts": "Eksporta ierobežojums (W)"
-        }
+        },
+        "description": "Iestatiet ierobežojumu uz 0 W, lai novērstu elektroenerģijas nodošanu tīklā. Citas vērtības nosaka maksimālo jaudu, ko sistēma drīkst nodot tīklā."
       },
       "export_limit_confirm": {
         "title": "Eksporta ierobežojums",
@@ -862,7 +867,7 @@
       },
       "export_limit_defaults": {
         "title": "Noklusējuma iestatījumi",
-        "description": "Saglabā ierobežojuma iespējošanas noklusējumus, nemainot vārteju. Atjaunošana dzēš saglabāto ātruma pārrakstījumu.",
+        "description": "Saglabājiet noklusējuma vērtības, kas tiek izmantotas, eksporta ierobežojuma vadīklā izvēloties Iespējots. To saglabāšana nemaina vārteju. Atjaunošana dzēš saglabāto ātruma pārrakstījumu.",
         "data": {
           "limit_watts": "Noklusējuma eksporta ierobežojums (W)",
           "slew_rate": "Izmaiņu ātrums (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "Pieprasījuma statuss",
             "state": {
-              "idle": "Nav pieprasījuma",
+              "idle": "Nav",
               "pending": "Gaida apstiprinājumu",
               "confirmed": "Konfigurācija apstiprināta",
               "unconfirmed": "Neapstiprināts",

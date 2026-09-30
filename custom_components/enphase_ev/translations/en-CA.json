@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Export Limit",
-        "description": "Configure system export limits.\n\nCurrent setting: **{current}**\n\n{status}",
+        "description": "Control how much power your system exports to the grid. The request status tracks changes submitted through this integration.\n\nCurrent setting: **{current}**\n\nPending setting: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Set export limit",
-          "export_limit_zero": "Set zero export",
-          "export_limit_disable": "Disable export limiting",
-          "export_limit_defaults": "Default settings"
+          "export_limit_set": "Enable Export Limit",
+          "export_limit_disable": "Disable Export Limit",
+          "export_limit_defaults": "Default Settings"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Save defaults for the Export Limit control.",
+          "export_limit_set": "Set the maximum grid export, including zero export.",
+          "export_limit_disable": "Allow grid exports without a configured limit."
         }
       },
       "export_limit_set": {
-        "title": "Set export limit",
+        "title": "Enable Export Limit",
         "data": {
           "limit_watts": "Export limit (W)"
-        }
+        },
+        "description": "Set the limit to 0 W to prevent exports to the grid. Other values set the maximum power your system is allowed to export."
       },
       "export_limit_confirm": {
         "title": "Export Limit",
@@ -861,8 +866,8 @@
         "description": "Export Limit is unavailable. Installer access and a supported single-gateway configuration are required.\n\nCurrent setting: **{current}**"
       },
       "export_limit_defaults": {
-        "title": "Default settings",
-        "description": "Save defaults for Enable Limit without changing the gateway. Restore clears the saved slew-rate override.",
+        "title": "Default Settings",
+        "description": "Save the defaults used when you select Enabled in the Export Limit control. Saving these defaults does not change the gateway. Restore clears the saved slew-rate override.",
         "data": {
           "limit_watts": "Default export limit (W)",
           "slew_rate": "Slew rate (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "Request status",
             "state": {
-              "idle": "No request",
+              "idle": "None",
               "pending": "Awaiting confirmation",
               "confirmed": "Configuration confirmed",
               "unconfirmed": "Unconfirmed",

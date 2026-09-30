@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Betáplálási korlát",
-        "description": "A rendszer betáplálási korlátainak beállítása.\n\nJelenlegi beállítás: **{current}**\n\n{status}",
+        "description": "Szabályozza, mekkora teljesítményt táplál a rendszere a hálózatba. A kérés állapota az ezen az integráción keresztül elküldött módosításokat követi.\n\nJelenlegi beállítás: **{current}**\n\nFüggőben lévő beállítás: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Betáplálási korlát beállítása",
-          "export_limit_zero": "Nulla betáplálás beállítása",
+          "export_limit_set": "Exportkorlát engedélyezése",
           "export_limit_disable": "Betáplálás korlátozásának kikapcsolása",
           "export_limit_defaults": "Alapértelmezett beállítások"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Mentse az exportkorlát vezérlő alapértékeit.",
+          "export_limit_set": "Állítsa be a maximális hálózati betáplálást, beleértve a nullát is.",
+          "export_limit_disable": "Engedélyezze a hálózati betáplálást beállított korlát nélkül."
         }
       },
       "export_limit_set": {
-        "title": "Betáplálási korlát beállítása",
+        "title": "Exportkorlát engedélyezése",
         "data": {
           "limit_watts": "Betáplálási korlát (W)"
-        }
+        },
+        "description": "Állítsa a korlátot 0 W-ra a hálózatba történő betáplálás megakadályozásához. Más értékek a rendszer által betáplálható maximális teljesítményt határozzák meg."
       },
       "export_limit_confirm": {
         "title": "Betáplálási korlát",
@@ -862,7 +867,7 @@
       },
       "export_limit_defaults": {
         "title": "Alapértelmezett beállítások",
-        "description": "Menti az engedélyezés alapértékeit az átjáró módosítása nélkül. A visszaállítás törli a mentett sebességfelülírást.",
+        "description": "Mentse az alapértékeket, amelyeket az exportkorlát vezérlő Engedélyezve állapotának kiválasztásakor használ a rendszer. Az értékek mentése nem módosítja az átjárót. A visszaállítás törli a mentett sebességfelülírást.",
         "data": {
           "limit_watts": "Alapértelmezett betáplálási korlát (W)",
           "slew_rate": "Változási sebesség (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "Kérés állapota",
             "state": {
-              "idle": "Nincs kérés",
+              "idle": "Nincs",
               "pending": "Megerősítésre vár",
               "confirmed": "Konfiguráció megerősítve",
               "unconfirmed": "Nem megerősített",

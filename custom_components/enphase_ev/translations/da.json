@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Eksportgrænse",
-        "description": "Konfigurer systemets eksportgrænser.\n\nAktuel indstilling: **{current}**\n\n{status}",
+        "description": "Styr, hvor meget effekt dit system leverer til elnettet. Anmodningsstatus viser ændringer sendt via denne integration.\n\nAktuel indstilling: **{current}**\n\nAfventende indstilling: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Indstil eksportgrænse",
-          "export_limit_zero": "Indstil nuleksport",
+          "export_limit_set": "Aktivér eksportgrænse",
           "export_limit_disable": "Deaktivér eksportbegrænsning",
           "export_limit_defaults": "Standardindstillinger"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Gem standardværdier for styringen af eksportgrænsen.",
+          "export_limit_set": "Indstil maksimal eksport til elnettet, inklusive nul eksport.",
+          "export_limit_disable": "Tillad eksport til elnettet uden en indstillet grænse."
         }
       },
       "export_limit_set": {
-        "title": "Indstil eksportgrænse",
+        "title": "Aktivér eksportgrænse",
         "data": {
           "limit_watts": "Eksportgrænse (W)"
-        }
+        },
+        "description": "Sæt grænsen til 0 W for at forhindre eksport til elnettet. Andre værdier angiver den maksimale effekt, systemet må levere til elnettet."
       },
       "export_limit_confirm": {
         "title": "Eksportgrænse",
@@ -862,7 +867,7 @@
       },
       "export_limit_defaults": {
         "title": "Standardindstillinger",
-        "description": "Gem standarder til aktivering af grænsen uden at ændre gatewayen. Gendannelse fjerner den gemte hastighed.",
+        "description": "Gem de standardværdier, der bruges, når du vælger Aktiveret i styringen af eksportgrænsen. Lagring af disse værdier ændrer ikke gatewayen. Gendannelse fjerner den gemte hastighed.",
         "data": {
           "limit_watts": "Standardeksportgrænse (W)",
           "slew_rate": "Ændringshastighed (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "Anmodningsstatus",
             "state": {
-              "idle": "Ingen anmodning",
+              "idle": "Ingen",
               "pending": "Afventer bekræftelse",
               "confirmed": "Konfiguration bekræftet",
               "unconfirmed": "Ubekræftet",

@@ -830,19 +830,24 @@
       },
       "export_limit_action": {
         "title": "Exportgräns",
-        "description": "Konfigurera systemets exportgränser.\n\nAktuell inställning: **{current}**\n\n{status}",
+        "description": "Styr hur mycket effekt ditt system levererar till elnätet. Begärans status visar ändringar som skickats via denna integration.\n\nAktuell inställning: **{current}**\n\nVäntande inställning: **{pending}**",
         "menu_options": {
-          "export_limit_set": "Ange exportgräns",
-          "export_limit_zero": "Ange nollexport",
+          "export_limit_set": "Aktivera exportgräns",
           "export_limit_disable": "Inaktivera exportbegränsning",
           "export_limit_defaults": "Standardinställningar"
+        },
+        "menu_option_descriptions": {
+          "export_limit_defaults": "Spara standardvärden för kontrollen för exportgränsen.",
+          "export_limit_set": "Ange maximal export till elnätet, inklusive noll export.",
+          "export_limit_disable": "Tillåt export till elnätet utan en inställd gräns."
         }
       },
       "export_limit_set": {
-        "title": "Ange exportgräns",
+        "title": "Aktivera exportgräns",
         "data": {
           "limit_watts": "Exportgräns (W)"
-        }
+        },
+        "description": "Ställ in gränsen på 0 W för att förhindra export till elnätet. Andra värden anger den maximala effekt som systemet får leverera till elnätet."
       },
       "export_limit_confirm": {
         "title": "Exportgräns",
@@ -862,7 +867,7 @@
       },
       "export_limit_defaults": {
         "title": "Standardinställningar",
-        "description": "Spara standardvärden för aktivering utan att ändra gatewayen. Återställning tar bort den sparade hastighetsåsidosättningen.",
+        "description": "Spara standardvärdena som används när du väljer Aktiverad i kontrollen för exportgränsen. Att spara värdena ändrar inte gatewayen. Återställning tar bort den sparade hastighetsåsidosättningen.",
         "data": {
           "limit_watts": "Standardgräns för export (W)",
           "slew_rate": "Ändringshastighet (W/sec)",
@@ -2150,7 +2155,7 @@
           "request_status": {
             "name": "Begärans status",
             "state": {
-              "idle": "Ingen begäran",
+              "idle": "Ingen",
               "pending": "Väntar på bekräftelse",
               "confirmed": "Konfiguration bekräftad",
               "unconfirmed": "Obekräftad",
