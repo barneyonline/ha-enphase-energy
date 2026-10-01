@@ -1544,7 +1544,9 @@ async def test_inventory_runtime_parameter_pagination_limit_is_not_authoritative
     assert health.last_error == "Dashboard parameter pagination limit reached for power"
 
     current_time[0] = 1_901.0
-    monkeypatch.setattr(coord, "_endpoint_family_should_run", lambda *_args: False)
+    monkeypatch.setattr(
+        coord, "_endpoint_family_should_run", lambda *_args, **_kwargs: False
+    )
     assert await runtime._async_refresh_inverter_parameter_telemetry(  # noqa: SLF001
         ["INV-A", "INV-B"]
     ) == {"INV-A": {"power": 275.0, "parameter_ids": {"power": "power"}}}
@@ -2101,12 +2103,16 @@ async def test_inventory_runtime_parameter_telemetry_edge_paths(
         "devices": ["bad", {}, {"serial_num": "GW-A"}, {"serial_num": "GW-A"}],
     }
     assert runtime._gateway_serials_for_inverter_telemetry() == ["GW-A"]  # noqa: SLF001
-    monkeypatch.setattr(coord, "_endpoint_family_should_run", lambda *_args: False)
+    monkeypatch.setattr(
+        coord, "_endpoint_family_should_run", lambda *_args, **_kwargs: False
+    )
     assert await runtime._async_inverter_dashboard_inventory(  # noqa: SLF001
         [{"serial_number": "INV-CACHED", "name": "Legacy"}]
     ) == [{"serial_number": "INV-CACHED", "name": "Legacy"}]
 
-    monkeypatch.setattr(coord, "_endpoint_family_should_run", lambda *_args: True)
+    monkeypatch.setattr(
+        coord, "_endpoint_family_should_run", lambda *_args, **_kwargs: True
+    )
     coord.client.system_dashboard_envoy_inverters = AsyncMock(
         return_value={"data": ["bad", {"serial_number": ""}]}
     )
@@ -4051,7 +4057,7 @@ async def test_parameter_requests_prioritize_power_pace_pages_and_stop_on_429(
     monkeypatch.setattr(
         coord,
         "_endpoint_family_should_run",
-        lambda family: family == "inverter_parameter_telemetry",
+        lambda family, **_kwargs: family == "inverter_parameter_telemetry",
     )
     clock = [1000.0]
     monkeypatch.setattr(
@@ -4107,7 +4113,7 @@ async def test_parameter_429_takes_priority_over_prior_failure_and_stops_queue(
     monkeypatch.setattr(
         coord,
         "_endpoint_family_should_run",
-        lambda family: family == "inverter_parameter_telemetry",
+        lambda family, **_kwargs: family == "inverter_parameter_telemetry",
     )
     coord.client.system_dashboard_parameter_view = AsyncMock(
         side_effect=[
@@ -4136,7 +4142,7 @@ async def test_parameter_diagnostics_poll_hourly_and_retain_two_hour_cache(
     monkeypatch.setattr(
         coord,
         "_endpoint_family_should_run",
-        lambda family: family == "inverter_parameter_telemetry",
+        lambda family, **_kwargs: family == "inverter_parameter_telemetry",
     )
     clock = [1000.0]
     monkeypatch.setattr(

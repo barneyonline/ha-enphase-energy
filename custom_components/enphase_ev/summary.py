@@ -6,13 +6,12 @@ import asyncio
 import logging
 import time
 from datetime import datetime, timedelta
-from email.utils import parsedate_to_datetime
 from typing import Any, Callable
 
-import aiohttp
 from homeassistant.util import dt as dt_util
 
 from .api import InvalidPayloadError
+from .cloud_retry import retry_after_delay
 from .log_redaction import redact_text
 
 _LOGGER = logging.getLogger(__name__)
@@ -80,27 +79,7 @@ class SummaryStore:
         return bool(backoff_until and time.monotonic() < float(str(backoff_until)))
 
     def _failure_backoff_delay(self, err: Exception, failures: int) -> float:
-        retry_delay = 0.0
-        if isinstance(err, aiohttp.ClientResponseError) and err.headers:
-            retry_after = err.headers.get("Retry-After")
-            if retry_after:
-                try:
-                    retry_delay = max(0.0, float(int(retry_after)))
-                except Exception:
-                    retry_dt = None
-                    try:
-                        retry_dt = parsedate_to_datetime(str(retry_after))
-                    except Exception:
-                        retry_dt = None
-                    if retry_dt is not None:
-                        if retry_dt.tzinfo is None:
-                            retry_dt = retry_dt.replace(tzinfo=dt_util.UTC)
-                        retry_delay = max(
-                            0.0,
-                            (
-                                retry_dt.astimezone(dt_util.UTC) - dt_util.utcnow()
-                            ).total_seconds(),
-                        )
+        retry_delay = retry_after_delay(err) or 0.0
         multiplier = 2 ** min(max(failures - 1, 0), 3)
         base_delay = max(self._ttl, SUMMARY_FAILURE_BACKOFF_S)
         return float(

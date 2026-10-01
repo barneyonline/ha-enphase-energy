@@ -1340,6 +1340,9 @@ class CoordinatorDiagnostics:
                         lambda: None,
                     )()
                 ),
+                "pagination": _signature_copy(
+                    getattr(session_history, "pagination_diagnostics", None)
+                ),
             }
         evse_timeseries = getattr(coord, "evse_timeseries", None)
         if evse_timeseries is not None:

@@ -49,3 +49,12 @@ class VppClient(JsonClient, Protocol):
     """The VPP surface needs only isolated headers and JSON transport."""
 
     def _vpp_headers(self) -> dict[str, str | None]: ...
+
+
+class SessionHistoryClient(JsonClient, Protocol):
+    """Authentication capabilities used by read-only charger history requests."""
+
+    def _session_history_username(self) -> str | None: ...
+    def _session_history_headers(
+        self, request_id: str, username: str | None
+    ) -> dict[str, str]: ...

@@ -713,13 +713,23 @@ def _should_limit_enlighten_read_request(method: object, url: object) -> bool:
         method_text = str(method).strip().upper()
     except Exception:  # noqa: BLE001 - defensive casting
         return False
-    if method_text not in {"GET", "HEAD"}:
+    if method_text not in {"GET", "HEAD", "POST"}:
         return False
     try:
         url_text = str(url).strip()
     except Exception:  # noqa: BLE001 - defensive casting
         return False
-    return url_text.startswith((f"{BASE_URL}/", f"{GS_BASE_URL}/"))
+    if not url_text.startswith((f"{BASE_URL}/", f"{GS_BASE_URL}/")):
+        return False
+    # Session-history retrieval uses POST but consumes the same cloud read
+    # capacity as GET. Keep mutating POST endpoints outside the read budget.
+    return method_text != "POST" or bool(
+        re.fullmatch(
+            rf"{re.escape(BASE_URL)}/service/enho_historical_events_ms/"
+            r"[^/?#]+/sessions/[^/?#]+/history(?:[?#].*)?",
+            url_text,
+        )
+    )
 
 
 def _get_enlighten_read_semaphore() -> asyncio.Semaphore:
@@ -768,7 +778,7 @@ def _enlighten_reauth_read_scope() -> Iterator[None]:
 async def _enlighten_read_request_guard(
     method: object, url: object
 ) -> AsyncIterator[None]:
-    """Limit concurrent GET/HEAD requests to the Enlighten web host."""
+    """Limit browser-host reads, including read-only history POST requests."""
 
     if _enlighten_read_limiter_bypass.get() or not _should_limit_enlighten_read_request(
         method, url

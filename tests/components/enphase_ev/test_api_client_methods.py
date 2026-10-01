@@ -3411,19 +3411,35 @@ async def test_get_schedules_normalizes_payload() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_schedules_handles_bad_payloads() -> None:
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "bad",
+        {"meta": {"serverTimeStamp": "ts"}, "data": "bad"},
+        {"error": "temporary backend error"},
+        {"data": {}},
+        {"data": {"slots": None}},
+        {"data": {"slots": "invalid"}},
+        {"data": {"slots": ["invalid"]}},
+        {"data": {"slots": [{"id": "slot-1"}, {}]}},
+    ],
+)
+async def test_get_schedules_handles_bad_payloads(payload) -> None:
     client = _make_client()
-    client._json = _RequestMock(return_value="bad")
-    data = await client.get_schedules("SN123")
-    assert data == {"meta": None, "config": None, "slots": []}
+    client._json = _RequestMock(return_value=payload)
+    with pytest.raises(api.InvalidPayloadError, match="valid slots list"):
+        await client.get_schedules("SN123")
 
-    client._json = _RequestMock(
-        return_value={"meta": {"serverTimeStamp": "ts"}, "data": "bad"}
-    )
-    data = await client.get_schedules("SN123")
-    assert data["meta"] == {"serverTimeStamp": "ts"}
-    assert data["config"] is None
-    assert data["slots"] == []
+
+@pytest.mark.asyncio
+async def test_get_schedules_preserves_authoritative_empty_list() -> None:
+    client = _make_client()
+    client._json = _RequestMock(return_value={"data": {"slots": []}})
+    assert await client.get_schedules("SN123") == {
+        "meta": None,
+        "config": None,
+        "slots": [],
+    }
 
 
 @pytest.mark.asyncio

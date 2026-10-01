@@ -20,6 +20,7 @@ from ..log_redaction import (
     redact_text,
 )
 from . import site_surface as api_site_surface
+from .protocols import SessionHistoryClient
 from .errors import (
     EnphaseLoginWallUnauthorized,
     EVSETimeseriesUnavailable,
@@ -1474,7 +1475,7 @@ async def inverter_production(
 
 
 async def session_history_filter_criteria(
-    self: EnphaseEVClient,
+    self: SessionHistoryClient,
     *,
     request_id: str | None = None,
     username: str | None = None,
@@ -1495,7 +1496,7 @@ async def session_history_filter_criteria(
 
 
 async def session_history(
-    self: EnphaseEVClient,
+    self: SessionHistoryClient,
     sn: str,
     *,
     start_date: str,

@@ -4672,3 +4672,119 @@ async def test_tariff_latest_transition_recognizes_original_read_after_older_exp
     assert (
         _tariff_test_rate(coord.client.site_tariff_update.await_args.args[0]) == "0.4"
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stage", ["read", "tariff_write", "billing_write", "notify"])
+async def test_tariff_write_finishing_after_retirement_cannot_start_followup(
+    coordinator_factory, stage
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.tariff_runtime
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    payload = {"purchase": _write_test_branch("0.2")}
+    results = {
+        "read": payload,
+        "tariff_write": {"accepted": True},
+        "billing_write": {"accepted": True},
+        "notify": None,
+    }
+
+    async def blocked(*_args, **_kwargs):
+        entered.set()
+        await release.wait()
+        return results[stage]
+
+    endpoints = {
+        "read": "site_tariff",
+        "tariff_write": "site_tariff_update",
+        "billing_write": "site_tariff_billing_update",
+        "notify": "notify_tariff_change",
+    }
+    coord.client.site_tariff = AsyncMock(return_value=payload)
+    coord.client.site_tariff_update = AsyncMock(return_value={"accepted": True})
+    coord.client.site_tariff_billing_update = AsyncMock(return_value={"accepted": True})
+    coord.client.notify_tariff_change = AsyncMock()
+    setattr(coord.client, endpoints[stage], AsyncMock(side_effect=blocked))
+    runtime.async_refresh = AsyncMock()
+    runtime._schedule_post_write_reconciliation = Mock()
+    publish = Mock()
+    coord.async_add_listener(publish)
+    pending = asyncio.create_task(
+        runtime.async_update_tariff(
+            purchase_tariff=_write_test_branch("0.3"),
+            billing={
+                "billing_start_date": "2026-10-01",
+                "billing_frequency": "MONTH",
+                "billing_interval_value": 1,
+            },
+        )
+    )
+    await entered.wait()
+    coord.mark_runtime_stopped()
+    release.set()
+    result = await pending
+    if stage == "read":
+        assert result == {"tariff": None, "billing": None}
+        coord.client.site_tariff_update.assert_not_awaited()
+    if stage in {"read", "tariff_write"}:
+        coord.client.site_tariff_billing_update.assert_not_awaited()
+    if stage != "notify":
+        coord.client.notify_tariff_change.assert_not_awaited()
+    runtime.async_refresh.assert_not_awaited()
+    runtime._schedule_post_write_reconciliation.assert_not_called()
+    publish.assert_not_called()
+    assert await runtime.async_update_tariff(
+        purchase_tariff=_write_test_branch("0.4")
+    ) == {"tariff": None, "billing": None}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("late_stage", ["bundle", "dated_fallback"])
+async def test_tariff_refresh_retired_during_fetch_preserves_state(
+    coordinator_factory, late_stage
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.tariff_runtime
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    original = parse_tariff_rate({"purchase": _write_test_branch("0.2")}, "purchase")
+    coord.tariff_import_rate = original
+
+    async def blocked(*_args):
+        entered.set()
+        await release.wait()
+        return (
+            (None, {"purchase": _write_test_branch("0.3")})
+            if late_stage == "bundle"
+            else None
+        )
+
+    coord.client.site_tariff_bundle = AsyncMock(
+        side_effect=blocked if late_stage == "bundle" else None,
+        return_value=(None, {"purchase": _write_test_branch("0.3")}),
+    )
+    if late_stage == "dated_fallback":
+        runtime._async_export_rate_with_dated_fallback = blocked
+    task = asyncio.create_task(runtime.async_refresh(force=True))
+    await entered.wait()
+    coord.mark_runtime_stopped()
+    release.set()
+    await task
+    assert coord.tariff_import_rate is original
+    await runtime.async_refresh(force=True)
+    coord.client.site_tariff_bundle.assert_awaited_once()
+    runtime._publish_tariff_update()
+    runtime._schedule_post_write_reconciliation(())
+    assert runtime._post_write_reconcile_task is None
+
+
+@pytest.mark.asyncio
+async def test_tariff_reconcile_sleep_observes_retired_runtime(coordinator_factory):
+    coord = coordinator_factory()
+    runtime = coord.tariff_runtime
+    coord.mark_runtime_stopped()
+    runtime.async_refresh = AsyncMock()
+    await runtime._async_reconcile_after_write(())
+    runtime.async_refresh.assert_not_awaited()
