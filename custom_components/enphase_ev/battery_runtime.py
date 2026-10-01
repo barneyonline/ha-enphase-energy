@@ -590,6 +590,11 @@ class BatteryRuntime:
     ) -> None:
         coord = self.coordinator
         state = self.battery_state
+        # A response requested before this accepted write cannot confirm it or
+        # replace newer readback, even after local pending state has cleared.
+        state._battery_profile_read_generation = (
+            getattr(state, "_battery_profile_read_generation", 0) + 1
+        )
         state._battery_pending_profile = profile
         state._battery_pending_reserve = reserve
         state._battery_pending_sub_type = self._normalize_pending_sub_type(
@@ -3444,6 +3449,7 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "battery_status", None)
         if not callable(fetcher):
             return
+        read_generation = getattr(state, "_battery_profile_read_generation", 0)
         try:
             payload = await fetcher()
         except Exception as err:  # noqa: BLE001
@@ -3451,6 +3457,8 @@ class BatteryRuntime:
             state._battery_status_cache_until = coord._endpoint_family_next_retry_mono(
                 family
             )
+            return
+        if read_generation != getattr(state, "_battery_profile_read_generation", 0):
             return
         redacted_payload = coord.redact_battery_payload(payload)
         if isinstance(redacted_payload, dict):
@@ -3526,10 +3534,13 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "battery_settings_details", None)
         if not callable(fetcher):
             return False
+        read_generation = getattr(state, "_battery_profile_read_generation", 0)
         try:
             payload = await fetcher()
         except Exception as err:  # noqa: BLE001
             self.health.note_endpoint_family_failure(family, err)
+            return False
+        if read_generation != getattr(state, "_battery_profile_read_generation", 0):
             return False
         redacted_payload = coord.redact_battery_payload(payload)
         if isinstance(redacted_payload, dict):
@@ -4019,10 +4030,13 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "storm_guard_profile", None)
         if not callable(fetcher):
             return
+        read_generation = getattr(state, "_battery_profile_read_generation", 0)
         try:
             payload = await fetcher(locale=locale)
         except Exception as err:  # noqa: BLE001
             self.health.note_endpoint_family_failure(family, err)
+            return
+        if read_generation != getattr(state, "_battery_profile_read_generation", 0):
             return
         redacted_payload = coord.redact_battery_payload(payload)
         if isinstance(redacted_payload, dict):
