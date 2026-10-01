@@ -461,7 +461,7 @@ async def _async_setup_entry_impl(
         EvseScheduleEditorManager as EvseScheduleEditorManager,
     )
     from .evse_firmware import EvseFirmwareDetailsManager as EvseFirmwareDetailsManager
-    from .firmware_catalog import FirmwareCatalogManager as FirmwareCatalogManager
+    from .firmware_catalog import get_firmware_catalog_manager
     from .gateway_software_update import (
         GatewaySoftwareUpdateManager as GatewaySoftwareUpdateManager,
     )
@@ -482,7 +482,7 @@ async def _async_setup_entry_impl(
         ),
     )
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
-    firmware_catalog = FirmwareCatalogManager(hass)
+    firmware_catalog = get_firmware_catalog_manager(hass)
     evse_firmware_details = EvseFirmwareDetailsManager(lambda: coord.client)
     gateway_software_update = GatewaySoftwareUpdateManager(
         lambda: coord.client,
@@ -595,15 +595,19 @@ async def _async_setup_entry_impl(
     last_registry_signature = _registry_metadata_signature(coord)
     _record_phase("registry_reconcile_s", registry_started)
 
-    def _sync_registry_on_update() -> None:
+    def _sync_registry_on_update(*, cleanup: bool = True) -> None:
         nonlocal last_registry_signature
 
         try:
             current_signature = _registry_metadata_signature(coord)
+            if not cleanup and current_signature == last_registry_signature:
+                return
             if current_signature != last_registry_signature:
-                _sync_registry_devices(entry, coord, dev_reg, site_id, hass=hass)
+                _sync_registry_devices(
+                    entry, coord, dev_reg, site_id, hass=hass, cleanup=cleanup
+                )
                 last_registry_signature = current_signature
-            else:
+            elif cleanup:
                 _prune_inactive_serial_entities(hass, entry, coord, site_id)
                 _remove_empty_inactive_serial_devices(
                     hass, entry, coord, dev_reg, site_id
@@ -622,6 +626,9 @@ async def _async_setup_entry_impl(
 
     add_state_listener = getattr(coord, "async_add_listener", None)
     if callable(add_state_listener):
+        entry.async_on_unload(
+            add_state_listener(lambda: _sync_registry_on_update(cleanup=False))
+        )
         entry.async_on_unload(
             add_state_listener(battery_schedule_editor.sync_from_coordinator)
         )
@@ -732,6 +739,9 @@ async def _async_cleanup_failed_runtime(
     """Release all runtime resources when config-entry setup does not complete."""
 
     coord = runtime_data.coordinator
+    mark_stopped = getattr(coord, "mark_runtime_stopped", None)
+    if callable(mark_stopped):
+        mark_stopped()
     cleanup_steps = (
         getattr(runtime_data.activity_publisher, "stop", None),
         runtime_data.async_stop_weather,
@@ -783,6 +793,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> 
         pass
     unload_ok = await _async_unload_platforms_safe(hass, entry)
     if unload_ok:
+        mark_stopped = getattr(coord, "mark_runtime_stopped", None)
+        if callable(mark_stopped):
+            mark_stopped()
         if runtime_data is not None:
             if runtime_data.activity_publisher is not None:
                 runtime_data.activity_publisher.stop()

@@ -5957,6 +5957,10 @@ async def test_async_setup_entry_registry_sync_runs_only_for_topology_updates(
     assert sync_registry_devices.call_count == 1
 
     dummy_coord.data[RANDOM_SERIAL]["sw_version"] = "1.2.3"
+    for listener in state_listeners:
+        listener()
+    assert sync_registry_devices.call_count == 2
+    assert sync_registry_devices.call_args.kwargs["cleanup"] is False
     topology_listeners[0]()
     assert sync_registry_devices.call_count == 2
     assert migrate_updates.call_count == 1
@@ -6108,3 +6112,80 @@ async def test_activity_default_normalization_does_not_reload(
     coord.async_apply_config_entry_options.assert_awaited_once_with(previous)
     assert runtime.applied_options == target
     assert config_entry.runtime_data is runtime
+
+
+def test_registry_metadata_signature_uses_cached_type_device_info():
+    info = {
+        "name": "IQ Battery",
+        "model": "IQ Battery 5P",
+        "hw_version": "2",
+        "serial_number": "battery",
+        "model_id": "5P",
+        "sw_version": "1.2.3",
+    }
+    view = SimpleNamespace(
+        iter_type_keys=lambda: ["encharge"],
+        type_identifier=lambda key: (DOMAIN, "type:site:encharge"),
+        type_label=lambda key: "IQ Batteries",
+        type_device_info=lambda key: info,
+    )
+    coord = SimpleNamespace(inventory_view=view)
+    assert _registry_type_metadata_signature(coord) == (
+        (
+            "encharge",
+            (DOMAIN, "type:site:encharge"),
+            "IQ Batteries",
+            "IQ Battery",
+            "IQ Battery 5P",
+            "2",
+            "battery",
+            "5P",
+            "1.2.3",
+        ),
+    )
+    info["sw_version"] = "1.2.4"
+    assert _registry_type_metadata_signature(coord)[0][-1] == "1.2.4"
+
+
+@pytest.mark.asyncio
+async def test_failed_setup_retires_before_awaited_runtime_cleanup(
+    config_entry, coordinator_factory
+):
+    coord = coordinator_factory(data={RANDOM_SERIAL: {"power": 100}})
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def stop():
+        entered.set()
+        await release.wait()
+
+    coord.schedule_sync = SimpleNamespace(async_stop=stop)
+    coord.async_cleanup_runtime_state = AsyncMock()
+    coord.async_close = AsyncMock()
+    runtime = EnphaseRuntimeData(coordinator=coord)
+    pending = asyncio.create_task(
+        enphase_init._async_cleanup_failed_runtime(config_entry, runtime)
+    )
+    await entered.wait()
+    assert coord.runtime_active is False
+    coord.async_set_updated_data({RANDOM_SERIAL: {"power": 200}})
+    assert coord.data[RANDOM_SERIAL]["power"] == 100
+    release.set()
+    await pending
+    coord.async_cleanup_runtime_state.assert_awaited_once()
+    coord.async_close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_failed_platform_unload_preserves_active_runtime(
+    hass, config_entry, coordinator_factory, monkeypatch
+):
+    coord = coordinator_factory()
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
+    monkeypatch.setattr(
+        hass.config_entries, "async_forward_entry_unload", AsyncMock(return_value=False)
+    )
+    assert await async_unload_entry(hass, config_entry) is False
+    assert coord.runtime_active is True
+    assert config_entry.runtime_data.coordinator is coord

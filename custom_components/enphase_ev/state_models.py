@@ -178,32 +178,60 @@ class RefreshHealthState:
 
 @dataclass(slots=True)
 class InventoryState:
+    # Publication excludes only explicitly marked internal fields. New observable
+    # values participate regardless of their names; raw data and clocks opt out.
     array_capacity: dict[str, Any] = field(default_factory=dict)
-    array_capacity_next_refresh: float = 0.0
+    array_capacity_next_refresh: float = field(
+        default=0.0, metadata={"publication": False}
+    )
     cloud_metadata: dict[str, object] = field(default_factory=dict)
     _gateway_today_connections: dict[str, dict[str, bool]] = field(default_factory=dict)
-    _inverters_inventory_cache_until: float | None = None
-    _devices_inventory_cache_until: float | None = None
-    _devices_inventory_payload: PayloadMap | None = None
-    _status_payload_cache: PayloadMap | None = None
-    _system_dashboard_cache_until: float | None = None
-    _system_dashboard_devices_tree_raw: PayloadMap | None = None
-    _system_dashboard_devices_tree_payload: PayloadMap | None = None
+    _inverters_inventory_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _devices_inventory_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _devices_inventory_payload: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _status_payload_cache: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _system_dashboard_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _system_dashboard_devices_tree_raw: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _system_dashboard_devices_tree_payload: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
     _system_dashboard_devices_details_raw: dict[str, dict[str, PayloadMap]] = field(
-        default_factory=dict
+        default_factory=dict, metadata={"publication": False}
     )
     _system_dashboard_devices_details_payloads: PayloadMapByKey = field(
-        default_factory=dict
+        default_factory=dict, metadata={"publication": False}
     )
     _system_dashboard_detail_failures: dict[str, str] = field(default_factory=dict)
     _system_dashboard_hierarchy_index: PayloadMapByKey = field(default_factory=dict)
     _system_dashboard_hierarchy_summary: PayloadMap = field(default_factory=dict)
     _system_dashboard_type_summaries: PayloadMapByKey = field(default_factory=dict)
-    _inverters_inventory_payload: PayloadMap | None = None
-    _inverter_status_cache_until: float | None = None
-    _inverter_status_payload: PayloadMap | None = None
-    _inverter_production_cache_until: float | None = None
-    _inverter_production_payload: PayloadMap | None = None
+    _inverters_inventory_payload: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _inverter_status_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _inverter_status_payload: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _inverter_production_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _inverter_production_payload: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
     _inverter_data: PayloadMapByKey = field(default_factory=dict)
     _inverter_order: list[str] = field(default_factory=list)
     _inverter_panel_info: PayloadMap | None = None
@@ -226,41 +254,77 @@ class InventoryState:
     _inverter_parameter_columns: list[str] = field(default_factory=list)
     _inverter_parameter_telemetry: PayloadMapByKey = field(default_factory=dict)
     _inverter_parameter_success_mono: dict[str, dict[str, float]] = field(
-        default_factory=dict
+        default_factory=dict, metadata={"publication": False}
     )
 
 
 @dataclass(slots=True)
 class HeatpumpState:
-    _hems_support_preflight_cache_until: float | None = None
-    _hems_devices_cache_until: float | None = None
-    _hems_devices_payload: PayloadMap | None = None
-    _hems_devices_last_success_mono: float | None = None
-    _hems_devices_last_success_utc: datetime | None = None
+    _hems_support_preflight_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _hems_devices_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _hems_devices_payload: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _hems_devices_last_success_mono: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _hems_devices_last_success_utc: datetime | None = field(
+        default=None, metadata={"publication": False}
+    )
     _hems_devices_using_stale: bool = False
-    _heatpump_runtime_diagnostics_cache_until: float | None = None
-    _show_livestream_payload: PayloadMap | None = None
-    _heatpump_events_payloads: PayloadRecords = field(default_factory=list)
+    _heatpump_runtime_diagnostics_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _show_livestream_payload: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _heatpump_events_payloads: PayloadRecords = field(
+        default_factory=list, metadata={"publication": False}
+    )
     _heatpump_runtime_diagnostics_error: str | None = None
     _heatpump_runtime_state: PayloadMap | None = None
-    _heatpump_runtime_state_cache_until: float | None = None
-    _heatpump_runtime_state_backoff_until: float | None = None
+    _heatpump_runtime_state_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _heatpump_runtime_state_backoff_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
     _heatpump_runtime_state_last_error: str | None = None
-    _heatpump_runtime_state_last_success_mono: float | None = None
-    _heatpump_runtime_state_last_success_utc: datetime | None = None
+    _heatpump_runtime_state_last_success_mono: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _heatpump_runtime_state_last_success_utc: datetime | None = field(
+        default=None, metadata={"publication": False}
+    )
     _heatpump_runtime_state_using_stale: bool = False
     _heatpump_known_present: bool = False
     _heatpump_daily_consumption: PayloadMap | None = None
-    _heatpump_daily_consumption_cache_until: float | None = None
-    _heatpump_daily_consumption_backoff_until: float | None = None
+    _heatpump_daily_consumption_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _heatpump_daily_consumption_backoff_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
     _heatpump_daily_consumption_last_error: str | None = None
     _heatpump_daily_consumption_cache_key: tuple[str, str] | None = None
-    _heatpump_daily_consumption_last_success_mono: float | None = None
-    _heatpump_daily_consumption_last_success_utc: datetime | None = None
+    _heatpump_daily_consumption_last_success_mono: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _heatpump_daily_consumption_last_success_utc: datetime | None = field(
+        default=None, metadata={"publication": False}
+    )
     _heatpump_daily_consumption_using_stale: bool = False
     _heatpump_daily_split_last_error: str | None = None
-    _heatpump_daily_split_last_success_mono: float | None = None
-    _heatpump_daily_split_last_success_utc: datetime | None = None
+    _heatpump_daily_split_last_success_mono: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _heatpump_daily_split_last_success_utc: datetime | None = field(
+        default=None, metadata={"publication": False}
+    )
     _heatpump_daily_split_using_stale: bool = False
     _heatpump_power_w: float | None = None
     _heatpump_power_sample_utc: datetime | None = None
@@ -271,12 +335,22 @@ class HeatpumpState:
     _heatpump_power_window_seconds: float | None = None
     _heatpump_power_validation: str | None = None
     _heatpump_power_smoothed: bool = False
-    _heatpump_power_sample_history: PayloadRecords = field(default_factory=list)
-    _heatpump_power_cache_until: float | None = None
-    _heatpump_power_backoff_until: float | None = None
+    _heatpump_power_sample_history: PayloadRecords = field(
+        default_factory=list, metadata={"publication": False}
+    )
+    _heatpump_power_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _heatpump_power_backoff_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
     _heatpump_power_last_error: str | None = None
-    _heatpump_power_last_success_mono: float | None = None
-    _heatpump_power_last_success_utc: datetime | None = None
+    _heatpump_power_last_success_mono: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _heatpump_power_last_success_utc: datetime | None = field(
+        default=None, metadata={"publication": False}
+    )
     _heatpump_power_using_stale: bool = False
     _heatpump_power_snapshot: PayloadMap | None = None
 
@@ -290,42 +364,74 @@ class BatteryState:
     _storm_alert_active: bool | None = None
     _storm_alert_critical_override: bool | None = None
     _storm_alerts: PayloadRecords = field(default_factory=list)
-    _storm_guard_cache_until: float | None = None
-    _storm_alert_cache_until: float | None = None
-    _grid_control_check_cache_until: float | None = None
-    _grid_control_check_last_success_mono: float | None = None
+    _storm_guard_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _storm_alert_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _grid_control_check_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _grid_control_check_last_success_mono: float | None = field(
+        default=None, metadata={"publication": False}
+    )
     _grid_control_check_failures: int = 0
-    _grid_control_check_payload: PayloadMap | None = None
+    _grid_control_check_payload: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
     _grid_control_disable: bool | None = None
     _grid_control_active_download: bool | None = None
     _grid_control_sunlight_backup_system_check: bool | None = None
     _grid_control_grid_outage_check: bool | None = None
     _grid_control_user_initiated_toggle: bool | None = None
     _grid_control_supported: bool | None = None
-    _grid_mode_status_cache_until: float | None = None
-    _grid_mode_status_last_success_mono: float | None = None
+    _grid_mode_status_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _grid_mode_status_last_success_mono: float | None = field(
+        default=None, metadata={"publication": False}
+    )
     _grid_mode_status_failures: int = 0
-    _grid_mode_status_payload: PayloadMap | None = None
+    _grid_mode_status_payload: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
     _grid_mode_status_supported: bool | None = None
     _grid_mode_status: str | None = None
-    _grid_mode_status_raw: str | None = None
-    _grid_outage_context_cache_until: float | None = None
-    _grid_outage_context_last_success_mono: float | None = None
+    _grid_mode_status_raw: str | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _grid_outage_context_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _grid_outage_context_last_success_mono: float | None = field(
+        default=None, metadata={"publication": False}
+    )
     _grid_outage_context_failures: int = 0
-    _grid_outage_context_payload: PayloadMap | None = None
+    _grid_outage_context_payload: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
     _grid_outage_context_supported: bool | None = None
     _grid_outage_is_grid_outage: bool | None = None
     _grid_outage_show_grid_connect: bool | None = None
     _grid_outage_has_battery: bool | None = None
     _grid_outage_is_sunlight_backup: bool | None = None
-    _dry_contact_settings_cache_until: float | None = None
-    _dry_contact_settings_last_success_mono: float | None = None
+    _dry_contact_settings_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _dry_contact_settings_last_success_mono: float | None = field(
+        default=None, metadata={"publication": False}
+    )
     _dry_contact_settings_failures: int = 0
-    _dry_contact_settings_payload: PayloadMap | None = None
+    _dry_contact_settings_payload: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
     _dry_contact_settings_supported: bool | None = None
     _dry_contact_settings_entries: PayloadRecords = field(default_factory=list)
     _dry_contact_unmatched_settings: PayloadRecords = field(default_factory=list)
-    _battery_site_settings_cache_until: float | None = None
+    _battery_site_settings_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
     _battery_show_production: bool | None = None
     _battery_show_consumption: bool | None = None
     _battery_show_charge_from_grid: bool | None = None
@@ -353,7 +459,9 @@ class BatteryState:
     _battery_site_status_severity: str | None = None
     _battery_profile: str | None = None
     _battery_profile_authoritative_seen: bool = False
-    _battery_profile_authoritative_seen_mono: float | None = None
+    _battery_profile_authoritative_seen_mono: float | None = field(
+        default=None, metadata={"publication": False}
+    )
     _battery_live_profile: str | None = None
     _battery_live_profile_label: str | None = None
     _battery_live_profile_sample_utc: datetime | None = None
@@ -375,7 +483,9 @@ class BatteryState:
     _battery_profile_evse_device: PayloadMap | None = None
     _battery_use_battery_for_self_consumption: bool | None = None
     _battery_profile_devices: PayloadRecords = field(default_factory=list)
-    _battery_profile_devices_last_success_mono: float | None = None
+    _battery_profile_devices_last_success_mono: float | None = field(
+        default=None, metadata={"publication": False}
+    )
     _battery_pending_profile: str | None = None
     _battery_pending_reserve: int | None = None
     _battery_pending_sub_type: str | None = None
@@ -393,12 +503,24 @@ class BatteryState:
         default_factory=lambda: dict(BATTERY_PROFILE_DEFAULT_RESERVE)
     )
     _battery_profile_issue_reported: bool = False
-    _battery_profile_write_lock: Any = None
-    _battery_profile_recovery_restore_task: Any = None
-    _battery_profile_last_write_mono: float | None = None
-    _battery_settings_write_lock: Any = None
-    _battery_settings_last_write_mono: float | None = None
-    _battery_settings_cache_until: float | None = None
+    _battery_profile_write_lock: Any = field(
+        default=None, metadata={"publication": False}
+    )
+    _battery_profile_recovery_restore_task: Any = field(
+        default=None, metadata={"publication": False}
+    )
+    _battery_profile_last_write_mono: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _battery_settings_write_lock: Any = field(
+        default=None, metadata={"publication": False}
+    )
+    _battery_settings_last_write_mono: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _battery_settings_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
     _battery_cfg_pending_charge_from_grid: bool | None = None
     _battery_cfg_pending_schedule_enabled: bool | None = None
     _battery_cfg_pending_begin_time: int | None = None
@@ -444,14 +566,28 @@ class BatteryState:
     _battery_very_low_soc: int | None = None
     _battery_very_low_soc_min: int | None = None
     _battery_very_low_soc_max: int | None = None
-    _battery_site_settings_payload: PayloadMap | None = None
-    _battery_profile_payload: PayloadMap | None = None
-    _battery_settings_payload: PayloadMap | None = None
-    _battery_status_cache_until: float | None = None
-    _battery_status_payload: PayloadMap | None = None
-    _battery_backup_history_payload: PayloadMap | None = None
+    _battery_site_settings_payload: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _battery_profile_payload: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _battery_settings_payload: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _battery_status_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _battery_status_payload: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
+    _battery_backup_history_payload: PayloadMap | None = field(
+        default=None, metadata={"publication": False}
+    )
     _battery_backup_history_events: PayloadRecords = field(default_factory=list)
-    _battery_backup_history_cache_until: float | None = None
+    _battery_backup_history_cache_until: float | None = field(
+        default=None, metadata={"publication": False}
+    )
     _battery_storage_data: PayloadMapByKey = field(default_factory=dict)
     _battery_storage_order: list[str] = field(default_factory=list)
     _battery_aggregate_charge_pct: float | None = None

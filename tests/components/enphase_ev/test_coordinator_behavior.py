@@ -7660,3 +7660,139 @@ def test_battery_serial_and_storage_edge_cases(coordinator_factory) -> None:
     coord._battery_storage_data = {"BAT-1": {"identity": "BAT-1"}}  # noqa: SLF001
     assert coord.battery_storage(BadStr()) is None
     assert coord.battery_storage("   ") is None
+
+
+@pytest.mark.asyncio
+async def test_live_scheduler_option_preserves_concurrent_telemetry(
+    hass, coordinator_factory
+) -> None:
+    """Restarting scheduler support must not restore a pre-await snapshot."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={},
+        options={OPT_SCHEDULE_SYNC_ENABLED: True, OPT_NOMINAL_VOLTAGE: 240},
+    )
+    entry.add_to_hass(hass)
+    coord = coordinator_factory(data={RANDOM_SERIAL: {"power": 100}})
+    coord.config_entry = entry
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def restart():
+        entered.set()
+        await release.wait()
+
+    coord.schedule_sync = SimpleNamespace(async_stop=AsyncMock(), async_start=restart)
+    update = asyncio.create_task(
+        coord.async_apply_config_entry_options({OPT_SCHEDULE_SYNC_ENABLED: False})
+    )
+    await entered.wait()
+    coord.async_set_updated_data({RANDOM_SERIAL: {"power": 200}})
+    release.set()
+    await update
+    assert coord.data[RANDOM_SERIAL] == {"power": 200, "nominal_v": 240}
+
+
+@pytest.mark.asyncio
+async def test_stopped_runtime_rejects_publication_refresh_and_new_tasks(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory(data={RANDOM_SERIAL: {"power": 100}})
+    listeners = Mock()
+    coord.async_add_listener(listeners)
+    original = coord.data
+    revisions = dict(coord._runtime_publication_revisions)
+    coord.mark_runtime_stopped()
+    assert coord.runtime_active is False
+    coord.async_set_updated_data({RANDOM_SERIAL: {"power": 200}})
+    coord.publish_auth_refresh_update()
+    coord.publish_runtime_state_update("late_write")
+    await coord.async_request_refresh()
+    task = asyncio.create_task(asyncio.sleep(60))
+    coord.track_entry_background_task(task)
+    await asyncio.gather(task, return_exceptions=True)
+    assert task.cancelled()
+    assert coord.data is original
+    assert coord._runtime_publication_revisions == revisions
+    listeners.assert_not_called()
+    assert coord._entry_background_tasks == set()
+    with pytest.raises(asyncio.CancelledError):
+        await coord._async_update_data()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("waiting_for_lock", [False, True])
+async def test_refresh_retired_during_await_cannot_restart_or_publish(
+    coordinator_factory, waiting_for_lock
+) -> None:
+    coord = coordinator_factory(data={RANDOM_SERIAL: {"power": 100}})
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def refresh():
+        entered.set()
+        await release.wait()
+        return {RANDOM_SERIAL: {"power": 200}}
+
+    coord._async_update_data_locked = AsyncMock(side_effect=refresh)
+    if waiting_for_lock:
+        await coord._refresh_lock.acquire()
+    pending = asyncio.create_task(coord._async_update_data())
+    if waiting_for_lock:
+        await asyncio.sleep(0)
+    else:
+        await entered.wait()
+    coord.mark_runtime_stopped()
+    release.set()
+    if waiting_for_lock:
+        coord._refresh_lock.release()
+    with pytest.raises(asyncio.CancelledError):
+        await pending
+    assert coord._async_update_data_locked.await_count == (0 if waiting_for_lock else 1)
+    assert coord.data[RANDOM_SERIAL]["power"] == 100
+
+
+def test_public_hems_auth_boundary_delegates(coordinator_factory):
+    coord = coordinator_factory()
+    error = RuntimeError("offline")
+    coord._note_hems_auth_failure = Mock(return_value=True)
+    coord._note_hems_auth_success = Mock()
+    coord._skip_hems_polling_due_to_auth_circuit = Mock(return_value=False)
+    assert coord.note_hems_auth_failure(error, endpoint="inventory") is True
+    coord.note_hems_auth_success(endpoint="inventory")
+    assert coord.skip_hems_polling_due_to_auth_circuit(endpoint="inventory") is False
+    coord._note_hems_auth_failure.assert_called_once_with(error, endpoint="inventory")
+    coord._note_hems_auth_success.assert_called_once_with(endpoint="inventory")
+    coord._skip_hems_polling_due_to_auth_circuit.assert_called_once_with(
+        endpoint="inventory"
+    )
+
+
+@pytest.mark.asyncio
+async def test_live_scheduler_option_cannot_restart_retired_runtime(
+    hass, coordinator_factory
+):
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={}, options={OPT_SCHEDULE_SYNC_ENABLED: True}
+    )
+    entry.add_to_hass(hass)
+    coord = coordinator_factory(data={RANDOM_SERIAL: {"power": 100}})
+    coord.config_entry = entry
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def stop():
+        entered.set()
+        await release.wait()
+
+    coord.schedule_sync = SimpleNamespace(async_stop=stop, async_start=AsyncMock())
+    update = asyncio.create_task(
+        coord.async_apply_config_entry_options({OPT_SCHEDULE_SYNC_ENABLED: False})
+    )
+    await entered.wait()
+    coord.mark_runtime_stopped()
+    release.set()
+    await update
+    coord.schedule_sync.async_start.assert_not_awaited()
+    await coord.async_apply_config_entry_options({OPT_SCHEDULE_SYNC_ENABLED: False})
+    coord.schedule_sync.async_start.assert_not_awaited()

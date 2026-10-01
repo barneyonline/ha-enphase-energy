@@ -2,6 +2,7 @@
 
 import importlib.util
 from pathlib import Path
+import runpy
 
 import pytest
 
@@ -30,12 +31,24 @@ def test_snapshot_benchmark_shape_and_scope():
         for metrics in case["results"].values():
             assert metrics["median_microseconds_per_build"] > 0
             assert metrics["peak_traced_bytes"] > 0
+    assert [case["inverters"] for case in result["mixed_inventory_scenarios"]] == [
+        50,
+        500,
+    ]
+    for case in result["mixed_inventory_scenarios"]:
+        assert case["batteries"] == 20
+        current = case["results"]["unchanged"]
+        assert current["reused_inventory"] is True
+        assert current["reused_battery"] is True
+        assert (
+            current["peak_traced_bytes"] < case["results"]["fresh"]["peak_traced_bytes"]
+        )
     with pytest.raises(ValueError, match="positive"):
         module.benchmark(iterations=0)
 
 
 def test_benchmark_cli(monkeypatch, capsys):
-    module = _module()
     monkeypatch.setattr("sys.argv", ["benchmark_snapshots", "--iterations", "1"])
-    module.main()
+    path = Path(__file__).resolve().parents[3] / "scripts" / "benchmark_snapshots.py"
+    runpy.run_path(str(path), run_name="__main__")
     assert '"iterations_per_batch": 1' in capsys.readouterr().out

@@ -1403,6 +1403,11 @@ class TariffRuntime:
         ) = None
         self._post_write_reconcile_task: asyncio.Task[None] | None = None
 
+    def _runtime_active(self) -> bool:
+        """Respect the owning entry lifecycle, including narrow test hosts."""
+
+        return getattr(self.coordinator, "runtime_active", True) is not False
+
     def _rate_signature(self) -> tuple[tuple[object, ...], ...]:
         """Return the active editable-rate shape and values."""
 
@@ -1419,6 +1424,8 @@ class TariffRuntime:
     def _publish_tariff_update(self) -> None:
         """Notify coordinator entities after an out-of-band tariff refresh."""
 
+        if not self._runtime_active():
+            return
         coord = self.coordinator
         publish = getattr(coord, "async_set_updated_data", None)
         if not callable(publish):
@@ -1438,6 +1445,8 @@ class TariffRuntime:
 
         for delay in TARIFF_WRITE_RECONCILE_DELAYS_S:
             await asyncio.sleep(delay)
+            if not self._runtime_active():
+                return
             try:
                 await self.async_refresh(force=True)
             except asyncio.CancelledError:
@@ -1461,6 +1470,8 @@ class TariffRuntime:
     ) -> None:
         """Schedule bounded read-after-write reconciliation."""
 
+        if not self._runtime_active():
+            return
         existing = self._post_write_reconcile_task
         if existing is not None and not existing.done():
             existing.cancel()
@@ -1486,6 +1497,8 @@ class TariffRuntime:
         """Refresh tariff billing and rate snapshots."""
 
         coord = self.coordinator
+        if not self._runtime_active():
+            return
         if not coord._endpoint_family_should_run(TARIFF_ENDPOINT_FAMILY, force=force):
             return
         try:
@@ -1494,6 +1507,8 @@ class TariffRuntime:
                 raise OptionalEndpointUnavailable("Tariff API is unavailable")
             pending = self._acknowledged_history
             billing_payload, tariff_payload = await site_tariff_bundle()
+            if not self._runtime_active():
+                return
             if (
                 pending
                 and self._acknowledged_history is pending
@@ -1525,6 +1540,8 @@ class TariffRuntime:
                 )
                 return
 
+        if not self._runtime_active():
+            return
         refresh_time = dt_util.utcnow()
         coord.tariff_billing = billing
         coord.tariff_import_rate = import_rate
@@ -1660,6 +1677,8 @@ class TariffRuntime:
         """Serialize site writes, including readback and billing side effects."""
 
         async with self._write_lock:
+            if not self._runtime_active():
+                return {"tariff": None, "billing": None}
             return await self._async_update_tariff(
                 billing=billing,
                 rate_updates=rate_updates,
@@ -1763,6 +1782,8 @@ class TariffRuntime:
                     message="Tariff write API is unavailable.",
                 )
             payload = await site_tariff()
+            if not self._runtime_active():
+                return {"tariff": None, "billing": None}
             if not isinstance(payload, dict):
                 _raise_tariff_validation(
                     "tariff_rate_api_unavailable",
@@ -1794,6 +1815,8 @@ class TariffRuntime:
             # never become the baseline for a later edit.
             observed_baseline = copy.deepcopy(payload)
             tariff_result = await site_tariff_update(update_payload)
+            if not self._runtime_active():
+                return {"tariff": tariff_result, "billing": None}
             self._acknowledged_tariff = (baseline, copy.deepcopy(update_payload))
             self._acknowledged_tariff_deadline = (
                 monotonic() + TARIFF_WRITE_ACKNOWLEDGEMENT_TTL_S
@@ -1868,6 +1891,8 @@ class TariffRuntime:
     ) -> None:
         """Notify dependent services and publish authoritative readback only."""
 
+        if not self._runtime_active():
+            return
         coord = self.coordinator
         notifier = getattr(coord.client, "notify_tariff_change", None)
         if callable(notifier):
@@ -1879,6 +1904,8 @@ class TariffRuntime:
                     redact_site_id(coord.site_id),
                     redact_text(err, site_ids=(coord.site_id,)),
                 )
+        if not self._runtime_active():
+            return
         await self.async_refresh(force=True)
         self._publish_tariff_update()
         if (

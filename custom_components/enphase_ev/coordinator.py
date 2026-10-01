@@ -32,7 +32,6 @@ from typing import (
 from zoneinfo import ZoneInfo
 
 import aiohttp
-from email.utils import parsedate_to_datetime
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
@@ -42,6 +41,8 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
+
+from .cloud_retry import retry_after_delay
 
 from .api import (
     AuthTokens,
@@ -878,6 +879,7 @@ class EnphaseCoordinator(
                 default=DEFAULT_API_TIMEOUT,
             )
         timeout = min(MAX_API_TIMEOUT, max(MIN_API_TIMEOUT, timeout))
+        self._runtime_stopped = False
         self._entry_background_tasks = set()
         self.client = EnphaseEVClient(
             async_get_clientsession(hass),
@@ -1110,9 +1112,21 @@ class EnphaseCoordinator(
 
         await self._async_setup()
 
+    @property
+    def runtime_active(self) -> bool:
+        """Whether this entry lifecycle may publish state or start new work."""
+
+        return not self.__dict__.get("_runtime_stopped", False)
+
+    def mark_runtime_stopped(self) -> None:
+        """Retire this lifecycle before awaited shutdown steps release control."""
+
+        self._runtime_stopped = True
+
     async def async_close(self) -> None:
         """Release config-entry-owned HTTP resources."""
 
+        self.mark_runtime_stopped()
         await self.client.async_close()
 
     def __setattr__(self, name: str, value: object) -> None:
@@ -1254,12 +1268,16 @@ class EnphaseCoordinator(
     def async_set_updated_data(self, data: dict[str, dict[str, object]]) -> None:
         """Publish normalized data using aggregate integration equality."""
 
+        if not self.runtime_active:
+            return
         snapshot = self._build_integration_snapshot(data)
         super().async_set_updated_data(CoordinatorData(data, snapshot))
 
     def publish_auth_refresh_update(self) -> None:
         """Notify auth observers without marking telemetry fresh or rescheduling polls."""
 
+        if not self.runtime_active:
+            return
         current = dict(self.data)
         self.data = CoordinatorData(current, self._build_integration_snapshot(current))
         self.async_update_listeners()
@@ -1267,6 +1285,8 @@ class EnphaseCoordinator(
     def publish_runtime_state_update(self, source: str) -> None:
         """Publish a manager-owned state transition with unchanged charger data."""
 
+        if not self.runtime_active:
+            return
         source_key = str(source).strip() or "runtime"
         self._runtime_publication_revisions[source_key] = (
             self._runtime_publication_revisions.get(source_key, 0) + 1
@@ -1447,7 +1467,7 @@ class EnphaseCoordinator(
         """Apply non-topology config-entry options without reloading entities."""
 
         config_entry = self.config_entry
-        if config_entry is None:
+        if config_entry is None or not self.runtime_active:
             return
         options = config_entry.options
 
@@ -1551,8 +1571,11 @@ class EnphaseCoordinator(
         )
         if schedule_sync_changed:
             await self.schedule_sync.async_stop()
+            if not self.runtime_active:
+                return
             await self.schedule_sync.async_start()
 
+        current_data = self.data if isinstance(self.data, dict) else {}
         published = {
             serial: {**payload, "nominal_v": nominal}
             for serial, payload in current_data.items()
@@ -1576,6 +1599,8 @@ class EnphaseCoordinator(
     async def async_request_refresh(self) -> None:
         """Request a coordinator refresh and allow one cooldown-bypass cycle."""
 
+        if not self.runtime_active:
+            return
         self._endpoint_manual_bypass_requested = True
         self._endpoint_manual_bypass_active = True
         try:
@@ -1679,25 +1704,7 @@ class EnphaseCoordinator(
     def _retry_after_delay(err: Exception) -> float | None:
         """Return a Retry-After delay in seconds when an HTTP error provides one."""
 
-        if not isinstance(err, aiohttp.ClientResponseError) or not err.headers:
-            return None
-        retry_after = err.headers.get("Retry-After")
-        if not retry_after:
-            return None
-        try:
-            return max(0.0, float(int(retry_after)))
-        except Exception:
-            retry_dt = None
-            try:
-                retry_dt = parsedate_to_datetime(str(retry_after))
-            except Exception:
-                retry_dt = None
-            if retry_dt is None:
-                return None
-            if retry_dt.tzinfo is None:
-                retry_dt = retry_dt.replace(tzinfo=_tz.utc)
-            retry_dt = retry_dt.astimezone(_tz.utc)
-            return float(max(0.0, (retry_dt - dt_util.utcnow()).total_seconds()))
+        return retry_after_delay(err)
 
     def _endpoint_family_backoff_delay(
         self,
@@ -2145,6 +2152,7 @@ class EnphaseCoordinator(
         their cancellation handlers to finish before closing the client.
         """
 
+        self._runtime_stopped = True
         cancelled_tasks: list[asyncio.Future[Any]] = []
 
         def _task_done(task: object) -> bool:
@@ -2257,6 +2265,7 @@ class EnphaseCoordinator(
     async def async_quiesce_for_reload(self) -> bool:
         """Stop entry background work while retaining cached runtime state."""
 
+        self.mark_runtime_stopped()
         current_task = asyncio.current_task()
         cancelled_tasks: set[asyncio.Future[Any]] = set()
         quiesced = True
@@ -2336,6 +2345,9 @@ class EnphaseCoordinator(
         """Track config-entry background work for pre-client-close cancellation."""
 
         if not isinstance(task, asyncio.Future) or task.done():
+            return
+        if not self.runtime_active:
+            task.cancel()
             return
         self._entry_background_tasks.add(task)
         task.add_done_callback(self._entry_background_tasks.discard)
@@ -3911,8 +3923,15 @@ class EnphaseCoordinator(
         task.add_done_callback(self._clear_grid_profile_metadata_task)
 
     async def _async_update_data(self) -> dict[str, dict[str, object]]:
+        if not self.runtime_active:
+            raise asyncio.CancelledError
         async with self._refresh_lock:
-            return await self._async_update_data_locked()
+            if not self.runtime_active:
+                raise asyncio.CancelledError
+            data = await self._async_update_data_locked()
+            if not self.runtime_active:
+                raise asyncio.CancelledError
+            return data
 
     async def _async_update_data_locked(self) -> dict[str, dict[str, object]]:
         """Run one serialized coordinator refresh."""
@@ -5813,6 +5832,21 @@ class EnphaseCoordinator(
         if self._hems_auth_last_endpoint not in _HEATPUMP_HEMS_AUTH_ENDPOINTS:
             return
         self._clear_hems_auth_circuit(persist=True, reset_failure_count=True)
+
+    def note_hems_auth_failure(self, err: BaseException, *, endpoint: str) -> bool:
+        """Record optional HEMS authentication failure for a feature runtime."""
+
+        return self._note_hems_auth_failure(err, endpoint=endpoint)
+
+    def note_hems_auth_success(self, *, endpoint: str | None = None) -> None:
+        """Record optional HEMS authentication recovery for a feature runtime."""
+
+        self._note_hems_auth_success(endpoint=endpoint)
+
+    def skip_hems_polling_due_to_auth_circuit(self, *, endpoint: str) -> bool:
+        """Expose HEMS authentication admission to feature runtimes."""
+
+        return self._skip_hems_polling_due_to_auth_circuit(endpoint=endpoint)
 
     def _note_hems_auth_failure(
         self,

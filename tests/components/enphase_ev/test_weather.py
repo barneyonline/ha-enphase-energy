@@ -13,10 +13,12 @@ import aiohttp
 import pytest
 from homeassistant.const import UnitOfTemperature
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.enphase_ev.const import OPT_WEATHER_ENABLED
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from custom_components.enphase_ev import weather as weather_module
+from custom_components.enphase_ev import cloud_retry
 from custom_components.enphase_ev.weather import (
     EnphaseSiteWeather,
     EnphaseWeatherCoordinator,
@@ -107,6 +109,94 @@ def test_weather_scalar_helpers_handle_invalid_values() -> None:
     assert _number(False) is None
     assert _optional_text(BadString()) is None
     assert _optional_text("  ") is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("header", ["3600", "Wed, 01 Jan 2025 13:00:00 GMT", None])
+async def test_weather_rate_limit_blocks_requests_until_provider_deadline(
+    hass, monkeypatch, header
+) -> None:
+    from datetime import datetime, timezone
+
+    now = datetime(2025, 1, 1, 12, tzinfo=timezone.utc)
+    clock = [100.0]
+    monkeypatch.setattr(cloud_retry.dt_util, "utcnow", lambda: now)
+    monkeypatch.setattr(
+        weather_module, "time", SimpleNamespace(monotonic=lambda: clock[0])
+    )
+    error = aiohttp.ClientResponseError(
+        MagicMock(real_url="https://example.invalid/weather"),
+        (),
+        status=429,
+        headers={"Retry-After": header} if header else None,
+    )
+    client = SimpleNamespace(weather=AsyncMock(side_effect=[error, _payload()]))
+    coord = EnphaseWeatherCoordinator(hass, client, locale="en")
+    expected = 3600.0 if header else 900.0
+    with pytest.raises(UpdateFailed) as failure:
+        await coord._async_update_data()
+    assert failure.value.retry_after == expected
+    clock[0] += 60
+    with pytest.raises(UpdateFailed) as failure:
+        await coord._async_update_data()
+    assert failure.value.retry_after == expected - 60
+    assert client.weather.await_count == 1
+    clock[0] = 100 + expected
+    assert (await coord._async_update_data()).temperature == 8
+    assert client.weather.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_weather_discovery_waits_for_provider_retry_deadline(hass, monkeypatch):
+    clock = [100.0]
+    monkeypatch.setattr(
+        weather_module, "time", SimpleNamespace(monotonic=lambda: clock[0])
+    )
+    error = aiohttp.ClientResponseError(
+        MagicMock(real_url="https://example.invalid/weather"),
+        (),
+        status=429,
+        headers={"Retry-After": "3600"},
+    )
+    client = SimpleNamespace(weather=AsyncMock(side_effect=[error, _payload()]))
+    coord = EnphaseWeatherCoordinator(hass, client, locale="en")
+    delays = []
+
+    async def sleep(delay):
+        delays.append(delay)
+        clock[0] += delay
+
+    monkeypatch.setattr(weather_module.asyncio, "sleep", sleep)
+    added = []
+    await _async_discover_weather(
+        coord, site_id=RANDOM_SITE_ID, async_add_entities=added.extend
+    )
+    assert delays == [3600]
+    assert len(added) == 1
+    assert client.weather.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_weather_stopped_runtime_never_publishes_inflight_data(hass):
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def fetch(**_kwargs):
+        entered.set()
+        await release.wait()
+        return _payload()
+
+    client = SimpleNamespace(weather=AsyncMock(side_effect=fetch))
+    coord = EnphaseWeatherCoordinator(hass, client, locale="en")
+    task = asyncio.create_task(coord.async_probe())
+    await entered.wait()
+    coord.mark_stopped()
+    release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    with pytest.raises(asyncio.CancelledError):
+        await coord._async_update_data()
+    assert coord.data is None
+    client.weather.assert_awaited_once()
 
 
 @pytest.mark.asyncio
