@@ -491,6 +491,9 @@
     "export_limit_changed": {
       "message": "Configuration modifiée. Vérifiez les réglages actualisés et confirmez à nouveau."
     },
+    "export_limit_mismatch": {
+      "message": "Le formulaire installateur Enphase ne correspond pas aux réglages de la passerelle. Actualisez les réglages et réessayez."
+    },
     "export_limit_pending": {
       "message": "En attente de confirmation de la configuration. Actualisez l’état avant une autre modification."
     },
@@ -855,8 +858,7 @@
         "title": "Limite d’injection",
         "description": "Réglage actuel: **{current}**\n\nRéglage demandé: **{requested}**\n\nVitesse de variation (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Confirmer cette modification",
-          "restore_slew_rate": "Restaurer la vitesse depuis la passerelle"
+          "confirm": "Confirmer cette modification"
         }
       },
       "export_limit_submitted": {
@@ -905,6 +907,7 @@
       "export_limit_unavailable": "Limite d’injection indisponible. Un accès installateur et une configuration compatible avec une seule passerelle sont requis.",
       "export_limit_invalid": "Saisissez un nombre entier de watts entre 0 et 100000.",
       "export_limit_changed": "Configuration modifiée. Vérifiez les réglages actualisés et confirmez à nouveau.",
+      "export_limit_mismatch": "Le formulaire installateur Enphase ne correspond pas aux réglages de la passerelle. Actualisez les réglages et réessayez.",
       "export_limit_pending": "En attente de confirmation de la configuration. Actualisez l’état avant une autre modification.",
       "export_limit_disabled": "Activer les commandes de limite d’injection (Fonctionnalités → Fonctionnalités avancées).",
       "export_limit_confirmation": "Confirmer cette modification",

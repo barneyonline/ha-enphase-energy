@@ -98,6 +98,24 @@ class ExportLimitSnapshot:
         return "zero_export" if self.watts == 0 else "limited"
 
 
+def _form_matches_snapshot(
+    fields: list[tuple[str, str]],
+    snapshot: ExportLimitSnapshot,
+    *,
+    allow_zero_slew: bool = False,
+) -> bool:
+    """Compare the installer form with all supported gateway settings."""
+    return form_matches_configuration(
+        fields,
+        enabled=snapshot.enabled,
+        watts=snapshot.watts,
+        slew=snapshot.slew,
+        export_target=snapshot.export,
+        reference=snapshot.reference,
+        allow_zero_slew=allow_zero_slew,
+    )
+
+
 def parse_settings(
     payload: object, site_id: str, *, gateway_id: str | None = None
 ) -> ExportLimitSnapshot | None:
@@ -450,7 +468,6 @@ class ExportLimitRuntime:
         confirm: bool,
         expected: ExportLimitSnapshot | None = None,
         slew_rate: float | None = None,
-        reconcile_zero_slew: bool = False,
     ) -> dict[str, object]:
         if confirm is not True:
             fail("export_limit_confirmation")
@@ -464,11 +481,44 @@ class ExportLimitRuntime:
             try:
                 await self.coordinator.client.async_prepare_activation_auth()
                 await self.coordinator.client.async_get_activation_device_list()
-                await self._read(require_gateway_identity=reconcile_zero_slew)
+                await self._read()
                 if self.pending is not None:
                     fail("export_limit_pending")
                 # Acquire the token after any read-side session renewal.
                 fields = await self.coordinator.client.async_get_export_limit_form()
+                snapshot = self.snapshot
+                if snapshot is None or not snapshot.supported:
+                    fail("export_limit_unavailable")
+                assert snapshot is not None
+                if expected is not None and snapshot != expected:
+                    fail("export_limit_changed")
+                requested_slew = snapshot.slew if slew_rate is None else slew_rate
+                if requested_slew == snapshot.slew and (
+                    (watts is None and not snapshot.enabled)
+                    or (
+                        watts is not None
+                        and snapshot.enabled
+                        and snapshot.watts == watts
+                    )
+                ):
+                    return self.attributes()
+                if not _form_matches_snapshot(fields, snapshot):
+                    # Enphase can return a zero form default while the gateway has
+                    # a positive slew rate. Preserve that rate only when every other
+                    # form setting matches, then verify identity and settings again.
+                    if requested_slew != snapshot.slew or not _form_matches_snapshot(
+                        fields, snapshot, allow_zero_slew=True
+                    ):
+                        fail("export_limit_mismatch")
+                    await self._read(require_gateway_identity=True)
+                    if self.snapshot != snapshot:
+                        fail("export_limit_changed")
+                    # The read may renew the session, so acquire a fresh form token.
+                    fields = await self.coordinator.client.async_get_export_limit_form()
+                    if not _form_matches_snapshot(
+                        fields, snapshot, allow_zero_slew=True
+                    ):
+                        fail("export_limit_mismatch")
             except ServiceValidationError:
                 raise
             except Exception as err:
@@ -492,36 +542,6 @@ class ExportLimitRuntime:
                         else "export_limit_unavailable"
                     ),
                 ) from err
-            snapshot = self.snapshot
-            if snapshot is None or not snapshot.supported:
-                fail("export_limit_unavailable")
-            assert snapshot is not None
-            if expected is not None and snapshot != expected:
-                fail("export_limit_changed")
-            requested_slew = snapshot.slew if slew_rate is None else slew_rate
-            # Only the guided flow can explicitly opt into repairing a zero
-            # form default, preserving the exact gateway rate shown to the user.
-            allow_zero_slew = (
-                reconcile_zero_slew is True
-                and expected is not None
-                and not snapshot.dynamic
-                and requested_slew == snapshot.slew
-            )
-            if requested_slew == snapshot.slew and (
-                (watts is None and not snapshot.enabled)
-                or (watts is not None and snapshot.enabled and snapshot.watts == watts)
-            ):
-                return self.attributes()
-            if not form_matches_configuration(
-                fields,
-                enabled=snapshot.enabled,
-                watts=snapshot.watts,
-                slew=snapshot.slew,
-                export_target=snapshot.export,
-                reference=snapshot.reference,
-                allow_zero_slew=allow_zero_slew,
-            ):
-                fail("export_limit_changed")
             self.pending = {
                 "gateway": snapshot.gateway,
                 "watts": watts,

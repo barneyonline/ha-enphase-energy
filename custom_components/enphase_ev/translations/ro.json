@@ -491,6 +491,9 @@
     "export_limit_changed": {
       "message": "Configurația s-a schimbat. Verificați setările actualizate și confirmați din nou."
     },
+    "export_limit_mismatch": {
+      "message": "Formularul de instalare Enphase nu corespunde setărilor gateway-ului. Reîmprospătați setările și încercați din nou."
+    },
     "export_limit_pending": {
       "message": "Se așteaptă confirmarea configurației. Actualizați starea înainte de altă modificare."
     },
@@ -855,8 +858,7 @@
         "title": "Limită de injecție",
         "description": "Setare actuală: **{current}**\n\nSetare solicitată: **{requested}**\n\nRata de variație (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Confirmați această modificare",
-          "restore_slew_rate": "Restabilește rata din gateway"
+          "confirm": "Confirmați această modificare"
         }
       },
       "export_limit_submitted": {
@@ -905,6 +907,7 @@
       "export_limit_unavailable": "Limita de injecție nu este disponibilă. Sunt necesare acces de instalator și o configurație acceptată cu un singur gateway.",
       "export_limit_invalid": "Introduceți wați întregi între 0 și 100000.",
       "export_limit_changed": "Configurația s-a schimbat. Verificați setările actualizate și confirmați din nou.",
+      "export_limit_mismatch": "Formularul de instalare Enphase nu corespunde setărilor gateway-ului. Reîmprospătați setările și încercați din nou.",
       "export_limit_pending": "Se așteaptă confirmarea configurației. Actualizați starea înainte de altă modificare.",
       "export_limit_disabled": "Activați comenzile pentru limita de injecție (Funcții → Funcții avansate).",
       "export_limit_confirmation": "Confirmați această modificare",

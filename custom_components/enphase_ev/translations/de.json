@@ -491,6 +491,9 @@
     "export_limit_changed": {
       "message": "Konfiguration geändert. Aktualisierte Einstellungen prüfen und erneut bestätigen."
     },
+    "export_limit_mismatch": {
+      "message": "Das Enphase-Installateurformular stimmt nicht mit den Gateway-Einstellungen überein. Aktualisieren Sie die Einstellungen und versuchen Sie es erneut."
+    },
     "export_limit_pending": {
       "message": "Bestätigung der Konfiguration ausstehend. Vor einer weiteren Änderung den Status aktualisieren."
     },
@@ -855,8 +858,7 @@
         "title": "Einspeisebegrenzung",
         "description": "Aktuelle Einstellung: **{current}**\n\nAngeforderte Einstellung: **{requested}**\n\nÄnderungsrate (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Diese Änderung bestätigen",
-          "restore_slew_rate": "Änderungsrate vom Gateway wiederherstellen"
+          "confirm": "Diese Änderung bestätigen"
         }
       },
       "export_limit_submitted": {
@@ -905,6 +907,7 @@
       "export_limit_unavailable": "Einspeisebegrenzung nicht verfügbar. Installateurzugriff und eine unterstützte Konfiguration mit einem Gateway sind erforderlich.",
       "export_limit_invalid": "Ganze Wattzahlen von 0 bis 100000 eingeben.",
       "export_limit_changed": "Konfiguration geändert. Aktualisierte Einstellungen prüfen und erneut bestätigen.",
+      "export_limit_mismatch": "Das Enphase-Installateurformular stimmt nicht mit den Gateway-Einstellungen überein. Aktualisieren Sie die Einstellungen und versuchen Sie es erneut.",
       "export_limit_pending": "Bestätigung der Konfiguration ausstehend. Vor einer weiteren Änderung den Status aktualisieren.",
       "export_limit_disabled": "Steuerung der Einspeisebegrenzung aktivieren (Funktionen → Erweiterte Funktionen).",
       "export_limit_confirmation": "Diese Änderung bestätigen",

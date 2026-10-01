@@ -72,11 +72,20 @@ and nonzero limits: 0 W requests no grid export, and a positive value sets the
 maximum permitted export power. Both proceed through the same confirmation step.
 The menu shows the pending request’s wattage or Disabled while a request remains,
 and None when it has been cleared, regardless of the last request status.
-The guided Export Limit confirmation can explicitly reconcile a zero form slew-rate
-default against fresh gateway readback when enabling, changing, or disabling a limit.
-It requires the exact confirmed snapshot, fresh gateway identity, no dynamic mode,
-and preservation of the positive gateway slew rate. Any nonzero disagreement or
-other form mismatch remains blocked; selector and service writes do not opt in.
+All Export Limit writes automatically reconcile an installer form's zero slew-rate
+default when every other form setting matches fresh gateway readback and the
+requested rate preserves the gateway's positive slew rate. Before submitting,
+the shared runtime resolves the current gateway identity, verifies the snapshot
+is unchanged, and fetches and validates a fresh form token. This applies when
+enabling, changing, or disabling a limit through the selector, guided flow, or
+service. The guided flow still requires confirmation of the requested change;
+no separate restore checkbox is needed. The displayed requested slew rate is
+frozen for that confirmation, even if saved defaults change while the dialog is
+open. A changed gateway snapshot resets that rate for the next review. Dynamic
+mode, nonpositive gateway rates, nonzero form disagreements, and changed or
+ambiguous gateway identity remain
+blocked. Actual readback changes request reconfirmation; installer-form conflicts
+report that Enphase's form disagrees with the gateway settings.
 Options forms that navigate to another input or confirmation step set
 `last_step=False` to show Home Assistant’s translated Next button. Forms that
 save options or apply gateway changes retain Submit.
