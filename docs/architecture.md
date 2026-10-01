@@ -244,6 +244,11 @@ retirement.
 Runtime managers keep endpoint-family behavior out of the main coordinator:
 
 - `battery_runtime.py` handles BatteryConfig controls, profile state, schedules, pending writes, and battery diagnostics payloads.
+  Each accepted profile or reserve write invalidates profile, settings, and live
+  status reads already in flight. Their responses cannot confirm the new request
+  or overwrite newer readback, including after pending intent has cleared. Reads
+  started after acceptance retain the normal configured/live profile precedence;
+  this does not resolve disagreement between Enphase's backend data sources.
 - `evse_runtime.py` handles charger commands, fast polling, streaming, charge-mode cache, auth settings, and EVSE control side effects.
   Start, Stop, and automatic resume share a per-charger command lock. Explicit
   intent is recorded before waiting, so a newer Stop follows an already-issued
