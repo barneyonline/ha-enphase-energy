@@ -59,6 +59,24 @@ The current-power and EVSE feature-flag families are the first migrated state
 owners. Grid-profile state uses explicit runtime publication revisions. Other
 families follow the same pattern without requiring a big-bang rewrite.
 
+Battery, inventory, and heat-pump runtimes use narrow typed endpoint-health and
+HEMS authentication host contracts through `runtime_health.py`. Legacy private
+method resolution is contained in adapters at that boundary. Pure battery
+grid-relay normalization and session-pagination validation have independent
+helpers with compatibility facades retained where existing callers need them.
+
+Legacy state dataclasses mark acquisition clocks, locks, and diagnostic payloads
+with explicit `publication=False` field metadata. New observable state defaults
+to inclusion, independent of naming conventions. Normalized dataclass values
+reuse immutable snapshots when unchanged. Device metadata has a separate
+invalidation revision so cached type-level summaries update with model, firmware,
+or preferred-gateway changes even when topology stays stable.
+
+The coordinator exposes `runtime_active` as the lifecycle boundary for delayed
+work. Successful unload and failed setup retire it before awaited cleanup;
+failed unload leaves the loaded entry active. Acknowledged cloud writes retain
+their results after retirement without creating new requests or publications.
+
 ## Consequences
 
 - Home Assistant listeners observe manager-only transitions even when charger

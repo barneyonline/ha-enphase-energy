@@ -138,6 +138,23 @@ Manual install steps: see the wiki Installation page.
 
 Sign in with your Enlighten credentials; MFA is supported. See the wiki for details.
 
+## Cloud updates and recovery
+
+Cloud endpoint failures are isolated so an optional service outage does not stop
+unrelated telemetry. Site energy, charger session history, weather, and firmware
+catalogs honor Enphase or hosting-provider rate-limit retry deadlines. Previously
+valid schedules and session history are retained when responses are malformed or
+incomplete; a valid empty collection still clears the corresponding cache.
+Overlapping session-history pages are deduplicated before calculating daily
+charging energy. Diagnostic pagination counts indicate incomplete responses
+without exposing session identifiers.
+
+Schedule writes are serialized for each charger, and older in-flight reads cannot
+undo successful local edits. Cloud readback still determines confirmed state.
+Public firmware catalogs are cached once per URL across integration entries in
+the same Home Assistant instance. Endpoint telemetry and authentication remain
+scoped to each entry.
+
 ## Documentation
 
 Refer to the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki) for setup,

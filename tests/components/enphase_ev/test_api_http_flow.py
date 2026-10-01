@@ -128,7 +128,10 @@ async def test_enlighten_request_timeout_includes_limiter_queue(monkeypatch) -> 
 
 
 @pytest.mark.asyncio
-async def test_optional_enlighten_reads_reserve_capacity_for_core(monkeypatch) -> None:
+@pytest.mark.parametrize("method", ["GET", "POST"])
+async def test_optional_enlighten_reads_reserve_capacity_for_core(
+    monkeypatch, method
+) -> None:
     monkeypatch.setattr(api_common, "_enlighten_read_semaphore", asyncio.Semaphore(3))
     monkeypatch.setattr(
         api_common, "_enlighten_optional_read_semaphore", asyncio.Semaphore(2)
@@ -142,7 +145,8 @@ async def test_optional_enlighten_reads_reserve_capacity_for_core(monkeypatch) -
     async def _optional(entered: asyncio.Event) -> None:
         with api.enlighten_optional_read_scope():
             async with api._enlighten_read_request_guard(  # noqa: SLF001
-                "GET", f"{api.BASE_URL}/service/optional"
+                method,
+                f"{api.BASE_URL}/service/enho_historical_events_ms/SITE/sessions/SN/history",
             ):
                 entered.set()
                 await release.wait()
@@ -167,6 +171,18 @@ async def test_optional_enlighten_reads_reserve_capacity_for_core(monkeypatch) -
     release.set()
     await asyncio.gather(first, second, third, core)
     assert third_optional_entered.is_set() is True
+
+
+@pytest.mark.asyncio
+async def test_session_history_transport_waits_for_global_read_capacity(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(api_common, "_enlighten_read_semaphore", asyncio.Semaphore(0))
+    session = FakeSession([FakeResponse(json_body={"data": {"result": []}})])
+    client = api.EnphaseEVClient(session, "SITE", None, None, timeout=0.01)
+    with pytest.raises(TimeoutError):
+        await client.session_history("SN", start_date="01-01-2026")
+    assert session.calls == []
 
 
 @pytest.mark.asyncio

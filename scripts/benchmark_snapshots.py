@@ -14,7 +14,14 @@ from timeit import repeat
 import tracemalloc
 
 from custom_components.enphase_ev.integration_snapshot import freeze_charger_data
+from custom_components.enphase_ev.feature_snapshot import capture_feature_snapshot
 from custom_components.enphase_ev.snapshot_helpers import freeze_snapshot_mapping
+from custom_components.enphase_ev.state_models import (
+    BatteryControlCapability,
+    BatteryState,
+    HeatpumpState,
+    InventoryState,
+)
 
 
 def make_payload(count: int) -> dict[str, dict[str, object]]:
@@ -44,6 +51,52 @@ def legacy_freeze(data: dict[str, dict[str, object]]) -> object:
     return freeze_snapshot_mapping(
         {serial: freeze_snapshot_mapping(payload) for serial, payload in data.items()}
     )
+
+
+def benchmark_mixed_inventory(*, iterations: int) -> list[dict[str, object]]:
+    """Measure fresh and unchanged feature snapshots at realistic larger sizes."""
+
+    scenarios = []
+    for count in (50, 500):
+        members = [
+            {"serial_number": f"synthetic-{index}", "model": "IQ8", "power": 100.0}
+            for index in range(count)
+        ]
+        inventory = InventoryState(
+            _inverter_data={
+                str(index): dict(member) for index, member in enumerate(members)
+            },
+            _type_device_buckets={
+                "microinverter": {"count": count, "devices": members},
+                "encharge": {"count": 20, "devices": members[:20]},
+            },
+        )
+        battery = BatteryState(
+            _battery_cfg_control=BatteryControlCapability(show=True, enabled=True)
+        )
+        heatpump = HeatpumpState()
+        previous = capture_feature_snapshot(battery, heatpump, inventory)
+        results = {}
+        for label, old in (("fresh", None), ("unchanged", previous)):
+
+            def build():
+                return capture_feature_snapshot(battery, heatpump, inventory, old)
+
+            batches = repeat(build, number=iterations, repeat=5)
+            tracemalloc.start()
+            current = build()
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+            results[label] = {
+                "median_microseconds_per_build": round(
+                    median(batches) * 1e6 / iterations, 3
+                ),
+                "peak_traced_bytes": peak,
+                "reused_inventory": current.inventory is previous.inventory,
+                "reused_battery": current.battery is previous.battery,
+            }
+        scenarios.append({"inverters": count, "batteries": 20, "results": results})
+    return scenarios
 
 
 def benchmark(*, iterations: int = 100) -> dict[str, object]:
@@ -77,8 +130,9 @@ def benchmark(*, iterations: int = 100) -> dict[str, object]:
         "python": platform.python_version(),
         "iterations_per_batch": iterations,
         "batches": 5,
-        "scope": "synthetic nested charger freeze; excludes network and HA recorder",
+        "scope": "synthetic charger and mixed-inventory snapshots; excludes network and HA recorder",
         "scenarios": scenarios,
+        "mixed_inventory_scenarios": benchmark_mixed_inventory(iterations=iterations),
     }
 
 

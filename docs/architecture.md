@@ -109,7 +109,10 @@ cookies cannot override the current saved credentials.
 `registry_migrations.py` owns versioned migrations and `registry_sync.py` owns
 ongoing reconciliation. Device and entity registry cleanup is intentionally conservative. Startup migrations
 run once per migration version, while normal reconciliation runs only when the
-coordinator reports a topology change—not for ordinary telemetry updates. Cleanup
+coordinator reports a topology change—not for ordinary telemetry updates. Metadata
+listeners compare compact charger and cached type-device signatures independently
+of topology so firmware/model changes update device records. Unchanged metadata
+does not run registry reconciliation or cleanup. Cleanup
 still waits for inventory readiness so transient cloud discovery failures do not
 remove user-customized entities.
 
@@ -146,6 +149,18 @@ health state. Feature runtimes can use the public `endpoint_family_should_run`,
 `note_endpoint_family_success`, and `note_endpoint_family_failure` services;
 `CurrentPowerHost` is the narrow typed contract used by the current-power runtime.
 Existing private coordinator entry points remain available for compatibility.
+
+`runtime_health.py` defines narrow typed endpoint-health and HEMS authentication
+contracts used by battery, inventory, and heat-pump runtimes. The shared adapters
+contain legacy private-method fallback; feature code uses public host services.
+`battery_grid_helpers.py` owns pure grid-relay payload traversal and normalization,
+with compatibility methods retained on the battery runtime.
+
+An entry's public `runtime_active` boundary prevents retired coordinators from
+publishing updates, refreshing, or retaining new background tasks. Unload retires
+the runtime before awaited resource cleanup. Tariff follow-up stages check that
+boundary around external awaits; an already acknowledged cloud write keeps its
+result without starting additional work on the retired entry.
 
 Authentication refresh uses its own lock and one shared, cancellation-shielded
 login task, so a 401 during a poll cannot reacquire the poll lock. JSON and HTML login-wall
@@ -204,6 +219,11 @@ Keep new endpoint handling inside `api_client/` or narrow parser modules so
 coordinator and entity code remain normalized. Preserve compatibility exports
 from `api.py` when moving existing behavior.
 
+The shared Enlighten read budget also covers the session-history POST endpoint,
+which is logically a read. Optional history enrichment reserves core read capacity;
+mutating POST requests remain outside the read limiter. Endpoint-family cooldowns
+use `cloud_retry.py` to interpret numeric and HTTP-date Retry-After headers.
+
 ### Weather child coordinator
 
 Weather is the deliberate exception to the one-main-coordinator polling model.
@@ -214,6 +234,10 @@ tracks both the child and its discovery task, unload explicitly cancels/releases
 them, and config-entry diagnostics report discovery and update health. Entities
 must not create additional independent coordinators without documenting the
 lifecycle and diagnostics ownership here.
+
+Weather discovery and ordinary polling share the same monotonic provider retry
+deadline. A stopped child cannot fetch or publish a response completing after
+retirement.
 
 ## Runtime Managers
 
@@ -353,6 +377,19 @@ lightweight discovery revision on refresh completion; unchanged telemetry does
 not deep-copy or JSON-serialize inverter and battery snapshots. Delayed writes
 coalesce revisions and reuse the already captured compact payload.
 
+`InventoryView.type_device_info` caches compact shared metadata by inventory
+revision and bucket identity, returning detached copies. Inventory summary
+rebuilds explicitly invalidate it even when membership is stable, so model,
+firmware, and preferred-gateway changes remain visible. Repeated per-device
+registration does not copy and rescan the entire type bucket.
+
+Feature publication uses explicit dataclass field metadata to exclude clocks,
+locks, and raw diagnostic payloads. Dataclass capabilities are normalized
+consistently with mappings, allowing unchanged immutable family snapshots to be
+reused. Changed families normalize dataclasses and freeze containers in one
+traversal without constructing an intermediate mutable inventory copy.
+Acquisition deadlines cannot create entity updates by themselves.
+
 ## Diagnostics, Redaction, And Repairs
 
 `diagnostics.py` builds Home Assistant config-entry and device diagnostics. `coordinator_diagnostics.py` builds coordinator health snapshots and manages repair issues. `log_redaction.py` and `runtime_helpers.redact_battery_payload` are the shared redaction helpers.
@@ -386,6 +423,13 @@ surface rejection with the same translated error instead of treating a swallowed
 transport failure as a successful action. Lifecycle checks prevent writes that
 finish after shutdown from publishing stale state or restarting refresh timers.
 All schedule mutations use the same authentication-failure handling.
+
+Writes are serialized per charger, including collection preparation and the
+read-modify-write enabled-state map. Reads capture the mutation revision before
+requesting data and discard results superseded by accepted writes or lifecycle
+changes. Different chargers can still operate concurrently. Scheduler responses
+must contain an explicit slot list; malformed envelopes cannot authorize an
+empty cache or remove known helper schedules.
 
 Tariff writes are serialized per config-entry runtime across read, modification,
 write, and immediate reconciliation. Recently acknowledged changes are retained
@@ -435,6 +479,25 @@ Keep tests close to the changed behavior under `tests/components/enphase_ev/`.
 
 Use the pinned Docker commands from `CONTRIBUTING.md` for validation.
 
+`test_transport_history_reliability.py` exercises acquisition ordering,
+cancellation, invalidation, incomplete pagination, and provider cooldowns.
+`test_inventory_view_contracts.py` bounds shared metadata work for a mixed
+500-inverter/20-battery inventory and verifies snapshot reuse and cache isolation.
+Run `PYTHONPATH=. python scripts/benchmark_snapshots.py --iterations 100` in
+`ha-dev` for observational charger and mixed-inventory snapshot timings and
+allocation measurements. These exclude network latency and recorder load;
+regressions assert bounded work and reuse rather than machine-specific timings.
+
+`session_history_pages.py` owns envelope validation, stable-identity deduplication,
+repeated-page detection, and completeness within the five-page budget. A valid
+empty result remains authoritative. Invalid or incomplete fetches reuse valid
+cached history; diagnostics expose only counts and categorical outcomes.
+
+`FirmwareCatalogManager` is shared by catalog URL within a Home Assistant instance.
+Concurrent refreshes share one acquisition and consumers receive detached data,
+so entries cannot modify one another's public catalog cache. Authentication and
+site telemetry are never part of this shared cache.
+
 ### Consumption Power Recovery
 
 `EnphaseSiteConsumptionPowerSensor` derives average watts from compatible
@@ -460,6 +523,12 @@ Responses with no usable energy flows are recorded as invalid payloads, leaving
 the last successful cache and source-progress timestamps intact. These fetch diagnostics remain available
 before any successful payload, independently of the existing service/backoff
 policy. They contain no raw payloads or exception messages.
+
+Site-energy acquisition is serialized within its manager. Callers overlapping one
+attempt reuse its completion, while cancellation or invalidation lets queued
+callers acquire fresh data. Invalidation rejects the older result before parsing
+can change guards or published source metadata. Sequential forced reads retain
+the existing treatment of legitimate cloud corrections.
 
 ### Microinverter Telemetry Rate Limits
 

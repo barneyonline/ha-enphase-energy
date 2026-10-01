@@ -1,8 +1,73 @@
 """Inventory gating and device metadata contracts previously excluded from coverage."""
 
 import pytest
+from unittest.mock import patch
 
 from custom_components.enphase_ev.inventory_view import InventoryView
+from custom_components.enphase_ev.feature_snapshot import capture_feature_snapshot
+from custom_components.enphase_ev.state_models import BatteryControlCapability
+
+
+def test_large_mixed_inventory_registration_reuses_metadata_and_snapshots(
+    coordinator_factory,
+):
+    coord = coordinator_factory(serials=["EVSE"])
+    coord._selected_type_keys = None
+    coord._type_device_buckets = {
+        kind: {
+            "count": count,
+            "devices": [
+                {
+                    "name": "IQ8" if kind == "microinverter" else "IQ Battery",
+                    "serial_number": f"{kind}-{index}",
+                    "sw_version": "1.0",
+                }
+                for index in range(count)
+            ],
+        }
+        for kind, count in (("microinverter", 500), ("encharge", 20))
+    }
+    coord.battery_state._battery_cfg_control = BatteryControlCapability(show=True)
+    view = coord.inventory_view
+    with patch.object(view, "type_bucket", wraps=view.type_bucket) as buckets:
+        for _ in range(500):
+            inverter = view.type_device_info("microinverter")
+            assert inverter["model"] == "IQ8"
+            assert inverter["sw_version"] == "1.0"
+        for _ in range(20):
+            assert view.type_device_info("encharge")["model"] == "IQ Battery"
+        assert buckets.call_count <= 12
+    first = capture_feature_snapshot(
+        coord.battery_state, coord.heatpump_state, coord.inventory_state
+    )
+    second = capture_feature_snapshot(
+        coord.battery_state, coord.heatpump_state, coord.inventory_state, first
+    )
+    assert second.inventory is first.inventory
+    assert second.battery is first.battery
+
+
+def test_shared_device_metadata_defensive_copies_and_stable_topology_updates(
+    coordinator_factory,
+):
+    coord = coordinator_factory()
+    coord._selected_type_keys = None
+    members = [{"name": "IQ8", "sw_version": "1.0"}]
+    coord._type_device_buckets = {"microinverter": {"count": 1, "devices": members}}
+    view = coord.inventory_view
+    first = view.type_device_info("microinverter")
+    first["identifiers"].clear()
+    first["model"] = "Modified outside runtime"
+    assert view.type_device_info("microinverter")["model"] == "IQ8"
+    assert view.type_device_info("microinverter")["identifiers"]
+    members[0]["sw_version"] = "2.0"
+    members[0]["name"] = "IQ8 Updated"
+    coord.inventory_runtime._rebuild_inventory_summary_caches()
+    updated = view.type_device_info("microinverter")
+    assert updated["sw_version"] == "2.0"
+    assert updated["model"] == "IQ8 Updated"
+    coord._type_device_buckets["microinverter"]["devices"] = [{"name": "IQ9"}]
+    assert view.type_device_info("microinverter")["model"] == "IQ9"
 
 
 @pytest.mark.parametrize(

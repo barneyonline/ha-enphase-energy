@@ -19,6 +19,18 @@ from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL, RANDOM_SITE_ID
 
 
+def test_history_pagination_health_is_detached_and_contains_only_counts(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    counts = {"pages": 2, "unique_rows": 50, "duplicates": 50, "complete": False}
+    coord.session_history._pagination_diagnostics = counts
+    health = coord.diagnostics.payload_health_diagnostics()
+    assert health["session_history"]["pagination"] == counts
+    health["session_history"]["pagination"]["unique_rows"] = 999
+    assert coord.session_history.pagination_diagnostics["unique_rows"] == 50
+
+
 def test_gateway_diagnostics_helper_branches() -> None:
     class BadStr:
         def __str__(self) -> str:

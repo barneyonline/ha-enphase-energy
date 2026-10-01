@@ -8,7 +8,8 @@ from datetime import timedelta
 import logging
 import math
 import re
-from typing import Any, cast
+import time
+from typing import Any, Protocol, cast
 
 import aiohttp
 from homeassistant.components.weather import WeatherEntity
@@ -28,6 +29,7 @@ from .api import (
     enlighten_optional_read_scope,
 )
 from .const import DOMAIN, OPT_WEATHER_ENABLED
+from .cloud_retry import retry_after_delay
 from .device_info_helpers import _cloud_device_info
 from .log_redaction import redact_site_id, redact_text
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
@@ -87,6 +89,12 @@ class EnphaseWeatherData:
 
 class WeatherEndpointUnsupported(UpdateFailed):  # type: ignore[misc]
     """Signal that Enlighten does not provide weather for this site."""
+
+
+class WeatherClient(Protocol):
+    """Only the weather request surface is needed by the child coordinator."""
+
+    async def weather(self, *, locale: str) -> object: ...
 
 
 def _number(value: object) -> float | None:
@@ -155,7 +163,7 @@ class EnphaseWeatherCoordinator(
     def __init__(
         self,
         hass: HomeAssistant,
-        client: Any,
+        client: WeatherClient,
         *,
         locale: str,
         site_id: str | None = None,
@@ -172,8 +180,21 @@ class EnphaseWeatherCoordinator(
         self._site_id = site_id
         self._discovery_state = "pending"
         self._discovery_failures = 0
+        self._retry_deadline_mono = 0.0
+
+    @property
+    def retry_delay(self) -> float:
+        """Remaining provider cooldown, shared by discovery and regular polling."""
+
+        return max(0.0, self._retry_deadline_mono - time.monotonic())
 
     async def _async_update_data(self) -> EnphaseWeatherData:
+        if self._discovery_state == "stopped":
+            raise asyncio.CancelledError
+        if remaining_delay := self.retry_delay:
+            raise UpdateFailed(
+                "Weather service rate limited", retry_after=remaining_delay
+            )
         try:
             with enlighten_optional_read_scope():
                 payload = await self._client.weather(locale=self._locale)
@@ -182,9 +203,17 @@ class EnphaseWeatherCoordinator(
                 raise WeatherEndpointUnsupported(
                     "Weather endpoint unsupported"
                 ) from err
+            delay = None
+            if err.status == 429:
+                delay = max(
+                    _WEATHER_UPDATE_INTERVAL.total_seconds(),
+                    retry_after_delay(err) or 0.0,
+                )
+                self._retry_deadline_mono = time.monotonic() + delay
             raise UpdateFailed(
                 redact_text(err, site_ids=((self._site_id,) if self._site_id else ()))
-                or err.__class__.__name__
+                or err.__class__.__name__,
+                retry_after=delay,
             ) from err
         except (
             aiohttp.ClientError,
@@ -196,6 +225,8 @@ class EnphaseWeatherCoordinator(
                 redact_text(err, site_ids=((self._site_id,) if self._site_id else ()))
                 or err.__class__.__name__
             ) from err
+        if self._discovery_state == "stopped":
+            raise asyncio.CancelledError
         normalized = _normalize_weather(payload)
         if normalized is None:
             raise UpdateFailed("Weather payload is missing a valid temperature")
@@ -318,6 +349,7 @@ async def _async_discover_weather(
             min(failures, len(_WEATHER_DISCOVERY_BACKOFF_S) - 1)
         ]
         failures += 1
+        delay = max(delay, coordinator.retry_delay)
         _LOGGER.debug(
             "Weather endpoint unavailable for site %s; retrying in %s seconds",
             redact_site_id(site_id),

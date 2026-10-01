@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import time
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -15,6 +16,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
 from .log_redaction import redact_text
+from .cloud_retry import retry_after_seconds
+from .const import DOMAIN
 from .runtime_helpers import (
     iso_or_none as _iso_or_none,
     monotonic_deadline_to_utc_iso as _mono_to_utc_iso,
@@ -31,6 +34,7 @@ FIRMWARE_CATALOG_URL_ENV = "ENPHASE_EV_FIRMWARE_CATALOG_URL"
 FIRMWARE_CATALOG_CACHE_TTL_SECONDS = 12 * 60 * 60
 FIRMWARE_CATALOG_RETRY_BACKOFF_SECONDS = 30 * 60
 FIRMWARE_CATALOG_FETCH_TIMEOUT_SECONDS = 20
+_CATALOG_MANAGERS_KEY = f"{DOMAIN}_firmware_catalog_managers"
 
 
 @dataclass(slots=True)
@@ -66,48 +70,72 @@ class FirmwareCatalogManager:
         self._last_error: str | None = None
         self._using_stale = False
         self._lock = asyncio.Lock()
+        self._fetch_revision = 0
+        self._retry_after_mono = 0.0
 
     @property
     def cached_catalog(self) -> dict[str, Any] | None:
-        return self._catalog
+        """Return a detached catalog so entries cannot mutate a shared cache."""
+
+        return deepcopy(self._catalog)
 
     async def async_get_catalog(
         self, *, force_refresh: bool = False
     ) -> dict[str, Any] | None:
         now = time.monotonic()
-        if not force_refresh and now < self._expires_mono:
-            return self._catalog
+        if now < self._retry_after_mono or (
+            not force_refresh and now < self._expires_mono
+        ):
+            return self.cached_catalog
 
+        revision = self._fetch_revision
         async with self._lock:
             now = time.monotonic()
-            if not force_refresh and now < self._expires_mono:
-                return self._catalog
+            if (
+                now < self._retry_after_mono
+                or revision != self._fetch_revision
+                or (not force_refresh and now < self._expires_mono)
+            ):
+                return self.cached_catalog
 
             self._last_fetch_utc = dt_util.utcnow()
             session = async_get_clientsession(self._hass)
+            provider_delay = 0.0
             try:
                 async with session.get(
                     self._url,
                     timeout=self._fetch_timeout_seconds,
                 ) as response:
                     if response.status >= 400:
+                        headers = getattr(response, "headers", None) or {}
+                        provider_delay = (
+                            retry_after_seconds(headers.get("Retry-After")) or 0.0
+                        )
+                        if response.status == 429:
+                            provider_delay = max(
+                                provider_delay, self._retry_backoff_seconds
+                            )
                         raise RuntimeError(f"HTTP {response.status}")
                     payload = await response.json(content_type=None)
                 catalog = _validate_catalog(payload)
             except Exception as err:  # noqa: BLE001
                 self._last_error = redact_text(err)
                 self._using_stale = self._catalog is not None
-                backoff = self._retry_backoff_seconds
+                backoff = max(self._retry_backoff_seconds, provider_delay)
                 self._expires_mono = time.monotonic() + backoff
+                if provider_delay:
+                    self._retry_after_mono = self._expires_mono
+                self._fetch_revision += 1
                 _LOGGER.debug("Firmware catalog refresh failed: %s", self._last_error)
-                return self._catalog
+                return self.cached_catalog
 
-            self._catalog = catalog
+            self._catalog = deepcopy(catalog)
             self._last_success_utc = dt_util.utcnow()
             self._last_error = None
             self._using_stale = False
             self._expires_mono = time.monotonic() + self._ttl_seconds
-            return self._catalog
+            self._fetch_revision += 1
+            return self.cached_catalog
 
     def status_snapshot(self) -> dict[str, Any]:
         generated_at = _catalog_generated_at(self._catalog)
@@ -123,6 +151,23 @@ class FirmwareCatalogManager:
             "catalog_generated_at": generated_at,
             "catalog_source_age_seconds": source_age_seconds,
         }
+
+
+def get_firmware_catalog_manager(
+    hass: HomeAssistant, *, url: str | None = None
+) -> FirmwareCatalogManager:
+    """Share public catalog acquisition by URL within one Home Assistant instance."""
+
+    resolved_url = str(url or _firmware_catalog_url())
+    data = getattr(hass, "data", None)
+    if not isinstance(data, dict):
+        return FirmwareCatalogManager(hass, url=resolved_url)
+    managers: dict[str, FirmwareCatalogManager] = data.setdefault(
+        _CATALOG_MANAGERS_KEY, {}
+    )
+    if resolved_url not in managers:
+        managers[resolved_url] = FirmwareCatalogManager(hass, url=resolved_url)
+    return managers[resolved_url]
 
 
 def _firmware_catalog_url() -> str:

@@ -11,10 +11,19 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Preserve successful EV charger schedule edits and deletions when an older cloud read finishes later, and serialize competing writes for each charger.
+- Keep the last valid schedules and session history when Enphase returns malformed or incomplete responses. Deduplicate overlapping session pages so daily charging energy is not counted twice.
+- Prevent scheduler option changes from replacing newer charger telemetry with an older snapshot.
+- Coalesce overlapping site-energy reads and discard acquisitions superseded by cache invalidation. Honor provider rate-limit deadlines for site energy, session history, weather, and firmware catalogs.
+- Prevent retired entry runtimes from publishing late updates or starting tariff reconciliation and scheduler work after unload.
+- Refresh device firmware and model metadata when cloud inventory changes without a topology change.
 
 ### 🔧 Improvements
-- None
+- Cache shared device metadata to reduce repeated scans when registering large microinverter and battery inventories, while preserving user customizations and defensive copies.
+- Reuse unchanged battery capability snapshots and explicitly exclude cache bookkeeping from entity update comparisons.
+- Build immutable feature snapshots in one traversal to avoid copying large inventories twice.
+- Share public firmware catalog downloads across entries using the same URL and include read-only session-history POST requests in the cloud request budget.
+- Introduce typed runtime health and authentication boundaries, extract pure battery grid-relay and session-pagination helpers, and expand mixed-inventory performance and concurrency regression coverage.
 
 ### 🔄 Other changes
 - None

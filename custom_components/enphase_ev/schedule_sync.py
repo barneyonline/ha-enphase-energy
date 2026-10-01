@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Coroutine, Iterable
+from collections.abc import Awaitable, Coroutine, Iterable
 from datetime import datetime, time as dt_time, timedelta
 import inspect
 import json
@@ -83,6 +83,8 @@ class ScheduleSync:
         self._meta_cache: dict[str, str | None] = {}
         self._config_cache: dict[str, dict[str, Any]] = {}
         self._lock = asyncio.Lock()
+        self._mutation_locks: dict[str, asyncio.Lock] = {}
+        self._mutation_revisions: dict[str, int] = {}
         self._lifecycle_lock = asyncio.Lock()
         self._lifecycle_generation = 0
         self._storage_collection: ScheduleStorageCollection | None = None
@@ -419,7 +421,29 @@ class ScheduleSync:
             return None, None
         return serial, slot_id
 
+    async def _async_mutate_serial(
+        self, sn: str, mutation: Callable[[], Awaitable[bool]]
+    ) -> bool:
+        """Serialize one charger's writes and invalidate older read results."""
+
+        generation = self._lifecycle_generation
+        lock = self._mutation_locks.setdefault(sn, asyncio.Lock())
+        async with lock:
+            if not self._lifecycle_active(generation) or not self._sync_enabled():
+                return False
+            accepted = await mutation()
+            if accepted and self._lifecycle_active(generation):
+                self._mutation_revisions[sn] = self._mutation_revisions.get(sn, 0) + 1
+            return accepted
+
     async def async_set_slot_enabled(
+        self, sn: str, slot_id: str, enabled: bool
+    ) -> bool:
+        return await self._async_mutate_serial(
+            sn, lambda: self._async_set_slot_enabled(sn, slot_id, enabled)
+        )
+
+    async def _async_set_slot_enabled(
         self, sn: str, slot_id: str, enabled: bool
     ) -> bool:
         if self._stopping:
@@ -602,11 +626,13 @@ class ScheduleSync:
         if not self._has_scheduler_bearer():
             self._last_status = "missing_bearer"
             return
-        if self._lock.locked():
+        if self._lock.locked() and reason not in {"patch", "replace_prepare"}:
             # Coordinator updates can arrive while an interval refresh is still
             # running; the next scheduled tick will catch up.
             return
         async with self._lock:
+            if not self._lifecycle_active(generation):
+                return
             serial_list = (
                 list(serials)
                 if serials is not None
@@ -621,8 +647,10 @@ class ScheduleSync:
                     sn: str,
                 ) -> tuple[str, dict[str, Any] | None, Exception | None]:
                     async with semaphore:
+                        read_revisions[sn] = self._mutation_revisions.get(sn, 0)
                         return (sn, *await self._async_fetch_serial_sync(sn))
 
+                read_revisions: dict[str, int] = {}
                 tasks = []
                 async with asyncio.TaskGroup() as group:
                     for sn in unique_serials:
@@ -634,7 +662,12 @@ class ScheduleSync:
                         )
                 if not self._lifecycle_active(generation):
                     return
-                results = [task.result() for task in tasks]
+                results = [
+                    result
+                    for task in tasks
+                    if read_revisions[(result := task.result())[0]]
+                    == self._mutation_revisions.get(result[0], 0)
+                ]
                 auth_result = next(
                     (
                         result
@@ -798,8 +831,13 @@ class ScheduleSync:
         return True
 
     async def _sync_serial(self, sn: str) -> None:
+        generation = self._lifecycle_generation
+        revision = self._mutation_revisions.get(sn, 0)
         response, err = await self._async_fetch_serial_sync(sn)
-        self._apply_sync_serial_result(sn, response, err)
+        if self._lifecycle_active(
+            generation
+        ) and revision == self._mutation_revisions.get(sn, 0):
+            self._apply_sync_serial_result(sn, response, err)
 
     async def _async_fetch_serial_sync(
         self, sn: str
@@ -873,6 +911,11 @@ class ScheduleSync:
         return cast(str, dt_util.utcnow().isoformat(timespec="milliseconds"))
 
     async def async_replace_slots(self, sn: str, slots: list[dict[str, Any]]) -> bool:
+        return await self._async_mutate_serial(
+            sn, lambda: self._async_replace_slots(sn, slots)
+        )
+
+    async def _async_replace_slots(self, sn: str, slots: list[dict[str, Any]]) -> bool:
         if self._stopping:
             return False
         generation = self._lifecycle_generation
@@ -969,12 +1012,22 @@ class ScheduleSync:
         return True
 
     async def async_upsert_slot(self, sn: str, slot: dict[str, Any]) -> bool:
+        return await self._async_mutate_serial(
+            sn, lambda: self._async_upsert_slot(sn, slot)
+        )
+
+    async def _async_upsert_slot(self, sn: str, slot: dict[str, Any]) -> bool:
         slot_id = str(slot.get("id") or "")
         if slot_id and slot_id in self._slot_cache.get(sn, {}):
             return await self._patch_slot(sn, slot_id, slot)
         return await self._create_slot(sn, slot)
 
     async def async_delete_slot(self, sn: str, slot_id: str) -> bool:
+        return await self._async_mutate_serial(
+            sn, lambda: self._async_delete_slot(sn, slot_id)
+        )
+
+    async def _async_delete_slot(self, sn: str, slot_id: str) -> bool:
         if self._stopping:
             return False
         generation = self._lifecycle_generation

@@ -14,9 +14,16 @@ import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
-from .api import InvalidPayloadError, SessionHistoryUnavailable, Unauthorized
+from .api import (
+    InvalidPayloadError,
+    SessionHistoryUnavailable,
+    Unauthorized,
+    enlighten_optional_read_scope,
+)
+from .cloud_retry import retry_after_delay
 from .log_redaction import redact_identifier, redact_text
 from .request_metrics import request_metrics_scope
+from .session_history_pages import SessionHistoryPages, parse_session_timestamp
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -107,6 +114,12 @@ class SessionHistoryManager:
         self._service_backoff_ends_utc: datetime | None = None
         self._service_using_stale = False
         self._service_last_payload_signature: dict[str, object] | None = None
+        self._pagination_diagnostics: dict[str, object] = {}
+
+    @property
+    def pagination_diagnostics(self) -> dict[str, object]:
+        """Return detached, identifier-free results of the last paginated read."""
+        return dict(self._pagination_diagnostics)
 
     def _site_ids(self) -> tuple[object, ...]:
         if self._site_id_getter is None:
@@ -226,6 +239,8 @@ class SessionHistoryManager:
             err.signature_dict() if isinstance(err, InvalidPayloadError) else None
         )
         delay = max(self._failure_backoff, MIN_SESSION_HISTORY_CACHE_TTL)
+        if isinstance(err, BaseException):
+            delay = max(delay, retry_after_delay(err) or 0.0)
         self._service_backoff_until = time.monotonic() + delay
         try:
             self._service_backoff_ends_utc = dt_util.utcnow() + timedelta(seconds=delay)
@@ -416,7 +431,7 @@ class SessionHistoryManager:
         day_local: datetime,
         max_cache_age: float | None = None,
     ) -> dict[str, list[dict[str, Any]]]:
-        with request_metrics_scope("session_history"):
+        with request_metrics_scope("session_history"), enlighten_optional_read_scope():
             return await self._async_enrich_sessions_impl(
                 serials,
                 day_local=day_local,
@@ -632,6 +647,13 @@ class SessionHistoryManager:
                     err.status,
                     self._redact_error(err.message),
                 )
+                if err.status == 429:
+                    self._note_service_unavailable(
+                        err, using_stale=bool(cached and cached.has_valid_cache)
+                    )
+                    if cached and cached.has_valid_cache:
+                        self._set_stale_reused_entry(sn, day_key, cached, err)
+                        return cached.sessions
                 if err.status in (500, 502, 503, 504, 550):
                     self._block_until[sn] = now_mono + self._failure_backoff
                 self._set_unavailable_entry(sn, day_key, now_mono, err)
@@ -649,10 +671,10 @@ class SessionHistoryManager:
                 self._set_unavailable_entry(sn, day_key, now_mono, err)
                 return []
 
-        async def _fetch_page(
-            offset: int, limit: int
-        ) -> tuple[list[dict[str, Any]], bool]:
-            payload = await client.session_history(
+        pages = SessionHistoryPages()
+
+        async def _fetch_page(offset: int, limit: int) -> object:
+            return await client.session_history(
                 sn,
                 start_date=api_day,
                 end_date=api_day,
@@ -661,24 +683,16 @@ class SessionHistoryManager:
                 timezone=timezone_name,
                 request_id=str(uuid.uuid4()),
             )
-            data = payload.get("data") if isinstance(payload, dict) else None
-            items = data.get("result") if isinstance(data, dict) else None
-            has_more = bool(data.get("hasMore")) if isinstance(data, dict) else False
-            if not isinstance(items, list):
-                return [], False
-            return items, has_more
 
-        results: list[dict[str, Any]] = []
         offset = 0
         limit = 50
         try:
             for _ in range(5):
-                page, has_more = await _fetch_page(offset, limit)
-                if page:
-                    results.extend(page)
-                if not has_more or len(page) < limit:
+                payload = await _fetch_page(offset, limit)
+                if not pages.add(payload):
                     break
                 offset += limit
+            results = pages.finish()
         except SessionHistoryUnavailable as err:
             self._logger.debug(
                 "Session history unavailable for %s on %s: %s",
@@ -710,6 +724,13 @@ class SessionHistoryManager:
                 err.status,
                 self._redact_error(err.message),
             )
+            if err.status == 429:
+                self._note_service_unavailable(
+                    err, using_stale=bool(cached and cached.has_valid_cache)
+                )
+                if cached and cached.has_valid_cache:
+                    self._set_stale_reused_entry(sn, day_key, cached, err)
+                    return cached.sessions
             if err.status in (500, 502, 503, 504, 550):
                 self._block_until[sn] = now_mono + self._failure_backoff
             self._set_unavailable_entry(sn, day_key, now_mono, err)
@@ -725,8 +746,12 @@ class SessionHistoryManager:
                 self._note_service_unavailable(err, using_stale=True)
                 self._set_stale_reused_entry(sn, day_key, cached, err)
                 return cached.sessions
+            if isinstance(err, InvalidPayloadError):
+                self._note_service_unavailable(err)
             self._set_unavailable_entry(sn, day_key, now_mono, err)
             return []
+        finally:
+            self._pagination_diagnostics = pages.diagnostics()
 
         sessions = self._normalise_sessions_for_day(local_dt=local_dt, results=results)
         self._mark_service_available()
@@ -855,35 +880,6 @@ class SessionHistoryManager:
         day_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = day_start + timedelta(days=1)
 
-        def _parse_ts(value: object) -> datetime | None:
-            if value is None:
-                return None
-            if isinstance(value, (int, float)):
-                try:
-                    return cast(
-                        datetime,
-                        dt_util.as_local(
-                            datetime.fromtimestamp(float(value), tz=_tz.utc)
-                        ),
-                    )
-                except Exception:  # noqa: BLE001
-                    return None
-            if isinstance(value, str):
-                cleaned = value.strip().replace("[UTC]", "")
-                if cleaned.endswith("Z"):
-                    cleaned = cleaned[:-1] + "+00:00"
-                try:
-                    dt_val = datetime.fromisoformat(cleaned)
-                except ValueError:
-                    return None
-                if dt_val.tzinfo is None:
-                    dt_val = dt_val.replace(tzinfo=_tz.utc)
-                try:
-                    return cast(datetime, dt_util.as_local(dt_val))
-                except Exception:  # noqa: BLE001
-                    return None
-            return None
-
         def _as_float(val: object, *, precision: int | None = None) -> float | None:
             if val is None:
                 return None
@@ -918,8 +914,8 @@ class SessionHistoryManager:
         for item in results:
             if not isinstance(item, dict):
                 continue
-            start_dt = _parse_ts(item.get("startTime"))
-            end_dt = _parse_ts(item.get("endTime"))
+            start_dt = parse_session_timestamp(item.get("startTime"))
+            end_dt = parse_session_timestamp(item.get("endTime"))
 
             if start_dt is None and end_dt is None:
                 continue
