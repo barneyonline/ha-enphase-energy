@@ -491,6 +491,9 @@
     "export_limit_changed": {
       "message": "Konfiguracja uległa zmianie. Sprawdź aktualne ustawienia i potwierdź ponownie."
     },
+    "export_limit_mismatch": {
+      "message": "Formularz instalatora Enphase nie odpowiada ustawieniom bramy. Odśwież ustawienia i spróbuj ponownie."
+    },
     "export_limit_pending": {
       "message": "Oczekiwanie na potwierdzenie konfiguracji. Odśwież stan przed kolejną zmianą."
     },
@@ -855,8 +858,7 @@
         "title": "Limit oddawania energii",
         "description": "Bieżące ustawienie: **{current}**\n\nŻądane ustawienie: **{requested}**\n\nSzybkość zmiany (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Potwierdź tę zmianę",
-          "restore_slew_rate": "Przywróć szybkość z bramy"
+          "confirm": "Potwierdź tę zmianę"
         }
       },
       "export_limit_submitted": {
@@ -905,6 +907,7 @@
       "export_limit_unavailable": "Limit niedostępny. Wymagane są uprawnienia instalatora i obsługiwana konfiguracja z jedną bramą.",
       "export_limit_invalid": "Wprowadź całkowitą liczbę watów od 0 do 100000.",
       "export_limit_changed": "Konfiguracja uległa zmianie. Sprawdź aktualne ustawienia i potwierdź ponownie.",
+      "export_limit_mismatch": "Formularz instalatora Enphase nie odpowiada ustawieniom bramy. Odśwież ustawienia i spróbuj ponownie.",
       "export_limit_pending": "Oczekiwanie na potwierdzenie konfiguracji. Odśwież stan przed kolejną zmianą.",
       "export_limit_disabled": "Włącz sterowanie limitem oddawania energii (Funkcje → Funkcje zaawansowane).",
       "export_limit_confirmation": "Potwierdź tę zmianę",

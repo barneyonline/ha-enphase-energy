@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file.
 - Add localized descriptive Activity entries for system events, service and cloud health, charger status, gateway and microinverter connectivity, battery status, Export Limit outcomes, and heat-pump SG Ready changes without changing entity states. Enable them in Configure → Notifications; the feature is disabled by default.
 
 ### 🐛 Bug fixes
+- Freeze the displayed Export Limit slew rate for confirmation so edits to saved defaults cannot submit a different rate from the one reviewed. Refresh the displayed rate when changed gateway settings require reconfirmation.
+- Automatically preserve the gateway slew rate when Enphase returns a zero form default for Export Limit writes, including enabling and disabling from the dropdown. Verify current gateway identity and unchanged settings, remove the extra restore checkbox from confirmation, and distinguish form conflicts from configuration changes.
 - Show the actual pending Export Limit setting, or None when no request remains, independently of the last request status.
 - Keep per-array Current Power sensors enabled independently of the individual Microinverter Power feature setting when account telemetry is available.
 - Report microinverter power telemetry status independently of the individual sensor option, and remove retired charger buttons without waiting for inventory refresh.

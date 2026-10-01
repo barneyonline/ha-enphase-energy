@@ -491,6 +491,9 @@
     "export_limit_changed": {
       "message": "Seadistus muutus. Kontrolli uuendatud seadistust ja kinnita uuesti."
     },
+    "export_limit_mismatch": {
+      "message": "Enphase’i paigaldaja vorm ei vasta lüüsi seadistustele. Värskenda seadistusi ja proovi uuesti."
+    },
     "export_limit_pending": {
       "message": "Oodatakse seadistuse kinnitamist. Enne uut muudatust värskenda olekut."
     },
@@ -855,8 +858,7 @@
         "title": "Ekspordipiirang",
         "description": "Praegune seadistus: **{current}**\n\nTaotletud seadistus: **{requested}**\n\nMuutumiskiirus (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Kinnita see muudatus",
-          "restore_slew_rate": "Taasta muutumiskiirus lüüsist"
+          "confirm": "Kinnita see muudatus"
         }
       },
       "export_limit_submitted": {
@@ -905,6 +907,7 @@
       "export_limit_unavailable": "Ekspordipiirang pole saadaval. Vaja on paigaldaja ligipääsu ja toetatud ühe lüüsiga seadistust.",
       "export_limit_invalid": "Sisesta täisarv vatte vahemikus 0 kuni 100000.",
       "export_limit_changed": "Seadistus muutus. Kontrolli uuendatud seadistust ja kinnita uuesti.",
+      "export_limit_mismatch": "Enphase’i paigaldaja vorm ei vasta lüüsi seadistustele. Värskenda seadistusi ja proovi uuesti.",
       "export_limit_pending": "Oodatakse seadistuse kinnitamist. Enne uut muudatust värskenda olekut.",
       "export_limit_disabled": "Luba ekspordipiirangu juhtimine (Funktsioonid → Täpsemad funktsioonid).",
       "export_limit_confirmation": "Kinnita see muudatus",

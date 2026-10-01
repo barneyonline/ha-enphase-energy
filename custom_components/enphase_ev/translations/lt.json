@@ -491,6 +491,9 @@
     "export_limit_changed": {
       "message": "Konfigūracija pasikeitė. Peržiūrėkite atnaujintus nustatymus ir patvirtinkite dar kartą."
     },
+    "export_limit_mismatch": {
+      "message": "Enphase montuotojo forma neatitinka šliuzo nustatymų. Atnaujinkite nustatymus ir bandykite dar kartą."
+    },
     "export_limit_pending": {
       "message": "Laukiama konfigūracijos patvirtinimo. Prieš kitą pakeitimą atnaujinkite būseną."
     },
@@ -855,8 +858,7 @@
         "title": "Eksporto riba",
         "description": "Dabartinis nustatymas: **{current}**\n\nPrašomas nustatymas: **{requested}**\n\nKitimo greitis (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Patvirtinti šį pakeitimą",
-          "restore_slew_rate": "Atkurti greitį iš šliuzo"
+          "confirm": "Patvirtinti šį pakeitimą"
         }
       },
       "export_limit_submitted": {
@@ -905,6 +907,7 @@
       "export_limit_unavailable": "Eksporto riba nepasiekiama. Reikalinga montuotojo prieiga ir palaikoma konfigūracija su vienu šliuzu.",
       "export_limit_invalid": "Įveskite sveikąjį vatų skaičių nuo 0 iki 100000.",
       "export_limit_changed": "Konfigūracija pasikeitė. Peržiūrėkite atnaujintus nustatymus ir patvirtinkite dar kartą.",
+      "export_limit_mismatch": "Enphase montuotojo forma neatitinka šliuzo nustatymų. Atnaujinkite nustatymus ir bandykite dar kartą.",
       "export_limit_pending": "Laukiama konfigūracijos patvirtinimo. Prieš kitą pakeitimą atnaujinkite būseną.",
       "export_limit_disabled": "Įjungti eksporto ribos valdymą (Funkcijos → Išplėstinės funkcijos).",
       "export_limit_confirmation": "Patvirtinti šį pakeitimą",

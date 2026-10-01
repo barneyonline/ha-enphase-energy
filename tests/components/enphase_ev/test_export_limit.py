@@ -1026,7 +1026,7 @@ async def test_changed_live_form_blocks_write(runtime, name, value):
     ]
     with pytest.raises(ServiceValidationError) as err:
         await runtime.async_apply(0, confirm=True)
-    assert err.value.translation_key == "export_limit_changed"
+    assert err.value.translation_key == "export_limit_mismatch"
     client.async_set_export_limit.assert_not_awaited()
     runtime._store.async_save.assert_not_awaited()
 
@@ -1434,7 +1434,8 @@ async def test_historical_gateway_lookup_missing_payload_blocks_identity(runtime
     assert runtime.snapshot is None
 
 
-async def test_disabled_default_form_stale_slew_still_blocks_write(runtime):
+async def test_zero_default_form_without_gateway_identity_blocks_write(runtime):
+    runtime.coordinator.client.devices_details = AsyncMock(return_value=None)
     runtime.coordinator.client.async_get_export_limit_settings.return_value = payload(
         enable=False,
         export_limit=False,
@@ -1461,7 +1462,7 @@ async def test_disabled_default_form_stale_slew_still_blocks_write(runtime):
     runtime.coordinator.client.async_get_export_limit_form.return_value = fields
     with pytest.raises(ServiceValidationError) as raised:
         await runtime.async_apply(1000, confirm=True)
-    assert raised.value.translation_key == "export_limit_changed"
+    assert raised.value.translation_key == "export_limit_unavailable"
     runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
 
 
@@ -1546,9 +1547,7 @@ def _zero_slew_form(runtime, *, enabled=False):
 async def test_guided_zero_slew_reconciliation_preserves_gateway_rate(runtime):
     settings, fields = _zero_slew_form(runtime)
     expected = await runtime.async_prepare()
-    await runtime.async_apply(
-        1000, confirm=True, expected=expected, reconcile_zero_slew=True
-    )
+    await runtime.async_apply(1000, confirm=True, expected=expected)
     runtime.coordinator.client.async_set_export_limit.assert_awaited_once_with(
         fields, 1000, 6980.0
     )
@@ -1567,8 +1566,6 @@ async def test_guided_zero_slew_reconciliation_preserves_gateway_rate(runtime):
 @pytest.mark.parametrize(
     "case",
     [
-        "no_opt_in",
-        "no_expected",
         "override",
         "unconfirmed",
         "enabled",
@@ -1582,12 +1579,8 @@ async def test_guided_zero_slew_reconciliation_preserves_gateway_rate(runtime):
 async def test_zero_slew_reconciliation_rejects_unsafe_context(runtime, case):
     settings, _ = _zero_slew_form(runtime)
     expected = await runtime.async_prepare()
-    kwargs = {"confirm": True, "expected": expected, "reconcile_zero_slew": True}
-    if case == "no_opt_in":
-        kwargs["reconcile_zero_slew"] = False
-    elif case == "no_expected":
-        kwargs["expected"] = None
-    elif case == "override":
+    kwargs = {"confirm": True, "expected": expected}
+    if case == "override":
         kwargs["slew_rate"] = 6000
     elif case == "unconfirmed":
         kwargs["confirm"] = False
@@ -1643,27 +1636,20 @@ async def test_zero_slew_reconciliation_rejects_other_form_disagreements(
         for key, current in fields
     ]
     with pytest.raises(ServiceValidationError) as raised:
-        await runtime.async_apply(
-            1000, confirm=True, expected=expected, reconcile_zero_slew=True
-        )
-    assert raised.value.translation_key == "export_limit_changed"
+        await runtime.async_apply(1000, confirm=True, expected=expected)
+    assert raised.value.translation_key == "export_limit_mismatch"
     runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
 
 
-async def test_guided_confirmation_requires_explicit_gateway_rate_restore(runtime):
+async def test_guided_confirmation_automatically_preserves_gateway_rate(runtime):
     _zero_slew_form(runtime)
     flow = OptionsFlowHandler(runtime.coordinator.config_entry)
     flow.hass = runtime.coordinator.hass
     await flow.async_step_export_limit()
     result = await flow.async_step_export_limit_set({"limit_watts": 1000})
     assert result["description_placeholders"]["requested_slew"] == "6980.0"
-    assert result["data_schema"]({"confirm": True})["restore_slew_rate"] is False
+    assert result["data_schema"]({"confirm": True}) == {"confirm": True}
     result = await flow.async_step_export_limit_confirm({"confirm": True})
-    assert result["errors"]["base"] == "export_limit_changed"
-    runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
-    result = await flow.async_step_export_limit_confirm(
-        {"confirm": True, "restore_slew_rate": True}
-    )
     assert result["step_id"] == "export_limit_submitted"
     assert runtime.coordinator.client.async_set_export_limit.await_count == 1
 
@@ -1739,9 +1725,7 @@ def test_disabled_checked_radio_unchecks_previous_without_submitting():
 async def test_enabled_zero_slew_reconciliation_preserves_gateway_rate(runtime, watts):
     settings, fields = _zero_slew_form(runtime, enabled=True)
     expected = await runtime.async_prepare()
-    await runtime.async_apply(
-        watts, confirm=True, expected=expected, reconcile_zero_slew=True
-    )
+    await runtime.async_apply(watts, confirm=True, expected=expected)
     runtime.coordinator.client.async_set_export_limit.assert_awaited_once_with(
         fields, watts, 6980.0
     )
@@ -1761,7 +1745,7 @@ async def test_enabled_zero_slew_reconciliation_preserves_gateway_rate(runtime, 
 
 
 @pytest.mark.parametrize("watts", [None, 1000])
-async def test_guided_enabled_zero_slew_requires_explicit_restore(runtime, watts):
+async def test_guided_enabled_zero_slew_automatically_preserves_rate(runtime, watts):
     _zero_slew_form(runtime, enabled=True)
     flow = OptionsFlowHandler(runtime.coordinator.config_entry)
     flow.hass = runtime.coordinator.hass
@@ -1771,13 +1755,8 @@ async def test_guided_enabled_zero_slew_requires_explicit_restore(runtime, watts
         if watts is None
         else await flow.async_step_export_limit_set({"limit_watts": watts})
     )
-    assert result["data_schema"]({"confirm": True})["restore_slew_rate"] is False
+    assert result["data_schema"]({"confirm": True}) == {"confirm": True}
     result = await flow.async_step_export_limit_confirm({"confirm": True})
-    assert result["errors"]["base"] == "export_limit_changed"
-    runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
-    result = await flow.async_step_export_limit_confirm(
-        {"confirm": True, "restore_slew_rate": True}
-    )
     assert result["step_id"] == "export_limit_submitted"
     assert runtime.coordinator.client.async_set_export_limit.await_args.args[1:] == (
         watts,
@@ -1798,10 +1777,8 @@ async def test_guided_disable_preserves_gateway_slew_despite_saved_override(runt
     await flow.async_step_export_limit()
     result = await flow.async_step_export_limit_disable()
     assert result["description_placeholders"]["requested_slew"] == "6980.0"
-    assert result["data_schema"]({"confirm": True})["restore_slew_rate"] is False
-    await flow.async_step_export_limit_confirm(
-        {"confirm": True, "restore_slew_rate": True}
-    )
+    assert result["data_schema"]({"confirm": True}) == {"confirm": True}
+    await flow.async_step_export_limit_confirm({"confirm": True})
     assert runtime.coordinator.client.async_set_export_limit.await_args.args[1:] == (
         None,
         6980.0,
@@ -1827,3 +1804,339 @@ async def test_saved_pending_intent_published_before_write(runtime):
     await runtime.async_apply(0, confirm=True)
     assert observations[-1]["request_status"] == "confirmed"
     assert observations[-1]["requested_watts"] is None
+
+
+@pytest.mark.parametrize("watts", [0, 1000, None])
+@pytest.mark.parametrize("caller", ["selector", "guided", "runtime"])
+async def test_zero_default_enables_and_disables_through_shared_validation(
+    runtime, watts, caller
+):
+    """Both UI paths and service runtime preserve the rate without extra opt-in."""
+    from custom_components.enphase_ev.const import OPT_EXPORT_LIMIT_DEFAULT_WATTS
+    from custom_components.enphase_ev.select import ExportLimitSelect
+
+    settings, fields = _zero_slew_form(runtime, enabled=watts is None)
+    client = runtime.coordinator.client
+    # Reconciliation must submit a token acquired after the identity read.
+    refreshed_fields = [
+        (key, "fresh-token" if key == "authenticity_token" else value)
+        for key, value in fields
+    ]
+    if caller == "guided":
+        flow = OptionsFlowHandler(runtime.coordinator.config_entry)
+        flow.hass = runtime.coordinator.hass
+        await flow.async_step_export_limit()
+        result = (
+            await flow.async_step_export_limit_disable()
+            if watts is None
+            else await flow.async_step_export_limit_set({"limit_watts": watts})
+        )
+        assert result["data_schema"]({"confirm": True}) == {"confirm": True}
+    client.async_get_export_limit_form.side_effect = [fields, refreshed_fields]
+    if caller == "selector":
+        entry = runtime.coordinator.config_entry
+        runtime.coordinator.hass.config_entries.async_update_entry(
+            entry, options={**entry.options, OPT_EXPORT_LIMIT_DEFAULT_WATTS: watts or 0}
+        )
+        await ExportLimitSelect(runtime.coordinator).async_select_option(
+            "disable_limit" if watts is None else "enable_limit"
+        )
+    elif caller == "guided":
+        result = await flow.async_step_export_limit_confirm({"confirm": True})
+        assert result["step_id"] == "export_limit_submitted"
+    else:
+        await runtime.async_apply(watts, confirm=True)
+    client.async_set_export_limit.assert_awaited_once_with(
+        refreshed_fields, watts, 6980.0
+    )
+    client.devices_details.assert_awaited_once_with("envoy")
+    assert runtime.pending["slew"] == 6980.0
+    assert runtime.request_status == "pending"
+    settings["data"]["gateway_settings"][0]["pel_settings_infos"].update(
+        enable=watts is not None,
+        export_limit=True,
+        reference_value=3,
+        free_limit_value=watts or 0,
+    )
+    await runtime.async_refresh()
+    assert runtime.request_status == "confirmed"
+    assert runtime.pending is None
+
+
+@pytest.mark.parametrize("change", ["gateway", "rate", "watts", "dynamic"])
+async def test_automatic_reconciliation_rejects_settings_changed_during_identity_read(
+    runtime, change
+):
+    settings, _ = _zero_slew_form(runtime)
+    changed = payload(
+        enable=False,
+        export_limit=False,
+        reference_value=1,
+        free_limit_value=0,
+        slew_rate=6980,
+    )
+    changed["data"]["gateway_settings"][0]["device_id"] = "300"
+    record = changed["data"]["gateway_settings"][0]
+    if change == "gateway":
+        record["device_id"] = "400"
+        runtime.coordinator.client.devices_details.return_value["envoys"][0]["id"] = 400
+    else:
+        record["pel_settings_infos"].update(
+            {
+                "rate": {"slew_rate": 7000},
+                "watts": {"free_limit_value": 5},
+                "dynamic": {"enable_dynamic_limiting": True},
+            }[change]
+        )
+    runtime.coordinator.client.async_get_export_limit_settings.side_effect = [
+        settings,
+        changed,
+    ]
+    with pytest.raises(ServiceValidationError) as raised:
+        await runtime.async_apply(0, confirm=True)
+    assert raised.value.translation_key == "export_limit_changed"
+    runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
+    runtime._store.async_save.assert_not_awaited()
+
+
+async def test_automatic_reconciliation_rechecks_fresh_form(runtime):
+    _, fields = _zero_slew_form(runtime)
+    changed_fields = [
+        (key, "7000" if key == "info_pel_settings_info[slew_rate]" else value)
+        for key, value in fields
+    ]
+    runtime.coordinator.client.async_get_export_limit_form.side_effect = [
+        fields,
+        changed_fields,
+    ]
+    with pytest.raises(ServiceValidationError) as raised:
+        await runtime.async_apply(0, confirm=True)
+    assert raised.value.translation_key == "export_limit_mismatch"
+    runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
+    runtime._store.async_save.assert_not_awaited()
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+@pytest.mark.parametrize("rate", [0, -1])
+async def test_automatic_reconciliation_rejects_nonpositive_gateway_rate(
+    runtime, enabled, rate
+):
+    settings, _ = _zero_slew_form(runtime, enabled=enabled)
+    settings["data"]["gateway_settings"][0]["pel_settings_infos"]["slew_rate"] = rate
+    with pytest.raises(ServiceValidationError) as raised:
+        await runtime.async_apply(1000, confirm=True)
+    assert raised.value.translation_key == "export_limit_unavailable"
+    runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
+
+
+@pytest.mark.parametrize("initial_override,new_override", [(None, 7000), (12.25, None)])
+async def test_confirmation_submits_the_slew_rate_shown_before_defaults_change(
+    runtime, initial_override, new_override
+):
+    """A later defaults edit must not change a rate the user has already reviewed."""
+    from custom_components.enphase_ev.const import OPT_EXPORT_LIMIT_SLEW_RATE
+
+    entry = runtime.coordinator.config_entry
+    options = dict(entry.options)
+    if initial_override is not None:
+        options[OPT_EXPORT_LIMIT_SLEW_RATE] = initial_override
+    runtime.coordinator.hass.config_entries.async_update_entry(entry, options=options)
+    expected_rate = 6000.0 if initial_override is None else initial_override
+    flow = OptionsFlowHandler(entry)
+    flow.hass = runtime.coordinator.hass
+    await flow.async_step_export_limit()
+    result = await flow.async_step_export_limit_set({"limit_watts": 0})
+    assert result["description_placeholders"]["requested_slew"] == str(expected_rate)
+    if new_override is None:
+        options.pop(OPT_EXPORT_LIMIT_SLEW_RATE)
+    else:
+        options[OPT_EXPORT_LIMIT_SLEW_RATE] = new_override
+    runtime.coordinator.hass.config_entries.async_update_entry(entry, options=options)
+    result = await flow.async_step_export_limit_confirm({"confirm": True})
+    assert result["step_id"] == "export_limit_submitted"
+    assert runtime.coordinator.client.async_set_export_limit.await_args.args[1:] == (
+        0,
+        expected_rate,
+    )
+
+
+async def test_reconfirmation_refreshes_the_displayed_gateway_slew(runtime):
+    flow = OptionsFlowHandler(runtime.coordinator.config_entry)
+    flow.hass = runtime.coordinator.hass
+    await flow.async_step_export_limit()
+    result = await flow.async_step_export_limit_set({"limit_watts": 0})
+    assert result["description_placeholders"]["requested_slew"] == "6000.0"
+    client = runtime.coordinator.client
+    client.async_get_export_limit_settings.return_value = payload(slew_rate=7000)
+    client.async_get_export_limit_form.return_value = parse_form(
+        form().replace('value="6000"', 'value="7000"'), "123"
+    )
+    result = await flow.async_step_export_limit_confirm({"confirm": True})
+    assert result["errors"]["base"] == "export_limit_changed"
+    assert result["description_placeholders"]["requested_slew"] == "7000.0"
+    client.async_set_export_limit.assert_not_awaited()
+    result = await flow.async_step_export_limit_confirm({"confirm": True})
+    assert result["step_id"] == "export_limit_submitted"
+    assert client.async_set_export_limit.await_args.args[1:] == (0, 7000.0)
+
+
+async def test_switching_confirmation_action_discards_previous_rate_override(runtime):
+    from custom_components.enphase_ev.const import OPT_EXPORT_LIMIT_SLEW_RATE
+
+    entry = runtime.coordinator.config_entry
+    runtime.coordinator.hass.config_entries.async_update_entry(
+        entry, options={**entry.options, OPT_EXPORT_LIMIT_SLEW_RATE: 12.25}
+    )
+    flow = OptionsFlowHandler(entry)
+    flow.hass = runtime.coordinator.hass
+    await flow.async_step_export_limit()
+    result = await flow.async_step_export_limit_set({"limit_watts": 0})
+    assert result["description_placeholders"]["requested_slew"] == "12.25"
+    result = await flow.async_step_export_limit_disable()
+    assert result["description_placeholders"]["requested_slew"] == "6000.0"
+    await flow.async_step_export_limit_confirm({"confirm": True})
+    assert runtime.coordinator.client.async_set_export_limit.await_args.args[1:] == (
+        None,
+        6000.0,
+    )
+
+
+@pytest.mark.parametrize("watts", [0, 1000, None])
+async def test_service_zero_slew_reconciliation_serializes_one_safe_write(
+    runtime, watts
+):
+    """Exercise real HA service routing and the API serializer, mocking only I/O."""
+    from urllib.parse import parse_qs
+
+    from homeassistant.config_entries import ConfigEntryState
+
+    from custom_components.enphase_ev.services import async_setup_services
+
+    _, fields = _zero_slew_form(runtime, enabled=watts is None)
+    client = runtime.coordinator.client
+    client.async_get_export_limit_form.side_effect = [
+        fields,
+        [
+            (key, "fresh-token" if key == "authenticity_token" else value)
+            for key, value in fields
+        ],
+    ]
+    api = EnphaseEVClient(SimpleNamespace(), "123", "token", "cookie")
+    api._text_response = AsyncMock(
+        return_value=SimpleNamespace(status=200, location=None, text="")
+    )
+    client.async_set_export_limit = api.async_set_export_limit
+    entry = runtime.coordinator.config_entry
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
+    hass = runtime.coordinator.hass
+    async_setup_services(hass)
+    response = await hass.services.async_call(
+        DOMAIN,
+        "disable_export_limit" if watts is None else "set_export_limit",
+        {
+            "config_entry_id": entry.entry_id,
+            **({"limit_watts": watts} if watts is not None else {}),
+        },
+        blocking=True,
+        return_response=True,
+    )
+    assert response["request_status"] == "pending"
+    api._text_response.assert_awaited_once()
+    call = api._text_response.await_args
+    assert call.args == (
+        "PUT",
+        "https://enlighten.enphaseenergy.com/site_pel_settings/123",
+    )
+    body = parse_qs(call.kwargs["data"])
+    assert body["authenticity_token"] == ["fresh-token"]
+    assert body["info_pel_settings_info[slew_rate]"] == ["6980.0"]
+    assert body["info_pel_settings_info[enable_dynamic_limiting]"] == [
+        "disable_settings" if watts is None else "false"
+    ]
+    if watts is not None:
+        assert body["info_pel_settings_info[free_limit_value]"] == [str(watts)]
+        assert body["info_pel_settings_info[export_limit]"] == ["true"]
+        assert body["info_pel_settings_info[reference_value]"] == ["3"]
+    assert call.kwargs["allow_replay"] is False
+    assert call.kwargs["allow_reauth"] is False
+
+
+async def test_zero_default_confirmation_preserves_shown_rate_after_defaults_edit(
+    runtime,
+):
+    from custom_components.enphase_ev.const import OPT_EXPORT_LIMIT_SLEW_RATE
+
+    _zero_slew_form(runtime)
+    entry = runtime.coordinator.config_entry
+    flow = OptionsFlowHandler(entry)
+    flow.hass = runtime.coordinator.hass
+    await flow.async_step_export_limit()
+    result = await flow.async_step_export_limit_set({"limit_watts": 0})
+    assert result["description_placeholders"]["requested_slew"] == "6980.0"
+    runtime.coordinator.hass.config_entries.async_update_entry(
+        entry, options={**entry.options, OPT_EXPORT_LIMIT_SLEW_RATE: 6000}
+    )
+    result = await flow.async_step_export_limit_confirm({"confirm": True})
+    assert result["step_id"] == "export_limit_submitted"
+    assert runtime.coordinator.client.async_set_export_limit.await_args.args[1:] == (
+        0,
+        6980.0,
+    )
+
+
+@pytest.mark.parametrize("stage", ["settings", "identity", "form"])
+@pytest.mark.parametrize("failure", ["timeout", "session_expired", "cancelled"])
+async def test_reconciliation_preflight_failure_never_sends_or_persists_intent(
+    runtime, stage, failure
+):
+    """Failures in the extra read/form cycle must remain entirely read-only."""
+    from custom_components.enphase_ev.api_client.errors import ActivationSessionExpired
+
+    settings, fields = _zero_slew_form(runtime)
+    client = runtime.coordinator.client
+    error = {
+        "timeout": TimeoutError(),
+        "session_expired": ActivationSessionExpired("expired"),
+        "cancelled": asyncio.CancelledError(),
+    }[failure]
+    if stage == "settings":
+        client.async_get_export_limit_settings.side_effect = [settings, error]
+    elif stage == "identity":
+        client.devices_details.side_effect = error
+    else:
+        client.async_get_export_limit_form.side_effect = [fields, error]
+    with patch.object(
+        type(runtime.coordinator.config_entry), "async_start_reauth"
+    ) as reauth:
+        if failure == "cancelled":
+            with pytest.raises(asyncio.CancelledError):
+                await runtime.async_apply(0, confirm=True)
+        else:
+            with pytest.raises(ServiceValidationError) as raised:
+                await runtime.async_apply(0, confirm=True)
+            assert raised.value.translation_key == (
+                "export_limit_session_expired"
+                if failure == "session_expired"
+                else "export_limit_unavailable"
+            )
+        if failure == "session_expired":
+            reauth.assert_called_once_with(runtime.coordinator.hass)
+            assert runtime.snapshot is None
+        else:
+            reauth.assert_not_called()
+    assert runtime.pending is None
+    client.async_set_export_limit.assert_not_awaited()
+    runtime._store.async_save.assert_not_awaited()
+
+
+async def test_reconciliation_accepts_fresh_form_when_zero_default_disappears(runtime):
+    """A freshly matching form is valid even if the earlier form used zero."""
+    _, fields = _zero_slew_form(runtime)
+    refreshed_fields = [
+        (key, "6980" if key == "info_pel_settings_info[slew_rate]" else value)
+        for key, value in fields
+    ]
+    client = runtime.coordinator.client
+    client.async_get_export_limit_form.side_effect = [fields, refreshed_fields]
+    await runtime.async_apply(0, confirm=True)
+    client.async_set_export_limit.assert_awaited_once_with(refreshed_fields, 0, 6980.0)
