@@ -491,6 +491,9 @@
     "export_limit_changed": {
       "message": "Konfigurace se změnila. Zkontrolujte aktualizované nastavení a znovu potvrďte."
     },
+    "export_limit_mismatch": {
+      "message": "Instalační formulář Enphase neodpovídá nastavení brány. Obnovte nastavení a zkuste to znovu."
+    },
     "export_limit_pending": {
       "message": "Čeká se na potvrzení konfigurace. Před další změnou obnovte stav."
     },
@@ -855,8 +858,7 @@
         "title": "Limit přetoků",
         "description": "Aktuální nastavení: **{current}**\n\nPožadované nastavení: **{requested}**\n\nRychlost změny (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Potvrdit tuto změnu",
-          "restore_slew_rate": "Obnovit rychlost změny z brány"
+          "confirm": "Potvrdit tuto změnu"
         }
       },
       "export_limit_submitted": {
@@ -905,6 +907,7 @@
       "export_limit_unavailable": "Limit přetoků není dostupný. Je vyžadován přístup instalátora a podporovaná konfigurace s jedinou bránou.",
       "export_limit_invalid": "Zadejte celé watty od 0 do 100000.",
       "export_limit_changed": "Konfigurace se změnila. Zkontrolujte aktualizované nastavení a znovu potvrďte.",
+      "export_limit_mismatch": "Instalační formulář Enphase neodpovídá nastavení brány. Obnovte nastavení a zkuste to znovu.",
       "export_limit_pending": "Čeká se na potvrzení konfigurace. Před další změnou obnovte stav.",
       "export_limit_disabled": "Povolit ovládání limitu přetoků (Funkce → Pokročilé funkce).",
       "export_limit_confirmation": "Potvrdit tuto změnu",

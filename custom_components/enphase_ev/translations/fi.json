@@ -491,6 +491,9 @@
     "export_limit_changed": {
       "message": "Asetukset muuttuivat. Tarkista päivitetyt asetukset ja vahvista uudelleen."
     },
+    "export_limit_mismatch": {
+      "message": "Enphasen asentajan lomake ei vastaa yhdyskäytävän asetuksia. Päivitä asetukset ja yritä uudelleen."
+    },
     "export_limit_pending": {
       "message": "Odotetaan asetusten vahvistusta. Päivitä tila ennen uutta muutosta."
     },
@@ -855,8 +858,7 @@
         "title": "Syöttöraja",
         "description": "Nykyinen asetus: **{current}**\n\nPyydetty asetus: **{requested}**\n\nMuutosnopeus (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Vahvista tämä muutos",
-          "restore_slew_rate": "Palauta muutosnopeus yhdyskäytävästä"
+          "confirm": "Vahvista tämä muutos"
         }
       },
       "export_limit_submitted": {
@@ -905,6 +907,7 @@
       "export_limit_unavailable": "Syöttöraja ei ole käytettävissä. Tarvitaan asentajan käyttöoikeus ja tuettu yhden yhdyskäytävän kokoonpano.",
       "export_limit_invalid": "Anna kokonaisluku watteina väliltä 0–100000.",
       "export_limit_changed": "Asetukset muuttuivat. Tarkista päivitetyt asetukset ja vahvista uudelleen.",
+      "export_limit_mismatch": "Enphasen asentajan lomake ei vastaa yhdyskäytävän asetuksia. Päivitä asetukset ja yritä uudelleen.",
       "export_limit_pending": "Odotetaan asetusten vahvistusta. Päivitä tila ennen uutta muutosta.",
       "export_limit_disabled": "Ota syöttörajan ohjaus käyttöön (Ominaisuudet → Lisäominaisuudet).",
       "export_limit_confirmation": "Vahvista tämä muutos",

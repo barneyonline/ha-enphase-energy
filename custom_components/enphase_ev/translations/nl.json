@@ -491,6 +491,9 @@
     "export_limit_changed": {
       "message": "Configuratie gewijzigd. Controleer de bijgewerkte instellingen en bevestig opnieuw."
     },
+    "export_limit_mismatch": {
+      "message": "Het installatieformulier van Enphase komt niet overeen met de gatewayinstellingen. Vernieuw de instellingen en probeer het opnieuw."
+    },
     "export_limit_pending": {
       "message": "Wachten op bevestiging van de configuratie. Vernieuw de status voordat u nog een wijziging indient."
     },
@@ -855,8 +858,7 @@
         "title": "Terugleverlimiet",
         "description": "Huidige instelling: **{current}**\n\nAangevraagde instelling: **{requested}**\n\nVeranderingssnelheid (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Deze wijziging bevestigen",
-          "restore_slew_rate": "Herstel snelheid van gateway"
+          "confirm": "Deze wijziging bevestigen"
         }
       },
       "export_limit_submitted": {
@@ -905,6 +907,7 @@
       "export_limit_unavailable": "Terugleverlimiet niet beschikbaar. Installateurstoegang en een ondersteunde configuratie met één gateway zijn vereist.",
       "export_limit_invalid": "Voer gehele watts in van 0 tot 100000.",
       "export_limit_changed": "Configuratie gewijzigd. Controleer de bijgewerkte instellingen en bevestig opnieuw.",
+      "export_limit_mismatch": "Het installatieformulier van Enphase komt niet overeen met de gatewayinstellingen. Vernieuw de instellingen en probeer het opnieuw.",
       "export_limit_pending": "Wachten op bevestiging van de configuratie. Vernieuw de status voordat u nog een wijziging indient.",
       "export_limit_disabled": "Bediening voor terugleverlimieten inschakelen (Functies → Geavanceerde functies).",
       "export_limit_confirmation": "Deze wijziging bevestigen",

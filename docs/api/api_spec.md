@@ -5734,8 +5734,12 @@ requested settings remain separate attributes. Runtime readback uses the configu
 fast polling interval for 10 minutes, then raises a repair warning and uses the
 configured standard interval without repeating the write.
 PEL writes reject incomplete or ambiguous live forms and require their current
-mode, watts, and slew rate to match the fresh gateway readback. Required controls
-must occur once; unrelated repeated successful controls are preserved.
+mode, watts, and slew rate to match the fresh gateway readback. The sole automatic
+exception is a zero form slew-rate default: when the requested rate preserves the
+positive gateway rate and all other settings match, the runtime independently
+verifies the current gateway identity, checks that the snapshot is unchanged,
+and validates a newly fetched form before submitting. Required controls must
+occur once; unrelated repeated successful controls are preserved.
 Integration-session writes still require live validation. Reported write verification means
 configuration readback in that investigation, not physical export-ceiling
 verification. Initial feature policy requires installer access; these browser
@@ -5925,14 +5929,16 @@ headers redirected this route to `/public/not_found` despite valid installer
 access; HTML headers returned HTTP 200 and the expected form. The disabled form
 retained `enable_dynamic_limiting=false`, `export_limit=false`, and
 `reference_value=1`. Its slew rate differed from current gateway readback, so
-ordinary writes remain blocked by the form/readback consistency check; no write
-was performed during this verification. The guided confirmation flow may
-explicitly restore this zero form default from a positive gateway slew rate only
-while limiting is disabled and non-dynamic. It requires an independently verified
-single current gateway, an unchanged expected snapshot, matching remaining form
-settings, and no requested slew override. The preserved rate is displayed before
-confirmation and included in the single submission. Nonzero disagreements and
-service/selector calls retain the strict consistency check.
+no write was performed during this verification. The integration now automatically
+restores that zero form default from the positive gateway slew rate when enabling,
+changing, or disabling a non-dynamic limit, including service and selector calls.
+It requires an independently verified single current gateway, unchanged settings
+across the identity read, matching remaining form settings, and a requested rate
+that preserves the gateway rate. The guided flow displays and freezes the
+requested rate before confirmation; changes to saved defaults cannot alter the
+rate being confirmed. A changed gateway snapshot requires a new review. Nonzero
+form disagreements and requested rate overrides that differ from the gateway
+remain blocked when the form supplies a zero default.
 
 Response: authenticated HTML form containing `authenticity_token`, hidden fields,
 and `info_pel_settings_info[...]` controls. There is no gateway selector; the
@@ -6028,8 +6034,9 @@ enabled form marked both production/export radios and both percentage/absolute
 reference radios as checked. Browser radio-group semantics select the last
 checked control; parsing must reproduce that selection without accepting
 duplicate hidden or other successful controls. The form continued to show a
-zero slew rate while limiting was enabled, so explicit gateway-rate restoration
-is needed for disablement as well as enablement on this site.
+zero slew rate while limiting was enabled, so gateway-rate restoration is needed
+for disablement as well as enablement on this site. The shared runtime now handles
+this restoration automatically under the checks described in 2.30.3.
 
 The form can display a zero slew-rate default inconsistent with gateway readback. Frontend validation requires a positive value, including on disablement. It uses `parseFloat`, checks for NaN and nonpositive input, normalizes negative input and rounds excess decimal places to two. The slew input itself has `min="0"`, `step="0.01"`, and no maximum; the separate
 script enforces positivity. Other UI inputs: `limit_value` has minimum 0,

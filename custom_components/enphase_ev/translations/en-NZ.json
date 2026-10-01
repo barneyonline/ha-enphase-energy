@@ -491,6 +491,9 @@
     "export_limit_changed": {
       "message": "Configuration changed. Review the updated settings and confirm again."
     },
+    "export_limit_mismatch": {
+      "message": "Enphase's installer form disagrees with the gateway settings. Refresh the settings and try again."
+    },
     "export_limit_pending": {
       "message": "Awaiting configuration confirmation. Refresh status before submitting another change."
     },
@@ -855,8 +858,7 @@
         "title": "Export Limit",
         "description": "Current setting: **{current}**\n\nRequested setting: **{requested}**\n\nSlew rate (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Confirm this change",
-          "restore_slew_rate": "Restore slew rate from gateway"
+          "confirm": "Confirm this change"
         }
       },
       "export_limit_submitted": {
@@ -905,6 +907,7 @@
       "export_limit_unavailable": "Export Limit is unavailable. Installer access and a supported single-gateway configuration are required.",
       "export_limit_invalid": "Enter whole-number watts from 0 to 100000.",
       "export_limit_changed": "Configuration changed. Review the updated settings and confirm again.",
+      "export_limit_mismatch": "Enphase's installer form disagrees with the gateway settings. Refresh the settings and try again.",
       "export_limit_pending": "Awaiting configuration confirmation. Refresh status before submitting another change.",
       "export_limit_disabled": "Enable Export Limit controls (Features → Advanced Features).",
       "export_limit_confirmation": "Confirm this change",

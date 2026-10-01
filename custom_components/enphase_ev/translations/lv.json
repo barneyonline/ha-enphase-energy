@@ -491,6 +491,9 @@
     "export_limit_changed": {
       "message": "Konfigurācija ir mainījusies. Pārskatiet atjauninātos iestatījumus un apstipriniet vēlreiz."
     },
+    "export_limit_mismatch": {
+      "message": "Enphase uzstādītāja veidlapa neatbilst vārtejas iestatījumiem. Atsvaidziniet iestatījumus un mēģiniet vēlreiz."
+    },
     "export_limit_pending": {
       "message": "Gaida konfigurācijas apstiprinājumu. Pirms citas izmaiņas atjauniniet statusu."
     },
@@ -855,8 +858,7 @@
         "title": "Eksporta ierobežojums",
         "description": "Pašreizējais iestatījums: **{current}**\n\nPieprasītais iestatījums: **{requested}**\n\nIzmaiņu ātrums (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Apstiprināt šo izmaiņu",
-          "restore_slew_rate": "Atjaunot ātrumu no vārtejas"
+          "confirm": "Apstiprināt šo izmaiņu"
         }
       },
       "export_limit_submitted": {
@@ -905,6 +907,7 @@
       "export_limit_unavailable": "Eksporta ierobežojums nav pieejams. Nepieciešama uzstādītāja piekļuve un atbalstīta konfigurācija ar vienu vārteju.",
       "export_limit_invalid": "Ievadiet veselus vatus no 0 līdz 100000.",
       "export_limit_changed": "Konfigurācija ir mainījusies. Pārskatiet atjauninātos iestatījumus un apstipriniet vēlreiz.",
+      "export_limit_mismatch": "Enphase uzstādītāja veidlapa neatbilst vārtejas iestatījumiem. Atsvaidziniet iestatījumus un mēģiniet vēlreiz.",
       "export_limit_pending": "Gaida konfigurācijas apstiprinājumu. Pirms citas izmaiņas atjauniniet statusu.",
       "export_limit_disabled": "Iespējot eksporta ierobežojuma vadību (Funkcijas → Papildu funkcijas).",
       "export_limit_confirmation": "Apstiprināt šo izmaiņu",

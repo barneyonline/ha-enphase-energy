@@ -491,6 +491,9 @@
     "export_limit_changed": {
       "message": "A konfiguráció megváltozott. Ellenőrizze a frissített beállításokat, és erősítse meg újra."
     },
+    "export_limit_mismatch": {
+      "message": "Az Enphase telepítői űrlapja nem egyezik az átjáró beállításaival. Frissítse a beállításokat, és próbálja újra."
+    },
     "export_limit_pending": {
       "message": "A konfiguráció megerősítésére vár. Újabb módosítás előtt frissítse az állapotot."
     },
@@ -855,8 +858,7 @@
         "title": "Betáplálási korlát",
         "description": "Jelenlegi beállítás: **{current}**\n\nKért beállítás: **{requested}**\n\nVáltozási sebesség (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Módosítás megerősítése",
-          "restore_slew_rate": "Sebesség visszaállítása az átjáróról"
+          "confirm": "Módosítás megerősítése"
         }
       },
       "export_limit_submitted": {
@@ -905,6 +907,7 @@
       "export_limit_unavailable": "A betáplálási korlát nem érhető el. Telepítői hozzáférés és támogatott, egyetlen átjárós konfiguráció szükséges.",
       "export_limit_invalid": "Adjon meg egész wattértéket 0 és 100000 között.",
       "export_limit_changed": "A konfiguráció megváltozott. Ellenőrizze a frissített beállításokat, és erősítse meg újra.",
+      "export_limit_mismatch": "Az Enphase telepítői űrlapja nem egyezik az átjáró beállításaival. Frissítse a beállításokat, és próbálja újra.",
       "export_limit_pending": "A konfiguráció megerősítésére vár. Újabb módosítás előtt frissítse az állapotot.",
       "export_limit_disabled": "A betáplálási korlát vezérlésének engedélyezése (Funkciók → Speciális funkciók).",
       "export_limit_confirmation": "Módosítás megerősítése",

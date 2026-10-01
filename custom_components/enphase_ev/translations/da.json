@@ -491,6 +491,9 @@
     "export_limit_changed": {
       "message": "Konfigurationen er ændret. Kontrollér de opdaterede indstillinger, og bekræft igen."
     },
+    "export_limit_mismatch": {
+      "message": "Enphases installatørformular stemmer ikke overens med gatewayens indstillinger. Opdater indstillingerne, og prøv igen."
+    },
     "export_limit_pending": {
       "message": "Afventer bekræftelse af konfigurationen. Opdatér status før en ny ændring."
     },
@@ -855,8 +858,7 @@
         "title": "Eksportgrænse",
         "description": "Aktuel indstilling: **{current}**\n\nAnmodet indstilling: **{requested}**\n\nÆndringshastighed (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Bekræft denne ændring",
-          "restore_slew_rate": "Gendan ændringshastighed fra gateway"
+          "confirm": "Bekræft denne ændring"
         }
       },
       "export_limit_submitted": {
@@ -905,6 +907,7 @@
       "export_limit_unavailable": "Eksportgrænsen er utilgængelig. Installatøradgang og en understøttet konfiguration med én gateway kræves.",
       "export_limit_invalid": "Indtast hele watt fra 0 til 100000.",
       "export_limit_changed": "Konfigurationen er ændret. Kontrollér de opdaterede indstillinger, og bekræft igen.",
+      "export_limit_mismatch": "Enphases installatørformular stemmer ikke overens med gatewayens indstillinger. Opdater indstillingerne, og prøv igen.",
       "export_limit_pending": "Afventer bekræftelse af konfigurationen. Opdatér status før en ny ændring.",
       "export_limit_disabled": "Aktivér styring af eksportgrænser (Funktioner → Avancerede funktioner).",
       "export_limit_confirmation": "Bekræft denne ændring",

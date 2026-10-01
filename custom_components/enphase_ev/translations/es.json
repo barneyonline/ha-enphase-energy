@@ -491,6 +491,9 @@
     "export_limit_changed": {
       "message": "La configuración ha cambiado. Revise los ajustes y confirme de nuevo."
     },
+    "export_limit_mismatch": {
+      "message": "El formulario del instalador de Enphase no coincide con los ajustes de la puerta de enlace. Actualiza los ajustes e inténtalo de nuevo."
+    },
     "export_limit_pending": {
       "message": "Esperando confirmación de la configuración. Actualice el estado antes de otro cambio."
     },
@@ -855,8 +858,7 @@
         "title": "Límite de vertido",
         "description": "Configuración actual: **{current}**\n\nConfiguración solicitada: **{requested}**\n\nTasa de variación (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Confirmar este cambio",
-          "restore_slew_rate": "Restaurar la tasa desde la puerta de enlace"
+          "confirm": "Confirmar este cambio"
         }
       },
       "export_limit_submitted": {
@@ -905,6 +907,7 @@
       "export_limit_unavailable": "Límite de vertido no disponible. Se requiere acceso de instalador y una configuración compatible con una sola pasarela.",
       "export_limit_invalid": "Introduzca vatios enteros entre 0 y 100000.",
       "export_limit_changed": "La configuración ha cambiado. Revise los ajustes y confirme de nuevo.",
+      "export_limit_mismatch": "El formulario del instalador de Enphase no coincide con los ajustes de la puerta de enlace. Actualiza los ajustes e inténtalo de nuevo.",
       "export_limit_pending": "Esperando confirmación de la configuración. Actualice el estado antes de otro cambio.",
       "export_limit_disabled": "Activar controles del límite de vertido (Funciones → Funciones avanzadas).",
       "export_limit_confirmation": "Confirmar este cambio",
