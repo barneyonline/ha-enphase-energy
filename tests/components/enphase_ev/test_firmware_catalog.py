@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta
 import time
 from types import SimpleNamespace
@@ -10,9 +11,10 @@ from custom_components.enphase_ev import firmware_catalog
 
 
 class _FakeResponse:
-    def __init__(self, *, status: int, payload):
+    def __init__(self, *, status: int, payload, headers=None):
         self.status = status
         self._payload = payload
+        self.headers = headers
 
     async def __aenter__(self):
         return self
@@ -162,6 +164,86 @@ async def test_catalog_manager_lock_recheck_returns_cached_without_fetch(
 
     result = await manager.async_get_catalog()
     assert result == payload
+
+
+@pytest.mark.asyncio
+async def test_shared_catalog_acquisition_is_coalesced_and_detached(
+    hass, monkeypatch
+) -> None:
+    payload = {"schema_version": 1, "devices": {"envoy": {"versions": ["1.0"]}}}
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    class Response(_FakeResponse):
+        async def json(self, content_type=None):
+            entered.set()
+            await release.wait()
+            return await super().json(content_type)
+
+    session = _FakeSession([Response(status=200, payload=payload)])
+    monkeypatch.setattr(firmware_catalog, "async_get_clientsession", lambda _h: session)
+    first = firmware_catalog.get_firmware_catalog_manager(hass)
+    second = firmware_catalog.get_firmware_catalog_manager(hass)
+    assert first is second
+    request = asyncio.create_task(first.async_get_catalog(force_refresh=True))
+    await entered.wait()
+    joined = asyncio.create_task(second.async_get_catalog(force_refresh=True))
+    await asyncio.sleep(0)
+    release.set()
+    left, right = await asyncio.gather(request, joined)
+    assert left == right == payload
+    assert not session._actions
+    left["devices"]["envoy"]["versions"].clear()
+    payload["devices"].clear()
+    assert right["devices"]["envoy"]["versions"] == ["1.0"]
+    cached = first.cached_catalog
+    cached["devices"].clear()
+    assert (await second.async_get_catalog())["devices"]["envoy"]["versions"] == ["1.0"]
+
+
+def test_shared_catalog_is_scoped_to_home_assistant_and_url(hass) -> None:
+    first = firmware_catalog.get_firmware_catalog_manager(hass, url="https://a.invalid")
+    assert first is firmware_catalog.get_firmware_catalog_manager(
+        hass, url="https://a.invalid"
+    )
+    assert first is not firmware_catalog.get_firmware_catalog_manager(
+        hass, url="https://b.invalid"
+    )
+    other = SimpleNamespace(data={})
+    assert first is not firmware_catalog.get_firmware_catalog_manager(
+        other, url="https://a.invalid"
+    )
+    assert (
+        firmware_catalog.get_firmware_catalog_manager(SimpleNamespace()).cached_catalog
+        is None
+    )
+
+
+@pytest.mark.asyncio
+async def test_catalog_rate_limit_preserves_cache_and_cooldown_even_when_forced(
+    monkeypatch,
+) -> None:
+    clock = [100.0]
+    monkeypatch.setattr(
+        firmware_catalog, "time", SimpleNamespace(monotonic=lambda: clock[0])
+    )
+    payload = {"schema_version": 1, "devices": {"envoy": {}}}
+    session = _FakeSession(
+        [
+            _FakeResponse(status=200, payload=payload),
+            _FakeResponse(status=429, payload={}, headers={"Retry-After": "3600"}),
+            _FakeResponse(status=200, payload=payload),
+        ]
+    )
+    monkeypatch.setattr(firmware_catalog, "async_get_clientsession", lambda _h: session)
+    manager = firmware_catalog.FirmwareCatalogManager(SimpleNamespace())
+    await manager.async_get_catalog()
+    assert await manager.async_get_catalog(force_refresh=True) == payload
+    assert manager._expires_mono == 3700.0
+    assert await manager.async_get_catalog(force_refresh=True) == payload
+    assert len(session._actions) == 1
+    clock[0] = 3701.0
+    assert await manager.async_get_catalog(force_refresh=True) == payload
+    assert manager.status_snapshot()["using_stale"] is False
 
 
 def test_resolve_country_and_locale_priority() -> None:

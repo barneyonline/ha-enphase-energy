@@ -1,6 +1,8 @@
 """Ensure unchanged chargers cannot hide changes in other device families."""
 
 from datetime import datetime, timezone
+from dataclasses import fields
+import tracemalloc
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -15,11 +17,74 @@ from custom_components.enphase_ev.feature_snapshot import (
     _matches_frozen,
     capture_feature_snapshot,
 )
+from custom_components.enphase_ev.snapshot_helpers import freeze_snapshot_mapping
 from custom_components.enphase_ev.state_models import (
     BatteryState,
+    BatteryControlCapability,
     HeatpumpState,
     InventoryState,
 )
+
+
+def test_populated_capabilities_reuse_detached_family_snapshot():
+    battery, heatpump, inventory = BatteryState(), HeatpumpState(), InventoryState()
+    battery._battery_cfg_control = BatteryControlCapability(show=True, enabled=True)
+    battery._battery_dtg_control = BatteryControlCapability(locked=True)
+    first = capture_feature_snapshot(battery, heatpump, inventory)
+    second = capture_feature_snapshot(battery, heatpump, inventory, first)
+    assert second.battery is first.battery
+    assert first.battery["_battery_cfg_control"]["show"] is True
+    with pytest.raises(TypeError):
+        first.battery["_battery_cfg_control"]["show"] = False
+    battery._battery_cfg_control = BatteryControlCapability(show=True, enabled=False)
+    changed = capture_feature_snapshot(battery, heatpump, inventory, second)
+    assert changed.battery is not first.battery
+    assert changed.heatpump is first.heatpump
+
+
+def test_explicit_bookkeeping_fields_never_change_publication():
+    states = BatteryState(), HeatpumpState(), InventoryState()
+    first = capture_feature_snapshot(*states)
+    for state in states:
+        for item in fields(state):
+            if item.metadata.get("publication") is False:
+                setattr(state, item.name, object())
+    second = capture_feature_snapshot(*states, first)
+    assert second == first
+    assert second.battery is first.battery
+    assert second.heatpump is first.heatpump
+    assert second.inventory is first.inventory
+
+
+def test_changed_large_inventory_avoids_an_intermediate_mutable_copy():
+    """Publication allocation stays near one detached copy as inventory grows."""
+    battery, heatpump, inventory = BatteryState(), HeatpumpState(), InventoryState()
+    inventory._inverter_data = {
+        str(index): {"serial_number": str(index), "model": "IQ8", "power": 100.0}
+        for index in range(1000)
+    }
+
+    def measured(build):
+        tracemalloc.start()
+        try:
+            snapshot = build()
+            return snapshot, tracemalloc.get_traced_memory()[1]
+        finally:
+            tracemalloc.stop()
+
+    _, single_copy_peak = measured(
+        lambda: freeze_snapshot_mapping(inventory._inverter_data)
+    )
+    snapshot, publication_peak = measured(
+        lambda: capture_feature_snapshot(battery, heatpump, inventory)
+    )
+    # Allow the fixed-size other families and container bookkeeping, but not a
+    # second full-size inventory tree before the immutable result is built.
+    assert publication_peak < single_copy_peak * 1.25
+    inventory._inverter_data["0"]["power"] = 200.0
+    assert snapshot.inventory["_inverter_data"]["0"]["power"] == 100.0
+    with pytest.raises(TypeError):
+        snapshot.inventory["_inverter_data"]["0"]["power"] = 300.0
 
 
 def test_family_snapshots_detach_nested_mutations_and_reuse_unchanged_content():

@@ -186,7 +186,11 @@ async def test_endpoint_policy_rebuilt_after_authentication(family):
     session = _FakeSession(
         [
             _FakeResponse(status=401, json_body={}),
-            _FakeResponse(status=200, json_body={"data": {}}, text_body="telemetry"),
+            _FakeResponse(
+                status=200,
+                json_body={"data": {"slots": []} if family == "scheduler" else {}},
+                text_body="telemetry",
+            ),
         ]
     )
     client = api.EnphaseEVClient(

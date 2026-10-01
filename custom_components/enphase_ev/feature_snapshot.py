@@ -12,44 +12,15 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, fields, is_dataclass
 from types import MappingProxyType
 
-from .snapshot_helpers import freeze_snapshot_mapping
+from .snapshot_helpers import freeze_snapshot_value
 from .state_models import BatteryState, HeatpumpState, InventoryState
-
-_BOOKKEEPING_SUFFIXES = (
-    "_cache_until",
-    "_backoff_until",
-    "_last_success_mono",
-    "_last_success_utc",
-    "_last_write_mono",
-    "_authoritative_seen_mono",
-    "_payload",
-    "_payloads",
-    "_raw",
-)
-_BOOKKEEPING_FIELDS = frozenset(
-    {
-        "_battery_profile_write_lock",
-        "_battery_settings_write_lock",
-        "_battery_profile_recovery_restore_task",
-        "_inverter_parameter_success_mono",
-        "_heatpump_power_sample_history",
-        "_status_payload_cache",
-    }
-)
-_SEMANTIC_PAYLOADS = frozenset({"_battery_schedules_payload"})
 
 
 def _semantic_fields(
     model: type[BatteryState | HeatpumpState | InventoryState],
 ) -> tuple[str, ...]:
     return tuple(
-        item.name
-        for item in fields(model)
-        if item.name in _SEMANTIC_PAYLOADS
-        or (
-            item.name not in _BOOKKEEPING_FIELDS
-            and not item.name.endswith(_BOOKKEEPING_SUFFIXES)
-        )
+        item.name for item in fields(model) if item.metadata.get("publication", True)
     )
 
 
@@ -89,18 +60,24 @@ def _matches_frozen(value: object, frozen: object) -> bool:
 
 
 def _publication_value(value: object) -> object:
-    """Detach dataclass fields as well as containers at legacy manager boundaries."""
+    """Freeze dataclass fields and containers in one detached traversal."""
 
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
     if is_dataclass(value) and not isinstance(value, type):
-        return {
-            item.name: _publication_value(getattr(value, item.name))
-            for item in fields(value)
-        }
+        return MappingProxyType(
+            {
+                item.name: _publication_value(getattr(value, item.name))
+                for item in fields(value)
+            }
+        )
     if isinstance(value, Mapping):
-        return {key: _publication_value(item) for key, item in value.items()}
+        return MappingProxyType(
+            {key: _publication_value(item) for key, item in value.items()}
+        )
     if isinstance(value, (list, tuple)):
         return tuple(_publication_value(item) for item in value)
-    return value
+    return freeze_snapshot_value(value)
 
 
 def _capture_values(
@@ -109,7 +86,7 @@ def _capture_values(
     values = values or {}
     if _matches_frozen(values, previous):
         return previous
-    return freeze_snapshot_mapping(
+    return MappingProxyType(
         {key: _publication_value(value) for key, value in values.items()}
     )
 
@@ -122,7 +99,9 @@ def _capture(
     current = {name: getattr(state, name) for name in names}
     if _matches_frozen(current, previous):
         return previous
-    return freeze_snapshot_mapping(current)
+    return MappingProxyType(
+        {key: _publication_value(value) for key, value in current.items()}
+    )
 
 
 @dataclass(frozen=True, slots=True)

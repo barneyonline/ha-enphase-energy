@@ -490,6 +490,32 @@ def _registry_type_metadata_signature(
             continue
         normalized = normalized or _clean_optional_text(type_key) or ""
         ident = inventory_view.type_identifier(type_key)
+        device_info_getter = getattr(inventory_view, "type_device_info", None)
+        device_info = (
+            device_info_getter(type_key) if callable(device_info_getter) else None
+        )
+        if isinstance(device_info, dict):
+            # InventoryView caches this compact metadata independently of
+            # telemetry. Avoid rescanning every member for each scalar getter.
+            signature.append(
+                (
+                    normalized,
+                    ident,
+                    _clean_optional_text(inventory_view.type_label(type_key)),
+                    *(
+                        _clean_optional_text(device_info.get(key))
+                        for key in (
+                            "name",
+                            "model",
+                            "hw_version",
+                            "serial_number",
+                            "model_id",
+                            "sw_version",
+                        )
+                    ),
+                )
+            )
+            continue
         signature.append(
             (
                 normalized,

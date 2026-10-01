@@ -648,7 +648,8 @@ def test_summary_store_retry_after_helper_handles_naive_dates(monkeypatch) -> No
     store = SummaryStore(lambda: _DummySummaryClient())
 
     monkeypatch.setattr(
-        summary_mod, "parsedate_to_datetime", lambda _: datetime(2025, 1, 2)
+        "custom_components.enphase_ev.cloud_retry.parsedate_to_datetime",
+        lambda _: datetime(2025, 1, 2),
     )
     monkeypatch.setattr(summary_mod.dt_util, "utcnow", lambda: now)
 
@@ -670,7 +671,9 @@ def test_summary_store_retry_after_helper_handles_bad_dates(monkeypatch) -> None
     def _raise(_value: str) -> datetime:
         raise ValueError("bad date")
 
-    monkeypatch.setattr(summary_mod, "parsedate_to_datetime", _raise)
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.cloud_retry.parsedate_to_datetime", _raise
+    )
 
     delay = store._failure_backoff_delay(err, 1)  # noqa: SLF001
 

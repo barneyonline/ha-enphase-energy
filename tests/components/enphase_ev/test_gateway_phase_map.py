@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -292,6 +293,54 @@ async def test_inventory_refresh_runs_due_phase_map_inside_inventory_cache(
     await coord.inventory_runtime._async_refresh_devices_inventory()  # noqa: SLF001
 
     phase_fetcher.assert_awaited_once_with()
+    inventory_fetcher.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_phase_map_invalidates_cached_gateway_metadata_with_inventory_cached(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    _set_gateway_members(coord)
+    bucket = coord._type_device_buckets["envoy"]
+    bucket["devices"][0]["sw_version"] = "1.0"
+    bucket["devices"][1]["sw_version"] = "2.0"
+    old_phase_map = deepcopy(PHASE_MAP)
+    old_phase_map["GW-1"]["isPrimaryGateway"] = True
+    old_phase_map["GW-1"]["isDefaultGateway"] = True
+    old_phase_map["GW-2"]["isPrimaryGateway"] = False
+    old_phase_map["GW-2"]["isDefaultGateway"] = False
+    coord.inventory_runtime._set_shared_state_attr(
+        "_gateway_phase_map",
+        InventoryRuntime._normalize_gateway_phase_map(old_phase_map),
+    )
+    view = coord.inventory_view
+    before = view.type_device_info("envoy")
+    assert before["serial_number"] == "GW-1"
+    assert before["sw_version"] == "1.0"
+    phase_fetcher = AsyncMock(return_value=PHASE_MAP)
+    inventory_fetcher = AsyncMock()
+    coord.client = SimpleNamespace(
+        phase_map_multiple_envoy=phase_fetcher,
+        devices_inventory=inventory_fetcher,
+    )
+    coord.inventory_runtime._devices_inventory_cache_until = 1000.0
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.inventory_runtime.time.monotonic", lambda: 100.0
+    )
+    with patch.object(
+        view, "invalidate_device_metadata", wraps=view.invalidate_device_metadata
+    ) as invalidate:
+        await coord.inventory_runtime._async_refresh_devices_inventory()
+        after = view.type_device_info("envoy")
+        assert after["serial_number"] == "GW-2"
+        assert after["sw_version"] == "2.0"
+        assert after["model"] == "Gateway Two"
+        assert coord._type_device_buckets["envoy"] is bucket
+        invalidate.assert_called_once_with()
+        # An unchanged phase map extends its own cache without rebuilding metadata.
+        await coord.inventory_runtime._async_refresh_gateway_phase_map(force=True)
+        invalidate.assert_called_once_with()
     inventory_fetcher.assert_not_awaited()
 
 

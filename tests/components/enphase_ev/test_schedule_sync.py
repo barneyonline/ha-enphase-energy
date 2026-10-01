@@ -2815,3 +2815,219 @@ async def test_collection_write_rejects_newly_disabled_option_before_runtime_sto
     assert sync._slot_cache[RANDOM_SERIAL] == {"slot-1": _slot("slot-1")}
     assert sync._pending_patch_refresh_cancels == {}
     assert sync._pending_patch_refresh_tasks == {}
+
+
+@pytest.mark.parametrize(
+    "operation", ["update", "create", "delete", "toggle", "replace"]
+)
+@pytest.mark.parametrize("direct_read", [False, True])
+async def test_old_scheduler_read_cannot_overwrite_accepted_mutation(
+    hass, operation, direct_read
+):
+    """Read responses started before a write cannot undo its cache or version."""
+    entry = MockConfigEntry(domain=DOMAIN, data={"site_id": RANDOM_SITE_ID})
+    sync, client = await _setup_sync(
+        hass,
+        entry,
+        {"meta": {"serverTimeStamp": "initial"}, "slots": [_slot("slot-1")]},
+    )
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def old_read(*_args):
+        entered.set()
+        await release.wait()
+        return {"meta": {"serverTimeStamp": "obsolete"}, "slots": [_slot("slot-1")]}
+
+    client.get_schedules = AsyncMock(side_effect=old_read)
+    sync._schedule_post_patch_refresh = MagicMock()
+    read = asyncio.create_task(
+        sync._sync_serial(RANDOM_SERIAL) if direct_read else sync.async_refresh()
+    )
+    await entered.wait()
+    endpoint = {
+        "update": "patch_schedule",
+        "create": "create_schedule",
+        "delete": "delete_schedule",
+        "toggle": "patch_schedule_states",
+        "replace": "patch_schedules",
+    }[operation]
+    setattr(
+        client,
+        endpoint,
+        AsyncMock(
+            return_value={"meta": {"serverTimeStamp": "accepted"}, "data": "new-slot"}
+        ),
+    )
+    if operation in {"create", "update"}:
+        assert await sync.async_upsert_slot(
+            RANDOM_SERIAL,
+            _slot("new-slot" if operation == "create" else "slot-1", startTime="10:00"),
+        )
+    elif operation == "delete":
+        assert await sync.async_delete_slot(RANDOM_SERIAL, "slot-1")
+    elif operation == "toggle":
+        assert await sync.async_set_slot_enabled(RANDOM_SERIAL, "slot-1", False)
+    else:
+        assert await sync.async_replace_slots(RANDOM_SERIAL, [_slot("new-slot")])
+    expected = {
+        key: dict(value) for key, value in sync._slot_cache[RANDOM_SERIAL].items()
+    }
+    release.set()
+    await read
+    assert sync._slot_cache[RANDOM_SERIAL] == expected
+    assert sync._meta_cache[RANDOM_SERIAL] == "accepted"
+
+
+async def test_scheduler_mutations_serialize_same_charger_but_not_other_chargers(hass):
+    """Independent toggles merge the prior accepted state; another charger proceeds."""
+    entry = MockConfigEntry(domain=DOMAIN, data={"site_id": RANDOM_SITE_ID})
+    sync, client = await _setup_sync(
+        hass, entry, {"slots": [_slot("slot-1"), _slot("slot-2")]}
+    )
+    other_serial = "other-charger"
+    sync._slot_cache[other_serial] = {"other-slot": _slot("other-slot")}
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    calls = []
+
+    async def toggle(sn, *, slot_states):
+        calls.append((sn, dict(slot_states)))
+        if len(calls) == 1:
+            entered.set()
+            await release.wait()
+        return {}
+
+    client.patch_schedule_states = AsyncMock(side_effect=toggle)
+    sync._schedule_post_patch_refresh = MagicMock()
+    first = asyncio.create_task(
+        sync.async_set_slot_enabled(RANDOM_SERIAL, "slot-1", False)
+    )
+    await entered.wait()
+    second = asyncio.create_task(
+        sync.async_set_slot_enabled(RANDOM_SERIAL, "slot-2", False)
+    )
+    assert await sync.async_set_slot_enabled(other_serial, "other-slot", False)
+    assert len(calls) == 2
+    release.set()
+    assert await first
+    assert await second
+    assert calls[-1] == (RANDOM_SERIAL, {"slot-1": False, "slot-2": False})
+
+
+async def test_queued_scheduler_write_does_not_enter_restarted_lifecycle(hass):
+    entry = MockConfigEntry(domain=DOMAIN, data={"site_id": RANDOM_SITE_ID})
+    sync, client = await _setup_sync(hass, entry, {"slots": [_slot("slot-1")]})
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def delete(*_args):
+        entered.set()
+        await release.wait()
+        return {}
+
+    client.delete_schedule = AsyncMock(side_effect=delete)
+    first = asyncio.create_task(sync.async_delete_slot(RANDOM_SERIAL, "slot-1"))
+    await entered.wait()
+    second = asyncio.create_task(sync.async_delete_slot(RANDOM_SERIAL, "slot-1"))
+    await asyncio.sleep(0)
+    await sync.async_stop()
+    await sync.async_start()
+    release.set()
+    assert await first
+    assert await second is False
+    client.delete_schedule.assert_awaited_once()
+
+
+@pytest.mark.parametrize("stop", [False, True])
+async def test_post_patch_refresh_waits_for_active_scheduler_read(hass, stop):
+    entry = MockConfigEntry(domain=DOMAIN, data={"site_id": RANDOM_SITE_ID})
+    sync, client = await _setup_sync(hass, entry, {"slots": [_slot("slot-1")]})
+    client.get_schedules.reset_mock()
+    await sync._lock.acquire()
+    pending = asyncio.create_task(sync.async_refresh(reason="patch"))
+    await asyncio.sleep(0)
+    assert not pending.done()
+    if stop:
+        await sync.async_stop()
+    sync._lock.release()
+    await pending
+    assert client.get_schedules.await_count == (0 if stop else 1)
+
+
+async def test_scheduler_invalid_payload_retains_cache_and_valid_empty_clears_it(hass):
+    from custom_components.enphase_ev.api import InvalidPayloadError
+
+    entry = MockConfigEntry(domain=DOMAIN, data={"site_id": RANDOM_SITE_ID})
+    sync, client = await _setup_sync(
+        hass,
+        entry,
+        {"meta": {"serverTimeStamp": "initial"}, "slots": [_slot("slot-1")]},
+    )
+    client.get_schedules = AsyncMock(side_effect=InvalidPayloadError("invalid slots"))
+    await sync.async_refresh()
+    assert set(sync._slot_cache[RANDOM_SERIAL]) == {"slot-1"}
+    assert sync._meta_cache[RANDOM_SERIAL] == "initial"
+    client.get_schedules = AsyncMock(return_value={"slots": []})
+    await sync.async_refresh()
+    assert sync._slot_cache[RANDOM_SERIAL] == {}
+
+
+@pytest.mark.parametrize(
+    ("operation", "admission"),
+    [
+        ("toggle", "stopped"),
+        ("update", "stopped"),
+        ("create", "stopped"),
+        ("replace", "stopped"),
+        ("delete", "stopped"),
+        ("toggle", "disabled"),
+        ("replace", "disabled"),
+    ],
+)
+async def test_schedule_mutation_helpers_reject_inactive_runtime_without_io(
+    hass, operation, admission
+):
+    """Internal mutation admission remains safe outside the public queue wrapper."""
+    entry = MockConfigEntry(domain=DOMAIN, data={"site_id": RANDOM_SITE_ID})
+    sync, client = await _setup_sync(
+        hass,
+        entry,
+        {"meta": {"serverTimeStamp": "initial"}, "slots": [_slot("slot-1")]},
+    )
+    endpoints = {
+        "toggle": "patch_schedule_states",
+        "update": "patch_schedule",
+        "create": "create_schedule",
+        "replace": "patch_schedules",
+        "delete": "delete_schedule",
+    }
+    request = AsyncMock()
+    setattr(client, endpoints[operation], request)
+    listener = MagicMock()
+    sync.async_add_listener(listener)
+    if admission == "stopped":
+        await sync.async_stop()
+    else:
+        hass.config_entries.async_update_entry(
+            entry, options={**entry.options, OPT_SCHEDULE_SYNC_ENABLED: False}
+        )
+        assert sync._stopping is False
+    if operation == "toggle":
+        accepted = await sync._async_set_slot_enabled(RANDOM_SERIAL, "slot-1", False)
+    elif operation == "update":
+        accepted = await sync._patch_slot(
+            RANDOM_SERIAL, "slot-1", _slot("slot-1", startTime="10:00")
+        )
+    elif operation == "create":
+        accepted = await sync._create_slot(RANDOM_SERIAL, _slot("new-slot"))
+    elif operation == "replace":
+        accepted = await sync._async_replace_slots(RANDOM_SERIAL, [_slot("new-slot")])
+    else:
+        accepted = await sync._async_delete_slot(RANDOM_SERIAL, "slot-1")
+    assert accepted is False
+    request.assert_not_awaited()
+    listener.assert_not_called()
+    assert sync._slot_cache[RANDOM_SERIAL] == {"slot-1": _slot("slot-1")}
+    assert sync._meta_cache[RANDOM_SERIAL] == "initial"
+    assert sync._pending_patch_refresh_cancels == {}

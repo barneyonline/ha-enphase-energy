@@ -47,6 +47,7 @@ from .runtime_helpers import (
     resolve_site_timezone_name,
 )
 from .scalar_helpers import sum_optional_values
+from .runtime_health import RuntimeAuthServices
 from .state_models import HeatpumpState, install_state_descriptors
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -136,6 +137,7 @@ class HeatpumpRuntime:
         self, coordinator: EnphaseCoordinator, *, state: HeatpumpState | None = None
     ) -> None:
         self.coordinator = coordinator
+        self.auth = RuntimeAuthServices(coordinator)
         self.inventory_state = coordinator.inventory_state
         self.heatpump_state = state if state is not None else coordinator.heatpump_state
 
@@ -394,7 +396,7 @@ class HeatpumpRuntime:
     async def _async_refresh_hems_support_preflight(
         self, *, force: bool = False
     ) -> None:
-        if self.coordinator._skip_hems_polling_due_to_auth_circuit(
+        if self.auth.skip_hems_polling_due_to_auth_circuit(
             endpoint="hems_support_preflight"
         ):
             return
@@ -419,7 +421,7 @@ class HeatpumpRuntime:
                 allow_reauth=False,
             )
         except Exception as err:  # noqa: BLE001
-            if self.coordinator._note_hems_auth_failure(
+            if self.auth.note_hems_auth_failure(
                 err,
                 endpoint="hems_support_preflight",
             ):
@@ -511,7 +513,7 @@ class HeatpumpRuntime:
 
         show_livestream = getattr(self.client, "show_livestream", None)
         if callable(show_livestream):
-            if self.coordinator._skip_hems_polling_due_to_auth_circuit(
+            if self.auth.skip_hems_polling_due_to_auth_circuit(
                 endpoint="show_livestream"
             ):
                 self._show_livestream_payload = None
@@ -525,7 +527,7 @@ class HeatpumpRuntime:
                     self._show_livestream_payload = None
                     self._heatpump_runtime_diagnostics_error = (
                         "HEMS auth backoff active"
-                        if self.coordinator._note_hems_auth_failure(
+                        if self.auth.note_hems_auth_failure(
                             err,
                             endpoint="show_livestream",
                         )
@@ -543,7 +545,7 @@ class HeatpumpRuntime:
                         self._show_livestream_payload = None
                     else:
                         self._show_livestream_payload = {"value": redacted_payload}
-        elif self.coordinator._skip_hems_polling_due_to_auth_circuit(
+        elif self.auth.skip_hems_polling_due_to_auth_circuit(
             endpoint="show_livestream"
         ):
             self._show_livestream_payload = None
@@ -575,7 +577,7 @@ class HeatpumpRuntime:
 
                 if callable(events_fetcher):
                     endpoint = f"{namespace}_events"
-                    if self.coordinator._skip_hems_polling_due_to_auth_circuit(
+                    if self.auth.skip_hems_polling_due_to_auth_circuit(
                         endpoint=endpoint
                     ):
                         payload_entry["error"] = "HEMS auth backoff active"
@@ -583,7 +585,7 @@ class HeatpumpRuntime:
                         try:
                             payload = await events_fetcher(uid)
                         except Exception as err:  # noqa: BLE001
-                            if self.coordinator._note_hems_auth_failure(
+                            if self.auth.note_hems_auth_failure(
                                 err,
                                 endpoint=endpoint,
                             ):
@@ -594,7 +596,7 @@ class HeatpumpRuntime:
                                     or err.__class__.__name__
                                 )
                         else:
-                            self.coordinator._note_hems_auth_success(endpoint=endpoint)
+                            self.auth.note_hems_auth_success(endpoint=endpoint)
                             # Event payloads can include opaque device links and
                             # identifiers.
                             redacted_payload = self._redact_battery_payload(payload)
@@ -721,14 +723,14 @@ class HeatpumpRuntime:
         ):
             return
 
-        if self.coordinator._skip_hems_polling_due_to_auth_circuit(
+        if self.auth.skip_hems_polling_due_to_auth_circuit(
             endpoint="hems_heatpump_state"
         ):
             self._mark_heatpump_runtime_state_auth_backoff(now=now)
             return
 
         await self._async_refresh_hems_support_preflight(force=force)
-        if self.coordinator._skip_hems_polling_due_to_auth_circuit(
+        if self.auth.skip_hems_polling_due_to_auth_circuit(
             endpoint="hems_heatpump_state"
         ):
             self._mark_heatpump_runtime_state_auth_backoff(now=now)
@@ -767,7 +769,7 @@ class HeatpumpRuntime:
                 timezone=self._site_timezone_name(),
             )
         except Exception as err:  # noqa: BLE001
-            if self.coordinator._note_hems_auth_failure(
+            if self.auth.note_hems_auth_failure(
                 err,
                 endpoint="hems_heatpump_state",
             ):
@@ -810,7 +812,7 @@ class HeatpumpRuntime:
         self._heatpump_runtime_state_using_stale = False
         self._heatpump_runtime_state_last_success_mono = now
         self._heatpump_runtime_state_last_success_utc = dt_util.utcnow()
-        self.coordinator._note_hems_auth_success(endpoint="hems_heatpump_state")
+        self.auth.note_hems_auth_success(endpoint="hems_heatpump_state")
 
     async def async_refresh_heatpump_runtime_state(
         self, *, force: bool = False
@@ -1715,7 +1717,7 @@ class HeatpumpRuntime:
 
         split_payload: object = None
         split_error: str | None = None
-        skip_split_for_auth = self.coordinator._skip_hems_polling_due_to_auth_circuit(
+        skip_split_for_auth = self.auth.skip_hems_polling_due_to_auth_circuit(
             endpoint="hems_energy_consumption"
         )
         if skip_split_for_auth:
@@ -1753,7 +1755,7 @@ class HeatpumpRuntime:
                     step="P1D",
                 )
             except Exception as err:  # noqa: BLE001
-                if self.coordinator._note_hems_auth_failure(
+                if self.auth.note_hems_auth_failure(
                     err,
                     endpoint="hems_energy_consumption",
                 ):
@@ -1770,9 +1772,7 @@ class HeatpumpRuntime:
                         or err.__class__.__name__
                     )
             else:
-                self.coordinator._note_hems_auth_success(
-                    endpoint="hems_energy_consumption"
-                )
+                self.auth.note_hems_auth_success(endpoint="hems_energy_consumption")
         elif callable(split_fetcher):
             split_error = split_error or "HEMS auth backoff active"
         else:

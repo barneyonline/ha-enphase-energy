@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import TYPE_CHECKING, Iterable
 
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
@@ -28,6 +29,20 @@ class InventoryView:
 
     def __init__(self, coordinator: EnphaseCoordinator) -> None:
         self.coordinator = coordinator
+        self._device_metadata_revision = 0
+        self._device_metadata_cache: dict[
+            str, tuple[object, object, int, object, DeviceInfo]
+        ] = {}
+
+    def invalidate_device_metadata(self) -> None:
+        """Advance the metadata revision after inventory acquisition or enrichment.
+
+        Membership can stay unchanged while firmware, models, or the preferred
+        gateway change. Keep this invalidation separate from topology signals.
+        """
+
+        self._device_metadata_revision += 1
+        self._device_metadata_cache.clear()
 
     @property
     def site_id(self) -> str:
@@ -764,6 +779,18 @@ class InventoryView:
         identifier = self.type_identifier(type_key)
         if identifier is None:
             return None
+        buckets = getattr(self.coordinator, "_type_device_buckets", None)
+        bucket = buckets.get(normalized) if isinstance(buckets, dict) else None
+        members = bucket.get("devices") if isinstance(bucket, dict) else None
+        cached = self._device_metadata_cache.get(normalized)
+        if (
+            cached is not None
+            and cached[0] is bucket
+            and cached[1] is members
+            and cached[2] == self._device_metadata_revision
+            and cached[3] == identifier
+        ):
+            return deepcopy(cached[4])
         label = self.type_label(type_key) or "Device"
         name = self.type_device_name(type_key) or label
         model = self.type_device_model(type_key) or label
@@ -790,7 +817,15 @@ class InventoryView:
             controller_mac = self._envoy_controller_mac()
             if controller_mac:
                 info_kwargs["connections"] = {(CONNECTION_NETWORK_MAC, controller_mac)}
-        return DeviceInfo(**info_kwargs)
+        info = DeviceInfo(**info_kwargs)
+        self._device_metadata_cache[normalized] = (
+            bucket,
+            members,
+            self._device_metadata_revision,
+            identifier,
+            info,
+        )
+        return deepcopy(info)
 
     def gateway_iq_energy_router_records(self) -> list[dict[str, object]]:
         records = self.coordinator.discovery_snapshot.gateway_iq_energy_router_records()

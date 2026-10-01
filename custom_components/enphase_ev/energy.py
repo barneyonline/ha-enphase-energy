@@ -9,10 +9,12 @@ from datetime import datetime, timedelta
 from datetime import timezone as _tz
 from typing import Callable, Iterable, Protocol
 
+import aiohttp
 from homeassistant.const import UnitOfPower
 from homeassistant.util import dt as dt_util
 
 from .api import SiteEnergyUnavailable
+from .cloud_retry import retry_after_delay
 from .log_redaction import redact_site_id, redact_text
 
 LIFETIME_DROP_JITTER_KWH = 0.02
@@ -95,6 +97,9 @@ class EnergyManager:
         self._site_energy_guard: dict[str, LifetimeGuardState] = {}
         self._site_energy_last_reset: dict[str, str | None] = {}
         self._site_energy_force_refresh = False
+        self._site_energy_refresh_lock = asyncio.Lock()
+        self._site_energy_completion_revision = 0
+        self._site_energy_invalidation_revision = 0
         self._lifetime_guard: dict[str, LifetimeGuardState] = {}
         self._service_available = True
         self._service_failures = 0
@@ -183,6 +188,7 @@ class EnergyManager:
 
     def _invalidate_site_energy_cache(self) -> None:
         """Drop the cached site energy payload."""
+        self._site_energy_invalidation_revision += 1
         self._site_energy_cache_ts = None
 
     def site_energy_refresh_due(self, *, force: bool = False) -> bool:
@@ -254,6 +260,8 @@ class EnergyManager:
         delay = max(
             SITE_ENERGY_FAILURE_BACKOFF_S, SITE_ENERGY_DEFAULT_INTERVAL_MIN * 60
         )
+        if isinstance(err, BaseException):
+            delay = max(delay, retry_after_delay(err) or 0.0)
         self._service_backoff_until = time.monotonic() + delay
         try:
             self._service_backoff_ends_utc = dt_util.utcnow() + timedelta(seconds=delay)
@@ -1021,7 +1029,19 @@ class EnergyManager:
         )
 
     async def _async_refresh_site_energy(self, *, force: bool = False) -> None:
+        """Serialize acquisition and coalesce callers waiting on the same read."""
+        completion = self._site_energy_completion_revision
+        async with self._site_energy_refresh_lock:
+            if completion != self._site_energy_completion_revision:
+                return
+            revision = self._site_energy_invalidation_revision
+            await self._async_refresh_site_energy_locked(force=force)
+            if revision == self._site_energy_invalidation_revision:
+                self._site_energy_completion_revision += 1
+
+    async def _async_refresh_site_energy_locked(self, *, force: bool) -> None:
         """Refresh lifetime energy cache with TTL enforcement."""
+        revision = self._site_energy_invalidation_revision
         force_refresh = force or self._site_energy_force_refresh
         self._site_energy_force_refresh = False
         now_mono = time.monotonic()
@@ -1056,6 +1076,8 @@ class EnergyManager:
             return
         except Exception as err:  # noqa: BLE001
             self._record_site_energy_fetch("request_error")
+            if isinstance(err, aiohttp.ClientResponseError) and err.status == 429:
+                self._note_service_unavailable(err)
             self._logger.debug(
                 "Failed to fetch lifetime energy for site %s: %s",
                 redact_site_id(self.site_id),
@@ -1113,6 +1135,9 @@ class EnergyManager:
                                 )
                             else:
                                 self._note_hems_lifetime_unavailable(None)
+        if revision != self._site_energy_invalidation_revision:
+            self._record_site_energy_fetch("superseded")
+            return
         parsed = self._aggregate_site_energy(payload)
         if parsed is None or not parsed[0]:
             self._record_site_energy_fetch("invalid_payload")
