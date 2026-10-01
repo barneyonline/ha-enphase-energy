@@ -146,10 +146,10 @@ tzdata==2026.3
 uart-devices==0.1.1
 ulid-transform==2.2.9
 unidiff==1.0.0
-urllib3==2.7.0
+urllib3==2.8.0
 usb-devices==0.5.1
 uv==0.12.5
-virtualenv==21.7.8
+virtualenv==21.7.13
 voluptuous==0.16.0
 webrtc-models==0.3.0
 yarl==1.24.5
