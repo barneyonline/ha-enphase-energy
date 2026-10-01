@@ -491,6 +491,9 @@
     "export_limit_changed": {
       "message": "A configuração mudou. Revise os ajustes atualizados e confirme novamente."
     },
+    "export_limit_mismatch": {
+      "message": "O formulário do instalador da Enphase não corresponde às configurações do gateway. Atualize as configurações e tente novamente."
+    },
     "export_limit_pending": {
       "message": "Aguardando confirmação da configuração. Atualize o estado antes de outra alteração."
     },
@@ -855,8 +858,7 @@
         "title": "Limite de injeção",
         "description": "Configuração atual: **{current}**\n\nConfiguração solicitada: **{requested}**\n\nTaxa de variação (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Confirmar esta alteração",
-          "restore_slew_rate": "Restaurar taxa do gateway"
+          "confirm": "Confirmar esta alteração"
         }
       },
       "export_limit_submitted": {
@@ -905,6 +907,7 @@
       "export_limit_unavailable": "Limite de injeção indisponível. São necessários acesso de instalador e uma configuração compatível com um único gateway.",
       "export_limit_invalid": "Insira watts inteiros de 0 a 100000.",
       "export_limit_changed": "A configuração mudou. Revise os ajustes atualizados e confirme novamente.",
+      "export_limit_mismatch": "O formulário do instalador da Enphase não corresponde às configurações do gateway. Atualize as configurações e tente novamente.",
       "export_limit_pending": "Aguardando confirmação da configuração. Atualize o estado antes de outra alteração.",
       "export_limit_disabled": "Ativar controles do limite de injeção (Recursos → Recursos avançados).",
       "export_limit_confirmation": "Confirmar esta alteração",

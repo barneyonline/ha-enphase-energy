@@ -491,6 +491,9 @@
     "export_limit_changed": {
       "message": "Configurazione modificata. Controlla le impostazioni aggiornate e conferma di nuovo."
     },
+    "export_limit_mismatch": {
+      "message": "Il modulo installatore di Enphase non corrisponde alle impostazioni del gateway. Aggiorna le impostazioni e riprova."
+    },
     "export_limit_pending": {
       "message": "In attesa di conferma della configurazione. Aggiorna lo stato prima di un’altra modifica."
     },
@@ -855,8 +858,7 @@
         "title": "Limite di immissione",
         "description": "Impostazione attuale: **{current}**\n\nImpostazione richiesta: **{requested}**\n\nVelocità di variazione (W/sec): **{current_slew}** → **{requested_slew}**",
         "data": {
-          "confirm": "Conferma questa modifica",
-          "restore_slew_rate": "Ripristina la velocità dal gateway"
+          "confirm": "Conferma questa modifica"
         }
       },
       "export_limit_submitted": {
@@ -905,6 +907,7 @@
       "export_limit_unavailable": "Limite di immissione non disponibile. Sono necessari accesso installatore e una configurazione supportata con un solo gateway.",
       "export_limit_invalid": "Inserisci watt interi da 0 a 100000.",
       "export_limit_changed": "Configurazione modificata. Controlla le impostazioni aggiornate e conferma di nuovo.",
+      "export_limit_mismatch": "Il modulo installatore di Enphase non corrisponde alle impostazioni del gateway. Aggiorna le impostazioni e riprova.",
       "export_limit_pending": "In attesa di conferma della configurazione. Aggiorna lo stato prima di un’altra modifica.",
       "export_limit_disabled": "Abilita i controlli del limite di immissione (Funzionalità → Funzionalità avanzate).",
       "export_limit_confirmation": "Conferma questa modifica",

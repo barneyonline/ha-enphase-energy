@@ -174,6 +174,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         self._grid_mode_target: str | None = None
         self._export_snapshot: ExportLimitSnapshot | None = None
         self._export_watts: int | None = None
+        self._export_slew: float | None = None
 
     @staticmethod
     def _normalize_serials(value: Any) -> list[str]:
@@ -1041,6 +1042,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         if user_input is not None:
             try:
                 self._export_watts = validate_watts(user_input["limit_watts"])
+                self._export_slew = None
             except ServiceValidationError:
                 errors["base"] = "export_limit_invalid"
             else:
@@ -1075,7 +1077,21 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         self._export_watts = None
+        self._export_slew = None
         return await self.async_step_export_limit_confirm()
+
+    def _export_requested_slew(self) -> float:
+        """Freeze the requested rate when it is first displayed for confirmation."""
+        if self._export_slew is None:
+            assert self._export_snapshot is not None
+            self._export_slew = (
+                self._entry.options.get(
+                    OPT_EXPORT_LIMIT_SLEW_RATE, self._export_snapshot.slew
+                )
+                if self._export_watts is not None
+                else self._export_snapshot.slew
+            )
+        return self._export_slew
 
     async def async_step_export_limit_confirm(
         self, user_input: dict[str, Any] | None = None
@@ -1085,15 +1101,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         if self._export_snapshot is None:
             return await self.async_step_export_limit()
         if user_input is not None:
+            requested_slew = self._export_requested_slew()
             try:
                 await runtime.async_apply(
                     self._export_watts,
                     confirm=user_input.get("confirm") is True,
                     expected=self._export_snapshot,
-                    reconcile_zero_slew=user_input.get("restore_slew_rate") is True,
                     slew_rate=(
-                        self._entry.options.get(OPT_EXPORT_LIMIT_SLEW_RATE)
-                        if self._export_watts is not None
+                        requested_slew
+                        if requested_slew != self._export_snapshot.slew
                         else None
                     ),
                 )
@@ -1102,6 +1118,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 errors["base"] = key
                 if key == "export_limit_changed":
                     self._export_snapshot = runtime.snapshot or self._export_snapshot
+                    self._export_slew = None
             else:
                 status = runtime.request_status
                 return self.async_show_form(
@@ -1118,31 +1135,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             data_schema=vol.Schema(
                 {
                     vol.Required("confirm", default=False): bool,
-                    **(
-                        {vol.Optional("restore_slew_rate", default=False): bool}
-                        if not self._export_snapshot.dynamic
-                        and (
-                            self._export_watts is None
-                            or self._entry.options.get(
-                                OPT_EXPORT_LIMIT_SLEW_RATE, self._export_snapshot.slew
-                            )
-                            == self._export_snapshot.slew
-                        )
-                        else {}
-                    ),
                 }
             ),
             errors=errors,
             description_placeholders={
                 "current": await self._export_current_label(),
                 "current_slew": str(self._export_snapshot.slew),
-                "requested_slew": str(
-                    self._entry.options.get(
-                        OPT_EXPORT_LIMIT_SLEW_RATE, self._export_snapshot.slew
-                    )
-                    if self._export_watts is not None
-                    else self._export_snapshot.slew
-                ),
+                "requested_slew": str(self._export_requested_slew()),
                 "requested": (
                     str(self._export_watts) + " W"
                     if self._export_watts is not None
