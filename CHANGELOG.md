@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- Ignore battery profile, settings, and live-status responses requested before a
+  newly accepted profile or reserve write, preventing older in-flight reads from
+  confirming the request or replacing newer profile and reserve readback.
 - Preserve successful EV charger schedule edits and deletions when an older cloud read finishes later, and serialize competing writes for each charger.
 - Keep the last valid schedules and session history when Enphase returns malformed or incomplete responses. Deduplicate overlapping session pages so daily charging energy is not counted twice.
 - Prevent scheduler option changes from replacing newer charger telemetry with an older snapshot.
