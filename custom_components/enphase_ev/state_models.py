@@ -493,6 +493,9 @@ class BatteryState:
     _battery_pending_requested_mono: float | None = None
     _battery_pending_require_exact_settings: bool = True
     _battery_pending_authoritative_confirmation_required: bool = False
+    _battery_profile_read_generation: int = field(
+        default=0, metadata={"publication": False}
+    )
     _battery_optimistic_profile: str | None = None
     _battery_optimistic_reserve: int | None = None
     _battery_optimistic_sub_type: str | None = None
