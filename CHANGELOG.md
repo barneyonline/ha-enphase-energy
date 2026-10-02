@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - Build immutable feature snapshots in one traversal to avoid copying large inventories twice.
 - Share public firmware catalog downloads across entries using the same URL and include read-only session-history POST requests in the cloud request budget.
 - Introduce typed runtime health and authentication boundaries, extract pure battery grid-relay and session-pagination helpers, and expand mixed-inventory performance and concurrency regression coverage.
+- Keep confirmed control values visible during Enphase writes and report progress separately through Control Update Status. Apply confirmation tracking and conflict guards to charger settings, charging commands, battery profiles/settings/schedules, Storm Guard, grid controls, and tariffs. Integrate Export Limit progress, bound extra confirmation polling, and keep Stop available during a pending Start.
 
 ### 🔄 Other changes
 - None

@@ -508,6 +508,9 @@
     },
     "export_limit_session_expired": {
       "message": "Enlighten sesija ir beigusies vai noraidīta. Atveriet Autentifikācija, autentificējieties atkārtoti un mēģiniet vēlreiz."
+    },
+    "control_change_pending": {
+      "message": "Vadības izmaiņa gaida apstiprinājumu. Pirms citas izmaiņas iesniegšanas atsvaidziniet tās statusu."
     }
   },
   "options": {
@@ -1110,6 +1113,9 @@
           },
           "amp_control_applies_in_modes": {
             "name": "Režīmi, kuros ampēru vadība ir piemērojama"
+          },
+          "requested_mode": {
+            "name": "Pieprasītais režīms"
           }
         }
       },
@@ -2282,6 +2288,15 @@
       },
       "inverter_array_power": {
         "name": "{array} Pašreizējā jauda"
+      },
+      "control_update_status": {
+        "name": "Vadības izmaiņas statuss",
+        "state": {
+          "idle": "Dīkstāve",
+          "pending": "Gaida",
+          "unconfirmed": "Neapstiprināts",
+          "failed": "Neizdevās"
+        }
       }
     },
     "number": {

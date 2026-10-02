@@ -250,6 +250,56 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   started after acceptance retain the normal configured/live profile precedence;
   this does not resolve disagreement between Enphase's backend data sources.
 - `evse_runtime.py` handles charger commands, fast polling, streaming, charge-mode cache, auth settings, and EVSE control side effects.
+  Charge Mode selections retain the confirmed cache and publish requested intent
+  independently. Pending requests bypass lookup caches, including when status
+  embeds a mode. Only matching fresh scheduler feedback confirms a change;
+  scheduler backoff still applies. Failed or cancelled submissions do not replace
+  confirmed device values. Internal Start/Stop mode enforcement uses the same
+  guarded confirmation path and cannot overwrite another pending mode request.
+- `control_updates.py` tracks command progress separately from entity state and
+  availability. `control_values.py` defines readback contracts. Runtime command
+  decorators cover entity actions and services at the same boundary; related
+  battery profile, settings, storm, and schedule payloads share conflict groups.
+  Inherited command context is restricted to the executing task so concurrent
+  calls cannot bypass these guards. Runtime retirement clears progress and its
+  timers before awaited cleanup; inactive-runtime calls preserve the underlying
+  command's lifecycle behavior without starting new tracking.
+  Fresh reads capture request identities before
+  I/O so an older read cannot confirm a newer request. Charging acknowledgements
+  invalidate earlier reads, including reads collected while a command waits for
+  its lock. Accepted battery settings writes also invalidate earlier observations
+  so an old schedule acknowledgement cannot confirm a new family toggle.
+  Battery feedback includes only fields returned by that endpoint;
+  telemetry cannot confirm reserve/subtype values and settings cannot confirm
+  schedule limits. Schedule CRUD confirmation requires explicit family inventory
+  and gateway acknowledgement; enable intent uses fresh family settings because
+  entry enable flags can differ from the active family control. Grid eligibility
+  checks do not confirm relay state. Batch schedule deletion services guard the
+  complete delete-and-commit operation and require acknowledgement from every
+  affected family. Schedule update services also track the family settings
+  commit, so commit failures report Failed and release the conflict guard while
+  edits to inactive entries preserve the selected family's settings.
+  Companion values remain protected after the
+  primary control confirms, until their own fresh fields arrive.
+  Explicit empty schedule inventories can acknowledge disabled families. Grid
+  Profile confirmation requires a profile ID returned for the requested gateway;
+  missing fields and other gateways cannot confirm cached profile state.
+  Schedule comparison normalizes equivalent time, weekday, ID, and scalar
+  representations without inventing missing readback fields. Follow-up profile
+  edits use the confirmed profile and companion values shown by the controls.
+  Charger configuration must return the requested setting's value; malformed
+  payloads and unrelated keys cannot confirm a cached setting. Alert opt-out
+  confirmation requires explicit fresh alert state.
+  Endpoint success counters and EVSE cache generations
+  distinguish successful reads from cached responses,
+  failures, and write echoes. Control Update Status reports Pending, Unconfirmed,
+  Failed, or Idle, with requested and confirmed values grouped by site/charger.
+  Timeout cancels extra polling after ten minutes and permits an explicit new
+  request; normal lookup caches resume and a new request retires older unresolved
+  progress in its conflict group. It never automatically retries a write. Export
+  Limit contributes its durable pending and repair status, while installer Grid
+  Profile contributes its
+  cloud readback status. Local draft entities retain immediate draft state.
   Start, Stop, and automatic resume share a per-charger command lock. Explicit
   intent is recorded before waiting, so a newer Stop follows an already-issued
   Start and obsolete retries or state updates cannot override it. A newer command

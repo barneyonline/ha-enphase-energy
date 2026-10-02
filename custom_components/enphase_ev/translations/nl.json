@@ -508,6 +508,9 @@
     },
     "export_limit_session_expired": {
       "message": "De Enlighten-sessie is verlopen of geweigerd. Open Authenticatie, meld u opnieuw aan en probeer het opnieuw."
+    },
+    "control_change_pending": {
+      "message": "Een bedieningswijziging wacht op bevestiging. Vernieuw de status voordat je een andere wijziging indient."
     }
   },
   "options": {
@@ -1110,6 +1113,9 @@
           },
           "amp_control_applies_in_modes": {
             "name": "Modi waarin ampèreregeling van toepassing is"
+          },
+          "requested_mode": {
+            "name": "Aangevraagde modus"
           }
         }
       },
@@ -2282,6 +2288,15 @@
       },
       "inverter_array_power": {
         "name": "{array} Huidig vermogen"
+      },
+      "control_update_status": {
+        "name": "Status van bedieningswijziging",
+        "state": {
+          "idle": "Inactief",
+          "pending": "In behandeling",
+          "unconfirmed": "Onbevestigd",
+          "failed": "Mislukt"
+        }
       }
     },
     "number": {

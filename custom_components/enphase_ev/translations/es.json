@@ -508,6 +508,9 @@
     },
     "export_limit_session_expired": {
       "message": "La sesión de Enlighten ha caducado o ha sido rechazada. Abra Autenticación, vuelva a autenticarse e inténtelo de nuevo."
+    },
+    "control_change_pending": {
+      "message": "Un cambio de control está pendiente de confirmación. Actualiza su estado antes de enviar otro cambio."
     }
   },
   "options": {
@@ -1110,6 +1113,9 @@
           },
           "amp_control_applies_in_modes": {
             "name": "Modos en los que aplica el control de amperaje"
+          },
+          "requested_mode": {
+            "name": "Modo solicitado"
           }
         }
       },
@@ -2282,6 +2288,15 @@
       },
       "inverter_array_power": {
         "name": "{array} Potencia actual"
+      },
+      "control_update_status": {
+        "name": "Estado del cambio de control",
+        "state": {
+          "idle": "Inactivo",
+          "pending": "Pendiente",
+          "unconfirmed": "Sin confirmar",
+          "failed": "Fallido"
+        }
       }
     },
     "number": {

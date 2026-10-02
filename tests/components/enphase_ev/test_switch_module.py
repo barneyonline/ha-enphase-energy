@@ -4,6 +4,8 @@ from types import MappingProxyType
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import time
+
 import pytest
 from homeassistant.const import STATE_ON
 from homeassistant.core import State
@@ -303,72 +305,6 @@ def test_switch_pending_helper_edge_paths() -> None:
     )
     switch_mod._write_state_if_available(entity)
     entity.async_write_ha_state.assert_called_once()
-
-    coord = SimpleNamespace(_green_battery_pending={})
-
-    assert (
-        switch_mod._effective_evse_toggle_state(
-            SimpleNamespace(_green_battery_pending=True),  # type: ignore[arg-type]
-            "_green_battery_pending",
-            RANDOM_SERIAL,
-            False,
-        )
-        is False
-    )
-
-    coord._green_battery_pending[RANDOM_SERIAL] = ("bad",)  # noqa: SLF001
-    assert (
-        switch_mod._effective_evse_toggle_state(
-            coord, "_green_battery_pending", RANDOM_SERIAL, False
-        )
-        is False
-    )
-    assert RANDOM_SERIAL not in coord._green_battery_pending  # noqa: SLF001
-
-    coord._green_battery_pending[RANDOM_SERIAL] = (
-        False,
-        switch_mod.time.monotonic() + 10,
-    )  # noqa: SLF001
-    assert (
-        switch_mod._effective_evse_toggle_state(
-            coord, "_green_battery_pending", RANDOM_SERIAL, False
-        )
-        is False
-    )
-    assert RANDOM_SERIAL not in coord._green_battery_pending  # noqa: SLF001
-
-    coord._green_battery_pending[RANDOM_SERIAL] = (
-        True,
-        switch_mod.time.monotonic() - 1,
-    )  # noqa: SLF001
-    assert (
-        switch_mod._effective_evse_toggle_state(
-            coord, "_green_battery_pending", RANDOM_SERIAL, False
-        )
-        is False
-    )
-    assert RANDOM_SERIAL not in coord._green_battery_pending  # noqa: SLF001
-
-    coord._green_battery_pending[RANDOM_SERIAL] = (True, object())  # noqa: SLF001
-    assert (
-        switch_mod._effective_evse_toggle_state(
-            coord, "_green_battery_pending", RANDOM_SERIAL, False
-        )
-        is False
-    )
-    assert RANDOM_SERIAL not in coord._green_battery_pending  # noqa: SLF001
-
-    coord._pending_charging = {RANDOM_SERIAL: ("bad",)}  # noqa: SLF001
-    assert switch_mod._pending_charging_state(coord, RANDOM_SERIAL) is None
-
-    coord._pending_charging = {
-        RANDOM_SERIAL: (True, switch_mod.time.monotonic() - 1)
-    }  # noqa: SLF001
-    assert switch_mod._pending_charging_state(coord, RANDOM_SERIAL) is None
-    assert RANDOM_SERIAL not in coord._pending_charging  # noqa: SLF001
-
-    coord._pending_charging = {RANDOM_SERIAL: (True, object())}  # noqa: SLF001
-    assert switch_mod._pending_charging_state(coord, RANDOM_SERIAL) is None
 
 
 @pytest.mark.asyncio
@@ -1665,10 +1601,10 @@ def test_green_battery_switch_is_on_prefers_short_pending_override(
     )
     coord._green_battery_pending[RANDOM_SERIAL] = (  # noqa: SLF001
         True,
-        switch_mod.time.monotonic() + 10,
+        time.monotonic() + 10,
     )
 
-    assert GreenBatterySwitch(coord, RANDOM_SERIAL).is_on is True
+    assert GreenBatterySwitch(coord, RANDOM_SERIAL).is_on is False
 
 
 def test_green_battery_switch_unavailable_without_data(coordinator_factory) -> None:
@@ -1717,9 +1653,11 @@ async def test_green_battery_switch_turn_on_off(coordinator_factory) -> None:
     coord.client.set_green_battery_setting.assert_awaited_once_with(
         RANDOM_SERIAL, enabled=True
     )
-    assert coord._green_battery_cache[RANDOM_SERIAL][0] is True
+    assert RANDOM_SERIAL not in coord._green_battery_cache
     assert coord._green_battery_pending[RANDOM_SERIAL][0] is True
 
+    if getattr(coord, "control_updates", None):
+        coord.control_updates.cleanup()
     await sw.async_turn_off()
     assert coord.evse_runtime.async_set_green_battery_setting.await_count == 2
     coord.evse_runtime.async_set_green_battery_setting.assert_awaited_with(
@@ -1729,7 +1667,7 @@ async def test_green_battery_switch_turn_on_off(coordinator_factory) -> None:
     coord.client.set_green_battery_setting.assert_awaited_with(
         RANDOM_SERIAL, enabled=False
     )
-    assert coord._green_battery_cache[RANDOM_SERIAL][0] is False
+    assert RANDOM_SERIAL not in coord._green_battery_cache
     assert coord._green_battery_pending[RANDOM_SERIAL][0] is False
     assert coord.async_request_refresh.await_count == 2
 
@@ -1795,10 +1733,10 @@ def test_app_auth_switch_is_on_prefers_short_pending_override(
     coord = coordinator_factory({"app_auth_supported": True, "app_auth_enabled": False})
     coord._app_auth_pending[RANDOM_SERIAL] = (
         True,
-        switch_mod.time.monotonic() + 10,
+        time.monotonic() + 10,
     )  # noqa: SLF001
 
-    assert AppAuthenticationSwitch(coord, RANDOM_SERIAL).is_on is True
+    assert AppAuthenticationSwitch(coord, RANDOM_SERIAL).is_on is False
 
 
 @pytest.mark.asyncio
@@ -1817,9 +1755,11 @@ async def test_app_auth_switch_turn_on_off(coordinator_factory) -> None:
     coord.client.set_app_authentication.assert_awaited_once_with(
         RANDOM_SERIAL, enabled=True
     )
-    assert coord._auth_settings_cache[RANDOM_SERIAL][0] is True
+    assert RANDOM_SERIAL not in coord._auth_settings_cache
     assert coord._app_auth_pending[RANDOM_SERIAL][0] is True
 
+    if getattr(coord, "control_updates", None):
+        coord.control_updates.cleanup()
     await sw.async_turn_off()
     assert coord.evse_runtime.async_set_app_authentication.await_count == 2
     coord.evse_runtime.async_set_app_authentication.assert_awaited_with(
@@ -1829,7 +1769,7 @@ async def test_app_auth_switch_turn_on_off(coordinator_factory) -> None:
     coord.client.set_app_authentication.assert_awaited_with(
         RANDOM_SERIAL, enabled=False
     )
-    assert coord._auth_settings_cache[RANDOM_SERIAL][0] is False
+    assert RANDOM_SERIAL not in coord._auth_settings_cache
     assert coord._app_auth_pending[RANDOM_SERIAL][0] is False
     assert coord.async_request_refresh.await_count == 2
 
@@ -1996,11 +1936,9 @@ def test_storm_guard_switch_is_on_prefers_pending_state(coordinator_factory) -> 
     coord = coordinator_factory()
     coord._storm_guard_state = "disabled"  # noqa: SLF001
     coord._storm_guard_pending_state = "enabled"  # noqa: SLF001
-    coord._storm_guard_pending_expires_mono = (
-        switch_mod.time.monotonic() + 60
-    )  # noqa: SLF001
+    coord._storm_guard_pending_expires_mono = time.monotonic() + 60  # noqa: SLF001
 
-    assert StormGuardSwitch(coord).is_on is True
+    assert StormGuardSwitch(coord).is_on is False
 
 
 def test_storm_guard_switch_available_while_write_access_unknown(
@@ -2664,7 +2602,7 @@ def test_charging_switch_is_on_prefers_pending_expectation(coordinator_factory) 
     coord = coordinator_factory({"charging": False})
     coord.evse_runtime.set_charging_expectation(RANDOM_SERIAL, True, hold_for=60)
 
-    assert ChargingSwitch(coord, RANDOM_SERIAL).is_on is True
+    assert ChargingSwitch(coord, RANDOM_SERIAL).is_on is False
 
 
 def test_storm_guard_evse_switch_availability(coordinator_factory) -> None:
