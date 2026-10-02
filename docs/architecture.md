@@ -614,8 +614,10 @@ unload cancels it. HTTP 429 retains the existing shared rate-limit cooldown, and
 HTTP 5xx does not trigger reauthentication.
 
 Cloud Backoff Ends shows the charger-status deadline when no shared cooldown is
-active. Service Status identifies `charger_status` degradation, and cloud diagnostic
-attributes expose its HTTP status, next retry, and last successful status read.
+active. Its charger-status attributes are hidden while a shared cooldown takes
+precedence. Service Status identifies `charger_status` degradation, and cloud
+diagnostic attributes expose its HTTP status, next retry, and last successful
+status read.
 Optional degraded-service repairs refresh their retry timestamp on each failure.
 Cloud reachability advances only when a sibling endpoint actually succeeds;
 source freshness guards continue to expire stale battery and power readings.
@@ -625,4 +627,6 @@ recovery and restarts. It contains timestamps, HTTP status codes, a fixed allowl
 of backend error codes, and UUID request IDs. It excludes credentials, raw URLs,
 response bodies, telemetry, and exception messages. Restore validates these fields,
 honors an outstanding retry deadline, and never restores authoritative telemetry.
+Disabling charger polling retains the history but clears its active cooldown and
+repair so site-only entries do not report an obsolete charger outage.
 Config-entry diagnostics can read the history even while setup is retrying.

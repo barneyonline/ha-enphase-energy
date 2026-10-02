@@ -3508,7 +3508,11 @@ class EnphaseSiteBackoffEndsSensor(_SiteBaseEntity):
     @property
     def extra_state_attributes(self) -> Any:
         runtime = getattr(self._coord, "_evse_status_health", None)
-        if runtime is None or runtime.available:
+        if (
+            self._coord.backoff_ends_utc is not None
+            or runtime is None
+            or runtime.available
+        ):
             return {}
         health = runtime.diagnostics()
         return {
