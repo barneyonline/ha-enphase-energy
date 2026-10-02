@@ -24,7 +24,12 @@ from homeassistant.util import dt as dt_util
 from .const import DOMAIN, CURRENT_POWER_STALE_AFTER_S
 from .coordinator import EnphaseCoordinator
 from .device_info_helpers import _cloud_device_info
-from .energy import SiteEnergyFlow
+from .energy import (
+    LIFETIME_RESET_DROP_THRESHOLD_KWH,
+    LIFETIME_RESET_FLOOR_KWH,
+    LIFETIME_RESET_RATIO,
+    SiteEnergyFlow,
+)
 from .power_validation import EXTREME_SITE_POWER_W, ExtremePowerValidator
 from .runtime_helpers import inventory_type_device_info as _type_device_info
 from .sensor_base import EnphaseSiteSensorEntity as _SiteBaseEntity
@@ -274,6 +279,7 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
         self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_{flow_key}"
         self._restored_value: float | None = None
         self._restored_reset_at: str | None = None
+        self._last_source_value: float | None = None
         self._composition_offset_kwh = 0.0
         self._composition_offset_reset_at: str | None = None
         self._composition_source_start_date: str | None = None
@@ -289,7 +295,7 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
                 )
             except Exception:  # noqa: BLE001
                 restored = None
-            if restored is not None and restored >= 0:
+            if restored is not None and math.isfinite(restored) and restored >= 0:
                 self._restored_value = restored
                 self._attr_native_value = restored
         try:
@@ -317,6 +323,10 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
                 composition_restore.composition_source_start_date
             )
             self._composition_migration_checked = True
+        if self._restored_value is not None:
+            self._last_source_value = (
+                self._restored_value + self._composition_offset_kwh
+            )
 
     @staticmethod
     def _coerce_nonnegative_float(value: object) -> float | None:
@@ -357,15 +367,19 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
         if val is None:
             return None
         try:
-            return float(val)  # type: ignore[arg-type]
+            value = float(val)  # type: ignore[arg-type]
         except Exception:  # noqa: BLE001
             return None
+        return value if math.isfinite(value) else None
 
     def _ensure_composition_migration(self) -> None:
         """Preserve total-increasing continuity across export composition changes."""
 
         data = self._flow_data()
         current_value = self._coerce_nonnegative_float(data.get("value_kwh"))
+        if current_value is None:
+            # Invalid flow metadata cannot retire the retained raw baseline.
+            return
         reset_at = data.get("last_reset_at")
         current_reset_at = reset_at if isinstance(reset_at, str) else None
         start_date = data.get("start_date")
@@ -388,8 +402,6 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
                 self._composition_offset_kwh = 0.0
                 self._composition_offset_reset_at = current_reset_at
                 self._composition_source_start_date = current_start_date
-            return
-        if current_value is None:
             return
         if self._restored_value is not None:
             legacy_offset = self._coerce_nonnegative_float(
@@ -437,7 +449,34 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
         current = self._current_value()
         if current is not None:
             self._ensure_composition_migration()
-            return round(max(current - self._composition_offset_kwh, 0.0), 2)
+            value = round(max(current - self._composition_offset_kwh, 0.0), 2)
+            reset_at = self._flow_data().get("last_reset_at")
+            previous = self._restored_value
+            previous_source = self._last_source_value
+            # The manager's in-memory guard cannot protect the restored total
+            # after a restart. Keep that baseline through cloud corrections,
+            # while allowing confirmed resets and the manager's reset policy.
+            if (
+                previous is not None
+                and value < previous
+                and (reset_at is None or reset_at == self._restored_reset_at)
+                and not (
+                    previous_source is not None
+                    and previous_source - current >= LIFETIME_RESET_DROP_THRESHOLD_KWH
+                    and (
+                        current <= LIFETIME_RESET_FLOOR_KWH
+                        or current <= previous_source * LIFETIME_RESET_RATIO
+                    )
+                )
+            ):
+                value = round(previous, 2)
+            self._restored_value = value
+            # Attribute reads may already have cleared a migration offset.
+            # Keep the corresponding raw baseline independently for resets.
+            self._last_source_value = value + self._composition_offset_kwh
+            if isinstance(reset_at, str):
+                self._restored_reset_at = reset_at
+            return value
         if self._restored_value is None:
             return None
         return round(self._restored_value, 2)

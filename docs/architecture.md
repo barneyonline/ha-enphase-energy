@@ -382,6 +382,18 @@ source-specific policies. Cumulative energy totals remain available as historica
 measurements. Daily heat-pump totals expose a source-day `last_reset` so recorder
 handles midnight and within-day corrections correctly.
 
+Site lifetime energy sensors preserve their last accepted total as the restore
+baseline. The manager guards decreases during polling; the entity also holds
+lower cloud corrections against that baseline after a restart, until the source
+catches up. Missing or nonfinite flow data retains the latest accepted finite
+value, and nonfinite restore data cannot establish a baseline. A new confirmed
+reset marker or a drop satisfying the manager's lifetime-reset thresholds starts
+a new baseline, including resets while Home Assistant was offline. Reset detection
+uses the corresponding raw lifetime baseline independently of migration-offset
+clearing and entity attribute reads. Invalid flow metadata cannot clear migration
+offsets and lose that baseline across another restart. Repeated equal totals remain
+valid `total_increasing` states.
+
 Current Grid Power and Current Battery Power reseed their cumulative-energy
 baselines when missing source channels return, including during reload or reauth.
 Synthetic zero placeholders never authorize a delta from zero to a lifetime total.
