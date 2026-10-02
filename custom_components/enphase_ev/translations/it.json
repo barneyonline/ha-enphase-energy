@@ -508,6 +508,9 @@
     },
     "export_limit_session_expired": {
       "message": "La sessione Enlighten è scaduta o è stata rifiutata. Apri Autenticazione, avvia una nuova autenticazione e riprova."
+    },
+    "control_change_pending": {
+      "message": "Una modifica del controllo è in attesa di conferma. Aggiorna il suo stato prima di inviare un’altra modifica."
     }
   },
   "options": {
@@ -1110,6 +1113,9 @@
           },
           "amp_control_applies_in_modes": {
             "name": "Modalità in cui si applica il controllo amperaggio"
+          },
+          "requested_mode": {
+            "name": "Modalità richiesta"
           }
         }
       },
@@ -2282,6 +2288,15 @@
       },
       "inverter_array_power": {
         "name": "{array} Potenza attuale"
+      },
+      "control_update_status": {
+        "name": "Stato della modifica del controllo",
+        "state": {
+          "idle": "Inattivo",
+          "pending": "In attesa",
+          "unconfirmed": "Non confermato",
+          "failed": "Non riuscito"
+        }
       }
     },
     "number": {

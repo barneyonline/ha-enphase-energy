@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Awaitable, Callable
 from datetime import date, time
 from typing import TYPE_CHECKING, Any, NoReturn, cast
 
@@ -1216,19 +1215,12 @@ def async_setup_services(
                     or hass.config.time_zone
                     or "UTC"
                 ),
-                apply_settings=False,
+                settings_override=(
+                    apply_start_str,
+                    apply_end_str,
+                    apply_enabled,
+                ),
             )
-            if schedule_type == "cfg":
-                await coord.battery_runtime.async_commit_cfg_schedule_write(
-                    schedule_enabled=apply_enabled
-                )
-            else:
-                await coord.battery_runtime.async_apply_schedule_family_settings(
-                    schedule_type,
-                    start_time=apply_start_str,
-                    end_time=apply_end_str,
-                    enabled=apply_enabled,
-                )
         except aiohttp.ClientResponseError as err:
             coord.battery_runtime.raise_schedule_update_validation_error(err)
             raise
@@ -1288,10 +1280,10 @@ def async_setup_services(
                 "battery_schedule_api_unavailable",
                 message="Battery schedule API is unavailable.",
             )
-        delete_schedule = cast(Callable[..., Awaitable[object]], deleter)
         schedule_inventory = _schedule_inventory_by_id(coord)
         requested_schedule_type = call.data.get("schedule_type")
         deleted_schedule_ids_by_family: dict[str, set[str]] = {}
+        schedules: list[tuple[str, str]] = []
         for schedule_id in schedule_ids:
             schedule = schedule_inventory.get(schedule_id)
             schedule_type = (
@@ -1303,36 +1295,19 @@ def async_setup_services(
                     else "cfg"
                 )
             )
-            try:
-                await delete_schedule(schedule_id, schedule_type=schedule_type)
-            except aiohttp.ClientResponseError as err:
-                coord.battery_runtime.raise_schedule_update_validation_error(err)
-                raise
+            schedules.append((schedule_id, schedule_type))
             deleted_schedule_ids_by_family.setdefault(
                 str(schedule_type).lower(), set()
             ).add(schedule_id)
-        for schedule_type, deleted_ids in deleted_schedule_ids_by_family.items():
-            remaining_schedule = _remaining_schedule_for_delete_family(
+        remaining_schedules = {
+            schedule_type: _remaining_schedule_for_delete_family(
                 coord, schedule_type, deleted_ids
             )
-            await coord.battery_runtime.async_apply_schedule_family_settings(
-                schedule_type,
-                start_time=(
-                    remaining_schedule.start_time
-                    if remaining_schedule is not None
-                    else None
-                ),
-                end_time=(
-                    remaining_schedule.end_time
-                    if remaining_schedule is not None
-                    else None
-                ),
-                enabled=(
-                    remaining_schedule.enabled
-                    if remaining_schedule is not None
-                    else False
-                ),
-            )
+            for schedule_type, deleted_ids in deleted_schedule_ids_by_family.items()
+        }
+        await coord.battery_runtime.async_delete_battery_schedule_batch(
+            schedules, remaining_schedules
+        )
         await coord.async_request_refresh()
 
     async def _svc_validate_schedule(call: ServiceCall) -> dict[str, Any]:

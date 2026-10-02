@@ -508,6 +508,9 @@
     },
     "export_limit_session_expired": {
       "message": "Sesiunea Enlighten a expirat sau a fost respinsă. Deschideți Autentificare, autentificați-vă din nou și reîncercați."
+    },
+    "control_change_pending": {
+      "message": "O modificare a comenzii așteaptă confirmarea. Actualizați starea înainte de a trimite altă modificare."
     }
   },
   "options": {
@@ -1110,6 +1113,9 @@
           },
           "amp_control_applies_in_modes": {
             "name": "Modurile în care se aplică controlul amperajului"
+          },
+          "requested_mode": {
+            "name": "Mod solicitat"
           }
         }
       },
@@ -2282,6 +2288,15 @@
       },
       "inverter_array_power": {
         "name": "{array} Putere curentă"
+      },
+      "control_update_status": {
+        "name": "Starea modificării comenzii",
+        "state": {
+          "idle": "Inactiv",
+          "pending": "În așteptare",
+          "unconfirmed": "Neconfirmat",
+          "failed": "Eșuat"
+        }
       }
     },
     "number": {

@@ -871,6 +871,7 @@ def test_battery_runtime_set_pending_records_current_time(monkeypatch) -> None:
     coordinator = SimpleNamespace(
         _normalize_battery_sub_type=lambda value: value,
         _sync_battery_profile_pending_issue=lambda: None,
+        publish_runtime_state_update=Mock(),
     )
     runtime = BatteryRuntime(coordinator)
 
@@ -887,6 +888,7 @@ def test_battery_runtime_set_pending_records_current_time(monkeypatch) -> None:
 
     assert coordinator._battery_pending_requested_at == requested_at
     assert coordinator._battery_pending_sub_type is None
+    coordinator.publish_runtime_state_update.assert_called_once_with("system_profile")
 
 
 def test_battery_runtime_transition_helpers_cover_private_and_fallback_paths() -> None:

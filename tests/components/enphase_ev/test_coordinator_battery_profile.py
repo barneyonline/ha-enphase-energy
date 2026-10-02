@@ -120,6 +120,8 @@ async def test_refresh_battery_site_settings_parses_ai_optimisation_flag(
 @pytest.mark.asyncio
 async def test_set_system_profile_uses_remembered_reserve(coordinator_factory) -> None:
     coord = coordinator_factory()
+    # Isolate API validation from the separately tested confirmation guard.
+    coord.control_updates = None
     coord._battery_show_charge_from_grid = True  # noqa: SLF001
     coord._battery_show_savings_mode = True  # noqa: SLF001
     coord._battery_show_ai_opti_savings_mode = True  # noqa: SLF001
@@ -164,6 +166,8 @@ async def test_set_system_profile_uses_remembered_reserve(coordinator_factory) -
 @pytest.mark.asyncio
 async def test_savings_subtype_payload_on_and_off(coordinator_factory) -> None:
     coord = coordinator_factory()
+    # Isolate API validation from the separately tested confirmation guard.
+    coord.control_updates = None
     coord._battery_profile = "cost_savings"  # noqa: SLF001
     coord._battery_backup_percentage = 21  # noqa: SLF001
     coord._battery_show_savings_mode = True  # noqa: SLF001
@@ -1042,7 +1046,7 @@ def test_battery_profile_property_helpers_cover_branches(coordinator_factory) ->
     assert coord.battery_effective_profile_display == "Self-Consumption"
     coord._battery_live_profile = None  # noqa: SLF001
     coord._battery_pending_profile = "cost_savings"  # noqa: SLF001
-    assert coord.savings_use_battery_after_peak is True
+    assert coord.savings_use_battery_after_peak is None
 
     coord._battery_pending_profile = "ai_optimisation"  # noqa: SLF001
     assert coord.battery_selected_operation_mode_sub_type == "prioritize-energy"
@@ -1855,6 +1859,8 @@ async def test_battery_profile_setter_validation_and_fallbacks(
     from custom_components.enphase_ev.coordinator import ServiceValidationError
 
     coord = coordinator_factory()
+    # Isolate API validation from the separately tested confirmation guard.
+    coord.control_updates = None
     coord.client.set_battery_profile = AsyncMock(return_value={"message": "success"})
     coord.client.set_battery_settings_compat = AsyncMock(return_value={})
     coord.client.battery_site_settings = AsyncMock(return_value={"data": {}})

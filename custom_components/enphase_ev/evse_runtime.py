@@ -19,6 +19,7 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.util import dt as dt_util
 
 from .api import AuthSettingsUnavailable, ChargerConfigUnavailable, SchedulerUnavailable
+from .control_updates import control_readback, tracked_control
 from .const import (
     AUTH_APP_SETTING,
     AUTH_RFID_SETTING,
@@ -50,6 +51,7 @@ _LOGGER = logging.getLogger(__name__)
 GREEN_BATTERY_CACHE_TTL = 300.0
 AUTH_SETTINGS_CACHE_TTL = 300.0
 CHARGE_MODE_CACHE_TTL = 300.0
+CHARGE_MODE_CONFIRMATION_FAST_S = 600.0
 CHARGER_CONFIG_CACHE_TTL = 3600.0
 CHARGER_CONFIG_FAILURE_BACKOFF_S = 900.0
 EVSE_TOGGLE_PENDING_HOLD_S = 15.0
@@ -147,6 +149,7 @@ class EvseRuntime:
         self._amp_restart_intents: dict[str, _AmpRestartIntent] = {}
         self._charging_command_tokens: dict[str, object] = {}
         self._charging_command_locks: dict[str, asyncio.Lock] = {}
+        self._charge_mode_submitting: set[str] = set()
 
     @property
     def snapshot(self) -> EvseControlSnapshot:
@@ -425,6 +428,9 @@ class EvseRuntime:
         else:
             coord._serial_order = [sn for sn in keep_serials]
         self.state.prune(keep_serials)
+        runtime = getattr(self.coordinator, "control_updates", None)
+        if runtime:
+            runtime.prune(keep_serials)
         for sn in tuple(self._charging_command_tokens):
             if sn not in keep_serials:
                 self._charging_command_tokens.pop(sn)
@@ -632,7 +638,17 @@ class EvseRuntime:
             )
             is True
         )
+        runtime = getattr(coord, "control_updates", None)
+        if runtime and any(
+            update.status == "pending" for update in runtime.updates.values()
+        ):
+            want_fast = True
         now_mono = time.monotonic()
+        if any(
+            now_mono - requested_at < CHARGE_MODE_CONFIRMATION_FAST_S
+            for _mode, requested_at in self.state._charge_mode_pending.values()
+        ):
+            want_fast = True
         if coord._fast_until and now_mono < coord._fast_until:
             want_fast = True
         fast_stream_enabled = True
@@ -716,6 +732,13 @@ class EvseRuntime:
                     results[sn] = ChargeModeResolution(response, "scheduler_endpoint")
         return results
 
+    @tracked_control(
+        "charging",
+        arguments=(),
+        serial_argument="sn",
+        supersede=True,
+        fixed_enabled=True,
+    )
     async def async_start_charging(
         self,
         sn: str,
@@ -772,6 +795,9 @@ class EvseRuntime:
             )
             if not self._charging_command_is_current(sn_str, token):
                 return {"status": "superseded"}
+            runtime = getattr(coord, "control_updates", None)
+            if runtime:
+                runtime.invalidate_observations("charging", sn_str)
             coord.set_last_set_amps(sn_str, amps)
             if isinstance(result, dict) and result.get("status") == "not_ready":
                 coord.set_desired_charging(sn_str, False)
@@ -870,6 +896,13 @@ class EvseRuntime:
                 fallback_cache.pop(sn_str, None)
         return result
 
+    @tracked_control(
+        "charging",
+        arguments=(),
+        serial_argument="sn",
+        supersede=True,
+        fixed_enabled=False,
+    )
     async def async_stop_charging(
         self,
         sn: str,
@@ -891,6 +924,9 @@ class EvseRuntime:
             result = await coord.client.stop_charging(sn_str)
             if not self._charging_command_is_current(sn_str, token):
                 return {"status": "superseded"}
+            runtime = getattr(coord, "control_updates", None)
+            if runtime:
+                runtime.invalidate_observations("charging", sn_str)
             await coord.async_start_streaming(
                 manual=False, serial=sn_str, expected_state=False
             )
@@ -1381,9 +1417,27 @@ class EvseRuntime:
                 return self.apply_amp_limits(sn_str, coerced)
         return self.apply_amp_limits(sn_str, fallback)
 
+    def control_pending(self, control: str, sn: str) -> bool:
+        runtime = getattr(self.coordinator, "control_updates", None)
+        return bool(
+            runtime
+            and (update := runtime.updates.get((control, sn)))
+            and update.status == "pending"
+        )
+
+    def charge_mode_confirmation_active(self, sn: str) -> bool:
+        pending = self.state._charge_mode_pending.get(sn)
+        return bool(
+            pending and time.monotonic() - pending[1] < CHARGE_MODE_CONFIRMATION_FAST_S
+        )
+
+    @control_readback("evse:charge_mode")
     async def async_get_charge_mode(self, sn: str) -> str | None:
+        pending = self.state._charge_mode_pending.get(sn)
         cached = self.cached_charge_mode_preference(sn)
-        if cached is not None:
+        if sn in self._charge_mode_submitting or (
+            cached is not None and not self.charge_mode_confirmation_active(sn)
+        ):
             return cached
         now = time.monotonic()
         try:
@@ -1395,17 +1449,27 @@ class EvseRuntime:
             return None
         except Exception:
             mode = None
+        # A lookup started before a write cannot confirm or overwrite that write.
+        if self.state._charge_mode_pending.get(sn) is not pending:
+            return None
         if mode:
             self.coordinator.mark_scheduler_available()
             self.state._charge_mode_cache[sn] = (mode, now)
+            if pending is not None and mode == pending[0]:
+                self.state._charge_mode_pending.pop(sn)
         return mode
 
+    @control_readback("evse:green_battery")
     async def async_get_green_battery_setting(
         self, sn: str
     ) -> tuple[bool | None, bool] | None:
         now = time.monotonic()
         cached = self.state._green_battery_cache.get(sn)
-        if cached and (now - cached[2] < GREEN_BATTERY_CACHE_TTL):
+        if (
+            cached
+            and (now - cached[2] < GREEN_BATTERY_CACHE_TTL)
+            and not self.control_pending("green_battery", sn)
+        ):
             return cached[0], cached[1]
         try:
             settings = await self.coordinator.client.green_charging_settings(sn)
@@ -1445,13 +1509,18 @@ class EvseRuntime:
         self.state._green_battery_cache[sn] = (enabled, supported, now)
         return enabled, supported
 
+    @control_readback("evse:app_authentication")
     async def async_get_auth_settings(
         self, sn: str
     ) -> tuple[bool | None, bool | None, bool, bool] | None:
         coord = self.coordinator
         now = time.monotonic()
         cached = self.state._auth_settings_cache.get(sn)
-        if cached and (now - cached[4] < AUTH_SETTINGS_CACHE_TTL):
+        if (
+            cached
+            and (now - cached[4] < AUTH_SETTINGS_CACHE_TTL)
+            and not self.control_pending("app_authentication", sn)
+        ):
             return cached[0], cached[1], cached[2], cached[3]
         if coord._auth_settings_backoff_active():
             # Unsupported auth endpoints are treated as transient so older
@@ -1531,6 +1600,7 @@ class EvseRuntime:
         )
         return app_enabled, rfid_enabled, app_supported, rfid_supported
 
+    @control_readback("evse:default_charge_level")
     async def async_get_charger_config(
         self,
         sn: str,
@@ -1556,7 +1626,11 @@ class EvseRuntime:
         cached = self.state._charger_config_cache.get(sn)
         cached_values: dict[str, object] = {}
         cache_fresh = False
-        if cached and (now - cached[1] < CHARGER_CONFIG_CACHE_TTL):
+        if (
+            cached
+            and (now - cached[1] < CHARGER_CONFIG_CACHE_TTL)
+            and not self.control_pending("default_charge_level", sn)
+        ):
             cache_fresh = True
             cached_values = dict(cached[0])
             if all(key in cached_values for key in requested):
@@ -1598,28 +1672,33 @@ class EvseRuntime:
                 }
             return None
 
+        if not isinstance(settings, list):
+            self.state._charger_config_backoff_until[sn] = (
+                time.monotonic() + CHARGER_CONFIG_FAILURE_BACKOFF_S
+            )
+            return None
         merged = dict(cached_values)
         returned_keys: set[str] = set()
-        if isinstance(settings, list):
-            for item in settings:
-                if not isinstance(item, dict):
-                    continue
-                raw_key: object = item.get("key")
-                try:
-                    key_text = str(raw_key).strip()
-                except Exception:
-                    continue
-                if key_text not in seen:
-                    continue
-                returned_keys.add(key_text)
-                if "value" in item:
-                    merged[key_text] = item.get("value")
-                elif "reqValue" in item:
-                    merged[key_text] = item.get("reqValue")
-        if isinstance(settings, list):
-            for key in requested:
-                if key not in returned_keys:
-                    merged[key] = _MISSING_CHARGER_CONFIG_VALUE
+        for item in settings:
+            if not isinstance(item, dict):
+                continue
+            raw_key: object = item.get("key")
+            try:
+                key_text = str(raw_key).strip()
+            except Exception:
+                continue
+            if key_text not in seen:
+                continue
+            returned_keys.add(key_text)
+            if "value" in item:
+                merged[key_text] = item.get("value")
+            elif "reqValue" in item:
+                merged[key_text] = item.get("reqValue")
+            else:
+                merged[key_text] = _MISSING_CHARGER_CONFIG_VALUE
+        for key in requested:
+            if key not in returned_keys:
+                merged[key] = _MISSING_CHARGER_CONFIG_VALUE
 
         self.state._charger_config_cache[sn] = (merged, now)
         self.state._charger_config_backoff_until.pop(sn, None)
@@ -1675,14 +1754,6 @@ class EvseRuntime:
         except Exception:  # noqa: BLE001
             return None
 
-    def set_default_charge_level_cache(self, sn: str, amps: int) -> None:
-        sn_str = str(sn)
-        now = time.monotonic()
-        cached = self.state._charger_config_cache.get(sn_str)
-        values = dict(cached[0]) if cached else {}
-        values[DEFAULT_CHARGE_LEVEL_SETTING] = int(amps)
-        self.state._charger_config_cache[sn_str] = (values, now)
-
     def _set_evse_toggle_pending(self, attr_name: str, sn: str, enabled: bool) -> None:
         pending = getattr(self.coordinator, attr_name, None)
         if not isinstance(pending, dict):
@@ -1693,6 +1764,7 @@ class EvseRuntime:
             time.monotonic() + EVSE_TOGGLE_PENDING_HOLD_S,
         )
 
+    @tracked_control("charge_mode", arguments=("mode",), serial_argument="sn")
     async def async_set_charge_mode(
         self,
         sn: str,
@@ -1701,19 +1773,30 @@ class EvseRuntime:
         previous_mode: str | None = None,
     ) -> None:
         sn_str = str(sn)
+        self.state._charge_mode_pending[sn_str] = (mode, time.monotonic())
+        self._charge_mode_submitting.add(sn_str)
+        self.coordinator.publish_runtime_state_update("charge_mode")
+        accepted = False
         try:
             await self.coordinator.client.set_charge_mode(
                 sn_str,
                 mode,
                 previous_mode=previous_mode,
             )
+            accepted = True
         except SchedulerUnavailable as err:
             self.coordinator.note_scheduler_unavailable(err)
             raise
+        finally:
+            self._charge_mode_submitting.discard(sn_str)
+            # Failed/cancelled submissions have no accepted request to confirm.
+            if not accepted:
+                self.state._charge_mode_pending.pop(sn_str, None)
+                self.coordinator.publish_runtime_state_update("charge_mode")
         self.coordinator.mark_scheduler_available()
-        self.set_charge_mode_cache(sn_str, mode)
         await self.coordinator.async_request_refresh()
 
+    @tracked_control("green_battery", arguments=("enabled",), serial_argument="sn")
     async def async_set_green_battery_setting(self, sn: str, *, enabled: bool) -> None:
         sn_str = str(sn)
         try:
@@ -1724,10 +1807,10 @@ class EvseRuntime:
             self.coordinator.note_scheduler_unavailable(err)
             raise
         self.coordinator.mark_scheduler_available()
-        self.set_green_battery_cache(sn_str, enabled)
         self._set_evse_toggle_pending("_green_battery_pending", sn_str, enabled)
         await self.coordinator.async_request_refresh()
 
+    @tracked_control("app_authentication", arguments=("enabled",), serial_argument="sn")
     async def async_set_app_authentication(self, sn: str, *, enabled: bool) -> None:
         sn_str = str(sn)
         try:
@@ -1738,10 +1821,10 @@ class EvseRuntime:
             self.coordinator.note_auth_settings_unavailable(err)
             raise
         self.coordinator.mark_auth_settings_available()
-        self.set_app_auth_cache(sn_str, enabled)
         self._set_evse_toggle_pending("_app_auth_pending", sn_str, enabled)
         await self.coordinator.async_request_refresh()
 
+    @tracked_control("default_charge_level", arguments=("amps",), serial_argument="sn")
     async def async_set_default_charge_level(self, sn: str, amps: int) -> None:
         sn_str = str(sn)
         try:
@@ -1772,7 +1855,11 @@ class EvseRuntime:
                 if coerced is not None:
                     accepted_amps = coerced
                 break
-        self.set_default_charge_level_cache(sn_str, accepted_amps)
+        runtime = getattr(self.coordinator, "control_updates", None)
+        if runtime:
+            runtime.set_requested(
+                "default_charge_level", {"amps": accepted_amps}, sn_str
+            )
         await self.coordinator.async_request_refresh()
 
     async def async_resolve_green_battery_settings(
@@ -1929,7 +2016,8 @@ class EvseRuntime:
         return [
             sn
             for sn in self._unique_serials(serials)
-            if self.cached_charge_mode_preference(sn, now=now) is None
+            if self.charge_mode_confirmation_active(sn)
+            or self.cached_charge_mode_preference(sn, now=now) is None
         ]
 
     def resolve_cached_green_battery_settings(
@@ -1960,7 +2048,8 @@ class EvseRuntime:
         return [
             sn
             for sn in self._unique_serials(serials)
-            if sn not in self.resolve_cached_green_battery_settings((sn,), now=now)
+            if self.control_pending("green_battery", sn)
+            or sn not in self.resolve_cached_green_battery_settings((sn,), now=now)
         ]
 
     def resolve_cached_auth_settings(
@@ -1991,7 +2080,8 @@ class EvseRuntime:
         return [
             sn
             for sn in self._unique_serials(serials)
-            if sn not in self.resolve_cached_auth_settings((sn,), now=now)
+            if self.control_pending("app_authentication", sn)
+            or sn not in self.resolve_cached_auth_settings((sn,), now=now)
         ]
 
     def resolve_cached_charger_config(
@@ -2035,7 +2125,9 @@ class EvseRuntime:
         )
         candidates: list[str] = []
         for sn in self._unique_serials(serials):
-            if sn in cached_results:
+            if sn in cached_results and not self.control_pending(
+                "default_charge_level", sn
+            ):
                 continue
             backoff_until = self.state._charger_config_backoff_until.get(sn)
             if backoff_until is not None and backoff_until > now:
@@ -2189,7 +2281,7 @@ class EvseRuntime:
     async def async_ensure_charge_mode(self, sn: str, target_mode: str) -> None:
         sn_str = str(sn)
         try:
-            await self.coordinator.client.set_charge_mode(sn_str, target_mode)
+            await self.async_set_charge_mode(sn_str, target_mode)
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug(
                 "Failed to enforce %s charge mode for charger %s: %s",
@@ -2202,4 +2294,3 @@ class EvseRuntime:
                 ),
             )
             return
-        self.set_charge_mode_cache(sn_str, target_mode)

@@ -508,6 +508,9 @@
     },
     "export_limit_session_expired": {
       "message": "Az Enlighten-munkamenet lejárt vagy elutasításra került. Nyissa meg a Hitelesítés menüt, jelentkezzen be újra, majd próbálja újra."
+    },
+    "control_change_pending": {
+      "message": "Egy vezérlési módosítás megerősítésre vár. Újabb módosítás elküldése előtt frissítse az állapotát."
     }
   },
   "options": {
@@ -1110,6 +1113,9 @@
           },
           "amp_control_applies_in_modes": {
             "name": "Módok, amelyekben az áramerősség-szabályzás alkalmazható"
+          },
+          "requested_mode": {
+            "name": "Kért mód"
           }
         }
       },
@@ -2282,6 +2288,15 @@
       },
       "inverter_array_power": {
         "name": "{array} Pillanatnyi teljesítmény"
+      },
+      "control_update_status": {
+        "name": "Vezérlési módosítás állapota",
+        "state": {
+          "idle": "Tétlen",
+          "pending": "Függőben levő",
+          "unconfirmed": "Nem megerősített",
+          "failed": "Sikertelen"
+        }
       }
     },
     "number": {

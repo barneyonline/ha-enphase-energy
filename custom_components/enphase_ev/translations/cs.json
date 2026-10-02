@@ -508,6 +508,9 @@
     },
     "export_limit_session_expired": {
       "message": "Relace Enlighten vypršela nebo byla odmítnuta. Otevřete Ověřování, spusťte nové ověření a zkuste to znovu."
+    },
+    "control_change_pending": {
+      "message": "Změna ovládání čeká na potvrzení. Před odesláním další změny obnovte její stav."
     }
   },
   "options": {
@@ -1110,6 +1113,9 @@
           },
           "amp_control_applies_in_modes": {
             "name": "Režimy, ve kterých je řízení proudu použitelné"
+          },
+          "requested_mode": {
+            "name": "Požadovaný režim"
           }
         }
       },
@@ -2282,6 +2288,15 @@
       },
       "inverter_array_power": {
         "name": "{array} Aktuální výkon"
+      },
+      "control_update_status": {
+        "name": "Stav změny ovládání",
+        "state": {
+          "idle": "Nečinné",
+          "pending": "Čeká na vyřízení",
+          "unconfirmed": "Nepotvrzeno",
+          "failed": "Selhalo"
+        }
       }
     },
     "number": {

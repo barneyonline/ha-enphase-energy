@@ -1590,6 +1590,8 @@ async def test_battery_schedule_services_support_crud_and_validation(
     from custom_components.enphase_ev.services import async_setup_services
 
     coord = coordinator_factory()
+    # Isolate API validation from the separately tested confirmation guard.
+    coord.control_updates = None
     _prepare_battery_schedule_coord(coord)
     coord._battery_charge_from_grid = False  # noqa: SLF001
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)

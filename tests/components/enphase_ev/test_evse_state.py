@@ -15,11 +15,16 @@ def test_runtime_owns_state_and_publishes_detached_controls(coordinator_factory)
     runtime.set_desired_charging("one", True)
     runtime.state._pending_charging["one"] = (True, 1.0)
     runtime.state._charge_mode_cache["one"] = ("MANUAL_CHARGING", 1.0)
+    runtime.state._charge_mode_pending["one"] = ("SCHEDULED_CHARGING", 1.0)
     runtime.state._green_battery_cache["one"] = (True, True, 1.0)
     runtime.state._auth_settings_cache["one"] = (True, False, True, True, 1.0)
     first = runtime.snapshot
+    runtime.state._charge_mode_pending["one"] = ("SCHEDULED_CHARGING", 2.0)
     runtime.state._charge_mode_cache["one"] = ("MANUAL_CHARGING", 2.0)
     assert runtime.snapshot == first
+    runtime.state._charge_mode_pending.clear()
+    assert first.pending_charge_modes["one"] == "SCHEDULED_CHARGING"
+    assert not runtime.snapshot.pending_charge_modes
     runtime.set_desired_charging("one", False)
     assert first.desired_charging["one"] is True
     assert runtime.snapshot.desired_charging["one"] is False

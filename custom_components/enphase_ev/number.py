@@ -17,6 +17,7 @@ from .battery_schedule_editor import (
     BatteryScheduleEditorEntity,
     battery_scheduler_enabled,
 )
+from .control_updates import current_control_value
 from .const import DOMAIN, SAFE_LIMIT_AMPS
 from .entity import evse_safe_limit_active, evse_charging_active
 from .entity import (
@@ -342,7 +343,16 @@ class BatteryReserveNumber(CoordinatorEntity, NumberEntity):  # type: ignore[mis
 
     @property
     def native_value(self) -> float | None:
-        value = self._coord.battery_selected_backup_percentage
+        value = current_control_value(
+            self._coord,
+            "battery_reserve",
+            "reserve",
+            getattr(
+                self._coord,
+                "_battery_backup_percentage",
+                self._coord.battery_selected_backup_percentage,
+            ),
+        )
         if value is None:
             return None
         return float(value)
@@ -469,7 +479,15 @@ class DefaultChargeLevelNumber(EnphaseBaseEntity, NumberEntity):  # type: ignore
 
     @property
     def native_value(self) -> float | None:
-        value = self._coerce_amp(self.data.get("default_charge_level"))
+        value = self._coerce_amp(
+            current_control_value(
+                self._coord,
+                "default_charge_level",
+                "amps",
+                self.data.get("default_charge_level"),
+                self._sn,
+            )
+        )
         return float(value) if value is not None else None
 
     @property
@@ -531,7 +549,12 @@ class BatteryShutdownLevelNumber(CoordinatorEntity, NumberEntity):  # type: igno
 
     @property
     def native_value(self) -> float | None:
-        value = self._coord.battery_shutdown_level
+        value = current_control_value(
+            self._coord,
+            "battery_shutdown_level",
+            "level",
+            self._coord.battery_shutdown_level,
+        )
         if value is None:
             return None
         return float(value)

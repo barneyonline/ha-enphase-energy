@@ -44,6 +44,128 @@ def _client_response_error(status: int, *, message: str = "", headers=None):
     )
 
 
+async def test_charge_mode_waits_for_fresh_readback(coordinator_factory):
+    from custom_components.enphase_ev.select import ChargeModeSelect
+    from custom_components.enphase_ev.sensor import EnphaseChargeModeSensor
+
+    coord = coordinator_factory(serials=["EV1", "EV2"])
+    coord.last_update_success = True
+    coord.data["EV1"]["charge_mode_pref"] = "MANUAL_CHARGING"
+    runtime = coord.evse_runtime
+    runtime.set_charge_mode_cache("EV1", "MANUAL_CHARGING")
+    coord.client.set_charge_mode = AsyncMock()
+    coord.client.charge_mode = AsyncMock(
+        side_effect=["MANUAL_CHARGING", None, RuntimeError("offline"), "SCHEDULED"]
+    )
+    coord.async_request_refresh = AsyncMock()
+    notifications = Mock()
+    coord.async_add_listener(notifications)
+    select = ChargeModeSelect(coord, "EV1")
+    sensor = EnphaseChargeModeSensor(coord, "EV1")
+
+    await runtime.async_set_charge_mode("EV1", "SCHEDULED_CHARGING")
+
+    assert notifications.called
+    assert select.available
+    assert ChargeModeSelect(coord, "EV2").available
+    assert sensor.native_value == "MANUAL_CHARGING"
+    assert sensor.extra_state_attributes["requested_mode"] == "SCHEDULED_CHARGING"
+    assert sensor.extra_state_attributes["preferred_mode"] == "MANUAL_CHARGING"
+    assert runtime.charge_mode_lookup_candidates(["EV1"]) == ["EV1"]
+    assert runtime.determine_polling_state({})["want_fast"] is True
+    with pytest.raises(ServiceValidationError, match="awaiting confirmation"):
+        await runtime.async_set_charge_mode("EV1", "GREEN_CHARGING")
+    coord.client.set_charge_mode.assert_awaited_once()
+
+    for _ in range(3):
+        await runtime.async_get_charge_mode("EV1")
+        assert sensor.native_value == "MANUAL_CHARGING"
+        assert select.available
+    assert await runtime.async_get_charge_mode("EV1") == "SCHEDULED_CHARGING"
+    assert select.available
+    assert sensor.extra_state_attributes["requested_mode"] is None
+    assert runtime.snapshot.charge_modes["EV1"] == "SCHEDULED_CHARGING"
+    assert not runtime.snapshot.pending_charge_modes
+
+
+async def test_charge_mode_submission_blocks_confirmation(coordinator_factory):
+    coord = coordinator_factory(serials=["EV1"])
+    runtime = coord.evse_runtime
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def write(*_args, **_kwargs):
+        entered.set()
+        await release.wait()
+
+    coord.client.set_charge_mode = write
+    coord.client.charge_mode = AsyncMock(return_value="SCHEDULED_CHARGING")
+    coord.async_request_refresh = AsyncMock()
+    task = asyncio.create_task(
+        runtime.async_set_charge_mode("EV1", "SCHEDULED_CHARGING")
+    )
+    await entered.wait()
+    assert await runtime.async_get_charge_mode("EV1") is None
+    coord.client.charge_mode.assert_not_awaited()
+    assert runtime.snapshot.pending_charge_modes["EV1"] == "SCHEDULED_CHARGING"
+    release.set()
+    await task
+    assert await runtime.async_get_charge_mode("EV1") == "SCHEDULED_CHARGING"
+    assert not runtime.snapshot.pending_charge_modes
+
+
+@pytest.mark.parametrize(
+    "error",
+    [RuntimeError("failed"), SchedulerUnavailable("down"), asyncio.CancelledError()],
+)
+async def test_charge_mode_submission_failure_clears_pending(
+    coordinator_factory, error
+):
+    coord = coordinator_factory(serials=["EV1"])
+    runtime = coord.evse_runtime
+    runtime.set_charge_mode_cache("EV1", "MANUAL_CHARGING")
+    coord.client.set_charge_mode = AsyncMock(side_effect=error)
+    coord.async_request_refresh = AsyncMock()
+    with pytest.raises(type(error)):
+        await runtime.async_set_charge_mode("EV1", "SCHEDULED_CHARGING")
+    assert not runtime.snapshot.pending_charge_modes
+    assert runtime.snapshot.charge_modes["EV1"] == "MANUAL_CHARGING"
+    assert not runtime._charge_mode_submitting
+    coord.async_request_refresh.assert_not_awaited()
+
+
+async def test_charge_mode_ignores_lookup_started_before_request(coordinator_factory):
+    coord = coordinator_factory(serials=["EV1"])
+    runtime = coord.evse_runtime
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def read(_sn):
+        entered.set()
+        await release.wait()
+        return "SCHEDULED_CHARGING"
+
+    coord.client.charge_mode = read
+    coord.client.set_charge_mode = AsyncMock()
+    coord.async_request_refresh = AsyncMock()
+    lookup = asyncio.create_task(runtime.async_get_charge_mode("EV1"))
+    await entered.wait()
+    await runtime.async_set_charge_mode("EV1", "SCHEDULED_CHARGING")
+    release.set()
+    assert await lookup is None
+    assert runtime.snapshot.pending_charge_modes["EV1"] == "SCHEDULED_CHARGING"
+    assert not runtime.snapshot.charge_modes
+
+
+def test_charge_mode_confirmation_fast_polling_is_bounded(
+    coordinator_factory, monkeypatch
+):
+    coord = coordinator_factory(serials=["EV1"])
+    runtime = coord.evse_runtime
+    monkeypatch.setattr(time, "monotonic", lambda: 700.0)
+    runtime.state._charge_mode_pending["EV1"] = ("SCHEDULED_CHARGING", 100.0)
+    assert runtime.determine_polling_state({})["want_fast"] is False
+    assert runtime.snapshot.pending_charge_modes["EV1"] == "SCHEDULED_CHARGING"
+
+
 def test_evse_runtime_helper_paths(coordinator_factory) -> None:
     coord = coordinator_factory()
     runtime = coord.evse_runtime
@@ -1340,3 +1462,32 @@ async def test_start_after_completed_stop_ignores_stale_charging_telemetry(
     coord.client.stop_charging.assert_awaited_once_with("EV1")
     coord.client.start_charging.assert_awaited_once()
     assert coord.get_desired_charging("EV1") is True
+
+
+async def test_pending_charge_mode_refresh_reads_scheduler_despite_embedded_mode(
+    coordinator_factory,
+):
+    coord = coordinator_factory(serials=["EV1"])
+    coord._has_successful_refresh = True
+    coord.client.status = AsyncMock(
+        return_value={
+            "evChargerData": [
+                {
+                    "sn": "EV1",
+                    "chargeMode": "MANUAL_CHARGING",
+                    "connectors": [{}],
+                    "session_d": {},
+                }
+            ]
+        }
+    )
+    coord.client.charge_mode = AsyncMock(return_value="SCHEDULED_CHARGING")
+    coord.client.set_charge_mode = AsyncMock()
+    coord.async_request_refresh = AsyncMock()
+    runtime = coord.evse_runtime
+    runtime.set_charge_mode_cache("EV1", "MANUAL_CHARGING")
+    await runtime.async_set_charge_mode("EV1", "SCHEDULED_CHARGING")
+    result = await coord._async_update_data()
+    coord.client.charge_mode.assert_awaited_once_with("EV1")
+    assert result["EV1"]["charge_mode_pref"] == "SCHEDULED_CHARGING"
+    assert not runtime.snapshot.pending_charge_modes
