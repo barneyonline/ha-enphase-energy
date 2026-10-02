@@ -16,6 +16,8 @@ All notable changes to this project will be documented in this file.
   exposing cached charger state as current or confirming pending commands.
 - Clear obsolete charger outages when charger polling is disabled, and avoid
   labeling shared retry deadlines as charger-status failures.
+- Keep cached charger readings and writes unavailable while recovery awaits
+  storage or follow-up reads, until the new charger state is ready to publish.
 
 ### 🔧 Improvements
 - Add bounded charger-status retries, visible endpoint retry times, localized

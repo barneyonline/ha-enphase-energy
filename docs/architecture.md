@@ -606,6 +606,9 @@ metadata; they are neither reparsed nor used to confirm pending commands. Serial
 selection and charger caches are preserved until authoritative inventory returns.
 Tracked charger writes reject unavailable status; an explicit Stop action remains
 allowed and still requires fresh readback for confirmation.
+Recovery keeps cached charger entities and writes unavailable until fresh status
+has been normalized and all awaited recovery work is complete. Background state
+publications cannot restore availability using the previous cached payload.
 
 Retries start at approximately one minute and grow to a maximum locally chosen
 wait of ten minutes, with jitter. A longer provider `Retry-After` takes precedence.
