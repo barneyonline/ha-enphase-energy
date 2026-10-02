@@ -11,6 +11,23 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v5.0.0b5 - 2026-10-02
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
 - Ignore battery profile, settings, and live-status responses requested before a
   newly accepted profile or reserve write, preventing older in-flight reads from
   confirming the request or replacing newer profile and reserve readback.
@@ -30,7 +47,7 @@ All notable changes to this project will be documented in this file.
 - Keep confirmed control values visible during Enphase writes and report progress separately through Control Update Status. Apply confirmation tracking and conflict guards to charger settings, charging commands, battery profiles/settings/schedules, Storm Guard, grid controls, and tariffs. Integrate Export Limit progress, bound extra confirmation polling, and keep Stop available during a pending Start.
 
 ### 🔄 Other changes
-- None
+- Bumped the integration manifest version to `5.0.0b5`.
 
 ## v5.0.0b4 - 2026-09-30
 
