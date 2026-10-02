@@ -533,3 +533,70 @@ async def test_unload_during_history_save_prevents_late_refresh_and_repairs(
     coord.energy._async_refresh_site_energy.assert_not_awaited()
     assert not mock_issue_registry.created
     assert not coord.evse_status_health.cooldown_active
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("pause_at", ["followup", "history"])
+async def test_recovery_keeps_cached_charger_unavailable_until_fresh_data_is_ready(
+    coordinator_factory, status_clock, monkeypatch, pause_at
+):
+    coord = coordinator_factory(
+        data={RANDOM_SERIAL: {"sn": RANDOM_SERIAL, "plugged": True, "faulted": False}}
+    )
+    coord._has_successful_refresh = True
+    coord.client.status = AsyncMock(
+        return_value={
+            "evChargerData": [
+                {"sn": RANDOM_SERIAL, "pluggedIn": False, "faulted": True}
+            ],
+            "ts": None,
+        }
+    )
+    coord.client.summary_v2 = AsyncMock(return_value=[])
+    coord.client.start_charging = AsyncMock()
+    coord._async_resolve_post_status_evse_enrichments = AsyncMock(
+        return_value=({}, {}, {}, {})
+    )
+    coord._async_run_post_status_refresh_pipeline = AsyncMock()
+    coord._async_run_post_session_refresh_pipeline = AsyncMock()
+    await coord.evse_status_health.async_failure(server_error())
+    coord.evse_status_health.stop()
+    charger = EnphaseBaseEntity(coord, RANDOM_SERIAL)
+    charger.async_write_ha_state = Mock()
+    unsub = coord.async_add_listener(charger._handle_coordinator_update)
+    paused = asyncio.Event()
+    release = asyncio.Event()
+
+    async def pause(*_args, **_kwargs):
+        paused.set()
+        await release.wait()
+
+    if pause_at == "followup":
+        coord._async_run_post_status_refresh_pipeline.side_effect = pause
+    else:
+        monkeypatch.setattr(
+            health_mod.Store, "async_save", AsyncMock(side_effect=pause)
+        )
+    refresh = asyncio.create_task(coord.async_refresh())
+    try:
+        await paused.wait()
+        # An unrelated runtime publication must not revive the cached charger.
+        coord.publish_runtime_state_update("power")
+        assert charger.data["plugged"] is True
+        assert not charger.available
+        assert not coord.evse_status_available
+        with pytest.raises(ServiceValidationError):
+            await coord.async_start_charging(RANDOM_SERIAL, allow_unplugged=True)
+        coord.client.start_charging.assert_not_awaited()
+        release.set()
+        await refresh
+        assert coord.last_update_success
+        assert coord.evse_status_available
+        assert charger.available
+        assert charger.data["plugged"] is False
+        assert charger.data["faulted"] is True
+    finally:
+        release.set()
+        await refresh
+        unsub()
+        await coord.async_cleanup_runtime_state()

@@ -4055,6 +4055,7 @@ class EnphaseCoordinator(
         if first_refresh and not context.minimal_setup_refresh:
             self._start_first_refresh_followups(context)
         status_refresh_succeeded = False
+        status_endpoint_succeeded = False
         status_charger_data_authoritative = False
         status_charger_data_serials: list[str] | None = None
         status_empty_observed = False
@@ -4137,8 +4138,7 @@ class EnphaseCoordinator(
                     success_mono=time.monotonic(),
                     success_utc=dt_util.utcnow(),
                 )
-                await self.evse_status_health.async_success()
-                self.diagnostics.clear_evse_status_issue()
+                status_endpoint_succeeded = True
             self.last_failure_endpoint = None
             if not status_empty_preserved:
                 self.payload_using_stale = False
@@ -4957,8 +4957,6 @@ class EnphaseCoordinator(
 
             out[sn] = entry
 
-        self._sync_desired_charging(out)
-
         polling_state = self._determine_polling_state(out)
         context.fast_poll = bool(polling_state["want_fast"])
 
@@ -5464,6 +5462,12 @@ class EnphaseCoordinator(
                 self._phase_timings,
             )
 
+        # Keep cached charger data unavailable through every awaited recovery
+        # step. Once health succeeds, return fresh data without yielding again.
+        if status_endpoint_succeeded:
+            await self.evse_status_health.async_success()
+            self.diagnostics.clear_evse_status_issue()
+        self._sync_desired_charging(out)
         return out
 
     def _sync_desired_charging(self, data: dict[str, dict[str, object]]) -> None:

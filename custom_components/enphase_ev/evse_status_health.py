@@ -183,12 +183,12 @@ class EvseStatusHealth:
         if not self.coordinator.runtime_active:
             raise asyncio.CancelledError
         recovered = not self.available
-        self.available = True
         self.last_success_utc = dt_util.utcnow().isoformat()
         self._consecutive_failures = 0
         self.stop()
         if recovered:
             await self._async_save()
+        self.available = True
 
     async def _async_save(self) -> None:
         try:
