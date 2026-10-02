@@ -9,7 +9,10 @@ import pytest
 from homeassistant.core import State
 from homeassistant.components.sensor import SensorStateClass
 from homeassistant.components.sensor import recorder as sensor_recorder
-from custom_components.enphase_ev.sensor import EnphaseInverterLifetimeEnergySensor
+from custom_components.enphase_ev.sensor import (
+    EnphaseInverterLifetimeEnergySensor,
+    EnphaseSiteEnergySensor,
+)
 from custom_components.enphase_ev.sensor_heatpump import (
     EnphaseHeatPumpDailyEnergySensor,
     EnphaseHeatPumpDailyGridEnergySensor,
@@ -21,6 +24,101 @@ from custom_components.enphase_ev.inverter_inventory import (
     inverter_page,
 )
 from custom_components.enphase_ev.sensor_snapshot_helpers import restore_power_w
+
+
+@pytest.mark.parametrize("flow", ["grid_export", "grid_import", "solar_production"])
+@pytest.mark.parametrize(
+    ("samples", "expected_states", "expected_sum"),
+    [
+        (
+            [19753.48, 19753.48, 19753.49, 19753.50],
+            ["19753.49", "19753.49", "19753.49", "19753.5"],
+            42.01,
+        ),
+        ([1.0, 1.5], ["1.0", "1.5"], 43.5),
+        (
+            [19753.49, 1.0, 1.0, 2.0],
+            ["19753.49", "19753.49", "1.0", "2.0"],
+            44.0,
+        ),
+    ],
+    ids=["cloud-correction", "offline-reset", "confirmed-live-reset"],
+)
+async def test_site_energy_recorder_preserves_restored_total(
+    hass,
+    coordinator_factory,
+    monkeypatch,
+    flow,
+    caplog,
+    samples,
+    expected_states,
+    expected_sum,
+):
+    """A lower first cloud sample must not lower restored recorder statistics."""
+    coord = coordinator_factory(serials=[])
+    entity = EnphaseSiteEnergySensor(coord, flow, f"site_{flow}", flow)
+    entity.hass = hass
+    entity.async_get_last_sensor_data = AsyncMock(
+        return_value=SimpleNamespace(native_value=19753.49)
+    )
+    entity.async_get_last_state = AsyncMock(return_value=None)
+    entity.async_get_last_extra_data = AsyncMock(return_value=None)
+    await entity.async_added_to_hass()
+
+    history = []
+    start = datetime(2026, 10, 2, 10, 5, tzinfo=timezone.utc)
+    for index, value in enumerate(samples):
+        # The new manager has no pre-restart high-water mark.
+        source = {"grid_export": "solar_grid", "grid_import": "import"}.get(
+            flow, "production"
+        )
+        coord.energy.site_energy, _ = coord.energy._aggregate_site_energy(
+            {source: [value * 1000]}
+        )
+        history.append(
+            State(
+                "sensor.site_energy",
+                str(entity.native_value),
+                {
+                    "state_class": entity.state_class,
+                    "device_class": entity.device_class,
+                    "unit_of_measurement": entity.native_unit_of_measurement,
+                    **entity.extra_state_attributes,
+                },
+                last_changed=start + timedelta(seconds=index),
+            )
+        )
+    assert [state.state for state in history] == expected_states
+    assert entity.state_class == SensorStateClass.TOTAL_INCREASING
+
+    monkeypatch.setattr(sensor_recorder, "_get_sensor_states", lambda _: [history[-1]])
+    monkeypatch.setattr(sensor_recorder, "get_instance", lambda _: MagicMock())
+    monkeypatch.setattr(
+        sensor_recorder.history,
+        "get_full_significant_states_with_session",
+        lambda *a, **k: {"sensor.site_energy": history},
+    )
+    monkeypatch.setattr(
+        sensor_recorder.statistics, "get_metadata_with_session", lambda *a, **k: {}
+    )
+    monkeypatch.setattr(
+        sensor_recorder.statistics,
+        "get_latest_short_term_statistics_with_session",
+        lambda *a, **k: {
+            "sensor.site_energy": [{"state": 19753.49, "sum": 42.0, "last_reset": None}]
+        },
+    )
+    result = sensor_recorder.compile_statistics(
+        hass, MagicMock(), start, start + timedelta(minutes=5), {}
+    )
+    assert result.platform_stats[0]["stat"]["sum"] == pytest.approx(expected_sum)
+    assert "sensor.site_energy" not in hass.data.get(sensor_recorder.SEEN_DIP, set())
+    assert "not strictly increasing" not in caplog.text
+
+    # Missing cloud data keeps the latest accepted value, not the restart value.
+    coord.energy.site_energy = {}
+    assert entity.native_value == float(expected_states[-1])
+    assert entity.extra_restore_state_data.native_value == float(expected_states[-1])
 
 
 @pytest.mark.parametrize(
