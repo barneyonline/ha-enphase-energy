@@ -15,9 +15,12 @@ from yarl import URL
 
 from custom_components.enphase_ev import evse_status_health as health_mod
 from custom_components.enphase_ev.const import (
+    ISSUE_CLOUD_ERRORS,
     ISSUE_EVSE_STATUS_UNAVAILABLE,
+    ISSUE_NETWORK_UNREACHABLE,
     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
 )
+from custom_components.enphase_ev.api import InvalidPayloadError
 from custom_components.enphase_ev.diagnostics import async_get_config_entry_diagnostics
 from custom_components.enphase_ev.entity import EnphaseBaseEntity
 from custom_components.enphase_ev.evse_status_health import (
@@ -329,6 +332,63 @@ async def test_auth_and_rate_limits_still_block_shared_refresh(
     with pytest.raises((UpdateFailed, ConfigEntryAuthFailed)):
         await coord._async_update_data()
     assert coord.evse_status_health.diagnostics()["failures"] == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("error", "prior_failures"),
+    [
+        (aiohttp.ClientError("network unavailable"), 2),
+        (InvalidPayloadError("bad JSON"), 1),
+    ],
+)
+async def test_status_server_response_breaks_other_failure_streaks(
+    coordinator_factory,
+    config_entry,
+    mock_issue_registry,
+    status_clock,
+    error,
+    prior_failures,
+):
+    clock, _ = status_clock
+    coord = coordinator_factory()
+    coord.config_entry = config_entry
+    coord.hass.config_entries.async_update_entry(
+        config_entry, options={OPT_DEGRADED_SERVICE_REPAIR_ISSUES: True}
+    )
+    coord._has_successful_refresh = True
+    coord._minimal_setup_refresh_active = True
+    # A running entry can have cached normalized state after its raw payload expires.
+    coord._status_payload_cache = None
+    coord.energy._async_refresh_site_energy = AsyncMock()
+    coord.refresh_runner.async_run_refresh_plan = AsyncMock()
+    coord.client.status = AsyncMock(side_effect=error)
+    try:
+        for _ in range(prior_failures):
+            with pytest.raises(UpdateFailed):
+                await coord._async_update_data()
+            delay = coord._backoff_until - clock.mono + 1
+            clock.mono += delay
+            clock.now += timedelta(seconds=delay)
+            coord._clear_backoff_timer()
+            coord._backoff_until = None
+
+        coord.client.status.side_effect = server_error()
+        await coord._async_update_data()
+        coord.evse_status_health.stop()
+        coord.client.status.side_effect = error
+        with pytest.raises(UpdateFailed):
+            await coord._async_update_data()
+
+        assert coord._backoff_until - clock.mono == coord._slow_interval_floor()
+        assert not any(
+            payload["translation_key"]
+            in {ISSUE_NETWORK_UNREACHABLE, ISSUE_CLOUD_ERRORS}
+            for _, _, payload in mock_issue_registry.created
+        )
+        assert not coord.evse_status_available
+    finally:
+        await coord.async_cleanup_runtime_state()
 
 
 @pytest.mark.asyncio

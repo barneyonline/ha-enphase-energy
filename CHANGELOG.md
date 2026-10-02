@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file.
   labeling shared retry deadlines as charger-status failures.
 - Keep cached charger readings and writes unavailable while recovery awaits
   storage or follow-up reads, until the new charger state is ready to publish.
+- Reset interrupted network and malformed-response failure streaks after charger
+  server responses, avoiding premature repairs and inflated shared retry delays.
 
 ### 🔧 Improvements
 - Add bounded charger-status retries, visible endpoint retry times, localized

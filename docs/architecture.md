@@ -615,6 +615,8 @@ wait of ten minutes, with jitter. A longer provider `Retry-After` takes preceden
 An independent entry-owned timer requests recovery without pausing sibling polls;
 unload cancels it. HTTP 429 retains the existing shared rate-limit cooldown, and
 HTTP 5xx does not trigger reauthentication.
+An HTTP server response resets preceding network and malformed-payload failure
+streaks so a later failure of another kind starts at its normal retry delay.
 
 Cloud Backoff Ends shows the charger-status deadline when no shared cooldown is
 active. Its charger-status attributes are hidden while a shared cooldown takes
