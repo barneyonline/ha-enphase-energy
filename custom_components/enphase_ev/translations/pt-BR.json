@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "Uma alteração de controle aguarda confirmação. Atualize seu status antes de enviar outra alteração."
+    },
+    "charger_status_unavailable": {
+      "message": "O status atualizado do carregador está indisponível. Aguarde a recuperação antes de alterar as configurações."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Alteração do limite de injeção não confirmada",
       "description": "A alteração não foi confirmada após {pending_timeout_minutes} minutos. As verificações continuam no intervalo padrão. Verifique a configuração do gateway; a gravação não será repetida automaticamente."
+    },
+    "evse_status_unavailable": {
+      "title": "Status do carregador indisponível",
+      "description": "O status do carregador da instalação {site_id} retornou HTTP {status}. As leituras e os controles ficam indisponíveis até receber um status atualizado. Próxima tentativa: {next_retry}. Os outros endpoints continuam sendo consultados de forma independente."
     }
   },
   "system_health": {

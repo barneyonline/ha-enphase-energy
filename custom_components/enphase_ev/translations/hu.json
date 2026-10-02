@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "Egy vezérlési módosítás megerősítésre vár. Újabb módosítás elküldése előtt frissítse az állapotát."
+    },
+    "charger_status_unavailable": {
+      "message": "A töltő friss állapota nem érhető el. A beállítások módosítása előtt várja meg a helyreállást."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "A betáplálási korlát módosítása nincs megerősítve",
       "description": "A módosítás {pending_timeout_minutes} perc után sincs megerősítve. Az ellenőrzések a szokásos időközzel folytatódnak. Ellenőrizze az átjáró beállításait; az írás nem ismétlődik meg automatikusan."
+    },
+    "evse_status_unavailable": {
+      "title": "A töltő állapota nem érhető el",
+      "description": "A(z) {site_id} helyszín töltőállapota HTTP {status} választ adott. A töltő adatai és vezérlése nem érhetők el a friss állapot visszatéréséig. Következő próbálkozás: {next_retry}. A többi végpont lekérdezése egymástól függetlenül folytatódik."
     }
   },
   "system_health": {

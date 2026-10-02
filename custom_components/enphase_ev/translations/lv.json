@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "Vadības izmaiņa gaida apstiprinājumu. Pirms citas izmaiņas iesniegšanas atsvaidziniet tās statusu."
+    },
+    "charger_status_unavailable": {
+      "message": "Aktuāls lādētāja statuss nav pieejams. Pirms iestatījumu maiņas uzgaidiet, līdz savienojums atjaunojas."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Eksporta ierobežojuma izmaiņa nav apstiprināta",
       "description": "Izmaiņa nav apstiprināta pēc {pending_timeout_minutes} minūtēm. Pārbaudes turpinās standarta intervālā. Pārbaudiet vārtejas iestatījumus; ierakstīšana netiks automātiski atkārtota."
+    },
+    "evse_status_unavailable": {
+      "title": "Lādētāja statuss nav pieejams",
+      "description": "Objekta {site_id} lādētāja statuss atgrieza HTTP {status}. Rādījumi un vadība nav pieejami, līdz tiek saņemts aktuāls statuss. Nākamais mēģinājums: {next_retry}. Pārējo galapunktu aptauja turpinās neatkarīgi."
     }
   },
   "system_health": {

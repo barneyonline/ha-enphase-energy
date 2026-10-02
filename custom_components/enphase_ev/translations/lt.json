@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "Valdymo pakeitimas laukia patvirtinimo. Prieš pateikdami kitą pakeitimą atnaujinkite jo būseną."
+    },
+    "charger_status_unavailable": {
+      "message": "Nauja įkroviklio būsena nepasiekiama. Prieš keisdami nustatymus palaukite, kol ryšys atsikurs."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Eksporto ribos pakeitimas nepatvirtintas",
       "description": "Pakeitimas nepatvirtintas po {pending_timeout_minutes} minučių. Tikrinimas tęsiamas įprastu intervalu. Patikrinkite šliuzo nustatymus; įrašymas automatiškai nekartojamas."
+    },
+    "evse_status_unavailable": {
+      "title": "Įkroviklio būsena nepasiekiama",
+      "description": "Objekto {site_id} įkroviklio būsena grąžino HTTP {status}. Įkroviklio rodmenys ir valdymas nepasiekiami, kol bus gauta nauja būsena. Kitas bandymas: {next_retry}. Kiti galiniai taškai toliau apklausiami nepriklausomai."
     }
   },
   "system_health": {

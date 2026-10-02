@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "Una modifica del controllo è in attesa di conferma. Aggiorna il suo stato prima di inviare un’altra modifica."
+    },
+    "charger_status_unavailable": {
+      "message": "Lo stato aggiornato del caricatore non è disponibile. Attendi il ripristino prima di modificarne le impostazioni."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Modifica del limite di immissione non confermata",
       "description": "La modifica non è confermata dopo {pending_timeout_minutes} minuti. I controlli continuano all’intervallo normale. Verifica la configurazione del gateway; la scrittura non verrà ripetuta automaticamente."
+    },
+    "evse_status_unavailable": {
+      "title": "Stato del caricatore non disponibile",
+      "description": "Lo stato del caricatore del sito {site_id} ha restituito HTTP {status}. Letture e comandi non sono disponibili finché non arriva uno stato aggiornato. Prossimo tentativo: {next_retry}. Gli altri endpoint continuano a essere interrogati indipendentemente."
     }
   },
   "system_health": {

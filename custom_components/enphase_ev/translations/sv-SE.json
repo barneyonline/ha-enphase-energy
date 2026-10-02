@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "En kontrolländring väntar på bekräftelse. Uppdatera dess status innan du skickar en ny ändring."
+    },
+    "charger_status_unavailable": {
+      "message": "Aktuell laddarstatus är inte tillgänglig. Vänta på återställning innan du ändrar laddarinställningarna."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Ändring av exportgränsen är obekräftad",
       "description": "Ändringen har inte bekräftats efter {pending_timeout_minutes} minuter. Kontroller fortsätter med standardintervallet. Kontrollera gatewayens inställningar; skrivningen upprepas inte automatiskt."
+    },
+    "evse_status_unavailable": {
+      "title": "Laddarstatus är inte tillgänglig",
+      "description": "Laddarstatus för anläggning {site_id} returnerade HTTP {status}. Laddarens mätvärden och styrning är inte tillgängliga tills aktuell status återkommer. Nästa försök: {next_retry}. Andra ändpunkter fortsätter att hämtas oberoende."
     }
   },
   "system_health": {

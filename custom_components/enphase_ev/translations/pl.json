@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "Zmiana sterowania oczekuje na potwierdzenie. Odśwież jej stan przed wysłaniem kolejnej zmiany."
+    },
+    "charger_status_unavailable": {
+      "message": "Aktualny stan ładowarki jest niedostępny. Przed zmianą ustawień poczekaj na przywrócenie działania."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Zmiana limitu oddawania energii niepotwierdzona",
       "description": "Zmiana nie została potwierdzona po {pending_timeout_minutes} minutach. Sprawdzanie trwa w standardowym interwale. Sprawdź konfigurację bramy; zapis nie będzie automatycznie ponawiany."
+    },
+    "evse_status_unavailable": {
+      "title": "Stan ładowarki niedostępny",
+      "description": "Stan ładowarki dla instalacji {site_id} zwrócił HTTP {status}. Odczyty i sterowanie są niedostępne do czasu otrzymania aktualnego stanu. Następna próba: {next_retry}. Pozostałe punkty końcowe są nadal odpytywane niezależnie."
     }
   },
   "system_health": {

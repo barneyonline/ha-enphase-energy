@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "Een bedieningswijziging wacht op bevestiging. Vernieuw de status voordat je een andere wijziging indient."
+    },
+    "charger_status_unavailable": {
+      "message": "Actuele laadpaalstatus is niet beschikbaar. Wacht op herstel voordat je instellingen wijzigt."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Wijziging terugleverlimiet onbevestigd",
       "description": "De wijziging is na {pending_timeout_minutes} minuten niet bevestigd. Controles gaan verder met het standaardinterval. Controleer de gatewayconfiguratie; het schrijven wordt niet automatisch herhaald."
+    },
+    "evse_status_unavailable": {
+      "title": "Laadpaalstatus niet beschikbaar",
+      "description": "De laadpaalstatus voor locatie {site_id} gaf HTTP {status}. Metingen en bediening zijn niet beschikbaar totdat actuele statusgegevens terugkeren. Volgende poging: {next_retry}. Andere eindpunten worden onafhankelijk verder opgevraagd."
     }
   },
   "system_health": {
