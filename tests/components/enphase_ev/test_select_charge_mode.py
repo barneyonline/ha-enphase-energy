@@ -68,8 +68,13 @@ async def test_charge_mode_select(hass, monkeypatch):
         "MANUAL_CHARGING",
         previous_mode="SCHEDULED_CHARGING",
     )
-    # cache should update immediately
-    assert coord._charge_mode_cache[RANDOM_SERIAL][0] == "MANUAL_CHARGING"
+    # Accepted requests remain separate from confirmed mode.
+    assert RANDOM_SERIAL not in coord._charge_mode_cache
+    assert (
+        coord.evse_runtime.snapshot.pending_charge_modes[RANDOM_SERIAL]
+        == "MANUAL_CHARGING"
+    )
+    assert sel.available is True
 
 
 @pytest.mark.asyncio
@@ -1026,6 +1031,35 @@ def test_system_profile_select_available_while_write_access_unknown(
     sel = SystemProfileSelect(coord)
 
     assert sel.available is True
+
+
+def test_system_profile_control_and_sensor_wait_for_confirmation(coordinator_factory):
+    from custom_components.enphase_ev.select import SystemProfileSelect
+    from custom_components.enphase_ev.sensor import EnphaseSystemProfileStatusSensor
+
+    coord = coordinator_factory()
+    coord.last_update_success = True
+    coord._battery_show_charge_from_grid = True
+    coord._battery_profile = "self-consumption"
+    select = SystemProfileSelect(coord)
+    sensor = EnphaseSystemProfileStatusSensor(coord)
+    assert select.available
+    coord.battery_runtime.set_battery_pending(
+        profile="backup_only", reserve=100, sub_type=None, require_exact_settings=False
+    )
+    assert select.available
+    assert sensor.native_value == "Self-Consumption"
+    assert sensor.extra_state_attributes["configured_profile"] == "self-consumption"
+    assert sensor.extra_state_attributes["requested_profile"] == "backup_only"
+    coord.battery_runtime.parse_battery_status_payload(
+        {
+            "storages": [
+                {"id": "123", "battery_mode": "Full Backup", "current_charge": "75%"}
+            ]
+        }
+    )
+    assert select.available
+    assert sensor.native_value == "Full Backup"
 
 
 @pytest.mark.asyncio

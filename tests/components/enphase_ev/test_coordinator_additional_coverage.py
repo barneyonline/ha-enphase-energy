@@ -3239,13 +3239,21 @@ def test_charge_mode_normalizers_handle_invalid_values(coordinator_factory):
 
 
 @pytest.mark.asyncio
-async def test_ensure_charge_mode_updates_cache(coordinator_factory):
+async def test_ensure_charge_mode_tracks_intent_without_updating_cache(
+    coordinator_factory,
+):
     coord = coordinator_factory(serials=["EV1"])
     sn = "EV1"
     coord.client.set_charge_mode = AsyncMock(return_value={"ok": True})
+    coord.async_request_refresh = AsyncMock()
     await coord._ensure_charge_mode(sn, "SCHEDULED_CHARGING")
-    coord.client.set_charge_mode.assert_awaited_once_with(sn, "SCHEDULED_CHARGING")
-    assert coord._charge_mode_cache[sn][0] == "SCHEDULED_CHARGING"
+    coord.client.set_charge_mode.assert_awaited_once_with(
+        sn, "SCHEDULED_CHARGING", previous_mode=None
+    )
+    assert sn not in coord._charge_mode_cache
+    assert coord.control_updates.updates[("charge_mode", sn)].requested == {
+        "mode": "SCHEDULED_CHARGING"
+    }
 
 
 @pytest.mark.asyncio
@@ -4078,9 +4086,10 @@ async def test_async_set_default_charge_level_caches_accepted_value(
     await coord.evse_runtime.async_set_default_charge_level(SERIAL_ONE, 24)
 
     coord.client.set_default_charge_level.assert_awaited_once_with(SERIAL_ONE, 24)
-    assert coord._charger_config_cache[SERIAL_ONE][0][DEFAULT_CHARGE_LEVEL_SETTING] == (
-        30
-    )
+    assert SERIAL_ONE not in coord._charger_config_cache
+    assert coord.control_updates.updates[
+        ("default_charge_level", SERIAL_ONE)
+    ].requested == {"amps": 30}
     coord.async_request_refresh.assert_awaited_once()
 
 
@@ -4102,9 +4111,10 @@ async def test_async_set_default_charge_level_uses_reqvalue_and_ignores_noise(
 
     await coord.evse_runtime.async_set_default_charge_level(SERIAL_ONE, 24)
 
-    assert coord._charger_config_cache[SERIAL_ONE][0][DEFAULT_CHARGE_LEVEL_SETTING] == (
-        32
-    )
+    assert SERIAL_ONE not in coord._charger_config_cache
+    assert coord.control_updates.updates[
+        ("default_charge_level", SERIAL_ONE)
+    ].requested == {"amps": 32}
 
 
 @pytest.mark.asyncio
@@ -4119,9 +4129,10 @@ async def test_async_set_default_charge_level_keeps_requested_value_for_bad_resp
 
     await coord.evse_runtime.async_set_default_charge_level(SERIAL_ONE, 24)
 
-    assert coord._charger_config_cache[SERIAL_ONE][0][DEFAULT_CHARGE_LEVEL_SETTING] == (
-        24
-    )
+    assert SERIAL_ONE not in coord._charger_config_cache
+    assert coord.control_updates.updates[
+        ("default_charge_level", SERIAL_ONE)
+    ].requested == {"amps": 24}
     assert coord.evse_runtime._coerce_charge_level(None) is None  # noqa: SLF001
 
 
@@ -5036,6 +5047,7 @@ async def test_async_start_charging_handles_bad_data(coordinator_factory):
             raise RuntimeError("boom")
 
     coord.data = BadData()
+    coord.publish_runtime_state_update = MagicMock()
     coord.pick_start_amps = MagicMock(return_value=32)
     coord._charge_mode_start_preferences = MagicMock(
         return_value=ChargeModeStartPreferences()

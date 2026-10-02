@@ -508,6 +508,9 @@
     },
     "export_limit_session_expired": {
       "message": "Enlighteni seanss on aegunud või tagasi lükatud. Avage Autentimine, autentige uuesti ja proovige uuesti."
+    },
+    "control_change_pending": {
+      "message": "Juhtimise muudatus ootab kinnitust. Enne järgmise muudatuse saatmist värskenda selle olekut."
     }
   },
   "options": {
@@ -1110,6 +1113,9 @@
           },
           "amp_control_applies_in_modes": {
             "name": "Režiimid, kus amprite juhtimine kehtib"
+          },
+          "requested_mode": {
+            "name": "Taotletud režiim"
           }
         }
       },
@@ -2282,6 +2288,15 @@
       },
       "inverter_array_power": {
         "name": "{array} Hetkevõimsus"
+      },
+      "control_update_status": {
+        "name": "Juhtimise muudatuse olek",
+        "state": {
+          "idle": "Jõude",
+          "pending": "Ootel",
+          "unconfirmed": "Kinnitamata",
+          "failed": "Nurjus"
+        }
       }
     },
     "number": {

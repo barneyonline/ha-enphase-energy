@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -12,6 +13,7 @@ from homeassistant.exceptions import ServiceValidationError
 
 from .api import ActivationAccessDenied, OptionalEndpointUnavailable, Unauthorized
 from .api_client.errors import ActivationSessionExpired
+from .control_updates import tracked_control
 from .const import DOMAIN
 from .service_validation import raise_translated_service_validation
 
@@ -766,7 +768,12 @@ class GridProfileRuntime:
                 )
                 self.gateway_targets = targets
 
-    def _parse_activation_devices(self, payload: object) -> None:
+    def _parse_activation_devices(
+        self,
+        payload: object,
+        *,
+        control_tokens: Mapping[tuple[str, str | None], object] | None = None,
+    ) -> None:
         """Parse Activation device-list status returned by the cloud endpoint."""
 
         if isinstance(payload, dict):
@@ -832,6 +839,17 @@ class GridProfileRuntime:
             serial = self._envoy_serial_from_record(record)
             if serial is None and len(targets) == 1:
                 serial = next(iter(targets))
+            if control_tokens is not None and serial and current_id:
+                update = self.coordinator.control_updates.updates.get(
+                    ("grid_profile", None)
+                )
+                if update and update.requested.get("gateway_serial") == serial:
+                    self.coordinator.control_updates.observe(
+                        "grid_profile",
+                        None,
+                        {"profile_id": current_id, "gateway_serial": serial},
+                        control_tokens,
+                    )
             if serial:
                 existing = targets.get(serial)
                 ensemble = _coerce_bool(
@@ -1092,10 +1110,12 @@ class GridProfileRuntime:
             family = ACTIVATION_GRID_PROFILE_FAMILY
             if not self.coordinator._endpoint_family_should_run(family, force=force):
                 return self.browse()
+            runtime = getattr(self.coordinator, "control_updates", None)
+            control_tokens = runtime.read_tokens() if runtime else None
             try:
                 await self._async_prepare_activation_auth()
                 devices = await self.client.async_get_activation_device_list()
-                self._parse_activation_devices(devices)
+                self._parse_activation_devices(devices, control_tokens=control_tokens)
             except Exception as err:  # noqa: BLE001
                 if (
                     self._is_access_denied(err)
@@ -1497,6 +1517,7 @@ class GridProfileRuntime:
             region_code=self.staged_region_code,
         )
 
+    @tracked_control("grid_profile", arguments=("profile_id",))
     async def async_apply_grid_profile(
         self,
         profile_id: str | None,
@@ -1570,6 +1591,15 @@ class GridProfileRuntime:
         assert target is not None
         try:
             await self._async_prepare_activation_auth()
+            runtime = getattr(self.coordinator, "control_updates", None)
+            if runtime:
+                runtime.set_requested(
+                    "grid_profile",
+                    {
+                        "profile_id": profile.profile_id,
+                        "gateway_serial": target.serial_num,
+                    },
+                )
             await self.client.async_apply_grid_profile(
                 gateway_serial=target.serial_num,
                 part_num=target.part_num,

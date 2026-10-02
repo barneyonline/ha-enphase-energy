@@ -23,6 +23,7 @@ from .battery_schedule_editor import (
     battery_schedule_type_options,
     battery_scheduler_enabled,
 )
+from .control_updates import current_control_value
 from .const import DOMAIN, OPT_EXPORT_LIMIT_DEFAULT_WATTS, OPT_EXPORT_LIMIT_SLEW_RATE
 from .export_limit_runtime import ExportLimitRuntime, fail
 from .entity import battery_schedule_supported
@@ -369,12 +370,7 @@ class ExportLimitSelect(CoordinatorEntity, SelectEntity):  # type: ignore[misc]
     @property
     def available(self) -> bool:
         runtime = self._coord.export_limit_runtime
-        return bool(
-            runtime.enabled
-            and runtime.snapshot
-            and runtime.snapshot.supported
-            and not runtime.pending
-        )
+        return bool(runtime.enabled and runtime.snapshot and runtime.snapshot.supported)
 
     @property
     def current_option(self) -> str | None:
@@ -459,7 +455,12 @@ class SystemProfileSelect(CoordinatorEntity, SelectEntity):  # type: ignore[misc
 
     @property
     def current_option(self) -> str | None:
-        selected = self._coord.battery_selected_profile
+        selected = current_control_value(
+            self._coord,
+            "system_profile",
+            "profile_key",
+            self._coord.battery_live_profile or self._coord.battery_profile,
+        )
         if not selected:
             return None
         return battery_profile_label(
@@ -733,7 +734,13 @@ class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):  # type: ignore[misc]
     @property
     def current_option(self) -> str | None:
         resolve_pref = getattr(self._coord, "_resolve_charge_mode_pref", None)
-        val = resolve_pref(self._sn) if callable(resolve_pref) else None
+        val = current_control_value(
+            self._coord,
+            "charge_mode",
+            "mode",
+            resolve_pref(self._sn) if callable(resolve_pref) else None,
+            self._sn,
+        )
         if not val:
             return None
         if val == "MANUAL_CHARGING":

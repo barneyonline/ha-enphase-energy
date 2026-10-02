@@ -4082,6 +4082,8 @@ async def test_tariff_writes_serialize_and_preserve_lagging_acknowledged_rates(
     coordinator_factory,
 ) -> None:
     coord = coordinator_factory()
+    # Exercise write serialization and payload merging independently of the guard.
+    coord.control_updates = None
     runtime = coord.tariff_runtime
     payload = {
         "purchase": _write_test_branch("0.1"),
@@ -4185,6 +4187,8 @@ async def test_tariff_full_write_then_granular_write_preserves_pending_structure
     coordinator_factory,
 ) -> None:
     coord = coordinator_factory()
+    # Exercise write serialization and payload merging independently of the guard.
+    coord.control_updates = None
     runtime = coord.tariff_runtime
     coord.client.site_tariff = AsyncMock(
         return_value={
@@ -4317,6 +4321,8 @@ async def test_tariff_failure_preserves_prior_acknowledgement_only(
     coordinator_factory,
 ) -> None:
     coord = coordinator_factory()
+    # Exercise write serialization and payload merging independently of the guard.
+    coord.control_updates = None
     runtime = coord.tariff_runtime
     coord.client.site_tariff = AsyncMock(
         return_value={
@@ -4349,6 +4355,9 @@ def test_merge_tariff_distinguishes_null_from_absent_keys() -> None:
 
 def _pending_tariff_test_runtime(coordinator_factory):
     coord = coordinator_factory()
+    # These cases isolate acknowledged-payload merging. The public pending
+    # guard and readback status are exercised in test_control_updates.py.
+    coord.control_updates = None
     payload = {
         "purchase": _write_test_branch("0.1"),
         "buyback": _write_test_branch("0.2"),
@@ -4722,7 +4731,12 @@ async def test_tariff_write_finishing_after_retirement_cannot_start_followup(
         )
     )
     await entered.wait()
+    # Submission publishes Pending before retirement. Only later publications
+    # violate the retired-runtime contract exercised by this test.
+    publish.assert_called_once()
+    publish.reset_mock()
     coord.mark_runtime_stopped()
+    assert not coord.control_updates.updates
     release.set()
     result = await pending
     if stage == "read":

@@ -848,7 +848,7 @@ async def test_sensor_pending_until_matching_readback(runtime, watts, final_stat
         assert not sensor.extra_state_attributes["pending"]
         assert sensor.extra_state_attributes["pending_requested_at"] is None
         await runtime.async_apply(watts, confirm=True, slew_rate=250)
-        assert sensor.native_value == "pending"
+        assert sensor.native_value == "limited"
         assert sensor.available
         attrs = sensor.extra_state_attributes
         assert attrs["pending"] is True
@@ -867,8 +867,8 @@ async def test_sensor_pending_until_matching_readback(runtime, watts, final_stat
         coord.client.async_get_export_limit_settings.side_effect = TimeoutError
         with pytest.raises(ServiceValidationError):
             await runtime.async_refresh()
-        assert sensor.native_value == "unconfirmed"
-        assert sensor.available
+        assert sensor.native_value is None
+        assert not sensor.available
         assert sensor.extra_state_attributes["pending"] is True
         coord.client.async_get_export_limit_settings.side_effect = None
         coord.client.async_get_export_limit_settings.return_value = payload(

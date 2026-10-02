@@ -508,6 +508,9 @@
     },
     "export_limit_session_expired": {
       "message": "Sesja Enlighten wygasła lub została odrzucona. Otwórz Uwierzytelnianie, uwierzytelnij się ponownie i spróbuj jeszcze raz."
+    },
+    "control_change_pending": {
+      "message": "Zmiana sterowania oczekuje na potwierdzenie. Odśwież jej stan przed wysłaniem kolejnej zmiany."
     }
   },
   "options": {
@@ -1110,6 +1113,9 @@
           },
           "amp_control_applies_in_modes": {
             "name": "Tryby, w których sterowanie amperażem ma zastosowanie"
+          },
+          "requested_mode": {
+            "name": "Żądany tryb"
           }
         }
       },
@@ -2282,6 +2288,15 @@
       },
       "inverter_array_power": {
         "name": "{array} Bieżąca moc"
+      },
+      "control_update_status": {
+        "name": "Stan zmiany sterowania",
+        "state": {
+          "idle": "Bezczynny",
+          "pending": "Oczekujący",
+          "unconfirmed": "Niepotwierdzone",
+          "failed": "Niepowodzenie"
+        }
       }
     },
     "number": {

@@ -508,6 +508,9 @@
     },
     "export_limit_session_expired": {
       "message": "Enlighten-økten er utløpt eller avvist. Åpne Autentisering, start ny autentisering og prøv igjen."
+    },
+    "control_change_pending": {
+      "message": "En kontrollendring venter på bekreftelse. Oppdater statusen før du sender en ny endring."
     }
   },
   "options": {
@@ -1110,6 +1113,9 @@
           },
           "amp_control_applies_in_modes": {
             "name": "Moduser der amperekontroll gjelder"
+          },
+          "requested_mode": {
+            "name": "Ønsket modus"
           }
         }
       },
@@ -2282,6 +2288,15 @@
       },
       "inverter_array_power": {
         "name": "{array} Nåværende effekt"
+      },
+      "control_update_status": {
+        "name": "Status for kontrollendring",
+        "state": {
+          "idle": "Inaktiv",
+          "pending": "Venter",
+          "unconfirmed": "Ubekreftet",
+          "failed": "Mislyktes"
+        }
       }
     },
     "number": {

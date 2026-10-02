@@ -27,6 +27,7 @@ from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 
 from .api import EnphaseLoginWallUnauthorized, SchedulerUnavailable
+from .control_updates import current_control_value, tracked_control
 from .const import (
     DEFAULT_SCHEDULE_SYNC_ENABLED,
     DOMAIN,
@@ -201,11 +202,24 @@ class ScheduleSync:
                 _LOGGER.exception("Schedule sync listener error")
 
     def get_slot(self, sn: str, slot_id: str) -> dict[str, Any] | None:
-        return self._slot_cache.get(sn, {}).get(slot_id)
+        return self._confirmed_slots(sn).get(slot_id)
+
+    def _confirmed_slots(self, sn: str) -> dict[str, dict[str, Any]]:
+        values = self._slot_cache.get(sn, {})
+        for control in (
+            "evse_schedule_enabled",
+            "evse_schedule_replace",
+            "evse_schedule_save",
+            "evse_schedule_delete",
+        ):
+            values = current_control_value(
+                self._coordinator, control, "slots", values, sn
+            )
+        return values
 
     def iter_slots(self) -> Iterable[tuple[str, str, dict[str, Any]]]:
         for serial, slots in self._slot_cache.items():
-            for slot_id, slot in slots.items():
+            for slot_id, slot in self._confirmed_slots(serial).items():
                 yield serial, slot_id, slot
 
     def is_off_peak_eligible(self, sn: str) -> bool:
@@ -436,6 +450,12 @@ class ScheduleSync:
                 self._mutation_revisions[sn] = self._mutation_revisions.get(sn, 0) + 1
             return accepted
 
+    @tracked_control(
+        "evse_schedule_enabled",
+        arguments=("slot_id", "enabled"),
+        serial_argument="sn",
+        group="evse_schedule",
+    )
     async def async_set_slot_enabled(
         self, sn: str, slot_id: str, enabled: bool
     ) -> bool:
@@ -825,6 +845,17 @@ class ScheduleSync:
             self._meta_cache[sn] = new_timestamp
         if created_slot_id:
             slot_payload["id"] = created_slot_id
+            runtime = getattr(self._coordinator, "control_updates", None)
+            if runtime:
+                from .control_values import requested_control_values
+
+                runtime.set_requested(
+                    "evse_schedule_save",
+                    requested_control_values(
+                        "evse_schedule_save", {"slot": slot_payload}, self._coordinator
+                    ),
+                    sn,
+                )
             self._slot_cache.setdefault(sn, {})[created_slot_id] = slot_payload
         self._schedule_post_patch_refresh(sn)
         self._notify_listeners()
@@ -842,8 +873,25 @@ class ScheduleSync:
     async def _async_fetch_serial_sync(
         self, sn: str
     ) -> tuple[dict[str, Any] | None, Exception | None]:
+        runtime = getattr(self._coordinator, "control_updates", None)
+        tokens = runtime.read_tokens() if runtime else {}
         try:
-            return await self._coordinator.client.get_schedules(sn), None
+            response = await self._coordinator.client.get_schedules(sn)
+            slots = response.get("slots") if isinstance(response, dict) else None
+            if (
+                runtime
+                and isinstance(slots, list)
+                and all(isinstance(slot, dict) and slot.get("id") for slot in slots)
+            ):
+                values = {"slots": {str(slot["id"]): slot for slot in slots}}
+                for control in (
+                    "evse_schedule_enabled",
+                    "evse_schedule_replace",
+                    "evse_schedule_save",
+                    "evse_schedule_delete",
+                ):
+                    runtime.observe(control, sn, values, tokens)
+            return response, None
         except Exception as err:  # noqa: BLE001
             return None, err
 
@@ -910,6 +958,12 @@ class ScheduleSync:
     def _default_server_timestamp(self) -> str:
         return cast(str, dt_util.utcnow().isoformat(timespec="milliseconds"))
 
+    @tracked_control(
+        "evse_schedule_replace",
+        arguments=("slots",),
+        serial_argument="sn",
+        group="evse_schedule",
+    )
     async def async_replace_slots(self, sn: str, slots: list[dict[str, Any]]) -> bool:
         return await self._async_mutate_serial(
             sn, lambda: self._async_replace_slots(sn, slots)
@@ -1011,6 +1065,12 @@ class ScheduleSync:
         self._notify_listeners()
         return True
 
+    @tracked_control(
+        "evse_schedule_save",
+        arguments=("slot",),
+        serial_argument="sn",
+        group="evse_schedule",
+    )
     async def async_upsert_slot(self, sn: str, slot: dict[str, Any]) -> bool:
         return await self._async_mutate_serial(
             sn, lambda: self._async_upsert_slot(sn, slot)
@@ -1022,6 +1082,12 @@ class ScheduleSync:
             return await self._patch_slot(sn, slot_id, slot)
         return await self._create_slot(sn, slot)
 
+    @tracked_control(
+        "evse_schedule_delete",
+        arguments=("slot_id",),
+        serial_argument="sn",
+        group="evse_schedule",
+    )
     async def async_delete_slot(self, sn: str, slot_id: str) -> bool:
         return await self._async_mutate_serial(
             sn, lambda: self._async_delete_slot(sn, slot_id)
