@@ -2221,62 +2221,33 @@ async def test_track_entry_background_task_ignores_invalid_or_completed(
 
 
 @pytest.mark.asyncio
-async def test_http_error_issue(hass, monkeypatch):
-    from homeassistant.helpers.update_coordinator import UpdateFailed
+async def test_http_error_issue(coordinator_factory, config_entry, mock_issue_registry):
+    from custom_components.enphase_ev.const import ISSUE_EVSE_STATUS_UNAVAILABLE
 
-    from custom_components.enphase_ev.const import ISSUE_CLOUD_ERRORS
-    from custom_components.enphase_ev import coordinator_diagnostics as diag_mod
-
-    coord = _make_coordinator(hass, monkeypatch)
-
-    class FailingClient:
-        async def status(self):
-            raise _client_response_error(503)
-
-    created = []
-    deleted = []
-    monkeypatch.setattr(
-        diag_mod.ir,
-        "async_create_issue",
-        lambda hass, domain, issue_id, **kwargs: created.append(
-            (domain, issue_id, kwargs)
-        ),
-        raising=False,
+    coord = coordinator_factory()
+    coord.config_entry = config_entry
+    coord.hass.config_entries.async_update_entry(
+        config_entry, options={OPT_DEGRADED_SERVICE_REPAIR_ISSUES: True}
     )
-    monkeypatch.setattr(
-        diag_mod.ir,
-        "async_delete_issue",
-        lambda hass, domain, issue_id: deleted.append((domain, issue_id)),
-        raising=False,
-    )
-
-    coord.client = FailingClient()
-
-    for _ in range(3):
-        with pytest.raises(UpdateFailed):
+    coord.client.status = AsyncMock(side_effect=_client_response_error(503))
+    coord._async_run_site_only_refresh_pipeline = AsyncMock(return_value={})
+    try:
+        for _ in range(3):
             await coord._async_update_data()
-        coord._backoff_until = None
-
-    matching = [
-        kwargs for _, issue_id, kwargs in created if issue_id == ISSUE_CLOUD_ERRORS
-    ]
-    assert matching
-    latest_payload = matching[-1]
-    placeholders = latest_payload["translation_placeholders"]
-    assert placeholders["site_id"] == coord.site_id
-    metrics = latest_payload["data"]["site_metrics"]
-    assert metrics["last_error"]
-
-    class SuccessClient:
-        async def status(self):
-            return {"evChargerData": []}
-
-    coord.client = SuccessClient()
-    coord._backoff_until = None
-    data = await coord._async_update_data()
-    coord.async_set_updated_data(data)
-
-    assert any(issue_id == ISSUE_CLOUD_ERRORS for _, issue_id in deleted)
+            coord.evse_status_health.stop()
+        matching = [
+            payload
+            for _, _, payload in mock_issue_registry.created
+            if payload["translation_key"] == ISSUE_EVSE_STATUS_UNAVAILABLE
+        ]
+        assert len(matching) == 3
+        assert matching[-1]["translation_placeholders"]["site_id"] == coord.site_id
+        assert (
+            matching[-1]["data"]["site_metrics"]["charger_status"]["http_status"] == 503
+        )
+        assert coord._backoff_until is None
+    finally:
+        coord.evse_status_health.stop()
 
 
 def test_ignored_battery_profile_issue_survives_clear_and_recurrence(
@@ -2446,15 +2417,15 @@ async def test_http_error_description_plain_text(hass, monkeypatch):
 
     class StubClient:
         async def status(self):
-            raise _client_response_error(500, message=payload)
+            raise _client_response_error(400, message=payload)
 
     coord.client = StubClient()
 
     with pytest.raises(UpdateFailed):
         await coord._async_update_data()
 
-    assert coord.last_failure_status == 500
-    assert coord.last_failure_description == "Internal Server Error"
+    assert coord.last_failure_status == 400
+    assert coord.last_failure_description == "Bad Request"
     assert coord.last_failure_response == "backend unavailable"
 
 
@@ -2466,15 +2437,15 @@ async def test_http_error_description_falls_back_to_status_phrase(hass, monkeypa
 
     class StubClient:
         async def status(self):
-            raise _client_response_error(503, message=" ")
+            raise _client_response_error(403, message=" ")
 
     coord.client = StubClient()
 
     with pytest.raises(UpdateFailed):
         await coord._async_update_data()
 
-    assert coord.last_failure_status == 503
-    assert coord.last_failure_description == "Service Unavailable"
+    assert coord.last_failure_status == 403
+    assert coord.last_failure_description == "Forbidden"
     assert coord.last_failure_response == ""
 
 
@@ -5560,7 +5531,7 @@ def test_restored_site_energy_and_router_hints_expire_after_authoritative_refres
 
 
 @pytest.mark.asyncio
-async def test_http_backoff_respects_configured_slow_interval(hass, monkeypatch):
+async def test_rate_limit_backoff_respects_configured_slow_interval(hass, monkeypatch):
     from homeassistant.helpers.update_coordinator import UpdateFailed
 
     from custom_components.enphase_ev.const import (
@@ -5620,7 +5591,7 @@ async def test_http_backoff_respects_configured_slow_interval(hass, monkeypatch)
             super().__init__(
                 request_info=req,
                 history=(),
-                status=503,
+                status=429,
                 message="",
                 headers={},
             )

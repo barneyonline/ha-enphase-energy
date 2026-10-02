@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "Eine Steuerungsänderung wartet auf Bestätigung. Aktualisiere ihren Status, bevor du eine weitere Änderung sendest."
+    },
+    "charger_status_unavailable": {
+      "message": "Aktuelle Statusdaten des Ladegeräts sind nicht verfügbar. Warte auf die Wiederherstellung, bevor du Einstellungen änderst."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Änderung der Einspeisegrenze unbestätigt",
       "description": "Die Änderung wurde nach {pending_timeout_minutes} Minuten nicht bestätigt. Prüfungen laufen im normalen Abfrageintervall weiter. Prüfen Sie die Gateway-Konfiguration; der Schreibvorgang wird nicht automatisch wiederholt."
+    },
+    "evse_status_unavailable": {
+      "title": "Ladestatus nicht verfügbar",
+      "description": "Der Ladestatus für Anlage {site_id} lieferte HTTP {status}. Messwerte und Steuerung des Ladegeräts sind bis zum Empfang aktueller Statusdaten nicht verfügbar. Nächster Versuch: {next_retry}. Andere Endpunkte werden weiterhin unabhängig abgefragt."
     }
   },
   "system_health": {

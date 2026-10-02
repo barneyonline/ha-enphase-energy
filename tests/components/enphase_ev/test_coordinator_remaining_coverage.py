@@ -652,7 +652,7 @@ async def test_async_update_data_http_error_plain_string(coordinator_factory):
     err = aiohttp.ClientResponseError(
         _request_info(),
         (),
-        status=502,
+        status=400,
         message='"temporary"',
     )
     coord.client.status = AsyncMock(side_effect=err)

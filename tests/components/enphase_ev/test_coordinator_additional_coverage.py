@@ -114,7 +114,7 @@ async def test_async_update_data_http_error_description(
     err = aiohttp.ClientResponseError(
         _request_info(),
         (),
-        status=502,
+        status=400,
         message='{"error":{"description":"bad"}}',
         headers={"Retry-After": "Wed, 21 Oct 2015 07:28:00"},
     )
@@ -129,7 +129,9 @@ async def test_async_update_data_http_error_description(
         await coord._async_update_data()
 
     assert coord.last_failure_description == "bad"
-    assert any(issue[1] == ISSUE_CLOUD_ERRORS for issue in mock_issue_registry.created)
+    assert not any(
+        issue[1] == ISSUE_CLOUD_ERRORS for issue in mock_issue_registry.created
+    )
 
 
 @pytest.mark.asyncio
@@ -140,7 +142,7 @@ async def test_async_update_data_http_error_trimmed_json(
     err = aiohttp.ClientResponseError(
         _request_info(),
         (),
-        status=500,
+        status=400,
         message='"{"error":{"displayMessage":"trimmed"}}"',
     )
     coord.client.status = AsyncMock(side_effect=err)
@@ -551,7 +553,7 @@ async def test_async_update_data_handles_bad_request_info_url(
     err = aiohttp.ClientResponseError(
         BadRequestInfo(),
         (),
-        status=500,
+        status=400,
         message="Server error",
     )
     coord.client.status = AsyncMock(side_effect=err)
@@ -2051,30 +2053,28 @@ def test_collect_site_metrics_handles_empty_and_invalid_type_buckets(
 
 
 @pytest.mark.asyncio
-async def test_async_update_data_http_error_creates_cloud_issue(
-    coordinator_factory, mock_issue_registry, monkeypatch
+async def test_async_update_data_http_error_isolates_charger_status(
+    coordinator_factory,
 ):
     coord = coordinator_factory()
-    headers = CIMultiDictProxy(
-        CIMultiDict({"Retry-After": "Wed, 21 Oct 2015 07:28:00 GMT"})
-    )
-    err = aiohttp.ClientResponseError(
+    error = aiohttp.ClientResponseError(
         _request_info(),
         (),
         status=503,
         message='{"error":{"displayMessage":"scheduled maintenance"}}',
-        headers=headers,
+        headers={"Retry-After": "1800"},
     )
-    coord.client.status = AsyncMock(side_effect=err)
-    coord._http_errors = 2
-    coord._schedule_backoff_timer = MagicMock()
-
-    with pytest.raises(UpdateFailed):
-        await coord._async_update_data()
-
-    assert coord._backoff_until is not None
-    assert coord.last_failure_description == "scheduled maintenance"
-    assert any(issue[1] == ISSUE_CLOUD_ERRORS for issue in mock_issue_registry.created)
+    coord.client.status = AsyncMock(side_effect=error)
+    result = await coord._async_update_data()
+    try:
+        assert result == coord.data
+        assert coord._backoff_until is None
+        assert not coord.evse_status_available
+        assert coord.last_failure_description == "Charger status HTTP 503"
+        assert coord.last_failure_response is None
+        assert coord.evse_status_health.cooldown_active
+    finally:
+        coord.evse_status_health.stop()
 
 
 @pytest.mark.asyncio

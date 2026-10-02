@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "En kontrolændring afventer bekræftelse. Opdater dens status, før du sender en ny ændring."
+    },
+    "charger_status_unavailable": {
+      "message": "Frisk opladerstatus er utilgængelig. Vent på genoprettelse, før du ændrer opladerindstillinger."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Ændring af eksportgrænse er ikke bekræftet",
       "description": "Ændringen er ikke bekræftet efter {pending_timeout_minutes} minutter. Kontroller fortsætter med standardintervallet. Kontrollér gatewayens indstillinger; skrivningen gentages ikke automatisk."
+    },
+    "evse_status_unavailable": {
+      "title": "Opladerstatus er utilgængelig",
+      "description": "Opladerstatus for anlæg {site_id} returnerede HTTP {status}. Opladerens målinger og styring er utilgængelige, indtil frisk status modtages. Næste forsøg: {next_retry}. Andre slutpunkter forespørges fortsat uafhængigt."
     }
   },
   "system_health": {

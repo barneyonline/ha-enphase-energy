@@ -31,8 +31,9 @@ flowchart TD
 `__init__.py` handles config entry setup and unload. It creates the coordinator
 and invokes its public bootstrap API. Coordinator-owned `_async_setup` restores
 compact discovery state and starts an independent power-acquisition task before
-the authoritative status refresh. Config-entry setup blocks only on that refresh
-before forwarding platforms.
+the authoritative status refresh. Config-entry setup blocks on that refresh before
+forwarding platforms, with degraded setup permitted for charger-status HTTP 5xx
+failures as described under [charger-status recovery](#charger-status-recovery).
 Translation and integration-version priming run concurrently with that work.
 Optional endpoint families then warm up in feature-aware stages, publishing after
 each stage so one slow family does not hold back unrelated state. Schedule sync and
@@ -47,7 +48,8 @@ platforms can recreate entities promptly. Setup constructs a new coordinator and
 private session; the previous lifecycle fully cancels its tasks and shuts down.
 No session, manager, lock, or task crosses the reload. New option and device
 selections are applied before restored data is published, followed by a background
-refresh. Cold setup continues to require an authoritative first refresh.
+refresh. Cold setup requires an authoritative first refresh except for isolated
+charger-status server failures.
 Battery status and inverter inventory readiness also participate in topology
 comparison. Restored discovery metadata preserves device identities without
 restoring authoritative endpoint payloads. The first successful refresh must
@@ -594,3 +596,33 @@ deadline. Reloads and restarts therefore cannot reset an active retry window.
 Expired records are ignored; no account credentials or telemetry are stored.
 The existing Microinverter Connectivity Status sensor exposes power telemetry
 status and the next retry timestamp, including before any power entities exist.
+
+### Charger-Status Recovery
+
+`EvseStatusHealth` isolates HTTP 5xx responses from the EV charger status endpoint.
+The site refresh pipeline continues during its cooldown, including on cold setup,
+while charger entities remain unavailable. Cached charger payloads preserve device
+metadata; they are neither reparsed nor used to confirm pending commands. Serial
+selection and charger caches are preserved until authoritative inventory returns.
+Tracked charger writes reject unavailable status; an explicit Stop action remains
+allowed and still requires fresh readback for confirmation.
+
+Retries start at approximately one minute and grow to a maximum locally chosen
+wait of ten minutes, with jitter. A longer provider `Retry-After` takes precedence.
+An independent entry-owned timer requests recovery without pausing sibling polls;
+unload cancels it. HTTP 429 retains the existing shared rate-limit cooldown, and
+HTTP 5xx does not trigger reauthentication.
+
+Cloud Backoff Ends shows the charger-status deadline when no shared cooldown is
+active. Service Status identifies `charger_status` degradation, and cloud diagnostic
+attributes expose its HTTP status, next retry, and last successful status read.
+Optional degraded-service repairs refresh their retry timestamp on each failure.
+Cloud reachability advances only when a sibling endpoint actually succeeds;
+source freshness guards continue to expire stale battery and power readings.
+
+A config-entry storage record retains the latest 16 server failures through
+recovery and restarts. It contains timestamps, HTTP status codes, a fixed allowlist
+of backend error codes, and UUID request IDs. It excludes credentials, raw URLs,
+response bodies, telemetry, and exception messages. Restore validates these fields,
+honors an outstanding retry deadline, and never restores authoritative telemetry.
+Config-entry diagnostics can read the history even while setup is retrying.

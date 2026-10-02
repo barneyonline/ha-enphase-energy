@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "Juhtimise muudatus ootab kinnitust. Enne järgmise muudatuse saatmist värskenda selle olekut."
+    },
+    "charger_status_unavailable": {
+      "message": "Laadija värske olek pole saadaval. Enne seadete muutmist oota taastumist."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Ekspordipiirangu muudatus kinnitamata",
       "description": "Muudatust pole {pending_timeout_minutes} minuti järel kinnitatud. Kontrollid jätkuvad tavapärase intervalliga. Kontrollige lüüsi seadistust; kirjutamist automaatselt ei korrata."
+    },
+    "evse_status_unavailable": {
+      "title": "Laadija olek pole saadaval",
+      "description": "Paigaldise {site_id} laadija olek tagastas HTTP {status}. Laadija näidud ja juhtimine pole saadaval, kuni saabuvad värsked olekuandmed. Järgmine katse: {next_retry}. Teisi lõpp-punkte küsitletakse jätkuvalt sõltumatult."
     }
   },
   "system_health": {

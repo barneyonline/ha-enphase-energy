@@ -306,6 +306,15 @@ def tracked_control(
             )
             runtime = getattr(coord, "control_updates", None)
             serial = str(bound.arguments[serial_argument]) if serial_argument else None
+            if (
+                serial is not None
+                and getattr(coord, "evse_status_available", True) is False
+                and not (control == "charging" and fixed_enabled is False)
+            ):
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="charger_status_unavailable",
+                )
             group_key = group or control
             active = _active_command.get()
             task = asyncio.current_task()

@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "Změna ovládání čeká na potvrzení. Před odesláním další změny obnovte její stav."
+    },
+    "charger_status_unavailable": {
+      "message": "Aktuální stav nabíječky není dostupný. Před změnou nastavení počkejte na obnovení."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Změna limitu přetoků nepotvrzena",
       "description": "Změna nebyla potvrzena po {pending_timeout_minutes} minutách. Kontroly pokračují ve standardním intervalu. Ověřte nastavení brány; zápis se automaticky neopakuje."
+    },
+    "evse_status_unavailable": {
+      "title": "Stav nabíječky není dostupný",
+      "description": "Stav nabíječky pro lokalitu {site_id} vrátil HTTP {status}. Hodnoty a ovládání nabíječky nejsou dostupné, dokud se neobnoví aktuální stav. Další pokus: {next_retry}. Ostatní koncové body se nadále dotazují nezávisle."
     }
   },
   "system_health": {
