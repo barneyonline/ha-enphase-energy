@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "Une modification de commande attend une confirmation. Actualisez son état avant de soumettre une autre modification."
+    },
+    "charger_status_unavailable": {
+      "message": "L’état actualisé du chargeur est indisponible. Attendez le rétablissement avant de modifier ses paramètres."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Modification de la limite d’injection non confirmée",
       "description": "La modification n’est pas confirmée après {pending_timeout_minutes} minutes. Les vérifications continuent à l’intervalle normal. Vérifiez la configuration de la passerelle ; l’écriture ne sera pas répétée automatiquement."
+    },
+    "evse_status_unavailable": {
+      "title": "État du chargeur indisponible",
+      "description": "L’état du chargeur du site {site_id} a renvoyé HTTP {status}. Les relevés et les commandes sont indisponibles jusqu’au retour de données actualisées. Prochaine tentative : {next_retry}. Les autres points de terminaison restent interrogés indépendamment."
     }
   },
   "system_health": {

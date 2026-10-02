@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "Un cambio de control está pendiente de confirmación. Actualiza su estado antes de enviar otro cambio."
+    },
+    "charger_status_unavailable": {
+      "message": "El estado actualizado del cargador no está disponible. Espera a que se recupere antes de cambiar los ajustes."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Cambio del límite de vertido sin confirmar",
       "description": "El cambio no se ha confirmado tras {pending_timeout_minutes} minutos. Las comprobaciones continúan con el intervalo normal. Revise la configuración de la puerta de enlace; la escritura no se repetirá automáticamente."
+    },
+    "evse_status_unavailable": {
+      "title": "Estado del cargador no disponible",
+      "description": "El estado del cargador del sitio {site_id} devolvió HTTP {status}. Las lecturas y los controles no están disponibles hasta recibir un estado actualizado. Próximo intento: {next_retry}. Los demás puntos de conexión se siguen consultando de forma independiente."
     }
   },
   "system_health": {

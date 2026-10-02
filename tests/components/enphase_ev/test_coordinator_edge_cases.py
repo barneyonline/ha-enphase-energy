@@ -996,84 +996,40 @@ async def test_http_error_retry_after_date_triggers_rate_limit_issue(hass, monke
 
 
 @pytest.mark.asyncio
-async def test_http_server_errors_raise_cloud_issue_and_clear_on_success(
-    hass, monkeypatch
+async def test_http_server_errors_raise_endpoint_issue_and_clear_on_success(
+    coordinator_factory, config_entry, mock_issue_registry
 ):
-    from custom_components.enphase_ev import coordinator as coord_mod
-    from custom_components.enphase_ev import coordinator_diagnostics as diag_mod
     from custom_components.enphase_ev.const import (
-        ISSUE_CLOUD_ERRORS,
-        ISSUE_DNS_RESOLUTION,
+        OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
+        ISSUE_EVSE_STATUS_UNAVAILABLE,
     )
-    from custom_components.enphase_ev.coordinator import EnphaseCoordinator
 
-    entry = _make_entry(hass)
-
-    monkeypatch.setattr(
-        coord_mod, "async_get_clientsession", lambda *args, **kwargs: object()
+    coord = coordinator_factory()
+    coord.config_entry = config_entry
+    coord.hass.config_entries.async_update_entry(
+        config_entry, options={OPT_DEGRADED_SERVICE_REPAIR_ISSUES: True}
     )
-    monkeypatch.setattr(coord_mod.time, "monotonic", lambda: 2_000.0)
-    monkeypatch.setattr(coord_mod.random, "uniform", lambda *args, **kwargs: 1.5)
-
-    created: list[tuple] = []
-    deleted: list[tuple] = []
-
-    monkeypatch.setattr(
-        diag_mod.ir,
-        "async_create_issue",
-        lambda *args, **kwargs: created.append((args, kwargs)),
+    coord.client.status = AsyncMock(
+        side_effect=_client_response_error(503, message="Service Unavailable")
     )
-    monkeypatch.setattr(
-        diag_mod.ir,
-        "async_delete_issue",
-        lambda *args, **kwargs: deleted.append((args, kwargs)),
-    )
-    monkeypatch.setattr(
-        coord_mod, "async_call_later", lambda *args, **kwargs: lambda: None
-    )
-    monkeypatch.setattr(coord_mod.dt_util, "utcnow", lambda: datetime.now(timezone.utc))
-
-    class ErrorClient:
-        async def status(self):
-            raise _client_response_error(503, message="Service Unavailable")
-
-        async def summary_v2(self):
-            return []
-
-    class SuccessClient:
-        async def status(self):
-            return {"evChargerData": [], "ts": None}
-
-        async def summary_v2(self):
-            return []
-
-    coord = EnphaseCoordinator(hass, entry.data, config_entry=entry)
-    coord.client = ErrorClient()
-    coord._http_errors = 2  # first increment -> 3 to trigger issue
-
-    with pytest.raises(UpdateFailed):
+    try:
         await coord._async_update_data()
-
-    assert any(
-        call[0][2] == ISSUE_CLOUD_ERRORS for call in created
-    ), "Cloud issue should be created"
-
-    coord.client = SuccessClient()
-    coord._cloud_issue_reported = True
-    coord._dns_issue_reported = True
-    coord._backoff_until = None
-    coord.backoff_ends_utc = None
-    created.clear()
-
-    await coord._async_update_data()
-
-    assert coord._cloud_issue_reported is False
-    assert any(
-        call[0][2] == ISSUE_CLOUD_ERRORS for call in deleted
-    ), "Cloud issue should be cleared"
-    assert any(
-        call[0][2] == ISSUE_DNS_RESOLUTION for call in deleted
-    ), "DNS issue should be cleared on success"
+        assert coord._evse_status_issue_reported
+        coord.evse_status_health.stop()
+        coord._empty_status_charger_data_count = 2
+        coord._inventory_evse_serials = lambda: []
+        coord.client.status.side_effect = None
+        coord.client.status.return_value = {"evChargerData": [], "ts": None}
+        coord.client.summary_v2 = AsyncMock(return_value=[])
+        await coord._async_update_data()
+        assert coord.evse_status_available
+        assert not coord._evse_status_issue_reported
+        assert any(
+            ISSUE_EVSE_STATUS_UNAVAILABLE in issue_id
+            for _, issue_id in mock_issue_registry.deleted
+        )
+    finally:
+        coord.evse_status_health.stop()
 
 
 @pytest.mark.asyncio

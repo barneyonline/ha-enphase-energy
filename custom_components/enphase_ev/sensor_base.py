@@ -161,6 +161,13 @@ class EnphaseSiteSensorEntity(CoordinatorEntity, SensorEntity):  # type: ignore[
             attrs["payload_using_stale"] = True
         if self._coord.backoff_ends_utc:
             attrs["backoff_ends_utc"] = self._coord.backoff_ends_utc.isoformat()
+        health = getattr(self._coord, "_evse_status_health", None)
+        if health is not None:
+            status = health.diagnostics()
+            attrs["charger_status_available"] = status["available"]
+            attrs["charger_status_http_status"] = status["http_status"]
+            attrs["charger_status_next_retry_utc"] = status["next_retry_utc"]
+            attrs["charger_status_last_success_utc"] = status["last_success_utc"]
         return attrs
 
     def _backoff_remaining_seconds(self) -> int | None:

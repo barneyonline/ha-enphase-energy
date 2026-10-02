@@ -118,7 +118,11 @@ class EnphaseBaseEntity(
 
     @property
     def available(self) -> bool:
-        return super().available and self._has_data
+        return (
+            super().available
+            and self._has_data
+            and getattr(self._coord, "evse_status_available", True)
+        )
 
     @property
     def data(self) -> dict[str, Any]:

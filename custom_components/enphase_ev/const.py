@@ -71,6 +71,7 @@ DEFAULT_PRICING_EDITS_ENABLED = True
 ISSUE_NETWORK_UNREACHABLE = "cloud_unreachable"
 ISSUE_DNS_RESOLUTION = "cloud_dns_resolution"
 ISSUE_CLOUD_ERRORS = "cloud_service_unavailable"
+ISSUE_EVSE_STATUS_UNAVAILABLE = "evse_status_unavailable"
 ISSUE_RATE_LIMITED = "rate_limited"
 ISSUE_REAUTH_REQUIRED = "reauth_required"
 ISSUE_AUTH_BLOCKED = "auth_blocked"

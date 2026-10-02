@@ -11,10 +11,14 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Isolate charger-status server failures from site polling and allow startup in
+  degraded mode, keeping fresh battery and gateway readings available without
+  exposing cached charger state as current or confirming pending commands.
 
 ### 🔧 Improvements
-- None
+- Add bounded charger-status retries, visible endpoint retry times, localized
+  outage repairs, and credential-free incident history that survives recovery
+  and restart. Preserve shared rate-limit cooldowns and explicit Stop actions.
 
 ### 🔄 Other changes
 - None

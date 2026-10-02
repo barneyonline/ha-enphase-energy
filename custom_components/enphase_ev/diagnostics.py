@@ -12,6 +12,7 @@ from homeassistant.helpers import device_registry as dr
 from .const import CONF_EMAIL, CONF_SITE_ID, DOMAIN
 from .device_types import parse_type_identifier
 from .energy import SiteEnergyFlow
+from .evse_status_health import async_load_status_history
 from .log_redaction import redact_text
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
 from .scalar_helpers import coerce_snapshot_bool
@@ -466,6 +467,7 @@ async def async_get_config_entry_diagnostics(
         runtime_data = get_runtime_data(entry)
         coord = runtime_data.coordinator
     except RuntimeError:
+        diag["charger_status"] = await async_load_status_history(hass, entry.entry_id)
         return _redact_diagnostics_payload(diag, site_ids=site_ids)
 
     try:

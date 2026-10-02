@@ -3492,7 +3492,9 @@ class EnphaseSiteBackoffEndsSensor(_SiteBaseEntity):
 
     @property
     def native_value(self) -> Any:
-        ends = self._coord.backoff_ends_utc
+        ends = getattr(
+            self._coord, "cloud_next_retry_utc", self._coord.backoff_ends_utc
+        )
         if ends is None:
             return None
         try:
@@ -3505,7 +3507,15 @@ class EnphaseSiteBackoffEndsSensor(_SiteBaseEntity):
 
     @property
     def extra_state_attributes(self) -> Any:
-        return {}
+        runtime = getattr(self._coord, "_evse_status_health", None)
+        if runtime is None or runtime.available:
+            return {}
+        health = runtime.diagnostics()
+        return {
+            "endpoint": "charger_status" if not health["available"] else None,
+            "http_status": health["http_status"],
+            "last_success_utc": health["last_success_utc"],
+        }
 
     @property
     def device_info(self) -> Any:
@@ -3518,7 +3528,9 @@ class EnphaseSiteBackoffEndsSensor(_SiteBaseEntity):
     def _ensure_expiry_timer(self) -> None:
         if self.hass is None:
             return
-        ends = self._coord.backoff_ends_utc
+        ends = getattr(
+            self._coord, "cloud_next_retry_utc", self._coord.backoff_ends_utc
+        )
         try:
             now = dt_util.utcnow()
         except Exception:  # noqa: BLE001
