@@ -20,6 +20,12 @@ All notable changes to this project will be documented in this file.
   storage or follow-up reads, until the new charger state is ready to publish.
 - Reset interrupted network and malformed-response failure streaks after charger
   server responses, avoiding premature repairs and inflated shared retry delays.
+- Preserve the last accepted site energy total across restarts and missing cloud
+  data. Hold lower cloud corrections until the total catches up, preventing
+  recorder decrease warnings without hiding confirmed lifetime resets. Compare
+  resets against the original export composition when clearing migration offsets,
+  and ignore nonfinite cloud or restored readings. Retain migration offsets when
+  rejecting invalid cloud totals so a later restart preserves the raw baseline.
 
 ### 🔧 Improvements
 - Add bounded charger-status retries, visible endpoint retry times, localized
