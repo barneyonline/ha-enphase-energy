@@ -285,6 +285,8 @@ def coordinator_factory(hass, mock_clientsession, mock_issue_registry, monkeypat
         lambda *_args, **_kwargs: (lambda: None),
     )
 
+    coordinators = []
+
     def _factory(
         *,
         config: dict[str, Any] | None = None,
@@ -342,9 +344,13 @@ def coordinator_factory(hass, mock_clientsession, mock_issue_registry, monkeypat
                     "data": {"userDetails": {"isOwner": True, "isInstaller": False}}
                 }
             )
+        coordinators.append(coord)
         return coord
 
-    return _factory
+    yield _factory
+    for coord in coordinators:
+        if coord.control_updates is not None:
+            coord.control_updates.cleanup()
 
 
 @pytest.fixture

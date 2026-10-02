@@ -18,6 +18,7 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.util import dt as dt_util
 
 from .api import InvalidPayloadError, OptionalEndpointUnavailable
+from .control_updates import control_readback, tracked_control
 from .const import DOMAIN
 from .log_redaction import redact_site_id, redact_text
 from .service_validation import raise_translated_service_validation
@@ -1493,6 +1494,7 @@ class TariffRuntime:
             self.coordinator._endpoint_family_should_run(TARIFF_ENDPOINT_FAMILY)
         )
 
+    @control_readback("tariff")
     async def async_refresh(self, *, force: bool = False) -> None:
         """Refresh tariff billing and rate snapshots."""
 
@@ -1662,6 +1664,7 @@ class TariffRuntime:
         )
         return merged
 
+    @tracked_control("tariff", arguments=())
     async def async_update_tariff(
         self,
         *,
@@ -1772,6 +1775,15 @@ class TariffRuntime:
                 message="Tariff billing write API is unavailable.",
             )
 
+        runtime = getattr(coord, "control_updates", None)
+        requested_values: dict[str, object] = {}
+        if billing_update is not None:
+            billing_snapshot = parse_tariff_billing(billing_update.payload)
+            requested_values["billing"] = (
+                dict(billing_snapshot.attributes) if billing_snapshot else None
+            )
+        if runtime:
+            runtime.set_requested("tariff", requested_values)
         previous_rate_signature = self._rate_signature()
         tariff_result: dict[str, object] | None = None
         billing_result: dict[str, object] | None = None
@@ -1814,6 +1826,15 @@ class TariffRuntime:
             # Retain only acknowledged writes. Failed/cancelled requests must
             # never become the baseline for a later edit.
             observed_baseline = copy.deepcopy(payload)
+            requested_values["rates"] = tuple(
+                (branch, spec.get("key"), spec.get("state"))
+                for branch in ("purchase", "buyback")
+                for spec in tariff_rate_sensor_specs(
+                    parse_tariff_rate(update_payload, branch)
+                )
+            )
+            if runtime:
+                runtime.set_requested("tariff", requested_values)
             tariff_result = await site_tariff_update(update_payload)
             if not self._runtime_active():
                 return {"tariff": tariff_result, "billing": None}

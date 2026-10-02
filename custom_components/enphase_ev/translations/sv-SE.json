@@ -508,6 +508,9 @@
     },
     "export_limit_session_expired": {
       "message": "Enlighten-sessionen har gått ut eller avvisats. Öppna Autentisering, autentisera igen och försök sedan på nytt."
+    },
+    "control_change_pending": {
+      "message": "En kontrolländring väntar på bekräftelse. Uppdatera dess status innan du skickar en ny ändring."
     }
   },
   "options": {
@@ -1110,6 +1113,9 @@
           },
           "amp_control_applies_in_modes": {
             "name": "Lägen där amperestyrning gäller"
+          },
+          "requested_mode": {
+            "name": "Begärt läge"
           }
         }
       },
@@ -2282,6 +2288,15 @@
       },
       "inverter_array_power": {
         "name": "{array} Aktuell effekt"
+      },
+      "control_update_status": {
+        "name": "Status för kontrolländring",
+        "state": {
+          "idle": "Inaktiv",
+          "pending": "Väntar",
+          "unconfirmed": "Obekräftad",
+          "failed": "Misslyckades"
+        }
       }
     },
     "number": {

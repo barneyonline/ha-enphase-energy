@@ -359,8 +359,8 @@ def test_storm_guard_state_sensor_normalizes():
     coord._storm_guard_pending_state = "disabled"  # noqa: SLF001
     coord._storm_guard_pending_expires_mono = time.monotonic() + 30.0  # noqa: SLF001
     coord.data[sn]["storm_guard_state"] = None
-    assert sensor.available is True
-    assert sensor.native_value == "Updating"
+    assert sensor.available is False
+    assert sensor.native_value is None
     coord.data[sn]["storm_guard_state"] = "enabled"
     coord._storm_guard_pending_state = None  # noqa: SLF001
     coord._storm_guard_pending_expires_mono = None  # noqa: SLF001
@@ -1523,7 +1523,7 @@ def test_system_profile_status_sensor_states():
     coord.battery_profile_display = "AI Optimisation"
     coord.battery_selected_backup_percentage = 25
     coord.battery_selected_operation_mode_sub_type = "prioritize-energy"
-    assert sensor.native_value == "AI Optimisation"
+    assert sensor.native_value == "Self-Consumption"
     attrs = sensor.extra_state_attributes
     assert attrs["pending"] is True
     assert attrs["effective_profile"] == "self-consumption"

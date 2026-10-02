@@ -55,6 +55,7 @@ from .api import (
     is_scheduler_unavailable_error,
 )
 from .auth_refresh_runtime import AuthRefreshRuntime, ManualAuthRefreshResult
+from .control_updates import ControlUpdates, current_control_value
 from .const import (
     AUTH_BLOCKED_COOLDOWN_S,
     BATTERY_MIN_SOC_FALLBACK,
@@ -1067,6 +1068,7 @@ class EnphaseCoordinator(
                 always_update=self.site_only or not self.serials,
             )
         self.config_entry = config_entry
+        self.control_updates = ControlUpdates(self)
         self.session_history = SessionHistoryManager(
             hass,
             lambda: self.client,
@@ -1122,6 +1124,9 @@ class EnphaseCoordinator(
         """Retire this lifecycle before awaited shutdown steps release control."""
 
         self._runtime_stopped = True
+        runtime = getattr(self, "control_updates", None)
+        if runtime:
+            runtime.cleanup()
 
     async def async_close(self) -> None:
         """Release config-entry-owned HTTP resources."""
@@ -2153,6 +2158,9 @@ class EnphaseCoordinator(
         """
 
         self._runtime_stopped = True
+        runtime = getattr(self, "control_updates", None)
+        if runtime:
+            runtime.cleanup()
         cancelled_tasks: list[asyncio.Future[Any]] = []
 
         def _task_done(task: object) -> bool:
@@ -3987,6 +3995,7 @@ class EnphaseCoordinator(
         status_empty_preserved = False
         preserve_normalized_status = False
         try:
+            status_control_tokens = self.control_updates.read_tokens()
             status_start = time.monotonic()
             data = await self.client.status()
             phase_timings["status_s"] = round(time.monotonic() - status_start, 3)
@@ -4342,7 +4351,9 @@ class EnphaseCoordinator(
                 continue
             self._ensure_serial_tracked(sn)
             records.append((sn, obj))
-            if not self._has_embedded_charge_mode_preference(obj):
+            if self.evse_runtime.charge_mode_confirmation_active(
+                sn
+            ) or not self._has_embedded_charge_mode_preference(obj):
                 charge_mode_candidates.append(sn)
 
         if (
@@ -4504,6 +4515,17 @@ class EnphaseCoordinator(
                 suspended_by_evse=suspended_by_evse,
             )
             self._record_actual_charging(sn, actual_charging_flag)
+            if (
+                status_refresh_succeeded
+                and not context.status_used_stale
+                and actual_charging_flag is not None
+            ):
+                self.control_updates.observe(
+                    "charging",
+                    sn,
+                    {"enabled": actual_charging_flag},
+                    status_control_tokens,
+                )
             pending_expectation = self._pending_charging.get(sn)
             if pending_expectation:
                 target_state, expires_at = pending_expectation
@@ -6838,13 +6860,18 @@ class EnphaseCoordinator(
 
     @property
     def savings_use_battery_after_peak(self) -> bool | None:
-        profile = self.battery_selected_profile
+        profile = current_control_value(
+            self,
+            "system_profile",
+            "profile_key",
+            self.battery_live_profile or self.battery_profile,
+        )
         if profile != "cost_savings":
             return None
-        subtype = self.battery_selected_operation_mode_sub_type
+        subtype = getattr(self, "_battery_operation_mode_sub_type", None)
         if subtype is None:
             return False
-        return subtype == SAVINGS_OPERATION_MODE_SUBTYPE
+        return bool(subtype == SAVINGS_OPERATION_MODE_SUBTYPE)
 
     @property
     def savings_use_battery_switch_available(self) -> bool:
@@ -6852,7 +6879,15 @@ class EnphaseCoordinator(
             return False
         if getattr(self, "_battery_show_savings_mode", None) is False:
             return False
-        return self.battery_selected_profile == "cost_savings"
+        return (
+            current_control_value(
+                self,
+                "system_profile",
+                "profile_key",
+                self.battery_live_profile or self.battery_profile,
+            )
+            == "cost_savings"
+        )
 
     @property
     def battery_reserve_editable(self) -> bool:
@@ -6880,14 +6915,24 @@ class EnphaseCoordinator(
                     return False
             elif rbd_show is False and reserve_show is not True:
                 return False
-        profile = self.battery_selected_profile
+        profile = current_control_value(
+            self,
+            "system_profile",
+            "profile_key",
+            self.battery_live_profile or self.battery_profile,
+        )
         if profile is None:
             return False
         return profile != "backup_only"
 
     @property
     def battery_reserve_min(self) -> int:
-        profile = self.battery_selected_profile
+        profile = current_control_value(
+            self,
+            "system_profile",
+            "profile_key",
+            self.battery_live_profile or self.battery_profile,
+        )
         if profile == "backup_only":
             return 100
         value = self._coerce_optional_int(
@@ -6899,7 +6944,12 @@ class EnphaseCoordinator(
 
     @property
     def battery_reserve_max(self) -> int:
-        profile = self.battery_selected_profile
+        profile = current_control_value(
+            self,
+            "system_profile",
+            "profile_key",
+            self.battery_live_profile or self.battery_profile,
+        )
         if profile == "backup_only":
             return 100
         value = self._coerce_optional_int(

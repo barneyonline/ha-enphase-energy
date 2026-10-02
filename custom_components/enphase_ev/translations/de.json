@@ -508,6 +508,9 @@
     },
     "export_limit_session_expired": {
       "message": "Die Enlighten-Sitzung ist abgelaufen oder wurde abgelehnt. Öffnen Sie Authentifizierung, starten Sie die erneute Anmeldung und versuchen Sie es erneut."
+    },
+    "control_change_pending": {
+      "message": "Eine Steuerungsänderung wartet auf Bestätigung. Aktualisiere ihren Status, bevor du eine weitere Änderung sendest."
     }
   },
   "options": {
@@ -1110,6 +1113,9 @@
           },
           "amp_control_applies_in_modes": {
             "name": "Modi mit anwendbarer Ampere-Steuerung"
+          },
+          "requested_mode": {
+            "name": "Angeforderter Modus"
           }
         }
       },
@@ -2282,6 +2288,15 @@
       },
       "inverter_array_power": {
         "name": "{array} Aktuelle Leistung"
+      },
+      "control_update_status": {
+        "name": "Status der Steuerungsänderung",
+        "state": {
+          "idle": "Inaktiv",
+          "pending": "Ausstehend",
+          "unconfirmed": "Unbestätigt",
+          "failed": "Fehlgeschlagen"
+        }
       }
     },
     "number": {

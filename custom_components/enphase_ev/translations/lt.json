@@ -508,6 +508,9 @@
     },
     "export_limit_session_expired": {
       "message": "Enlighten seansas baigėsi arba buvo atmestas. Atidarykite Autentifikavimas, autentifikuokitės iš naujo ir bandykite dar kartą."
+    },
+    "control_change_pending": {
+      "message": "Valdymo pakeitimas laukia patvirtinimo. Prieš pateikdami kitą pakeitimą atnaujinkite jo būseną."
     }
   },
   "options": {
@@ -1110,6 +1113,9 @@
           },
           "amp_control_applies_in_modes": {
             "name": "Režimai, kuriuose taikomas srovės valdymas"
+          },
+          "requested_mode": {
+            "name": "Prašomas režimas"
           }
         }
       },
@@ -2282,6 +2288,15 @@
       },
       "inverter_array_power": {
         "name": "{array} Dabartinė galia"
+      },
+      "control_update_status": {
+        "name": "Valdymo pakeitimo būsena",
+        "state": {
+          "idle": "Neaktyvu",
+          "pending": "Laukiama",
+          "unconfirmed": "Nepatvirtinta",
+          "failed": "Nepavyko"
+        }
       }
     },
     "number": {

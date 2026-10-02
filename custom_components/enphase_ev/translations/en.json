@@ -508,6 +508,9 @@
     },
     "export_limit_session_expired": {
       "message": "The Enlighten session has expired or was rejected. Open Configure → Authentication, select Start reauthentication, complete the login, then try again."
+    },
+    "control_change_pending": {
+      "message": "A control change is awaiting confirmation. Refresh its status before submitting another change."
     }
   },
   "options": {
@@ -1110,6 +1113,9 @@
           },
           "amp_control_applies_in_modes": {
             "name": "Amp Control Applies In Modes"
+          },
+          "requested_mode": {
+            "name": "Requested Mode"
           }
         }
       },
@@ -2282,6 +2288,15 @@
       },
       "inverter_array_power": {
         "name": "{array} Current Power"
+      },
+      "control_update_status": {
+        "name": "Control Update Status",
+        "state": {
+          "idle": "Idle",
+          "pending": "Pending",
+          "unconfirmed": "Unconfirmed",
+          "failed": "Failed"
+        }
       }
     },
     "number": {

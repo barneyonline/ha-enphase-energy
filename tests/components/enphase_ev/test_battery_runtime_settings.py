@@ -1134,7 +1134,7 @@ async def test_set_power_match_uses_partial_payload_and_confirms(
     assert coord.battery_power_match_enabled is True
     assert coord.battery_settings_write_pending is False
     coord.async_request_refresh.assert_not_awaited()
-    coord.publish_runtime_state_update.assert_called_once_with("power_match")
+    coord.publish_runtime_state_update.assert_any_call("power_match")
 
 
 @pytest.mark.asyncio
@@ -1164,7 +1164,7 @@ async def test_set_power_match_noops_when_fresh_state_matches(
     coord.client.battery_site_settings.assert_awaited_once_with()
     assert coord.battery_write_access_confirmed is True
     coord.client.set_battery_settings_compat.assert_not_awaited()
-    coord.publish_runtime_state_update.assert_called_once_with("power_match")
+    coord.publish_runtime_state_update.assert_any_call("power_match")
 
 
 @pytest.mark.asyncio
@@ -1225,7 +1225,7 @@ async def test_set_power_match_rejects_unconfirmed_server_state(
     )
     assert coord.battery_power_match_enabled is False
     assert coord.battery_settings_write_pending is False
-    coord.publish_runtime_state_update.assert_called_once_with("power_match")
+    coord.publish_runtime_state_update.assert_any_call("power_match")
 
 
 @pytest.mark.asyncio
@@ -1286,7 +1286,7 @@ async def test_set_power_match_restores_authoritative_state_when_confirmation_fa
         partial_payload_only=True,
     )
     coord.async_request_refresh.assert_not_awaited()
-    coord.publish_runtime_state_update.assert_called_once_with("power_match")
+    coord.publish_runtime_state_update.assert_any_call("power_match")
 
 
 @pytest.mark.asyncio
@@ -1625,6 +1625,8 @@ async def test_schedule_toggle_and_time_updates_validate_and_allow_overnight(
     from custom_components.enphase_ev.coordinator import ServiceValidationError
 
     coord = coordinator_factory()
+    # Isolate API validation from the separately tested confirmation guard.
+    coord.control_updates = None
     coord._battery_has_encharge = True  # noqa: SLF001
     coord._battery_hide_charge_from_grid = False  # noqa: SLF001
     coord._battery_charge_from_grid = False  # noqa: SLF001
@@ -1677,6 +1679,8 @@ async def test_set_battery_shutdown_level_validation_and_write_guard(
     from custom_components.enphase_ev.coordinator import ServiceValidationError
 
     coord = coordinator_factory()
+    # Isolate API validation from the separately tested confirmation guard.
+    coord.control_updates = None
     coord._battery_envoy_supports_vls = True  # noqa: SLF001
     coord._battery_very_low_soc = 15  # noqa: SLF001
     coord._battery_very_low_soc_min = 10  # noqa: SLF001
@@ -4484,6 +4488,8 @@ async def test_schedule_family_public_wrappers_delegate_to_generic_helpers(
     coordinator_factory,
 ) -> None:
     coord = coordinator_factory()
+    # Isolate API validation from the separately tested confirmation guard.
+    coord.control_updates = None
     runtime = coord.battery_runtime
     runtime._async_set_schedule_family_limit = AsyncMock()  # noqa: SLF001
     runtime._async_set_schedule_family_enabled = AsyncMock()  # noqa: SLF001
@@ -5747,6 +5753,8 @@ async def test_battery_runtime_async_set_storm_evse_enabled_success_and_error_pa
     from custom_components.enphase_ev.coordinator import ServiceValidationError
 
     coord = coordinator_factory()
+    # Isolate API validation from the separately tested confirmation guard.
+    coord.control_updates = None
     coord._storm_guard_state = "enabled"  # noqa: SLF001
     coord.client.storm_guard_profile = AsyncMock(
         return_value={"data": {"stormGuardState": "enabled", "evseStormEnabled": False}}

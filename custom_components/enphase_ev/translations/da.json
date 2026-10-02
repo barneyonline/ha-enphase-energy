@@ -508,6 +508,9 @@
     },
     "export_limit_session_expired": {
       "message": "Enlighten-sessionen er udløbet eller afvist. Åbn Godkendelse, start godkendelse igen, og prøv derefter igen."
+    },
+    "control_change_pending": {
+      "message": "En kontrolændring afventer bekræftelse. Opdater dens status, før du sender en ny ændring."
     }
   },
   "options": {
@@ -1110,6 +1113,9 @@
           },
           "amp_control_applies_in_modes": {
             "name": "Tilstande hvor ampere-styring gælder"
+          },
+          "requested_mode": {
+            "name": "Ønsket tilstand"
           }
         }
       },
@@ -2282,6 +2288,15 @@
       },
       "inverter_array_power": {
         "name": "{array} Aktuel effekt"
+      },
+      "control_update_status": {
+        "name": "Status for kontrolændring",
+        "state": {
+          "idle": "Inaktiv",
+          "pending": "Afventer",
+          "unconfirmed": "Ubekræftet",
+          "failed": "Mislykkedes"
+        }
       }
     },
     "number": {

@@ -14,6 +14,7 @@ type PayloadMapByKey = dict[str, PayloadMap]
 @dataclass(slots=True)
 class EVSEState:
     _charge_mode_cache: dict[str, tuple[str, float]] = field(default_factory=dict)
+    _charge_mode_pending: dict[str, tuple[str, float]] = field(default_factory=dict)
     _green_battery_cache: dict[str, tuple[bool | None, bool, float]] = field(
         default_factory=dict
     )
@@ -40,6 +41,7 @@ class EVSEState:
 
         for cache in (
             self._charge_mode_cache,
+            self._charge_mode_pending,
             self._green_battery_cache,
             self._green_battery_pending,
             self._charger_config_cache,
@@ -70,6 +72,12 @@ class EVSEState:
             charge_modes=MappingProxyType(
                 {serial: value[0] for serial, value in self._charge_mode_cache.items()}
             ),
+            pending_charge_modes=MappingProxyType(
+                {
+                    serial: value[0]
+                    for serial, value in self._charge_mode_pending.items()
+                }
+            ),
             green_battery=MappingProxyType(
                 {
                     serial: value[:2]
@@ -96,6 +104,9 @@ class EvseControlSnapshot:
         default_factory=lambda: MappingProxyType({})
     )
     charge_modes: Mapping[str, str] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
+    pending_charge_modes: Mapping[str, str] = field(
         default_factory=lambda: MappingProxyType({})
     )
     green_battery: Mapping[str, tuple[bool | None, bool]] = field(

@@ -70,6 +70,7 @@ from tests.components.enphase_ev.random_ids import RANDOM_SERIAL, RANDOM_SITE_ID
 def _make_coordinator(hass, monkeypatch):
     from custom_components.enphase_ev.coordinator import EnphaseCoordinator
     from custom_components.enphase_ev import coordinator as coord_mod
+    from custom_components.enphase_ev import control_updates as updates_mod
 
     cfg = {
         CONF_SITE_ID: RANDOM_SITE_ID,
@@ -86,6 +87,11 @@ def _make_coordinator(hass, monkeypatch):
     )
     monkeypatch.setattr(
         coord_mod,
+        "async_call_later",
+        lambda *_args, **_kwargs: (lambda: None),
+    )
+    monkeypatch.setattr(
+        updates_mod,
         "async_call_later",
         lambda *_args, **_kwargs: (lambda: None),
     )
@@ -2958,14 +2964,15 @@ async def test_async_start_and_stop_preserve_scheduled_mode(hass, monkeypatch):
         RANDOM_SERIAL, 18, 1, include_level=True, strict_preference=False
     )
     coord.client.set_charge_mode.assert_awaited_once_with(
-        RANDOM_SERIAL, "SCHEDULED_CHARGING"
+        RANDOM_SERIAL, "SCHEDULED_CHARGING", previous_mode=None
     )
 
     coord.client.set_charge_mode.reset_mock()
     await coord.async_stop_charging(RANDOM_SERIAL)
-    coord.client.set_charge_mode.assert_awaited_once_with(
-        RANDOM_SERIAL, "SCHEDULED_CHARGING"
-    )
+    # The accepted mode intent is still pending; Stop must remain usable without
+    # issuing a conflicting duplicate mode write.
+    coord.client.stop_charging.assert_awaited_once_with(RANDOM_SERIAL)
+    coord.client.set_charge_mode.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -3000,7 +3007,7 @@ async def test_async_start_charging_scheduled_mode_explicit_request_stays_strict
         RANDOM_SERIAL, 24, 1, include_level=True, strict_preference=True
     )
     coord.client.set_charge_mode.assert_awaited_once_with(
-        RANDOM_SERIAL, "SCHEDULED_CHARGING"
+        RANDOM_SERIAL, "SCHEDULED_CHARGING", previous_mode=None
     )
 
 

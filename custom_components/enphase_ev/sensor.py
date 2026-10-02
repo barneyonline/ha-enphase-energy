@@ -42,6 +42,8 @@ from .battery_schedule_editor import (
     battery_scheduler_enabled,
 )
 from .entity import evse_safe_limit_active, evse_charging_active
+from .control_updates import current_control_value
+from .labels import battery_profile_label
 from .const import (
     DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     DEFAULT_MICROINVERTER_POWER_ENABLED,
@@ -515,6 +517,10 @@ async def async_setup_entry(
                     translation_key=translation_key,
                     state_attr=state_attr,
                 ),
+            )
+        if getattr(coord, "control_updates", None) is not None:
+            _add_site_entity(
+                "control_update_status", EnphaseControlUpdateStatusSensor(coord)
             )
         export_runtime = getattr(coord, "export_limit_runtime", None)
         if export_runtime is not None and export_runtime.enabled:
@@ -2589,10 +2595,23 @@ class EnphaseChargeModeSensor(EnphaseBaseEntity, SensorEntity):  # type: ignore[
         self._attr_unique_id = f"{DOMAIN}_{sn}_charge_mode"
 
     @property
+    def _requested_mode(self) -> str | None:
+        pending = getattr(
+            getattr(self._coord, "evse_state", None), "_charge_mode_pending", {}
+        ).get(self._sn)
+        return pending[0] if pending else None
+
+    @property
     def native_value(self) -> Any:
         d = self.data
         # Prefer scheduler preference when available for consistency with selector
-        return d.get("charge_mode_pref") or d.get("charge_mode")
+        return current_control_value(
+            self._coord,
+            "charge_mode",
+            "mode",
+            d.get("charge_mode_pref") or d.get("charge_mode"),
+            self._sn,
+        )
 
     @property
     def icon(self) -> str | None:
@@ -2629,6 +2648,7 @@ class EnphaseChargeModeSensor(EnphaseBaseEntity, SensorEntity):  # type: ignore[
         applicable = evse_amp_control_applicable(self._coord, self._sn)
         resolved_mode = evse_resolved_charge_mode(self._coord, self._sn)
         return {
+            "requested_mode": self._requested_mode,
             "preferred_mode": self.data.get("charge_mode_pref"),
             "effective_mode": self.data.get("charge_mode"),
             "charge_mode_supported": self._as_bool(
@@ -2672,14 +2692,10 @@ class EnphaseStormGuardStateSensor(EnphaseBaseEntity, SensorEntity):  # type: ig
     def available(self) -> bool:
         if not super().available:
             return False
-        if bool(getattr(self._coord, "storm_guard_update_pending", False)):
-            return True
         return self.data.get("storm_guard_state") is not None
 
     @property
     def native_value(self) -> Any:
-        if bool(getattr(self._coord, "storm_guard_update_pending", False)):
-            return "Updating"
         raw = self.data.get("storm_guard_state")
         if raw is None:
             return None
@@ -3233,7 +3249,7 @@ class EnphaseAuthRefreshCounterSensor(_SiteBaseEntity):
 
 
 class EnphaseExportLimitSensor(_SiteBaseEntity):
-    """Show pending updates while retaining separate confirmed/requested details."""
+    """Show gateway-confirmed export limiting separately from command progress."""
 
     _attr_translation_key = "export_limit"
     _attr_icon = "mdi:transmission-tower-export"
@@ -3243,8 +3259,6 @@ class EnphaseExportLimitSensor(_SiteBaseEntity):
         "zero_export",
         "limited",
         "unsupported",
-        "pending",
-        "unconfirmed",
     ]
 
     def __init__(self, coord: EnphaseCoordinator) -> None:
@@ -3254,18 +3268,12 @@ class EnphaseExportLimitSensor(_SiteBaseEntity):
     def available(self) -> bool:
         runtime = self._coord.export_limit_runtime
         return bool(
-            super().available
-            and runtime.enabled
-            and (runtime.snapshot is not None or runtime.pending is not None)
+            super().available and runtime.enabled and runtime.snapshot is not None
         )
 
     @property
     def native_value(self) -> str | None:
         runtime = self._coord.export_limit_runtime
-        if runtime.pending is not None:
-            return (
-                "unconfirmed" if runtime.request_status == "unconfirmed" else "pending"
-            )
         snapshot = runtime.snapshot
         return snapshot.state if snapshot else None
 
@@ -3990,26 +3998,60 @@ class EnphaseSystemProfileStatusSensor(_SiteBaseEntity):
 
     @property
     def native_value(self) -> Any:
-        if self._coord.battery_profile_pending:
-            return (
-                self._coord.battery_profile_display
-                or self._coord.battery_effective_profile_display
-            )
-        return self._coord.battery_effective_profile_display
+        profile = current_control_value(
+            self._coord,
+            "system_profile",
+            "profile_key",
+            self._coord.battery_live_profile or self._coord.battery_profile,
+        )
+        return (
+            self._coord.battery_profile_option_labels.get(profile)
+            or battery_profile_label(profile, hass=getattr(self._coord, "hass", None))
+            if profile
+            else None
+        )
 
     @property
     def extra_state_attributes(self) -> Any:
         labels = self._coord.battery_profile_option_labels
         attrs = {
-            "effective_profile": self._coord.battery_effective_profile,
-            "effective_profile_label": self._coord.battery_effective_profile_display,
-            "configured_profile": self._coord.battery_profile,
+            "effective_profile": current_control_value(
+                self._coord,
+                "system_profile",
+                "profile_key",
+                self._coord.battery_live_profile or self._coord.battery_profile,
+            ),
+            "effective_profile_label": self.native_value,
+            "configured_profile": current_control_value(
+                self._coord,
+                "system_profile",
+                "configured_profile",
+                self._coord.battery_profile,
+            ),
             "live_profile": self._coord.battery_live_profile,
             "live_profile_label": getattr(
                 self._coord, "_battery_live_profile_label", None
             ),
-            "effective_reserve_percentage": self._coord.battery_effective_backup_percentage,
-            "effective_operation_mode_sub_type": self._coord.battery_effective_operation_mode_sub_type,
+            "effective_reserve_percentage": current_control_value(
+                self._coord,
+                "battery_reserve",
+                "reserve",
+                getattr(
+                    self._coord,
+                    "_battery_backup_percentage",
+                    self._coord.battery_effective_backup_percentage,
+                ),
+            ),
+            "effective_operation_mode_sub_type": current_control_value(
+                self._coord,
+                "system_profile",
+                "operation_mode_sub_type",
+                getattr(
+                    self._coord,
+                    "_battery_operation_mode_sub_type",
+                    self._coord.battery_effective_operation_mode_sub_type,
+                ),
+            ),
             "requested_profile": self._coord.battery_pending_profile,
             "requested_profile_label": labels.get(
                 self._coord.battery_pending_profile or ""
@@ -4111,3 +4153,58 @@ class EnphaseSystemProfileStatusSensor(_SiteBaseEntity):
         if isinstance(evse_profile, dict):
             attrs["evse_profile"] = evse_profile
         return attrs
+
+
+class EnphaseControlUpdateStatusSensor(_SiteBaseEntity):
+    """Show independent progress for all site and charger control writes."""
+
+    _attr_translation_key = "control_update_status"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["idle", "pending", "unconfirmed", "failed"]
+    _attr_icon = "mdi:progress-clock"
+
+    def __init__(self, coord: EnphaseCoordinator) -> None:
+        super().__init__(
+            coord, "control_update_status", "Control Update Status", type_key=None
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        runtime = self._coord.control_updates
+        scopes = {serial for _control, serial in runtime.updates}
+        updates: dict[str, object] = {"site": runtime.attributes()}
+        for serial in sorted(scope for scope in scopes if scope is not None):
+            updates[serial] = runtime.attributes(serial)
+        site = cast(dict[str, object], updates["site"])
+        export = self._coord.export_limit_runtime
+        if export.enabled:
+            site["export_limit"] = {
+                "status": export.request_status or "idle",
+                **export.attributes(),
+            }
+        grid = self._coord.grid_profile_runtime
+        if grid.pending_profile_id is not None and "grid_profile" not in site:
+            site["grid_profile"] = {
+                "status": grid.status,
+                "requested_profile_id": grid.pending_profile_id,
+            }
+        return {"updates": updates}
+
+    @property
+    def native_value(self) -> str:
+        runtime = self._coord.control_updates
+        states = {runtime.status(serial) for _control, serial in runtime.updates}
+        export = self._coord.export_limit_runtime
+        if export.pending is not None:
+            states.add(
+                "unconfirmed" if export.request_status == "unconfirmed" else "pending"
+            )
+        if export.request_status == "rejected":
+            states.add("failed")
+        grid = self._coord.grid_profile_runtime
+        if grid.pending_profile_id is not None:
+            states.add(grid.status)
+        for state in ("pending", "unconfirmed", "failed"):
+            if state in states:
+                return state
+        return "idle"
