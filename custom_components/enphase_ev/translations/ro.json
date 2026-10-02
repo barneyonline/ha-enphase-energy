@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "O modificare a comenzii așteaptă confirmarea. Actualizați starea înainte de a trimite altă modificare."
+    },
+    "charger_status_unavailable": {
+      "message": "Starea actualizată a încărcătorului nu este disponibilă. Așteptați restabilirea înainte de a modifica setările."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Modificarea limitei de injecție este neconfirmată",
       "description": "Modificarea nu este confirmată după {pending_timeout_minutes} minute. Verificările continuă la intervalul standard. Verificați configurația gateway-ului; scrierea nu va fi repetată automat."
+    },
+    "evse_status_unavailable": {
+      "title": "Starea încărcătorului nu este disponibilă",
+      "description": "Starea încărcătorului pentru locația {site_id} a returnat HTTP {status}. Citirile și comenzile nu sunt disponibile până la primirea unei stări actualizate. Următoarea încercare: {next_retry}. Celelalte puncte finale sunt interogate în continuare independent."
     }
   },
   "system_health": {

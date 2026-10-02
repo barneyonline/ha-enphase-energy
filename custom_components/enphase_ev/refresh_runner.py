@@ -112,6 +112,8 @@ class RefreshRunner:
             return True
         if getattr(coordinator, "_current_power_consumption_w", None) is not None:
             return True
+        if getattr(coordinator, "battery_aggregate_charge_pct", None) is not None:
+            return True
         return any(
             getattr(coordinator, attr, None) is not None
             for attr in (

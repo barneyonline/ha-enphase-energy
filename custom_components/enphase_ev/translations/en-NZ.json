@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "A control change is awaiting confirmation. Refresh its status before submitting another change."
+    },
+    "charger_status_unavailable": {
+      "message": "Fresh charger status is unavailable. Wait for recovery before changing charger settings."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Export Limit update unconfirmed",
       "description": "The export limit change has not been confirmed after {pending_timeout_minutes} minutes. Checks continue at the standard polling interval. Verify the gateway configuration; the write will not be repeated automatically."
+    },
+    "evse_status_unavailable": {
+      "title": "Charger status unavailable",
+      "description": "Charger status for site {site_id} returned HTTP {status}. Charger readings and controls are unavailable until fresh status returns. Next retry: {next_retry}. Other endpoints continue polling independently."
     }
   },
   "system_health": {

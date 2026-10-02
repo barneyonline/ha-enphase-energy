@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "En kontrollendring venter på bekreftelse. Oppdater statusen før du sender en ny endring."
+    },
+    "charger_status_unavailable": {
+      "message": "Fersk laderstatus er utilgjengelig. Vent på gjenoppretting før du endrer laderinnstillingene."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Endring av eksportgrense er ubekreftet",
       "description": "Endringen er ikke bekreftet etter {pending_timeout_minutes} minutter. Kontroller fortsetter med standardintervallet. Kontroller gatewayens innstillinger; skrivingen gjentas ikke automatisk."
+    },
+    "evse_status_unavailable": {
+      "title": "Laderstatus er utilgjengelig",
+      "description": "Laderstatus for anlegg {site_id} returnerte HTTP {status}. Laderens målinger og styring er utilgjengelige til fersk status mottas. Neste forsøk: {next_retry}. Andre endepunkter forespørres fortsatt uavhengig."
     }
   },
   "system_health": {

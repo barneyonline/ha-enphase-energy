@@ -511,6 +511,9 @@
     },
     "control_change_pending": {
       "message": "Ohjausmuutos odottaa vahvistusta. Päivitä sen tila ennen uuden muutoksen lähettämistä."
+    },
+    "charger_status_unavailable": {
+      "message": "Laturin ajantasainen tila ei ole saatavilla. Odota palautumista ennen asetusten muuttamista."
     }
   },
   "options": {
@@ -2833,6 +2836,10 @@
     "export_limit_pending": {
       "title": "Syöttörajan muutos vahvistamatta",
       "description": "Muutosta ei ole vahvistettu {pending_timeout_minutes} minuutissa. Tarkistukset jatkuvat normaalilla kyselyvälillä. Tarkista yhdyskäytävän asetukset; kirjoitusta ei toisteta automaattisesti."
+    },
+    "evse_status_unavailable": {
+      "title": "Laturin tila ei ole saatavilla",
+      "description": "Kohteen {site_id} laturin tila palautti HTTP {status}. Laturin lukemat ja ohjaus eivät ole saatavilla ennen uusien tilatietojen saapumista. Seuraava yritys: {next_retry}. Muiden rajapintojen kysely jatkuu itsenäisesti."
     }
   },
   "system_health": {

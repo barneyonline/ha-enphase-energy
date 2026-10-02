@@ -31,6 +31,8 @@ def cloud_error_code(coord: EnphaseCoordinator) -> str:
         failure_ts and (success_ts is None or failure_ts > success_ts)
     )
     if not failure_active:
+        if not getattr(coord, "evse_status_available", True):
+            return "service_unavailable"
         return STATE_NONE
     failure_source = getattr(coord, "last_failure_source", None)
     if (

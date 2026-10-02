@@ -15,6 +15,7 @@ from .const import (
     DOMAIN,
     ISSUE_BATTERY_PROFILE_PENDING,
     ISSUE_CLOUD_ERRORS,
+    ISSUE_EVSE_STATUS_UNAVAILABLE,
     ISSUE_DNS_RESOLUTION,
     ISSUE_NETWORK_UNREACHABLE,
     ISSUE_RATE_LIMITED,
@@ -40,6 +41,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 _DEGRADED_SERVICE_REPAIR_ISSUES: tuple[tuple[str, str], ...] = (
+    ("_evse_status_issue_reported", ISSUE_EVSE_STATUS_UNAVAILABLE),
     ("_scheduler_issue_reported", ISSUE_SCHEDULER_UNAVAILABLE),
     ("_session_history_issue_reported", ISSUE_SESSION_HISTORY_UNAVAILABLE),
     ("_site_energy_issue_reported", ISSUE_SITE_ENERGY_UNAVAILABLE),
@@ -421,6 +423,7 @@ class CoordinatorDiagnostics:
             "backoff_active": backoff_active,
             "backoff_until_monotonic": coord._backoff_until,
             "backoff_ends_utc": _iso(coord.backoff_ends_utc),
+            "charger_status": coord.evse_status_health.diagnostics(),
             "network_errors": getattr(coord, "_network_errors", 0),
             "http_errors": getattr(coord, "_http_errors", 0),
             "rate_limit_hits": getattr(coord, "_rate_limit_hits", 0),
@@ -1118,6 +1121,8 @@ class CoordinatorDiagnostics:
             if family not in degraded_services
         )
         metrics["degraded_services"] = degraded_services
+        if not coord.evse_status_available:
+            degraded_services.append("charger_status")
 
         firmware_catalog_manager = getattr(coord, "firmware_catalog_manager", None)
         status_snapshot = getattr(firmware_catalog_manager, "status_snapshot", None)
@@ -1639,6 +1644,30 @@ class CoordinatorDiagnostics:
             ISSUE_CLOUD_ERRORS,
             severity=ir.IssueSeverity.WARNING,
         )
+
+    def clear_evse_status_issue(self) -> None:
+        self._clear_reported_issue(
+            "_evse_status_issue_reported", ISSUE_EVSE_STATUS_UNAVAILABLE
+        )
+
+    def report_evse_status_issue(self) -> None:
+        """Update each failure so the visible retry timestamp stays accurate."""
+        flag = "_evse_status_issue_reported"
+        if self._degraded_service_issue_suppressed(flag, ISSUE_EVSE_STATUS_UNAVAILABLE):
+            return
+        health = self.coordinator.evse_status_health
+        self._create_site_metrics_issue(
+            ISSUE_EVSE_STATUS_UNAVAILABLE,
+            severity=ir.IssueSeverity.WARNING,
+            placeholders={
+                "status": str(health.diagnostics()["http_status"]),
+                "next_retry": self.coordinator._format_auth_blocked_until(
+                    health.next_retry_utc
+                )
+                or "",
+            },
+        )
+        setattr(self.coordinator, flag, True)
 
     def clear_dns_issue(self) -> None:
         self._clear_reported_issue(

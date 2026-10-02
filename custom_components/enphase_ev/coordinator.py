@@ -43,6 +43,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .cloud_retry import retry_after_delay
+from .evse_status_health import EvseStatusHealth
 
 from .api import (
     AuthTokens,
@@ -611,6 +612,32 @@ class EnphaseCoordinator(
         """Return the last immutable aggregate state published to listeners."""
 
         return self._integration_snapshot
+
+    @property
+    def evse_status_health(self) -> EvseStatusHealth:
+        """Return endpoint-local status health, including for lightweight hosts."""
+        health = self.__dict__.get("_evse_status_health")
+        if health is None:
+            health = EvseStatusHealth(self)
+            self.__dict__["_evse_status_health"] = health
+        return cast(EvseStatusHealth, health)
+
+    @property
+    def evse_status_available(self) -> bool:
+        health = self.__dict__.get("_evse_status_health")
+        return health is None or bool(health.available)
+
+    @property
+    def cloud_next_retry_utc(self) -> datetime | None:
+        """Expose the global or endpoint-local retry without gating site reads."""
+        if self.backoff_ends_utc is not None:
+            return self.backoff_ends_utc
+        health = self.__dict__.get("_evse_status_health")
+        return (
+            health.next_retry_utc
+            if health is not None and health.cooldown_active
+            else None
+        )
 
     @property
     def current_power_snapshot(self) -> CurrentPowerSample:
@@ -1228,6 +1255,8 @@ class EnphaseCoordinator(
                 },
             ),
             health=(
+                self.evse_status_available,
+                self.cloud_next_retry_utc,
                 getattr(self, "_last_error", None),
                 getattr(self, "last_failure_status", None),
                 tuple(
@@ -1363,6 +1392,7 @@ class EnphaseCoordinator(
         self._phase_timings = {}
         started = time.monotonic()
         await self.discovery_snapshot.async_restore_state()
+        await self.evse_status_health.async_restore()
         if not self._heatpump_hems_polling_enabled():
             self.inventory_runtime._mark_hems_inventory_polling_disabled()
             self._clear_disabled_heatpump_hems_auth_state()
@@ -2217,6 +2247,9 @@ class EnphaseCoordinator(
                 cancelled_tasks.append(self._auth_refresh_task)
             self._auth_refresh_task = None
         self._clear_backoff_timer()
+        status_health = self.__dict__.get("_evse_status_health")
+        if status_health is not None:
+            status_health.stop()
         for task in list(self._backoff_refresh_tasks):
             if not _task_done(task):
                 task.cancel()
@@ -3451,25 +3484,31 @@ class EnphaseCoordinator(
     async def _async_run_site_only_refresh_pipeline(
         self,
         context: RefreshPipelineContext,
+        *,
+        status_degraded: bool = False,
     ) -> dict[str, dict[str, object]]:
         phase_timings = context.phase_timings
+        if status_degraded:
+            context.status_used_stale = True
+            self.payload_using_stale = True
         self._status_charger_data_authoritative = False
         self._status_charger_data_serials = None
         self._empty_status_charger_data_count = 0
-        self._backoff_until = None
-        self._clear_backoff_timer()
-        self._clear_auth_repair_issues_on_success()
-        self.diagnostics.clear_network_issue()
-        self.diagnostics.clear_cloud_issue()
-        self.diagnostics.clear_dns_issue()
-        self.diagnostics.clear_rate_limited_issue()
-        self._unauth_errors = 0
-        self._rate_limit_hits = 0
-        self._http_errors = 0
-        self._network_errors = 0
-        self._dns_failures = 0
-        self._last_error = None
-        self.backoff_ends_utc = None
+        if not status_degraded:
+            self._backoff_until = None
+            self._clear_backoff_timer()
+            self._clear_auth_repair_issues_on_success()
+            self.diagnostics.clear_network_issue()
+            self.diagnostics.clear_cloud_issue()
+            self.diagnostics.clear_dns_issue()
+            self.diagnostics.clear_rate_limited_issue()
+            self._unauth_errors = 0
+            self._rate_limit_hits = 0
+            self._http_errors = 0
+            self._network_errors = 0
+            self._dns_failures = 0
+            self._last_error = None
+            self.backoff_ends_utc = None
         self._has_successful_refresh = True
         if context.first_refresh and not context.minimal_setup_refresh:
             self._start_first_refresh_followups(context)
@@ -3495,13 +3534,35 @@ class EnphaseCoordinator(
                     plan=followup_plan,
                 )
         self._clear_auth_refresh_rejection_state_if_unchanged(context)
-        self._prune_runtime_caches(active_serials=(), keep_day_keys=())
+        if not status_degraded:
+            self._prune_runtime_caches(active_serials=(), keep_day_keys=())
         self._sync_battery_profile_pending_issue()
-        self.last_success_utc = dt_util.utcnow()
+        if not status_degraded:
+            self.last_success_utc = dt_util.utcnow()
+        else:
+            # Only actual sibling acquisitions demonstrate cloud reachability.
+            # Cached payloads and skipped cooldown polls do not advance it.
+            candidates = [
+                health.last_success_utc
+                for health in self._endpoint_family_health.values()
+                if isinstance(health.last_success_utc, datetime)
+                and health.last_success_utc >= context.refresh_started_utc
+            ]
+            stamp = self.energy.site_energy_fetch_diagnostics.get("last_success_utc")
+            energy_success = (
+                dt_util.parse_datetime(stamp) if isinstance(stamp, str) else None
+            )
+            if (
+                energy_success is not None
+                and energy_success >= context.refresh_started_utc
+            ):
+                candidates.append(energy_success)
+            if candidates:
+                self.last_success_utc = max(candidates)
         self.latency_ms = int((time.monotonic() - context.started_mono) * 1000)
         self._schedule_grid_profile_metadata_refresh(context)
         self._finish_refresh_pipeline(context)
-        return {}
+        return context.fallback_data if status_degraded else {}
 
     def _record_status_refresh_success(
         self,
@@ -3986,9 +4047,15 @@ class EnphaseCoordinator(
                 retry_after=retry_after,
             )
 
+        if self.evse_status_health.cooldown_active:
+            return await self._async_run_site_only_refresh_pipeline(
+                context, status_degraded=True
+            )
+
         if first_refresh and not context.minimal_setup_refresh:
             self._start_first_refresh_followups(context)
         status_refresh_succeeded = False
+        status_endpoint_succeeded = False
         status_charger_data_authoritative = False
         status_charger_data_serials: list[str] | None = None
         status_empty_observed = False
@@ -4071,6 +4138,7 @@ class EnphaseCoordinator(
                     success_mono=time.monotonic(),
                     success_utc=dt_util.utcnow(),
                 )
+                status_endpoint_succeeded = True
             self.last_failure_endpoint = None
             if not status_empty_preserved:
                 self.payload_using_stale = False
@@ -4189,10 +4257,28 @@ class EnphaseCoordinator(
                 )
                 self._phase_timings = phase_timings.copy()
                 return fallback_data
-            # Respect Retry-After and create a warning issue on repeated 429
-            self._last_error = f"HTTP {err.status}"
+            # An HTTP response breaks network and malformed-payload streaks,
+            # including when a server failure is isolated to charger status.
             self._network_errors = 0
             self._payload_errors = 0
+            if 500 <= err.status < 600:
+                await self.evse_status_health.async_failure(err)
+                self._last_error = f"Charger status HTTP {err.status}"
+                self.last_failure_utc = dt_util.utcnow()
+                self.last_failure_status = err.status
+                self.last_failure_description = self._last_error
+                self.last_failure_response = None
+                self.last_failure_source = "http"
+                self.last_failure_endpoint = "charger_status"
+                self.payload_using_stale = True
+                self.payload_failure_kind = None
+                context.status_used_stale = True
+                self.diagnostics.report_evse_status_issue()
+                return await self._async_run_site_only_refresh_pipeline(
+                    context, status_degraded=True
+                )
+            # Respect Retry-After and create a warning issue on repeated 429
+            self._last_error = f"HTTP {err.status}"
             self._http_errors += 1
             delay = self._retry_after_delay(err) or 0.0
             # Exponential backoff anchored to configured slow poll interval
@@ -4207,12 +4293,7 @@ class EnphaseCoordinator(
                 if self._rate_limit_hits >= 2:
                     self.diagnostics.create_rate_limited_issue()
             else:
-                is_server_error = 500 <= err.status < 600
-                if is_server_error:
-                    if self._http_errors >= 2:
-                        self.diagnostics.report_cloud_issue()
-                else:
-                    self.diagnostics.clear_cloud_issue()
+                self.diagnostics.clear_cloud_issue()
             raw_payload = redact_text(err.message, site_ids=(self.site_id,))
             description = _extract_error_description(raw_payload)
             reason = redact_text(err.message, site_ids=(self.site_id,))
@@ -4878,8 +4959,6 @@ class EnphaseCoordinator(
 
             out[sn] = entry
 
-        self._sync_desired_charging(out)
-
         polling_state = self._determine_polling_state(out)
         context.fast_poll = bool(polling_state["want_fast"])
 
@@ -5385,6 +5464,12 @@ class EnphaseCoordinator(
                 self._phase_timings,
             )
 
+        # Keep cached charger data unavailable through every awaited recovery
+        # step. Once health succeeds, return fresh data without yielding again.
+        if status_endpoint_succeeded:
+            await self.evse_status_health.async_success()
+            self.diagnostics.clear_evse_status_issue()
+        self._sync_desired_charging(out)
         return out
 
     def _sync_desired_charging(self, data: dict[str, dict[str, object]]) -> None:
