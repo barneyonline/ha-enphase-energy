@@ -14,6 +14,8 @@ All notable changes to this project will be documented in this file.
 - Isolate charger-status server failures from site polling and allow startup in
   degraded mode, keeping fresh battery and gateway readings available without
   exposing cached charger state as current or confirming pending commands.
+- Clear obsolete charger outages when charger polling is disabled, and avoid
+  labeling shared retry deadlines as charger-status failures.
 
 ### 🔧 Improvements
 - Add bounded charger-status retries, visible endpoint retry times, localized

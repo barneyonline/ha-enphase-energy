@@ -246,6 +246,80 @@ async def test_status_repair_updates_retry_and_clears_on_recovery(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("site_only", [False, True])
+async def test_disabled_status_polling_retains_history_without_restoring_outage(
+    coordinator_factory, config_entry, mock_issue_registry, status_clock, site_only
+):
+    coord = coordinator_factory()
+    coord.config_entry = config_entry
+    coord.hass.config_entries.async_update_entry(
+        config_entry, options={OPT_DEGRADED_SERVICE_REPAIR_ISSUES: True}
+    )
+    await coord.evse_status_health.async_failure(server_error())
+    coord.diagnostics.report_evse_status_issue()
+    assert coord._evse_status_issue_reported
+    coord.evse_status_health.stop()
+
+    restored = coordinator_factory(serials=[])
+    restored.config_entry = config_entry
+    restored.site_only = site_only
+    restored._selected_type_keys = {"envoy", "encharge"}
+    restored.client.status = AsyncMock()
+    restored.energy._async_refresh_site_energy = AsyncMock()
+    restored.refresh_runner.async_run_refresh_plan = AsyncMock()
+    try:
+        await restored.evse_status_health.async_restore()
+        assert restored.evse_status_available
+        assert not restored.evse_status_health.cooldown_active
+        assert (
+            restored.evse_status_health.diagnostics()["failures"][0]["http_status"]
+            == 500
+        )
+        assert any(
+            ISSUE_EVSE_STATUS_UNAVAILABLE in issue_id
+            for _, issue_id in mock_issue_registry.deleted
+        )
+        await restored.async_refresh()
+        restored.client.status.assert_not_awaited()
+        assert (
+            "charger_status" not in restored.collect_site_metrics()["degraded_services"]
+        )
+        assert EnphaseSiteBackoffEndsSensor(restored).native_value is None
+    finally:
+        await coord.async_cleanup_runtime_state()
+        await restored.async_cleanup_runtime_state()
+
+
+@pytest.mark.asyncio
+async def test_shared_backoff_does_not_report_previous_status_outage_as_its_cause(
+    coordinator_factory, status_clock
+):
+    clock, _ = status_clock
+    coord = coordinator_factory()
+    coord._minimal_setup_refresh_active = True
+    coord.client.status = AsyncMock(side_effect=server_error())
+    coord.energy._async_refresh_site_energy = AsyncMock()
+    try:
+        await coord.async_refresh()
+        sensor = EnphaseSiteBackoffEndsSensor(coord)
+        assert sensor.extra_state_attributes["endpoint"] == "charger_status"
+        clock.now += timedelta(seconds=60)
+        clock.mono += 60
+        coord.client.status.side_effect = server_error(429, {"Retry-After": "1800"})
+        await coord.async_refresh()
+        assert not coord.last_update_success
+        assert sensor.native_value == clock.now + timedelta(seconds=1800)
+        assert sensor.extra_state_attributes == {}
+        assert (
+            coord.evse_status_health.diagnostics()["failures"][0]["http_status"] == 500
+        )
+        assert coord.last_failure_status == 429
+        assert not coord.evse_status_available
+    finally:
+        await coord.async_cleanup_runtime_state()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("error", [server_error(429), ConfigEntryAuthFailed("expired")])
 async def test_auth_and_rate_limits_still_block_shared_refresh(
     coordinator_factory, error

@@ -133,6 +133,11 @@ class EvseStatusHealth:
             return
         self.last_success_utc = saved.get("last_success_utc")
         self._failures = saved.get("failures", [])
+        if not self.coordinator._evse_status_refresh_enabled():
+            self.available = True
+            self.stop()
+            self.coordinator.diagnostics.clear_evse_status_issue()
+            return
         value = saved.get("next_retry_utc")
         if value is None or not self._failures:
             return
