@@ -4257,6 +4257,10 @@ class EnphaseCoordinator(
                 )
                 self._phase_timings = phase_timings.copy()
                 return fallback_data
+            # An HTTP response breaks network and malformed-payload streaks,
+            # including when a server failure is isolated to charger status.
+            self._network_errors = 0
+            self._payload_errors = 0
             if 500 <= err.status < 600:
                 await self.evse_status_health.async_failure(err)
                 self._last_error = f"Charger status HTTP {err.status}"
@@ -4275,8 +4279,6 @@ class EnphaseCoordinator(
                 )
             # Respect Retry-After and create a warning issue on repeated 429
             self._last_error = f"HTTP {err.status}"
-            self._network_errors = 0
-            self._payload_errors = 0
             self._http_errors += 1
             delay = self._retry_after_delay(err) or 0.0
             # Exponential backoff anchored to configured slow poll interval
