@@ -2665,9 +2665,6 @@
       }
     },
     "button": {
-      "cancel_pending_profile_change": {
-        "name": "A függőben lévő profilmódosítás visszavonása"
-      },
       "storm_alert_opt_out": {
         "name": "Viharriasztás letiltása"
       },
@@ -2823,7 +2820,45 @@
     },
     "battery_profile_pending": {
       "title": "Az Enphase Energy akkumulátorprofil frissítése függőben",
-      "description": "A(z) {site_id} hely akkumulátorprofil-módosítása több mint {pending_timeout_minutes} perce függőben van. Előfordulhat, hogy a felhő még feldolgozza a kérést."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Akkumulátorprofil módosítása",
+            "description": "A(z) {site_id} hely akkumulátorprofil-módosítása több mint {pending_timeout_minutes} perce függőben van. Előfordulhat, hogy a felhő még feldolgozza a kérést.\n\nEllenőrizze az állapotot, vagy vonja vissza a függőben lévő kérést.",
+            "menu_options": {
+              "check_again": "Újraellenőrzés",
+              "cancel_change": "Módosítás visszavonása"
+            }
+          },
+          "pending": {
+            "title": "Akkumulátorprofil módosítása",
+            "description": "A módosítás továbbra is megerősítetlen. Az ellenőrzések automatikusan folytatódnak. Újra ellenőrizheti vagy visszavonhatja.",
+            "menu_options": {
+              "check_again": "Újraellenőrzés",
+              "cancel_change": "Módosítás visszavonása"
+            }
+          },
+          "check_failed": {
+            "title": "Akkumulátorprofil módosítása",
+            "description": "A profil frissítése nem sikerült. Próbálja újra később, vagy vonja vissza a függőben lévő kérést.",
+            "menu_options": {
+              "check_again": "Újraellenőrzés",
+              "cancel_change": "Módosítás visszavonása"
+            }
+          },
+          "cancel_change": {
+            "title": "Visszavonja a függőben lévő profilmódosítást?",
+            "description": "Vonja vissza ezt a függőben lévő akkumulátorprofil-kérést az Enphase rendszerben. Ez nem állít vissza egy már életbe lépett profilt."
+          }
+        },
+        "error": {
+          "cannot_cancel": "A kérést nem sikerült visszavonni. Ellenőrizze a kapcsolatot és az Enphase-fiók jogosultságait, majd próbálja újra."
+        },
+        "abort": {
+          "entry_unavailable": "Az integráció nincs betöltve. Töltse be, és nyissa meg újra ezt a javítást.",
+          "request_changed": "A függőben lévő kérés megváltozott. Zárja be ezt a varázslót, és nyissa meg újra az aktuális javítást."
+        }
+      }
     },
     "hems_auth_degraded": {
       "title": "Az Enphase Energy HEMS ideiglenesen szünetel",

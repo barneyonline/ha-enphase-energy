@@ -2714,9 +2714,6 @@
       }
     },
     "button": {
-      "cancel_pending_profile_change": {
-        "name": "Cancel Pending Profile Change"
-      },
       "storm_alert_opt_out": {
         "name": "Storm Alert Opt Out"
       },
@@ -2823,7 +2820,45 @@
     },
     "battery_profile_pending": {
       "title": "Enphase Energy battery profile update pending",
-      "description": "A battery profile change for site {site_id} has been pending for more than {pending_timeout_minutes} minutes. The cloud may still be processing the request."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Battery profile change",
+            "description": "A battery profile change for site {site_id} has been pending for more than {pending_timeout_minutes} minutes. The cloud may still be processing the request.\n\nCheck its status or cancel the pending request.",
+            "menu_options": {
+              "check_again": "Check again",
+              "cancel_change": "Cancel change"
+            }
+          },
+          "pending": {
+            "title": "Battery profile change",
+            "description": "The change is still unconfirmed. Checks continue automatically. You can check again or cancel.",
+            "menu_options": {
+              "check_again": "Check again",
+              "cancel_change": "Cancel change"
+            }
+          },
+          "check_failed": {
+            "title": "Battery profile change",
+            "description": "Could not refresh the profile. Try again later or cancel the pending request.",
+            "menu_options": {
+              "check_again": "Check again",
+              "cancel_change": "Cancel change"
+            }
+          },
+          "cancel_change": {
+            "title": "Cancel pending profile change?",
+            "description": "Cancel this pending battery profile request in Enphase. This does not restore a profile that has already taken effect."
+          }
+        },
+        "error": {
+          "cannot_cancel": "Could not cancel the request. Check your connection and Enphase account permissions, then try again."
+        },
+        "abort": {
+          "entry_unavailable": "The integration is not loaded. Load it and reopen this repair.",
+          "request_changed": "The pending request changed. Close this flow and reopen the current repair."
+        }
+      }
     },
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS temporarily paused",

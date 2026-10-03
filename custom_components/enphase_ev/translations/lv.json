@@ -2665,9 +2665,6 @@
       }
     },
     "button": {
-      "cancel_pending_profile_change": {
-        "name": "Atcelt gaidošo profila maiņu"
-      },
       "storm_alert_opt_out": {
         "name": "Atteikties no vētras brīdinājuma"
       },
@@ -2823,7 +2820,45 @@
     },
     "battery_profile_pending": {
       "title": "Gaida Enphase Energy akumulatora profila atjauninājumu",
-      "description": "Akumulatora profila maiņa vietai {site_id} gaida ilgāk nekā {pending_timeout_minutes} minūtes. Mākoņserviss, iespējams, joprojām apstrādā pieprasījumu."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Akumulatora profila maiņa",
+            "description": "Akumulatora profila maiņa vietai {site_id} gaida ilgāk nekā {pending_timeout_minutes} minūtes. Mākoņserviss, iespējams, joprojām apstrādā pieprasījumu.\n\nPārbaudiet statusu vai atceliet gaidošo pieprasījumu.",
+            "menu_options": {
+              "check_again": "Pārbaudīt vēlreiz",
+              "cancel_change": "Atcelt maiņu"
+            }
+          },
+          "pending": {
+            "title": "Akumulatora profila maiņa",
+            "description": "Maiņa vēl nav apstiprināta. Pārbaudes turpinās automātiski. Varat pārbaudīt vēlreiz vai atcelt.",
+            "menu_options": {
+              "check_again": "Pārbaudīt vēlreiz",
+              "cancel_change": "Atcelt maiņu"
+            }
+          },
+          "check_failed": {
+            "title": "Akumulatora profila maiņa",
+            "description": "Neizdevās atjaunināt profilu. Mēģiniet vēlāk vai atceliet gaidošo pieprasījumu.",
+            "menu_options": {
+              "check_again": "Pārbaudīt vēlreiz",
+              "cancel_change": "Atcelt maiņu"
+            }
+          },
+          "cancel_change": {
+            "title": "Atcelt gaidošo profila maiņu?",
+            "description": "Atceliet šo gaidošo akumulatora profila pieprasījumu Enphase. Tas neatjauno profilu, kas jau ir stājies spēkā."
+          }
+        },
+        "error": {
+          "cannot_cancel": "Neizdevās atcelt pieprasījumu. Pārbaudiet savienojumu un Enphase konta atļaujas, pēc tam mēģiniet vēlreiz."
+        },
+        "abort": {
+          "entry_unavailable": "Integrācija nav ielādēta. Ielādējiet to un atkārtoti atveriet šo labojumu.",
+          "request_changed": "Gaidošais pieprasījums ir mainījies. Aizveriet šo vedni un atkārtoti atveriet pašreizējo labojumu."
+        }
+      }
     },
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS īslaicīgi apturēts",

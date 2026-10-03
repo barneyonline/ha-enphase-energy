@@ -2665,9 +2665,6 @@
       }
     },
     "button": {
-      "cancel_pending_profile_change": {
-        "name": "Annulla la modifica del profilo in sospeso"
-      },
       "storm_alert_opt_out": {
         "name": "Disattiva avviso tempesta"
       },
@@ -2823,7 +2820,45 @@
     },
     "battery_profile_pending": {
       "title": "Aggiornamento del profilo batteria Enphase Energy in attesa",
-      "description": "Una modifica del profilo batteria per il sito {site_id} è in attesa da oltre {pending_timeout_minutes} minuti. Il cloud potrebbe ancora elaborare la richiesta."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Modifica del profilo batteria",
+            "description": "Una modifica del profilo batteria per il sito {site_id} è in attesa da oltre {pending_timeout_minutes} minuti. Il cloud potrebbe ancora elaborare la richiesta.\n\nControlla lo stato o annulla la richiesta in sospeso.",
+            "menu_options": {
+              "check_again": "Controlla di nuovo",
+              "cancel_change": "Annulla modifica"
+            }
+          },
+          "pending": {
+            "title": "Modifica del profilo batteria",
+            "description": "La modifica non è ancora confermata. I controlli continuano automaticamente. Puoi controllare di nuovo o annullare.",
+            "menu_options": {
+              "check_again": "Controlla di nuovo",
+              "cancel_change": "Annulla modifica"
+            }
+          },
+          "check_failed": {
+            "title": "Modifica del profilo batteria",
+            "description": "Impossibile aggiornare il profilo. Riprova più tardi o annulla la richiesta in sospeso.",
+            "menu_options": {
+              "check_again": "Controlla di nuovo",
+              "cancel_change": "Annulla modifica"
+            }
+          },
+          "cancel_change": {
+            "title": "Annullare la modifica del profilo in sospeso?",
+            "description": "Annulla questa richiesta di profilo batteria in sospeso in Enphase. Questa operazione non ripristina un profilo già entrato in vigore."
+          }
+        },
+        "error": {
+          "cannot_cancel": "Impossibile annullare la richiesta. Controlla la connessione e le autorizzazioni dell’account Enphase, quindi riprova."
+        },
+        "abort": {
+          "entry_unavailable": "L’integrazione non è caricata. Caricala e riapri questa riparazione.",
+          "request_changed": "La richiesta in sospeso è cambiata. Chiudi questa procedura e riapri la riparazione corrente."
+        }
+      }
     },
     "hems_auth_degraded": {
       "title": "HEMS Enphase Energy temporaneamente in pausa",
