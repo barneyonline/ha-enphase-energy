@@ -64,6 +64,7 @@ class CoordinatorDiagnostics:
         self.coordinator = coordinator
         if self._entry_issue_suffix() is not None:
             self.clear_legacy_degraded_service_repair_issues()
+            self._delete_issue(ISSUE_BATTERY_PROFILE_PENDING)
         if not self.degraded_service_repair_issues_enabled:
             self.clear_degraded_service_repair_issues()
 
@@ -86,7 +87,10 @@ class CoordinatorDiagnostics:
         return suffix or None
 
     def _repair_issue_id(self, issue_id: str) -> str:
-        if issue_id not in _DEGRADED_SERVICE_REPAIR_ISSUE_IDS:
+        if (
+            issue_id not in _DEGRADED_SERVICE_REPAIR_ISSUE_IDS
+            and issue_id != ISSUE_BATTERY_PROFILE_PENDING
+        ):
             return issue_id
         suffix = self._entry_issue_suffix()
         if suffix is None:
@@ -159,15 +163,24 @@ class CoordinatorDiagnostics:
         issue_placeholders = dict(base_placeholders)
         if placeholders:
             issue_placeholders.update(placeholders)
+        issue_data: dict[str, object] = {"site_metrics": metrics}
+        profile_repair = issue_id == ISSUE_BATTERY_PROFILE_PENDING
+        if profile_repair:
+            entry = getattr(coord, "config_entry", None)
+            requested_at = coord.battery_pending_requested_at
+            issue_data.update(
+                entry_id=getattr(entry, "entry_id", None),
+                requested_at=requested_at.isoformat() if requested_at else None,
+            )
         ir.async_create_issue(
             coord.hass,
             DOMAIN,
             registry_issue_id,
-            is_fixable=False,
+            is_fixable=profile_repair,
             severity=severity,
             translation_key=issue_id,
             translation_placeholders=issue_placeholders,
-            data={"site_metrics": metrics},
+            data=issue_data,
         )
         if registry_issue_id != issue_id:
             self._delete_issue(issue_id)

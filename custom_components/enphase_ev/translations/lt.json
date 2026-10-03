@@ -2665,9 +2665,6 @@
       }
     },
     "button": {
-      "cancel_pending_profile_change": {
-        "name": "Atšaukti laukiantį profilio pakeitimą"
-      },
       "storm_alert_opt_out": {
         "name": "Atsisakyti audros įspėjimo"
       },
@@ -2823,7 +2820,45 @@
     },
     "battery_profile_pending": {
       "title": "Laukiama „Enphase Energy“ baterijos profilio atnaujinimo",
-      "description": "Baterijos profilio pakeitimas vietai {site_id} laukia ilgiau nei {pending_timeout_minutes} min. Debesijos paslauga vis dar gali apdoroti užklausą."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Akumuliatoriaus profilio keitimas",
+            "description": "Baterijos profilio pakeitimas vietai {site_id} laukia ilgiau nei {pending_timeout_minutes} min. Debesijos paslauga vis dar gali apdoroti užklausą.\n\nPatikrinkite būseną arba atšaukite laukiančią užklausą.",
+            "menu_options": {
+              "check_again": "Tikrinti dar kartą",
+              "cancel_change": "Atšaukti pakeitimą"
+            }
+          },
+          "pending": {
+            "title": "Akumuliatoriaus profilio keitimas",
+            "description": "Pakeitimas vis dar nepatvirtintas. Patikros tęsiamos automatiškai. Galite tikrinti dar kartą arba atšaukti.",
+            "menu_options": {
+              "check_again": "Tikrinti dar kartą",
+              "cancel_change": "Atšaukti pakeitimą"
+            }
+          },
+          "check_failed": {
+            "title": "Akumuliatoriaus profilio keitimas",
+            "description": "Nepavyko atnaujinti profilio. Bandykite vėliau arba atšaukite laukiančią užklausą.",
+            "menu_options": {
+              "check_again": "Tikrinti dar kartą",
+              "cancel_change": "Atšaukti pakeitimą"
+            }
+          },
+          "cancel_change": {
+            "title": "Atšaukti laukiantį profilio pakeitimą?",
+            "description": "Atšaukite šią laukiančią akumuliatoriaus profilio užklausą „Enphase“. Tai neatkuria profilio, kuris jau įsigaliojo."
+          }
+        },
+        "error": {
+          "cannot_cancel": "Nepavyko atšaukti užklausos. Patikrinkite ryšį ir „Enphase“ paskyros leidimus, tada bandykite dar kartą."
+        },
+        "abort": {
+          "entry_unavailable": "Integracija neįkelta. Įkelkite ją ir vėl atidarykite šį taisymą.",
+          "request_changed": "Laukianti užklausa pasikeitė. Uždarykite šį vedlį ir vėl atidarykite dabartinį taisymą."
+        }
+      }
     },
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS laikinai pristabdyta",

@@ -2665,9 +2665,6 @@
       }
     },
     "button": {
-      "cancel_pending_profile_change": {
-        "name": "Ausstehende Profiländerung abbrechen"
-      },
       "storm_alert_opt_out": {
         "name": "Sturmwarnung abwählen"
       },
@@ -2823,7 +2820,45 @@
     },
     "battery_profile_pending": {
       "title": "Aktualisierung des Enphase Energy-Batterieprofils ausstehend",
-      "description": "Eine Änderung des Batterieprofils für Standort {site_id} ist seit mehr als {pending_timeout_minutes} Minuten ausstehend. Die Cloud verarbeitet die Anfrage möglicherweise noch."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Änderung des Batterieprofils",
+            "description": "Eine Änderung des Batterieprofils für Standort {site_id} ist seit mehr als {pending_timeout_minutes} Minuten ausstehend. Die Cloud verarbeitet die Anfrage möglicherweise noch.\n\nPrüfe den Status oder brich die ausstehende Anfrage ab.",
+            "menu_options": {
+              "check_again": "Erneut prüfen",
+              "cancel_change": "Änderung abbrechen"
+            }
+          },
+          "pending": {
+            "title": "Änderung des Batterieprofils",
+            "description": "Die Änderung ist weiterhin unbestätigt. Die Prüfungen werden automatisch fortgesetzt. Du kannst erneut prüfen oder abbrechen.",
+            "menu_options": {
+              "check_again": "Erneut prüfen",
+              "cancel_change": "Änderung abbrechen"
+            }
+          },
+          "check_failed": {
+            "title": "Änderung des Batterieprofils",
+            "description": "Das Profil konnte nicht aktualisiert werden. Versuche es später erneut oder brich die ausstehende Anfrage ab.",
+            "menu_options": {
+              "check_again": "Erneut prüfen",
+              "cancel_change": "Änderung abbrechen"
+            }
+          },
+          "cancel_change": {
+            "title": "Ausstehende Profiländerung abbrechen?",
+            "description": "Brich diese ausstehende Anfrage für das Batterieprofil bei Enphase ab. Dadurch wird kein Profil wiederhergestellt, das bereits wirksam geworden ist."
+          }
+        },
+        "error": {
+          "cannot_cancel": "Die Anfrage konnte nicht abgebrochen werden. Prüfe deine Verbindung und die Berechtigungen des Enphase-Kontos und versuche es erneut."
+        },
+        "abort": {
+          "entry_unavailable": "Die Integration ist nicht geladen. Lade sie und öffne diese Reparatur erneut.",
+          "request_changed": "Die ausstehende Anfrage hat sich geändert. Schließe diesen Dialog und öffne die aktuelle Reparatur erneut."
+        }
+      }
     },
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS vorübergehend pausiert",

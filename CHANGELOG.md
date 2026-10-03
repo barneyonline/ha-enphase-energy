@@ -6,9 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### 🚧 Breaking changes
 - Remove the central Control Update Status sensor. Update dashboards and automations to use the owning device’s diagnostic Update Status sensor instead.
+- Remove the Cancel Pending Profile Change button. Recover overdue battery System Profile changes through Settings → System → Repairs instead; automations using the retired button need updating.
 
 ### ✨ New features
-- None
+- Add a battery profile Repair flow after ten minutes without confirmation, offering fresh status checks and confirmed cancellation of the specific pending request.
 
 ### 🐛 Bug fixes
 - Isolate charger-status server failures from site polling and allow startup in

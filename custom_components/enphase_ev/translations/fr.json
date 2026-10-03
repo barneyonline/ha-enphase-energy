@@ -2665,9 +2665,6 @@
       }
     },
     "button": {
-      "cancel_pending_profile_change": {
-        "name": "Annuler le changement de profil en attente"
-      },
       "storm_alert_opt_out": {
         "name": "Se désinscrire de l'alerte de tempête"
       },
@@ -2823,7 +2820,45 @@
     },
     "battery_profile_pending": {
       "title": "Mise à jour du profil de batterie Enphase Energy en attente",
-      "description": "Une modification du profil de batterie pour le site {site_id} est en attente depuis plus de {pending_timeout_minutes} minutes. Le cloud traite peut-être encore la demande."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Modification du profil de batterie",
+            "description": "Une modification du profil de batterie pour le site {site_id} est en attente depuis plus de {pending_timeout_minutes} minutes. Le cloud traite peut-être encore la demande.\n\nVérifiez l’état ou annulez la demande en attente.",
+            "menu_options": {
+              "check_again": "Vérifier à nouveau",
+              "cancel_change": "Annuler la modification"
+            }
+          },
+          "pending": {
+            "title": "Modification du profil de batterie",
+            "description": "La modification reste non confirmée. Les vérifications continuent automatiquement. Vous pouvez vérifier à nouveau ou annuler.",
+            "menu_options": {
+              "check_again": "Vérifier à nouveau",
+              "cancel_change": "Annuler la modification"
+            }
+          },
+          "check_failed": {
+            "title": "Modification du profil de batterie",
+            "description": "Impossible d’actualiser le profil. Réessayez plus tard ou annulez la demande en attente.",
+            "menu_options": {
+              "check_again": "Vérifier à nouveau",
+              "cancel_change": "Annuler la modification"
+            }
+          },
+          "cancel_change": {
+            "title": "Annuler la modification de profil en attente ?",
+            "description": "Annulez cette demande de profil de batterie en attente dans Enphase. Cela ne rétablit pas un profil déjà entré en vigueur."
+          }
+        },
+        "error": {
+          "cannot_cancel": "Impossible d’annuler la demande. Vérifiez votre connexion et les autorisations du compte Enphase, puis réessayez."
+        },
+        "abort": {
+          "entry_unavailable": "L’intégration n’est pas chargée. Chargez-la et rouvrez cette réparation.",
+          "request_changed": "La demande en attente a changé. Fermez cet assistant et rouvrez la réparation actuelle."
+        }
+      }
     },
     "hems_auth_degraded": {
       "title": "HEMS Enphase Energy temporairement suspendu",

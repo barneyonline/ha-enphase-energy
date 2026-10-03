@@ -4,9 +4,6 @@ from types import SimpleNamespace
 from datetime import datetime, timezone
 
 from custom_components.enphase_ev.binary_sensor import SiteCloudReachableBinarySensor
-from custom_components.enphase_ev.button import (
-    CancelPendingProfileChangeButton,
-)
 from custom_components.enphase_ev.entity import EnphaseBaseEntity
 from custom_components.enphase_ev.battery_schedule_editor import (
     BatteryScheduleEditorManager,
@@ -101,9 +98,6 @@ def test_site_device_info_fallbacks_without_type_device_info_provider() -> None:
         storm_evse_enabled=True,
     )
 
-    assert CancelPendingProfileChangeButton(coord).device_info["identifiers"] == {
-        ("enphase_ev", "type:site-1:envoy")
-    }
     assert BatteryReserveNumber(coord).device_info["identifiers"] == {
         ("enphase_ev", "type:site-1:encharge")
     }
@@ -278,7 +272,6 @@ def test_type_device_entities_use_provided_type_device_info() -> None:
     )
 
     assert SiteCloudReachableBinarySensor(coord).device_info is provided
-    assert CancelPendingProfileChangeButton(coord).device_info is provided
     assert BatteryReserveNumber(coord).device_info is provided
     assert BatteryShutdownLevelNumber(coord).device_info is provided
     assert SystemProfileSelect(coord).device_info is provided

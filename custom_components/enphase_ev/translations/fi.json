@@ -2665,9 +2665,6 @@
       }
     },
     "button": {
-      "cancel_pending_profile_change": {
-        "name": "Peruuta odottava profiilimuutos"
-      },
       "storm_alert_opt_out": {
         "name": "Poista myrskyhälytys käytöstä"
       },
@@ -2823,7 +2820,45 @@
     },
     "battery_profile_pending": {
       "title": "Enphase Energy -akun profiilin päivitys odottaa",
-      "description": "Kohteen {site_id} akun profiilin muutos on ollut odottamassa yli {pending_timeout_minutes} minuuttia. Pilvipalvelu saattaa edelleen käsitellä pyyntöä."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Akun profiilin muutos",
+            "description": "Kohteen {site_id} akun profiilin muutos on ollut odottamassa yli {pending_timeout_minutes} minuuttia. Pilvipalvelu saattaa edelleen käsitellä pyyntöä.\n\nTarkista tila tai peruuta odottava pyyntö.",
+            "menu_options": {
+              "check_again": "Tarkista uudelleen",
+              "cancel_change": "Peruuta muutos"
+            }
+          },
+          "pending": {
+            "title": "Akun profiilin muutos",
+            "description": "Muutosta ei ole vieläkään vahvistettu. Tarkistukset jatkuvat automaattisesti. Voit tarkistaa uudelleen tai peruuttaa.",
+            "menu_options": {
+              "check_again": "Tarkista uudelleen",
+              "cancel_change": "Peruuta muutos"
+            }
+          },
+          "check_failed": {
+            "title": "Akun profiilin muutos",
+            "description": "Profiilia ei voitu päivittää. Yritä myöhemmin uudelleen tai peruuta odottava pyyntö.",
+            "menu_options": {
+              "check_again": "Tarkista uudelleen",
+              "cancel_change": "Peruuta muutos"
+            }
+          },
+          "cancel_change": {
+            "title": "Peruutetaanko odottava profiilin muutos?",
+            "description": "Peruuta tämä odottava akun profiilipyyntö Enphasessa. Tämä ei palauta jo voimaan tullutta profiilia."
+          }
+        },
+        "error": {
+          "cannot_cancel": "Pyyntöä ei voitu peruuttaa. Tarkista yhteys ja Enphase-tilin käyttöoikeudet ja yritä uudelleen."
+        },
+        "abort": {
+          "entry_unavailable": "Integraatiota ei ole ladattu. Lataa se ja avaa tämä korjaus uudelleen.",
+          "request_changed": "Odottava pyyntö on muuttunut. Sulje tämä ohjattu toiminto ja avaa nykyinen korjaus uudelleen."
+        }
+      }
     },
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS on tilapäisesti keskeytetty",
