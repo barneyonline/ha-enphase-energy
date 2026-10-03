@@ -2665,9 +2665,6 @@
       }
     },
     "button": {
-      "cancel_pending_profile_change": {
-        "name": "Annuller afventende profilændring"
-      },
       "storm_alert_opt_out": {
         "name": "Fravælg stormadvarsel"
       },
@@ -2823,7 +2820,45 @@
     },
     "battery_profile_pending": {
       "title": "Opdatering af Enphase Energy-batteriprofil afventer",
-      "description": "En ændring af batteriprofilen for anlæg {site_id} har været afventende i mere end {pending_timeout_minutes} minutter. Cloudtjenesten behandler muligvis stadig anmodningen."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Ændring af batteriprofil",
+            "description": "En ændring af batteriprofilen for anlæg {site_id} har været afventende i mere end {pending_timeout_minutes} minutter. Cloudtjenesten behandler muligvis stadig anmodningen.\n\nKontrollér status, eller annullér den afventende anmodning.",
+            "menu_options": {
+              "check_again": "Kontrollér igen",
+              "cancel_change": "Annullér ændring"
+            }
+          },
+          "pending": {
+            "title": "Ændring af batteriprofil",
+            "description": "Ændringen er stadig ikke bekræftet. Kontrollerne fortsætter automatisk. Du kan kontrollere igen eller annullere.",
+            "menu_options": {
+              "check_again": "Kontrollér igen",
+              "cancel_change": "Annullér ændring"
+            }
+          },
+          "check_failed": {
+            "title": "Ændring af batteriprofil",
+            "description": "Profilen kunne ikke opdateres. Prøv igen senere, eller annullér den afventende anmodning.",
+            "menu_options": {
+              "check_again": "Kontrollér igen",
+              "cancel_change": "Annullér ændring"
+            }
+          },
+          "cancel_change": {
+            "title": "Annullér afventende profilændring?",
+            "description": "Annullér denne afventende anmodning om batteriprofil i Enphase. Dette gendanner ikke en profil, der allerede er trådt i kraft."
+          }
+        },
+        "error": {
+          "cannot_cancel": "Anmodningen kunne ikke annulleres. Kontrollér forbindelsen og Enphase-kontoens tilladelser, og prøv igen."
+        },
+        "abort": {
+          "entry_unavailable": "Integrationen er ikke indlæst. Indlæs den, og åbn denne reparation igen.",
+          "request_changed": "Den afventende anmodning er ændret. Luk denne vejledning, og åbn den aktuelle reparation igen."
+        }
+      }
     },
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS er midlertidigt sat på pause",

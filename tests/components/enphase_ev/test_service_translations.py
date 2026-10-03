@@ -1120,16 +1120,14 @@ def test_battery_profile_strings_localized_for_non_english_locales() -> None:
         / "translations"
     )
     en_data = json.loads((translations_dir / "en.json").read_text(encoding="utf-8"))
-    paths = [
+    paths = _string_paths_under(en_data, "issues.battery_profile_pending.fix_flow") + [
         "entity.select.system_profile.name",
         "entity.number.battery_reserve.name",
         "entity.switch.savings_use_battery_after_peak.name",
         "entity.sensor.system_profile_status.name",
         "entity.sensor.system_profile_status.state.pending",
-        "entity.button.cancel_pending_profile_change.name",
         "entity.button.storm_alert_opt_out.name",
         "issues.battery_profile_pending.title",
-        "issues.battery_profile_pending.description",
     ]
     for locale in translations_dir.glob("*.json"):
         name = locale.name
@@ -1142,7 +1140,9 @@ def test_battery_profile_strings_localized_for_non_english_locales() -> None:
             assert value != _at_path(
                 en_data, path
             ), f"{name} should localize {path} (still matches English)"
-        desc = _at_path(data, "issues.battery_profile_pending.description")
+        desc = _at_path(
+            data, "issues.battery_profile_pending.fix_flow.step.init.description"
+        )
         assert "{site_id}" in desc, f"{name} missing {{site_id}} placeholder"
         assert (
             "{pending_timeout_minutes}" in desc

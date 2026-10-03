@@ -4341,7 +4341,9 @@ class BatteryRuntime:
             require_exact_pending_match=False,
         )
 
-    async def async_cancel_pending_profile_change(self) -> None:
+    async def async_cancel_pending_profile_change(
+        self, *, expected_requested_at: datetime | None = None
+    ) -> None:
         coord = self.coordinator
         state = self.battery_state
         if not coord.battery_profile_pending:
@@ -4353,6 +4355,14 @@ class BatteryRuntime:
             return
         await self.async_assert_battery_profile_write_allowed()
         async with state._battery_profile_write_lock:
+            if expected_requested_at is not None and (
+                not coord.runtime_active
+                or state._battery_pending_requested_at != expected_requested_at
+            ):
+                self._raise_validation(
+                    "control_change_pending",
+                    message="The pending battery profile request changed. Reopen the repair.",
+                )
             state._battery_profile_last_write_mono = time.monotonic()
             try:
                 await coord.client.cancel_battery_profile_update()

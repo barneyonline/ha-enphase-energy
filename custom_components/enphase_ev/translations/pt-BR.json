@@ -2665,9 +2665,6 @@
       }
     },
     "button": {
-      "cancel_pending_profile_change": {
-        "name": "Cancelar alteração de perfil pendente"
-      },
       "storm_alert_opt_out": {
         "name": "Desativar alerta de tempestade"
       },
@@ -2823,7 +2820,45 @@
     },
     "battery_profile_pending": {
       "title": "Atualização pendente do perfil de bateria do Enphase Energy",
-      "description": "Uma alteração de perfil de bateria para o local {site_id} está pendente há mais de {pending_timeout_minutes} minutos. A nuvem ainda pode estar processando a solicitação."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Alteração do perfil da bateria",
+            "description": "Uma alteração de perfil de bateria para o local {site_id} está pendente há mais de {pending_timeout_minutes} minutos. A nuvem ainda pode estar processando a solicitação.\n\nVerifique o status ou cancele a solicitação pendente.",
+            "menu_options": {
+              "check_again": "Verificar novamente",
+              "cancel_change": "Cancelar alteração"
+            }
+          },
+          "pending": {
+            "title": "Alteração do perfil da bateria",
+            "description": "A alteração ainda não foi confirmada. As verificações continuam automaticamente. Você pode verificar novamente ou cancelar.",
+            "menu_options": {
+              "check_again": "Verificar novamente",
+              "cancel_change": "Cancelar alteração"
+            }
+          },
+          "check_failed": {
+            "title": "Alteração do perfil da bateria",
+            "description": "Não foi possível atualizar o perfil. Tente novamente mais tarde ou cancele a solicitação pendente.",
+            "menu_options": {
+              "check_again": "Verificar novamente",
+              "cancel_change": "Cancelar alteração"
+            }
+          },
+          "cancel_change": {
+            "title": "Cancelar a alteração de perfil pendente?",
+            "description": "Cancele esta solicitação pendente de perfil da bateria no Enphase. Isso não restaura um perfil que já entrou em vigor."
+          }
+        },
+        "error": {
+          "cannot_cancel": "Não foi possível cancelar a solicitação. Verifique a conexão e as permissões da conta Enphase e tente novamente."
+        },
+        "abort": {
+          "entry_unavailable": "A integração não está carregada. Carregue-a e reabra este reparo.",
+          "request_changed": "A solicitação pendente mudou. Feche este assistente e reabra o reparo atual."
+        }
+      }
     },
     "hems_auth_degraded": {
       "title": "HEMS da Enphase Energy pausado temporariamente",
