@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v5.0.0b6 - 2026-10-03
+
+### 🚧 Breaking changes
 - Remove the central Control Update Status sensor. Update dashboards and automations to use the owning device’s diagnostic Update Status sensor instead.
 - Remove the Cancel Pending Profile Change button. Recover overdue battery System Profile changes through Settings → System → Repairs instead; automations using the retired button need updating.
 
@@ -35,7 +52,7 @@ All notable changes to this project will be documented in this file.
 - Add diagnostic Update Status sensors to EV chargers, gateways (including system-controller controls), and battery systems, showing each device’s control progress and requested/confirmed values without additional cloud polling. Keep charger progress visible through cloud read failures and retain tariff-only diagnostics on Enphase Cloud when tariff controls are hosted there.
 
 ### 🔄 Other changes
-- None
+- Bumped the integration manifest version to `5.0.0b6`.
 
 ## v5.0.0b5 - 2026-10-02
 
