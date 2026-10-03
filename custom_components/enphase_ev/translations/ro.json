@@ -2292,8 +2292,8 @@
       "inverter_array_power": {
         "name": "{array} Putere curentă"
       },
-      "control_update_status": {
-        "name": "Starea modificării comenzii",
+      "update_status": {
+        "name": "Starea actualizării",
         "state": {
           "idle": "Inactiv",
           "pending": "În așteptare",

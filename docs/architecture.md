@@ -294,8 +294,21 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   confirmation requires explicit fresh alert state.
   Endpoint success counters and EVSE cache generations
   distinguish successful reads from cached responses,
-  failures, and write echoes. Control Update Status reports Pending, Unconfirmed,
-  Failed, or Idle, with requested and confirmed values grouped by site/charger.
+  failures, and write echoes. Diagnostic Update Status sensors report Pending,
+  Unconfirmed, Failed, or Idle
+  per owning device, with requested and confirmed values in their `updates`
+  attributes. Gateway controls include System Profile, Storm Guard, tariffs,
+  Grid Mode, installer Grid Profile, and Export Limit; battery
+  reserve/settings/schedules belong to the battery system. The inventory model
+  groups system controllers with gateways, so they share that device’s sensor.
+  Each charger includes only its serial-scoped
+  controls plus the shared Storm Guard EV charging setting. Setup removes the
+  retired central Control Update Status entity and prunes charger diagnostics
+  with the other charger entities. Charger diagnostics retain local progress
+  through telemetry refresh failures after a successful read. Tariff progress
+  follows the tariff number entities onto the cloud device while selected
+  gateway metadata is absent; discovery moves it back to the gateway and removes
+  the cloud-only diagnostic.
   Timeout cancels extra polling after ten minutes and permits an explicit new
   request; normal lookup caches resume and a new request retires older unresolved
   progress in its conflict group. It never automatically retries a write. Export

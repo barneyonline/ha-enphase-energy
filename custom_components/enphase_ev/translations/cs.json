@@ -2292,8 +2292,8 @@
       "inverter_array_power": {
         "name": "{array} Aktuální výkon"
       },
-      "control_update_status": {
-        "name": "Stav změny ovládání",
+      "update_status": {
+        "name": "Stav aktualizace",
         "state": {
           "idle": "Nečinné",
           "pending": "Čeká na vyřízení",

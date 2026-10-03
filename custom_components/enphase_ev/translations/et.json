@@ -2292,8 +2292,8 @@
       "inverter_array_power": {
         "name": "{array} Hetkevõimsus"
       },
-      "control_update_status": {
-        "name": "Juhtimise muudatuse olek",
+      "update_status": {
+        "name": "Uuenduse olek",
         "state": {
           "idle": "Jõude",
           "pending": "Ootel",

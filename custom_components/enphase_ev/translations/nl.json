@@ -2292,8 +2292,8 @@
       "inverter_array_power": {
         "name": "{array} Huidig vermogen"
       },
-      "control_update_status": {
-        "name": "Status van bedieningswijziging",
+      "update_status": {
+        "name": "Bijwerkstatus",
         "state": {
           "idle": "Inactief",
           "pending": "In behandeling",
