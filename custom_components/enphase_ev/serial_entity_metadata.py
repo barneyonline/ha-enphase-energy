@@ -29,6 +29,7 @@ CHARGER_SENSOR_UNIQUE_SUFFIXES: tuple[str, ...] = (
     "_lifetime_energy",
     "_lifetime_kwh",
     "_storm_guard_state",
+    "_update_status",
 )
 HISTORICAL_CHARGER_SENSOR_UNIQUE_SUFFIXES: tuple[str, ...] = (
     "_connector_reason",

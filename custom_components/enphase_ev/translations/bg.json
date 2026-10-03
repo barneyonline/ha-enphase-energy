@@ -2292,8 +2292,8 @@
       "inverter_array_power": {
         "name": "{array} Текуща мощност"
       },
-      "control_update_status": {
-        "name": "Състояние на промяната на управлението",
+      "update_status": {
+        "name": "Състояние на актуализацията",
         "state": {
           "idle": "В покой",
           "pending": "В очакване",

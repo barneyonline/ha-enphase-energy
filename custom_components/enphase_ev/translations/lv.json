@@ -2292,8 +2292,8 @@
       "inverter_array_power": {
         "name": "{array} Pašreizējā jauda"
       },
-      "control_update_status": {
-        "name": "Vadības izmaiņas statuss",
+      "update_status": {
+        "name": "Atjaunināšanas statuss",
         "state": {
           "idle": "Dīkstāve",
           "pending": "Gaida",
