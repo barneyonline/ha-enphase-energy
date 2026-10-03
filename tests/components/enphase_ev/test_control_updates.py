@@ -29,7 +29,10 @@ from custom_components.enphase_ev.const import (
     GREEN_BATTERY_SETTING,
     SAVINGS_OPERATION_MODE_SUBTYPE,
 )
-from custom_components.enphase_ev.sensor import EnphaseControlUpdateStatusSensor
+from custom_components.enphase_ev.sensor_control_updates import (
+    EnphaseChargerUpdateStatusSensor,
+    EnphaseDeviceUpdateStatusSensor,
+)
 from custom_components.enphase_ev.switch import GreenBatterySwitch, ChargingSwitch
 
 
@@ -447,37 +450,38 @@ async def test_stop_remains_available_when_start_is_pending(coordinator_factory)
     }
 
 
-def test_progress_sensor_includes_site_chargers_export_and_grid(coordinator_factory):
-    coord = coordinator_factory(serials=["EV1"])
-    sensor = EnphaseControlUpdateStatusSensor(coord)
-    assert sensor.native_value == "idle"
+def test_progress_sensors_isolate_chargers_from_gateway(coordinator_factory):
+    coord = coordinator_factory(serials=["EV1", "EV2"])
+    charger = EnphaseChargerUpdateStatusSensor(coord, "EV1")
+    other = EnphaseChargerUpdateStatusSensor(coord, "EV2")
+    gateway = EnphaseDeviceUpdateStatusSensor(coord, "envoy")
+    assert charger.native_value == "idle"
     update = coord.control_updates.begin(
         "charge_mode", "EV1", {"mode": "new"}, {"mode": "old"}
     )
-    assert sensor.native_value == "pending"
-    assert sensor.extra_state_attributes["updates"]["EV1"]["charge_mode"][
-        "confirmed"
-    ] == {"mode": "old"}
+    assert charger.native_value == "pending"
+    assert other.native_value == gateway.native_value == "idle"
+    assert charger.extra_state_attributes["updates"]["charge_mode"]["confirmed"] == {
+        "mode": "old"
+    }
     coord.control_updates.finish(("charge_mode", "EV1"), update, failed=True)
-    assert sensor.native_value == "failed"
+    assert charger.native_value == "failed"
     update.status = "unconfirmed"
-    assert sensor.native_value == "unconfirmed"
-    coord.export_limit_runtime.pending = {"watts": 0, "started": 0}
-    coord.export_limit_runtime.request_status = "pending"
-    assert sensor.native_value == "pending"
-    coord.export_limit_runtime.request_status = "unconfirmed"
-    assert sensor.native_value == "unconfirmed"
+    assert charger.native_value == "unconfirmed"
     coord.export_limit_runtime = SimpleNamespace(
         enabled=True,
-        pending=coord.export_limit_runtime.pending,
-        request_status="unconfirmed",
-        attributes=lambda: {},
+        pending={"watts": 0, "started": 0},
+        request_status="pending",
+        attributes=lambda: {"requested_watts": 0},
     )
-    assert "export_limit" in sensor.extra_state_attributes["updates"]["site"]
+    assert gateway.native_value == "pending"
+    coord.export_limit_runtime.request_status = "unconfirmed"
+    assert gateway.native_value == "unconfirmed"
+    assert "export_limit" in gateway.extra_state_attributes["updates"]
     coord.grid_profile_runtime.pending_profile_id = "profile"
-    assert sensor.native_value == "pending"
+    assert gateway.native_value == "pending"
     assert (
-        sensor.extra_state_attributes["updates"]["site"]["grid_profile"][
+        gateway.extra_state_attributes["updates"]["grid_profile"][
             "requested_profile_id"
         ]
         == "profile"
@@ -575,7 +579,10 @@ async def test_grid_profile_request_target_and_fresh_confirmation(coordinator_fa
 def test_export_rejection_is_reported_separately(coordinator_factory):
     coord = coordinator_factory()
     coord.export_limit_runtime.request_status = "rejected"
-    assert EnphaseControlUpdateStatusSensor(coord).native_value == "failed"
+    coord.export_limit_runtime = SimpleNamespace(
+        enabled=True, pending=None, request_status="rejected", attributes=lambda: {}
+    )
+    assert EnphaseDeviceUpdateStatusSensor(coord, "envoy").native_value == "failed"
 
 
 @pytest.mark.asyncio

@@ -2292,8 +2292,8 @@
       "inverter_array_power": {
         "name": "{array} Potenza attuale"
       },
-      "control_update_status": {
-        "name": "Stato della modifica del controllo",
+      "update_status": {
+        "name": "Stato dell’aggiornamento",
         "state": {
           "idle": "Inattivo",
           "pending": "In attesa",

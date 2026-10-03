@@ -2292,8 +2292,8 @@
       "inverter_array_power": {
         "name": "{array} Nåværende effekt"
       },
-      "control_update_status": {
-        "name": "Status for kontrollendring",
+      "update_status": {
+        "name": "Oppdateringsstatus",
         "state": {
           "idle": "Inaktiv",
           "pending": "Venter",
