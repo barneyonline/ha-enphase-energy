@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
-- None
+- Remove the central Control Update Status sensor. Update dashboards and automations to use the owning device’s diagnostic Update Status sensor instead.
 
 ### ✨ New features
 - None
@@ -31,6 +31,7 @@ All notable changes to this project will be documented in this file.
 - Add bounded charger-status retries, visible endpoint retry times, localized
   outage repairs, and credential-free incident history that survives recovery
   and restart. Preserve shared rate-limit cooldowns and explicit Stop actions.
+- Add diagnostic Update Status sensors to EV chargers, gateways (including system-controller controls), and battery systems, showing each device’s control progress and requested/confirmed values without additional cloud polling. Keep charger progress visible through cloud read failures and retain tariff-only diagnostics on Enphase Cloud when tariff controls are hosted there.
 
 ### 🔄 Other changes
 - None

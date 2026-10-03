@@ -2292,8 +2292,8 @@
       "inverter_array_power": {
         "name": "{array} Bieżąca moc"
       },
-      "control_update_status": {
-        "name": "Stan zmiany sterowania",
+      "update_status": {
+        "name": "Stan aktualizacji",
         "state": {
           "idle": "Bezczynny",
           "pending": "Oczekujący",

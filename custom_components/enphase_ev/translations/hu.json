@@ -2292,8 +2292,8 @@
       "inverter_array_power": {
         "name": "{array} Pillanatnyi teljesítmény"
       },
-      "control_update_status": {
-        "name": "Vezérlési módosítás állapota",
+      "update_status": {
+        "name": "Frissítés állapota",
         "state": {
           "idle": "Tétlen",
           "pending": "Függőben levő",

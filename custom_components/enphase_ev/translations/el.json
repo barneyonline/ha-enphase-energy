@@ -2292,8 +2292,8 @@
       "inverter_array_power": {
         "name": "{array} Τρέχουσα ισχύς"
       },
-      "control_update_status": {
-        "name": "Κατάσταση αλλαγής ελέγχου",
+      "update_status": {
+        "name": "Κατάσταση ενημέρωσης",
         "state": {
           "idle": "Αδρανές",
           "pending": "Εκκρεμής",

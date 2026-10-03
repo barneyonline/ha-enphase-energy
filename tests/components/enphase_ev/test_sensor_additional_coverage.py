@@ -118,7 +118,7 @@ async def test_async_setup_entry_registers_entities(
     assert any(ent.unique_id.endswith("_last_rpt") for ent in added)
     assert any(ent.unique_id.endswith("_electrical_phase") for ent in added)
     assert any(ent.unique_id.endswith("_charger_authentication") for ent in added)
-    assert len([ent for ent in added if hasattr(ent, "_sn")]) == 11
+    assert len([ent for ent in added if hasattr(ent, "_sn")]) == 12
     grid_profile = next(
         ent for ent in added if ent.unique_id.endswith("_current_grid_profile")
     )
@@ -133,7 +133,7 @@ async def test_async_setup_entry_registers_entities(
         cb for cb in callbacks if cb.__name__ == "_async_sync_topology"
     )
     sync_topology_cb()
-    assert len([ent for ent in added if hasattr(ent, "_sn")]) == 11
+    assert len([ent for ent in added if hasattr(ent, "_sn")]) == 12
 
     new_sn = "NEWSN123"
     coord.data[new_sn] = dict(coord.data[RANDOM_SERIAL], sn=new_sn)

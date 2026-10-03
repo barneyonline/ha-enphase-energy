@@ -2292,8 +2292,8 @@
       "inverter_array_power": {
         "name": "{array} Nykyinen teho"
       },
-      "control_update_status": {
-        "name": "Ohjausmuutoksen tila",
+      "update_status": {
+        "name": "Päivityksen tila",
         "state": {
           "idle": "Jouten",
           "pending": "Odottaa",

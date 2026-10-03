@@ -126,6 +126,11 @@ from .serial_discovery import (
     active_charger_serials_for_cleanup,
     active_inverter_serials_for_cleanup,
 )
+from .sensor_control_updates import (
+    EnphaseChargerUpdateStatusSensor,
+    EnphaseDeviceUpdateStatusSensor,
+    tariff_updates_use_cloud_device,
+)
 from .sensor_registry import EnphaseSensorRegistrySetup
 from .sensor_vpp import VPP_SENSOR_KEYS, vpp_sensor_entities
 from .serial_entity_metadata import (
@@ -519,9 +524,32 @@ async def async_setup_entry(
                 ),
             )
         if getattr(coord, "control_updates", None) is not None:
-            _add_site_entity(
-                "control_update_status", EnphaseControlUpdateStatusSensor(coord)
-            )
+            if gateway_available:
+                _add_site_entity(
+                    "envoy_update_status",
+                    EnphaseDeviceUpdateStatusSensor(coord, "envoy"),
+                )
+            elif inventory_ready:
+                _async_remove_site_sensor_entity("envoy_update_status")
+            if site_has_battery and battery_device_available:
+                _add_site_entity(
+                    "encharge_update_status",
+                    EnphaseDeviceUpdateStatusSensor(coord, "encharge"),
+                )
+            elif inventory_ready:
+                _async_remove_site_sensor_entity("encharge_update_status")
+            if tariff_updates_use_cloud_device(coord) and (
+                getattr(coord, "tariff_import_rate", None) is not None
+                or getattr(coord, "tariff_export_rate", None) is not None
+                or getattr(coord, "tariff_billing", None) is not None
+                or ("tariff", None) in coord.control_updates.updates
+            ):
+                _add_site_entity(
+                    "cloud_update_status",
+                    EnphaseDeviceUpdateStatusSensor(coord, "cloud"),
+                )
+            else:
+                _async_remove_site_sensor_entity("cloud_update_status")
         export_runtime = getattr(coord, "export_limit_runtime", None)
         if export_runtime is not None and export_runtime.enabled:
             _add_site_entity("export_limit", EnphaseExportLimitSensor(coord))
@@ -934,6 +962,8 @@ async def async_setup_entry(
             per_serial_entities.append(EnphaseChargeModeSensor(coord, sn))
             per_serial_entities.append(EnphaseChargerAuthenticationSensor(coord, sn))
             per_serial_entities.append(EnphaseStatusSensor(coord, sn))
+            if getattr(coord, "control_updates", None) is not None:
+                per_serial_entities.append(EnphaseChargerUpdateStatusSensor(coord, sn))
             per_serial_entities.append(EnphaseLifetimeEnergySensor(coord, sn))
             if site_has_battery:
                 per_serial_entities.append(EnphaseStormGuardStateSensor(coord, sn))
@@ -1162,6 +1192,8 @@ async def async_setup_entry(
             getattr(coord, "tariff_import_rate", None) is not None,
             getattr(coord, "tariff_export_rate", None) is not None,
             getattr(coord, "tariff_rates_last_refresh_utc", None) is not None,
+            ("tariff", None)
+            in getattr(getattr(coord, "control_updates", None), "updates", {}),
             frozenset(site_energy) if isinstance(site_energy, dict) else frozenset(),
             populated_bucket_keys,
             known_channels,
@@ -1192,6 +1224,7 @@ async def async_setup_entry(
     # every coordinator update.
     _async_prune_dry_contact_type_inventory_entities()
     _async_prune_blocked_type_inventory_entities({"encharge"})
+    _async_remove_site_sensor_entity("control_update_status")
     _async_remove_site_sensor_entity("current_power_consumption")
     _async_remove_site_sensor_entity("grid_import_power")
     _async_remove_site_sensor_entity("grid_export_power")
@@ -4169,58 +4202,3 @@ class EnphaseSystemProfileStatusSensor(_SiteBaseEntity):
         if isinstance(evse_profile, dict):
             attrs["evse_profile"] = evse_profile
         return attrs
-
-
-class EnphaseControlUpdateStatusSensor(_SiteBaseEntity):
-    """Show independent progress for all site and charger control writes."""
-
-    _attr_translation_key = "control_update_status"
-    _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = ["idle", "pending", "unconfirmed", "failed"]
-    _attr_icon = "mdi:progress-clock"
-
-    def __init__(self, coord: EnphaseCoordinator) -> None:
-        super().__init__(
-            coord, "control_update_status", "Control Update Status", type_key=None
-        )
-
-    @property
-    def extra_state_attributes(self) -> dict[str, object]:
-        runtime = self._coord.control_updates
-        scopes = {serial for _control, serial in runtime.updates}
-        updates: dict[str, object] = {"site": runtime.attributes()}
-        for serial in sorted(scope for scope in scopes if scope is not None):
-            updates[serial] = runtime.attributes(serial)
-        site = cast(dict[str, object], updates["site"])
-        export = self._coord.export_limit_runtime
-        if export.enabled:
-            site["export_limit"] = {
-                "status": export.request_status or "idle",
-                **export.attributes(),
-            }
-        grid = self._coord.grid_profile_runtime
-        if grid.pending_profile_id is not None and "grid_profile" not in site:
-            site["grid_profile"] = {
-                "status": grid.status,
-                "requested_profile_id": grid.pending_profile_id,
-            }
-        return {"updates": updates}
-
-    @property
-    def native_value(self) -> str:
-        runtime = self._coord.control_updates
-        states = {runtime.status(serial) for _control, serial in runtime.updates}
-        export = self._coord.export_limit_runtime
-        if export.pending is not None:
-            states.add(
-                "unconfirmed" if export.request_status == "unconfirmed" else "pending"
-            )
-        if export.request_status == "rejected":
-            states.add("failed")
-        grid = self._coord.grid_profile_runtime
-        if grid.pending_profile_id is not None:
-            states.add(grid.status)
-        for state in ("pending", "unconfirmed", "failed"):
-            if state in states:
-                return state
-        return "idle"

@@ -2292,8 +2292,8 @@
       "inverter_array_power": {
         "name": "{array} Current Power"
       },
-      "control_update_status": {
-        "name": "Control Update Status",
+      "update_status": {
+        "name": "Update Status",
         "state": {
           "idle": "Idle",
           "pending": "Pending",
