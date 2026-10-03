@@ -2665,9 +2665,6 @@
       }
     },
     "button": {
-      "cancel_pending_profile_change": {
-        "name": "Anulați modificarea profilului în așteptare"
-      },
       "storm_alert_opt_out": {
         "name": "Renunță la alerta de furtună"
       },
@@ -2823,7 +2820,45 @@
     },
     "battery_profile_pending": {
       "title": "Actualizarea profilului bateriei Enphase Energy este în așteptare",
-      "description": "O modificare a profilului bateriei pentru instalația {site_id} este în așteptare de mai mult de {pending_timeout_minutes} minute. Serviciul cloud poate încă procesa solicitarea."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Schimbarea profilului bateriei",
+            "description": "O modificare a profilului bateriei pentru instalația {site_id} este în așteptare de mai mult de {pending_timeout_minutes} minute. Serviciul cloud poate încă procesa solicitarea.\n\nVerificați starea sau anulați cererea în așteptare.",
+            "menu_options": {
+              "check_again": "Verifică din nou",
+              "cancel_change": "Anulează schimbarea"
+            }
+          },
+          "pending": {
+            "title": "Schimbarea profilului bateriei",
+            "description": "Schimbarea este încă neconfirmată. Verificările continuă automat. Puteți verifica din nou sau anula.",
+            "menu_options": {
+              "check_again": "Verifică din nou",
+              "cancel_change": "Anulează schimbarea"
+            }
+          },
+          "check_failed": {
+            "title": "Schimbarea profilului bateriei",
+            "description": "Profilul nu a putut fi actualizat. Încercați mai târziu sau anulați cererea în așteptare.",
+            "menu_options": {
+              "check_again": "Verifică din nou",
+              "cancel_change": "Anulează schimbarea"
+            }
+          },
+          "cancel_change": {
+            "title": "Anulați schimbarea de profil în așteptare?",
+            "description": "Anulați această cerere de profil al bateriei în așteptare în Enphase. Aceasta nu restabilește un profil care a intrat deja în vigoare."
+          }
+        },
+        "error": {
+          "cannot_cancel": "Cererea nu a putut fi anulată. Verificați conexiunea și permisiunile contului Enphase, apoi încercați din nou."
+        },
+        "abort": {
+          "entry_unavailable": "Integrarea nu este încărcată. Încărcați-o și redeschideți această reparație.",
+          "request_changed": "Cererea în așteptare s-a schimbat. Închideți acest asistent și redeschideți reparația curentă."
+        }
+      }
     },
     "hems_auth_degraded": {
       "title": "HEMS Enphase Energy este pauzat temporar",

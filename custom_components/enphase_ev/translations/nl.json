@@ -2665,9 +2665,6 @@
       }
     },
     "button": {
-      "cancel_pending_profile_change": {
-        "name": "Annuleer lopende profielwijziging"
-      },
       "storm_alert_opt_out": {
         "name": "Afmelden voor stormwaarschuwing"
       },
@@ -2823,7 +2820,45 @@
     },
     "battery_profile_pending": {
       "title": "Update van Enphase Energy-batterijprofiel in behandeling",
-      "description": "Een wijziging van het batterijprofiel voor locatie {site_id} staat al langer dan {pending_timeout_minutes} minuten in behandeling. De cloud verwerkt de aanvraag mogelijk nog."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Wijziging van batterijprofiel",
+            "description": "Een wijziging van het batterijprofiel voor locatie {site_id} staat al langer dan {pending_timeout_minutes} minuten in behandeling. De cloud verwerkt de aanvraag mogelijk nog.\n\nControleer de status of annuleer het wachtende verzoek.",
+            "menu_options": {
+              "check_again": "Opnieuw controleren",
+              "cancel_change": "Wijziging annuleren"
+            }
+          },
+          "pending": {
+            "title": "Wijziging van batterijprofiel",
+            "description": "De wijziging is nog niet bevestigd. De controles gaan automatisch door. Je kunt opnieuw controleren of annuleren.",
+            "menu_options": {
+              "check_again": "Opnieuw controleren",
+              "cancel_change": "Wijziging annuleren"
+            }
+          },
+          "check_failed": {
+            "title": "Wijziging van batterijprofiel",
+            "description": "Het profiel kon niet worden vernieuwd. Probeer het later opnieuw of annuleer het wachtende verzoek.",
+            "menu_options": {
+              "check_again": "Opnieuw controleren",
+              "cancel_change": "Wijziging annuleren"
+            }
+          },
+          "cancel_change": {
+            "title": "Wachtende profielwijziging annuleren?",
+            "description": "Annuleer dit wachtende verzoek voor het batterijprofiel in Enphase. Dit herstelt geen profiel dat al van kracht is geworden."
+          }
+        },
+        "error": {
+          "cannot_cancel": "Het verzoek kon niet worden geannuleerd. Controleer je verbinding en de rechten van het Enphase-account en probeer het opnieuw."
+        },
+        "abort": {
+          "entry_unavailable": "De integratie is niet geladen. Laad deze en open deze reparatie opnieuw.",
+          "request_changed": "Het wachtende verzoek is gewijzigd. Sluit deze wizard en open de huidige reparatie opnieuw."
+        }
+      }
     },
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS tijdelijk gepauzeerd",

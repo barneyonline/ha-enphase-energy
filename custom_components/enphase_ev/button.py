@@ -58,10 +58,6 @@ def _storm_guard_visible(coord: EnphaseCoordinator) -> bool:
     return show_storm_guard is not False
 
 
-def _retain_cancel_pending_profile_change(coord: EnphaseCoordinator) -> bool:
-    return _type_available(coord, "envoy")
-
-
 def _retain_storm_alert_opt_out(coord: EnphaseCoordinator) -> bool:
     return (
         _site_has_battery(coord)
@@ -96,7 +92,7 @@ async def async_setup_entry(
 ) -> None:
     coord: EnphaseCoordinator = get_runtime_data(entry).coordinator
     ent_reg = er.async_get(hass)
-    # These buttons are retired for every charger, so their registry cleanup
+    # These buttons are retired, so their registry cleanup
     # does not depend on a successful inventory refresh.
     prune_managed_entities(
         ent_reg,
@@ -104,9 +100,12 @@ async def async_setup_entry(
         domain="button",
         active_unique_ids=(),
         is_managed=lambda unique_id: (
-            unique_id.startswith(f"{DOMAIN}_")
-            and not unique_id.startswith(f"{DOMAIN}_site_")
-            and unique_id.endswith(("_start_charging", "_stop_charging"))
+            unique_id == f"{DOMAIN}_site_{coord.site_id}_cancel_pending_profile_change"
+            or (
+                unique_id.startswith(f"{DOMAIN}_")
+                and not unique_id.startswith(f"{DOMAIN}_site_")
+                and unique_id.endswith(("_start_charging", "_stop_charging"))
+            )
         ),
     )
     known_serials: set[str] = set()
@@ -124,13 +123,6 @@ async def async_setup_entry(
         site_entities: list[ButtonEntity] = []
         retain_site_entity_keys: set[str] = set()
         current_serials = {sn for sn in coord.iter_serials() if sn}
-        if _retain_cancel_pending_profile_change(coord):
-            retain_site_entity_keys.add("cancel_pending_profile_change")
-        if "cancel_pending_profile_change" not in site_entity_keys and _type_available(
-            coord, "envoy"
-        ):
-            site_entities.append(CancelPendingProfileChangeButton(coord))
-            site_entity_keys.add("cancel_pending_profile_change")
         if _retain_storm_alert_opt_out(coord):
             retain_site_entity_keys.add("storm_alert_opt_out")
         if (
@@ -203,7 +195,6 @@ async def async_setup_entry(
             is_managed=lambda unique_id: (
                 unique_id
                 in {
-                    _site_button_unique_id("cancel_pending_profile_change"),
                     _site_button_unique_id("storm_alert_opt_out"),
                     _site_button_unique_id("battery_force_refresh"),
                     _site_button_unique_id("battery_schedule_save"),
@@ -223,42 +214,6 @@ async def async_setup_entry(
     unsubscribe = coord.async_add_listener(_async_sync_chargers)
     entry.async_on_unload(unsubscribe)
     _async_sync_chargers()
-
-
-class CancelPendingProfileChangeButton(CoordinatorEntity, ButtonEntity):  # type: ignore[misc]
-    _attr_has_entity_name = True
-    _attr_translation_key = "cancel_pending_profile_change"
-
-    def __init__(self, coord: EnphaseCoordinator) -> None:
-        super().__init__(coord)
-        self._coord = coord
-        self._attr_unique_id = (
-            f"{DOMAIN}_site_{coord.site_id}_cancel_pending_profile_change"
-        )
-
-    @property
-    def available(self) -> bool:
-        return cast(
-            bool,
-            (
-                super().available
-                and _type_available(self._coord, "envoy")
-                and self._coord.battery_profile_pending
-            ),
-        )
-
-    async def async_press(self) -> None:
-        await self._coord.async_cancel_pending_profile_change()
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        info = _type_device_info(self._coord, "envoy")
-        if info is not None:
-            return info
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"type:{self._coord.site_id}:envoy")},
-            manufacturer="Enphase",
-        )
 
 
 class StormAlertOptOutButton(CoordinatorEntity, ButtonEntity):  # type: ignore[misc]

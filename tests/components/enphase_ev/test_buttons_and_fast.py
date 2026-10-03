@@ -428,7 +428,6 @@ async def test_button_platform_async_setup_entry_filters_known_serials(
     hass, config_entry, coordinator_factory
 ):
     from custom_components.enphase_ev.button import (
-        CancelPendingProfileChangeButton,
         BatteryForceRefreshButton,
         BatteryScheduleDeleteButton,
         BatteryScheduleSaveButton,
@@ -459,8 +458,7 @@ async def test_button_platform_async_setup_entry_filters_known_serials(
 
     await async_setup_entry(hass, config_entry, capture_add)
     assert len(added) == 2
-    assert isinstance(added[0][0], CancelPendingProfileChangeButton)
-    assert isinstance(added[0][1], StormAlertOptOutButton)
+    assert isinstance(added[0][0], StormAlertOptOutButton)
     assert any(isinstance(entity, BatteryForceRefreshButton) for entity in added[0])
     assert any(isinstance(entity, BatteryScheduleSaveButton) for entity in added[0])
     assert any(isinstance(entity, BatteryScheduleDeleteButton) for entity in added[0])
@@ -545,53 +543,6 @@ async def test_button_platform_removes_retired_charging_buttons_when_inventory_r
         for batch in added
         for entity in batch
     )
-
-
-@pytest.mark.asyncio
-async def test_cancel_pending_profile_button(hass, monkeypatch) -> None:
-    from custom_components.enphase_ev.button import CancelPendingProfileChangeButton
-    from custom_components.enphase_ev.coordinator import EnphaseCoordinator
-    from custom_components.enphase_ev.const import (
-        CONF_COOKIE,
-        CONF_EAUTH,
-        CONF_SCAN_INTERVAL,
-        CONF_SERIALS,
-        CONF_SITE_ID,
-    )
-
-    cfg = {
-        CONF_SITE_ID: RANDOM_SITE_ID,
-        CONF_SERIALS: [RANDOM_SERIAL],
-        CONF_EAUTH: "EAUTH",
-        CONF_COOKIE: "COOKIE",
-        CONF_SCAN_INTERVAL: 30,
-    }
-    from custom_components.enphase_ev import coordinator as coord_mod
-
-    monkeypatch.setattr(
-        coord_mod, "async_get_clientsession", lambda *args, **kwargs: object()
-    )
-    coord = EnphaseCoordinator(hass, cfg)
-    coord.inventory_runtime._set_type_device_buckets(  # noqa: SLF001
-        {
-            "envoy": {
-                "type_key": "envoy",
-                "type_label": "Gateway",
-                "count": 1,
-                "devices": [{"name": "IQ Gateway"}],
-            }
-        },
-        ["envoy"],
-    )
-    coord._battery_pending_profile = "self-consumption"  # noqa: SLF001
-    coord.async_cancel_pending_profile_change = AsyncMock()
-
-    button = CancelPendingProfileChangeButton(coord)
-    assert button.available is True
-
-    await button.async_press()
-
-    coord.async_cancel_pending_profile_change.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -696,27 +647,6 @@ def test_storm_alert_opt_out_button_device_info_fallback() -> None:
     assert button.device_info["manufacturer"] == "Enphase"
 
 
-def test_cancel_pending_profile_button_device_info_fallback_and_override() -> None:
-    from custom_components.enphase_ev.button import CancelPendingProfileChangeButton
-
-    coord = SimpleNamespace(
-        site_id="site",
-        last_update_success=True,
-        battery_profile_pending=True,
-        inventory_view=SimpleNamespace(
-            has_type_for_entities=lambda key: key == "envoy",
-            type_device_info=lambda _key: None,
-        ),
-    )
-    button = CancelPendingProfileChangeButton(coord)
-
-    assert button.device_info["identifiers"] == {("enphase_ev", "type:site:envoy")}
-
-    expected = {"identifiers": {("enphase_ev", "provided")}}
-    coord.inventory_view.type_device_info = MagicMock(return_value=expected)
-    assert button.device_info is expected
-
-
 @pytest.mark.asyncio
 async def test_async_setup_entry_button_cleanup_waits_for_inventory_ready(
     hass, config_entry, monkeypatch
@@ -752,12 +682,28 @@ async def test_async_setup_entry_button_cleanup_waits_for_inventory_ready(
         "enphase_ev_5555_start_charging",
         config_entry=config_entry,
     )
+    old_cancel = ent_reg.async_get_or_create(
+        "button",
+        "enphase_ev",
+        "enphase_ev_site_123456_cancel_pending_profile_change",
+        config_entry=config_entry,
+    )
+    other_site_cancel = ent_reg.async_get_or_create(
+        "button",
+        "enphase_ev",
+        "enphase_ev_site_other_cancel_pending_profile_change",
+        config_entry=config_entry,
+    )
     remove_spy = MagicMock(wraps=ent_reg.async_remove)
     monkeypatch.setattr(ent_reg, "async_remove", remove_spy)
 
     await async_setup_entry(hass, config_entry, lambda *_args, **_kwargs: None)
 
-    remove_spy.assert_called_once_with(retired.entity_id)
+    assert remove_spy.call_count == 2
+    remove_spy.assert_any_call(retired.entity_id)
+    remove_spy.assert_any_call(old_cancel.entity_id)
+    assert ent_reg.async_get(old_cancel.entity_id) is None
+    assert ent_reg.async_get(other_site_cancel.entity_id) is not None
     assert ent_reg.async_get(retired.entity_id) is None
     assert ent_reg.async_get(stale.entity_id) is not None
 

@@ -2665,9 +2665,6 @@
       }
     },
     "button": {
-      "cancel_pending_profile_change": {
-        "name": "Tühista ootel profiilimuudatus"
-      },
       "storm_alert_opt_out": {
         "name": "Loobu tormihoiatusest"
       },
@@ -2823,7 +2820,45 @@
     },
     "battery_profile_pending": {
       "title": "Enphase Energy aku profiili uuendus on ootel",
-      "description": "Asukoha {site_id} aku profiili muudatus on olnud ootel üle {pending_timeout_minutes} minuti. Pilveteenus võib päringut endiselt töödelda."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Aku profiili muutmine",
+            "description": "Asukoha {site_id} aku profiili muudatus on olnud ootel üle {pending_timeout_minutes} minuti. Pilveteenus võib päringut endiselt töödelda.\n\nKontrolli olekut või tühista ootel taotlus.",
+            "menu_options": {
+              "check_again": "Kontrolli uuesti",
+              "cancel_change": "Tühista muudatus"
+            }
+          },
+          "pending": {
+            "title": "Aku profiili muutmine",
+            "description": "Muudatus on endiselt kinnitamata. Kontrollimine jätkub automaatselt. Saad uuesti kontrollida või tühistada.",
+            "menu_options": {
+              "check_again": "Kontrolli uuesti",
+              "cancel_change": "Tühista muudatus"
+            }
+          },
+          "check_failed": {
+            "title": "Aku profiili muutmine",
+            "description": "Profiili ei saanud värskendada. Proovi hiljem uuesti või tühista ootel taotlus.",
+            "menu_options": {
+              "check_again": "Kontrolli uuesti",
+              "cancel_change": "Tühista muudatus"
+            }
+          },
+          "cancel_change": {
+            "title": "Kas tühistada ootel profiilimuudatus?",
+            "description": "Tühista see ootel aku profiili taotlus Enphase’is. See ei taasta profiili, mis on juba jõustunud."
+          }
+        },
+        "error": {
+          "cannot_cancel": "Taotlust ei saanud tühistada. Kontrolli ühendust ja Enphase’i konto õigusi ning proovi uuesti."
+        },
+        "abort": {
+          "entry_unavailable": "Integratsioon pole laaditud. Laadi see ja ava see parandus uuesti.",
+          "request_changed": "Ootel taotlus muutus. Sulge see viisard ja ava praegune parandus uuesti."
+        }
+      }
     },
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS on ajutiselt peatatud",

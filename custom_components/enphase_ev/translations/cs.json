@@ -2665,9 +2665,6 @@
       }
     },
     "button": {
-      "cancel_pending_profile_change": {
-        "name": "Zrušit čekající změnu profilu"
-      },
       "storm_alert_opt_out": {
         "name": "Odhlásit upozornění na bouři"
       },
@@ -2823,7 +2820,45 @@
     },
     "battery_profile_pending": {
       "title": "Probíhá aktualizace profilu baterie Enphase Energy",
-      "description": "Změna profilu baterie pro lokalitu {site_id} čeká déle než {pending_timeout_minutes} minut. Cloud může požadavek stále zpracovávat."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Změna profilu baterie",
+            "description": "Změna profilu baterie pro lokalitu {site_id} čeká déle než {pending_timeout_minutes} minut. Cloud může požadavek stále zpracovávat.\n\nZkontrolujte stav nebo zrušte čekající požadavek.",
+            "menu_options": {
+              "check_again": "Zkontrolovat znovu",
+              "cancel_change": "Zrušit změnu"
+            }
+          },
+          "pending": {
+            "title": "Změna profilu baterie",
+            "description": "Změna stále není potvrzena. Kontroly pokračují automaticky. Můžete znovu zkontrolovat stav nebo změnu zrušit.",
+            "menu_options": {
+              "check_again": "Zkontrolovat znovu",
+              "cancel_change": "Zrušit změnu"
+            }
+          },
+          "check_failed": {
+            "title": "Změna profilu baterie",
+            "description": "Profil se nepodařilo aktualizovat. Zkuste to později nebo zrušte čekající požadavek.",
+            "menu_options": {
+              "check_again": "Zkontrolovat znovu",
+              "cancel_change": "Zrušit změnu"
+            }
+          },
+          "cancel_change": {
+            "title": "Zrušit čekající změnu profilu?",
+            "description": "Zrušte tento čekající požadavek na profil baterie v Enphase. Tím se neobnoví profil, který již vstoupil v platnost."
+          }
+        },
+        "error": {
+          "cannot_cancel": "Požadavek se nepodařilo zrušit. Zkontrolujte připojení a oprávnění účtu Enphase a zkuste to znovu."
+        },
+        "abort": {
+          "entry_unavailable": "Integrace není načtena. Načtěte ji a znovu otevřete tuto opravu.",
+          "request_changed": "Čekající požadavek se změnil. Zavřete tento průvodce a znovu otevřete aktuální opravu."
+        }
+      }
     },
     "hems_auth_degraded": {
       "title": "Enphase Energy HEMS je dočasně pozastaveno",

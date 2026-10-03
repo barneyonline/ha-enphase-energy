@@ -2665,9 +2665,6 @@
       }
     },
     "button": {
-      "cancel_pending_profile_change": {
-        "name": "Anuluj oczekującą zmianę profilu"
-      },
       "storm_alert_opt_out": {
         "name": "Zrezygnuj z alertu burzowego"
       },
@@ -2823,7 +2820,45 @@
     },
     "battery_profile_pending": {
       "title": "Oczekująca aktualizacja profilu baterii Enphase Energy",
-      "description": "Zmiana profilu baterii dla lokalizacji {site_id} oczekuje od ponad {pending_timeout_minutes} minut. Chmura może nadal przetwarzać żądanie."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Zmiana profilu baterii",
+            "description": "Zmiana profilu baterii dla lokalizacji {site_id} oczekuje od ponad {pending_timeout_minutes} minut. Chmura może nadal przetwarzać żądanie.\n\nSprawdź stan lub anuluj oczekujące żądanie.",
+            "menu_options": {
+              "check_again": "Sprawdź ponownie",
+              "cancel_change": "Anuluj zmianę"
+            }
+          },
+          "pending": {
+            "title": "Zmiana profilu baterii",
+            "description": "Zmiana nadal nie jest potwierdzona. Sprawdzanie jest kontynuowane automatycznie. Możesz sprawdzić ponownie lub anulować.",
+            "menu_options": {
+              "check_again": "Sprawdź ponownie",
+              "cancel_change": "Anuluj zmianę"
+            }
+          },
+          "check_failed": {
+            "title": "Zmiana profilu baterii",
+            "description": "Nie udało się odświeżyć profilu. Spróbuj później lub anuluj oczekujące żądanie.",
+            "menu_options": {
+              "check_again": "Sprawdź ponownie",
+              "cancel_change": "Anuluj zmianę"
+            }
+          },
+          "cancel_change": {
+            "title": "Anulować oczekującą zmianę profilu?",
+            "description": "Anuluj to oczekujące żądanie profilu baterii w Enphase. Nie przywraca to profilu, który już zaczął obowiązywać."
+          }
+        },
+        "error": {
+          "cannot_cancel": "Nie udało się anulować żądania. Sprawdź połączenie i uprawnienia konta Enphase, a następnie spróbuj ponownie."
+        },
+        "abort": {
+          "entry_unavailable": "Integracja nie jest załadowana. Załaduj ją i ponownie otwórz tę naprawę.",
+          "request_changed": "Oczekujące żądanie zmieniło się. Zamknij ten kreator i ponownie otwórz bieżącą naprawę."
+        }
+      }
     },
     "hems_auth_degraded": {
       "title": "HEMS Enphase Energy tymczasowo wstrzymany",
