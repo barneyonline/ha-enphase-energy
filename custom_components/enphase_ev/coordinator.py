@@ -4041,7 +4041,9 @@ class EnphaseCoordinator(
 
         # Handle backoff window
         if self._backoff_until and time.monotonic() < self._backoff_until:
-            retry_after = max(0.0, self._backoff_until - time.monotonic())
+            # HA truncates the loop clock before adding retry_after. Sub-second
+            # delays can therefore schedule in the past and spin until expiry.
+            retry_after = max(1.0, self._backoff_until - time.monotonic())
             raise UpdateFailed(
                 "In backoff due to rate limiting or server errors",
                 retry_after=retry_after,
