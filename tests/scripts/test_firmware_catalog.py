@@ -60,6 +60,113 @@ def test_parse_facets_and_languages(firmware_catalog_module, fixture_dir: Path) 
     assert alt_locales["ja-jp"] == "Japan (JP)"
 
 
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        ('"', "'"),
+        ('class="facet-item__value"', 'class="extra facet-item__value active"'),
+        ("<span class=", '<span title="label" class='),
+        (
+            'data-drupal-facet-alias="document"',
+            'DATA-DRUPAL-FACET-ALIAS="DOCUMENT"',
+        ),
+        (
+            ">Release notes</span>",
+            ">Release <strong><span>notes</span></strong></span>",
+        ),
+        (">Release notes</span>", ">Release&nbsp;notes</span>"),
+    ],
+)
+def test_parse_facets_accepts_html_variations(
+    firmware_catalog_module, fixture_dir: Path, before: str, after: str
+) -> None:
+    page = (fixture_dir / "enphase_apps_facets.html").read_text(encoding="utf-8")
+    page = page.replace(before, after)
+    assert firmware_catalog_module.parse_facet_values(page, "document") == {
+        "Data sheets": 159,
+        "Release notes": 217,
+    }
+    assert (
+        firmware_catalog_module.parse_facet_values(page, "product_media_name")[
+            "IQ Gateway software"
+        ]
+        == 5002
+    )
+
+
+def test_parse_facets_scopes_labels_and_rejects_invalid_items(
+    firmware_catalog_module,
+) -> None:
+    page = """
+    <ul data-drupal-facet-alias="other">
+      <a data-drupal-facet-item-value="999"><span class="facet-item__value">Release notes</span></a>
+    </ul>
+    <ul data-drupal-facet-alias="document">
+      <a data-drupal-facet-item-value="invalid"><span class="facet-item__value">Invalid</span></a>
+      <a data-drupal-facet-item-value="-1"><span class="facet-item__value">Negative</span></a>
+      <a><span class="facet-item__value">Missing</span></a>
+      <a data-drupal-facet-item-value="218"><span class="facet-item__value"> </span></a>
+      <a data-drupal-facet-item-value="219"><span class="not-facet-item__value">Wrong class</span></a>
+      <a data-drupal-facet-item-value="217"><span class="facet-item__value">Release notes</span><span class="facet-item__count">(65)</span></a>
+      <span class="facet-item__value">Outside link</span>
+      <ul data-drupal-facet-alias="other">
+        <a data-drupal-facet-item-value="998"><span class="facet-item__value">Release notes</span></a>
+      </ul>
+      <a data-drupal-facet-item-value="159"><span class="facet-item__value">Data sheets</span></a>
+    </ul>
+    <a data-drupal-facet-item-value="997"><span class="facet-item__value">Release notes</span></a>
+    """
+    assert firmware_catalog_module.parse_facet_values(page, "document") == {
+        "Release notes": 217,
+        "Data sheets": 159,
+    }
+
+
+def test_bootstrap_uses_discovered_topic_id(
+    firmware_catalog_module, monkeypatch
+) -> None:
+    page = """
+    <ul data-drupal-facet-alias='document'>
+      <a data-drupal-facet-item-value='731'>
+        <span title='label' class='extra facet-item__value'>Release notes</span>
+      </a>
+    </ul>
+    """
+    monkeypatch.setattr(
+        firmware_catalog_module, "fetch_text", lambda url, **kwargs: page
+    )
+    target = firmware_catalog_module._bootstrap_target(
+        {"site_url": "https://enphase.com/"},
+        timeout=5,
+        docs_path=firmware_catalog_module.COMMUNICATION_CATEGORY_PATH,
+    )
+    assert target["topic_id"] == 731
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        "",
+        "</ul><ul><li>No facets</li></ul>",
+        "<html><title>Please wait</title><body>Checking browser</body></html>",
+        '<ul data-drupal-facet-alias="document"><a data-drupal-facet-item-value="159"><span class="facet-item__value">Data sheets</span></a></ul>',
+        '<ul data-drupal-facet-alias="document"><a data-drupal-facet-item-value="217"><span class="facet-item__value">Release notes',
+    ],
+)
+def test_bootstrap_missing_topic_fails_before_writing(
+    firmware_catalog_module, monkeypatch, tmp_path: Path, page: str
+) -> None:
+    monkeypatch.setattr(
+        firmware_catalog_module, "fetch_previous_runtime_catalog", lambda **kwargs: None
+    )
+    monkeypatch.setattr(
+        firmware_catalog_module, "fetch_text", lambda url, **kwargs: page
+    )
+    with pytest.raises(RuntimeError, match="Could not discover release-notes topic id"):
+        firmware_catalog_module.build_catalog(tmp_path, timeout=5, max_pages=1)
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_parse_release_cards_and_pagination(
     firmware_catalog_module, fixture_dir: Path, monkeypatch
 ) -> None:
@@ -2282,3 +2389,307 @@ def test_parse_args_and_main_paths(
     )
     assert firmware_catalog_module.main(None) == 1
     assert "Failed to build firmware catalog: boom" in capsys.readouterr().err
+
+
+@pytest.fixture
+def doc_center_page(fixture_dir):
+    return (fixture_dir / "enphase_doc_center_v1.html").read_text()
+
+
+@pytest.fixture
+def doc_center_response(fixture_dir):
+    response = json.loads((fixture_dir / "enphase_doc_center_search.json").read_text())
+    # The captured live request sampled two of 65 records. Make a complete page.
+    response["data"]["hits"]["total"]["value"] = 2
+    return response
+
+
+def _mock_doc_center_requests(module, monkeypatch, payloads):
+    import io
+
+    responses = iter(
+        [b"anonymous-test-token", *[json.dumps(p).encode() for p in payloads]]
+    )
+    requests = []
+
+    class Opener:
+        def open(self, request, *, timeout):
+            assert timeout == 5
+            requests.append(request)
+            return io.BytesIO(next(responses))
+
+    monkeypatch.setattr(module, "build_opener", lambda *args: Opener())
+    monkeypatch.setattr(module.time, "sleep", lambda delay: None)
+    return requests
+
+
+def _crawl_modern(module, **kwargs):
+    return module._crawl_doc_center(
+        config={"tid": "141"},
+        page_url="https://enphase.com/installers/resources/documentation/communication",
+        topic_id=731,
+        product_media_name_id=5002,
+        search_locale="en-ca",
+        timeout=5,
+        max_pages=kwargs.pop("max_pages", 3),
+        **kwargs,
+    )
+
+
+def test_doc_center_live_fixture_metadata_and_cards(
+    firmware_catalog_module, doc_center_page, doc_center_response, monkeypatch
+):
+    module = firmware_catalog_module
+    monkeypatch.setattr(module, "fetch_text", lambda *args, **kwargs: doc_center_page)
+    bootstrap = module._bootstrap_target(
+        {"site_url": "https://enphase.com/"},
+        timeout=5,
+        docs_path=module.COMMUNICATION_CATEGORY_PATH,
+    )
+    assert bootstrap["product_type"] == "141"
+    assert bootstrap["topic_id"] == 217
+    assert module.parse_facet_values(doc_center_page, "unknown") == {}
+    cards = module._doc_center_cards(doc_center_response["data"]["hits"]["hits"])
+    assert [(c.version, c.release_date, c.media_id, c.langcode) for c in cards] == [
+        ("8.3.5433", "2026-07-15", "35434", "en"),
+        ("8.3.6087", "2026-07-14", "36049", "en"),
+    ]
+    assert (
+        cards[0].countries_text
+        == "Bermuda, Canada, Mexico, Puerto Rico and the United States"
+    )
+    assert len(cards[0].summary) <= 500
+
+
+@pytest.mark.parametrize(
+    "settings", [[], {"docCenterV1": []}, {"docCenterV1": {"tid": "bad"}}]
+)
+def test_doc_center_rejects_invalid_settings(firmware_catalog_module, settings):
+    with pytest.raises(ValueError):
+        firmware_catalog_module.parse_doc_center_settings(
+            '<script data-drupal-selector="drupal-settings-json">'
+            + json.dumps(settings)
+            + "</script>"
+        )
+
+
+def test_doc_center_settings_require_complete_block(firmware_catalog_module):
+    module = firmware_catalog_module
+    assert (
+        module.parse_doc_center_settings(
+            '<script data-drupal-selector="drupal-settings-json">{}'
+        )
+        is None
+    )
+    assert (
+        module.parse_doc_center_settings(
+            '<script data-drupal-selector="drupal-settings-json">{}</script>'
+        )
+        is None
+    )
+    assert module._doc_center_facets(
+        {
+            "tidToName1Map": {
+                "bad": "Release notes",
+                "731": "  Release notes  ",
+                "8": " ",
+            }
+        },
+        "document",
+    ) == {"Release notes": 731}
+    with pytest.raises(ValueError, match="facet map"):
+        module._doc_center_facets({"tidToName1Map": []}, "document")
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("name", ""),
+        ("media_id", "bad"),
+        ("langcode", "en'"),
+        ("field_release_notes", None),
+        ("status", False),
+        ("bundle", "document"),
+    ],
+)
+def test_doc_center_rejects_invalid_record(
+    firmware_catalog_module, doc_center_response, field, value
+):
+    hits = doc_center_response["data"]["hits"]["hits"]
+    hits[0]["_source"][field] = value
+    with pytest.raises(ValueError, match="release-note record"):
+        firmware_catalog_module._doc_center_cards(hits)
+
+
+def test_doc_center_pagination_query_and_polling(
+    firmware_catalog_module, doc_center_response, monkeypatch
+):
+    import copy
+
+    module = firmware_catalog_module
+    first = copy.deepcopy(doc_center_response)
+    first["data"]["hits"]["hits"] = first["data"]["hits"]["hits"][:1] * 25
+    first["data"]["hits"]["total"]["value"] = 27
+    doc_center_response["data"]["hits"]["total"]["value"] = 27
+    doc_center_response["status"] = "cached"
+    requests = _mock_doc_center_requests(
+        module, monkeypatch, [{"status": "processing"}, first, doc_center_response]
+    )
+    cards, pages = _crawl_modern(module)
+    assert len(cards) == 27
+    assert len(pages) == 2 and pages[-1].endswith("page=1")
+    assert requests[0].full_url == "https://enphase.com/session/token"
+    assert all(
+        r.full_url
+        == "https://enphase.com/opensearch/documentation_index_opensearch/_search"
+        for r in requests[1:]
+    )
+    queries = [json.loads(r.data) for r in requests[1:]]
+    assert [q["from"] for q in queries] == [0, 0, 25]
+    assert queries[0]["post_filter"]["bool"]["must"] == [
+        {"terms": {"tid_1.keyword": ["731"]}},
+        {"terms": {"mid.keyword": ["5002"]}},
+    ]
+    assert queries[0]["query"]["bool"]["must"] == [
+        {"term": {"tid.keyword": "141"}},
+        {"term": {"status": "true"}},
+        {
+            "bool": {
+                "should": [
+                    {"term": {"langcode.keyword": "en-ca"}},
+                    {"term": {"field_alternative_language.keyword": "en-ca"}},
+                ],
+                "minimum_should_match": 1,
+            }
+        },
+    ]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        [],
+        {},
+        {"status": "failed"},
+        {"status": "completed", "data": None},
+        {"hits": {"hits": [], "total": {"value": 1, "relation": "eq"}}},
+        {"hits": {"hits": [], "total": {"value": 0, "relation": "gte"}}},
+    ],
+)
+def test_doc_center_rejects_incomplete_search(
+    firmware_catalog_module, monkeypatch, payload
+):
+    _mock_doc_center_requests(firmware_catalog_module, monkeypatch, [payload])
+    with pytest.raises((ValueError, RuntimeError)):
+        _crawl_modern(firmware_catalog_module)
+
+
+def test_doc_center_poll_limit_and_page_limit(
+    firmware_catalog_module, monkeypatch, doc_center_response
+):
+    module = firmware_catalog_module
+    _mock_doc_center_requests(module, monkeypatch, [{"status": "retrying"}] * 5)
+    with pytest.raises(RuntimeError, match="did not complete"):
+        _crawl_modern(module)
+    data = doc_center_response["data"]
+    data["hits"]["hits"] = data["hits"]["hits"][:1] * 25
+    data["hits"]["total"]["value"] = 26
+    _mock_doc_center_requests(module, monkeypatch, [data])
+    with pytest.raises(RuntimeError, match="exceeded max_pages"):
+        _crawl_modern(module, max_pages=1)
+
+
+def test_doc_center_crawl_deduplicates(
+    firmware_catalog_module, doc_center_page, doc_center_response, monkeypatch
+):
+    module = firmware_catalog_module
+    hits = doc_center_response["data"]["hits"]["hits"]
+    hits[1] = hits[0]
+    hits[0]["_source"]["field_release_date"] = None
+    monkeypatch.setattr(module, "fetch_text", lambda *args, **kwargs: doc_center_page)
+    requests = _mock_doc_center_requests(module, monkeypatch, [doc_center_response])
+    cards, pages = module.crawl_release_cards(
+        apps_url="https://enphase.com/installers/resources/documentation/communication",
+        product_type="141",
+        topic_id=217,
+        product_media_name_id=None,
+        search_locale="en",
+        timeout=5,
+        max_pages=3,
+    )
+    assert len(cards) == 1 and cards[0].release_date is None
+    assert len(pages) == 1
+    assert len(json.loads(requests[1].data)["post_filter"]["bool"]["must"]) == 1
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_doc_center_build_catalog(
+    firmware_catalog_module,
+    doc_center_page,
+    doc_center_response,
+    monkeypatch,
+    tmp_path,
+    empty,
+):
+    module = firmware_catalog_module
+    monkeypatch.setattr(
+        module, "REGION_SITE_ROUTE_ROWS", [module.REGION_SITE_ROUTE_ROWS[0]]
+    )
+    monkeypatch.setattr(module, "fetch_text", lambda *args, **kwargs: doc_center_page)
+    monkeypatch.setattr(module, "fetch_previous_runtime_catalog", lambda **kwargs: None)
+    if empty:
+        doc_center_response["data"]["hits"] = {
+            "hits": [],
+            "total": {"value": 0, "relation": "eq"},
+        }
+    _mock_doc_center_requests(module, monkeypatch, [doc_center_response])
+    if empty:
+        with pytest.raises(RuntimeError, match="required documentation source"):
+            module.build_catalog(tmp_path, timeout=5, max_pages=3)
+        assert not list(tmp_path.iterdir())
+    else:
+        module.build_catalog(tmp_path, timeout=5, max_pages=3)
+        catalog = json.loads((tmp_path / "catalog/v1/runtime_catalog.json").read_text())
+        assert catalog["schema_version"] == 1
+        assert (
+            catalog["devices"]["envoy"]["latest_by_country"]["US"]["version"]
+            == "8.3.5433"
+        )
+
+
+def test_doc_center_missing_topic_fails_before_write(
+    firmware_catalog_module, monkeypatch, tmp_path
+):
+    module = firmware_catalog_module
+    page = '<script data-drupal-selector="drupal-settings-json">{"docCenterV1":{"tid":"141","tidToName1Map":{"159":"Data sheets"}}}</script>'
+    monkeypatch.setattr(module, "fetch_text", lambda *args, **kwargs: page)
+    monkeypatch.setattr(module, "fetch_previous_runtime_catalog", lambda **kwargs: None)
+    with pytest.raises(RuntimeError, match="Could not discover release-notes topic id"):
+        module.build_catalog(tmp_path, timeout=5, max_pages=3)
+    assert not list(tmp_path.iterdir())
+
+
+def test_doc_center_empty_note_and_country_punctuation(
+    firmware_catalog_module, doc_center_response
+):
+    hits = doc_center_response["data"]["hits"]["hits"]
+    hits[0]["_source"]["field_release_notes"] = []
+    card = firmware_catalog_module._doc_center_cards(hits[:1])[0]
+    assert card.summary == "" and card.countries_text is None
+    assert (
+        firmware_catalog_module.ReleaseCardParser._extract_country_text("Countries: ;")
+        is None
+    )
+
+
+def test_doc_center_live_nested_and_empty_note_records(
+    firmware_catalog_module, fixture_dir
+):
+    hits = json.loads(
+        (fixture_dir / "enphase_doc_center_legacy_notes.json").read_text()
+    )
+    cards = firmware_catalog_module._doc_center_cards(hits)
+    assert [c.media_id for c in cards] == ["26179", "16586"]
+    assert cards[0].version == "8.3.5058"
+    assert cards[0].countries_text is not None
+    assert cards[1].summary == "" and cards[1].countries_text is None

@@ -1,0 +1,24 @@
+[
+  {
+    "_source": {
+      "bundle": "software_release_note",
+      "field_release_date": 1749124800,
+      "field_release_notes": "<p>IQ Gateway software version 8.3.5058 supports grid-forming and grid-tied systems with<br>IQ8 Series Microinverters, IQ7 Series Microinverters, and third-party string inverters, along with<br>IQ Battery 3T/10T or IQ Battery 5P or IQ Battery 5P with FlexPhase.</p><ul><li><p><span dir=\"ltr\"><strong>Countries:</strong> Germany, Austria, Switzerland, Luxembourg, France, The Netherlands, Belgium,</span><br><span dir=\"ltr\">Poland, Spain, Portugal, Croatia, and Slovenia</span></p><table style=\"border-collapse:collapse;font-size:1rem;line-height:1.4em;margin-bottom:16px;width:100%;\" border=\"1\" cellpadding=\"4\"><tbody><tr><td style=\"border-color:hsl(0, 0%, 0%);\">#</td><td style=\"border-color:hsl(0, 0%, 0%);\">Feature</td><td style=\"border-color:hsl(0, 0%, 0%);\">Description</td></tr><tr><td style=\"border-color:hsl(0, 0%, 0%);\">1</td><td style=\"border-color:hsl(0, 0%, 0%);\">Bug fixes</td><td style=\"border-color:hsl(0, 0%, 0%);\"><ul><li>Fixes the issue of collapsing off-grid systems at a higher<br>State of Charge (SoC) in the case of IQ Battery 5P with FlexPhase sites.</li><li>Fixes the issue of limited power production in Grid Interconnection<br>Capability (GIC) in the Power Export Limit (PEL) enabled sites.</li></ul></td></tr></tbody></table></li><li><strong>Gateways supported:</strong><ul><li>IQ Gateway Metered</li></ul></li><li><strong>Microinverters supported</strong><ul><li>IQ8 Series, IQ7 Series, M Series, and third-party string inverters</li></ul></li><li><strong>Batteries supported</strong><ul><li>IQ Battery 5P with FlexPhase</li><li>IQ Battery 5P</li></ul></li><li><strong>System controllers supported:</strong><ul><li>IQ System Controller 3 INT</li></ul></li><li><strong>Supported system configurations:</strong><ul><li>Germany, Austria, Switzerland, Luxembourg, France, The Netherlands, Poland, Spain,<br>Portugal, Croatia, and Slovenia<ul><li>Grid-tied solar and storage systems with IQ8 Series Microinverters,<br>IQ Gateway Metered, and IQ Battery 5P with FlexPhase.</li><li>Grid-tied solar and storage systems with IQ7 Series Microinverters,<br>IQ Gateway Metered, and IQ Battery 5P with FlexPhase.</li><li>Grid-tied solar and storage systems with M Series Microinverters and/or<br>IQ7 Series Microinverters, IQ Gateway Metered, and<br>IQ Battery 5P with FlexPhase.</li><li>Grid-tied solar and storage systems with compatible third-party string inverters,<br>IQ Gateway Metered, and IQ Battery 5P with FlexPhase.</li><li>Grid-agnostic solar and storage systems with IQ8 Series Microinverters,<br>IQ System Controller 3 INT, and IQ Battery 5P with FlexPhase.</li><li>Grid-forming (with backup) solar and storage systems with<br>IQ7 Series Microinverters, IQ System Controller 3 INT and<br>IQ Battery 5P with FlexPhase.</li><li>Grid-forming (with backup) solar and storage systems with M Series Microinverters<br>and/or IQ7 Series Microinverters, IQ System Controller 3 INT, and<br>IQ Battery 5P with FlexPhase.</li><li>Grid-forming (with backup) solar and storage systems with compatible third-party<br>string inverters, IQ System Controller 3 INT, and IQ Battery 5P with FlexPhase.</li></ul></li><li>France, The Netherlands, Belgium, and Luxembourg<ul><li>Grid-tied solar and storage systems with IQ8 Series Microinverters,<br>IQ Gateway Metered, and IQ Battery 5P.</li><li>Grid-tied solar and storage systems with IQ7 Series Microinverters,<br>IQ Gateway Metered, and IQ Battery 5P.</li><li>Grid-tied solar and storage systems with M Series Microinverters and/or<br>IQ7 Series Microinverters, IQ Gateway Metered, and IQ Battery 5P.</li><li>Grid-tied solar and storage systems with compatible third-party string inverters,<br>IQ Gateway Metered, and IQ Battery 5P.</li><li>Grid-forming (with backup) solar and storage systems with<br>IQ8 Series Microinverters, IQ System Controller 3 INT, and IQ Battery 5P.</li><li>Grid-forming (with backup) solar and storage systems with IQ7 Series Microinverters,<br>IQ System Controller 3 INT, and IQ Battery 5P.</li><li>Grid-forming (with backup) solar and storage systems with M Series Microinverters<br>and/or IQ7 Series Microinverters, IQ System Controller 3 INT, and IQ Battery 5P.</li><li>Grid-forming (with backup) solar and storage systems with compatible third-party<br>string inverters, IQ System Controller 3 INT, and IQ Battery 5P.</li></ul></li></ul></li></ul>",
+      "langcode": "en",
+      "media_id": 26179,
+      "name": "IQ Gateway software release notes (8.3.5058)",
+      "status": true
+    }
+  },
+  {
+    "_source": {
+      "bundle": "software_release_note",
+      "field_release_date": 1706788800,
+      "field_release_notes": [],
+      "langcode": "en",
+      "media_id": 16586,
+      "name": "IQ Gateway software release notes (8.2.127)",
+      "status": true
+    }
+  }
+]
