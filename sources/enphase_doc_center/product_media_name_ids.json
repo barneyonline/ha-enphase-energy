@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-26T08:38:14.211116Z",
+  "generated_at": "2026-10-04T07:38:39.556274Z",
   "products": {
     "400 A Production Current Transformer": 29681,
     "600 A Consumption Current Transformer": 29683,
@@ -8,6 +8,7 @@
     "Communications Kit": 2696,
     "Communications Kit 2": 12932,
     "Communications Kit with Cell Modem": 3075,
+    "Enphase 3\u2011Year Data Plan Extension": 18833,
     "Enphase Communications Kit with CELLMODEM-M1-06-SP-05": 10997,
     "Enphase Control Cable": 13378,
     "Enphase Envoy S Metered Installation Kit": 22017,
@@ -37,6 +38,7 @@
     "IQ Communications Hub": 35423,
     "IQ Gateway": 667,
     "IQ Gateway (IEEE Certified)": 10249,
+    "IQ Gateway 2": 27227,
     "IQ Gateway Cellular Kit with Installation": 26642,
     "IQ Gateway Commercial": 26253,
     "IQ Gateway Commercial 2": 5750,
@@ -45,6 +47,7 @@
     "IQ Gateway with Installation": 26020,
     "IQ System Controller 4": 35201,
     "Jumper (Pack of 50)": 16015,
+    "Line Communication Filter (single-phase)": 20943,
     "Mobile Connect (AT&T)": 9891,
     "Mobile Connect CELLMODEM-07": 22060,
     "Mobile Connect CELLMODEM-07 F": 32497,
@@ -52,6 +55,7 @@
     "Mobile Connect Cellular Modem Pro": 30667,
     "Network Protection Relay (3-Phase)": 6796,
     "Production Current Transformer": 5748,
+    "Replacement Deadfront for AC Combiner Box": 2697,
     "Zigbee Wireless Range Extender": 2954
   },
   "targets": {
