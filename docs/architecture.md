@@ -143,6 +143,9 @@ The coordinator distinguishes core failures from optional endpoint failures:
 
 - Auth failures can trigger Home Assistant reauth or an auth-block repair issue.
 - Rate limits and cloud outages enter bounded backoff and expose diagnostic sensors.
+  The active backoff guard requests at least one second before a coordinator retry
+  to avoid immediate rescheduling from Home Assistant clock rounding. The separate
+  expiry timer still clears backoff state and requests recovery at the deadline.
 - Optional endpoint failures mark that family stale, preserve recent useful data where safe, and report repairs when needed.
 
 `endpoint_policies.py` defines immutable cache and cooldown policies separately
