@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- Prevent rapid coordinator reschedules near the end of a cloud backoff window when Home Assistant rounds its scheduling clock.
 - Restore firmware catalog discovery from Enphase's new documentation widget and public search endpoint, retaining legacy HTML support and rejecting missing topics or incomplete required results.
 
 ### 🔧 Improvements
