@@ -13,13 +13,15 @@ import json
 import logging
 import re
 import sys
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from html.parser import HTMLParser
+from http.cookiejar import CookieJar
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlsplit, urlunsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -1160,6 +1162,9 @@ def discover_apps_entrypoint(root_html: str) -> tuple[str, str]:
 
 
 def parse_product_type_from_apps_page(apps_html: str) -> str | None:
+    config = parse_doc_center_settings(apps_html)
+    if config is not None:
+        return str(config["tid"])
     match = re.search(r"productType\s*:\s*'?(\d+)'?", apps_html)
     if match:
         return match.group(1)
@@ -1167,27 +1172,281 @@ def parse_product_type_from_apps_page(apps_html: str) -> str | None:
     return match.group(1) if match else None
 
 
-def parse_facet_values(apps_html: str, alias: str) -> dict[str, int]:
-    section_match = re.search(
-        rf"<ul[^>]+data-drupal-facet-alias=\"{re.escape(alias)}\"[^>]*>(.*?)</ul>",
-        apps_html,
-        flags=re.IGNORECASE | re.DOTALL,
+class _DocCenterSettingsParser(HTMLParser):
+    """Read only the public widget's completed Drupal JSON settings block."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.active = False
+        self.parts: list[str] = []
+        self.settings: dict[str, Any] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = dict(attrs)
+        if (
+            tag == "script"
+            and attributes.get("data-drupal-selector") == "drupal-settings-json"
+        ):
+            self.active = True
+            self.parts = []
+
+    def handle_data(self, data: str) -> None:
+        if self.active:
+            self.parts.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "script" and self.active:
+            self.active = False
+            settings = json.loads("".join(self.parts))
+            if not isinstance(settings, dict):
+                raise ValueError("Invalid Drupal settings")
+            config = settings.get("docCenterV1")
+            if config is not None:
+                if not isinstance(config, dict) or not re.fullmatch(
+                    r"[0-9]+", str(config.get("tid", ""))
+                ):
+                    raise ValueError("Invalid documentation category")
+                self.settings = config
+
+
+def parse_doc_center_settings(page_html: str) -> dict[str, Any] | None:
+    parser = _DocCenterSettingsParser()
+    parser.feed(page_html)
+    parser.close()
+    return parser.settings
+
+
+def _doc_center_facets(config: dict[str, Any], alias: str) -> dict[str, int]:
+    key = {"document": "tidToName1Map", "product_media_name": "midToNameMap"}.get(
+        alias.casefold()
     )
-    if not section_match:
-        return {}
-    section = section_match.group(1)
-    values: dict[str, int] = {}
-    for match in re.finditer(
-        r"data-drupal-facet-item-value=\"(\d+)\"[^>]*>\s*<span class=\"facet-item__value\">(.*?)</span>",
-        section,
-        flags=re.IGNORECASE | re.DOTALL,
-    ):
-        raw_id, raw_label = match.groups()
-        label = _strip_tags(raw_label)
-        if not label:
-            continue
-        values[label] = int(raw_id)
-    return values
+    mapping = config.get(key, {}) if key else {}
+    if not isinstance(mapping, dict):
+        raise ValueError("Invalid documentation facet map")
+    return {
+        _collapse_ws(label): int(item_id)
+        for item_id, label in mapping.items()
+        if re.fullmatch(r"[0-9]+", item_id) and isinstance(label, str) and label.strip()
+    }
+
+
+class _DocCenterNoteParser(HTMLParser):
+    """Collect note text without coupling card boundaries to nested/void markup."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.parts: list[str] = []
+
+    def handle_data(self, data: str) -> None:
+        self.parts.append(data)
+
+
+def _doc_center_cards(hits: list[dict[str, Any]]) -> list[ReleaseCard]:
+    """Feed the widget's public release fields through the existing card parser."""
+    cards: list[ReleaseCard] = []
+    for hit in hits:
+        source = hit.get("_source", {})
+        title = source.get("name")
+        media_id = str(source.get("media_id", ""))
+        language = source.get("langcode")
+        note = source.get("field_release_notes")
+        if note == []:
+            note = ""
+        if (
+            not isinstance(title, str)
+            or not title.strip()
+            or not re.fullmatch(r"[0-9]+", media_id)
+            or not isinstance(language, str)
+            or not re.fullmatch(r"[a-zA-Z-]+", language)
+            or not isinstance(note, str)
+            or source.get("status") not in (True, "true")
+            or source.get("bundle") != "software_release_note"
+        ):
+            raise ValueError("Invalid public release-note record")
+        timestamp = source.get("field_release_date")
+        release_date = (
+            datetime.fromtimestamp(float(timestamp), UTC).strftime("%B %d, %Y")
+            if timestamp
+            else ""
+        )
+        note_parser = _DocCenterNoteParser()
+        note_parser.feed(note)
+        note_parser.close()
+        note_text = html.escape(" ".join(note_parser.parts))
+        cards.extend(
+            parse_release_cards(
+                '<div class="release-item">'
+                f'<div class="release-item__name">{html.escape(title)}</div>'
+                f"<button class=\"document-copy-link\" x-data=\"media_id: '{media_id}', langcode: '{language}'\"></button>"
+                f'<div class="release-item__date">{release_date}</div>'
+                f'<div class="release-item__note">{note_text}</div></div>'
+            )
+        )
+    return cards
+
+
+def _crawl_doc_center(
+    *,
+    config: dict[str, Any],
+    page_url: str,
+    topic_id: int,
+    product_media_name_id: int | None,
+    search_locale: str,
+    timeout: int,
+    max_pages: int,
+) -> tuple[list[ReleaseCard], list[str]]:
+    # Match the anonymous, published-only search used by Enphase's public widget.
+    opener = build_opener(HTTPCookieProcessor(CookieJar()))
+    headers = {"User-Agent": "ha-enphase-ev-firmware-catalog/1.0"}
+    with opener.open(
+        Request(urljoin(page_url, "/session/token"), headers=headers), timeout=timeout
+    ) as response:
+        token = response.read().decode("utf-8")
+    headers.update({"Content-Type": "application/json", "X-CSRF-Token": token})
+    endpoint = urljoin(page_url, "/opensearch/documentation_index_opensearch/_search")
+    locale = _normalize_locale(search_locale)
+    filters: list[dict[str, Any]] = [{"terms": {"tid_1.keyword": [str(topic_id)]}}]
+    if product_media_name_id is not None:
+        filters.append({"terms": {"mid.keyword": [str(product_media_name_id)]}})
+    query = {
+        "size": 25,
+        "from": 0,
+        "track_total_hits": True,
+        "query": {
+            "bool": {
+                "must": [
+                    {"term": {"tid.keyword": config["tid"]}},
+                    {"term": {"status": "true"}},
+                    {
+                        "bool": {
+                            "should": [
+                                {"term": {"langcode.keyword": locale}},
+                                {
+                                    "term": {
+                                        "field_alternative_language.keyword": locale
+                                    }
+                                },
+                            ],
+                            "minimum_should_match": 1,
+                        }
+                    },
+                ]
+            }
+        },
+        "post_filter": {"bool": {"must": filters}},
+        "sort": [
+            {"weight": {"order": "asc", "missing": 0}},
+            {"field_release_date": {"order": "desc", "missing": "_last"}},
+            {"field_weight": {"order": "asc", "missing": "_last"}},
+            {"changed": {"order": "desc"}},
+        ],
+    }
+    cards: list[ReleaseCard] = []
+    visited: list[str] = []
+    for page in range(max_pages):
+        query["from"] = page * 25
+        request = Request(
+            endpoint,
+            data=json.dumps(query).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+        for attempt in range(5):
+            with opener.open(request, timeout=timeout) as response:
+                payload = json.load(response)
+            if not isinstance(payload, dict):
+                raise ValueError("Invalid documentation search response")
+            status = payload.get("status")
+            if status in {"processing", "retrying"} and attempt < 4:
+                time.sleep(0.5)
+                continue
+            if status in {"completed", "cached"}:
+                payload = payload.get("data")
+            elif status is not None:
+                raise RuntimeError("Documentation search did not complete")
+            break
+        if not isinstance(payload, dict) or not isinstance(payload.get("hits"), dict):
+            raise ValueError("Missing documentation search hits")
+        hits = payload["hits"].get("hits")
+        total = payload["hits"].get("total")
+        if (
+            not isinstance(hits, list)
+            or not isinstance(total, dict)
+            or total.get("relation") != "eq"
+            or type(total.get("value")) is not int
+            or total["value"] < 0
+        ):
+            raise ValueError("Invalid documentation search pagination")
+        if len(hits) != min(25, max(0, total["value"] - page * 25)):
+            raise ValueError("Incomplete documentation search page")
+        cards.extend(_doc_center_cards(hits))
+        visited.append(_with_query(page_url, {"page": str(page)}))
+        if (page + 1) * 25 >= total["value"]:
+            return cards, visited
+    raise RuntimeError("Documentation search exceeded max_pages")
+
+
+class _FacetParser(HTMLParser):
+    """Read labeled Drupal facet links without depending on HTML formatting."""
+
+    def __init__(self, alias: str) -> None:
+        super().__init__()
+        self.alias = alias.casefold()
+        self.values: dict[str, int] = {}
+        self._lists: list[str] = []
+        self._item_id: int | None = None
+        self._label_depth = 0
+        self._label_parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = dict(attrs)
+        if tag == "ul":
+            self._lists.append(
+                (attributes.get("data-drupal-facet-alias") or "").casefold()
+            )
+            self._item_id = None
+            self._label_depth = 0
+        if not self._lists or self._lists[-1] != self.alias:
+            return
+        if tag == "a":
+            raw_id = attributes.get("data-drupal-facet-item-value") or ""
+            self._item_id = int(raw_id) if re.fullmatch(r"[0-9]+", raw_id) else None
+            self._label_depth = 0
+            self._label_parts = []
+        if tag == "span":
+            if self._label_depth:
+                self._label_depth += 1
+            elif (
+                self._item_id is not None
+                and "facet-item__value" in (attributes.get("class") or "").split()
+            ):
+                self._label_depth = 1
+                self._label_parts = []
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "span" and self._label_depth:
+            self._label_depth -= 1
+            if not self._label_depth and self._item_id is not None:
+                label = _collapse_ws("".join(self._label_parts))
+                if label:
+                    self.values[label] = self._item_id
+        if tag in {"a", "ul"}:
+            self._item_id = None
+            self._label_depth = 0
+        if tag == "ul" and self._lists:
+            self._lists.pop()
+
+    def handle_data(self, data: str) -> None:
+        if self._label_depth:
+            self._label_parts.append(data)
+
+
+def parse_facet_values(apps_html: str, alias: str) -> dict[str, int]:
+    parser = _FacetParser(alias)
+    parser.feed(apps_html)
+    parser.close()
+    config = parse_doc_center_settings(apps_html)
+    return _doc_center_facets(config, alias) if config is not None else parser.values
 
 
 def parse_language_options(apps_html: str, select_name: str) -> dict[str, str]:
@@ -1621,6 +1880,18 @@ def crawl_release_cards(
         seen_pages.add(page_url)
         visited_pages.append(page_url)
         page_html = fetch_text(page_url, timeout=timeout)
+        config = parse_doc_center_settings(page_html)
+        if config is not None:
+            cards, visited_pages = _crawl_doc_center(
+                config=config,
+                page_url=page_url,
+                topic_id=topic_id,
+                product_media_name_id=product_media_name_id,
+                search_locale=search_locale,
+                timeout=timeout,
+                max_pages=max_pages,
+            )
+            break
         cards.extend(parse_release_cards(page_html))
         page_url = find_next_page_url(page_url, page_html)
 
@@ -1958,6 +2229,15 @@ def build_catalog(output_dir: Path, *, timeout: int, max_pages: int) -> None:
             cards = [
                 card for card in cards if release_applies_to_device(card, device_key)
             ]
+            if (
+                str(target["key"]) == global_target_key
+                and product_meta.get("required")
+                and parse_doc_center_settings(str(target["apps_html"])) is not None
+                and not cards
+            ):
+                raise RuntimeError(
+                    "No release notes from required documentation source"
+                )
             total_count += len(cards)
             target_crawl[str(target["key"])] = {
                 "site_url": target["site_url"],
