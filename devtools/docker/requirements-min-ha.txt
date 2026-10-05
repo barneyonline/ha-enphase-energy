@@ -1,4 +1,4 @@
-# Advertised minimum Home Assistant and its exact matching test-plugin stack.
+# Advertised minimum Home Assistant, matching test plugin, and transitive dependency stack.
 -c constraints-min-ha.txt
 homeassistant==2026.9.0
 pytest-homeassistant-custom-component==0.13.363

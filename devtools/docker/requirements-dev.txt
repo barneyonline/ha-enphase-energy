@@ -1,4 +1,4 @@
-# Current stable Home Assistant and its matching test-plugin dependency stack.
+# Current stable Home Assistant, matching test plugin, and transitive dependency stack.
 # Upgrade both together and regenerate the constraints after validating the lane.
 -c constraints-dev.txt
 homeassistant==2026.9.0
