@@ -1216,6 +1216,7 @@ class BatteryRuntime:
         data = payload.get("data")
         if not isinstance(data, dict):
             data = payload
+        self.ev_preferences.observe_capabilities(data)
         self._apply_battery_capability_blocks(data)
         self._apply_battery_user_details(data.get("userDetails"))
 
