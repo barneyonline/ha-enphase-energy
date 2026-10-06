@@ -1,14 +1,8 @@
 {
-  "current_status": "Down",
-  "generated_at": "2026-10-06T00:35:21.982991Z",
+  "current_status": "Fully Operational",
+  "generated_at": "2026-10-06T07:11:42.351295Z",
   "retention_days": 30,
   "samples": [
-    {
-      "checked_at": "2026-09-06T03:01:26.788698Z",
-      "checks_failed": 0,
-      "failed_check_names": [],
-      "status": "Fully Operational"
-    },
     {
       "checked_at": "2026-09-06T08:02:08.890395Z",
       "checks_failed": 0,
@@ -1058,6 +1052,12 @@
         "evse_scheduler"
       ],
       "status": "Down"
+    },
+    {
+      "checked_at": "2026-10-06T07:11:42.351295Z",
+      "checks_failed": 0,
+      "failed_check_names": [],
+      "status": "Fully Operational"
     }
   ]
 }
