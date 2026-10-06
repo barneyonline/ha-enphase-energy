@@ -514,6 +514,12 @@
     },
     "charger_status_unavailable": {
       "message": "Aktuální stav nabíječky není dostupný. Před změnou nastavení počkejte na obnovení."
+    },
+    "ev_battery_limit_range": {
+      "message": "Minimální stav baterie pro nabíjení elektromobilu musí být celé procento mezi {minimum} a {maximum}."
+    },
+    "ev_battery_update_unconfirmed": {
+      "message": "Změnu využití baterie pro elektromobil se nepodařilo potvrdit. Obnovte nastavení a zkuste to znovu."
     }
   },
   "options": {
@@ -2468,6 +2474,9 @@
             "name": "Lokátor tarifu"
           }
         }
+      },
+      "ev_battery_limit": {
+        "name": "Minimální stav baterie pro nabíjení elektromobilu"
       }
     },
     "binary_sensor": {

@@ -1565,6 +1565,20 @@ async def battery_settings_details(self: EnphaseEVClient) -> JsonDict:
     return result
 
 
+async def set_ev_battery_preference(
+    self: EnphaseEVClient, *, enabled: bool, limit: int
+) -> JsonDict:
+    """Write the paired site preference using shared BatteryConfig authentication."""
+    url = f"{BASE_URL}/service/batteryConfig/api/v1/device/battery/preference/{self._site}"
+    return await self._battery_config_request(
+        "PUT",
+        url,
+        json_body={"useBatteryForEVSE": enabled, "batteryLimit": limit},
+        endpoint_family="ev_battery_preference",
+        bootstrap_xsrf=True,
+    )
+
+
 async def accept_battery_settings_disclaimer(
     self: EnphaseEVClient, disclaimer_type: str = "itc"
 ) -> JsonDict:

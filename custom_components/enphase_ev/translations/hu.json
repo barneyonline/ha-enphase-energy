@@ -514,6 +514,12 @@
     },
     "charger_status_unavailable": {
       "message": "A töltő friss állapota nem érhető el. A beállítások módosítása előtt várja meg a helyreállást."
+    },
+    "ev_battery_limit_range": {
+      "message": "Az elektromos autó töltéséhez szükséges minimális akkumulátorszintnek {minimum} és {maximum} közötti egész százaléknak kell lennie."
+    },
+    "ev_battery_update_unconfirmed": {
+      "message": "Az elektromos autó töltéséhez használt akkumulátor beállításának módosítását nem sikerült megerősíteni. Frissítse a beállításokat, majd próbálja újra."
     }
   },
   "options": {
@@ -2468,6 +2474,9 @@
             "name": "Tarifa helymeghatározó"
           }
         }
+      },
+      "ev_battery_limit": {
+        "name": "Minimális akkumulátorszint az elektromos autó töltéséhez"
       }
     },
     "binary_sensor": {

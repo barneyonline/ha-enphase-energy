@@ -514,6 +514,12 @@
     },
     "charger_status_unavailable": {
       "message": "Lo stato aggiornato del caricatore non è disponibile. Attendi il ripristino prima di modificarne le impostazioni."
+    },
+    "ev_battery_limit_range": {
+      "message": "Il minimo della batteria per la ricarica del veicolo elettrico deve essere una percentuale intera tra {minimum} e {maximum}."
+    },
+    "ev_battery_update_unconfirmed": {
+      "message": "Non è stato possibile confermare la modifica dell’uso della batteria per la ricarica del veicolo elettrico. Aggiorna le impostazioni e riprova."
     }
   },
   "options": {
@@ -2468,6 +2474,9 @@
             "name": "Localizzatore tariffa"
           }
         }
+      },
+      "ev_battery_limit": {
+        "name": "Batteria minima per la ricarica del veicolo elettrico"
       }
     },
     "binary_sensor": {

@@ -24,6 +24,7 @@ from .battery_schedule_editor import (
     battery_scheduler_enabled,
 )
 from .control_updates import current_control_value
+from .ev_battery_preferences import preferences_for
 from .const import DOMAIN
 from .entity import (
     battery_write_access_explicitly_denied as _battery_write_access_explicitly_denied,
@@ -440,11 +441,26 @@ async def async_setup_entry(
                     if not sn:
                         continue
                     data = data_source.get(sn) or {}
-                    if data.get("green_battery_supported") is True:
+                    # Keep registry identity through optional endpoint warmup/failure.
+                    if (
+                        sn in known_green_battery
+                        or ent_reg.async_get_entity_id(
+                            "switch", DOMAIN, f"{DOMAIN}_{sn}_green_battery"
+                        )
+                        is not None
+                    ):
+                        retain_green_battery.add(sn)
+                    preferences = preferences_for(coord)
+                    if data.get("green_battery_supported") is True or (
+                        preferences is not None and preferences.seen
+                    ):
                         retain_green_battery.add(sn)
                     if sn in known_green_battery:
                         continue
-                    if data.get("green_battery_supported") is True:
+                    preferences = preferences_for(coord)
+                    if data.get("green_battery_supported") is True or (
+                        preferences is not None and preferences.seen
+                    ):
                         entities.append(GreenBatterySwitch(coord, sn))
                         known_green_battery.add(sn)
             for sn in coord.iter_serials():
@@ -1035,6 +1051,9 @@ class GreenBatterySwitch(EnphaseBaseEntity, SwitchEntity):  # type: ignore[misc]
     def available(self) -> bool:
         if not super().available:
             return False
+        preferences = preferences_for(self._coord)
+        if preferences is not None and preferences.seen:
+            return preferences.available
         if not self._coord.scheduler_available:
             return False
         if self.data.get("green_battery_supported") is not True:
@@ -1043,6 +1062,9 @@ class GreenBatterySwitch(EnphaseBaseEntity, SwitchEntity):  # type: ignore[misc]
 
     @property
     def is_on(self) -> bool:
+        preferences = preferences_for(self._coord)
+        if preferences is not None and preferences.seen:
+            return bool(preferences.value and preferences.value.enabled)
         return bool(
             current_control_value(
                 self._coord,
