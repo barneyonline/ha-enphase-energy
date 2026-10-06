@@ -11,8 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- Prevent rapid coordinator reschedules near the end of a cloud backoff window when Home Assistant rounds its scheduling clock.
-- Restore firmware catalog discovery from Enphase's new documentation widget and public search endpoint, retaining legacy HTML support and rejecting missing topics or incomplete required results.
+- None
 
 ### 🔧 Improvements
 - None
@@ -20,191 +19,71 @@ All notable changes to this project will be documented in this file.
 ### 🔄 Other changes
 - None
 
-## v5.0.0b6 - 2026-10-03
+## v5.0.0 - 2026-10-06
 
 ### 🚧 Breaking changes
-- Remove the central Control Update Status sensor. Update dashboards and automations to use the owning device’s diagnostic Update Status sensor instead.
+- Remove legacy AC Battery discovery, sensors, sleep controls, and cloud polling. Existing AC Battery entities and empty device records are retired on upgrade; IQ Battery support is unchanged.
+- Remove the EV charger Start Charging and Stop Charging button entities. Use the charger switch or the Enphase charging actions; automations using `button.press` on the retired buttons need updating. Retired buttons are removed without waiting for inventory refresh.
 - Remove the Cancel Pending Profile Change button. Recover overdue battery System Profile changes through Settings → System → Repairs instead; automations using the retired button need updating.
+- For users upgrading from a 5.0.0 beta, replace the central Control Update Status sensor in dashboards and automations with the owning device’s diagnostic Update Status sensor.
 
 ### ✨ New features
-- Add a battery profile Repair flow after ten minutes without confirmation, offering fresh status checks and confirmed cancellation of the specific pending request.
-
-### 🐛 Bug fixes
-- Isolate charger-status server failures from site polling and allow startup in
-  degraded mode, keeping fresh battery and gateway readings available without
-  exposing cached charger state as current or confirming pending commands.
-- Clear obsolete charger outages when charger polling is disabled, and avoid
-  labeling shared retry deadlines as charger-status failures.
-- Keep cached charger readings and writes unavailable while recovery awaits
-  storage or follow-up reads, until the new charger state is ready to publish.
-- Reset interrupted network and malformed-response failure streaks after charger
-  server responses, avoiding premature repairs and inflated shared retry delays.
-- Preserve the last accepted site energy total across restarts and missing cloud
-  data. Hold lower cloud corrections until the total catches up, preventing
-  recorder decrease warnings without hiding confirmed lifetime resets. Compare
-  resets against the original export composition when clearing migration offsets,
-  and ignore nonfinite cloud or restored readings. Retain migration offsets when
-  rejecting invalid cloud totals so a later restart preserves the raw baseline.
-
-### 🔧 Improvements
-- Add bounded charger-status retries, visible endpoint retry times, localized
-  outage repairs, and credential-free incident history that survives recovery
-  and restart. Preserve shared rate-limit cooldowns and explicit Stop actions.
+- Add installer Export Limit controls, disabled by default and enabled under Features → Advanced Features. Configure default watts and slew rate, enable or disable the limit from IQ Gateway Controls, or use automation actions with an optional slew rate. Control attributes expose saved defaults, and configuration diagnostics track pending and unconfirmed updates. Enable Export Limit supports both zero and nonzero limits.
+- Add per-array Lifetime Energy and Current Power sensors under IQ Microinverters, using existing inverter readings with complete-member validation and power freshness expiry. Both remain independent of the individual inverter sensor switches when the account can access the required data.
+- Add Total Array Size and Total Inverter Capacity diagnostic sensors with per-array capacity attributes for IQ Microinverters, discovered independently when the account can access their required data.
+- Add Enphase Cloud Site information and Account access diagnostic sensors with site metadata and explicit account-role flags.
 - Add diagnostic Update Status sensors to EV chargers, gateways (including system-controller controls), and battery systems, showing each device’s control progress and requested/confirmed values without additional cloud polling. Keep charger progress visible through cloud read failures and retain tariff-only diagnostics on Enphase Cloud when tariff controls are hosted there.
-
-### 🔄 Other changes
-- Bumped the integration manifest version to `5.0.0b6`.
-
-## v5.0.0b5 - 2026-10-02
-
-### 🚧 Breaking changes
-- None
-
-### ✨ New features
-- None
-
-### 🐛 Bug fixes
-- Ignore battery profile, settings, and live-status responses requested before a
-  newly accepted profile or reserve write, preventing older in-flight reads from
-  confirming the request or replacing newer profile and reserve readback.
-- Preserve successful EV charger schedule edits and deletions when an older cloud read finishes later, and serialize competing writes for each charger.
-- Keep the last valid schedules and session history when Enphase returns malformed or incomplete responses. Deduplicate overlapping session pages so daily charging energy is not counted twice.
-- Prevent scheduler option changes from replacing newer charger telemetry with an older snapshot.
-- Coalesce overlapping site-energy reads and discard acquisitions superseded by cache invalidation. Honor provider rate-limit deadlines for site energy, session history, weather, and firmware catalogs.
-- Prevent retired entry runtimes from publishing late updates or starting tariff reconciliation and scheduler work after unload.
-- Refresh device firmware and model metadata when cloud inventory changes without a topology change.
-
-### 🔧 Improvements
-- Cache shared device metadata to reduce repeated scans when registering large microinverter and battery inventories, while preserving user customizations and defensive copies.
-- Reuse unchanged battery capability snapshots and explicitly exclude cache bookkeeping from entity update comparisons.
-- Build immutable feature snapshots in one traversal to avoid copying large inventories twice.
-- Share public firmware catalog downloads across entries using the same URL and include read-only session-history POST requests in the cloud request budget.
-- Introduce typed runtime health and authentication boundaries, extract pure battery grid-relay and session-pagination helpers, and expand mixed-inventory performance and concurrency regression coverage.
-- Keep confirmed control values visible during Enphase writes and report progress separately through Control Update Status. Apply confirmation tracking and conflict guards to charger settings, charging commands, battery profiles/settings/schedules, Storm Guard, grid controls, and tariffs. Integrate Export Limit progress, bound extra confirmation polling, and keep Stop available during a pending Start.
-
-### 🔄 Other changes
-- Bumped the integration manifest version to `5.0.0b5`.
-
-## v5.0.0b4 - 2026-09-30
-
-### 🚧 Breaking changes
-- Remove the EV charger Start Charging and Stop Charging button entities. Use the charger switch or the Enphase charging actions; automations using `button.press` on the retired buttons need updating.
-
-### ✨ New features
+- Add a battery profile Repair flow after ten minutes without confirmation, offering fresh status checks and confirmed cancellation of the specific pending request.
 - Add localized descriptive Activity entries for system events, service and cloud health, charger status, gateway and microinverter connectivity, battery status, Export Limit outcomes, and heat-pump SG Ready changes without changing entity states. Enable them in Configure → Notifications; the feature is disabled by default.
 
 ### 🐛 Bug fixes
-- Freeze the displayed Export Limit slew rate for confirmation so edits to saved defaults cannot submit a different rate from the one reviewed. Refresh the displayed rate when changed gateway settings require reconfirmation.
-- Automatically preserve the gateway slew rate when Enphase returns a zero form default for Export Limit writes, including enabling and disabling from the dropdown. Verify current gateway identity and unchanged settings, remove the extra restore checkbox from confirmation, and distinguish form conflicts from configuration changes.
-- Show the actual pending Export Limit setting, or None when no request remains, independently of the last request status.
-- Keep per-array Current Power sensors enabled independently of the individual Microinverter Power feature setting when account telemetry is available.
-- Report microinverter power telemetry status independently of the individual sensor option, and remove retired charger buttons without waiting for inventory refresh.
-
-### 🔧 Improvements
-- Show Home Assistant’s translated Next button on intermediate options forms for Export Limit, Grid Mode, Grid Profile, and Envoy history migration.
-- Add short descriptions below Export Limit menu headings and align their capitalisation with the other options menus in every locale.
-- Combine export-limit and zero-export actions into Enable Export Limit, explaining zero and nonzero limits in every locale.
-- Explain that saved Export Limit defaults apply when selecting Enabled in the Export Limit control.
-- Clarify the Export Limit dialog description and show “Pending setting: None” when no request is active in every locale.
-- Capitalize options labels and clarify feature, polling, device, notification, authentication, and advanced-control descriptions, including default states for settings and features in every locale.
-- Rename Active System Events to System Events in every locale and retain sanitized Enphase fault descriptions for event details.
-- Align the Enphase Cloud live power sensor names as Battery Power, Grid Power, Consumption Power, and Production Power in every locale.
-- Label the Export Limit selector states as Enabled and Disabled in every locale.
-- Show Battery Available Power and Battery Mode under Diagnostics on the IQ Battery device.
-- Rename the charger Plugged In sensor to Vehicle Connection in every locale.
-- Align charger and gateway Connectivity and Last Reported names, show Connection Method on both, and leave charger connectivity unavailable when its reported state is missing.
-
-### 🔄 Other changes
-- Bumped the integration manifest version to `5.0.0b4`.
-
-## v5.0.0b3 - 2026-09-29
-
-### 🚧 Breaking changes
-- None
-
-### ✨ New features
-- Add per-array Lifetime Energy and Current Power sensors under IQ Microinverters, using existing inverter readings with complete-member validation and power freshness expiry. Array energy is independent of individual inverter sensor switches; array power uses the existing telemetry opt-in.
-
-### 🐛 Bug fixes
-- None
-
-### 🔧 Improvements
-- Move the IQ Gateway Export Limit selector from Configuration to Controls.
-
-### 🔄 Other changes
-- Bumped the integration manifest version to `5.0.0b3`.
-
-## v5.0.0b2 - 2026-09-28
-
-### 🚧 Breaking changes
-- None
-
-### ✨ New features
-- None
-
-### 🐛 Bug fixes
-- Show localized reauthentication guidance when an Enlighten session expires while confirming an Export Limit change or restoring defaults.
-- Parse Export Limit radio groups using browser selection rules when Enphase marks multiple choices checked, allowing enabled configurations to be read and disabled again.
-- Allow explicit restoration of an Export Limit form's zero slew-rate default from the current gateway when enabling, changing, or disabling a limit, with fresh identity checks and unchanged-setting confirmation.
-- Preserve microinverter power telemetry rate-limit deadlines across settings reloads and Home Assistant restarts. Expose telemetry status and the next retry time on Microinverter Connectivity Status, even before individual power sensors are discovered.
-- Fix the Export Limit action menu failing to open in Home Assistant options.
-- Fetch the installer Export Limit form with HTML request headers so valid installer sessions do not receive a misleading not-found redirect.
-- Resolve Export Limit settings for a single current gateway when replaced gateways remain in cloud history, and recognize compatible disabled configurations with retained default settings.
-- Restore per-device IQ Battery and enabled microinverter sensors after settings reloads, including when refreshed inventory contains the same devices as the restored discovery cache.
-- Stop treating valid Enlighten settings pages as expired sessions and prevent shared-session cookies from overriding current installer credentials.
-- Reseed grid and battery power baselines after missing lifetime data returns, preventing lifetime totals from becoming short-window power spikes during reauthentication or reload.
-- Recover expired Enlighten HTML sessions through the shared automatic authentication refresh and request Home Assistant reauthentication when installer-session recovery fails. Preserve permission-denial errors separately from expired sessions.
-- Explain expired sessions in Export Limit settings instead of reporting a generic installer or gateway configuration error.
-- Remove per-microinverter Lifetime Energy and Power entities when their respective feature is off, and discover them again when enabled without affecting total capacity or connectivity sensors.
-
-### 🔧 Improvements
-- Pace microinverter telemetry requests, fetch power first, update diagnostic parameters hourly, and stop remaining requests immediately after a rate-limit response.
-- Group Enable Export Limit controls under Features > Advanced Features, including localized enablement guidance in options and service errors.
-- Remove MAC addresses from charger device information and clean up previously registered charger MAC connections.
-
-### 🔄 Other changes
-- None
-
-## v5.0.0b1 - 2026-09-28
-
-### 🚧 Breaking changes
-- Removed legacy AC Battery discovery, sensors, sleep controls, and cloud polling. Existing AC Battery entities and empty device records are retired on upgrade; IQ Battery support is unchanged.
-
-### ✨ New features
-- Add default-off installer Export Limit controls enabled under Device Features and configured in Advanced settings, with an IQ Gateway enable/disable selector, configurable default watts and slew rate exposed as control attributes, automation actions with optional slew rate, and a configuration status sensor that displays pending and unconfirmed updates.
-- Add Total Array Size and Total Inverter Capacity diagnostic sensors with per-array capacity attributes for IQ Microinverters, discovered independently when the account can access their required data.
-- Add Enphase Cloud Site information and Account access diagnostic sensors with site metadata and explicit account-role flags.
-
-### 🐛 Bug fixes
-- Serialize EV charger commands and supersede obsolete starts, retries, auto-resume, and amp-change restarts when newer charging intent arrives.
-- Require an actual Start after an amp-change Stop even when charging telemetry has not caught up.
+- Serialize EV charger commands and supersede obsolete starts, retries, auto-resume, and amp-change restarts when newer charging intent arrives. Require an actual Start after an amp-change Stop even when charging telemetry has not caught up.
+- Serialize competing schedule writes for each charger, preserve successful edits and deletions when older cloud reads finish later, and report rejected writes to Home Assistant. Handle expired authentication consistently across schedule writes.
+- Keep the last valid schedules and session history when Enphase returns malformed or incomplete responses. Deduplicate overlapping session pages so daily charging energy is not counted twice.
+- Prevent scheduler option changes from replacing newer charger telemetry with an older snapshot. Preserve the discovered charger list across settings reloads so retired chargers from the original configuration do not reappear.
+- Prevent retired entry runtimes and writes completing during unload from publishing late updates or restarting polling, tariff reconciliation, or scheduler work.
+- Ignore battery profile, settings, and live-status responses requested before a newly accepted profile or reserve write, preventing older in-flight reads from confirming the request or replacing newer readback.
 - Preserve acknowledged tariff edits through intermediate and incomplete cloud readback, and reconcile successful tariff writes when a later billing update fails.
-- Report rejected EV charger schedule edits and deletions to Home Assistant instead of completing the action silently.
-- Prevent schedule writes completing during unload from restarting background polling, and handle expired authentication consistently across schedule writes.
-- Expire stale Current Production Power readings independently of successful polling for other endpoint families.
-- Expire stale Current Grid Power and Current Battery Power source readings, and restore battery-family availability after unchanged successful recovery.
-- Preserve the discovered charger list across settings reloads so retired chargers from the original configuration do not reappear.
+- Isolate charger-status server failures from site polling and allow startup in degraded mode, keeping fresh battery and gateway readings available. Keep cached charger readings and writes unavailable until storage and follow-up reads are ready to publish, without treating cached state as current or using it to confirm pending commands.
+- Clear obsolete charger outages when charger polling is disabled, distinguish shared retry deadlines from charger-status failures, and reset interrupted network and malformed-response failure streaks after server responses to avoid premature repairs and inflated retry delays.
+- Prevent rapid coordinator reschedules near the end of a cloud backoff window when Home Assistant rounds its scheduling clock.
+- Preserve the last accepted site energy total across restarts and missing cloud data. Hold lower cloud corrections until the total catches up, preventing recorder decrease warnings without hiding confirmed lifetime resets. Compare resets against the original export composition when clearing migration offsets, ignore nonfinite cloud or restored readings, and retain migration offsets after invalid totals so restarts preserve the raw baseline.
+- Coalesce overlapping site-energy reads and discard acquisitions superseded by cache invalidation. Honor provider rate-limit deadlines for site energy, session history, weather, and firmware catalogs.
+- Expire stale production, grid, and battery power readings independently of successful polling for other endpoint families, and restore battery-family availability after unchanged successful recovery. Reseed grid and battery power baselines when missing lifetime data returns to prevent short-window power spikes during reauthentication or reload.
+- Calculate Consumption Power immediately from available production, grid, and battery power sensors, and recalculate whenever an input changes instead of waiting for a second consumption energy sample.
 - Round Battery Overall Charge down to a whole percentage to align with Enphase reporting (for example, 20.5% becomes 20%).
-- Calculate Current Power Consumption immediately from available production, grid, and battery power sensors, and recalculate whenever an input changes instead of waiting for a second consumption energy sample.
-- Resolve IQ Gateway Connection Method from serial-matched site-today transport flags when dashboard device details do not expose the connection method.
+- Restore per-device IQ Battery and enabled microinverter sensors after settings reloads, including when refreshed inventory matches the restored discovery cache. Remove individual microinverter Lifetime Energy and Power entities when their respective feature is off, and discover them again when enabled without affecting array, capacity, or connectivity sensors.
+- Preserve microinverter telemetry rate-limit deadlines across settings reloads and Home Assistant restarts. Report telemetry status and the next retry time on Microinverter Connectivity Status independently of the individual sensor option, including before power sensors are discovered.
+- Recover expired Enlighten HTML sessions through shared automatic authentication refresh and request Home Assistant reauthentication when installer-session recovery fails. Keep permission-denial errors distinct, accept valid settings pages, and prevent shared-session cookies from overriding current installer credentials.
+- Keep enabled Grid Profile Control visible during session failures and show localized reauthentication guidance in Grid Profile and Export Limit flows instead of generic access or configuration errors. Session failures take precedence over mixed permission errors and stop pending-profile polling.
+- Fix the Export Limit action menu failing to open, fetch installer forms with HTML request headers to avoid misleading not-found redirects, and parse radio groups using browser selection rules when multiple choices are marked checked.
+- Resolve Export Limit settings for a single current gateway when replaced gateways remain in cloud history, recognize compatible disabled configurations with retained defaults, and reject incomplete or changed forms.
+- Automatically preserve the gateway slew rate when Enphase returns a zero Export Limit form default, including enabling and disabling from the selector. Verify current gateway identity and unchanged settings, distinguish form conflicts from configuration changes, and remove the extra restore checkbox from confirmation.
+- Freeze the displayed Export Limit slew rate for confirmation so edits to saved defaults cannot submit a different rate from the one reviewed. Refresh the displayed rate when gateway settings require reconfirmation, and show the actual pending setting or None independently of the last request status.
+- Resolve IQ Gateway Connection Method from serial-matched site-today transport flags when dashboard device details do not expose it. Leave charger connectivity unavailable when its reported state is missing.
+- Refresh device firmware and model metadata when cloud inventory changes without a topology change.
+- Restore firmware catalog discovery from Enphase's new documentation widget and public search endpoint, retaining legacy HTML support and rejecting missing topics or incomplete required results.
 
 ### 🔧 Improvements
-- Add behavioral regression coverage for overlapping commands, superseded charging intent, failed schedule writes, stale endpoint data, and tariff log redaction.
-- Separate immutable endpoint policies from the coordinator and give the current-power runtime an explicit typed interface for shared endpoint health services.
-- Redact site identifiers and cloud exception text consistently in tariff failure logs.
-- Remove the integration version from the Enphase Cloud Service info card.
-- Align IQ Battery, microinverter, and EV charger cards with friendly model names and full shared SKUs in brackets; summarize mixed models, omit SKU-only Hardware rows, and link device and cloud service cards to the Enlighten site.
-- Keep enabled Grid Profile Control visible during session failures and explain when to reauthenticate instead of reporting installer access denial. Session failures take precedence over mixed permission errors and stop pending-profile polling.
-- Move device feature options into a top-level Features menu, with installer Grid Profile and Microinverter Power toggles grouped under Advanced Features.
-- Prevent automatic HTTP transport retries of Export Limit writes after uncertain connection failures.
-- Start and stop Export Limit polling with the feature toggle; reject incomplete or changed PEL forms, clear unsent pending requests, and remove pending repairs on unload.
-- Align System Profile and Export Limit readback to a 10-minute fast-polling window, followed by a repair warning and standard-interval checks.
-- Rename the System Profile Status sensor to System Profile, preserving its existing entity identity.
-- Default both per-microinverter Lifetime Energy and Power Device Features to off, preserving saved user choices and independent total array capacity sensors.
+- Keep confirmed control values visible during writes and report progress through each device’s Update Status sensor. Apply confirmation tracking and conflict guards to charger settings and commands, battery profiles/settings/schedules, Storm Guard, grid controls, Export Limit, and tariffs. Bound extra confirmation polling to ten minutes, then use repair warnings and standard-interval checks where applicable; keep Stop available during a pending Start.
+- Add bounded charger-status retries, visible endpoint retry times, localized outage repairs, and credential-free incident history that survives recovery and restart. Preserve shared rate-limit cooldowns and explicit Stop actions.
+- Pace microinverter telemetry requests, fetch power first, update diagnostic parameters hourly, and stop remaining requests immediately after a rate-limit response.
+- Start and stop Export Limit polling with the feature toggle, clear unsent pending requests, remove pending repairs on unload, and prevent automatic HTTP transport retries of writes after uncertain connection failures.
+- Move device feature options into a top-level Features menu, with installer controls and individual Microinverter Power grouped under Advanced Features. Default individual microinverter Lifetime Energy and Power features to off while preserving saved user choices and independent array sensors.
+- Align options-label capitalisation and clarify feature, polling, device, notification, authentication, and advanced-control descriptions and default states in every locale. Use translated Next buttons on intermediate Export Limit, Grid Mode, Grid Profile, and Envoy history migration forms.
+- Add localized Export Limit menu descriptions and enablement guidance, align menu capitalisation, label selector states Enabled and Disabled, explain that saved defaults apply when selecting Enabled, and show Pending setting: None when no request is active.
+- Rename Active System Events to System Events and retain sanitized Enphase fault descriptions. Align Enphase Cloud live power sensor names as Battery Power, Grid Power, Consumption Power, and Production Power in every locale.
+- Rename System Profile Status to System Profile while preserving its entity identity. Show Battery Available Power and Battery Mode under Diagnostics on the IQ Battery device.
+- Rename the charger Plugged In sensor to Vehicle Connection, align charger and gateway Connectivity and Last Reported names, and show Connection Method on both in every locale.
+- Use friendly model names and full shared SKUs in brackets on IQ Battery, microinverter, and EV charger cards, summarize mixed models, omit SKU-only Hardware rows, and link device and cloud service cards to the Enlighten site. Remove the integration version from the Enphase Cloud Service info card and remove charger MAC addresses, including previously registered MAC connections.
+- Cache shared device metadata to reduce repeated scans of large inventories while preserving user customizations and defensive copies. Reuse unchanged battery capability snapshots, exclude cache bookkeeping from entity update comparisons, and build immutable feature snapshots in one traversal.
+- Share public firmware catalog downloads across entries using the same URL and include read-only session-history POST requests in the cloud request budget.
+- Separate immutable endpoint policies from the coordinator, introduce typed current-power, runtime-health, and authentication boundaries, and extract pure battery grid-relay and session-pagination helpers. Expand behavioral, concurrency, and mixed-inventory performance regression coverage.
+- Redact site identifiers and cloud exception text consistently in tariff failure logs, with regression coverage for tariff log redaction.
 
 ### 🔄 Other changes
 - Updated the CI setup-uv action from `10.1.0` to `10.2.0`. (#888)
-- Bumped the integration manifest version to `5.0.0b1`.
+- Bumped the integration manifest version to `5.0.0`.
 
 ## v4.3.5 - 2026-09-25
 
