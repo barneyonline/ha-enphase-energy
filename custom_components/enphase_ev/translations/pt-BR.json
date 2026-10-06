@@ -514,6 +514,12 @@
     },
     "charger_status_unavailable": {
       "message": "O status atualizado do carregador está indisponível. Aguarde a recuperação antes de alterar as configurações."
+    },
+    "ev_battery_limit_range": {
+      "message": "O mínimo da bateria para carregamento do veículo elétrico deve ser uma porcentagem inteira entre {minimum} e {maximum}."
+    },
+    "ev_battery_update_unconfirmed": {
+      "message": "Não foi possível confirmar a alteração do uso da bateria para carregamento do veículo elétrico. Atualize as configurações e tente novamente."
     }
   },
   "options": {
@@ -2468,6 +2474,9 @@
             "name": "Localizador de tarifa"
           }
         }
+      },
+      "ev_battery_limit": {
+        "name": "Bateria mínima para carregamento do veículo elétrico"
       }
     },
     "binary_sensor": {

@@ -514,6 +514,12 @@
     },
     "charger_status_unavailable": {
       "message": "Fresh charger status is unavailable. Wait for recovery before changing charger settings."
+    },
+    "ev_battery_limit_range": {
+      "message": "Minimum battery for EV charging must be a whole percentage between {minimum} and {maximum}."
+    },
+    "ev_battery_update_unconfirmed": {
+      "message": "The battery-to-EV update could not be confirmed. Refresh settings before retrying."
     }
   },
   "options": {
@@ -2468,6 +2474,9 @@
             "name": "Tariff Locator"
           }
         }
+      },
+      "ev_battery_limit": {
+        "name": "Minimum battery for EV charging"
       }
     },
     "binary_sensor": {

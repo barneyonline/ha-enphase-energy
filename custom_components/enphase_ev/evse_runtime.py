@@ -19,6 +19,7 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.util import dt as dt_util
 
 from .api import AuthSettingsUnavailable, ChargerConfigUnavailable, SchedulerUnavailable
+from .ev_battery_preferences import preferences_for
 from .control_updates import control_readback, tracked_control
 from .const import (
     AUTH_APP_SETTING,
@@ -1796,8 +1797,17 @@ class EvseRuntime:
         self.coordinator.mark_scheduler_available()
         await self.coordinator.async_request_refresh()
 
-    @tracked_control("green_battery", arguments=("enabled",), serial_argument="sn")
     async def async_set_green_battery_setting(self, sn: str, *, enabled: bool) -> None:
+        preferences = preferences_for(self.coordinator)
+        if preferences is not None and preferences.seen:
+            await preferences.async_update(enabled=enabled)
+            return
+        await self._async_set_legacy_green_battery_setting(sn, enabled=enabled)
+
+    @tracked_control("green_battery", arguments=("enabled",), serial_argument="sn")
+    async def _async_set_legacy_green_battery_setting(
+        self, sn: str, *, enabled: bool
+    ) -> None:
         sn_str = str(sn)
         try:
             await self.coordinator.client.set_green_battery_setting(

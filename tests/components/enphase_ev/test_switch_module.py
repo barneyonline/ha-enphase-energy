@@ -1179,7 +1179,7 @@ async def test_async_setup_entry_skips_app_auth_switch_when_unsupported(
 
 
 @pytest.mark.asyncio
-async def test_async_setup_entry_prunes_feature_switches_when_inventory_ready(
+async def test_async_setup_entry_retains_battery_switch_when_legacy_support_disappears(
     hass, config_entry, coordinator_factory, monkeypatch
 ) -> None:
     coord = coordinator_factory(
@@ -1212,7 +1212,8 @@ async def test_async_setup_entry_prunes_feature_switches_when_inventory_ready(
     listener = listener_spy.call_args[0][0]
     listener()
 
-    remove_spy.assert_called_with(stale.entity_id)
+    remove_spy.assert_not_called()
+    assert ent_reg.async_get(stale.entity_id) is not None
 
 
 @pytest.mark.asyncio

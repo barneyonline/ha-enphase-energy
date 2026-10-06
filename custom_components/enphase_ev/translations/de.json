@@ -514,6 +514,12 @@
     },
     "charger_status_unavailable": {
       "message": "Aktuelle Statusdaten des Ladegeräts sind nicht verfügbar. Warte auf die Wiederherstellung, bevor du Einstellungen änderst."
+    },
+    "ev_battery_limit_range": {
+      "message": "Der Mindestbatteriestand für EV-Laden muss eine ganze Prozentzahl zwischen {minimum} und {maximum} sein."
+    },
+    "ev_battery_update_unconfirmed": {
+      "message": "Die Änderung der Batterienutzung für EV-Laden konnte nicht bestätigt werden. Aktualisieren Sie die Einstellungen und versuchen Sie es erneut."
     }
   },
   "options": {
@@ -2468,6 +2474,9 @@
             "name": "Tarif-Locator"
           }
         }
+      },
+      "ev_battery_limit": {
+        "name": "Mindestbatteriestand für EV-Laden"
       }
     },
     "binary_sensor": {

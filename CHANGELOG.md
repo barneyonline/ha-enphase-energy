@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
-- None
+- Add beta support for site-level battery use for EV charging: retain existing battery-use switches and add a minimum battery percentage number with site-specific bounds and verified paired writes. Successful live validation on the maintainer’s system remains unavailable.
 
 ### 🐛 Bug fixes
 - None
