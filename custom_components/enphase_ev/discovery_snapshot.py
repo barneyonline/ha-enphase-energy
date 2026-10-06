@@ -11,6 +11,7 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
+from .ev_battery_preferences import preferences_for
 from .device_types import normalize_type_key
 from .log_redaction import redact_site_id
 from .scalar_helpers import coerce_snapshot_bool, snapshot_compatible_value
@@ -254,7 +255,9 @@ class DiscoverySnapshotManager:
             if isinstance(inverter_data, dict)
             else ()
         )
+        preferences = preferences_for(self.coordinator)
         return (
+            bool(preferences is not None and preferences.seen),
             tuple(self.coordinator.iter_serials()),
             tuple(getattr(self.coordinator, "_type_device_order", []) or []),
             tuple(type_key),
@@ -420,11 +423,22 @@ class DiscoverySnapshotManager:
                 if (compact := _compact_discovery_record(record))
             ],
         }
+        preferences = preferences_for(self.coordinator)
+        if preferences is not None and preferences.seen:
+            snapshot["ev_battery_preferences_seen"] = True
         return snapshot
 
     def apply(self, snapshot: object) -> None:
         if not isinstance(snapshot, dict):
             return
+
+        preferences = preferences_for(self.coordinator)
+        if (
+            preferences is not None
+            and snapshot.get("ev_battery_preferences_seen") is True
+        ):
+            # Restore routing only; state and permissions still require fresh reads.
+            preferences.seen = True
 
         serial_order = snapshot.get("serial_order")
         if isinstance(serial_order, list):

@@ -47,7 +47,9 @@ def preferences():
         publish_runtime_state_update=Mock(),
     )
     runtime = SimpleNamespace(
-        coordinator=coord, async_ensure_battery_write_access_confirmed=AsyncMock()
+        coordinator=coord,
+        async_ensure_battery_write_access_confirmed=AsyncMock(),
+        _apply_battery_permission_payload=Mock(),
     )
     prefs = EVBatteryPreferences(runtime)
     coord.battery_runtime = runtime
@@ -455,3 +457,99 @@ async def test_enable_and_disable_share_site_state_between_chargers(
     prefs.observe(payload(False, 95))
     assert not first.is_on and not second.is_on
     assert EVBatteryLimitNumber(coord).available
+
+
+@pytest.mark.parametrize(
+    "guard",
+    [{"systemTask": True}, {"userDetails": {"isOwner": False, "isInstaller": False}}],
+)
+@pytest.mark.asyncio
+async def test_fresh_settings_guard_blocks_write(coordinator_factory, guard):
+    coord = coordinator_factory()
+    coord.battery_state._battery_user_is_owner = True
+    coord.battery_state._battery_system_task = False
+    fresh = payload()
+    fresh["data"].update(guard)
+    coord.client.battery_settings_details = AsyncMock(return_value=fresh)
+    coord.client.set_ev_battery_preference = AsyncMock()
+    with pytest.raises(ServiceValidationError):
+        await coord.battery_runtime.ev_preferences.async_update(enabled=True)
+    coord.client.set_ev_battery_preference.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_permission_bootstrap_honors_capability_denial(coordinator_factory):
+    coord = coordinator_factory()
+    coord.battery_state._battery_user_is_owner = None
+    coord.battery_state._battery_user_is_installer = None
+    coord.client.battery_site_settings = AsyncMock(
+        return_value={
+            "data": {
+                "userDetails": {"isOwner": True},
+                "isUseBatteryForEVSESupported": False,
+            }
+        }
+    )
+    coord.client.battery_settings_details = AsyncMock(return_value=payload())
+    coord.client.set_ev_battery_preference = AsyncMock()
+    with pytest.raises(ServiceValidationError):
+        await coord.battery_runtime.ev_preferences.async_update(enabled=True)
+    assert coord.battery_write_access_confirmed
+    assert coord.battery_runtime.ev_preferences.supported is False
+    coord.client.set_ev_battery_preference.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_discovery_persists_only_ownership_and_blocks_legacy_after_restart(
+    coordinator_factory,
+):
+    old = coordinator_factory()
+    prefs = old.battery_runtime.ev_preferences
+    store = old.discovery_snapshot._store
+    store.async_save = AsyncMock()
+    # Establish a saved snapshot before discovery, so the new flag must affect revisions.
+    old.discovery_snapshot.schedule_save()
+    await old.discovery_snapshot.async_save()
+    prefs.observe(payload(True, 95))
+    await old.discovery_snapshot.async_save()
+    saved = store.async_save.await_args.args[0]
+    assert saved["ev_battery_preferences_seen"] is True
+    assert "batteryLimit" not in str(saved)
+    old.discovery_snapshot.cancel_pending_save()
+
+    restored = coordinator_factory()
+    restored.discovery_snapshot._store.async_load = AsyncMock(return_value=saved)
+    await restored.discovery_snapshot.async_restore_state()
+    assert restored.battery_runtime.ev_preferences.seen
+    assert restored.battery_runtime.ev_preferences.value is None
+    restored.data[RANDOM_SERIAL].update(
+        green_battery_supported=True, green_battery_enabled=True
+    )
+    restored.client.set_green_battery_setting = AsyncMock()
+    restored.client.set_ev_battery_preference = AsyncMock()
+    restored.client.battery_settings_details = AsyncMock(return_value={})
+    restored.battery_state._battery_user_is_owner = True
+    with pytest.raises(ServiceValidationError):
+        await restored.evse_runtime.async_set_green_battery_setting(
+            RANDOM_SERIAL, enabled=True
+        )
+    restored.client.set_green_battery_setting.assert_not_awaited()
+    restored.client.set_ev_battery_preference.assert_not_awaited()
+    assert not GreenBatterySwitch(restored, RANDOM_SERIAL).available
+
+
+def test_reload_handoff_preserves_ownership_without_state(coordinator_factory):
+    from custom_components.enphase_ev.reload_snapshot import ReloadSnapshot
+
+    old = coordinator_factory()
+    old.battery_runtime.ev_preferences.observe_capabilities(
+        {"isUseBatteryForEVSESupported": True}
+    )
+    old.battery_runtime.ev_preferences.observe(payload(True, 95))
+    snapshot = ReloadSnapshot.capture(old)
+    restored = coordinator_factory()
+    snapshot.apply(restored)
+    assert restored.battery_runtime.ev_preferences.seen
+    assert restored.battery_runtime.ev_preferences.value is None
+    assert restored.battery_runtime.ev_preferences.supported is None
+    old.discovery_snapshot.cancel_pending_save()

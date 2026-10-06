@@ -60,13 +60,22 @@ class EVBatteryPreferences:
             devices = data.get("devices") if isinstance(data, dict) else None
             evse = devices.get("iqEvse") if isinstance(devices, dict) else None
             if isinstance(evse, dict) and "useBatteryForEVSE" in evse:
-                self.seen = True
+                self._mark_seen()
 
     def observe_capabilities(self, data: dict[str, object]) -> None:
         flag = data.get("isUseBatteryForEVSESupported")
-        self.supported = flag if type(flag) is bool else None
-        if self.supported is True:
-            self.seen = True
+        if type(flag) is bool:
+            self.supported = flag
+            if flag:
+                self._mark_seen()
+
+    def _mark_seen(self) -> None:
+        if self.seen:
+            return
+        self.seen = True
+        snapshot = getattr(self.runtime.coordinator, "discovery_snapshot", None)
+        if snapshot is not None:
+            snapshot.schedule_save()
 
     @property
     def available(self) -> bool:
@@ -87,7 +96,9 @@ class EVBatteryPreferences:
             await self.runtime.async_ensure_battery_write_access_confirmed()
             self.generation += 1
             try:
-                self.observe(await coord.client.battery_settings_details())
+                payload = await coord.client.battery_settings_details()
+                self.runtime._apply_battery_permission_payload(payload)
+                self.observe(payload)
                 if not self.available or self.value is None:
                     raise ServiceValidationError(
                         "Battery-to-EV preferences are unavailable.",
