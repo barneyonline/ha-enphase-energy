@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-10-07T11:15:24.722739Z",
+  "checked_at": "2026-10-07T17:55:16.179809Z",
   "checks": [
     {
       "affects": true,
@@ -34,7 +34,7 @@
       ],
       "group": "main",
       "name": "evse_runtime",
-      "ok": true
+      "ok": false
     },
     {
       "affects": true,
@@ -122,7 +122,7 @@
       ],
       "group": "degraded",
       "name": "battery_config",
-      "ok": true
+      "ok": false
     },
     {
       "affects": false,
@@ -272,12 +272,12 @@
       "category": "evse_runtime",
       "check_group": "evse_runtime",
       "check_mode": "all",
-      "error": null,
+      "error": "The read operation timed out",
       "group": "main",
       "method": "GET",
       "name": "charger_status",
-      "ok": true,
-      "status": 200,
+      "ok": false,
+      "status": null,
       "url": "/service/evse_controller/{site_id}/ev_chargers/status"
     },
     {
@@ -334,7 +334,7 @@
       "name": "session_history_criteria",
       "ok": true,
       "status": 200,
-      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=9f68d446-67e3-4f1d-9b00-cb57588cfe34&username=2999024"
+      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=ff89dfe4-2a76-40b8-9aa8-2912702d1f35&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -404,7 +404,7 @@
       "name": "evse_timeseries_daily_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=9f68d446-67e3-4f1d-9b00-cb57588cfe34&start_date=2026-10-07&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=ff89dfe4-2a76-40b8-9aa8-2912702d1f35&start_date=2026-10-07&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -418,7 +418,7 @@
       "name": "evse_timeseries_lifetime_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=9f68d446-67e3-4f1d-9b00-cb57588cfe34&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=ff89dfe4-2a76-40b8-9aa8-2912702d1f35&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -468,12 +468,12 @@
       "category": "battery_config",
       "check_group": "battery_config",
       "check_mode": "all",
-      "error": null,
+      "error": "The read operation timed out",
       "group": "degraded",
       "method": "GET",
       "name": "battery_profile",
-      "ok": true,
-      "status": 200,
+      "ok": false,
+      "status": null,
       "url": "/service/batteryConfig/api/v1/profile/{site_id}?userId=2999024&source=enho&locale=en-AU"
     },
     {
@@ -482,12 +482,12 @@
       "category": "battery_config",
       "check_group": "battery_config",
       "check_mode": "all",
-      "error": null,
+      "error": "The read operation timed out",
       "group": "degraded",
       "method": "GET",
       "name": "battery_settings",
-      "ok": true,
-      "status": 200,
+      "ok": false,
+      "status": null,
       "url": "/service/batteryConfig/api/v1/batterySettings/{site_id}?userId=2999024&source=enho"
     },
     {
@@ -729,16 +729,16 @@
       "url": "/service/evse_controller/api/v1/{site_id}/ev_chargers/{serial}/ev_charger_config"
     }
   ],
-  "status": "Fully Operational",
+  "status": "Down",
   "summary": {
-    "checks_failed": 0,
-    "checks_failed_affecting": 0,
-    "checks_failed_broad_outage": 0,
-    "checks_failed_non_affecting": 0,
-    "checks_ok": 17,
+    "checks_failed": 2,
+    "checks_failed_affecting": 1,
+    "checks_failed_broad_outage": 2,
+    "checks_failed_non_affecting": 1,
+    "checks_ok": 15,
     "checks_total": 17,
-    "endpoints_failed": 0,
-    "endpoints_ok": 37,
+    "endpoints_failed": 3,
+    "endpoints_ok": 34,
     "endpoints_total": 37
   }
 }
