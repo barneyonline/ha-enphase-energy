@@ -514,6 +514,12 @@
     },
     "charger_status_unavailable": {
       "message": "Actuele laadpaalstatus is niet beschikbaar. Wacht op herstel voordat je instellingen wijzigt."
+    },
+    "ev_battery_limit_range": {
+      "message": "Het minimale batterijniveau voor EV-laden moet een geheel percentage tussen {minimum} en {maximum} zijn."
+    },
+    "ev_battery_update_unconfirmed": {
+      "message": "De wijziging van het batterijgebruik voor EV-laden kon niet worden bevestigd. Vernieuw de instellingen en probeer het opnieuw."
     }
   },
   "options": {
@@ -2468,6 +2474,9 @@
             "name": "Tariefzoeker"
           }
         }
+      },
+      "ev_battery_limit": {
+        "name": "Minimaal batterijniveau voor EV-laden"
       }
     },
     "binary_sensor": {

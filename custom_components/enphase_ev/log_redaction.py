@@ -26,6 +26,7 @@ _SITE_URL_PATH_RE = re.compile(
     r"(?P<site>\d+)(?=$|[/?#\s])"
     r"|(?P<service_prefix>/service/(?:enho_historical_events_ms"
     r"|batteryConfig/api/v1/(?:siteSettings|profile|batterySettings)"
+    r"|batteryConfig/api/v1/device/battery/preference"
     r"|batteryConfig/api/v1/batterySettings/acceptDisclaimer"
     r"|batteryConfig/api/v1/(?:acceptDisclaimer|cancel/profile)"
     r"|batteryConfig/api/v1/stormGuard(?:/toggle)?"

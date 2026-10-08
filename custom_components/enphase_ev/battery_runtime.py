@@ -38,6 +38,7 @@ from .battery_runtime_dry_contact import (
     normalize_dry_contact_schedule_windows,
     parse_dry_contact_settings_payload,
 )
+from .ev_battery_preferences import EVBatteryPreferences
 from .control_updates import control_readback, current_control_value, tracked_control
 from .const import (
     BATTERY_BACKUP_HISTORY_CACHE_TTL,
@@ -118,6 +119,7 @@ class BatteryRuntime:
         self.coordinator = coordinator
         self.health = RuntimeHealthServices(coordinator)
         self._state = state
+        self.ev_preferences = EVBatteryPreferences(self)
 
     @property
     def battery_state(self) -> BatteryState:
@@ -1214,6 +1216,7 @@ class BatteryRuntime:
         data = payload.get("data")
         if not isinstance(data, dict):
             data = payload
+        self.ev_preferences.observe_capabilities(data)
         self._apply_battery_capability_blocks(data)
         self._apply_battery_user_details(data.get("userDetails"))
 
@@ -3004,6 +3007,8 @@ class BatteryRuntime:
         if not isinstance(data, dict):
             data = payload
 
+        self.ev_preferences.observe_capabilities(data)
+
         def _as_text(value: object) -> str | None:
             if value is None:
                 return None
@@ -3662,14 +3667,22 @@ class BatteryRuntime:
         fetcher = getattr(coord.client, "battery_settings_details", None)
         if not callable(fetcher):
             return False
+        ev_generation = self.ev_preferences.generation
         read_generation = getattr(state, "_battery_profile_read_generation", 0)
         try:
             payload = await fetcher()
         except Exception as err:  # noqa: BLE001
+            if (
+                ev_generation == self.ev_preferences.generation
+                and ev_generation % 2 == 0
+            ):
+                self.ev_preferences.value = None
             self.health.note_endpoint_family_failure(family, err)
             return False
         if read_generation != getattr(state, "_battery_profile_read_generation", 0):
             return False
+        if ev_generation == self.ev_preferences.generation and ev_generation % 2 == 0:
+            self.ev_preferences.observe(payload)
         redacted_payload = coord.redact_battery_payload(payload)
         if isinstance(redacted_payload, dict):
             state._battery_settings_payload = redacted_payload

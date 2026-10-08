@@ -1806,6 +1806,12 @@ class EnphaseEVClient(MqttStreamSurface):
 
         return await api_battery_surface.battery_settings_details(self)
 
+    async def set_ev_battery_preference(self, *, enabled: bool, limit: int) -> JsonDict:
+        """Set site-wide battery use for EV charging and its minimum percentage."""
+        return await api_battery_surface.set_ev_battery_preference(
+            self, enabled=enabled, limit=limit
+        )
+
     async def accept_battery_settings_disclaimer(
         self, disclaimer_type: str = "itc"
     ) -> JsonDict:

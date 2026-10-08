@@ -7,6 +7,7 @@ from typing import Any, TypeVar, cast
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.const import UnitOfElectricCurrent, UnitOfEnergy, UnitOfRatio
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.core import HomeAssistant, callback as ha_callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
@@ -18,6 +19,7 @@ from .battery_schedule_editor import (
     battery_scheduler_enabled,
 )
 from .control_updates import current_control_value
+from .ev_battery_preferences import preferences_for
 from .const import DOMAIN, SAFE_LIMIT_AMPS
 from .entity import evse_safe_limit_active, evse_charging_active
 from .entity import (
@@ -64,6 +66,9 @@ def _retained_site_number_unique_ids(
         f"{DOMAIN}_site_{coord.site_id}_battery_reserve",
         f"{DOMAIN}_site_{coord.site_id}_battery_shutdown_level",
     }
+    preferences = preferences_for(coord)
+    if preferences is not None and preferences.seen:
+        core_unique_ids.add(f"{DOMAIN}_site_{coord.site_id}_ev_battery_limit")
     if not battery_scheduler_enabled(entry):
         return set() if write_access_denied else core_unique_ids
     editor_active = _battery_schedule_editor_active(coord, entry)
@@ -119,6 +124,7 @@ async def async_setup_entry(
 
     def _managed_site_number_unique_ids() -> set[str]:
         return {
+            f"{DOMAIN}_site_{coord.site_id}_ev_battery_limit",
             f"{DOMAIN}_site_{coord.site_id}_battery_reserve",
             f"{DOMAIN}_site_{coord.site_id}_battery_shutdown_level",
             f"{DOMAIN}_site_{coord.site_id}_battery_cfg_schedule_limit",
@@ -135,6 +141,7 @@ async def async_setup_entry(
 
     def _core_site_number_unique_ids() -> set[str]:
         return {
+            f"{DOMAIN}_site_{coord.site_id}_ev_battery_limit",
             f"{DOMAIN}_site_{coord.site_id}_battery_reserve",
             f"{DOMAIN}_site_{coord.site_id}_battery_shutdown_level",
         }
@@ -151,6 +158,9 @@ async def async_setup_entry(
         site_entities: dict[str, NumberEntity] = {}
 
         entity_factories: dict[str, Callable[[], NumberEntity]] = {
+            f"{DOMAIN}_site_{coord.site_id}_ev_battery_limit": lambda: EVBatteryLimitNumber(
+                coord
+            ),
             f"{DOMAIN}_site_{coord.site_id}_battery_reserve": lambda: BatteryReserveNumber(
                 coord
             ),
@@ -183,6 +193,12 @@ async def async_setup_entry(
         inventory_ready = bool(getattr(coord, "_devices_inventory_ready", False))
         current_serials = {sn for sn in coord.iter_serials() if sn}
         retained_site_number_unique_ids = _retained_site_number_unique_ids(coord, entry)
+        ev_unique_id = f"{DOMAIN}_site_{coord.site_id}_ev_battery_limit"
+        if (
+            _type_available(coord, "encharge")
+            and ent_reg.async_get_entity_id("number", DOMAIN, ev_unique_id) is not None
+        ):
+            retained_site_number_unique_ids.add(ev_unique_id)
         active_site_number_unique_ids: set[str] = set()
         site_entities: list[NumberEntity] = []
         tariff_entities = _tariff_rate_number_entities(coord)
@@ -523,6 +539,63 @@ class DefaultChargeLevelNumber(EnphaseBaseEntity, NumberEntity):  # type: ignore
             self._sn,
             int(value),
         )
+
+
+class EVBatteryLimitNumber(CoordinatorEntity, NumberEntity):  # type: ignore[misc]
+    """One threshold for all EV chargers belonging to the site."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "ev_battery_limit"
+    _attr_native_max_value = 100.0
+    _attr_native_step = 1.0
+    _attr_native_unit_of_measurement = UnitOfRatio.PERCENTAGE
+    _attr_mode = NumberMode.BOX
+
+    def __init__(self, coord: EnphaseCoordinator) -> None:
+        super().__init__(coord)
+        self._coord = coord
+        self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_ev_battery_limit"
+
+    @property
+    def available(self) -> bool:
+        preferences = preferences_for(self._coord)
+        return bool(
+            super().available and preferences is not None and preferences.available
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        preferences = preferences_for(self._coord)
+        value = preferences.value if preferences is not None else None
+        # Zero is a disabled sentinel, not a user-selected minimum percentage.
+        return (
+            float(value.limit)
+            if value is not None and value.limit >= value.minimum
+            else None
+        )
+
+    @property
+    def native_min_value(self) -> float:
+        preferences = preferences_for(self._coord)
+        value = preferences.value if preferences is not None else None
+        return float(value.minimum) if value is not None else 0.0
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return _type_device_info(self._coord, "encharge") or DeviceInfo(
+            identifiers={(DOMAIN, f"type:{self._coord.site_id}:encharge")},
+            manufacturer="Enphase",
+        )
+
+    async def async_set_native_value(self, value: float) -> None:
+        preferences = preferences_for(self._coord)
+        if preferences is None:
+            raise ServiceValidationError(
+                "Battery-to-EV preferences are unavailable.",
+                translation_domain=DOMAIN,
+                translation_key="battery_settings_updates_unavailable",
+            )
+        await preferences.async_update(limit=value)
 
 
 class BatteryShutdownLevelNumber(CoordinatorEntity, NumberEntity):  # type: ignore[misc]

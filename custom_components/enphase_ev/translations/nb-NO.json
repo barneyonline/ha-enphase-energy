@@ -514,6 +514,12 @@
     },
     "charger_status_unavailable": {
       "message": "Fersk laderstatus er utilgjengelig. Vent på gjenoppretting før du endrer laderinnstillingene."
+    },
+    "ev_battery_limit_range": {
+      "message": "Minste batterinivå for elbillading må være en hel prosent mellom {minimum} og {maximum}."
+    },
+    "ev_battery_update_unconfirmed": {
+      "message": "Endringen av batteribruk til elbillading kunne ikke bekreftes. Oppdater innstillingene og prøv igjen."
     }
   },
   "options": {
@@ -2468,6 +2474,9 @@
             "name": "Tarifflokator"
           }
         }
+      },
+      "ev_battery_limit": {
+        "name": "Minste batterinivå for elbillading"
       }
     },
     "binary_sensor": {
