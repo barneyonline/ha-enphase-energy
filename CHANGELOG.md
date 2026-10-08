@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
-- Add beta support for site-level battery use for EV charging: retain existing battery-use switches and add a minimum battery percentage number with site-specific bounds and verified paired writes. Successful live validation on the maintainer’s system remains unavailable.
+- None
 
 ### 🐛 Bug fixes
 - None
@@ -18,6 +18,24 @@ All notable changes to this project will be documented in this file.
 
 ### 🔄 Other changes
 - None
+
+## v5.0.1 - 2026-10-08
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- Add beta support for site-level battery use for EV charging: retain existing battery-use switches and add a minimum battery percentage number with site-specific bounds and verified paired writes. Successful live validation on the maintainer’s system remains unavailable.
+
+### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Simplify the README by removing the Cloud updates and recovery section and detailed control-update overview.
+- Bump the integration manifest version to `5.0.1`.
 
 ## v5.0.0 - 2026-10-06
 
