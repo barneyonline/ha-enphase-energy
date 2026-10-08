@@ -7080,7 +7080,32 @@ Notes:
 - The error conflicted with both Battery Settings and Profile returning `stormGuardState="disabled"`. Profile also returned `evseStormEnabled=false`, `showStormGuardAlert=false`, and `isBatteryChangePending=false`; the dedicated Storm Guard alert read returned no alerts and `criticalAlertActive=false` (section 5.6).
 - A verified Storm Guard enable/disable cycle succeeded, but the same EV preference request still returned `STORM_GUARD_ACTIVE`. This establishes an unresolved backend rejection, not an active storm or a proven internal root cause.
 - The first-party UI displayed Enabled after the rejected request. A fresh read and reopened Battery page confirmed `useBatteryForEVSE=false`, `batteryLimit=0`, and the original system settings. Clients must handle error responses and verify persisted state rather than trusting optimistic UI state.
-- No successful EV preference write was captured. Successful enable/disable, limit-only updates, disable-time limit preservation/reset, AI Optimization restrictions, exact capability/lock rules, and interaction with the older Green Charging scheduler remain unverified.
+Successful sanitized capture, 2026-10-06 ([request payloads](https://github.com/barneyonline/ha-enphase-energy/issues/917#issuecomment-6012902853), [responses and readback](https://github.com/barneyonline/ha-enphase-energy/issues/917#issuecomment-6013380274)); Envoy 8.3.5528, web app 26.9.2, integration 4.3.5:
+
+| Action | PUT body |
+| --- | --- |
+| Enable | `{"useBatteryForEVSE":true,"batteryLimit":90}` |
+| Change percentage | `{"useBatteryForEVSE":true,"batteryLimit":95}` |
+| Disable | `{"useBatteryForEVSE":false,"batteryLimit":95}` |
+
+All three were reported to return HTTP `200` with this response (timestamp omitted):
+```json
+{"type":"iqevse-battery-preference","data":{"message":"success"}}
+```
+Reopening settings was reported to reflect the changes. The explicit fresh readback supplied was:
+```json
+{"data":{"devices":{"iqEvse":{"batteryLimit":95,"useBatteryForEVSE":true,"minBatteryLimit":10}}}}
+```
+Separate fresh readback excerpts for each action were not supplied. The capture confirms 1% UI increments transmitted in the PUT. The original request specifies a maximum of 100%; the follow-up does not independently reconfirm that maximum, and no EV-specific maximum field is evidenced. `batteryBackupPercentageMax` belongs to backup reserve and must not define the EV threshold. Use the dynamic `minBatteryLimit` (observed 10 and 20), 1% increments, and a 100% percentage ceiling with this remaining validation limit documented.
+
+The opening reads were `GET /service/batteryConfig/api/v1/siteSettings/<site_id>?userId=<user_id>` and `GET /service/batteryConfig/api/v1/batterySettings/<site_id>?source=enho&userId=<user_id>`. The successful report does not establish a required authentication-header subset. The integration retains its existing shared BatteryConfig authentication and `source=enlm` settings read; whether `source=enho` is required to expose these fields on some sites remains unverified. The preference PUT uses the exact dedicated path above, both fields, and no invented query parameters or merged battery-settings body.
+
+Implementation and remaining validation:
+- A site-owned lock spans fresh companion reads, PUT, and confirmation readback. HTTP success alone is not an applied state. Missing fields, rejected writes (including `10003/STORM_GUARD_ACTIVE`), permission failures, and readback mismatch must not appear as successful changes.
+- A disabled limit of zero is shown as an unknown threshold; enabling initializes to `minBatteryLimit`, matching the earlier captured UI behavior. Changing the number while disabled preserves `useBatteryForEVSE=false`; disabling preserves the current limit.
+- Complete EV fields establish capability unless site settings explicitly deny it. Missing or malformed fields after discovery make controls unavailable; they do not redirect writes to GreenCharging. Exact capability/lock rules, AI Optimization restrictions, and backend interaction with the old scheduler remain unverified.
+- Existing charger switch identities are retained as aliases of this site preference when discovered. A single battery-system number owns the percentage. Sites without the new contract retain legacy GreenCharging behavior.
+- Intended for beta validation in the next release: the maintainer cannot validate successful EV preference changes on their own system. No live account requests or setting changes were performed during implementation.
 
 ### 5.6 Storm Guard Alert Status, Opt-Out, and Toggle
 ```
@@ -8228,8 +8253,8 @@ retained; access has not been verified by this capture.
 | `dtgControl` / `cfgControl` / `rbdControl` | Battery UI feature-capability blocks with visibility, lock, and schedule support flags; observed booleans so far include `show=true`, `showDaySchedule=true`, `enabled=false`, `locked=false`, `scheduleSupported=true` |
 | `systemTask` | Backend task/activity flag that may indicate settings are being managed asynchronously; observed value so far: `false` |
 | `devices.iqEvse.useBatteryFrSelfConsumption` | Indicates IQ EV charger battery participation support in self-consumption mode; observed value so far: `true` |
-| `devices.iqEvse.useBatteryForEVSE` | New Discharge battery to EV state; observed persisted value: `false`; enable request was rejected |
-| `devices.iqEvse.batteryLimit` / `minBatteryLimit` | Separate EV discharge limit and reported minimum; observed disabled limit `0`, minimum `20`, and UI enable request limit `20`; system reserve remains separate |
+| `devices.iqEvse.useBatteryForEVSE` | Site EV battery-use state; successful enable/change/disable reported; explicit fresh readback `true` at 95%, plus earlier rejected enable capture (section 5.5.2) |
+| `devices.iqEvse.batteryLimit` / `minBatteryLimit` | Separate EV discharge limit and dynamic minimum; observed limits `0`, `90`, `95` and minima `10`, `20`; system reserve remains separate (section 5.5.2) |
 | `isUseBatteryForEVSESupported` / `iqEvseHoControl` / `iqEvseHoControlScope` | Site-settings capability fields observed with the new EV battery UI: `true`, `true`, and `[]`; complete gating semantics not verified |
 | `grid_profiles` | Activation grid-profile discovery grouping keyed by display region such as `"VIC, AU"` |
 | `recommended_profile` | Activation-selected recommended grid profile; can duplicate one of the grouped `grid_profiles` entries |

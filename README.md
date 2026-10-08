@@ -151,3 +151,29 @@ Enable **Configure → Notifications → Enable Descriptive Activity Entries** t
 add reported condition details alongside normal Home Assistant Activity entries.
 The feature is **disabled by default**. See [Descriptive Activity entries](docs/descriptive_activity.md)
 for supported entities and behavior.
+
+### Battery use for EV charging (beta)
+
+On supported BatteryConfig sites, the existing **Use Battery for EV Charging**
+switch controls battery use for all EV chargers at the site. Existing switch IDs,
+customizations, and automations are retained; switches on multiple chargers reflect
+and change the same site preference. Sites without the new capability continue to
+use their legacy GreenCharging setting.
+
+The battery system gains one **Minimum battery for EV charging** number, with 1%
+steps and a minimum supplied by the site (10% and 20% have been observed). Its 100%
+ceiling follows the original feature request; it is not derived from backup reserve.
+Changing this number preserves whether battery use is enabled. Disabling preserves
+the threshold. If Enphase returns a disabled threshold of zero, the number is unknown
+until set; enabling uses the site's minimum. This threshold is separate from system
+backup reserve and does not prevent battery use by other home loads.
+
+Updates require confirmed battery write permission and fresh readback. Cloud errors,
+including `STORM_GUARD_ACTIVE` even when visible storm flags are off, are surfaced;
+an acknowledged write whose readback differs is not shown as applied. Missing fields
+after discovery make the controls unavailable instead of switching to the legacy API.
+The IQ EV Charger must stay connected to the IQ Gateway for the restrictions to hold.
+
+This feature is intended for beta testing in the next release because the maintainer
+cannot validate successful changes on their own system. See the
+[API capture evidence and remaining uncertainties](docs/api/api_spec.md#552-discharge-battery-to-ev).

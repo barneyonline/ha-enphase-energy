@@ -514,6 +514,12 @@
     },
     "charger_status_unavailable": {
       "message": "Aktuell laddarstatus är inte tillgänglig. Vänta på återställning innan du ändrar laddarinställningarna."
+    },
+    "ev_battery_limit_range": {
+      "message": "Lägsta batterinivå för elbilsladdning måste vara en hel procent mellan {minimum} och {maximum}."
+    },
+    "ev_battery_update_unconfirmed": {
+      "message": "Ändringen av batterianvändning för elbilsladdning kunde inte bekräftas. Uppdatera inställningarna och försök igen."
     }
   },
   "options": {
@@ -2468,6 +2474,9 @@
             "name": "Tarifflokaliserare"
           }
         }
+      },
+      "ev_battery_limit": {
+        "name": "Lägsta batterinivå för elbilsladdning"
       }
     },
     "binary_sensor": {
