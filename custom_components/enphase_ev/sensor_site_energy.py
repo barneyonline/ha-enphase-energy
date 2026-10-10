@@ -21,8 +21,9 @@ from homeassistant.util.unit_conversion import PowerConverter
 from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, CURRENT_POWER_STALE_AFTER_S
+from .const import DOMAIN, CURRENT_POWER_STALE_AFTER_S, PRODUCTION_POWER_STALE_AFTER_S
 from .coordinator import EnphaseCoordinator
+from .current_power_runtime import is_idle_power_sample
 from .device_info_helpers import _cloud_device_info
 from .energy import (
     LIFETIME_RESET_DROP_THRESHOLD_KWH,
@@ -2001,7 +2002,7 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
         self._schedule_freshness_expiry()
 
     def _cache_ttl(self) -> timedelta:
-        return timedelta(seconds=CURRENT_POWER_STALE_AFTER_S)
+        return timedelta(seconds=PRODUCTION_POWER_STALE_AFTER_S)
 
     def _freshness_reference_utc(self) -> datetime:
         success_utc = _normalize_utc_datetime(
@@ -2029,6 +2030,11 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
     def _sample_freshness_utc(self) -> datetime | None:
         """Bound freshness by both acquisition and the source timestamp."""
 
+        received_utc = self._last_good_cached_at_utc
+        if received_utc is not None and is_idle_power_sample(
+            self._last_good_value, self._last_good_sample_utc, received_utc
+        ):
+            return received_utc
         timestamps = [
             stamp
             for stamp in (
@@ -2072,8 +2078,12 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
                 self._coord.current_power_runtime.received_utc
                 or self._source_first_observed
             )
-            self._last_good_cached_at_utc = min(
-                self._last_good_sample_utc or received_utc, received_utc
+            self._last_good_cached_at_utc = (
+                received_utc
+                if is_idle_power_sample(
+                    self._last_good_value, self._last_good_sample_utc, received_utc
+                )
+                else min(self._last_good_sample_utc or received_utc, received_utc)
             )
             self._last_good_source = source
             self._last_good_reported_units = units

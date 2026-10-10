@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .const import (
-    CURRENT_POWER_STALE_AFTER_S,
+    PRODUCTION_POWER_STALE_AFTER_S,
     GRID_CONTROL_CHECK_STALE_AFTER_S,
     GRID_MODE_STATUS_CACHE_TTL,
     GRID_MODE_STATUS_STALE_AFTER_S,
@@ -38,7 +38,7 @@ def build_endpoint_family_policies() -> dict[str, EndpointFamilyPolicy]:
         ),
         "current_power": EndpointFamilyPolicy(
             success_ttl_s=60.0,
-            stale_after_s=CURRENT_POWER_STALE_AFTER_S,
+            stale_after_s=PRODUCTION_POWER_STALE_AFTER_S,
             failure_backoff_schedule_s=(300.0, 900.0, 1800.0, 3600.0),
             max_backoff_s=3600.0,
             optional=True,

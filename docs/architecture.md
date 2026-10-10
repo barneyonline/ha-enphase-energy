@@ -420,12 +420,18 @@ healthy. Battery and heat-pump family recovery is published when freshness is
 restored, including when the measurement itself has not changed. This restores
 availability and expiry timers without publishing every identical successful poll.
 
-Current Production Power checks its source timestamp even when the runtime still
-holds a numeric value and core polling remains healthy. Its acquisition time caps
-future source timestamps and provides a fallback when a timestamp is absent.
-The endpoint's 15-minute stale window also drives entity-owned expiry timers,
-independently of changes to core polling cadence. Current Power Consumption's
-separate derived-power behavior is unchanged.
+Current Production Power uses a 20-minute freshness window to allow delivery
+delay for sites reporting every 15 minutes. Both its source timestamp and first
+acquisition time bound nonzero readings, even while core polling remains healthy.
+Validated readings within +/-1 W with a nonfuture source timestamp instead use
+their latest successful acquisition: Enphase can repeat its last near-zero
+production sample overnight. The reported value and source timestamp are
+preserved. Missing timestamps also use acquisition time. Failed, malformed,
+unsupported-unit, quarantined, or skipped responses never renew that time, so
+even near-zero readings expire after 20 minutes without a valid response.
+Entity-owned expiry timers remain independent of core polling cadence. Grid and
+Battery Power retain their 15-minute window; Current Power Consumption's separate
+derived-power behavior is unchanged.
 
 The per-inverter Lifetime Energy and Power feature switches independently gate
 entity creation. Switching a feature off removes its registered entities, including
