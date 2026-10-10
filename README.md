@@ -39,6 +39,7 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - Unified support for EV chargers, gateway, battery, and microinverter entities
 - Multi-gateway topology awareness for primary/default Gateway and phase selection
 - EV charging switch and session telemetry, including charge-mode aware behavior and persistent default charge-level controls when exposed by Enphase. Use the switch to start or stop charging, or the `enphase_ev.start_charging` and `enphase_ev.stop_charging` actions in automations. The Start Charging and Stop Charging button entities have been removed; replace `button.press` calls with `switch.turn_on` or `switch.turn_off`.
+- The EV charger **Charging** binary sensor follows actual charging telemetry and turns off when the vehicle suspends charging, even while **Plugged In** remains on. A pending Start request does not turn it on before charging is reported.
 - Advisory firmware update entities for gateway and EV charger devices with locale-aware release-note links; the gateway entity also monitors read-only live update progress, percentage, timing, and sanitized component status when Enphase exposes it
 - Heat-pump runtime status, connectivity, SG-Ready mode, power, and current-day consumption details sourced from HEMS endpoints
 - Site and battery energy telemetry, including Consumption Power calculated from the available power sensors, plus derived grid-import, grid-export, and battery power sensors for Home Assistant Energy Dashboard use
