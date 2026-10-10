@@ -1550,6 +1550,21 @@ Notes:
   with the same timestamp and timestamp-less extreme samples are not sufficient
   confirmation.
 - The normalized runtime field is `current_power_consumption_w` with source `app-api:get_latest_power`.
+- Production Power expires after 20 minutes, allowing cloud delivery delay beyond
+  a 15-minute source cadence. Successful validated responses within +/-1 W renew
+  freshness even when a nonfuture timestamp repeats overnight; the value is held
+  as reported, never synthesized from missing data. Other timestamped samples
+  remain bounded by their source and first receipt times. Failed or invalid polls
+  cannot renew freshness.
+- Issue [#923](https://github.com/barneyonline/ha-enphase-energy/issues/923) reports
+  daytime revisions of values sharing a timestamp. The response exposes no
+  interval duration, completion flag, or previous completed interval. Do not
+  assume `time` means interval start or rescale watts based on elapsed time.
+  With integration debug logging enabled, `current_power_runtime` logs only
+  normalized watts, source and receipt times, supported units, precision, and
+  validation state. Compare successive `Latest production power sample` lines
+  with local gateway readings to investigate this provider behavior; raw bodies,
+  credentials, and identifiers are excluded.
 
 ### 2.9.3.a Multi-Gateway Phase Map
 

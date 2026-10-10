@@ -40,6 +40,7 @@ def test_runtime_health_services_isolate_sites_and_allow_explicit_refresh(
 def test_endpoint_policy_configuration_is_immutable_and_entry_local():
     first = build_endpoint_family_policies()
     second = build_endpoint_family_policies()
+    assert first["current_power"].stale_after_s == 1200
     with pytest.raises(FrozenInstanceError):
         first["current_power"].stale_after_s = 0
     first.pop("current_power")
