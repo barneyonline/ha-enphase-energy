@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import Callable
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.util import dt as dt_util
 
 from custom_components.enphase_ev import DOMAIN
@@ -1030,6 +1032,89 @@ def test_ev_bool_sensors_reflect_coordinator_state(
     attrs = connected.extra_state_attributes
     assert attrs["connection"] == "Wi-Fi"
     assert attrs["ip_address"] == "192.0.2.10"
+
+
+@pytest.mark.parametrize(
+    ("charging", "actual_charging", "expected"),
+    [(True, False, False), (False, True, True), (True, None, False)],
+)
+def test_charging_binary_sensor_prefers_actual_telemetry(
+    coordinator_factory, charging, actual_charging, expected
+) -> None:
+    """Actual telemetry takes precedence over enabled or pending control state."""
+    coord = coordinator_factory(
+        data={
+            RANDOM_SERIAL: {
+                "sn": RANDOM_SERIAL,
+                "plugged": True,
+                "charging": charging,
+                "actual_charging": actual_charging,
+            }
+        }
+    )
+    sensor = ChargingBinarySensor(coord, RANDOM_SERIAL)
+    assert sensor.is_on is expected
+    assert sensor.icon == ("mdi:flash" if expected else "mdi:flash-off")
+    assert PluggedInBinarySensor(coord, RANDOM_SERIAL).is_on is True
+    assert sensor.unique_id == f"{DOMAIN}_{RANDOM_SERIAL}_charging"
+
+
+@pytest.mark.parametrize(
+    ("suspended_status", "control_enabled"),
+    [("SUSPENDED_EV", True), ("SUSPENDED", True), ("SUSPENDED_EVSE", False)],
+)
+@pytest.mark.asyncio
+async def test_charging_binary_sensor_turns_off_when_vehicle_suspends(
+    hass, config_entry, coordinator_factory, suspended_status, control_enabled
+) -> None:
+    """Publish actual charging transitions through real coordinator refreshes."""
+    coord = coordinator_factory()
+    coord.summary.async_fetch = AsyncMock(return_value=[])
+    coord._async_resolve_charge_modes = AsyncMock(return_value={})
+    payload = {
+        "sn": RANDOM_SERIAL,
+        "name": "Garage EV",
+        "connected": True,
+        "pluggedIn": True,
+        "charging": True,
+        "connectorStatusType": "CHARGING",
+    }
+    coord.client.status = AsyncMock(return_value={"evChargerData": [payload]})
+    await coord.async_refresh()
+    component = EntityComponent(logging.getLogger(__name__), "binary_sensor", hass)
+    component._platforms["binary_sensor"].config_entry = config_entry
+    charging = ChargingBinarySensor(coord, RANDOM_SERIAL)
+    plugged = PluggedInBinarySensor(coord, RANDOM_SERIAL)
+    await component.async_add_entities([charging, plugged])
+    assert hass.states.get(charging.entity_id).state == "on"
+    assert hass.states.get(plugged.entity_id).state == "on"
+
+    # Enphase keeps the session/control enabled after the EV stops drawing power.
+    payload["connectorStatusType"] = suspended_status
+    await coord.async_refresh()
+    assert coord.data[RANDOM_SERIAL]["charging"] is control_enabled
+    assert coord.data[RANDOM_SERIAL]["actual_charging"] is False
+    assert hass.states.get(charging.entity_id).state == "off"
+    assert hass.states.get(charging.entity_id).attributes["icon"] == "mdi:flash-off"
+    assert hass.states.get(plugged.entity_id).state == "on"
+
+    coord.set_charging_expectation(RANDOM_SERIAL, True, hold_for=120)
+    await coord.async_refresh()
+    assert coord.data[RANDOM_SERIAL]["charging"] is True
+    assert hass.states.get(charging.entity_id).state == "off"
+    assert hass.states.get(plugged.entity_id).state == "on"
+
+    payload["connectorStatusType"] = "CHARGING"
+    await coord.async_refresh()
+    assert hass.states.get(charging.entity_id).state == "on"
+
+    payload.update(connectorStatusType="AVAILABLE", pluggedIn=False, charging=False)
+    await coord.async_refresh()
+    assert hass.states.get(charging.entity_id).state == "off"
+    assert hass.states.get(plugged.entity_id).state == "off"
+    await component.async_remove_entity(charging.entity_id)
+    await component.async_remove_entity(plugged.entity_id)
+    await coord.async_cleanup_runtime_state()
 
 
 def test_site_cloud_reachable_binary_sensor_metadata(
