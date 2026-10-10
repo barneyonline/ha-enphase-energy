@@ -228,6 +228,11 @@ class ChargingBinarySensor(_EVBoolSensor):
         super().__init__(coord, sn, "charging", "charging")
 
     @property
+    def is_on(self) -> bool:
+        # Control intent can remain enabled while the vehicle suspends charging.
+        return bool(self.data.get("actual_charging", self.data.get("charging")))
+
+    @property
     def icon(self) -> str | None:
         # Lightning bolt when charging, dimmed/off otherwise
         return "mdi:flash" if self.is_on else "mdi:flash-off"
