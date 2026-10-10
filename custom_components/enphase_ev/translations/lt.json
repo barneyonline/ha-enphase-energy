@@ -520,6 +520,9 @@
     },
     "ev_battery_update_unconfirmed": {
       "message": "Nepavyko patvirtinti baterijos naudojimo elektromobilio įkrovimui pakeitimo. Atnaujinkite nustatymus ir bandykite dar kartą."
+    },
+    "storm_alert_opt_in_failed": {
+      "message": "Nepavyko vėl įjungti {count} audros įspėjimų."
     }
   },
   "options": {
@@ -2700,6 +2703,9 @@
       },
       "battery_schedule_save": {
         "name": "Išsaugoti baterijos tvarkaraštį"
+      },
+      "storm_alert_opt_in": {
+        "name": "Vėl įjungti audros įspėjimą"
       }
     },
     "time": {
@@ -2884,6 +2890,48 @@
     "evse_status_unavailable": {
       "title": "Įkroviklio būsena nepasiekiama",
       "description": "Objekto {site_id} įkroviklio būsena grąžino HTTP {status}. Įkroviklio rodmenys ir valdymas nepasiekiami, kol bus gauta nauja būsena. Kitas bandymas: {next_retry}. Kiti galiniai taškai toliau apklausiami nepriklausomai."
+    },
+    "battery_profile_mismatch": {
+      "title": "Akumuliatoriaus profilio šaltiniai nesutampa",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Akumuliatoriaus profilio šaltiniai nesutampa",
+            "description": "Objekto {site_id} Enphase konfigūracija rodo {configured_profile}, o akumuliatoriaus būsena rodo {live_profile}. Naujausi rodmenys skiriasi ilgiau nei dešimt minučių. Patikrinkite dar kartą arba aiškiai išsiųskite akumuliatoriaus būsenos profilį. Profilis nėra automatiškai atkuriamas ar siunčiamas pakartotinai.",
+            "menu_options": {
+              "check_again": "Tikrinti dar kartą",
+              "retry_profile": "Pakartoti akumuliatoriaus būsenos profilį"
+            }
+          },
+          "pending": {
+            "title": "Akumuliatoriaus profilio šaltiniai nesutampa",
+            "description": "Objekto {site_id} Enphase konfigūracija rodo {configured_profile}, o akumuliatoriaus būsena rodo {live_profile}. Naujausi rodmenys skiriasi ilgiau nei dešimt minučių. Patikrinkite dar kartą arba aiškiai išsiųskite akumuliatoriaus būsenos profilį. Profilis nėra automatiškai atkuriamas ar siunčiamas pakartotinai.",
+            "menu_options": {
+              "check_again": "Tikrinti dar kartą",
+              "retry_profile": "Pakartoti akumuliatoriaus būsenos profilį"
+            }
+          },
+          "check_failed": {
+            "title": "Akumuliatoriaus profilio šaltiniai nesutampa",
+            "description": "Nepavyko pakartotinai išsiųsti profilio. Patikrinkite audros įspėjimus, ryšį ir paskyros teises.",
+            "menu_options": {
+              "check_again": "Tikrinti dar kartą",
+              "retry_profile": "Pakartoti akumuliatoriaus būsenos profilį"
+            }
+          },
+          "retry_profile": {
+            "title": "Pakartoti akumuliatoriaus būsenos profilį",
+            "description": "Siųsti {profile} su {reserve}% rezervu ir išsaugotais profilio nustatymais į Enphase? Tai atnaujina debesies konfigūraciją. Po siuntimo bus tikrinamas patvirtinimas. Pakartoti negalima esant aktyviam audros įspėjimui ar nežinomai būsenai."
+          }
+        },
+        "error": {
+          "cannot_retry": "Nepavyko pakartotinai išsiųsti profilio. Patikrinkite audros įspėjimus, ryšį ir paskyros teises."
+        },
+        "abort": {
+          "entry_unavailable": "Integracija neįkelta. Įkelkite ją ir vėl atidarykite šį taisymą.",
+          "request_changed": "Profilio neatitikimas arba nustatymai pasikeitė. Iš naujo atverkite dabartinį taisymą."
+        }
+      }
     }
   },
   "system_health": {

@@ -520,6 +520,9 @@
     },
     "ev_battery_update_unconfirmed": {
       "message": "No se pudo confirmar el cambio de uso de la batería para cargar el vehículo eléctrico. Actualiza los ajustes e inténtalo de nuevo."
+    },
+    "storm_alert_opt_in_failed": {
+      "message": "No se pudieron reactivar {count} alertas de tormenta."
     }
   },
   "options": {
@@ -2700,6 +2703,9 @@
       },
       "battery_schedule_save": {
         "name": "Guardar horario de la batería"
+      },
+      "storm_alert_opt_in": {
+        "name": "Reactivar alerta de tormenta"
       }
     },
     "time": {
@@ -2884,6 +2890,48 @@
     "evse_status_unavailable": {
       "title": "Estado del cargador no disponible",
       "description": "El estado del cargador del sitio {site_id} devolvió HTTP {status}. Las lecturas y los controles no están disponibles hasta recibir un estado actualizado. Próximo intento: {next_retry}. Los demás puntos de conexión se siguen consultando de forma independiente."
+    },
+    "battery_profile_mismatch": {
+      "title": "Las fuentes del perfil de batería no coinciden",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Las fuentes del perfil de batería no coinciden",
+            "description": "Para el sitio {site_id}, la configuración de Enphase indica {configured_profile}, mientras que el estado de la batería indica {live_profile}. Las lecturas recientes difieren desde hace más de diez minutos. Compruebe de nuevo o envíe explícitamente el perfil del estado de la batería. No se restaura ni reintenta ningún perfil automáticamente.",
+            "menu_options": {
+              "check_again": "Comprobar de nuevo",
+              "retry_profile": "Reenviar perfil del estado de la batería"
+            }
+          },
+          "pending": {
+            "title": "Las fuentes del perfil de batería no coinciden",
+            "description": "Para el sitio {site_id}, la configuración de Enphase indica {configured_profile}, mientras que el estado de la batería indica {live_profile}. Las lecturas recientes difieren desde hace más de diez minutos. Compruebe de nuevo o envíe explícitamente el perfil del estado de la batería. No se restaura ni reintenta ningún perfil automáticamente.",
+            "menu_options": {
+              "check_again": "Comprobar de nuevo",
+              "retry_profile": "Reenviar perfil del estado de la batería"
+            }
+          },
+          "check_failed": {
+            "title": "Las fuentes del perfil de batería no coinciden",
+            "description": "No se pudo reenviar el perfil. Compruebe las alertas de tormenta, la conexión y los permisos de la cuenta.",
+            "menu_options": {
+              "check_again": "Comprobar de nuevo",
+              "retry_profile": "Reenviar perfil del estado de la batería"
+            }
+          },
+          "retry_profile": {
+            "title": "Reenviar perfil del estado de la batería",
+            "description": "¿Enviar {profile} con una reserva del {reserve}% y sus ajustes de perfil guardados a Enphase? Esto actualiza la configuración en la nube. Se comprobará la confirmación después del envío. No se permite reintentar con una alerta de tormenta activa o de estado desconocido."
+          }
+        },
+        "error": {
+          "cannot_retry": "No se pudo reenviar el perfil. Compruebe las alertas de tormenta, la conexión y los permisos de la cuenta."
+        },
+        "abort": {
+          "entry_unavailable": "La integración no está cargada. Cárgala y vuelve a abrir esta reparación.",
+          "request_changed": "La discrepancia del perfil o los ajustes han cambiado. Abra de nuevo la reparación actual."
+        }
+      }
     }
   },
   "system_health": {

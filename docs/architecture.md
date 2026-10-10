@@ -254,6 +254,17 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   or overwrite newer readback, including after pending intent has cleared. Reads
   started after acceptance retain the normal configured/live profile precedence;
   this does not resolve disagreement between Enphase's backend data sources.
+  `battery_profile_mismatch.py` retains actual profile/status observations apart
+  from locally confirmed intent. Repeated recent disagreement for ten minutes
+  creates an entry-scoped Repair. Pending writes, unknown/conflicting modes,
+  stale sources, accepted writes and runtime retirement invalidate the recovery
+  context. Checks refresh both sources before deciding whether disagreement
+  has resolved; explicit retry freezes the displayed profile, reserve and subtype,
+  rechecks sources and alerts, and validates the
+  context again after permission I/O and acquiring the profile write lock.
+  Every storage record must supply a mode for recovery, and retries cannot
+  overlap pending Storm Alert commands. Opt-in rejects an in-flight profile write.
+  The monitor adds no polling or automatic writes; unload removes its Repair.
 - `evse_runtime.py` handles charger commands, fast polling, streaming, charge-mode cache, auth settings, and EVSE control side effects.
   Charge Mode selections retain the confirmed cache and publish requested intent
   independently. Pending requests bypass lookup caches, including when status
@@ -294,7 +305,11 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   edits use the confirmed profile and companion values shown by the controls.
   Charger configuration must return the requested setting's value; malformed
   payloads and unrelated keys cannot confirm a cached setting. Alert opt-out
-  confirmation requires explicit fresh alert state.
+  confirmation requires explicit fresh alert state. Opt-in additionally confirms
+  the targeted advisory IDs, skipping expired or unknown-expiry advisories, and
+  shares a conflict group with opt-out. Each advisory's expiry is checked again
+  before submission; advisories that expire during the batch are removed from
+  its confirmation targets.
   Endpoint success counters and EVSE cache generations
   distinguish successful reads from cached responses,
   failures, and write echoes. Diagnostic Update Status sensors report Pending,

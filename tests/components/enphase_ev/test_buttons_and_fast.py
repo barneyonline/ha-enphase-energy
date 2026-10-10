@@ -946,3 +946,14 @@ def test_battery_schedule_button_result_label_is_none_without_editor() -> None:
     button.hass = coord.hass
 
     assert button._schedule_result_label() is None  # noqa: SLF001
+
+
+async def test_storm_alert_opt_in_button_uses_coordinator(coordinator_factory):
+    from custom_components.enphase_ev.button import StormAlertOptInButton
+
+    coord = coordinator_factory()
+    coord.async_opt_in_all_storm_alerts = AsyncMock()
+    entity = StormAlertOptInButton(coord)
+    assert entity.unique_id.endswith("_storm_alert_opt_in")
+    await entity.async_press()
+    coord.async_opt_in_all_storm_alerts.assert_awaited_once_with()

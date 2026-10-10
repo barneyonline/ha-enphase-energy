@@ -520,6 +520,9 @@
     },
     "ev_battery_update_unconfirmed": {
       "message": "Ändringen av batterianvändning för elbilsladdning kunde inte bekräftas. Uppdatera inställningarna och försök igen."
+    },
+    "storm_alert_opt_in_failed": {
+      "message": "Kunde inte aktivera {count} stormvarningar igen."
     }
   },
   "options": {
@@ -2700,6 +2703,9 @@
       },
       "battery_schedule_save": {
         "name": "Spara batterischema"
+      },
+      "storm_alert_opt_in": {
+        "name": "Aktivera stormvarning igen"
       }
     },
     "time": {
@@ -2884,6 +2890,48 @@
     "evse_status_unavailable": {
       "title": "Laddarstatus är inte tillgänglig",
       "description": "Laddarstatus för anläggning {site_id} returnerade HTTP {status}. Laddarens mätvärden och styrning är inte tillgängliga tills aktuell status återkommer. Nästa försök: {next_retry}. Andra ändpunkter fortsätter att hämtas oberoende."
+    },
+    "battery_profile_mismatch": {
+      "title": "Batteriets profilkällor skiljer sig åt",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Batteriets profilkällor skiljer sig åt",
+            "description": "För anläggning {site_id} visar Enphase-konfigurationen {configured_profile}, medan batteristatus visar {live_profile}. Nya avläsningar har skiljt sig åt i mer än tio minuter. Kontrollera igen eller skicka uttryckligen profilen från batteristatus. Ingen profil återställs eller skickas igen automatiskt.",
+            "menu_options": {
+              "check_again": "Kontrollera igen",
+              "retry_profile": "Skicka profilen från batteristatus igen"
+            }
+          },
+          "pending": {
+            "title": "Batteriets profilkällor skiljer sig åt",
+            "description": "För anläggning {site_id} visar Enphase-konfigurationen {configured_profile}, medan batteristatus visar {live_profile}. Nya avläsningar har skiljt sig åt i mer än tio minuter. Kontrollera igen eller skicka uttryckligen profilen från batteristatus. Ingen profil återställs eller skickas igen automatiskt.",
+            "menu_options": {
+              "check_again": "Kontrollera igen",
+              "retry_profile": "Skicka profilen från batteristatus igen"
+            }
+          },
+          "check_failed": {
+            "title": "Batteriets profilkällor skiljer sig åt",
+            "description": "Kunde inte skicka profilen igen. Kontrollera stormvarningar, anslutningen och kontobehörigheterna.",
+            "menu_options": {
+              "check_again": "Kontrollera igen",
+              "retry_profile": "Skicka profilen från batteristatus igen"
+            }
+          },
+          "retry_profile": {
+            "title": "Skicka profilen från batteristatus igen",
+            "description": "Skicka {profile} med {reserve}% reserv och profilens sparade inställningar till Enphase? Detta uppdaterar molnkonfigurationen. Bekräftelsen kontrolleras efter att begäran skickats. Ny begäran är inte tillgänglig vid aktiv stormvarning eller okänd status."
+          }
+        },
+        "error": {
+          "cannot_retry": "Kunde inte skicka profilen igen. Kontrollera stormvarningar, anslutningen och kontobehörigheterna."
+        },
+        "abort": {
+          "entry_unavailable": "Integrationen är inte inläst. Läs in den och öppna den här reparationen igen.",
+          "request_changed": "Profilskillnaden eller inställningarna har ändrats. Öppna den aktuella reparationen igen."
+        }
+      }
     }
   },
   "system_health": {
