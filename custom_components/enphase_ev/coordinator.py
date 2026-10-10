@@ -1151,6 +1151,7 @@ class EnphaseCoordinator(
         """Retire this lifecycle before awaited shutdown steps release control."""
 
         self._runtime_stopped = True
+        self.battery_runtime.profile_mismatch.invalidate()
         runtime = getattr(self, "control_updates", None)
         if runtime:
             runtime.cleanup()
@@ -8869,6 +8870,9 @@ class EnphaseCoordinator(
             await self._async_refresh_storm_alert(force=force, raise_on_error=True)
             return
         await self._async_refresh_storm_alert(force=force)
+
+    async def async_opt_in_all_storm_alerts(self) -> None:
+        await self.battery_runtime.async_opt_in_all_storm_alerts()
 
     async def async_opt_out_all_storm_alerts(self) -> None:
         await self.battery_runtime.async_opt_out_all_storm_alerts()

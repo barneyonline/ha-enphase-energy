@@ -520,6 +520,9 @@
     },
     "ev_battery_update_unconfirmed": {
       "message": "The battery-to-EV update could not be confirmed. Refresh settings before retrying."
+    },
+    "storm_alert_opt_in_failed": {
+      "message": "Could not opt in to {count} Storm Alert(s)."
     }
   },
   "options": {
@@ -2749,6 +2752,9 @@
       },
       "evse_schedule_add": {
         "name": "Create new schedule"
+      },
+      "storm_alert_opt_in": {
+        "name": "Storm Alert opt-in"
       }
     },
     "update": {
@@ -2884,6 +2890,48 @@
     "evse_status_unavailable": {
       "title": "Charger status unavailable",
       "description": "Charger status for site {site_id} returned HTTP {status}. Charger readings and controls are unavailable until fresh status returns. Next retry: {next_retry}. Other endpoints continue polling independently."
+    },
+    "battery_profile_mismatch": {
+      "title": "Battery profile sources disagree",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Battery profile sources disagree",
+            "description": "For site {site_id}, Enphase configuration reports {configured_profile}, while battery status reports {live_profile}. Recent readings have disagreed for more than ten minutes. Check again or explicitly send the profile shown by battery status. No profile is restored or retried automatically.",
+            "menu_options": {
+              "check_again": "Check again",
+              "retry_profile": "Retry profile from battery status"
+            }
+          },
+          "pending": {
+            "title": "Battery profile sources disagree",
+            "description": "For site {site_id}, Enphase configuration reports {configured_profile}, while battery status reports {live_profile}. Recent readings have disagreed for more than ten minutes. Check again or explicitly send the profile shown by battery status. No profile is restored or retried automatically.",
+            "menu_options": {
+              "check_again": "Check again",
+              "retry_profile": "Retry profile from battery status"
+            }
+          },
+          "check_failed": {
+            "title": "Battery profile sources disagree",
+            "description": "Could not retry the profile. Check Storm Alerts, your connection and account permissions, then try again.",
+            "menu_options": {
+              "check_again": "Check again",
+              "retry_profile": "Retry profile from battery status"
+            }
+          },
+          "retry_profile": {
+            "title": "Retry profile from battery status",
+            "description": "Send {profile} with a {reserve}% reserve and its remembered profile settings to Enphase? This updates the cloud configuration. Confirmation will be checked after submission. Retry is unavailable while a Storm Alert is active or its state is unknown."
+          }
+        },
+        "error": {
+          "cannot_retry": "Could not retry the profile. Check Storm Alerts, your connection and account permissions, then try again."
+        },
+        "abort": {
+          "entry_unavailable": "The integration is not loaded. Load it and reopen this repair.",
+          "request_changed": "The profile disagreement or settings changed. Reopen the current repair."
+        }
+      }
     }
   },
   "system_health": {

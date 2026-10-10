@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import time
 from datetime import datetime, time as dt_time, timedelta
 from datetime import timezone as _tz
@@ -16,6 +17,7 @@ import aiohttp
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.util import dt as dt_util
 
+from .battery_profile_mismatch import BatteryProfileMismatch
 from .battery_schedule_editor import (
     BatteryScheduleRecord,
     battery_schedule_overlap_message,
@@ -120,6 +122,9 @@ class BatteryRuntime:
         self.health = RuntimeHealthServices(coordinator)
         self._state = state
         self.ev_preferences = EVBatteryPreferences(self)
+        self.profile_mismatch = BatteryProfileMismatch(self)
+        self.storm_alert_opt_in_targets: set[str] = set()
+        self.storm_alert_reads = 0
 
     @property
     def battery_state(self) -> BatteryState:
@@ -598,6 +603,7 @@ class BatteryRuntime:
         state._battery_profile_read_generation = (
             getattr(state, "_battery_profile_read_generation", 0) + 1
         )
+        self.profile_mismatch.invalidate()
         state._battery_pending_profile = profile
         state._battery_pending_reserve = reserve
         state._battery_pending_sub_type = self._normalize_pending_sub_type(
@@ -2281,6 +2287,7 @@ class BatteryRuntime:
         reserve: int,
         sub_type: str | None = None,
         require_exact_pending_match: bool = True,
+        expected_mismatch: str | None = None,
     ) -> None:
         coord = self.coordinator
         state = self.battery_state
@@ -2306,6 +2313,29 @@ class BatteryRuntime:
         ):
             normalized_sub_type = SAVINGS_OPERATION_MODE_SUBTYPE
         async with state._battery_profile_write_lock:
+            if expected_mismatch is not None:
+                self.profile_mismatch.require_current(expected_mismatch)
+                if (
+                    reserve != normalized_reserve
+                    or self.target_reserve_for_profile(normalized_profile) != reserve
+                    or self.target_operation_mode_sub_type(normalized_profile)
+                    != sub_type
+                ):
+                    self._raise_validation(
+                        "control_change_pending",
+                        message="Battery profile settings changed.",
+                    )
+                controls = getattr(coord, "control_updates", None)
+                if coord.storm_alert_active is not False or (
+                    controls is not None
+                    and (
+                        controls.pending("storm_alert_opt_in")
+                        or controls.pending("storm_alert_opt_out")
+                    )
+                ):
+                    self._raise_validation(
+                        "control_change_pending", message="Storm Alert state changed."
+                    )
             state._battery_profile_last_write_mono = time.monotonic()
             try:
                 await coord.client.set_battery_profile(
@@ -2762,6 +2792,7 @@ class BatteryRuntime:
                             ),
                         }
 
+        self.profile_mismatch.note_configured(profile)
         stale_profile_read = self._read_profile_is_stale_after_write(profile)
         if profile is not None and not stale_profile_read:
             state._battery_profile = profile
@@ -2819,6 +2850,7 @@ class BatteryRuntime:
             state._battery_live_profile = None
             state._battery_live_profile_label = None
             state._battery_live_profile_sample_utc = None
+            self.profile_mismatch.note_live(None)
             self._refresh_cached_topology()
             return
 
@@ -2838,9 +2870,11 @@ class BatteryRuntime:
         worst_status: str | None = None
         worst_severity = self._battery_status_severity_value("normal")
         live_profiles: list[tuple[str, str]] = []
+        complete_live_profiles = True
 
         for item in storage_items:
             if not isinstance(item, dict):
+                complete_live_profiles = False
                 continue
             raw_payload: dict[str, object] = {}
             for raw_key, raw_value in item.items():
@@ -2850,6 +2884,8 @@ class BatteryRuntime:
             live_profile = self.normalize_live_battery_mode_profile(live_label)
             if live_profile is not None and live_label is not None:
                 live_profiles.append((live_profile, live_label))
+            else:
+                complete_live_profiles = False
 
             excluded = self._coerce_optional_bool(raw_payload.get("excluded")) is True
             if excluded:
@@ -2951,6 +2987,11 @@ class BatteryRuntime:
             state._battery_live_profile = None
             state._battery_live_profile_label = None
             state._battery_live_profile_sample_utc = None
+        self.profile_mismatch.note_live(
+            state._battery_live_profile
+            if complete_live_profiles and len({p for p, _label in live_profiles}) <= 1
+            else None
+        )
         state._battery_aggregate_status_details = {
             "status": aggregate_status,
             "worst_storage_key": worst_key,
@@ -4235,12 +4276,29 @@ class BatteryRuntime:
                 raise
             return
         active = self.parse_storm_alert(payload)
+        if (
+            active is not None
+            and isinstance(payload, dict)
+            and isinstance(payload.get("stormAlerts"), list)
+        ):
+            self.storm_alert_reads += 1
         if active is not None:
             state._storm_alert_active = active
             if runtime:
                 runtime.observe(
                     "storm_alert_opt_out", None, {"active_alerts": active}, tokens
                 )
+        if (
+            runtime
+            and isinstance(payload, dict)
+            and isinstance(payload.get("stormAlerts"), list)
+        ):
+            runtime.observe(
+                "storm_alert_opt_in",
+                None,
+                {"opted_in_alerts": self.storm_alert_opt_in_confirmed_count()},
+                tokens,
+            )
         state._storm_alert_cache_until = now + STORM_ALERT_CACHE_TTL
         self.health.note_endpoint_family_success(family)
 
@@ -4352,6 +4410,35 @@ class BatteryRuntime:
             reserve=reserve,
             sub_type=sub_type,
             require_exact_pending_match=False,
+        )
+
+    @tracked_control(
+        "system_profile", arguments=("profile_key",), group="battery_profile"
+    )
+    async def async_retry_mismatched_profile(
+        self, *, profile_key: str, reserve: int, sub_type: str | None, identity: str
+    ) -> None:
+        self.profile_mismatch.require_current(identity)
+        if self.coordinator.storm_alert_active is not False:
+            self._raise_validation(
+                "control_change_pending",
+                message="Check Storm Alerts before retrying the profile.",
+            )
+        if profile_key not in self.coordinator.battery_profile_option_keys:
+            self._raise_validation(
+                "battery_profile_unsupported",
+                message="Selected battery profile is not supported.",
+            )
+        self._assert_battery_profile_feature_writable(
+            "Battery profile is unavailable.",
+            unavailable_key="battery_profile_unavailable",
+        )
+        await self.async_apply_battery_profile(
+            profile=profile_key,
+            reserve=reserve,
+            sub_type=sub_type,
+            require_exact_pending_match=False,
+            expected_mismatch=identity,
         )
 
     async def async_cancel_pending_profile_change(
@@ -5810,7 +5897,98 @@ class BatteryRuntime:
             )
         await self.async_apply_battery_settings({"veryLowSoc": normalized})
 
-    @tracked_control("storm_alert_opt_out", arguments=())
+    def storm_alert_can_opt_in(self, alert: dict[str, object]) -> bool:
+        status = coerce_optional_text(alert.get("status"))
+        end = coerce_optional_float(alert.get("endTime"))
+        return bool(
+            status
+            and status.lower().replace("_", "-") == "opted-out"
+            and end is not None
+            and math.isfinite(end)
+            and end > dt_util.utcnow().timestamp() * 1000
+        )
+
+    def storm_alert_opt_in_confirmed_count(self) -> int:
+        return len(
+            {
+                alert.get("id")
+                for alert in self.coordinator.storm_alerts
+                if isinstance(alert.get("id"), str)
+                and alert.get("id") in self.storm_alert_opt_in_targets
+                and coerce_optional_text(alert.get("status")) == "active"
+            }
+        )
+
+    @tracked_control("storm_alert_opt_in", arguments=(), group="storm_alert")
+    async def async_opt_in_all_storm_alerts(self) -> None:
+        coord = self.coordinator
+        if not coord.runtime_active:
+            return
+        self.storm_alert_opt_in_targets.clear()
+        runtime = getattr(coord, "control_updates", None)
+        if runtime:
+            runtime.set_requested("storm_alert_opt_in", {"opted_in_alerts": 0})
+        reads = self.storm_alert_reads
+        await coord.async_refresh_storm_alert(force=True, raise_on_error=True)
+        if not coord.runtime_active:
+            return
+        if self.storm_alert_reads == reads:
+            self._raise_validation(
+                "storm_guard_settings_unavailable",
+                message="Storm Alert state is unavailable.",
+            )
+        if self.battery_state._battery_profile_write_lock.locked():
+            self._raise_validation(
+                "battery_profile_update_in_progress",
+                message="Another battery profile update is already in progress.",
+            )
+        actionable: dict[str, dict[str, object]] = {}
+        for alert in coord.storm_alerts:
+            alert_id = coerce_optional_text(alert.get("id"))
+            if alert_id and self.storm_alert_can_opt_in(alert):
+                actionable[alert_id] = alert
+        if not actionable:
+            return
+        self.storm_alert_opt_in_targets = set(actionable)
+        runtime = getattr(coord, "control_updates", None)
+        if runtime:
+            runtime.set_requested(
+                "storm_alert_opt_in", {"opted_in_alerts": len(actionable)}
+            )
+        failures = 0
+        for alert_id, alert in actionable.items():
+            if not coord.runtime_active:
+                return
+            if not self.storm_alert_can_opt_in(alert):
+                self.storm_alert_opt_in_targets.discard(alert_id)
+                if runtime:
+                    runtime.set_requested(
+                        "storm_alert_opt_in",
+                        {"opted_in_alerts": len(self.storm_alert_opt_in_targets)},
+                    )
+                continue
+            name = coerce_optional_text(alert.get("name")) or "Storm Alert"
+            try:
+                await coord.client.opt_in_storm_alert(alert_id=alert_id, name=name)
+            except (aiohttp.ClientError, ServiceValidationError, TimeoutError):
+                failures += 1
+            if runtime:
+                runtime.invalidate_observations("storm_alert_opt_in")
+        if coord.runtime_active:
+            self.battery_state._storm_alert_cache_until = None
+            await coord.async_refresh_storm_alert(force=True, raise_on_error=True)
+            if not coord.runtime_active:
+                return
+            coord.kick_fast(FAST_TOGGLE_POLL_HOLD_S)
+            await coord.async_request_refresh()
+        if failures:
+            self._raise_validation(
+                "storm_alert_opt_in_failed",
+                placeholders={"count": str(failures)},
+                message=f"Storm Alert opt-in failed for {failures} alert(s).",
+            )
+
+    @tracked_control("storm_alert_opt_out", arguments=(), group="storm_alert")
     async def async_opt_out_all_storm_alerts(self) -> None:
         coord = self.coordinator
         await coord.async_refresh_storm_alert(force=True)

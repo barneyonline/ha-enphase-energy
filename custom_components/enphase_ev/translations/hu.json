@@ -520,6 +520,9 @@
     },
     "ev_battery_update_unconfirmed": {
       "message": "Az elektromos autó töltéséhez használt akkumulátor beállításának módosítását nem sikerült megerősíteni. Frissítse a beállításokat, majd próbálja újra."
+    },
+    "storm_alert_opt_in_failed": {
+      "message": "Nem sikerült újra feliratkozni {count} viharriasztásra."
     }
   },
   "options": {
@@ -2700,6 +2703,9 @@
       },
       "battery_schedule_save": {
         "name": "Akkumulátor-ütemezési mentés"
+      },
+      "storm_alert_opt_in": {
+        "name": "Újbóli feliratkozás viharriasztásra"
       }
     },
     "time": {
@@ -2884,6 +2890,48 @@
     "evse_status_unavailable": {
       "title": "A töltő állapota nem érhető el",
       "description": "A(z) {site_id} helyszín töltőállapota HTTP {status} választ adott. A töltő adatai és vezérlése nem érhetők el a friss állapot visszatéréséig. Következő próbálkozás: {next_retry}. A többi végpont lekérdezése egymástól függetlenül folytatódik."
+    },
+    "battery_profile_mismatch": {
+      "title": "Az akkumulátorprofil forrásai eltérnek",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Az akkumulátorprofil forrásai eltérnek",
+            "description": "A(z) {site_id} helyszínen az Enphase beállítása {configured_profile}, míg az akkumulátor állapota {live_profile} profilt jelez. A friss adatok több mint tíz perce eltérnek. Ellenőrizze újra, vagy kifejezetten küldje el az akkumulátor állapota szerinti profilt. Nincs automatikus visszaállítás vagy ismétlés.",
+            "menu_options": {
+              "check_again": "Újraellenőrzés",
+              "retry_profile": "Az akkumulátor állapota szerinti profil újraküldése"
+            }
+          },
+          "pending": {
+            "title": "Az akkumulátorprofil forrásai eltérnek",
+            "description": "A(z) {site_id} helyszínen az Enphase beállítása {configured_profile}, míg az akkumulátor állapota {live_profile} profilt jelez. A friss adatok több mint tíz perce eltérnek. Ellenőrizze újra, vagy kifejezetten küldje el az akkumulátor állapota szerinti profilt. Nincs automatikus visszaállítás vagy ismétlés.",
+            "menu_options": {
+              "check_again": "Újraellenőrzés",
+              "retry_profile": "Az akkumulátor állapota szerinti profil újraküldése"
+            }
+          },
+          "check_failed": {
+            "title": "Az akkumulátorprofil forrásai eltérnek",
+            "description": "Nem sikerült újraküldeni a profilt. Ellenőrizze a viharriasztásokat, a kapcsolatot és a fiók jogosultságait.",
+            "menu_options": {
+              "check_again": "Újraellenőrzés",
+              "retry_profile": "Az akkumulátor állapota szerinti profil újraküldése"
+            }
+          },
+          "retry_profile": {
+            "title": "Az akkumulátor állapota szerinti profil újraküldése",
+            "description": "Elküldi az Enphase számára a(z) {profile} profilt {reserve}% tartalékkal és a mentett profilbeállításokkal? Ez frissíti a felhőbeli beállítást. Küldés után a megerősítés ellenőrzése következik. Aktív viharriasztás vagy ismeretlen állapot esetén nem lehet újraküldeni."
+          }
+        },
+        "error": {
+          "cannot_retry": "Nem sikerült újraküldeni a profilt. Ellenőrizze a viharriasztásokat, a kapcsolatot és a fiók jogosultságait."
+        },
+        "abort": {
+          "entry_unavailable": "Az integráció nincs betöltve. Töltse be, és nyissa meg újra ezt a javítást.",
+          "request_changed": "A profilok eltérése vagy a beállítások megváltoztak. Nyissa meg újra a jelenlegi javítást."
+        }
+      }
     }
   },
   "system_health": {

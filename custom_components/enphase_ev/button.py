@@ -125,6 +125,10 @@ async def async_setup_entry(
         current_serials = {sn for sn in coord.iter_serials() if sn}
         if _retain_storm_alert_opt_out(coord):
             retain_site_entity_keys.add("storm_alert_opt_out")
+            retain_site_entity_keys.add("storm_alert_opt_in")
+            if "storm_alert_opt_in" not in site_entity_keys:
+                site_entities.append(StormAlertOptInButton(coord))
+                site_entity_keys.add("storm_alert_opt_in")
         if (
             "storm_alert_opt_out" not in site_entity_keys
             and _site_has_battery(coord)
@@ -196,6 +200,7 @@ async def async_setup_entry(
                 unique_id
                 in {
                     _site_button_unique_id("storm_alert_opt_out"),
+                    _site_button_unique_id("storm_alert_opt_in"),
                     _site_button_unique_id("battery_force_refresh"),
                     _site_button_unique_id("battery_schedule_save"),
                     _site_button_unique_id("battery_schedule_delete"),
@@ -246,6 +251,17 @@ class StormAlertOptOutButton(CoordinatorEntity, ButtonEntity):  # type: ignore[m
             identifiers={(DOMAIN, f"type:{self._coord.site_id}:envoy")},
             manufacturer="Enphase",
         )
+
+
+class StormAlertOptInButton(StormAlertOptOutButton):
+    _attr_translation_key = "storm_alert_opt_in"
+
+    def __init__(self, coord: EnphaseCoordinator) -> None:
+        super().__init__(coord)
+        self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_storm_alert_opt_in"
+
+    async def async_press(self) -> None:
+        await self._coord.async_opt_in_all_storm_alerts()
 
 
 class _BatteryScheduleButton(BatteryScheduleEditorEntity, ButtonEntity):  # type: ignore[misc]

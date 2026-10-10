@@ -520,6 +520,9 @@
     },
     "ev_battery_update_unconfirmed": {
       "message": "Modificarea utilizării bateriei pentru încărcarea vehiculului electric nu a putut fi confirmată. Actualizați setările și încercați din nou."
+    },
+    "storm_alert_opt_in_failed": {
+      "message": "Nu s-au putut reactiva {count} alerte de furtună."
     }
   },
   "options": {
@@ -2700,6 +2703,9 @@
       },
       "battery_schedule_save": {
         "name": "Salvare planificare baterie"
+      },
+      "storm_alert_opt_in": {
+        "name": "Reactivare alertă de furtună"
       }
     },
     "time": {
@@ -2884,6 +2890,48 @@
     "evse_status_unavailable": {
       "title": "Starea încărcătorului nu este disponibilă",
       "description": "Starea încărcătorului pentru locația {site_id} a returnat HTTP {status}. Citirile și comenzile nu sunt disponibile până la primirea unei stări actualizate. Următoarea încercare: {next_retry}. Celelalte puncte finale sunt interogate în continuare independent."
+    },
+    "battery_profile_mismatch": {
+      "title": "Sursele profilului bateriei nu concordă",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Sursele profilului bateriei nu concordă",
+            "description": "Pentru locația {site_id}, configurația Enphase indică {configured_profile}, iar starea bateriei indică {live_profile}. Citirile recente diferă de peste zece minute. Verificați din nou sau trimiteți explicit profilul din starea bateriei. Niciun profil nu este restaurat sau retrimis automat.",
+            "menu_options": {
+              "check_again": "Verifică din nou",
+              "retry_profile": "Retrimite profilul din starea bateriei"
+            }
+          },
+          "pending": {
+            "title": "Sursele profilului bateriei nu concordă",
+            "description": "Pentru locația {site_id}, configurația Enphase indică {configured_profile}, iar starea bateriei indică {live_profile}. Citirile recente diferă de peste zece minute. Verificați din nou sau trimiteți explicit profilul din starea bateriei. Niciun profil nu este restaurat sau retrimis automat.",
+            "menu_options": {
+              "check_again": "Verifică din nou",
+              "retry_profile": "Retrimite profilul din starea bateriei"
+            }
+          },
+          "check_failed": {
+            "title": "Sursele profilului bateriei nu concordă",
+            "description": "Profilul nu a putut fi retrimis. Verificați alertele de furtună, conexiunea și permisiunile contului.",
+            "menu_options": {
+              "check_again": "Verifică din nou",
+              "retry_profile": "Retrimite profilul din starea bateriei"
+            }
+          },
+          "retry_profile": {
+            "title": "Retrimite profilul din starea bateriei",
+            "description": "Trimiteți {profile} cu o rezervă de {reserve}% și setările de profil memorate către Enphase? Aceasta actualizează configurația din cloud. Confirmarea va fi verificată după trimitere. Retrimiterea nu este disponibilă cu o alertă de furtună activă sau cu stare necunoscută."
+          }
+        },
+        "error": {
+          "cannot_retry": "Profilul nu a putut fi retrimis. Verificați alertele de furtună, conexiunea și permisiunile contului."
+        },
+        "abort": {
+          "entry_unavailable": "Integrarea nu este încărcată. Încărcați-o și redeschideți această reparație.",
+          "request_changed": "Neconcordanța profilurilor sau setările s-au schimbat. Redeschideți reparația curentă."
+        }
+      }
     }
   },
   "system_health": {

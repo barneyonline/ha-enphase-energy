@@ -520,6 +520,9 @@
     },
     "ev_battery_update_unconfirmed": {
       "message": "Nie udało się potwierdzić zmiany użycia baterii do ładowania pojazdu elektrycznego. Odśwież ustawienia i spróbuj ponownie."
+    },
+    "storm_alert_opt_in_failed": {
+      "message": "Nie udało się ponownie włączyć {count} ostrzeżeń o burzy."
     }
   },
   "options": {
@@ -2700,6 +2703,9 @@
       },
       "battery_schedule_save": {
         "name": "Zapis harmonogramu baterii"
+      },
+      "storm_alert_opt_in": {
+        "name": "Ponownie włącz ostrzeżenie o burzy"
       }
     },
     "time": {
@@ -2884,6 +2890,48 @@
     "evse_status_unavailable": {
       "title": "Stan ładowarki niedostępny",
       "description": "Stan ładowarki dla instalacji {site_id} zwrócił HTTP {status}. Odczyty i sterowanie są niedostępne do czasu otrzymania aktualnego stanu. Następna próba: {next_retry}. Pozostałe punkty końcowe są nadal odpytywane niezależnie."
+    },
+    "battery_profile_mismatch": {
+      "title": "Źródła profilu akumulatora są niezgodne",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Źródła profilu akumulatora są niezgodne",
+            "description": "Dla instalacji {site_id} konfiguracja Enphase wskazuje {configured_profile}, a stan akumulatora wskazuje {live_profile}. Aktualne odczyty różnią się od ponad dziesięciu minut. Sprawdź ponownie lub jawnie wyślij profil ze stanu akumulatora. Żaden profil nie jest automatycznie przywracany ani ponawiany.",
+            "menu_options": {
+              "check_again": "Sprawdź ponownie",
+              "retry_profile": "Ponownie wyślij profil ze stanu akumulatora"
+            }
+          },
+          "pending": {
+            "title": "Źródła profilu akumulatora są niezgodne",
+            "description": "Dla instalacji {site_id} konfiguracja Enphase wskazuje {configured_profile}, a stan akumulatora wskazuje {live_profile}. Aktualne odczyty różnią się od ponad dziesięciu minut. Sprawdź ponownie lub jawnie wyślij profil ze stanu akumulatora. Żaden profil nie jest automatycznie przywracany ani ponawiany.",
+            "menu_options": {
+              "check_again": "Sprawdź ponownie",
+              "retry_profile": "Ponownie wyślij profil ze stanu akumulatora"
+            }
+          },
+          "check_failed": {
+            "title": "Źródła profilu akumulatora są niezgodne",
+            "description": "Nie udało się ponownie wysłać profilu. Sprawdź ostrzeżenia o burzy, połączenie i uprawnienia konta.",
+            "menu_options": {
+              "check_again": "Sprawdź ponownie",
+              "retry_profile": "Ponownie wyślij profil ze stanu akumulatora"
+            }
+          },
+          "retry_profile": {
+            "title": "Ponownie wyślij profil ze stanu akumulatora",
+            "description": "Wysłać do Enphase profil {profile} z rezerwą {reserve}% i zapisanymi ustawieniami profilu? Zaktualizuje to konfigurację w chmurze. Potwierdzenie zostanie sprawdzone po wysłaniu. Ponowienie jest niedostępne przy aktywnym ostrzeżeniu o burzy lub nieznanym stanie."
+          }
+        },
+        "error": {
+          "cannot_retry": "Nie udało się ponownie wysłać profilu. Sprawdź ostrzeżenia o burzy, połączenie i uprawnienia konta."
+        },
+        "abort": {
+          "entry_unavailable": "Integracja nie jest załadowana. Załaduj ją i ponownie otwórz tę naprawę.",
+          "request_changed": "Niezgodność profili lub ustawienia uległy zmianie. Otwórz ponownie bieżącą naprawę."
+        }
+      }
     }
   },
   "system_health": {

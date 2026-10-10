@@ -520,6 +520,9 @@
     },
     "ev_battery_update_unconfirmed": {
       "message": "Não foi possível confirmar a alteração do uso da bateria para carregamento do veículo elétrico. Atualize as configurações e tente novamente."
+    },
+    "storm_alert_opt_in_failed": {
+      "message": "Não foi possível reativar {count} alerta(s) de tempestade."
     }
   },
   "options": {
@@ -2700,6 +2703,9 @@
       },
       "battery_schedule_save": {
         "name": "Salvar agendamento da bateria"
+      },
+      "storm_alert_opt_in": {
+        "name": "Reativar alerta de tempestade"
       }
     },
     "time": {
@@ -2884,6 +2890,48 @@
     "evse_status_unavailable": {
       "title": "Status do carregador indisponível",
       "description": "O status do carregador da instalação {site_id} retornou HTTP {status}. As leituras e os controles ficam indisponíveis até receber um status atualizado. Próxima tentativa: {next_retry}. Os outros endpoints continuam sendo consultados de forma independente."
+    },
+    "battery_profile_mismatch": {
+      "title": "As fontes do perfil da bateria divergem",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "As fontes do perfil da bateria divergem",
+            "description": "Para o local {site_id}, a configuração da Enphase informa {configured_profile}, enquanto o estado da bateria informa {live_profile}. As leituras recentes divergem há mais de dez minutos. Verifique novamente ou envie explicitamente o perfil indicado pela bateria. Nenhum perfil é restaurado ou reenviado automaticamente.",
+            "menu_options": {
+              "check_again": "Verificar novamente",
+              "retry_profile": "Reenviar perfil do estado da bateria"
+            }
+          },
+          "pending": {
+            "title": "As fontes do perfil da bateria divergem",
+            "description": "Para o local {site_id}, a configuração da Enphase informa {configured_profile}, enquanto o estado da bateria informa {live_profile}. As leituras recentes divergem há mais de dez minutos. Verifique novamente ou envie explicitamente o perfil indicado pela bateria. Nenhum perfil é restaurado ou reenviado automaticamente.",
+            "menu_options": {
+              "check_again": "Verificar novamente",
+              "retry_profile": "Reenviar perfil do estado da bateria"
+            }
+          },
+          "check_failed": {
+            "title": "As fontes do perfil da bateria divergem",
+            "description": "Não foi possível reenviar o perfil. Verifique os alertas de tempestade, a conexão e as permissões da conta.",
+            "menu_options": {
+              "check_again": "Verificar novamente",
+              "retry_profile": "Reenviar perfil do estado da bateria"
+            }
+          },
+          "retry_profile": {
+            "title": "Reenviar perfil do estado da bateria",
+            "description": "Enviar {profile} com reserva de {reserve}% e as configurações de perfil salvas para a Enphase? Isso atualiza a configuração na nuvem. A confirmação será verificada após o envio. O reenvio não está disponível com um alerta de tempestade ativo ou estado desconhecido."
+          }
+        },
+        "error": {
+          "cannot_retry": "Não foi possível reenviar o perfil. Verifique os alertas de tempestade, a conexão e as permissões da conta."
+        },
+        "abort": {
+          "entry_unavailable": "A integração não está carregada. Carregue-a e reabra este reparo.",
+          "request_changed": "A divergência dos perfis ou as configurações mudaram. Reabra o reparo atual."
+        }
+      }
     }
   },
   "system_health": {

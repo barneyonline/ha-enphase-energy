@@ -520,6 +520,9 @@
     },
     "ev_battery_update_unconfirmed": {
       "message": "La modification de l’utilisation de la batterie pour la recharge du véhicule électrique n’a pas pu être confirmée. Actualisez les paramètres et réessayez."
+    },
+    "storm_alert_opt_in_failed": {
+      "message": "Impossible de réactiver {count} alerte(s) de tempête."
     }
   },
   "options": {
@@ -2700,6 +2703,9 @@
       },
       "battery_schedule_save": {
         "name": "Enregistrer le planning de batterie"
+      },
+      "storm_alert_opt_in": {
+        "name": "Réactiver une alerte de tempête"
       }
     },
     "time": {
@@ -2884,6 +2890,48 @@
     "evse_status_unavailable": {
       "title": "État du chargeur indisponible",
       "description": "L’état du chargeur du site {site_id} a renvoyé HTTP {status}. Les relevés et les commandes sont indisponibles jusqu’au retour de données actualisées. Prochaine tentative : {next_retry}. Les autres points de terminaison restent interrogés indépendamment."
+    },
+    "battery_profile_mismatch": {
+      "title": "Les sources du profil de batterie divergent",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Les sources du profil de batterie divergent",
+            "description": "Pour le site {site_id}, la configuration Enphase indique {configured_profile}, tandis que l’état de la batterie indique {live_profile}. Les relevés récents divergent depuis plus de dix minutes. Vérifiez à nouveau ou envoyez explicitement le profil indiqué par la batterie. Aucun profil n’est restauré ni renvoyé automatiquement.",
+            "menu_options": {
+              "check_again": "Vérifier à nouveau",
+              "retry_profile": "Renvoyer le profil indiqué par la batterie"
+            }
+          },
+          "pending": {
+            "title": "Les sources du profil de batterie divergent",
+            "description": "Pour le site {site_id}, la configuration Enphase indique {configured_profile}, tandis que l’état de la batterie indique {live_profile}. Les relevés récents divergent depuis plus de dix minutes. Vérifiez à nouveau ou envoyez explicitement le profil indiqué par la batterie. Aucun profil n’est restauré ni renvoyé automatiquement.",
+            "menu_options": {
+              "check_again": "Vérifier à nouveau",
+              "retry_profile": "Renvoyer le profil indiqué par la batterie"
+            }
+          },
+          "check_failed": {
+            "title": "Les sources du profil de batterie divergent",
+            "description": "Impossible de renvoyer le profil. Vérifiez les alertes de tempête, la connexion et les autorisations du compte.",
+            "menu_options": {
+              "check_again": "Vérifier à nouveau",
+              "retry_profile": "Renvoyer le profil indiqué par la batterie"
+            }
+          },
+          "retry_profile": {
+            "title": "Renvoyer le profil indiqué par la batterie",
+            "description": "Envoyer {profile} avec une réserve de {reserve}% et ses paramètres de profil mémorisés à Enphase ? Cela met à jour la configuration dans le cloud. La confirmation sera vérifiée après l’envoi. Le renvoi est indisponible si une alerte de tempête est active ou si son état est inconnu."
+          }
+        },
+        "error": {
+          "cannot_retry": "Impossible de renvoyer le profil. Vérifiez les alertes de tempête, la connexion et les autorisations du compte."
+        },
+        "abort": {
+          "entry_unavailable": "L’intégration n’est pas chargée. Chargez-la et rouvrez cette réparation.",
+          "request_changed": "La divergence des profils ou les paramètres ont changé. Rouvrez la réparation actuelle."
+        }
+      }
     }
   },
   "system_health": {

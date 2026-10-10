@@ -603,6 +603,11 @@ class CoordinatorDiagnostics:
                 coord, "_battery_use_battery_for_self_consumption", None
             ),
             "battery_profile_pending": coord.battery_profile_pending,
+            "battery_profile_mismatch": (
+                coord.battery_runtime.profile_mismatch.diagnostics()
+                if getattr(coord, "battery_runtime", None) is not None
+                else None
+            ),
             "battery_pending_profile": getattr(coord, "_battery_pending_profile", None),
             "battery_pending_reserve": getattr(coord, "_battery_pending_reserve", None),
             "battery_pending_sub_type": getattr(
@@ -1524,6 +1529,7 @@ class CoordinatorDiagnostics:
         )
 
     def sync_battery_profile_pending_issue(self) -> None:
+        self.coordinator.battery_runtime.profile_mismatch.sync()
         coord = self.coordinator
         pending_profile = getattr(coord, "_battery_pending_profile", None)
         requested_at = getattr(coord, "_battery_pending_requested_at", None)
