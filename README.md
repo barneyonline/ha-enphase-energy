@@ -44,6 +44,8 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - Heat-pump runtime status, connectivity, SG-Ready mode, power, and current-day consumption details sourced from HEMS endpoints
 - Site and battery energy telemetry, including Consumption Power calculated from the available power sensors, plus derived grid-import, grid-export, and battery power sensors for Home Assistant Energy Dashboard use
 - Battery System Profile changes still unconfirmed after ten minutes appear under **Settings → System → Repairs**. Open the repair to **Check again** using fresh cloud reads or **Cancel change** with confirmation. The former Cancel Pending Profile Change button is removed. Timeout does not automatically cancel a change.
+- Storm Alert Opt-In on IQ Gateway reactivates opted-out advisories that have a known future expiry. Opt-Out can leave the system in Full Backup: check the profile and reserve afterward and select your desired normal System Profile if needed.
+- If recent Enphase configuration and battery-status readings disagree on the profile for more than ten minutes, a Repair shows both profiles. **Check again** refreshes both sources; **Retry profile from battery status** shows the profile and reserve and requires confirmation before sending. Retries are blocked while a Storm Alert is active or unknown. Profiles are not restored or retried automatically.
 - Optional IQ Battery Scheduler controls and CFG, DTG, and RBD schedule sensors
 - Capability-gated PowerMatch cloud control for supported IQ Battery sites with permitted BatteryConfig write access
 - Optional current site weather on the Enphase Cloud device, created only when the authenticated Enphase weather endpoint is available

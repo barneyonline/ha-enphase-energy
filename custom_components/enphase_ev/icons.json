@@ -840,6 +840,9 @@
     "button": {
       "storm_alert_opt_out": {
         "default": "mdi:shield-off-outline"
+      },
+      "storm_alert_opt_in": {
+        "default": "mdi:shield-check-outline"
       }
     },
     "select": {

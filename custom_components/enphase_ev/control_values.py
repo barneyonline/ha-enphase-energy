@@ -204,6 +204,10 @@ def confirmed_control_values(
             ),
             "gateway_serial": serial,
         }
+    if control == "storm_alert_opt_in":
+        return {
+            "opted_in_alerts": coord.battery_runtime.storm_alert_opt_in_confirmed_count()
+        }
     if control == "storm_alert_opt_out":
         return {"active_alerts": getattr(coord, "storm_alert_active", None)}
     if control == "tariff":
@@ -306,6 +310,8 @@ def requested_control_values(
                 ]
             }
         )
+    if control == "storm_alert_opt_in":
+        return {"opted_in_alerts": 0}
     if control == "storm_alert_opt_out":
         return {"active_alerts": False}
     if control == "tariff":

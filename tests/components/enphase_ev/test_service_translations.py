@@ -1120,7 +1120,13 @@ def test_battery_profile_strings_localized_for_non_english_locales() -> None:
         / "translations"
     )
     en_data = json.loads((translations_dir / "en.json").read_text(encoding="utf-8"))
-    paths = _string_paths_under(en_data, "issues.battery_profile_pending.fix_flow") + [
+    paths = (
+        _string_paths_under(en_data, "issues.battery_profile_pending.fix_flow")
+        + _string_paths_under(en_data, "issues.battery_profile_mismatch.fix_flow")
+    ) + [
+        "entity.button.storm_alert_opt_in.name",
+        "exceptions.storm_alert_opt_in_failed.message",
+        "issues.battery_profile_mismatch.title",
         "entity.select.system_profile.name",
         "entity.number.battery_reserve.name",
         "entity.switch.savings_use_battery_after_peak.name",

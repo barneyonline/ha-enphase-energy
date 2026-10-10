@@ -520,6 +520,9 @@
     },
     "ev_battery_update_unconfirmed": {
       "message": "Aku kasutamise muudatust elektriauto laadimiseks ei saanud kinnitada. Värskenda seadeid ja proovi uuesti."
+    },
+    "storm_alert_opt_in_failed": {
+      "message": "{count} tormihoiatusega ei saanud uuesti liituda."
     }
   },
   "options": {
@@ -2700,6 +2703,9 @@
       },
       "battery_schedule_save": {
         "name": "Salvesta aku ajakava"
+      },
+      "storm_alert_opt_in": {
+        "name": "Tormihoiatusega uuesti liitumine"
       }
     },
     "time": {
@@ -2884,6 +2890,48 @@
     "evse_status_unavailable": {
       "title": "Laadija olek pole saadaval",
       "description": "Paigaldise {site_id} laadija olek tagastas HTTP {status}. Laadija näidud ja juhtimine pole saadaval, kuni saabuvad värsked olekuandmed. Järgmine katse: {next_retry}. Teisi lõpp-punkte küsitletakse jätkuvalt sõltumatult."
+    },
+    "battery_profile_mismatch": {
+      "title": "Aku profiili allikad ei ühti",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Aku profiili allikad ei ühti",
+            "description": "Asukoha {site_id} Enphase’i seadistus näitab {configured_profile}, kuid aku olek näitab {live_profile}. Värsked näidud on erinenud üle kümne minuti. Kontrollige uuesti või saatke aku olekus näidatud profiil selgesõnaliselt. Ühtegi profiili ei taastata ega saadeta automaatselt uuesti.",
+            "menu_options": {
+              "check_again": "Kontrolli uuesti",
+              "retry_profile": "Saada aku oleku profiil uuesti"
+            }
+          },
+          "pending": {
+            "title": "Aku profiili allikad ei ühti",
+            "description": "Asukoha {site_id} Enphase’i seadistus näitab {configured_profile}, kuid aku olek näitab {live_profile}. Värsked näidud on erinenud üle kümne minuti. Kontrollige uuesti või saatke aku olekus näidatud profiil selgesõnaliselt. Ühtegi profiili ei taastata ega saadeta automaatselt uuesti.",
+            "menu_options": {
+              "check_again": "Kontrolli uuesti",
+              "retry_profile": "Saada aku oleku profiil uuesti"
+            }
+          },
+          "check_failed": {
+            "title": "Aku profiili allikad ei ühti",
+            "description": "Profiili ei saanud uuesti saata. Kontrollige tormihoiatusi, ühendust ja konto õigusi.",
+            "menu_options": {
+              "check_again": "Kontrolli uuesti",
+              "retry_profile": "Saada aku oleku profiil uuesti"
+            }
+          },
+          "retry_profile": {
+            "title": "Saada aku oleku profiil uuesti",
+            "description": "Kas saata Enphase’ile {profile} reserviga {reserve}% ja salvestatud profiiliseadetega? See uuendab pilveseadistust. Pärast saatmist kontrollitakse kinnitust. Uuesti saatmine pole võimalik aktiivse tormihoiatuse või teadmata oleku korral."
+          }
+        },
+        "error": {
+          "cannot_retry": "Profiili ei saanud uuesti saata. Kontrollige tormihoiatusi, ühendust ja konto õigusi."
+        },
+        "abort": {
+          "entry_unavailable": "Integratsioon pole laaditud. Laadi see ja ava see parandus uuesti.",
+          "request_changed": "Profiilierinevus või seaded on muutunud. Avage praegune parandus uuesti."
+        }
+      }
     }
   },
   "system_health": {

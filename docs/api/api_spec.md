@@ -7122,7 +7122,7 @@ Implementation and remaining validation:
 - Existing charger switch identities are retained as aliases of this site preference when discovered. A single battery-system number owns the percentage. Sites without the new contract retain legacy GreenCharging behavior.
 - Intended for beta validation in the next release: the maintainer cannot validate successful EV preference changes on their own system. No live account requests or setting changes were performed during implementation.
 
-### 5.6 Storm Guard Alert Status, Opt-Out, and Toggle
+### 5.6 Storm Guard Alert Status, Opt-In, Opt-Out, and Toggle
 ```
 GET /service/batteryConfig/api/v1/stormGuard/<site_id>/stormAlert
 ```
@@ -7165,7 +7165,12 @@ Body: {
   ]
 }
 ```
-Opts out of a specific active Storm Guard alert.
+Opts out of a specific active Storm Guard alert. To opt back into an unexpired,
+opted-out advisory, use the same request with `status: "active"`. The first-party
+phone and web clients and successful response were captured in
+[issue #902](https://github.com/barneyonline/ha-enphase-energy/issues/902).
+The integration opt-in button targets only fresh opted-out advisories with a
+known future `endTime`; confirmation requires the targeted IDs to report active.
 
 Implementation auth notes:
 - The client routes this through the same compatibility pipeline as other
@@ -7204,7 +7209,19 @@ Notes:
 - `evseStormEnabled` controls EV charging behavior during Storm Guard alerts.
 - Live verification on 2026-09-11 confirmed HTTP `200` with `{"message":"success"}` for both `{"stormGuardState":"enabled","evseStormEnabled":false}` and `{"stormGuardState":"disabled","evseStormEnabled":false}`. The UI showed No Ongoing Alert while enabled; the alert GET returned the empty-alert example above. Restoring disabled did not clear the EV preference endpoint's `STORM_GUARD_ACTIVE` rejection (section 5.5.2).
 - Alert opt-out uses `PUT /stormGuard/<site_id>/stormAlert` with `status: "opted-out"` per alert ID.
-- Observed behavior: if that opt-out removes the last active Storm Alert and Storm Guard remains enabled, the system profile exits storm-driven Full Backup and returns to the normal configured profile.
+- Profile restoration after opt-out is inconsistent. Issue #902 reports successful
+  restoration through the phone app, but both the integration and Enlighten web
+  left Full Backup and a 100% reserve active after the advisory was opted out.
+  Check System Profile and battery status after opting out. If Full Backup remains,
+  explicitly select the desired normal profile; the integration does not infer or
+  restore a pre-storm profile automatically. `previousBatteryBackupPercentage`
+  remembers reserve values per profile, not the profile active before the storm.
+- BatteryConfig and battery status can continue disagreeing after a profile write.
+  Ten minutes of repeated, recent conflicting profile reads create a Repair with
+  Check again and an explicitly confirmed retry of the profile from battery status.
+  The confirmation displays the reserve and uses the normal guarded write path.
+  A retry needs successful fresh profile/status reads and no active or unknown
+  Storm Alert. No automatic write replay or change to source precedence is made.
 - Once enabled, the profile automatically switches to Full Backup during severe weather alerts and reserves full battery capacity.
 - The current client sends this write with the same BatteryConfig write flow as other mutations: acquire XSRF first, then send the official-web BatteryConfig shape plus `X-XSRF-Token`, using the primary `e-auth-token` + `requestid` variant first and the lean fallback after `403`.
 

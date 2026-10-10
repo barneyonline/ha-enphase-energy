@@ -8,7 +8,8 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
-- None
+- Add Storm Alert Opt-In on IQ Gateway for unexpired opted-out advisories, with confirmation of each targeted alert.
+- Add a Repair for persistent disagreement between Enphase configuration and battery status, offering fresh checks and an explicitly confirmed profile retry with the displayed reserve.
 
 ### 🐛 Bug fixes
 - Fix the EV charger Charging binary sensor remaining on when the vehicle suspends charging while still plugged in. Use actual charging telemetry instead of the charging control state, including while a Start request is awaiting confirmation.
@@ -16,6 +17,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🔧 Improvements
 - Add sanitized Production Power debug samples with source and receipt times to investigate cloud values that change within the same timestamp (#923).
+- Explain that Storm Alert opt-out can leave Full Backup active and may require a manual System Profile change. Correct the API documentation's assumption of automatic restoration.
 
 ### 🔄 Other changes
 - None

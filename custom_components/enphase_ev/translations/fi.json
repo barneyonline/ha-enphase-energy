@@ -520,6 +520,9 @@
     },
     "ev_battery_update_unconfirmed": {
       "message": "Akun käytön muutosta sähköauton lataukseen ei voitu vahvistaa. Päivitä asetukset ja yritä uudelleen."
+    },
+    "storm_alert_opt_in_failed": {
+      "message": "{count} myrskyvaroitusta ei voitu ottaa uudelleen käyttöön."
     }
   },
   "options": {
@@ -2700,6 +2703,9 @@
       },
       "battery_schedule_save": {
         "name": "Tallenna akun aikataulu"
+      },
+      "storm_alert_opt_in": {
+        "name": "Ota myrskyvaroitus uudelleen käyttöön"
       }
     },
     "time": {
@@ -2884,6 +2890,48 @@
     "evse_status_unavailable": {
       "title": "Laturin tila ei ole saatavilla",
       "description": "Kohteen {site_id} laturin tila palautti HTTP {status}. Laturin lukemat ja ohjaus eivät ole saatavilla ennen uusien tilatietojen saapumista. Seuraava yritys: {next_retry}. Muiden rajapintojen kysely jatkuu itsenäisesti."
+    },
+    "battery_profile_mismatch": {
+      "title": "Akkuprofiilin lähteet ovat ristiriidassa",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Akkuprofiilin lähteet ovat ristiriidassa",
+            "description": "Kohteen {site_id} Enphase-asetukset ilmoittavat {configured_profile}, mutta akun tila ilmoittaa {live_profile}. Tuoreet lukemat ovat poikenneet yli kymmenen minuuttia. Tarkista uudelleen tai lähetä akun tilan mukainen profiili erikseen. Profiilia ei palauteta eikä lähetetä uudelleen automaattisesti.",
+            "menu_options": {
+              "check_again": "Tarkista uudelleen",
+              "retry_profile": "Lähetä akun tilan profiili uudelleen"
+            }
+          },
+          "pending": {
+            "title": "Akkuprofiilin lähteet ovat ristiriidassa",
+            "description": "Kohteen {site_id} Enphase-asetukset ilmoittavat {configured_profile}, mutta akun tila ilmoittaa {live_profile}. Tuoreet lukemat ovat poikenneet yli kymmenen minuuttia. Tarkista uudelleen tai lähetä akun tilan mukainen profiili erikseen. Profiilia ei palauteta eikä lähetetä uudelleen automaattisesti.",
+            "menu_options": {
+              "check_again": "Tarkista uudelleen",
+              "retry_profile": "Lähetä akun tilan profiili uudelleen"
+            }
+          },
+          "check_failed": {
+            "title": "Akkuprofiilin lähteet ovat ristiriidassa",
+            "description": "Profiilia ei voitu lähettää uudelleen. Tarkista myrskyvaroitukset, yhteys ja tilin oikeudet.",
+            "menu_options": {
+              "check_again": "Tarkista uudelleen",
+              "retry_profile": "Lähetä akun tilan profiili uudelleen"
+            }
+          },
+          "retry_profile": {
+            "title": "Lähetä akun tilan profiili uudelleen",
+            "description": "Lähetetäänkö {profile}, {reserve}% varaus ja tallennetut profiiliasetukset Enphaseen? Tämä päivittää pilviasetukset. Vahvistus tarkistetaan lähetyksen jälkeen. Uudelleenlähetys ei ole mahdollista aktiivisen myrskyvaroituksen tai tuntemattoman tilan aikana."
+          }
+        },
+        "error": {
+          "cannot_retry": "Profiilia ei voitu lähettää uudelleen. Tarkista myrskyvaroitukset, yhteys ja tilin oikeudet."
+        },
+        "abort": {
+          "entry_unavailable": "Integraatiota ei ole ladattu. Lataa se ja avaa tämä korjaus uudelleen.",
+          "request_changed": "Profiilien ristiriita tai asetukset muuttuivat. Avaa nykyinen korjaus uudelleen."
+        }
+      }
     }
   },
   "system_health": {
