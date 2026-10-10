@@ -182,7 +182,7 @@ def test_current_power_consumption_sensor_expires_stale_cached_sample(monkeypatc
 
     assert sensor.available is True
 
-    stale_now = now + timedelta(seconds=886)
+    stale_now = now + timedelta(seconds=1186)
     coord.last_success_utc = stale_now
     monkeypatch.setattr(sensor_mod.dt_util, "utcnow", lambda: stale_now)
 
@@ -202,7 +202,7 @@ def test_current_power_consumption_sensor_freshness_fallback_paths(monkeypatch):
     monkeypatch.setattr(sensor_mod.dt_util, "utcnow", lambda: now)
 
     sensor = EnphaseCurrentPowerConsumptionSensor(coord)
-    assert sensor._cache_ttl() == timedelta(minutes=15)  # noqa: SLF001
+    assert sensor._cache_ttl() == timedelta(minutes=20)  # noqa: SLF001
     assert sensor._freshness_reference_utc() == now  # noqa: SLF001
 
     sensor._last_good_value = 1.0  # noqa: SLF001
