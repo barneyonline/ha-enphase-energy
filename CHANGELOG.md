@@ -11,10 +11,10 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Keep Production Power available when Enphase successfully repeats a near-zero overnight sample, while still expiring failed or invalid reads. Allow a 20-minute production freshness window to prevent dropouts at a 15-minute sample boundary (#923).
 
 ### 🔧 Improvements
-- None
+- Add sanitized Production Power debug samples with source and receipt times to investigate cloud values that change within the same timestamp (#923).
 
 ### 🔄 Other changes
 - None

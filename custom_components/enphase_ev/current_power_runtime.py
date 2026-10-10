@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Protocol
 from homeassistant.util import dt as dt_util
 
 from .api import InvalidPayloadError
-from .const import CURRENT_POWER_STALE_AFTER_S
+from .const import PRODUCTION_POWER_IDLE_MAX_W, PRODUCTION_POWER_STALE_AFTER_S
 from .log_redaction import redact_site_id, redact_text
 from .power_validation import ExtremePowerValidator
 
@@ -22,6 +22,19 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 CURRENT_POWER_CACHE_TTL_S = 60.0
 CURRENT_POWER_ENDPOINT_FAMILY = "current_power"
+
+
+def is_idle_power_sample(
+    value_w: float | None, sample_utc: datetime | None, received_utc: datetime
+) -> bool:
+    """Recognize a timestamped near-zero reading without trusting future clocks."""
+
+    return (
+        value_w is not None
+        and abs(value_w) <= PRODUCTION_POWER_IDLE_MAX_W
+        and sample_utc is not None
+        and sample_utc <= received_utc
+    )
 
 
 class CurrentPowerHost(Protocol):
@@ -277,28 +290,44 @@ class CurrentPowerRuntime:
         )
         self._validation_state = validation.state
         self._validation_reason = validation.reason
+        received_utc = dt_util.utcnow()
+        # Log only validated measurement fields, never raw bodies or identifiers.
+        _LOGGER.debug(
+            "Latest production power sample: value_w=%s, sampled_at_utc=%s, "
+            "received_at_utc=%s, reported_units=%s, reported_precision=%s, "
+            "validation_state=%s",
+            normalized_w,
+            sampled_at,
+            received_utc,
+            units,
+            precision,
+            validation.state,
+        )
         if not validation.accepted:
             self._cache_until_mono = now + CURRENT_POWER_CACHE_TTL_S
             self.using_stale = self._cached_state_present()
             coord.note_endpoint_family_success(CURRENT_POWER_ENDPOINT_FAMILY)
             return
 
-        received_utc = dt_util.utcnow()
         freshness_revision = self._sample.freshness_revision
-        if sampled_at is None or sampled_at != self._sample.sample_utc:
+        if (
+            sampled_at is None
+            or sampled_at != self._sample.sample_utc
+            or is_idle_power_sample(normalized_w, sampled_at, received_utc)
+        ):
             # A timestamp-less sample can recover with an identical value after
             # expiry. Publish that transition without notifying on every fetch.
             if (
                 self.received_utc is not None
                 and (received_utc - self.received_utc).total_seconds()
-                >= CURRENT_POWER_STALE_AFTER_S
+                >= PRODUCTION_POWER_STALE_AFTER_S
             ):
                 freshness_revision += 1
             self.received_utc = received_utc
         elif self.received_utc is None:
             self.received_utc = received_utc
-        # Repeated timestamped responses keep their original receipt bound;
-        # even a source clock in the future cannot perpetually renew freshness.
+        # Healthy near-zero responses can repeat overnight. Other timestamped
+        # responses retain their receipt bound, including future source clocks.
         self._sample = CurrentPowerSample(
             w=normalized_w,
             freshness_revision=freshness_revision,
