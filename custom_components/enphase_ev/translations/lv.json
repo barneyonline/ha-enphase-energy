@@ -520,6 +520,9 @@
     },
     "ev_battery_update_unconfirmed": {
       "message": "Neizdevās apstiprināt akumulatora izmantošanas izmaiņas elektroauto uzlādei. Atsvaidziniet iestatījumus un mēģiniet vēlreiz."
+    },
+    "storm_alert_opt_in_failed": {
+      "message": "Neizdevās atkal ieslēgt {count} vētras brīdinājumus."
     }
   },
   "options": {
@@ -2700,6 +2703,9 @@
       },
       "battery_schedule_save": {
         "name": "Saglabāt akumulatora grafiku"
+      },
+      "storm_alert_opt_in": {
+        "name": "Atkal ieslēgt vētras brīdinājumu"
       }
     },
     "time": {
@@ -2884,6 +2890,48 @@
     "evse_status_unavailable": {
       "title": "Lādētāja statuss nav pieejams",
       "description": "Objekta {site_id} lādētāja statuss atgrieza HTTP {status}. Rādījumi un vadība nav pieejami, līdz tiek saņemts aktuāls statuss. Nākamais mēģinājums: {next_retry}. Pārējo galapunktu aptauja turpinās neatkarīgi."
+    },
+    "battery_profile_mismatch": {
+      "title": "Akumulatora profila avoti nesakrīt",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Akumulatora profila avoti nesakrīt",
+            "description": "Objektam {site_id} Enphase konfigurācija rāda {configured_profile}, bet akumulatora statuss rāda {live_profile}. Jaunākie rādījumi atšķiras vairāk nekā desmit minūtes. Pārbaudiet vēlreiz vai skaidri nosūtiet akumulatora statusa profilu. Profils netiek automātiski atjaunots vai atkārtoti nosūtīts.",
+            "menu_options": {
+              "check_again": "Pārbaudīt vēlreiz",
+              "retry_profile": "Atkārtoti nosūtīt akumulatora statusa profilu"
+            }
+          },
+          "pending": {
+            "title": "Akumulatora profila avoti nesakrīt",
+            "description": "Objektam {site_id} Enphase konfigurācija rāda {configured_profile}, bet akumulatora statuss rāda {live_profile}. Jaunākie rādījumi atšķiras vairāk nekā desmit minūtes. Pārbaudiet vēlreiz vai skaidri nosūtiet akumulatora statusa profilu. Profils netiek automātiski atjaunots vai atkārtoti nosūtīts.",
+            "menu_options": {
+              "check_again": "Pārbaudīt vēlreiz",
+              "retry_profile": "Atkārtoti nosūtīt akumulatora statusa profilu"
+            }
+          },
+          "check_failed": {
+            "title": "Akumulatora profila avoti nesakrīt",
+            "description": "Neizdevās atkārtoti nosūtīt profilu. Pārbaudiet vētras brīdinājumus, savienojumu un konta atļaujas.",
+            "menu_options": {
+              "check_again": "Pārbaudīt vēlreiz",
+              "retry_profile": "Atkārtoti nosūtīt akumulatora statusa profilu"
+            }
+          },
+          "retry_profile": {
+            "title": "Atkārtoti nosūtīt akumulatora statusa profilu",
+            "description": "Vai nosūtīt {profile} ar {reserve}% rezervi un saglabātajiem profila iestatījumiem uz Enphase? Tas atjaunina mākoņa konfigurāciju. Pēc nosūtīšanas tiks pārbaudīts apstiprinājums. Atkārtošana nav pieejama aktīva vētras brīdinājuma vai nezināma statusa gadījumā."
+          }
+        },
+        "error": {
+          "cannot_retry": "Neizdevās atkārtoti nosūtīt profilu. Pārbaudiet vētras brīdinājumus, savienojumu un konta atļaujas."
+        },
+        "abort": {
+          "entry_unavailable": "Integrācija nav ielādēta. Ielādējiet to un atkārtoti atveriet šo labojumu.",
+          "request_changed": "Profila neatbilstība vai iestatījumi ir mainījušies. Atveriet pašreizējo labojumu vēlreiz."
+        }
+      }
     }
   },
   "system_health": {

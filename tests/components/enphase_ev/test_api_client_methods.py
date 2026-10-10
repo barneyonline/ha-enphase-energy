@@ -7155,7 +7155,8 @@ async def test_set_storm_guard_passes_payload_and_xsrf() -> None:
 
 
 @pytest.mark.asyncio
-async def test_opt_out_storm_alert_passes_payload_and_xsrf() -> None:
+@pytest.mark.parametrize("opt_in", [False, True])
+async def test_storm_alert_status_passes_payload_and_xsrf(opt_in) -> None:
     token = _make_token({"user_id": "99"})
     client = _make_client()
     client.update_credentials(
@@ -7164,7 +7165,8 @@ async def test_opt_out_storm_alert_passes_payload_and_xsrf() -> None:
     )
     client._json = _RequestMock(return_value={"message": "success"})
 
-    out = await client.opt_out_storm_alert(alert_id="IDV21037", name="Severe Weather")
+    write = client.opt_in_storm_alert if opt_in else client.opt_out_storm_alert
+    out = await write(alert_id="IDV21037", name="Severe Weather")
 
     assert out == {"message": "success"}
     args, kwargs = client._json.await_args
@@ -7173,7 +7175,11 @@ async def test_opt_out_storm_alert_passes_payload_and_xsrf() -> None:
     assert args[1].endswith("/stormAlert")
     assert kwargs["json"] == {
         "stormAlerts": [
-            {"id": "IDV21037", "name": "Severe Weather", "status": "opted-out"}
+            {
+                "id": "IDV21037",
+                "name": "Severe Weather",
+                "status": "active" if opt_in else "opted-out",
+            }
         ]
     }
     assert kwargs["headers"]["X-XSRF-Token"] == "xsrf-token"

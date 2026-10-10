@@ -520,6 +520,9 @@
     },
     "ev_battery_update_unconfirmed": {
       "message": "Die Änderung der Batterienutzung für EV-Laden konnte nicht bestätigt werden. Aktualisieren Sie die Einstellungen und versuchen Sie es erneut."
+    },
+    "storm_alert_opt_in_failed": {
+      "message": "{count} Sturmwarnungen konnten nicht wieder aktiviert werden."
     }
   },
   "options": {
@@ -2700,6 +2703,9 @@
       },
       "battery_schedule_save": {
         "name": "Speichern des Batterieplans"
+      },
+      "storm_alert_opt_in": {
+        "name": "Sturmwarnung wieder aktivieren"
       }
     },
     "time": {
@@ -2884,6 +2890,48 @@
     "evse_status_unavailable": {
       "title": "Ladestatus nicht verfügbar",
       "description": "Der Ladestatus für Anlage {site_id} lieferte HTTP {status}. Messwerte und Steuerung des Ladegeräts sind bis zum Empfang aktueller Statusdaten nicht verfügbar. Nächster Versuch: {next_retry}. Andere Endpunkte werden weiterhin unabhängig abgefragt."
+    },
+    "battery_profile_mismatch": {
+      "title": "Batterieprofilquellen stimmen nicht überein",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Batterieprofilquellen stimmen nicht überein",
+            "description": "Für Anlage {site_id} meldet die Enphase-Konfiguration {configured_profile}, der Batteriestatus dagegen {live_profile}. Aktuelle Messwerte widersprechen sich seit mehr als zehn Minuten. Prüfen Sie erneut oder senden Sie ausdrücklich das im Batteriestatus angezeigte Profil. Es wird kein Profil automatisch wiederhergestellt oder erneut gesendet.",
+            "menu_options": {
+              "check_again": "Erneut prüfen",
+              "retry_profile": "Profil aus dem Batteriestatus erneut senden"
+            }
+          },
+          "pending": {
+            "title": "Batterieprofilquellen stimmen nicht überein",
+            "description": "Für Anlage {site_id} meldet die Enphase-Konfiguration {configured_profile}, der Batteriestatus dagegen {live_profile}. Aktuelle Messwerte widersprechen sich seit mehr als zehn Minuten. Prüfen Sie erneut oder senden Sie ausdrücklich das im Batteriestatus angezeigte Profil. Es wird kein Profil automatisch wiederhergestellt oder erneut gesendet.",
+            "menu_options": {
+              "check_again": "Erneut prüfen",
+              "retry_profile": "Profil aus dem Batteriestatus erneut senden"
+            }
+          },
+          "check_failed": {
+            "title": "Batterieprofilquellen stimmen nicht überein",
+            "description": "Das Profil konnte nicht erneut gesendet werden. Prüfen Sie Sturmwarnungen, Verbindung und Kontoberechtigungen.",
+            "menu_options": {
+              "check_again": "Erneut prüfen",
+              "retry_profile": "Profil aus dem Batteriestatus erneut senden"
+            }
+          },
+          "retry_profile": {
+            "title": "Profil aus dem Batteriestatus erneut senden",
+            "description": "{profile} mit {reserve}% Reserve und den gespeicherten Profileinstellungen an Enphase senden? Dies aktualisiert die Cloud-Konfiguration. Die Bestätigung wird nach dem Senden geprüft. Bei aktiver Sturmwarnung oder unbekanntem Status ist kein erneutes Senden möglich."
+          }
+        },
+        "error": {
+          "cannot_retry": "Das Profil konnte nicht erneut gesendet werden. Prüfen Sie Sturmwarnungen, Verbindung und Kontoberechtigungen."
+        },
+        "abort": {
+          "entry_unavailable": "Die Integration ist nicht geladen. Lade sie und öffne diese Reparatur erneut.",
+          "request_changed": "Die Profilabweichung oder Einstellungen haben sich geändert. Öffnen Sie die aktuelle Reparatur erneut."
+        }
+      }
     }
   },
   "system_health": {

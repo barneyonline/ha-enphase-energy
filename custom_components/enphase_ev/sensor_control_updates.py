@@ -20,6 +20,7 @@ _GATEWAY_CONTROLS = frozenset(
         "system_profile",
         "storm_guard",
         "storm_alert_opt_out",
+        "storm_alert_opt_in",
         "tariff",
         "grid_profile",
         "grid_mode",

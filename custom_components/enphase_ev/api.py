@@ -1680,6 +1680,12 @@ class EnphaseEVClient(MqttStreamSurface):
             self, alert_id=alert_id, name=name
         )
 
+    async def opt_in_storm_alert(self, *, alert_id: str, name: str) -> JsonDict:
+        """Opt back into a specific Storm Guard advisory."""
+        return await api_battery_surface.opt_in_storm_alert(
+            self, alert_id=alert_id, name=name
+        )
+
     async def storm_guard_profile(self, *, locale: str | None = None) -> JsonDict:
         "Return Storm Guard state and EVSE settings for the site."
 

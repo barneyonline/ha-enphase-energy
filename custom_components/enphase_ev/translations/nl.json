@@ -520,6 +520,9 @@
     },
     "ev_battery_update_unconfirmed": {
       "message": "De wijziging van het batterijgebruik voor EV-laden kon niet worden bevestigd. Vernieuw de instellingen en probeer het opnieuw."
+    },
+    "storm_alert_opt_in_failed": {
+      "message": "Kon {count} stormwaarschuwingen niet opnieuw inschakelen."
     }
   },
   "options": {
@@ -2700,6 +2703,9 @@
       },
       "battery_schedule_save": {
         "name": "Batterijschema opslaan"
+      },
+      "storm_alert_opt_in": {
+        "name": "Stormwaarschuwing opnieuw inschakelen"
       }
     },
     "time": {
@@ -2884,6 +2890,48 @@
     "evse_status_unavailable": {
       "title": "Laadpaalstatus niet beschikbaar",
       "description": "De laadpaalstatus voor locatie {site_id} gaf HTTP {status}. Metingen en bediening zijn niet beschikbaar totdat actuele statusgegevens terugkeren. Volgende poging: {next_retry}. Andere eindpunten worden onafhankelijk verder opgevraagd."
+    },
+    "battery_profile_mismatch": {
+      "title": "Bronnen van het batterijprofiel verschillen",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Bronnen van het batterijprofiel verschillen",
+            "description": "Voor locatie {site_id} meldt de Enphase-configuratie {configured_profile}, terwijl de batterijstatus {live_profile} meldt. Recente metingen verschillen al meer dan tien minuten. Controleer opnieuw of verstuur expliciet het profiel uit de batterijstatus. Er wordt geen profiel automatisch hersteld of opnieuw verstuurd.",
+            "menu_options": {
+              "check_again": "Opnieuw controleren",
+              "retry_profile": "Profiel uit batterijstatus opnieuw versturen"
+            }
+          },
+          "pending": {
+            "title": "Bronnen van het batterijprofiel verschillen",
+            "description": "Voor locatie {site_id} meldt de Enphase-configuratie {configured_profile}, terwijl de batterijstatus {live_profile} meldt. Recente metingen verschillen al meer dan tien minuten. Controleer opnieuw of verstuur expliciet het profiel uit de batterijstatus. Er wordt geen profiel automatisch hersteld of opnieuw verstuurd.",
+            "menu_options": {
+              "check_again": "Opnieuw controleren",
+              "retry_profile": "Profiel uit batterijstatus opnieuw versturen"
+            }
+          },
+          "check_failed": {
+            "title": "Bronnen van het batterijprofiel verschillen",
+            "description": "Kon het profiel niet opnieuw versturen. Controleer stormwaarschuwingen, de verbinding en accountrechten.",
+            "menu_options": {
+              "check_again": "Opnieuw controleren",
+              "retry_profile": "Profiel uit batterijstatus opnieuw versturen"
+            }
+          },
+          "retry_profile": {
+            "title": "Profiel uit batterijstatus opnieuw versturen",
+            "description": "{profile} met {reserve}% reserve en de opgeslagen profielinstellingen naar Enphase versturen? Dit werkt de cloudconfiguratie bij. De bevestiging wordt na verzending gecontroleerd. Opnieuw versturen is niet beschikbaar bij een actieve stormwaarschuwing of onbekende status."
+          }
+        },
+        "error": {
+          "cannot_retry": "Kon het profiel niet opnieuw versturen. Controleer stormwaarschuwingen, de verbinding en accountrechten."
+        },
+        "abort": {
+          "entry_unavailable": "De integratie is niet geladen. Laad deze en open deze reparatie opnieuw.",
+          "request_changed": "Het profielverschil of de instellingen zijn gewijzigd. Open de huidige reparatie opnieuw."
+        }
+      }
     }
   },
   "system_health": {

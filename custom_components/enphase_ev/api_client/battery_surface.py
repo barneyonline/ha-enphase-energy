@@ -1485,31 +1485,38 @@ async def storm_guard_alert(self: EnphaseEVClient) -> JsonDict:
 async def opt_out_storm_alert(
     self: EnphaseEVClient, *, alert_id: str, name: str
 ) -> JsonDict:
-    """Opt out of a specific Storm Guard alert.
+    """Opt out of a specific Storm Guard alert."""
+    return await _set_storm_alert_status(
+        self,
+        alert_id=alert_id,
+        name=name,
+        status="opted-out",
+        intent="storm_alert_opt_out",
+    )
 
-    PUT /service/batteryConfig/api/v1/stormGuard/<site_id>/stormAlert
-    Body: {
-      "stormAlerts": [
-        {"id": "<alert_id>", "name": "<alert_name>", "status": "opted-out"}
-      ]
-    }
-    """
+
+async def opt_in_storm_alert(
+    self: EnphaseEVClient, *, alert_id: str, name: str
+) -> JsonDict:
+    """Opt back into a specific Storm Guard advisory."""
+    return await _set_storm_alert_status(
+        self, alert_id=alert_id, name=name, status="active", intent="storm_alert_opt_in"
+    )
+
+
+async def _set_storm_alert_status(
+    self: EnphaseEVClient, *, alert_id: str, name: str, status: str, intent: str
+) -> JsonDict:
     url = f"{BASE_URL}/service/batteryConfig/api/v1/stormGuard/{self._site}/stormAlert"
     payload: JsonDict = {
-        "stormAlerts": [
-            {
-                "id": str(alert_id),
-                "name": str(name),
-                "status": "opted-out",
-            }
-        ]
+        "stormAlerts": [{"id": str(alert_id), "name": str(name), "status": status}]
     }
     return await self._battery_config_write_request(
         "PUT",
         url,
         json_body=payload,
         endpoint_family="storm_alert",
-        write_intent="storm_alert_opt_out",
+        write_intent=intent,
     )
 
 

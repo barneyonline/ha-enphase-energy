@@ -520,6 +520,9 @@
     },
     "ev_battery_update_unconfirmed": {
       "message": "Ændringen af batteribrug til elbilopladning kunne ikke bekræftes. Opdater indstillingerne, og prøv igen."
+    },
+    "storm_alert_opt_in_failed": {
+      "message": "Kunne ikke tilmelde {count} stormvarsler."
     }
   },
   "options": {
@@ -2700,6 +2703,9 @@
       },
       "battery_schedule_save": {
         "name": "Batteritidsplanspare"
+      },
+      "storm_alert_opt_in": {
+        "name": "Tilmeld stormvarsel"
       }
     },
     "time": {
@@ -2884,6 +2890,48 @@
     "evse_status_unavailable": {
       "title": "Opladerstatus er utilgængelig",
       "description": "Opladerstatus for anlæg {site_id} returnerede HTTP {status}. Opladerens målinger og styring er utilgængelige, indtil frisk status modtages. Næste forsøg: {next_retry}. Andre slutpunkter forespørges fortsat uafhængigt."
+    },
+    "battery_profile_mismatch": {
+      "title": "Batteriets profilkilder er uenige",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Batteriets profilkilder er uenige",
+            "description": "For anlæg {site_id} viser Enphase-konfigurationen {configured_profile}, mens batteristatus viser {live_profile}. Nye målinger har været uenige i over ti minutter. Kontrollér igen, eller send udtrykkeligt profilen fra batteristatus. Ingen profil gendannes eller sendes igen automatisk.",
+            "menu_options": {
+              "check_again": "Kontrollér igen",
+              "retry_profile": "Send profilen fra batteristatus igen"
+            }
+          },
+          "pending": {
+            "title": "Batteriets profilkilder er uenige",
+            "description": "For anlæg {site_id} viser Enphase-konfigurationen {configured_profile}, mens batteristatus viser {live_profile}. Nye målinger har været uenige i over ti minutter. Kontrollér igen, eller send udtrykkeligt profilen fra batteristatus. Ingen profil gendannes eller sendes igen automatisk.",
+            "menu_options": {
+              "check_again": "Kontrollér igen",
+              "retry_profile": "Send profilen fra batteristatus igen"
+            }
+          },
+          "check_failed": {
+            "title": "Batteriets profilkilder er uenige",
+            "description": "Kunne ikke sende profilen igen. Kontrollér stormvarsler, forbindelsen og kontoens tilladelser.",
+            "menu_options": {
+              "check_again": "Kontrollér igen",
+              "retry_profile": "Send profilen fra batteristatus igen"
+            }
+          },
+          "retry_profile": {
+            "title": "Send profilen fra batteristatus igen",
+            "description": "Send {profile} med {reserve}% reserve og profilens gemte indstillinger til Enphase? Dette opdaterer konfigurationen i skyen. Bekræftelse kontrolleres efter afsendelse. Gentagelse er ikke tilgængelig, når et stormvarsel er aktivt eller status er ukendt."
+          }
+        },
+        "error": {
+          "cannot_retry": "Kunne ikke sende profilen igen. Kontrollér stormvarsler, forbindelsen og kontoens tilladelser."
+        },
+        "abort": {
+          "entry_unavailable": "Integrationen er ikke indlæst. Indlæs den, og åbn denne reparation igen.",
+          "request_changed": "Profilkonflikten eller indstillingerne er ændret. Åbn den aktuelle reparation igen."
+        }
+      }
     }
   },
   "system_health": {

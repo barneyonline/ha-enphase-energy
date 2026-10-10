@@ -520,6 +520,9 @@
     },
     "ev_battery_update_unconfirmed": {
       "message": "Změnu využití baterie pro elektromobil se nepodařilo potvrdit. Obnovte nastavení a zkuste to znovu."
+    },
+    "storm_alert_opt_in_failed": {
+      "message": "Nepodařilo se přihlásit k {count} výstrahám před bouří."
     }
   },
   "options": {
@@ -2700,6 +2703,9 @@
       },
       "battery_schedule_save": {
         "name": "Uložení rozvrhu baterie"
+      },
+      "storm_alert_opt_in": {
+        "name": "Přihlášení k výstraze před bouří"
       }
     },
     "time": {
@@ -2884,6 +2890,48 @@
     "evse_status_unavailable": {
       "title": "Stav nabíječky není dostupný",
       "description": "Stav nabíječky pro lokalitu {site_id} vrátil HTTP {status}. Hodnoty a ovládání nabíječky nejsou dostupné, dokud se neobnoví aktuální stav. Další pokus: {next_retry}. Ostatní koncové body se nadále dotazují nezávisle."
+    },
+    "battery_profile_mismatch": {
+      "title": "Zdroje profilu baterie se neshodují",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Zdroje profilu baterie se neshodují",
+            "description": "Pro lokalitu {site_id} uvádí konfigurace Enphase {configured_profile}, zatímco stav baterie uvádí {live_profile}. Aktuální údaje se liší déle než deset minut. Zkontrolujte stav znovu nebo výslovně odešlete profil ze stavu baterie. Žádný profil se neobnovuje ani neodesílá automaticky.",
+            "menu_options": {
+              "check_again": "Zkontrolovat znovu",
+              "retry_profile": "Znovu odeslat profil ze stavu baterie"
+            }
+          },
+          "pending": {
+            "title": "Zdroje profilu baterie se neshodují",
+            "description": "Pro lokalitu {site_id} uvádí konfigurace Enphase {configured_profile}, zatímco stav baterie uvádí {live_profile}. Aktuální údaje se liší déle než deset minut. Zkontrolujte stav znovu nebo výslovně odešlete profil ze stavu baterie. Žádný profil se neobnovuje ani neodesílá automaticky.",
+            "menu_options": {
+              "check_again": "Zkontrolovat znovu",
+              "retry_profile": "Znovu odeslat profil ze stavu baterie"
+            }
+          },
+          "check_failed": {
+            "title": "Zdroje profilu baterie se neshodují",
+            "description": "Profil se nepodařilo znovu odeslat. Zkontrolujte výstrahy před bouří, připojení a oprávnění účtu.",
+            "menu_options": {
+              "check_again": "Zkontrolovat znovu",
+              "retry_profile": "Znovu odeslat profil ze stavu baterie"
+            }
+          },
+          "retry_profile": {
+            "title": "Znovu odeslat profil ze stavu baterie",
+            "description": "Odeslat do Enphase profil {profile} s rezervou {reserve}% a uloženým nastavením profilu? Tím se změní konfigurace v cloudu. Po odeslání se ověří potvrzení. Opakování není dostupné při aktivní výstraze před bouří nebo neznámém stavu."
+          }
+        },
+        "error": {
+          "cannot_retry": "Profil se nepodařilo znovu odeslat. Zkontrolujte výstrahy před bouří, připojení a oprávnění účtu."
+        },
+        "abort": {
+          "entry_unavailable": "Integrace není načtena. Načtěte ji a znovu otevřete tuto opravu.",
+          "request_changed": "Neshoda profilů nebo nastavení se změnily. Znovu otevřete aktuální opravu."
+        }
+      }
     }
   },
   "system_health": {
