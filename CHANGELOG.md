@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Fix the EV charger Charging binary sensor remaining on when the vehicle suspends charging while still plugged in. Use actual charging telemetry instead of the charging control state, including while a Start request is awaiting confirmation.
 
 ### 🔧 Improvements
 - None
