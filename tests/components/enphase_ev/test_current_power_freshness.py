@@ -71,7 +71,7 @@ async def test_healthy_idle_sample_stays_available_overnight_then_expires(
     now[0] += timedelta(minutes=1)
     runtime._cache_until_mono = None
     await runtime.async_refresh()
-    now[0] += timedelta(minutes=19)
+    now[0] += timedelta(minutes=29)
     coord.last_success_utc = now[0]
     async_fire_time_changed(hass, now[0])
     await hass.async_block_till_done()
@@ -124,7 +124,7 @@ async def test_quarter_hour_samples_allow_delivery_delay(
         runtime._cache_until_mono = None
         await runtime.async_refresh()
         assert entity.available
-    now[0] = sampled_at + timedelta(minutes=20)
+    now[0] = sampled_at + timedelta(minutes=30)
     coord.last_success_utc = now[0]
     assert not entity.available
 
@@ -135,7 +135,7 @@ async def test_non_idle_old_sample_still_expires(
     coordinator_factory, monkeypatch, value
 ):
     now = [dt_util.utcnow()]
-    sampled_at = now[0] - timedelta(minutes=21)
+    sampled_at = now[0] - timedelta(minutes=31)
     monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
     coord = coordinator_factory()
     coord.last_success_utc = now[0]
@@ -219,7 +219,7 @@ async def test_current_power_expires_with_healthy_core_and_recovers(
     await runtime.async_refresh()
     # Equal data may suppress coordinator listeners: the entity's own timer
     # still publishes expiry, based on the original source timestamp.
-    now[0] += timedelta(seconds=1131)
+    now[0] += timedelta(seconds=1731)
     coord.last_success_utc = now[0]
     async_fire_time_changed(hass, now[0])
     await hass.async_block_till_done()
@@ -262,7 +262,7 @@ async def test_source_clock_and_missing_timestamp_cannot_extend_failed_sample(
     await coord.current_power_runtime.async_refresh()
     entity = EnphaseCurrentPowerConsumptionSensor(coord)
     assert entity.available is (timestamp != "old")
-    now[0] += timedelta(minutes=20)
+    now[0] += timedelta(minutes=30)
     coord.last_success_utc = now[0]
     assert not entity.available
     assert entity.native_value is None
@@ -374,7 +374,7 @@ async def test_identical_sample_recovers_after_expiry(
     await coord.async_refresh()
     listener.assert_not_called()
     # A skipped endpoint can expire without a failure changing aggregate health.
-    now[0] += timedelta(minutes=21)
+    now[0] += timedelta(minutes=31)
     coord.last_success_utc = now[0]
     async_fire_time_changed(hass, now[0])
     await hass.async_block_till_done()
@@ -408,7 +408,7 @@ async def test_repeated_future_source_timestamp_keeps_original_receipt_bound(
     received = runtime.received_utc
     entity = EnphaseCurrentPowerConsumptionSensor(coord)
     assert entity.available
-    for minutes in (5, 16):
+    for minutes in (5, 26):
         now[0] += timedelta(minutes=minutes)
         coord.last_success_utc = now[0]
         runtime._cache_until_mono = None
