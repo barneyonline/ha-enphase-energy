@@ -68,7 +68,7 @@ jobs:
               "4. For device-specific issues, open the affected device page and download diagnostics there as well",
               "",
               "Add the files to this issue or reply here once they are attached. When the missing details are provided, the `status/needs-diagnostics` label can be removed and triage can continue.",
-            ].join("\\n");
+            ].join("\n");
 
             if (existing) {
               await github.rest.issues.updateComment({
