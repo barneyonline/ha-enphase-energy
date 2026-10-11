@@ -8,6 +8,23 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v5.1.0 - 2026-10-11
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
 - Add Storm Alert Opt-In on IQ Gateway for unexpired opted-out advisories, with confirmation of each targeted alert.
 - Add a Repair for persistent disagreement between Enphase configuration and battery status, offering fresh checks and an explicitly confirmed profile retry with the displayed reserve.
 
@@ -21,7 +38,10 @@ All notable changes to this project will be documented in this file.
 - Explain that Storm Alert opt-out can leave Full Backup active and may require a manual System Profile change. Correct the API documentation's assumption of automatic restoration.
 
 ### 🔄 Other changes
-- None
+- Simplify the README feature and device summaries and remove the Screenshots, Descriptive Activity entries, and battery use for EV charging beta sections.
+- Update `multidict` from `6.7.1` to `6.9.1` in both pinned Docker validation environments. (#931)
+- Update the development and CI validation environment to Home Assistant `2026.10.0` with its matching test plugin and refreshed security dependencies, while retaining the Home Assistant `2026.9.0` minimum-version environment. (#932)
+- Bump the integration manifest version to `5.1.0`.
 
 ## v5.0.1 - 2026-10-08
 
