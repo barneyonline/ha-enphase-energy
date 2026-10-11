@@ -622,6 +622,17 @@ production acquisitions follow the production sensor's overnight rule. Missing
 inputs retain the last valid calculation only until its original expiry; fresh
 consumption buckets can supply the existing fallback.
 
+Consumption Power persists its last valid power balance in Home Assistant's
+restore data, separately from the consumption-bucket delta baseline. During
+startup, a restored balance can bridge missing source entities only for the
+remaining part of its original 30-minute freshness window. It exposes the original
+`sampled_at_utc` and `using_cached: true`; fresh published inputs take priority.
+Repeated restarts never renew the stored timestamp. Older display states can
+also restore a numeric balance when their units and every required contributing
+source clock are valid. Missing, future, expired, malformed or extreme restored
+readings remain unavailable. Display restoration does not authorize a new delta
+calculation from the restored watts or bypass bucket-baseline validation.
+
 `EnergyManager.site_energy_fetch_diagnostics` exposes detached, process-local
 attempt and cumulative failure counts, attempt/completion/success timestamps,
 and categorical outcomes. The last failure timestamp and category survive
