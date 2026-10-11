@@ -27,104 +27,26 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 ## Supported device categories
 
 - IQ Gateway / System Controller entities and controls
-- IQ Battery telemetry and BatteryConfig controls (where supported); Battery Overall Charge rounds down to a whole percentage (for example, 20.5% becomes 20%) to align with Enphase reporting
+- IQ Battery telemetry and BatteryConfig controls (where supported)
 - IQ EV Charger controls and session telemetry
 - IQ Microinverter connectivity, inventory, lifetime production, and optional installer-level parameter telemetry
 - Site and cloud energy telemetry (including supported HEMS channels such as Heat Pump and Water Heater lifetime energy)
 
 ## Key features
 
-- Guided onboarding for site selection and device-category enablement
-- Isolate charger-status server failures during startup and normal polling, keeping fresh battery and gateway readings available. Expose endpoint retry times and retain safe incident history across restarts; see [charger-status recovery](docs/architecture.md#charger-status-recovery).
-- Unified support for EV chargers, gateway, battery, and microinverter entities
-- Multi-gateway topology awareness for primary/default Gateway and phase selection
-- EV charging switch and session telemetry, including charge-mode aware behavior and persistent default charge-level controls when exposed by Enphase. Use the switch to start or stop charging, or the `enphase_ev.start_charging` and `enphase_ev.stop_charging` actions in automations. The Start Charging and Stop Charging button entities have been removed; replace `button.press` calls with `switch.turn_on` or `switch.turn_off`.
-- The EV charger **Charging** binary sensor follows actual charging telemetry and turns off when the vehicle suspends charging, even while **Plugged In** remains on. A pending Start request does not turn it on before charging is reported.
-- Advisory firmware update entities for gateway and EV charger devices with locale-aware release-note links; the gateway entity also monitors read-only live update progress, percentage, timing, and sanitized component status when Enphase exposes it
-- Heat-pump runtime status, connectivity, SG-Ready mode, power, and current-day consumption details sourced from HEMS endpoints
-- Site and battery energy telemetry, including Consumption Power calculated from the available power sensors, plus derived grid-import, grid-export, and battery power sensors for Home Assistant Energy Dashboard use
-- Battery System Profile changes still unconfirmed after ten minutes appear under **Settings → System → Repairs**. Open the repair to **Check again** using fresh cloud reads or **Cancel change** with confirmation. The former Cancel Pending Profile Change button is removed. Timeout does not automatically cancel a change.
-- Storm Alert Opt-In on IQ Gateway reactivates opted-out advisories that have a known future expiry. Opt-Out can leave the system in Full Backup: check the profile and reserve afterward and select your desired normal System Profile if needed.
-- If recent Enphase configuration and battery-status readings disagree on the profile for more than ten minutes, a Repair shows both profiles. **Check again** refreshes both sources; **Retry profile from battery status** shows the profile and reserve and requires confirmation before sending. Retries are blocked while a Storm Alert is active or unknown. Profiles are not restored or retried automatically.
-- Optional IQ Battery Scheduler controls and CFG, DTG, and RBD schedule sensors
-- Capability-gated PowerMatch cloud control for supported IQ Battery sites with permitted BatteryConfig write access
-- Optional current site weather on the Enphase Cloud device, created only when the authenticated Enphase weather endpoint is available
-- Independent per-microinverter Lifetime Energy and optional installer-level Power sensors are both off by default. Enable Lifetime Energy under Configure > Features > Device Features and Power under Advanced Features. Turning either feature off removes its per-inverter entities; turning it on discovers them again. These switches do not control the total array capacity sensors.
-- Microinverter power requests run before diagnostic parameters and are paced to avoid bursts. Power refreshes every 15 minutes; diagnostic parameters refresh hourly. A rate-limit response stops the remaining requests.
-- Site tariff visibility, editable rate entities, and tariff update actions
-- Optional installer-only Grid Profile Control through Enphase cloud Activation,
-  with country-scoped profile selection and current profile monitoring. Enable it
-  under Options > Features > Advanced Features; it is disabled by default and makes
-  no Grid Profile requests until enabled
-- Read-only Grid Mode monitoring with a guided, OTP-confirmed control workflow under Configure > Advanced > Grid Mode and admin-only actions for scripts
-- Administrator-only service actions for charger control, cloud reauthentication, live streaming, battery schedule changes, tariff updates, and Grid Profile application
-- Health diagnostics, service-availability tracking, persistent stored-credential login counters, and actionable repair issues
-- Read-only System Dashboard event and standing-alarm monitoring, including a
-  diagnostic Problem sensor with bounded sanitized event context and optional,
-  default-off Repair notifications sourced from authoritative standing alarms
-- A site-level System Event History calendar on the Enphase Cloud device, with
-  localized descriptions, bounded on-demand pagination, and identifier redaction
-- Optional read-only VPP/ELRP monitoring for enrolled sites, with a VPP Events
-  calendar and next-event start, end, type, subtype, and status sensors on the
-  Enphase Cloud device. Enable it under Options > Features > Device Features;
-  it is disabled by default and makes no VPP service requests until enabled
-- Detailed diagnostic and inventory entities remain available but are disabled by default when they are mainly useful for troubleshooting
-- Restored discovery data creates known entities early during startup; live power
-  acquisition starts alongside the minimal setup refresh and is attempted within
-  55 seconds, while optional feature data fills in incrementally afterward
-- Rate-conscious microinverter telemetry runs no more than once every 15 minutes,
-  uses limited-concurrency bulk reads, preserves fresh partial results, and
-  exposes power plus available AC/DC, frequency, temperature, signal, and
-  firmware details when available
-- Broad localization support across all user-facing integration strings
-
-Localized strings cover English (default plus US, Canada, Australia, New Zealand, and Ireland variants), French, German, Spanish, Italian, Dutch, Swedish, Danish, Finnish, Norwegian Bokmal, Polish, Greek, Romanian, Czech, Hungarian, Bulgarian, Latvian, Lithuanian, Estonian, and Brazilian Portuguese.
-
-## Screenshots
-
-Screenshots below are from a mixed Enphase site and show multiple supported device categories.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/setup-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/setup-light.png">
-  <img alt="Add integration flow showing category-based device selection (gateway, battery, EV chargers, and microinverters)" src="docs/images/setup-light.png">
-</picture>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/devices-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/devices-light.png">
-  <img alt="Device overview showing Enphase entities grouped across battery, EV charger, gateway, microinverters, and cloud" src="docs/images/devices-light.png">
-</picture>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/gateway-controls-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/gateway-controls-light.png">
-  <img alt="Gateway controls card with site operation controls" src="docs/images/gateway-controls-light.png">
-</picture>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/battery-controls-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/battery-controls-light.png">
-  <img alt="Battery controls card with profile and reserve controls" src="docs/images/battery-controls-light.png">
-</picture>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/microinverters-sensors-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/microinverters-sensors-light.png">
-  <img alt="Microinverter device sensors with per-inverter lifetime production telemetry" src="docs/images/microinverters-sensors-light.png">
-</picture>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/charger-controls-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/charger-controls-light.png">
-  <img alt="EV charger controls card with charge mode, amps control, and charge actions" src="docs/images/charger-controls-light.png">
-</picture>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/cloud-sensors-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/cloud-sensors-light.png">
-  <img alt="Cloud sensor entities with site-level energy and connectivity telemetry" src="docs/images/cloud-sensors-light.png">
-</picture>
+- Guided setup with site, device-category, and multi-gateway selection
+- Site and battery energy monitoring for the Home Assistant Energy Dashboard
+- EV charging controls, actual charging status, and session history
+- Battery profiles, reserve settings, schedules, and supported PowerMatch controls
+- Array monitoring and optional per-microinverter energy and power sensors
+- Heat-pump status, SG-Ready mode, and energy monitoring
+- Gateway and charger firmware information with release-note links
+- Editable tariffs, optional installer Grid Profile controls, and OTP-confirmed Grid Mode changes
+- Storm Alert controls and guided battery profile recovery through Repairs
+- System events, alarms, and calendars, plus optional VPP/ELRP monitoring
+- Optional site weather from Enphase
+- Cloud recovery, health diagnostics, and automation actions
+- User-facing strings localized in more than 20 languages
 
 ## Quick install (HACS)
 
@@ -147,36 +69,3 @@ Sign in with your Enlighten credentials; MFA is supported. See the wiki for deta
 
 Refer to the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki) for setup,
 configuration, and troubleshooting guidance.
-
-### Descriptive Activity entries
-
-Enable **Configure → Notifications → Enable Descriptive Activity Entries** to
-add reported condition details alongside normal Home Assistant Activity entries.
-The feature is **disabled by default**. See [Descriptive Activity entries](docs/descriptive_activity.md)
-for supported entities and behavior.
-
-### Battery use for EV charging (beta)
-
-On supported BatteryConfig sites, the existing **Use Battery for EV Charging**
-switch controls battery use for all EV chargers at the site. Existing switch IDs,
-customizations, and automations are retained; switches on multiple chargers reflect
-and change the same site preference. Sites without the new capability continue to
-use their legacy GreenCharging setting.
-
-The battery system gains one **Minimum battery for EV charging** number, with 1%
-steps and a minimum supplied by the site (10% and 20% have been observed). Its 100%
-ceiling follows the original feature request; it is not derived from backup reserve.
-Changing this number preserves whether battery use is enabled. Disabling preserves
-the threshold. If Enphase returns a disabled threshold of zero, the number is unknown
-until set; enabling uses the site's minimum. This threshold is separate from system
-backup reserve and does not prevent battery use by other home loads.
-
-Updates require confirmed battery write permission and fresh readback. Cloud errors,
-including `STORM_GUARD_ACTIVE` even when visible storm flags are off, are surfaced;
-an acknowledged write whose readback differs is not shown as applied. Missing fields
-after discovery make the controls unavailable instead of switching to the legacy API.
-The IQ EV Charger must stay connected to the IQ Gateway for the restrictions to hold.
-
-This feature is intended for beta testing in the next release because the maintainer
-cannot validate successful changes on their own system. See the
-[API capture evidence and remaining uncertainties](docs/api/api_spec.md#552-discharge-battery-to-ev).
