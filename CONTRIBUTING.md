@@ -48,13 +48,14 @@ Include the integration version, Home Assistant version, affected entity IDs, de
    ```
    Reuse the running container with `docker compose exec` for subsequent checks
    to avoid paying container startup costs on every command.
-   The default `ha-dev` lane pins Home Assistant 2026.9.0, the matching test
+   The default `ha-dev` lane pins Home Assistant 2026.10.0, the matching test
    plugin, and Linux/Python 3.14 transitive constraints in
    `devtools/docker/constraints-dev.txt`. Rebuild after changing requirements.
    The minimum supported Home Assistant version is 2026.9.0, paired with
    `pytest-homeassistant-custom-component==0.13.363`. The `ha-minimum` lane
-   covers this exact version; the default lane covers current stable Home
-   Assistant.
+   covers this exact version; the default lane covers the latest Home
+   Assistant version supported by the test plugin (currently
+   `pytest-homeassistant-custom-component==0.13.371`).
    To reproduce minimum-version coverage, run:
    ```bash
    docker compose -f devtools/docker/docker-compose.yml build ha-minimum
