@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Restore a recent Consumption Power balance after Home Assistant restarts while cloud power inputs warm up. Preserve the original sample timestamp and 30-minute expiry, and keep the cached reading separate from cumulative-energy baselines.
 
 ### 🔧 Improvements
 - Align cloud production, grid, battery, consumption and heat-pump power with a 30-minute freshness limit. Apply the same limit to individual battery charge alongside aggregate charge and available energy/power; retained consumption readings now expire from their contributing sample timestamps.

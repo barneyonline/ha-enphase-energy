@@ -199,7 +199,7 @@ class _SiteLifetimePowerRestoreData(ExtraStoredData):  # type: ignore[misc]
 
 @dataclass
 class _SiteConsumptionPowerRestoreData(ExtraStoredData):  # type: ignore[misc]
-    """Persist a validated site-consumption bucket baseline across restarts."""
+    """Persist validated consumption baselines and the last power balance."""
 
     latest_bucket_wh: float | None
     raw_bucket_count: int | None
@@ -210,6 +210,8 @@ class _SiteConsumptionPowerRestoreData(ExtraStoredData):  # type: ignore[misc]
     last_window_seconds: float | None
     method: str | None
     power_sample_ts: float | None = None
+    balance_power_w: int | None = None
+    balance_sample_ts: float | None = None
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -226,6 +228,8 @@ class _SiteConsumptionPowerRestoreData(ExtraStoredData):  # type: ignore[misc]
                 if self.power_sample_ts is not None
                 else self.energy_ts
             ),
+            "balance_power_w": self.balance_power_w,
+            "balance_sample_ts": self.balance_sample_ts,
         }
 
     @classmethod
@@ -245,6 +249,7 @@ class _SiteConsumptionPowerRestoreData(ExtraStoredData):  # type: ignore[misc]
 
         start_date = data.get("start_date")
         method = data.get("method")
+        balance = _as_float(data.get("balance_power_w"))
         return cls(
             latest_bucket_wh=_as_float(data.get("latest_bucket_wh")),
             raw_bucket_count=_as_int(data.get("raw_bucket_count")),
@@ -257,6 +262,15 @@ class _SiteConsumptionPowerRestoreData(ExtraStoredData):  # type: ignore[misc]
             power_sample_ts=_as_float(
                 data.get("power_sample_ts", data.get("energy_ts"))
             ),
+            balance_power_w=(
+                int(balance)
+                if balance is not None
+                and balance >= 0
+                and balance.is_integer()
+                and not isinstance(data.get("balance_power_w"), bool)
+                else None
+            ),
+            balance_sample_ts=_as_float(data.get("balance_sample_ts")),
         )
 
 
@@ -1564,6 +1578,8 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         restored = _SiteConsumptionPowerRestoreData.from_dict(
             last_extra.as_dict() if last_extra is not None else None
         )
+        await self._async_restore_power_balance(restored)
+        self._schedule_freshness_expiry()
         if (
             restored.latest_bucket_wh is None
             or restored.latest_bucket_wh < 0
@@ -1594,6 +1610,62 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._restored_pending_validation = True
         self._using_cached = restored.power_sample_ts != restored.energy_ts
         self._schedule_freshness_expiry()
+
+    async def _async_restore_power_balance(
+        self, restored: _SiteConsumptionPowerRestoreData
+    ) -> None:
+        """Bridge startup with a recent reading, independently of delta baselines."""
+        if self._balance_power_w is not None:
+            return
+        power_w = restored.balance_power_w
+        timestamp = restored.balance_sample_ts
+        if power_w is None and timestamp is None:
+            # Older versions recorded the balance and its contributing clocks
+            # in the display state. Restore watts with HA's stored unit.
+            last_state = await self.async_get_last_state()
+            if (
+                last_state is None
+                or last_state.attributes.get("method") != "power_balance"
+            ):
+                return
+            source_times = last_state.attributes.get("source_sampled_at_utc")
+            if not isinstance(source_times, dict):
+                return
+            keys = {"current_production_power", "grid_power"}
+            if (
+                self._coord.battery_has_encharge is not False
+                or self._coord.battery_has_acb is not False
+            ):
+                keys.add("battery_power")
+            timestamps = [
+                _EnphaseSiteLifetimePowerSensor._parse_sample_timestamp(
+                    source_times.get(key)
+                )
+                for key in keys
+            ]
+            if any(
+                stamp is None
+                or not math.isfinite(stamp)
+                or stamp <= 0
+                or self._timestamp_age_seconds(stamp) < 0
+                for stamp in timestamps
+            ):
+                return
+            timestamp = min(stamp for stamp in timestamps if stamp is not None)
+            power_w = restore_power_w(last_state)
+        if (
+            power_w is None
+            or not 0 <= power_w < EXTREME_SITE_POWER_W
+            or timestamp is None
+            or timestamp <= 0
+            or not 0
+            <= self._timestamp_age_seconds(timestamp)
+            < CURRENT_POWER_STALE_AFTER_S
+        ):
+            return
+        self._balance_power_w = power_w
+        self._balance_power_ts = timestamp
+        self._balance_using_cached = True
 
     @staticmethod
     def _coerce_nonnegative_float(value: object) -> float | None:
@@ -1948,6 +2020,13 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         if self._balance_power_w is not None:
             return {
                 "method": "power_balance",
+                "sampled_at_utc": (
+                    datetime.fromtimestamp(
+                        self._balance_power_ts, tz=timezone.utc
+                    ).isoformat()
+                    if self._balance_power_ts is not None
+                    else None
+                ),
                 "source_entities": dict(self._balance_sources),
                 "source_sampled_at_utc": dict(self._balance_source_times),
                 "using_cached": self._balance_using_cached,
@@ -1975,6 +2054,8 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             last_window_seconds=self._last_window_s,
             method=self._last_method,
             power_sample_ts=self._last_power_ts,
+            balance_power_w=self._balance_power_w,
+            balance_sample_ts=self._balance_power_ts,
         )
 
 
