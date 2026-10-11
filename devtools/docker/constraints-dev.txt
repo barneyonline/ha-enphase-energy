@@ -81,7 +81,7 @@ license-expression==30.4.3
 lru-dict==1.4.1
 mashumaro==3.22
 mock-open==1.4.0
-multidict==6.7.1
+multidict==6.9.1
 mypy==2.2.0
 mypy_extensions==1.1.0
 nodeenv==1.10.0
