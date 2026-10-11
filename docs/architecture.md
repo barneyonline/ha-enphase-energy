@@ -621,6 +621,10 @@ the oldest contributing sample bounds its 30-minute expiry. Successful near-zero
 production acquisitions follow the production sensor's overnight rule. Missing
 inputs retain the last valid calculation only until its original expiry; fresh
 consumption buckets can supply the existing fallback.
+Grid and Battery Power expose `freshness_reference_utc` separately from their
+calculation timestamp, so consumption also respects the oldest contributing flow
+when import/export or charge/discharge clocks differ. Stale numeric candidates
+cannot overwrite a still-valid retained balance or its original deadline.
 
 Consumption Power persists its last valid power balance in Home Assistant's
 restore data, separately from the consumption-bucket delta baseline. During

@@ -132,6 +132,27 @@ async def test_live_startup_reading_takes_priority_over_restore(
     await component.async_remove_entity(sensor.entity_id)
 
 
+@pytest.mark.parametrize("power_w", [0, 2000])
+async def test_stale_startup_inputs_do_not_replace_fresh_restore(
+    hass, config_entry, coordinator_factory, monkeypatch, power_w
+):
+    now = dt_util.utcnow()
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now)
+    coord = coordinator_factory()
+    publish_power(hass, coord, now - timedelta(minutes=31))
+    sampled_at = now - timedelta(minutes=5)
+    sensor, component = await add_sensor(
+        hass,
+        config_entry,
+        coord,
+        extra=stored_balance(sampled_at, balance_power_w=power_w),
+    )
+    assert hass.states.get(sensor.entity_id).state == str(power_w)
+    assert sensor.extra_state_attributes["sampled_at_utc"] == sampled_at.isoformat()
+    assert sensor.extra_state_attributes["using_cached"] is True
+    await component.async_remove_entity(sensor.entity_id)
+
+
 @pytest.mark.parametrize(
     "changes",
     [
