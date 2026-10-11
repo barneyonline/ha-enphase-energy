@@ -133,7 +133,13 @@ async def test_lifetime_power_expires_and_recovers_with_healthy_core(
     component._platforms["sensor"].config_entry = config_entry
     await component.async_add_entities([entity])
     assert hass.states.get(entity.entity_id).state == "6000"
-    now[0] += timedelta(days=1)
+    accepted_at = now[0]
+    now[0] = accepted_at + timedelta(seconds=1799)
+    coord.last_success_utc = now[0]
+    async_fire_time_changed(hass, now[0])
+    await hass.async_block_till_done()
+    assert hass.states.get(entity.entity_id).state == "6000"
+    now[0] = accepted_at + timedelta(seconds=1800)
     coord.last_success_utc = now[0]
     async_fire_time_changed(hass, now[0])
     await hass.async_block_till_done()
@@ -148,6 +154,58 @@ async def test_lifetime_power_expires_and_recovers_with_healthy_core(
     assert hass.states.get(entity.entity_id).state != "unavailable"
     assert entity._cancel_freshness_expiry is not None
     await component.async_remove_entity(entity.entity_id)
+
+
+async def test_individual_battery_charge_expires_and_recovers(
+    hass, coordinator_factory, config_entry, monkeypatch
+):
+    from custom_components.enphase_ev.sensor_battery import (
+        EnphaseBatteryStorageChargeSensor,
+        EnphaseBatteryStorageHealthSensor,
+    )
+
+    now = [dt_util.utcnow()]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.sensor_battery._type_available",
+        lambda *_args: True,
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.sensor_base.inventory_type_available",
+        lambda *_args: True,
+    )
+    coord = coordinator_factory()
+    coord.update_interval = None
+    coord.last_success_utc = now[0]
+    monkeypatch.setattr(
+        coord, "battery_storage", lambda _serial: {"current_charge_pct": 75, "soh": 95}
+    )
+    coord.note_endpoint_family_success("battery_status")
+    charge = EnphaseBatteryStorageChargeSensor(coord, "test-battery")
+    charge.entity_id = "sensor.battery_charge"
+    health = EnphaseBatteryStorageHealthSensor(coord, "test-battery")
+    health.entity_id = "sensor.battery_health"
+    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    component._platforms["sensor"].config_entry = config_entry
+    await component.async_add_entities([charge, health])
+    accepted_at = now[0]
+    now[0] += timedelta(seconds=1799)
+    coord.last_success_utc = now[0]
+    async_fire_time_changed(hass, now[0])
+    await hass.async_block_till_done()
+    assert hass.states.get(charge.entity_id).state == "75.0"
+    now[0] = accepted_at + timedelta(seconds=1800)
+    async_fire_time_changed(hass, now[0])
+    await hass.async_block_till_done()
+    assert hass.states.get(charge.entity_id).state == "unavailable"
+    assert hass.states.get(health.entity_id).state == "95.0"
+    coord.note_endpoint_family_success("battery_status")
+    coord.async_update_listeners()
+    await hass.async_block_till_done()
+    assert hass.states.get(charge.entity_id).state == "75.0"
+    assert charge._cancel_freshness_expiry is not None
+    await component.async_remove_entity(charge.entity_id)
+    await component.async_remove_entity(health.entity_id)
 
 
 @pytest.mark.parametrize("clock", [None, "future", "infinite"])
@@ -170,7 +228,7 @@ def test_lifetime_power_missing_or_invalid_clock_is_bounded(
     }
     entity = EnphaseGridPowerSensor(coord)
     assert entity.available is (clock is None)
-    now[0] += timedelta(minutes=16)
+    now[0] += timedelta(minutes=31)
     coord.last_success_utc = now[0]
     assert not entity.available
     # Restarted/restored history cannot renew the fallback grace period.
@@ -192,7 +250,7 @@ def test_lifetime_power_oldest_source_metadata_and_core_deadlines(
         "grid_import": {"value_kwh": 1, "last_report_date": now},
         "grid_export": {
             "value_kwh": 1,
-            "last_report_date": now - timedelta(minutes=16),
+            "last_report_date": now - timedelta(minutes=31),
         },
     }
     entity = EnphaseGridPowerSensor(coord)
@@ -201,14 +259,14 @@ def test_lifetime_power_oldest_source_metadata_and_core_deadlines(
     coord.energy.site_energy = {}
     coord.energy._site_energy_meta = {
         "bucket_lengths": {"import": 1},
-        "last_report_date": now - timedelta(minutes=16),
+        "last_report_date": now - timedelta(minutes=31),
     }
     assert not entity.available
     coord.energy._site_energy_meta["last_report_date"] = now
     assert entity.available
     # The source deadline cannot extend the existing core-outage grace period.
     coord.last_update_success = False
-    coord.last_success_utc = now - timedelta(minutes=14)
+    coord.last_success_utc = now - timedelta(minutes=29)
     assert entity._freshness_deadline() == now + timedelta(minutes=1)
 
 

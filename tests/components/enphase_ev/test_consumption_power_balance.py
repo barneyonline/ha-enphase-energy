@@ -1,11 +1,14 @@
 """Consumption responds to published power readings without a bucket warmup."""
 
 import logging
+from datetime import timedelta
 from unittest.mock import AsyncMock
 from homeassistant.helpers.entity_component import EntityComponent
 
 import pytest
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.enphase_ev.const import DOMAIN
 from custom_components.enphase_ev.sensor_site_energy import (
@@ -161,3 +164,142 @@ async def test_balance_bypasses_restored_bucket_validation(hass, coordinator_fac
     assert sensor.available
     assert sensor.native_value == 1992
     assert not coord.energy.consumption_power_diagnostics["restored_pending_validation"]
+
+
+async def test_balance_timer_uses_oldest_sample_and_recovers(
+    hass, config_entry, coordinator_factory, monkeypatch
+):
+    now = [dt_util.utcnow()]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+    coord = coordinator_factory()
+    coord.update_interval = None
+    coord.last_success_utc = now[0]
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    sensor.entity_id = "sensor.consumption_expiry"
+    sensor.async_get_last_extra_data = AsyncMock(return_value=None)
+    accepted_at = now[0]
+    keys = ("current_production_power", "grid_power", "battery_power")
+    entities = [source(hass, coord, key, 1000) for key in keys]
+
+    def publish(source_time):
+        for entity_id in entities:
+            hass.states.async_set(
+                entity_id,
+                1000,
+                {
+                    "unit_of_measurement": "W",
+                    "sampled_at_utc": source_time.isoformat(),
+                    "cached_at_utc": now[0].isoformat(),
+                },
+            )
+
+    publish(accepted_at)
+    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    component._platforms["sensor"].config_entry = config_entry
+    await component.async_add_entities([sensor])
+    assert hass.states.get(sensor.entity_id).state == "3000"
+    now[0] += timedelta(seconds=1799)
+    publish(accepted_at)
+    async_fire_time_changed(hass, now[0])
+    await hass.async_block_till_done()
+    assert hass.states.get(sensor.entity_id).state == "3000"
+    # Successful acquisitions and attribute changes cannot renew non-idle watts.
+    now[0] += timedelta(seconds=1)
+    publish(accepted_at)
+    async_fire_time_changed(hass, now[0])
+    await hass.async_block_till_done()
+    assert hass.states.get(sensor.entity_id).state == "unavailable"
+    # Updating just one contributing sample cannot renew the whole balance.
+    hass.states.async_set(
+        entities[0],
+        1000,
+        {"unit_of_measurement": "W", "sampled_at_utc": now[0].isoformat()},
+    )
+    await hass.async_block_till_done()
+    assert hass.states.get(sensor.entity_id).state == "unavailable"
+    publish(now[0])
+    await hass.async_block_till_done()
+    assert hass.states.get(sensor.entity_id).state == "3000"
+    assert sensor._cancel_freshness_expiry is not None
+    # Missing data retains only the bounded last valid calculation.
+    hass.states.async_set(entities[1], "unavailable")
+    await hass.async_block_till_done()
+    assert hass.states.get(sensor.entity_id).state == "3000"
+    now[0] += timedelta(minutes=30)
+    async_fire_time_changed(hass, now[0])
+    await hass.async_block_till_done()
+    assert hass.states.get(sensor.entity_id).state == "unavailable"
+    await component.async_remove_entity(sensor.entity_id)
+
+
+@pytest.mark.parametrize("clock", ["nan", "inf", -1, 1e100])
+@pytest.mark.parametrize("attribute", ["sampled_at_utc", "cached_at_utc"])
+async def test_invalid_balance_clock_cannot_seed(
+    hass, coordinator_factory, clock, attribute
+):
+    coord = coordinator_factory()
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    sensor.hass = hass
+    entity_id = source(hass, coord, "current_production_power", 1000)
+    source(hass, coord, "grid_power", 0)
+    source(hass, coord, "battery_power", 0)
+    hass.states.async_set(
+        entity_id, 1000, {"unit_of_measurement": "W", attribute: clock}
+    )
+    assert not sensor.available
+    assert sensor.native_value is None
+
+
+async def test_idle_production_and_acquisition_bound_balance(
+    hass, coordinator_factory, monkeypatch
+):
+    now = dt_util.utcnow()
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now)
+    coord = coordinator_factory()
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    sensor.hass = hass
+    production = source(hass, coord, "current_production_power", 0)
+    source(hass, coord, "grid_power", 1000)
+    source(hass, coord, "battery_power", 0)
+    attrs = {
+        "unit_of_measurement": "W",
+        "sampled_at_utc": (now - timedelta(hours=6)).isoformat(),
+        "cached_at_utc": now.isoformat(),
+    }
+    hass.states.async_set(production, 0, attrs)
+    assert sensor.available
+    assert sensor.native_value == 1000
+    # A fresh source clock cannot hide a stale acquisition; a missing clock also
+    # follows acquisition rather than a recent HA attribute publication.
+    attrs["cached_at_utc"] = (now - timedelta(minutes=30)).isoformat()
+    attrs["sampled_at_utc"] = now.isoformat()
+    hass.states.async_set(production, 1000, attrs)
+    assert not sensor.available
+    attrs.pop("sampled_at_utc")
+    hass.states.async_set(production, 1000, attrs)
+    assert not sensor.available
+
+
+async def test_future_ha_publication_cannot_seed_missing_source_clock(
+    hass, coordinator_factory, monkeypatch
+):
+    from homeassistant.core import State
+
+    now = dt_util.utcnow()
+    coord = coordinator_factory()
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    sensor.hass = hass
+    for key in ("current_production_power", "grid_power", "battery_power"):
+        source(hass, coord, key, 1000)
+    monkeypatch.setattr(
+        type(hass.states),
+        "get",
+        lambda _self, entity_id: State(
+            entity_id,
+            "1000",
+            {"unit_of_measurement": "W"},
+            last_updated=now + timedelta(days=1),
+        ),
+    )
+    assert not sensor.available
+    assert sensor.native_value is None

@@ -9,7 +9,6 @@ from typing import Any, TypedDict, cast
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
-    SensorEntity,
     SensorStateClass,
 )
 from homeassistant.helpers.entity import EntityCategory
@@ -17,6 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import EnphaseCoordinator
+from .sensor_base import EnphaseSiteSensorEntity
 from .runtime_helpers import (
     inventory_type_available as _type_available,
     inventory_type_device_info as _type_device_info,
@@ -113,8 +113,9 @@ class BatterySensorModel:
         return _type_device_info(self.coordinator, "encharge")
 
 
-class _EnphaseBatteryStorageBaseSensor(CoordinatorEntity, SensorEntity):  # type: ignore[misc]
+class _EnphaseBatteryStorageBaseSensor(EnphaseSiteSensorEntity):
     _attr_has_entity_name = True
+    _expire_battery_charge = False
     _unrecorded_attributes = frozenset(
         {"serial_number", "status", "sampled_at_utc", "state"}
     )
@@ -122,7 +123,9 @@ class _EnphaseBatteryStorageBaseSensor(CoordinatorEntity, SensorEntity):  # type
     def __init__(
         self, coord: EnphaseCoordinator, serial: str, unique_suffix: str
     ) -> None:
-        super().__init__(coord)
+        super().__init__(
+            coord, f"battery_{serial}{unique_suffix}", "", type_key="encharge"
+        )
         self._coord = coord
         self._sn = str(serial)
         self._model = BatterySensorModel(coord, self._sn)
@@ -150,7 +153,17 @@ class _EnphaseBatteryStorageBaseSensor(CoordinatorEntity, SensorEntity):  # type
     def available(self) -> bool:
         if not self._model.available:
             return False
-        return bool(super().available and self._snapshot() is not None)
+        available = (
+            super().available
+            if self._expire_battery_charge
+            else CoordinatorEntity.available.fget(self)
+        )
+        return bool(available and self._snapshot() is not None)
+
+    def _freshness_deadline(self) -> datetime | None:
+        if not self._expire_battery_charge:
+            return None
+        return super()._freshness_deadline()
 
     @property
     def _battery_label(self) -> str:
@@ -185,6 +198,7 @@ class EnphaseBatteryStorageChargeSensor(_EnphaseBatteryStorageBaseSensor):
     """Per-battery state-of-charge sensor under the shared battery type device."""
 
     _attr_translation_key = "battery_storage_charge"
+    _expire_battery_charge = True
     _attr_device_class = SensorDeviceClass.BATTERY
     _attr_native_unit_of_measurement = "%"
     _attr_state_class = SensorStateClass.MEASUREMENT

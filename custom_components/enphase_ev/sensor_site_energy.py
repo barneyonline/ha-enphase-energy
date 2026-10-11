@@ -1422,6 +1422,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             type_key=None,
         )
         self._balance_power_w: int | None = None
+        self._balance_power_ts: float | None = None
         self._balance_sources: dict[str, str] = {}
         self._balance_using_cached = False
         self._balance_source_times: dict[str, object] = {}
@@ -1451,6 +1452,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
     @callback
     def _power_source_changed(self, event: Event) -> None:
         if self._power_source_key(event.data["entity_id"]) is not None:
+            self._schedule_freshness_expiry()
             self.async_write_ha_state()
 
     def _update_power_balance(self) -> None:
@@ -1461,6 +1463,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         registry = er.async_get(self.hass)
         sources: dict[str, str] = {}
         source_times: dict[str, object] = {}
+        timestamps: list[float] = []
         total = 0.0
         for key in ("current_production_power", "grid_power", "battery_power"):
             entity_id = registry.async_get_entity_id(
@@ -1487,10 +1490,57 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
                 return
             if not math.isfinite(value):
                 return
+            raw_source_ts = state.attributes.get("sampled_at_utc")
+            raw_received_ts = state.attributes.get("cached_at_utc")
+            source_ts = _EnphaseSiteLifetimePowerSensor._parse_sample_timestamp(
+                raw_source_ts
+            )
+            received_ts = _EnphaseSiteLifetimePowerSensor._parse_sample_timestamp(
+                raw_received_ts
+            )
+            for raw_timestamp, timestamp in (
+                (raw_source_ts, source_ts),
+                (raw_received_ts, received_ts),
+            ):
+                if raw_timestamp is not None and (
+                    timestamp is None
+                    or not math.isfinite(timestamp)
+                    or timestamp <= 0
+                    or self._timestamp_is_too_far_in_future(timestamp)
+                ):
+                    return
+            if (
+                key == "current_production_power"
+                and received_ts is not None
+                and is_idle_power_sample(
+                    value,
+                    (
+                        datetime.fromtimestamp(source_ts, tz=timezone.utc)
+                        if source_ts is not None
+                        else None
+                    ),
+                    datetime.fromtimestamp(received_ts, tz=timezone.utc),
+                )
+            ):
+                source_ts = received_ts
+            elif received_ts is not None:
+                source_ts = (
+                    min(source_ts, received_ts)
+                    if source_ts is not None
+                    else received_ts
+                )
+            if source_ts is None:
+                source_ts = state.last_updated.timestamp()
+            if not math.isfinite(source_ts) or self._timestamp_is_too_far_in_future(
+                source_ts
+            ):
+                return
             total += value
+            timestamps.append(source_ts)
             sources[key] = entity_id
             source_times[key] = state.attributes.get("sampled_at_utc")
         self._balance_power_w = max(round(total), 0)
+        self._balance_power_ts = min(timestamps)
         self._balance_sources = sources
         self._balance_source_times = source_times
         self._balance_using_cached = False
@@ -1543,6 +1593,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._last_method = restored.method or "restored"
         self._restored_pending_validation = True
         self._using_cached = restored.power_sample_ts != restored.energy_ts
+        self._schedule_freshness_expiry()
 
     @staticmethod
     def _coerce_nonnegative_float(value: object) -> float | None:
@@ -1626,8 +1677,19 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             }
 
     def _freshness_deadline(self) -> datetime | None:
-        """Keep the last valid calculation until source data replaces it."""
-        return None
+        """Bound retained watts by the last valid contributing source sample."""
+        self._process_current_sample()
+        timestamp = (
+            self._balance_power_ts
+            if self._balance_power_w is not None
+            else self._last_power_ts
+        )
+        return (
+            datetime.fromtimestamp(timestamp, tz=timezone.utc)
+            + timedelta(seconds=CURRENT_POWER_STALE_AFTER_S)
+            if timestamp is not None
+            else None
+        )
 
     def _seed(
         self,
@@ -1657,6 +1719,12 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
     def _process_current_sample(self) -> None:
         self._process_consumption_sample()
         self._update_power_balance()
+        if (
+            self._balance_power_ts is not None
+            and self._timestamp_age_seconds(self._balance_power_ts)
+            >= CURRENT_POWER_STALE_AFTER_S
+        ):
+            self._balance_power_w = None
         energy = getattr(self._coord, "energy", None)
         if energy is not None:
             energy.consumption_power_diagnostics = {
@@ -1666,9 +1734,11 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
                     else self._last_power_w
                 ),
                 "last_valid_sample_timestamp": (
-                    None if self._balance_power_w is not None else self._last_power_ts
+                    self._balance_power_ts
+                    if self._balance_power_w is not None
+                    else self._last_power_ts
                 ),
-                "retention_seconds": None,
+                "retention_seconds": CURRENT_POWER_STALE_AFTER_S,
                 "max_window_seconds": self._MAX_POWER_WINDOW_SECONDS,
                 "last_window_seconds": (
                     None if self._balance_power_w is not None else self._last_window_s

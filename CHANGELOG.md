@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔧 Improvements
-- None
+- Align cloud production, grid, battery, consumption and heat-pump power with a 30-minute freshness limit. Apply the same limit to individual battery charge alongside aggregate charge and available energy/power; retained consumption readings now expire from their contributing sample timestamps.
 
 ### 🔄 Other changes
 - None
