@@ -1550,12 +1550,19 @@ Notes:
   with the same timestamp and timestamp-less extreme samples are not sufficient
   confirmation.
 - The normalized runtime field is `current_power_consumption_w` with source `app-api:get_latest_power`.
-- Production Power expires after 20 minutes, allowing cloud delivery delay beyond
+- Production Power expires after 30 minutes, allowing cloud delivery delay beyond
   a 15-minute source cadence. Successful validated responses within +/-1 W renew
   freshness even when a nonfuture timestamp repeats overnight; the value is held
   as reported, never synthesized from missing data. Other timestamped samples
   remain bounded by their source and first receipt times. Failed or invalid polls
   cannot renew freshness.
+- Samples more than 60 seconds ahead of receipt are not yet valid for publication
+  or extreme-power confirmation. Retain the prior validated reading only for its
+  original freshness window; a later fetch can accept a revised value bearing the
+  same timestamp. The rejection is `future_timestamp` / `sample_timestamp_in_future`
+  in normalized diagnostics. Restored samples are also checked against their
+  original acquisition time. This guard does not infer interval completion or
+  correct the separate daytime under-reading reported in issue #934.
 - Issue [#923](https://github.com/barneyonline/ha-enphase-energy/issues/923) reports
   daytime revisions of values sharing a timestamp. The response exposes no
   interval duration, completion flag, or previous completed interval. Do not

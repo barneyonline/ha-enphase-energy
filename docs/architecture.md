@@ -449,6 +449,12 @@ battery, consumption and heat-pump power use the same 30-minute limit. Aggregate
 and individual battery charge, available energy and available power expire after
 30 minutes without a successful battery-status acquisition. Battery health,
 cycle counts and historical readings retain their existing policies.
+Production samples more than 60 seconds ahead of receipt are rejected before
+publication or extreme-power confirmation. Healthy responses containing these
+samples do not renew the last accepted reading's freshness; the next fetch may
+accept a revised value with the same timestamp once it falls within the clock
+allowance. Restore rejects samples that were premature at their stored receipt
+time. Diagnostics and sanitized measurement logs expose `future_timestamp`.
 
 The per-inverter Lifetime Energy and Power feature switches independently gate
 entity creation. Switching a feature off removes its registered entities, including

@@ -23,7 +23,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, CURRENT_POWER_STALE_AFTER_S, PRODUCTION_POWER_STALE_AFTER_S
 from .coordinator import EnphaseCoordinator
-from .current_power_runtime import is_idle_power_sample
+from .current_power_runtime import is_future_power_sample, is_idle_power_sample
 from .device_info_helpers import _cloud_device_info
 from .energy import (
     LIFETIME_RESET_DROP_THRESHOLD_KWH,
@@ -2194,7 +2194,13 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
         sample_utc = self._sample_freshness_utc()
         if sample_utc is None:
             return False
-        age = self._freshness_reference_utc() - sample_utc
+        reference_utc = self._freshness_reference_utc()
+        if is_future_power_sample(
+            self._last_good_sample_utc,
+            self._last_good_cached_at_utc or reference_utc,
+        ):
+            return False
+        age = reference_utc - sample_utc
         return timedelta(0) <= age < self._cache_ttl()
 
     def _sample_freshness_utc(self) -> datetime | None:
