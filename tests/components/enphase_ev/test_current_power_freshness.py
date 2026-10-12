@@ -261,7 +261,7 @@ async def test_source_clock_and_missing_timestamp_cannot_extend_failed_sample(
     )
     await coord.current_power_runtime.async_refresh()
     entity = EnphaseCurrentPowerConsumptionSensor(coord)
-    assert entity.available is (timestamp != "old")
+    assert entity.available is (timestamp == "missing")
     now[0] += timedelta(minutes=30)
     coord.last_success_utc = now[0]
     assert not entity.available
@@ -392,7 +392,7 @@ async def test_identical_sample_recovers_after_expiry(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("value", [0, 2500])
-async def test_repeated_future_source_timestamp_keeps_original_receipt_bound(
+async def test_repeated_future_source_timestamp_is_rejected_and_recovers(
     coordinator_factory, monkeypatch, value
 ):
     now = [dt_util.utcnow()]
@@ -407,7 +407,9 @@ async def test_repeated_future_source_timestamp_keeps_original_receipt_bound(
     await runtime.async_refresh()
     received = runtime.received_utc
     entity = EnphaseCurrentPowerConsumptionSensor(coord)
-    assert entity.available
+    assert received is None
+    assert not entity.available
+    assert runtime.diagnostics()["validation_state"] == "future_timestamp"
     for minutes in (5, 26):
         now[0] += timedelta(minutes=minutes)
         coord.last_success_utc = now[0]
