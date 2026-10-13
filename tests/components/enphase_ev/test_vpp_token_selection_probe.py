@@ -168,6 +168,52 @@ async def test_shared_jar_is_not_an_account_bound_token_source(monkeypatch):
     assert merged["enlighten_manager_token_production"] == other_account
 
 
+@pytest.mark.parametrize("stored_manager", [True, False])
+@pytest.mark.parametrize(
+    "method,args",
+    [
+        ("vpp_enrollment_id", ()),
+        ("vpp_enrollment_details", (ENROLLMENT_ID,)),
+        ("vpp_events", (PROGRAM_ID,)),
+    ],
+)
+async def test_updated_credentials_are_not_overridden_by_retained_jar_token(
+    monkeypatch, stored_manager, method, args
+):
+    now = datetime(2026, 10, 13, 12, tzinfo=UTC)
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now)
+    client, shared, stateless, reauth, old, new, fallback = _fake_client("jar", now)
+    shared.cookie_jar.update_cookies(
+        {"enlighten_manager_token_production": old}, URL(api.BASE_URL)
+    )
+    cookie = "session=synthetic-session"
+    if stored_manager:
+        cookie += f"; enlighten_manager_token_production={new}"
+    client.update_credentials(eauth=new, cookie=cookie)
+
+    for _ in range(2):
+        # Reapplying the same credentials must not re-enable the retained token.
+        client.update_credentials(eauth=new, cookie=cookie)
+        assert isinstance(await getattr(client, method)(*args), dict)
+        assert stateless.request.call_args.kwargs["headers"]["Authorization"] == new
+    assert (
+        shared.cookie_jar.filter_cookies(URL(api.BASE_URL))[
+            "enlighten_manager_token_production"
+        ].value
+        == old
+    )
+    assert client.scheduler_bearer() == (new if stored_manager else None)
+    assert client._control_headers()["Authorization"] == f"Bearer {new}"
+    reauth.assert_not_awaited()
+    shared.request.assert_not_called()
+
+    # A later eligible jar rotation can be adopted without a credential update.
+    shared.cookie_jar.update_cookies(
+        {"enlighten_manager_token_production": fallback}, URL(api.BASE_URL)
+    )
+    assert client._vpp_headers()["Authorization"] == fallback
+
+
 @pytest.mark.parametrize("status", [401, 403, 429])
 @pytest.mark.parametrize(
     "method,args",

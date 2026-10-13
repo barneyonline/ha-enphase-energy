@@ -46,14 +46,35 @@ def _usable_token(token: str | None, now: float) -> bool:
     return True
 
 
+def live_manager_token(jar: AbstractCookieJar | None) -> str | None:
+    """Read the Enlighten manager without mutating the shared session jar."""
+
+    if jar is None:
+        return None
+    try:
+        morsel = jar.filter_cookies(URL(BASE_URL)).get(
+            "enlighten_manager_token_production"
+        )
+        value = morsel.value if morsel is not None else None
+        return value if isinstance(value, str) else None
+    except Exception:  # noqa: BLE001 - keep stored credentials on jar failure
+        return None
+
+
 def select_vpp_token(
-    manager: str | None, access: str | None, jar: AbstractCookieJar | None
+    manager: str | None,
+    access: str | None,
+    jar: AbstractCookieJar | None,
+    *,
+    ignored_live_token: str | None = None,
 ) -> str | None:
     """Prefer a same-account live manager, then eligible stored credentials.
 
     The HA session jar is shared. Decoded identity must match a consistent entry
     credential context before adopting a jar token; claims are not authentication
     proof, and the Grid Services server still validates the selected credential.
+    A token retained in the jar across an explicit credential update cannot
+    override that update. A different eligible jar token can be adopted later.
     """
 
     now = dt_util.utcnow().timestamp()
@@ -63,17 +84,11 @@ def select_vpp_token(
         if (identity := _account_identity(token)) and identity.strip()
     }
     if jar is not None and len(identities) == 1:
-        try:
-            morsel = jar.filter_cookies(URL(BASE_URL)).get(
-                "enlighten_manager_token_production"
-            )
-            value = morsel.value if morsel is not None else None
-            candidate = value if isinstance(value, str) else None
-        except Exception:  # noqa: BLE001 - keep stored credentials on jar failure
-            candidate = None
+        candidate = live_manager_token(jar)
         candidate_identity = _account_identity(candidate)
         if (
             candidate_identity is not None
+            and candidate != ignored_live_token
             and candidate_identity.strip() in identities
             and _usable_token(candidate, now)
         ):
