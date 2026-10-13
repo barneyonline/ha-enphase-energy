@@ -365,6 +365,9 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   stored tokens remain compatible. Requests still use raw Authorization without
   cookies or a Bearer prefix. Global scheduler/control/HEMS token selection is
   unchanged, and selection neither updates persisted credentials nor logs tokens.
+  After an explicit credential change, a different manager token already present
+  in the jar cannot override the updated credentials. A later eligible jar token
+  can be adopted without another credential update or changing the shared jar.
   HTTP 401 retains only its status through the optional failure conversion.
   Sanitized HTTP failures retain their status and Retry-After delay. Program
   changes invalidate event data from the previous program while respecting active

@@ -3635,6 +3635,10 @@ with known-expired numeric `exp` claims are excluded, while opaque or unknown-ex
 stored tokens retain compatibility. Decoded claims do not prove authentication:
 the server still validates the token, and token choice does not establish VPP
 entitlement. Scheduler, control and HEMS credential selection is unchanged.
+An explicit credential change excludes a different manager token retained in the
+shared jar from VPP selection. This exclusion lasts while that token remains in
+the jar; a later eligible jar token can be adopted. The shared jar is not mutated,
+and reapplying identical credentials does not reset the exclusion.
 
 These requests send raw Authorization without a Bearer prefix or Enlighten
 cookies, use the stateless session and retain `allow_reauth=False`. VPP 401s never

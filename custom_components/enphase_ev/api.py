@@ -381,6 +381,7 @@ class EnphaseEVClient(MqttStreamSurface):
         self._battery_config_write_bases: dict[str, dict[str, Any]] = {}
         self._cookie = cookie or ""
         self._eauth = eauth or None
+        self._vpp_ignored_live_token: str | None = None
         self._activation_token: str | None = None
         self._activation_referer: str | None = None
         self._activation_settings_grid_profiles: list[tuple[str, str]] = []
