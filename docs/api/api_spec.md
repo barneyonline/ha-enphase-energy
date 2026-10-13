@@ -3627,6 +3627,22 @@ The optional VPP Events feature uses the `https://gs.enphaseenergy.com` service.
 It is disabled by default. The integration sends no requests to this host unless
 the config-entry option is enabled.
 
+VPP uses a separate read-only credential resolver. It prefers a live manager
+token from the Enlighten origin only when its decoded account identity matches
+the consistent stored credential context; the shared HA jar is not account-bound.
+Otherwise it tries the stored manager and existing access-token fallback. JWTs
+with known-expired numeric `exp` claims are excluded, while opaque or unknown-expiry
+stored tokens retain compatibility. Decoded claims do not prove authentication:
+the server still validates the token, and token choice does not establish VPP
+entitlement. Scheduler, control and HEMS credential selection is unchanged.
+
+These requests send raw Authorization without a Bearer prefix or Enlighten
+cookies, use the stateless session and retain `allow_reauth=False`. VPP 401s never
+trigger password login, replay or account-wide reauthentication. Only HTTP status
+is preserved through the sanitized authorization failure into family diagnostics;
+private request URLs, bodies, headers and credentials are discarded. Existing
+cooldowns remain in force after credential updates.
+
 Program resolution follows one authoritative chain and supports one active
 program per site:
 

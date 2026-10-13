@@ -20,6 +20,7 @@ from .api import (
     Unauthorized,
 )
 from .api_client.vpp_surface import valid_object_id
+from .api_client.errors import HttpUnauthorized
 from .const import DEFAULT_VPP_EVENTS_ENABLED, OPT_VPP_EVENTS_ENABLED
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -337,6 +338,8 @@ class VppRuntime:
     def _safe_failure(summary: str, err: Exception) -> Exception:
         """Preserve HTTP backoff metadata without retaining private request data."""
 
+        if isinstance(err, HttpUnauthorized):
+            return VppHttpUnavailable(summary, err.status, None)
         if isinstance(err, aiohttp.ClientResponseError):
             return VppHttpUnavailable(
                 summary,

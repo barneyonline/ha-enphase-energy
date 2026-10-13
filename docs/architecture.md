@@ -357,6 +357,15 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   never trigger stored-credential login and enter only that endpoint family's
   cooldown. They preserve bounded cached data and do not independently trigger
   config-entry reauthentication; core authentication failures still can.
+  VPP alone prefers a live Enlighten manager token when its decoded account
+  identity matches the consistent stored credential context. The shared HA jar
+  is never treated as account-specific: mismatched, unknown or conflicting
+  identities cannot authorize adoption of a jar token. Known-expired JWTs are
+  skipped before the stored-manager/access fallback; opaque or unknown-expiry
+  stored tokens remain compatible. Requests still use raw Authorization without
+  cookies or a Bearer prefix. Global scheduler/control/HEMS token selection is
+  unchanged, and selection neither updates persisted credentials nor logs tokens.
+  HTTP 401 retains only its status through the optional failure conversion.
   Sanitized HTTP failures retain their status and Retry-After delay. Program
   changes invalidate event data from the previous program while respecting active
   event-family cooldowns. Nonempty event lists with no valid rows are failures;
