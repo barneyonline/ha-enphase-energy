@@ -17,6 +17,7 @@ from .common import (
     _jwt_session_id,
     _jwt_user_id,
 )
+from .vpp_auth import live_manager_token, select_vpp_token
 
 
 def update_credentials(
@@ -37,6 +38,10 @@ def update_credentials(
         self._cookie = cookie or ""
     if credentials_changed:
         self._clear_activation_auth_context()
+        live = live_manager_token(getattr(self._s, "cookie_jar", None))
+        self._vpp_ignored_live_token = (
+            live if live not in (self._bearer(), self._eauth) else None
+        )
 
     if self._cookie:
         self._h["Cookie"] = self._cookie
@@ -243,7 +248,12 @@ def _vpp_headers(self: EnphaseEVClient) -> dict[str, str | None]:
     """Return isolated browser headers for the Grid Services host."""
 
     # Observed GS requests send the control token without a Bearer prefix.
-    token = self._bearer() or self._eauth
+    token = select_vpp_token(
+        self._bearer(),
+        self._eauth,
+        getattr(self._s, "cookie_jar", None),
+        ignored_live_token=self._vpp_ignored_live_token,
+    )
     headers: dict[str, str | None] = {
         "Accept": "application/json, text/javascript, */*; q=0.01",
         "Origin": BASE_URL,

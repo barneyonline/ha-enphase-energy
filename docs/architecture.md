@@ -357,6 +357,18 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   never trigger stored-credential login and enter only that endpoint family's
   cooldown. They preserve bounded cached data and do not independently trigger
   config-entry reauthentication; core authentication failures still can.
+  VPP alone prefers a live Enlighten manager token when its decoded account
+  identity matches the consistent stored credential context. The shared HA jar
+  is never treated as account-specific: mismatched, unknown or conflicting
+  identities cannot authorize adoption of a jar token. Known-expired JWTs are
+  skipped before the stored-manager/access fallback; opaque or unknown-expiry
+  stored tokens remain compatible. Requests still use raw Authorization without
+  cookies or a Bearer prefix. Global scheduler/control/HEMS token selection is
+  unchanged, and selection neither updates persisted credentials nor logs tokens.
+  After an explicit credential change, a different manager token already present
+  in the jar cannot override the updated credentials. A later eligible jar token
+  can be adopted without another credential update or changing the shared jar.
+  HTTP 401 retains only its status through the optional failure conversion.
   Sanitized HTTP failures retain their status and Retry-After delay. Program
   changes invalidate event data from the previous program while respecting active
   event-family cooldowns. Nonempty event lists with no valid rows are failures;
@@ -404,7 +416,7 @@ later coordinator update. Existing registry entries are retained while write acc
 is unknown; availability still requires confirmed access.
 
 Instantaneous site telemetry has bounded freshness: after a core outage, the
-last successful sample has a 15-minute grace period. Battery and heat-pump
+last successful sample has a 30-minute grace period. Battery and heat-pump
 measurements with an established family success expire after 30 minutes without
 that family succeeding, even when core polling still works. Entity-owned timers
 publish expiry without waiting for another coordinator callback and are cancelled
@@ -430,23 +442,31 @@ baselines when missing source channels return, including during reload or reauth
 Synthetic zero placeholders never authorize a delta from zero to a lifetime total.
 
 Current Grid Power and Current Battery Power expire when their contributing
-source samples exceed a 15-minute freshness window, even if core polling remains
+source samples reach a 30-minute freshness window, even if core polling remains
 healthy. Battery and heat-pump family recovery is published when freshness is
 restored, including when the measurement itself has not changed. This restores
 availability and expiry timers without publishing every identical successful poll.
 
-Current Production Power uses a 20-minute freshness window to allow delivery
-delay for sites reporting every 15 minutes. Both its source timestamp and first
+Current Production Power uses the shared 30-minute cloud telemetry freshness
+window to tolerate delayed cloud updates. Both its source timestamp and first
 acquisition time bound nonzero readings, even while core polling remains healthy.
 Validated readings within +/-1 W with a nonfuture source timestamp instead use
 their latest successful acquisition: Enphase can repeat its last near-zero
 production sample overnight. The reported value and source timestamp are
 preserved. Missing timestamps also use acquisition time. Failed, malformed,
 unsupported-unit, quarantined, or skipped responses never renew that time, so
-even near-zero readings expire after 20 minutes without a valid response.
-Entity-owned expiry timers remain independent of core polling cadence. Grid and
-Battery Power retain their 15-minute window; Current Power Consumption's separate
-derived-power behavior is unchanged.
+even near-zero readings expire after 30 minutes without a valid response.
+Entity-owned expiry timers remain independent of core polling cadence. Grid,
+battery, consumption and heat-pump power use the same 30-minute limit. Aggregate
+and individual battery charge, available energy and available power expire after
+30 minutes without a successful battery-status acquisition. Battery health,
+cycle counts and historical readings retain their existing policies.
+Production samples more than 60 seconds ahead of receipt are rejected before
+publication or extreme-power confirmation. Healthy responses containing these
+samples do not renew the last accepted reading's freshness; the next fetch may
+accept a revised value with the same timestamp once it falls within the clock
+allowance. Restore rejects samples that were premature at their stored receipt
+time. Diagnostics and sanitized measurement logs expose `future_timestamp`.
 
 The per-inverter Lifetime Energy and Power feature switches independently gate
 entity creation. Switching a feature off removes its registered entities, including
@@ -609,11 +629,31 @@ site telemetry are never part of this shared cache.
 `EnphaseSiteConsumptionPowerSensor` derives average watts from compatible
 consumption buckets over at most 30 minutes. The averaging window and reading
 freshness are separate: a recovered average can span a 20-minute source gap,
-but its latest source timestamp must still be less than 15 minutes old for the
+but its latest source timestamp must still be less than 30 minutes old for the
 entity to be available. Repeated or rejected payloads never extend that expiry.
 Larger gaps reseed the baseline; decreasing buckets, incompatible rollovers,
 changed intervals, and invalid timestamps remain guarded. The actual averaging
 window is exposed in `last_window_seconds` and consumption-power diagnostics.
+When consumption is calculated from published production, grid and battery watts,
+the oldest contributing sample bounds its 30-minute expiry. Successful near-zero
+production acquisitions follow the production sensor's overnight rule. Missing
+inputs retain the last valid calculation only until its original expiry; fresh
+consumption buckets can supply the existing fallback.
+Grid and Battery Power expose `freshness_reference_utc` separately from their
+calculation timestamp, so consumption also respects the oldest contributing flow
+when import/export or charge/discharge clocks differ. Stale numeric candidates
+cannot overwrite a still-valid retained balance or its original deadline.
+
+Consumption Power persists its last valid power balance in Home Assistant's
+restore data, separately from the consumption-bucket delta baseline. During
+startup, a restored balance can bridge missing source entities only for the
+remaining part of its original 30-minute freshness window. It exposes the original
+`sampled_at_utc` and `using_cached: true`; fresh published inputs take priority.
+Repeated restarts never renew the stored timestamp. Older display states can
+also restore a numeric balance when their units and every required contributing
+source clock are valid. Missing, future, expired, malformed or extreme restored
+readings remain unavailable. Display restoration does not authorize a new delta
+calculation from the restored watts or bypass bucket-baseline validation.
 
 `EnergyManager.site_energy_fetch_diagnostics` exposes detached, process-local
 attempt and cumulative failure counts, attempt/completion/success timestamps,

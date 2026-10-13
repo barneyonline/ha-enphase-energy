@@ -12,7 +12,7 @@ from homeassistant.helpers.event import async_track_point_in_utc_time
 from .entity import callback
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import CLOUD_TELEMETRY_STALE_AFTER_S, DOMAIN
 from .coordinator import EnphaseCoordinator
 from .device_info_helpers import _cloud_device_info
 from .runtime_helpers import (
@@ -60,7 +60,7 @@ class EnphaseSiteSensorEntity(CoordinatorEntity, SensorEntity):  # type: ignore[
         deadline = self._freshness_deadline()
         if deadline is not None and dt_util.utcnow() >= deadline:
             return False
-        if self._coord.last_success_utc is not None:
+        if getattr(self._coord, "last_success_utc", None) is not None:
             return True
         return super().available  # type: ignore[no-any-return]
 
@@ -89,12 +89,12 @@ class EnphaseSiteSensorEntity(CoordinatorEntity, SensorEntity):  # type: ignore[
             source_success = self._source_first_observed
         if not isinstance(source_success, datetime):
             source_success = (
-                self._coord.last_success_utc
+                getattr(self._coord, "last_success_utc", None)
                 if not self._coord.last_update_success
                 else None
             )
         return (
-            source_success + timedelta(minutes=30 if family_source else 15)
+            source_success + timedelta(seconds=CLOUD_TELEMETRY_STALE_AFTER_S)
             if source_success is not None
             else None
         )
