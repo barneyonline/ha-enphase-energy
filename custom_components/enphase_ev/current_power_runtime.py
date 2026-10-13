@@ -14,7 +14,7 @@ from homeassistant.util import dt as dt_util
 from .api import InvalidPayloadError
 from .const import PRODUCTION_POWER_IDLE_MAX_W, PRODUCTION_POWER_STALE_AFTER_S
 from .log_redaction import redact_site_id, redact_text
-from .power_validation import ExtremePowerValidator
+from .power_validation import ExtremePowerValidationResult, ExtremePowerValidator
 
 if TYPE_CHECKING:
     from .api import EnphaseEVClient
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 CURRENT_POWER_CACHE_TTL_S = 60.0
 CURRENT_POWER_ENDPOINT_FAMILY = "current_power"
+CURRENT_POWER_MAX_FUTURE_SKEW_S = 60.0
 
 
 def is_idle_power_sample(
@@ -34,6 +35,16 @@ def is_idle_power_sample(
         and abs(value_w) <= PRODUCTION_POWER_IDLE_MAX_W
         and sample_utc is not None
         and sample_utc <= received_utc
+    )
+
+
+def is_future_power_sample(sample_utc: datetime | None, received_utc: datetime) -> bool:
+    """Reject premature measurements beyond the site power clock-skew allowance."""
+
+    return (
+        sample_utc is not None
+        and (sample_utc - received_utc).total_seconds()
+        > CURRENT_POWER_MAX_FUTURE_SKEW_S
     )
 
 
@@ -284,14 +295,21 @@ class CurrentPowerRuntime:
             except Exception:  # noqa: BLE001
                 precision = None
 
-        validation = self._extreme_validator.evaluate(
-            normalized_w,
-            sample_ts=(sampled_at.timestamp() if sampled_at is not None else None),
-        )
+        received_utc = dt_util.utcnow()
+        if is_future_power_sample(sampled_at, received_utc):
+            # Do not publish a premature sample, renew accepted freshness, or
+            # let its clock confirm/replace an extreme sample awaiting validation.
+            validation = ExtremePowerValidationResult(
+                False, False, "future_timestamp", "sample_timestamp_in_future"
+            )
+        else:
+            validation = self._extreme_validator.evaluate(
+                normalized_w,
+                sample_ts=(sampled_at.timestamp() if sampled_at is not None else None),
+            )
         self._validation_state = validation.state
         self._validation_reason = validation.reason
-        received_utc = dt_util.utcnow()
-        # Log only validated measurement fields, never raw bodies or identifiers.
+        # Log only normalized measurement fields, never raw bodies or identifiers.
         _LOGGER.debug(
             "Latest production power sample: value_w=%s, sampled_at_utc=%s, "
             "received_at_utc=%s, reported_units=%s, reported_precision=%s, "
@@ -327,7 +345,7 @@ class CurrentPowerRuntime:
         elif self.received_utc is None:
             self.received_utc = received_utc
         # Healthy near-zero responses can repeat overnight. Other timestamped
-        # responses retain their receipt bound, including future source clocks.
+        # responses retain their receipt bound, including tolerated clock skew.
         self._sample = CurrentPowerSample(
             w=normalized_w,
             freshness_revision=freshness_revision,

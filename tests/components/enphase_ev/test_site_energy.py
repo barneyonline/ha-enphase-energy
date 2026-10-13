@@ -849,7 +849,7 @@ def test_site_consumption_power_interval_floor_and_long_gap(
         reported_at=base_ts + timedelta(minutes=40),
     )
     assert sensor.native_value == 600
-    assert sensor.available is True
+    assert sensor.available is False
     assert sensor.extra_state_attributes["method"] == "interval_discontinuity"
 
 
@@ -5198,7 +5198,7 @@ def test_consumption_retains_valid_baseline_and_records_rejection(
     assert coord.energy.consumption_power_diagnostics["last_rejection"] == rejection
     now[0] += timedelta(seconds=1)
     assert sensor.available
-    assert coord.energy.consumption_power_diagnostics["retention_seconds"] is None
+    assert coord.energy.consumption_power_diagnostics["retention_seconds"] == 1800
 
     # Recover against the last valid baseline, never against the bad bucket.
     coord.energy.site_energy["consumption"] = _consumption_flow(
@@ -5288,6 +5288,7 @@ async def test_consumption_reseeding_and_restore_do_not_refresh_retained_power(
     await restored.async_added_to_hass()
     assert restored.available
     assert restored.native_value == 1200
+    assert restored._cancel_freshness_expiry is not None
     now[0] += timedelta(seconds=1)
     assert restored.available
     assert sensor.available
@@ -5355,20 +5356,20 @@ async def test_consumption_retains_value_without_polling_and_updates_from_source
     async_fire_time_changed(hass, now[0])
     await hass.async_block_till_done()
     assert hass.states.get(sensor.entity_id).state == "583"
-    # A prolonged coordinator outage must not reintroduce the base-class expiry.
+    # Retained readings expire from their accepted sample even without polling.
     coord.last_update_success = False
     coord.last_success_utc = accepted_at
     now[0] += timedelta(days=1)
     async_fire_time_changed(hass, now[0])
     coord.async_update_listeners()
     await hass.async_block_till_done()
-    assert hass.states.get(sensor.entity_id).state == "583"
+    assert hass.states.get(sensor.entity_id).state == "unavailable"
     assert sensor._cancel_freshness_expiry is None
 
     # A long source gap seeds a baseline; the next comparable update recalculates.
     coord.last_update_success = True
     await refresh([1000, 3000])
-    assert hass.states.get(sensor.entity_id).state == "583"
+    assert hass.states.get(sensor.entity_id).state == "unavailable"
     now[0] += timedelta(minutes=5)
     await refresh([1000, 3200])
     assert hass.states.get(sensor.entity_id).state == "2400"
@@ -5599,7 +5600,7 @@ def test_consumption_long_window_publishes_delayed_endpoint(
         latest_bucket_wh=1200, reported_at=now - timedelta(minutes=15)
     )
     assert sensor.available
-    assert coord.energy.consumption_power_diagnostics["retention_seconds"] is None
+    assert coord.energy.consumption_power_diagnostics["retention_seconds"] == 1800
 
 
 @pytest.mark.asyncio

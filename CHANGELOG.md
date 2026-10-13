@@ -11,10 +11,13 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Select VPP credentials from a same-account live manager token before stored credentials, prevent a retained jar token from overriding explicit credential updates, reject known-expired JWT candidates, and preserve HTTP 401 in sanitized family diagnostics without password refresh or whole-entry reauthentication.
+- Reject production samples timestamped more than 60 seconds ahead of receipt, including prematurely accepted restored readings. Preserve the previous valid reading's expiry and expose the rejection in sanitized diagnostics/debug logs.
+- Restore a recent Consumption Power balance after Home Assistant restarts while cloud power inputs warm up. Preserve the original sample timestamp and 30-minute expiry, and keep the cached reading separate from cumulative-energy baselines.
+- Preserve a still-valid Consumption Power balance when numeric source states become stale, and carry Grid/Battery Power's oldest contributing flow deadline into its cached balance.
 
 ### 🔧 Improvements
-- None
+- Align cloud production, grid, battery, consumption and heat-pump power with a 30-minute freshness limit. Apply the same limit to individual battery charge alongside aggregate charge and available energy/power; retained consumption readings now expire from their contributing sample timestamps.
 
 ### 🔄 Other changes
 - None

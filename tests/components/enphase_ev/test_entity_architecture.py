@@ -329,7 +329,7 @@ def test_instantaneous_outage_freshness_preserves_totals(
     coord = coordinator_factory()
     now = dt_util.utcnow()
     coord.last_update_success = False
-    coord.last_success_utc = now - timedelta(minutes=16)
+    coord.last_success_utc = now - timedelta(minutes=31)
     entity = EnphaseSiteSensorEntity(coord, "test", "Test", type_key=None)
     entity._attr_device_class = SensorDeviceClass.POWER
     assert not entity.available
@@ -438,7 +438,7 @@ async def test_live_sensor_expires_without_another_poll(
     await entity.async_added_to_hass()
     entity.async_write_ha_state()
     assert hass.states.get(entity.entity_id).state == "1250"
-    now[0] += timedelta(minutes=16)
+    now[0] += timedelta(minutes=31)
     async_fire_time_changed(hass, now[0])
     await hass.async_block_till_done()
     assert hass.states.get(entity.entity_id).state == "unavailable"

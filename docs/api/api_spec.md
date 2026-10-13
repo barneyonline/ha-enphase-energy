@@ -1550,12 +1550,19 @@ Notes:
   with the same timestamp and timestamp-less extreme samples are not sufficient
   confirmation.
 - The normalized runtime field is `current_power_consumption_w` with source `app-api:get_latest_power`.
-- Production Power expires after 20 minutes, allowing cloud delivery delay beyond
+- Production Power expires after 30 minutes, allowing cloud delivery delay beyond
   a 15-minute source cadence. Successful validated responses within +/-1 W renew
   freshness even when a nonfuture timestamp repeats overnight; the value is held
   as reported, never synthesized from missing data. Other timestamped samples
   remain bounded by their source and first receipt times. Failed or invalid polls
   cannot renew freshness.
+- Samples more than 60 seconds ahead of receipt are not yet valid for publication
+  or extreme-power confirmation. Retain the prior validated reading only for its
+  original freshness window; a later fetch can accept a revised value bearing the
+  same timestamp. The rejection is `future_timestamp` / `sample_timestamp_in_future`
+  in normalized diagnostics. Restored samples are also checked against their
+  original acquisition time. This guard does not infer interval completion or
+  correct the separate daytime under-reading reported in issue #934.
 - Issue [#923](https://github.com/barneyonline/ha-enphase-energy/issues/923) reports
   daytime revisions of values sharing a timestamp. The response exposes no
   interval duration, completion flag, or previous completed interval. Do not
@@ -3619,6 +3626,26 @@ Runtime safety rules:
 The optional VPP Events feature uses the `https://gs.enphaseenergy.com` service.
 It is disabled by default. The integration sends no requests to this host unless
 the config-entry option is enabled.
+
+VPP uses a separate read-only credential resolver. It prefers a live manager
+token from the Enlighten origin only when its decoded account identity matches
+the consistent stored credential context; the shared HA jar is not account-bound.
+Otherwise it tries the stored manager and existing access-token fallback. JWTs
+with known-expired numeric `exp` claims are excluded, while opaque or unknown-expiry
+stored tokens retain compatibility. Decoded claims do not prove authentication:
+the server still validates the token, and token choice does not establish VPP
+entitlement. Scheduler, control and HEMS credential selection is unchanged.
+An explicit credential change excludes a different manager token retained in the
+shared jar from VPP selection. This exclusion lasts while that token remains in
+the jar; a later eligible jar token can be adopted. The shared jar is not mutated,
+and reapplying identical credentials does not reset the exclusion.
+
+These requests send raw Authorization without a Bearer prefix or Enlighten
+cookies, use the stateless session and retain `allow_reauth=False`. VPP 401s never
+trigger password login, replay or account-wide reauthentication. Only HTTP status
+is preserved through the sanitized authorization failure into family diagnostics;
+private request URLs, bodies, headers and credentials are discarded. Existing
+cooldowns remain in force after credential updates.
 
 Program resolution follows one authoritative chain and supports one active
 program per site:
