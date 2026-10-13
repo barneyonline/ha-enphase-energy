@@ -21,7 +21,7 @@ from ..request_metrics import record_request_attempt
 from .errors import (
     EnphaseLoginWallUnauthorized,
     InvalidPayloadError,
-    Unauthorized,
+    HttpUnauthorized,
     _is_enphase_login_wall,
     _is_scheduler_charging_mode_endpoint,
     _scheduler_error_context_from_text,
@@ -245,7 +245,7 @@ async def _json(
                                     "Received 401 for %s with no stored-credential refresh available",
                                     safe_request_label,
                                 )
-                            raise Unauthorized()
+                            raise HttpUnauthorized()
                         if r.status in (204, 205):
                             if mark_payload_success:
                                 self._mark_payload_healthy(endpoint or None)
@@ -523,7 +523,7 @@ async def _text_response(
                                     reauth_ok = await self._reauth_cb()
                                 if reauth_ok:
                                     continue
-                            raise Unauthorized()
+                            raise HttpUnauthorized()
                         if r.status >= 400 and not (
                             expected_statuses and r.status in expected_statuses
                         ):

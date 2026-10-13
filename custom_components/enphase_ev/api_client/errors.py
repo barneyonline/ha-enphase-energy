@@ -18,6 +18,12 @@ class Unauthorized(Exception):
     pass
 
 
+class HttpUnauthorized(Unauthorized):
+    """HTTP 401 without private response, request or credential metadata."""
+
+    status = 401
+
+
 class EnphaseLoginWallUnauthorized(Unauthorized):
     """Raised when Enlighten serves the browser login wall to API requests."""
 
