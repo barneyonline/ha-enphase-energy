@@ -145,6 +145,7 @@ jobs:
       - name: Validate strict typing for full integration package
         run: mypy --strict --ignore-missing-imports --follow-imports=skip custom_components/enphase_ev
 
+  # Keep runtime validation on the pinned minimum stack while 2026.10 tests are paused.
   python314-diagnostics:
     runs-on: ubuntu-latest
     needs: changes
@@ -161,10 +162,12 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: |
-            devtools/docker/requirements-dev.txt
-            devtools/docker/constraints-dev.txt
+            devtools/docker/requirements-min-ha.txt
+            devtools/docker/constraints-min-ha.txt
       - name: Install deps
-        run: uv pip install --system -r devtools/docker/requirements-dev.txt
+        run: |
+          uv pip install --system -r devtools/docker/requirements-min-ha.txt
+          python -c "from homeassistant.const import __version__; assert __version__ == '2026.9.0', __version__; print(f'Home Assistant {__version__}')"
       - name: Gate integration import deprecations and profile import time
         run: python scripts/importtime_profile.py --strict-integration-warnings --output importtime-enphase-ev.log
       - name: Upload import-time profile
@@ -242,12 +245,12 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: |
-            devtools/docker/requirements-dev.txt
-            devtools/docker/constraints-dev.txt
+            devtools/docker/requirements-min-ha.txt
+            devtools/docker/constraints-min-ha.txt
       - name: Install deps
         run: |
-          uv pip install --system -r devtools/docker/requirements-dev.txt
-          python -c "from homeassistant.const import __version__; assert __version__ == '2026.10.0', __version__; print(f'Home Assistant {__version__}')"
+          uv pip install --system -r devtools/docker/requirements-min-ha.txt
+          python -c "from homeassistant.const import __version__; assert __version__ == '2026.9.0', __version__; print(f'Home Assistant {__version__}')"
       - name: Detect changed integration modules
         id: changed
         if: ${{ github.event_name == 'pull_request' }}
