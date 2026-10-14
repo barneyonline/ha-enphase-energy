@@ -5,13 +5,14 @@ from datetime import timedelta
 from unittest.mock import AsyncMock
 
 import pytest
-import orjson
 from homeassistant.core import State
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_component import EntityComponent
-from homeassistant.helpers import restore_state
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import async_fire_time_changed
+from pytest_homeassistant_custom_component.common import (
+    async_fire_time_changed,
+    async_mock_restore_state_shutdown_restart,
+)
 
 from custom_components.enphase_ev.const import DOMAIN
 from custom_components.enphase_ev.sensor_site_energy import (
@@ -68,23 +69,11 @@ async def test_balance_survives_restart_without_renewing_sample_age(
     sources = publish_power(hass, coord, accepted_at)
     original, component = await add_sensor(hass, config_entry, coord)
     assert hass.states.get(original.entity_id).state == "2000"
-    cache = restore_state.async_get(hass)
-
-    def persisted_record(entity_id):
-        record = next(
-            record
-            for record in cache.async_get_stored_states()
-            if record.state.entity_id == entity_id
-        )
-        return restore_state.StoredState.from_dict(
-            orjson.loads(orjson.dumps(record.as_dict()))
-        )
-
-    saved = persisted_record(original.entity_id)
     for entity_id in sources:
         hass.states.async_remove(entity_id)
     await component.async_remove_entity(original.entity_id)
-    cache.last_states[original.entity_id] = saved
+    # The hass fixture mocks storage, including its JSON serialization round trip.
+    await async_mock_restore_state_shutdown_restart(hass)
     now[0] += timedelta(minutes=10)
     coord = coordinator_factory()
     restored, component = await add_sensor(hass, config_entry, coord, use_cache=True)
@@ -96,9 +85,8 @@ async def test_balance_survives_restart_without_renewing_sample_age(
     assert restored.extra_restore_state_data.as_dict()["last_power_w"] is None
 
     # A second restart keeps the same persisted clock and remaining grace.
-    saved_again = persisted_record(restored.entity_id)
     await component.async_remove_entity(restored.entity_id)
-    cache.last_states[restored.entity_id] = saved_again
+    await async_mock_restore_state_shutdown_restart(hass)
     now[0] += timedelta(minutes=10)
     restored, component = await add_sensor(hass, config_entry, coord, use_cache=True)
     assert hass.states.get(restored.entity_id).state == "2000"
