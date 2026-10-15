@@ -132,8 +132,6 @@ def test_pytest_reuses_one_coverage_run_and_loads_only_required_plugins() -> Non
 
 def test_uv_caches_depend_only_on_dependency_inputs() -> None:
     for job in _jobs().values():
-        if not isinstance(job, dict):
-            continue
         for step in job.get("steps", []):
             if not isinstance(step, dict) or "astral-sh/setup-uv@" not in str(
                 step.get("uses", "")
@@ -196,3 +194,32 @@ def test_every_compatibility_input_triggers_its_lane(path, tmp_path):
         ["bash", "-c", script], env=env, check=True, capture_output=True, text=True
     )
     assert "compatibility=true" in output.read_text().splitlines()
+
+
+@pytest.mark.parametrize(
+    ("job_name", "output_name"),
+    [("pytest", "integration"), ("python314-diagnostics", "diagnostics")],
+)
+def test_runtime_dependency_inputs_trigger_their_jobs(job_name, output_name, tmp_path):
+    """Run each runtime job when any of its dependency inputs changes."""
+    jobs = _jobs()
+    setup_uv = next(
+        step
+        for step in jobs[job_name]["steps"]
+        if "astral-sh/setup-uv@" in step.get("uses", "")
+    )
+    step = next(
+        step
+        for step in jobs["changes"]["steps"]
+        if step.get("name") == "Classify changed paths"
+    )
+    script = step["run"]
+    script = script[script.index("set_output()") :]
+    output = tmp_path / "outputs"
+    for path in shlex.split(setup_uv["with"]["cache-dependency-glob"]):
+        output.unlink(missing_ok=True)
+        env = {**os.environ, "GITHUB_OUTPUT": str(output), "changed_files": path}
+        subprocess.run(
+            ["bash", "-c", script], env=env, check=True, capture_output=True, text=True
+        )
+        assert f"{output_name}=true" in output.read_text().splitlines(), path
