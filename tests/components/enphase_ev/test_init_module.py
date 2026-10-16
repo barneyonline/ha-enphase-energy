@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 from collections import UserDict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, Mock, call
@@ -16,6 +17,7 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady, ServiceValidationError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers.typing import UNDEFINED, UndefinedType
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 import custom_components.enphase_ev as enphase_init
@@ -6114,8 +6116,26 @@ async def test_activity_default_normalization_does_not_reload(
     assert config_entry.runtime_data is runtime
 
 
-def test_registry_metadata_signature_uses_cached_type_device_info():
-    info = {
+@dataclass(slots=True)
+class _DataclassDeviceInfo:
+    """Subset of HA 2026.11 DeviceInfo, including its unset-field contract."""
+
+    name: str | None | UndefinedType = UNDEFINED
+    model: str | None | UndefinedType = UNDEFINED
+    hw_version: str | None | UndefinedType = UNDEFINED
+    serial_number: str | None | UndefinedType = UNDEFINED
+    model_id: str | None | UndefinedType = UNDEFINED
+    sw_version: str | None | UndefinedType = UNDEFINED
+
+    def as_dict(self):
+        return {
+            key: value for key, value in asdict(self).items() if value is not UNDEFINED
+        }
+
+
+@pytest.mark.parametrize("info_factory", [dict, _DataclassDeviceInfo])
+def test_registry_metadata_signature_uses_cached_type_device_info(info_factory):
+    fields = {
         "name": "IQ Battery",
         "model": "IQ Battery 5P",
         "hw_version": "2",
@@ -6123,11 +6143,19 @@ def test_registry_metadata_signature_uses_cached_type_device_info():
         "model_id": "5P",
         "sw_version": "1.2.3",
     }
+    info = info_factory(**fields)
+    scalar_getter = Mock(side_effect=AssertionError("cached metadata was bypassed"))
     view = SimpleNamespace(
         iter_type_keys=lambda: ["encharge"],
         type_identifier=lambda key: (DOMAIN, "type:site:encharge"),
         type_label=lambda key: "IQ Batteries",
         type_device_info=lambda key: info,
+        type_device_name=scalar_getter,
+        type_device_model=scalar_getter,
+        type_device_hw_version=scalar_getter,
+        type_device_serial_number=scalar_getter,
+        type_device_model_id=scalar_getter,
+        type_device_sw_version_summary=scalar_getter,
     )
     coord = SimpleNamespace(inventory_view=view)
     assert _registry_type_metadata_signature(coord) == (
@@ -6143,8 +6171,80 @@ def test_registry_metadata_signature_uses_cached_type_device_info():
             "1.2.3",
         ),
     )
-    info["sw_version"] = "1.2.4"
+    if isinstance(info, dict):
+        info["sw_version"] = "1.2.4"
+    else:
+        info.sw_version = "1.2.4"
     assert _registry_type_metadata_signature(coord)[0][-1] == "1.2.4"
+    scalar_getter.assert_not_called()
+
+
+@pytest.mark.parametrize("info_factory", [dict, _DataclassDeviceInfo])
+@pytest.mark.parametrize(
+    "fields,expected",
+    [
+        ({}, (None, None, None, None, None, None)),
+        (
+            {"name": "  IQ Battery  ", "model": " ", "sw_version": None},
+            ("IQ Battery", None, None, None, None, None),
+        ),
+    ],
+)
+def test_registry_metadata_signature_handles_optional_cached_fields(
+    info_factory, fields, expected
+):
+    info = info_factory(**fields)
+    # Omit scalar helpers so even empty cached metadata must use the fast path.
+    view = SimpleNamespace(
+        iter_type_keys=lambda: ["encharge"],
+        type_identifier=lambda key: (DOMAIN, "type:site:encharge"),
+        type_label=lambda key: "IQ Batteries",
+        type_device_info=lambda key: info,
+    )
+    assert _registry_type_metadata_signature(SimpleNamespace(inventory_view=view)) == (
+        ("encharge", (DOMAIN, "type:site:encharge"), "IQ Batteries", *expected),
+    )
+
+
+@pytest.mark.parametrize("cached_info", [None, object(), "missing_getter"])
+def test_registry_metadata_signature_preserves_scalar_fallback(cached_info):
+    view = SimpleNamespace(
+        iter_type_keys=lambda: ["encharge"],
+        type_identifier=lambda key: (DOMAIN, "type:site:encharge"),
+        type_label=lambda key: "IQ Batteries",
+        type_device_name=Mock(return_value=" IQ Battery "),
+        type_device_model=Mock(return_value="IQ Battery 5P"),
+        type_device_hw_version=Mock(return_value="2"),
+        type_device_serial_number=Mock(return_value="battery"),
+        type_device_model_id=Mock(return_value="5P"),
+        type_device_sw_version_summary=Mock(return_value=None),
+        type_device_sw_version=Mock(return_value="1.2.3"),
+    )
+    if cached_info != "missing_getter":
+        view.type_device_info = lambda key: cached_info
+    assert _registry_type_metadata_signature(SimpleNamespace(inventory_view=view)) == (
+        (
+            "encharge",
+            (DOMAIN, "type:site:encharge"),
+            "IQ Batteries",
+            "IQ Battery",
+            "IQ Battery 5P",
+            "2",
+            "battery",
+            "5P",
+            "1.2.3",
+        ),
+    )
+    for name in (
+        "name",
+        "model",
+        "hw_version",
+        "serial_number",
+        "model_id",
+        "sw_version_summary",
+        "sw_version",
+    ):
+        getattr(view, f"type_device_{name}").assert_called_once_with("encharge")
 
 
 @pytest.mark.asyncio

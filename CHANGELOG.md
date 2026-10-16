@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Preserve the cached registry metadata fast path with Home Assistant 2026.11's dataclass-based DeviceInfo while retaining dictionary support for older versions.
 
 ### 🔧 Improvements
 - None
