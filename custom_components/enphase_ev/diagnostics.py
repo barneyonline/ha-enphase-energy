@@ -9,6 +9,7 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
+from .api_client.vpp_auth import credential_diagnostics
 from .const import CONF_EMAIL, CONF_SITE_ID, DOMAIN
 from .device_types import parse_type_identifier
 from .energy import SiteEnergyFlow
@@ -645,6 +646,9 @@ async def async_get_config_entry_diagnostics(
         "system_events": system_events,
         "system_event_history": system_event_history,
         "vpp": vpp,
+        "vpp_credential_selection": credential_diagnostics(
+            getattr(client, "_vpp_credential_diagnostics", None)
+        ),
         "heatpump_runtime": heatpump_runtime,
         "current_power": current_power,
         "scheduler": scheduler,

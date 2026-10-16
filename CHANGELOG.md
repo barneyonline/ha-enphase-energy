@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔧 Improvements
-- None
+- Add credential-free, request-time VPP diagnostics for the selected credential source, candidate expiry/eligibility, account matching, and retained-candidate exclusion. This supplies evidence for authorization failures without changing authentication or claiming to resolve HTTP 401.
 
 ### 🔄 Other changes
 - None

@@ -32,18 +32,55 @@ def _account_identity(token: str | None) -> str | None:
     return None
 
 
-def _usable_token(token: str | None, now: float) -> bool:
-    """Exclude known-expired JWTs while retaining opaque-token compatibility."""
+def _expiry_state(token: str | None, now: float) -> str:
+    """Describe expiry without retaining claims or changing opaque-token policy."""
 
     if not token:
-        return False
+        return "absent"
     payload = _decode_jwt_payload(token)
     expiry = payload.get("exp") if payload is not None else None
     if isinstance(expiry, int) and not isinstance(expiry, bool):
-        return expiry > now
+        return "not_expired" if expiry > now else "expired"
     if isinstance(expiry, float) and math.isfinite(expiry):
-        return expiry > now
-    return True
+        return "not_expired" if expiry > now else "expired"
+    return "unknown"
+
+
+def credential_diagnostics(snapshot: object) -> dict[str, object]:
+    """Export only bounded categories from the last request-time selection."""
+
+    data = snapshot if isinstance(snapshot, dict) else {}
+    source = data.get("source")
+    account_match = data.get("account_match")
+    candidates = data.get("candidates")
+    candidates = candidates if isinstance(candidates, dict) else {}
+    safe_candidates = {}
+    for category in ("stored_manager", "stored_access", "live_manager"):
+        candidate = candidates.get(category)
+        candidate = candidate if isinstance(candidate, dict) else {}
+        expiry = candidate.get("expiry")
+        safe_candidates[category] = {
+            "expiry": (
+                expiry
+                if expiry in ("absent", "expired", "not_expired", "unknown")
+                else "not_evaluated"
+            ),
+            "eligible": candidate.get("eligible") is True,
+        }
+    return {
+        "source": (
+            source
+            if source in ("live_manager", "stored_manager", "stored_access", "none")
+            else "not_attempted"
+        ),
+        "account_match": (
+            account_match
+            if account_match in ("match", "mismatch", "unknown", "conflicting_context")
+            else "not_evaluated"
+        ),
+        "retained_candidate_excluded": data.get("retained_candidate_excluded") is True,
+        "candidates": safe_candidates,
+    }
 
 
 def live_manager_token(jar: AbstractCookieJar | None) -> str | None:
@@ -67,6 +104,7 @@ def select_vpp_token(
     jar: AbstractCookieJar | None,
     *,
     ignored_live_token: str | None = None,
+    diagnostics: dict[str, object] | None = None,
 ) -> str | None:
     """Prefer a same-account live manager, then eligible stored credentials.
 
@@ -83,16 +121,52 @@ def select_vpp_token(
         for token in (manager, access)
         if (identity := _account_identity(token)) and identity.strip()
     }
+    candidates = {
+        category: {
+            "expiry": (expiry := _expiry_state(token, now)),
+            "eligible": expiry in ("not_expired", "unknown"),
+        }
+        for category, token in (("stored_manager", manager), ("stored_access", access))
+    }
+    candidates["live_manager"] = {"expiry": "not_evaluated", "eligible": False}
+    state: dict[str, object] = {
+        "source": "none",
+        "account_match": "conflicting_context" if len(identities) > 1 else "unknown",
+        "retained_candidate_excluded": False,
+        "candidates": candidates,
+    }
+    if diagnostics is not None:
+        diagnostics.clear()
+        diagnostics.update(state)
     if jar is not None and len(identities) == 1:
         candidate = live_manager_token(jar)
         candidate_identity = _account_identity(candidate)
-        if (
+        retained = bool(candidate and candidate == ignored_live_token)
+        matches = (
+            candidate_identity is not None and candidate_identity.strip() in identities
+        )
+        expiry = _expiry_state(candidate, now)
+        eligible = (
             candidate_identity is not None
-            and candidate != ignored_live_token
-            and candidate_identity.strip() in identities
-            and _usable_token(candidate, now)
-        ):
+            and not retained
+            and matches
+            and expiry in ("not_expired", "unknown")
+        )
+        candidates["live_manager"] = {"expiry": expiry, "eligible": eligible}
+        if diagnostics is not None:
+            diagnostics["account_match"] = (
+                "unknown"
+                if candidate_identity is None
+                else "match" if matches else "mismatch"
+            )
+            diagnostics["retained_candidate_excluded"] = retained
+        if eligible:
+            if diagnostics is not None:
+                diagnostics["source"] = "live_manager"
             return candidate
-    return next(
-        (token for token in (manager, access) if _usable_token(token, now)), None
-    )
+    for category, token in (("stored_manager", manager), ("stored_access", access)):
+        if candidates[category]["eligible"]:
+            if diagnostics is not None:
+                diagnostics["source"] = category
+            return token
+    return None
