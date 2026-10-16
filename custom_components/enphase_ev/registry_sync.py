@@ -494,6 +494,10 @@ def _registry_type_metadata_signature(
         device_info = (
             device_info_getter(type_key) if callable(device_info_getter) else None
         )
+        # HA 2026.11 DeviceInfo is a dataclass; as_dict omits its unset fields.
+        device_info_as_dict = getattr(device_info, "as_dict", None)
+        if callable(device_info_as_dict):
+            device_info = device_info_as_dict()
         if isinstance(device_info, dict):
             # InventoryView caches this compact metadata independently of
             # telemetry. Avoid rescanning every member for each scalar getter.
