@@ -532,6 +532,24 @@ VPP diagnostics deliberately expose only enrollment/availability state, aggregat
 event counts, last-success and cached-data flags, and truncation. Site, enrollment,
 program, event, gateway, and request identifiers are never included.
 
+`coordinator.vpp_credential_selection` captures the last VPP header selection in
+process memory, including failed requests. Downloading diagnostics does not select
+credentials, read the cookie jar, or make requests. Later credential updates do
+not rewrite this snapshot; the next VPP request replaces it. Before a request,
+the source is `not_attempted`. Source categories are `live_manager`,
+`stored_manager`, `stored_access`, and `none` when no candidate is eligible.
+Each candidate has an `eligible` boolean and an expiry category: `absent`,
+`expired`, `not_expired`, `unknown`, or `not_evaluated`. Unknown expiry preserves
+opaque-token compatibility; it does not establish server acceptance. Live-manager
+expiry remains `not_evaluated` when the existing policy skips reading the jar.
+`account_match` is `match`, `mismatch`, `unknown`, `conflicting_context`, or
+`not_evaluated`; it describes decoded-claim comparison, not verified identity.
+`retained_candidate_excluded` is true when an evaluated jar candidate matches
+the token already excluded by an explicit credential update. The export permits
+only these fixed categories and booleans. It contains no tokens, hashes, decoded
+identities, account identifiers, cookies, or exact expiry times. This evidence does
+not identify the cause of a Grid Services HTTP 401 or change login/refresh policy.
+
 When in doubt, redact broadly and expose counts, status summaries, field names, or shape summaries instead of raw values.
 
 Domain actions are registered once during integration setup and remain registered

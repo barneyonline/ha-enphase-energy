@@ -382,6 +382,7 @@ class EnphaseEVClient(MqttStreamSurface):
         self._cookie = cookie or ""
         self._eauth = eauth or None
         self._vpp_ignored_live_token: str | None = None
+        self._vpp_credential_diagnostics: dict[str, object] | None = None
         self._activation_token: str | None = None
         self._activation_referer: str | None = None
         self._activation_settings_grid_profiles: list[tuple[str, str]] = []
