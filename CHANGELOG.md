@@ -11,6 +11,23 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v5.1.2 - 2026-10-17
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
 - Preserve the cached registry metadata fast path with Home Assistant 2026.11's dataclass-based DeviceInfo while retaining dictionary support for older versions.
 
 ### 🔧 Improvements
@@ -18,6 +35,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🔄 Other changes
 - Pin hassfest validation to a verified Home Assistant 2026.9.2 image digest and assert its version before validation while 2026.10 execution remains paused.
+- Bump the integration manifest version to `5.1.2`.
 
 ## v5.1.1 - 2026-10-15
 
