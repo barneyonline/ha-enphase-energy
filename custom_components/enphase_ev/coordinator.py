@@ -2694,197 +2694,6 @@ class EnphaseCoordinator(
     ) -> dict[str, object]:
         return self.inventory_runtime._debug_topology_summary(snapshot)
 
-    @staticmethod
-    def _dashboard_key_token(key: object) -> str:  # pragma: no cover
-        return sd_helpers.dashboard_key_token(key)
-
-    @classmethod
-    def _dashboard_key_matches(  # pragma: no cover - compatibility shim
-        cls, key: object, *candidates: str
-    ) -> bool:
-        return sd_helpers.dashboard_key_matches(key, *candidates)
-
-    @staticmethod
-    def _dashboard_simple_value(value: object) -> object | None:  # pragma: no cover
-        return sd_helpers.dashboard_simple_value(value)
-
-    @classmethod
-    def _iter_dashboard_mappings(  # pragma: no cover - compatibility shim
-        cls, value: object
-    ) -> Iterable[dict[str, object]]:
-        yield from sd_helpers.iter_dashboard_mappings(value)
-
-    @classmethod
-    def _dashboard_first_value(  # pragma: no cover - compatibility shim
-        cls, payload: object, *keys: str
-    ) -> object | None:
-        return sd_helpers.dashboard_first_value(payload, *keys)
-
-    @classmethod
-    def _dashboard_first_mapping(  # pragma: no cover - compatibility shim
-        cls, payload: object, *keys: str
-    ) -> dict[str, object] | None:
-        return sd_helpers.dashboard_first_mapping(payload, *keys)
-
-    @classmethod
-    def _dashboard_field(  # pragma: no cover - compatibility shim
-        cls, payload: object, *keys: str, default: object | None = None
-    ) -> object | None:
-        return sd_helpers.dashboard_field(payload, *keys, default=default)
-
-    @classmethod
-    def _dashboard_field_map(  # pragma: no cover - compatibility shim
-        cls,
-        payload: object,
-        fields: dict[str, tuple[str, ...]],
-    ) -> dict[str, object]:
-        return sd_helpers.dashboard_field_map(payload, fields)
-
-    @classmethod
-    def _dashboard_aliases(  # pragma: no cover - compatibility shim
-        cls, payload: dict[str, object]
-    ) -> list[str]:
-        return sd_helpers.dashboard_aliases(payload)
-
-    @classmethod
-    def _dashboard_primary_id(  # pragma: no cover - compatibility shim
-        cls, payload: dict[str, object]
-    ) -> str | None:
-        return sd_helpers.dashboard_primary_id(payload)
-
-    @classmethod
-    def _dashboard_parent_id(  # pragma: no cover - compatibility shim
-        cls, payload: dict[str, object]
-    ) -> str | None:
-        return sd_helpers.dashboard_parent_id(payload)
-
-    @classmethod
-    def _dashboard_raw_type(  # pragma: no cover - compatibility shim
-        cls, payload: dict[str, object], fallback_type: str | None = None
-    ) -> str | None:
-        return sd_helpers.dashboard_raw_type(payload, fallback_type)
-
-    @classmethod
-    def _system_dashboard_type_key(  # pragma: no cover - compatibility shim
-        cls, raw_type: object
-    ) -> str | None:
-        return sd_helpers.system_dashboard_type_key(raw_type)
-
-    @classmethod
-    def _system_dashboard_detail_records(  # pragma: no cover - compatibility shim
-        cls,
-        payloads: dict[str, object],
-        *source_types: str,
-    ) -> list[dict[str, object]]:
-        return sd_helpers.system_dashboard_detail_records(payloads, *source_types)
-
-    @classmethod
-    def _system_dashboard_meter_kind(  # pragma: no cover - compatibility shim
-        cls, payload: dict[str, object]
-    ) -> str | None:
-        return sd_helpers.system_dashboard_meter_kind(payload)
-
-    @classmethod
-    def _system_dashboard_battery_detail_subset(  # pragma: no cover - compatibility shim
-        cls,
-        payload: dict[str, object] | None,
-    ) -> dict[str, object]:
-        return sd_helpers.system_dashboard_battery_detail_subset(payload)
-
-    @classmethod
-    def _dashboard_node_entry(  # pragma: no cover - compatibility shim
-        cls,
-        payload: dict[str, object],
-        *,
-        fallback_type: str | None = None,
-        parent_uid: str | None = None,
-    ) -> dict[str, object] | None:
-        return sd_helpers.dashboard_node_entry(
-            payload,
-            fallback_type=fallback_type,
-            parent_uid=parent_uid,
-        )
-
-    @classmethod
-    def _dashboard_child_containers(  # pragma: no cover - compatibility shim
-        cls, payload: dict[str, object]
-    ) -> list[tuple[object, str | None]]:
-        return sd_helpers.dashboard_child_containers(payload)
-
-    @classmethod
-    def _index_dashboard_nodes(  # pragma: no cover - compatibility shim
-        cls,
-        payload: object,
-        *,
-        fallback_type: str | None = None,
-        parent_uid: str | None = None,
-        index: dict[str, dict[str, object]] | None = None,
-        alias_index: dict[str, str] | None = None,
-    ) -> dict[str, dict[str, object]]:
-        return sd_helpers.index_dashboard_nodes(
-            payload,
-            fallback_type=fallback_type,
-            parent_uid=parent_uid,
-            index=index,
-            alias_index=alias_index,
-        )
-
-    @classmethod
-    def _system_dashboard_hierarchy_summary_from_index(  # pragma: no cover
-        cls,
-        index: dict[str, dict[str, object]],
-        alias_index: dict[str, str] | None = None,
-    ) -> dict[str, object]:
-        return sd_helpers.system_dashboard_hierarchy_summary_from_index(
-            index, alias_index
-        )
-
-    @classmethod
-    def _system_dashboard_type_hierarchy(  # pragma: no cover - compatibility shim
-        cls,
-        type_key: str,
-        index: dict[str, dict[str, object]],
-        alias_index: dict[str, str] | None = None,
-    ) -> dict[str, object]:
-        return sd_helpers.system_dashboard_type_hierarchy(type_key, index, alias_index)
-
-    @classmethod
-    def _system_dashboard_meter_summaries(  # pragma: no cover - compatibility shim
-        cls, payloads: dict[str, object]
-    ) -> list[dict[str, object]]:
-        return sd_helpers.system_dashboard_meter_summaries(payloads)
-
-    @classmethod
-    def _system_dashboard_envoy_summary(  # pragma: no cover - compatibility shim
-        cls,
-        payloads: dict[str, object],
-        index: dict[str, dict[str, object]],
-        alias_index: dict[str, str] | None = None,
-    ) -> dict[str, object]:
-        return sd_helpers.system_dashboard_envoy_summary(payloads, index, alias_index)
-
-    @classmethod
-    def _system_dashboard_encharge_summary(  # pragma: no cover - compatibility shim
-        cls,
-        payloads: dict[str, object],
-        index: dict[str, dict[str, object]],
-        alias_index: dict[str, str] | None = None,
-    ) -> dict[str, object]:
-        return sd_helpers.system_dashboard_encharge_summary(
-            payloads, index, alias_index
-        )
-
-    @classmethod
-    def _system_dashboard_microinverter_summary(  # pragma: no cover - compatibility shim
-        cls,
-        payloads: dict[str, object],
-        index: dict[str, dict[str, object]],
-        alias_index: dict[str, str] | None = None,
-    ) -> dict[str, object]:
-        return sd_helpers.system_dashboard_microinverter_summary(
-            payloads, index, alias_index
-        )
-
     def _build_system_dashboard_summaries(  # pragma: no cover - compatibility shim
         self,
         tree_payload: dict[str, object] | None,
@@ -3756,11 +3565,6 @@ class EnphaseCoordinator(
         ):
             new_interval = timedelta(seconds=target)
             self.update_interval = new_interval
-            if hasattr(self, "async_set_update_interval"):
-                try:
-                    self.async_set_update_interval(new_interval)
-                except Exception:
-                    pass
 
     @staticmethod
     def _charger_amp_bounds_missing(data: dict[str, object]) -> bool:
@@ -8528,28 +8332,8 @@ class EnphaseCoordinator(
     def _set_storm_guard_pending(self, target_state: str) -> None:  # pragma: no cover
         self.battery_runtime.set_storm_guard_pending(target_state)
 
-    def _sync_storm_guard_pending(  # pragma: no cover - compatibility shim
-        self, effective_state: str | None = None
-    ) -> None:
-        self.battery_runtime.sync_storm_guard_pending(effective_state)
-
     def _clear_battery_pending(self) -> None:
         self.battery_runtime.clear_battery_pending()
-
-    def _set_battery_pending(  # pragma: no cover - compatibility shim
-        self,
-        *,
-        profile: str,
-        reserve: int,
-        sub_type: str | None,
-        require_exact_settings: bool = True,
-    ) -> None:
-        self.battery_runtime.set_battery_pending(
-            profile=profile,
-            reserve=reserve,
-            sub_type=sub_type,
-            require_exact_settings=require_exact_settings,
-        )
 
     def _assert_battery_profile_write_allowed(self) -> None:  # pragma: no cover
         self.battery_runtime.assert_battery_profile_write_allowed()
@@ -8633,35 +8417,6 @@ class EnphaseCoordinator(
 
     def _battery_itc_disclaimer_value(self) -> str:  # pragma: no cover
         return self.battery_runtime.battery_itc_disclaimer_value()
-
-    async def _async_apply_battery_settings(  # pragma: no cover - compatibility shim
-        self, payload: dict[str, object]
-    ) -> None:
-        await self.battery_runtime.async_apply_battery_settings(payload)
-
-    def _raise_schedule_update_validation_error(  # pragma: no cover - compatibility shim
-        self, err: aiohttp.ClientResponseError
-    ) -> None:
-        self.battery_runtime.raise_schedule_update_validation_error(err)
-
-    async def _async_update_battery_schedule(  # pragma: no cover - compatibility shim
-        self,
-        schedule_id: str,
-        *,
-        start_time: str,
-        end_time: str,
-        limit: int,
-        days: list[int],
-        timezone: str,
-    ) -> None:
-        await self.battery_runtime.async_update_battery_schedule(
-            schedule_id,
-            start_time=start_time,
-            end_time=end_time,
-            limit=limit,
-            days=days,
-            timezone=timezone,
-        )
 
     def parse_battery_status_payload(self, payload: object) -> None:  # pragma: no cover
         self.battery_runtime.parse_battery_status_payload(payload)
@@ -8814,18 +8569,6 @@ class EnphaseCoordinator(
         self, level: int
     ) -> None:  # pragma: no cover
         await self.battery_runtime.async_set_battery_shutdown_level(level)
-
-    def _parse_storm_guard_profile(  # pragma: no cover - compatibility shim
-        self, payload: object
-    ) -> tuple[str | None, bool | None]:
-        if not isinstance(payload, dict):
-            return None, None
-        data = payload.get("data")
-        if not isinstance(data, dict):
-            data = payload
-        state = self._normalize_storm_guard_state(data.get("stormGuardState"))
-        evse = self._coerce_optional_bool(data.get("evseStormEnabled"))
-        return state, evse
 
     def _parse_storm_alert(self, payload: object) -> bool | None:  # pragma: no cover
         return self.battery_runtime.parse_storm_alert(payload)

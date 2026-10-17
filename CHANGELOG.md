@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
-- None
+- Require Home Assistant `2026.10.0` or newer (Python `3.14`+).
 
 ### ✨ New features
 - None
@@ -14,10 +14,13 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔧 Improvements
-- None
+- Use Home Assistant's target-selection API directly and avoid repeated target expansion while resolving service devices and sites.
+- Remove obsolete service-target, device-ownership, and polling-interval compatibility paths and their unused tests.
+- Remove 31 unused coordinator forwarding methods and the redundant device-lookup wrapper.
 
 ### 🔄 Other changes
-- None
+- Run the full CI suite on the pinned Home Assistant `2026.10.0` stack and remove the duplicate minimum-version environment and compatibility job.
+- Update pinned hassfest validation to Home Assistant `2026.10.2`.
 
 ## v5.1.2 - 2026-10-17
 

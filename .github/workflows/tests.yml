@@ -14,7 +14,6 @@ on:
       - 'devtools/docker/constraints*.txt'
       - 'devtools/docker/requirements-ci-quality.txt'
       - 'devtools/docker/requirements-ci-scripts.txt'
-      - 'devtools/docker/requirements-min-ha.txt'
       - 'devtools/docker/Dockerfile'
       - 'devtools/docker/docker-compose.yml'
       - 'hacs.json'
@@ -38,7 +37,6 @@ jobs:
     permissions:
       contents: read
     outputs:
-      compatibility: ${{ steps.paths.outputs.compatibility }}
       diagnostics: ${{ steps.paths.outputs.diagnostics }}
       integration: ${{ steps.paths.outputs.integration }}
       quality: ${{ steps.paths.outputs.quality }}
@@ -52,7 +50,7 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" != "pull_request" ]; then
-            for group in compatibility diagnostics integration quality scripts; do
+            for group in diagnostics integration quality scripts; do
               echo "${group}=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -76,9 +74,8 @@ jobs:
           }
 
           common='^(hacs\.json|\.github/workflows/(ci|tests)\.yml|devtools/docker/(Dockerfile|docker-compose\.yml|constraints-[^/]+\.txt))$'
-          set_output integration "${common}|^scripts/(benchmark_snapshots|check_statement_coverage)\.py$|^custom_components/enphase_ev/|^tests/components/enphase_ev/|^devtools/docker/requirements-(dev|min-ha)\.txt$|^pytest\.ini$|^\.pre-commit-config\.yaml$|^\.ruff\.toml$"
-          set_output compatibility "${common}|^custom_components/enphase_ev/.*\.py$|^custom_components/enphase_ev/manifest\.json$|^tests/components/enphase_ev/(conftest|test_(number_module|device_registry_compat|device_action|device_trigger|entry_lifecycle|integration_lifecycle|reload_snapshot|init_module|manifest|runtime_data|schedule_sync|services))\.py$|^devtools/docker/requirements-min-ha\.txt$|^pytest\.ini$"
-          set_output diagnostics "${common}|^custom_components/enphase_ev/.*\.py$|^scripts/importtime_profile\.py$|^tests/scripts/test_importtime_profile\.py$|^devtools/docker/requirements-(dev|min-ha)\.txt$"
+          set_output integration "${common}|^scripts/(benchmark_snapshots|check_statement_coverage)\.py$|^custom_components/enphase_ev/|^tests/components/enphase_ev/|^devtools/docker/requirements-dev\.txt$|^pytest\.ini$|^\.pre-commit-config\.yaml$|^\.ruff\.toml$"
+          set_output diagnostics "${common}|^custom_components/enphase_ev/.*\.py$|^scripts/importtime_profile\.py$|^tests/scripts/test_importtime_profile\.py$|^devtools/docker/requirements-dev\.txt$"
           set_output quality "${common}|^custom_components/enphase_ev/|^tests/components/enphase_ev/|^quality_scale\.yaml$|^scripts/validate_quality_scale\.py$|^tests/scripts/test_validate_quality_scale\.py$|^devtools/docker/requirements-(dev|ci-quality)\.txt$|^\.pre-commit-config\.yaml$|^\.strict-typing$"
           set_output scripts "${common}|^scripts/.*\.py$|^tests/scripts/.*\.py$|^devtools/docker/requirements-ci-scripts\.txt$"
 
@@ -145,7 +142,6 @@ jobs:
       - name: Validate strict typing for full integration package
         run: mypy --strict --ignore-missing-imports --follow-imports=skip custom_components/enphase_ev
 
-  # Keep runtime validation on the pinned minimum stack while 2026.10 tests are paused.
   python314-diagnostics:
     runs-on: ubuntu-latest
     needs: changes
@@ -162,12 +158,12 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: |
-            devtools/docker/requirements-min-ha.txt
-            devtools/docker/constraints-min-ha.txt
+            devtools/docker/requirements-dev.txt
+            devtools/docker/constraints-dev.txt
       - name: Install deps
         run: |
-          uv pip install --system -r devtools/docker/requirements-min-ha.txt
-          python -c "from homeassistant.const import __version__; assert __version__ == '2026.9.0', __version__; print(f'Home Assistant {__version__}')"
+          uv pip install --system -r devtools/docker/requirements-dev.txt
+          python -c "from homeassistant.const import __version__; assert __version__ == '2026.10.0', __version__; print(f'Home Assistant {__version__}')"
       - name: Gate integration import deprecations and profile import time
         run: python scripts/importtime_profile.py --strict-integration-warnings --output importtime-enphase-ev.log
       - name: Upload import-time profile
@@ -175,51 +171,6 @@ jobs:
         with:
           name: importtime-enphase-ev-python314
           path: importtime-enphase-ev.log
-
-  minimum-homeassistant:
-    runs-on: ubuntu-latest
-    needs: changes
-    if: ${{ needs.changes.outputs.compatibility == 'true' }}
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: '3.14'
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-        with:
-          enable-cache: true
-          cache-dependency-glob: |
-            devtools/docker/requirements-min-ha.txt
-            devtools/docker/constraints-min-ha.txt
-      - name: Install minimum Home Assistant test deps
-        run: |
-          uv pip install --system -r devtools/docker/requirements-min-ha.txt
-          python -m pip check
-          python -c "from homeassistant.const import __version__; assert __version__ == '2026.9.0', __version__; print(f'Home Assistant {__version__}')"
-      - name: Run minimum Home Assistant tests
-        env:
-          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-          PYTEST_PLUGINS: pytest_asyncio.plugin,pytest_homeassistant_custom_component.plugins,pytest_github_actions_annotate_failures.plugin
-        run: >
-          pytest -q
-          tests/components/enphase_ev/test_manifest.py
-          tests/components/enphase_ev/test_device_registry_compat.py
-          tests/components/enphase_ev/test_number_module.py
-          tests/components/enphase_ev/test_device_action.py
-          tests/components/enphase_ev/test_device_trigger.py
-          tests/components/enphase_ev/test_schedule_sync.py
-          tests/components/enphase_ev/test_entry_lifecycle.py
-          tests/components/enphase_ev/test_integration_lifecycle.py
-          tests/components/enphase_ev/test_reload_snapshot.py
-          tests/components/enphase_ev/test_services.py
-          tests/components/enphase_ev/test_init_module.py::test_unsupported_migration_preserves_entry_and_registries
-          tests/components/enphase_ev/test_init_module.py::test_framework_rejects_newer_schema_before_integration_migration
-          tests/components/enphase_ev/test_init_module.py::test_async_setup_entry_updates_existing_device
-          tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_preserves_real_devices_with_site_identifier
-          tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_removes_empty_device_without_gateway
 
   pytest:
     runs-on: ubuntu-latest
@@ -245,12 +196,12 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: |
-            devtools/docker/requirements-min-ha.txt
-            devtools/docker/constraints-min-ha.txt
+            devtools/docker/requirements-dev.txt
+            devtools/docker/constraints-dev.txt
       - name: Install deps
         run: |
-          uv pip install --system -r devtools/docker/requirements-min-ha.txt
-          python -c "from homeassistant.const import __version__; assert __version__ == '2026.9.0', __version__; print(f'Home Assistant {__version__}')"
+          uv pip install --system -r devtools/docker/requirements-dev.txt
+          python -c "from homeassistant.const import __version__; assert __version__ == '2026.10.0', __version__; print(f'Home Assistant {__version__}')"
       - name: Detect changed integration modules
         id: changed
         if: ${{ github.event_name == 'pull_request' }}

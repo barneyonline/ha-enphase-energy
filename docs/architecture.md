@@ -4,6 +4,12 @@ This document is a contributor map for the Enphase Energy integration. It explai
 
 ## Runtime Shape
 
+Home Assistant 2026.10.0 and Python 3.14 are the minimum supported versions.
+Service routing uses Home Assistant's target-selection API and reuses each
+expansion when resolving devices and entities. Device lookups use the
+entry-scoped registry API directly. Migrated composite device IDs remain valid
+saved targets and are resolved through their current split devices.
+
 Each Home Assistant config entry owns one `EnphaseCoordinator`. The coordinator is the integration boundary for entities: platforms read normalized state from the coordinator and call coordinator/service helpers for writes. Entities should not call the cloud client directly unless a local helper already establishes that pattern.
 
 ```mermaid
@@ -153,7 +159,8 @@ from the coordinator. Each config entry receives its own policy mapping and
 health state. Feature runtimes can use the public `endpoint_family_should_run`,
 `note_endpoint_family_success`, and `note_endpoint_family_failure` services;
 `CurrentPowerHost` is the narrow typed contract used by the current-power runtime.
-Existing private coordinator entry points remain available for compatibility.
+Private coordinator entry points with current callers remain available; unused
+forwarding methods have been removed.
 
 `runtime_health.py` defines narrow typed endpoint-health and HEMS authentication
 contracts used by battery, inventory, and heat-pump runtimes. The shared adapters

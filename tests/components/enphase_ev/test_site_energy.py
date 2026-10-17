@@ -1392,41 +1392,6 @@ async def test_summary_ip_address_empty_string_list(monkeypatch, coordinator_fac
     assert flaky._count >= 3
 
 
-@pytest.mark.asyncio
-async def test_async_update_sets_update_interval_with_exception(
-    monkeypatch, coordinator_factory
-):
-    coord = coordinator_factory()
-    coord.config_entry = SimpleNamespace(options={})
-    coord.client.status = AsyncMock(return_value={"evChargerData": []})
-    coord._fast_until = time.monotonic() + 5
-
-    class BoomCoord(type(coord)):
-        def async_set_update_interval(self, *_args, **_kwargs):
-            raise ValueError("fail")
-
-    coord.__class__.async_set_update_interval = BoomCoord.async_set_update_interval  # type: ignore[assignment]
-    coord.update_interval = timedelta(seconds=1)
-    await coord._async_update_data()
-
-
-@pytest.mark.asyncio
-async def test_async_update_handles_async_set_update_interval_error(
-    monkeypatch, coordinator_factory
-):
-    coord = coordinator_factory()
-    coord.config_entry = SimpleNamespace(options={})
-    coord.client.status = AsyncMock(return_value={"evChargerData": []})
-
-    def boom_update_interval(*_args, **_kwargs):
-        raise ValueError("boom")
-
-    coord.async_set_update_interval = boom_update_interval
-    coord._fast_until = time.monotonic() + 5
-    coord.update_interval = timedelta(seconds=5)
-    await coord._async_update_data()
-
-
 def test_slow_interval_floor_handles_bad_update_interval(
     monkeypatch, coordinator_factory
 ):
