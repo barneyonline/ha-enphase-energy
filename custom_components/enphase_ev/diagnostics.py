@@ -72,6 +72,7 @@ DIAGNOSTIC_IDENTIFIER_KEYS = [
     "mac",
     "mac_address",
     "uid",
+    "uuid",
     "device_uid",
     "device-uid",
     "iqer_uid",
@@ -154,7 +155,7 @@ def _value_matches_site_id(value: Any, site_ids: tuple[str, ...]) -> bool:
 
 
 def _redact_embedded_diagnostics_text(value: Any, site_ids: tuple[str, ...]) -> Any:
-    """Redact site IDs embedded in otherwise non-sensitive diagnostics strings."""
+    """Redact contextual identifiers and site IDs embedded in diagnostics text."""
 
     if isinstance(value, dict):
         redacted: dict[Any, Any] = {}
@@ -165,9 +166,25 @@ def _redact_embedded_diagnostics_text(value: Any, site_ids: tuple[str, ...]) -> 
                 safe_key = "[site]"
             else:
                 safe_key = key
-            redacted[safe_key] = _redact_embedded_diagnostics_text(
-                child_value, site_ids
-            )
+            if key == "last_scheduler_modes" and isinstance(child_value, dict):
+                # Generate aliases after text redaction so short site IDs cannot
+                # collapse distinct charger keys into the same redacted key.
+                redacted[safe_key] = {
+                    f"[charger_{index}]": _redact_embedded_diagnostics_text(
+                        mode, site_ids
+                    )
+                    for index, mode in enumerate(child_value.values(), start=1)
+                }
+            elif key == "cached_serials":
+                redacted[safe_key] = (
+                    ["**REDACTED**" for _ in child_value]
+                    if isinstance(child_value, list)
+                    else "**REDACTED**"
+                )
+            else:
+                redacted[safe_key] = _redact_embedded_diagnostics_text(
+                    child_value, site_ids
+                )
         return redacted
     if isinstance(value, list):
         return [_redact_embedded_diagnostics_text(item, site_ids) for item in value]
