@@ -27,7 +27,6 @@ def test_slow_jobs_use_path_classification_instead_of_precommit_gate() -> None:
     assert "changes" in jobs
     assert "translation-regressions" not in jobs
     for name in (
-        "minimum-homeassistant",
         "pytest",
         "python314-diagnostics",
         "quality-scale",
@@ -103,7 +102,6 @@ def test_path_classification_when_base_advances_after_checkout(tmp_path):
     assert result.returncode == 0, result.stderr
     assert set(output.read_text().splitlines()) == {
         "integration=true",
-        "compatibility=true",
         "diagnostics=true",
         "quality=true",
         "scripts=false",
@@ -157,43 +155,6 @@ def test_duplicate_static_gates_have_single_ci_owners() -> None:
     assert (
         sum(command.lstrip().startswith("mypy ") for command in quality_commands) == 1
     )
-
-
-def _compatibility_test_paths():
-    paths = set()
-    for step in _jobs()["minimum-homeassistant"]["steps"]:
-        for token in shlex.split(step.get("run", "")):
-            if token.startswith("tests/"):
-                paths.add(token.split("::")[0])
-    return sorted(paths)
-
-
-@pytest.mark.parametrize(
-    "path",
-    [
-        *_compatibility_test_paths(),
-        "hacs.json",
-        "devtools/docker/requirements-min-ha.txt",
-        "devtools/docker/constraints-min-ha.txt",
-    ],
-)
-def test_every_compatibility_input_triggers_its_lane(path, tmp_path):
-    """Execute the classifier for minimum-version metadata, dependencies, and tests."""
-    step = next(
-        step
-        for step in _jobs()["changes"]["steps"]
-        if step.get("name") == "Classify changed paths"
-    )
-    script = step["run"]
-    # The classifier below consumes git's changed-path output. No network/git
-    # mutation is needed to exercise its actual shell expressions.
-    script = script[script.index("          set_output()".strip()) :]
-    output = tmp_path / "outputs"
-    env = {**os.environ, "GITHUB_OUTPUT": str(output), "changed_files": path}
-    subprocess.run(
-        ["bash", "-c", script], env=env, check=True, capture_output=True, text=True
-    )
-    assert "compatibility=true" in output.read_text().splitlines()
 
 
 @pytest.mark.parametrize(
