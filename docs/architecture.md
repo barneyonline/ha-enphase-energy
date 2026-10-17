@@ -528,6 +528,13 @@ Diagnostics may include raw or near-raw Enphase payloads after redaction. Any ne
 - Site IDs, serials, device UIDs, MAC addresses, IP addresses, hostnames, URLs, and modem/SIM identifiers.
 - Nested payloads where future fields may add identifiers.
 
+Downloaded diagnostics redact UUID fields in charger profiles and other nested
+payloads. Scheduler-mode maps use unique per-export `[charger_N]` keys, preserving
+every mode without exposing serials or merging entries. Cached schedule serials
+become redaction markers while retaining list length. These transformations run
+at the diagnostic export boundary and leave runtime caches and source payloads
+unchanged.
+
 VPP diagnostics deliberately expose only enrollment/availability state, aggregate
 event counts, last-success and cached-data flags, and truncation. Site, enrollment,
 program, event, gateway, and request identifiers are never included.

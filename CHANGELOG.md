@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Redact EV charger profile UUIDs, scheduler-mode identifier keys, and cached schedule serials from downloaded diagnostics while preserving mode entries and cache list length.
 
 ### 🔧 Improvements
 - None
