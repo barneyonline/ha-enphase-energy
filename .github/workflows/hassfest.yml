@@ -26,6 +26,17 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      # Keep validation on verified HA 2026.9.2 while 2026.10 execution is paused.
+      HASSFEST_IMAGE: ghcr.io/home-assistant/hassfest@sha256:d13ffcc8995c1217804fe355ed078a81d3028b7002355bc5d89d19d9075d63c7
     steps:
       - uses: actions/checkout@v7
-      - uses: home-assistant/actions/hassfest@master
+      - name: Verify hassfest Home Assistant version
+        run: >-
+          docker run --rm --workdir /usr/src/homeassistant --entrypoint python3
+          "$HASSFEST_IMAGE" -c
+          "from homeassistant.const import __version__; assert __version__ == '2026.9.2', __version__; print(f'Home Assistant {__version__}')"
+      - name: Validate with hassfest
+        run: >-
+          docker run --rm -v "$GITHUB_WORKSPACE:/github/workspace"
+          "$HASSFEST_IMAGE"

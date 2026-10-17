@@ -14,10 +14,10 @@ All notable changes to this project will be documented in this file.
 - Preserve the cached registry metadata fast path with Home Assistant 2026.11's dataclass-based DeviceInfo while retaining dictionary support for older versions.
 
 ### 🔧 Improvements
-- None
+- Add credential-free, request-time VPP diagnostics for the selected credential source, candidate expiry/eligibility, account matching, and retained-candidate exclusion. This supplies evidence for authorization failures without changing authentication or claiming to resolve HTTP 401.
 
 ### 🔄 Other changes
-- None
+- Pin hassfest validation to a verified Home Assistant 2026.9.2 image digest and assert its version before validation while 2026.10 execution remains paused.
 
 ## v5.1.1 - 2026-10-15
 
