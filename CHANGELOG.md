@@ -17,7 +17,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔄 Other changes
-- None
+- Pin the HACS validator image and its Home Assistant runtime to the verified 2026.9 stack while 2026.10 execution remains paused.
 
 ## v5.1.2 - 2026-10-17
 
