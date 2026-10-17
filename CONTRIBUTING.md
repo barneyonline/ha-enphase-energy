@@ -51,19 +51,12 @@ Include the integration version, Home Assistant version, affected entity IDs, de
    The default `ha-dev` lane pins Home Assistant 2026.10.0, the matching test
    plugin, and Linux/Python 3.14 transitive constraints in
    `devtools/docker/constraints-dev.txt`. Rebuild after changing requirements.
-   The minimum supported Home Assistant version is 2026.9.0, paired with
-   `pytest-homeassistant-custom-component==0.13.363`. The `ha-minimum` lane
-   covers this exact version; the default lane covers the latest Home
-   Assistant version supported by the test plugin (currently
-   `pytest-homeassistant-custom-component==0.13.371`).
-   To reproduce minimum-version coverage, run:
-   ```bash
-   docker compose -f devtools/docker/docker-compose.yml build ha-minimum
-   docker compose -f devtools/docker/docker-compose.yml run --rm ha-minimum bash -lc "python -c 'from homeassistant.const import __version__; assert __version__ == \"2026.9.0\"' && python -m pip check && pytest -q tests/components/enphase_ev/test_manifest.py tests/components/enphase_ev/test_device_registry_compat.py tests/components/enphase_ev/test_number_module.py tests/components/enphase_ev/test_device_action.py tests/components/enphase_ev/test_device_trigger.py tests/components/enphase_ev/test_schedule_sync.py tests/components/enphase_ev/test_entry_lifecycle.py tests/components/enphase_ev/test_integration_lifecycle.py tests/components/enphase_ev/test_reload_snapshot.py tests/components/enphase_ev/test_services.py tests/components/enphase_ev/test_init_module.py::test_unsupported_migration_preserves_entry_and_registries tests/components/enphase_ev/test_init_module.py::test_framework_rejects_newer_schema_before_integration_migration tests/components/enphase_ev/test_init_module.py::test_async_setup_entry_updates_existing_device tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_preserves_real_devices_with_site_identifier tests/components/enphase_ev/test_init_module.py::test_remove_legacy_site_device_removes_empty_device_without_gateway"
-   ```
-   Every lane resolves Home Assistant together with its exact matching test
-   plugin and transitive constraints. Upgrade each Home Assistant/plugin pair
-   deliberately; do not overlay a beta on an unrelated dependency stack.
+   The minimum supported Home Assistant version is 2026.10.0, paired with
+   `pytest-homeassistant-custom-component==0.13.371`. The full integration suite
+   runs on this exact version in Docker and CI, so a separate minimum-version
+   environment and repeated compatibility subset are unnecessary.
+   Upgrade Home Assistant together with its matching test plugin and transitive
+   constraints; do not overlay a beta on an unrelated dependency stack.
 5. **Start `ha-runtime` when you need a real Home Assistant UI for manual verification**:
    ```bash
    mkdir -p .ha-config
