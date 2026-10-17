@@ -368,6 +368,22 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   After an explicit credential change, a different manager token already present
   in the jar cannot override the updated credentials. A later eligible jar token
   can be adopted without another credential update or changing the shared jar.
+  `vpp_session.py` additionally permits one session-only `/users/self/token`
+  request when an enabled poll is eligible and no usable VPP token remains.
+  It seeds a private jar solely from the entry cookie snapshot, never the shared
+  HA jar, and follows no redirects. All available stored account claims must
+  agree; a returned token must match that account and have a future JWT expiry.
+  Decoded identity is only a consistency guard, not signature verification.
+  Missing or ambiguous identity/session state fails closed. Token and post-mint
+  cookies are persisted together through the internal entry-update path without
+  clearing core/HEMS auth blocks. Credential replacement during I/O discards the
+  response. An entry-owned lock and persisted fifteen-minute cooldown bound
+  attempts across concurrent polls and reloads; longer Retry-After values apply.
+  Invalid sessions, login walls and identity rejection suspend renewal until
+  explicit credential replacement. Failed renewal skips unauthenticated Grid
+  Services calls. No password login, MFA, or 401-driven renewal is introduced.
+  This targets the expired-credential stuck state and cannot resolve every VPP
+  authorization failure, including rejection of a still-valid token.
   HTTP 401 retains only its status through the optional failure conversion.
   Sanitized HTTP failures retain their status and Retry-After delay. Program
   changes invalidate event data from the previous program while respecting active
