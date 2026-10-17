@@ -18,8 +18,26 @@ permissions: {}
 jobs:
   validate-hacs:
     runs-on: "ubuntu-latest"
+    permissions:
+      contents: read
     steps:
+      - uses: actions/checkout@v7
+      - name: Build pinned HACS validator on Home Assistant 2026.9.0
+        run: docker build --file devtools/docker/Dockerfile.hacs --tag enphase-hacs-validator .
+      - name: Verify HACS Home Assistant version
+        run: >-
+          docker run --rm --entrypoint python3 enphase-hacs-validator -c
+          "from homeassistant.const import __version__; assert __version__ == '2026.9.0', __version__; print(f'Home Assistant {__version__}')"
       - name: HACS validation
-        uses: "hacs/action@main"
-        with:
-          category: "integration"
+        env:
+          INPUT_GITHUB_TOKEN: ${{ github.token }}
+          INPUT_CATEGORY: integration
+        run: >-
+          docker run --rm
+          --env INPUT_GITHUB_TOKEN --env INPUT_CATEGORY
+          --env GITHUB_REPOSITORY --env GITHUB_ACTOR
+          --env GITHUB_EVENT_PATH=/github/workflow/event.json
+          --env GITHUB_WORKSPACE=/github/workspace
+          --volume "$GITHUB_EVENT_PATH:/github/workflow/event.json:ro"
+          --volume "$GITHUB_WORKSPACE:/github/workspace:ro"
+          enphase-hacs-validator

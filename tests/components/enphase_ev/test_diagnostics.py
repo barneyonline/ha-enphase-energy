@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -809,7 +810,7 @@ async def test_config_entry_diagnostics_includes_coordinator(
         "role": "child_coordinator",
         "discovery_state": "available",
     }
-    assert diag["coordinator"]["last_scheduler_modes"] == {RANDOM_SERIAL: "FAST"}
+    assert diag["coordinator"]["last_scheduler_modes"] == {"[charger_1]": "FAST"}
     assert diag["coordinator"]["session_history"]["cache_keys"] == 1
     assert diag["coordinator"]["current_power"] == {
         "accepted_value_w": 2452.0,
@@ -1275,6 +1276,185 @@ async def test_config_entry_diagnostics_handles_snapshot_helper_errors(
     assert coordinator["session_history"] == {}
     assert coordinator["battery_config"] == {}
     assert coordinator["inverters"] == {}
+
+
+@pytest.mark.asyncio
+async def test_config_diagnostics_redacts_profile_and_scheduler_identifiers(
+    hass, config_entry
+) -> None:
+    """Redact identifiers throughout the export without changing cached data."""
+
+    profile_uuid = "11111111-2222-4333-8444-555555555555"
+    second_uuid = "synthetic-profile-device"
+    serials = ["EVSE-AAAA-middle-one-ZZZZ", "EVSE-AAAA-middle-two-ZZZZ"]
+    cached_only_serial = "synthetic-cached-only-charger"
+    coord = DummyCoordinator()
+    metrics = coord.collect_site_metrics()
+    metrics["battery_profile_evse_device"] = {
+        "uuid": profile_uuid,
+        "chargingMode": "FAST",
+        "enabled": True,
+    }
+    coord.collect_site_metrics = lambda: metrics
+    coord._battery_profile_payload = {
+        "data": {
+            "profile": "cost_savings",
+            "devices": {
+                "iqEvse": [
+                    {"uuid": profile_uuid, "chargingMode": "FAST"},
+                    {"uuid": second_uuid, "chargingMode": "SCHEDULED"},
+                ],
+                "other": {"enabled": False},
+            },
+        }
+    }
+    coord._charge_mode_cache = {
+        serials[0]: ("FAST", 1),
+        serials[1]: ("SCHEDULED", 2),
+        "[charger_9]": ("MANUAL", 3),
+    }
+    sync_payload = {
+        "enabled": True,
+        "last_status": "success",
+        "cached_serials": [*serials, cached_only_serial, serials[0]],
+        "details": {"slot_count": 4},
+    }
+    coord.schedule_sync = SimpleNamespace(diagnostics=lambda: sync_payload)
+    source = {
+        "metrics": metrics,
+        "profile": coord._battery_profile_payload,
+        "modes": coord._charge_mode_cache,
+        "sync": sync_payload,
+        "entry_data": config_entry.data,
+        "entry_options": config_entry.options,
+    }
+    original = deepcopy(
+        {
+            **source,
+            "entry_data": dict(config_entry.data),
+            "entry_options": dict(config_entry.options),
+        }
+    )
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+
+    diag = await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
+
+    serialized = json.dumps(diag, default=str)
+    for identifier in (
+        profile_uuid,
+        second_uuid,
+        *serials,
+        cached_only_serial,
+        "[charger_9]",
+    ):
+        assert identifier not in serialized
+    coordinator = diag["coordinator"]
+    assert coordinator["site_metrics"]["battery_profile_evse_device"] == {
+        "uuid": "**REDACTED**",
+        "chargingMode": "FAST",
+        "enabled": True,
+    }
+    assert coordinator["battery_config"]["profile_payload"] == {
+        "data": {
+            "profile": "cost_savings",
+            "devices": {
+                "iqEvse": [
+                    {"uuid": "**REDACTED**", "chargingMode": "FAST"},
+                    {"uuid": "**REDACTED**", "chargingMode": "SCHEDULED"},
+                ],
+                "other": {"enabled": False},
+            },
+        }
+    }
+    assert coordinator["last_scheduler_modes"] == {
+        "[charger_1]": "FAST",
+        "[charger_2]": "SCHEDULED",
+        "[charger_3]": "MANUAL",
+    }
+    assert coordinator["schedule_sync"] == {
+        "enabled": True,
+        "last_status": "success",
+        "cached_serials": ["**REDACTED**"] * 4,
+        "details": {"slot_count": 4},
+    }
+    assert source == original
+    coordinator["site_metrics"]["battery_profile_evse_device"]["enabled"] = False
+    coordinator["battery_config"]["profile_payload"]["data"]["devices"]["other"][
+        "enabled"
+    ] = True
+    coordinator["last_scheduler_modes"]["[charger_1]"] = "changed"
+    coordinator["schedule_sync"]["details"]["slot_count"] = 99
+    coordinator["schedule_sync"]["cached_serials"].append("changed")
+    assert source == original
+
+
+@pytest.mark.parametrize(
+    "cached_serials", [[], None, "synthetic-serial", {"synthetic-serial": 1}]
+)
+def test_diagnostics_redacts_cached_serials_shapes(cached_serials) -> None:
+    payload = {"cached_serials": cached_serials, "enabled": True}
+    original = deepcopy(payload)
+
+    redacted = diagnostics._redact_diagnostics_payload(payload)
+
+    assert redacted == {
+        "cached_serials": [] if isinstance(cached_serials, list) else "**REDACTED**",
+        "enabled": True,
+    }
+    assert payload == original
+
+
+def test_scheduler_aliases_survive_site_text_redaction_without_collisions() -> None:
+    payload = {
+        "coordinator": {
+            "last_scheduler_modes": {
+                f"synthetic-charger-{index}": "FAST" if index % 2 else "SCHEDULED"
+                for index in range(1, 13)
+            },
+            "last_error": "Request /systems/1/devices for site_id=2 failed",
+        }
+    }
+    original = deepcopy(payload)
+
+    redacted = diagnostics._redact_diagnostics_payload(payload, site_ids=("1", "2"))
+
+    assert "synthetic-charger" not in json.dumps(redacted)
+    assert redacted["coordinator"]["last_scheduler_modes"] == {
+        f"[charger_{index}]": "FAST" if index % 2 else "SCHEDULED"
+        for index in range(1, 13)
+    }
+    assert redacted["coordinator"]["last_error"] == (
+        "Request /systems/[site]/devices for site_id=[site] failed"
+    )
+    assert payload == original
+
+
+@pytest.mark.asyncio
+async def test_site_device_diagnostics_redacts_profile_uuid(hass, config_entry) -> None:
+    profile_uuid = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+    coord = DummyCoordinator()
+    metrics = coord.collect_site_metrics()
+    metrics["battery_profile_evse_device"] = {"uuid": profile_uuid, "enabled": True}
+    coord.collect_site_metrics = lambda: metrics
+    original = deepcopy(metrics)
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=config_entry.entry_id,
+        identifiers={(DOMAIN, f"site:{RANDOM_SITE_ID}")},
+        manufacturer="Enphase",
+        name="Site",
+    )
+
+    diag = await diagnostics.async_get_device_diagnostics(hass, config_entry, device)
+
+    assert profile_uuid not in json.dumps(diag, default=str)
+    assert diag["site_metrics"]["battery_profile_evse_device"] == {
+        "uuid": "**REDACTED**",
+        "enabled": True,
+    }
+    assert metrics == original
+    diag["site_metrics"]["battery_profile_evse_device"]["enabled"] = False
+    assert metrics == original
 
 
 @pytest.mark.asyncio
