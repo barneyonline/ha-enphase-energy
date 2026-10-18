@@ -380,3 +380,24 @@ def test_malformed_jwt_claims_remain_categories(monkeypatch):
         "eligible": True,
     }
     assert "secret" not in json.dumps(state)
+
+
+async def test_download_includes_renewal_diagnostics(
+    hass, config_entry, coordinator_factory
+):
+    coord = coordinator_factory()
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    coord.config_entry = config_entry
+    hass.config_entries.async_update_entry(
+        config_entry, options={**config_entry.options, "vpp_events_enabled": True}
+    )
+    renewal = coord.vpp_runtime.session_renewal
+    renewal._last_attempt_utc = NOW.isoformat()
+    renewal._last_http_status = 403
+    renewal._result("failed", "session_rejected")
+    exported = await diagnostics.async_get_config_entry_diagnostics(hass, config_entry)
+    result = exported["coordinator"]["vpp"]["session_renewal"]
+    assert result["last_attempt_utc"] == NOW.isoformat()
+    assert result["last_http_status"] == 403
+    assert result["last_reason"] == "session_rejected"
+    assert result["last_outcome"] == "failed"

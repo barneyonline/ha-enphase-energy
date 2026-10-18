@@ -18,6 +18,7 @@ from ..log_redaction import (
     redact_text,
 )
 from ..request_metrics import record_request_attempt
+from .vpp_auth import select_vpp_fallback
 from .errors import (
     EnphaseLoginWallUnauthorized,
     InvalidPayloadError,
@@ -175,6 +176,7 @@ async def _json(
     redaction_identifiers = kwargs.pop("redaction_identifiers", None)
     allow_reauth = bool(kwargs.pop("allow_reauth", True))
     allow_empty_success = bool(kwargs.pop("allow_empty_success", False))
+    vpp_token_fallback = bool(kwargs.pop("vpp_token_fallback", False))
     attempt = 0
     request_label = _request_label(method, url)
     safe_request_label = redact_text(
@@ -245,7 +247,34 @@ async def _json(
                                     "Received 401 for %s with no stored-credential refresh available",
                                     safe_request_label,
                                 )
-                            raise HttpUnauthorized()
+                            retry_after = r.headers.get("Retry-After")
+                            if (
+                                vpp_token_fallback
+                                and not allow_reauth
+                                and attempt == 0
+                                and retry_after is None
+                            ):
+                                diagnostics = dict(
+                                    self._vpp_credential_diagnostics or {}
+                                )
+                                token = select_vpp_fallback(
+                                    self._bearer(),
+                                    self._eauth,
+                                    getattr(self._s, "cookie_jar", None),
+                                    rejected_token=base_headers.get("Authorization"),
+                                    ignored_live_token=self._vpp_ignored_live_token,
+                                    diagnostics=diagnostics,
+                                )
+                                if token is not None:
+                                    self._vpp_credential_diagnostics = diagnostics
+                                    # Freeze the isolated header profile for this one retry.
+                                    extra_headers = {
+                                        **dict(attempt_headers),
+                                        "Authorization": token,
+                                    }
+                                    attempt += 1
+                                    continue
+                            raise HttpUnauthorized(retry_after=retry_after)
                         if r.status in (204, 205):
                             if mark_payload_success:
                                 self._mark_payload_healthy(endpoint or None)

@@ -32,6 +32,28 @@ def _account_identity(token: str | None) -> str | None:
     return None
 
 
+def strict_account_identity(token: str) -> str | None:
+    """Require every supported identity claim to agree, including nested claims."""
+    payload = _decode_jwt_payload(token)
+    if not payload:
+        return None
+    identities = set()
+    for container in (payload, payload.get("data")):
+        if not isinstance(container, dict):
+            continue
+        for key in ("user_id", "userId", "userid"):
+            if key not in container:
+                continue
+            value = container[key]
+            if isinstance(value, bool) or not isinstance(value, (str, int)):
+                return None
+            identity = str(value).strip()
+            if not identity:
+                return None
+            identities.add(identity)
+    return identities.pop() if len(identities) == 1 else None
+
+
 def _expiry_state(token: str | None, now: float) -> str:
     """Describe expiry without retaining claims or changing opaque-token policy."""
 
@@ -79,6 +101,7 @@ def credential_diagnostics(snapshot: object) -> dict[str, object]:
             else "not_evaluated"
         ),
         "retained_candidate_excluded": data.get("retained_candidate_excluded") is True,
+        "fallback_attempted": data.get("fallback_attempted") is True,
         "candidates": safe_candidates,
     }
 
@@ -168,5 +191,53 @@ def select_vpp_token(
         if candidates[category]["eligible"]:
             if diagnostics is not None:
                 diagnostics["source"] = category
+            return token
+    return None
+
+
+def select_vpp_fallback(
+    manager: str | None,
+    access: str | None,
+    jar: AbstractCookieJar | None,
+    *,
+    rejected_token: str | None,
+    ignored_live_token: str | None,
+    diagnostics: dict[str, object],
+) -> str | None:
+    """Select one distinct, unexpired, account-bound token after a GS 401.
+
+    Unlike the initial compatibility policy, opaque/ambiguous account context
+    and unknown expiry cannot authorize an additional request.
+    """
+    account = strict_account_identity(rejected_token or "")
+    context = [token for token in (manager, access) if token]
+    if (
+        account is None
+        or not context
+        or any(strict_account_identity(token) != account for token in context)
+    ):
+        return None
+    now = dt_util.utcnow().timestamp()
+    live = live_manager_token(jar)
+    for source, token in (
+        ("live_manager", live if live != ignored_live_token else None),
+        ("stored_manager", manager),
+        ("stored_access", access),
+    ):
+        if (
+            token
+            and token != rejected_token
+            and strict_account_identity(token) == account
+            and _expiry_state(token, now) == "not_expired"
+        ):
+            diagnostics["source"] = source
+            diagnostics["fallback_attempted"] = True
+            previous = diagnostics.get("candidates")
+            candidates = dict(previous) if isinstance(previous, dict) else {}
+            candidates[source] = {"expiry": "not_expired", "eligible": True}
+            diagnostics["candidates"] = candidates
+            if source == "live_manager":
+                diagnostics["account_match"] = "match"
+                diagnostics["retained_candidate_excluded"] = False
             return token
     return None
