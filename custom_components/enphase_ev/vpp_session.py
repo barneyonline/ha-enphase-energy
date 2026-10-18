@@ -133,6 +133,19 @@ class VppSessionRenewal:
             data, reason="vpp_session_renewal"
         )
 
+    def _extend_cooldown(self, deadline: float) -> float:
+        """Extend the entry's current cooldown without restoring stale auth state."""
+        entry = self.coordinator.config_entry
+        assert entry is not None
+        raw_state = entry.data.get(STATE_KEY)
+        state = dict(raw_state) if isinstance(raw_state, dict) else {}
+        current_deadline = state.get("next_attempt")
+        if isinstance(current_deadline, (int, float)) and current_deadline >= deadline:
+            return current_deadline
+        state["next_attempt"] = deadline
+        self._store(state)
+        return deadline
+
     async def async_prepare(self) -> bool:
         """Return usable credentials, making at most one bounded session request."""
         async with self._lock:
@@ -225,15 +238,20 @@ class VppSessionRenewal:
                         allow_redirects=False,
                         timeout=aiohttp.ClientTimeout(total=15),
                     ) as response:
+                        retry_after = response.headers.get("Retry-After")
+                        deadline = _retry_deadline(
+                            retry_after, dt_util.utcnow().timestamp()
+                        )
+                        # Backoff belongs to the entry even if credentials changed
+                        # in flight or reading the response body fails/cancels.
+                        if retry_after is not None and coord.config_entry is entry:
+                            deadline = self._extend_cooldown(deadline)
+                        state["next_attempt"] = deadline
                         # Never follow even same-origin redirects into login/MFA.
                         if response.status in (301, 302, 303, 307, 308, 401, 403):
                             state["suspended"] = True
                             payload = None
                         elif response.status != 200:
-                            state["next_attempt"] = _retry_deadline(
-                                response.headers.get("Retry-After"),
-                                dt_util.utcnow().timestamp(),
-                            )
                             payload = None
                         elif response.content_type != "application/json":
                             state["suspended"] = True

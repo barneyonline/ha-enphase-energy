@@ -377,8 +377,12 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   Missing or ambiguous identity/session state fails closed. Token and post-mint
   cookies are persisted together through the internal entry-update path without
   clearing core/HEMS auth blocks. Credential replacement during I/O discards the
-  response. An entry-owned lock and persisted fifteen-minute cooldown bound
-  attempts across concurrent polls and reloads; longer Retry-After values apply.
+  returned credentials. An entry-owned lock and persisted fifteen-minute cooldown
+  bound attempts across concurrent polls and reloads; longer Retry-After values apply.
+  Retry-After is persisted when headers arrive, including on redirects and auth
+  failures, and survives credential replacement or a failed/cancelled body read.
+  This extends only the current entry's cooldown without restoring stale auth
+  state, shortening a newer deadline, or updating a removed/replaced entry.
   Invalid sessions, login walls and identity rejection suspend renewal until
   explicit credential replacement. Failed renewal skips unauthenticated Grid
   Services calls. No password login, MFA, or 401-driven renewal is introduced.
