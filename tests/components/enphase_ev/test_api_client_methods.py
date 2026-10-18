@@ -2204,16 +2204,20 @@ async def test_json_logs_evse_control_write_failure_details(caplog) -> None:
                     "Authorization": "Bearer secret-auth",
                     "Cookie": "session=1; other=1",
                 },
-                json=[{"key": "sessionAuthentication", "value": "enabled"}],
+                json=[
+                    {"key": "sessionAuthentication", "value": "enabled"},
+                    "synthetic-private-value",
+                ],
             )
 
     assert "EVSE control write failed for PUT" in caplog.text
     assert (
-        "payload={'json_item_count': 1, 'json_keys': ['key', 'value']}" in caplog.text
+        "payload={'json_item_count': 2, 'json_keys': ['key', 'value']}" in caplog.text
     )
     assert "'has_authorization': True" in caplog.text
     assert "cookie_names=['other', 'session']" in caplog.text
     assert "secret-auth" not in caplog.text
+    assert "synthetic-private-value" not in caplog.text
 
 
 @pytest.mark.asyncio
@@ -10590,3 +10594,55 @@ async def test_text_login_redirect_refreshes_reads_without_replaying_writes(
             )
     assert refresh.await_count == int(method == "GET")
     assert len(session.calls) == (2 if method == "GET" and recovery else 1)
+
+
+def test_login_wall_error_without_optional_metadata_is_safe():
+    err = api.EnphaseLoginWallUnauthorized(endpoint=None, request_label="GET")
+    assert str(err) == "Enphase login wall returned HTML for API request"
+
+
+def test_response_error_without_reason_or_headers_is_safe():
+    summary = api._safe_response_error_message(
+        status=401, reason=None, headers=object(), body_text=None
+    )
+    assert summary == "HTTP error from Enphase endpoint (status=401)"
+    assert not api._is_hems_invalid_site_error(_make_cre(550, "{}"))
+
+
+@pytest.mark.parametrize("mode", ["json_no_content", "json_empty", "text"])
+async def test_success_can_preserve_payload_health_when_marking_disabled(mode):
+    response = _FakeResponse(
+        status=204 if mode == "json_no_content" else 200,
+        json_body=ValueError("empty response"),
+        text_body="",
+    )
+    response.headers["Content-Type"] = "application/json"
+    client = _make_client(_FakeSession([response]))
+    endpoint = "/service/activation/envoys"
+    # A transport-only read must not clear a previously recorded payload failure.
+    client._payload_failure_log_state[endpoint] = "previous-failure"
+    url = "https://example.test" + endpoint
+    if mode == "text":
+        result = await client._text_response("GET", url, mark_payload_success=False)
+        assert result.status == 200
+    else:
+        assert (
+            await client._json(
+                "GET", url, allow_empty_success=True, mark_payload_success=False
+            )
+            == {}
+        )
+    assert client._payload_failure_log_state[endpoint] == "previous-failure"
+
+
+async def test_scheduler_error_without_structured_code_retains_http_status():
+    client = _make_client(
+        _FakeSession([_FakeResponse(status=403, json_body={}, text_body="denied")])
+    )
+    with pytest.raises(aiohttp.ClientResponseError) as caught:
+        await client._json(
+            "GET",
+            "https://enlighten.enphaseenergy.com/service/evse_scheduler/api/v1/iqevc/charging-mode/synthetic",
+        )
+    assert caught.value.status == 403
+    assert not hasattr(caught.value, "enphase_scheduler_error")

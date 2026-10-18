@@ -368,7 +368,37 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   After an explicit credential change, a different manager token already present
   in the jar cannot override the updated credentials. A later eligible jar token
   can be adopted without another credential update or changing the shared jar.
-  HTTP 401 retains only its status through the optional failure conversion.
+  `vpp_session.py` additionally permits one session-only `/users/self/token`
+  request when an enabled poll is eligible and no usable VPP token remains.
+  It seeds a private jar solely from the entry cookie snapshot, never the shared
+  HA jar, and follows no redirects. All available stored account claims must
+  agree; a returned token must match that account and have a future JWT expiry.
+  Decoded identity is only a consistency guard, not signature verification.
+  Missing or ambiguous identity/session state fails closed. Token and post-mint
+  cookies are persisted together through the internal entry-update path without
+  clearing core/HEMS auth blocks. Credential replacement during I/O discards the
+  returned credentials. An entry-owned lock and persisted fifteen-minute cooldown
+  bound attempts across concurrent polls and reloads; longer Retry-After values apply.
+  Retry-After is persisted when headers arrive, including on redirects and auth
+  failures, and survives credential replacement or a failed/cancelled body read.
+  This extends only the current entry's cooldown without restoring stale auth
+  state, shortening a newer deadline, or updating a removed/replaced entry.
+  Retired runtimes cannot start renewal or adopt late credentials/suspension
+  state, even before an in-flight refresh finishes cancelling. A received
+  Retry-After can still extend the registered entry's cooldown across reloads;
+  checking HA's current entry registry prevents late writes after removal.
+  Invalid sessions, login walls and identity rejection suspend renewal until
+  explicit credential replacement. Failed renewal skips unauthenticated Grid
+  Services calls. No password login, MFA, or 401-driven renewal is introduced.
+  This targets the expired-credential stuck state and cannot resolve every VPP
+  authorization failure. On a Grid Services HTTP 401, each read can additionally
+  retry once using a distinct existing token with a future JWT expiry and an
+  unambiguous account identity matching the rejected token and all stored tokens.
+  Opaque/unknown-expiry alternatives, conflicting identity claims and retained
+  shared-jar tokens cannot authorize this retry. A Retry-After header suppresses
+  the retry, even if malformed; a valid delay survives optional-family conversion.
+  The retry does not mint tokens, log in, modify credentials or change global
+  authentication policy. Non-401 failures and a second rejection are not retried.
   Sanitized HTTP failures retain their status and Retry-After delay. Program
   changes invalidate event data from the previous program while respecting active
   event-family cooldowns. Nonempty event lists with no valid rows are failures;
@@ -539,11 +569,23 @@ VPP diagnostics deliberately expose only enrollment/availability state, aggregat
 event counts, last-success and cached-data flags, and truncation. Site, enrollment,
 program, event, gateway, and request identifiers are never included.
 
+VPP diagnostics under `coordinator.vpp.session_renewal` include the last renewal
+attempt's UTC time, HTTP status, fixed outcome/reason codes, the latest preflight
+skip reason, the next allowed attempt time, and suspension state/reason. Attempt
+details belong to the current runtime and reset on reload; the persisted cooldown
+and allowlisted suspension reason survive reloads. Suspension state and reason
+apply only while their credential binding matches the current entry/client
+snapshot; credential replacement immediately releases them in diagnostics without
+writing state or changing the persisted retry deadline. Successful renewal and later
+usable-token preflights retain the previous attempt outcome. No credentials,
+account identifiers, raw response bodies or exception messages are exported.
+
 `coordinator.vpp_credential_selection` captures the last VPP header selection in
 process memory, including failed requests. Downloading diagnostics does not select
 credentials, read the cookie jar, or make requests. Later credential updates do
-not rewrite this snapshot; the next VPP request replaces it. Before a request,
-the source is `not_attempted`. Source categories are `live_manager`,
+not rewrite this snapshot; the next VPP request replaces it. A bounded alternate
+credential retry sets `fallback_attempted` and records the retry's selected source.
+Before a request, the source is `not_attempted`. Source categories are `live_manager`,
 `stored_manager`, `stored_access`, and `none` when no candidate is eligible.
 Each candidate has an `eligible` boolean and an expiry category: `absent`,
 `expired`, `not_expired`, `unknown`, or `not_evaluated`. Unknown expiry preserves
