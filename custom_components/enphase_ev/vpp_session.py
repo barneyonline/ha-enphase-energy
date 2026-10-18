@@ -10,6 +10,7 @@ import asyncio
 import hashlib
 import json
 import math
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from http.cookies import CookieError, SimpleCookie
 from typing import TYPE_CHECKING
@@ -20,7 +21,11 @@ from homeassistant.util import dt as dt_util
 from yarl import URL
 
 from .api_client.common import _decode_jwt_payload, _serialize_cookie_jar
-from .api_client.vpp_auth import _expiry_state, select_vpp_token
+from .api_client.vpp_auth import (
+    _expiry_state,
+    select_vpp_token,
+    strict_account_identity as _identity,
+)
 from .api_models import AuthTokens
 from .const import (
     BASE_URL,
@@ -39,28 +44,14 @@ STATE_KEY = "vpp_session_renewal"
 COOLDOWN_S = 900.0
 _SESSION_COOKIES = ("_enlighten_4_session", "enlighten_session", "_enlighten_session")
 _MANAGER = "enlighten_manager_token_production"
-
-
-def _identity(token: str) -> str | None:
-    """Require every supported identity claim to agree, including nested claims."""
-    payload = _decode_jwt_payload(token)
-    if not payload:
-        return None
-    identities = set()
-    for container in (payload, payload.get("data")):
-        if not isinstance(container, dict):
-            continue
-        for key in ("user_id", "userId", "userid"):
-            if key not in container:
-                continue
-            value = container[key]
-            if isinstance(value, bool) or not isinstance(value, (str, int)):
-                return None
-            identity = str(value).strip()
-            if not identity:
-                return None
-            identities.add(identity)
-    return identities.pop() if len(identities) == 1 else None
+_SUSPENSION_REASONS = (
+    "missing_session",
+    "ambiguous_account",
+    "session_rejected",
+    "redirect",
+    "non_json_response",
+    "token_rejected",
+)
 
 
 def _cookies(header: str) -> SimpleCookie:
@@ -104,6 +95,58 @@ class VppSessionRenewal:
     def __init__(self, coordinator: EnphaseCoordinator) -> None:
         self.coordinator = coordinator
         self._lock = asyncio.Lock()
+        self._last_attempt_utc: str | None = None
+        self._last_http_status: int | None = None
+        self._last_outcome = "not_attempted"
+        self._last_reason = "not_attempted"
+        self._last_check_reason = "not_checked"
+
+    def _skip(self, reason: str) -> bool:
+        self._last_check_reason = reason
+        return False
+
+    def _result(self, outcome: str, reason: str) -> None:
+        self._last_outcome = outcome
+        self._last_reason = reason
+
+    def diagnostics(self) -> dict[str, object]:
+        """Return fixed reasons and times without credentials or response text.
+
+        Attempt details belong to this runtime; the persisted cooldown survives
+        reloads even when no attempt has occurred in the new runtime.
+        """
+        entry = self.coordinator.config_entry
+        raw_state = entry.data.get(STATE_KEY) if entry is not None else None
+        state = raw_state if isinstance(raw_state, dict) else {}
+        suspended = (
+            entry is not None
+            and state.get("suspended") is True
+            and state.get("auth_identifier")
+            == hashlib.sha256(json.dumps(self._credentials()).encode()).hexdigest()
+        )
+        deadline = state.get("next_attempt")
+        next_attempt = None
+        if isinstance(deadline, (int, float)) and not isinstance(deadline, bool):
+            try:
+                if math.isfinite(deadline):
+                    next_attempt = datetime.fromtimestamp(deadline, UTC).isoformat()
+            except (ValueError, OverflowError, OSError):
+                pass
+        return {
+            "last_attempt_utc": self._last_attempt_utc,
+            "last_http_status": self._last_http_status,
+            "last_outcome": self._last_outcome,
+            "last_reason": self._last_reason,
+            "last_check_reason": self._last_check_reason,
+            "next_attempt_utc": next_attempt,
+            "suspended": suspended,
+            "suspension_reason": (
+                reason
+                if suspended
+                and (reason := state.get("suspension_reason")) in _SUSPENSION_REASONS
+                else None
+            ),
+        }
 
     def _credentials(self) -> tuple[object, ...]:
         coord = self.coordinator
@@ -151,7 +194,7 @@ class VppSessionRenewal:
         async with self._lock:
             coord = self.coordinator
             if not coord.runtime_active:
-                return False
+                return self._skip("runtime_inactive")
             client = coord.client
             # Preflight must not replace the last actual GS request's diagnostics.
             if select_vpp_token(
@@ -160,10 +203,11 @@ class VppSessionRenewal:
                 getattr(client._s, "cookie_jar", None),
                 ignored_live_token=client._vpp_ignored_live_token,
             ):
+                self._last_check_reason = "usable_token"
                 return True
             entry = coord.config_entry
             if entry is None:
-                return False
+                return self._skip("missing_entry")
             snapshot = self._credentials()
             account_credentials = (
                 entry.data.get(CONF_EMAIL),
@@ -179,7 +223,7 @@ class VppSessionRenewal:
                 or access
                 != (entry.data.get(CONF_EAUTH) or entry.data.get(CONF_ACCESS_TOKEN))
             ):
-                return False
+                return self._skip("credential_snapshot_mismatch")
             binding = hashlib.sha256(json.dumps(snapshot).encode()).hexdigest()
             raw_state = entry.data.get(STATE_KEY)
             state = dict(raw_state) if isinstance(raw_state, dict) else {}
@@ -192,10 +236,10 @@ class VppSessionRenewal:
                 }
             now = dt_util.utcnow().timestamp()
             deadline = state.get("next_attempt")
-            if state.get("suspended") is True or (
-                isinstance(deadline, (int, float)) and deadline > now
-            ):
-                return False
+            if state.get("suspended") is True:
+                return self._skip("suspended")
+            if isinstance(deadline, (int, float)) and deadline > now:
+                return self._skip("cooldown")
             cookies = _cookies(cookie)
             manager = cookies.get(_MANAGER)
             tokens = [
@@ -209,22 +253,25 @@ class VppSessionRenewal:
                 if isinstance(token, str) and token
             ]
             identities = {_identity(token) for token in tokens}
-            if (
-                not any(
-                    cookies.get(name) and cookies[name].value
-                    for name in _SESSION_COOKIES
-                )
-                or len(identities) != 1
-                or None in identities
-            ):
+            has_session = any(
+                cookies.get(name) and cookies[name].value for name in _SESSION_COOKIES
+            )
+            if not has_session or len(identities) != 1 or None in identities:
                 state["suspended"] = True
+                state["suspension_reason"] = (
+                    "missing_session" if not has_session else "ambiguous_account"
+                )
                 self._store(state)
-                return False
+                return self._skip(str(state["suspension_reason"]))
             expected = identities.pop()
             state["next_attempt"] = now + COOLDOWN_S
             # Reserve before I/O so reloads cannot defeat the attempt floor.
             if not self._store(state):
-                return False
+                return self._skip("entry_update_rejected")
+            self._last_check_reason = "attempted"
+            self._last_attempt_utc = dt_util.utcnow().isoformat()
+            self._last_http_status = None
+            self._result("pending", "request_started")
             jar = aiohttp.CookieJar()
             jar.update_cookies(cookies, response_url=URL(BASE_URL))
             try:
@@ -240,6 +287,7 @@ class VppSessionRenewal:
                         allow_redirects=False,
                         timeout=aiohttp.ClientTimeout(total=15),
                     ) as response:
+                        self._last_http_status = response.status
                         retry_after = response.headers.get("Retry-After")
                         deadline = _retry_deadline(
                             retry_after, dt_util.utcnow().timestamp()
@@ -259,13 +307,26 @@ class VppSessionRenewal:
                         # Never follow even same-origin redirects into login/MFA.
                         if response.status in (301, 302, 303, 307, 308, 401, 403):
                             state["suspended"] = True
+                            self._result(
+                                "failed",
+                                (
+                                    "session_rejected"
+                                    if response.status in (401, 403)
+                                    else "redirect"
+                                ),
+                            )
+                            state["suspension_reason"] = self._last_reason
                             payload = None
                         elif response.status != 200:
+                            self._result("failed", "http_error")
                             payload = None
                         elif response.content_type != "application/json":
                             state["suspended"] = True
+                            self._result("failed", "non_json_response")
+                            state["suspension_reason"] = self._last_reason
                             payload = None
                         else:
+                            self._result("failed", "invalid_payload")
                             payload = await response.json()
                 if (
                     not coord.runtime_active
@@ -273,6 +334,7 @@ class VppSessionRenewal:
                     or coord.client is not client
                     or self._credentials() != snapshot
                 ):
+                    self._result("discarded", "credential_snapshot_changed")
                     return False
                 if not isinstance(payload, dict):
                     self._store(state)
@@ -308,6 +370,8 @@ class VppSessionRenewal:
                     )
                 ):
                     state["suspended"] = True
+                    self._result("failed", "token_rejected")
+                    state["suspension_reason"] = self._last_reason
                     self._store(state)
                     return False
                 claims = _decode_jwt_payload(token)
@@ -345,6 +409,7 @@ class VppSessionRenewal:
                     json.dumps(accepted).encode()
                 ).hexdigest()
                 if not self._store(state, **updates):
+                    self._result("discarded", "entry_update_rejected")
                     return False
                 coord._tokens = AuthTokens(
                     cookie=cookie_header,
@@ -354,8 +419,13 @@ class VppSessionRenewal:
                     raw_cookies=cookie_map,
                 )
                 client.update_credentials(eauth=token, cookie=cookie_header)
+                self._result("succeeded", "renewed")
                 return True
+            except asyncio.CancelledError:
+                self._result("cancelled", "request_cancelled")
+                raise
             except (aiohttp.ClientError, TimeoutError, ValueError):
+                self._result("failed", "request_error")
                 # No exception text, response bodies or credentials enter diagnostics.
                 if (
                     coord.runtime_active

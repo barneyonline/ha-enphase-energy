@@ -342,7 +342,7 @@ class VppRuntime:
         """Preserve HTTP backoff metadata without retaining private request data."""
 
         if isinstance(err, HttpUnauthorized):
-            return VppHttpUnavailable(summary, err.status, None)
+            return VppHttpUnavailable(summary, err.status, err.retry_after)
         if isinstance(err, aiohttp.ClientResponseError):
             return VppHttpUnavailable(
                 summary,
@@ -500,6 +500,7 @@ class VppRuntime:
         health = self.coordinator._endpoint_family_state(VPP_EVENTS_ENDPOINT_FAMILY)
         return {
             "enabled": self.enabled,
+            "session_renewal": self.session_renewal.diagnostics(),
             "enrollment_state": self._enrollment_state,
             "available": self.available,
             "event_count": len(self._events),

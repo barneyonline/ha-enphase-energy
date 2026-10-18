@@ -907,3 +907,177 @@ async def test_retired_runtime_neither_renews_nor_uses_valid_token(
     assert not ctx.calls
     assert not ctx.writes
     ctx.coord.client._json.assert_not_awaited()
+
+
+async def test_renewal_diagnostics_capture_success_without_credentials(context):
+    ctx = context
+    initial = ctx.renewal.diagnostics()
+    assert initial["last_attempt_utc"] is None
+    assert initial["last_outcome"] == "not_attempted"
+    assert initial["next_attempt_utc"] is None
+    assert await ctx.renewal.async_prepare()
+    result = ctx.renewal.diagnostics()
+    assert result["last_attempt_utc"] is not None
+    assert result["last_http_status"] == 200
+    assert result["last_outcome"] == "succeeded"
+    assert result["last_reason"] == "renewed"
+    assert result["last_check_reason"] == "attempted"
+    assert result["next_attempt_utc"] is not None
+    assert result["suspended"] is False
+    assert result["suspension_reason"] is None
+    assert await ctx.renewal.async_prepare()
+    later = ctx.renewal.diagnostics()
+    assert later["last_check_reason"] == "usable_token"
+    assert later["last_attempt_utc"] == result["last_attempt_utc"]
+    assert later["last_reason"] == "renewed"
+    # Downloads are independent copies and retain no account identifiers.
+    result["last_reason"] = "tampered"
+    serialized = json.dumps(ctx.renewal.diagnostics())
+    for secret in (
+        ctx.coord.client._eauth,
+        ctx.coord.client._cookie,
+        "synthetic-account-a",
+        "synthetic-session",
+    ):
+        assert secret not in serialized
+    reloaded = VppSessionRenewal(ctx.coord).diagnostics()
+    assert reloaded["last_attempt_utc"] is None
+    assert reloaded["next_attempt_utc"] == later["next_attempt_utc"]
+
+
+@pytest.mark.parametrize(
+    "status,content_type,payload,outcome,reason,suspended",
+    [
+        (401, "application/json", None, "failed", "session_rejected", True),
+        (403, "application/json", None, "failed", "session_rejected", True),
+        (302, "application/json", None, "failed", "redirect", True),
+        (429, "application/json", None, "failed", "http_error", False),
+        (200, "text/html", None, "failed", "non_json_response", True),
+        (200, "application/json", [], "failed", "invalid_payload", False),
+        (
+            200,
+            "application/json",
+            {"token": "synthetic-invalid"},
+            "failed",
+            "token_rejected",
+            True,
+        ),
+    ],
+)
+async def test_renewal_failure_diagnostics(
+    context, status, content_type, payload, outcome, reason, suspended
+):
+    ctx = context
+    ctx.response.status = status
+    ctx.response.content_type = content_type
+    ctx.response.payload = payload
+    assert not await ctx.renewal.async_prepare()
+    result = ctx.renewal.diagnostics()
+    assert result["last_http_status"] == status
+    assert result["last_outcome"] == outcome
+    assert result["last_reason"] == reason
+    assert result["suspended"] is suspended
+    if suspended:
+        assert result["suspension_reason"] == reason
+        assert VppSessionRenewal(ctx.coord).diagnostics()["suspension_reason"] == reason
+    assert not await ctx.renewal.async_prepare()
+    assert ctx.renewal.diagnostics()["last_check_reason"] == (
+        "suspended" if suspended else "cooldown"
+    )
+    assert ctx.renewal.diagnostics()["last_reason"] == reason
+
+
+async def test_renewal_diagnostics_preserve_missing_session_reason(context):
+    ctx = context
+    replace_credentials(ctx, cookie=f"{MANAGER}={jwt()}")
+    assert not await ctx.renewal.async_prepare()
+    assert ctx.renewal.diagnostics()["last_check_reason"] == "missing_session"
+    assert ctx.renewal.diagnostics()["suspension_reason"] == "missing_session"
+    assert not await ctx.renewal.async_prepare()
+    assert ctx.renewal.diagnostics()["last_check_reason"] == "suspended"
+    assert ctx.renewal.diagnostics()["suspension_reason"] == "missing_session"
+    assert not ctx.calls
+
+
+@pytest.mark.parametrize(
+    "deadline",
+    [None, "synthetic-private", True, float("nan"), float("inf"), 1e30, 10**1000],
+)
+async def test_renewal_diagnostics_reject_unbounded_persisted_state(context, deadline):
+    ctx = context
+    ctx.coord.config_entry.data[STATE_KEY] = {
+        "next_attempt": deadline,
+        "suspended": "private",
+        "suspension_reason": {"synthetic-private": True},
+    }
+    result = ctx.renewal.diagnostics()
+    assert result["next_attempt_utc"] is None
+    assert result["suspended"] is False
+    assert result["suspension_reason"] is None
+    assert "synthetic-private" not in json.dumps(result)
+    ctx.coord.config_entry.data[STATE_KEY] = "synthetic-private"
+    assert ctx.renewal.diagnostics() == result
+    ctx.coord.config_entry = None
+    assert ctx.renewal.diagnostics() == result
+
+
+async def test_renewal_diagnostics_capture_transport_error(context):
+    ctx = context
+    ctx.response.error = aiohttp.ClientError("synthetic-private")
+    assert not await ctx.renewal.async_prepare()
+    result = ctx.renewal.diagnostics()
+    assert result["last_http_status"] is None
+    assert result["last_reason"] == "request_error"
+    assert result["last_outcome"] == "failed"
+    assert "synthetic-private" not in json.dumps(result)
+
+
+@pytest.mark.parametrize("usable", [False, True])
+async def test_diagnostics_release_old_suspension_on_credential_replacement(
+    context, usable
+):
+    ctx = context
+    ctx.response.status = 403
+    assert not await ctx.renewal.async_prepare()
+    before = ctx.renewal.diagnostics()
+    assert before["suspended"] is True
+    assert before["suspension_reason"] == "session_rejected"
+    before_data = dict(ctx.coord.config_entry.data)
+    replace_credentials(
+        ctx,
+        cookie="_enlighten_4_session=synthetic-replacement",
+        access=jwt(seconds=3600 if usable else -60),
+    )
+    replacement_data = dict(ctx.coord.config_entry.data)
+    # Export reports the effective state before the next poll, without I/O/writes.
+    result = ctx.renewal.diagnostics()
+    assert result["suspended"] is False
+    assert result["suspension_reason"] is None
+    assert result["next_attempt_utc"] == before["next_attempt_utc"]
+    assert result["last_reason"] == "session_rejected"
+    assert ctx.coord.config_entry.data == replacement_data
+    assert replacement_data[STATE_KEY] == before_data[STATE_KEY]
+    assert await ctx.renewal.async_prepare() is usable
+    result = ctx.renewal.diagnostics()
+    assert result["last_check_reason"] == ("usable_token" if usable else "cooldown")
+    assert result["suspended"] is False
+    assert result["suspension_reason"] is None
+    assert len(ctx.calls) == 1
+    assert ctx.coord.config_entry.data == replacement_data
+    reloaded = VppSessionRenewal(ctx.coord).diagnostics()
+    assert reloaded["suspended"] is False
+    assert reloaded["suspension_reason"] is None
+    assert reloaded["next_attempt_utc"] == before["next_attempt_utc"]
+
+
+async def test_diagnostics_redact_unknown_reason_for_current_suspension(context):
+    ctx = context
+    ctx.response.status = 403
+    assert not await ctx.renewal.async_prepare()
+    ctx.coord.config_entry.data[STATE_KEY]["suspension_reason"] = {
+        "synthetic-private": True
+    }
+    result = ctx.renewal.diagnostics()
+    assert result["suspended"] is True
+    assert result["suspension_reason"] is None
+    assert "synthetic-private" not in json.dumps(result)
