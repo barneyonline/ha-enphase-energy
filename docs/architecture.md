@@ -383,6 +383,10 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   failures, and survives credential replacement or a failed/cancelled body read.
   This extends only the current entry's cooldown without restoring stale auth
   state, shortening a newer deadline, or updating a removed/replaced entry.
+  Retired runtimes cannot start renewal or adopt late credentials/suspension
+  state, even before an in-flight refresh finishes cancelling. A received
+  Retry-After can still extend the registered entry's cooldown across reloads;
+  checking HA's current entry registry prevents late writes after removal.
   Invalid sessions, login walls and identity rejection suspend renewal until
   explicit credential replacement. Failed renewal skips unauthenticated Grid
   Services calls. No password login, MFA, or 401-driven renewal is introduced.

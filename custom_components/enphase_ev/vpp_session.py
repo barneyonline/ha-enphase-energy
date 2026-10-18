@@ -150,6 +150,8 @@ class VppSessionRenewal:
         """Return usable credentials, making at most one bounded session request."""
         async with self._lock:
             coord = self.coordinator
+            if not coord.runtime_active:
+                return False
             client = coord.client
             # Preflight must not replace the last actual GS request's diagnostics.
             if select_vpp_token(
@@ -244,7 +246,14 @@ class VppSessionRenewal:
                         )
                         # Backoff belongs to the entry even if credentials changed
                         # in flight or reading the response body fails/cancels.
-                        if retry_after is not None and coord.config_entry is entry:
+                        if (
+                            retry_after is not None
+                            and coord.hass.config_entries.async_get_entry(
+                                entry.entry_id
+                            )
+                            is entry
+                            and coord.config_entry is entry
+                        ):
                             deadline = self._extend_cooldown(deadline)
                         state["next_attempt"] = deadline
                         # Never follow even same-origin redirects into login/MFA.
@@ -259,7 +268,8 @@ class VppSessionRenewal:
                         else:
                             payload = await response.json()
                 if (
-                    coord.config_entry is not entry
+                    not coord.runtime_active
+                    or coord.config_entry is not entry
                     or coord.client is not client
                     or self._credentials() != snapshot
                 ):
@@ -348,7 +358,8 @@ class VppSessionRenewal:
             except (aiohttp.ClientError, TimeoutError, ValueError):
                 # No exception text, response bodies or credentials enter diagnostics.
                 if (
-                    coord.config_entry is entry
+                    coord.runtime_active
+                    and coord.config_entry is entry
                     and coord.client is client
                     and self._credentials() == snapshot
                 ):
