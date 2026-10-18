@@ -6,6 +6,7 @@ import asyncio
 import base64
 import json
 from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -92,6 +93,7 @@ async def context(monkeypatch):
         payload={"token": jwt(seconds=3600)},
         rotation={},
         error=None,
+        json_error=None,
         started=asyncio.Event(),
         release=None,
     )
@@ -136,6 +138,8 @@ async def context(monkeypatch):
             return Response()
 
     async def payload():
+        if response.json_error is not None:
+            raise response.json_error
         return response.payload
 
     response.json = payload
@@ -640,3 +644,186 @@ async def test_preflight_keeps_last_request_credential_diagnostics(context):
     context.response.status = 401
     assert not await context.renewal.async_prepare()
     assert context.coord.client._vpp_credential_diagnostics is previous
+
+
+@pytest.mark.parametrize("status", [301, 302, 303, 307, 308, 401, 403])
+@pytest.mark.parametrize("retry_after_form", ["seconds", "date"])
+async def test_suspended_response_preserves_retry_after_on_replacement(
+    context, monkeypatch, status, retry_after_form
+):
+    ctx = context
+    now = dt_util.utcnow().replace(microsecond=0)
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now)
+    retry_at = now + timedelta(seconds=3600)
+    ctx.response.status = status
+    ctx.response.headers = {
+        "Retry-After": (
+            "3600" if retry_after_form == "seconds" else format_datetime(retry_at)
+        )
+    }
+    assert not await ctx.renewal.async_prepare()
+    assert ctx.coord.config_entry.data[STATE_KEY]["suspended"]
+    assert (
+        ctx.coord.config_entry.data[STATE_KEY]["next_attempt"] == retry_at.timestamp()
+    )
+    replace_credentials(ctx, cookie="_enlighten_4_session=synthetic-replacement")
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now + timedelta(seconds=901))
+    assert not await VppSessionRenewal(ctx.coord).async_prepare()
+    assert len(ctx.calls) == 1
+    monkeypatch.setattr(dt_util, "utcnow", lambda: retry_at + timedelta(seconds=1))
+    ctx.response.status = 200
+    ctx.response.payload = {"token": jwt(seconds=3600)}
+    assert await VppSessionRenewal(ctx.coord).async_prepare()
+    assert len(ctx.calls) == 2
+
+
+@pytest.mark.parametrize("retry_after_form", ["seconds", "date"])
+async def test_inflight_replacement_preserves_response_retry_after(
+    context, monkeypatch, retry_after_form
+):
+    ctx = context
+    now = dt_util.utcnow().replace(microsecond=0)
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now)
+    retry_at = now + timedelta(seconds=3600)
+    ctx.response.status = 429
+    ctx.response.headers = {
+        "Retry-After": (
+            "3600" if retry_after_form == "seconds" else format_datetime(retry_at)
+        )
+    }
+    ctx.response.release = asyncio.Event()
+    task = asyncio.create_task(ctx.renewal.async_prepare())
+    await ctx.response.started.wait()
+    replace_credentials(ctx, cookie="_enlighten_4_session=synthetic-replacement")
+    replacement_tokens = ctx.coord._tokens
+    ctx.response.release.set()
+    assert not await task
+    assert ctx.coord._tokens is replacement_tokens
+    assert (
+        ctx.coord.config_entry.data[STATE_KEY]["next_attempt"] == retry_at.timestamp()
+    )
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now + timedelta(seconds=901))
+    assert not await VppSessionRenewal(ctx.coord).async_prepare()
+    assert len(ctx.calls) == 1
+    monkeypatch.setattr(dt_util, "utcnow", lambda: retry_at + timedelta(seconds=1))
+    ctx.response.status = 200
+    ctx.response.payload = {"token": jwt(seconds=3600)}
+    assert await VppSessionRenewal(ctx.coord).async_prepare()
+    assert len(ctx.calls) == 2
+
+
+@pytest.mark.parametrize("status", [200, 403, 429])
+@pytest.mark.parametrize("current_delay", [None, "invalid", 1800, 3600, 7200])
+async def test_retry_after_preserves_current_state_during_replacement(
+    context, monkeypatch, status, current_delay
+):
+    ctx = context
+    now = dt_util.utcnow()
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now)
+    ctx.response.status = status
+    ctx.response.headers = {"Retry-After": "3600"}
+    ctx.response.release = asyncio.Event()
+    task = asyncio.create_task(ctx.renewal.async_prepare())
+    await ctx.response.started.wait()
+    replace_credentials(ctx, cookie="_enlighten_4_session=synthetic-replacement")
+    current_state = {
+        "auth_identifier": "synthetic-replacement-binding",
+        "suspended": False,
+        "next_attempt": (
+            now.timestamp() + current_delay
+            if isinstance(current_delay, int)
+            else current_delay
+        ),
+    }
+    ctx.coord.config_entry.data[STATE_KEY] = dict(current_state)
+    ctx.response.release.set()
+    assert not await task
+    assert ctx.coord.config_entry.data[STATE_KEY] == {
+        **current_state,
+        "next_attempt": now.timestamp()
+        + max(3600, current_delay if isinstance(current_delay, int) else 0),
+    }
+
+
+@pytest.mark.parametrize(
+    "replacement", ["removed_state", "invalid_state", "removed_entry", "new_entry"]
+)
+async def test_retry_after_handles_replaced_entry_or_missing_state(
+    context, monkeypatch, replacement
+):
+    ctx = context
+    now = dt_util.utcnow()
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now)
+    ctx.response.status = 429
+    ctx.response.headers = {"Retry-After": "3600"}
+    ctx.response.release = asyncio.Event()
+    task = asyncio.create_task(ctx.renewal.async_prepare())
+    await ctx.response.started.wait()
+    if replacement == "removed_state":
+        replace_credentials(ctx, cookie="_enlighten_4_session=synthetic-replacement")
+        ctx.coord.config_entry.data.pop(STATE_KEY)
+    elif replacement == "invalid_state":
+        replace_credentials(ctx, cookie="_enlighten_4_session=synthetic-replacement")
+        ctx.coord.config_entry.data[STATE_KEY] = "invalid"
+    elif replacement == "removed_entry":
+        ctx.coord.config_entry = None
+    else:
+        ctx.coord.config_entry = SimpleNamespace(data=dict(ctx.coord.config_entry.data))
+    ctx.response.release.set()
+    assert not await task
+    if replacement in ("removed_state", "invalid_state"):
+        assert ctx.coord.config_entry.data[STATE_KEY] == {
+            "next_attempt": now.timestamp() + 3600,
+        }
+        assert len(ctx.writes) == 2
+    else:
+        assert len(ctx.writes) == 1
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        ValueError("invalid JSON"),
+        aiohttp.ClientError(),
+        TimeoutError(),
+        asyncio.CancelledError(),
+    ],
+)
+async def test_retry_after_is_persisted_before_body_failure(
+    context, monkeypatch, error
+):
+    ctx = context
+    now = dt_util.utcnow()
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now)
+    ctx.response.headers = {"Retry-After": "3600"}
+    ctx.response.json_error = error
+    before = ctx.coord._tokens
+    if isinstance(error, asyncio.CancelledError):
+        with pytest.raises(asyncio.CancelledError):
+            await ctx.renewal.async_prepare()
+    else:
+        assert not await ctx.renewal.async_prepare()
+    assert ctx.coord._tokens is before
+    assert (
+        ctx.coord.config_entry.data[STATE_KEY]["next_attempt"] == now.timestamp() + 3600
+    )
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now + timedelta(seconds=901))
+    assert not await VppSessionRenewal(ctx.coord).async_prepare()
+    assert len(ctx.calls) == 1
+
+
+async def test_successful_renewal_keeps_retry_after_after_token_expires(
+    context, monkeypatch
+):
+    ctx = context
+    now = dt_util.utcnow()
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now)
+    ctx.response.headers = {"Retry-After": "3600"}
+    ctx.response.payload = {"token": jwt(seconds=30)}
+    assert await ctx.renewal.async_prepare()
+    assert (
+        ctx.coord.config_entry.data[STATE_KEY]["next_attempt"] == now.timestamp() + 3600
+    )
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now + timedelta(seconds=901))
+    assert not await VppSessionRenewal(ctx.coord).async_prepare()
+    assert len(ctx.calls) == 1
