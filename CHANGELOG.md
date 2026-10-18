@@ -11,6 +11,23 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v5.1.3 - 2026-10-18
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
 - Redact EV charger profile UUIDs, scheduler-mode identifier keys, and cached schedule serials from downloaded diagnostics while preserving mode entries and cache list length.
 - Add bounded session-only VPP token renewal when no usable credential remains. Preserve the no-password-login protection; valid-token Grid Services rejection still does not renew credentials.
 - Preserve VPP renewal Retry-After delays on authentication failures and redirects, including when credentials change during a request.
@@ -23,6 +40,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🔄 Other changes
 - Pin the HACS validator image and its Home Assistant runtime to the verified 2026.9 stack while 2026.10 execution remains paused.
+- Bump the integration manifest version to `5.1.3`.
 
 ## v5.1.2 - 2026-10-17
 
