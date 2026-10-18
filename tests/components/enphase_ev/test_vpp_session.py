@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock
 import aiohttp
 import pytest
 import pytest_asyncio
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 from homeassistant.helpers.redact import async_redact_data
 from homeassistant.util import dt as dt_util
 from yarl import URL
@@ -25,6 +26,7 @@ from custom_components.enphase_ev.const import (
     CONF_COOKIE,
     CONF_EAUTH,
     CONF_SESSION_ID,
+    DOMAIN,
     OPT_VPP_EVENTS_ENABLED,
     SELF_TOKEN_URL,
 )
@@ -58,6 +60,7 @@ async def context(monkeypatch):
     access = jwt()
     cookie = f"_enlighten_4_session=synthetic-session; {MANAGER}={access}"
     entry = SimpleNamespace(
+        entry_id="synthetic-entry",
         data={CONF_COOKIE: cookie, CONF_EAUTH: access, CONF_ACCESS_TOKEN: access},
         options={OPT_VPP_EVENTS_ENABLED: True},
     )
@@ -71,6 +74,10 @@ async def context(monkeypatch):
     )
     coord = SimpleNamespace(
         config_entry=entry,
+        runtime_active=True,
+        hass=SimpleNamespace(
+            config_entries=SimpleNamespace(async_get_entry=lambda _: entry)
+        ),
         client=client,
         _tokens=AuthTokens(cookie=cookie, access_token=access),
         _endpoint_family_should_run=lambda _: True,
@@ -827,3 +834,76 @@ async def test_successful_renewal_keeps_retry_after_after_token_expires(
     monkeypatch.setattr(dt_util, "utcnow", lambda: now + timedelta(seconds=901))
     assert not await VppSessionRenewal(ctx.coord).async_prepare()
     assert len(ctx.calls) == 1
+
+
+@pytest.mark.parametrize("retry_after", [False, True])
+@pytest.mark.parametrize("remove_entry", [False, True])
+@pytest.mark.parametrize(
+    "outcome", ["success", "invalid_session", "bad_token", "body_failure"]
+)
+async def test_retired_refresh_cannot_persist_renewal_or_start_gs_requests(
+    context, coordinator_factory, hass, monkeypatch, retry_after, remove_entry, outcome
+):
+    ctx = context
+    now = dt_util.utcnow()
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now)
+    if retry_after:
+        ctx.response.headers = {"Retry-After": "3600"}
+    if outcome == "invalid_session":
+        ctx.response.status = 401
+    elif outcome == "bad_token":
+        ctx.response.payload = {"token": jwt(account="synthetic-other", seconds=3600)}
+    elif outcome == "body_failure":
+        ctx.response.json_error = aiohttp.ClientError("synthetic body failure")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data=dict(ctx.coord.config_entry.data),
+        options=dict(ctx.coord.config_entry.options),
+    )
+    entry.add_to_hass(hass)
+    coord = coordinator_factory(client=ctx.coord.client)
+    coord.config_entry = entry
+    coord._tokens = ctx.coord._tokens
+    before_tokens = coord._tokens
+    runtime = VppRuntime(coord)
+    coord.client._json = AsyncMock(return_value={"data": None})
+
+    async def refresh():
+        await runtime.async_refresh()
+        return {}
+
+    monkeypatch.setattr(coord, "_async_update_data_locked", refresh)
+    ctx.response.release = asyncio.Event()
+    task = asyncio.create_task(coord._async_update_data())
+    await ctx.response.started.wait()
+    before_data = dict(entry.data)
+    coord.mark_runtime_stopped()
+    if remove_entry:
+        assert await hass.config_entries.async_remove(entry.entry_id)
+    ctx.response.release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    if retry_after and not remove_entry:
+        before_data[STATE_KEY] = {
+            **before_data[STATE_KEY],
+            "next_attempt": now.timestamp() + 3600,
+        }
+    assert dict(entry.data) == before_data
+    assert coord._tokens is before_tokens
+    coord.client._json.assert_not_awaited()
+
+
+@pytest.mark.parametrize("valid_token", [False, True])
+async def test_retired_runtime_neither_renews_nor_uses_valid_token(
+    context, valid_token
+):
+    ctx = context
+    if valid_token:
+        replace_credentials(ctx, access=jwt(seconds=3600))
+    ctx.coord.runtime_active = False
+    ctx.coord.client._json = AsyncMock()
+    assert not await ctx.renewal.async_prepare()
+    await VppRuntime(ctx.coord).async_refresh()
+    assert not ctx.calls
+    assert not ctx.writes
+    ctx.coord.client._json.assert_not_awaited()

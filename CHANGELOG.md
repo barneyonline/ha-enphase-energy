@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Redact EV charger profile UUIDs, scheduler-mode identifier keys, and cached schedule serials from downloaded diagnostics while preserving mode entries and cache list length.
 - Add bounded session-only VPP token renewal when no usable credential remains. Preserve the no-password-login protection; valid-token Grid Services rejection still does not renew credentials.
 - Preserve VPP renewal Retry-After delays on authentication failures and redirects, including when credentials change during a request.
+- Discard late VPP renewal credentials after runtime retirement so reloads cannot persist stale credentials or start new Grid Services requests. Skip late cooldown writes after entry removal.
 
 ### 🔧 Improvements
 - None
