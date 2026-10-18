@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass
 
 import aiohttp
 
 from ..api_models import AuthTokens
+from ..cloud_retry import retry_after_seconds
 from ..log_redaction import redact_text
 
 _ENPHASE_ERROR_STATUS_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
@@ -22,6 +24,14 @@ class HttpUnauthorized(Unauthorized):
     """HTTP 401 without private response, request or credential metadata."""
 
     status = 401
+    retry_after: str | None = None
+
+    def __init__(self, *, retry_after: str | None = None) -> None:
+        super().__init__()
+        # Keep only a normalized delay, never arbitrary header text.
+        delay = retry_after_seconds(retry_after)
+        if delay is not None:
+            self.retry_after = str(math.ceil(delay))
 
 
 class EnphaseLoginWallUnauthorized(Unauthorized):

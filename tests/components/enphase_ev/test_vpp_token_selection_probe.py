@@ -39,7 +39,7 @@ class _FakeResponse(_Response):
         return "synthetic denial"
 
 
-def _fake_client(mode, now, denied_status=401, reject_all=False):
+def _fake_client(mode, now, denied_status=401, reject_all=False, valid_for=7200):
     expiry = int(now.timestamp())
     old = _make_token(
         {
@@ -49,10 +49,14 @@ def _fake_client(mode, now, denied_status=401, reject_all=False):
         }
     )
     new = _make_token(
-        {"exp": expiry + 7200, "probe": "NEW", "user_id": "synthetic-account-a"}
+        {"exp": expiry + valid_for, "probe": "NEW", "user_id": "synthetic-account-a"}
     )
     fallback = _make_token(
-        {"exp": expiry + 7200, "probe": "FALLBACK", "user_id": "synthetic-account-a"}
+        {
+            "exp": expiry + valid_for,
+            "probe": "FALLBACK",
+            "user_id": "synthetic-account-a",
+        }
     )
     jar = aiohttp.CookieJar()
     if mode == "jar":
@@ -237,15 +241,14 @@ async def test_real_request_error_path_preserves_status_without_private_metadata
     if status == 401:
         assert isinstance(caught.value, HttpUnauthorized)
         assert caught.value.status == 401
-        assert caught.value.__dict__ == {}
+        assert caught.value.__dict__ == {"retry_after": "7200"}
     coord = coordinator_factory(client=client)
     safe = coord.vpp_runtime._safe_failure("VPP unavailable", caught.value)
     assert coord._endpoint_family_status_from_error(safe) == status
     assert str(safe) == "VPP unavailable" or "VPP unavailable" in str(safe)
     assert "synthetic-private" not in str(safe)
     assert not getattr(safe, "headers", {}).get("Set-Cookie")
-    if status != 401:
-        assert safe.headers["Retry-After"] == "7200"
+    assert safe.headers["Retry-After"] == "7200"
     reauth.assert_not_awaited()
     shared.request.assert_not_called()
     assert stateless.request.call_count == 1
@@ -289,7 +292,9 @@ async def test_actual_401_pipeline_cooldown_and_credential_update_recovery(
         "custom_components.enphase_ev.vpp_runtime.time",
         SimpleNamespace(monotonic=lambda: clock[0]),
     )
-    client, shared, stateless, reauth, old, new, fallback = _fake_client(mode, now[0])
+    client, shared, stateless, reauth, old, new, fallback = _fake_client(
+        mode, now[0], valid_for=10800
+    )
     client.update_credentials(
         eauth="SYNTHETIC-REJECTED",
         cookie="enlighten_manager_token_production=SYNTHETIC-REJECTED",
@@ -332,7 +337,7 @@ async def test_actual_401_pipeline_cooldown_and_credential_update_recovery(
     assert "VPP enrollment unavailable" in health.last_error
     assert "SYNTHETIC-REJECTED" not in health.last_error
     retry_delay = health.next_retry_mono - clock[0]
-    assert 900 <= retry_delay <= 990
+    assert retry_delay == 7200
     assert coord.vpp_runtime.snapshot.enrollment_state == "unknown"
     assert coord.vpp_runtime.available is False
     assert coord._unauth_errors == 0
