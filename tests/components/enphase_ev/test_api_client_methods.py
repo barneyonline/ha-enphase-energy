@@ -4187,8 +4187,8 @@ async def test_charge_mode_extracts_enabled_mode() -> None:
         ),
         ({"greenCharging": {"enabled": False}}, ("GREEN_CHARGING",)),
         ({"smartCharging": {"isHidden": True}}, ()),
-        ({"smartCharging": {"chargingMode": "GREEN_CHARGING"}}, ()),
-        ({"smartCharging": "invalid"}, ()),
+        ({"smartCharging": {"chargingMode": "GREEN_CHARGING"}}, None),
+        ({"smartCharging": "invalid"}, None),
         (
             {"smartCharging": {}, "greenCharging": {}},
             ("SMART_CHARGING", "GREEN_CHARGING"),
@@ -4218,6 +4218,26 @@ async def test_charge_mode_retains_advertised_solar_choices(solar_entries, expec
     client._json = _RequestMock(return_value={"data": {"modes": "invalid"}})
     assert await client.charge_mode("SN") is None
     assert client.charge_mode_solar_modes("SN") == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad_key", ["smartCharging", "greenCharging"])
+@pytest.mark.parametrize("bad_entry", ["invalid", {"chargingMode": "invalid"}])
+async def test_mixed_malformed_solar_metadata_keeps_affected_choice(bad_key, bad_entry):
+    client = _make_client()
+    client._json = _RequestMock(
+        return_value={"data": {"modes": {"smartCharging": {}, "greenCharging": {}}}}
+    )
+    await client.charge_mode("SN")
+    client._json = _RequestMock(
+        return_value={
+            "data": {
+                "modes": {"smartCharging": {}, "greenCharging": {}, bad_key: bad_entry}
+            }
+        }
+    )
+    await client.charge_mode("SN")
+    assert client.charge_mode_solar_modes("SN") == ("SMART_CHARGING", "GREEN_CHARGING")
 
 
 @pytest.mark.asyncio

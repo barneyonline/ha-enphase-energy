@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import UTC, datetime
 from functools import partial
 from typing import TYPE_CHECKING, Any, Iterable, cast
 
@@ -568,19 +569,36 @@ async def charge_mode(self: EnphaseEVClient, sn: str) -> str | None:
         raise
     try:
         modes = (data.get("data") or {}).get("modes") or {}
-        if isinstance(modes, dict) and modes:
+        solar_entries = (
+            ("smartCharging", "SMART_CHARGING"),
+            ("greenCharging", "GREEN_CHARGING"),
+        )
+        valid_solar_entries = {
+            mode: entry
+            for key, mode in solar_entries
+            if isinstance(modes, dict)
+            and isinstance(entry := modes.get(key), dict)
+            and entry.get("chargingMode", mode) == mode
+        }
+        if valid_solar_entries:
             # Disabled means inactive, not unsupported: retain the solar choice
             # while Manual or Scheduled is enabled. Hidden modes are not choices.
+            # Omitted or malformed solar entries are not an empty choice list.
+            previous = self._charge_mode_solar_modes.get(sn, ())
             self._charge_mode_solar_modes[sn] = tuple(
                 mode
-                for key, mode in (
-                    ("smartCharging", "SMART_CHARGING"),
-                    ("greenCharging", "GREEN_CHARGING"),
+                for key, mode in solar_entries
+                if (
+                    mode in valid_solar_entries
+                    and valid_solar_entries[mode].get("isHidden") is not True
                 )
-                if isinstance(entry := modes.get(key), dict)
-                and entry.get("isHidden") is not True
-                and entry.get("chargingMode", mode) == mode
+                or (
+                    key in modes
+                    and mode not in valid_solar_entries
+                    and mode in previous
+                )
             )
+            self._charge_mode_solar_modes_updated_at[sn] = datetime.now(UTC)
         # Prefer the mode whose 'enabled' is true
         for key in (
             "smartCharging",

@@ -372,6 +372,7 @@ class EnphaseEVClient(MqttStreamSurface):
         self._start_variant_idx_no_level: int | None = None
         self._stop_variant_idx: int | None = None
         self._charge_mode_solar_modes: dict[str, tuple[str, ...]] = {}
+        self._charge_mode_solar_modes_updated_at: dict[str, datetime] = {}
         self._bp_xsrf_token: str | None = None
         self._battery_config_variant_cache: dict[tuple[str, str, str], str] = {}
         self._battery_config_write_attempt_cache: dict[
@@ -1648,6 +1649,24 @@ class EnphaseEVClient(MqttStreamSurface):
     def charge_mode_solar_modes(self, sn: str) -> tuple[str, ...] | None:
         """Return solar choices advertised by the last scheduler response."""
         return self._charge_mode_solar_modes.get(sn)
+
+    def invalidate_charge_mode_solar_modes(
+        self, sn: str, *, observed_at: str | None = None
+    ) -> bool:
+        """Discard choices contradicted by a newer charger preference."""
+        updated_at = self._charge_mode_solar_modes_updated_at.get(sn)
+        if updated_at is not None:
+            if observed_at is None:
+                return False
+            try:
+                observation = datetime.fromisoformat(observed_at)
+                if observation <= updated_at:
+                    return False
+            except (TypeError, ValueError):
+                return False
+        self._charge_mode_solar_modes.pop(sn, None)
+        self._charge_mode_solar_modes_updated_at.pop(sn, None)
+        return True
 
     async def set_charge_mode(
         self, sn: str, mode: str, *, previous_mode: str | None = None
