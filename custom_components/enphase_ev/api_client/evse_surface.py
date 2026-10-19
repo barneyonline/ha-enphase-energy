@@ -568,6 +568,19 @@ async def charge_mode(self: EnphaseEVClient, sn: str) -> str | None:
         raise
     try:
         modes = (data.get("data") or {}).get("modes") or {}
+        if isinstance(modes, dict) and modes:
+            # Disabled means inactive, not unsupported: retain the solar choice
+            # while Manual or Scheduled is enabled. Hidden modes are not choices.
+            self._charge_mode_solar_modes[sn] = tuple(
+                mode
+                for key, mode in (
+                    ("smartCharging", "SMART_CHARGING"),
+                    ("greenCharging", "GREEN_CHARGING"),
+                )
+                if isinstance(entry := modes.get(key), dict)
+                and entry.get("isHidden") is not True
+                and entry.get("chargingMode", mode) == mode
+            )
         # Prefer the mode whose 'enabled' is true
         for key in (
             "smartCharging",

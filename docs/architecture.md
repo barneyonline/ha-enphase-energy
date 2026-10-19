@@ -266,6 +266,12 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   overlap pending Storm Alert commands. Opt-in rejects an in-flight profile write.
   The monitor adds no polling or automatic writes; unload removes its Repair.
 - `evse_runtime.py` handles charger commands, fast polling, streaming, charge-mode cache, auth settings, and EVSE control side effects.
+  Scheduler preference reads retain each charger's visible Smart/Green choices
+  separately from its enabled mode. Charge Mode selects use those choices during
+  Manual/Scheduled intervals, preserving the distinct scheduler write values.
+  If choice metadata is unavailable, the select retains the solar mode observed
+  for that charger during its lifetime; a site-wide battery profile alone cannot
+  establish another charger's Smart support.
   Charge Mode selections retain the confirmed cache and publish requested intent
   independently. Pending requests bypass lookup caches, including when status
   embeds a mode. Only matching fresh scheduler feedback confirms a change;
