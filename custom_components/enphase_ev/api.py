@@ -371,6 +371,7 @@ class EnphaseEVClient(MqttStreamSurface):
         self._start_variant_idx_with_level: int | None = None
         self._start_variant_idx_no_level: int | None = None
         self._stop_variant_idx: int | None = None
+        self._charge_mode_solar_modes: dict[str, tuple[str, ...]] = {}
         self._bp_xsrf_token: str | None = None
         self._battery_config_variant_cache: dict[tuple[str, str, str], str] = {}
         self._battery_config_write_attempt_cache: dict[
@@ -1643,6 +1644,10 @@ class EnphaseEVClient(MqttStreamSurface):
         "Fetch the current charge mode via scheduler API."
 
         return await api_evse_surface.charge_mode(self, sn)
+
+    def charge_mode_solar_modes(self, sn: str) -> tuple[str, ...] | None:
+        """Return solar choices advertised by the last scheduler response."""
+        return self._charge_mode_solar_modes.get(sn)
 
     async def set_charge_mode(
         self, sn: str, mode: str, *, previous_mode: str | None = None

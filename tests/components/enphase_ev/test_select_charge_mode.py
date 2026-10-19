@@ -379,6 +379,141 @@ def test_charge_mode_select_uses_smart_label_for_smart_mode(coordinator_factory)
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("initial_source", ["data", "cache"])
+@pytest.mark.parametrize(
+    "solar_mode,label", [("SMART_CHARGING", "Smart"), ("GREEN_CHARGING", "Green")]
+)
+async def test_charge_mode_service_wrapper_preserves_solar_mode_after_manual(
+    coordinator_factory, solar_mode, label, initial_source
+):
+    """A saved automation must remain valid after confirmed manual charging."""
+    from custom_components.enphase_ev.select import ChargeModeSelect
+
+    coord = coordinator_factory()
+    if initial_source == "data":
+        coord.data[RANDOM_SERIAL].update(
+            charge_mode_pref=solar_mode, charge_mode=solar_mode
+        )
+    else:
+        coord.set_charge_mode_cache(RANDOM_SERIAL, solar_mode)
+    coord.client.set_charge_mode = AsyncMock(return_value={"status": "accepted"})
+    coord.async_request_refresh = AsyncMock()
+    sel = ChargeModeSelect(coord, RANDOM_SERIAL)
+    assert label in sel.options
+
+    await sel.async_handle_select_option("Manual")
+    coord.data[RANDOM_SERIAL].update(
+        charge_mode_pref="MANUAL_CHARGING", charge_mode="MANUAL_CHARGING"
+    )
+    coord.client.charge_mode = AsyncMock(return_value="MANUAL_CHARGING")
+    assert (
+        await coord.evse_runtime.async_get_charge_mode(RANDOM_SERIAL)
+        == "MANUAL_CHARGING"
+    )
+    coord.client.set_charge_mode.reset_mock()
+
+    await sel.async_handle_select_option(label)
+
+    coord.client.set_charge_mode.assert_awaited_once_with(
+        RANDOM_SERIAL, solar_mode, previous_mode="MANUAL_CHARGING"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "modes,labels",
+    [
+        (("SMART_CHARGING",), ["Smart"]),
+        (("GREEN_CHARGING",), ["Green"]),
+        (("SMART_CHARGING", "GREEN_CHARGING"), ["Smart", "Green"]),
+        ((), []),
+    ],
+)
+async def test_charge_mode_service_wrapper_uses_advertised_solar_modes(
+    coordinator_factory, modes, labels
+):
+    """A startup in Manual retains exactly the scheduler's solar choices."""
+    from custom_components.enphase_ev.select import ChargeModeSelect
+
+    coord = coordinator_factory()
+    coord.data[RANDOM_SERIAL].update(charge_mode_pref="MANUAL_CHARGING")
+    coord.client.charge_mode_solar_modes = lambda _sn: modes
+    coord.client.set_charge_mode = AsyncMock(return_value={"status": "accepted"})
+    coord.async_request_refresh = AsyncMock()
+    sel = ChargeModeSelect(coord, RANDOM_SERIAL)
+    assert sel.options == ["Manual", "Scheduled", *labels]
+    for mode, label in zip(modes, labels, strict=True):
+        coord.client.set_charge_mode.reset_mock()
+        await sel.async_handle_select_option(label)
+        coord.client.set_charge_mode.assert_awaited_once_with(
+            RANDOM_SERIAL, mode, previous_mode="MANUAL_CHARGING"
+        )
+        coord.client.charge_mode = AsyncMock(return_value=mode)
+        assert await coord.evse_runtime.async_get_charge_mode(RANDOM_SERIAL) == mode
+    for label in {"Smart", "Green"} - set(labels):
+        coord.client.set_charge_mode.reset_mock()
+        with pytest.raises(ServiceValidationError):
+            await sel.async_handle_select_option(label)
+        coord.client.set_charge_mode.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_charge_mode_rejects_smart_on_green_charger(coordinator_factory):
+    from custom_components.enphase_ev.select import ChargeModeSelect
+
+    coord = coordinator_factory()
+    coord.client.set_charge_mode = AsyncMock()
+    sel = ChargeModeSelect(coord, RANDOM_SERIAL)
+    with pytest.raises(ServiceValidationError):
+        await sel.async_select_option("Smart")
+    coord.client.set_charge_mode.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_charge_mode_solar_context_is_per_charger_and_localized(
+    coordinator_factory,
+):
+    from custom_components.enphase_ev.labels import async_prime_label_translations
+    from custom_components.enphase_ev.select import ChargeModeSelect
+
+    other = "SECOND-CHARGER"
+    coord = coordinator_factory(serials=[RANDOM_SERIAL, other])
+    coord.hass.config.language = "de"
+    await async_prime_label_translations(coord.hass)
+    coord.data[RANDOM_SERIAL].update(charge_mode_pref="SMART_CHARGING")
+    coord.data[other].update(charge_mode_pref="GREEN_CHARGING")
+    smart = ChargeModeSelect(coord, RANDOM_SERIAL)
+    green = ChargeModeSelect(coord, other)
+    assert "Smart" in smart.options
+    assert "Grün" in green.options
+    for sn in (RANDOM_SERIAL, other):
+        coord.data[sn].update(charge_mode_pref="MANUAL_CHARGING")
+        coord.set_charge_mode_cache(sn, "MANUAL_CHARGING")
+    coord.client.set_charge_mode = AsyncMock(return_value={"status": "accepted"})
+    coord.async_request_refresh = AsyncMock()
+    await smart.async_handle_select_option("Smart")
+    await green.async_handle_select_option("Grün")
+    assert [call.args[1] for call in coord.client.set_charge_mode.await_args_list] == [
+        "SMART_CHARGING",
+        "GREEN_CHARGING",
+    ]
+    assert "Grün" not in smart.options
+    assert "Smart" not in green.options
+
+
+def test_charge_mode_updates_advertised_solar_choice(coordinator_factory):
+    from custom_components.enphase_ev.select import ChargeModeSelect
+
+    coord = coordinator_factory()
+    coord.data[RANDOM_SERIAL].update(charge_mode_pref="SMART_CHARGING")
+    sel = ChargeModeSelect(coord, RANDOM_SERIAL)
+    assert sel.current_option == "Smart"
+    coord.client.charge_mode_solar_modes = lambda _sn: ("GREEN_CHARGING",)
+    assert "Smart" not in sel.options
+    assert sel.current_option is None
+
+
+@pytest.mark.asyncio
 async def test_charge_mode_select_localizes_labels(coordinator_factory):
     from custom_components.enphase_ev.select import ChargeModeSelect
     from custom_components.enphase_ev.labels import async_prime_label_translations
@@ -395,8 +530,10 @@ async def test_charge_mode_select_localizes_labels(coordinator_factory):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("cached_mode", [None, "MANUAL_CHARGING"])
 async def test_charge_mode_select_sets_smart_mode_for_single_evse_profile_context(
     coordinator_factory,
+    cached_mode,
 ):
     from custom_components.enphase_ev.select import ChargeModeSelect
 
@@ -405,6 +542,8 @@ async def test_charge_mode_select_sets_smart_mode_for_single_evse_profile_contex
     coord._battery_profile_devices = [  # noqa: SLF001
         {"uuid": RANDOM_SERIAL, "chargeMode": "SMART", "enable": False}
     ]
+    if cached_mode is not None:
+        coord.set_charge_mode_cache(RANDOM_SERIAL, cached_mode)
     coord.client.set_charge_mode = AsyncMock(return_value={"status": "accepted"})
     coord.async_request_refresh = AsyncMock()
 
@@ -413,7 +552,7 @@ async def test_charge_mode_select_sets_smart_mode_for_single_evse_profile_contex
     await sel.async_select_option("Smart")
 
     coord.client.set_charge_mode.assert_awaited_once_with(
-        RANDOM_SERIAL, "SMART_CHARGING", previous_mode=None
+        RANDOM_SERIAL, "SMART_CHARGING", previous_mode=cached_mode
     )
 
 
