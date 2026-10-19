@@ -266,6 +266,26 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   overlap pending Storm Alert commands. Opt-in rejects an in-flight profile write.
   The monitor adds no polling or automatic writes; unload removes its Repair.
 - `evse_runtime.py` handles charger commands, fast polling, streaming, charge-mode cache, auth settings, and EVSE control side effects.
+  Scheduler preference reads retain each charger's visible Smart/Green choices
+  separately from its enabled mode. Charge Mode selects use those choices during
+  Manual/Scheduled intervals, preserving the distinct scheduler write values.
+  Missing/malformed solar metadata retains prior choices. A newer explicit
+  charger solar preference invalidates contradictory cached visible choices and
+  takes precedence over the weaker single-charger battery-profile fallback.
+  Synthesized preferences keep their source tags; only genuine charger evidence
+  can invalidate advertised choices. Numeric effective solar status does not
+  establish whether the scheduler uses Smart or Green. Profile/cache hints seed
+  unknown context but cannot replace an already learned charger choice.
+  Profile-only seeds retain their weaker provenance so newer profile hints can
+  update them. Reused stale status cannot invalidate newer scheduler choices;
+  malformed entries in an otherwise valid response retain their prior choices.
+  Scheduler choices retain their acquisition time: an older normalized snapshot
+  published during command confirmation cannot invalidate a newer response.
+  Choice values participate in semantic snapshot equality, so a scheduler-only
+  visibility change updates the registered select even if its mode is unchanged.
+  If choice metadata is unavailable, the select retains the solar mode observed
+  for that charger during its lifetime; a site-wide battery profile alone cannot
+  establish another charger's Smart support.
   Charge Mode selections retain the confirmed cache and publish requested intent
   independently. Pending requests bypass lookup caches, including when status
   embeds a mode. Only matching fresh scheduler feedback confirms a change;

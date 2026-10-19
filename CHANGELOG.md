@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Preserve charger-specific Smart/Green choices during Manual or Scheduled charging so saved Charge Mode automations remain valid, without rewriting Smart requests to Green.
 
 ### 🔧 Improvements
 - None
