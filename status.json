@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-10-20T03:29:18.114991Z",
+  "checked_at": "2026-10-20T08:49:49.773591Z",
   "checks": [
     {
       "affects": true,
@@ -23,7 +23,7 @@
       ],
       "group": "other",
       "name": "discovery",
-      "ok": true
+      "ok": false
     },
     {
       "affects": true,
@@ -70,7 +70,7 @@
       ],
       "group": "degraded",
       "name": "site_energy",
-      "ok": true
+      "ok": false
     },
     {
       "affects": false,
@@ -182,7 +182,7 @@
       ],
       "group": "degraded",
       "name": "battery_runtime",
-      "ok": true
+      "ok": false
     },
     {
       "affects": false,
@@ -244,12 +244,12 @@
       "category": "discovery",
       "check_group": "discovery",
       "check_mode": "all",
-      "error": null,
+      "error": "HTTP 503",
       "group": "other",
       "method": "GET",
       "name": "site_discovery_1",
-      "ok": true,
-      "status": 200,
+      "ok": false,
+      "status": 503,
       "url": "/app-api/search_sites.json?searchText=&favourite=false"
     },
     {
@@ -334,7 +334,7 @@
       "name": "session_history_criteria",
       "ok": true,
       "status": 200,
-      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=88f8ed0d-ca44-4f8c-8689-e2bbce076bcc&username=2999024"
+      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=1e0e9ec9-7eb9-4291-bfc7-d9dbcc84a92d&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -356,12 +356,12 @@
       "category": "site_energy",
       "check_group": "site_energy",
       "check_mode": "all",
-      "error": null,
+      "error": "HTTP 503",
       "group": "degraded",
       "method": "GET",
       "name": "site_energy",
-      "ok": true,
-      "status": 200,
+      "ok": false,
+      "status": 503,
       "url": "/pv/systems/{site_id}/lifetime_energy"
     },
     {
@@ -404,7 +404,7 @@
       "name": "evse_timeseries_daily_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=88f8ed0d-ca44-4f8c-8689-e2bbce076bcc&start_date=2026-10-20&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=1e0e9ec9-7eb9-4291-bfc7-d9dbcc84a92d&start_date=2026-10-20&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -418,7 +418,7 @@
       "name": "evse_timeseries_lifetime_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=88f8ed0d-ca44-4f8c-8689-e2bbce076bcc&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=1e0e9ec9-7eb9-4291-bfc7-d9dbcc84a92d&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -636,12 +636,12 @@
       "category": "battery_runtime",
       "check_group": "battery_runtime",
       "check_mode": "all",
-      "error": null,
+      "error": "HTTP 503",
       "group": "degraded",
       "method": "GET",
       "name": "battery_backup_history",
-      "ok": true,
-      "status": 200,
+      "ok": false,
+      "status": 503,
       "url": "/app-api/{site_id}/battery_backup_history.json"
     },
     {
@@ -729,16 +729,16 @@
       "url": "/service/evse_controller/api/v1/{site_id}/ev_chargers/{serial}/ev_charger_config"
     }
   ],
-  "status": "Fully Operational",
+  "status": "Degraded",
   "summary": {
-    "checks_failed": 0,
-    "checks_failed_affecting": 0,
-    "checks_failed_broad_outage": 0,
-    "checks_failed_non_affecting": 0,
-    "checks_ok": 17,
+    "checks_failed": 3,
+    "checks_failed_affecting": 2,
+    "checks_failed_broad_outage": 3,
+    "checks_failed_non_affecting": 1,
+    "checks_ok": 14,
     "checks_total": 17,
-    "endpoints_failed": 0,
-    "endpoints_ok": 37,
+    "endpoints_failed": 3,
+    "endpoints_ok": 34,
     "endpoints_total": 37
   }
 }
