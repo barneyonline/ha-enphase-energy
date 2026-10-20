@@ -1,20 +1,8 @@
 {
-  "current_status": "Degraded",
-  "generated_at": "2026-10-20T08:49:49.773591Z",
+  "current_status": "Fully Operational",
+  "generated_at": "2026-10-20T14:06:17.708854Z",
   "retention_days": 30,
   "samples": [
-    {
-      "checked_at": "2026-09-20T09:57:35.009984Z",
-      "checks_failed": 0,
-      "failed_check_names": [],
-      "status": "Fully Operational"
-    },
-    {
-      "checked_at": "2026-09-20T14:01:44.053383Z",
-      "checks_failed": 0,
-      "failed_check_names": [],
-      "status": "Fully Operational"
-    },
     {
       "checked_at": "2026-09-20T17:33:37.604530Z",
       "checks_failed": 0,
@@ -957,6 +945,12 @@
         "site_energy"
       ],
       "status": "Degraded"
+    },
+    {
+      "checked_at": "2026-10-20T14:06:17.708854Z",
+      "checks_failed": 0,
+      "failed_check_names": [],
+      "status": "Fully Operational"
     }
   ]
 }
