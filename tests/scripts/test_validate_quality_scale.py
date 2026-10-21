@@ -5,7 +5,6 @@ from datetime import date
 import json
 from pathlib import Path
 import sys
-from urllib.error import URLError
 
 
 def _load_module():
@@ -26,6 +25,9 @@ validate_quality_scale = _load_module()
 def _write_manifest(root: Path, quality_scale: str = "platinum") -> None:
     manifest_dir = root / "custom_components" / "enphase_ev"
     manifest_dir.mkdir(parents=True)
+    brand_dir = manifest_dir / "brand"
+    brand_dir.mkdir()
+    (brand_dir / "icon.png").write_bytes(validate_quality_scale.PNG_SIGNATURE)
     (manifest_dir / "manifest.json").write_text(
         json.dumps({"domain": "enphase_ev", "quality_scale": quality_scale})
     )
@@ -59,28 +61,6 @@ def _write_strict_mypy_gate(
         "      - name: Validate strict typing for full integration package\n"
         f"        run: {command}\n"
     )
-
-
-class _FakeUrlopenResponse:
-    def __init__(
-        self,
-        payload: object | None = None,
-        *,
-        status: int = 200,
-        content_type: str = "image/png",
-    ) -> None:
-        self._payload = payload
-        self.status = status
-        self.headers = {"content-type": content_type}
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args: object) -> None:
-        return None
-
-    def read(self) -> bytes:
-        return json.dumps(self._payload).encode()
 
 
 def test_repository_quality_scale_matches_manifest_claim() -> None:
@@ -361,148 +341,60 @@ rules:
     assert "Rules marked n/a without an allowlist exception" in "\n".join(messages)
 
 
-def test_remote_brands_validation_requires_icon(monkeypatch, tmp_path: Path) -> None:
+def test_local_brands_validation_requires_icon(tmp_path: Path) -> None:
     _write_manifest(tmp_path)
-    monkeypatch.setattr(
-        validate_quality_scale,
-        "_fetch_brand_asset_names",
-        lambda domain: {"logo.png"},
-    )
-    monkeypatch.setattr(
-        validate_quality_scale,
-        "_validate_brand_cdn_asset",
-        lambda domain, asset: [],
-    )
+    (tmp_path / "custom_components/enphase_ev/brand/icon.png").unlink()
 
-    messages = validate_quality_scale._validate_brands_support(tmp_path, remote=True)
-
-    assert "missing icon.png" in "\n".join(messages)
+    for remote in (False, True):
+        messages = validate_quality_scale._validate_brands_support(
+            tmp_path, remote=remote
+        )
+        assert "missing icon.png" in "\n".join(messages)
 
 
-def test_remote_brands_validation_checks_cdn_for_known_assets(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_local_brands_validation_accepts_all_supported_assets(tmp_path: Path) -> None:
     _write_manifest(tmp_path)
-    checked_assets: list[str] = []
-    monkeypatch.setattr(
-        validate_quality_scale,
-        "_fetch_brand_asset_names",
-        lambda domain: {"icon.png", "logo.png"},
-    )
+    brand_dir = tmp_path / "custom_components/enphase_ev/brand"
+    for asset in validate_quality_scale.OPTIONAL_BRAND_ASSETS:
+        (brand_dir / asset).write_bytes(validate_quality_scale.PNG_SIGNATURE)
 
-    def _validate_asset(domain: str, asset: str) -> list[str]:
-        checked_assets.append(asset)
-        return []
-
-    monkeypatch.setattr(
-        validate_quality_scale,
-        "_validate_brand_cdn_asset",
-        _validate_asset,
-    )
-
-    messages = validate_quality_scale._validate_brands_support(tmp_path, remote=True)
-
-    assert messages == []
-    assert checked_assets == ["icon.png", "logo.png"]
-
-
-def test_remote_brands_validation_reports_fetch_failures(
-    monkeypatch, tmp_path: Path
-) -> None:
-    _write_manifest(tmp_path)
-
-    def _raise_fetch_error(domain: str) -> set[str]:
-        raise URLError("offline")
-
-    monkeypatch.setattr(
-        validate_quality_scale,
-        "_fetch_brand_asset_names",
-        _raise_fetch_error,
-    )
-
-    messages = validate_quality_scale._validate_brands_support(tmp_path, remote=True)
-
-    assert "Could not validate brands repository assets" in "\n".join(messages)
-
-
-def test_fetch_brand_asset_names_reads_github_listing(monkeypatch) -> None:
-    def _urlopen(request, timeout):
-        assert "custom_integrations/enphase_ev" in request.full_url
-        assert timeout == 10
-        return _FakeUrlopenResponse(
-            [{"name": "icon.png"}, {"name": "logo.png"}, {"unexpected": True}]
+    for remote in (False, True):
+        assert (
+            validate_quality_scale._validate_brands_support(tmp_path, remote=remote)
+            == []
         )
 
-    monkeypatch.setattr(validate_quality_scale, "urlopen", _urlopen)
 
-    assert validate_quality_scale._fetch_brand_asset_names("enphase_ev") == {
-        "icon.png",
-        "logo.png",
-    }
+def test_local_brands_validation_rejects_non_png_assets(tmp_path: Path) -> None:
+    _write_manifest(tmp_path)
+    brand_dir = tmp_path / "custom_components/enphase_ev/brand"
+    (brand_dir / "logo.png").write_text("<html>not an image</html>")
+    (brand_dir / "icon.png").write_bytes(b"")
 
+    messages = validate_quality_scale._validate_brands_support(tmp_path)
 
-def test_fetch_brand_asset_names_rejects_non_directory_listing(monkeypatch) -> None:
-    monkeypatch.setattr(
-        validate_quality_scale,
-        "urlopen",
-        lambda request, timeout: _FakeUrlopenResponse({"name": "icon.png"}),
-    )
-
-    try:
-        validate_quality_scale._fetch_brand_asset_names("enphase_ev")
-    except ValueError as err:
-        assert "not a directory listing" in str(err)
-    else:
-        raise AssertionError("Expected ValueError")
+    assert messages == [
+        "ERROR: Local brand asset icon.png is not a PNG image",
+        "ERROR: Local brand asset logo.png is not a PNG image",
+    ]
 
 
-def test_validate_brand_cdn_asset_accepts_png(monkeypatch) -> None:
-    def _urlopen(request, timeout):
-        assert request.get_method() == "HEAD"
-        assert request.full_url.endswith("/enphase_ev/icon.png")
-        assert timeout == 10
-        return _FakeUrlopenResponse(status=200, content_type="image/png")
-
-    monkeypatch.setattr(validate_quality_scale, "urlopen", _urlopen)
-
-    assert (
-        validate_quality_scale._validate_brand_cdn_asset("enphase_ev", "icon.png") == []
-    )
-
-
-def test_validate_brand_cdn_asset_reports_url_errors(monkeypatch) -> None:
-    def _urlopen(request, timeout):
-        raise URLError("offline")
-
-    monkeypatch.setattr(validate_quality_scale, "urlopen", _urlopen)
-
-    assert "Could not validate brands CDN asset" in "\n".join(
-        validate_quality_scale._validate_brand_cdn_asset("enphase_ev", "icon.png")
-    )
-
-
-def test_validate_brand_cdn_asset_reports_status_and_content_type(
-    monkeypatch,
+def test_local_brands_validation_reports_unreadable_assets(
+    monkeypatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(
-        validate_quality_scale,
-        "urlopen",
-        lambda request, timeout: _FakeUrlopenResponse(status=500),
-    )
-    assert "HTTP 500" in "\n".join(
-        validate_quality_scale._validate_brand_cdn_asset("enphase_ev", "icon.png")
-    )
+    _write_manifest(tmp_path)
+    original_open = Path.open
 
-    monkeypatch.setattr(
-        validate_quality_scale,
-        "urlopen",
-        lambda request, timeout: _FakeUrlopenResponse(
-            status=200, content_type="text/html"
-        ),
-    )
-    assert "content-type" in "\n".join(
-        validate_quality_scale._validate_brand_cdn_asset("enphase_ev", "icon.png")
-    )
+    def _open(path, *args, **kwargs):
+        if path.name == "icon.png":
+            raise PermissionError("unreadable")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", _open)
+
+    messages = validate_quality_scale._validate_brands_support(tmp_path)
+
+    assert messages == ["ERROR: Could not read local brand asset icon.png: unreadable"]
 
 
 def test_validate_brands_support_reports_manifest_domain_errors(
