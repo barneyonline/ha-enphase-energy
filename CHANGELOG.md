@@ -17,7 +17,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔄 Other changes
-- None
+- Classify the integration under Energy for Home Assistant Marketplace discovery.
 
 ## v5.1.4 - 2026-10-21
 
