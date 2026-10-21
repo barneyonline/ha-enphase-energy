@@ -11,13 +11,32 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- Preserve charger-specific Smart/Green choices during Manual or Scheduled charging so saved Charge Mode automations remain valid, without rewriting Smart requests to Green.
+- None
 
 ### 🔧 Improvements
 - None
 
 ### 🔄 Other changes
 - None
+
+## v5.1.4 - 2026-10-21
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Preserve charger-specific Smart/Green choices during Manual or Scheduled charging so saved Charge Mode automations remain valid, without rewriting Smart requests to Green.
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Validate bundled brand images instead of retired Home Assistant brands repository/CDN URLs, preserving the existing CI command-line flag.
+- Update `astral-sh/setup-uv` from `10.2.0` to `10.3.0` in CI workflows. (#945)
+- Bump the integration manifest version to `5.1.4`.
 
 ## v5.1.3 - 2026-10-18
 
