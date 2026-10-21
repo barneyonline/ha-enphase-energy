@@ -5,10 +5,7 @@ import ast
 import argparse
 from datetime import date
 import json
-from http import HTTPStatus
 import sys
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 from pathlib import Path
 
 try:
@@ -105,13 +102,17 @@ STRICT_TYPING_COMMAND = (
     "custom_components/enphase_ev"
 )
 PINNED_MYPY_REQUIREMENT = "mypy==2.2.0"
-BRANDS_GITHUB_API_URL = (
-    "https://api.github.com/repos/home-assistant/brands/contents/"
-    "custom_integrations/{domain}"
-)
-BRANDS_CDN_URL = "https://brands.home-assistant.io/{domain}/{asset}"
 REQUIRED_BRAND_ASSETS = ("icon.png",)
-OPTIONAL_BRAND_ASSETS = ("logo.png",)
+OPTIONAL_BRAND_ASSETS = (
+    "icon@2x.png",
+    "dark_icon.png",
+    "dark_icon@2x.png",
+    "logo.png",
+    "logo@2x.png",
+    "dark_logo.png",
+    "dark_logo@2x.png",
+)
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
 def _load_yaml(path: Path) -> dict:
@@ -260,74 +261,34 @@ def _manifest_domain(root: Path) -> str:
 
 
 def _validate_brands_support(root: Path, *, remote: bool = False) -> list[str]:
-    """Return brand support validation errors."""
+    """Validate bundled brands; remote is retained for existing CLI callers."""
 
     try:
         domain = _manifest_domain(root)
     except (json.JSONDecodeError, ValueError) as err:
         return [f"ERROR: {err}"]
 
-    if not remote:
-        return []
-
+    brand_dir = root / "custom_components" / domain / "brand"
     messages: list[str] = []
-    try:
-        names = _fetch_brand_asset_names(domain)
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, ValueError) as err:
-        return [f"ERROR: Could not validate brands repository assets: {err}"]
-
     for asset in REQUIRED_BRAND_ASSETS:
-        if asset not in names:
+        if not (brand_dir / asset).is_file():
             messages.append(
-                f"ERROR: home-assistant/brands is missing {asset} for {domain}"
+                f"ERROR: Local brand directory is missing {asset} for {domain}"
             )
 
     for asset in (*REQUIRED_BRAND_ASSETS, *OPTIONAL_BRAND_ASSETS):
-        if asset in names:
-            messages.extend(_validate_brand_cdn_asset(domain, asset))
-
+        asset_path = brand_dir / asset
+        if not asset_path.exists():
+            continue
+        try:
+            with asset_path.open("rb") as image:
+                signature = image.read(len(PNG_SIGNATURE))
+        except OSError as err:
+            messages.append(f"ERROR: Could not read local brand asset {asset}: {err}")
+            continue
+        if signature != PNG_SIGNATURE:
+            messages.append(f"ERROR: Local brand asset {asset} is not a PNG image")
     return messages
-
-
-def _fetch_brand_asset_names(domain: str) -> set[str]:
-    request = Request(
-        BRANDS_GITHUB_API_URL.format(domain=domain),
-        headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": "ha-enphase-ev-quality-scale-validator",
-        },
-    )
-    with urlopen(request, timeout=10) as response:
-        payload = json.loads(response.read().decode())
-    if not isinstance(payload, list):
-        raise ValueError("GitHub brands response was not a directory listing")
-    names: set[str] = set()
-    for item in payload:
-        if isinstance(item, dict) and isinstance(item.get("name"), str):
-            names.add(item["name"])
-    return names
-
-
-def _validate_brand_cdn_asset(domain: str, asset: str) -> list[str]:
-    request = Request(
-        BRANDS_CDN_URL.format(domain=domain, asset=asset),
-        method="HEAD",
-        headers={"User-Agent": "ha-enphase-ev-quality-scale-validator"},
-    )
-    try:
-        with urlopen(request, timeout=10) as response:
-            status = response.status
-            content_type = response.headers.get("content-type", "")
-    except (HTTPError, URLError, TimeoutError) as err:
-        return [f"ERROR: Could not validate brands CDN asset {asset}: {err}"]
-
-    if status != HTTPStatus.OK:
-        return [f"ERROR: brands CDN asset {asset} returned HTTP {status}"]
-    if not content_type.lower().startswith("image/png"):
-        return [
-            f"ERROR: brands CDN asset {asset} returned content-type {content_type!r}"
-        ]
-    return []
 
 
 def _validate_strict_typing_contract(root: Path) -> list[str]:
@@ -633,7 +594,7 @@ def main() -> int:
     parser.add_argument(
         "--validate-remote-brands",
         action="store_true",
-        help="Validate live home-assistant/brands GitHub and CDN assets.",
+        help="Compatibility flag; bundled local brand assets are always validated.",
     )
     args = parser.parse_args()
 

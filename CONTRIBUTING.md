@@ -84,6 +84,10 @@ docker compose -f devtools/docker/docker-compose.yml exec ha-dev pre-commit run 
 docker compose -f devtools/docker/docker-compose.yml exec ha-dev pytest -q tests/components/enphase_ev
 ```
 
+The quality-scale validator checks the bundled `brand/` PNG images. The legacy
+`--validate-remote-brands` flag remains accepted for existing CI commands and
+performs the same local checks; it no longer requests retired brands CDN assets.
+
 For a full coverage run, collect coverage once and reuse that data when enforcing
 100% statement coverage on the integration modules you changed. Branch data is
 also collected to expose untested decisions; the changed-module gate checks
