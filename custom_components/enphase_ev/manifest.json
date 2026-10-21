@@ -5,6 +5,9 @@
     "logbook",
     "recorder"
   ],
+  "categories": [
+    "energy"
+  ],
   "codeowners": [
     "@barneyonline"
   ],
