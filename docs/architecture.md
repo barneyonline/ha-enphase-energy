@@ -730,6 +730,31 @@ Grid and Battery Power expose `freshness_reference_utc` separately from their
 calculation timestamp, so consumption also respects the oldest contributing flow
 when import/export or charge/discharge clocks differ. Stale numeric candidates
 cannot overwrite a still-valid retained balance or its original deadline.
+Rejected extreme/outlier calculations and cumulative-source reseeds preserve
+the accepted watts' `freshness_reference_utc`, even when the new payload clock
+advances. That bound survives restoration of a validated two-sample history.
+Coordinator outage deadlines apply separately to entity availability; they never
+replace the accepted source clock or the clock saved for restoration. Recovering
+core polling can therefore restore availability while the same source reading
+is still fresh, without renewing its original expiry. Out-of-range restored
+timestamps discard the restored history instead of failing entity setup.
+Normal coordinator publication can recover an expired reading as soon as a new
+valid delta is calculated. The same publication path processes recovery after an
+initial rejected or reseeded calculation, even before any accepted power clock
+exists. Availability cannot prevent the next valid sample from being evaluated.
+Recovery evaluation first validates the current source freshness deadline. Stale
+or future-dated responses cannot change cumulative baselines or the accepted
+clock, so the next valid reading uses the previous valid calculation window.
+Consumption marks retained source watts as
+`using_cached`, and ignores numeric `seeded`/`no_live_data` placeholders.
+
+Consumption diagnostics separate the current `power_balance_blocker` (source
+key and categorical reason) from `last_rejection`, which is historical rejection
+evidence for the consumption-bucket fallback. A healthy power balance can coexist
+with an older `missing_consumption` rejection. `power_balance_source_freshness`
+records the effective clock used for each input to the last accepted balance;
+`power_balance_source_timestamps` retains the reported calculation clocks.
+These clocks can differ for retained grid/battery watts and overnight production.
 
 Consumption Power persists its last valid power balance in Home Assistant's
 restore data, separately from the consumption-bucket delta baseline. During
