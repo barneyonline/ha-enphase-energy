@@ -4,6 +4,7 @@ import logging
 from datetime import timedelta
 from unittest.mock import AsyncMock
 from homeassistant.helpers.entity_component import EntityComponent
+from homeassistant.helpers.entity_platform import EntityPlatform
 
 import pytest
 from homeassistant.helpers import entity_registry as er
@@ -12,6 +13,8 @@ from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.enphase_ev.const import DOMAIN
 from custom_components.enphase_ev.sensor_site_energy import (
+    EnphaseBatteryPowerSensor,
+    EnphaseGridPowerSensor,
     EnphaseSiteConsumptionPowerSensor,
 )
 
@@ -416,3 +419,443 @@ async def test_balance_obeys_oldest_flow_clock(
     await hass.async_block_till_done()
     assert hass.states.get(sensor.entity_id).state == "unavailable"
     await component.async_remove_entity(sensor.entity_id)
+
+
+@pytest.mark.parametrize("kind", ["grid", "battery"])
+@pytest.mark.parametrize(
+    "rejection", ["outlier_ignored", "extreme_pending", "source_changed_reseed"]
+)
+async def test_rejected_flow_calculations_cannot_renew_consumption(
+    hass, config_entry, coordinator_factory, monkeypatch, kind, rejection
+):
+    """New payload clocks cannot renew watts from a rejected calculation."""
+    now = [dt_util.utcnow()]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+    accepted_at = now[0]
+    coord = coordinator_factory()
+    coord.update_interval = None
+    coord.last_success_utc = now[0]
+    coord._battery_has_encharge = True
+    power = (EnphaseGridPowerSensor if kind == "grid" else EnphaseBatteryPowerSensor)(
+        coord
+    )
+    flow = next(iter(power._flow_signs))
+    value = 1.0
+
+    def payload(timestamp, *, fields=None):
+        coord.energy.site_energy = {
+            flow: {
+                "value_kwh": value,
+                "last_report_date": timestamp,
+                "fields_used": fields or [flow],
+                "interval_minutes": 5,
+            }
+        }
+
+    other_entities = [
+        source(hass, coord, key, 1000)
+        for key in ("current_production_power", "grid_power", "battery_power")
+        if key != kind + "_power"
+    ]
+    power.entity_id = source(hass, coord, kind + "_power", None)
+    consumption = EnphaseSiteConsumptionPowerSensor(coord)
+    consumption.entity_id = "sensor.rejected_balance"
+    consumption.async_get_last_extra_data = AsyncMock(return_value=None)
+    consumption.async_get_last_state = AsyncMock(return_value=None)
+    power.async_get_last_state = AsyncMock(return_value=None)
+    power.async_get_last_extra_data = AsyncMock(return_value=None)
+    payload(accepted_at - timedelta(minutes=5))
+    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    component._platforms["sensor"] = EntityPlatform(
+        hass=hass,
+        logger=logging.getLogger(__name__),
+        domain="sensor",
+        platform_name=DOMAIN,
+        platform=None,
+        scan_interval=timedelta(seconds=30),
+        entity_namespace=None,
+    )
+    component._platforms["sensor"].config_entry = config_entry
+    await component._platforms["sensor"].async_add_entities([power, consumption])
+
+    value += 0.1
+    payload(accepted_at)
+    coord.async_update_listeners()
+    await hass.async_block_till_done()
+    expected = 2000 + 1200 * power._flow_signs[flow]
+    assert hass.states.get(consumption.entity_id).state == str(expected)
+
+    for index in range(1, 7):
+        now[0] = accepted_at + timedelta(minutes=5 * index)
+        if rejection == "outlier_ignored":
+            value += 10
+        elif rejection == "extreme_pending":
+            # Keep successive extremes incomparable rather than confirming them.
+            value += 1000 * 3**index
+        payload(
+            now[0],
+            fields=[str(index)] if rejection == "source_changed_reseed" else None,
+        )
+        for entity_id in other_entities:
+            hass.states.async_set(
+                entity_id,
+                1000,
+                {"unit_of_measurement": "W", "sampled_at_utc": now[0].isoformat()},
+            )
+        coord.async_update_listeners()
+        async_fire_time_changed(hass, now[0])
+        await hass.async_block_till_done()
+        assert power.extra_state_attributes["method"] == rejection
+        assert power.extra_state_attributes["freshness_reference_utc"] == (
+            accepted_at.isoformat()
+        )
+        if index < 6:
+            assert hass.states.get(consumption.entity_id).state == str(expected)
+            assert consumption.extra_state_attributes["using_cached"] is True
+            assert consumption.extra_state_attributes["sampled_at_utc"] == (
+                accepted_at.isoformat()
+            )
+        else:
+            assert hass.states.get(power.entity_id).state == "unavailable"
+            assert hass.states.get(consumption.entity_id).state == "unavailable"
+
+    # A new valid delta recovers through the normal coordinator publication path.
+    now[0] += timedelta(minutes=5)
+    value += 0.1
+    payload(now[0], fields=["6"] if rejection == "source_changed_reseed" else None)
+    coord.async_update_listeners()
+    await hass.async_block_till_done()
+    assert hass.states.get(consumption.entity_id).state == str(expected)
+    assert consumption.extra_state_attributes["using_cached"] is False
+    assert coord.energy.consumption_power_diagnostics["power_balance_blocker"] is None
+    await component.async_remove_entity(consumption.entity_id)
+    await component.async_remove_entity(power.entity_id)
+
+
+@pytest.mark.parametrize(
+    ("attributes", "reason"),
+    [
+        ({"method": "seeded"}, "incomplete_source"),
+        ({"method": "no_live_data"}, "incomplete_source"),
+        ({"freshness_reference_utc": "bad-clock"}, "invalid_timestamp"),
+    ],
+)
+async def test_balance_diagnostics_distinguish_blocked_source_from_bucket_history(
+    hass, coordinator_factory, attributes, reason
+):
+    coord = coordinator_factory()
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    sensor.hass = hass
+    source(hass, coord, "current_production_power", 1000)
+    grid = source(hass, coord, "grid_power", 0)
+    source(hass, coord, "battery_power", 0)
+    hass.states.async_set(grid, 0, {"unit_of_measurement": "W", **attributes})
+    assert not sensor.available
+    diagnostics = coord.energy.consumption_power_diagnostics
+    assert diagnostics["power_balance_blocker"] == {
+        "source": "grid_power",
+        "reason": reason,
+    }
+    rejection = diagnostics["last_rejection"]
+    assert rejection["reason"] == "missing_consumption"
+    hass.states.async_set(grid, 0, {"unit_of_measurement": "W"})
+    assert sensor.native_value == 1000
+    recovered = coord.energy.consumption_power_diagnostics
+    assert recovered["power_balance_blocker"] is None
+    assert recovered["last_rejection"] == rejection
+    assert recovered["power_balance_source_freshness"]["grid_power"] == (
+        hass.states.get(grid).last_updated.isoformat()
+    )
+    assert diagnostics["power_balance_blocker"]["reason"] == reason
+
+
+@pytest.mark.parametrize("flag", ["using_stale", "using_cached"])
+async def test_balance_reports_cached_upstream_input(hass, coordinator_factory, flag):
+    coord = coordinator_factory()
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    sensor.hass = hass
+    production = source(hass, coord, "current_production_power", 1000)
+    source(hass, coord, "grid_power", 0)
+    source(hass, coord, "battery_power", 0)
+    hass.states.async_set(production, 1000, {"unit_of_measurement": "W", flag: True})
+    assert sensor.native_value == 1000
+    assert sensor.extra_state_attributes["using_cached"] is True
+
+
+@pytest.mark.parametrize("stored_reference", ["older", "future", "invalid"])
+async def test_restored_flow_power_preserves_accepted_freshness(
+    hass, coordinator_factory, monkeypatch, stored_reference
+):
+    from homeassistant.core import State
+
+    now = dt_util.utcnow()
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now)
+    coord = coordinator_factory()
+    sensor = EnphaseGridPowerSensor(coord)
+    for minutes, value in ((10, 1), (5, 1.1)):
+        coord.energy.site_energy = {
+            "grid_import": {
+                "value_kwh": value,
+                "last_report_date": now - timedelta(minutes=minutes),
+                "fields_used": ["import"],
+            }
+        }
+        sensor.native_value
+    attributes = sensor.extra_state_attributes
+    original_reference = now - timedelta(minutes=5)
+    expected = original_reference
+    if stored_reference == "older":
+        expected = now - timedelta(minutes=20)
+        attributes["freshness_reference_utc"] = expected.isoformat()
+    elif stored_reference == "future":
+        attributes["freshness_reference_utc"] = (now + timedelta(days=1)).isoformat()
+    else:
+        attributes["freshness_reference_utc"] = float("inf")
+    restored = EnphaseGridPowerSensor(coord)
+    restored.hass = hass
+    restored.async_get_last_state = AsyncMock(
+        return_value=State("sensor.restored_grid", "1200", attributes)
+    )
+    restored.async_get_last_extra_data = AsyncMock(
+        return_value=sensor.extra_restore_state_data
+    )
+    # This parser test uses a manually attached entity; platform expiry is tested above.
+    monkeypatch.setattr(restored, "_schedule_freshness_expiry", lambda: None)
+    await restored.async_added_to_hass()
+    assert restored.extra_state_attributes["freshness_reference_utc"] == (
+        expected.isoformat()
+    )
+    assert restored.native_value == 1200
+    await restored.async_will_remove_from_hass()
+
+
+@pytest.mark.parametrize("kind", ["grid", "battery"])
+@pytest.mark.parametrize("restore", [False, True])
+async def test_core_outage_deadline_does_not_become_accepted_source_clock(
+    hass, coordinator_factory, monkeypatch, kind, restore
+):
+    from homeassistant.core import State
+
+    now = [dt_util.utcnow()]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+    accepted_at = now[0]
+    coord = coordinator_factory()
+    coord.last_success_utc = accepted_at - timedelta(minutes=29)
+    coord.last_update_success = False
+    sensor = (EnphaseGridPowerSensor if kind == "grid" else EnphaseBatteryPowerSensor)(
+        coord
+    )
+    flow = next(iter(sensor._flow_signs))
+    for minutes, value in ((5, 1), (0, 1.1)):
+        coord.energy.site_energy = {
+            flow: {
+                "value_kwh": value,
+                "last_report_date": accepted_at - timedelta(minutes=minutes),
+                "fields_used": [flow],
+            }
+        }
+        _ = sensor.native_value
+    expected = 1200 * sensor._flow_signs[flow]
+    assert sensor.native_value == expected
+    assert sensor.extra_state_attributes["freshness_reference_utc"] == (
+        accepted_at.isoformat()
+    )
+    if restore:
+        previous = sensor
+        sensor = type(previous)(coord)
+        sensor.hass = hass
+        sensor.async_get_last_state = AsyncMock(
+            return_value=State(
+                "sensor.core_outage_power",
+                str(expected),
+                previous.extra_state_attributes,
+            )
+        )
+        sensor.async_get_last_extra_data = AsyncMock(
+            return_value=previous.extra_restore_state_data
+        )
+        monkeypatch.setattr(sensor, "_schedule_freshness_expiry", lambda: None)
+        await sensor.async_added_to_hass()
+    now[0] = accepted_at + timedelta(minutes=2)
+    assert not sensor.available  # The existing core-outage bound still applies.
+    coord.last_update_success = True
+    coord.last_success_utc = now[0]
+    assert sensor.available
+    assert sensor.native_value == expected
+    assert sensor.extra_state_attributes["freshness_reference_utc"] == (
+        accepted_at.isoformat()
+    )
+    now[0] = accepted_at + timedelta(minutes=30)
+    assert not sensor.available  # Core recovery cannot renew the source clock.
+    if restore:
+        await sensor.async_will_remove_from_hass()
+
+
+@pytest.mark.parametrize("timestamp", [1e20, 1e100])
+async def test_out_of_range_restored_power_clock_cannot_break_setup(
+    hass, coordinator_factory, monkeypatch, timestamp
+):
+    from homeassistant.core import State
+    from custom_components.enphase_ev.sensor_site_energy import (
+        _SiteLifetimePowerRestoreData,
+    )
+
+    coord = coordinator_factory()
+    coord.energy.site_energy = {}
+    sensor = EnphaseGridPowerSensor(coord)
+    sensor.hass = hass
+    sensor.async_get_last_state = AsyncMock(
+        return_value=State(
+            "sensor.invalid_restored_power",
+            "1200",
+            {
+                "last_flow_kwh": {"grid_import": 1.1},
+                "last_sample_ts": timestamp,
+                "last_energy_ts": timestamp,
+                "method": "lifetime_energy_window",
+            },
+        )
+    )
+    baseline = (dt_util.utcnow() - timedelta(minutes=5)).timestamp()
+    sensor.async_get_last_extra_data = AsyncMock(
+        return_value=_SiteLifetimePowerRestoreData(
+            previous_live_flow_kwh={"grid_import": 1},
+            previous_live_sample_ts=baseline,
+            previous_live_energy_ts=baseline,
+            last_live_interval_minutes=5,
+            last_live_flow_sources={"grid_import": ("import",)},
+            previous_live_flow_sources={"grid_import": ("import",)},
+        )
+    )
+    monkeypatch.setattr(sensor, "_schedule_freshness_expiry", lambda: None)
+    await sensor.async_added_to_hass()
+    assert not sensor.available
+    assert sensor._last_sample_ts is None
+    assert sensor._live_flow_sample_count == 0
+    await sensor.async_will_remove_from_hass()
+
+
+@pytest.mark.parametrize("kind", ["grid", "battery"])
+@pytest.mark.parametrize(
+    "rejection", ["outlier_ignored", "extreme_pending", "source_changed_reseed"]
+)
+async def test_initial_power_rejection_recovers_through_publication(
+    hass, config_entry, coordinator_factory, monkeypatch, kind, rejection
+):
+    """Availability must process recovery even without a previously accepted power."""
+    now = [dt_util.utcnow()]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+    coord = coordinator_factory()
+    coord.update_interval = None
+    coord.last_success_utc = now[0]
+    power = (EnphaseGridPowerSensor if kind == "grid" else EnphaseBatteryPowerSensor)(
+        coord
+    )
+    flow = next(iter(power._flow_signs))
+    value = 1.0
+    fields = [flow]
+
+    def publish_payload():
+        coord.energy.site_energy = {
+            flow: {
+                "value_kwh": value,
+                "last_report_date": now[0],
+                "fields_used": fields,
+                "interval_minutes": 5,
+            }
+        }
+        coord.async_update_listeners()
+
+    power.entity_id = "sensor.initially_rejected_" + kind
+    power.async_get_last_state = AsyncMock(return_value=None)
+    power.async_get_last_extra_data = AsyncMock(return_value=None)
+    publish_payload()
+    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    component._platforms["sensor"].config_entry = config_entry
+    await component.async_add_entities([power])
+    now[0] += timedelta(minutes=5)
+    if rejection == "source_changed_reseed":
+        fields = ["replacement_channel"]
+    else:
+        value += 1000 if rejection == "extreme_pending" else 10
+    publish_payload()
+    await hass.async_block_till_done()
+    # Once unavailable, HA no longer reads native_value while writing state.
+    coord.async_update_listeners()
+    await hass.async_block_till_done()
+    assert hass.states.get(power.entity_id).state == "unavailable"
+    assert power._last_method == rejection
+    assert power._accepted_power_freshness is None
+    now[0] += timedelta(minutes=5)
+    value += 0.1
+    publish_payload()
+    await hass.async_block_till_done()
+    assert hass.states.get(power.entity_id).state == str(1200 * power._flow_signs[flow])
+    assert power.extra_state_attributes["freshness_reference_utc"] == now[0].isoformat()
+    assert power._cancel_freshness_expiry is not None
+    await component.async_remove_entity(power.entity_id)
+
+
+@pytest.mark.parametrize("kind", ["grid", "battery"])
+@pytest.mark.parametrize("invalid_clock", ["stale", "future"])
+async def test_invalid_source_clock_cannot_advance_power_baseline(
+    hass, config_entry, coordinator_factory, monkeypatch, kind, invalid_clock
+):
+    """A rejected payload clock cannot change the next valid dE/dt window."""
+    now = [dt_util.utcnow()]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+    accepted_at = now[0]
+    coord = coordinator_factory()
+    coord.update_interval = None
+    coord.last_success_utc = now[0]
+    power = (EnphaseGridPowerSensor if kind == "grid" else EnphaseBatteryPowerSensor)(
+        coord
+    )
+    flow = next(iter(power._flow_signs))
+
+    def publish_payload(value, timestamp):
+        coord.energy.site_energy = {
+            flow: {
+                "value_kwh": value,
+                "last_report_date": timestamp,
+                "fields_used": [flow],
+                "interval_minutes": 5,
+            }
+        }
+        coord.async_update_listeners()
+
+    power.entity_id = "sensor.invalid_clock_" + kind
+    power.async_get_last_state = AsyncMock(return_value=None)
+    power.async_get_last_extra_data = AsyncMock(return_value=None)
+    publish_payload(1, accepted_at - timedelta(minutes=5))
+    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    component._platforms["sensor"].config_entry = config_entry
+    await component.async_add_entities([power])
+    publish_payload(1.1, accepted_at)
+    await hass.async_block_till_done()
+    assert hass.states.get(power.entity_id).state == str(1200 * power._flow_signs[flow])
+
+    now[0] += timedelta(minutes=5)
+    # A lifetime guard can retain the cumulative value while the source clock
+    # regresses. Neither that response nor a future-dated response is usable.
+    timestamp = accepted_at + timedelta(minutes=-60 if invalid_clock == "stale" else 60)
+    publish_payload(1.1, timestamp)
+    await hass.async_block_till_done()
+    assert hass.states.get(power.entity_id).state == "unavailable"
+
+    # Recovery can return the last valid sample before the next source advance.
+    now[0] += timedelta(minutes=1)
+    publish_payload(1.1, accepted_at)
+    await hass.async_block_till_done()
+    assert hass.states.get(power.entity_id).state == str(1200 * power._flow_signs[flow])
+    assert power.extra_state_attributes["freshness_reference_utc"] == (
+        accepted_at.isoformat()
+    )
+
+    now[0] = accepted_at + timedelta(minutes=10)
+    publish_payload(1.2, now[0])
+    await hass.async_block_till_done()
+    # 100 Wh over ten valid source minutes, not the rejected clock's window.
+    assert hass.states.get(power.entity_id).state == str(600 * power._flow_signs[flow])
+    assert power.extra_state_attributes["last_window_seconds"] == 600
+    await component.async_remove_entity(power.entity_id)
