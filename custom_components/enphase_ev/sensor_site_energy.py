@@ -636,6 +636,7 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
         self._previous_live_flow_sources: dict[str, tuple[str, ...]] = {}
         self._extreme_power_validator = ExtremePowerValidator()
         self._restored_method_explicit = False
+        self._accepted_power_freshness: datetime | None = None
 
     def _clear_restored_live_history(self, *, discard_power: bool = False) -> None:
         """Drop restored live-history samples that are not safe to reuse."""
@@ -732,6 +733,22 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
             if flow_key in self._flow_signs
         }
         self._restore_live_history()
+        if self._live_flow_sample_count >= 2:
+            restored_reference = self._parse_sample_timestamp(
+                attrs.get("freshness_reference_utc")
+            )
+            reference = self._last_sample_ts
+            if reference is not None and math.isfinite(reference):
+                if restored_reference is not None and math.isfinite(restored_reference):
+                    reference = min(reference, restored_reference)
+                try:
+                    self._accepted_power_freshness = datetime.fromtimestamp(
+                        reference, tz=timezone.utc
+                    )
+                except (OverflowError, OSError, ValueError):
+                    self._clear_restored_live_history(discard_power=True)
+                    self._discard_restored_baseline()
+                    self._live_flow_sample_count = 0
         self._schedule_freshness_expiry()
 
     def _restore_live_history(self) -> None:
@@ -1152,7 +1169,49 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
     def _freshness_deadline(self) -> datetime | None:
         """Bound derived watts by the oldest contributing source sample."""
 
+        deadline = self._power_freshness_deadline()
         core_deadline: datetime | None = super()._freshness_deadline()
+        if core_deadline is not None:
+            return min(deadline, core_deadline) if deadline else core_deadline
+        return deadline
+
+    def _power_freshness_deadline(self) -> datetime | None:
+        """Keep the accepted source clock independent of coordinator health."""
+
+        # Timers and HA availability run before native_value during publication.
+        # Rejected source clocks must not rebase the next valid calculation.
+        deadline = self._source_freshness_deadline()
+        if (
+            deadline is not None
+            and dt_util.utcnow() < deadline
+            and self._site_energy_flows()
+            and (
+                self._accepted_power_freshness is not None
+                or self._last_method
+                in {"extreme_pending", "outlier_ignored", "source_changed_reseed"}
+            )
+        ):
+            _ = self.native_value
+            deadline = self._source_freshness_deadline()
+        if not self._current_flow_values()[0]:
+            return deadline
+        if self._accepted_power_freshness is None and self._last_method in {
+            "extreme_pending",
+            "outlier_ignored",
+            "source_changed_reseed",
+        }:
+            now: datetime = dt_util.utcnow()
+            return now
+        if self._accepted_power_freshness is not None:
+            accepted_deadline = self._accepted_power_freshness + timedelta(
+                seconds=CURRENT_POWER_STALE_AFTER_S
+            )
+            return min(deadline, accepted_deadline) if deadline else accepted_deadline
+        return deadline
+
+    def _source_freshness_deadline(self) -> datetime | None:
+        """Return the current payload's deadline independently of retained watts."""
+
         now: datetime = dt_util.utcnow()
         timestamps: list[float] = []
         flows = self._site_energy_flows()
@@ -1179,11 +1238,11 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
                 return now
             timestamps.append(timestamp)
         if not timestamps:
-            return core_deadline
+            return None
         deadline = datetime.fromtimestamp(min(timestamps), tz=timezone.utc) + timedelta(
             seconds=CURRENT_POWER_STALE_AFTER_S
         )
-        return min(deadline, core_deadline) if core_deadline is not None else deadline
+        return deadline
 
     @property
     def available(self) -> bool:
@@ -1194,6 +1253,26 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
 
     @property
     def native_value(self) -> Any:
+        previous_sample = self._last_sample_ts
+        value = self._calculate_power()
+        if value is not None and self._last_sample_ts != previous_sample:
+            if self._last_method in {
+                "lifetime_energy_window",
+                "no_change",
+                "lifetime_reset",
+                "extreme_confirmed",
+            }:
+                deadline = self._source_freshness_deadline()
+                self._accepted_power_freshness = (
+                    deadline - timedelta(seconds=CURRENT_POWER_STALE_AFTER_S)
+                    if deadline is not None
+                    else None
+                )
+        return value
+
+    def _calculate_power(self) -> Any:
+        """Advance calculation baselines without renewing rejected power."""
+
         flows = self._site_energy_flows()
         current_values, synthetic_zero_flows = self._current_flow_values()
         has_live_flow_values = self._has_live_flow_values(
@@ -1389,7 +1468,7 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
 
     @property
     def extra_state_attributes(self) -> Any:
-        deadline = self._freshness_deadline()
+        deadline = self._power_freshness_deadline()
         return {
             "sampled_at_utc": self._last_report_date_iso,
             "freshness_reference_utc": (
@@ -1447,6 +1526,8 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._balance_sources: dict[str, str] = {}
         self._balance_using_cached = False
         self._balance_source_times: dict[str, object] = {}
+        self._balance_source_freshness: dict[str, str] = {}
+        self._balance_blocker: dict[str, str] | None = None
         self._last_bucket_wh: float | None = None
         self._last_bucket_count: int | None = None
         self._last_start_date: str | None = None
@@ -1484,9 +1565,12 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         registry = er.async_get(self.hass)
         sources: dict[str, str] = {}
         source_times: dict[str, object] = {}
+        source_freshness: dict[str, str] = {}
         timestamps: list[float] = []
+        using_cached = False
         total = 0.0
         for key in ("current_production_power", "grid_power", "battery_power"):
+            self._balance_blocker = {"source": key, "reason": "missing_entity"}
             entity_id = registry.async_get_entity_id(
                 "sensor", DOMAIN, f"{DOMAIN}_site_{self._coord.site_id}_{key}"
             )
@@ -1499,8 +1583,10 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
                     continue
                 return
             state = self.hass.states.get(entity_id)
+            self._balance_blocker["reason"] = "missing_state"
             if state is None:
                 return
+            self._balance_blocker["reason"] = "invalid_power"
             try:
                 value = PowerConverter.convert(
                     float(state.state),
@@ -1511,6 +1597,15 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
                 return
             if not math.isfinite(value):
                 return
+            self._balance_blocker["reason"] = "incomplete_source"
+            if state.attributes.get("method") in {"seeded", "no_live_data"}:
+                return
+            using_cached |= bool(
+                state.attributes.get("using_stale")
+                or state.attributes.get("using_cached")
+                or state.attributes.get("method")
+                in {"source_changed_reseed", "extreme_pending", "outlier_ignored"}
+            )
             raw_source_ts = state.attributes.get("sampled_at_utc")
             raw_received_ts = state.attributes.get("cached_at_utc")
             raw_freshness_ts = state.attributes.get("freshness_reference_utc")
@@ -1523,6 +1618,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             freshness_ts = _EnphaseSiteLifetimePowerSensor._parse_sample_timestamp(
                 raw_freshness_ts
             )
+            self._balance_blocker["reason"] = "invalid_timestamp"
             for raw_timestamp, timestamp in (
                 (raw_source_ts, source_ts),
                 (raw_received_ts, received_ts),
@@ -1563,20 +1659,24 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
                 source_ts
             ):
                 return
+            self._balance_blocker["reason"] = "stale_source"
+            if self._timestamp_age_seconds(source_ts) >= CURRENT_POWER_STALE_AFTER_S:
+                return
             total += value
             timestamps.append(source_ts)
             sources[key] = entity_id
             source_times[key] = state.attributes.get("sampled_at_utc")
-        # Reject a stale candidate before replacing the retained valid balance.
-        # A numeric HA state can lag its source's availability publication.
+            source_freshness[key] = datetime.fromtimestamp(
+                source_ts, tz=timezone.utc
+            ).isoformat()
         balance_ts = min(timestamps)
-        if self._timestamp_age_seconds(balance_ts) >= CURRENT_POWER_STALE_AFTER_S:
-            return
         self._balance_power_w = max(round(total), 0)
         self._balance_power_ts = balance_ts
         self._balance_sources = sources
         self._balance_source_times = source_times
-        self._balance_using_cached = False
+        self._balance_source_freshness = source_freshness
+        self._balance_using_cached = using_cached
+        self._balance_blocker = None
 
     @staticmethod
     def _timestamp_age_seconds(timestamp: float) -> float:
@@ -1845,6 +1945,10 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
                 "power_balance_w": self._balance_power_w,
                 "power_balance_sources": dict(self._balance_sources),
                 "power_balance_source_timestamps": dict(self._balance_source_times),
+                "power_balance_source_freshness": dict(self._balance_source_freshness),
+                "power_balance_blocker": (
+                    dict(self._balance_blocker) if self._balance_blocker else None
+                ),
                 "method": (
                     "power_balance"
                     if self._balance_power_w is not None
