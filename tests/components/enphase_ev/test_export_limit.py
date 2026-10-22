@@ -963,6 +963,38 @@ async def test_poll_wakeup_on_submission(runtime):
     runtime._task = None
 
 
+async def test_disable_can_confirm_after_35_minutes_without_resubmission(runtime):
+    """A late gateway readback confirms once; earlier reads never echo intent."""
+    client = runtime.coordinator.client
+    await runtime.async_apply(None, confirm=True)
+    started = runtime.pending["started"]
+    assert runtime.attributes()["confirmed_watts"] == 5000
+    assert runtime.attributes()["requested_action"] == "disable"
+    for elapsed in (300, 600, 1800, 2100):
+        with patch(
+            "custom_components.enphase_ev.export_limit_runtime.time.time",
+            return_value=started + elapsed,
+        ):
+            attrs = await runtime.async_refresh()
+            assert attrs["pending"] is True
+            assert attrs["confirmed_watts"] == 5000
+            if elapsed >= 600:
+                assert attrs["request_status"] == "unconfirmed"
+            with pytest.raises(ServiceValidationError):
+                await runtime.async_apply(None, confirm=True)
+    client.async_get_export_limit_settings.return_value = payload(enable=False)
+    with patch(
+        "custom_components.enphase_ev.export_limit_runtime.time.time",
+        return_value=started + 2110,
+    ):
+        attrs = await runtime.async_refresh()
+    assert attrs["pending"] is False
+    assert attrs["request_status"] == "confirmed"
+    assert attrs["confirmed_watts"] is None
+    assert attrs["last_successful_readback"] == started + 2110
+    client.async_set_export_limit.assert_awaited_once()
+
+
 @pytest.mark.parametrize(
     "name",
     [
