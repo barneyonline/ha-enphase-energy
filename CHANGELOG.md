@@ -20,7 +20,7 @@ All notable changes to this project will be documented in this file.
 - Include the current power-balance blocking source/reason and effective contributing freshness clocks in consumption diagnostics, separately from historical consumption-bucket rejections.
 
 ### 🔄 Other changes
-- None
+- Classify the integration under Energy for Home Assistant Marketplace discovery.
 
 ## v5.1.4 - 2026-10-21
 
