@@ -5,11 +5,10 @@ from typing import TYPE_CHECKING
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers import service as ha_service
 from homeassistant.helpers import target as ha_target
 from .const import DOMAIN
 from .device_types import parse_type_identifier
-from .device_registry_compat import device_config_entry_ids
+from .device_registry_helpers import device_config_entry_ids
 from .runtime_data import iter_coordinators, loaded_runtime_data
 from homeassistant.exceptions import ServiceValidationError
 
@@ -188,52 +187,22 @@ class ServiceRouter:
 
     def _extract_target_references(
         self, call: ServiceCall
-    ) -> tuple[set[str], set[str], set[str], bool]:
-        referenced_entity_ids: set[str] = set()
-        indirect_entity_ids: set[str] = set()
-        device_ids: set[str] = set()
-        extractor = getattr(ha_target, "async_extract_referenced_entity_ids", None)
-        target_selection = getattr(ha_target, "TargetSelection", None)
-        if not callable(extractor):
-            return (referenced_entity_ids, indirect_entity_ids, device_ids, False)
-        try:
-            selection = (
-                target_selection(call.data) if callable(target_selection) else call
-            )
-            selected = extractor(self.hass, selection)
-        except Exception:
-            return (referenced_entity_ids, indirect_entity_ids, device_ids, False)
-        referenced = getattr(selected, "referenced", None)
-        indirectly_referenced = getattr(selected, "indirectly_referenced", None)
-        referenced_devices = getattr(selected, "referenced_devices", None)
-        if referenced is None and indirectly_referenced is None:
-            referenced_entity_ids |= {str(entity_id) for entity_id in selected}
-        else:
-            referenced_entity_ids |= {str(entity_id) for entity_id in referenced or ()}
-            indirect_entity_ids |= {
-                str(entity_id) for entity_id in indirectly_referenced or ()
-            }
-        device_ids |= {str(device_id) for device_id in referenced_devices or ()}
-        return (referenced_entity_ids, indirect_entity_ids, device_ids, True)
+    ) -> ha_target.SelectedEntities:
+        return ha_target.async_extract_referenced_entity_ids(
+            self.hass, ha_target.TargetSelection(call.data)
+        )
 
     def _extract_device_ids(self, call: ServiceCall) -> list[str]:
-        _entity_ids, _indirect_entity_ids, device_ids, _extracted = (
+        return self._device_ids_from_target_references(
             self._extract_target_references(call)
         )
-        extractor = getattr(ha_service, "async_extract_referenced_device_ids", None)
-        if callable(extractor):
-            try:
-                device_ids |= {str(value) for value in extractor(self.hass, call)}
-            except Exception:
-                pass
-        data_ids = call.data.get("device_id")
-        if data_ids:
-            if isinstance(data_ids, str):
-                device_ids.add(data_ids)
-            else:
-                device_ids |= {str(v) for v in data_ids}
+
+    def _device_ids_from_target_references(
+        self, selected: ha_target.SelectedEntities
+    ) -> list[str]:
+        device_ids = set(selected.referenced_devices)
         ent_reg = er.async_get(self.hass)
-        for entity_id in self._extract_entity_ids(call, include_indirect=True):
+        for entity_id in selected.referenced | selected.indirectly_referenced:
             reg_entry = ent_reg.async_get(entity_id)
             if (
                 reg_entry is not None
@@ -243,39 +212,18 @@ class ServiceRouter:
                 device_ids.add(reg_entry.device_id)
         return list(device_ids)
 
-    def _extract_entity_ids(
-        self, call: ServiceCall, *, include_indirect: bool = False
-    ) -> list[str]:
-        entity_ids, indirect_entity_ids, _device_ids, extracted = (
-            self._extract_target_references(call)
-        )
-        if include_indirect:
-            entity_ids |= indirect_entity_ids
-        if not extracted:
-            extractor = getattr(ha_service, "async_extract_referenced_entity_ids", None)
-            if callable(extractor):
-                try:
-                    entity_ids |= {
-                        str(entity_id) for entity_id in extractor(self.hass, call)
-                    }
-                except Exception:
-                    pass
-        raw_entity_ids = call.data.get("entity_id")
-        if raw_entity_ids:
-            if isinstance(raw_entity_ids, str):
-                entity_ids.add(raw_entity_ids)
-            else:
-                entity_ids |= {str(entity_id) for entity_id in raw_entity_ids}
-        return list(entity_ids)
+    def _extract_entity_ids(self, call: ServiceCall) -> list[str]:
+        return list(self._extract_target_references(call).referenced)
 
     async def _resolve_site_ids_from_call(self, call: ServiceCall) -> set[str]:
+        selected = self._extract_target_references(call)
         site_ids: set[str] = set()
-        for device_id in self._extract_device_ids(call):
+        for device_id in self._device_ids_from_target_references(selected):
             site_id = await self._resolve_site_id(device_id)
             if site_id:
                 site_ids.add(site_id)
         ent_reg = er.async_get(self.hass)
-        for entity_id in self._extract_entity_ids(call, include_indirect=True):
+        for entity_id in selected.referenced | selected.indirectly_referenced:
             reg_entry = ent_reg.async_get(entity_id)
             if reg_entry is None or reg_entry.platform != DOMAIN:
                 continue

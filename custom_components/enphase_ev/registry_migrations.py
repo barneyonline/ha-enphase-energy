@@ -15,10 +15,9 @@ from .device_info_helpers import (
     _cloud_device_info,
     _normalize_evse_model_name as _normalize_evse_model_name,
 )
-from .device_registry_compat import (
+from .device_registry_helpers import (
     device_belongs_to_config_entry,
     device_config_entry_ids,
-    get_device_by_identifier,
 )
 from .device_types import (
     is_dry_contact_type_key,
@@ -410,7 +409,9 @@ def _migrate_legacy_gateway_type_devices(
         DOMAIN,
         f"type:{site_id_text}:envoy",
     )
-    gateway_device = get_device_by_identifier(dev_reg, gateway_ident, entry.entry_id)
+    gateway_device = dev_reg.async_get_device_by_identifier(
+        gateway_ident, entry.entry_id
+    )
     if gateway_device is None:
         return
     gateway_device_id = getattr(gateway_device, "id", None)
@@ -493,7 +494,9 @@ def _migrate_legacy_gateway_type_devices(
 
     for type_key in _LEGACY_GATEWAY_TYPE_KEYS:
         legacy_ident = (DOMAIN, f"type:{site_id_text}:{type_key}")
-        legacy_device = get_device_by_identifier(dev_reg, legacy_ident, entry.entry_id)
+        legacy_device = dev_reg.async_get_device_by_identifier(
+            legacy_ident, entry.entry_id
+        )
         if legacy_device is None:
             continue
         _move_device_to_gateway(legacy_device, type_key)
@@ -556,13 +559,15 @@ def _remove_legacy_site_device(
         DOMAIN,
         f"type:{site_id_text}:envoy",
     )
-    gateway_device = get_device_by_identifier(dev_reg, gateway_ident, entry.entry_id)
+    gateway_device = dev_reg.async_get_device_by_identifier(
+        gateway_ident, entry.entry_id
+    )
     if gateway_device is not None:
         gateway_device_id = getattr(gateway_device, "id", None)
 
     legacy_site_ident = (DOMAIN, f"site:{site_id_text}")
-    legacy_site_device = get_device_by_identifier(
-        dev_reg, legacy_site_ident, entry.entry_id
+    legacy_site_device = dev_reg.async_get_device_by_identifier(
+        legacy_site_ident, entry.entry_id
     )
     if legacy_site_device is None:
         return
@@ -706,7 +711,7 @@ def _remove_evse_type_device_and_entities(
         return
 
     evse_ident = (DOMAIN, f"type:{site_id_text}:iqevse")
-    evse_device = get_device_by_identifier(dev_reg, evse_ident, entry.entry_id)
+    evse_device = dev_reg.async_get_device_by_identifier(evse_ident, entry.entry_id)
     if evse_device is None:
         return
     evse_device_id = getattr(evse_device, "id", None)
@@ -785,8 +790,8 @@ def _remove_retired_ac_battery_entities(
             entity.unique_id.startswith(prefix) or entity.unique_id == inventory_id
         ):
             ent_reg.async_remove(entity.entity_id)
-    device = get_device_by_identifier(
-        dev_reg, (DOMAIN, f"type:{site_id}:ac_battery"), entry.entry_id
+    device = dev_reg.async_get_device_by_identifier(
+        (DOMAIN, f"type:{site_id}:ac_battery"), entry.entry_id
     )
     if (
         device is not None

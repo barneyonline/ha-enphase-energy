@@ -793,32 +793,32 @@ def test_remove_empty_inactive_serial_devices_handles_guard_paths(
     devices = {
         "foreign-entry": SimpleNamespace(
             id="foreign-entry",
-            config_entries={"other-entry"},
+            config_entry_id="other-entry",
             identifiers={(DOMAIN, "EV-FOREIGN")},
         ),
         "no-identifiers": SimpleNamespace(
             id="no-identifiers",
-            config_entries={config_entry.entry_id},
+            config_entry_id=config_entry.entry_id,
             identifiers=set(),
         ),
         "other-domain": SimpleNamespace(
             id="other-domain",
-            config_entries={config_entry.entry_id},
+            config_entry_id=config_entry.entry_id,
             identifiers={("other", "EV-OTHER")},
         ),
         "bad-identifier": SimpleNamespace(
             id="bad-identifier",
-            config_entries={config_entry.entry_id},
+            config_entry_id=config_entry.entry_id,
             identifiers={(DOMAIN, BadIdentifier())},
         ),
         "no-id": SimpleNamespace(
             id=None,
-            config_entries={config_entry.entry_id},
+            config_entry_id=config_entry.entry_id,
             identifiers={(DOMAIN, "EV-NO-ID")},
         ),
         "remove-fails": SimpleNamespace(
             id="remove-fails",
-            config_entries={config_entry.entry_id},
+            config_entry_id=config_entry.entry_id,
             identifiers={(DOMAIN, "EV-REMOVE-FAILS")},
         ),
     }

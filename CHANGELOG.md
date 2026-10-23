@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
-- None
+- Require Home Assistant `2026.10.0` or newer (Python `3.14`+).
 
 ### ✨ New features
 - None
@@ -14,11 +14,15 @@ All notable changes to this project will be documented in this file.
 - Normalize live battery "Savings Mode" readings so the Savings profile displays correctly, its after-peak control remains available, and profile writes confirm, while preserving AI Optimisation selections. (#952)
 
 ### 🔧 Improvements
+- Use Home Assistant's target-selection API directly and avoid repeated target expansion while resolving service devices and sites.
+- Remove obsolete service-target, device-ownership, and polling-interval compatibility paths and their unused tests.
+- Remove 31 unused coordinator forwarding methods and the redundant device-lookup wrapper.
 - Restore Production, Grid, Battery, and Consumption Power immediately after a short Home Assistant restart using the last two accepted readings and their original freshness deadlines. Keep validated calculation baselines separate from startup placeholders and cached display values.
 - On Home Assistant 2026.11 and newer, hide the manual Slew Rate in Export Limit Defaults while Restore Slew Rate is checked. Older supported versions keep the existing form; restoring still clears the override after fresh gateway readback.
 
 ### 🔄 Other changes
-- None
+- Run the full CI suite on the pinned Home Assistant `2026.10.0` stack and remove the duplicate minimum-version environment and compatibility job.
+- Update pinned hassfest validation to Home Assistant `2026.10.2` and HACS validation to Home Assistant `2026.10.0`.
 
 ## v5.1.5 - 2026-10-23
 

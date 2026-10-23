@@ -22,12 +22,12 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      - name: Build pinned HACS validator on Home Assistant 2026.9.0
+      - name: Build pinned HACS validator on Home Assistant 2026.10.0
         run: docker build --file devtools/docker/Dockerfile.hacs --tag enphase-hacs-validator .
       - name: Verify HACS Home Assistant version
         run: >-
           docker run --rm --entrypoint python3 enphase-hacs-validator -c
-          "from homeassistant.const import __version__; assert __version__ == '2026.9.0', __version__; print(f'Home Assistant {__version__}')"
+          "from homeassistant.const import __version__; assert __version__ == '2026.10.0', __version__; print(f'Home Assistant {__version__}')"
       - name: HACS validation
         env:
           INPUT_GITHUB_TOKEN: ${{ github.token }}
