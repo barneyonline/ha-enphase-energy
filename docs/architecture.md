@@ -767,6 +767,43 @@ source clock are valid. Missing, future, expired, malformed or extreme restored
 readings remain unavailable. Display restoration does not authorize a new delta
 calculation from the restored watts or bypass bucket-baseline validation.
 
+### Power Sensor Restart Continuity
+
+Production, Grid, Battery, and Consumption Power retain the last two distinct
+accepted readings in versioned private Home Assistant restore data. Each reading
+stores native watts, its source timestamp, its effective freshness reference,
+and calculation metadata. Production also preserves its acquisition timestamp.
+Repeated unchanged observations, rejected candidates, and restarts do not renew
+the accepted clocks. Successful overnight near-zero production acquisitions
+retain the existing acquisition-based freshness rule.
+
+Restoration finishes before entity freshness evaluation and first publication.
+Supported entities reuse persisted discovery metadata. A valid live reading takes
+priority; otherwise the newest eligible saved reading is published with
+`using_cached: true`, including while cloud inputs or dependent entities warm up.
+A corrupt newest record can fall back to the older valid record. Readings expire
+at their original 30-minute deadline through entity timers without another poll.
+This continuity starts once integration setup permits entity creation; it does
+not bypass authentication, setup failures, or coordinator health checks.
+
+Grid and Battery persist both cumulative samples, source signatures, and interval
+metadata privately, independently of display-state attributes. Their accepted
+watts are separate from mutable calculation baselines, so missing startup data
+and synthetic zero placeholders cannot erase the accepted history. Restored
+watts never become cumulative-energy samples. Source changes, resets, partial
+channels, and invalid deltas retain the existing baseline-validation safeguards.
+Consumption can bridge startup with either a saved balance or a saved accepted
+bucket-derived reading while its calculation baseline awaits live validation.
+The oldest contributing source still bounds balance freshness. Production exposes
+its effective `freshness_reference_utc` separately from acquisition time so a
+restored source cannot extend a dependent balance's deadline. Accepted cached
+watts retain their calculation metadata while a new cumulative baseline seeds;
+Consumption diagnostics describe the same reading as the displayed state.
+Malformed extra-data envelopes are ignored so live acquisition can recover.
+Existing restore formats remain readable conservatively; new records use watts regardless of a
+user's selected display unit. HA manages persistence for ordinary restarts and
+reloads; this does not guarantee the latest sample survives an abrupt power loss.
+
 `EnergyManager.site_energy_fetch_diagnostics` exposes detached, process-local
 attempt and cumulative failure counts, attempt/completion/success timestamps,
 and categorical outcomes. The last failure timestamp and category survive

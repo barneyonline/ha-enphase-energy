@@ -617,7 +617,7 @@ async def test_restored_flow_power_preserves_accepted_freshness(
         return_value=State("sensor.restored_grid", "1200", attributes)
     )
     restored.async_get_last_extra_data = AsyncMock(
-        return_value=sensor.extra_restore_state_data
+        return_value=sensor.extra_restore_state_data.legacy
     )
     # This parser test uses a manually attached entity; platform expiry is tested above.
     monkeypatch.setattr(restored, "_schedule_freshness_expiry", lambda: None)

@@ -965,8 +965,7 @@ async def test_site_consumption_power_validates_and_uses_restored_baseline(
     assert sensor.available is True
     assert sensor.native_value == 1200
     stored = sensor.extra_restore_state_data
-    assert isinstance(stored, _SiteConsumptionPowerRestoreData)
-    assert stored.last_power_w == 1200
+    assert stored.as_dict()["last_power_w"] == 1200
 
     coord.energy.site_energy["consumption"] = _consumption_flow(
         latest_bucket_wh=1200.0,
@@ -2702,6 +2701,7 @@ async def test_site_lifetime_power_sensor_restores_two_live_samples_for_same_buc
     coord = coordinator_factory()
     sensor = EnphaseGridPowerSensor(coord)
     sensor.hass = hass
+    monkeypatch.setattr(sensor, "_schedule_freshness_expiry", lambda: None)
     base_ts = datetime(2024, 1, 2, tzinfo=timezone.utc)
 
     class LastState:
@@ -2761,6 +2761,7 @@ async def test_site_lifetime_power_sensor_restore_uses_interval_floor_for_tiny_g
     coord = coordinator_factory()
     sensor = EnphaseGridPowerSensor(coord)
     sensor.hass = hass
+    monkeypatch.setattr(sensor, "_schedule_freshness_expiry", lambda: None)
     base_ts = datetime(2024, 1, 2, tzinfo=timezone.utc)
 
     class LastState:
