@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🔧 Improvements
 - Restore Production, Grid, Battery, and Consumption Power immediately after a short Home Assistant restart using the last two accepted readings and their original freshness deadlines. Keep validated calculation baselines separate from startup placeholders and cached display values.
+- On Home Assistant 2026.11 and newer, hide the manual Slew Rate in Export Limit Defaults while Restore Slew Rate is checked. Older supported versions keep the existing form; restoring still clears the override after fresh gateway readback.
 
 ### 🔄 Other changes
 - None

@@ -95,6 +95,10 @@ The options menu separates device category selection (Devices) from feature
 configuration (Features). Features contains Device Features and Advanced Features;
 the latter groups installer Grid Profile controls, Export Limit controls, and
 Microinverter Power.
+Export Limit Defaults conditionally hides the manual Slew Rate while Restore Slew
+Rate is checked on Home Assistant 2026.11 and newer. Older supported versions keep
+the unconditional form. Restoration ignores any manual value, reads fresh gateway
+settings, and clears the saved override; saving defaults never writes the gateway.
 Installer Grid Profile controls are also a default-off topology option. Disabled
 entries skip both the startup Activation probe and steady metadata refreshes;
 config-entry migration enables the option only when an existing Current Grid
