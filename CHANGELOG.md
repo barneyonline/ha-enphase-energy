@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v5.2.0 - 2026-10-24
+
+### 🚧 Breaking changes
 - Require Home Assistant `2026.10.0` or newer (Python `3.14`+).
 
 ### ✨ New features
@@ -23,6 +40,7 @@ All notable changes to this project will be documented in this file.
 ### 🔄 Other changes
 - Run the full CI suite on the pinned Home Assistant `2026.10.0` stack and remove the duplicate minimum-version environment and compatibility job.
 - Update pinned hassfest validation to Home Assistant `2026.10.2` and HACS validation to Home Assistant `2026.10.0`.
+- Bump the integration manifest version to `5.2.0`.
 
 ## v5.1.5 - 2026-10-23
 
