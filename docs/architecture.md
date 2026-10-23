@@ -101,6 +101,10 @@ The options menu separates device category selection (Devices) from feature
 configuration (Features). Features contains Device Features and Advanced Features;
 the latter groups installer Grid Profile controls, Export Limit controls, and
 Microinverter Power.
+Export Limit Defaults conditionally hides the manual Slew Rate while Restore Slew
+Rate is checked on Home Assistant 2026.11 and newer. Older supported versions keep
+the unconditional form. Restoration ignores any manual value, reads fresh gateway
+settings, and clears the saved override; saving defaults never writes the gateway.
 Installer Grid Profile controls are also a default-off topology option. Disabled
 entries skip both the startup Activation probe and steady metadata refreshes;
 config-entry migration enables the option only when an existing Current Grid
@@ -273,6 +277,26 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   overlap pending Storm Alert commands. Opt-in rejects an in-flight profile write.
   The monitor adds no polling or automatic writes; unload removes its Repair.
 - `evse_runtime.py` handles charger commands, fast polling, streaming, charge-mode cache, auth settings, and EVSE control side effects.
+  Scheduler preference reads retain each charger's visible Smart/Green choices
+  separately from its enabled mode. Charge Mode selects use those choices during
+  Manual/Scheduled intervals, preserving the distinct scheduler write values.
+  Missing/malformed solar metadata retains prior choices. A newer explicit
+  charger solar preference invalidates contradictory cached visible choices and
+  takes precedence over the weaker single-charger battery-profile fallback.
+  Synthesized preferences keep their source tags; only genuine charger evidence
+  can invalidate advertised choices. Numeric effective solar status does not
+  establish whether the scheduler uses Smart or Green. Profile/cache hints seed
+  unknown context but cannot replace an already learned charger choice.
+  Profile-only seeds retain their weaker provenance so newer profile hints can
+  update them. Reused stale status cannot invalidate newer scheduler choices;
+  malformed entries in an otherwise valid response retain their prior choices.
+  Scheduler choices retain their acquisition time: an older normalized snapshot
+  published during command confirmation cannot invalidate a newer response.
+  Choice values participate in semantic snapshot equality, so a scheduler-only
+  visibility change updates the registered select even if its mode is unchanged.
+  If choice metadata is unavailable, the select retains the solar mode observed
+  for that charger during its lifetime; a site-wide battery profile alone cannot
+  establish another charger's Smart support.
   Charge Mode selections retain the confirmed cache and publish requested intent
   independently. Pending requests bypass lookup caches, including when status
   embeds a mode. Only matching fresh scheduler feedback confirms a change;
@@ -375,7 +399,37 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   After an explicit credential change, a different manager token already present
   in the jar cannot override the updated credentials. A later eligible jar token
   can be adopted without another credential update or changing the shared jar.
-  HTTP 401 retains only its status through the optional failure conversion.
+  `vpp_session.py` additionally permits one session-only `/users/self/token`
+  request when an enabled poll is eligible and no usable VPP token remains.
+  It seeds a private jar solely from the entry cookie snapshot, never the shared
+  HA jar, and follows no redirects. All available stored account claims must
+  agree; a returned token must match that account and have a future JWT expiry.
+  Decoded identity is only a consistency guard, not signature verification.
+  Missing or ambiguous identity/session state fails closed. Token and post-mint
+  cookies are persisted together through the internal entry-update path without
+  clearing core/HEMS auth blocks. Credential replacement during I/O discards the
+  returned credentials. An entry-owned lock and persisted fifteen-minute cooldown
+  bound attempts across concurrent polls and reloads; longer Retry-After values apply.
+  Retry-After is persisted when headers arrive, including on redirects and auth
+  failures, and survives credential replacement or a failed/cancelled body read.
+  This extends only the current entry's cooldown without restoring stale auth
+  state, shortening a newer deadline, or updating a removed/replaced entry.
+  Retired runtimes cannot start renewal or adopt late credentials/suspension
+  state, even before an in-flight refresh finishes cancelling. A received
+  Retry-After can still extend the registered entry's cooldown across reloads;
+  checking HA's current entry registry prevents late writes after removal.
+  Invalid sessions, login walls and identity rejection suspend renewal until
+  explicit credential replacement. Failed renewal skips unauthenticated Grid
+  Services calls. No password login, MFA, or 401-driven renewal is introduced.
+  This targets the expired-credential stuck state and cannot resolve every VPP
+  authorization failure. On a Grid Services HTTP 401, each read can additionally
+  retry once using a distinct existing token with a future JWT expiry and an
+  unambiguous account identity matching the rejected token and all stored tokens.
+  Opaque/unknown-expiry alternatives, conflicting identity claims and retained
+  shared-jar tokens cannot authorize this retry. A Retry-After header suppresses
+  the retry, even if malformed; a valid delay survives optional-family conversion.
+  The retry does not mint tokens, log in, modify credentials or change global
+  authentication policy. Non-401 failures and a second rejection are not retried.
   Sanitized HTTP failures retain their status and Retry-After delay. Program
   changes invalidate event data from the previous program while respecting active
   event-family cooldowns. Nonempty event lists with no valid rows are failures;
@@ -535,15 +589,34 @@ Diagnostics may include raw or near-raw Enphase payloads after redaction. Any ne
 - Site IDs, serials, device UIDs, MAC addresses, IP addresses, hostnames, URLs, and modem/SIM identifiers.
 - Nested payloads where future fields may add identifiers.
 
+Downloaded diagnostics redact UUID fields in charger profiles and other nested
+payloads. Scheduler-mode maps use unique per-export `[charger_N]` keys, preserving
+every mode without exposing serials or merging entries. Cached schedule serials
+become redaction markers while retaining list length. These transformations run
+at the diagnostic export boundary and leave runtime caches and source payloads
+unchanged.
+
 VPP diagnostics deliberately expose only enrollment/availability state, aggregate
 event counts, last-success and cached-data flags, and truncation. Site, enrollment,
 program, event, gateway, and request identifiers are never included.
 
+VPP diagnostics under `coordinator.vpp.session_renewal` include the last renewal
+attempt's UTC time, HTTP status, fixed outcome/reason codes, the latest preflight
+skip reason, the next allowed attempt time, and suspension state/reason. Attempt
+details belong to the current runtime and reset on reload; the persisted cooldown
+and allowlisted suspension reason survive reloads. Suspension state and reason
+apply only while their credential binding matches the current entry/client
+snapshot; credential replacement immediately releases them in diagnostics without
+writing state or changing the persisted retry deadline. Successful renewal and later
+usable-token preflights retain the previous attempt outcome. No credentials,
+account identifiers, raw response bodies or exception messages are exported.
+
 `coordinator.vpp_credential_selection` captures the last VPP header selection in
 process memory, including failed requests. Downloading diagnostics does not select
 credentials, read the cookie jar, or make requests. Later credential updates do
-not rewrite this snapshot; the next VPP request replaces it. Before a request,
-the source is `not_attempted`. Source categories are `live_manager`,
+not rewrite this snapshot; the next VPP request replaces it. A bounded alternate
+credential retry sets `fallback_attempted` and records the retry's selected source.
+Before a request, the source is `not_attempted`. Source categories are `live_manager`,
 `stored_manager`, `stored_access`, and `none` when no candidate is eligible.
 Each candidate has an `eligible` boolean and an expiry category: `absent`,
 `expired`, `not_expired`, `unknown`, or `not_evaluated`. Unknown expiry preserves
@@ -668,6 +741,31 @@ Grid and Battery Power expose `freshness_reference_utc` separately from their
 calculation timestamp, so consumption also respects the oldest contributing flow
 when import/export or charge/discharge clocks differ. Stale numeric candidates
 cannot overwrite a still-valid retained balance or its original deadline.
+Rejected extreme/outlier calculations and cumulative-source reseeds preserve
+the accepted watts' `freshness_reference_utc`, even when the new payload clock
+advances. That bound survives restoration of a validated two-sample history.
+Coordinator outage deadlines apply separately to entity availability; they never
+replace the accepted source clock or the clock saved for restoration. Recovering
+core polling can therefore restore availability while the same source reading
+is still fresh, without renewing its original expiry. Out-of-range restored
+timestamps discard the restored history instead of failing entity setup.
+Normal coordinator publication can recover an expired reading as soon as a new
+valid delta is calculated. The same publication path processes recovery after an
+initial rejected or reseeded calculation, even before any accepted power clock
+exists. Availability cannot prevent the next valid sample from being evaluated.
+Recovery evaluation first validates the current source freshness deadline. Stale
+or future-dated responses cannot change cumulative baselines or the accepted
+clock, so the next valid reading uses the previous valid calculation window.
+Consumption marks retained source watts as
+`using_cached`, and ignores numeric `seeded`/`no_live_data` placeholders.
+
+Consumption diagnostics separate the current `power_balance_blocker` (source
+key and categorical reason) from `last_rejection`, which is historical rejection
+evidence for the consumption-bucket fallback. A healthy power balance can coexist
+with an older `missing_consumption` rejection. `power_balance_source_freshness`
+records the effective clock used for each input to the last accepted balance;
+`power_balance_source_timestamps` retains the reported calculation clocks.
+These clocks can differ for retained grid/battery watts and overnight production.
 
 Consumption Power persists its last valid power balance in Home Assistant's
 restore data, separately from the consumption-bucket delta baseline. During
@@ -679,6 +777,43 @@ also restore a numeric balance when their units and every required contributing
 source clock are valid. Missing, future, expired, malformed or extreme restored
 readings remain unavailable. Display restoration does not authorize a new delta
 calculation from the restored watts or bypass bucket-baseline validation.
+
+### Power Sensor Restart Continuity
+
+Production, Grid, Battery, and Consumption Power retain the last two distinct
+accepted readings in versioned private Home Assistant restore data. Each reading
+stores native watts, its source timestamp, its effective freshness reference,
+and calculation metadata. Production also preserves its acquisition timestamp.
+Repeated unchanged observations, rejected candidates, and restarts do not renew
+the accepted clocks. Successful overnight near-zero production acquisitions
+retain the existing acquisition-based freshness rule.
+
+Restoration finishes before entity freshness evaluation and first publication.
+Supported entities reuse persisted discovery metadata. A valid live reading takes
+priority; otherwise the newest eligible saved reading is published with
+`using_cached: true`, including while cloud inputs or dependent entities warm up.
+A corrupt newest record can fall back to the older valid record. Readings expire
+at their original 30-minute deadline through entity timers without another poll.
+This continuity starts once integration setup permits entity creation; it does
+not bypass authentication, setup failures, or coordinator health checks.
+
+Grid and Battery persist both cumulative samples, source signatures, and interval
+metadata privately, independently of display-state attributes. Their accepted
+watts are separate from mutable calculation baselines, so missing startup data
+and synthetic zero placeholders cannot erase the accepted history. Restored
+watts never become cumulative-energy samples. Source changes, resets, partial
+channels, and invalid deltas retain the existing baseline-validation safeguards.
+Consumption can bridge startup with either a saved balance or a saved accepted
+bucket-derived reading while its calculation baseline awaits live validation.
+The oldest contributing source still bounds balance freshness. Production exposes
+its effective `freshness_reference_utc` separately from acquisition time so a
+restored source cannot extend a dependent balance's deadline. Accepted cached
+watts retain their calculation metadata while a new cumulative baseline seeds;
+Consumption diagnostics describe the same reading as the displayed state.
+Malformed extra-data envelopes are ignored so live acquisition can recover.
+Existing restore formats remain readable conservatively; new records use watts regardless of a
+user's selected display unit. HA manages persistence for ordinary restarts and
+reloads; this does not guarantee the latest sample survives an abrupt power loss.
 
 `EnergyManager.site_energy_fetch_diagnostics` exposes detached, process-local
 attempt and cumulative failure counts, attempt/completion/success timestamps,

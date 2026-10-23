@@ -11,16 +11,80 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Normalize live battery "Savings Mode" readings so the Savings profile displays correctly, its after-peak control remains available, and profile writes confirm, while preserving AI Optimisation selections. (#952)
 
 ### 🔧 Improvements
 - Use Home Assistant's target-selection API directly and avoid repeated target expansion while resolving service devices and sites.
 - Remove obsolete service-target, device-ownership, and polling-interval compatibility paths and their unused tests.
 - Remove 31 unused coordinator forwarding methods and the redundant device-lookup wrapper.
+- Restore Production, Grid, Battery, and Consumption Power immediately after a short Home Assistant restart using the last two accepted readings and their original freshness deadlines. Keep validated calculation baselines separate from startup placeholders and cached display values.
+- On Home Assistant 2026.11 and newer, hide the manual Slew Rate in Export Limit Defaults while Restore Slew Rate is checked. Older supported versions keep the existing form; restoring still clears the override after fresh gateway readback.
 
 ### 🔄 Other changes
 - Run the full CI suite on the pinned Home Assistant `2026.10.0` stack and remove the duplicate minimum-version environment and compatibility job.
-- Update pinned hassfest validation to Home Assistant `2026.10.2`.
+- Update pinned hassfest validation to Home Assistant `2026.10.2` and HACS validation to Home Assistant `2026.10.0`.
+
+## v5.1.5 - 2026-10-23
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Preserve the original freshness of retained Grid/Battery Power after rejected calculations or source reseeds so Consumption Power cannot treat old watts as fresh. Ignore incomplete source placeholders and report cached upstream inputs.
+- Keep coordinator outage deadlines separate from accepted power-source clocks so polling recovery restores still-fresh readings, and discard out-of-range restored power history without failing entity setup.
+- Recover Grid/Battery Power after an initial rejected or reseeded calculation without requiring a reload or a previously accepted reading.
+- Prevent stale or future-dated responses from changing Grid/Battery Power calculation baselines and distorting the next valid reading.
+
+### 🔧 Improvements
+- Include the current power-balance blocking source/reason and effective contributing freshness clocks in consumption diagnostics, separately from historical consumption-bucket rejections.
+
+### 🔄 Other changes
+- Bump the integration manifest version to `5.1.5`.
+
+## v5.1.4 - 2026-10-21
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Preserve charger-specific Smart/Green choices during Manual or Scheduled charging so saved Charge Mode automations remain valid, without rewriting Smart requests to Green.
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Validate bundled brand images instead of retired Home Assistant brands repository/CDN URLs, preserving the existing CI command-line flag.
+- Update `astral-sh/setup-uv` from `10.2.0` to `10.3.0` in CI workflows. (#945)
+- Bump the integration manifest version to `5.1.4`.
+
+## v5.1.3 - 2026-10-18
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Redact EV charger profile UUIDs, scheduler-mode identifier keys, and cached schedule serials from downloaded diagnostics while preserving mode entries and cache list length.
+- Add bounded session-only VPP token renewal when no usable credential remains. Preserve the no-password-login protection; valid-token Grid Services rejection still does not renew credentials.
+- Preserve VPP renewal Retry-After delays on authentication failures and redirects, including when credentials change during a request.
+- Discard late VPP renewal credentials after runtime retirement so reloads cannot persist stale credentials or start new Grid Services requests. Skip late cooldown writes after entry removal.
+- Retry a VPP HTTP 401 once with a distinct, unexpired token for the same account when available, without login or credential mutation. Honor HTTP 401 Retry-After before any retry.
+- Report VPP renewal suspension only for the current credentials so explicit replacements do not appear blocked by a previous session rejection. Preserve the existing retry deadline.
+
+### 🔧 Improvements
+- Include credential-free VPP session-renewal attempt time, HTTP status, outcome, skip/suspension reasons, and next retry time in diagnostics.
+
+### 🔄 Other changes
+- Pin the HACS validator image and its Home Assistant runtime to the verified 2026.9 stack while 2026.10 execution remains paused.
+- Bump the integration manifest version to `5.1.3`.
 
 ## v5.1.2 - 2026-10-17
 

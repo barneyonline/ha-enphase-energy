@@ -77,6 +77,10 @@ docker compose -f devtools/docker/docker-compose.yml exec ha-dev pre-commit run 
 docker compose -f devtools/docker/docker-compose.yml exec ha-dev pytest -q tests/components/enphase_ev
 ```
 
+The quality-scale validator checks the bundled `brand/` PNG images. The legacy
+`--validate-remote-brands` flag remains accepted for existing CI commands and
+performs the same local checks; it no longer requests retired brands CDN assets.
+
 For a full coverage run, collect coverage once and reuse that data when enforcing
 100% statement coverage on the integration modules you changed. Branch data is
 also collected to expose untested decisions; the changed-module gate checks
@@ -97,7 +101,8 @@ test needs; do not modify standard-library classes to supply missing behavior.
 `test_integration_lifecycle.py` covers charger and site-only setup with real
 platforms, topology-option reload, registry customization, polling, and unload.
 It replaces cloud methods and fails on unexpected cloud calls. These scenarios
-also run in the minimum Home Assistant lane.
+also run in the full integration suite on the supported minimum Home Assistant
+version.
 
 Maintenance-script tests use only lightweight dependencies and can be run
 separately while iterating on `scripts/`:
@@ -118,9 +123,8 @@ Keep Dependabot alerts enabled and review new advisories even for ignored
 packages. Address applicable advisories through a compatible Home Assistant
 upgrade: update the Home Assistant version and matching test plugin together,
 regenerate that lane's constraints, and validate it in Docker. Preserve the
-exact dependency stack for the minimum-version lane while that Home
-Assistant version remains supported. Do not override their dependency pins
-independently to clear an alert.
+exact dependency stack for the supported minimum Home Assistant version. Do not
+override their dependency pins independently to clear an alert.
 
 The `open-pull-requests-limit: 0` setting only disables version-update PRs;
 the explicit `ignore` rules suppress security-update PRs for these four

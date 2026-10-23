@@ -16,12 +16,14 @@ from yarl import URL
 from homeassistant.util import dt as dt_util
 
 from .api import (
+    EnphaseEVClient,
     OptionalEndpointUnavailable,
     Unauthorized,
 )
 from .api_client.vpp_surface import valid_object_id
 from .api_client.errors import HttpUnauthorized
 from .const import DEFAULT_VPP_EVENTS_ENABLED, OPT_VPP_EVENTS_ENABLED
+from .vpp_session import VppSessionRenewal
 
 if TYPE_CHECKING:  # pragma: no cover
     from .coordinator import EnphaseCoordinator
@@ -215,6 +217,7 @@ class VppRuntime:
 
     def __init__(self, coordinator: EnphaseCoordinator) -> None:
         self.coordinator = coordinator
+        self.session_renewal = VppSessionRenewal(coordinator)
         self._enrollment_state = "unknown"
         self._program_id: str | None = None
         self._program_last_confirmed_mono: float | None = None
@@ -339,7 +342,7 @@ class VppRuntime:
         """Preserve HTTP backoff metadata without retaining private request data."""
 
         if isinstance(err, HttpUnauthorized):
-            return VppHttpUnavailable(summary, err.status, None)
+            return VppHttpUnavailable(summary, err.status, err.retry_after)
         if isinstance(err, aiohttp.ClientResponseError):
             return VppHttpUnavailable(
                 summary,
@@ -477,6 +480,11 @@ class VppRuntime:
         if not self.enabled:
             self.clear()
             return
+        if not self.refresh_due():
+            return
+        if isinstance(self.coordinator.client, EnphaseEVClient):
+            if not await self.session_renewal.async_prepare():
+                return
         self._expire_cached_program()
         await self._async_refresh_enrollment()
         await self._async_refresh_events()
@@ -492,6 +500,7 @@ class VppRuntime:
         health = self.coordinator._endpoint_family_state(VPP_EVENTS_ENDPOINT_FAMILY)
         return {
             "enabled": self.enabled,
+            "session_renewal": self.session_renewal.diagnostics(),
             "enrollment_state": self._enrollment_state,
             "available": self.available,
             "event_count": len(self._events),

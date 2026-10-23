@@ -103,6 +103,7 @@ _LIVE_BATTERY_MODE_PROFILE_ALIASES = {
     "backup only": "backup_only",
     "backup_only": "backup_only",
     "savings": "cost_savings",
+    "savings mode": "cost_savings",
     "cost savings": "cost_savings",
     "cost_savings": "cost_savings",
     "ai optimisation": "ai_optimisation",

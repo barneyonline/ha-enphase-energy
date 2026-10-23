@@ -32,6 +32,12 @@ from .energy import (
     SiteEnergyFlow,
 )
 from .power_validation import EXTREME_SITE_POWER_W, ExtremePowerValidator
+from .power_restore import (
+    PowerHistory,
+    PowerReading,
+    PowerStoredData,
+    power_restore_data,
+)
 from .runtime_helpers import inventory_type_device_info as _type_device_info
 from .sensor_base import EnphaseSiteSensorEntity as _SiteBaseEntity
 from .sensor_common import (
@@ -152,7 +158,7 @@ class _SiteLifetimePowerRestoreData(ExtraStoredData):  # type: ignore[misc]
                     numeric = float(raw_value)
                 except Exception:
                     continue
-                if numeric < 0:
+                if not math.isfinite(numeric) or numeric < 0:
                     continue
                 previous_live_flow_kwh[flow_key] = numeric
 
@@ -636,6 +642,9 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
         self._previous_live_flow_sources: dict[str, tuple[str, ...]] = {}
         self._extreme_power_validator = ExtremePowerValidator()
         self._restored_method_explicit = False
+        self._accepted_power_freshness: datetime | None = None
+        self._power_history = PowerHistory()
+        self._using_restored_power = False
 
     def _clear_restored_live_history(self, *, discard_power: bool = False) -> None:
         """Drop restored live-history samples that are not safe to reuse."""
@@ -666,15 +675,27 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
         )
 
     async def async_added_to_hass(self) -> None:
+        await self._async_restore_power()
+        cached = self._power_history.latest(dt_util.utcnow().timestamp())
+        if cached is not None:
+            self._accepted_power_freshness = datetime.fromtimestamp(
+                cached.freshness_ts, tz=timezone.utc
+            )
+            self._using_restored_power = True
         await super().async_added_to_hass()
+
+    async def _async_restore_power(self) -> None:
         last_state = await self.async_get_last_state()
         last_extra = await self.async_get_last_extra_data()
-        extra_data = _SiteLifetimePowerRestoreData.from_dict(
-            last_extra.as_dict() if last_extra is not None else None
+        raw_extra = power_restore_data(last_extra)
+        extra_data = _SiteLifetimePowerRestoreData.from_dict(raw_extra)
+        self._power_history.restore(
+            raw_extra.get("power_history"), dt_util.utcnow().timestamp()
         )
-        if not last_state:
+        baseline = raw_extra.get("power_baseline")
+        if not last_state and not isinstance(baseline, dict):
             return
-        attrs = last_state.attributes or {}
+        attrs = baseline if isinstance(baseline, dict) else last_state.attributes or {}
         raw_last_flow_kwh = attrs.get("last_flow_kwh")
         if isinstance(raw_last_flow_kwh, dict):
             restored_flows: dict[str, float] = {}
@@ -682,7 +703,9 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
                 raw_value = raw_last_flow_kwh.get(flow_key)
                 try:
                     if raw_value is not None:
-                        restored_flows[flow_key] = float(raw_value)
+                        value = float(raw_value)
+                        if math.isfinite(value) and value >= 0:
+                            restored_flows[flow_key] = value
                 except Exception:
                     continue
             self._last_flow_kwh = restored_flows
@@ -692,7 +715,7 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
         self._last_sample_ts = _restore_optional_float_attribute(
             attrs, "last_sample_ts"
         )
-        restored_power = restore_power_w(last_state)
+        restored_power = restore_power_w(last_state) if last_state is not None else None
         if restored_power is None:
             self._restored_power_w = None
         else:
@@ -731,8 +754,59 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
             for flow_key, sources in extra_data.previous_live_flow_sources.items()
             if flow_key in self._flow_signs
         }
+        if isinstance(baseline, dict) and any(
+            stamp is not None
+            and (
+                not math.isfinite(stamp)
+                or not 0 < stamp <= dt_util.utcnow().timestamp()
+            )
+            for stamp in (
+                self._last_sample_ts,
+                self._last_energy_ts,
+                self._previous_live_sample_ts,
+                self._previous_live_energy_ts,
+            )
+        ):
+            self._discard_restored_baseline()
+            self._clear_restored_live_history(discard_power=True)
         self._restore_live_history()
-        self._schedule_freshness_expiry()
+        if self._live_flow_sample_count >= 2:
+            restored_reference = self._parse_sample_timestamp(
+                attrs.get("freshness_reference_utc")
+            )
+            reference = self._last_sample_ts
+            if reference is not None and math.isfinite(reference):
+                if restored_reference is not None and math.isfinite(restored_reference):
+                    reference = min(reference, restored_reference)
+                try:
+                    self._accepted_power_freshness = datetime.fromtimestamp(
+                        reference, tz=timezone.utc
+                    )
+                except (OverflowError, OSError, ValueError):
+                    self._clear_restored_live_history(discard_power=True)
+                    self._discard_restored_baseline()
+                    self._live_flow_sample_count = 0
+        if (
+            "power_history" not in raw_extra
+            and self._live_flow_sample_count >= 2
+            and self._last_sample_ts is not None
+            and self._accepted_power_freshness is not None
+            and 0
+            <= (dt_util.utcnow() - self._accepted_power_freshness).total_seconds()
+            < CURRENT_POWER_STALE_AFTER_S
+            and self._last_sample_ts <= dt_util.utcnow().timestamp()
+        ):
+            self._power_history.remember(
+                PowerReading(
+                    float(self._last_power_w),
+                    self._last_sample_ts,
+                    self._accepted_power_freshness.timestamp(),
+                    {
+                        "method": self._last_method,
+                        "last_window_seconds": self._last_window_s,
+                    },
+                )
+            )
 
     def _restore_live_history(self) -> None:
         """Restore a valid two-sample live history when available."""
@@ -1152,7 +1226,61 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
     def _freshness_deadline(self) -> datetime | None:
         """Bound derived watts by the oldest contributing source sample."""
 
+        deadline = self._power_freshness_deadline()
         core_deadline: datetime | None = super()._freshness_deadline()
+        if core_deadline is not None:
+            return min(deadline, core_deadline) if deadline else core_deadline
+        return deadline
+
+    def _power_freshness_deadline(self) -> datetime | None:
+        """Keep the accepted source clock independent of coordinator health."""
+
+        # Timers and HA availability run before native_value during publication.
+        # Rejected source clocks must not rebase the next valid calculation.
+        deadline = self._source_freshness_deadline()
+        if (
+            deadline is not None
+            and dt_util.utcnow() < deadline
+            and self._site_energy_flows()
+            and (
+                self._accepted_power_freshness is not None
+                or self._last_method
+                in {"extreme_pending", "outlier_ignored", "source_changed_reseed"}
+            )
+        ):
+            _ = self.native_value
+            deadline = self._source_freshness_deadline()
+        if not self._current_flow_values()[0]:
+            cached = self._power_history.latest(dt_util.utcnow().timestamp())
+            if cached is not None:
+                return datetime.fromtimestamp(
+                    cached.freshness_ts, tz=timezone.utc
+                ) + timedelta(seconds=CURRENT_POWER_STALE_AFTER_S)
+            if self._accepted_power_freshness is not None:
+                accepted_deadline = self._accepted_power_freshness + timedelta(
+                    seconds=CURRENT_POWER_STALE_AFTER_S
+                )
+                return (
+                    min(deadline, accepted_deadline) if deadline else accepted_deadline
+                )
+            return deadline
+        if self._accepted_power_freshness is None and self._last_method in {
+            "extreme_pending",
+            "outlier_ignored",
+            "source_changed_reseed",
+        }:
+            now: datetime = dt_util.utcnow()
+            return now
+        if self._accepted_power_freshness is not None:
+            accepted_deadline = self._accepted_power_freshness + timedelta(
+                seconds=CURRENT_POWER_STALE_AFTER_S
+            )
+            return min(deadline, accepted_deadline) if deadline else accepted_deadline
+        return deadline
+
+    def _source_freshness_deadline(self) -> datetime | None:
+        """Return the current payload's deadline independently of retained watts."""
+
         now: datetime = dt_util.utcnow()
         timestamps: list[float] = []
         flows = self._site_energy_flows()
@@ -1179,21 +1307,86 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
                 return now
             timestamps.append(timestamp)
         if not timestamps:
-            return core_deadline
+            return None
         deadline = datetime.fromtimestamp(min(timestamps), tz=timezone.utc) + timedelta(
             seconds=CURRENT_POWER_STALE_AFTER_S
         )
-        return min(deadline, core_deadline) if core_deadline is not None else deadline
+        return deadline
 
     @property
     def available(self) -> bool:
         if not super().available:
             return False
         current_values, _synthetic_zero_flows = self._current_flow_values()
-        return bool(current_values)
+        return (
+            bool(current_values)
+            or self._power_history.latest(dt_util.utcnow().timestamp()) is not None
+        )
 
     @property
     def native_value(self) -> Any:
+        previous_sample = self._last_sample_ts
+        current_values, synthetic = self._current_flow_values()
+        cached = self._power_history.latest(dt_util.utcnow().timestamp())
+        if cached is not None and not self._has_live_flow_values(
+            current_values, synthetic
+        ):
+            self._using_restored_power = True
+            return cached.watts
+        value = self._calculate_power()
+        if value is not None and self._last_sample_ts != previous_sample:
+            if self._last_method in {
+                "lifetime_energy_window",
+                "no_change",
+                "lifetime_reset",
+                "extreme_confirmed",
+            }:
+                deadline = self._source_freshness_deadline()
+                self._accepted_power_freshness = (
+                    deadline - timedelta(seconds=CURRENT_POWER_STALE_AFTER_S)
+                    if deadline is not None
+                    else None
+                )
+                if (
+                    deadline is not None
+                    and dt_util.utcnow() < deadline
+                    and self._last_sample_ts is not None
+                ):
+                    self._using_restored_power = False
+                    self._power_history.remember(
+                        PowerReading(
+                            float(value),
+                            self._last_sample_ts,
+                            (
+                                deadline
+                                - timedelta(seconds=CURRENT_POWER_STALE_AFTER_S)
+                            ).timestamp(),
+                            {
+                                "sampled_at_utc": self._last_report_date_iso,
+                                "method": self._last_method,
+                                "last_window_seconds": self._last_window_s,
+                            },
+                        )
+                    )
+        if cached is not None and (
+            value is None
+            or self._using_restored_power
+            or self._last_method
+            in {
+                "seeded",
+                "no_live_data",
+                "source_changed_reseed",
+                "extreme_pending",
+                "outlier_ignored",
+            }
+        ):
+            self._using_restored_power = True
+            return cached.watts
+        return value
+
+    def _calculate_power(self) -> Any:
+        """Advance calculation baselines without renewing rejected power."""
+
         flows = self._site_energy_flows()
         current_values, synthetic_zero_flows = self._current_flow_values()
         has_live_flow_values = self._has_live_flow_values(
@@ -1389,8 +1582,8 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
 
     @property
     def extra_state_attributes(self) -> Any:
-        deadline = self._freshness_deadline()
-        return {
+        deadline = self._power_freshness_deadline()
+        attrs = {
             "sampled_at_utc": self._last_report_date_iso,
             "freshness_reference_utc": (
                 (deadline - timedelta(seconds=CURRENT_POWER_STALE_AFTER_S)).isoformat()
@@ -1407,15 +1600,54 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
             "source_flows": list(self._flow_signs),
         }
 
+        cached = self._power_history.latest(dt_util.utcnow().timestamp())
+        if (
+            self._using_restored_power
+            and cached is not None
+            and (
+                self._last_method in {"seeded", "no_live_data"}
+                or not self._has_live_flow_values(*self._current_flow_values())
+            )
+        ):
+            attrs.update(cached.attributes)
+            attrs["sampled_at_utc"] = datetime.fromtimestamp(
+                cached.sampled_ts, tz=timezone.utc
+            ).isoformat()
+            attrs["freshness_reference_utc"] = datetime.fromtimestamp(
+                cached.freshness_ts, tz=timezone.utc
+            ).isoformat()
+        attrs["using_cached"] = self._using_restored_power
+        return attrs
+
     @property
     def extra_restore_state_data(self) -> ExtraStoredData | None:
-        return _SiteLifetimePowerRestoreData(
+        legacy = _SiteLifetimePowerRestoreData(
             previous_live_flow_kwh=dict(self._previous_live_flow_kwh),
             previous_live_energy_ts=self._previous_live_energy_ts,
             previous_live_sample_ts=self._previous_live_sample_ts,
             last_live_interval_minutes=self._last_live_interval_minutes,
             last_live_flow_sources=dict(self._last_live_flow_sources),
             previous_live_flow_sources=dict(self._previous_live_flow_sources),
+        )
+
+        return PowerStoredData(
+            legacy,
+            self._power_history,
+            {
+                "last_flow_kwh": dict(self._last_flow_kwh),
+                "last_energy_ts": self._last_energy_ts,
+                "last_sample_ts": self._last_sample_ts,
+                "last_power_w": self._last_power_w,
+                "last_window_seconds": self._last_window_s,
+                "last_reset_at": self._last_reset_at,
+                "method": self._last_method,
+                "last_report_date": self._last_report_date_iso,
+                "freshness_reference_utc": (
+                    self._accepted_power_freshness.isoformat()
+                    if self._accepted_power_freshness is not None
+                    else None
+                ),
+            },
         )
 
 
@@ -1447,6 +1679,8 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._balance_sources: dict[str, str] = {}
         self._balance_using_cached = False
         self._balance_source_times: dict[str, object] = {}
+        self._balance_source_freshness: dict[str, str] = {}
+        self._balance_blocker: dict[str, str] | None = None
         self._last_bucket_wh: float | None = None
         self._last_bucket_count: int | None = None
         self._last_start_date: str | None = None
@@ -1460,6 +1694,8 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._using_cached = False
         self._last_rejection: dict[str, object] | None = None
         self._last_rejected_sample: dict[str, object] | None = None
+        self._power_history = PowerHistory()
+        self._restored_reading: PowerReading | None = None
 
     def _power_source_key(self, entity_id: str) -> str | None:
         entry = er.async_get(self.hass).async_get(entity_id)
@@ -1484,9 +1720,12 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         registry = er.async_get(self.hass)
         sources: dict[str, str] = {}
         source_times: dict[str, object] = {}
+        source_freshness: dict[str, str] = {}
         timestamps: list[float] = []
+        using_cached = False
         total = 0.0
         for key in ("current_production_power", "grid_power", "battery_power"):
+            self._balance_blocker = {"source": key, "reason": "missing_entity"}
             entity_id = registry.async_get_entity_id(
                 "sensor", DOMAIN, f"{DOMAIN}_site_{self._coord.site_id}_{key}"
             )
@@ -1499,8 +1738,10 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
                     continue
                 return
             state = self.hass.states.get(entity_id)
+            self._balance_blocker["reason"] = "missing_state"
             if state is None:
                 return
+            self._balance_blocker["reason"] = "invalid_power"
             try:
                 value = PowerConverter.convert(
                     float(state.state),
@@ -1511,6 +1752,15 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
                 return
             if not math.isfinite(value):
                 return
+            self._balance_blocker["reason"] = "incomplete_source"
+            if state.attributes.get("method") in {"seeded", "no_live_data"}:
+                return
+            using_cached |= bool(
+                state.attributes.get("using_stale")
+                or state.attributes.get("using_cached")
+                or state.attributes.get("method")
+                in {"source_changed_reseed", "extreme_pending", "outlier_ignored"}
+            )
             raw_source_ts = state.attributes.get("sampled_at_utc")
             raw_received_ts = state.attributes.get("cached_at_utc")
             raw_freshness_ts = state.attributes.get("freshness_reference_utc")
@@ -1523,6 +1773,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             freshness_ts = _EnphaseSiteLifetimePowerSensor._parse_sample_timestamp(
                 raw_freshness_ts
             )
+            self._balance_blocker["reason"] = "invalid_timestamp"
             for raw_timestamp, timestamp in (
                 (raw_source_ts, source_ts),
                 (raw_received_ts, received_ts),
@@ -1563,20 +1814,24 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
                 source_ts
             ):
                 return
+            self._balance_blocker["reason"] = "stale_source"
+            if self._timestamp_age_seconds(source_ts) >= CURRENT_POWER_STALE_AFTER_S:
+                return
             total += value
             timestamps.append(source_ts)
             sources[key] = entity_id
             source_times[key] = state.attributes.get("sampled_at_utc")
-        # Reject a stale candidate before replacing the retained valid balance.
-        # A numeric HA state can lag its source's availability publication.
+            source_freshness[key] = datetime.fromtimestamp(
+                source_ts, tz=timezone.utc
+            ).isoformat()
         balance_ts = min(timestamps)
-        if self._timestamp_age_seconds(balance_ts) >= CURRENT_POWER_STALE_AFTER_S:
-            return
         self._balance_power_w = max(round(total), 0)
         self._balance_power_ts = balance_ts
         self._balance_sources = sources
         self._balance_source_times = source_times
-        self._balance_using_cached = False
+        self._balance_source_freshness = source_freshness
+        self._balance_using_cached = using_cached
+        self._balance_blocker = None
 
     @staticmethod
     def _timestamp_age_seconds(timestamp: float) -> float:
@@ -1589,15 +1844,26 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         return self._timestamp_age_seconds(timestamp) < -self._MAX_FUTURE_SKEW_SECONDS
 
     async def async_added_to_hass(self) -> None:
+        await self._async_restore_power()
         await super().async_added_to_hass()
+
+    async def _async_restore_power(self) -> None:
         self.async_on_remove(
             self.hass.bus.async_listen(EVENT_STATE_CHANGED, self._power_source_changed)
         )
         last_extra = await self.async_get_last_extra_data()
-        restored = _SiteConsumptionPowerRestoreData.from_dict(
-            last_extra.as_dict() if last_extra is not None else None
+        raw_extra = power_restore_data(last_extra)
+        restored = _SiteConsumptionPowerRestoreData.from_dict(raw_extra)
+        self._power_history.restore(
+            raw_extra.get("power_history"),
+            dt_util.utcnow().timestamp(),
+            nonnegative=True,
         )
-        await self._async_restore_power_balance(restored)
+        self._restored_reading = self._power_history.latest(
+            dt_util.utcnow().timestamp()
+        )
+        if "power_history" not in raw_extra:
+            await self._async_restore_power_balance(restored)
         self._schedule_freshness_expiry()
         if (
             restored.latest_bucket_wh is None
@@ -1775,6 +2041,8 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             if self._balance_power_w is not None
             else self._last_power_ts
         )
+        if self._restored_reading is not None and self._balance_power_w is None:
+            timestamp = self._restored_reading.freshness_ts
         return (
             datetime.fromtimestamp(timestamp, tz=timezone.utc)
             + timedelta(seconds=CURRENT_POWER_STALE_AFTER_S)
@@ -1816,9 +2084,45 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             >= CURRENT_POWER_STALE_AFTER_S
         ):
             self._balance_power_w = None
+        watts = self._balance_power_w
+        timestamp = self._balance_power_ts
+        attrs: dict[str, Any] = {
+            "method": "power_balance",
+            "source_entities": dict(self._balance_sources),
+            "source_sampled_at_utc": dict(self._balance_source_times),
+        }
+        if (
+            watts is None
+            and not self._restored_pending_validation
+            and not self._using_cached
+        ):
+            watts, timestamp = self._last_power_w, self._last_power_ts
+            attrs = {
+                "method": self._last_method,
+                "last_window_seconds": self._last_window_s,
+            }
+        if (
+            watts is not None
+            and timestamp is not None
+            and 0
+            <= self._timestamp_age_seconds(timestamp)
+            < CURRENT_POWER_STALE_AFTER_S
+        ):
+            if (
+                self._restored_reading is None
+                or timestamp > self._restored_reading.freshness_ts
+            ):
+                self._restored_reading = None
+            attrs["sampled_at_utc"] = datetime.fromtimestamp(
+                timestamp, tz=timezone.utc
+            ).isoformat()
+            self._power_history.remember(
+                PowerReading(float(watts), timestamp, timestamp, attrs)
+            )
+        cached = self._restored_reading if self._balance_power_w is None else None
         energy = getattr(self._coord, "energy", None)
         if energy is not None:
-            energy.consumption_power_diagnostics = {
+            diagnostics = {
                 "last_valid_power_w": (
                     self._balance_power_w
                     if self._balance_power_w is not None
@@ -1845,6 +2149,10 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
                 "power_balance_w": self._balance_power_w,
                 "power_balance_sources": dict(self._balance_sources),
                 "power_balance_source_timestamps": dict(self._balance_source_times),
+                "power_balance_source_freshness": dict(self._balance_source_freshness),
+                "power_balance_blocker": (
+                    dict(self._balance_blocker) if self._balance_blocker else None
+                ),
                 "method": (
                     "power_balance"
                     if self._balance_power_w is not None
@@ -1852,6 +2160,19 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
                 ),
                 "last_rejection": self._last_rejection,
             }
+            if cached is not None:
+                diagnostics.update(
+                    {
+                        "last_valid_power_w": cached.watts,
+                        "last_valid_sample_timestamp": cached.sampled_ts,
+                        "last_window_seconds": cached.attributes.get(
+                            "last_window_seconds"
+                        ),
+                        "method": cached.attributes.get("method", self._last_method),
+                        "using_cached": True,
+                    }
+                )
+            energy.consumption_power_diagnostics = diagnostics
 
     def _process_consumption_sample(self) -> None:
         data = self._flow_data()
@@ -2021,13 +2342,19 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._process_current_sample()
         if not super().available:
             return False
-        return self._balance_power_w is not None or bool(
-            self._last_power_w is not None and not self._restored_pending_validation
+        return (
+            self._restored_reading is not None
+            or self._balance_power_w is not None
+            or bool(
+                self._last_power_w is not None and not self._restored_pending_validation
+            )
         )
 
     @property
     def native_value(self) -> int | None:
         self._process_current_sample()
+        if self._balance_power_w is None and self._restored_reading is not None:
+            return round(self._restored_reading.watts)
         return (
             self._balance_power_w
             if self._balance_power_w is not None
@@ -2036,6 +2363,17 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
 
     @property
     def extra_state_attributes(self) -> Any:
+        if self._restored_reading is not None and self._balance_power_w is None:
+            return {
+                **self._restored_reading.attributes,
+                "sampled_at_utc": datetime.fromtimestamp(
+                    self._restored_reading.sampled_ts, tz=timezone.utc
+                ).isoformat(),
+                "freshness_reference_utc": datetime.fromtimestamp(
+                    self._restored_reading.freshness_ts, tz=timezone.utc
+                ).isoformat(),
+                "using_cached": True,
+            }
         if self._balance_power_w is not None:
             return {
                 "method": "power_balance",
@@ -2063,7 +2401,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
 
     @property
     def extra_restore_state_data(self) -> ExtraStoredData | None:
-        return _SiteConsumptionPowerRestoreData(
+        legacy = _SiteConsumptionPowerRestoreData(
             latest_bucket_wh=self._last_bucket_wh,
             raw_bucket_count=self._last_bucket_count,
             start_date=self._last_start_date,
@@ -2076,6 +2414,8 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             balance_power_w=self._balance_power_w,
             balance_sample_ts=self._balance_power_ts,
         )
+
+        return PowerStoredData(legacy, self._power_history)
 
 
 class EnphaseGridPowerSensor(_EnphaseSiteLifetimePowerSensor):
@@ -2108,6 +2448,9 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
     _attr_native_unit_of_measurement = UnitOfPower.WATT
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_entity_registry_enabled_default = True
+    _unrecorded_attributes = _SiteBaseEntity._unrecorded_attributes | frozenset(
+        {"freshness_reference_utc"}
+    )
 
     def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(
@@ -2122,9 +2465,41 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
         self._last_good_source: str | None = None
         self._last_good_reported_units: str | None = None
         self._last_good_reported_precision: int | None = None
+        self._power_history = PowerHistory()
+        self._using_restored_power = False
+        self._restored_power_freshness: datetime | None = None
 
     async def async_added_to_hass(self) -> None:
+        await self._async_restore_power()
         await super().async_added_to_hass()
+
+    async def _async_restore_power(self) -> None:
+        extra = await self.async_get_last_extra_data()
+        raw_extra = power_restore_data(extra)
+        self._power_history.restore(
+            raw_extra.get("power_history"), dt_util.utcnow().timestamp()
+        )
+        cached = self._power_history.latest(dt_util.utcnow().timestamp())
+        if cached is not None:
+            self._restored_power_freshness = datetime.fromtimestamp(
+                cached.freshness_ts, tz=timezone.utc
+            )
+            self._last_good_value = cached.watts
+            self._last_good_sample_utc = datetime.fromtimestamp(
+                cached.sampled_ts, tz=timezone.utc
+            )
+            self._last_good_cached_at_utc = datetime.fromtimestamp(
+                cached.received_ts or cached.freshness_ts, tz=timezone.utc
+            )
+            self._last_good_source = cached.attributes.get("source")
+            self._last_good_reported_units = cached.attributes.get("reported_units")
+            self._last_good_reported_precision = cached.attributes.get(
+                "reported_precision"
+            )
+            self._using_restored_power = True
+            return
+        if "power_history" in raw_extra or (extra is not None and not raw_extra):
+            return
         last = await self.async_get_last_sensor_data()
         if last is not None:
             try:
@@ -2139,6 +2514,7 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
                 and abs(restored) < EXTREME_SITE_POWER_W
             ):
                 self._last_good_value = restored
+                self._using_restored_power = True
 
         try:
             last_state = await self.async_get_last_state()
@@ -2169,6 +2545,30 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
                 self._last_good_reported_precision = int(precision)
         except Exception:  # noqa: BLE001
             self._last_good_reported_precision = None
+        freshness = self._sample_freshness_utc()
+        if (
+            self._last_good_value is not None
+            and self._last_good_sample_utc is not None
+            and freshness is not None
+            and self._cached_sample_is_fresh()
+        ):
+            self._power_history.remember(
+                PowerReading(
+                    self._last_good_value,
+                    self._last_good_sample_utc.timestamp(),
+                    freshness.timestamp(),
+                    {
+                        "source": self._last_good_source,
+                        "reported_units": self._last_good_reported_units,
+                        "reported_precision": self._last_good_reported_precision,
+                    },
+                    (
+                        self._last_good_cached_at_utc.timestamp()
+                        if self._last_good_cached_at_utc is not None
+                        else None
+                    ),
+                )
+            )
         self._schedule_freshness_expiry()
 
     def _cache_ttl(self) -> timedelta:
@@ -2210,12 +2610,13 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
         if received_utc is not None and is_idle_power_sample(
             self._last_good_value, self._last_good_sample_utc, received_utc
         ):
-            return received_utc
+            return min(received_utc, self._restored_power_freshness or received_utc)
         timestamps = [
             stamp
             for stamp in (
                 self._last_good_cached_at_utc,
                 self._last_good_sample_utc,
+                self._restored_power_freshness,
             )
             if stamp is not None
         ]
@@ -2240,40 +2641,64 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
         self,
     ) -> tuple[float | None, datetime | None, str | None, str | None, int | None]:
         value = self._coord.current_power_consumption_w
-        sample_utc = self._coord.current_power_consumption_sample_utc
+        sample_utc = _normalize_utc_datetime(
+            self._coord.current_power_consumption_sample_utc
+        )
         source = self._coord.current_power_consumption_source
         units = self._coord.current_power_consumption_reported_units
         precision = self._coord.current_power_consumption_reported_precision
-
+        received_utc = self._coord.current_power_runtime.received_utc
         if value is not None:
-            self._last_good_value = float(value)
-            self._last_good_sample_utc = _normalize_utc_datetime(sample_utc)
             if self._source_first_observed is None:
                 self._source_first_observed = self._freshness_reference_utc()
-            received_utc = (
-                self._coord.current_power_runtime.received_utc
-                or self._source_first_observed
-            )
-            self._last_good_cached_at_utc = (
+            received_utc = received_utc or self._source_first_observed
+            freshness = (
                 received_utc
-                if is_idle_power_sample(
-                    self._last_good_value, self._last_good_sample_utc, received_utc
-                )
-                else min(self._last_good_sample_utc or received_utc, received_utc)
+                if is_idle_power_sample(value, sample_utc, received_utc)
+                else min(sample_utc or received_utc, received_utc)
             )
-            self._last_good_source = source
-            self._last_good_reported_units = units
-            self._last_good_reported_precision = precision
-
+            age = self._freshness_reference_utc() - freshness
+            if (
+                not is_future_power_sample(sample_utc, received_utc)
+                and timedelta(0) <= age < self._cache_ttl()
+            ):
+                self._last_good_value = float(value)
+                self._last_good_sample_utc = sample_utc
+                self._last_good_cached_at_utc = freshness
+                self._last_good_source = source
+                self._last_good_reported_units = units
+                self._last_good_reported_precision = precision
+                self._using_restored_power = False
+                self._restored_power_freshness = None
+                if sample_utc is not None:
+                    self._power_history.remember(
+                        PowerReading(
+                            float(value),
+                            sample_utc.timestamp(),
+                            freshness.timestamp(),
+                            {
+                                "source": self._last_good_source,
+                                "reported_units": self._last_good_reported_units,
+                                "reported_precision": self._last_good_reported_precision,
+                            },
+                            received_utc.timestamp(),
+                        )
+                    )
         if self._last_good_value is not None and not self._cached_sample_is_fresh():
             self._clear_last_good_sample()
-
         return (
             self._last_good_value,
             self._last_good_sample_utc,
             self._last_good_source,
             self._last_good_reported_units,
             self._last_good_reported_precision,
+        )
+
+    @property
+    def extra_restore_state_data(self) -> ExtraStoredData | None:
+        return PowerStoredData(
+            SensorExtraStoredData(self._last_good_value, UnitOfPower.WATT),
+            self._power_history,
         )
 
     @property
@@ -2302,9 +2727,13 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
         _value, sample_utc, source, units, precision = (
             self._current_or_cached_snapshot()
         )
+        freshness = self._sample_freshness_utc()
         return {
             "sampled_at_utc": (
                 sample_utc.isoformat() if sample_utc is not None else None
+            ),
+            "freshness_reference_utc": (
+                freshness.isoformat() if freshness is not None else None
             ),
             "cached_at_utc": (
                 self._last_good_cached_at_utc.isoformat()
@@ -2315,6 +2744,7 @@ class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # t
             "reported_units": units,
             "reported_precision": precision,
             "using_stale": bool(self._coord.current_power_runtime.using_stale),
+            "using_cached": self._using_restored_power,
         }
 
     @property

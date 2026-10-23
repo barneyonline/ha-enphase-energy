@@ -93,9 +93,10 @@ rules:
         - README.md
   brands:
     status: done
-    comment: Branding has been set up in home-assistant/brands and CI validates the remote brands repository/CDN assets.
+    comment: Branding ships in the integration brand directory and CI validates the required icon and supported local PNG assets.
     references:
       code:
+        - custom_components/enphase_ev/brand/icon.png
         - custom_components/enphase_ev/manifest.json
         - hacs.json
         - .github/workflows/tests.yml
@@ -373,6 +374,7 @@ rules:
       tests:
         - tests/components/enphase_ev/test_diagnostics.py
         - tests/components/enphase_ev/test_site_energy.py
+        - tests/components/enphase_ev/test_consumption_power_balance.py
       docs:
         - README.md
         - docs/architecture.md

@@ -2668,8 +2668,14 @@ async def test_async_update_data_uses_cached_charge_preference_when_status_only_
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "reported_mode,explicit_solar",
+    [(0, False), (1, False), ("GREEN_CHARGING", True), ("SMART_CHARGING", True)],
+)
 async def test_async_update_data_uses_status_mode_for_effective_charge_mode(
     coordinator_factory,
+    reported_mode,
+    explicit_solar,
 ):
     coord = coordinator_factory(
         serials=["EV1"],
@@ -2692,7 +2698,7 @@ async def test_async_update_data_uses_status_mode_for_effective_charge_mode(
                 {
                     "sn": "EV1",
                     "name": "Garage EV",
-                    "mode": 0,
+                    "mode": reported_mode,
                     "connectors": [
                         {
                             "connectorStatusType": coord_mod.SUSPENDED_EVSE_STATUS,
@@ -2745,9 +2751,20 @@ async def test_async_update_data_uses_status_mode_for_effective_charge_mode(
 
     assert result["EV1"]["charge_mode_pref"] == "GREEN_CHARGING"
     assert result["EV1"]["charge_mode_pref_source"] == "scheduler_endpoint"
-    assert result["EV1"]["charge_mode"] == "MANUAL_CHARGING"
+    assert result["EV1"]["charge_mode"] == (
+        {0: "MANUAL_CHARGING", 1: "GREEN_CHARGING"}.get(reported_mode, reported_mode)
+    )
     assert result["EV1"]["charge_mode_source"] == "explicit_status"
+    assert result["EV1"]["charge_mode_explicit_solar"] is explicit_solar
     coord.client.charge_mode.assert_awaited_once_with("EV1")
+    # Reused status must not become fresh capability evidence on the next poll.
+    coord.data = result
+    from custom_components.enphase_ev.api import OptionalEndpointUnavailable
+
+    coord.client.status = AsyncMock(side_effect=OptionalEndpointUnavailable("down"))
+    stale = await coord._async_update_data()
+    assert stale["EV1"]["charge_mode_explicit_solar"] is False
+    coord.discovery_snapshot.cancel_pending_save()
 
 
 @pytest.mark.asyncio

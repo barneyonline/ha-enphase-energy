@@ -85,6 +85,23 @@ def test_development_requirements_cover_minimum_homeassistant_version():
         assert f"== '{current_pin}'" in install_step["run"]
 
 
+def test_hacs_validator_uses_supported_homeassistant_version():
+    """HACS must validate using the advertised minimum, not a retired runtime."""
+    root = pathlib.Path(__file__).resolve().parents[3]
+    hacs = json.loads((root / "hacs.json").read_text())
+    expected_version = hacs["homeassistant"]
+    dockerfile = (root / "devtools/docker/Dockerfile.hacs").read_text()
+    workflow = yaml.safe_load((root / ".github/workflows/validate.yaml").read_text())
+    version_step = next(
+        step
+        for step in workflow["jobs"]["validate-hacs"]["steps"]
+        if step.get("name") == "Verify HACS Home Assistant version"
+    )
+
+    assert f"== '{expected_version}'" in dockerfile
+    assert f"== '{expected_version}'" in version_step["run"]
+
+
 def test_service_actions_have_icons():
     root = pathlib.Path(__file__).resolve().parents[3]
     integration_dir = root / "custom_components" / "enphase_ev"
