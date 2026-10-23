@@ -11,6 +11,23 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v5.1.5 - 2026-10-23
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
 - Preserve the original freshness of retained Grid/Battery Power after rejected calculations or source reseeds so Consumption Power cannot treat old watts as fresh. Ignore incomplete source placeholders and report cached upstream inputs.
 - Keep coordinator outage deadlines separate from accepted power-source clocks so polling recovery restores still-fresh readings, and discard out-of-range restored power history without failing entity setup.
 - Recover Grid/Battery Power after an initial rejected or reseeded calculation without requiring a reload or a previously accepted reading.
@@ -20,7 +37,7 @@ All notable changes to this project will be documented in this file.
 - Include the current power-balance blocking source/reason and effective contributing freshness clocks in consumption diagnostics, separately from historical consumption-bucket rejections.
 
 ### 🔄 Other changes
-- None
+- Bump the integration manifest version to `5.1.5`.
 
 ## v5.1.4 - 2026-10-21
 
