@@ -1218,8 +1218,17 @@ class EnphaseCoordinator(
                 )
             family_success[family] = success
 
+        # Scheduler choices are semantic entity state even when the enabled
+        # mode and charger telemetry are unchanged. Acquisition times are not.
+        charger_data = data
+        solar_choices = getattr(self.client, "charge_mode_solar_modes", None)
+        if callable(solar_choices):
+            charger_data = {
+                serial: {**payload, "charge_mode_solar_modes": solar_choices(serial)}
+                for serial, payload in data.items()
+            }
         candidate = IntegrationSnapshot(
-            chargers=freeze_charger_data(data),
+            chargers=freeze_charger_data(charger_data),
             evse_feature_flags=feature_flags,
             current_power=current_power,
             vpp=self.vpp_runtime.snapshot,
@@ -4453,6 +4462,7 @@ class EnphaseCoordinator(
 
             charge_mode_source = None
             charge_mode = None
+            charge_mode_explicit_solar = False
             for charge_mode_candidate in (
                 obj.get("mode"),
                 obj.get("chargeMode"),
@@ -4465,6 +4475,13 @@ class EnphaseCoordinator(
                 )
                 if charge_mode is not None:
                     charge_mode_source = "explicit_status"
+                    charge_mode_explicit_solar = (
+                        not context.status_used_stale
+                        and self._normalize_charge_mode_preference(
+                            charge_mode_candidate
+                        )
+                        in {"SMART_CHARGING", "GREEN_CHARGING"}
+                    )
                     break
             if charge_mode is None:
                 if charge_mode_pref:
@@ -4703,6 +4720,7 @@ class EnphaseCoordinator(
                 "schedule_reminder_min": _as_int(sch_info0.get("remindTime")),
                 "charge_mode": charge_mode,
                 "charge_mode_source": charge_mode_source,
+                "charge_mode_explicit_solar": charge_mode_explicit_solar,
                 # Expose scheduler preference explicitly for entities that care
                 "charge_mode_pref": charge_mode_pref,
                 "charge_mode_pref_source": charge_mode_pref_source,

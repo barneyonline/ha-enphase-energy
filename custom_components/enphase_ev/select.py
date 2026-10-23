@@ -73,12 +73,6 @@ def _smart_charging_context(coord: EnphaseCoordinator, sn: str | None = None) ->
             value = ""
         if value == "SMART_CHARGING":
             return True
-    cache_entry = getattr(coord, "_charge_mode_cache", {}).get(sn)
-    if cache_entry:
-        try:
-            return str(cache_entry[0]).strip().upper() == "SMART_CHARGING"
-        except Exception:
-            return False
     battery_profile_pref = getattr(
         coord, "_battery_profile_charge_mode_preference", None
     )
@@ -90,32 +84,36 @@ def _smart_charging_context(coord: EnphaseCoordinator, sn: str | None = None) ->
     return False
 
 
-def _explicit_charge_mode(coord: EnphaseCoordinator, sn: str) -> str | None:
+def _explicit_charge_mode(
+    coord: EnphaseCoordinator, sn: str, *, include_cache: bool = True
+) -> str | None:
     try:
         data = (coord.data or {}).get(sn, {})
     except Exception:
         data = {}
     for key in ("charge_mode_pref", "charge_mode"):
+        if not include_cache:
+            source = data.get(f"{key}_source") if isinstance(data, dict) else None
+            if source not in {None, "scheduler_endpoint", "explicit_status"}:
+                continue
+            if (
+                key == "charge_mode"
+                and source == "explicit_status"
+                and data.get("charge_mode_explicit_solar") is not True
+            ):
+                # Numeric effective mode 1 means solar operation; it does not
+                # distinguish the Green and Smart scheduler preferences.
+                continue
         normalizer = getattr(coord, "_normalize_charge_mode_preference", None)
         raw = data.get(key) if isinstance(data, dict) else None
         value = normalizer(raw) if callable(normalizer) else raw
         if value is not None:
             return str(value)
+    if not include_cache:
+        return None
     cached = getattr(coord, "_cached_charge_mode_preference", None)
     value = cached(sn) if callable(cached) else None
     return str(value) if value is not None else None
-
-
-def _solar_mode(coord: EnphaseCoordinator, sn: str | None = None) -> tuple[str, str]:
-    if _smart_charging_context(coord, sn):
-        # The Enphase UI can present the same solar option as Smart Charging
-        # when battery profile preferences are active.
-        return "SMART_CHARGING", cast(
-            str, charge_mode_label("SMART_CHARGING", hass=coord.hass)
-        )
-    return "GREEN_CHARGING", cast(
-        str, charge_mode_label("GREEN_CHARGING", hass=coord.hass)
-    )
 
 
 def _english_charge_mode_label(mode: str) -> str | None:
@@ -716,15 +714,78 @@ class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):  # type: ignore[misc]
     def __init__(self, coord: EnphaseCoordinator, sn: str) -> None:
         super().__init__(coord, sn)
         self._attr_unique_id = f"{DOMAIN}_{sn}_charge_mode_select"
+        self._solar_mode_keys: tuple[str, ...] | None = None
+        self._solar_mode_is_hint = False
+
+    def _solar_modes(self) -> tuple[str, ...]:
+        advertised = getattr(self._coord.client, "charge_mode_solar_modes", None)
+        modes = advertised(self._sn) if callable(advertised) else None
+        explicit = _explicit_charge_mode(self._coord, self._sn, include_cache=False)
+        explicit_solar = explicit in {"SMART_CHARGING", "GREEN_CHARGING"}
+        if (
+            isinstance(modes, tuple)
+            and modes
+            and explicit_solar
+            and explicit not in modes
+        ):
+            # Readback confirmation can publish old coordinator data before the
+            # poll commits. Only a newer observation may replace these choices.
+            data = (self._coord.data or {}).get(self._sn) or {}
+            observed_at = data.get("fetched_at_utc")
+            if self._coord.client.invalidate_charge_mode_solar_modes(
+                self._sn,
+                observed_at=observed_at if isinstance(observed_at, str) else None,
+            ):
+                modes = None
+        if isinstance(modes, tuple):
+            self._solar_mode_keys = modes
+            self._solar_mode_is_hint = False
+        elif explicit_solar:
+            self._solar_mode_keys = (cast(str, explicit),)
+            self._solar_mode_is_hint = False
+        elif self._solar_mode_keys is None or self._solar_mode_is_hint:
+            cached_mode = getattr(self._coord, "_cached_charge_mode_preference", None)
+            cached = cached_mode(self._sn) if callable(cached_mode) else None
+            profile_mode = None
+            profile = getattr(
+                self._coord, "_battery_profile_charge_mode_preference", None
+            )
+            if callable(profile):
+                try:
+                    profile_mode = profile(self._sn)
+                except Exception:
+                    pass
+            if cached in {"SMART_CHARGING", "GREEN_CHARGING"}:
+                self._solar_mode_keys = (cast(str, cached),)
+                self._solar_mode_is_hint = False
+            elif profile_mode in {"SMART_CHARGING", "GREEN_CHARGING"}:
+                self._solar_mode_keys = (cast(str, profile_mode),)
+                self._solar_mode_is_hint = True
+            elif self._solar_mode_keys is None:
+                if _smart_charging_context(self._coord, self._sn):
+                    self._solar_mode_keys = ("SMART_CHARGING",)
+                    self._solar_mode_is_hint = True
+                elif _explicit_charge_mode(self._coord, self._sn) == "GREEN_CHARGING":
+                    self._solar_mode_keys = ("GREEN_CHARGING",)
+                    self._solar_mode_is_hint = True
+        # Manual/Scheduled do not establish a different solar mode. Preserve
+        # charger-specific observations when the scheduler omits its choices.
+        return (
+            self._solar_mode_keys
+            if self._solar_mode_keys is not None
+            else ("GREEN_CHARGING",)
+        )
 
     @property
     def options(self) -> list[str]:
-        _solar_mode_key, solar_label = _solar_mode(self._coord, self._sn)
         hass = getattr(self, "hass", None) or self._coord.hass
         return [
             cast(str, charge_mode_label("MANUAL_CHARGING", hass=hass)),
             cast(str, charge_mode_label("SCHEDULED_CHARGING", hass=hass)),
-            solar_label,
+            *(
+                cast(str, charge_mode_label(mode, hass=hass))
+                for mode in self._solar_modes()
+            ),
         ]
 
     @property
@@ -752,7 +813,10 @@ class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):  # type: ignore[misc]
                 val, hass=getattr(self, "hass", None) or self._coord.hass
             )
         if val in {"GREEN_CHARGING", "SMART_CHARGING"}:
-            return _solar_mode(self._coord, self._sn)[1]
+            if val in self._solar_modes():
+                return charge_mode_label(
+                    val, hass=getattr(self, "hass", None) or self._coord.hass
+                )
         return None
 
     async def async_select_option(self, option: str) -> None:
@@ -766,21 +830,27 @@ class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):  # type: ignore[misc]
                 ),
             )
         hass = getattr(self, "hass", None) or self._coord.hass
-        solar_mode_key, solar_label = _solar_mode(self._coord, self._sn)
+        solar_modes = self._solar_modes()
         manual_label = charge_mode_label("MANUAL_CHARGING", hass=hass)
         scheduled_label = charge_mode_label("SCHEDULED_CHARGING", hass=hass)
         option_map: dict[str, str] = {}
         for label, mode in (
             (manual_label, "MANUAL_CHARGING"),
             (scheduled_label, "SCHEDULED_CHARGING"),
-            (solar_label, solar_mode_key),
-            (charge_mode_label("GREEN_CHARGING", hass=hass), solar_mode_key),
-            (charge_mode_label("SMART_CHARGING", hass=hass), solar_mode_key),
-            (_english_charge_mode_label("GREEN_CHARGING"), solar_mode_key),
-            (_english_charge_mode_label("SMART_CHARGING"), solar_mode_key),
+            *((charge_mode_label(mode, hass=hass), mode) for mode in solar_modes),
+            *((_english_charge_mode_label(mode), mode) for mode in solar_modes),
         ):
             if label:
                 option_map[label] = mode
+        if solar_modes == ("SMART_CHARGING",):
+            # Preserve the historical Green -> Smart alias only on Smart sites.
+            # Smart must never be rewritten to GREEN_CHARGING on a Green site.
+            for label in (
+                charge_mode_label("GREEN_CHARGING", hass=hass),
+                _english_charge_mode_label("GREEN_CHARGING"),
+            ):
+                if label:
+                    option_map[label] = "SMART_CHARGING"
         mode = option_map.get(option)  # type: ignore[assignment]
         if mode is None:
             raise ServiceValidationError(

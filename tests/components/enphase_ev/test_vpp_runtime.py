@@ -78,7 +78,7 @@ def _coordinator(*, events: object | None = None) -> SimpleNamespace:
         return True
 
     coord = SimpleNamespace(
-        config_entry=SimpleNamespace(options={OPT_VPP_EVENTS_ENABLED: True}),
+        config_entry=SimpleNamespace(options={OPT_VPP_EVENTS_ENABLED: True}, data={}),
         site_id="1234567",
         client=SimpleNamespace(
             vpp_enrollment_id=AsyncMock(return_value={"data": ENROLLMENT_ID}),

@@ -1,0 +1,10 @@
+# HACS validator source: hacs/integration@279f8f18a615ef046c452211c2e474d3cb12c1ca.
+# The upstream action wraps a floating image; copy its pinned validator source.
+FROM --platform=linux/amd64 ghcr.io/hacs/action@sha256:a0336b447da4500204122cabea01cac1e0992840d8b927535782ddd5b601f698 AS hacs-validator
+
+# Copy validator files only; retain the immutable HA 2026.10.0 runtime/dependencies.
+FROM ghcr.io/home-assistant/home-assistant@sha256:1b64d38f38d922bf9d59336451fd6453e1d614f934456af4ee3d2a51061be3a4
+COPY --from=hacs-validator /hacs /hacs
+WORKDIR /hacs
+RUN python3 -c "from homeassistant.const import __version__; assert __version__ == '2026.10.0', __version__; print(f'Home Assistant {__version__}')"
+ENTRYPOINT ["python3", "/hacs/action.py"]
