@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Normalize live battery "Savings Mode" readings so the Savings profile displays correctly, its after-peak control remains available, and profile writes confirm, while preserving AI Optimisation selections. (#952)
 
 ### 🔧 Improvements
 - None
