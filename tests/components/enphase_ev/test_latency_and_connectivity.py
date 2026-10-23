@@ -61,11 +61,13 @@ def test_current_power_consumption_sensor_value_and_attributes(monkeypatch):
     assert sensor.native_value == 752
     assert sensor.extra_state_attributes == {
         "sampled_at_utc": "2026-03-11T05:40:00+00:00",
+        "freshness_reference_utc": "2026-03-11T05:40:00+00:00",
         "cached_at_utc": "2026-03-11T05:40:00+00:00",
         "source": "app-api:get_latest_power",
         "reported_units": "W",
         "reported_precision": 0,
         "using_stale": False,
+        "using_cached": False,
     }
 
 
@@ -149,11 +151,13 @@ def test_current_power_consumption_sensor_keeps_fresh_last_good_runtime_sample(
     assert sensor.native_value == 752
     assert sensor.extra_state_attributes == {
         "sampled_at_utc": "2026-03-11T05:40:45+00:00",
+        "freshness_reference_utc": "2026-03-11T05:40:45+00:00",
         "cached_at_utc": "2026-03-11T05:40:45+00:00",
         "source": "app-api:get_latest_power",
         "reported_units": "W",
         "reported_precision": 0,
         "using_stale": False,
+        "using_cached": False,
     }
 
 
@@ -267,11 +271,13 @@ async def test_current_power_consumption_sensor_restores_last_good_state(
     assert sensor.native_value == 752
     assert sensor.extra_state_attributes == {
         "sampled_at_utc": "2026-03-11T05:40:45+00:00",
+        "freshness_reference_utc": "2026-03-11T05:40:45+00:00",
         "cached_at_utc": None,
         "source": "app-api:get_latest_power",
         "reported_units": "W",
         "reported_precision": None,
         "using_stale": False,
+        "using_cached": True,
     }
 
 
