@@ -76,9 +76,6 @@ from custom_components.enphase_ev.const import (
     OPT_VPP_EVENTS_ENABLED,
 )
 from custom_components.enphase_ev.device_types import type_identifier
-from custom_components.enphase_ev.device_registry_compat import (
-    get_device_by_identifier,
-)
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from custom_components.enphase_ev.services import async_setup_services
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
@@ -774,8 +771,8 @@ async def test_async_setup_entry_updates_existing_device(
     dummy_coord.export_limit_runtime.async_start.assert_awaited_once()
     forward.assert_awaited_once()
 
-    updated = get_device_by_identifier(
-        device_registry, (DOMAIN, RANDOM_SERIAL), config_entry.entry_id
+    updated = device_registry.async_get_device_by_identifier(
+        (DOMAIN, RANDOM_SERIAL), config_entry.entry_id
     )
     assert updated is not None
     assert updated.name == "Garage Charger"
@@ -784,10 +781,8 @@ async def test_async_setup_entry_updates_existing_device(
     assert updated.model_id == "ignored"
     assert updated.hw_version == "321"
     assert updated.sw_version == "654"
-    ev_type_device = get_device_by_identifier(
-        device_registry,
-        (DOMAIN, f"type:{site_id}:iqevse"),
-        config_entry.entry_id,
+    ev_type_device = device_registry.async_get_device_by_identifier(
+        (DOMAIN, f"type:{site_id}:iqevse"), config_entry.entry_id
     )
     assert ev_type_device is None
     assert updated.via_device_id is None
@@ -1335,10 +1330,8 @@ async def test_async_setup_entry_skips_legacy_cleanup_when_migration_current(
 
     assert dev_reg.async_get(legacy_site_device.id) is not None
     assert (
-        get_device_by_identifier(
-            dev_reg,
-            (DOMAIN, f"type:{site_id}:envoy"),
-            config_entry.entry_id,
+        dev_reg.async_get_device_by_identifier(
+            (DOMAIN, f"type:{site_id}:envoy"), config_entry.entry_id
         )
         is not None
     )
@@ -1482,7 +1475,7 @@ def test_remove_legacy_site_device_handles_guard_paths(
     legacy_other_entry = SimpleNamespace(
         id="legacy",
         identifiers={(DOMAIN, "site:site-1")},
-        config_entries={"other-entry"},
+        config_entry_id="other-entry",
     )
     _remove_legacy_site_device(
         hass, config_entry, coord, _device_reg_for(legacy_other_entry), "site-1"
@@ -1491,7 +1484,7 @@ def test_remove_legacy_site_device_handles_guard_paths(
     legacy_no_id = SimpleNamespace(
         id=None,
         identifiers={(DOMAIN, "site:site-1")},
-        config_entries={config_entry.entry_id},
+        config_entry_id=config_entry.entry_id,
     )
     _remove_legacy_site_device(
         hass, config_entry, coord, _device_reg_for(legacy_no_id), "site-1"
@@ -1500,7 +1493,7 @@ def test_remove_legacy_site_device_handles_guard_paths(
     legacy_same_id = SimpleNamespace(
         id="gateway",
         identifiers={(DOMAIN, "site:site-1")},
-        config_entries={config_entry.entry_id},
+        config_entry_id=config_entry.entry_id,
     )
     _remove_legacy_site_device(
         hass, config_entry, coord, _device_reg_for(legacy_same_id), "site-1"
@@ -1509,7 +1502,7 @@ def test_remove_legacy_site_device_handles_guard_paths(
     legacy = SimpleNamespace(
         id="legacy",
         identifiers={(DOMAIN, "site:site-1")},
-        config_entries={config_entry.entry_id},
+        config_entry_id=config_entry.entry_id,
     )
     monkeypatch.setattr(
         "custom_components.enphase_ev.er.async_get",
@@ -1847,11 +1840,11 @@ async def test_async_setup_entry_model_display_variants(
 
     assert await async_setup_entry(hass, config_entry)
 
-    model_device = get_device_by_identifier(
-        device_registry, (DOMAIN, "MODEL_ONLY"), config_entry.entry_id
+    model_device = device_registry.async_get_device_by_identifier(
+        (DOMAIN, "MODEL_ONLY"), config_entry.entry_id
     )
-    display_device = get_device_by_identifier(
-        device_registry, (DOMAIN, "DISPLAY_ONLY"), config_entry.entry_id
+    display_device = device_registry.async_get_device_by_identifier(
+        (DOMAIN, "DISPLAY_ONLY"), config_entry.entry_id
     )
 
     assert model_device is not None
@@ -1908,8 +1901,8 @@ async def test_async_setup_entry_uses_fallback_name_for_model(
 
     assert await async_setup_entry(hass, config_entry)
 
-    device = get_device_by_identifier(
-        device_registry, (DOMAIN, "FALLBACK_ONLY"), config_entry.entry_id
+    device = device_registry.async_get_device_by_identifier(
+        (DOMAIN, "FALLBACK_ONLY"), config_entry.entry_id
     )
     assert device is not None
     assert device.model == "Fallback Charger"
@@ -2569,30 +2562,6 @@ async def test_registered_services_cover_branches(
         ),
     )
 
-    class FakeHAService:
-        def __init__(self) -> None:
-            self.calls = 0
-            self.referenced_device_ids: list[str] = []
-
-        def async_extract_referenced_device_ids(self, hass_, call):
-            self.calls += 1
-            if self.calls == 1:
-                raise RuntimeError("boom")
-            return list(self.referenced_device_ids)
-
-        @staticmethod
-        def async_register_admin_service(
-            hass_, domain, service, handler, schema, **kwargs
-        ):
-            hass_.services.async_register(
-                domain, service, handler, schema=schema, **kwargs
-            )
-
-    fake_service_helper = FakeHAService()
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.service_routing.ha_service", fake_service_helper
-    )
-
     site_device = device_registry.async_get_or_create(
         config_entry_id=config_entry.entry_id,
         identifiers={(DOMAIN, f"site:{site_id}")},
@@ -2757,7 +2726,6 @@ async def test_registered_services_cover_branches(
             SimpleNamespace(data={"device_id": [site_device.id, other_site_device.id]})
         )
 
-    fake_service_helper.calls = 0
     with pytest.raises(ServiceValidationError):
         await svc_trigger(SimpleNamespace(data={"requested_message": "MeterValues"}))
 
@@ -2786,12 +2754,10 @@ async def test_registered_services_cover_branches(
     assert call(reason="service", serials=[second_serial]) in (
         coord_primary.schedule_sync.async_refresh.await_args_list
     )
-    fake_service_helper.referenced_device_ids = ["missing-device-id"]
     with pytest.raises(ServiceValidationError):
         await svc_sync(
-            SimpleNamespace(data={"device_id": [charger_two.id, site_device.id]})
+            SimpleNamespace(data={"device_id": [charger_two.id, "missing-device-id"]})
         )
-    fake_service_helper.referenced_device_ids = []
     with pytest.raises(ServiceValidationError):
         await svc_sync(SimpleNamespace(data={"device_id": [lonely_device.id]}))
     await svc_request_grid_otp(
@@ -2843,18 +2809,16 @@ async def test_registered_services_cover_branches(
     assert call(second_serial, requested_amps=30, connector_id=2) in await_args
     assert coord_primary.async_start_charging.await_count == 2
     coord_site_only.async_start_charging.assert_not_awaited()
-    fake_service_helper.referenced_device_ids = ["missing-device-id"]
     with pytest.raises(ServiceValidationError):
         await svc_start(
             SimpleNamespace(
                 data={
-                    "device_id": [charger_one.id, site_device.id, charger_two.id],
+                    "device_id": [charger_one.id, "missing-device-id", charger_two.id],
                     "charging_level": 30,
                     "connector_id": 2,
                 }
             )
         )
-    fake_service_helper.referenced_device_ids = []
 
     stop_call = SimpleNamespace(data={"device_id": charger_one.id})
     await svc_stop(stop_call)
@@ -2909,7 +2873,6 @@ async def test_registered_services_cover_branches(
     assert coord_other.async_stop_streaming.await_count == 0
     assert coord_primary._streaming is False
 
-    fake_service_helper.calls = 0
     with pytest.raises(ServiceValidationError):
         await svc_sync(SimpleNamespace(data={}))
     assert coord_primary.schedule_sync.async_refresh.await_count >= 1
@@ -2931,7 +2894,6 @@ async def test_registered_services_cover_branches(
     from custom_components.enphase_ev.services import SupportsResponse
 
     assert supports_response is SupportsResponse.OPTIONAL
-    assert fake_service_helper.calls >= 3
 
     with pytest.raises(vol.Invalid):
         request_grid_otp_schema({})
@@ -2980,10 +2942,6 @@ async def test_device_service_routing_prefers_owning_entry_over_empty_serial_fal
         }
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.service_routing.ha_service",
-        SimpleNamespace(async_extract_referenced_device_ids=lambda *_args: []),
-    )
 
     serial = "EV-ROUTE-1"
     site_id = "site-route"
@@ -3064,10 +3022,6 @@ async def test_device_service_routing_prefers_global_exact_match_before_empty_en
         }
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.service_routing.ha_service",
-        SimpleNamespace(async_extract_referenced_device_ids=lambda *_args: []),
-    )
 
     serial = "EV-STALE-ENTRY-1"
     empty_coord = SimpleNamespace(
@@ -3147,10 +3101,6 @@ async def test_device_service_routing_skips_ambiguous_empty_serial_fallback(
         }
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.service_routing.ha_service",
-        SimpleNamespace(async_extract_referenced_device_ids=lambda *_args: []),
-    )
 
     serial = "EV-AMBIGUOUS-EMPTY-1"
     first_empty_coord = SimpleNamespace(
@@ -3229,10 +3179,6 @@ async def test_device_service_routing_allows_single_empty_serial_fallback(
         }
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.service_routing.ha_service",
-        SimpleNamespace(async_extract_referenced_device_ids=lambda *_args: []),
-    )
 
     serial = "EV-SINGLE-EMPTY-1"
     empty_coord = SimpleNamespace(
@@ -3304,10 +3250,6 @@ async def test_device_service_routing_helper_guard_paths(
         raise AssertionError(f"helper {target} not found")
 
     monkeypatch.setattr(hass.services.__class__, "async_register", fake_register)
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.service_routing.ha_service",
-        SimpleNamespace(async_extract_referenced_device_ids=lambda *_args: []),
-    )
 
     async_setup_services(hass)
     svc_start = registered[(DOMAIN, "start_charging")]["handler"]
@@ -3331,36 +3273,26 @@ async def test_device_service_routing_helper_guard_paths(
     )
     assert config_ids_for_device(
         SimpleNamespace(async_get=Mock()),
-        SimpleNamespace(
-            config_entries=None, config_entry_id="legacy-entry", via_device_id=None
-        ),
-    ) == ["legacy-entry"]
+        SimpleNamespace(config_entry_id="owning-entry", via_device_id=None),
+    ) == ["owning-entry"]
     assert (
         config_ids_for_device(
             SimpleNamespace(async_get=Mock()),
-            SimpleNamespace(
-                config_entries=None, config_entry_id=None, via_device_id=None
-            ),
+            SimpleNamespace(config_entry_id=None, via_device_id=None),
         )
         == []
     )
     assert (
         config_ids_for_device(
             SimpleNamespace(async_get=Mock(return_value=None)),
-            SimpleNamespace(
-                config_entries=None, config_entry_id=None, via_device_id="missing"
-            ),
+            SimpleNamespace(config_entry_id=None, via_device_id="missing"),
         )
         == []
     )
-    parent_device = SimpleNamespace(
-        config_entries={"parent-entry"}, config_entry_id=None, via_device_id=None
-    )
+    parent_device = SimpleNamespace(config_entry_id="parent-entry", via_device_id=None)
     assert config_ids_for_device(
         SimpleNamespace(async_get=Mock(return_value=parent_device)),
-        SimpleNamespace(
-            config_entries=None, config_entry_id=None, via_device_id="parent"
-        ),
+        SimpleNamespace(config_entry_id=None, via_device_id="parent"),
     ) == ["parent-entry"]
 
     site_serial = "EV-SITE-DUPE"
@@ -4961,17 +4893,17 @@ def test_migrate_legacy_gateway_type_devices_handles_internal_edge_paths(
         devices={
             "foreign": SimpleNamespace(
                 id="foreign",
-                config_entries={"other-entry"},
+                config_entry_id="other-entry",
                 identifiers={(DOMAIN, "type:site-fallback:nc1")},
             ),
             "missing-identifiers": SimpleNamespace(
                 id="missing-identifiers",
-                config_entries={config_entry.entry_id},
+                config_entry_id=config_entry.entry_id,
                 identifiers=set(),
             ),
             "other-domain": SimpleNamespace(
                 id="other-domain",
-                config_entries={config_entry.entry_id},
+                config_entry_id=config_entry.entry_id,
                 identifiers={("other", "type:site-fallback:nc1")},
             ),
         },
@@ -5075,10 +5007,8 @@ async def test_migrate_cloud_entities_to_cloud_device_rehomes_known_entities(
     coord = SimpleNamespace(site_id=site_id)
     _migrate_cloud_entities_to_cloud_device(hass, config_entry, coord, dev_reg, None)
 
-    cloud_device = get_device_by_identifier(
-        dev_reg,
-        (DOMAIN, f"type:{site_id}:cloud"),
-        config_entry.entry_id,
+    cloud_device = dev_reg.async_get_device_by_identifier(
+        (DOMAIN, f"type:{site_id}:cloud"), config_entry.entry_id
     )
     assert cloud_device is not None
 
@@ -5364,10 +5294,8 @@ async def test_migrate_cloud_entities_to_cloud_device_rehomes_legacy_cloud_suffi
     coord = SimpleNamespace(site_id=site_id)
     _migrate_cloud_entities_to_cloud_device(hass, config_entry, coord, dev_reg, None)
 
-    cloud_device = get_device_by_identifier(
-        dev_reg,
-        (DOMAIN, f"type:{site_id}:cloud"),
-        config_entry.entry_id,
+    cloud_device = dev_reg.async_get_device_by_identifier(
+        (DOMAIN, f"type:{site_id}:cloud"), config_entry.entry_id
     )
     assert cloud_device is not None
     reg_entry = ent_reg.async_get(legacy_cloud_error.entity_id)

@@ -32,13 +32,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /workspace
 
-ARG REQUIREMENTS_FILE=requirements-dev.txt
-
 COPY devtools/docker/requirements*.txt devtools/docker/constraints*.txt /tmp/enphase-ev-requirements/
 
 RUN python -m pip install --upgrade "pip==26.2.1" && \
     pip install --no-cache-dir \
-        -r "/tmp/enphase-ev-requirements/${REQUIREMENTS_FILE}"
+        -r "/tmp/enphase-ev-requirements/requirements-dev.txt"
 
 # Allow git operations (e.g. pre-commit) inside the mounted workspace.
 RUN git config --global --add safe.directory /workspace

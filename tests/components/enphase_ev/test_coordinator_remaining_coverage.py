@@ -1188,7 +1188,6 @@ async def test_async_update_data_success_handles_edge_payloads(
         data={"entry_id": "123"},
         entry_id="123",
     )
-    coord.async_set_update_interval = MagicMock(side_effect=RuntimeError("legacy"))
 
     result = await coord._async_update_data()
 
@@ -1246,7 +1245,6 @@ async def test_async_update_data_resets_issues_and_network_config(
     monkeypatch.setattr(coord_mod.dt_util, "now", lambda: datetime(2025, 1, 1))
     monkeypatch.setattr(coord_mod.dt_util, "as_local", fake_as_local)
 
-    coord.async_set_update_interval = MagicMock(side_effect=TypeError("legacy"))
     coord.config_entry = SimpleNamespace(
         options={}, data={"entry_id": "123"}, entry_id="123"
     )
@@ -1544,7 +1542,6 @@ async def test_async_update_data_covers_remaining_branches(
     coord.config_entry = SimpleNamespace(
         options={}, data={"entry_id": "123"}, entry_id="123"
     )
-    coord.async_set_update_interval = AsyncMock(side_effect=RuntimeError("boom"))
 
     result = await coord._async_update_data()
 

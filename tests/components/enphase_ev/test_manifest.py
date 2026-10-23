@@ -3,7 +3,7 @@ import pathlib
 
 import yaml
 
-MIN_HOME_ASSISTANT_VERSION = "2026.9.0"
+MIN_HOME_ASSISTANT_VERSION = "2026.10.0"
 
 
 def test_manifest_keys_present():
@@ -62,9 +62,6 @@ def test_development_requirements_cover_minimum_homeassistant_version():
     requirements_dev = (
         root / "devtools" / "docker" / "requirements-dev.txt"
     ).read_text()
-    requirements_min_ha = (
-        root / "devtools" / "docker" / "requirements-min-ha.txt"
-    ).read_text()
 
     assert hacs.get("homeassistant") == MIN_HOME_ASSISTANT_VERSION
     current_pin = next(
@@ -72,25 +69,37 @@ def test_development_requirements_cover_minimum_homeassistant_version():
         for line in requirements_dev.splitlines()
         if line.startswith("homeassistant==")
     )
-    assert tuple(map(int, current_pin.split("."))) >= tuple(
-        map(int, MIN_HOME_ASSISTANT_VERSION.split("."))
-    )
+    # The single runtime lane must exercise the exact advertised minimum.
+    assert current_pin == MIN_HOME_ASSISTANT_VERSION
     assert "-c constraints-dev.txt" in requirements_dev
     constraints = (root / "devtools/docker/constraints-dev.txt").read_text()
     assert f"homeassistant=={current_pin}" in constraints
-    assert f"homeassistant=={MIN_HOME_ASSISTANT_VERSION}" in requirements_min_ha
-    assert "-c constraints-min-ha.txt" in requirements_min_ha
-    minimum_constraints = (root / "devtools/docker/constraints-min-ha.txt").read_text()
-    for line in requirements_min_ha.splitlines():
-        if "==" in line and not line.startswith("#"):
-            assert line in minimum_constraints
     workflow = yaml.safe_load((root / ".github/workflows/tests.yml").read_text())
-    install_step = next(
+    for job_name in ("pytest", "python314-diagnostics"):
+        install_step = next(
+            step
+            for step in workflow["jobs"][job_name]["steps"]
+            if step.get("name") == "Install deps"
+        )
+        assert "-r devtools/docker/requirements-dev.txt" in install_step["run"]
+        assert f"== '{current_pin}'" in install_step["run"]
+
+
+def test_hacs_validator_uses_supported_homeassistant_version():
+    """HACS must validate using the advertised minimum, not a retired runtime."""
+    root = pathlib.Path(__file__).resolve().parents[3]
+    hacs = json.loads((root / "hacs.json").read_text())
+    expected_version = hacs["homeassistant"]
+    dockerfile = (root / "devtools/docker/Dockerfile.hacs").read_text()
+    workflow = yaml.safe_load((root / ".github/workflows/validate.yaml").read_text())
+    version_step = next(
         step
-        for step in workflow["jobs"]["minimum-homeassistant"]["steps"]
-        if step.get("name") == "Install minimum Home Assistant test deps"
+        for step in workflow["jobs"]["validate-hacs"]["steps"]
+        if step.get("name") == "Verify HACS Home Assistant version"
     )
-    assert f"== '{MIN_HOME_ASSISTANT_VERSION}'" in install_step["run"]
+
+    assert f"== '{expected_version}'" in dockerfile
+    assert f"== '{expected_version}'" in version_step["run"]
 
 
 def test_service_actions_have_icons():
