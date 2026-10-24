@@ -3648,13 +3648,28 @@ class EnphaseCoordinator(
                 ("min", "min_amp"),
                 ("max", "max_amp"),
                 ("granularity", "amp_granularity"),
-                ("defaultChargeLevel", "default_charge_level"),
             ):
                 value = _coerce_intish(charge_details.get(source))
                 if value is None and previous_entry is not None:
                     value = _coerce_intish(previous_entry.get(destination))
                 if value is not None:
                     current[destination] = value
+            # Config readback owns the persistent default, including an explicit
+            # unset value. Summary may contain an older value or "disabled".
+            has_config_default = (
+                "default_charge_level" in current
+                and current.get("default_charge_level_supported") is True
+                and current.get("default_charge_level_supported_source")
+                == "charger_config"
+            )
+            if not has_config_default:
+                default_level = _coerce_intish(charge_details.get("defaultChargeLevel"))
+                if default_level is None and previous_entry is not None:
+                    default_level = _coerce_intish(
+                        previous_entry.get("default_charge_level")
+                    )
+                if default_level is not None:
+                    current["default_charge_level"] = default_level
             max_current = _coerce_intish(item.get("maxCurrent"))
             if max_current is None and previous_entry is not None:
                 max_current = _coerce_intish(previous_entry.get("max_current"))
@@ -4867,7 +4882,7 @@ class EnphaseCoordinator(
                         cur.pop("green_battery_enabled", None)
                 default_charge_level = cld.get("defaultChargeLevel")
                 if default_charge_level is not None:
-                    cur["default_charge_level"] = default_charge_level
+                    cur.setdefault("default_charge_level", default_charge_level)
                 conn = item.get("activeConnection")
                 if isinstance(conn, str):
                     conn = conn.strip()
