@@ -388,6 +388,34 @@ class BatteryReserveNumber(CoordinatorEntity, NumberEntity):  # type: ignore[mis
         await self._coord.async_set_battery_reserve(reserve)
 
     @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        """Keep cloud configuration and outstanding intent distinguishable."""
+        runtime = getattr(self._coord, "control_updates", None)
+        key = ("battery_reserve", None)
+        update = (
+            runtime.held_by.get(key) or runtime.updates.get(key) if runtime else None
+        )
+        backend_pending = getattr(
+            self._coord, "_battery_backend_profile_update_pending", None
+        )
+        return {
+            "reserve_source": "battery_config",
+            "pending": bool(
+                self._coord.battery_profile_pending
+                or backend_pending is True
+                or (
+                    update is not None
+                    and (
+                        update.submitting or update.status in {"pending", "unconfirmed"}
+                    )
+                )
+            ),
+            "backend_pending": backend_pending,
+            "requested_reserve_percentage": self._coord.battery_pending_backup_percentage,
+            "control_update_status": update.status if update else "idle",
+        }
+
+    @property
     def device_info(self) -> DeviceInfo:
         info = _type_device_info(self._coord, "encharge")
         if info is not None:
