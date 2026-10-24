@@ -11,6 +11,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
+import http.client
 import http.cookiejar
 import socket
 import urllib.error
@@ -291,7 +292,11 @@ def _request(
         except Exception:
             body = b""
         return err.code, dict(err.headers), body, f"HTTP {err.code}"
-    except (urllib.error.URLError, socket.timeout) as err:
+    except (
+        urllib.error.URLError,
+        socket.timeout,
+        http.client.RemoteDisconnected,
+    ) as err:
         return None, {}, b"", str(err)
 
 
