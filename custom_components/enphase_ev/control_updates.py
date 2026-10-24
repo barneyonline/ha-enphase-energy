@@ -414,12 +414,15 @@ def control_readback(
                     )
                 )
             ):
-                runtime.observe(
-                    evse_control,
-                    serial,
-                    confirmed_control_values(coord, evse_control, serial),
-                    tokens,
-                )
+                values = confirmed_control_values(coord, evse_control, serial)
+                # During confirmation, empty default-current feedback cannot
+                # erase the last numeric value. Ended commands accept unset reads.
+                if (
+                    evse_control != "default_charge_level"
+                    or values["amps"] is not None
+                    or not runtime.pending(evse_control, serial)
+                ):
+                    runtime.observe(evse_control, serial, values, tokens)
             if (
                 runtime
                 and not evse_control
