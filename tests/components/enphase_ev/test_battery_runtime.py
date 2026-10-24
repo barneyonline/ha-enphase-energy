@@ -607,7 +607,7 @@ def test_backend_pending_false_clears_when_effective_state_matches(
     runtime.sync_backend_battery_profile_pending(False)
 
     assert coord.battery_profile_pending is False
-    assert coord._battery_backend_profile_update_pending is None  # noqa: SLF001
+    assert coord._battery_backend_profile_update_pending is False  # noqa: SLF001
 
 
 def test_fresh_live_profile_sample_clears_pending_with_stale_configured_profile(

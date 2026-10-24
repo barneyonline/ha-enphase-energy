@@ -337,6 +337,15 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   Battery reserve writes equal to the confirmed displayed value are no-ops.
   Repeating a different pending reserve target reaches the runtime conflict
   guard; after the tracker timeout, retries retain normal write safeguards.
+  The reserve number identifies its source as `battery_config` and exposes
+  `pending`, `backend_pending`, `requested_reserve_percentage`, and
+  `control_update_status`. The owning profile transaction also supplies status
+  when it holds the reserve as a related control. Backend pending state remains
+  visible when there is no local transaction, including after a fresh setup.
+  Local confirmation preserves the last backend pending flag until a later read
+  replaces it; matching configured readback does not erase cloud pending state.
+  These values describe cloud configuration and command progress; neither a
+  successful fetch nor an idle tracker verifies the gateway's enforced reserve.
   Charger configuration must return the requested setting's value; malformed
   payloads and unrelated keys cannot confirm a cached setting. Alert opt-out
   confirmation requires explicit fresh alert state. Opt-in additionally confirms
