@@ -389,7 +389,9 @@ class BatteryRuntime:
             return cast(str | None, func(sub_type))
         return None
 
-    def clear_battery_pending(self, *, clear_optimistic: bool = True) -> None:
+    def clear_battery_pending(
+        self, *, clear_optimistic: bool = True, clear_backend_pending: bool = True
+    ) -> None:
         state = self.battery_state
         state._battery_pending_profile = None
         state._battery_pending_reserve = None
@@ -398,7 +400,8 @@ class BatteryRuntime:
         state._battery_pending_requested_mono = None
         state._battery_pending_require_exact_settings = True
         state._battery_pending_authoritative_confirmation_required = False
-        state._battery_backend_profile_update_pending = None
+        if clear_backend_pending:
+            state._battery_backend_profile_update_pending = None
         state._battery_backend_not_pending_observed_at = None
         if clear_optimistic:
             self.clear_battery_optimistic_profile()
@@ -568,7 +571,10 @@ class BatteryRuntime:
                 state._battery_operation_mode_sub_type = pending_sub_type
             else:
                 state._battery_operation_mode_sub_type = None
-        self.clear_battery_pending()
+        # Matching configured readback resolves local intent, but Enphase can
+        # still report that its gateway update is pending. Keep that observation
+        # until another read supplies a new flag.
+        self.clear_battery_pending(clear_backend_pending=False)
 
     def clear_battery_settings_write_pending(self) -> None:
         self.battery_state._battery_settings_last_write_mono = None
