@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Keep service-status probes and report generation running when a remote server closes the connection without a response.
 
 ### 🔧 Improvements
 - None

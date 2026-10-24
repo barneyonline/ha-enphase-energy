@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import base64
+import http.client
 import importlib.util
 import json
 from pathlib import Path
 import sys
 import urllib.error
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -361,6 +363,27 @@ def test_request_and_jwt_helpers(service_status_module) -> None:
     assert headers == {}
     assert body == b""
     assert "boom" in str(error)
+
+
+@pytest.mark.parametrize("failure_stage", ["open", "read"])
+def test_request_remote_disconnected_returns_failure(
+    service_status_module, failure_stage: str
+) -> None:
+    error_message = "Remote end closed connection without response"
+    opener = MagicMock()
+    if failure_stage == "open":
+        opener.open.side_effect = http.client.RemoteDisconnected(error_message)
+    else:
+        response = opener.open.return_value.__enter__.return_value
+        response.read.side_effect = http.client.RemoteDisconnected(error_message)
+
+    result = service_status_module._request(
+        opener, "GET", "https://example.invalid", timeout=5
+    )
+
+    assert result == (None, {}, b"", error_message)
+    opener.open.assert_called_once()
+    assert opener.open.call_args.kwargs == {"timeout": 5}
 
 
 def test_helper_edge_branches(
@@ -1336,6 +1359,72 @@ def test_main_success_generates_history_and_wiki(
         not in wiki_text
     )
     assert "raw.example.invalid/service-status/history.json" in wiki_text
+
+
+def test_main_remote_disconnected_continues_probes_and_generates_reports(
+    service_status_module, tmp_path: Path, monkeypatch
+) -> None:
+    token = _jwt({"user_id": "user-1", "session_id": "session-1"})
+    monkeypatch.setenv("ENPHASE_EMAIL", "user@example.com")
+    monkeypatch.setenv("ENPHASE_PASSWORD", "secret")
+    monkeypatch.setenv("ENPHASE_SITE_ID", "SITE")
+    monkeypatch.setenv("ENPHASE_SERIAL", "SERIAL")
+    monkeypatch.setattr(
+        service_status_module,
+        "_cookie_header_for",
+        lambda url, jar: f"enlighten_manager_token_production={token}",
+    )
+    requested_urls: list[str] = []
+    error_message = "Remote end closed connection without response"
+
+    def fake_open(request, timeout):  # noqa: ARG001
+        url = request.full_url
+        requested_urls.append(url)
+        if url.endswith("/SITE/SERIAL/preference"):
+            raise http.client.RemoteDisconnected(error_message)
+        payload = {}
+        if url == service_status_module.LOGIN_URL:
+            payload = {"session_id": "session-1", "success": True}
+        elif url == f"{service_status_module.ENTREZ_URL}/tokens":
+            payload = {"token": token}
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.getcode.return_value = 200
+        response.headers = {}
+        response.read.return_value = json.dumps(payload).encode("utf-8")
+        return response
+
+    opener = MagicMock()
+    opener.open.side_effect = fake_open
+    monkeypatch.setattr(
+        service_status_module.urllib.request, "build_opener", lambda *args: opener
+    )
+    output_dir = tmp_path / "out"
+    monkeypatch.setattr(
+        sys, "argv", ["service_status.py", "--output-dir", str(output_dir)]
+    )
+
+    assert service_status_module.main() == 0
+
+    status_payload = json.loads((output_dir / "status.json").read_text())
+    endpoints = status_payload["endpoints"]
+    failed = next(e for e in endpoints if e["name"] == "scheduler_charge_mode")
+    assert failed["ok"] is False
+    assert failed["status"] is None
+    assert failed["error"] == error_message
+    assert [e["name"] for e in endpoints if not e["ok"]] == ["scheduler_charge_mode"]
+    assert endpoints[-1]["name"] == "auth_settings"
+    assert endpoints[-1]["ok"] is True
+    assert len(requested_urls) == len(set(requested_urls)) == len(endpoints)
+    assert status_payload["status"] == "Degraded"
+    assert status_payload["summary"]["checks_failed"] == 1
+    history = json.loads((output_dir / "history.json").read_text())
+    assert history["samples"][-1]["status"] == "Degraded"
+    incidents = json.loads((output_dir / "incidents.json").read_text())
+    assert incidents["incidents"][-1]["status"] == "Degraded"
+    wiki_text = (output_dir / "wiki" / "Service-Status-History.md").read_text()
+    assert "evse_scheduler" in wiki_text
+    assert (output_dir / "status.svg").is_file()
 
 
 def test_main_treats_optional_probe_4xx_responses_as_operational(
