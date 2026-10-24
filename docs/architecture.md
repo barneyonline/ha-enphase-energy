@@ -130,6 +130,18 @@ remove user-customized entities.
 
 ## Coordinator And Refresh Flow
 
+The EV charger's persistent Default Charge Level comes from charger configuration
+readback. Summary `chargeLevelDetails.defaultChargeLevel` is only a fallback when
+that field is absent; its older values and `disabled` label cannot overwrite
+configuration readback, including an explicit unset value. Startup summary
+enrichment follows the same precedence. While a default-current write awaits
+numeric readback, the number retains its last confirmed value and reports the
+pending command separately. An acknowledgement alone does not confirm the write.
+Failed or cancelled commands accept subsequent unset readback. Fresh startup
+summary values can replace older summary fallbacks when config readback is absent.
+The Set Current sensor reports the session setpoint from charger status; this can
+differ from the persistent default until Enphase reports the updated session.
+
 `coordinator.py` owns polling cadence, auth refresh coordination, endpoint health, backoff state, runtime managers, and normalized integration state. `refresh_plan.py` defines which endpoint families are refreshed in each phase. `refresh_runner.py` executes those plans and isolates optional endpoint failures so one unhealthy Enphase service does not fail the whole coordinator refresh.
 
 ```mermaid
