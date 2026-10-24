@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Keep service-status probes and report generation running when a remote server closes the connection without a response.
 - Compare battery reserve writes with the confirmed displayed value so repeating a pending target reaches the normal conflict guard or retry path instead of silently returning. (#960)
 - Expose local and cloud pending state, requested reserve, and the owning control update status on Battery Reserve, and identify its BatteryConfig source so automations can distinguish outstanding intent from readback. The reported cloud/gateway reserve mismatch remains under investigation. (#960)
+- Keep the IQ EV Charger Default Charge Level numeric after changes by prioritizing configuration readback over summary data and retaining the last confirmed current while numeric readback is pending. (#959)
 
 ### 🔧 Improvements
 - None
