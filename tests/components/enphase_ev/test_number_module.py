@@ -627,7 +627,9 @@ async def test_battery_reserve_number_ignores_current_value(hass, config_entry) 
     coord._battery_show_battery_backup_percentage = True  # noqa: SLF001
     coord._battery_backup_percentage = 25  # noqa: SLF001
 
-    await BatteryReserveNumber(coord).async_set_native_value(25)
+    number = BatteryReserveNumber(coord)
+    assert number.native_value == 25.0
+    await number.async_set_native_value(25)
 
     coord.async_set_battery_reserve.assert_not_awaited()
 
