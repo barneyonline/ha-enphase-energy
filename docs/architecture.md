@@ -334,6 +334,9 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   Schedule comparison normalizes equivalent time, weekday, ID, and scalar
   representations without inventing missing readback fields. Follow-up profile
   edits use the confirmed profile and companion values shown by the controls.
+  Battery reserve writes equal to the confirmed displayed value are no-ops.
+  Repeating a different pending reserve target reaches the runtime conflict
+  guard; after the tracker timeout, retries retain normal write safeguards.
   Charger configuration must return the requested setting's value; malformed
   payloads and unrelated keys cannot confirm a cached setting. Alert opt-out
   confirmation requires explicit fresh alert state. Opt-in additionally confirms
