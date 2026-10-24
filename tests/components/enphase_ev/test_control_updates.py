@@ -1092,6 +1092,85 @@ async def test_battery_status_read_cannot_confirm_reserve_without_reserve_feedba
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("control", ["battery_reserve", "system_profile"])
+@pytest.mark.parametrize(
+    "action", ["confirmed_value", "pending_value", "timeout_retry"]
+)
+async def test_battery_reserve_number_compares_confirmed_value(
+    coordinator_factory, tracker, control, action
+):
+    from custom_components.enphase_ev.control_values import RELATED_CONTROLS
+    from custom_components.enphase_ev.number import BatteryReserveNumber
+
+    _coord, _runtime, timers = tracker
+    coord = coordinator_factory()
+    coord._battery_profile = "self-consumption"
+    coord._battery_backup_percentage = 20
+    coord._battery_show_battery_backup_percentage = True
+    coord._battery_user_is_owner = True
+    coord._battery_user_is_installer = False
+    coord.client.set_battery_settings_compat = AsyncMock(return_value={})
+    coord.async_request_refresh = AsyncMock()
+    coord.kick_fast = Mock()
+    ledger = coord.control_updates
+    requested = (
+        {"reserve": 25, "profile_ready": True}
+        if control == "battery_reserve"
+        else {"profile_key": "self-consumption", "profile_ready": True}
+    )
+    update = ledger.begin(
+        control,
+        None,
+        requested,
+        confirmed_control_values(coord, control),
+        group="battery_profile",
+    )
+    for related in RELATED_CONTROLS["battery_profile"]:
+        ledger.hold_related(
+            related, None, update, confirmed_control_values(coord, related)
+        )
+    coord.battery_runtime.set_battery_pending(
+        profile="self-consumption",
+        reserve=25,
+        sub_type=None,
+        require_exact_settings=True,
+    )
+    # Neither pending intent nor an optimistic settings echo is confirmed readback.
+    coord._battery_backup_percentage = 25
+    ledger.finish((control, None), update)
+    number = BatteryReserveNumber(coord)
+    assert number.native_value == 20.0
+    assert coord.battery_selected_backup_percentage == 25
+
+    if action == "timeout_retry":
+        timers[-1][0](None)
+        assert update.status == "unconfirmed"
+        assert number.native_value == 20.0
+        assert coord.battery_selected_backup_percentage == 25
+
+        await number.async_set_native_value(25)
+
+        coord.client.set_battery_settings_compat.assert_awaited_once_with(
+            {"batteryBackupPercentage": 25}, merged_payload=True, strip_devices=True
+        )
+        retry = ledger.updates[("battery_reserve", None)]
+        assert retry is not update
+        assert retry.status == "pending"
+        assert retry.requested == {"reserve": 25, "profile_ready": True}
+    else:
+        if action == "pending_value":
+            with pytest.raises(ServiceValidationError) as caught:
+                await number.async_set_native_value(25)
+            assert caught.value.translation_key == "control_change_pending"
+        else:
+            await number.async_set_native_value(20)
+        coord.client.set_battery_settings_compat.assert_not_awaited()
+        assert ledger.updates[(control, None)] is update
+        assert update.status == "pending"
+    assert number.native_value == 20.0
+
+
+@pytest.mark.asyncio
 async def test_battery_reserve_confirmation_uses_the_normalized_request(
     coordinator_factory,
 ):

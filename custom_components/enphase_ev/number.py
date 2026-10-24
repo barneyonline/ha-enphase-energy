@@ -383,7 +383,7 @@ class BatteryReserveNumber(CoordinatorEntity, NumberEntity):  # type: ignore[mis
 
     async def async_set_native_value(self, value: float) -> None:
         reserve = int(value)
-        if self._coord.battery_selected_backup_percentage == reserve:
+        if self.native_value == reserve:
             return
         await self._coord.async_set_battery_reserve(reserve)
 
