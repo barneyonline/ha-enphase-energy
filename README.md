@@ -65,6 +65,20 @@ Manual install steps: see the wiki Installation page.
 
 Sign in with your Enlighten credentials; MFA is supported. See the wiki for details.
 
+## Battery reserve readback
+
+Battery Reserve reports the configured reserve from Enphase BatteryConfig.
+Its `pending` attribute covers local changes awaiting confirmation and changes
+reported pending by Enphase. `backend_pending` is Enphase's last reported flag
+(or `null` when unknown), `requested_reserve_percentage` is the outstanding local
+target, and `control_update_status` describes the local reserve or profile request.
+An `unconfirmed` request remains pending after the ten-minute confirmation window.
+
+Cloud configuration can differ from the reserve enforced by the gateway. An idle
+request or a fresh cloud fetch does not establish that the gateway applied it.
+Automations that require the enforced reserve should use a local Envoy reserve
+reading when available and account for pending changes.
+
 ## Documentation
 
 Refer to the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki) for setup,
