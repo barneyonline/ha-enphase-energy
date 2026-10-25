@@ -136,7 +136,8 @@ that field is absent; its older values and `disabled` label cannot overwrite
 configuration readback, including an explicit unset value. Startup summary
 enrichment follows the same precedence. While a default-current write awaits
 numeric readback, the number retains its last confirmed value and reports the
-pending command separately. An acknowledgement alone does not confirm the write.
+pending command separately. Non-finite current values are treated as unset and
+cannot block a new current write. An acknowledgement alone does not confirm the write.
 Failed or cancelled commands accept subsequent unset readback. Fresh startup
 summary values can replace older summary fallbacks when config readback is absent.
 The Set Current sensor reports the session setpoint from charger status; this can
