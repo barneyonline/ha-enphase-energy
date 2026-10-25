@@ -1,20 +1,8 @@
 {
-  "current_status": "Fully Operational",
-  "generated_at": "2026-10-24T17:49:42.393092Z",
+  "current_status": "Degraded",
+  "generated_at": "2026-10-25T00:50:01.370556Z",
   "retention_days": 30,
   "samples": [
-    {
-      "checked_at": "2026-09-24T20:39:43.645989Z",
-      "checks_failed": 0,
-      "failed_check_names": [],
-      "status": "Fully Operational"
-    },
-    {
-      "checked_at": "2026-09-24T23:45:31.617833Z",
-      "checks_failed": 0,
-      "failed_check_names": [],
-      "status": "Fully Operational"
-    },
     {
       "checked_at": "2026-09-25T03:32:20.013988Z",
       "checks_failed": 0,
@@ -939,6 +927,15 @@
       "checks_failed": 0,
       "failed_check_names": [],
       "status": "Fully Operational"
+    },
+    {
+      "checked_at": "2026-10-25T00:50:01.370556Z",
+      "checks_failed": 2,
+      "failed_check_names": [
+        "evse_timeseries",
+        "session_history"
+      ],
+      "status": "Degraded"
     }
   ]
 }

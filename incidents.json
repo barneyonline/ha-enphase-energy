@@ -1,6 +1,6 @@
 {
-  "current_status": "Fully Operational",
-  "generated_at": "2026-10-24T17:49:42.393092Z",
+  "current_status": "Degraded",
+  "generated_at": "2026-10-25T00:50:01.370556Z",
   "incidents": [
     {
       "active": false,
@@ -64,6 +64,18 @@
       ],
       "last_seen_at": "2026-10-20T08:49:49.773591Z",
       "started_at": "2026-10-20T08:49:49.773591Z",
+      "status": "Degraded"
+    },
+    {
+      "active": true,
+      "duration_minutes": 0,
+      "ended_at": null,
+      "failed_checks": [
+        "evse_timeseries",
+        "session_history"
+      ],
+      "last_seen_at": "2026-10-25T00:50:01.370556Z",
+      "started_at": "2026-10-25T00:50:01.370556Z",
       "status": "Degraded"
     }
   ],
