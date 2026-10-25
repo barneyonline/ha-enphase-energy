@@ -1,9 +1,8 @@
-# Current Home Assistant test-plugin release and its transitive dependency stack.
-# Upgrade both together and regenerate the constraints after validating the lane.
+# Keep the minimum Home Assistant version and its matching test plugin together.
+# Only independently upgradable repository tooling is constrained locally.
 -c constraints-dev.txt
 homeassistant==2026.10.0
 pytest-homeassistant-custom-component==0.13.371
-PyYAML==6.0.3
 mypy==2.2.0
 ruff==0.16.4
 black==26.10.1
