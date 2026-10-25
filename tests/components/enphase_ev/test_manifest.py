@@ -1,6 +1,9 @@
+from importlib.metadata import requires
 import json
 import pathlib
 
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 import yaml
 
 MIN_HOME_ASSISTANT_VERSION = "2026.10.0"
@@ -73,7 +76,21 @@ def test_development_requirements_cover_minimum_homeassistant_version():
     assert current_pin == MIN_HOME_ASSISTANT_VERSION
     assert "-c constraints-dev.txt" in requirements_dev
     constraints = (root / "devtools/docker/constraints-dev.txt").read_text()
-    assert f"homeassistant=={current_pin}" in constraints
+    local_constraints = {
+        canonicalize_name(Requirement(line).name)
+        for line in constraints.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    upstream_pins = {
+        canonicalize_name(Requirement(declaration).name)
+        for owner in ("homeassistant", "pytest-homeassistant-custom-component")
+        for declaration in requires(owner) or []
+        if any(
+            spec.operator in ("==", "===")
+            for spec in Requirement(declaration).specifier
+        )
+    }
+    assert local_constraints.isdisjoint(upstream_pins)
     workflow = yaml.safe_load((root / ".github/workflows/tests.yml").read_text())
     for job_name in ("pytest", "python314-diagnostics"):
         install_step = next(

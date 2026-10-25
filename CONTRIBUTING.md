@@ -49,14 +49,14 @@ Include the integration version, Home Assistant version, affected entity IDs, de
    Reuse the running container with `docker compose exec` for subsequent checks
    to avoid paying container startup costs on every command.
    The default `ha-dev` lane pins Home Assistant 2026.10.0, the matching test
-   plugin, and Linux/Python 3.14 transitive constraints in
+   plugin, and independently upgradable tooling constraints in
    `devtools/docker/constraints-dev.txt`. Rebuild after changing requirements.
    The minimum supported Home Assistant version is 2026.10.0, paired with
    `pytest-homeassistant-custom-component==0.13.371`. The full integration suite
    runs on this exact version in Docker and CI, so a separate minimum-version
    environment and repeated compatibility subset are unnecessary.
-   Upgrade Home Assistant together with its matching test plugin and transitive
-   constraints; do not overlay a beta on an unrelated dependency stack.
+   Upgrade Home Assistant together with its matching test plugin and validate
+   the tooling constraints; do not overlay a beta on an unrelated dependency stack.
 5. **Start `ha-runtime` when you need a real Home Assistant UI for manual verification**:
    ```bash
    mkdir -p .ha-config
@@ -113,30 +113,25 @@ docker compose -f devtools/docker/docker-compose.yml exec ha-dev pytest -q tests
 
 ## Dependency Maintenance
 
-Dependabot continues to propose weekly GitHub Actions updates. For
-`devtools/docker`, routine Python version PRs are disabled. Standalone updates
-to `cryptography`, `PyJWT`, `aiohttp`, and `Pillow`, including security-update
-PRs, are ignored because Home Assistant requires exact versions of these
-packages. Other Python security updates remain enabled.
+Declare the dependencies this repository can choose directly. Keep the supported
+Home Assistant version and its matching test plugin in `requirements-dev.txt`,
+and the independently upgradable certificate bundle `certifi` in
+`constraints-dev.txt`. Let pre-commit select its own virtualenv and filelock
+dependencies. Keep the Black requirement and pre-commit
+hook aligned when updating the formatter.
 
-Keep Dependabot alerts enabled and review new advisories even for ignored
-packages. Address applicable advisories through a compatible Home Assistant
-upgrade: update the Home Assistant version and matching test plugin together,
-regenerate that lane's constraints, and validate it in Docker. Preserve the
-exact dependency stack for the supported minimum Home Assistant version. Do not
-override their dependency pins independently to clear an alert.
+Home Assistant and its test plugin provide their own transitive requirements.
+Do not duplicate their exact pins in a local dependency freeze or submit their
+complete installed environment to GitHub's dependency graph. Packages such as
+`Pillow`, `uv`, `aiohttp`, and `cryptography` remain installed at the versions
+required by Home Assistant. Upgrade the Home Assistant/test-plugin pair together
+when changing the supported minimum, then rebuild and validate in Docker.
 
-Home Assistant 2026.10.0 also requires `uv==0.12.23` and `Pillow==12.3.0`.
-Their advisories remain open in the minimum-version test lane until a compatible
-Home Assistant upgrade is possible. Security updates to dependencies whose
-allowed ranges include the patched versions, such as `certifi`, `filelock`, and
-`virtualenv`, can be pinned independently after rebuilding and validating the
-lane. Keep the Black requirement, constraint, and pre-commit hook aligned when
-updating the formatter.
-
-The `open-pull-requests-limit: 0` setting only disables version-update PRs;
-the explicit `ignore` rules suppress security-update PRs for these four
-packages. Neither setting disables Dependabot alerts. See GitHub's
+Dependabot alerts and security updates remain enabled for the repository's
+declared dependencies. The `open-pull-requests-limit: 0` setting disables only
+routine Python version-update PRs. Removing upstream pins from repository
+metadata does not remediate vulnerabilities in a Home Assistant installation.
+See GitHub's
 [security-update configuration guidance](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configure-security-updates).
 
 ## Coding Standards and Tooling
