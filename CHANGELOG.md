@@ -11,6 +11,23 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v5.2.1 - 2026-10-25
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
 - Keep service-status probes and report generation running when a remote server closes the connection without a response.
 - Compare battery reserve writes with the confirmed displayed value so repeating a pending target reaches the normal conflict guard or retry path instead of silently returning. (#960)
 - Expose local and cloud pending state, requested reserve, and the owning control update status on Battery Reserve, and identify its BatteryConfig source so automations can distinguish outstanding intent from readback. The reported cloud/gateway reserve mismatch remains under investigation. (#960)
@@ -20,7 +37,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔄 Other changes
-- None
+- Bump the integration manifest version to `5.2.1`.
 
 ## v5.2.0 - 2026-10-24
 
