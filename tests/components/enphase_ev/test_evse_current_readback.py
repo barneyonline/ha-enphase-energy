@@ -11,10 +11,11 @@ from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("decimal_strings", [False, True])
 @pytest.mark.parametrize("summary_default", ["disabled", "16", None])
 @pytest.mark.parametrize("initial_default", [6, None])
 async def test_default_current_survives_write_readback_and_summary(
-    coordinator_factory, summary_default, initial_default
+    coordinator_factory, summary_default, initial_default, decimal_strings
 ):
     """Summary labels and older defaults cannot overwrite config readback."""
     coord = coordinator_factory(serials=[RANDOM_SERIAL])
@@ -64,7 +65,10 @@ async def test_default_current_survives_write_readback_and_summary(
     coord.async_request_refresh = coord.async_refresh
     for amps in (12, 10, 9, 8):
         coord.client.charger_config.return_value = [
-            {"key": DEFAULT_CHARGE_LEVEL_SETTING, "value": str(amps)}
+            {
+                "key": DEFAULT_CHARGE_LEVEL_SETTING,
+                "value": f"{amps}.0" if decimal_strings else str(amps),
+            }
         ]
         coord.client.status.return_value["evChargerData"][0]["chargingLevel"] = amps
         await number.async_set_native_value(amps)
@@ -81,11 +85,11 @@ async def test_default_current_survives_write_readback_and_summary(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("readback", [None, "", "invalid"])
+@pytest.mark.parametrize("readback", [None, "", "invalid", "inf", "-inf", "1e309"])
 async def test_pending_default_current_keeps_last_numeric_readback(
     coordinator_factory, readback
 ):
-    """An empty read while applying a write cannot erase the confirmed current."""
+    """Invalid readback during a write cannot erase the confirmed current."""
     coord = coordinator_factory(
         serials=[RANDOM_SERIAL],
         data={
@@ -115,6 +119,50 @@ async def test_pending_default_current_keeps_last_numeric_readback(
     coord.client.charger_config.return_value = [
         {"key": DEFAULT_CHARGE_LEVEL_SETTING, "value": "12"}
     ]
+    result = await coord.evse_runtime.async_get_charger_config(
+        RANDOM_SERIAL, keys=[DEFAULT_CHARGE_LEVEL_SETTING]
+    )
+    coord.data[RANDOM_SERIAL]["default_charge_level"] = result[
+        DEFAULT_CHARGE_LEVEL_SETTING
+    ]
+    assert number.native_value == 12
+    assert coord.control_updates.status(RANDOM_SERIAL) == "idle"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("readback", ["inf", "-inf", "1e309"])
+@pytest.mark.parametrize("cached", [False, True])
+async def test_default_current_write_recovers_from_nonfinite_readback(
+    coordinator_factory, readback, cached
+):
+    """Malformed current values cannot prevent a new write and confirmation."""
+    coord = coordinator_factory(
+        serials=[RANDOM_SERIAL],
+        data={
+            RANDOM_SERIAL: {
+                "default_charge_level_supported": True,
+                "default_charge_level": readback,
+            }
+        },
+    )
+    if cached:
+        coord.evse_state._charger_config_cache[RANDOM_SERIAL] = (  # noqa: SLF001
+            {DEFAULT_CHARGE_LEVEL_SETTING: readback},
+            0,
+        )
+    coord.client.set_default_charge_level = AsyncMock(return_value={})
+    coord.async_request_refresh = AsyncMock()
+    number = DefaultChargeLevelNumber(coord, RANDOM_SERIAL)
+    number.async_write_ha_state = MagicMock()
+    coord.async_add_listener(number._handle_coordinator_update)  # noqa: SLF001
+    assert number.native_value is None
+
+    await number.async_set_native_value(12)
+    coord.client.set_default_charge_level.assert_awaited_once_with(RANDOM_SERIAL, 12)
+    assert coord.control_updates.status(RANDOM_SERIAL) == "pending"
+    coord.client.charger_config = AsyncMock(
+        return_value=[{"key": DEFAULT_CHARGE_LEVEL_SETTING, "value": "12.0"}]
+    )
     result = await coord.evse_runtime.async_get_charger_config(
         RANDOM_SERIAL, keys=[DEFAULT_CHARGE_LEVEL_SETTING]
     )

@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Treat non-finite IQ EV Charger current readback as unset so malformed values cannot block current changes or erase the last confirmed value during a pending write.
 
 ### 🔧 Improvements
 - None
