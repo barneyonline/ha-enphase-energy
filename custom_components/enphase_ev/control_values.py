@@ -135,7 +135,7 @@ def confirmed_control_values(
         )
         try:
             value = int(float(str(value).strip()))
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OverflowError):
             value = None
         return {"amps": value}
     if control == "charging":
