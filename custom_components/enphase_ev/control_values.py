@@ -134,7 +134,7 @@ def confirmed_control_values(
             else data.get("default_charge_level")
         )
         try:
-            value = int(str(value))
+            value = int(float(str(value).strip()))
         except (ValueError, TypeError):
             value = None
         return {"amps": value}
