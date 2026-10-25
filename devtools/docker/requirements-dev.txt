@@ -3,6 +3,7 @@
 -c constraints-dev.txt
 homeassistant==2026.10.0
 pytest-homeassistant-custom-component==0.13.371
+packaging==26.3
 mypy==2.2.0
 ruff==0.16.4
 black==26.10.1
