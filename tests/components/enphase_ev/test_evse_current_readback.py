@@ -11,10 +11,11 @@ from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("decimal_strings", [False, True])
 @pytest.mark.parametrize("summary_default", ["disabled", "16", None])
 @pytest.mark.parametrize("initial_default", [6, None])
 async def test_default_current_survives_write_readback_and_summary(
-    coordinator_factory, summary_default, initial_default
+    coordinator_factory, summary_default, initial_default, decimal_strings
 ):
     """Summary labels and older defaults cannot overwrite config readback."""
     coord = coordinator_factory(serials=[RANDOM_SERIAL])
@@ -64,7 +65,10 @@ async def test_default_current_survives_write_readback_and_summary(
     coord.async_request_refresh = coord.async_refresh
     for amps in (12, 10, 9, 8):
         coord.client.charger_config.return_value = [
-            {"key": DEFAULT_CHARGE_LEVEL_SETTING, "value": str(amps)}
+            {
+                "key": DEFAULT_CHARGE_LEVEL_SETTING,
+                "value": f"{amps}.0" if decimal_strings else str(amps),
+            }
         ]
         coord.client.status.return_value["evChargerData"][0]["chargingLevel"] = amps
         await number.async_set_native_value(amps)
