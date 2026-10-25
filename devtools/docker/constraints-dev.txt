@@ -43,7 +43,7 @@ boto3==1.43.111
 botocore==1.43.111
 btsocket==0.3.0
 build==1.6.1
-certifi==2026.10.19
+certifi==2026.10.23
 cffi==2.1.1
 cfgv==3.5.0
 charset-normalizer==3.5.2
@@ -164,7 +164,7 @@ ulid-transform==2.2.9
 unidiff==1.0.1
 urllib3==2.8.0
 usb-devices==0.5.1
-uv==0.12.23
+uv==0.13.4
 virtualenv==21.14.9
 voluptuous==0.16.0
 webrtc-models==0.3.0
