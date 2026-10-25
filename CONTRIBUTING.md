@@ -126,6 +126,14 @@ regenerate that lane's constraints, and validate it in Docker. Preserve the
 exact dependency stack for the supported minimum Home Assistant version. Do not
 override their dependency pins independently to clear an alert.
 
+Home Assistant 2026.10.0 also requires `uv==0.12.23` and `Pillow==12.3.0`.
+Their advisories remain open in the minimum-version test lane until a compatible
+Home Assistant upgrade is possible. Security updates to dependencies whose
+allowed ranges include the patched versions, such as `certifi`, `filelock`, and
+`virtualenv`, can be pinned independently after rebuilding and validating the
+lane. Keep the Black requirement, constraint, and pre-commit hook aligned when
+updating the formatter.
+
 The `open-pull-requests-limit: 0` setting only disables version-update PRs;
 the explicit `ignore` rules suppress security-update PRs for these four
 packages. Neither setting disables Dependabot alerts. See GitHub's
