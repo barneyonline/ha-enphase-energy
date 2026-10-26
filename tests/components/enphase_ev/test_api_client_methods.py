@@ -5140,6 +5140,25 @@ async def test_set_battery_profile_uses_canonical_batteryconfig_write_path() -> 
     assert kwargs["headers"]["X-Requested-With"] is None
 
 
+@pytest.mark.parametrize("subtype", ["prioritize-energy", "", None])
+@pytest.mark.asyncio
+async def test_set_battery_profile_preserves_explicit_empty_subtype(subtype) -> None:
+    client = _make_client()
+    client._acquire_xsrf_token = AsyncMock(return_value="fresh-xsrf")  # noqa: SLF001
+    client._json = _RequestMock(return_value={"message": "success"})
+
+    await client.set_battery_profile(
+        profile="cost_savings",
+        battery_backup_percentage=21,
+        operation_mode_sub_type=subtype,
+    )
+
+    expected = {"profile": "cost_savings", "batteryBackupPercentage": 21}
+    if subtype is not None:
+        expected["operationModeSubType"] = subtype
+    assert client._json.await_args.kwargs["json"] == expected
+
+
 def test_battery_config_endpoint_family_identifies_schedule_routes() -> None:
     client = _make_client()
 
@@ -7090,6 +7109,29 @@ async def test_set_battery_settings_compat_builds_merged_payload_without_devices
     assert (
         client._battery_config_write_request.await_args.kwargs["strip_devices"] is True
     )
+
+
+@pytest.mark.parametrize("subtype", ["prioritize-energy", ""])
+@pytest.mark.asyncio
+async def test_battery_reserve_write_preserves_readback_subtype(subtype) -> None:
+    client = _make_client()
+    client._remember_battery_config_write_base(  # noqa: SLF001
+        "battery_settings",
+        {"data": {"profile": "cost_savings", "operationModeSubType": subtype}},
+    )
+    client._battery_config_write_request = AsyncMock(  # noqa: SLF001
+        return_value={"message": "success"}
+    )
+
+    await client.set_battery_settings_compat(
+        {"batteryBackupPercentage": 30}, merged_payload=True, strip_devices=True
+    )
+
+    assert client._battery_config_write_request.await_args.kwargs["json_body"] == {
+        "profile": "cost_savings",
+        "operationModeSubType": subtype,
+        "batteryBackupPercentage": 30,
+    }
 
 
 @pytest.mark.asyncio
