@@ -11,14 +11,34 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- Send and read back the explicit empty Savings subtype when Use Battery After Peak Hours is off, allowing authoritative readback to confirm the change. (#972)
-- Treat non-finite IQ EV Charger current readback as unset so malformed values cannot block current changes or erase the last confirmed value during a pending write.
+- None
 
 ### 🔧 Improvements
 - None
 
 ### 🔄 Other changes
 - None
+
+## v5.2.2 - 2026-10-26
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Send and read back the explicit empty Savings subtype when Use Battery After Peak Hours is off, allowing authoritative readback to confirm the change. (#972)
+- Accept decimal IQ EV Charger Default Charge Level readback such as `10.0` so successful current changes can confirm. (#959)
+- Treat non-finite IQ EV Charger current readback as unset so malformed values cannot block current changes or erase the last confirmed value during a pending write.
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Update compatible development dependencies and limit local pins to repository-managed dependencies while preserving the minimum Home Assistant test stack. (#967, #969)
+- Update `astral-sh/setup-uv` from `10.3.0` to `10.3.2` in CI workflows. (#970)
+- Bump the integration manifest version to `5.2.2`.
 
 ## v5.2.1 - 2026-10-25
 
