@@ -1678,7 +1678,7 @@ async def set_battery_profile(
         "profile": str(profile),
         "batteryBackupPercentage": int(battery_backup_percentage),
     }
-    if operation_mode_sub_type:
+    if operation_mode_sub_type is not None:
         payload["operationModeSubType"] = str(operation_mode_sub_type)
     if devices:
         payload["devices"] = [item for item in devices if isinstance(item, dict)]

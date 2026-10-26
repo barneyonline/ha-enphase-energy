@@ -6760,7 +6760,7 @@ Response:
 Notes:
 - Verified working profile response body remains the compact success envelope:
   - `{"message":"success"}`
-- The reserve slider enforces a 10% minimum (Self-Consumption) and 100% for Full Backup. The Savings profile uses a reserve slider plus a "Use battery after peak hours" toggle; `operationModeSubType` appears to track this state (only `prioritize-energy` observed so far).
+- The reserve slider enforces a 10% minimum (Self-Consumption) and 100% for Full Backup. The Savings profile uses a reserve slider plus a "Use battery after peak hours" toggle; `operationModeSubType` is `"prioritize-energy"` for on and `""` for off. Savings writes must include the subtype even when empty; omission does not request off. Explicit empty readback clears the subtype, while an omitted or null field retains the previous Savings subtype. These empty-value semantics are supported by the UI payload and alternating profile-write/readback evidence in [issue #972](https://github.com/barneyonline/ha-enphase-energy/issues/972); the separately reported gateway queue/auth-path behavior is not resolved by this contract.
 - The AI Optimization flow uses the profile key `ai_optimisation` and also sends `operationModeSubType: "prioritize-energy"` with the EVSE device payload.
 - Switching away from AI Optimization may still include an EVSE `devices` payload. In the observed AI -> Self-Consumption transition, the EVSE payload included `profileConfig: "full"` and `chargeMode: "SMART"`.
 - After saving a mode change, the profile may remain in a pending state until the change takes effect. During this window, a separate cancel endpoint can be used.

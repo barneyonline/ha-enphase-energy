@@ -185,7 +185,85 @@ async def test_savings_subtype_payload_on_and_off(coordinator_factory) -> None:
     coord._battery_profile_last_write_mono = time.monotonic() - 10  # noqa: SLF001
     await coord.async_set_savings_use_battery_after_peak(False)
     kwargs = coord.client.set_battery_profile.await_args.kwargs
-    assert kwargs["operation_mode_sub_type"] is None
+    assert kwargs["operation_mode_sub_type"] == ""
+
+
+@pytest.mark.asyncio
+async def test_savings_off_requires_explicit_authoritative_readback(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    coord._battery_profile = "cost_savings"  # noqa: SLF001
+    coord._battery_backup_percentage = 21  # noqa: SLF001
+    coord._battery_operation_mode_sub_type = "prioritize-energy"  # noqa: SLF001
+    coord._battery_show_savings_mode = True  # noqa: SLF001
+    coord._battery_show_charge_from_grid = True  # noqa: SLF001
+    coord.async_request_refresh = AsyncMock()
+    coord.client.set_battery_profile = AsyncMock(return_value={"message": "success"})
+
+    await coord.async_set_savings_use_battery_after_peak(False)
+
+    assert coord.client.set_battery_profile.await_args.kwargs == {
+        "profile": "cost_savings",
+        "battery_backup_percentage": 21,
+        "operation_mode_sub_type": "",
+        "devices": None,
+    }
+    assert coord.battery_pending_operation_mode_sub_type is None
+    assert coord.savings_use_battery_after_peak is True
+    assert coord.battery_profile_pending is True
+
+    # A matching profile/reserve with no subtype cannot confirm Savings off.
+    coord.battery_runtime.parse_battery_profile_payload(
+        _profile_payload(profile="cost_savings", reserve=21)
+    )
+    assert coord.savings_use_battery_after_peak is True
+    assert coord.battery_profile_pending is True
+
+    # Settings alone cannot override a write awaiting authoritative readback.
+    coord.battery_runtime.parse_battery_settings_payload(
+        _profile_payload(profile="cost_savings", reserve=21, subtype="")
+    )
+    assert coord.savings_use_battery_after_peak is True
+    assert coord.battery_profile_pending is True
+
+    coord.battery_runtime.parse_battery_profile_payload(
+        _profile_payload(profile="cost_savings", reserve=21, subtype="")
+    )
+    assert coord.savings_use_battery_after_peak is False
+    assert coord.battery_profile_pending is False
+
+
+@pytest.mark.parametrize("subtype", [None, "prioritize-energy"])
+@pytest.mark.parametrize("write", ["reserve", "profile"])
+@pytest.mark.asyncio
+async def test_savings_reserve_and_profile_writes_preserve_subtype(
+    coordinator_factory, subtype, write
+) -> None:
+    coord = coordinator_factory()
+    coord._battery_profile = "cost_savings"  # noqa: SLF001
+    coord._battery_backup_percentage = 21  # noqa: SLF001
+    coord._battery_operation_mode_sub_type = subtype  # noqa: SLF001
+    coord._battery_show_savings_mode = True  # noqa: SLF001
+    coord._battery_show_charge_from_grid = True  # noqa: SLF001
+    coord._battery_show_battery_backup_percentage = True  # noqa: SLF001
+    coord._battery_user_is_owner = True  # noqa: SLF001
+    coord.async_request_refresh = AsyncMock()
+    coord.client.set_battery_profile = AsyncMock(return_value={"message": "success"})
+    coord.client.set_battery_settings_compat = AsyncMock(return_value={})
+
+    if write == "reserve":
+        await coord.async_set_battery_reserve(30)
+        coord.client.set_battery_settings_compat.assert_awaited_once_with(
+            {"batteryBackupPercentage": 30}, merged_payload=True, strip_devices=True
+        )
+        coord.client.set_battery_profile.assert_not_awaited()
+    else:
+        await coord.battery_runtime.async_set_system_profile("cost_savings")
+        assert coord.client.set_battery_profile.await_args.kwargs[
+            "operation_mode_sub_type"
+        ] == (subtype or "")
+    assert coord.battery_pending_operation_mode_sub_type == subtype
 
 
 @pytest.mark.asyncio
