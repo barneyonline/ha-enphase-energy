@@ -2348,7 +2348,12 @@ class BatteryRuntime:
                 await coord.client.set_battery_profile(
                     profile=normalized_profile,
                     battery_backup_percentage=normalized_reserve,
-                    operation_mode_sub_type=normalized_sub_type,
+                    operation_mode_sub_type=(
+                        ""
+                        if normalized_profile == "cost_savings"
+                        and normalized_sub_type is None
+                        else normalized_sub_type
+                    ),
                     devices=None,
                 )
             except aiohttp.ClientResponseError as err:
@@ -2815,10 +2820,10 @@ class BatteryRuntime:
             )
         if subtype is not None and not stale_profile_read:
             state._battery_operation_mode_sub_type = subtype
-        elif not stale_profile_read and profile not in {
-            "cost_savings",
-            "ai_optimisation",
-        }:
+        elif not stale_profile_read and (
+            data.get("operationModeSubType") == ""
+            or profile not in {"cost_savings", "ai_optimisation"}
+        ):
             state._battery_operation_mode_sub_type = None
         if supports_mqtt is not None:
             state._battery_supports_mqtt = supports_mqtt
@@ -3253,11 +3258,10 @@ class BatteryRuntime:
         if settings_subtype is not None and not stale_profile_read:
             state._battery_operation_mode_sub_type = settings_subtype
         elif not stale_profile_read and (
-            settings_profile or state._battery_profile
-        ) not in {
-            "cost_savings",
-            "ai_optimisation",
-        }:
+            data.get("operationModeSubType") == ""
+            or (settings_profile or state._battery_profile)
+            not in {"cost_savings", "ai_optimisation"}
+        ):
             state._battery_operation_mode_sub_type = None
         storm_state = self.normalize_storm_guard_state(data.get("stormGuardState"))
         if storm_state is not None:
