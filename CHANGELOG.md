@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- Send and read back the explicit empty Savings subtype when Use Battery After Peak Hours is off, allowing authoritative readback to confirm the change. (#972)
 - Treat non-finite IQ EV Charger current readback as unset so malformed values cannot block current changes or erase the last confirmed value during a pending write.
 
 ### 🔧 Improvements
