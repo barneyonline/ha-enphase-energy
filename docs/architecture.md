@@ -185,6 +185,14 @@ contain legacy private-method fallback; feature code uses public host services.
 `battery_grid_helpers.py` owns pure grid-relay payload traversal and normalization,
 with compatibility methods retained on the battery runtime.
 
+Clearing the shared HEMS authentication pause also releases inventory and
+heat-pump runtime delays inherited from that pause. This applies to the manual
+Clear HEMS Auth Backoff action, natural expiry, successful HEMS reads, and
+credential replacement. Runtimes retain cached payloads and unrelated endpoint
+cooldowns; entities recover only after successful readback. Clearing backoff
+does not obtain missing credentials. Use the integration options' Authentication
+menu to start reauthentication when the stored credentials are incomplete.
+
 An entry's public `runtime_active` boundary prevents retired coordinators from
 publishing updates, refreshing, or retaining new background tasks. Unload retires
 the runtime before awaited resource cleanup. Tariff follow-up stages check that

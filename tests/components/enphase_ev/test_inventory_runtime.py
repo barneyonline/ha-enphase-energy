@@ -2657,6 +2657,24 @@ async def test_inventory_runtime_skips_hems_devices_during_auth_circuit(
 
 
 @pytest.mark.asyncio
+async def test_hems_recovery_preserves_inventory_cache_replaced_after_auth_pause(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.inventory_runtime
+    coord._note_hems_auth_failure(  # noqa: SLF001
+        api.Unauthorized(), endpoint="hems_devices"
+    )
+    await runtime._async_refresh_hems_devices(force=True)  # noqa: SLF001
+    replacement_deadline = time.monotonic() + 300
+    runtime._hems_devices_cache_until = replacement_deadline  # noqa: SLF001
+
+    coord.note_hems_auth_success(endpoint="hems_energy_consumption")
+
+    assert runtime._hems_devices_cache_until == replacement_deadline  # noqa: SLF001
+
+
+@pytest.mark.asyncio
 async def test_inventory_runtime_hems_devices_auth_failure_uses_circuit(
     coordinator_factory,
 ) -> None:

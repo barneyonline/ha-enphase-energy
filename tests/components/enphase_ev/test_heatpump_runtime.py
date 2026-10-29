@@ -2399,6 +2399,115 @@ async def test_heatpump_runtime_skips_hems_polling_during_auth_circuit(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("recovery", ["manual", "success", "tokens", "expiry"])
+async def test_hems_recovery_releases_inventory_and_runtime_retry_delays(
+    coordinator_factory, config_entry, monkeypatch, recovery
+) -> None:
+    """A cleared shared pause must permit normal, non-forced HEMS readback."""
+
+    coord = coordinator_factory(serials=[])
+    coord.config_entry = config_entry
+    runtime = coord.heatpump_runtime
+    inventory = coord.inventory_runtime
+    _seed_heatpump_auth_test_topology(coord)
+    coord.client._hems_site_supported = True  # noqa: SLF001
+    coord.client.hems_heatpump_state = AsyncMock(
+        return_value={
+            "device_uid": "HP-1",
+            "heatpump_status": "IDLE",
+            "sg_ready_mode_raw": "MODE_3",
+        }
+    )
+    coord.client.hems_devices = AsyncMock(return_value={"data": []})
+    coord.async_request_refresh = AsyncMock()
+    coord._note_hems_auth_failure(  # noqa: SLF001
+        api.Unauthorized(), endpoint="hems_devices"
+    )
+    deadline = coord._hems_auth_backoff_until  # noqa: SLF001
+    assert deadline is not None
+    cached_inventory = {
+        "data": {
+            "hems-devices": {
+                "heat-pump": [
+                    {
+                        "device-type": "HEAT_PUMP",
+                        "device-uid": "HP-1",
+                        "name": "Heat Pump",
+                    }
+                ]
+            }
+        }
+    }
+    inventory._hems_devices_payload = cached_inventory  # noqa: SLF001
+
+    await runtime.async_refresh_heatpump_runtime_state(force=True)
+    await inventory._async_refresh_hems_devices(force=True)  # noqa: SLF001
+    assert runtime.heatpump_runtime_state_refresh_due() is False
+    assert inventory.hems_devices_refresh_due() is False
+    coord.client.hems_heatpump_state.assert_not_awaited()
+    coord.client.hems_devices.assert_not_awaited()
+
+    # Other requests can extend the shared pause after a runtime copied its deadline.
+    coord._note_hems_auth_failure(  # noqa: SLF001
+        api.Unauthorized(), endpoint="hems_energy_consumption"
+    )
+    assert coord._hems_auth_backoff_until > deadline  # noqa: SLF001
+    if recovery == "manual":
+        response = await coord.async_clear_hems_auth_backoff()
+        assert response["success"] is True
+        coord.async_request_refresh.assert_awaited_once_with()
+    elif recovery == "success":
+        coord.note_hems_auth_success(endpoint="hems_energy_consumption")
+    elif recovery == "tokens":
+        coord._persist_tokens(  # noqa: SLF001
+            api.AuthTokens(cookie="COOKIE", access_token="NEW-EAUTH")
+        )
+        assert config_entry.data["e_auth_token"] == "NEW-EAUTH"
+    else:
+        retry_at = coord._hems_auth_backoff_until  # noqa: SLF001
+        monkeypatch.setattr(time, "monotonic", lambda: retry_at + 1)
+        assert coord._hems_auth_circuit_active() is False  # noqa: SLF001
+
+    # Clearing the delay must not publish a fabricated or previously absent value.
+    assert coord.heatpump_runtime_state == {}
+    assert inventory._hems_devices_payload == cached_inventory  # noqa: SLF001
+    assert runtime.heatpump_runtime_state_refresh_due() is True
+    assert inventory.hems_devices_refresh_due() is True
+
+    await runtime.async_refresh_heatpump_runtime_state()
+    coord.client.hems_heatpump_state.assert_awaited_once_with(
+        device_uid="HP-1", timezone="UTC"
+    )
+    assert coord.heatpump_runtime_state["heatpump_status"] == "IDLE"
+    assert coord.heatpump_runtime_state_last_error is None
+    await inventory._async_refresh_hems_devices()  # noqa: SLF001
+    coord.client.hems_devices.assert_awaited_once_with(refresh_data=False)
+
+
+def test_hems_recovery_preserves_unrelated_runtime_delays(coordinator_factory):
+    coord = coordinator_factory(serials=[])
+    runtime = coord.heatpump_runtime
+    inventory = coord.inventory_runtime
+    _seed_heatpump_auth_test_topology(coord)
+    coord._note_hems_auth_failure(  # noqa: SLF001
+        api.Unauthorized(), endpoint="hems_devices"
+    )
+    deadline = time.monotonic() + 600
+    inventory._hems_devices_cache_until = deadline  # noqa: SLF001
+    runtime._heatpump_runtime_state_last_error = "HTTP 503"  # noqa: SLF001
+    runtime._heatpump_runtime_state_cache_until = deadline  # noqa: SLF001
+    runtime._heatpump_runtime_state_backoff_until = deadline  # noqa: SLF001
+    runtime._heatpump_power_backoff_until = deadline  # noqa: SLF001
+
+    coord.note_hems_auth_success(endpoint="hems_energy_consumption")
+
+    assert inventory._hems_devices_cache_until == deadline  # noqa: SLF001
+    assert runtime._heatpump_runtime_state_cache_until == deadline  # noqa: SLF001
+    assert runtime._heatpump_runtime_state_backoff_until == deadline  # noqa: SLF001
+    assert runtime._heatpump_power_backoff_until == deadline  # noqa: SLF001
+
+
+@pytest.mark.asyncio
 async def test_heatpump_runtime_isolates_hems_auth_failures(
     coordinator_factory,
     monkeypatch,
