@@ -196,6 +196,7 @@ class InventoryRuntime:
         self.coordinator = coordinator
         self.health = RuntimeHealthServices(coordinator)
         self.auth = RuntimeAuthServices(coordinator)
+        self._hems_devices_auth_backoff_until: float | None = None
         self._inverter_parameter_last_request_mono: float | None = None
         self._inverter_diagnostic_attempts: dict[str, float] = {}
         self.discovery_state = coordinator.discovery_state
@@ -2423,13 +2424,14 @@ class InventoryRuntime:
         """Keep HEMS inventory stale while the coordinator auth circuit is open."""
 
         coord = self.coordinator
+        self._hems_devices_auth_backoff_until = (
+            getattr(coord, "_hems_auth_backoff_until", None) or now + cache_ttl
+        )
         self._update_shared_state(
             _hems_devices_payload=previous_payload,
             _hems_devices_using_stale=previous_payload is not None,
             _hems_inventory_ready=True,
-            _hems_devices_cache_until=(
-                getattr(coord, "_hems_auth_backoff_until", None) or now + cache_ttl
-            ),
+            _hems_devices_cache_until=self._hems_devices_auth_backoff_until,
         )
         self._merge_heatpump_type_bucket()
         self._debug_log_summary_if_changed(
@@ -2437,6 +2439,16 @@ class InventoryRuntime:
             "HEMS discovery summary",
             self._debug_hems_inventory_summary(),
         )
+
+    def clear_hems_auth_backoff(self) -> None:
+        """Release an inventory cache delay inherited from the shared auth pause."""
+
+        if (
+            self._hems_devices_auth_backoff_until is not None
+            and self._hems_devices_cache_until == self._hems_devices_auth_backoff_until
+        ):
+            self._set_shared_state_attr("_hems_devices_cache_until", None)
+        self._hems_devices_auth_backoff_until = None
 
     def _mark_hems_inventory_polling_disabled(self) -> None:
         """Discard Heat Pump HEMS inventory state when its group is disabled."""
