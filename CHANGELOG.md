@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🔄 Other changes
 - Classify the integration under Energy for Home Assistant Marketplace discovery.
+- Skip full integration tests on pull requests limited to descriptive manifest metadata while retaining hassfest, HACS, lint, and quality checks.
 
 ## v5.2.2 - 2026-10-26
 
