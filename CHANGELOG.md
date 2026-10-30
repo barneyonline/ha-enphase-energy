@@ -11,13 +11,97 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Release HEMS inventory and heat-pump runtime retry delays when their authentication backoff is cleared, expires, or recovers, so normal polling can resume without waiting for the previous pause. (#975)
 
 ### 🔧 Improvements
 - None
 
 ### 🔄 Other changes
 - Classify the integration under Energy for Home Assistant Marketplace discovery.
+
+## v5.2.2 - 2026-10-26
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Send and read back the explicit empty Savings subtype when Use Battery After Peak Hours is off, allowing authoritative readback to confirm the change. (#972)
+- Accept decimal IQ EV Charger Default Charge Level readback such as `10.0` so successful current changes can confirm. (#959)
+- Treat non-finite IQ EV Charger current readback as unset so malformed values cannot block current changes or erase the last confirmed value during a pending write.
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Update compatible development dependencies and limit local pins to repository-managed dependencies while preserving the minimum Home Assistant test stack. (#967, #969)
+- Update `astral-sh/setup-uv` from `10.3.0` to `10.3.2` in CI workflows. (#970)
+- Bump the integration manifest version to `5.2.2`.
+
+## v5.2.1 - 2026-10-25
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Keep service-status probes and report generation running when a remote server closes the connection without a response.
+- Compare battery reserve writes with the confirmed displayed value so repeating a pending target reaches the normal conflict guard or retry path instead of silently returning. (#960)
+- Expose local and cloud pending state, requested reserve, and the owning control update status on Battery Reserve, and identify its BatteryConfig source so automations can distinguish outstanding intent from readback. The reported cloud/gateway reserve mismatch remains under investigation. (#960)
+- Keep the IQ EV Charger Default Charge Level numeric after changes by prioritizing configuration readback over summary data and retaining the last confirmed current while numeric readback is pending. (#959)
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- Bump the integration manifest version to `5.2.1`.
+
+## v5.2.0 - 2026-10-24
+
+### 🚧 Breaking changes
+- Require Home Assistant `2026.10.0` or newer (Python `3.14`+).
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Normalize live battery "Savings Mode" readings so the Savings profile displays correctly, its after-peak control remains available, and profile writes confirm, while preserving AI Optimisation selections. (#952)
+
+### 🔧 Improvements
+- Use Home Assistant's target-selection API directly and avoid repeated target expansion while resolving service devices and sites.
+- Remove obsolete service-target, device-ownership, and polling-interval compatibility paths and their unused tests.
+- Remove 31 unused coordinator forwarding methods and the redundant device-lookup wrapper.
+- Restore Production, Grid, Battery, and Consumption Power immediately after a short Home Assistant restart using the last two accepted readings and their original freshness deadlines. Keep validated calculation baselines separate from startup placeholders and cached display values.
+- On Home Assistant 2026.11 and newer, hide the manual Slew Rate in Export Limit Defaults while Restore Slew Rate is checked. Older supported versions keep the existing form; restoring still clears the override after fresh gateway readback.
+
+### 🔄 Other changes
+- Run the full CI suite on the pinned Home Assistant `2026.10.0` stack and remove the duplicate minimum-version environment and compatibility job.
+- Update pinned hassfest validation to Home Assistant `2026.10.2` and HACS validation to Home Assistant `2026.10.0`.
+- Bump the integration manifest version to `5.2.0`.
+
+## v5.1.5 - 2026-10-23
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
+- Preserve the original freshness of retained Grid/Battery Power after rejected calculations or source reseeds so Consumption Power cannot treat old watts as fresh. Ignore incomplete source placeholders and report cached upstream inputs.
+- Keep coordinator outage deadlines separate from accepted power-source clocks so polling recovery restores still-fresh readings, and discard out-of-range restored power history without failing entity setup.
+- Recover Grid/Battery Power after an initial rejected or reseeded calculation without requiring a reload or a previously accepted reading.
+- Prevent stale or future-dated responses from changing Grid/Battery Power calculation baselines and distorting the next valid reading.
+
+### 🔧 Improvements
+- Include the current power-balance blocking source/reason and effective contributing freshness clocks in consumption diagnostics, separately from historical consumption-bucket rejections.
+
+### 🔄 Other changes
+- Bump the integration manifest version to `5.1.5`.
 
 ## v5.1.4 - 2026-10-21
 

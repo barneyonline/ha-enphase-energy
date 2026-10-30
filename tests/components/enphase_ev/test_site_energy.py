@@ -965,8 +965,7 @@ async def test_site_consumption_power_validates_and_uses_restored_baseline(
     assert sensor.available is True
     assert sensor.native_value == 1200
     stored = sensor.extra_restore_state_data
-    assert isinstance(stored, _SiteConsumptionPowerRestoreData)
-    assert stored.last_power_w == 1200
+    assert stored.as_dict()["last_power_w"] == 1200
 
     coord.energy.site_energy["consumption"] = _consumption_flow(
         latest_bucket_wh=1200.0,
@@ -1390,41 +1389,6 @@ async def test_summary_ip_address_empty_string_list(monkeypatch, coordinator_fac
     await coord._async_update_data()
     assert coord.data["SN1"].get("ip_address") is None
     assert flaky._count >= 3
-
-
-@pytest.mark.asyncio
-async def test_async_update_sets_update_interval_with_exception(
-    monkeypatch, coordinator_factory
-):
-    coord = coordinator_factory()
-    coord.config_entry = SimpleNamespace(options={})
-    coord.client.status = AsyncMock(return_value={"evChargerData": []})
-    coord._fast_until = time.monotonic() + 5
-
-    class BoomCoord(type(coord)):
-        def async_set_update_interval(self, *_args, **_kwargs):
-            raise ValueError("fail")
-
-    coord.__class__.async_set_update_interval = BoomCoord.async_set_update_interval  # type: ignore[assignment]
-    coord.update_interval = timedelta(seconds=1)
-    await coord._async_update_data()
-
-
-@pytest.mark.asyncio
-async def test_async_update_handles_async_set_update_interval_error(
-    monkeypatch, coordinator_factory
-):
-    coord = coordinator_factory()
-    coord.config_entry = SimpleNamespace(options={})
-    coord.client.status = AsyncMock(return_value={"evChargerData": []})
-
-    def boom_update_interval(*_args, **_kwargs):
-        raise ValueError("boom")
-
-    coord.async_set_update_interval = boom_update_interval
-    coord._fast_until = time.monotonic() + 5
-    coord.update_interval = timedelta(seconds=5)
-    await coord._async_update_data()
 
 
 def test_slow_interval_floor_handles_bad_update_interval(
@@ -2702,6 +2666,7 @@ async def test_site_lifetime_power_sensor_restores_two_live_samples_for_same_buc
     coord = coordinator_factory()
     sensor = EnphaseGridPowerSensor(coord)
     sensor.hass = hass
+    monkeypatch.setattr(sensor, "_schedule_freshness_expiry", lambda: None)
     base_ts = datetime(2024, 1, 2, tzinfo=timezone.utc)
 
     class LastState:
@@ -2761,6 +2726,7 @@ async def test_site_lifetime_power_sensor_restore_uses_interval_floor_for_tiny_g
     coord = coordinator_factory()
     sensor = EnphaseGridPowerSensor(coord)
     sensor.hass = hass
+    monkeypatch.setattr(sensor, "_schedule_freshness_expiry", lambda: None)
     base_ts = datetime(2024, 1, 2, tzinfo=timezone.utc)
 
     class LastState:

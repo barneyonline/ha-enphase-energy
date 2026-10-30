@@ -374,6 +374,7 @@ rules:
       tests:
         - tests/components/enphase_ev/test_diagnostics.py
         - tests/components/enphase_ev/test_site_energy.py
+        - tests/components/enphase_ev/test_consumption_power_balance.py
       docs:
         - README.md
         - docs/architecture.md

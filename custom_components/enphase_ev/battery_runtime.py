@@ -103,6 +103,7 @@ _LIVE_BATTERY_MODE_PROFILE_ALIASES = {
     "backup only": "backup_only",
     "backup_only": "backup_only",
     "savings": "cost_savings",
+    "savings mode": "cost_savings",
     "cost savings": "cost_savings",
     "cost_savings": "cost_savings",
     "ai optimisation": "ai_optimisation",
@@ -388,7 +389,9 @@ class BatteryRuntime:
             return cast(str | None, func(sub_type))
         return None
 
-    def clear_battery_pending(self, *, clear_optimistic: bool = True) -> None:
+    def clear_battery_pending(
+        self, *, clear_optimistic: bool = True, clear_backend_pending: bool = True
+    ) -> None:
         state = self.battery_state
         state._battery_pending_profile = None
         state._battery_pending_reserve = None
@@ -397,7 +400,8 @@ class BatteryRuntime:
         state._battery_pending_requested_mono = None
         state._battery_pending_require_exact_settings = True
         state._battery_pending_authoritative_confirmation_required = False
-        state._battery_backend_profile_update_pending = None
+        if clear_backend_pending:
+            state._battery_backend_profile_update_pending = None
         state._battery_backend_not_pending_observed_at = None
         if clear_optimistic:
             self.clear_battery_optimistic_profile()
@@ -567,7 +571,10 @@ class BatteryRuntime:
                 state._battery_operation_mode_sub_type = pending_sub_type
             else:
                 state._battery_operation_mode_sub_type = None
-        self.clear_battery_pending()
+        # Matching configured readback resolves local intent, but Enphase can
+        # still report that its gateway update is pending. Keep that observation
+        # until another read supplies a new flag.
+        self.clear_battery_pending(clear_backend_pending=False)
 
     def clear_battery_settings_write_pending(self) -> None:
         self.battery_state._battery_settings_last_write_mono = None
@@ -2341,7 +2348,12 @@ class BatteryRuntime:
                 await coord.client.set_battery_profile(
                     profile=normalized_profile,
                     battery_backup_percentage=normalized_reserve,
-                    operation_mode_sub_type=normalized_sub_type,
+                    operation_mode_sub_type=(
+                        ""
+                        if normalized_profile == "cost_savings"
+                        and normalized_sub_type is None
+                        else normalized_sub_type
+                    ),
                     devices=None,
                 )
             except aiohttp.ClientResponseError as err:
@@ -2808,10 +2820,10 @@ class BatteryRuntime:
             )
         if subtype is not None and not stale_profile_read:
             state._battery_operation_mode_sub_type = subtype
-        elif not stale_profile_read and profile not in {
-            "cost_savings",
-            "ai_optimisation",
-        }:
+        elif not stale_profile_read and (
+            data.get("operationModeSubType") == ""
+            or profile not in {"cost_savings", "ai_optimisation"}
+        ):
             state._battery_operation_mode_sub_type = None
         if supports_mqtt is not None:
             state._battery_supports_mqtt = supports_mqtt
@@ -3246,11 +3258,10 @@ class BatteryRuntime:
         if settings_subtype is not None and not stale_profile_read:
             state._battery_operation_mode_sub_type = settings_subtype
         elif not stale_profile_read and (
-            settings_profile or state._battery_profile
-        ) not in {
-            "cost_savings",
-            "ai_optimisation",
-        }:
+            data.get("operationModeSubType") == ""
+            or (settings_profile or state._battery_profile)
+            not in {"cost_savings", "ai_optimisation"}
+        ):
             state._battery_operation_mode_sub_type = None
         storm_state = self.normalize_storm_guard_state(data.get("stormGuardState"))
         if storm_state is not None:

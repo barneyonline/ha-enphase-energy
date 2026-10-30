@@ -3,7 +3,7 @@
 from __future__ import annotations
 from typing import Any
 import voluptuous as vol
-from homeassistant import config_entries
+from homeassistant import config_entries, data_entry_flow
 from homeassistant.const import CONF_PASSWORD
 from homeassistant.data_entry_flow import FlowResult, section
 from homeassistant.exceptions import ServiceValidationError
@@ -983,7 +983,14 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                     self._export_snapshot = await self._export_runtime().async_prepare()
                     slew = validate_slew_rate(self._export_snapshot.slew)
                 else:
-                    slew = validate_slew_rate(user_input["slew_rate"])
+                    slew = validate_slew_rate(
+                        user_input.get(
+                            "slew_rate",
+                            self._entry.options.get(
+                                OPT_EXPORT_LIMIT_SLEW_RATE, self._export_snapshot.slew
+                            ),
+                        )
+                    )
             except ServiceValidationError as err:
                 errors["base"] = str(err.translation_key)
             else:
@@ -994,6 +1001,18 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 else:
                     options[OPT_EXPORT_LIMIT_SLEW_RATE] = slew
                 return self.async_create_entry(title="", data=options)
+        slew_default = self._entry.options.get(
+            OPT_EXPORT_LIMIT_SLEW_RATE, self._export_snapshot.slew
+        )
+        slew_field = vol.Required("slew_rate", default=slew_default)
+        # Older HA exposes typing.Required here, not the conditional form marker.
+        marker_type = getattr(data_entry_flow, "Required", None)
+        if isinstance(marker_type, type) and issubclass(marker_type, vol.Required):
+            slew_field = marker_type(
+                "slew_rate",
+                default=slew_default,
+                visible={"field": "restore_slew_rate", "value": False},
+            )
         return self.async_show_form(
             step_id="export_limit_defaults",
             data_schema=vol.Schema(
@@ -1014,12 +1033,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                             }
                         }
                     ),
-                    vol.Required(
-                        "slew_rate",
-                        default=self._entry.options.get(
-                            OPT_EXPORT_LIMIT_SLEW_RATE, self._export_snapshot.slew
-                        ),
-                    ): selector(
+                    slew_field: selector(
                         {
                             "number": {
                                 "min": 0.01,
@@ -1029,7 +1043,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                             }
                         }
                     ),
-                    vol.Optional("restore_slew_rate", default=False): bool,
+                    vol.Optional(
+                        "restore_slew_rate",
+                        default=(user_input or {}).get("restore_slew_rate", False),
+                    ): bool,
                 }
             ),
             errors=errors,

@@ -171,6 +171,85 @@ def test_backend_pending_flag_clears_stale_mismatched_request_after_grace(
     assert coord._battery_backend_not_pending_observed_at is None  # noqa: SLF001
 
 
+@pytest.mark.parametrize("parser", ["profile", "settings"])
+@pytest.mark.parametrize("profile", ["cost_savings", "ai_optimisation"])
+@pytest.mark.parametrize(
+    ("fields", "expected"),
+    [
+        ({}, SAVINGS_OPERATION_MODE_SUBTYPE),
+        ({"operationModeSubType": None}, SAVINGS_OPERATION_MODE_SUBTYPE),
+        ({"operationModeSubType": " "}, SAVINGS_OPERATION_MODE_SUBTYPE),
+        ({"operationModeSubType": ""}, None),
+    ],
+    ids=["omitted", "null", "whitespace", "explicit-empty"],
+)
+def test_savings_subtype_readback_distinguishes_empty_from_missing(
+    coordinator_factory, parser, profile, fields, expected
+) -> None:
+    coord = coordinator_factory()
+    coord._battery_profile = profile  # noqa: SLF001
+    coord._battery_operation_mode_sub_type = (
+        SAVINGS_OPERATION_MODE_SUBTYPE  # noqa: SLF001
+    )
+    parse = getattr(coord.battery_runtime, f"parse_battery_{parser}_payload")
+
+    parse({"data": {"profile": profile, **fields}})
+
+    assert coord.battery_effective_operation_mode_sub_type == expected
+
+
+@pytest.mark.parametrize("parser", ["profile", "settings"])
+def test_stale_empty_subtype_readback_preserves_pending_and_confirmed_state(
+    coordinator_factory, parser
+) -> None:
+    coord = coordinator_factory()
+    coord._battery_profile = "ai_optimisation"  # noqa: SLF001
+    coord._battery_backup_percentage = 21  # noqa: SLF001
+    coord._battery_operation_mode_sub_type = (
+        SAVINGS_OPERATION_MODE_SUBTYPE  # noqa: SLF001
+    )
+    runtime = coord.battery_runtime
+    runtime.set_battery_pending(
+        profile="ai_optimisation", reserve=21, sub_type=SAVINGS_OPERATION_MODE_SUBTYPE
+    )
+    parse = getattr(runtime, f"parse_battery_{parser}_payload")
+
+    parse({"data": {"profile": "cost_savings", "operationModeSubType": ""}})
+
+    assert (
+        coord._battery_operation_mode_sub_type  # noqa: SLF001
+        == SAVINGS_OPERATION_MODE_SUBTYPE
+    )
+    assert (
+        coord.battery_effective_operation_mode_sub_type
+        == SAVINGS_OPERATION_MODE_SUBTYPE
+    )
+    assert coord.battery_profile_pending is True
+
+
+def test_stale_settings_empty_subtype_cannot_override_authoritative_profile(
+    coordinator_factory,
+) -> None:
+    coord = coordinator_factory()
+    runtime = coord.battery_runtime
+    runtime.parse_battery_profile_payload(
+        {
+            "profile": "ai_optimisation",
+            "operationModeSubType": SAVINGS_OPERATION_MODE_SUBTYPE,
+        }
+    )
+
+    runtime.parse_battery_settings_payload(
+        {"profile": "cost_savings", "operationModeSubType": ""}
+    )
+
+    assert coord.battery_profile == "ai_optimisation"
+    assert (
+        coord.battery_effective_operation_mode_sub_type
+        == SAVINGS_OPERATION_MODE_SUBTYPE
+    )
+
+
 def test_stale_profile_reads_do_not_revert_accepted_write_after_grace(
     coordinator_factory, monkeypatch
 ) -> None:
@@ -607,7 +686,7 @@ def test_backend_pending_false_clears_when_effective_state_matches(
     runtime.sync_backend_battery_profile_pending(False)
 
     assert coord.battery_profile_pending is False
-    assert coord._battery_backend_profile_update_pending is None  # noqa: SLF001
+    assert coord._battery_backend_profile_update_pending is False  # noqa: SLF001
 
 
 def test_fresh_live_profile_sample_clears_pending_with_stale_configured_profile(
