@@ -5892,8 +5892,12 @@ class EnphaseCoordinator(
             or getattr(self, "_hems_auth_last_failure_utc", None)
             or int(getattr(self, "_hems_auth_failure_count", 0) or 0)
         )
+        backoff_until = getattr(self, "_hems_auth_backoff_until", None)
         self._hems_auth_backoff_until = None
         self._hems_auth_backoff_ends_utc = None
+        if backoff_until is not None:
+            self.inventory_runtime.clear_hems_auth_backoff()
+            self.heatpump_runtime.clear_hems_auth_backoff()
         if reset_failure_count:
             self._hems_auth_last_endpoint = None
             self._hems_auth_last_status = None

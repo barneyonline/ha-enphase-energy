@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
-- None
+- Release HEMS inventory and heat-pump runtime retry delays when their authentication backoff is cleared, expires, or recovers, so normal polling can resume without waiting for the previous pause. (#975)
 
 ### 🔧 Improvements
 - None
