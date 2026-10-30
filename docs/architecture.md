@@ -4,6 +4,12 @@ This document is a contributor map for the Enphase Energy integration. It explai
 
 ## Runtime Shape
 
+Home Assistant 2026.10.0 and Python 3.14 are the minimum supported versions.
+Service routing uses Home Assistant's target-selection API and reuses each
+expansion when resolving devices and entities. Device lookups use the
+entry-scoped registry API directly. Migrated composite device IDs remain valid
+saved targets and are resolved through their current split devices.
+
 Each Home Assistant config entry owns one `EnphaseCoordinator`. The coordinator is the integration boundary for entities: platforms read normalized state from the coordinator and call coordinator/service helpers for writes. Entities should not call the cloud client directly unless a local helper already establishes that pattern.
 
 ```mermaid
@@ -95,6 +101,10 @@ The options menu separates device category selection (Devices) from feature
 configuration (Features). Features contains Device Features and Advanced Features;
 the latter groups installer Grid Profile controls, Export Limit controls, and
 Microinverter Power.
+Export Limit Defaults conditionally hides the manual Slew Rate while Restore Slew
+Rate is checked on Home Assistant 2026.11 and newer. Older supported versions keep
+the unconditional form. Restoration ignores any manual value, reads fresh gateway
+settings, and clears the saved override; saving defaults never writes the gateway.
 Installer Grid Profile controls are also a default-off topology option. Disabled
 entries skip both the startup Activation probe and steady metadata refreshes;
 config-entry migration enables the option only when an existing Current Grid
@@ -119,6 +129,19 @@ still waits for inventory readiness so transient cloud discovery failures do not
 remove user-customized entities.
 
 ## Coordinator And Refresh Flow
+
+The EV charger's persistent Default Charge Level comes from charger configuration
+readback. Summary `chargeLevelDetails.defaultChargeLevel` is only a fallback when
+that field is absent; its older values and `disabled` label cannot overwrite
+configuration readback, including an explicit unset value. Startup summary
+enrichment follows the same precedence. While a default-current write awaits
+numeric readback, the number retains its last confirmed value and reports the
+pending command separately. Non-finite current values are treated as unset and
+cannot block a new current write. An acknowledgement alone does not confirm the write.
+Failed or cancelled commands accept subsequent unset readback. Fresh startup
+summary values can replace older summary fallbacks when config readback is absent.
+The Set Current sensor reports the session setpoint from charger status; this can
+differ from the persistent default until Enphase reports the updated session.
 
 `coordinator.py` owns polling cadence, auth refresh coordination, endpoint health, backoff state, runtime managers, and normalized integration state. `refresh_plan.py` defines which endpoint families are refreshed in each phase. `refresh_runner.py` executes those plans and isolates optional endpoint failures so one unhealthy Enphase service does not fail the whole coordinator refresh.
 
@@ -153,13 +176,22 @@ from the coordinator. Each config entry receives its own policy mapping and
 health state. Feature runtimes can use the public `endpoint_family_should_run`,
 `note_endpoint_family_success`, and `note_endpoint_family_failure` services;
 `CurrentPowerHost` is the narrow typed contract used by the current-power runtime.
-Existing private coordinator entry points remain available for compatibility.
+Private coordinator entry points with current callers remain available; unused
+forwarding methods have been removed.
 
 `runtime_health.py` defines narrow typed endpoint-health and HEMS authentication
 contracts used by battery, inventory, and heat-pump runtimes. The shared adapters
 contain legacy private-method fallback; feature code uses public host services.
 `battery_grid_helpers.py` owns pure grid-relay payload traversal and normalization,
 with compatibility methods retained on the battery runtime.
+
+Clearing the shared HEMS authentication pause also releases inventory and
+heat-pump runtime delays inherited from that pause. This applies to the manual
+Clear HEMS Auth Backoff action, natural expiry, successful HEMS reads, and
+credential replacement. Runtimes retain cached payloads and unrelated endpoint
+cooldowns; entities recover only after successful readback. Clearing backoff
+does not obtain missing credentials. Use the integration options' Authentication
+menu to start reauthentication when the stored credentials are incomplete.
 
 An entry's public `runtime_active` boundary prevents retired coordinators from
 publishing updates, refreshing, or retaining new background tasks. Unload retires
@@ -323,6 +355,18 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   Schedule comparison normalizes equivalent time, weekday, ID, and scalar
   representations without inventing missing readback fields. Follow-up profile
   edits use the confirmed profile and companion values shown by the controls.
+  Battery reserve writes equal to the confirmed displayed value are no-ops.
+  Repeating a different pending reserve target reaches the runtime conflict
+  guard; after the tracker timeout, retries retain normal write safeguards.
+  The reserve number identifies its source as `battery_config` and exposes
+  `pending`, `backend_pending`, `requested_reserve_percentage`, and
+  `control_update_status`. The owning profile transaction also supplies status
+  when it holds the reserve as a related control. Backend pending state remains
+  visible when there is no local transaction, including after a fresh setup.
+  Local confirmation preserves the last backend pending flag until a later read
+  replaces it; matching configured readback does not erase cloud pending state.
+  These values describe cloud configuration and command progress; neither a
+  successful fetch nor an idle tracker verifies the gateway's enforced reserve.
   Charger configuration must return the requested setting's value; malformed
   payloads and unrelated keys cannot confirm a cached setting. Alert opt-out
   confirmation requires explicit fresh alert state. Opt-in additionally confirms
@@ -730,6 +774,31 @@ Grid and Battery Power expose `freshness_reference_utc` separately from their
 calculation timestamp, so consumption also respects the oldest contributing flow
 when import/export or charge/discharge clocks differ. Stale numeric candidates
 cannot overwrite a still-valid retained balance or its original deadline.
+Rejected extreme/outlier calculations and cumulative-source reseeds preserve
+the accepted watts' `freshness_reference_utc`, even when the new payload clock
+advances. That bound survives restoration of a validated two-sample history.
+Coordinator outage deadlines apply separately to entity availability; they never
+replace the accepted source clock or the clock saved for restoration. Recovering
+core polling can therefore restore availability while the same source reading
+is still fresh, without renewing its original expiry. Out-of-range restored
+timestamps discard the restored history instead of failing entity setup.
+Normal coordinator publication can recover an expired reading as soon as a new
+valid delta is calculated. The same publication path processes recovery after an
+initial rejected or reseeded calculation, even before any accepted power clock
+exists. Availability cannot prevent the next valid sample from being evaluated.
+Recovery evaluation first validates the current source freshness deadline. Stale
+or future-dated responses cannot change cumulative baselines or the accepted
+clock, so the next valid reading uses the previous valid calculation window.
+Consumption marks retained source watts as
+`using_cached`, and ignores numeric `seeded`/`no_live_data` placeholders.
+
+Consumption diagnostics separate the current `power_balance_blocker` (source
+key and categorical reason) from `last_rejection`, which is historical rejection
+evidence for the consumption-bucket fallback. A healthy power balance can coexist
+with an older `missing_consumption` rejection. `power_balance_source_freshness`
+records the effective clock used for each input to the last accepted balance;
+`power_balance_source_timestamps` retains the reported calculation clocks.
+These clocks can differ for retained grid/battery watts and overnight production.
 
 Consumption Power persists its last valid power balance in Home Assistant's
 restore data, separately from the consumption-bucket delta baseline. During
@@ -741,6 +810,43 @@ also restore a numeric balance when their units and every required contributing
 source clock are valid. Missing, future, expired, malformed or extreme restored
 readings remain unavailable. Display restoration does not authorize a new delta
 calculation from the restored watts or bypass bucket-baseline validation.
+
+### Power Sensor Restart Continuity
+
+Production, Grid, Battery, and Consumption Power retain the last two distinct
+accepted readings in versioned private Home Assistant restore data. Each reading
+stores native watts, its source timestamp, its effective freshness reference,
+and calculation metadata. Production also preserves its acquisition timestamp.
+Repeated unchanged observations, rejected candidates, and restarts do not renew
+the accepted clocks. Successful overnight near-zero production acquisitions
+retain the existing acquisition-based freshness rule.
+
+Restoration finishes before entity freshness evaluation and first publication.
+Supported entities reuse persisted discovery metadata. A valid live reading takes
+priority; otherwise the newest eligible saved reading is published with
+`using_cached: true`, including while cloud inputs or dependent entities warm up.
+A corrupt newest record can fall back to the older valid record. Readings expire
+at their original 30-minute deadline through entity timers without another poll.
+This continuity starts once integration setup permits entity creation; it does
+not bypass authentication, setup failures, or coordinator health checks.
+
+Grid and Battery persist both cumulative samples, source signatures, and interval
+metadata privately, independently of display-state attributes. Their accepted
+watts are separate from mutable calculation baselines, so missing startup data
+and synthetic zero placeholders cannot erase the accepted history. Restored
+watts never become cumulative-energy samples. Source changes, resets, partial
+channels, and invalid deltas retain the existing baseline-validation safeguards.
+Consumption can bridge startup with either a saved balance or a saved accepted
+bucket-derived reading while its calculation baseline awaits live validation.
+The oldest contributing source still bounds balance freshness. Production exposes
+its effective `freshness_reference_utc` separately from acquisition time so a
+restored source cannot extend a dependent balance's deadline. Accepted cached
+watts retain their calculation metadata while a new cumulative baseline seeds;
+Consumption diagnostics describe the same reading as the displayed state.
+Malformed extra-data envelopes are ignored so live acquisition can recover.
+Existing restore formats remain readable conservatively; new records use watts regardless of a
+user's selected display unit. HA manages persistence for ordinary restarts and
+reloads; this does not guarantee the latest sample survives an abrupt power loss.
 
 `EnergyManager.site_energy_fetch_diagnostics` exposes detached, process-local
 attempt and cumulative failure counts, attempt/completion/success timestamps,

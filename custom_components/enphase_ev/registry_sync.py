@@ -18,9 +18,8 @@ from .device_info_helpers import (
     _normalize_evse_display_name,
     _normalize_evse_model_name as _normalize_evse_model_name,
 )
-from .device_registry_compat import (
+from .device_registry_helpers import (
     device_belongs_to_config_entry,
-    get_device_by_identifier,
 )
 from .device_types import (
     is_dry_contact_type_key,
@@ -122,7 +121,7 @@ def _sync_type_devices(
         kwargs["serial_number"] = serial_number
         kwargs["model_id"] = model_id
         kwargs["sw_version"] = sw_version
-        existing = get_device_by_identifier(dev_reg, ident, entry.entry_id)
+        existing = dev_reg.async_get_device_by_identifier(ident, entry.entry_id)
         changes: list[str] = []
         if existing is None:
             changes.append("new_device")
@@ -218,7 +217,7 @@ def _sync_charger_devices(
             kwargs["sw_version"] = str(sw)
 
         changes: list[str] = []
-        existing = get_device_by_identifier(dev_reg, (DOMAIN, sn), entry.entry_id)
+        existing = dev_reg.async_get_device_by_identifier((DOMAIN, sn), entry.entry_id)
         if existing is None:
             changes.append("new_device")
         else:

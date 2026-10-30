@@ -20,7 +20,6 @@ on:
       - 'devtools/docker/constraints*.txt'
       - 'devtools/docker/requirements-ci-quality.txt'
       - 'devtools/docker/requirements-ci-scripts.txt'
-      - 'devtools/docker/requirements-min-ha.txt'
       - 'devtools/docker/Dockerfile'
       - 'devtools/docker/docker-compose.yml'
       - 'hacs.json'

@@ -1077,17 +1077,9 @@ async def test_services_route_duplicate_serial_to_device_config_entry(
         entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
         object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
-    device = SimpleNamespace(
-        id="second-device",
-        identifiers={(DOMAIN, serial)},
+    device = dr.async_get(hass).async_get_or_create(
         config_entry_id=second_entry.entry_id,
-        via_device_id=None,
-    )
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.service_routing.dr.async_get",
-        lambda _hass: SimpleNamespace(
-            async_get=lambda device_id: device if device_id == device.id else None
-        ),
+        identifiers={(DOMAIN, serial)},
     )
 
     await handlers[(DOMAIN, "start_charging")](
@@ -1114,9 +1106,7 @@ async def test_services_route_composite_device_through_split_owners(
 
     handlers = _register_service_handlers(hass, monkeypatch)
     serial = "COMPOSITE-EVSE"
-    first_coord = _fake_service_coordinator(
-        site_id="first-site", serials={"OTHER-EVSE"}
-    )
+    first_coord = _fake_service_coordinator(site_id="first-site", serials={serial})
     second_coord = _fake_service_coordinator(site_id="second-site", serials={serial})
     first_entry = MockConfigEntry(
         domain=DOMAIN,
@@ -1138,32 +1128,21 @@ async def test_services_route_composite_device_through_split_owners(
         entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
         object.__setattr__(entry, "state", ConfigEntryState.LOADED)
 
-    composite = SimpleNamespace(
-        id="old-composite-device-id",
-        identifiers={(DOMAIN, serial)},
-        config_entry_id=first_entry.entry_id,
-        config_entries={first_entry.entry_id, second_entry.entry_id},
-        via_device_id=None,
-    )
-    split_devices = [
-        SimpleNamespace(config_entry_id=first_entry.entry_id),
-        SimpleNamespace(config_entry_id=second_entry.entry_id),
-    ]
-    registry = SimpleNamespace(
-        async_get=lambda device_id: (composite if device_id == composite.id else None),
-        async_get_devices_for_composite_device_id=lambda device_id: (
-            split_devices if device_id == composite.id else []
-        ),
-    )
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.service_routing.dr.async_get",
-        lambda _hass: registry,
-    )
+    registry = dr.async_get(hass)
+    composite_id = "old-composite-device-id"
+    for entry in (first_entry, second_entry):
+        device = dr.DeviceEntry(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, serial)},
+            composite_device_id=composite_id,
+            composite_primary_config_entry=first_entry.entry_id,
+        )
+        registry._devices[device.id] = device
 
     await handlers[(DOMAIN, "start_charging")](
         SimpleNamespace(
             data={
-                "device_id": [composite.id],
+                "device_id": [composite_id],
                 "charging_level": 18,
                 "connector_id": 2,
             }
@@ -1173,7 +1152,9 @@ async def test_services_route_composite_device_through_split_owners(
     second_coord.async_start_charging.assert_awaited_once_with(
         serial, requested_amps=18, connector_id=2
     )
-    first_coord.async_start_charging.assert_not_awaited()
+    first_coord.async_start_charging.assert_awaited_once_with(
+        serial, requested_amps=18, connector_id=2
+    )
 
 
 @pytest.mark.asyncio
@@ -1637,87 +1618,6 @@ async def test_update_tariff_accepts_friendly_rate_fields(
     coord.tariff_runtime.async_update_tariff.assert_awaited_once_with(
         billing=None,
         rate_updates=[{"locator": import_locator, "rate": 0.28}],
-    )
-
-
-@pytest.mark.asyncio
-async def test_update_tariff_rate_entity_extractor_fallback(
-    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    handlers = _register_service_handlers(hass, monkeypatch)
-    coord = _fake_service_coordinator(site_id="tariff-site", serials=set())
-    coord.tariff_runtime = SimpleNamespace(async_update_tariff=AsyncMock())
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        data={CONF_SITE_ID: "tariff-site", CONF_SITE_ONLY: True},
-        title="Tariff Site",
-        unique_id="tariff-site",
-    )
-    entry.add_to_hass(hass)
-    entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
-    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
-    locator = {
-        "branch": "purchase",
-        "kind": "period",
-        "season_index": 1,
-        "day_index": 1,
-        "period_index": 1,
-    }
-    reg_entry = er.async_get(hass).async_get_or_create(
-        "number",
-        DOMAIN,
-        f"{DOMAIN}_site_tariff-site_tariff_import_rate_default_week_fallback_number",
-        config_entry=entry,
-    )
-    hass.states.async_set(reg_entry.entity_id, 0.18, {"tariff_locator": locator})
-    monkeypatch.setattr(
-        "homeassistant.helpers.target.async_extract_referenced_entity_ids",
-        lambda _hass, _selection: [reg_entry.entity_id],
-    )
-
-    await handlers[(DOMAIN, "update_tariff")](SimpleNamespace(data={"rate": 0.24}))
-
-    coord.tariff_runtime.async_update_tariff.assert_awaited_once_with(
-        billing=None,
-        rate_updates=[{"locator": locator, "rate": 0.24}],
-    )
-    coord.tariff_runtime.async_update_tariff.reset_mock()
-
-    monkeypatch.setattr(
-        "homeassistant.helpers.target.async_extract_referenced_entity_ids",
-        None,
-        raising=False,
-    )
-    monkeypatch.setattr(
-        "homeassistant.helpers.service.async_extract_referenced_entity_ids",
-        lambda _hass, _call: [reg_entry.entity_id],
-        raising=False,
-    )
-
-    await handlers[(DOMAIN, "update_tariff")](SimpleNamespace(data={"rate": 0.25}))
-
-    coord.tariff_runtime.async_update_tariff.assert_awaited_once_with(
-        billing=None,
-        rate_updates=[{"locator": locator, "rate": 0.25}],
-    )
-    coord.tariff_runtime.async_update_tariff.reset_mock()
-
-    def raise_extract_error(_hass, _call):
-        raise RuntimeError("extract failed")
-
-    monkeypatch.setattr(
-        "homeassistant.helpers.service.async_extract_referenced_entity_ids",
-        raise_extract_error,
-        raising=False,
-    )
-
-    await handlers[(DOMAIN, "update_tariff")](
-        SimpleNamespace(data={"entity_id": reg_entry.entity_id, "rate": 0.26})
-    )
-
-    coord.tariff_runtime.async_update_tariff.assert_awaited_once_with(
-        billing=None,
-        rate_updates=[{"locator": locator, "rate": 0.26}],
     )
 
 

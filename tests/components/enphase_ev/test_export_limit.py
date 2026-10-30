@@ -9,6 +9,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
+import voluptuous as vol
+from homeassistant import data_entry_flow
 from homeassistant.exceptions import ServiceValidationError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -20,7 +22,12 @@ from custom_components.enphase_ev.api_client.export_limit_surface import (
     read_settings,
     write_settings,
 )
-from custom_components.enphase_ev.const import DOMAIN, OPT_EXPORT_LIMIT_CONTROLS_ENABLED
+from custom_components.enphase_ev.const import (
+    DOMAIN,
+    OPT_EXPORT_LIMIT_CONTROLS_ENABLED,
+    OPT_EXPORT_LIMIT_DEFAULT_WATTS,
+    OPT_EXPORT_LIMIT_SLEW_RATE,
+)
 from custom_components.enphase_ev.export_limit_runtime import (
     ExportLimitRuntime,
     parse_settings,
@@ -757,6 +764,159 @@ async def test_default_settings_and_restore(runtime, hass):
     runtime.coordinator.client.async_set_export_limit.assert_not_called()
 
 
+@pytest.fixture(params=["conditional", "legacy_typing", "legacy_missing"])
+def slew_visibility_api(request, monkeypatch):
+    """Model the published 2026.11 marker contract, without claiming runtime QA."""
+
+    class ConditionalRequired(vol.Required):
+        def __init__(self, *args, visible=None, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.visible = visible
+
+    if request.param == "conditional":
+        monkeypatch.setattr(data_entry_flow, "Required", ConditionalRequired)
+    elif request.param == "legacy_typing":
+        from typing import Required
+
+        monkeypatch.setattr(data_entry_flow, "Required", Required)
+    else:
+        monkeypatch.delattr(data_entry_flow, "Required")
+    return request.param == "conditional"
+
+
+async def test_defaults_slew_visibility_contract(runtime, slew_visibility_api):
+    flow = OptionsFlowHandler(runtime.coordinator.config_entry)
+    flow.hass = runtime.coordinator.hass
+    await flow.async_step_export_limit()
+    result = await flow.async_step_export_limit_defaults()
+    schema = result["data_schema"]
+    marker = next(key for key in schema.schema if key.schema == "slew_rate")
+    assert marker.default() == 6000
+    assert schema({}) == {
+        "limit_watts": 0,
+        "slew_rate": 6000,
+        "restore_slew_rate": False,
+    }
+    if slew_visibility_api:
+        assert marker.visible == {"field": "restore_slew_rate", "value": False}
+    else:
+        assert type(marker) is vol.Required
+        assert not hasattr(marker, "visible")
+        assert schema({"restore_slew_rate": True})["slew_rate"] == 6000
+    runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
+
+
+@pytest.mark.parametrize("manual", [{}, {"slew_rate": 0}, {"slew_rate": 40.25}])
+async def test_defaults_restore_omitted_or_stale_manual(
+    runtime, slew_visibility_api, manual
+):
+    entry = runtime.coordinator.config_entry
+    hass = runtime.coordinator.hass
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, OPT_EXPORT_LIMIT_SLEW_RATE: 12.25}
+    )
+    flow = OptionsFlowHandler(entry)
+    flow.hass = hass
+    await flow.async_step_export_limit()
+    client = runtime.coordinator.client
+    client.async_get_export_limit_settings.reset_mock()
+    client.async_get_export_limit_settings.return_value = payload(slew_rate=7000)
+    result = await flow.async_step_export_limit_defaults(
+        {"limit_watts": 1234, "restore_slew_rate": True, **manual}
+    )
+    assert result["type"] == "create_entry"
+    assert result["data"][OPT_EXPORT_LIMIT_DEFAULT_WATTS] == 1234
+    assert OPT_EXPORT_LIMIT_SLEW_RATE not in result["data"]
+    assert flow._export_snapshot.slew == 7000
+    client.async_get_export_limit_settings.assert_awaited_once()
+    client.async_set_export_limit.assert_not_awaited()
+
+
+@pytest.mark.parametrize("saved", [None, 40.25])
+async def test_defaults_manual_omission_uses_current_default(
+    runtime, slew_visibility_api, saved
+):
+    entry = runtime.coordinator.config_entry
+    if saved is not None:
+        runtime.coordinator.hass.config_entries.async_update_entry(
+            entry, options={**entry.options, OPT_EXPORT_LIMIT_SLEW_RATE: saved}
+        )
+    flow = OptionsFlowHandler(entry)
+    flow.hass = runtime.coordinator.hass
+    await flow.async_step_export_limit()
+    runtime.coordinator.client.async_get_export_limit_settings.reset_mock()
+    result = await flow.async_step_export_limit_defaults(
+        {"limit_watts": 1234, "restore_slew_rate": False}
+    )
+    assert result["type"] == "create_entry"
+    assert result["data"].get(OPT_EXPORT_LIMIT_SLEW_RATE) == saved
+    runtime.coordinator.client.async_get_export_limit_settings.assert_not_awaited()
+    runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "value", [None, 0, -1, True, "5", float("nan"), float("inf"), 0.001]
+)
+async def test_defaults_manual_validation(runtime, slew_visibility_api, value):
+    flow = OptionsFlowHandler(runtime.coordinator.config_entry)
+    flow.hass = runtime.coordinator.hass
+    await flow.async_step_export_limit()
+    result = await flow.async_step_export_limit_defaults(
+        {"limit_watts": 0, "restore_slew_rate": False, "slew_rate": value}
+    )
+    assert result["errors"] == {"base": "export_limit_invalid_slew"}
+    assert result["data_schema"]({})["restore_slew_rate"] is False
+    runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
+
+
+async def test_defaults_repeated_manual_restore_edits(runtime, slew_visibility_api):
+    entry = runtime.coordinator.config_entry
+    hass = runtime.coordinator.hass
+    # Reopen the flow after each successful edit, as HA does.
+    for inputs, gateway_slew, override in (
+        ({"slew_rate": 40.25}, 6000, 40.25),
+        ({"restore_slew_rate": True}, 7000, None),
+        ({"restore_slew_rate": False}, 7000, None),
+        ({"restore_slew_rate": False, "slew_rate": 50}, 7000, 50),
+        ({"restore_slew_rate": True, "slew_rate": 50}, 8000, None),
+    ):
+        runtime.coordinator.client.async_get_export_limit_settings.return_value = (
+            payload(slew_rate=gateway_slew)
+        )
+        flow = OptionsFlowHandler(entry)
+        flow.hass = hass
+        await flow.async_step_export_limit()
+        result = await flow.async_step_export_limit_defaults(
+            {"limit_watts": 0, **inputs}
+        )
+        assert result["data"].get(OPT_EXPORT_LIMIT_SLEW_RATE) == override
+        hass.config_entries.async_update_entry(entry, options=result["data"])
+    runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
+
+
+async def test_defaults_failed_restore_keeps_checkbox_and_override(
+    runtime, slew_visibility_api
+):
+    entry = runtime.coordinator.config_entry
+    hass = runtime.coordinator.hass
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, OPT_EXPORT_LIMIT_SLEW_RATE: 40.25}
+    )
+    flow = OptionsFlowHandler(entry)
+    flow.hass = hass
+    await flow.async_step_export_limit()
+    runtime.coordinator.client.async_get_export_limit_settings.side_effect = (
+        TimeoutError
+    )
+    result = await flow.async_step_export_limit_defaults(
+        {"limit_watts": 0, "restore_slew_rate": True}
+    )
+    assert result["errors"] == {"base": "export_limit_unavailable"}
+    assert result["data_schema"]({})["restore_slew_rate"] is True
+    assert entry.options[OPT_EXPORT_LIMIT_SLEW_RATE] == 40.25
+    runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
+
+
 async def test_export_limit_select(runtime, hass):
     from custom_components.enphase_ev.const import (
         OPT_EXPORT_LIMIT_DEFAULT_WATTS,
@@ -961,6 +1121,38 @@ async def test_poll_wakeup_on_submission(runtime):
     await runtime._wait_for_poll(10)
     assert not runtime._wake.is_set()
     runtime._task = None
+
+
+async def test_disable_can_confirm_after_35_minutes_without_resubmission(runtime):
+    """A late gateway readback confirms once; earlier reads never echo intent."""
+    client = runtime.coordinator.client
+    await runtime.async_apply(None, confirm=True)
+    started = runtime.pending["started"]
+    assert runtime.attributes()["confirmed_watts"] == 5000
+    assert runtime.attributes()["requested_action"] == "disable"
+    for elapsed in (300, 600, 1800, 2100):
+        with patch(
+            "custom_components.enphase_ev.export_limit_runtime.time.time",
+            return_value=started + elapsed,
+        ):
+            attrs = await runtime.async_refresh()
+            assert attrs["pending"] is True
+            assert attrs["confirmed_watts"] == 5000
+            if elapsed >= 600:
+                assert attrs["request_status"] == "unconfirmed"
+            with pytest.raises(ServiceValidationError):
+                await runtime.async_apply(None, confirm=True)
+    client.async_get_export_limit_settings.return_value = payload(enable=False)
+    with patch(
+        "custom_components.enphase_ev.export_limit_runtime.time.time",
+        return_value=started + 2110,
+    ):
+        attrs = await runtime.async_refresh()
+    assert attrs["pending"] is False
+    assert attrs["request_status"] == "confirmed"
+    assert attrs["confirmed_watts"] is None
+    assert attrs["last_successful_readback"] == started + 2110
+    client.async_set_export_limit.assert_awaited_once()
 
 
 @pytest.mark.parametrize(
