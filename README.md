@@ -30,13 +30,13 @@ EV charging modes, current and session controls alongside battery reserve, grid 
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/charger-controls-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/images/charger-controls-light.png">
-    <img src="docs/images/charger-controls-light.png" alt="EV charging controls: charge mode, charging current, start and stop actions, and battery charging options" width="280" align="top">
+    <img src="docs/images/charger-controls-light.png" alt="EV charging controls: charger switch, charge mode, charging current, default charge level, and battery charging options" width="320" align="top">
   </picture>
   &nbsp;
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/battery-controls-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/images/battery-controls-light.png">
-    <img src="docs/images/battery-controls-light.png" alt="Battery controls: reserve, charge from grid, charging schedule, and use battery after peak hours" width="280" align="top">
+    <img src="docs/images/battery-controls-light.png" alt="Battery controls: reserve, shutdown level, grid charging, minimum battery for EV charging, PowerMatch, and discharge schedule" width="320" align="top">
   </picture>
 </p>
 
@@ -57,13 +57,13 @@ EV charging modes, current and session controls alongside battery reserve, grid 
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/gateway-controls-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/images/gateway-controls-light.png">
-    <img src="docs/images/gateway-controls-light.png" alt="Gateway controls: system profile, grid toggle OTP, Storm Guard, and Storm Alert opt out" width="280" align="top">
+    <img src="docs/images/gateway-controls-light.png" alt="Gateway controls: export limit, system profile, Storm Guard, and Storm Alert opt in and opt out" width="320" align="top">
   </picture>
   &nbsp;
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/microinverters-sensors-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/images/microinverters-sensors-light.png">
-    <img src="docs/images/microinverters-sensors-light.png" alt="Per-microinverter lifetime production sensors" width="280" align="top">
+    <img src="docs/images/microinverters-sensors-light.png" alt="Microinverter array sensors: current power and lifetime energy for the North and West arrays" width="320" align="top">
   </picture>
 </p>
 
@@ -73,7 +73,7 @@ EV charging modes, current and session controls alongside battery reserve, grid 
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/cloud-sensors-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/images/cloud-sensors-light.png">
-    <img src="docs/images/cloud-sensors-light.png" alt="Cloud sensors: reachability, current consumption, battery energy, EV charging, grid imports and exports, and solar production" width="280">
+    <img src="docs/images/cloud-sensors-light.png" alt="Cloud sensors: battery, consumption, grid and production power, site energy totals, EV charging, and system event history" width="320">
   </picture>
 </p>
 
@@ -88,6 +88,19 @@ EV charging modes, current and session controls alongside battery reserve, grid 
 Requires **Home Assistant 2026.10.0+** (Python 3.14+).
 
 See the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki) for installation, setup and troubleshooting.
+
+<details>
+<summary>Device selection</summary>
+
+Choose the device categories to include. Availability depends on your site and account access.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/setup-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/setup-light.png">
+  <img src="docs/images/setup-light.png" alt="Device selection with Gateway, Battery, EV Chargers, Heat Pump, and Microinverters categories" width="580">
+</picture>
+
+</details>
 
 <details>
 <summary>Supported devices and features</summary>
