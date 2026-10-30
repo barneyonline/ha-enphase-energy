@@ -27,15 +27,17 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     env:
-      # Validate with the verified Home Assistant 2026.10.2 image.
-      HASSFEST_IMAGE: ghcr.io/home-assistant/hassfest@sha256:2dce3c5423a600e7965e5a3d5a95e0707e8452fb001ab2b5d0602099bbecba92
+      # Track current metadata rules independently of the supported HA runtime.
+      HASSFEST_IMAGE: ghcr.io/home-assistant/hassfest:latest
     steps:
       - uses: actions/checkout@v7
-      - name: Verify hassfest Home Assistant version
+      - name: Pull latest hassfest image
+        run: docker pull "$HASSFEST_IMAGE"
+      - name: Log hassfest Home Assistant version
         run: >-
           docker run --rm --workdir /usr/src/homeassistant --entrypoint python3
           "$HASSFEST_IMAGE" -c
-          "from homeassistant.const import __version__; assert __version__ == '2026.10.2', __version__; print(f'Home Assistant {__version__}')"
+          "from homeassistant.const import __version__; print(f'Home Assistant {__version__}')"
       - name: Validate with hassfest
         run: >-
           docker run --rm -v "$GITHUB_WORKSPACE:/github/workspace"
