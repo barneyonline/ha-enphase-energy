@@ -66,15 +66,27 @@ jobs:
           set_output() {
             local name="$1"
             local pattern="$2"
+            local paths="${3-$changed_files}"
             local value="false"
-            if printf '%s\n' "$changed_files" | grep -Eq "$pattern"; then
+            if printf '%s\n' "$paths" | grep -Eq "$pattern"; then
               value="true"
             fi
             echo "${name}=${value}" >> "$GITHUB_OUTPUT"
           }
 
-          common='^(hacs\.json|\.github/workflows/(ci|tests)\.yml|devtools/docker/(Dockerfile|docker-compose\.yml|constraints-[^/]+\.txt))$'
-          set_output integration "${common}|^scripts/(benchmark_snapshots|check_statement_coverage)\.py$|^custom_components/enphase_ev/|^tests/components/enphase_ev/|^devtools/docker/requirements-dev\.txt$|^pytest\.ini$|^\.pre-commit-config\.yaml$|^\.ruff\.toml$"
+          # Descriptive manifest edits still run hassfest, HACS, lint, and quality
+          # checks. Compare values so dependency or discovery edits cannot skip pytest.
+          integration_files="$changed_files"
+          manifest='custom_components/enphase_ev/manifest.json'
+          if printf '%s\n' "$changed_files" | grep -Fxq "$manifest"; then
+            if python3 scripts/ci_manifest_metadata.py --base-ref "origin/${{ github.base_ref }}"; then
+              integration_files="$(printf '%s\n' "$changed_files" | grep -Fxv "$manifest" || true)"
+              echo "Descriptive manifest change; checking other paths for runtime tests."
+            fi
+          fi
+
+          common='^(hacs\.json|\.github/workflows/(ci|tests)\.yml|scripts/ci_manifest_metadata\.py|devtools/docker/(Dockerfile|docker-compose\.yml|constraints-[^/]+\.txt))$'
+          set_output integration "${common}|^scripts/(benchmark_snapshots|check_statement_coverage)\.py$|^custom_components/enphase_ev/|^tests/components/enphase_ev/|^devtools/docker/requirements-dev\.txt$|^pytest\.ini$|^\.pre-commit-config\.yaml$|^\.ruff\.toml$" "$integration_files"
           set_output diagnostics "${common}|^custom_components/enphase_ev/.*\.py$|^scripts/importtime_profile\.py$|^tests/scripts/test_importtime_profile\.py$|^devtools/docker/requirements-dev\.txt$"
           set_output quality "${common}|^custom_components/enphase_ev/|^tests/components/enphase_ev/|^quality_scale\.yaml$|^scripts/validate_quality_scale\.py$|^tests/scripts/test_validate_quality_scale\.py$|^devtools/docker/requirements-(dev|ci-quality)\.txt$|^\.pre-commit-config\.yaml$|^\.strict-typing$"
           set_output scripts "${common}|^scripts/.*\.py$|^tests/scripts/.*\.py$|^devtools/docker/requirements-ci-scripts\.txt$"

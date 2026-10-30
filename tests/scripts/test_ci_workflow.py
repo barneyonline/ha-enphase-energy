@@ -3,15 +3,21 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import os
+import runpy
 import shlex
 import subprocess
+import sys
 
 import pytest
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+MANIFEST = "custom_components/enphase_ev/manifest.json"
+CLASSIFIER = ROOT / "scripts/ci_manifest_metadata.py"
+metadata_only = runpy.run_path(str(CLASSIFIER))["metadata_only"]
 
 
 def _jobs() -> dict[str, object]:
@@ -184,3 +190,238 @@ def test_runtime_dependency_inputs_trigger_their_jobs(job_name, output_name, tmp
             ["bash", "-c", script], env=env, check=True, capture_output=True, text=True
         )
         assert f"{output_name}=true" in output.read_text().splitlines(), path
+
+
+@pytest.fixture
+def manifest_repo(tmp_path, monkeypatch):
+    """Build a real PR checkout so classification exercises Git and JSON values."""
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "Workflow Test",
+        "GIT_AUTHOR_EMAIL": "workflow@example.test",
+        "GIT_COMMITTER_NAME": "Workflow Test",
+        "GIT_COMMITTER_EMAIL": "workflow@example.test",
+    }
+
+    def git(cwd, *args):
+        return subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    git(origin, "init", "--initial-branch=main")
+    manifest = origin / MANIFEST
+    manifest.parent.mkdir(parents=True)
+    manifest.write_bytes((ROOT / MANIFEST).read_bytes())
+    source = manifest.with_name("example.py")
+    source.write_text("# Integration source\n")
+    helper = origin / "scripts/ci_manifest_metadata.py"
+    helper.parent.mkdir()
+    helper.write_bytes(CLASSIFIER.read_bytes())
+    git(origin, "add", ".")
+    git(origin, "commit", "-m", "Initial main")
+    checkout = tmp_path / "checkout"
+    git(tmp_path, "clone", origin.as_uri(), str(checkout))
+    git(checkout, "switch", "-c", "feature")
+    monkeypatch.chdir(checkout)
+
+    def commit():
+        git(checkout, "add", "-A")
+        git(checkout, "commit", "-m", "PR change", "--allow-empty")
+
+    def classify(event="pull_request"):
+        step = next(
+            step
+            for step in _jobs()["changes"]["steps"]
+            if step.get("name") == "Classify changed paths"
+        )
+        script = step["run"].replace("${{ github.event_name }}", event)
+        script = script.replace("${{ github.base_ref }}", "main")
+        output = tmp_path / "outputs"
+        output.unlink(missing_ok=True)
+        subprocess.run(
+            ["bash", "-e", "-o", "pipefail", "-c", script],
+            cwd=checkout,
+            env={**env, "GITHUB_OUTPUT": str(output)},
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return dict(line.split("=", 1) for line in output.read_text().splitlines())
+
+    return checkout, origin, git, commit, classify
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("categories", ["energy"]),
+        ("codeowners", ["@example"]),
+        ("documentation", "https://example.test/docs"),
+        ("issue_tracker", "https://example.test/issues"),
+    ],
+)
+def test_descriptive_manifest_changes_skip_runtime_tests(manifest_repo, key, value):
+    checkout, _, _, commit, classify = manifest_repo
+    path = checkout / MANIFEST
+    manifest = json.loads(path.read_text())
+    manifest[key] = value
+    path.write_text(json.dumps(manifest))
+    (checkout / "CHANGELOG.md").write_text("Describe metadata change.\n")
+    commit()
+
+    assert metadata_only("origin/main") is True
+    assert classify() == {
+        "integration": "false",
+        "diagnostics": "false",
+        "quality": "true",
+        "scripts": "false",
+    }
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("requirements", ["package==1.0"]),
+        ("version", "99.0.0"),
+        ("config_flow", False),
+        ("config_flow", 1),
+        ("dependencies", ["mqtt"]),
+        ("after_dependencies", []),
+        ("zeroconf", ["_example._tcp.local."]),
+        ("unknown_future_key", True),
+    ],
+)
+def test_runtime_manifest_fields_keep_full_suite(manifest_repo, key, value):
+    checkout, _, _, commit, classify = manifest_repo
+    path = checkout / MANIFEST
+    manifest = json.loads(path.read_text())
+    manifest.update({"categories": ["energy"], key: value})
+    path.write_text(json.dumps(manifest))
+    commit()
+
+    assert metadata_only("origin/main") is False
+    assert classify()["integration"] == "true"
+
+
+@pytest.mark.parametrize("content", ["{", "[]", "null", "42", b"\xff"])
+def test_invalid_manifests_keep_runtime_tests(manifest_repo, content):
+    checkout, _, _, commit, classify = manifest_repo
+    (checkout / MANIFEST).write_bytes(
+        content if isinstance(content, bytes) else content.encode()
+    )
+    commit()
+
+    assert metadata_only("origin/main") is False
+    assert classify()["integration"] == "true"
+
+
+@pytest.mark.parametrize("key,expected", [("documentation", False), ("version", True)])
+def test_manifest_field_removal(manifest_repo, key, expected):
+    checkout, _, _, commit, classify = manifest_repo
+    path = checkout / MANIFEST
+    manifest = json.loads(path.read_text())
+    del manifest[key]
+    path.write_text(json.dumps(manifest))
+    commit()
+
+    assert metadata_only("origin/main") is not expected
+    assert classify()["integration"] == str(expected).lower()
+
+
+@pytest.mark.parametrize("operation", ["add", "delete", "rename"])
+def test_manifest_additions_deletions_and_renames_keep_tests(manifest_repo, operation):
+    checkout, origin, git, commit, classify = manifest_repo
+    path = checkout / MANIFEST
+    if operation == "add":
+        git(origin, "rm", MANIFEST)
+        git(origin, "commit", "-m", "Remove base manifest")
+        git(checkout, "fetch", "origin", "main")
+        git(checkout, "reset", "--hard", "origin/main")
+        path.write_bytes((ROOT / MANIFEST).read_bytes())
+    elif operation == "delete":
+        path.unlink()
+    else:
+        path.rename(path.with_name("old_manifest.json"))
+    commit()
+
+    assert metadata_only("origin/main") is False
+    assert classify()["integration"] == "true"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "custom_components/enphase_ev/example.py",
+        "tests/components/enphase_ev/test_example.py",
+        "custom_components/enphase_ev/strings.json",
+        "custom_components/enphase_ev/translations/fr.json",
+        "devtools/docker/requirements-dev.txt",
+        ".github/workflows/tests.yml",
+        "scripts/ci_manifest_metadata.py",
+    ],
+)
+def test_metadata_with_other_runtime_changes_keeps_tests(manifest_repo, path):
+    checkout, _, _, commit, classify = manifest_repo
+    manifest_path = checkout / MANIFEST
+    manifest = json.loads(manifest_path.read_text())
+    manifest["categories"] = ["energy"]
+    manifest_path.write_text(json.dumps(manifest))
+    changed = checkout / path
+    changed.parent.mkdir(parents=True, exist_ok=True)
+    with changed.open("a") as stream:
+        stream.write("\n")
+    commit()
+
+    assert classify()["integration"] == "true"
+
+
+def test_cross_group_source_rename_keeps_runtime_tests(manifest_repo):
+    checkout, _, _, commit, classify = manifest_repo
+    (checkout / "custom_components/enphase_ev/example.py").rename(
+        checkout / "example.md"
+    )
+    commit()
+
+    assert classify()["integration"] == "true"
+    assert classify()["diagnostics"] == "true"
+
+
+def test_manifest_comparison_uses_merge_base_when_main_advances(manifest_repo):
+    checkout, origin, git, commit, classify = manifest_repo
+    path = checkout / MANIFEST
+    manifest = json.loads(path.read_text())
+    manifest["requirements"] = ["package==1.0"]
+    path.write_text(json.dumps(manifest))
+    commit()
+    # Main independently acquires the same runtime change after PR checkout.
+    # Comparing branch tips would hide that change from the classifier.
+    (origin / MANIFEST).write_text(json.dumps(manifest))
+    git(origin, "add", ".")
+    git(origin, "commit", "-m", "Advance main with same dependency")
+    git(checkout, "fetch", "origin", "main")
+
+    assert metadata_only("origin/main") is False
+    assert classify()["integration"] == "true"
+
+
+@pytest.mark.parametrize("event", ["push", "workflow_dispatch"])
+def test_non_pr_events_keep_all_jobs(manifest_repo, event):
+    *_, classify = manifest_repo
+    assert set(classify(event).values()) == {"true"}
+
+
+@pytest.mark.parametrize("base_ref,expected", [("origin/main", 0), ("missing", 1)])
+def test_manifest_classifier_command_line(
+    manifest_repo, monkeypatch, base_ref, expected
+):
+    monkeypatch.setattr(sys, "argv", [str(CLASSIFIER), "--base-ref", base_ref])
+    with pytest.raises(SystemExit) as raised:
+        runpy.run_path(str(CLASSIFIER), run_name="__main__")
+    assert raised.value.code == expected
