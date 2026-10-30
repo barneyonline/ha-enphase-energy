@@ -687,6 +687,14 @@ class HeatpumpRuntime:
             backoff_until or now + HEATPUMP_RUNTIME_STATE_FAILURE_BACKOFF_S
         )
 
+    def clear_hems_auth_backoff(self) -> None:
+        """Release runtime retry delays inherited from the shared auth pause."""
+
+        if self._heatpump_runtime_state_last_error == "HEMS auth backoff active":
+            self._heatpump_runtime_state_backoff_until = None
+            self._heatpump_runtime_state_cache_until = None
+            self._heatpump_runtime_diagnostics_cache_until = None
+
     async def _async_refresh_heatpump_runtime_state(
         self, *, force: bool = False
     ) -> None:
