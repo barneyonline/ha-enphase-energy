@@ -3,6 +3,7 @@
 import asyncio
 from datetime import datetime, timezone
 import time
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -22,13 +23,21 @@ def test_session_enrichment_without_history_manager(coordinator_factory, monkeyp
         )
 
 
+@pytest.mark.parametrize("uptime", [60.0, 100_000.0])
 async def test_session_adapter_refreshes_expired_cache_after_timezone_fallback(
-    coordinator_factory, monkeypatch
+    coordinator_factory, monkeypatch, uptime
 ):
     coord = coordinator_factory(serials=["EV"])
     day = datetime(2026, 10, 31, tzinfo=timezone.utc)
-    coord._session_history_cache_shim[("EV", "2026-10-31")] = (0, [{"old": True}])
+    ttl = coord._session_history_cache_ttl
+    assert ttl is not None
+    expired_at = uptime - ttl - 1
+    coord._session_history_cache_shim[("EV", "2026-10-31")] = (
+        expired_at,
+        [{"old": True}],
+    )
     with monkeypatch.context() as patch:
+        patch.setattr(module, "time", SimpleNamespace(monotonic=lambda: uptime))
         patch.setattr(
             coord.session_history,
             "_async_fetch_sessions_today",
@@ -40,6 +49,9 @@ async def test_session_adapter_refreshes_expired_cache_after_timezone_fallback(
         assert (
             await coord.evse_runtime.async_fetch_sessions_today("EV", day_local=day)
             == []
+        )
+        coord.session_history._async_fetch_sessions_today.assert_awaited_once_with(
+            "EV", day_local=day
         )
     assert coord._session_history_cache_shim[("EV", "2026-10-31")][1] == []
 
