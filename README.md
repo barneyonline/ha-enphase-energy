@@ -1,30 +1,112 @@
-# Enphase Energy — Home Assistant Custom Integration
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-banner-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/readme-banner-light.png">
+  <img src="docs/images/readme-banner-light.png" alt="Enphase Energy — Control your Enphase system from Home Assistant, illustrated with a solar home, battery and EV charger." width="1200">
+</picture>
 
-<!-- Badges -->
-[![Release](https://img.shields.io/github/v/release/barneyonline/ha-enphase-energy?display_name=tag&sort=semver)](https://github.com/barneyonline/ha-enphase-energy/releases)
-[![Stars](https://img.shields.io/github/stars/barneyonline/ha-enphase-energy)](https://github.com/barneyonline/ha-enphase-energy/stargazers)
-[![License](https://img.shields.io/github/license/barneyonline/ha-enphase-energy)](LICENSE)
+<p align="center">
+  <a href="https://github.com/barneyonline/ha-enphase-energy/releases"><img src="https://img.shields.io/github/v/release/barneyonline/ha-enphase-energy?display_name=tag&amp;sort=semver" alt="Latest release"></a>
+  <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=barneyonline&amp;repository=ha-enphase-energy&amp;category=integration"><img src="https://img.shields.io/badge/HACS-Default-41BDF5.svg" alt="Open Enphase Energy in HACS"></a>
+  <a href="https://github.com/barneyonline/ha-enphase-energy/wiki/Service-Status-History"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fbarneyonline%2Fha-enphase-energy%40service-status%2Fstatus_badge.json&amp;cacheSeconds=60" alt="Enphase service status"></a>
+</p>
 
-[![Tests](https://img.shields.io/github/actions/workflow/status/barneyonline/ha-enphase-energy/tests.yml?branch=main&label=tests)](https://github.com/barneyonline/ha-enphase-energy/actions/workflows/tests.yml)
-[![codecov](https://codecov.io/gh/barneyonline/ha-enphase-energy/graph/badge.svg?token=ichJ6LKzFK)](https://codecov.io/gh/barneyonline/ha-enphase-energy)
-[![Hassfest](https://img.shields.io/github/actions/workflow/status/barneyonline/ha-enphase-energy/hassfest.yml?branch=main&label=hassfest)](https://github.com/barneyonline/ha-enphase-energy/actions/workflows/hassfest.yml)
+<p align="center">Monitor solar, batteries and charging. Control your Enphase system from Home Assistant.</p>
 
-[![Quality Scale](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fbarneyonline%2Fha-enphase-energy%2Fmain%2Fcustom_components%2Fenphase_ev%2Fmanifest.json&query=%24.quality_scale&label=quality%20scale&cacheSeconds=3600)](https://developers.home-assistant.io/docs/integration_quality_scale_index)
-[![HACS](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://hacs.xyz)
-
-[![Open Issues](https://img.shields.io/github/issues/barneyonline/ha-enphase-energy)](https://github.com/barneyonline/ha-enphase-energy/issues)
-![Development Status](https://img.shields.io/badge/development-active-success?style=flat-square)
-
-[![Enphase Service Status](https://img.shields.io/endpoint?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fbarneyonline%2Fha-enphase-energy%40service-status%2Fstatus_badge.json&cacheSeconds=60)](https://github.com/barneyonline/ha-enphase-energy/wiki/Service-Status-History)
-
-Cloud-based Home Assistant integration for Enphase Energy systems.
+<p align="center">
+  <a href="#get-started">Install</a> ·
+  <a href="#key-features">Features</a> ·
+  <a href="#at-a-glance">Screenshots</a> ·
+  <a href="https://github.com/barneyonline/ha-enphase-energy/wiki">Documentation</a>
+</p>
 
 > [!IMPORTANT]
-> This is an unofficial community project. It is not affiliated with, endorsed by, or supported by Enphase Energy.
->
-> The integration relies on undocumented Enphase APIs. Those APIs may change or stop working without notice, which can break features until the integration is updated.
+> This is an unofficial community project, not affiliated with, endorsed by, or supported by Enphase Energy. It relies on undocumented cloud APIs that may change or stop working without notice.
 
-## Supported device categories
+## Key features
+
+- **Energy monitoring:** Solar, grid, battery and site telemetry, Energy Dashboard support, and optional per-microinverter sensors.
+- **EV charging:** Charge modes, current limits, charging status and session history.
+- **Battery controls:** Profiles, reserve settings, grid charging, schedules and supported PowerMatch controls.
+- **System controls:** Editable tariffs, supported export limits, Storm Guard and installer grid controls.
+- **Heat-pump monitoring:** Status, SG-Ready mode and energy usage.
+- **Automation and diagnostics:** Home Assistant actions, events, alarms, calendars, firmware information and recovery tools.
+
+Available features depend on your equipment and account access.
+
+## At a glance
+
+EV charging modes, current and session controls alongside battery reserve, grid charging and schedules.
+
+<!-- Inline images wrap onto separate rows on narrow screens. Keep their natural proportions. -->
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/charger-controls-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/charger-controls-light.png">
+    <img src="docs/images/charger-controls-light.png" alt="EV charging controls: charger switch, charge mode, charging current, default charge level, and battery charging options" width="320" align="top">
+  </picture>
+  &nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/battery-controls-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/battery-controls-light.png">
+    <img src="docs/images/battery-controls-light.png" alt="Battery controls: reserve, shutdown level, grid charging, minimum battery for EV charging, PowerMatch, and discharge schedule" width="320" align="top">
+  </picture>
+</p>
+
+<details>
+<summary>More screenshots · devices, gateway, solar and cloud</summary>
+
+### Connected devices
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/devices-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/devices-light.png">
+  <img src="docs/images/devices-light.png" alt="Home Assistant device overview with IQ Battery, IQ EV Charger, IQ Gateway, IQ Microinverters, and Enphase Cloud" width="1000">
+</picture>
+
+### Gateway controls and microinverter sensors
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/gateway-controls-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/gateway-controls-light.png">
+    <img src="docs/images/gateway-controls-light.png" alt="Gateway controls: export limit, system profile, Storm Guard, and Storm Alert opt in and opt out" width="320" align="top">
+  </picture>
+  &nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/microinverters-sensors-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/microinverters-sensors-light.png">
+    <img src="docs/images/microinverters-sensors-light.png" alt="Microinverter array sensors: current power and lifetime energy for the North and West arrays" width="320" align="top">
+  </picture>
+</p>
+
+### Cloud energy sensors
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/cloud-sensors-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/cloud-sensors-light.png">
+    <img src="docs/images/cloud-sensors-light.png" alt="Cloud sensors: battery, consumption, grid and production power, site energy totals, EV charging, and system event history" width="320">
+  </picture>
+</p>
+
+</details>
+
+## Get started
+
+1. [Open Enphase Energy in HACS](https://my.home-assistant.io/redirect/hacs_repository/?owner=barneyonline&repository=ha-enphase-energy&category=integration).
+2. Install and restart Home Assistant.
+3. Add the integration and sign in with your Enlighten credentials. MFA is supported.
+
+Enter your Home Assistant URL if prompted by the link.
+
+Requires **Home Assistant 2026.10.0+** (Python 3.14+).
+
+See the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki) for installation, setup and troubleshooting.
+
+<details>
+<summary>Supported devices and features</summary>
+
+### Supported device categories
 
 - IQ Gateway / System Controller entities and controls
 - IQ Battery telemetry and BatteryConfig controls (where supported)
@@ -32,7 +114,7 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - IQ Microinverter connectivity, inventory, lifetime production, and optional installer-level parameter telemetry
 - Site and cloud energy telemetry (including supported HEMS channels such as Heat Pump and Water Heater lifetime energy)
 
-## Key features
+### Feature details
 
 - Guided setup with site, device-category, and multi-gateway selection
 - Site and battery energy monitoring for the Home Assistant Energy Dashboard
@@ -48,24 +130,20 @@ Cloud-based Home Assistant integration for Enphase Energy systems.
 - Cloud recovery, health diagnostics, and automation actions
 - User-facing strings localized in more than 20 languages
 
-## Quick install (HACS)
+</details>
 
-1. HACS -> Integrations -> Enphase Energy
-2. Install and restart Home Assistant
-3. Add the integration and sign in
+<details>
+<summary>Migrating from Enphase Envoy</summary>
 
-Manual install steps: see the wiki Installation page.
+Users migrating from the core Enphase Envoy integration can preserve compatible Energy-dashboard history with the [Envoy History Migration](https://github.com/barneyonline/ha-enphase-energy/wiki/Envoy-History-Migration) assistant. Create a full Home Assistant backup first.
 
-## Compatibility
+</details>
 
-- Minimum supported Home Assistant version is `2026.10.0` (Python `3.14`+).
-- Users migrating from the core Enphase Envoy integration can preserve compatible Energy-dashboard history with the [Envoy History Migration](https://github.com/barneyonline/ha-enphase-energy/wiki/Envoy-History-Migration) assistant. Create a full Home Assistant backup first.
-
-## Authentication
-
-Sign in with your Enlighten credentials; MFA is supported. See the wiki for details.
-
-## Documentation
-
-Refer to the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki) for setup,
-configuration, and troubleshooting guidance.
+[![Tests](https://img.shields.io/github/actions/workflow/status/barneyonline/ha-enphase-energy/tests.yml?branch=main&label=tests)](https://github.com/barneyonline/ha-enphase-energy/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/barneyonline/ha-enphase-energy/graph/badge.svg?token=ichJ6LKzFK)](https://codecov.io/gh/barneyonline/ha-enphase-energy)
+[![Hassfest](https://img.shields.io/github/actions/workflow/status/barneyonline/ha-enphase-energy/hassfest.yml?branch=main&label=hassfest)](https://github.com/barneyonline/ha-enphase-energy/actions/workflows/hassfest.yml)
+[![Quality Scale](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fbarneyonline%2Fha-enphase-energy%2Fmain%2Fcustom_components%2Fenphase_ev%2Fmanifest.json&query=%24.quality_scale&label=quality%20scale&cacheSeconds=3600)](https://developers.home-assistant.io/docs/integration_quality_scale_index)
+[![Stars](https://img.shields.io/github/stars/barneyonline/ha-enphase-energy)](https://github.com/barneyonline/ha-enphase-energy/stargazers)
+[![License](https://img.shields.io/github/license/barneyonline/ha-enphase-energy)](LICENSE)
+[![Open Issues](https://img.shields.io/github/issues/barneyonline/ha-enphase-energy)](https://github.com/barneyonline/ha-enphase-energy/issues)
+![Development Status](https://img.shields.io/badge/development-active-success?style=flat-square)

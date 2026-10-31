@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔄 Other changes
+- Refresh the README with light and dark banners matching the wiki artwork, new Home Assistant screenshots in both themes, a key features overview, a direct HACS link, a compact gallery, expandable device and feature details, and visible project badges at the bottom.
 - Classify the integration under Energy for Home Assistant Marketplace discovery.
 - Skip full integration tests on pull requests limited to descriptive manifest metadata while retaining hassfest, HACS, lint, and quality checks.
 
