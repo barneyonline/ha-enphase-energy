@@ -14,12 +14,24 @@
 
 <p align="center">
   <a href="#get-started">Install</a> ·
+  <a href="#key-features">Features</a> ·
   <a href="#at-a-glance">Screenshots</a> ·
   <a href="https://github.com/barneyonline/ha-enphase-energy/wiki">Documentation</a>
 </p>
 
 > [!IMPORTANT]
 > This is an unofficial community project, not affiliated with, endorsed by, or supported by Enphase Energy. It relies on undocumented cloud APIs that may change or stop working without notice.
+
+## Key features
+
+- **Energy monitoring:** Solar, grid, battery and site telemetry, Energy Dashboard support, and optional per-microinverter sensors.
+- **EV charging:** Charge modes, current limits, charging status and session history.
+- **Battery controls:** Profiles, reserve settings, grid charging, schedules and supported PowerMatch controls.
+- **System controls:** Editable tariffs, supported export limits, Storm Guard and installer grid controls.
+- **Heat-pump monitoring:** Status, SG-Ready mode and energy usage.
+- **Automation and diagnostics:** Home Assistant actions, events, alarms, calendars, firmware information and recovery tools.
+
+Available features depend on your equipment and account access.
 
 ## At a glance
 
@@ -113,7 +125,7 @@ Choose the device categories to include. Availability depends on your site and a
 - IQ Microinverter connectivity, inventory, lifetime production, and optional installer-level parameter telemetry
 - Site and cloud energy telemetry (including supported HEMS channels such as Heat Pump and Water Heater lifetime energy)
 
-### Key features
+### Feature details
 
 - Guided setup with site, device-category, and multi-gateway selection
 - Site and battery energy monitoring for the Home Assistant Energy Dashboard
