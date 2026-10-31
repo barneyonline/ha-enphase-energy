@@ -1423,7 +1423,8 @@ def test_update_entry_helper_uses_reload_helper_without_title_when_no_listener(
 
 
 @pytest.mark.asyncio
-async def test_update_entry_helper_falls_back_for_legacy_core(hass) -> None:
+@pytest.mark.parametrize("title", [None, "Site: 12345"])
+async def test_update_entry_helper_falls_back_for_legacy_core(hass, title) -> None:
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
     entry.add_to_hass(hass)
 
@@ -1435,7 +1436,7 @@ async def test_update_entry_helper_falls_back_for_legacy_core(hass) -> None:
     with patch.object(hass.config_entries, "async_reload", reload_entry):
         result = flow._async_update_entry_and_abort(
             entry,
-            title="Site: 12345",
+            title=title,
             data={CONF_SITE_ID: "12345"},
             reason="reconfigure_successful",
         )
@@ -1443,7 +1444,8 @@ async def test_update_entry_helper_falls_back_for_legacy_core(hass) -> None:
 
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
-    assert entry.title == "Site: 12345"
+    if title is not None:
+        assert entry.title == title
     reload_entry.assert_awaited_once_with(entry.entry_id)
 
 
@@ -1840,7 +1842,10 @@ async def test_ensure_available_type_keys_treats_parallel_probe_exceptions_as_un
 
 
 @pytest.mark.asyncio
-async def test_ensure_available_type_keys_discovers_hems_heatpump(hass) -> None:
+@pytest.mark.parametrize("already_discovered", [False, True])
+async def test_ensure_available_type_keys_discovers_hems_heatpump(
+    hass, already_discovered
+) -> None:
     flow = _make_flow(hass)
     flow._auth_tokens = TOKENS
     flow._selected_site_id = "12345"
@@ -1848,7 +1853,15 @@ async def test_ensure_available_type_keys_discovers_hems_heatpump(hass) -> None:
     with (
         patch(
             "custom_components.enphase_ev.config_flow.async_fetch_devices_inventory",
-            AsyncMock(return_value={"result": []}),
+            AsyncMock(
+                return_value={
+                    "result": (
+                        [{"type": "heatpump", "devices": [{"device_uid": "HP-1"}]}]
+                        if already_discovered
+                        else []
+                    )
+                }
+            ),
         ),
         patch(
             "custom_components.enphase_ev.config_flow.async_fetch_hems_devices",
@@ -2217,6 +2230,72 @@ def test_legacy_selected_type_keys_uses_available_inventory_keys(hass) -> None:
     flow._chargers = [("EV1", "Garage")]
     selected = flow._legacy_selected_type_keys([], include_inverters=False)
     assert selected == ["envoy"]
+
+
+@pytest.mark.parametrize("available", [[], ["envoy", "iqevse", "microinverter"]])
+def test_legacy_selection_keeps_enabled_chargers_and_inverters(hass, available):
+    flow = _make_flow(hass)
+    flow._available_type_keys = available
+    flow._chargers = [("EV1", "Garage")] if available else []
+    selected = flow._legacy_selected_type_keys(["EV1"], include_inverters=True)
+    assert "iqevse" in selected
+    assert "microinverter" in selected
+
+
+def test_legacy_empty_selection_without_inverters_uses_site_types(hass):
+    flow = _make_flow(hass)
+    flow._available_type_keys = []
+    assert flow._legacy_selected_type_keys([], include_inverters=False) == [
+        "envoy",
+        "encharge",
+    ]
+
+
+@pytest.mark.parametrize("entry_data", [None, {}, {CONF_SITE_ID: "12345"}])
+async def test_auth_success_keeps_discovery_for_unchanged_site(hass, entry_data):
+    flow = _make_flow(hass)
+    flow._selected_site_id = "12345"
+    if entry_data is not None:
+        flow._reconfigure_entry = MockConfigEntry(domain=DOMAIN, data=entry_data)
+    flow._reset_discovery_cache = Mock()
+    flow.async_step_devices = AsyncMock(return_value={"step_id": "devices"})
+    flow.async_step_site = AsyncMock(return_value={"step_id": "site"})
+    result = await flow._handle_auth_success(
+        TOKENS, [SiteInfo(site_id="12345", name="Site")]
+    )
+    assert result["step_id"] == ("devices" if entry_data is None else "site")
+    flow._reset_discovery_cache.assert_not_called()
+
+
+async def test_manual_site_selection_keeps_discovery_for_unchanged_site(hass):
+    flow = _make_flow(hass)
+    flow._selected_site_id = "12345"
+    flow._reset_discovery_cache = Mock()
+    flow.async_step_devices = AsyncMock(return_value={"step_id": "devices"})
+    assert await flow.async_step_site({CONF_SITE_ID: "12345"}) == {"step_id": "devices"}
+    flow._reset_discovery_cache.assert_not_called()
+
+
+def test_legacy_inverter_discovery_without_result_mapping():
+    assert not config_flow._legacy_microinverters_available({"result": None})
+
+
+@pytest.mark.parametrize("result", [None, {}])
+def test_grid_profile_applied_placeholders_without_result(hass, config_entry, result):
+    handler = OptionsFlowHandler(config_entry)
+    handler.hass = hass
+    handler._grid_profile_apply_result = result
+    placeholders = handler._grid_profile_applied_placeholders(None)
+    assert placeholders["requested_profile_id"]
+    assert placeholders["cloud_apply_status"]
+
+
+async def test_grid_profile_applied_form_without_runtime(hass, config_entry):
+    handler = OptionsFlowHandler(config_entry)
+    handler.hass = hass
+    result = await handler.async_step_grid_profile_applied()
+    assert result["step_id"] == "grid_profile_applied"
+    assert result["description_placeholders"] == {}
 
 
 def test_stored_selected_type_keys_legacy_path(hass) -> None:
@@ -2658,7 +2737,14 @@ async def test_options_flow_discover_iqevse_serials_falls_back_when_inventory_fa
     with (
         patch(
             "custom_components.enphase_ev.options_flow.async_fetch_chargers",
-            AsyncMock(return_value=[ChargerInfo(serial="EV-FALLBACK", name="Garage")]),
+            AsyncMock(
+                return_value=[
+                    ChargerInfo(serial="", name="empty"),
+                    ChargerInfo(serial="EV-FALLBACK", name="Garage"),
+                    ChargerInfo(serial="EV-FALLBACK", name="duplicate"),
+                    ChargerInfo(serial=" ", name="blank"),
+                ]
+            ),
         ) as mock_chargers,
         patch(
             "custom_components.enphase_ev.options_flow.async_fetch_devices_inventory",
@@ -4770,8 +4856,9 @@ async def test_options_flow_migrate_intro_advances_when_backup_confirmed(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("preselected", [True, False])
 async def test_options_flow_migrate_mapping_preselects_candidates(
-    hass, monkeypatch
+    hass, monkeypatch, preselected
 ) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN, entry_id="enphase-entry", data={CONF_SITE_ID: "12345"}
@@ -4826,6 +4913,11 @@ async def test_options_flow_migrate_mapping_preselects_candidates(
     handler.hass = hass
     handler._selected_migration_source_id = "envoy-a"
 
+    if preselected:
+        handler._migration_selection = {
+            "solar_production": prod_entity,
+            "consumption": cons_entity,
+        }
     result = await handler.async_step_migrate_envoy_mapping()
 
     assert result["type"] is FlowResultType.FORM
@@ -5507,8 +5599,9 @@ async def test_options_flow_migrate_confirm_warns_for_lower_target_value_and_con
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("source_loaded", [True, False])
 async def test_options_flow_migrate_confirm_reloads_source_after_post_unload_validation_error(
-    hass, monkeypatch
+    hass, monkeypatch, source_loaded
 ) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN, entry_id="enphase-entry", data={CONF_SITE_ID: "12345"}
@@ -5516,7 +5609,15 @@ async def test_options_flow_migrate_confirm_reloads_source_after_post_unload_val
     entry.add_to_hass(hass)
     envoy = MockConfigEntry(domain="enphase_envoy", entry_id="envoy-a", title="Envoy A")
     _patch_entry_lookup(monkeypatch, hass, envoy)
-    object.__setattr__(envoy, "state", config_entries.ConfigEntryState.LOADED)
+    object.__setattr__(
+        envoy,
+        "state",
+        (
+            config_entries.ConfigEntryState.LOADED
+            if source_loaded
+            else config_entries.ConfigEntryState.NOT_LOADED
+        ),
+    )
     attrs = {
         "device_class": "energy",
         "state_class": "total_increasing",
@@ -5573,7 +5674,11 @@ async def test_options_flow_migrate_confirm_reloads_source_after_post_unload_val
     error_validation = EnvoyHistoryValidation("incompatible_energy_total", [])
 
     def _validate(*_args, require_source_unloaded=True, **_kwargs):
-        return error_validation if require_source_unloaded else success_validation
+        return (
+            error_validation
+            if require_source_unloaded or not source_loaded
+            else success_validation
+        )
 
     monkeypatch.setattr(
         "custom_components.enphase_ev.options_flow.validate_selected_mappings",
@@ -5586,7 +5691,7 @@ async def test_options_flow_migrate_confirm_reloads_source_after_post_unload_val
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "incompatible_energy_total"}
-    reload_source_spy.assert_awaited_once()
+    assert reload_source_spy.await_count == int(source_loaded)
 
 
 @pytest.mark.asyncio
@@ -5831,8 +5936,9 @@ async def test_options_flow_reload_migration_source_helper_handles_none_and_erro
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("source_loaded", [True, False])
 async def test_options_flow_migrate_confirm_reports_partial_failure_after_source_reload(
-    hass, monkeypatch
+    hass, monkeypatch, source_loaded
 ) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN, entry_id="enphase-entry", data={CONF_SITE_ID: "12345"}
@@ -5840,7 +5946,15 @@ async def test_options_flow_migrate_confirm_reports_partial_failure_after_source
     entry.add_to_hass(hass)
     envoy = MockConfigEntry(domain="enphase_envoy", entry_id="envoy-a", title="Envoy A")
     _patch_entry_lookup(monkeypatch, hass, envoy)
-    object.__setattr__(envoy, "state", config_entries.ConfigEntryState.LOADED)
+    object.__setattr__(
+        envoy,
+        "state",
+        (
+            config_entries.ConfigEntryState.LOADED
+            if source_loaded
+            else config_entries.ConfigEntryState.NOT_LOADED
+        ),
+    )
     attrs = {
         "device_class": "energy",
         "state_class": "total_increasing",
@@ -5900,7 +6014,7 @@ async def test_options_flow_migrate_confirm_reports_partial_failure_after_source
 
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "migration_partial_failure"
-    assert reload_spy.awaited
+    assert reload_spy.await_count == int(source_loaded)
 
 
 @pytest.mark.asyncio

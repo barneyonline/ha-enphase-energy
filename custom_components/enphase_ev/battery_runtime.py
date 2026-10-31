@@ -4142,8 +4142,7 @@ class BatteryRuntime:
         status = coord.coerce_optional_text(alert.get("status"))
         if status:
             normalized_status = status.strip().lower().replace("_", "-")
-            if normalized_status:
-                return not self.storm_alert_status_is_inactive(normalized_status)
+            return not self.storm_alert_status_is_inactive(normalized_status)
         return True
 
     def parse_storm_alert(self, payload: object) -> bool | None:
@@ -5302,12 +5301,7 @@ class BatteryRuntime:
         schedule_id = getattr(
             state, self._battery_schedule_id_attr(schedule_type), None
         )
-        use_battery_settings_toggle = normalized_schedule_type in {
-            "dtg",
-            "rbd",
-        }
-        if use_battery_settings_toggle:
-            self._set_schedule_family_toggle_target(schedule_type, enabled)
+        self._set_schedule_family_toggle_target(schedule_type, enabled)
         try:
             current_start, current_end = self._current_battery_schedule_window_for_type(
                 schedule_type,
@@ -5334,64 +5328,62 @@ class BatteryRuntime:
                             "complete, then refresh and try again."
                         ),
                     )
-            if use_battery_settings_toggle:
-                control_key = f"{normalized_schedule_type}Control"
-                control_payload = self._schedule_family_control_payload(
-                    schedule_type,
-                    enabled=enabled,
-                    current_start=current_start,
-                    current_end=current_end,
-                )
-                payload: dict[str, object] = {control_key: control_payload}
-                primary_write_rejected = False
-                async with state._battery_settings_write_lock:
-                    state._battery_settings_last_write_mono = time.monotonic()
-                    try:
-                        await coord.client.set_battery_settings(
-                            payload,
-                            schedule_type=normalized_schedule_type,
-                        )
-                        self.invalidate_settings_control_observations()
-                    except aiohttp.ClientResponseError as err:
-                        if (
-                            normalized_schedule_type in {"dtg", "rbd"}
-                            and err.status == HTTPStatus.FORBIDDEN
-                        ):
-                            primary_write_rejected = True
-                        else:
-                            self.raise_schedule_update_validation_error(err)
-                            raise
-                state._battery_settings_cache_until = None
-                coord.kick_fast(FAST_TOGGLE_POLL_HOLD_S)
+            control_key = f"{normalized_schedule_type}Control"
+            control_payload = self._schedule_family_control_payload(
+                schedule_type,
+                enabled=enabled,
+                current_start=current_start,
+                current_end=current_end,
+            )
+            payload: dict[str, object] = {control_key: control_payload}
+            primary_write_rejected = False
+            async with state._battery_settings_write_lock:
+                state._battery_settings_last_write_mono = time.monotonic()
                 try:
-                    if primary_write_rejected:
-                        self._raise_validation(
-                            "schedule_primary_write_rejected",
-                            message="primary write rejected",
-                        )
-                    await self._async_verify_schedule_family_toggle_applied(
-                        schedule_type,
-                        enabled=enabled,
-                    )
-                except ServiceValidationError:
-                    self.clear_battery_settings_write_pending()
-                    await self.async_apply_battery_settings_compat(
+                    await coord.client.set_battery_settings(
                         payload,
                         schedule_type=normalized_schedule_type,
-                        include_source=False,
-                        merged_payload=True,
-                        strip_devices=True,
                     )
-                    await self._async_verify_schedule_family_toggle_applied(
-                        schedule_type,
-                        enabled=enabled,
+                    self.invalidate_settings_control_observations()
+                except aiohttp.ClientResponseError as err:
+                    if (
+                        normalized_schedule_type in {"dtg", "rbd"}
+                        and err.status == HTTPStatus.FORBIDDEN
+                    ):
+                        primary_write_rejected = True
+                    else:
+                        self.raise_schedule_update_validation_error(err)
+                        raise
+            state._battery_settings_cache_until = None
+            coord.kick_fast(FAST_TOGGLE_POLL_HOLD_S)
+            try:
+                if primary_write_rejected:
+                    self._raise_validation(
+                        "schedule_primary_write_rejected",
+                        message="primary write rejected",
                     )
+                await self._async_verify_schedule_family_toggle_applied(
+                    schedule_type,
+                    enabled=enabled,
+                )
+            except ServiceValidationError:
                 self.clear_battery_settings_write_pending()
-                await coord.async_request_refresh()
+                await self.async_apply_battery_settings_compat(
+                    payload,
+                    schedule_type=normalized_schedule_type,
+                    include_source=False,
+                    merged_payload=True,
+                    strip_devices=True,
+                )
+                await self._async_verify_schedule_family_toggle_applied(
+                    schedule_type,
+                    enabled=enabled,
+                )
+            self.clear_battery_settings_write_pending()
+            await coord.async_request_refresh()
             setattr(state, self._battery_schedule_enabled_attr(schedule_type), enabled)
         finally:
-            if use_battery_settings_toggle:
-                self._clear_schedule_family_toggle_target(schedule_type)
+            self._clear_schedule_family_toggle_target(schedule_type)
         if schedule_id is not None:
             setattr(
                 state, self._battery_schedule_start_attr(schedule_type), current_start

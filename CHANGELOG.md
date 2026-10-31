@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- Ignore truncated MQTT packets whose remaining-length field is incomplete.
 - Release HEMS inventory and heat-pump runtime retry delays when their authentication backoff is cleared, expires, or recovers, so normal polling can resume without waiting for the previous pause. (#975)
 - Resolve battery activity names within their own config entry, avoiding ambiguous names and the deprecated Home Assistant device-registry lookup.
 
@@ -18,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🔄 Other changes
+- Require 100% integration statement and branch coverage in CI, with regression tests for malformed responses, optional capabilities, stale caches, and concurrent task cleanup.
 - Refresh the README with light and dark banners matching the wiki artwork, new Home Assistant screenshots in both themes, a key features overview, a direct HACS link, a compact gallery, expandable device and feature details, and visible project badges at the bottom.
 - Classify the integration under Energy for Home Assistant Marketplace discovery.
 - Skip full integration tests on pull requests limited to descriptive manifest metadata while retaining hassfest, HACS, lint, and quality checks.

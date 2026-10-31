@@ -1413,6 +1413,7 @@ async def test_battery_schedule_editor_guard_paths_cover_missing_editor_and_fall
     )
     from custom_components.enphase_ev.switch import BatteryScheduleEditorDaySwitch
     from custom_components.enphase_ev.time import (
+        BatteryScheduleEditEndTimeEntity,
         BatteryScheduleEditStartTimeEntity,
         _parse_editor_time,
     )
@@ -1452,6 +1453,12 @@ async def test_battery_schedule_editor_guard_paths_cover_missing_editor_and_fall
     await delete_button.async_press()
     await edit_day.async_turn_on()
     await edit_day.async_turn_off()
+    await schedule_select.async_select_option("ignored")
+    await edit_limit.async_set_native_value(80)
+    await edit_time.async_set_value(dt_time(8))
+    await BatteryScheduleEditEndTimeEntity(coord, config_entry).async_set_value(
+        dt_time(9)
+    )
 
     assert save_button.device_info["manufacturer"] == "Enphase"
     assert schedule_select.device_info["manufacturer"] == "Enphase"

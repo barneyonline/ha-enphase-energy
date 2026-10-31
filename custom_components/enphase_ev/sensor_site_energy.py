@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.components.sensor import (
     RestoreSensor,
@@ -900,8 +900,7 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
             if flow_reset:
                 reset_detected = True
                 break
-            if delta is not None:
-                signed_delta_kwh += delta * sign
+            signed_delta_kwh += cast(float, delta) * sign
 
         if reset_detected:
             self._last_power_w = 0
@@ -1511,8 +1510,7 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
             if flow_reset:
                 reset_detected = True
                 break
-            if delta is not None:
-                signed_delta_kwh += delta * sign
+            signed_delta_kwh += cast(float, delta) * sign
 
         self._previous_live_flow_kwh = previous_live_flow_kwh
         self._previous_live_energy_ts = previous_live_energy_ts

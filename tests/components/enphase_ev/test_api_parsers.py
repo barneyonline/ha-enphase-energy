@@ -8,6 +8,73 @@ from custom_components.enphase_ev import api_parsers
 from custom_components.enphase_ev.api import EnphaseEVClient
 
 
+def test_discovery_without_wrapper_lists():
+    assert api_parsers.normalize_sites({"sites": None}) == []
+    chargers = api_parsers.normalize_chargers([{"serial": "EV123"}])
+    assert [charger.serial for charger in chargers] == ["EV123"]
+
+
+def test_latest_power_without_sample_time():
+    sample = api_parsers.parse_latest_power_payload(
+        {"latest_power": {"value": 10, "units": "W"}}
+    )
+    assert sample is not None
+    assert sample.time is None
+
+
+def test_timeseries_date_accepts_unix_seconds():
+    assert api_parsers.parse_evse_timeseries_date_key(1700000000) == "2023-11-14"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"energy_kwh": None},
+        {"values": [None, {"value": "bad"}, {"other": 1}]},
+        {"values": [{"energy_kwh": "bad", "value": None}]},
+    ],
+)
+def test_lifetime_timeseries_with_no_usable_energy_is_ignored(payload):
+    assert api_parsers.parse_evse_lifetime_entry("EV123", payload) is None
+
+
+@pytest.mark.parametrize("daily", [True, False])
+def test_timeseries_list_ignores_records_without_energy(daily):
+    assert (
+        api_parsers.normalize_evse_timeseries_payload(
+            [{"serial": "EV123"}], daily=daily
+        )
+        == {}
+    )
+
+
+@pytest.mark.parametrize("consumption", [None, [{"solar": 1, "details": None}]])
+def test_hems_consumption_omits_missing_detail_lists(consumption):
+    entry = api_parsers.parse_hems_daily_consumption_entry(
+        {"device_uid": "HP", "consumption": consumption}
+    )
+    assert entry is not None
+    assert entry.to_dict()["consumption"] == (
+        []
+        if consumption is None
+        else [{"solar": 1.0, "battery": None, "grid": None, "details": []}]
+    )
+
+
+def test_hems_consumption_ignores_non_mapping_devices():
+    result = api_parsers.normalize_hems_energy_consumption_payload(
+        {"heat-pump": [None]}
+    )
+    assert result is not None
+    assert result["data"]["heat-pump"] == []
+
+
+def test_pv_today_without_statistics_has_empty_statistics():
+    assert api_parsers.normalize_pv_system_today_payload({"stats": None}) == {
+        "stats": []
+    }
+
+
 def test_discovery_parsers_return_typed_models() -> None:
     """Discovery payloads normalize into API boundary model instances."""
 

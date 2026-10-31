@@ -2690,3 +2690,30 @@ async def test_storm_guard_evse_switch_turn_on_off(coordinator_factory) -> None:
     await sw.async_turn_off()
     coord.async_set_storm_evse_enabled.assert_awaited_with(False)
     coord.async_request_refresh.assert_awaited_once()
+
+
+async def test_charging_switch_restore_and_failure_refresh_without_optional_tracker(
+    hass, coordinator_factory, monkeypatch
+):
+    from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+    coord = coordinator_factory()
+    coord.last_update_success = False
+    entity = switch_mod.ChargingSwitch(coord, "EV")
+    entity.hass = hass
+    monkeypatch.setattr(CoordinatorEntity, "async_added_to_hass", AsyncMock())
+    monkeypatch.setattr(entity, "async_get_last_state", AsyncMock(return_value=None))
+    await entity.async_added_to_hass()
+    assert entity._restored_state is None
+    monkeypatch.setattr(coord, "async_request_refresh", AsyncMock())
+    monkeypatch.setattr(coord, "track_entry_background_task", None)
+    entity._schedule_failure_refresh()
+    await hass.async_block_till_done()
+    coord.async_request_refresh.assert_awaited_once()
+
+
+def test_switch_migration_replaces_named_suffix():
+    assert (
+        switch_mod._migrated_switch_entity_id("switch.target_custom", "switch.target")
+        == "switch.target"
+    )

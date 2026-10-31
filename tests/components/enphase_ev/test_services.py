@@ -694,15 +694,18 @@ async def test_grid_profile_browse_services_return_requested_catalog(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "region_code,known_profile", [("VIC", False), ("VIC", True), (None, False)]
+)
 async def test_set_grid_profile_service_uses_metadata_only_preflight(
-    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch, region_code, known_profile
 ) -> None:
     handlers = _register_service_handlers(hass, monkeypatch)
     runtime = SimpleNamespace(
         installer_access_confirmed=True,
         async_refresh=AsyncMock(),
         async_load_profiles=AsyncMock(),
-        profile_for_id=MagicMock(return_value=None),
+        profile_for_id=MagicMock(return_value=object() if known_profile else None),
         async_apply_grid_profile=AsyncMock(return_value={"success": True}),
     )
     coord = _fake_service_coordinator(site_id="grid-site", serials=set())
@@ -734,7 +737,7 @@ async def test_set_grid_profile_service_uses_metadata_only_preflight(
             data={
                 "site_id": "grid-site",
                 "profile_id": "agf:test",
-                "region_code": "VIC",
+                "region_code": region_code,
                 "confirm": True,
             }
         )
@@ -745,15 +748,21 @@ async def test_set_grid_profile_service_uses_metadata_only_preflight(
         force=False,
         load_profiles=False,
     )
+    expected_loads = []
+    if region_code:
+        expected_loads.append(
+            {"region_code": region_code, "commonly_used": True, "force": False}
+        )
+        if not known_profile:
+            expected_loads.append(
+                {"region_code": region_code, "commonly_used": False, "force": False}
+            )
     assert [
         awaited.kwargs for awaited in runtime.async_load_profiles.await_args_list
-    ] == [
-        {"region_code": "VIC", "commonly_used": True, "force": False},
-        {"region_code": "VIC", "commonly_used": False, "force": False},
-    ]
+    ] == expected_loads
     runtime.async_apply_grid_profile.assert_awaited_once_with(
         "agf:test",
-        region_code="VIC",
+        region_code=region_code,
         gateway_serial=None,
     )
 
@@ -2496,3 +2505,59 @@ async def test_export_limit_actions_optional_slew(hass, monkeypatch):
         coord.export_limit_runtime.async_apply.assert_awaited_with(
             watts, confirm=True, slew_rate=12.25
         )
+
+
+async def test_guided_tariff_combines_periods_in_same_day_group(hass, monkeypatch):
+    handlers = _register_service_handlers(hass, monkeypatch)
+    coord = _fake_service_coordinator(site_id="tariff-site", serials=set())
+    coord.tariff_runtime = SimpleNamespace(async_update_tariff=AsyncMock())
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={CONF_SITE_ID: "tariff-site", CONF_SITE_ONLY: True}
+    )
+    entry.add_to_hass(hass)
+    entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
+    await handlers[(DOMAIN, "update_tariff")](
+        SimpleNamespace(
+            data={
+                "site_id": "tariff-site",
+                "configure_import_tariff": True,
+                "import_tariff_type": "tou",
+                "import_periods": [
+                    {"start_time": "00:00", "end_time": "12:00", "rate": 0.2},
+                    {"start_time": "12:00", "end_time": "23:59", "rate": 0.3},
+                ],
+            }
+        )
+    )
+    tariff = coord.tariff_runtime.async_update_tariff.await_args.kwargs[
+        "purchase_tariff"
+    ]
+    assert len(tariff["seasons"][0]["days"][0]["periods"]) == 2
+
+
+async def test_delete_schedule_without_cached_inventory(hass, monkeypatch):
+    handlers = _register_service_handlers(hass, monkeypatch)
+    coord = _fake_service_coordinator(site_id="battery-site", serials=set())
+    coord.battery_runtime = SimpleNamespace(
+        async_delete_battery_schedule_batch=AsyncMock()
+    )
+    coord._battery_schedules_payload = {}
+    coord.battery_write_access_confirmed = True
+    coord.client = SimpleNamespace(delete_battery_schedule=AsyncMock())
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={CONF_SITE_ID: "battery-site", CONF_SITE_ONLY: True}
+    )
+    entry.add_to_hass(hass)
+    entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
+    await handlers[(DOMAIN, "delete_schedule")](
+        SimpleNamespace(
+            data={
+                "site_id": "battery-site",
+                "schedule_id": "schedule-1",
+                "confirm": True,
+            }
+        )
+    )
+    coord.battery_runtime.async_delete_battery_schedule_batch.assert_awaited_once()

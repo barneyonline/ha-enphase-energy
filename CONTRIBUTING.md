@@ -81,16 +81,15 @@ The quality-scale validator checks the bundled `brand/` PNG images. The legacy
 `--validate-remote-brands` flag remains accepted for existing CI commands and
 performs the same local checks; it no longer requests retired brands CDN assets.
 
-For a full coverage run, collect coverage once and reuse that data when enforcing
-100% statement coverage on the integration modules you changed. Branch data is
-also collected to expose untested decisions; the changed-module gate checks
-statements independently so it does not impose blanket 100% branch coverage.
-Replace the example `--include` value with your changed module paths. This coverage run replaces the
-plain integration pytest command above:
+The full integration suite must maintain 100% statement and branch coverage.
+The shared `.coveragerc` enables branch measurement and the 100% report gate.
+Collect coverage once and reuse the data for the full gate and changed-module
+statement report. Replace the example `--include` value with your changed modules.
+This coverage run replaces the separate integration pytest invocation above.
 
 ```bash
 docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage run --branch --source=custom_components.enphase_ev -m pytest -q tests/components/enphase_ev
-docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage report -m --fail-under=95
+docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage report -m --fail-under=100
 docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage json -o /tmp/enphase_ev.coverage.json
 docker compose -f devtools/docker/docker-compose.yml exec ha-dev python scripts/check_statement_coverage.py --report /tmp/enphase_ev.coverage.json --include="custom_components/enphase_ev/api.py,custom_components/enphase_ev/coordinator.py"
 ```

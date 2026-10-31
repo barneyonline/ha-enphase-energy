@@ -1054,8 +1054,9 @@ async def test_pricing_edits_disabled_removes_tariff_numbers_before_inventory_re
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("tracking", [True, False])
 async def test_tariff_rate_number_is_removed_when_loaded_spec_disappears(
-    hass, config_entry, monkeypatch
+    hass, config_entry, monkeypatch, tracking
 ) -> None:
     payload = {
         "purchase": {
@@ -1113,6 +1114,8 @@ async def test_tariff_rate_number_is_removed_when_loaded_spec_disappears(
     added.clear()
     prune_spy.reset_mock()
     coord.tariff_import_rate = None
+    if not tracking:
+        coord.track_entry_background_task = None
     listener_callbacks[0]()
     await hass.async_block_till_done()
 

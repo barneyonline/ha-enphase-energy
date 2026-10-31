@@ -1413,8 +1413,9 @@ def test_validate_selected_mappings_rejects_bad_target_registry_and_state(
     )
 
 
+@pytest.mark.parametrize("with_old_state", [True, False])
 def test_execute_takeover_archives_envoy_and_reassigns_target(
-    hass, monkeypatch
+    hass, monkeypatch, with_old_state
 ) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN, entry_id="enphase-entry", data={CONF_SITE_ID: "1"}
@@ -1441,6 +1442,9 @@ def test_execute_takeover_archives_envoy_and_reassigns_target(
         state="4.1",
         attrs=_energy_attrs(),
     )
+
+    if not with_old_state:
+        hass.states.async_remove(old_entity_id)
 
     error = execute_takeover(
         hass,
@@ -1743,3 +1747,29 @@ def test_format_helpers_render_markdown_lists() -> None:
         "`sensor.envoy_lifetime_production`"
     )
     assert format_completed_preview([]) == "No mappings were completed."
+
+
+def test_unknown_history_flow_has_no_candidate_score():
+    assert (
+        _score_candidate(
+            "unknown", EnvoyHistoryCandidate("sensor.total", "external", "Total", 1)
+        )
+        == 0
+    )
+
+
+async def test_external_discovery_skips_non_energy_sensors(hass):
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "1"})
+    source = MockConfigEntry(domain="external")
+    entry.add_to_hass(hass)
+    source.add_to_hass(hass)
+    _add_entity(
+        hass,
+        entry=source,
+        platform="external",
+        unique_id="temperature",
+        object_id="temperature",
+        state="20",
+        attrs={"unit_of_measurement": "°C"},
+    )
+    assert await discover_external_migration_candidates(hass, entry) == []

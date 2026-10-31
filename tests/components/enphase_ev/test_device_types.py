@@ -16,6 +16,25 @@ from custom_components.enphase_ev.device_types import (
 import custom_components.enphase_ev.device_types as device_types_mod
 
 
+@pytest.mark.parametrize("allowed", [None, ["envoy"]])
+def test_empty_hems_inventory_has_no_active_heatpump(allowed):
+    assert (
+        active_type_keys_from_inventory(
+            [{"type": "hemsdevices", "devices": []}], allowed_type_keys=allowed
+        )
+        == []
+    )
+
+
+def test_inventory_member_without_serial_is_ignored():
+    assert (
+        active_type_serials_from_inventory(
+            [{"type": "iqevse", "devices": [{"name": "Garage"}]}], type_key="iqevse"
+        )
+        == []
+    )
+
+
 def test_normalize_type_key_handles_aliases_and_unknown_tokens() -> None:
     assert normalize_type_key(" IQEVSE ") == "iqevse"
     assert normalize_type_key("EV Chargers") == "iqevse"

@@ -81,11 +81,7 @@ def _sync_type_devices(
         ident = inventory_view.type_identifier(type_key)
         if ident is None:
             continue
-        if (
-            isinstance(ident, tuple)
-            and len(ident) == 2
-            and ident in type_devices_by_identifier
-        ):
+        if ident in type_devices_by_identifier:
             type_devices[type_key] = type_devices_by_identifier[ident]
             continue
         label = inventory_view.type_label(type_key)
@@ -149,8 +145,7 @@ def _sync_type_devices(
             )
         created = dev_reg.async_get_or_create(**kwargs)
         type_devices[type_key] = created
-        if isinstance(ident, tuple) and len(ident) == 2:
-            type_devices_by_identifier[ident] = created
+        type_devices_by_identifier[ident] = created
     return type_devices
 
 

@@ -1910,3 +1910,50 @@ async def test_async_setup_entry_select_cleanup_waits_for_inventory_ready(
 
     remove_spy.assert_not_called()
     assert ent_reg.async_get(stale.entity_id) is not None
+
+
+def test_charge_mode_solar_hint_survives_missing_optional_profile_helper(
+    coordinator_factory, monkeypatch
+):
+    from custom_components.enphase_ev.select import ChargeModeSelect
+
+    coord = coordinator_factory(
+        data={RANDOM_SERIAL: {"charge_mode_pref": "MANUAL_CHARGING"}}
+    )
+    monkeypatch.setattr(coord, "_battery_profile_charge_mode_preference", None)
+    monkeypatch.setattr(coord, "_cached_charge_mode_preference", lambda serial: None)
+    entity = ChargeModeSelect(coord, RANDOM_SERIAL)
+    entity._solar_mode_keys = ("GREEN_CHARGING",)
+    entity._solar_mode_is_hint = True
+    assert entity._solar_modes() == ("GREEN_CHARGING",)
+    coord.data[RANDOM_SERIAL]["charge_mode_pref"] = "SMART_CHARGING"
+    monkeypatch.setattr(
+        coord.client, "charge_mode_solar_modes", lambda serial: ("GREEN_CHARGING",)
+    )
+    monkeypatch.setattr(
+        coord.client,
+        "invalidate_charge_mode_solar_modes",
+        lambda *args, **kwargs: False,
+    )
+    assert entity.current_option is None
+
+
+async def test_battery_schedule_type_ignores_unknown_label(
+    hass, config_entry, coordinator_factory
+):
+    from custom_components.enphase_ev.select import BatteryNewScheduleTypeSelect
+    from custom_components.enphase_ev.battery_schedule_editor import (
+        BatteryScheduleEditorManager,
+    )
+
+    coord = coordinator_factory()
+    editor = BatteryScheduleEditorManager(coord)
+    config_entry.runtime_data = EnphaseRuntimeData(
+        coordinator=coord, battery_schedule_editor=editor
+    )
+    entity = BatteryNewScheduleTypeSelect(coord, config_entry)
+    entity.hass = hass
+    editor.select_schedule("new_schedule")
+    before = editor.edit.schedule_type
+    await entity.async_select_option("unknown")
+    assert editor.edit.schedule_type == before
