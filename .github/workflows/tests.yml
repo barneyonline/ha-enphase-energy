@@ -18,6 +18,7 @@ on:
       - 'devtools/docker/docker-compose.yml'
       - 'hacs.json'
       - 'pytest.ini'
+      - '.coveragerc'
       - 'quality_scale.yaml'
       - '.github/workflows/ci.yml'
       - '.github/workflows/tests.yml'
@@ -86,7 +87,7 @@ jobs:
           fi
 
           common='^(hacs\.json|\.github/workflows/(ci|tests)\.yml|scripts/ci_manifest_metadata\.py|devtools/docker/(Dockerfile|docker-compose\.yml|constraints-[^/]+\.txt))$'
-          set_output integration "${common}|^scripts/(benchmark_snapshots|check_statement_coverage)\.py$|^custom_components/enphase_ev/|^tests/components/enphase_ev/|^devtools/docker/requirements-dev\.txt$|^pytest\.ini$|^\.pre-commit-config\.yaml$|^\.ruff\.toml$" "$integration_files"
+          set_output integration "${common}|^scripts/(benchmark_snapshots|check_statement_coverage)\.py$|^custom_components/enphase_ev/|^tests/components/enphase_ev/|^devtools/docker/requirements-dev\.txt$|^pytest\.ini$|^\.coveragerc$|^\.pre-commit-config\.yaml$|^\.ruff\.toml$" "$integration_files"
           set_output diagnostics "${common}|^custom_components/enphase_ev/.*\.py$|^scripts/importtime_profile\.py$|^tests/scripts/test_importtime_profile\.py$|^devtools/docker/requirements-dev\.txt$"
           set_output quality "${common}|^custom_components/enphase_ev/|^tests/components/enphase_ev/|^quality_scale\.yaml$|^scripts/validate_quality_scale\.py$|^tests/scripts/test_validate_quality_scale\.py$|^devtools/docker/requirements-(dev|ci-quality)\.txt$|^\.pre-commit-config\.yaml$|^\.strict-typing$"
           set_output scripts "${common}|^scripts/.*\.py$|^tests/scripts/.*\.py$|^devtools/docker/requirements-ci-scripts\.txt$"
@@ -241,7 +242,7 @@ jobs:
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
           PYTEST_PLUGINS: pytest_asyncio.plugin,pytest_homeassistant_custom_component.plugins,pytest_cov.plugin,pytest_github_actions_annotate_failures.plugin
-        run: pytest -q tests/components/enphase_ev --cov=custom_components.enphase_ev --cov-branch --cov-report=term-missing --cov-report=xml --cov-report=json --cov-fail-under=95 --junitxml=junit.xml -o junit_family=legacy --log-file=pytest-runtime-warnings.log --log-file-level=WARNING
+        run: pytest -q tests/components/enphase_ev --cov=custom_components.enphase_ev --cov-branch --cov-report=term-missing --cov-report=xml --cov-report=json --cov-fail-under=100 --junitxml=junit.xml -o junit_family=legacy --log-file=pytest-runtime-warnings.log --log-file-level=WARNING
       - name: Upload runtime warning log
         if: ${{ always() }}
         uses: actions/upload-artifact@v7

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import logging
+from types import SimpleNamespace
+
+import pytest
 
 from custom_components.enphase_ev.entity import EnphaseBaseEntity
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
@@ -8,6 +11,44 @@ from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
 
 class DummyEntity(EnphaseBaseEntity):
     """Concrete subclass for exercising base entity logic."""
+
+
+def test_charge_mode_ignores_blank_resolved_and_raw_modes():
+    from custom_components.enphase_ev.entity import evse_resolved_charge_mode
+
+    coord = SimpleNamespace(
+        _resolve_charge_mode_pref=lambda serial: " ",
+        data={
+            RANDOM_SERIAL: {"charge_mode_pref": " ", "charge_mode": "manual_charging"}
+        },
+    )
+    assert evse_resolved_charge_mode(coord, RANDOM_SERIAL) == "MANUAL_CHARGING"
+
+
+def test_base_entity_data_without_coordinator_is_empty():
+    entity = object.__new__(EnphaseBaseEntity)
+    assert entity.data == {}
+
+
+def test_base_entity_initially_rejects_non_mapping_data(coordinator_factory):
+    coord = coordinator_factory()
+    coord.data = ["invalid"]
+    entity = DummyEntity(coord, RANDOM_SERIAL)
+    assert not entity.available
+    assert entity.data == {}
+
+
+@pytest.mark.parametrize("had_data", [False, True])
+def test_base_entity_repeated_missing_data_does_not_repeat_log(
+    coordinator_factory, caplog, had_data
+):
+    coord = coordinator_factory(data={})
+    entity = DummyEntity(coord, RANDOM_SERIAL)
+    entity._ever_had_data = had_data
+    entity.async_write_ha_state = lambda: None
+    caplog.set_level(logging.INFO)
+    entity._handle_coordinator_update()
+    assert "data unavailable" not in caplog.text
 
 
 def test_base_entity_data_falls_back_to_coordinator(coordinator_factory):

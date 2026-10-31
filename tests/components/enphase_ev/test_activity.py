@@ -995,6 +995,28 @@ async def test_coordinator_notification_keeps_cloud_discovery_quiet(activity, ha
     assert publisher.baselines["cloud"].signature[1] == "service_unavailable"
 
 
+async def test_activity_handles_registered_entities_without_states(activity, hass):
+    record = activity.make("cloud_reachable", "on", domain="binary_sensor")
+    hass.states.async_remove(record.entity_id)
+    await hass.async_block_till_done()
+    publisher = activity.start()
+    assert publisher.baselines == {}
+    assert not activity.events
+
+
+async def test_activity_coalesces_cloud_notifications(activity, hass):
+    activity.make("cloud_reachable", "on", domain="binary_sensor")
+    await hass.async_block_till_done()
+    publisher = activity.start()
+    publisher._coordinator_updated()
+    first_handle = publisher._cloud_handle
+    publisher._coordinator_updated()
+    assert publisher._cloud_handle is first_handle
+    await hass.async_block_till_done()
+    assert publisher._cloud_handle is None
+    assert not activity.events
+
+
 async def test_actual_coordinator_notification_cloud_fallback(
     activity, hass, coordinator_factory
 ):

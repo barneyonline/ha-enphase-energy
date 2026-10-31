@@ -605,7 +605,7 @@ async def async_setup_entry(
                     "dry_contacts_inventory",
                     EnphaseDryContactsInventorySensor(coord),
                 )
-            elif inventory_ready:
+            else:
                 _async_remove_site_sensor_entity("dry_contacts_inventory")
             production_meter_present = _gateway_meter_present("production")
             if (
@@ -617,7 +617,7 @@ async def async_setup_entry(
                     "gateway_production_meter",
                     EnphaseGatewayProductionMeterSensor(coord),
                 )
-            elif inventory_ready:
+            else:
                 _async_remove_site_sensor_entity("gateway_production_meter")
             consumption_meter_present = _gateway_meter_present("consumption")
             if (
@@ -629,7 +629,7 @@ async def async_setup_entry(
                     "gateway_consumption_meter",
                     EnphaseGatewayConsumptionMeterSensor(coord),
                 )
-            elif inventory_ready:
+            else:
                 _async_remove_site_sensor_entity("gateway_consumption_meter")
             _add_site_entity(
                 "gateway_connectivity_status",

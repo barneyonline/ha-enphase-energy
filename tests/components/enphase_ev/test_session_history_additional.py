@@ -443,3 +443,31 @@ def test_sum_session_energy_skips_invalid_entries():
         ]
     )
     assert total == 1.0
+
+
+async def test_session_enrichment_empty_result_cleans_inflight(hass, monkeypatch):
+    manager = sh_mod.SessionHistoryManager(
+        hass, client_getter=lambda: None, cache_ttl=60
+    )
+    monkeypatch.setattr(manager, "_async_enrich_sessions", AsyncMock(return_value={}))
+    manager.schedule_enrichment(["EV"], day_local=datetime.now(timezone.utc))
+    await hass.async_block_till_done()
+    assert not manager._refresh_in_progress
+    assert manager._normalize_serials([" ", "EV"]) == {"EV"}
+
+
+async def test_session_day_timezone_fallback_accepts_aware_datetime(hass, monkeypatch):
+    day = datetime(2026, 10, 31, tzinfo=timezone.utc)
+    client = SimpleNamespace(session_history=AsyncMock(return_value={"data": []}))
+    manager = sh_mod.SessionHistoryManager(
+        hass, client_getter=lambda: client, cache_ttl=60
+    )
+    with monkeypatch.context() as context:
+        context.setattr(
+            sh_mod.dt_util,
+            "as_local",
+            __import__("unittest.mock", fromlist=["Mock"]).Mock(
+                side_effect=[ValueError(), day]
+            ),
+        )
+        assert await manager._async_fetch_sessions_today("EV", day_local=day) == []

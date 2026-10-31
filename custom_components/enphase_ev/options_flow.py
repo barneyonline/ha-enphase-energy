@@ -1880,7 +1880,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                     )
                     if not unloaded:
                         errors["base"] = "envoy_entry_loaded"
-                    elif source_entry is not None:
+                    else:
                         object.__setattr__(
                             source_entry,
                             "state",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
@@ -38,6 +39,34 @@ from custom_components.enphase_ev.summary import (
     SUMMARY_IDLE_TTL,
 )
 from custom_components.enphase_ev.runtime_helpers import normalize_poll_intervals
+
+
+@pytest.mark.parametrize("site_metadata, inverter_data", [(None, None), ([], [])])
+def test_inverter_start_date_ignores_non_mapping_metadata(site_metadata, inverter_data):
+    assert (
+        runtime_helpers.resolve_inverter_start_date(site_metadata, inverter_data)
+        is None
+    )
+
+
+@pytest.mark.asyncio
+async def test_summary_expired_cache_is_replaced(monkeypatch):
+    client = SimpleNamespace(summary_v2=AsyncMock(return_value=[{"name": "fresh"}]))
+    store = SummaryStore(lambda: client)
+    monkeypatch.setattr(summary_mod.time, "monotonic", lambda: 1000.0)
+    store._cache = (0.0, [{"name": "stale"}], 600.0)
+
+    assert await store.async_fetch() == [{"name": "fresh"}]
+    client.summary_v2.assert_awaited_once_with()
+    assert store.diagnostics()["using_stale"] is False
+
+
+def test_summary_future_success_clock_has_no_negative_age(monkeypatch):
+    store = SummaryStore(lambda: None)
+    monkeypatch.setattr(summary_mod.time, "monotonic", lambda: 10.0)
+    store._state["last_success_mono"] = 20.0
+
+    assert store.diagnostics()["last_success_age_s"] is None
 
 
 def test_runtime_helpers_cover_parsing_dates_and_redaction(monkeypatch) -> None:

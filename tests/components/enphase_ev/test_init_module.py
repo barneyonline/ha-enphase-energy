@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, call
 
 import aiohttp
 import pytest
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import ConfigEntryState, OperationNotAllowed
 import voluptuous as vol
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from homeassistant import config_entries
@@ -396,15 +396,18 @@ def test_complete_startup_migrations_if_ready_ignores_failing_readiness_check(
 
 
 @pytest.mark.parametrize("update_result", [False, RuntimeError("boom")])
+@pytest.mark.parametrize("with_runtime", [False, True])
 def test_complete_startup_migrations_clears_reload_suppression_when_update_not_applied(
     hass: HomeAssistant,
     config_entry,
     monkeypatch,
     update_result,
+    with_runtime,
 ) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
     dev_reg = dr.async_get(hass)
-    config_entry.runtime_data = EnphaseRuntimeData(coordinator=SimpleNamespace())
+    if with_runtime:
+        config_entry.runtime_data = EnphaseRuntimeData(coordinator=SimpleNamespace())
     object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
     class DummyCoordinator:
@@ -454,7 +457,8 @@ def test_complete_startup_migrations_clears_reload_suppression_when_update_not_a
             hass, config_entry, DummyCoordinator(), dev_reg, site_id
         )
 
-    assert config_entry.runtime_data.reload_suppression_count == 0
+    if with_runtime:
+        assert config_entry.runtime_data.reload_suppression_count == 0
 
 
 def test_iter_device_registry_entries_handles_edge_paths() -> None:
@@ -976,9 +980,12 @@ async def test_async_setup_entry_restores_handoff_without_blocking_refresh(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("with_site", [True, False])
 async def test_async_setup_entry_cleans_cold_runtime_after_manager_failure(
-    hass: HomeAssistant, config_entry, monkeypatch, caplog
+    hass: HomeAssistant, config_entry, monkeypatch, caplog, with_site
 ) -> None:
+    if not with_site:
+        hass.config_entries.async_update_entry(config_entry, data={CONF_SITE_ID: ""})
     coordinator = SimpleNamespace(
         async_cleanup_runtime_state=AsyncMock(
             side_effect=RuntimeError("cleanup failed")
@@ -1375,8 +1382,9 @@ async def test_remove_legacy_site_device_preserves_real_devices_with_site_identi
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("supports_remove", [False, True])
 async def test_remove_legacy_site_device_removes_empty_device_without_gateway(
-    hass: HomeAssistant, config_entry
+    hass: HomeAssistant, config_entry, monkeypatch, supports_remove
 ) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
     dev_reg = dr.async_get(hass)
@@ -1393,9 +1401,11 @@ async def test_remove_legacy_site_device_removes_empty_device_without_gateway(
         )
     )
 
+    if not supports_remove:
+        monkeypatch.setattr(dev_reg, "async_remove_device", None)
     _remove_legacy_site_device(hass, config_entry, coord, dev_reg, site_id)
 
-    assert dev_reg.async_get(legacy_site_device.id) is None
+    assert (dev_reg.async_get(legacy_site_device.id) is None) is supports_remove
 
 
 @pytest.mark.asyncio
@@ -5420,8 +5430,9 @@ def test_migrate_cloud_entities_to_cloud_device_handles_edge_paths(
     )
 
 
+@pytest.mark.parametrize("sw_version", [object(), "5.2.2"])
 def test_migrate_cloud_entities_to_cloud_device_cloud_info_fallbacks(
-    hass: HomeAssistant, config_entry, monkeypatch
+    hass: HomeAssistant, config_entry, monkeypatch, sw_version
 ) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
     captured: dict[str, object] = {}
@@ -5440,7 +5451,7 @@ def test_migrate_cloud_entities_to_cloud_device_cloud_info_fallbacks(
     )
     monkeypatch.setattr(
         "custom_components.enphase_ev.registry_migrations._cloud_device_info",
-        lambda _site_id: {"model": object(), "sw_version": object()},
+        lambda _site_id: {"model": object(), "sw_version": sw_version},
     )
 
     _migrate_cloud_entities_to_cloud_device(
@@ -5452,7 +5463,9 @@ def test_migrate_cloud_entities_to_cloud_device_cloud_info_fallbacks(
     )
 
     assert captured["model"] == "Cloud Service"
-    assert captured["sw_version"] is None
+    assert captured["sw_version"] == (
+        sw_version if isinstance(sw_version, str) else None
+    )
 
 
 def test_is_disabled_by_integration_handles_bad_string_value() -> None:
@@ -6227,3 +6240,146 @@ async def test_failed_platform_unload_preserves_active_runtime(
     assert await async_unload_entry(hass, config_entry) is False
     assert coord.runtime_active is True
     assert config_entry.runtime_data.coordinator is coord
+
+
+@pytest.mark.parametrize("supports_remove", [False, True])
+def test_empty_type_migrations_with_optional_device_removal(
+    hass, config_entry, coordinator_factory, monkeypatch, supports_remove
+):
+    from custom_components.enphase_ev.registry_migrations import (
+        _migrate_legacy_gateway_type_devices,
+        _remove_evse_type_device_and_entities,
+    )
+
+    site_id = config_entry.data[CONF_SITE_ID]
+    registry = dr.async_get(hass)
+    gateway = registry.async_get_or_create(
+        config_entry_id=config_entry.entry_id,
+        identifiers={(DOMAIN, f"type:{site_id}:envoy")},
+    )
+    legacy = registry.async_get_or_create(
+        config_entry_id=config_entry.entry_id,
+        identifiers={(DOMAIN, f"type:{site_id}:enpower")},
+    )
+    evse = registry.async_get_or_create(
+        config_entry_id=config_entry.entry_id,
+        identifiers={(DOMAIN, f"type:{site_id}:iqevse")},
+    )
+    if not supports_remove:
+        monkeypatch.setattr(registry, "async_remove_device", None)
+    coord = coordinator_factory()
+    _migrate_legacy_gateway_type_devices(hass, config_entry, coord, registry, site_id)
+    _remove_evse_type_device_and_entities(hass, config_entry, registry, site_id)
+    assert registry.async_get(gateway.id)
+    assert (registry.async_get(legacy.id) is None) is supports_remove
+    assert (registry.async_get(evse.id) is None) is supports_remove
+
+
+@pytest.mark.parametrize("minor_version", [2, 3])
+async def test_migration_preserves_explicit_grid_profile_option(hass, minor_version):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={},
+        options={OPT_GRID_PROFILE_CONTROLS_ENABLED: True},
+        version=1,
+        minor_version=minor_version,
+    )
+    entry.add_to_hass(hass)
+    assert await async_migrate_entry(hass, entry)
+    assert entry.options[OPT_GRID_PROFILE_CONTROLS_ENABLED] is True
+
+
+@pytest.mark.parametrize("failure", [OperationNotAllowed, RuntimeError])
+async def test_update_listener_without_runtime_handles_reload_failure(
+    hass, config_entry, monkeypatch, failure
+):
+    from custom_components.enphase_ev import _async_update_listener_locked
+
+    object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
+    monkeypatch.setattr(
+        hass.config_entries,
+        "async_reload",
+        AsyncMock(side_effect=failure("reload unavailable")),
+    )
+    if failure is RuntimeError:
+        with pytest.raises(RuntimeError):
+            await _async_update_listener_locked(hass, config_entry, None)
+    else:
+        await _async_update_listener_locked(hass, config_entry, None)
+
+
+@pytest.mark.parametrize("replace_runtime", [False, True])
+async def test_failed_setup_retains_only_newer_runtime(
+    hass, config_entry, monkeypatch, replace_runtime
+):
+    from custom_components.enphase_ev import __dict__ as namespace
+
+    original = EnphaseRuntimeData(coordinator=SimpleNamespace())
+    replacement = EnphaseRuntimeData(coordinator=SimpleNamespace())
+    config_entry.runtime_data = original if replace_runtime else None
+
+    async def cleanup(entry, runtime):
+        assert runtime is original
+        entry.runtime_data = replacement
+
+    monkeypatch.setitem(
+        namespace,
+        "_async_setup_entry_impl",
+        AsyncMock(side_effect=RuntimeError("setup failed")),
+    )
+    monkeypatch.setitem(namespace, "_async_cleanup_failed_runtime", cleanup)
+    with pytest.raises(RuntimeError, match="setup failed"):
+        await async_setup_entry(hass, config_entry)
+    assert config_entry.runtime_data is (replacement if replace_runtime else None)
+
+
+async def test_cloud_migration_enables_entity_already_on_cloud_device(
+    hass, config_entry, coordinator_factory
+):
+    site_id = config_entry.data[CONF_SITE_ID]
+    devices = dr.async_get(hass)
+    cloud = devices.async_get_or_create(
+        config_entry_id=config_entry.entry_id,
+        identifiers={(DOMAIN, f"type:{site_id}:cloud")},
+    )
+    registry = er.async_get(hass)
+    entity = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{DOMAIN}_site_{site_id}_grid_import",
+        config_entry=config_entry,
+        device_id=cloud.id,
+        disabled_by=er.RegistryEntryDisabler.INTEGRATION,
+    )
+    _migrate_cloud_entities_to_cloud_device(
+        hass, config_entry, coordinator_factory(), devices, site_id
+    )
+    assert registry.async_get(entity.entity_id).disabled_by is None
+
+
+async def test_setup_failure_joins_completed_metadata_tasks(
+    hass, config_entry, coordinator_factory, monkeypatch
+):
+    from custom_components.enphase_ev import __dict__ as namespace
+
+    coord = coordinator_factory()
+    ready = asyncio.Event()
+    monkeypatch.setitem(namespace, "async_prime_label_translations", AsyncMock())
+
+    async def prime_version(hass):
+        ready.set()
+
+    monkeypatch.setitem(namespace, "async_prime_integration_version", prime_version)
+
+    async def fail_refresh():
+        await ready.wait()
+        await asyncio.sleep(0)
+        raise RuntimeError("refresh failed")
+
+    monkeypatch.setattr(coord, "async_bootstrap_first_refresh", fail_refresh)
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
+        lambda *args, **kwargs: coord,
+    )
+    with pytest.raises(RuntimeError, match="refresh failed"):
+        await async_setup_entry(hass, config_entry)

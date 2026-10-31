@@ -174,6 +174,8 @@ class MqttStreamSurface:
                 if (digit & 128) == 0:
                     break
                 multiplier *= 128
+            else:
+                return
             end = offset + remaining
             if end > data_len:
                 return

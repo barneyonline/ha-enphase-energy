@@ -363,6 +363,7 @@ def test_manifest_additions_deletions_and_renames_keep_tests(manifest_repo, oper
         "custom_components/enphase_ev/strings.json",
         "custom_components/enphase_ev/translations/fr.json",
         "devtools/docker/requirements-dev.txt",
+        ".coveragerc",
         ".github/workflows/tests.yml",
         "scripts/ci_manifest_metadata.py",
     ],

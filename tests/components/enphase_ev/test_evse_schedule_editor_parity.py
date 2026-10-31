@@ -657,6 +657,11 @@ async def test_evse_schedule_editor_entities_handle_missing_runtime(
     assert day.available is False
     assert day.is_on is False
     await day.async_turn_off()
+    await day.async_turn_on()
+    await start.async_set_value(dt_time(8))
+    await EvseScheduleEditEndTimeEntity(
+        coord, config_entry, RANDOM_SERIAL
+    ).async_set_value(dt_time(9))
 
     await save.async_press()
     await delete.async_press()
@@ -668,6 +673,7 @@ async def test_evse_schedule_editor_entities_handle_missing_runtime(
     editor.set_edit_time(RANDOM_SERIAL, "start_time", dt_time(6, 0))
     editor.set_edit_time(RANDOM_SERIAL, "end_time", dt_time(7, 0))
     coord.schedule_sync = None
+    await EvseScheduleRefreshButton(coord, config_entry, RANDOM_SERIAL).async_press()
     save_with_editor = EvseScheduleSaveButton(coord, config_entry, RANDOM_SERIAL)
     await save_with_editor.async_press()
     delete_new = EvseScheduleDeleteButton(coord, config_entry, RANDOM_SERIAL)

@@ -115,7 +115,7 @@ async def async_setup_entry(
             ent_reg.async_remove(entity_id)
         if key == "heat_pump_sg_ready_active":
             heatpump_sg_ready_entity_added = False
-        elif key == "active_system_events":
+        else:
             system_events_entity_added = False
 
     @callback
@@ -179,9 +179,8 @@ async def async_setup_entry(
             entities.append(PluggedInBinarySensor(coord, sn))
             entities.append(ChargingBinarySensor(coord, sn))
             entities.append(ConnectedBinarySensor(coord, sn))
-        if entities:
-            async_add_entities(entities, update_before_add=False)
-            known_serials.update(serials)
+        async_add_entities(entities, update_before_add=False)
+        known_serials.update(serials)
 
     add_topology_listener = getattr(coord, "async_add_topology_listener", None)
     add_update_listener = getattr(coord, "async_add_listener", None)

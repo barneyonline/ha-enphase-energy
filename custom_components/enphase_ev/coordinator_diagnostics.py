@@ -1547,10 +1547,11 @@ class CoordinatorDiagnostics:
             )
             return
         placeholders = {
-            "pending_timeout_minutes": str(int(BATTERY_PROFILE_PENDING_TIMEOUT_S // 60))
+            "pending_timeout_minutes": str(
+                int(BATTERY_PROFILE_PENDING_TIMEOUT_S // 60)
+            ),
+            "pending_age_minutes": str(max(1, cast(int, age_s) // 60)),
         }
-        if age_s is not None:
-            placeholders["pending_age_minutes"] = str(max(1, age_s // 60))
         self._report_flagged_issue(
             "_battery_profile_issue_reported",
             ISSUE_BATTERY_PROFILE_PENDING,

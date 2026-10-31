@@ -1476,3 +1476,19 @@ async def test_refresh_runner_surfaces_unexpected_stage_errors(
 
     assert coord.last_failure_source == "refresh_stage"
     assert coord.last_failure_endpoint == "devices_inventory_s"
+
+
+async def test_empty_refresh_stage_without_timing_key(coordinator_factory):
+    timings = {}
+    await RefreshRunner(coordinator_factory()).async_run_staged_refresh_calls(timings)
+    assert timings == {}
+
+
+def test_site_followup_without_due_inverters():
+    owner = _RefreshOwner()
+    owner.inventory_runtime.inverters_refresh_due = lambda: False
+    assert "inverters_s" not in [
+        task.timing_key
+        for stage in build_site_only_followup_plan(owner).stages
+        for task in stage.ordered_tasks
+    ]

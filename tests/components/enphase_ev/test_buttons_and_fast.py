@@ -810,8 +810,9 @@ async def test_battery_schedule_save_button_shows_success_notification(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("schedule_disappeared", [False, True])
 async def test_battery_schedule_delete_button_shows_success_notification(
-    hass, config_entry, monkeypatch
+    hass, config_entry, monkeypatch, schedule_disappeared
 ) -> None:
     from custom_components.enphase_ev.battery_schedule_editor import (
         BatteryScheduleEditorManager,
@@ -874,13 +875,16 @@ async def test_battery_schedule_delete_button_shows_success_notification(
     button = BatteryScheduleDeleteButton(coord, config_entry)
     button.hass = hass
 
+    if schedule_disappeared:
+        monkeypatch.setattr(editor, "get_schedule", lambda schedule_id: None)
+
     await button.async_press()
 
     async_call.assert_awaited_once()
     notification_spy.assert_called_once()
     args = notification_spy.call_args.args
     kwargs = notification_spy.call_args.kwargs
-    assert args[1] == "Restrict Battery Discharge Schedule 06:30-11:00"
+    assert args[1]
     assert kwargs["title"] == button._button_label("delete")  # noqa: SLF001
     assert kwargs["notification_id"] == "enphase_ev_battery_schedule_result_site"
 

@@ -4802,3 +4802,62 @@ async def test_tariff_reconcile_sleep_observes_retired_runtime(coordinator_facto
     runtime.async_refresh = AsyncMock()
     await runtime._async_reconcile_after_write(())
     runtime.async_refresh.assert_not_awaited()
+
+
+def test_legacy_tariff_without_locator_or_timezone():
+    from dataclasses import replace
+
+    assert tariff_mod._normalize_days([None, "1"]) == [1]
+    snapshot = parse_tariff_rate({"purchase": _write_test_branch("0.3")}, "purchase")
+    assert snapshot is not None
+    legacy = replace(
+        snapshot,
+        branch_key=None,
+        seasons=({"off_peak": "0.2", "tiers": [{"rate": "0.3"}]},),
+    )
+    specs = tariff_rate_sensor_specs(legacy)
+    assert len(specs) == 2
+    assert all("tariff_locator" not in spec["attributes"] for spec in specs)
+    assert (
+        parse_dated_tariff_rate({"data": {"purchase": [{"rate": "0.2"}]}}, "purchase")
+        is not None
+    )
+    tariff_mod._validate_tariff_season(
+        {"tiers": [{"rate": "0.3", "startValue": 0}], "id": "tier"}, type_id="tiered"
+    )
+    assert isinstance(tariff_mod._site_local_today(SimpleNamespace()), date)
+
+
+@pytest.mark.parametrize("cancelled", [False, True])
+async def test_partial_tariff_write_cleanup_failure_preserves_original_error(
+    coordinator_factory, cancelled
+):
+    coord, runtime = _pending_tariff_test_runtime(coordinator_factory)
+    failure = (
+        asyncio.CancelledError() if cancelled else RuntimeError("billing unavailable")
+    )
+    coord.client.site_tariff_billing_update.side_effect = failure
+    runtime._async_finish_write = AsyncMock(side_effect=RuntimeError("readback failed"))
+    with pytest.raises(type(failure)) as caught:
+        await runtime.async_update_tariff(
+            purchase_tariff=_write_test_branch("0.3"),
+            billing={
+                "billing_start_date": "2026-09-01",
+                "billing_frequency": "MONTH",
+                "billing_interval_value": 1,
+            },
+        )
+    assert caught.value is failure
+    if cancelled:
+        runtime._schedule_post_write_reconciliation.assert_not_called()
+    else:
+        runtime._schedule_post_write_reconciliation.assert_called_once()
+
+
+async def test_tariff_write_readback_without_notification_extension(
+    coordinator_factory,
+):
+    coord, runtime = _pending_tariff_test_runtime(coordinator_factory)
+    coord.client.notify_tariff_change = None
+    await runtime.async_update_tariff(purchase_tariff=_write_test_branch("0.3"))
+    coord.client.site_tariff_bundle.assert_awaited_once()

@@ -8,7 +8,7 @@ import time
 from collections.abc import Awaitable, Callable
 from datetime import datetime, time as dt_time, timedelta
 from datetime import timezone as _tz
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from zoneinfo import ZoneInfo
 
 from homeassistant.util import dt as dt_util
@@ -1006,25 +1006,20 @@ class HeatpumpRuntime:
         site_today_total_wh = self._site_today_heatpump_total_wh(site_today_payload)
         if site_today_total_wh is None:
             return None
+        site_today = cast(dict[str, object], site_today_payload)
         site_today_timestamp = None
         site_today_timestamp_source = None
-        if isinstance(site_today_payload, dict):
-            for key in ("last_report_date", "timestamp", "lastReportDate"):
-                if site_today_payload.get(key) is None:
-                    continue
-                site_today_timestamp = site_today_payload.get(key)
-                site_today_timestamp_source = key
-                break
+        for key in ("last_report_date", "timestamp", "lastReportDate"):
+            if site_today.get(key) is None:
+                continue
+            site_today_timestamp = site_today.get(key)
+            site_today_timestamp_source = key
+            break
         if site_today_timestamp is None:
             site_today_timestamp = dt_util.utcnow().isoformat()
             site_today_timestamp_source = "coordinator_refresh"
-        first_stat = None
-        if isinstance(site_today_payload, dict):
-            stats = site_today_payload.get("stats")
-            if isinstance(stats, list):
-                first_stat = next(
-                    (item for item in stats if isinstance(item, dict)), None
-                )
+        stats = cast(list[object], site_today["stats"])
+        first_stat = next((item for item in stats if isinstance(item, dict)), None)
         snapshot: dict[str, object] = {
             "device_uid": None,
             "device_name": None,
@@ -1552,9 +1547,7 @@ class HeatpumpRuntime:
                 display_delta_wh = coerce_optional_float(
                     smoothed_summary.get("delta_wh")
                 )
-                smoothed_start = smoothed_summary.get("series_start_utc")
-                if isinstance(smoothed_start, datetime):
-                    series_start_utc = smoothed_start
+                series_start_utc = cast(datetime, smoothed_summary["series_start_utc"])
                 display_validation = str(smoothed_summary["validation"])
                 validation = display_validation
                 smoothed = True
@@ -1586,9 +1579,7 @@ class HeatpumpRuntime:
                 display_delta_wh = coerce_optional_float(
                     smoothed_summary.get("delta_wh")
                 )
-                smoothed_start = smoothed_summary.get("series_start_utc")
-                if isinstance(smoothed_start, datetime):
-                    series_start_utc = smoothed_start
+                series_start_utc = cast(datetime, smoothed_summary["series_start_utc"])
                 display_validation = str(smoothed_summary["validation"])
                 validation = display_validation
                 smoothed = True
@@ -2063,6 +2054,7 @@ class HeatpumpRuntime:
 
         site_date = self._site_local_current_date()
         previous_device_uid = self._heatpump_power_device_uid
+        attempts: list[dict[str, object]] = []
         power_snapshot: dict[str, object] = {
             "site_date": site_date,
             "force": force,
@@ -2072,7 +2064,7 @@ class HeatpumpRuntime:
                     self._heatpump_runtime_device_uid()
                 )
             ],
-            "attempts": [],
+            "attempts": attempts,
             "selected_payload": None,
             "selected_source": None,
             "selected_sample_at_utc": None,
@@ -2118,9 +2110,7 @@ class HeatpumpRuntime:
             )
             power_snapshot["last_error"] = error
             power_snapshot["outcome"] = "fetch_error"
-            attempts = power_snapshot.setdefault("attempts", [])
-            if isinstance(attempts, list):
-                attempts.append({"source": "site_today_heatpump", "error": error})
+            attempts.append({"source": "site_today_heatpump", "error": error})
             self._heatpump_mark_power_stale(
                 now=now,
                 error=error,
@@ -2145,9 +2135,7 @@ class HeatpumpRuntime:
             runtime_snapshot=getattr(self, "_heatpump_runtime_state", None),
         )
         if power_summary is not None:
-            attempts = power_snapshot.setdefault("attempts", [])
-            if isinstance(attempts, list):
-                attempts.append(dict(power_summary))
+            attempts.append(dict(power_summary))
             if _LOGGER.isEnabledFor(logging.DEBUG):
                 _LOGGER.debug(
                     "Heat pump power candidate payload for site %s: %s",
@@ -2159,9 +2147,7 @@ class HeatpumpRuntime:
             error = daily_last_error or "No usable site today heat-pump payload"
             power_snapshot["last_error"] = error
             power_snapshot["outcome"] = "no_usable_payload"
-            attempts = power_snapshot.setdefault("attempts", [])
-            if isinstance(attempts, list) and error and not attempts:
-                attempts.append({"source": "site_today_heatpump", "error": error})
+            attempts.append({"source": "site_today_heatpump", "error": error})
             self._heatpump_mark_power_stale(
                 now=now,
                 error=error,
