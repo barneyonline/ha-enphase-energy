@@ -104,19 +104,6 @@ Requires **Home Assistant 2026.10.0+** (Python 3.14+).
 See the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki) for installation, setup and troubleshooting.
 
 <details>
-<summary>Device selection</summary>
-
-Choose the device categories to include. Availability depends on your site and account access.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/setup-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/setup-light.png">
-  <img src="docs/images/setup-light.png" alt="Device selection with Gateway, Battery, EV Chargers, Heat Pump, and Microinverters categories" width="580">
-</picture>
-
-</details>
-
-<details>
 <summary>Supported devices and features</summary>
 
 ### Supported device categories
@@ -152,9 +139,6 @@ Users migrating from the core Enphase Envoy integration can preserve compatible 
 
 </details>
 
-<details>
-<summary>Project status</summary>
-
 [![Tests](https://img.shields.io/github/actions/workflow/status/barneyonline/ha-enphase-energy/tests.yml?branch=main&label=tests)](https://github.com/barneyonline/ha-enphase-energy/actions/workflows/tests.yml)
 [![codecov](https://codecov.io/gh/barneyonline/ha-enphase-energy/graph/badge.svg?token=ichJ6LKzFK)](https://codecov.io/gh/barneyonline/ha-enphase-energy)
 [![Hassfest](https://img.shields.io/github/actions/workflow/status/barneyonline/ha-enphase-energy/hassfest.yml?branch=main&label=hassfest)](https://github.com/barneyonline/ha-enphase-energy/actions/workflows/hassfest.yml)
@@ -163,5 +147,3 @@ Users migrating from the core Enphase Envoy integration can preserve compatible 
 [![License](https://img.shields.io/github/license/barneyonline/ha-enphase-energy)](LICENSE)
 [![Open Issues](https://img.shields.io/github/issues/barneyonline/ha-enphase-energy)](https://github.com/barneyonline/ha-enphase-energy/issues)
 ![Development Status](https://img.shields.io/badge/development-active-success?style=flat-square)
-
-</details>
