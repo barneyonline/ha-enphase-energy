@@ -1,7 +1,7 @@
 """Control progress belongs to the device exposing the corresponding controls."""
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from homeassistant.helpers import entity_registry as er
@@ -154,6 +154,7 @@ def test_gateway_export_and_profile_confirmation(coordinator_factory):
     coord = coordinator_factory()
     sensor = EnphaseDeviceUpdateStatusSensor(coord, "envoy")
     coord.export_limit_runtime = SimpleNamespace(
+        stop=Mock(return_value=None),
         enabled=True,
         pending=None,
         request_status="confirmed",

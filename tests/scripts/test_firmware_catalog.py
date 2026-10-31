@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import logging
 from pathlib import Path
 import sys
 
@@ -1021,11 +1022,41 @@ def test_build_catalog_success_and_error_paths(
     assert runtime_payload["devices"]["envoy"]["product_media_name_id"] is None
 
 
-def test_build_catalog_skips_later_missing_product_id(
+@pytest.mark.parametrize(
+    (
+        "previous_device_present",
+        "previous_source_present",
+        "missing_product_is_expected",
+        "history_state",
+        "expected_level",
+    ),
+    [
+        (True, True, True, "complete", logging.WARNING),
+        (True, False, True, "complete", logging.WARNING),
+        (False, True, True, "complete", logging.WARNING),
+        (False, False, True, "complete", logging.INFO),
+        (False, False, False, "complete", logging.WARNING),
+        (False, False, True, "unavailable", logging.WARNING),
+        (False, False, True, "invalid_devices", logging.WARNING),
+        (False, False, True, "missing_source", logging.WARNING),
+        (False, False, True, "invalid_source", logging.WARNING),
+        (False, False, True, "missing_source_devices", logging.WARNING),
+        (False, False, True, "invalid_source_devices", logging.WARNING),
+        (False, False, True, "invalid_device_record", logging.WARNING),
+        (False, False, True, "invalid_source_record", logging.WARNING),
+    ],
+)
+def test_build_catalog_distinguishes_optional_product_absence_and_source_loss(
     firmware_catalog_module,
     fixture_dir: Path,
     monkeypatch,
     tmp_path: Path,
+    caplog,
+    previous_device_present: bool,
+    previous_source_present: bool,
+    missing_product_is_expected: bool,
+    history_state: str,
+    expected_level: int,
 ) -> None:
     root_html = (fixture_dir / "enphase_root.html").read_text(encoding="utf-8")
     apps_html = (fixture_dir / "enphase_apps_facets.html").read_text(encoding="utf-8")
@@ -1038,6 +1069,12 @@ def test_build_catalog_skips_later_missing_product_id(
         summary="Gateway release",
         countries_text=None,
     )
+    monkeypatch.setitem(
+        firmware_catalog_module.TARGET_PRODUCTS["iqevse"],
+        "missing_product_is_expected",
+        missing_product_is_expected,
+    )
+    caplog.set_level(logging.INFO, logger=firmware_catalog_module.__name__)
 
     monkeypatch.setattr(
         firmware_catalog_module, "_now_utc_iso", lambda: "2026-04-29T00:00:00Z"
@@ -1080,41 +1117,62 @@ def test_build_catalog_skips_later_missing_product_id(
             ["https://example.test/p0"],
         ),
     )
+    previous_catalog = {
+        "schema_version": 1,
+        "generated_at": "2026-04-28T00:00:00Z",
+        "source": {
+            "devices": {
+                "iqevse": {
+                    "docs_url": "https://enphase.com/installers/resources/documentation/apps",
+                    "docs_path": "/installers/resources/documentation/apps",
+                    "product_type": 216,
+                    "document_topic_id": 217,
+                    "product_media_name_id": 6001,
+                }
+            }
+        },
+        "devices": {
+            "iqevse": {
+                "product_media_name_id": 6001,
+                "document_topic_id": 217,
+                "latest_by_locale": {
+                    "en": {
+                        "version": "25.37.1.14",
+                        "urls_by_locale": {"en": "https://example.test/charger"},
+                    }
+                },
+                "latest_by_country": {},
+                "latest_global": {
+                    "version": "25.37.1.14",
+                    "urls_by_locale": {"en": "https://example.test/charger"},
+                },
+            }
+        },
+    }
+    if not previous_device_present:
+        previous_catalog["devices"].clear()
+    if not previous_source_present:
+        previous_catalog["source"]["devices"].clear()
+    if history_state == "unavailable":
+        previous_catalog = None
+    elif history_state == "invalid_devices":
+        previous_catalog["devices"] = []
+    elif history_state == "missing_source":
+        previous_catalog.pop("source")
+    elif history_state == "invalid_source":
+        previous_catalog["source"] = []
+    elif history_state == "missing_source_devices":
+        previous_catalog["source"].pop("devices")
+    elif history_state == "invalid_source_devices":
+        previous_catalog["source"]["devices"] = []
+    elif history_state == "invalid_device_record":
+        previous_catalog["devices"]["iqevse"] = None
+    elif history_state == "invalid_source_record":
+        previous_catalog["source"]["devices"]["iqevse"] = None
     monkeypatch.setattr(
         firmware_catalog_module,
         "fetch_previous_runtime_catalog",
-        lambda timeout=30: {
-            "schema_version": 1,
-            "generated_at": "2026-04-28T00:00:00Z",
-            "source": {
-                "devices": {
-                    "iqevse": {
-                        "docs_url": "https://enphase.com/installers/resources/documentation/apps",
-                        "docs_path": "/installers/resources/documentation/apps",
-                        "product_type": 216,
-                        "document_topic_id": 217,
-                        "product_media_name_id": 6001,
-                    }
-                }
-            },
-            "devices": {
-                "iqevse": {
-                    "product_media_name_id": 6001,
-                    "document_topic_id": 217,
-                    "latest_by_locale": {
-                        "en": {
-                            "version": "25.37.1.14",
-                            "urls_by_locale": {"en": "https://example.test/charger"},
-                        }
-                    },
-                    "latest_by_country": {},
-                    "latest_global": {
-                        "version": "25.37.1.14",
-                        "urls_by_locale": {"en": "https://example.test/charger"},
-                    },
-                }
-            },
-        },
+        lambda timeout=30: previous_catalog,
     )
 
     firmware_catalog_module.build_catalog(tmp_path, timeout=5, max_pages=1)
@@ -1130,16 +1188,35 @@ def test_build_catalog_skips_later_missing_product_id(
     )
 
     assert runtime["devices"]["envoy"]["latest_global"]["version"] == "8.3.5286"
-    assert runtime["devices"]["iqevse"]["latest_global"]["version"] == "25.37.1.14"
+    if previous_device_present:
+        assert runtime["devices"]["iqevse"]["latest_global"]["version"] == "25.37.1.14"
+    else:
+        assert "iqevse" not in runtime["devices"]
     assert runtime["source"]["crawl"]["iqevse"]["skipped"] is True
-    assert runtime["source"]["crawl"]["iqevse"]["using_previous_catalog_device"] is True
+    assert (
+        runtime["source"]["crawl"]["iqevse"]["using_previous_catalog_device"]
+        is previous_device_present
+    )
     assert (
         "IQ EV Charger software" in runtime["source"]["crawl"]["iqevse"]["skip_reason"]
     )
-    assert product_sources["targets"] == {
-        "envoy": {"label": "IQ Gateway software", "product_media_name_id": 5002},
-        "iqevse": {"label": "IQ EV Charger software", "product_media_name_id": 6001},
+    expected_sources = {
+        "envoy": {"label": "IQ Gateway software", "product_media_name_id": 5002}
     }
+    if previous_device_present:
+        expected_sources["iqevse"] = {
+            "label": "IQ EV Charger software",
+            "product_media_name_id": 6001,
+        }
+    assert product_sources["targets"] == expected_sources
+    assert ("iqevse" in runtime["source"]["devices"]) is previous_source_present
+    missing_product_records = [
+        record
+        for record in caplog.records
+        if "Firmware catalog skipping device iqevse" in record.getMessage()
+    ]
+    assert len(missing_product_records) == 1
+    assert missing_product_records[0].levelno == expected_level
 
 
 def test_build_catalog_crawls_gateway_without_product_media_filter(
@@ -2103,6 +2180,7 @@ def test_build_catalog_edge_error_and_degradation_paths(
     firmware_catalog_module,
     monkeypatch,
     tmp_path: Path,
+    caplog,
 ) -> None:
     monkeypatch.setattr(
         firmware_catalog_module, "build_region_site_routes", lambda _rows: []
@@ -2241,6 +2319,15 @@ def test_build_catalog_edge_error_and_degradation_paths(
         envoy_meta["targets"]["https://regional.example/|en-au"]["crawl_error"]
         == "HTTP Error 404: Not Found"
     )
+    for message in (
+        "Firmware catalog bootstrap failed",
+        "Firmware catalog crawl failed",
+    ):
+        records = [
+            record for record in caplog.records if message in record.getMessage()
+        ]
+        assert records
+        assert all(record.levelno == logging.WARNING for record in records)
 
 
 def test_build_catalog_tracks_missing_regional_product_ids(

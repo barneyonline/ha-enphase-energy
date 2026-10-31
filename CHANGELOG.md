@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 - Release HEMS inventory and heat-pump runtime retry delays when their authentication backoff is cleared, expires, or recovers, so normal polling can resume without waiting for the previous pause. (#975)
+- Resolve battery activity names within their own config entry, avoiding ambiguous names and the deprecated Home Assistant device-registry lookup.
 
 ### 🔧 Improvements
 - None
@@ -20,6 +21,8 @@ All notable changes to this project will be documented in this file.
 - Refresh the README with light and dark banners matching the wiki artwork, new Home Assistant screenshots in both themes, a key features overview, a direct HACS link, a compact gallery, expandable device and feature details, and visible project badges at the bottom.
 - Classify the integration under Energy for Home Assistant Marketplace discovery.
 - Skip full integration tests on pull requests limited to descriptive manifest metadata while retaining hassfest, HACS, lint, and quality checks.
+- Capture runtime warning logs in CI, restrict Codecov uploads to generated reports, and make the HACS source-image platform explicit.
+- Treat the known absence of an optional EV charger firmware documentation source as informational while retaining warnings for unverifiable history and preserving cached data for source regressions.
 
 ## v5.2.2 - 2026-10-26
 

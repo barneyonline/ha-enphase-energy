@@ -755,6 +755,17 @@ Concurrent refreshes share one acquisition and consumers receive detached data,
 so entries cannot modify one another's public catalog cache. Authentication and
 site telemetry are never part of this shared cache.
 
+The catalog generator currently discovers an authoritative IQ Gateway software
+source. Enphase's global documentation product facets do not expose an IQ EV Charger
+software source. This known optional absence is recorded in catalog crawl metadata
+and logged at informational level when a readable previous catalog confirms that
+neither an EV source nor a device was published. Unavailable or malformed history
+retains a warning because prior publication cannot be ruled out.
+Previously published devices remain cached when their source disappears, with a
+warning; unexpected product gaps and regional bootstrap or crawl failures also
+retain warnings. Do not infer charger firmware from gateway releases or invent
+a product identifier to fill the gap.
+
 ### Consumption Power Recovery
 
 `EnphaseSiteConsumptionPowerSensor` derives average watts from compatible

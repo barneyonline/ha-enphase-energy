@@ -1484,7 +1484,7 @@ def test_battery_schedule_inventory_sensors_expose_per_mode_counts(
     coord._battery_has_encharge = False  # noqa: SLF001
     assert _battery_schedule_inventory_supported(coord) is False
     coord._battery_has_encharge = True  # noqa: SLF001
-    coord.client = SimpleNamespace()
+    coord.client = SimpleNamespace(async_close=AsyncMock())
     coord._battery_schedules_payload = {"cfg": {"details": []}}  # noqa: SLF001
     assert _battery_schedule_inventory_supported(coord) is True
 
@@ -1500,7 +1500,7 @@ async def test_battery_schedule_sensor_setup_prunes_stale_inventory_entities_whe
     coord = coordinator_factory()
     coord._devices_inventory_ready = True  # noqa: SLF001
     coord._battery_has_encharge = True  # noqa: SLF001
-    coord.client = SimpleNamespace()
+    coord.client = SimpleNamespace(async_close=AsyncMock())
     coord._battery_schedules_payload = None  # noqa: SLF001
     coord._battery_cfg_schedule_id = None  # noqa: SLF001
     coord._battery_dtg_schedule_id = None  # noqa: SLF001

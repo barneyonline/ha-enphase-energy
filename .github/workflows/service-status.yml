@@ -80,14 +80,12 @@ jobs:
             exit 1
           fi
 
-          git init "${PUBLISH_DIR}"
+          git init --initial-branch="${BRANCH}" "${PUBLISH_DIR}"
           git -C "${PUBLISH_DIR}" remote add origin "${REMOTE_URL}"
           git -C "${PUBLISH_DIR}" fetch origin "${BRANCH}" || true
 
           if git -C "${PUBLISH_DIR}" show-ref --verify --quiet "refs/remotes/origin/${BRANCH}"; then
             git -C "${PUBLISH_DIR}" checkout -B "${BRANCH}" "origin/${BRANCH}"
-          else
-            git -C "${PUBLISH_DIR}" checkout --orphan "${BRANCH}"
           fi
 
           find "${PUBLISH_DIR}" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +

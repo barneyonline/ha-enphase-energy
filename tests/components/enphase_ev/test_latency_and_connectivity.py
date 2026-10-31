@@ -247,6 +247,7 @@ async def test_current_power_consumption_sensor_restores_last_good_state(
     )
 
     sensor = EnphaseCurrentPowerConsumptionSensor(coord)
+    sensor.async_get_last_extra_data = AsyncMock(return_value=None)
     sensor.async_get_last_sensor_data = AsyncMock(  # type: ignore[method-assign]
         return_value=type("LastSensorData", (), {"native_value": "752.0"})()
     )
@@ -297,6 +298,7 @@ async def test_current_power_consumption_sensor_restore_tolerates_last_state_err
     monkeypatch.setattr(CoordinatorEntity, "async_added_to_hass", _noop)
 
     sensor = EnphaseCurrentPowerConsumptionSensor(coord)
+    sensor.async_get_last_extra_data = AsyncMock(return_value=None)
     sensor.async_get_last_sensor_data = AsyncMock(  # type: ignore[method-assign]
         return_value=type("LastSensorData", (), {"native_value": "bad"})()
     )
@@ -326,6 +328,7 @@ async def test_current_power_consumption_sensor_discards_extreme_restored_state(
     monkeypatch.setattr(CoordinatorEntity, "async_added_to_hass", _noop)
 
     sensor = EnphaseCurrentPowerConsumptionSensor(coord)
+    sensor.async_get_last_extra_data = AsyncMock(return_value=None)
     sensor.async_get_last_sensor_data = AsyncMock(  # type: ignore[method-assign]
         return_value=type("LastSensorData", (), {"native_value": "-12000000"})()
     )
@@ -371,6 +374,7 @@ async def test_current_power_consumption_sensor_restore_bounds_freshness_by_sour
     )
 
     sensor = EnphaseCurrentPowerConsumptionSensor(coord)
+    sensor.async_get_last_extra_data = AsyncMock(return_value=None)
     sensor.async_get_last_sensor_data = AsyncMock(  # type: ignore[method-assign]
         return_value=type("LastSensorData", (), {"native_value": "752.0"})()
     )

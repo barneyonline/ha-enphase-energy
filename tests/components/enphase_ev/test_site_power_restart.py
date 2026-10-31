@@ -389,7 +389,9 @@ async def test_cached_power_expires_even_with_missing_or_invalid_private_baselin
     extra = PowerStoredData(
         _SiteLifetimePowerRestoreData({}, None, None, None), history, baseline
     )
-    sensor = EnphaseGridPowerSensor(coordinator_factory())
+    coord = coordinator_factory()
+    coord.update_interval = None
+    sensor = EnphaseGridPowerSensor(coord)
     sensor.entity_id = "sensor.history_only"
     sensor.async_get_last_extra_data = AsyncMock(return_value=extra)
     sensor.async_get_last_state = AsyncMock(return_value=None)
@@ -532,7 +534,9 @@ async def test_unknown_private_production_format_does_not_resurrect_legacy_watts
 ):
     from homeassistant.helpers.restore_state import RestoredExtraData
 
-    sensor = EnphaseCurrentPowerConsumptionSensor(coordinator_factory())
+    coord = coordinator_factory()
+    coord.update_interval = None
+    sensor = EnphaseCurrentPowerConsumptionSensor(coord)
     sensor.entity_id = "sensor.unknown_power_format"
     sensor.async_get_last_extra_data = AsyncMock(
         return_value=RestoredExtraData(
@@ -604,7 +608,9 @@ async def test_production_restore_cannot_extend_a_more_conservative_saved_deadli
     extra = RestoredExtraData(
         {"power_history": {"version": 1, "samples": [record.as_dict()]}}
     )
-    sensor = EnphaseCurrentPowerConsumptionSensor(coordinator_factory())
+    coord = coordinator_factory()
+    coord.update_interval = None
+    sensor = EnphaseCurrentPowerConsumptionSensor(coord)
     sensor.entity_id = "sensor.conservative_production"
     sensor.async_get_last_extra_data = AsyncMock(return_value=extra)
     component = EntityComponent(logging.getLogger(__name__), "sensor", hass)

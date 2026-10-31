@@ -415,13 +415,15 @@ async def test_weather_expected_failure_is_sanitized(hass):
 
 @pytest.mark.asyncio
 async def test_live_sensor_expires_without_another_poll(
-    hass, coordinator_factory, monkeypatch
+    hass, coordinator_factory, config_entry, monkeypatch
 ):
     """A suppressed repeat failure still publishes unavailable at its deadline."""
     from pytest_homeassistant_custom_component.common import async_fire_time_changed
     from custom_components.enphase_ev.sensor_base import EnphaseSiteSensorEntity
     from homeassistant.components.sensor import SensorDeviceClass
+    from homeassistant.helpers.entity_component import EntityComponent
     from homeassistant.util import dt as dt_util
+    import logging
 
     now = [dt_util.utcnow()]
     monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
@@ -430,13 +432,13 @@ async def test_live_sensor_expires_without_another_poll(
     coord.last_update_success = False
     coord.last_success_utc = now[0]
     entity = EnphaseSiteSensorEntity(coord, "expiry", "Expiry", type_key=None)
-    entity.hass = hass
     entity.entity_id = "sensor.expiry"
     entity._attr_device_class = SensorDeviceClass.POWER
     entity._attr_native_unit_of_measurement = "W"
     entity._attr_native_value = 1250
-    await entity.async_added_to_hass()
-    entity.async_write_ha_state()
+    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    component._platforms["sensor"].config_entry = config_entry
+    await component.async_add_entities([entity])
     assert hass.states.get(entity.entity_id).state == "1250"
     now[0] += timedelta(minutes=31)
     async_fire_time_changed(hass, now[0])
@@ -446,7 +448,7 @@ async def test_live_sensor_expires_without_another_poll(
     coord.last_success_utc = now[0]
     entity._handle_coordinator_update()
     assert hass.states.get(entity.entity_id).state == "1250"
-    await entity.async_will_remove_from_hass()
+    await component.async_remove_entity(entity.entity_id)
     assert entity._cancel_freshness_expiry is None
 
 
@@ -561,13 +563,15 @@ async def test_recorder_serialization_excludes_live_metadata(
 
 @pytest.mark.asyncio
 async def test_family_freshness_reschedules_without_coordinator_notification(
-    hass, coordinator_factory, monkeypatch
+    hass, coordinator_factory, config_entry, monkeypatch
 ):
     """Unchanged successful refreshes advance the eventual outage deadline."""
     from pytest_homeassistant_custom_component.common import async_fire_time_changed
     from custom_components.enphase_ev.sensor_base import EnphaseSiteSensorEntity
     from homeassistant.components.sensor import SensorDeviceClass
+    from homeassistant.helpers.entity_component import EntityComponent
     from homeassistant.util import dt as dt_util
+    import logging
 
     now = [dt_util.utcnow()]
     monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
@@ -577,13 +581,13 @@ async def test_family_freshness_reschedules_without_coordinator_notification(
     health = coord._endpoint_family_state("battery_status")
     health.last_success_utc = now[0]
     entity = EnphaseSiteSensorEntity(coord, "expiry_battery", "Battery", "encharge")
-    entity.hass = hass
     entity.entity_id = "sensor.expiry_battery"
     entity._attr_device_class = SensorDeviceClass.BATTERY
     entity._attr_native_unit_of_measurement = "%"
     entity._attr_native_value = 75
-    await entity.async_added_to_hass()
-    entity.async_write_ha_state()
+    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    component._platforms["sensor"].config_entry = config_entry
+    await component.async_add_entities([entity])
     now[0] += timedelta(minutes=20)
     health.last_success_utc = now[0]  # equal data: coordinator listener suppressed
     now[0] += timedelta(minutes=11)
@@ -599,7 +603,7 @@ async def test_family_freshness_reschedules_without_coordinator_notification(
     entity._handle_coordinator_update()
     assert hass.states.get(entity.entity_id).state == "75"
     entity._schedule_freshness_expiry()  # replacing a still-active timer
-    await entity.async_will_remove_from_hass()
+    await component.async_remove_entity(entity.entity_id)
     assert entity._cancel_freshness_expiry is None
 
 
@@ -699,6 +703,7 @@ async def test_current_power_restore_defensive_paths(
     coord.last_success_utc = dt_util.utcnow()
     entity = EnphaseCurrentPowerConsumptionSensor(coord)
     entity.hass = hass
+    entity.entity_id = "sensor.enphase_entity"
     monkeypatch.setattr(EnphaseSiteSensorEntity, "async_added_to_hass", AsyncMock())
     monkeypatch.setattr(
         entity,
