@@ -1,7 +1,7 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-banner-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/readme-banner-light.svg">
-  <img src="docs/images/readme-banner-light.svg" alt="Enphase Energy — your energy system in Home Assistant. Community integration." width="1200">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-banner-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/readme-banner-light.png">
+  <img src="docs/images/readme-banner-light.png" alt="Enphase Energy — your guide to Enphase Energy in Home Assistant, illustrated with a solar home, battery and EV charger." width="1200">
 </picture>
 
 <p align="center">
