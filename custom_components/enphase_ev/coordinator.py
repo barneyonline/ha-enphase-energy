@@ -9,6 +9,7 @@ client directly.
 from __future__ import annotations
 
 import asyncio
+from contextlib import AsyncExitStack
 import inspect
 import json
 import logging
@@ -819,14 +820,13 @@ class EnphaseCoordinator(
             self.serials.update(normalized_serials)
             self._serial_order.extend(list(dict.fromkeys(normalized_serials)))
         else:
-            if raw_serials is not None:
-                try:
-                    normalized = str(raw_serials).strip()
-                except Exception:
-                    normalized = ""
-                if normalized:
-                    self.serials = {normalized}
-                    self._serial_order.append(normalized)
+            try:
+                normalized = str(raw_serials).strip()
+            except Exception:
+                normalized = ""
+            if normalized:
+                self.serials = {normalized}
+                self._serial_order.append(normalized)
         self._configured_serials: set[str] = set(self.serials)
         raw_site_only = config.get(CONF_SITE_ONLY, None)
         if raw_site_only is None and config_entry is not None:
@@ -3782,11 +3782,16 @@ class EnphaseCoordinator(
         if not callable(refresh):
             return
         try:
-            async with asyncio.timeout(GRID_PROFILE_METADATA_REFRESH_DEADLINE_S):
-                async with self._grid_profile_metadata_refresh_lock:
-                    with request_metrics_scope("grid_profile_metadata"):
-                        with enlighten_optional_read_scope():
-                            await refresh(force=force, load_profiles=True)
+            async with AsyncExitStack() as stack:
+                await stack.enter_async_context(
+                    asyncio.timeout(GRID_PROFILE_METADATA_REFRESH_DEADLINE_S)
+                )
+                await stack.enter_async_context(
+                    self._grid_profile_metadata_refresh_lock
+                )
+                stack.enter_context(request_metrics_scope("grid_profile_metadata"))
+                stack.enter_context(enlighten_optional_read_scope())
+                await refresh(force=force, load_profiles=True)
         except TimeoutError:
             _LOGGER.debug(
                 "Stopped optional grid-profile metadata refresh for site %s after %.1f seconds",
@@ -6753,8 +6758,7 @@ class EnphaseCoordinator(
         labels: dict[str, str] = {}
         for key in self.battery_profile_option_keys:
             label = self._battery_profile_label(key)
-            if label:
-                labels[key] = label
+            labels[key] = cast(str, label)
         return labels
 
     @property
@@ -8061,8 +8065,7 @@ class EnphaseCoordinator(
             # Fallback for legacy configs where order could not be preserved
             ordered.extend(sorted(known_serials))
         source = self.data if isinstance(self.data, dict) else {}
-        if isinstance(source, dict):
-            ordered.extend(str(sn) for sn in source.keys())
+        ordered.extend(str(sn) for sn in source.keys())
         # Deduplicate while preserving order
         return [sn for sn in dict.fromkeys(ordered) if sn]
 

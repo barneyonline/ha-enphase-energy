@@ -83,6 +83,24 @@ def test_progress_confirmed_values_and_stale_reads(tracker):
     assert current_control_value(SimpleNamespace(), "other", "enabled", 1) == 1
 
 
+def test_requested_values_without_existing_command_do_not_create_pending_command(
+    tracker,
+):
+    _coord, runtime, _timers = tracker
+    runtime.set_requested("example", {"enabled": True})
+    assert runtime.updates == {}
+    assert runtime.status() == "idle"
+
+
+def test_cancelling_one_control_group_preserves_other_devices(tracker):
+    _coord, runtime, _timers = tracker
+    first = runtime.begin("charge_mode", "one", {"mode": "MANUAL_CHARGING"}, {})
+    other = runtime.begin("charge_mode", "two", {"mode": "MANUAL_CHARGING"}, {})
+    runtime.cancel_group(first.group, "one")
+    assert first.status == "cancelled"
+    assert other.status == "pending"
+
+
 def test_confirmation_timeout_retry_failure_and_supersession(tracker):
     _coord, runtime, timers = tracker
     update = runtime.begin(
@@ -339,6 +357,17 @@ def test_other_confirmed_contracts(tracker):
             {
                 "schedule": {"schedule_type": "cfg", "schedule_ready": True},
                 "family_enabled": {"cfg": True},
+            },
+        ),
+        (
+            "battery_schedule_update",
+            {"schedule_id": 1, "start_time": "08:00:00"},
+            {
+                "schedule": {
+                    "schedule_id": "1",
+                    "start_time": "08:00",
+                    "schedule_ready": True,
+                }
             },
         ),
         ("evse_schedule_delete", {"slot_id": "1"}, {"deleted_slot": "1"}),

@@ -539,3 +539,23 @@ async def test_login_wall_preserves_production_auth_failure(
     with pytest.raises(UpdateFailed if blocked else ConfigEntryAuthFailed):
         await coord.refresh_runner.async_run_refresh_call("test", "test", request)
     assert len(session.calls) == 1
+
+
+async def test_secondary_warmup_accepts_legacy_mode_and_unsupported_auth(
+    coordinator_factory,
+):
+    coord = coordinator_factory()
+    coord.async_set_updated_data({"EVSE": {"charging": False}})
+    coord.iter_serials = Mock(return_value=["EVSE"])
+    coord.evse_runtime.async_resolve_charge_modes = AsyncMock(
+        return_value={"EVSE": "MANUAL"}
+    )
+    coord.evse_runtime.async_resolve_green_battery_settings = AsyncMock(return_value={})
+    coord.evse_runtime.async_resolve_auth_settings = AsyncMock(
+        return_value={"EVSE": (None, None, False, False)}
+    )
+    coord.evse_runtime.async_resolve_charger_config = AsyncMock(return_value={})
+    await coord.refresh_runner.async_refresh_secondary_evse_state_for_warmup()
+    assert coord.data["EVSE"]["charge_mode_pref"] == "MANUAL"
+    assert "charge_mode_pref_source" not in coord.data["EVSE"]
+    assert "auth_required" not in coord.data["EVSE"]

@@ -24,6 +24,7 @@ on:
       - 'devtools/docker/docker-compose.yml'
       - 'hacs.json'
       - 'pytest.ini'
+      - '.coveragerc'
       - 'quality_scale.yaml'
       - '.github/workflows/tests.yml'
       - '.github/workflows/ci.yml'

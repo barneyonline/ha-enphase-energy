@@ -1567,7 +1567,8 @@ def test_device_info_falls_back_when_coordinator_does_not_supply_info() -> None:
     assert other.device_info is None
 
 
-def test_prune_removed_charger_updates_covers_registry_filters() -> None:
+@pytest.mark.parametrize("with_history", [False, True])
+def test_prune_removed_charger_updates_covers_registry_filters(with_history) -> None:
     removed: list[str] = []
     removed_history: list[str] = []
     ent_reg = SimpleNamespace(
@@ -1624,9 +1625,63 @@ def test_prune_removed_charger_updates_covers_registry_filters() -> None:
         ent_reg=ent_reg,
         current_serials={"KEEP_ME"},
         known_serials=known_serials,
-        version_history=SimpleNamespace(remove=removed_history.append),
+        version_history=(
+            SimpleNamespace(remove=removed_history.append) if with_history else None
+        ),
     )
 
     assert removed == ["update.no_domain"]
-    assert removed_history == [_charger_update_unique_id("REMOVE_ME")]
+    assert removed_history == (
+        [_charger_update_unique_id("REMOVE_ME")] if with_history else []
+    )
     assert known_serials == {"KEEP_ME"}
+
+
+async def test_concurrent_history_load_waiter_observes_completed_load(
+    hass, monkeypatch
+):
+    store = FirmwareVersionHistoryStore(hass)
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def load():
+        entered.set()
+        await release.wait()
+
+    monkeypatch.setattr(store, "async_load", AsyncMock(side_effect=load))
+    first = asyncio.create_task(store.async_ensure_loaded())
+    await entered.wait()
+    second = asyncio.create_task(store.async_ensure_loaded())
+    await asyncio.sleep(0)
+    release.set()
+    await asyncio.gather(first, second)
+    store.async_load.assert_awaited_once()
+
+
+@pytest.mark.parametrize("urls", [{}, None])
+def test_catalogue_release_metadata_without_release_urls(urls):
+    catalog = _catalog_payload()
+    for device in catalog["devices"].values():
+        for entry in device["latest_by_locale"].values():
+            entry["urls_by_locale"] = urls
+        for entry in device.get("latest_by_country", {}).values():
+            entry["urls_by_locale"] = urls
+    coord = DummyCoordinator()
+    catalog_manager = DummyCatalogManager(catalog)
+    gateway = FirmwareUpdateEntity(
+        coordinator=coord,
+        manager=catalog_manager,
+        device_type="envoy",
+        translation_key="gateway_firmware",
+        description=UpdateEntityDescription(key="gateway"),
+        installed_version_getter=_gateway_installed_version,
+    )
+    charger = ChargerFirmwareUpdateEntity(
+        coordinator=coord,
+        manager=DummyEvseFirmwareManager(_evse_payload()),
+        catalog_manager=catalog_manager,
+        serial=TEST_EVSE_SERIAL,
+        description=UpdateEntityDescription(key="charger"),
+    )
+    assert gateway.release_url is None
+    assert charger.release_url is None

@@ -158,8 +158,9 @@ async def test_async_get_triggers_ignores_unrelated_entries(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("trigger_type", ["charging_started", "plugged_in"])
 async def test_async_attach_trigger_wraps_state_trigger(
-    hass, device_entry, monkeypatch
+    hass, device_entry, monkeypatch, trigger_type
 ):
     """Attaching a trigger should delegate to the state trigger helper."""
     async_mock = AsyncMock(return_value="unsubscribe")
@@ -173,7 +174,7 @@ async def test_async_attach_trigger_wraps_state_trigger(
     device, _ = device_entry
     unsubscribe = await device_trigger.async_attach_trigger(
         hass,
-        {"device_id": device.id, "type": "charging_started"},
+        {"device_id": device.id, "type": trigger_type},
         action,
         automation_info,
     )
@@ -182,8 +183,33 @@ async def test_async_attach_trigger_wraps_state_trigger(
     state_cfg = async_mock.await_args.args[1]
     assert state_cfg["entity_id"].startswith("binary_sensor.")
     assert state_cfg["to"] == "on"
-    assert state_cfg["from"] == "off"
+    if trigger_type == "charging_started":
+        assert state_cfg["from"] == "off"
+    else:
+        assert "from" not in state_cfg
     assert unsubscribe == "unsubscribe"
+
+
+async def test_trigger_discovery_without_matching_binary_sensors(hass, config_entry):
+    device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=config_entry.entry_id, identifiers={(DOMAIN, "no-binary")}
+    )
+    er.async_get(hass).async_get_or_create(
+        "sensor", DOMAIN, "other", device_id=device.id, config_entry=config_entry
+    )
+    assert await device_trigger.async_get_triggers(hass, device.id) == []
+
+
+async def test_attach_plugged_trigger_skips_other_binary_sensors(
+    hass, device_entry, monkeypatch
+):
+    device, _ = device_entry
+    attach = AsyncMock(return_value=lambda: None)
+    monkeypatch.setattr(device_trigger.state_trigger, "async_attach_trigger", attach)
+    await device_trigger.async_attach_trigger(
+        hass, {"device_id": device.id, "type": "plugged_in"}, None, {}
+    )
+    assert attach.await_args.args[1]["to"] == "on"
 
 
 @pytest.mark.asyncio

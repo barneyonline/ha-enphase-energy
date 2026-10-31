@@ -607,7 +607,7 @@ async def _async_setup_entry_impl(
                     entry, coord, dev_reg, site_id, hass=hass, cleanup=cleanup
                 )
                 last_registry_signature = current_signature
-            elif cleanup:
+            else:
                 _prune_inactive_serial_entities(hass, entry, coord, site_id)
                 _remove_empty_inactive_serial_devices(
                     hass, entry, coord, dev_reg, site_id

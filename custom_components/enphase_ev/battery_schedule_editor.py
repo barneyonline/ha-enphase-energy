@@ -506,52 +506,18 @@ class BatteryScheduleEditorManager:
         selected = self.get_schedule(self.edit.selected_schedule_id)
         if selected is None:
             fallback = self._default_schedule_selection()
-            selection_before = (
-                self.edit.selected_schedule_id,
-                self.edit.create_mode,
-                self.edit.schedule_type,
-                self.edit.start_time,
-                self.edit.end_time,
-                self.edit.limit,
-                self.edit.days,
-            )
-            if fallback == NEW_SCHEDULE_OPTION or fallback is None:
+            if fallback is None:
                 self._set_create_mode_defaults(auto=True)
-            elif isinstance(fallback, BatteryScheduleRecord):
+            else:
                 self._apply_schedule_to_form(fallback)
-            selection_after = (
-                self.edit.selected_schedule_id,
-                self.edit.create_mode,
-                self.edit.schedule_type,
-                self.edit.start_time,
-                self.edit.end_time,
-                self.edit.limit,
-                self.edit.days,
-            )
-            if schedules_changed or selection_before != selection_after:
-                self._notify_listeners()
+            self._notify_listeners()
             return
 
         if not schedules_changed:
             return
 
-        schedule_before = (
-            self.edit.schedule_type,
-            self.edit.start_time,
-            self.edit.end_time,
-            self.edit.limit,
-            self.edit.days,
-        )
         self._apply_schedule_to_form(selected)
-        schedule_after = (
-            self.edit.schedule_type,
-            self.edit.start_time,
-            self.edit.end_time,
-            self.edit.limit,
-            self.edit.days,
-        )
-        if schedules_changed or schedule_before != schedule_after:
-            self._notify_listeners()
+        self._notify_listeners()
 
     def _apply_schedule_to_form(self, schedule: BatteryScheduleRecord) -> None:
         self.edit.selected_schedule_id = schedule.schedule_id
@@ -563,10 +529,10 @@ class BatteryScheduleEditorManager:
         self.edit.limit = int(schedule.limit) if schedule.limit is not None else 100
         self.edit.days = editor_days_from_list(schedule.days)
 
-    def _default_schedule_selection(self) -> BatteryScheduleRecord | str | None:
+    def _default_schedule_selection(self) -> BatteryScheduleRecord | None:
         if self.schedules:
             return self.schedules[0]
-        return NEW_SCHEDULE_OPTION
+        return None
 
     def _promote_created_schedule_from_form(self) -> BatteryScheduleRecord | None:
         matches = [

@@ -1,0 +1,7 @@
+[run]
+branch = True
+source = custom_components.enphase_ev
+
+[report]
+fail_under = 100
+precision = 2

@@ -2332,3 +2332,11 @@ async def test_reconciliation_accepts_fresh_form_when_zero_default_disappears(ru
     client.async_get_export_limit_form.side_effect = [fields, refreshed_fields]
     await runtime.async_apply(0, confirm=True)
     client.async_set_export_limit.assert_awaited_once_with(refreshed_fields, 0, 6980.0)
+
+
+async def test_prepare_preserves_non_authentication_form_failure(runtime):
+    failure = RuntimeError("form unavailable")
+    runtime.coordinator.client.async_get_export_limit_form.side_effect = failure
+    with pytest.raises(ServiceValidationError) as caught:
+        await runtime.async_prepare()
+    assert caught.value.__cause__ is failure

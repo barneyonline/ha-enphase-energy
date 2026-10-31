@@ -1121,6 +1121,9 @@ async def test_async_set_grid_mode_success_logs_and_refreshes(
     )
     coord.async_request_refresh.assert_awaited_once()
     assert coord.battery_runtime.async_refresh_grid_control_check.await_count == 2
+    coord.client.log_grid_change = None
+    coord.control_updates.cancel_group("grid_mode")
+    await coord.battery_runtime.async_set_grid_mode("off_grid", "1234")
 
 
 @pytest.mark.asyncio

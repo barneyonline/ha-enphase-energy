@@ -335,3 +335,26 @@ async def test_vpp_deadlines_publish_state_without_polling(
     await component.async_remove_entity(entity.entity_id)
     assert entity._cancel_vpp_transition is None
     await entity.async_will_remove_from_hass()
+
+
+async def test_calendar_repeated_sync_and_unknown_enrollment(
+    hass, config_entry, coordinator_factory
+):
+    coord = coordinator_factory(serials=[])
+    coord.config_entry = config_entry
+    object.__setattr__(config_entry, "options", {OPT_VPP_EVENTS_ENABLED: True})
+    _enable_with_events(coord, _events())
+    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    added = []
+    await async_setup_calendar(
+        hass, config_entry, lambda entities, **kwargs: added.extend(entities)
+    )
+    coord.async_update_listeners()
+    assert (
+        len([entity for entity in added if isinstance(entity, VppEventsCalendarEntity)])
+        == 1
+    )
+    await async_setup_sensors(hass, config_entry, lambda entities, **kwargs: None)
+    coord.vpp_runtime._enrollment_state = "unknown"
+    coord.vpp_runtime._events_last_success_mono = None
+    coord.async_update_listeners()

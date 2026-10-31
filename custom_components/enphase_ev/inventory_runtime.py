@@ -1031,8 +1031,7 @@ class InventoryRuntime:
             if serial is not None:
                 identity_parts.append(f"serial:{serial}")
             if identity_parts:
-                if source_type is not None:
-                    identity_parts.insert(0, f"source:{source_type}")
+                identity_parts.insert(0, f"source:{source_type}")
                 return "|".join(identity_parts)
 
             fingerprint_parts: list[str] = []
@@ -1135,8 +1134,7 @@ class InventoryRuntime:
                 if name_counts:
                     bucket["model_counts"] = dict(name_counts)
                     summary = self._format_inverter_model_summary(name_counts)
-                    if isinstance(summary, str) and summary.strip():
-                        bucket["model_summary"] = summary
+                    bucket["model_summary"] = summary
 
         return valid, dict(grouped), list(dict.fromkeys(ordered_keys))
 
@@ -1612,7 +1610,7 @@ class InventoryRuntime:
                     connected = None
             elif isinstance(connected, (int, float)):
                 connected = connected != 0
-            elif not isinstance(connected, bool):
+            else:
                 connected = None
             if connected is None:
                 if status == "normal":
@@ -1838,7 +1836,7 @@ class InventoryRuntime:
                 connectivity_state = "offline"
             elif reporting > 0 and reporting < total_inverters:
                 connectivity_state = "degraded"
-            elif unknown >= total_inverters:
+            else:
                 connectivity_state = "unknown"
         snapshot["connectivity_state"] = connectivity_state
         return snapshot
@@ -2625,8 +2623,7 @@ class InventoryRuntime:
             merged: dict[str, object] = {}
             for source_type, payload in payloads_by_source.items():
                 redacted = self._redact_battery_payload(payload)
-                if isinstance(redacted, dict):
-                    merged[source_type] = redacted
+                merged[source_type] = cast(dict[str, object], redacted)
             redacted_details[canonical_type] = merged
         self._update_shared_state(
             _system_dashboard_devices_tree_payload=tree_payload_out,
