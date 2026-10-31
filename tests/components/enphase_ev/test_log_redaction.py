@@ -17,6 +17,13 @@ def test_identifier_helpers_redact_values() -> None:
     assert redact_site_id("123456789") == "[site]"
 
 
+def test_redaction_ignores_blank_identifiers():
+    assert (
+        redact_text("ordinary text", identifiers=["", " "], site_ids=[" "])
+        == "ordinary text"
+    )
+
+
 def test_redact_text_scrubs_common_sensitive_values() -> None:
     text = (
         "site_id=12345&source=evse serialNumber=SERIAL-12345678 uid=DEVICE-UID-9999 "

@@ -221,14 +221,15 @@ async def test_setup_skips_weather_when_option_disabled(hass, config_entry) -> N
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("track_background", [False, True])
 async def test_setup_schedules_discovery_and_creates_cloud_weather_after_success(
-    hass, config_entry, monkeypatch
+    hass, config_entry, monkeypatch, track_background
 ) -> None:
     client = SimpleNamespace(weather=AsyncMock(return_value=_payload()))
     coordinator = SimpleNamespace(
         site_id=RANDOM_SITE_ID,
         client=client,
-        track_entry_background_task=MagicMock(),
+        track_entry_background_task=MagicMock() if track_background else None,
     )
     object.__setattr__(config_entry, "options", {OPT_WEATHER_ENABLED: True})
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coordinator)
@@ -258,7 +259,8 @@ async def test_setup_schedules_discovery_and_creates_cloud_weather_after_success
     assert config_entry.runtime_data.weather_coordinator is not None
     assert config_entry.runtime_data.weather_discovery_task is not None
     assert scheduled[0][1] == "enphase_ev_weather_discovery"
-    coordinator.track_entry_background_task.assert_called_once()
+    if track_background:
+        coordinator.track_entry_background_task.assert_called_once()
 
     await scheduled[0][0]
 

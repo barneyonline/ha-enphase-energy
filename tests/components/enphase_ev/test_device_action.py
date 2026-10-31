@@ -64,6 +64,32 @@ def _make_coordinator() -> SimpleNamespace:
 
 
 @pytest.mark.asyncio
+async def test_device_action_skips_other_sites_and_unknown_action(
+    hass, device_id, monkeypatch
+):
+    unrelated = _make_coordinator()
+    unrelated.serials = {"OTHER"}
+    unrelated.data = {}
+    coord = _make_coordinator()
+    monkeypatch.setattr(
+        device_action, "iter_coordinators", lambda _hass: iter([unrelated, coord])
+    )
+    await device_action.async_call_action_from_config(
+        hass, {CONF_DEVICE_ID: device_id, CONF_TYPE: "unknown"}, {}, None
+    )
+    coord.async_start_charging.assert_not_awaited()
+    coord.async_stop_charging.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_stop_device_action_has_no_extra_capabilities(hass):
+    result = await device_action.async_get_action_capabilities(
+        hass, {CONF_TYPE: device_action.ACTION_STOP}
+    )
+    assert result["extra_fields"]({}) == {}
+
+
+@pytest.mark.asyncio
 async def test_async_get_actions_returns_start_stop(
     hass, config_entry, device_id
 ) -> None:

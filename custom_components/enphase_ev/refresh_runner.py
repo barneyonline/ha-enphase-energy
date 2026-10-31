@@ -132,7 +132,7 @@ class RefreshRunner:
         callback_factory: Callable[[], Awaitable[object]],
         *,
         endpoint_family: str | None = None,
-    ) -> tuple[str, float | None]:
+    ) -> tuple[str, float]:
         started = time.monotonic()
         try:
             with enlighten_optional_read_scope():
@@ -174,7 +174,7 @@ class RefreshRunner:
         callback_factory: Callable[[], Awaitable[object]],
         *,
         endpoint_family: str | None = None,
-    ) -> tuple[str, float | None]:
+    ) -> tuple[str, float]:
         try:
             return await self.async_run_refresh_call(
                 timing_key,
@@ -238,8 +238,7 @@ class RefreshRunner:
 
         results = [task.result() for task in tasks]
         for timing_key, duration in results:
-            if duration is not None:
-                phase_timings[timing_key] = duration
+            phase_timings[timing_key] = duration
         if stage_key is not None:
             phase_timings[f"{stage_key}_s"] = round(time.monotonic() - group_started, 3)
 
@@ -263,8 +262,7 @@ class RefreshRunner:
                     callback_factory,
                     endpoint_family=endpoint_family,
                 )
-                if duration is not None:
-                    phase_timings[key] = duration
+                phase_timings[key] = duration
         finally:
             if defer_topology:
                 self._coordinator._end_topology_refresh_batch()

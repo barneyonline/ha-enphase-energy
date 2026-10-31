@@ -23,6 +23,17 @@ from custom_components.enphase_ev.sensor import (
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
 
 
+@pytest.mark.parametrize("timestamp", [1_700_000_000, "1700000000", 1_700_000_000_000])
+def test_gateway_seconds_and_milliseconds_represent_same_utc_time(timestamp):
+    from custom_components.enphase_ev.sensor_snapshot_helpers import (
+        parse_gateway_timestamp,
+    )
+
+    assert parse_gateway_timestamp(timestamp) == datetime(
+        2023, 11, 14, 22, 13, 20, tzinfo=timezone.utc
+    )
+
+
 def test_base_sensor_native_value(coordinator_factory):
     coord = coordinator_factory(
         data={RANDOM_SERIAL: {"connector_status": "AVAILABLE", "sn": RANDOM_SERIAL}}

@@ -840,8 +840,7 @@ class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):  # type: ignore[misc]
             *((charge_mode_label(mode, hass=hass), mode) for mode in solar_modes),
             *((_english_charge_mode_label(mode), mode) for mode in solar_modes),
         ):
-            if label:
-                option_map[label] = mode
+            option_map[cast(str, label)] = mode
         if solar_modes == ("SMART_CHARGING",):
             # Preserve the historical Green -> Smart alias only on Smart sites.
             # Smart must never be rewritten to GREEN_CHARGING on a Green site.
@@ -849,8 +848,7 @@ class ChargeModeSelect(EnphaseBaseEntity, SelectEntity):  # type: ignore[misc]
                 charge_mode_label("GREEN_CHARGING", hass=hass),
                 _english_charge_mode_label("GREEN_CHARGING"),
             ):
-                if label:
-                    option_map[label] = "SMART_CHARGING"
+                option_map[cast(str, label)] = "SMART_CHARGING"
         mode = option_map.get(option)  # type: ignore[assignment]
         if mode is None:
             raise ServiceValidationError(

@@ -372,12 +372,13 @@ async def test_system_health_missing_runtime_data_uses_entry_site_id(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "collector", [None, lambda: (_ for _ in ()).throw(RuntimeError)]
+)
 async def test_system_health_collect_metrics_error_uses_fallback_site_id(
-    hass, config_entry, monkeypatch
+    hass, config_entry, monkeypatch, collector
 ) -> None:
-    coord = SimpleNamespace(
-        collect_site_metrics=lambda: (_ for _ in ()).throw(RuntimeError)
-    )
+    coord = SimpleNamespace(collect_site_metrics=collector)
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
 
     async def can_reach_server(_hass, _url):

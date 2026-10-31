@@ -348,7 +348,7 @@ def parse_dry_contact_settings_payload(
     raw_entries: list[dict[str, object]] = []
     visited: set[int] = set()
 
-    def _visit(node: object, depth: int = 0) -> None:
+    def _visit(node: dict[str, object] | list[object], depth: int = 0) -> None:
         if depth > 4:
             return
         if isinstance(node, dict):
@@ -361,7 +361,7 @@ def parse_dry_contact_settings_payload(
             for value in node.values():
                 if isinstance(value, (dict, list)):
                     _visit(value, depth + 1)
-        elif isinstance(node, list):
+        else:
             for item in node:
                 if isinstance(item, (dict, list)):
                     _visit(item, depth + 1)

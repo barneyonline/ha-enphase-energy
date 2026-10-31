@@ -359,9 +359,9 @@ class EvseScheduleEditorManager:
                 form.limit,
                 dict(form.days),
             )
-            if fallback == NEW_SCHEDULE_OPTION or fallback is None:
+            if fallback is None:
                 self._set_create_mode_defaults(sn, auto=True)
-            elif isinstance(fallback, EvseScheduleRecord):
+            else:
                 self._apply_schedule_to_form(sn, fallback)
             selection_after = (
                 form.selected_slot_id,
@@ -401,11 +401,11 @@ class EvseScheduleEditorManager:
         form.limit = int(schedule.limit)
         form.days = editor_days_from_list(schedule.days)
 
-    def _default_schedule_selection(self, sn: str) -> EvseScheduleRecord | str | None:
+    def _default_schedule_selection(self, sn: str) -> EvseScheduleRecord | None:
         schedules = self.schedules_by_serial.get(sn, [])
         if schedules:
             return schedules[0]
-        return NEW_SCHEDULE_OPTION
+        return None
 
     def _promote_created_schedule_from_form(self, sn: str) -> EvseScheduleRecord | None:
         form = self._form(sn)

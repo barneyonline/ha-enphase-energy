@@ -24,6 +24,14 @@ def test_resolve_nominal_voltage_for_locale_uses_language_when_country_missing()
 
 def test_resolve_nominal_voltage_for_locale_defaults_when_unknown() -> None:
     assert resolve_nominal_voltage_for_locale(country="XX", language="zz") == 230
+    assert resolve_nominal_voltage_for_locale(language="en-XX") == 230
+
+
+def test_locale_with_no_configured_country_voltage_uses_default(monkeypatch):
+    from custom_components.enphase_ev import voltage
+
+    monkeypatch.setitem(voltage.LANGUAGE_DEFAULT_COUNTRY, "test", "XX")
+    assert resolve_nominal_voltage_for_locale(language="test") == 230
 
 
 def test_resolve_nominal_voltage_for_hass_handles_unfriendly_config(hass) -> None:

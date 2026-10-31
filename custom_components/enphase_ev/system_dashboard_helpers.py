@@ -824,22 +824,19 @@ def build_system_dashboard_summaries(
         payloads = details_payloads.get(key, {})
         if isinstance(payloads, dict):
             envoy_payloads.update(payloads)
-    if envoy_summary := system_dashboard_envoy_summary(
+    type_summaries["envoy"] = system_dashboard_envoy_summary(
         envoy_payloads,
         hierarchy_index,
         hierarchy_aliases,
-    ):
-        type_summaries["envoy"] = envoy_summary
-    if encharge_summary := system_dashboard_encharge_summary(
+    )
+    type_summaries["encharge"] = system_dashboard_encharge_summary(
         details_payloads.get("encharge", {}),
         hierarchy_index,
         hierarchy_aliases,
-    ):
-        type_summaries["encharge"] = encharge_summary
-    if microinverter_summary := system_dashboard_microinverter_summary(
+    )
+    type_summaries["microinverter"] = system_dashboard_microinverter_summary(
         details_payloads.get("microinverter", {}),
         hierarchy_index,
         hierarchy_aliases,
-    ):
-        type_summaries["microinverter"] = microinverter_summary
+    )
     return type_summaries, hierarchy_summary, hierarchy_index

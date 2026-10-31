@@ -91,6 +91,27 @@ def test_device_info_defaults_when_metadata_missing():
     assert info.get("model") is None
 
 
+@pytest.mark.asyncio
+async def test_charger_registry_does_not_use_bare_sku_as_friendly_model(
+    hass, config_entry
+):
+    from homeassistant.helpers import device_registry as dr
+    from custom_components.enphase_ev.const import DOMAIN
+    from custom_components.enphase_ev.registry_sync import _sync_charger_devices
+
+    registry = dr.async_get(hass)
+    coord = SimpleNamespace(
+        iter_serials=lambda: ["EV"], data={"EV": {"display_name": "(IQ-EVSE-EU-3032)"}}
+    )
+    _sync_charger_devices(config_entry, coord, registry, "SITE", {})
+    assert (
+        registry.async_get_device_by_identifier(
+            (DOMAIN, "EV"), config_entry.entry_id
+        ).model
+        is None
+    )
+
+
 def test_device_info_ignores_bad_mac_values():
     from custom_components.enphase_ev.entity import EnphaseBaseEntity
 
@@ -234,6 +255,51 @@ def test_integration_version_handles_manifest_edge_cases(monkeypatch) -> None:
         helpers.Path, "read_text", lambda *_args, **_kwargs: '{"version": 1}'
     )
     assert helpers._integration_version() is None
+
+
+@pytest.mark.parametrize(
+    ("version", "expected"),
+    [(" 5.2.2 ", "5.2.2"), ("", None), ("   ", None)],
+)
+def test_integration_version_reads_and_caches_manifest_version(
+    monkeypatch, version, expected
+) -> None:
+    import json
+    from unittest.mock import Mock
+
+    import custom_components.enphase_ev.device_info_helpers as helpers
+
+    read_manifest = Mock(return_value=json.dumps({"version": version}))
+    helpers._integration_version.cache_clear()
+    try:
+        monkeypatch.setattr(helpers.Path, "read_text", read_manifest)
+        assert helpers._integration_version() == expected
+        assert helpers._integration_version() == expected
+        read_manifest.assert_called_once_with(encoding="utf-8")
+    finally:
+        helpers._integration_version.cache_clear()
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("IQ EV Charger (ABCDEF)", False),
+        ("IQ EV Charger (   ) (SKU)", False),
+    ],
+)
+def test_model_identifier_preserves_distinct_parenthesized_values(name, expected):
+    from custom_components.enphase_ev.device_info_helpers import _is_redundant_model_id
+
+    assert _is_redundant_model_id(name, "OTHER-SKU") is expected
+
+
+def test_display_name_preserves_distinct_parenthesized_values():
+    from custom_components.enphase_ev.device_info_helpers import (
+        _normalize_evse_display_name,
+    )
+
+    name = "IQ EV Charger (ABCDEF) (OTHER-SKU)"
+    assert _normalize_evse_display_name(name) == name
 
 
 @pytest.mark.asyncio

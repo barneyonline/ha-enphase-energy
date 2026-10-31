@@ -6,7 +6,7 @@ import asyncio
 from collections.abc import Mapping
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import aiohttp
 from homeassistant.exceptions import ServiceValidationError
@@ -1232,14 +1232,13 @@ class GridProfileRuntime:
             loaded_catalogs: set[tuple[str, str, bool]] = set()
             if load_profiles and self.staged_region_code:
                 await self.async_load_profiles(force=force)
-                if self.country_code:
-                    loaded_catalogs.add(
-                        (
-                            self.country_code,
-                            self.staged_region_code,
-                            self.staged_commonly_used,
-                        )
+                loaded_catalogs.add(
+                    (
+                        cast(str, self.country_code),
+                        self.staged_region_code,
+                        self.staged_commonly_used,
                     )
+                )
             current_target = next(iter(self.gateway_targets.values()), None)
             current_profile_id = (
                 current_target.current_profile_id
@@ -1508,8 +1507,7 @@ class GridProfileRuntime:
             self._async_poll_pending_profile(profile_id),
             name=f"{DOMAIN}_grid_profile_pending_refresh",
         )
-        if isinstance(task, asyncio.Task):
-            self._pending_refresh_task = task
+        self._pending_refresh_task = task
 
     async def async_apply_staged(self) -> dict[str, object]:
         return await self.async_apply_grid_profile(

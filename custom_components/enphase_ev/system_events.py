@@ -791,7 +791,7 @@ class SystemEventsRuntime:
             events: dict[str, SystemEventHistoryEntry] = {}
             truncated = False
             try:
-                while rows_seen < SYSTEM_EVENT_HISTORY_ROW_LIMIT:
+                while True:
                     pages_seen += 1
                     if pages_seen > SYSTEM_EVENT_HISTORY_MAX_PAGES:
                         truncated = True

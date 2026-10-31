@@ -16,6 +16,19 @@ from custom_components.enphase_ev import api
 import pytest
 
 
+def test_mfa_headers_without_session_cookies():
+    from custom_components.enphase_ev.api_client.auth import mfa_headers
+
+    base = {"User-Agent": "Enphase test"}
+    assert mfa_headers(
+        {},
+        base_headers=base,
+        cookie_header=lambda cookies: "",
+        xsrf_token=lambda cookies: None,
+    ) == {"User-Agent": "Enphase test", "Accept": "application/json, text/plain, */*"}
+    assert base == {"User-Agent": "Enphase test"}
+
+
 @pytest.mark.asyncio
 async def test_serialize_cookie_jar() -> None:
     """Cookie jar serialization should extract cookies for provided URLs."""

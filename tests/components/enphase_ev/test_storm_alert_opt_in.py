@@ -194,8 +194,9 @@ async def test_opt_in_cannot_overlap_profile_write(storm_opt_in):
     coord.client.opt_in_storm_alert.assert_not_awaited()
 
 
+@pytest.mark.parametrize("tracking", [True, False])
 async def test_opt_in_skips_alert_that_expires_while_batch_is_submitting(
-    storm_opt_in, monkeypatch
+    storm_opt_in, monkeypatch, tracking
 ):
     coord, alert = storm_opt_in
     now = [dt_util.utcnow()]
@@ -214,10 +215,29 @@ async def test_opt_in_skips_alert_that_expires_while_batch_is_submitting(
         now[0] += timedelta(minutes=1)
 
     coord.client.opt_in_storm_alert.side_effect = slow_write
-    await coord.async_opt_in_all_storm_alerts()
+    with monkeypatch.context() as context:
+        if not tracking:
+            context.setattr(coord, "control_updates", None)
+        await coord.async_opt_in_all_storm_alerts()
     coord.client.opt_in_storm_alert.assert_awaited_once_with(
         alert_id="alert-a", name="Heat Advisory"
     )
-    update = coord.control_updates.updates[("storm_alert_opt_in", None)]
-    assert update.requested == {"opted_in_alerts": 1}
-    assert update.status == "confirmed"
+    if tracking:
+        update = coord.control_updates.updates[("storm_alert_opt_in", None)]
+        assert update.requested == {"opted_in_alerts": 1}
+        assert update.status == "confirmed"
+
+
+@pytest.mark.parametrize("retire", [False, True])
+async def test_opt_in_without_control_tracking(storm_opt_in, monkeypatch, retire):
+    coord, alert = storm_opt_in
+    if retire:
+
+        async def retire_write(**kwargs):
+            coord.mark_runtime_stopped()
+
+        coord.client.opt_in_storm_alert.side_effect = retire_write
+    with monkeypatch.context() as context:
+        context.setattr(coord, "control_updates", None)
+        await coord.async_opt_in_all_storm_alerts()
+    coord.client.opt_in_storm_alert.assert_awaited_once()
