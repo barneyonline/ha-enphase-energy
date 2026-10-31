@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/barneyonline/ha-enphase-energy/releases"><img src="https://img.shields.io/github/v/release/barneyonline/ha-enphase-energy?display_name=tag&amp;sort=semver" alt="Latest release"></a>
-  <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Default-41BDF5.svg" alt="HACS Default"></a>
+  <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=barneyonline&amp;repository=ha-enphase-energy&amp;category=integration"><img src="https://img.shields.io/badge/HACS-Default-41BDF5.svg" alt="Open Enphase Energy in HACS"></a>
   <a href="https://github.com/barneyonline/ha-enphase-energy/wiki/Service-Status-History"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fbarneyonline%2Fha-enphase-energy%40service-status%2Fstatus_badge.json&amp;cacheSeconds=60" alt="Enphase service status"></a>
 </p>
 
@@ -93,9 +93,11 @@ EV charging modes, current and session controls alongside battery reserve, grid 
 
 ## Get started
 
-1. Find **Enphase Energy** in HACS.
+1. [Open Enphase Energy in HACS](https://my.home-assistant.io/redirect/hacs_repository/?owner=barneyonline&repository=ha-enphase-energy&category=integration).
 2. Install and restart Home Assistant.
 3. Add the integration and sign in with your Enlighten credentials. MFA is supported.
+
+Enter your Home Assistant URL if prompted by the link.
 
 Requires **Home Assistant 2026.10.0+** (Python 3.14+).
 
