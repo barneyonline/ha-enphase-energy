@@ -9,7 +9,7 @@ import subprocess
 MANIFEST = "custom_components/enphase_ev/manifest.json"
 # Keep this list narrow: new and runtime-affecting keys require the full suite.
 METADATA_KEYS = frozenset(
-    {"categories", "codeowners", "documentation", "issue_tracker"}
+    {"categories", "codeowners", "documentation", "issue_tracker", "version"}
 )
 
 
@@ -30,6 +30,11 @@ def metadata_only(base_ref: str) -> bool:
         return False
     if not isinstance(before, dict) or not isinstance(after, dict):
         return False
+    # Release bumps can skip runtime tests; missing or malformed versions cannot.
+    for manifest in (before, after):
+        version = manifest.get("version")
+        if not isinstance(version, str) or not version.strip():
+            return False
     # JSON comparison preserves types (Python otherwise considers True == 1).
     return json.dumps(
         {key: value for key, value in before.items() if key not in METADATA_KEYS},

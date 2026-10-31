@@ -265,9 +265,11 @@ def manifest_repo(tmp_path, monkeypatch):
         ("codeowners", ["@example"]),
         ("documentation", "https://example.test/docs"),
         ("issue_tracker", "https://example.test/issues"),
+        ("version", "99.0.0"),
+        ("version", "99.0.0b1"),
     ],
 )
-def test_descriptive_manifest_changes_skip_runtime_tests(manifest_repo, key, value):
+def test_metadata_manifest_changes_skip_runtime_tests(manifest_repo, key, value):
     checkout, _, _, commit, classify = manifest_repo
     path = checkout / MANIFEST
     manifest = json.loads(path.read_text())
@@ -289,7 +291,6 @@ def test_descriptive_manifest_changes_skip_runtime_tests(manifest_repo, key, val
     ("key", "value"),
     [
         ("requirements", ["package==1.0"]),
-        ("version", "99.0.0"),
         ("config_flow", False),
         ("config_flow", 1),
         ("dependencies", ["mqtt"]),
@@ -302,7 +303,33 @@ def test_runtime_manifest_fields_keep_full_suite(manifest_repo, key, value):
     checkout, _, _, commit, classify = manifest_repo
     path = checkout / MANIFEST
     manifest = json.loads(path.read_text())
-    manifest.update({"categories": ["energy"], key: value})
+    manifest.update({"categories": ["energy"], "version": "99.0.0", key: value})
+    path.write_text(json.dumps(manifest))
+    commit()
+
+    assert metadata_only("origin/main") is False
+    assert classify()["integration"] == "true"
+
+
+@pytest.mark.parametrize("side", ["base", "head"])
+@pytest.mark.parametrize("version", [None, 42, False, "", " "])
+def test_missing_or_malformed_version_values_keep_runtime_tests(
+    manifest_repo, side, version
+):
+    checkout, origin, git, commit, classify = manifest_repo
+    if side == "base":
+        path = origin / MANIFEST
+        manifest = json.loads(path.read_text())
+        manifest["version"] = version
+        path.write_text(json.dumps(manifest))
+        git(origin, "add", MANIFEST)
+        git(origin, "commit", "-m", "Set malformed base version")
+        git(checkout, "fetch", "origin", "main")
+        git(checkout, "reset", "--hard", "origin/main")
+
+    path = checkout / MANIFEST
+    manifest = json.loads(path.read_text())
+    manifest["version"] = "99.0.0" if side == "base" else version
     path.write_text(json.dumps(manifest))
     commit()
 
@@ -356,6 +383,9 @@ def test_manifest_additions_deletions_and_renames_keep_tests(manifest_repo, oper
 
 
 @pytest.mark.parametrize(
+    ("key", "value"), [("categories", ["energy"]), ("version", "99.0.0")]
+)
+@pytest.mark.parametrize(
     "path",
     [
         "custom_components/enphase_ev/example.py",
@@ -368,11 +398,13 @@ def test_manifest_additions_deletions_and_renames_keep_tests(manifest_repo, oper
         "scripts/ci_manifest_metadata.py",
     ],
 )
-def test_metadata_with_other_runtime_changes_keeps_tests(manifest_repo, path):
+def test_metadata_with_other_runtime_changes_keeps_tests(
+    manifest_repo, path, key, value
+):
     checkout, _, _, commit, classify = manifest_repo
     manifest_path = checkout / MANIFEST
     manifest = json.loads(manifest_path.read_text())
-    manifest["categories"] = ["energy"]
+    manifest[key] = value
     manifest_path.write_text(json.dumps(manifest))
     changed = checkout / path
     changed.parent.mkdir(parents=True, exist_ok=True)

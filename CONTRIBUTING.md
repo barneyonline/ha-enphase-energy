@@ -140,11 +140,12 @@ docker compose -f devtools/docker/docker-compose.yml exec ha-dev pytest -q tests
 
 Pull-request CI selects runtime, import-diagnostic, quality, and maintenance-script
 jobs from the changed paths. Manifest edits limited to `categories`, `codeowners`,
-`documentation`, and `issue_tracker` skip the full integration pytest job when no
-other path requires it. Hassfest, HACS, scoped lint, and quality checks still run.
+`documentation`, `issue_tracker`, and `version` skip the full integration pytest job
+when no other path requires it. Hassfest, HACS, scoped lint, and quality checks still run.
 The classifier compares JSON values against the PR merge base; changing any other
-manifest field (including `version`, dependencies, or discovery), adding or removing
-the manifest, or supplying invalid JSON keeps the full integration suite enabled.
+manifest field (including dependencies or discovery), adding or removing
+the manifest, supplying invalid JSON, or a missing, non-string, or empty version
+in either manifest keeps the full integration suite enabled.
 Changes to the classifier or test workflow also run the full suite. Pushes to main
 and manual runs retain all test jobs.
 
