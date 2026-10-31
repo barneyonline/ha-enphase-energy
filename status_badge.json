@@ -1,6 +1,6 @@
 {
-  "color": "#4c1",
+  "color": "#e05d44",
   "label": "Enphase Service Status",
-  "message": "Fully Operational",
+  "message": "Down",
   "schemaVersion": 1
 }
