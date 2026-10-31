@@ -75,14 +75,14 @@ jobs:
             echo "${name}=${value}" >> "$GITHUB_OUTPUT"
           }
 
-          # Descriptive manifest edits still run hassfest, HACS, lint, and quality
-          # checks. Compare values so dependency or discovery edits cannot skip pytest.
+          # Descriptive metadata and version bumps retain hassfest, HACS, lint,
+          # and quality checks. Dependency or discovery edits cannot skip pytest.
           integration_files="$changed_files"
           manifest='custom_components/enphase_ev/manifest.json'
           if printf '%s\n' "$changed_files" | grep -Fxq "$manifest"; then
             if python3 scripts/ci_manifest_metadata.py --base-ref "origin/${{ github.base_ref }}"; then
               integration_files="$(printf '%s\n' "$changed_files" | grep -Fxv "$manifest" || true)"
-              echo "Descriptive manifest change; checking other paths for runtime tests."
+              echo "Manifest metadata or version change; checking other paths for runtime tests."
             fi
           fi
 

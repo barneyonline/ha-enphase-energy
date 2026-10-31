@@ -39,7 +39,7 @@ All notable changes to this project will be documented in this file.
 - Require 100% integration statement and branch coverage in CI, with regression tests for malformed responses, optional capabilities, stale caches, and concurrent task cleanup.
 - Refresh the README with light and dark banners matching the wiki artwork, new Home Assistant screenshots in both themes, a key features overview, a direct HACS link, a compact gallery, expandable device and feature details, and visible project badges at the bottom.
 - Classify the integration under Energy for Home Assistant Marketplace discovery.
-- Skip full integration tests on pull requests limited to descriptive manifest metadata while retaining hassfest, HACS, lint, and quality checks.
+- Skip full integration tests on pull requests limited to descriptive manifest metadata or version bumps while retaining hassfest, HACS, lint, and quality checks. Runtime changes and changes to the classifier or test workflow still run the full suite.
 - Capture runtime warning logs in CI, restrict Codecov uploads to generated reports, and make the HACS source-image platform explicit.
 - Treat the known absence of an optional EV charger firmware documentation source as informational while retaining warnings for unverifiable history and preserving cached data for source regressions.
 - Track the latest hassfest metadata validation rules independently of the minimum supported Home Assistant runtime.
