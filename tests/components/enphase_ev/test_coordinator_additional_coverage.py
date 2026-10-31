@@ -5292,6 +5292,7 @@ def test_schedule_stream_stop_skips_when_task_active(coordinator_factory, monkey
     coord._schedule_stream_stop()
 
     capture.assert_not_called()
+    coord._streaming_stop_task = None
 
 
 @pytest.mark.asyncio

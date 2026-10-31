@@ -560,8 +560,8 @@ class ActivityPublisher:
         number = self._battery_numbers.setdefault(
             identity, len(self._battery_numbers) + 1
         )
-        device = dr.async_get(self.hass).async_get_device(
-            identifiers={(DOMAIN, identity)}
+        device = dr.async_get(self.hass).async_get_device_by_identifier(
+            (DOMAIN, identity), self.entry.entry_id
         )
         if device is not None and (name := device.name_by_user or device.name):
             return self._safe(name)

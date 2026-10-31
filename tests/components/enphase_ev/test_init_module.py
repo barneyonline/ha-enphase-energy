@@ -2124,6 +2124,11 @@ async def test_async_unload_entry_does_not_cleanup_when_unload_fails(
     coord.cleanup_runtime_state.assert_not_called()
     assert config_entry.runtime_data is runtime_data
 
+    monkeypatch.setattr(
+        hass.config_entries, "async_forward_entry_unload", AsyncMock(return_value=True)
+    )
+    assert await async_unload_entry(hass, config_entry)
+
 
 @pytest.mark.asyncio
 async def test_async_unload_entry_handles_missing_runtime_data(
@@ -2521,6 +2526,11 @@ async def test_async_unload_entry_reraises_unexpected_value_error(
 
     schedule_sync.async_stop.assert_not_awaited()
     coord.cleanup_runtime_state.assert_not_called()
+
+    monkeypatch.setattr(
+        hass.config_entries, "async_forward_entry_unload", AsyncMock(return_value=True)
+    )
+    assert await async_unload_entry(hass, config_entry)
 
 
 @pytest.mark.asyncio

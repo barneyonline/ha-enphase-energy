@@ -947,6 +947,7 @@ async def test_site_consumption_power_validates_and_uses_restored_baseline(
     }
     sensor = EnphaseSiteConsumptionPowerSensor(coord)
     sensor.hass = hass
+    sensor.entity_id = "sensor.enphase_sensor"
     sensor.async_get_last_extra_data = AsyncMock(
         return_value=_SiteConsumptionPowerRestoreData(
             latest_bucket_wh=1100.0,
@@ -972,6 +973,7 @@ async def test_site_consumption_power_validates_and_uses_restored_baseline(
         reported_at=base_ts + timedelta(minutes=5),
     )
     assert sensor.native_value == 1200
+    await sensor.async_will_remove_from_hass()
 
 
 @pytest.mark.asyncio
@@ -989,6 +991,7 @@ async def test_site_consumption_power_rejects_invalid_or_mismatched_restore(
     }
     invalid = EnphaseSiteConsumptionPowerSensor(coord)
     invalid.hass = hass
+    invalid.entity_id = "sensor.enphase_invalid"
     invalid.async_get_last_extra_data = AsyncMock(
         return_value=_SiteConsumptionPowerRestoreData(
             None, None, None, None, None, None, None, None
@@ -999,6 +1002,7 @@ async def test_site_consumption_power_rejects_invalid_or_mismatched_restore(
 
     mismatched = EnphaseSiteConsumptionPowerSensor(coord)
     mismatched.hass = hass
+    mismatched.entity_id = "sensor.enphase_mismatched"
     mismatched.async_get_last_extra_data = AsyncMock(
         return_value=_SiteConsumptionPowerRestoreData(
             latest_bucket_wh=1100.0,
@@ -1022,6 +1026,7 @@ async def test_site_consumption_power_rejects_invalid_or_mismatched_restore(
     )
     interval_mismatch = EnphaseSiteConsumptionPowerSensor(coord)
     interval_mismatch.hass = hass
+    interval_mismatch.entity_id = "sensor.enphase_interval_mismatch"
     interval_mismatch.async_get_last_extra_data = AsyncMock(
         return_value=_SiteConsumptionPowerRestoreData(
             latest_bucket_wh=1200.0,
@@ -1040,6 +1045,7 @@ async def test_site_consumption_power_rejects_invalid_or_mismatched_restore(
 
     future_restore = EnphaseSiteConsumptionPowerSensor(coord)
     future_restore.hass = hass
+    future_restore.entity_id = "sensor.enphase_future_restore"
     future_restore.async_get_last_extra_data = AsyncMock(
         return_value=_SiteConsumptionPowerRestoreData(
             latest_bucket_wh=1200.0,
@@ -1082,6 +1088,7 @@ async def test_consumption_newer_incompatible_sample_discards_unvalidated_restor
     }
     sensor = EnphaseSiteConsumptionPowerSensor(coord)
     sensor.hass = hass
+    sensor.entity_id = "sensor.enphase_sensor"
     sensor.async_get_last_extra_data = AsyncMock(
         return_value=_SiteConsumptionPowerRestoreData(
             latest_bucket_wh=1100,
@@ -1790,6 +1797,7 @@ async def test_site_energy_sensor_attributes(hass, coordinator_factory):
         "Solar Production",
     )
     sensor.hass = hass
+    sensor.entity_id = "sensor.enphase_sensor"
     await sensor.async_added_to_hass()
     assert sensor.available is True
     assert sensor.native_value == pytest.approx(1.23)
@@ -2404,6 +2412,7 @@ async def test_site_lifetime_power_sensor_clears_stale_restore_when_zero_channel
     # platform timer behavior is covered by test_site_power_freshness.
     monkeypatch.setattr(sensor, "_schedule_freshness_expiry", lambda: None)
     sensor.hass = hass
+    sensor.entity_id = "sensor.enphase_sensor"
 
     class LastState:
         state = "900"
@@ -3607,6 +3616,7 @@ async def test_site_lifetime_power_sensor_restore_edge_cases(
     coord = coordinator_factory()
     sensor = EnphaseGridPowerSensor(coord)
     sensor.hass = hass
+    sensor.entity_id = "sensor.enphase_sensor"
 
     class Boom:
         def __float__(self):
@@ -3641,6 +3651,7 @@ async def test_site_lifetime_power_sensor_restore_edge_cases(
 
     sensor2 = EnphaseGridPowerSensor(coord)
     sensor2.hass = hass
+    sensor2.entity_id = "sensor.enphase_sensor2"
 
     class AttrState:
         state = "bad"
@@ -3944,6 +3955,7 @@ async def test_site_energy_sensor_restoration(monkeypatch, hass, coordinator_fac
         coord, "grid_import", "site_grid_import", "Grid Import"
     )
     sensor.hass = hass
+    sensor.entity_id = "sensor.enphase_sensor"
 
     class LastData:
         native_value = "2.5"
@@ -3980,6 +3992,7 @@ async def test_site_energy_sensor_restoration(monkeypatch, hass, coordinator_fac
         coord, "grid_export", "site_grid_export", "Grid Export"
     )
     sensor2.hass = hass
+    sensor2.entity_id = "sensor.enphase_sensor2"
     sensor2.async_get_last_sensor_data = AsyncMock(return_value=None)
     sensor2.async_get_last_state = AsyncMock(side_effect=RuntimeError("boom"))
     sensor2.async_get_last_extra_data = AsyncMock(return_value=None)
@@ -4001,6 +4014,7 @@ async def test_site_energy_sensor_restoration(monkeypatch, hass, coordinator_fac
         coord, "battery_charge", "site_battery_charge", "Battery Charge"
     )
     sensor3.hass = hass
+    sensor3.entity_id = "sensor.enphase_sensor3"
     sensor3.async_get_last_sensor_data = AsyncMock(return_value=BadLastData())
     sensor3.async_get_last_state = AsyncMock(return_value=None)
     sensor3.async_get_last_extra_data = AsyncMock(return_value=None)
@@ -4656,6 +4670,7 @@ async def test_site_lifetime_power_sensor_async_added_to_hass_without_restore_st
     coord = coordinator_factory()
     sensor = EnphaseGridPowerSensor(coord)
     sensor.hass = hass
+    sensor.entity_id = "sensor.enphase_sensor"
     sensor.async_get_last_state = AsyncMock(return_value=None)
 
     await sensor.async_added_to_hass()
@@ -5583,6 +5598,7 @@ async def test_consumption_restored_baseline_recovers_with_fresh_long_window(
     )
     sensor = EnphaseSiteConsumptionPowerSensor(coord)
     sensor.hass = hass
+    sensor.entity_id = "sensor.enphase_sensor"
     sensor.async_get_last_extra_data = AsyncMock(
         return_value=_SiteConsumptionPowerRestoreData(
             latest_bucket_wh=18482,

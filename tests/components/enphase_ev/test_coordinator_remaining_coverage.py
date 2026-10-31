@@ -1554,6 +1554,7 @@ async def test_async_update_data_covers_remaining_branches(
 async def test_async_auto_resume_handles_snapshot_and_state(coordinator_factory):
     coord = coordinator_factory()
     coord.data = object()
+    coord.async_request_refresh = AsyncMock()
     coord.pick_start_amps = lambda *args, **kwargs: 16
     coord._charge_mode_start_preferences = lambda sn: ChargeModeStartPreferences()
     coord.client.start_charging = AsyncMock(return_value={"status": "ok"})
@@ -1648,7 +1649,7 @@ def test_persist_tokens_handles_missing_entry(coordinator_factory):
 def test_persist_tokens_drops_none_fields(coordinator_factory):
     coord = coordinator_factory()
     merged = {}
-    coord.config_entry = SimpleNamespace(data={}, entry_id="1")
+    coord.config_entry = SimpleNamespace(data={}, options={}, entry_id="1")
 
     def _update(entry, *, data):
         merged.update(data)

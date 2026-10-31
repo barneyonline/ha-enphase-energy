@@ -5208,6 +5208,7 @@ async def test_startup_warmup_runner_and_task_edge_paths(
     assert create_calls == [f"{DOMAIN}_warmup_site", None]
     assert coord.site_id not in str(create_calls[0])
     assert coord._warmup_task == "task"  # noqa: SLF001
+    coord._warmup_task = None  # noqa: SLF001
 
     coord = coordinator_factory()
     power_create_calls: list[object] = []
@@ -5228,6 +5229,7 @@ async def test_startup_warmup_runner_and_task_edge_paths(
     await coord.refresh_runner.async_start_startup_power()
     assert power_create_calls == [f"{DOMAIN}_startup_power", None]
     assert coord._startup_power_task == "power-task"  # noqa: SLF001
+    coord._startup_power_task = None  # noqa: SLF001
 
     coord = coordinator_factory()
     failed_power = asyncio.get_running_loop().create_future()

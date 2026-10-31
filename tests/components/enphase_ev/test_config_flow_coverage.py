@@ -103,6 +103,8 @@ from custom_components.enphase_ev.const import (
 from custom_components.enphase_ev.envoy_history import migration_target_unique_id
 from custom_components.enphase_ev.envoy_history import skip_option_value
 from custom_components.enphase_ev.envoy_history import EnvoyHistoryExecutionError
+
+
 from custom_components.enphase_ev.envoy_history import EnvoyHistoryMapping
 from custom_components.enphase_ev.envoy_history import EnvoyHistoryValidation
 from custom_components.enphase_ev.grid_profile_runtime import (
@@ -117,6 +119,17 @@ from custom_components.enphase_ev.grid_profile_runtime import (
     SUPPORT_READ_ONLY,
     SUPPORT_UNAVAILABLE,
 )
+
+
+@pytest.fixture(autouse=True)
+def mock_entry_setup():
+    """Keep config-flow tests from starting an unrelated live coordinator."""
+
+    with patch(
+        "custom_components.enphase_ev.async_setup_entry", AsyncMock(return_value=True)
+    ):
+        yield
+
 
 TOKENS = AuthTokens(
     cookie="jar=1",

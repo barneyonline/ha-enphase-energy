@@ -363,7 +363,10 @@ def _fake_service_coordinator(*, site_id: str, serials: set[str]):
                 "hems_backoff_until": "2026-05-08T00:00:00+00:00",
             }
         ),
-        schedule_sync=SimpleNamespace(async_refresh=AsyncMock(return_value=None)),
+        schedule_sync=SimpleNamespace(
+            async_refresh=AsyncMock(return_value=None),
+            async_stop=AsyncMock(return_value=None),
+        ),
         _email="user@example.com",
         _remember_password=True,
         _stored_password="secret",
