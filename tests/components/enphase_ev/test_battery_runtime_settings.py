@@ -2329,12 +2329,14 @@ async def test_battery_settings_unknown_role_rejects_when_refresh_unresolved(
     coord.client.battery_site_settings = AsyncMock(
         return_value={"data": {"userDetails": {}}}
     )
+    coord.client.validate_battery_schedule = AsyncMock(return_value={"valid": True})
     coord.client.set_battery_settings = AsyncMock(return_value={"message": "success"})
 
     with pytest.raises(ServiceValidationError, match="could not be confirmed"):
         await coord.async_set_charge_from_grid(False)
 
     coord.client.battery_site_settings.assert_awaited_once()
+    coord.client.validate_battery_schedule.assert_awaited_once_with("cfg")
     coord.client.set_battery_settings.assert_not_awaited()
 
 

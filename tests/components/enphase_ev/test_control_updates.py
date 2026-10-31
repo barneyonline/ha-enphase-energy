@@ -469,6 +469,7 @@ def test_progress_sensors_isolate_chargers_from_gateway(coordinator_factory):
     update.status = "unconfirmed"
     assert charger.native_value == "unconfirmed"
     coord.export_limit_runtime = SimpleNamespace(
+        stop=Mock(return_value=None),
         enabled=True,
         pending={"watts": 0, "started": 0},
         request_status="pending",
@@ -580,7 +581,11 @@ def test_export_rejection_is_reported_separately(coordinator_factory):
     coord = coordinator_factory()
     coord.export_limit_runtime.request_status = "rejected"
     coord.export_limit_runtime = SimpleNamespace(
-        enabled=True, pending=None, request_status="rejected", attributes=lambda: {}
+        stop=Mock(return_value=None),
+        enabled=True,
+        pending=None,
+        request_status="rejected",
+        attributes=lambda: {},
     )
     assert EnphaseDeviceUpdateStatusSensor(coord, "envoy").native_value == "failed"
 

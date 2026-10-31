@@ -97,7 +97,9 @@ async def test_async_setup_entry_registers_entities(
             return_value={"profile_id": "agf:current"}
         ),
     )
-    coord.export_limit_runtime = SimpleNamespace(enabled=True)
+    coord.export_limit_runtime = SimpleNamespace(
+        enabled=True, stop=MagicMock(return_value=None)
+    )
     callbacks: list[Any] = []
 
     def fake_add_listener(cb):

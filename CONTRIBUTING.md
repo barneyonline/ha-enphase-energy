@@ -104,6 +104,34 @@ It replaces cloud methods and fails on unexpected cloud calls. These scenarios
 also run in the full integration suite on the supported minimum Home Assistant
 version.
 
+Passing pytest output can hide runtime warning and error logs. CI retains these
+as the `pytest-runtime-warnings-python314` and `script-runtime-warnings` artifacts.
+Capture the same evidence locally when investigating warnings:
+
+```bash
+docker compose -f devtools/docker/docker-compose.yml exec ha-dev pytest -q tests/components/enphase_ev --log-file=/tmp/enphase_ev-runtime-warnings.log --log-file-level=WARNING
+```
+
+Keep test doubles complete for the lifecycle they participate in, unload loaded
+entries, and cancel or await each coordinator's owned work during fixture teardown.
+Home Assistant's custom-component test plugin permits lingering timers by default;
+our fixture checks must not rely on that permission to hide incomplete teardown.
+Preserve explicit failure-path logging and assert expected failures in their tests.
+Home Assistant API deprecation logs require runtime coverage; the import-time
+warning gate alone cannot detect a deprecated method called after setup.
+
+Some external diagnostics are expected: Home Assistant identifies custom
+integrations as untested by Core, optional compression backends can fall back to
+zlib, and AMD64 hassfest under ARM/QEMU can report jemalloc fallback messages.
+Codecov's valid GPG signature can still carry a key-certification warning; retain
+signature checks rather than automatically trusting a downloaded key. Its missing
+optional YAML message means the uploader is using defaults. CodeQL's native-module
+path probe is upstream-owned: check its extraction coverage and tool version before
+changing integration behavior. The managed job is separate from this test workflow;
+setting the unsupported `CODEQL_PYTHON` variable adds another warning rather than
+controlling that interpreter. Asyncio debug timing under a shared Docker VM must
+be reproduced in a focused run before treating it as live event-loop blocking.
+
 Maintenance-script tests use only lightweight dependencies and can be run
 separately while iterating on `scripts/`:
 
@@ -120,6 +148,11 @@ manifest field (including `version`, dependencies, or discovery), adding or remo
 the manifest, or supplying invalid JSON keeps the full integration suite enabled.
 Changes to the classifier or test workflow also run the full suite. Pushes to main
 and manual runs retain all test jobs.
+
+The HACS validator copies Python source from a pinned AMD64-only upstream image
+onto the pinned Home Assistant runtime. `HACS_SOURCE_PLATFORM` selects that source
+stage; the final image retains Docker's requested target platform. Keep both image
+digests and the Home Assistant version assertion when updating this validator.
 
 ## Dependency Maintenance
 

@@ -57,6 +57,10 @@ async def test_config_flow_happy_path(hass: HomeAssistant) -> None:
 
     with (
         patch(
+            "custom_components.enphase_ev.async_setup_entry",
+            AsyncMock(return_value=True),
+        ),
+        patch(
             "custom_components.enphase_ev.config_flow.async_authenticate",
             AsyncMock(return_value=(tokens, sites)),
         ) as mock_auth,
