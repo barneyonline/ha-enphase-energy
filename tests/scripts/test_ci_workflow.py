@@ -394,8 +394,7 @@ def test_manifest_additions_deletions_and_renames_keep_tests(manifest_repo, oper
         "custom_components/enphase_ev/translations/fr.json",
         "devtools/docker/requirements-dev.txt",
         ".coveragerc",
-        ".github/workflows/tests.yml",
-        "scripts/ci_manifest_metadata.py",
+        ".github/workflows/ci.yml",
     ],
 )
 def test_metadata_with_other_runtime_changes_keeps_tests(
@@ -413,6 +412,45 @@ def test_metadata_with_other_runtime_changes_keeps_tests(
     commit()
 
     assert classify()["integration"] == "true"
+
+
+@pytest.mark.parametrize("version_bump", [False, True])
+@pytest.mark.parametrize(
+    "paths",
+    [
+        (".github/workflows/tests.yml",),
+        ("scripts/ci_manifest_metadata.py",),
+        ("tests/scripts/test_ci_workflow.py",),
+        (
+            ".github/workflows/tests.yml",
+            "scripts/ci_manifest_metadata.py",
+            "tests/scripts/test_ci_workflow.py",
+        ),
+    ],
+)
+def test_classifier_and_test_workflow_changes_use_script_tests(
+    manifest_repo, paths, version_bump
+):
+    checkout, _, _, commit, classify = manifest_repo
+    if version_bump:
+        path = checkout / MANIFEST
+        manifest = json.loads(path.read_text())
+        manifest["version"] = "99.0.0"
+        path.write_text(json.dumps(manifest))
+        (checkout / "CHANGELOG.md").write_text("Release version bump.\n")
+    for name in paths:
+        path = checkout / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a") as stream:
+            stream.write("\n")
+    commit()
+
+    assert classify() == {
+        "integration": "false",
+        "diagnostics": "false",
+        "quality": "true",
+        "scripts": "true",
+    }
 
 
 def test_cross_group_source_rename_keeps_runtime_tests(manifest_repo):
