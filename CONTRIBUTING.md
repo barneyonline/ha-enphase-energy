@@ -146,8 +146,11 @@ The classifier compares JSON values against the PR merge base; changing any othe
 manifest field (including dependencies or discovery), adding or removing
 the manifest, supplying invalid JSON, or a missing, non-string, or empty version
 in either manifest keeps the full integration suite enabled.
-Changes to the classifier or test workflow also run the full suite. Pushes to main
-and manual runs retain all test jobs.
+Changes limited to the classifier, its workflow regression tests, or
+`.github/workflows/tests.yml` run the script suite and quality checks instead of
+the integration suite. Integration source, integration tests, runtime dependencies,
+and `.github/workflows/ci.yml` still trigger the full suite. Pushes to main and
+manual runs retain all test jobs.
 
 The HACS validator copies Python source from a pinned AMD64-only upstream image
 onto the pinned Home Assistant runtime. `HACS_SOURCE_PLATFORM` selects that source
