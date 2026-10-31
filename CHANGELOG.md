@@ -11,6 +11,23 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### 🐛 Bug fixes
+- None
+
+### 🔧 Improvements
+- None
+
+### 🔄 Other changes
+- None
+
+## v5.2.3 - 2026-10-31
+
+### 🚧 Breaking changes
+- None
+
+### ✨ New features
+- None
+
+### 🐛 Bug fixes
 - Ignore truncated MQTT packets whose remaining-length field is incomplete.
 - Release HEMS inventory and heat-pump runtime retry delays when their authentication backoff is cleared, expires, or recovers, so normal polling can resume without waiting for the previous pause. (#975)
 - Resolve battery activity names within their own config entry, avoiding ambiguous names and the deprecated Home Assistant device-registry lookup.
@@ -25,6 +42,8 @@ All notable changes to this project will be documented in this file.
 - Skip full integration tests on pull requests limited to descriptive manifest metadata while retaining hassfest, HACS, lint, and quality checks.
 - Capture runtime warning logs in CI, restrict Codecov uploads to generated reports, and make the HACS source-image platform explicit.
 - Treat the known absence of an optional EV charger firmware documentation source as informational while retaining warnings for unverifiable history and preserving cached data for source regressions.
+- Track the latest hassfest metadata validation rules independently of the minimum supported Home Assistant runtime.
+- Bump the integration manifest version to `5.2.3`.
 
 ## v5.2.2 - 2026-10-26
 
