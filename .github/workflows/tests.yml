@@ -241,7 +241,14 @@ jobs:
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
           PYTEST_PLUGINS: pytest_asyncio.plugin,pytest_homeassistant_custom_component.plugins,pytest_cov.plugin,pytest_github_actions_annotate_failures.plugin
-        run: pytest -q tests/components/enphase_ev --cov=custom_components.enphase_ev --cov-branch --cov-report=term-missing --cov-report=xml --cov-report=json --cov-fail-under=95 --junitxml=junit.xml -o junit_family=legacy
+        run: pytest -q tests/components/enphase_ev --cov=custom_components.enphase_ev --cov-branch --cov-report=term-missing --cov-report=xml --cov-report=json --cov-fail-under=95 --junitxml=junit.xml -o junit_family=legacy --log-file=pytest-runtime-warnings.log --log-file-level=WARNING
+      - name: Upload runtime warning log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: pytest-runtime-warnings-python314
+          path: pytest-runtime-warnings.log
+          if-no-files-found: ignore
       - name: Enforce 100% coverage on changed integration modules
         id: targeted_coverage
         if: ${{ steps.changed.outputs.include != '' }}
@@ -256,6 +263,8 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml
+          disable_search: true
+          plugins: noop
           fail_ci_if_error: true
       - name: Upload test results to Codecov
         if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
@@ -263,6 +272,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./junit.xml
+          disable_search: true
           report_type: test_results
       - name: Fail if tests or targeted coverage failed
         if: ${{ steps.pytest.outcome == 'failure' || steps.targeted_coverage.outcome == 'failure' }}
@@ -291,4 +301,11 @@ jobs:
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
           PYTEST_PLUGINS: pytest_asyncio.plugin
-        run: pytest -q tests/scripts
+        run: pytest -q tests/scripts --log-file=script-runtime-warnings.log --log-file-level=WARNING
+      - name: Upload maintenance script warning log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: script-runtime-warnings
+          path: script-runtime-warnings.log
+          if-no-files-found: ignore

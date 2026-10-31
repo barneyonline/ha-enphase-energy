@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from collections.abc import Callable
 from contextlib import ExitStack
+from functools import wraps
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -56,6 +58,35 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for local test runs
 from .random_ids import RANDOM_SERIAL, RANDOM_SITE_ID
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
+_LIFECYCLE_LOGS = pytest.StashKey[logging.Handler]()
+
+
+class _LifecycleLogCapture(logging.Handler):
+    """Retain unexpected HA lifecycle and malformed transport errors through teardown."""
+
+    def __init__(self) -> None:
+        super().__init__(logging.WARNING)
+        self.records: list[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        error = record.exc_info[1] if record.exc_info else None
+        if (
+            (
+                record.name == "homeassistant.helpers.frame"
+                and "deprecated" in record.getMessage()
+            )
+            or (
+                record.name == "homeassistant.config_entries"
+                and record.getMessage().startswith("Error unloading entry")
+            )
+            or (
+                record.name.startswith(f"custom_components.{DOMAIN}.")
+                and isinstance(error, AttributeError)
+                and error.name == "request"
+                and type(error.obj) is object
+            )
+        ):
+            self.records.append(record)
 
 
 def _seed_default_type_buckets(coord: Any) -> None:
@@ -95,7 +126,7 @@ def _seed_default_type_buckets(coord: Any) -> None:
 
 
 @pytest.hookimpl(tryfirst=True)
-def pytest_runtest_setup() -> None:
+def pytest_runtest_setup(item) -> None:
     """Reset socket monkeypatching before HA plugin reapplies restrictions.
 
     In this test environment, ``pytest_homeassistant_custom_component`` invokes
@@ -104,6 +135,35 @@ def pytest_runtest_setup() -> None:
     recursive GuardedSocket subclass wrapping across long test runs.
     """
     pytest_socket.enable_socket()
+    handler = _LifecycleLogCapture()
+    item.stash[_LIFECYCLE_LOGS] = handler
+    logging.getLogger().addHandler(handler)
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """Fail on lifecycle errors and malformed doubles hidden by passing tests."""
+
+    outcome = yield
+    report = outcome.get_result()
+    if report.when != "teardown":
+        return
+    handler = item.stash.get(_LIFECYCLE_LOGS, None)
+    if handler is None:
+        return
+    logging.getLogger().removeHandler(handler)
+    del item.stash[_LIFECYCLE_LOGS]
+    if handler.records:
+        detail = (
+            "Unexpected integration lifecycle or test transport logs:\n"
+            + "\n".join(
+                f"{record.levelname} {record.name}: {record.getMessage()}"
+                + (f" [{record.exc_info[1]}]" if record.exc_info else "")
+                for record in handler.records
+            )
+        )
+        report.outcome = "failed"
+        report.longrepr = f"{report.longrepr}\n{detail}" if report.longrepr else detail
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -132,6 +192,39 @@ def pytest_fixture_setup(fixturedef, request):
 def ensure_hass_stopped(stop_hass):
     """Ensure manually constructed Home Assistant instances are stopped cleanly."""
     yield
+
+
+@pytest.fixture
+def expected_lingering_timers() -> bool:
+    """Require test owners to cancel timers instead of the plugin discarding them."""
+    return False
+
+
+@pytest.fixture(autouse=True)
+def cleanup_created_coordinators(monkeypatch):
+    """Own coordinators created by factories and directly constructed in tests."""
+    from custom_components.enphase_ev.coordinator import EnphaseCoordinator
+
+    initialize = EnphaseCoordinator.__init__
+    cleanup = EnphaseCoordinator.cleanup_runtime_state
+    async_cleanup = EnphaseCoordinator.async_cleanup_runtime_state
+    coordinators = []
+
+    @wraps(initialize)
+    def initialize_tracked(self, *args, **kwargs):
+        initialize(self, *args, **kwargs)
+        coordinators.append((self, self.hass))
+
+    monkeypatch.setattr(EnphaseCoordinator, "__init__", initialize_tracked)
+    yield
+    for coord, hass in reversed(coordinators):
+        # Tests may replace a cleanup method to exercise an error branch. The
+        # fixture still owns the real resources and must use the real boundary.
+        with (
+            patch.object(coord, "hass", hass),
+            patch.object(coord, "cleanup_runtime_state", cleanup.__get__(coord)),
+        ):
+            hass.loop.run_until_complete(async_cleanup(coord))
 
 
 @pytest.fixture
@@ -285,8 +378,6 @@ def coordinator_factory(hass, mock_clientsession, mock_issue_registry, monkeypat
         lambda *_args, **_kwargs: (lambda: None),
     )
 
-    coordinators = []
-
     def _factory(
         *,
         config: dict[str, Any] | None = None,
@@ -344,13 +435,9 @@ def coordinator_factory(hass, mock_clientsession, mock_issue_registry, monkeypat
                     "data": {"userDetails": {"isOwner": True, "isInstaller": False}}
                 }
             )
-        coordinators.append(coord)
         return coord
 
-    yield _factory
-    for coord in coordinators:
-        if coord.control_updates is not None:
-            coord.control_updates.cleanup()
+    return _factory
 
 
 @pytest.fixture

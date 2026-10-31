@@ -18,6 +18,7 @@ from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
 async def test_power_restore_missing_state(hass, coordinator_factory):
     sensor = EnphasePowerSensor(coordinator_factory(), RANDOM_SERIAL)
     sensor.hass = hass
+    sensor.entity_id = "sensor.enphase_sensor"
     sensor.async_get_last_state = AsyncMock(return_value=None)
     await sensor.async_added_to_hass()
 
@@ -47,6 +48,7 @@ async def test_power_restore_handles_bad_attrs(hass, coordinator_factory):
 
     sensor = EnphasePowerSensor(coordinator_factory(), RANDOM_SERIAL)
     sensor.hass = hass
+    sensor.entity_id = "sensor.enphase_sensor"
     sensor.async_get_last_state = AsyncMock(return_value=bad_state)
     await sensor.async_added_to_hass()
     assert sensor._last_power_w == 0
@@ -430,6 +432,7 @@ async def test_power_restore_legacy_last_ts_failure(hass, coordinator_factory):
     bad_state = State("sensor.power", "0", attributes=attrs)
     sensor = EnphasePowerSensor(coordinator_factory(), RANDOM_SERIAL)
     sensor.hass = hass
+    sensor.entity_id = "sensor.enphase_sensor"
     sensor.async_get_last_state = AsyncMock(return_value=bad_state)
     await sensor.async_added_to_hass()
     assert sensor._last_energy_ts is None

@@ -44,6 +44,9 @@ TARGET_PRODUCTS: dict[str, dict[str, Any]] = {
         "docs_path": TARGET_CATEGORY_PATH,
         "product_media_name_required": True,
         "required": False,
+        # Enphase does not currently advertise this software category. Keep
+        # probing without warning when readable history confirms its absence.
+        "missing_product_is_expected": True,
     },
 }
 
@@ -2110,6 +2113,30 @@ def build_catalog(output_dir: Path, *, timeout: int, max_pages: int) -> None:
             )
             if isinstance(previous_source_device, dict):
                 source_devices[device_key] = previous_source_device
+            previous_devices = (
+                previous_runtime_catalog.get("devices")
+                if isinstance(previous_runtime_catalog, dict)
+                else None
+            )
+            previous_source = (
+                previous_runtime_catalog.get("source")
+                if isinstance(previous_runtime_catalog, dict)
+                else None
+            )
+            previous_source_devices = (
+                previous_source.get("devices")
+                if isinstance(previous_source, dict)
+                else None
+            )
+            # Unavailable or malformed history cannot establish that a product
+            # was never published. Keep the warning in those cases.
+            expected_absence = bool(
+                product_meta.get("missing_product_is_expected")
+                and isinstance(previous_devices, dict)
+                and device_key not in previous_devices
+                and isinstance(previous_source_devices, dict)
+                and device_key not in previous_source_devices
+            )
             crawl_meta[device_key] = {
                 "count": 0,
                 "targets": {},
@@ -2122,7 +2149,8 @@ def build_catalog(output_dir: Path, *, timeout: int, max_pages: int) -> None:
                 "skip_reason": missing_message,
                 "using_previous_catalog_device": isinstance(previous_device, dict),
             }
-            _LOGGER.warning(
+            log_missing_product = _LOGGER.info if expected_absence else _LOGGER.warning
+            log_missing_product(
                 "Firmware catalog skipping device %s: %s",
                 device_key,
                 missing_message,

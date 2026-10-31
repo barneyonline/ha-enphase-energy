@@ -564,6 +564,49 @@ async def test_battery_names_order_and_redaction(activity, hass):
     assert len(activity.events) == 1
 
 
+@pytest.mark.parametrize("own_device", [False, True])
+async def test_battery_names_use_own_config_entry(activity, hass, caplog, own_device):
+    other_entry = MockConfigEntry(domain=DOMAIN, data={"site_id": "other-site"})
+    other_entry.add_to_hass(hass)
+    registry = dr.async_get(hass)
+    registry.async_get_or_create(
+        config_entry_id=other_entry.entry_id,
+        identifiers={(DOMAIN, "shared-battery")},
+        name="Other system battery",
+    )
+    if own_device:
+        device = registry.async_get_or_create(
+            config_entry_id=activity.entry.entry_id,
+            identifiers={(DOMAIN, "shared-battery")},
+            name="Garage battery",
+        )
+        registry.async_update_device(device.id, name_by_user="My battery")
+    record = activity.make(
+        "battery_overall_status",
+        "normal",
+        {"per_battery_status": {"shared-battery": "normal"}},
+    )
+    await hass.async_block_till_done()
+    activity.start()
+
+    hass.states.async_set(
+        record.entity_id,
+        "error",
+        {"per_battery_status": {"shared-battery": "error"}},
+    )
+    await hass.async_block_till_done()
+
+    message = activity.events[-1]["message"]
+    assert f"{'My battery' if own_device else 'Battery 1'}: Error" in message
+    assert "Other system battery" not in message
+    assert "shared-battery" not in message
+    assert not any(
+        record.name == "homeassistant.helpers.frame"
+        and "device_registry.async_get_device" in record.getMessage()
+        for record in caplog.records
+    )
+
+
 async def test_item_limit_full_events_and_truncation(activity, hass):
     runtime = SimpleNamespace(activity_events=())
     activity.coord.system_events_runtime = runtime
