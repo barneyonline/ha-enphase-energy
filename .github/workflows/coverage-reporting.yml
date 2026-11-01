@@ -28,15 +28,18 @@ jobs:
       pull-requests: read
     steps:
       - id: scope
-        uses: barneyonline/hal-github-maintenance/actions/coverage-reporting@134f3edaa7c0c59d1e672e788ebebb8973860b10
+        uses: barneyonline/hal-github-maintenance/actions/coverage-reporting@0bb8da1ff97cbae58c8b8f7a179ca6e112e751e3
         with:
           token: ${{ github.token }}
       - name: Upload coverage data to Codecov
+        id: coverage_upload
         if: ${{ steps.scope.outputs.eligible == 'true' }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ${{ runner.temp }}/hal-codecov-input/coverage.xml
+          root_dir: ${{ runner.temp }}/hal-codecov-source
+          name: hal-coverage-${{ github.run_id }}-${{ github.run_attempt }}
           plugins: noop
           disable_search: true
           disable_file_fixes: true
@@ -48,11 +51,14 @@ jobs:
           slug: ${{ github.repository }}
           fail_ci_if_error: true
       - name: Upload junit data to Codecov
+        id: junit_upload
         if: ${{ steps.scope.outputs.eligible == 'true' }}
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ${{ runner.temp }}/hal-codecov-input/junit.xml
+          root_dir: ${{ runner.temp }}/hal-codecov-source
+          name: hal-junit-${{ github.run_id }}-${{ github.run_attempt }}
           plugins: noop
           disable_search: true
           disable_file_fixes: true
@@ -64,3 +70,8 @@ jobs:
           slug: ${{ github.repository }}
           report_type: test_results
           fail_ci_if_error: true
+      - name: Verify Codecov processed this attempt's coverage and test results
+        if: ${{ always() && steps.scope.outputs.eligible == 'true' && steps.coverage_upload.outcome == 'success' && steps.junit_upload.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I -B "$RUNNER_TEMP/hal-ci-reporting.py" verify-delivery

@@ -22,7 +22,7 @@ jobs:
   reporter-followup:
     runs-on: ubuntu-26.04
     steps:
-      - uses: barneyonline/hal-github-maintenance/actions/reporter-followup@134f3edaa7c0c59d1e672e788ebebb8973860b10
+      - uses: barneyonline/hal-github-maintenance/actions/reporter-followup@0bb8da1ff97cbae58c8b8f7a179ca6e112e751e3
         with:
           token: ${{ github.token }}
           apply_actions: ${{ github.event_name == 'schedule' || inputs.apply_actions }}

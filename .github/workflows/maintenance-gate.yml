@@ -49,7 +49,7 @@ jobs:
       (github.event_name != 'issue_comment' || github.event.issue.pull_request) &&
       (github.event_name != 'check_run' || github.event.check_run.name != 'Autonomous maintenance / merge gate')
     steps:
-      - uses: barneyonline/hal-github-maintenance/actions/merge-gate@134f3edaa7c0c59d1e672e788ebebb8973860b10
+      - uses: barneyonline/hal-github-maintenance/actions/merge-gate@0bb8da1ff97cbae58c8b8f7a179ca6e112e751e3
         with:
           token: ${{ github.token }}
           pull_number: ${{ inputs.pull_number }}
