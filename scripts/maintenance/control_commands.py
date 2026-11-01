@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -98,11 +99,31 @@ def plan_dispatch(
             "action": "ignore",
             "reason": "Comment author is not the configured control actor",
         }
+    initiator = event.get("sender", {})
+    if initiator.get("id") != actor["id"] or initiator.get("login") != actor["login"]:
+        return {
+            "action": "ignore",
+            "reason": "Event initiator is not the control actor",
+        }
     body = comment.get("body")
     if not isinstance(body, str):
         raise ValueError("Control request body must be text")
     if not body.lstrip().startswith("<!-- hal-control-request:"):
         return {"action": "ignore", "reason": "Ordinary control-issue note"}
+    created = comment.get("created_at")
+    if (
+        not isinstance(created, str)
+        or not re.fullmatch(
+            r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", created
+        )
+        or comment.get("updated_at") != created
+        or comment.get("issue_url")
+        != f"https://api.github.com/repos/{repository}/issues/{policy['control_issue_number']}"
+    ):
+        raise ValueError(
+            "Control command requires an unedited creation in the configured issue"
+        )
+    datetime.fromisoformat(created.replace("Z", "+00:00"))
     if len(body) > 4096:
         raise ValueError("Control request must be a bounded standalone marker")
     match = re.fullmatch(

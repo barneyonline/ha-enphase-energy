@@ -123,11 +123,19 @@ def fixture() -> tuple[dict, dict]:
             "merge_base_commit": {"sha": BASE},
             "behind_by": 0,
             "status": "ahead",
+            "files": [
+                {
+                    "filename": "custom_components/integration/sensor.py",
+                    "sha": HEAD,
+                    "status": "modified",
+                }
+            ],
         },
         "stable": True,
         "errors": [],
         "pr": {
             "number": 1,
+            "changed_files": 1,
             "head": {"sha": HEAD},
             "base": {"sha": BASE, "ref": "main"},
             "user": AUTHOR,

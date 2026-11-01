@@ -12,6 +12,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -1025,6 +1026,199 @@ def base_ref_proof(repository: str, branch: str, sha: str) -> dict[str, str]:
     }
 
 
+def source_path(value: Any) -> str:
+    """Keep provider paths as data; reject ambiguous or escaping representations."""
+    if (
+        not isinstance(value, str)
+        or not value
+        or len(value) > 4096
+        or value.startswith("/")
+        or "\\" in value
+        or unicodedata.normalize("NFKC", value) != value
+        or any(ord(c) < 32 or ord(c) == 127 for c in value)
+        or any(part in {"", ".", ".."} for part in value.split("/"))
+    ):
+        raise GateError("invalid changed source path")
+    return value
+
+
+def source_files(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    """Compare caps files at 300; a boundary cannot certify completeness."""
+    values = snapshot.get("comparison", {}).get("files")
+    count = snapshot["pr"].get("changed_files")
+    if (
+        not isinstance(values, list)
+        or type(count) is not int
+        or not 0 <= count < 300
+        or len(values) != count
+    ):
+        raise GateError("complete bounded source inventory required")
+    result, seen = [], set()
+    for item in values:
+        if not isinstance(item, dict):
+            raise GateError("invalid source inventory entry")
+        path = source_path(item.get("filename"))
+        status = item.get("status")
+        blob = item.get("sha")
+        if (
+            path in seen
+            or status
+            not in {
+                "added",
+                "removed",
+                "modified",
+                "renamed",
+                "copied",
+                "changed",
+                "unchanged",
+            }
+            or not isinstance(blob, str)
+            or not SHA.fullmatch(blob)
+        ):
+            raise GateError("invalid source inventory entry")
+        entry = {"filename": path, "sha": blob, "status": status}
+        if status == "renamed" or "previous_filename" in item:
+            entry["previous_filename"] = source_path(item.get("previous_filename"))
+        seen.add(path)
+        result.append(entry)
+    return sorted(result, key=lambda item: item["filename"])
+
+
+def integration_manifest(path: str) -> bool:
+    return (
+        re.fullmatch(r"custom_components/[A-Za-z0-9_]+/manifest\.json", path)
+        is not None
+    )
+
+
+def manifest_data(value: Any, path: str) -> tuple[dict[str, Any], str]:
+    if (
+        not isinstance(value, dict)
+        or value.get("path") != path
+        or value.get("type") != "file"
+        or value.get("encoding") != "base64"
+        or type(value.get("size")) is not int
+        or not 0 < value["size"] <= 1_000_000
+        or not isinstance(value.get("content"), str)
+        or len(value["content"]) > 1_400_000
+    ):
+        raise GateError("manifest blob evidence unavailable")
+    raw = base64.b64decode(value["content"].replace("\n", ""), validate=True)
+    blob = hashlib.sha1(
+        b"blob " + str(len(raw)).encode() + b"\0" + raw, usedforsecurity=False
+    ).hexdigest()
+    if len(raw) != value["size"] or value.get("sha") != blob:
+        raise GateError("manifest blob evidence changed")
+    data = json.loads(raw, object_pairs_hook=unique_object)
+    if not isinstance(data, dict):
+        raise GateError("manifest must be an object")
+    return data, blob
+
+
+def patch_version_only(snapshot: dict[str, Any], item: dict[str, Any]) -> bool:
+    """Allow bug-release metadata, never silently approve new dependencies."""
+    path = item["filename"]
+    proof = snapshot.get("manifest_files", {}).get(path, {})
+    if (
+        item["status"] != "modified"
+        or "previous_filename" in item
+        or proof.get("base_commit") != snapshot["pr"]["base"]["sha"]
+        or proof.get("head_commit") != snapshot["pr"]["head"]["sha"]
+    ):
+        return False
+    before, _ = manifest_data(proof.get("base"), path)
+    after, blob = manifest_data(proof.get("head"), path)
+    old, new = before.pop("version", None), after.pop("version", None)
+    pattern = r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
+    if not isinstance(old, str) or not isinstance(new, str):
+        return False
+    a, b = re.fullmatch(pattern, old), re.fullmatch(pattern, new)
+    return bool(
+        a
+        and b
+        and before == after
+        and blob == item["sha"]
+        and tuple(map(int, b.groups()))
+        == (*map(int, a.groups()[:2]), int(a.group(3)) + 1)
+    )
+
+
+def sensitive_changes(
+    snapshot: dict[str, Any], files: list[dict[str, Any]]
+) -> list[str]:
+    """Public text, labels and candidate policy cannot waive a control change hold."""
+    held = set()
+    roots = {
+        ".github",
+        ".agents",
+        ".codex",
+        ".claude",
+        ".cursor",
+        ".devcontainer",
+        "devtools",
+    }
+    names = {
+        "agents.md",
+        "claude.md",
+        "gemini.md",
+        "codex.md",
+        "skill.md",
+        ".mcp.json",
+        "mcp.json",
+        "pyproject.toml",
+        "setup.py",
+        "setup.cfg",
+        "uv.lock",
+        "poetry.lock",
+        "pipfile",
+        "pipfile.lock",
+        "package.json",
+        "package-lock.json",
+        "npm-shrinkwrap.json",
+        "yarn.lock",
+        "pnpm-lock.yaml",
+        ".pre-commit-config.yaml",
+        ".gitmodules",
+        ".gitattributes",
+        ".gitconfig",
+        ".npmrc",
+        ".pypirc",
+        "pip.conf",
+        "pytest.ini",
+        "tox.ini",
+        "conftest.py",
+    }
+    for item in files:
+        for path in {item["filename"], item.get("previous_filename", item["filename"])}:
+            lower = path.casefold()
+            parts, name = lower.split("/"), lower.rsplit("/", 1)[-1]
+            if (
+                any(p in roots for p in parts)
+                or lower.startswith("scripts/maintenance/")
+                or (
+                    lower.startswith("scripts/")
+                    and (name.startswith("docker-") or name == "test")
+                )
+                or name in names
+                or name.startswith(
+                    (
+                        ".env",
+                        "dockerfile",
+                        "requirements",
+                        "constraints",
+                        "docker-compose",
+                        "compose.",
+                    )
+                )
+                or (
+                    integration_manifest(path)
+                    and not patch_version_only(snapshot, item)
+                )
+            ):
+                held.add(path)
+    return sorted(held)
+
+
 def evaluate(snapshot: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
     """Pure deterministic evaluator: no I/O, mutation, source execution or secrets."""
     result: dict[str, Any] = {
@@ -1102,6 +1296,11 @@ def evaluate(snapshot: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]
             or comparison.get("status") not in {"ahead", "identical"}
         ):
             block("current_base_ancestry_unproven")
+        files = source_files(snapshot)
+        result["source_inventory_digest"] = digest(files)
+        held = sensitive_changes(snapshot, files)
+        if held:
+            block("sensitive_changes_require_owner", paths=held)
         feedback, ledger, latest_checks = inventory(snapshot, policy)
         result["empty_check_suite_receipts"] = empty_suite_receipts(snapshot, policy)
         result["inventory_digest"] = inventory_digest(feedback)
@@ -1549,6 +1748,16 @@ class GitHub:
             head,
         )
         snap["comparison"] = comparison
+        snap["manifest_files"] = {}
+        for item in source_files(snap):
+            path = item["filename"]
+            if integration_manifest(path) and item["status"] == "modified":
+                snap["manifest_files"][path] = {
+                    "base_commit": pr["base"]["sha"],
+                    "head_commit": head,
+                    "base": self.get(f"contents/{path}?ref={pr['base']['sha']}"),
+                    "head": self.get(f"contents/{path}?ref={head}"),
+                }
         snap["issue_comments"] = self.pages(f"issues/{number}/comments?per_page=100")
         native_comments = [
             item

@@ -46,6 +46,7 @@ def event(command: dict | None = None) -> dict:
     return {
         "action": "created",
         "repository": {"full_name": REPOSITORY},
+        "sender": {"id": 38914183, "login": "barneyonline"},
         "issue": {
             "number": 42,
             "state": "open",
@@ -53,6 +54,9 @@ def event(command: dict | None = None) -> dict:
         },
         "comment": {
             "id": 123,
+            "created_at": "2026-11-01T00:00:00Z",
+            "updated_at": "2026-11-01T00:00:00Z",
+            "issue_url": "https://api.github.com/repos/example/integration/issues/42",
             "user": {"id": 38914183, "login": "barneyonline"},
             "body": "<!-- hal-control-request:v1 " + json.dumps(command) + " -->",
         },
@@ -60,6 +64,36 @@ def event(command: dict | None = None) -> dict:
 
 
 class ControlPlanTests(unittest.TestCase):
+    def test_foreign_initiator_and_edited_or_rehomed_owner_commands_refuse(self):
+        for sender in [
+            None,
+            {},
+            {"id": 1, "login": "barneyonline"},
+            {"id": 38914183, "login": "imposter"},
+        ]:
+            current = event()
+            if sender is None:
+                current.pop("sender")
+            else:
+                current["sender"] = sender
+            self.assertEqual(
+                "ignore", control.plan_dispatch(current, policy(), REPOSITORY)["action"]
+            )
+        for mutate in [
+            lambda e: e["comment"].pop("created_at"),
+            lambda e: e["comment"].update(created_at=1),
+            lambda e: e["comment"].update(created_at="bad"),
+            lambda e: e["comment"].update(updated_at="2026-11-02T00:00:00Z"),
+            lambda e: e["comment"].update(issue_url="https://evil.test/issues/42"),
+            lambda e: e["comment"].update(
+                created_at="2026-99-01T00:00:00Z", updated_at="2026-99-01T00:00:00Z"
+            ),
+        ]:
+            current = event()
+            mutate(current)
+            with self.assertRaises(ValueError):
+                control.plan_dispatch(current, policy(), REPOSITORY)
+
     def test_candidate_plan_targets_only_fixed_workflow_and_branch(self) -> None:
         plan = control.plan_dispatch(event(), policy(), REPOSITORY)
         self.assertEqual("release-candidate.yml", plan["workflow"])

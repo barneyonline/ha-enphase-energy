@@ -59,7 +59,10 @@ jobs:
             const currentRequest = (await github.rest.issues.getComment({...context.repo, comment_id: plan.request_comment_id})).data;
             if (!['open', 'closed'].includes(currentIssue.state) || !currentIssue.labels.some(label => label.name === 'automation/control') ||
                 currentRequest.body !== context.payload.comment.body || currentRequest.updated_at !== context.payload.comment.updated_at ||
-                currentRequest.user.id !== context.payload.comment.user.id) {
+                currentRequest.user.id !== context.payload.comment.user.id ||
+                currentRequest.created_at !== context.payload.comment.created_at ||
+                currentRequest.updated_at !== currentRequest.created_at ||
+                currentRequest.issue_url !== `https://api.github.com/repos/${context.repo.owner}/${context.repo.repo}/issues/${issueNumber}`) {
               throw new Error('Control issue or request changed; submit a new request after reconciliation');
             }
             const bot = (await github.rest.users.getByUsername({username: 'github-actions[bot]'})).data;
