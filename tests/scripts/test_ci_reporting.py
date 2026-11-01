@@ -1,12 +1,20 @@
 """Provenance and hostile report-data regressions for the protected reporter."""
 
 import copy
+import hashlib
 import importlib.util
+import io
 import json
 import os
+import stat
+import sys
 import tempfile
 import unittest
+import urllib.error
+import warnings
+import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import yaml
@@ -26,6 +34,14 @@ MODULE = (
 spec = importlib.util.spec_from_file_location("ci_reporting", MODULE)
 reporting = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(reporting)
+
+
+def archive_bytes(entries: dict[str, str]) -> bytes:
+    stream = io.BytesIO()
+    with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_DEFLATED) as zipped:
+        for name, content in entries.items():
+            zipped.writestr(name, content)
+    return stream.getvalue()
 
 
 class ScopeTests(unittest.TestCase):
@@ -64,6 +80,7 @@ class ScopeTests(unittest.TestCase):
             "base": {"repo": {"id": self.repo_id}},
         }
         self.artifact = {
+            "digest": "sha256:" + "d" * 64,
             "id": 99,
             "name": "coverage-evidence-2",
             "expired": False,
@@ -234,6 +251,11 @@ class ScopeTests(unittest.TestCase):
         with self.assertRaises(reporting.Refused):
             self.verify()
 
+    def test_cancelled_test_step_is_uncertain(self) -> None:
+        self.job["steps"][0]["conclusion"] = "cancelled"
+        with self.assertRaises(reporting.Refused):
+            self.verify()
+
 
 class ReportTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -300,19 +322,24 @@ class ReportTests(unittest.TestCase):
             reporting.validate_reports(self.reports)
 
 
+def transport_fixture() -> tuple[object, Mock]:
+    with patch.dict(os.environ, {"GH_TOKEN": "synthetic-unit-token"}, clear=True):
+        api = reporting.ReadAPI("barneyonline/ha-groq")
+    response = Mock()
+    response.__enter__ = Mock(return_value=response)
+    response.__exit__ = Mock(return_value=False)
+    response.geturl.return_value = (
+        "https://api.github.com/repos/barneyonline/ha-groq/actions/runs/42"
+    )
+    response.read.return_value = b'{"id":42}'
+    api.opener = Mock()
+    api.opener.open.return_value = response
+    return api, response
+
+
 class TransportTests(unittest.TestCase):
     def setUp(self) -> None:
-        with patch.dict(os.environ, {"GH_TOKEN": "synthetic-unit-token"}, clear=True):
-            self.api = reporting.ReadAPI("barneyonline/ha-groq")
-        self.response = Mock()
-        self.response.__enter__ = Mock(return_value=self.response)
-        self.response.__exit__ = Mock(return_value=False)
-        self.response.geturl.return_value = (
-            "https://api.github.com/repos/barneyonline/ha-groq/actions/runs/42"
-        )
-        self.response.read.return_value = b'{"id":42}'
-        self.api.opener = Mock()
-        self.api.opener.open.return_value = self.response
+        self.api, self.response = transport_fixture()
 
     def test_only_fixed_get_route_is_used(self) -> None:
         self.assertEqual(
@@ -363,6 +390,7 @@ class CLITests(unittest.TestCase):
             "GITHUB_OUTPUT": str(self.root / "outputs"),
             "RUNNER_TEMP": str(self.root),
             "REPORT_DIRECTORY": str(self.root / "reports"),
+            "GITHUB_ACTOR_ID": str(reporting.OWNER_ID),
         }
         self.scope = {
             "eligible": True,
@@ -374,13 +402,26 @@ class CLITests(unittest.TestCase):
             "branch": "codex/issue-7",
             "pr_number": 72,
         }
+        self.archive_bytes = archive_bytes(
+            {"coverage.xml": "<coverage/>", "junit.xml": "<testsuites/>"}
+        )
+        self.scope["artifact_digest"] = (
+            "sha256:" + hashlib.sha256(self.archive_bytes).hexdigest()
+        )
 
     def run_main(self, operation: str) -> int:
         with patch.dict(os.environ, self.environment, clear=True), patch(
             "sys.argv", ["ci_reporting.py", operation]
-        ), patch.object(reporting, "ReadAPI"), patch.object(
+        ), patch.object(
+            reporting,
+            "sys",
+            SimpleNamespace(flags=SimpleNamespace(isolated=1), stderr=sys.stderr),
+        ), patch.object(
+            reporting, "ReadAPI"
+        ) as api, patch.object(
             reporting, "verify_scope", return_value=self.scope
         ):
+            api.return_value.archive.return_value = io.BytesIO(self.archive_bytes)
             return reporting.main()
 
     def test_controller_and_scope_are_preserved_outside_reports(self) -> None:
@@ -401,18 +442,15 @@ class CLITests(unittest.TestCase):
 
     def test_revalidated_reports_are_required(self) -> None:
         self.assertEqual(self.run_main("verify-event"), 0)
-        reports = self.root / "reports"
-        reports.mkdir()
-        (reports / "coverage.xml").write_text("<coverage/>")
-        (reports / "junit.xml").write_text("<testsuites/>")
-        self.assertEqual(self.run_main("validate-reports"), 0)
-        (reports / "coverage.xml").unlink()
-        self.assertEqual(self.run_main("validate-reports"), 1)
+        self.assertEqual(self.run_main("consume-reports"), 0)
+        self.assertEqual(
+            (self.root / "reports/coverage.xml").read_text(), "<coverage/>"
+        )
 
     def test_scope_change_blocks_upload_flags(self) -> None:
         self.assertEqual(self.run_main("verify-event"), 0)
         self.scope["head_sha"] = "b" * 40
-        self.assertEqual(self.run_main("validate-reports"), 1)
+        self.assertEqual(self.run_main("consume-reports"), 1)
         self.assertNotIn("coverage=true", (self.root / "outputs").read_text())
 
     def test_pr_context_is_not_a_trusted_controller(self) -> None:
@@ -423,10 +461,36 @@ class CLITests(unittest.TestCase):
     def test_manual_rehearsal_refuses_non_numeric_run(self) -> None:
         self.environment["GITHUB_EVENT_NAME"] = "workflow_dispatch"
         (self.root / "event.json").write_text(
-            '{"inputs":{"producer_run_id":"42; touch marker"}}'
+            json.dumps(
+                {
+                    "sender": {"id": reporting.OWNER_ID},
+                    "inputs": {"producer_run_id": "42; touch marker"},
+                }
+            )
         )
         self.assertEqual(self.run_main("verify-event"), 1)
         self.assertFalse((self.root / "hal-ci-reporting.py").exists())
+
+    def test_nonisolated_invocation_is_refused_before_api(self) -> None:
+        with patch.dict(os.environ, self.environment, clear=True), patch(
+            "sys.argv", ["ci_reporting.py", "verify-event"]
+        ), patch.object(
+            reporting,
+            "sys",
+            SimpleNamespace(flags=SimpleNamespace(isolated=0), stderr=sys.stderr),
+        ), patch.object(
+            reporting, "ReadAPI"
+        ) as api:
+            self.assertEqual(reporting.main(), 1)
+            api.assert_not_called()
+
+    def test_manual_rehearsal_is_owner_only(self) -> None:
+        self.environment["GITHUB_EVENT_NAME"] = "workflow_dispatch"
+        self.environment["GITHUB_ACTOR_ID"] = "17"
+        (self.root / "event.json").write_text(
+            json.dumps({"sender": {"id": 17}, "inputs": {"producer_run_id": "42"}})
+        )
+        self.assertEqual(self.run_main("verify-event"), 1)
 
 
 @unittest.skipIf(
@@ -478,19 +542,166 @@ class WorkflowTests(unittest.TestCase):
             self.assertNotIn("binary", data)
 
     def test_artifact_reader_has_only_fixed_verified_identifiers(self) -> None:
-        reader = next(
-            s
-            for s in self.job["steps"]
-            if s.get("uses", "").startswith("actions/download-artifact@")
+        self.assertFalse(
+            any(
+                s.get("uses", "").startswith("actions/download-artifact@")
+                for s in self.job["steps"]
+            )
         )
+        consumer = next(s for s in self.job["steps"] if s.get("id") == "reports")
         self.assertEqual(
-            reader["with"]["artifact-ids"], "${{ steps.scope.outputs.artifact_id }}"
+            consumer["run"],
+            'python3 -I -B "$RUNNER_TEMP/hal-ci-reporting.py" consume-reports',
         )
-        self.assertEqual(reader["with"]["run-id"], "${{ steps.scope.outputs.run_id }}")
         self.assertEqual(self.job["permissions"]["actions"], "read")
         self.assertEqual(self.job["permissions"]["contents"], "read")
         self.assertEqual(self.job["permissions"]["pull-requests"], "read")
         self.assertLessEqual(self.job["timeout-minutes"], 10)
+
+
+class ArchiveTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name).resolve()
+        self.target = self.root / "reports"
+
+    def refuse(self, raw: bytes) -> None:
+        with self.assertRaises(reporting.Refused):
+            reporting.stage_archive(io.BytesIO(raw), self.target)
+        self.assertFalse(self.target.exists())
+
+    def test_valid_members_are_staged_as_data(self) -> None:
+        result = reporting.stage_archive(
+            io.BytesIO(
+                archive_bytes(
+                    {"coverage.xml": "<coverage/>", "junit.xml": "<testsuites/>"}
+                )
+            ),
+            self.target,
+        )
+        self.assertIs(result["coverage"], True)
+        self.assertEqual((self.target / "coverage.xml").read_text(), "<coverage/>")
+
+    def test_traversal_is_rejected_before_creation(self) -> None:
+        self.refuse(
+            archive_bytes(
+                {
+                    "coverage.xml": "<coverage/>",
+                    "junit.xml": "<testsuites/>",
+                    "../escape": "data",
+                }
+            )
+        )
+        self.assertFalse((self.root / "escape").exists())
+
+    def test_entry_count_is_bounded_before_creation(self) -> None:
+        self.refuse(
+            archive_bytes(
+                {
+                    "coverage.xml": "<coverage/>",
+                    "junit.xml": "<testsuites/>",
+                    "coverage.json": "{}",
+                    "extra": "x",
+                }
+            )
+        )
+
+    def test_highly_compressed_member_is_refused_before_creation(self) -> None:
+        self.refuse(
+            archive_bytes(
+                {"coverage.xml": "x" * 16_777_217, "junit.xml": "<testsuites/>"}
+            )
+        )
+
+    def test_symlink_metadata_is_refused(self) -> None:
+        stream = io.BytesIO()
+        with zipfile.ZipFile(stream, "w") as zipped:
+            link = zipfile.ZipInfo("coverage.xml")
+            link.create_system = 3
+            link.external_attr = (stat.S_IFLNK | 0o777) << 16
+            zipped.writestr(link, "../outside")
+            zipped.writestr("junit.xml", "<testsuites/>")
+        self.refuse(stream.getvalue())
+
+    def test_duplicate_member_is_refused(self) -> None:
+        stream = io.BytesIO()
+        with warnings.catch_warnings(), zipfile.ZipFile(stream, "w") as zipped:
+            warnings.simplefilter("ignore", UserWarning)
+            zipped.writestr("coverage.xml", "<coverage/>")
+            zipped.writestr("coverage.xml", "<coverage/>")
+            zipped.writestr("junit.xml", "<testsuites/>")
+        self.refuse(stream.getvalue())
+
+    def test_existing_destination_is_preserved(self) -> None:
+        self.target.mkdir()
+        (self.target / "unrelated").write_text("keep")
+        with self.assertRaises(reporting.Refused):
+            reporting.stage_archive(
+                io.BytesIO(
+                    archive_bytes(
+                        {"coverage.xml": "<coverage/>", "junit.xml": "<testsuites/>"}
+                    )
+                ),
+                self.target,
+            )
+        self.assertEqual((self.target / "unrelated").read_text(), "keep")
+
+    def test_bad_report_cleanup_removes_only_owned_staging(self) -> None:
+        self.refuse(
+            archive_bytes({"coverage.xml": "<wrong/>", "junit.xml": "<testsuites/>"})
+        )
+
+
+class ArchiveTransportTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.api, self.response = transport_fixture()
+        self.payload = archive_bytes(
+            {"coverage.xml": "<coverage/>", "junit.xml": "<testsuites/>"}
+        )
+        self.digest = "sha256:" + hashlib.sha256(self.payload).hexdigest()
+        self.destination = "https://productionresultssa0.blob.core.windows.net/artifact.zip?sig=synthetic"
+        self.api.artifact_opener = Mock()
+        self.api.artifact_opener.open.side_effect = urllib.error.HTTPError(
+            "https://api.github.com/",
+            302,
+            "Found",
+            {"Location": self.destination},
+            None,
+        )
+        self.response.geturl.return_value = self.destination
+        self.response.read.side_effect = [self.payload, b""]
+
+    def test_bearer_is_never_forwarded_to_storage(self) -> None:
+        with self.api.archive(99, self.digest) as stream:
+            self.assertEqual(stream.read(), self.payload)
+        first = self.api.artifact_opener.open.call_args.args[0]
+        second = self.api.opener.open.call_args.args[0]
+        self.assertIsNotNone(first.get_header("Authorization"))
+        self.assertIsNone(second.get_header("Authorization"))
+
+    def test_unapproved_storage_host_is_refused(self) -> None:
+        self.api.artifact_opener.open.side_effect = urllib.error.HTTPError(
+            "https://api.github.com/",
+            302,
+            "Found",
+            {"Location": "https://attacker.invalid/file"},
+            None,
+        )
+        with self.assertRaises(reporting.Refused), self.api.archive(99, self.digest):
+            self.fail("must not yield")
+        self.api.opener.open.assert_not_called()
+
+    def test_changed_archive_digest_is_refused(self) -> None:
+        with self.assertRaises(reporting.Refused), self.api.archive(
+            99, "sha256:" + "0" * 64
+        ):
+            self.fail("must not yield")
+
+    def test_compressed_stream_is_bounded(self) -> None:
+        self.response.read.side_effect = [b"x" * 65536] * 513
+        with self.assertRaises(reporting.Refused), self.api.archive(99, self.digest):
+            self.fail("must not yield")
 
 
 if __name__ == "__main__":

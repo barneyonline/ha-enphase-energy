@@ -7,14 +7,20 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import stat
 import sys
+import tempfile
+import urllib.error
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from collections.abc import Callable
+import zipfile
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 REPOSITORIES = {
     "barneyonline/ha-groq": 1233471561,
@@ -22,6 +28,7 @@ REPOSITORIES = {
     "barneyonline/ha-energy-planner": 1288905007,
 }
 WORKFLOWS = {".github/workflows/tests.yml", ".github/workflows/ci.yml"}
+OWNER_ID = 38914183
 PRODUCERS = {
     "barneyonline/ha-groq": (
         "checks",
@@ -99,7 +106,7 @@ def producer_executed(
     step = steps[0]
     require(step.get("status") == "completed", "producer_step_incomplete")
     require(
-        step.get("conclusion") in {"success", "failure", "skipped", "cancelled"},
+        step.get("conclusion") in {"success", "failure", "skipped"},
         "producer_step_refused",
     )
     return step["conclusion"] in {"success", "failure"}
@@ -207,6 +214,12 @@ def verify_scope(
     selected = [a for a in artifacts if a.get("name") == f"coverage-evidence-{attempt}"]
     require(len(selected) == 1, "artifact_identity_refused")
     artifact = selected[0]
+    archive_digest = artifact.get("digest")
+    require(
+        isinstance(archive_digest, str)
+        and re.fullmatch(r"sha256:[a-f0-9]{64}", archive_digest),
+        "artifact_digest_refused",
+    )
     require(
         timestamp(run.get("run_started_at"))
         <= timestamp(artifact.get("created_at"))
@@ -225,7 +238,12 @@ def verify_scope(
         and origin.get("head_sha") == head,
         "artifact_scope_refused",
     )
-    return {**result, "eligible": True, "artifact_id": artifact["id"]}
+    return {
+        **result,
+        "eligible": True,
+        "artifact_id": artifact["id"],
+        "artifact_digest": archive_digest,
+    }
 
 
 def validate_reports(directory: Path) -> dict[str, Any]:
@@ -282,9 +300,104 @@ def validate_reports(directory: Path) -> dict[str, Any]:
     return {"coverage": True, "junit": True, "total_bytes": total}
 
 
+def stage_archive(archive: BinaryIO, directory: Path) -> dict[str, Any]:
+    """Check every ZIP member and budget before creating any report file."""
+    require(
+        directory.is_absolute()
+        and directory.parent.resolve() == directory.parent
+        and directory.parent.is_dir()
+        and not directory.exists()
+        and not directory.is_symlink(),
+        "report_staging_refused",
+    )
+    allowed = {"coverage.xml", "junit.xml", "coverage.json"}
+    with zipfile.ZipFile(archive) as zipped:
+        entries = zipped.infolist()
+        require(1 <= len(entries) <= len(allowed), "archive_entry_budget_exceeded")
+        names, total = set(), 0
+        for entry in entries:
+            mode = entry.external_attr >> 16
+            require(
+                entry.filename in allowed
+                and entry.filename not in names
+                and not entry.is_dir(),
+                "archive_path_refused",
+            )
+            require(
+                stat.S_IFMT(mode) in {0, stat.S_IFREG}
+                and not mode & 0o111
+                and not entry.flag_bits & 1,
+                "archive_file_refused",
+            )
+            require(
+                entry.compress_type in {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}
+                and 0 < entry.file_size <= 16_777_216,
+                "archive_member_budget_exceeded",
+            )
+            total += entry.file_size
+            require(total <= 33_554_432, "archive_total_budget_exceeded")
+            names.add(entry.filename)
+        require({"coverage.xml", "junit.xml"} <= names, "required_reports_missing")
+        directory.mkdir(mode=0o700)
+        try:
+            for entry in entries:
+                descriptor = os.open(
+                    directory / entry.filename,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                    0o600,
+                )
+                copied = 0
+                with os.fdopen(descriptor, "wb") as target, zipped.open(
+                    entry
+                ) as source:
+                    while chunk := source.read(65536):
+                        copied += len(chunk)
+                        require(
+                            copied <= entry.file_size and copied <= 16_777_216,
+                            "archive_member_changed",
+                        )
+                        target.write(chunk)
+                require(copied == entry.file_size, "archive_member_changed")
+            return validate_reports(directory)
+        except Exception:
+            shutil.rmtree(directory)
+            raise
+
+
+def artifact_destination(value: str) -> str:
+    require(
+        isinstance(value, str)
+        and 0 < len(value) <= 16384
+        and not any(ord(c) < 32 or ord(c) == 127 for c in value),
+        "artifact_destination_refused",
+    )
+    parsed = urllib.parse.urlsplit(value)
+    host = parsed.hostname or ""
+    require(
+        parsed.scheme == "https"
+        and parsed.username is None
+        and parsed.password is None
+        and parsed.port in {None, 443}
+        and not parsed.fragment,
+        "artifact_destination_refused",
+    )
+    require(
+        bool(re.fullmatch(r"[a-z0-9-]+\.blob\.core\.windows\.net", host))
+        or host == "results-receiver.actions.githubusercontent.com",
+        "artifact_destination_refused",
+    )
+    return value
+
+
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *args: Any, **kwargs: Any) -> None:
         raise Refused("api_redirect_refused")
+
+
+class ArtifactRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
+        # Surface the first-party API's Location without forwarding its bearer.
+        return None
 
 
 class ReadAPI:
@@ -294,6 +407,7 @@ class ReadAPI:
         self.token = os.environ.get("GH_TOKEN", "")
         require(bool(self.token), "read_token_required")
         self.opener = urllib.request.build_opener(NoRedirect())
+        self.artifact_opener = urllib.request.build_opener(ArtifactRedirect())
 
     def __call__(self, route: str) -> Any:
         prefix = re.escape(f"repos/{self.repository}/")
@@ -321,6 +435,56 @@ class ReadAPI:
             raw = response.read(2_000_001)
             require(len(raw) <= 2_000_000, "api_response_budget_exceeded")
         return json.loads(raw)
+
+    @contextmanager
+    def archive(self, artifact_id: int, expected_digest: str) -> Iterator[BinaryIO]:
+        require(
+            positive(artifact_id)
+            and isinstance(expected_digest, str)
+            and re.fullmatch(r"sha256:[a-f0-9]{64}", expected_digest),
+            "artifact_identity_refused",
+        )
+        url = f"https://api.github.com/repos/{self.repository}/actions/artifacts/{artifact_id}/zip"
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Authorization": "Bearer " + self.token,
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "hal-ci-reporting",
+            },
+            method="GET",
+        )
+        try:
+            response = self.artifact_opener.open(request, timeout=15)
+            require(response.geturl() == url, "artifact_destination_refused")
+        except urllib.error.HTTPError as error:
+            require(error.code == 302, "artifact_redirect_refused")
+            destination = artifact_destination(error.headers.get("Location", ""))
+            error.close()
+            # This request contains only the API-issued signed URL, never GH_TOKEN.
+            response = self.opener.open(
+                urllib.request.Request(
+                    destination,
+                    headers={"User-Agent": "hal-ci-reporting"},
+                    method="GET",
+                ),
+                timeout=15,
+            )
+            require(response.geturl() == destination, "artifact_destination_refused")
+        with response, tempfile.TemporaryFile() as spool:
+            size, digest = 0, hashlib.sha256()
+            while chunk := response.read(65536):
+                size += len(chunk)
+                require(size <= 33_554_432, "archive_compressed_budget_exceeded")
+                digest.update(chunk)
+                spool.write(chunk)
+            require(
+                size > 0 and "sha256:" + digest.hexdigest() == expected_digest,
+                "archive_digest_changed",
+            )
+            spool.seek(0)
+            yield spool
 
 
 def runtime_file(name: str) -> Path:
@@ -365,7 +529,7 @@ def outputs(value: dict[str, Any]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=["verify-event", "validate-reports"])
+    parser.add_argument("operation", choices=["verify-event", "consume-reports"])
     args = parser.parse_args()
     try:
         require(sys.flags.isolated, "isolated_python_required")
@@ -388,6 +552,11 @@ def main() -> int:
         event = json.loads(event_path.read_bytes())
         api = ReadAPI(repository)
         if os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch":
+            require(
+                os.environ.get("GITHUB_ACTOR_ID") == str(OWNER_ID)
+                and event.get("sender", {}).get("id") == OWNER_ID,
+                "rehearsal_owner_required",
+            )
             requested = event.get("inputs", {}).get("producer_run_id")
             require(
                 isinstance(requested, str)
@@ -417,7 +586,13 @@ def main() -> int:
                 ).encode(),
                 0o400,
             )
-            outputs({k: v for k, v in scope.items() if k != "repository"})
+            outputs(
+                {
+                    k: v
+                    for k, v in scope.items()
+                    if k not in {"repository", "artifact_digest"}
+                }
+            )
         else:
             require(scope.get("eligible") is True, "reports_not_expected")
             sealed = json.loads(runtime_file("hal-ci-scope.json").read_bytes())
@@ -428,7 +603,8 @@ def main() -> int:
                 == sealed["controller_sha256"],
                 "report_scope_changed",
             )
-            result = validate_reports(Path(os.environ["REPORT_DIRECTORY"]))
+            with api.archive(scope["artifact_id"], scope["artifact_digest"]) as archive:
+                result = stage_archive(archive, Path(os.environ["REPORT_DIRECTORY"]))
             outputs({"coverage": result["coverage"], "junit": result["junit"]})
         print("CI report boundary verified; no candidate program executed.")
         return 0
