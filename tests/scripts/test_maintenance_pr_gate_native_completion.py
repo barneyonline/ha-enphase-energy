@@ -351,12 +351,16 @@ class NativeCompletionTests(unittest.TestCase):
             ):
                 counts["meta"] += 1
                 nodes = [
-                    copy.deepcopy(c["_native_review_meta"])
+                    copy.deepcopy(
+                        c.get("_handling_review_meta") or c.get("_native_review_meta")
+                    )
                     for c in snapshot["issue_comments"]
-                    if "_native_review_meta" in c
+                    if "_native_review_meta" in c or "_handling_review_meta" in c
                 ]
                 if mutate_editor and counts["meta"] == 2:
-                    nodes[0]["editor"]["databaseId"] = fixtures.AUTHOR["id"]
+                    next(node for node in nodes if node["databaseId"] == 80)["editor"][
+                        "databaseId"
+                    ] = fixtures.AUTHOR["id"]
                 return {
                     "data": {
                         "repository": {

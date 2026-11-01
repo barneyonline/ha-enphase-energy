@@ -260,6 +260,7 @@ class HardeningTests(unittest.TestCase):
             "body": "<!-- " + gate.CLEAN_MARKER + " " + json.dumps(verdict) + " -->",
         }
         snapshot["issue_comments"].append(witness)
+        fixtures.comment_provenance(witness)
         fixtures.seal(snapshot, policy)
         report = gate.evaluate(snapshot, policy)
         self.assertFalse(report["allow"])
@@ -273,6 +274,7 @@ class HardeningTests(unittest.TestCase):
         witness["body"] = (
             "<!-- " + gate.CLEAN_MARKER + " " + json.dumps(verdict) + " -->"
         )
+        fixtures.comment_provenance(witness, edited=True)
         fixtures.seal(snapshot, policy)
         self.assertTrue(
             gate.evaluate(snapshot, policy)["allow"], gate.evaluate(snapshot, policy)
@@ -430,6 +432,7 @@ class DigestAcceptanceTests(unittest.TestCase):
                 + " -->",
             }
         )
+        fixtures.comment_provenance(snapshot["issue_comments"][-1])
         fixtures.seal(snapshot, policy)
 
     def test_bare_approved_review_never_substitutes_for_digest_binding(self):
@@ -564,6 +567,7 @@ class DigestAcceptanceTests(unittest.TestCase):
         prior["reason"] = "Changed older verdict after both later verdict comments."
         body = "<!-- " + gate.CLEAN_MARKER + " " + json.dumps(prior) + " -->"
         witness["body"] = body
+        fixtures.comment_provenance(witness, edited=True)
         fixtures.seal(snapshot, policy)
         self.assertFalse(gate.evaluate(snapshot, policy)["allow"])
         self.append_clean(snapshot, policy, 93)

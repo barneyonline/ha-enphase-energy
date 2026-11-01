@@ -291,15 +291,18 @@ def attest(snapshot, policy):
         ),
         None,
     )
+    edited = witness is not None
     if witness is None:
         witness = {
             "id": WITNESS_ID,
             "user": INDEPENDENT,
             "updated_at": "2026-11-01T01:03:00Z",
+            "created_at": "2026-11-01T01:03:00Z",
             "html_url": f"https://github.com/example/integration/pull/1#issuecomment-{WITNESS_ID}",
         }
         snapshot["issue_comments"].append(witness)
     witness["body"] = body
+    comment_provenance(witness, edited=edited)
     overrides = {
         key: {
             field: value
@@ -310,6 +313,29 @@ def attest(snapshot, policy):
         for key, entry in entry_map.items()
     }
     seal(snapshot, policy, overrides)
+
+
+def comment_provenance(comment, *, edited=False, editor=None):
+    """Explicit fixture action by a real original independent actor, never seal()."""
+
+    def actor(value):
+        bot = value["login"].endswith("[bot]")
+        return {
+            "__typename": "Bot" if bot else "User",
+            "databaseId": value["id"],
+            "login": value["login"].removesuffix("[bot]") if bot else value["login"],
+        }
+
+    comment.setdefault("created_at", comment["updated_at"])
+    comment["_handling_review_meta"] = {
+        "databaseId": comment["id"],
+        "body": comment["body"],
+        "updatedAt": comment["updated_at"],
+        "lastEditedAt": comment["updated_at"] if edited else None,
+        "includesCreatedEdit": edited,
+        "author": actor(comment["user"]),
+        "editor": actor(editor or comment["user"]) if edited else None,
+    }
 
 
 class GateTests(unittest.TestCase):
@@ -686,6 +712,15 @@ class ClientTests(unittest.TestCase):
                             "pageInfo": {"hasNextPage": False, "endCursor": None},
                         }
                     field = "reviewThreads"
+                elif "comments(first:" in source:
+                    field = "comments"
+                    nodes = [
+                        comment.get("_handling_review_meta")
+                        or comment.get("_native_review_meta")
+                        for comment in snapshot["issue_comments"]
+                        if "_handling_review_meta" in comment
+                        or "_native_review_meta" in comment
+                    ]
                 else:
                     field, nodes = "reviews", snapshot["review_meta"]
                 return {
@@ -716,7 +751,14 @@ class ClientTests(unittest.TestCase):
             if path.startswith("compare/"):
                 return copy.deepcopy(snapshot["comparison"]), {}
             if path.startswith("issues/1/comments?"):
-                return copy.deepcopy(snapshot["issue_comments"]), {}
+                return [
+                    {
+                        k: copy.deepcopy(v)
+                        for k, v in comment.items()
+                        if k not in {"_handling_review_meta", "_native_review_meta"}
+                    }
+                    for comment in snapshot["issue_comments"]
+                ], {}
             if path.startswith("pulls/1/reviews?"):
                 return copy.deepcopy(snapshot["reviews"]), {}
             if path.startswith("pulls/1/comments?"):

@@ -259,6 +259,8 @@ def desired_labels_for_issue(
         return LabelDecision(set(), set(), [], [])
 
     current_labels = _current_label_names(issue)
+    if {"automation/hal", "automation/control"}.intersection(current_labels):
+        return LabelDecision(set(), set(), [], [])
     desired_labels: set[str] = set()
 
     if kind == "device_support":
@@ -471,7 +473,12 @@ def _list_target_issues(
     base_url = f"https://api.github.com/repos/{repo}"
     if issue_number:
         issue = _github_api_request(token, "GET", f"{base_url}/issues/{issue_number}")
-        return [issue] if issue_kind_from_title(normalize(issue.get("title"))) else []
+        return (
+            [issue]
+            if "pull_request" not in issue
+            and issue_kind_from_title(normalize(issue.get("title")))
+            else []
+        )
 
     issues: list[dict[str, Any]] = []
     page = 1

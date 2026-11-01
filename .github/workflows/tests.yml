@@ -204,17 +204,13 @@ jobs:
       contents: read
       checks: write
       pull-requests: write
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.14']
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.14'
       - name: Set up uv
         uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:

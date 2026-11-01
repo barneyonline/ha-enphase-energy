@@ -79,6 +79,10 @@ class GateError(ValueError):
     """Invalid or incomplete evidence, always a blocking result."""
 
 
+class DifferentCommentEditor(GateError):
+    """Complete provenance identifies a different actor, not reviewer authority."""
+
+
 def canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
@@ -554,8 +558,20 @@ def native_summary_state(item: dict[str, Any]) -> dict[str, Any]:
         if part["status"] is not None and not isinstance(part["status"], str):
             raise GateError("invalid native review status")
 
+    comment_edit_provenance(
+        item, "_native_review_meta", "native summary", require_bot=True
+    )
+    return state
+
+
+def comment_edit_provenance(
+    item: dict[str, Any], metadata_field: str, label: str, *, require_bot: bool = False
+) -> None:
+    """Bind current comment bytes and editor to the original REST actor."""
+    body = text(item.get("body"), f"{label} body")
     who = actor_key(item.get("user", {}))
-    meta = item.get("_native_review_meta")
+    is_bot = who[1].endswith("[bot]")
+    meta = item.get(metadata_field)
     required = {
         "databaseId",
         "body",
@@ -574,32 +590,50 @@ def native_summary_state(item: dict[str, Any]) -> dict[str, Any]:
         or meta["updatedAt"] != item["updated_at"]
         or type(meta["includesCreatedEdit"]) is not bool
     ):
-        raise GateError("native summary metadata missing or changed during collection")
+        raise GateError(f"{label} metadata missing or changed during collection")
 
-    def same_bot(actor: Any) -> bool:
+    def same_actor(actor: Any) -> bool:
         return (
             isinstance(actor, dict)
-            and actor.get("__typename") == "Bot"
+            and actor.get("__typename") == ("Bot" if is_bot else "User")
             and type(actor.get("databaseId")) is int
             and actor["databaseId"] == who[0]
-            and who[1].endswith("[bot]")
-            and actor.get("login") == who[1].removesuffix("[bot]")
+            and (not require_bot or is_bot)
+            and actor.get("login")
+            == (who[1].removesuffix("[bot]") if is_bot else who[1])
         )
 
-    if not same_bot(meta["author"]):
-        raise GateError("native summary author provenance mismatch")
+    if not same_actor(meta["author"]):
+        raise GateError(f"{label} author provenance mismatch")
     if meta["lastEditedAt"] is None:
         if meta["editor"] is not None:
-            raise GateError("native summary editor provenance ambiguous")
-        if timestamp(
-            item.get("created_at"), "native summary creation time"
-        ) != timestamp(item.get("updated_at"), "native summary update time"):
-            raise GateError("native summary has an update without editor provenance")
-    elif timestamp(meta["lastEditedAt"], "native summary edit time") != item[
-        "updated_at"
-    ] or not same_bot(meta["editor"]):
-        raise GateError("native summary was not last edited by its configured bot")
-    return state
+            raise GateError(f"{label} editor provenance ambiguous")
+        if timestamp(item.get("created_at"), f"{label} creation time") != timestamp(
+            item.get("updated_at"), f"{label} update time"
+        ):
+            raise GateError(f"{label} has an update without editor provenance")
+    else:
+        if timestamp(meta["lastEditedAt"], f"{label} edit time") != item["updated_at"]:
+            raise GateError(f"{label} edit time disagrees with its current update time")
+        editor = meta["editor"]
+        if (
+            not isinstance(editor, dict)
+            or set(editor) != {"__typename", "databaseId", "login"}
+            or editor["__typename"] not in {"Bot", "User"}
+        ):
+            raise GateError(f"{label} editor identity missing or malformed")
+        editor_id = integer(editor["databaseId"], f"{label} editor id")
+        login = text(editor["login"], f"{label} editor login")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]*", login):
+            raise GateError(f"{label} editor login malformed")
+        if same_actor(editor):
+            return
+        normalized_login = login + ("[bot]" if editor["__typename"] == "Bot" else "")
+        if editor_id == who[0] or normalized_login.casefold() == who[1].casefold():
+            raise GateError(f"{label} editor identity contradicts its original actor")
+        raise DifferentCommentEditor(
+            f"{label} was last edited by a different authenticated actor"
+        )
 
 
 def native_state_clean(state: dict[str, Any], head: str) -> bool:
@@ -856,6 +890,7 @@ def handling_proof(
         "candidates": [],
         "accepted": None,
     }
+    current_candidates = []
     for item in feedback:
         # Formal/inline reviews emit an observer check after submission or edits,
         # invalidating a verdict calculated before that check exists. An issue
@@ -883,6 +918,23 @@ def handling_proof(
             or not evidence_urls(verdict.get("evidence_urls"), policy["repository"])
         ):
             continue
+        comment = next(
+            comment
+            for comment in snapshot["issue_comments"]
+            if f"issue_comment:{comment['id']}" == item["source"]
+        )
+        try:
+            comment_edit_provenance(
+                comment, "_handling_review_meta", "handling witness"
+            )
+        except DifferentCommentEditor:
+            # Authenticated tampering is ordinary covered feedback, not a veto
+            # over a later genuine reviewer who explicitly covers this source.
+            continue
+        current_candidates.append((item, verdict))
+    # Validate every candidate's provenance before selecting any accepted one.
+    # Missing/racy/contradictory evidence must not depend on source ordering.
+    for item, verdict in current_candidates:
         # Exclude this candidate alone. Every earlier/later/invalid/adverse
         # verdict remains ordinary feedback and must be bound by this proof.
         targets = [other for other in feedback if other["source"] != item["source"]]
@@ -1435,7 +1487,18 @@ class GitHub:
                 in {actor_key(a) for a in policy["codex_reviewers"]}
             )
         ]
-        if native_comments:
+        handling_comments = [
+            item
+            for item in snap["issue_comments"]
+            if isinstance(item.get("body"), str)
+            and item["body"].lstrip().startswith("<!-- " + CLEAN_MARKER)
+            and (
+                policy is None
+                or actor_key(item["user"])
+                in {actor_key(actor) for actor in policy["independent_reviewers"]}
+            )
+        ]
+        if native_comments or handling_comments:
             fields = (
                 "databaseId body updatedAt lastEditedAt includesCreatedEdit "
                 "author{__typename login ... on Bot{databaseId} ... on User{databaseId}} "
@@ -1443,15 +1506,19 @@ class GitHub:
             )
             metadata = self.graphql_pages(number, "comments", fields)
             by_id = {
-                integer(m.get("databaseId"), "native summary metadata id"): m
+                integer(m.get("databaseId"), "comment provenance metadata id"): m
                 for m in metadata
             }
             if len(by_id) != len(metadata):
-                raise GateError("duplicate native summary metadata")
-            for item in native_comments:
-                if item["id"] not in by_id:
-                    raise GateError("native summary editor metadata missing")
-                item["_native_review_meta"] = by_id[item["id"]]
+                raise GateError("duplicate comment provenance metadata")
+            for comments, field in (
+                (native_comments, "_native_review_meta"),
+                (handling_comments, "_handling_review_meta"),
+            ):
+                for item in comments:
+                    if item["id"] not in by_id:
+                        raise GateError("comment editor metadata missing")
+                    item[field] = by_id[item["id"]]
         snap["reviews"] = self.pages(f"pulls/{number}/reviews?per_page=100")
         snap["review_comments"] = self.pages(f"pulls/{number}/comments?per_page=100")
         snap["review_meta"] = self.graphql_pages(

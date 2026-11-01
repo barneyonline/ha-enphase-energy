@@ -5,7 +5,8 @@ evidence, evaluates it and prints one JSON result. It never posts feedback,
 resolves threads, invokes reviewers, runs PR code, executes comment commands,
 changes settings, closes issues, publishes releases or merges.
 
-Run gate regressions with
+The implementation is `scripts/maintenance/pr_gate.py`. Its fixture tests are
+`tests/scripts/test_maintenance_pr_gate*.py`. Run
 `python3 -m unittest discover -s tests/scripts -p 'test_maintenance_pr_gate*.py'`.
 
 ## CLI and trust boundary
@@ -42,9 +43,9 @@ devices or proved semantic correctness of a fix.
 
 ## Policy schema 1
 
-The installed `.github/maintenance/merge-policy.json` records this repository's
-verified identities and actual check contexts. Changes require the owner's
-approval under the operating policy.
+Use `.github/maintenance/merge-policy.json` for this repository. Its actor IDs
+and check identities were verified during setup; changes remain owner-controlled.
+Live evaluation always loads policy from the current PR base commit.
 
 - `repository`, `base_branch`, `schema`: exact scope.
 - `trusted_ledger_authors`: numeric GitHub user ID **and** exact login, for the
@@ -172,6 +173,37 @@ witness, even with an exact marker. A bare approval or timestamp order never
 substitutes for these bindings: CheckRun output
 can change without changing `completed_at`, and ledger dispositions can change
 after a review.
+
+A comment's original author does not authenticate a later edit: repository
+writers can edit other users' comments. Each live sweep independently reads
+GraphQL author/editor provenance for potential trusted clean-witness comments.
+`_handling_review_meta` cross-binds the REST comment ID, full body and update time
+with GraphQL `databaseId`, `body`, `updatedAt`, `lastEditedAt`,
+`includesCreatedEdit`, `author` and `editor`. The author and current editor must
+be the same configured original independent actor, matching numeric ID, login
+and Bot/User type. A never-edited comment requires equal creation/update times,
+null last-edit time and null editor. Missing, contradictory or moving provenance
+blocks; author/ledger-author edits cannot refresh someone else's witness merely
+by replacing its digests. The metadata remains part of the source fingerprint
+and stable-sweep evidence. Native summaries reuse this provenance check while
+retaining their stricter Bot-only identity and receipt schema.
+
+Complete, coherent provenance identifying a different well-formed User/Bot
+editor makes an old CLEAN comment non-authoritative ordinary feedback. It is
+still fingerprinted, covered by the ledger and included in a fresh genuine
+reviewer's target digests; it is never removed from the inventory. A fresh
+independent witness can therefore recover in either source ordering. All
+current-scope candidate provenance is validated before selecting an acceptance:
+missing, racy, incomplete or contradictory metadata still blocks even if an
+earlier candidate would otherwise pass. Only the dedicated different-editor
+authority exception is recoverable; native summaries edited by another actor
+continue to block.
+
+The ledger protocol is unchanged. Editing its scope, source entries or
+dispositions invalidates the independent witness's existing bindings; only a
+genuine independent acceptance can restore authority. This change does not give
+an editor authority to act as the original reviewer, or establish that the real
+native reviewer can emit the independent clean-witness protocol.
 
 Complete the native exact-head code review first and wait for all resulting
 `review-event` jobs, bot summaries and other checks/reports to settle. Then

@@ -544,4 +544,10 @@ def test_maintenance_controls_require_every_validation_group(tmp_path, path):
 def test_pytest_context_is_stable_when_the_single_lane_is_skipped():
     job = _jobs()["pytest"]
     assert job["name"] == "pytest"
-    assert job["strategy"]["matrix"] == {"python-version": ["3.14"]}
+    assert "strategy" not in job
+    python_versions = [
+        step["with"]["python-version"]
+        for step in job["steps"]
+        if step.get("uses", "").startswith("actions/setup-python@")
+    ]
+    assert python_versions == ["3.14"]
