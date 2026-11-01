@@ -17,7 +17,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any, BinaryIO
@@ -95,11 +95,15 @@ def producer_executed(
     require(job.get("status") == "completed", "producer_job_incomplete")
     if job.get("conclusion") == "skipped":
         return False
+    require(
+        job.get("conclusion") in {"success", "failure"},
+        "producer_job_uncertain",
+    )
     steps = [s for s in job.get("steps", []) if s.get("name") == step_name]
     require(len(steps) <= 1, "producer_step_refused")
     if not steps:
         require(
-            job.get("conclusion") in {"failure", "cancelled", "timed_out"},
+            job.get("conclusion") == "failure",
             "producer_step_missing",
         )
         return False
@@ -390,7 +394,11 @@ def artifact_destination(value: str) -> str:
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
+    def redirect_request(
+        self, request: Any, response: Any = None, *args: Any, **kwargs: Any
+    ) -> None:
+        if response is not None:
+            response.close()
         raise Refused("api_redirect_refused")
 
 
@@ -430,10 +438,14 @@ class ReadAPI:
             },
             method="GET",
         )
-        with self.opener.open(request, timeout=15) as response:
-            require(response.geturl() == url, "api_destination_refused")
-            raw = response.read(2_000_001)
-            require(len(raw) <= 2_000_000, "api_response_budget_exceeded")
+        try:
+            with self.opener.open(request, timeout=15) as response:
+                require(response.geturl() == url, "api_destination_refused")
+                raw = response.read(2_000_001)
+                require(len(raw) <= 2_000_000, "api_response_budget_exceeded")
+        except urllib.error.HTTPError as error:
+            error.close()
+            raise Refused("api_read_refused") from None
         return json.loads(raw)
 
     @contextmanager
@@ -455,24 +467,36 @@ class ReadAPI:
             },
             method="GET",
         )
-        try:
-            response = self.artifact_opener.open(request, timeout=15)
-            require(response.geturl() == url, "artifact_destination_refused")
-        except urllib.error.HTTPError as error:
-            require(error.code == 302, "artifact_redirect_refused")
-            destination = artifact_destination(error.headers.get("Location", ""))
-            error.close()
-            # This request contains only the API-issued signed URL, never GH_TOKEN.
-            response = self.opener.open(
-                urllib.request.Request(
-                    destination,
-                    headers={"User-Agent": "hal-ci-reporting"},
-                    method="GET",
-                ),
-                timeout=15,
-            )
-            require(response.geturl() == destination, "artifact_destination_refused")
-        with response, tempfile.TemporaryFile() as spool:
+        with ExitStack() as resources, tempfile.TemporaryFile() as spool:
+            try:
+                response = resources.enter_context(
+                    self.artifact_opener.open(request, timeout=15)
+                )
+                require(response.geturl() == url, "artifact_destination_refused")
+            except urllib.error.HTTPError as error:
+                with error:
+                    require(error.code == 302, "artifact_redirect_refused")
+                    destination = artifact_destination(
+                        error.headers.get("Location", "")
+                    )
+                # The storage request never receives the GitHub bearer.
+                try:
+                    response = resources.enter_context(
+                        self.opener.open(
+                            urllib.request.Request(
+                                destination,
+                                headers={"User-Agent": "hal-ci-reporting"},
+                                method="GET",
+                            ),
+                            timeout=15,
+                        )
+                    )
+                except urllib.error.HTTPError as storage_error:
+                    storage_error.close()
+                    raise Refused("artifact_storage_refused") from None
+                require(
+                    response.geturl() == destination, "artifact_destination_refused"
+                )
             size, digest = 0, hashlib.sha256()
             while chunk := response.read(65536):
                 size += len(chunk)

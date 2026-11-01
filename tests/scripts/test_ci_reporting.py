@@ -256,6 +256,13 @@ class ScopeTests(unittest.TestCase):
         with self.assertRaises(reporting.Refused):
             self.verify()
 
+    def test_uncertain_jobs_are_refused_even_after_completed_tests(self) -> None:
+        for conclusion in ("cancelled", "timed_out", "action_required", None):
+            with self.subTest(conclusion=conclusion):
+                self.job["conclusion"] = conclusion
+                with self.assertRaises(reporting.Refused):
+                    self.verify()
+
 
 class ReportTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -361,8 +368,20 @@ class TransportTests(unittest.TestCase):
         self.api.opener.open.assert_not_called()
 
     def test_redirect_is_refused(self) -> None:
+        response = Mock()
         with self.assertRaises(reporting.Refused):
-            reporting.NoRedirect().redirect_request(None)
+            reporting.NoRedirect().redirect_request(None, response)
+        response.close.assert_called_once_with()
+
+    def test_http_error_is_closed_before_refusal(self) -> None:
+        error = urllib.error.HTTPError(
+            "https://api.github.com/", 403, "Forbidden", {}, None
+        )
+        self.addCleanup(error.close)
+        self.api.opener.open.side_effect = error
+        with self.assertRaises(reporting.Refused):
+            self.api("repos/barneyonline/ha-groq/actions/runs/42")
+        self.assertTrue(error.closed)
 
     def test_destination_change_is_refused(self) -> None:
         self.response.geturl.return_value = "https://attacker.invalid/"
@@ -669,6 +688,7 @@ class ArchiveTransportTests(unittest.TestCase):
             {"Location": self.destination},
             None,
         )
+        self.addCleanup(self.api.artifact_opener.open.side_effect.close)
         self.response.geturl.return_value = self.destination
         self.response.read.side_effect = [self.payload, b""]
 
@@ -688,9 +708,44 @@ class ArchiveTransportTests(unittest.TestCase):
             {"Location": "https://attacker.invalid/file"},
             None,
         )
+        error = self.api.artifact_opener.open.side_effect
+        self.addCleanup(error.close)
         with self.assertRaises(reporting.Refused), self.api.archive(99, self.digest):
             self.fail("must not yield")
         self.api.opener.open.assert_not_called()
+        self.assertTrue(error.closed)
+
+    def test_failed_redirect_status_is_closed(self) -> None:
+        error = urllib.error.HTTPError(
+            "https://api.github.com/", 403, "Forbidden", {}, None
+        )
+        self.addCleanup(error.close)
+        self.api.artifact_opener.open.side_effect = error
+        with self.assertRaises(reporting.Refused), self.api.archive(99, self.digest):
+            self.fail("must not yield")
+        self.assertTrue(error.closed)
+        self.api.opener.open.assert_not_called()
+
+    def test_storage_http_error_is_closed(self) -> None:
+        error = urllib.error.HTTPError(self.destination, 403, "Forbidden", {}, None)
+        self.addCleanup(error.close)
+        self.api.opener.open.side_effect = error
+        with self.assertRaises(reporting.Refused), self.api.archive(99, self.digest):
+            self.fail("must not yield")
+        self.assertTrue(error.closed)
+
+    def test_changed_storage_response_is_closed(self) -> None:
+        self.response.geturl.return_value = "https://attacker.invalid/"
+        with self.assertRaises(reporting.Refused), self.api.archive(99, self.digest):
+            self.fail("must not yield")
+        self.response.__exit__.assert_called_once()
+
+    def test_changed_direct_response_is_closed(self) -> None:
+        self.api.artifact_opener.open.side_effect = None
+        self.api.artifact_opener.open.return_value = self.response
+        with self.assertRaises(reporting.Refused), self.api.archive(99, self.digest):
+            self.fail("must not yield")
+        self.response.__exit__.assert_called_once()
 
     def test_changed_archive_digest_is_refused(self) -> None:
         with self.assertRaises(reporting.Refused), self.api.archive(
