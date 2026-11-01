@@ -83,11 +83,15 @@ class CandidatePackageTests(unittest.TestCase):
             self.skipTest("Planner's repository-specific packager is tested in Planner")
         shutil.copy2(planner_script, self.root / "scripts/package-release.py")
         (self.root / "pyproject.toml").write_text('[project]\nversion = "1.2.3"\n')
-        result = self.build("ha_energy_planner")
-        self.assertEqual("ha-energy-planner-v1.2.3.zip", result["archive"])
-        (self.root / "pyproject.toml").write_text('[project]\nversion = "1.2.4"\n')
-        with self.assertRaises(ValueError):
-            self.build("ha_energy_planner")
+        # Model the actual trusted tooling location when the real Planner helper
+        # is available in a sibling checkout; candidate code remains untrusted.
+        trusted_module = planner_script.parent / "maintenance/package_candidate.py"
+        with patch.object(package, "__file__", str(trusted_module)):
+            result = self.build("ha_energy_planner")
+            self.assertEqual("ha-energy-planner-v1.2.3.zip", result["archive"])
+            (self.root / "pyproject.toml").write_text('[project]\nversion = "1.2.4"\n')
+            with self.assertRaises(ValueError):
+                self.build("ha_energy_planner")
 
     def test_excludes_caches_dotfiles_and_bytecode(self) -> None:
         component = self.component()

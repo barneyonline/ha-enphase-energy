@@ -616,14 +616,14 @@ def handling_proof(
         "candidates": [],
         "accepted": None,
     }
-    formal = {f"review:{review['id']}": review for review in snapshot["reviews"]}
     for item in feedback:
-        if not item["actor"] or actor_key(item["actor"]) not in trusted:
-            continue
-        review = formal.get(item["source"])
-        if review is not None and (
-            review["state"] not in {"APPROVED", "COMMENTED"}
-            or review["commit_id"] != pr["head"]["sha"]
+        # Formal/inline reviews emit an observer check after submission or edits,
+        # invalidating a verdict calculated before that check exists. An issue
+        # comment can bind the settled observer while retaining it as feedback.
+        if (
+            item["kind"] != "issue_comment"
+            or not item["actor"]
+            or actor_key(item["actor"]) not in trusted
         ):
             continue
         verdict = marker(item["body"] or "", CLEAN_MARKER)

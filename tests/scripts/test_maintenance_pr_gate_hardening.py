@@ -434,6 +434,7 @@ class DigestAcceptanceTests(unittest.TestCase):
 
     def test_bare_approved_review_never_substitutes_for_digest_binding(self):
         snapshot, policy = fixtures.fixture()
+        fixtures.drop_handling_witness(snapshot)
         snapshot["reviews"][1]["body"] = "Approved; all looks good."
         snapshot["review_meta"][1]["body"] = "Approved; all looks good."
         fixtures.seal(snapshot, policy)
@@ -442,7 +443,7 @@ class DigestAcceptanceTests(unittest.TestCase):
             fixtures.codes(snapshot, policy),
         )
 
-    def test_dismissed_or_wrong_commit_formal_witness_is_not_active_authority(self):
+    def test_changed_formal_review_invalidates_issue_comment_handling_authority(self):
         for changes in ({"state": "DISMISSED"}, {"commit_id": "c" * 40}):
             snapshot, policy = fixtures.fixture()
             snapshot["reviews"][1].update(changes)
@@ -508,14 +509,19 @@ class DigestAcceptanceTests(unittest.TestCase):
             {"extra": "[P1] Unhandled finding"},
         ):
             snapshot, policy = fixtures.fixture()
-            verdict = gate.marker(snapshot["reviews"][1]["body"], gate.CLEAN_MARKER)
+            witness = next(
+                comment
+                for comment in snapshot["issue_comments"]
+                if comment["id"] == fixtures.WITNESS_ID
+            )
+            verdict = gate.marker(witness["body"], gate.CLEAN_MARKER)
             verdict.update(change)
             snapshot["issue_comments"].append(
                 {
-                    "id": 90,
+                    "id": 91,
                     "user": INDEPENDENT,
                     "updated_at": LATER,
-                    "html_url": "https://github.com/example/integration/pull/1#issuecomment-90",
+                    "html_url": "https://github.com/example/integration/pull/1#issuecomment-91",
                     "body": "<!-- "
                     + gate.CLEAN_MARKER
                     + " "
@@ -527,10 +533,10 @@ class DigestAcceptanceTests(unittest.TestCase):
             result = gate.evaluate(snapshot, policy)
             self.assertFalse(result["allow"], result)
             self.assertIn(
-                "issue_comment:90", {item["source"] for item in result["feedback"]}
+                "issue_comment:91", {item["source"] for item in result["feedback"]}
             )
             self.assertNotIn(
-                "issue_comment:90",
+                "issue_comment:91",
                 {item["source"] for item in result["handling_candidates"]},
             )
 
@@ -539,23 +545,28 @@ class DigestAcceptanceTests(unittest.TestCase):
     ):
         snapshot, policy = fixtures.fixture()
         self.assertEqual(
-            gate.evaluate(snapshot, policy)["handling_evidence"]["source"], "review:31"
+            gate.evaluate(snapshot, policy)["handling_evidence"]["source"],
+            fixtures.WITNESS_SOURCE,
         )
-        for ident in (90, 91):
+        for ident in (91, 92):
             self.append_clean(snapshot, policy, ident)
             result = gate.evaluate(snapshot, policy)
             self.assertTrue(result["allow"], result)
             self.assertEqual(
                 result["handling_evidence"]["source"], f"issue_comment:{ident}"
             )
-        prior = gate.marker(snapshot["reviews"][1]["body"], gate.CLEAN_MARKER)
-        prior["reason"] = "Changed older verdict after both later reviews."
+        witness = next(
+            comment
+            for comment in snapshot["issue_comments"]
+            if comment["id"] == fixtures.WITNESS_ID
+        )
+        prior = gate.marker(witness["body"], gate.CLEAN_MARKER)
+        prior["reason"] = "Changed older verdict after both later verdict comments."
         body = "<!-- " + gate.CLEAN_MARKER + " " + json.dumps(prior) + " -->"
-        snapshot["reviews"][1]["body"] = body
-        snapshot["review_meta"][1]["body"] = body
+        witness["body"] = body
         fixtures.seal(snapshot, policy)
         self.assertFalse(gate.evaluate(snapshot, policy)["allow"])
-        self.append_clean(snapshot, policy, 92)
+        self.append_clean(snapshot, policy, 93)
         self.assertTrue(gate.evaluate(snapshot, policy)["allow"])
 
 

@@ -31,6 +31,8 @@ AUTHOR = {"id": 1, "login": "maintainer"}
 CODEX = {"id": 3, "login": "chatgpt-codex-connector[bot]"}
 INDEPENDENT = {"id": 4, "login": "independent-reviewer"}
 URL = "https://github.com/example/integration/commit/" + HEAD
+WITNESS_ID = 90
+WITNESS_SOURCE = f"issue_comment:{WITNESS_ID}"
 
 
 def fixture() -> tuple[dict, dict]:
@@ -246,16 +248,24 @@ def codes(snapshot: dict, policy: dict) -> set[str]:
 
 
 def drop_approval(snapshot):
+    """Remove the ordinary independent approval and its separate handling witness."""
     snapshot["reviews"] = [r for r in snapshot["reviews"] if r["id"] != 31]
     snapshot["review_meta"] = [
         r for r in snapshot["review_meta"] if r["databaseId"] != 31
+    ]
+    drop_handling_witness(snapshot)
+
+
+def drop_handling_witness(snapshot):
+    snapshot["issue_comments"] = [
+        comment for comment in snapshot["issue_comments"] if comment["id"] != WITNESS_ID
     ]
 
 
 def attest(snapshot, policy):
     """Explicit independent fixture action, never implicitly done by seal()."""
     feedback, ledger, _ = gate.inventory(snapshot, policy)
-    targets = [item for item in feedback if item["source"] != "review:31"]
+    targets = [item for item in feedback if item["source"] != WITNESS_SOURCE]
     entry_map = {entry["source"]: entry for entry in ledger["entries"]}
     verdict = {
         "schema": 1,
@@ -273,10 +283,23 @@ def attest(snapshot, policy):
         "evidence_urls": [URL],
     }
     body = "<!-- " + gate.CLEAN_MARKER + " " + json.dumps(verdict) + " -->"
-    next(review for review in snapshot["reviews"] if review["id"] == 31)["body"] = body
-    next(meta for meta in snapshot["review_meta"] if meta["databaseId"] == 31)[
-        "body"
-    ] = body
+    witness = next(
+        (
+            comment
+            for comment in snapshot["issue_comments"]
+            if comment["id"] == WITNESS_ID
+        ),
+        None,
+    )
+    if witness is None:
+        witness = {
+            "id": WITNESS_ID,
+            "user": INDEPENDENT,
+            "updated_at": "2026-11-01T01:03:00Z",
+            "html_url": f"https://github.com/example/integration/pull/1#issuecomment-{WITNESS_ID}",
+        }
+        snapshot["issue_comments"].append(witness)
+    witness["body"] = body
     overrides = {
         key: {
             field: value

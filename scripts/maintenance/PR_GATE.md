@@ -118,11 +118,21 @@ All arbitrary sources are conservatively potentially substantive. Every final
 disposition, including `addressed`, needs independent clean handling evidence;
 changing the label to `addressed` cannot bypass independence. The reviewer must
 have a different numeric GitHub ID from both PR author and ledger author.
-Accepted proof always contains this exact standalone independently authored,
-digest-bound verdict, including when carried by an `APPROVED` review body. A bare
-approval or timestamp order never substitutes for these bindings: CheckRun output
+Accepted proof is an exact standalone independently authored, digest-bound
+**top-level PR conversation comment (issue comment)**. Formal review bodies and
+inline review comments remain ordinary feedback and cannot supply the handling
+witness, even with an exact marker. A bare approval or timestamp order never
+substitutes for these bindings: CheckRun output
 can change without changing `completed_at`, and ledger dispositions can change
 after a review.
+
+Complete the native exact-head code review first and wait for all resulting
+`review-event` jobs, bot summaries and other checks/reports to settle. Then
+prepare the current feedback ledger and obtain the independent issue-comment
+verdict. Review submission or editing emits another observer check, which would
+invalidate a verdict embedded in that review. The issue-comment path avoids
+that cycle while keeping every observer check in the inventory and digests.
+Pending or failed observer checks still block; they have no operational exclusion.
 
 ```text
 <!-- hal-clean-verdict:v1 {"schema":1,"repository":"OWNER/REPOSITORY","pull_number":123,"head_sha":"40_HEX_CHARACTERS","base_sha":"40_HEX_CHARACTERS","policy_sha256":"POLICY_HASH","feedback_digest":"FEEDBACK_HASH","dispositions_digest":"DISPOSITIONS_HASH","verdict":"clean","reason":"Independently verified the actual handling and final result.","evidence_urls":["https://github.com/OWNER/REPOSITORY/commit/COMMIT_SHA"]} -->
