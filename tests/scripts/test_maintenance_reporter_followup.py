@@ -101,6 +101,15 @@ class ReporterClockTests(unittest.TestCase):
                 row[field] = value
                 self.assertEqual("none", self.decide([state()], 90, row)["action"])
 
+    def test_internal_control_records_never_enter_reporter_timeouts(self) -> None:
+        row = issue()
+        row["labels"].append({"name": "automation/control"})
+        malformed = comment(2, "barneyonline", followup.STATE_MARKER + " invalid")
+        for day in (7, 21, 90):
+            for comments in ([state()], [malformed]):
+                with self.subTest(day=day, comments=comments):
+                    self.assertEqual("none", self.decide(comments, day, row)["action"])
+
     def test_reminds_at_seven_days_and_closes_at_twenty_one(self) -> None:
         self.assertEqual("none", self.decide([state()], 6)["action"])
         self.assertEqual("remind", self.decide([state()], 7)["action"])

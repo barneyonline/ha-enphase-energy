@@ -68,6 +68,8 @@ def followup_decision(
     if issue.get("state") != "open" or "pull_request" in issue:
         return {"action": "none", "reason": "Issue is not an open issue"}
     labels = {item["name"] for item in issue.get("labels", [])}
+    if "automation/control" in labels:
+        return {"action": "none", "reason": "Internal control records are excluded"}
     if WAITING_LABEL not in labels:
         return {"action": "none", "reason": "Issue is not awaiting its reporter"}
 

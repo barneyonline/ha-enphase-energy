@@ -109,6 +109,12 @@
       "workflow_path": ".github/workflows/maintenance-review-events.yml",
       "name": "review-event",
       "required": false
+    },
+    {
+      "app_id": 254,
+      "workflow_path": null,
+      "name": "codecov/patch",
+      "required": true
     }
   ],
   "statuses": [],
