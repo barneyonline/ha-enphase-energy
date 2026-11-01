@@ -1,8 +1,6 @@
 name: CI
 permissions:
   contents: read
-  checks: write
-  pull-requests: write
 
 on:
   push:
@@ -41,4 +39,3 @@ concurrency:
 jobs:
   checks:
     uses: ./.github/workflows/tests.yml
-    secrets: inherit
