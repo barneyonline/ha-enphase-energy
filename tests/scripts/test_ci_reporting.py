@@ -120,6 +120,50 @@ class ScopeTests(unittest.TestCase):
         self.assertEqual(result["head_sha"], self.head)
         self.assertEqual(result["pr_number"], 72)
 
+    def test_all_three_repository_producers_are_bound(self) -> None:
+        cases = [
+            (
+                "barneyonline/ha-groq",
+                1233471561,
+                "checks",
+                "Run tests with coverage in Home Assistant Docker",
+            ),
+            ("barneyonline/ha-enphase-energy", 1052048747, "pytest", "Run tests"),
+            (
+                "barneyonline/ha-energy-planner",
+                1288905007,
+                "pytest-coverage",
+                "Run tests with coverage in Home Assistant Docker",
+            ),
+        ]
+        for repository, identity, job_name, step_name in cases:
+
+            def convert(value):
+                if isinstance(value, dict):
+                    return {key: convert(item) for key, item in value.items()}
+                if isinstance(value, list):
+                    return [convert(item) for item in value]
+                return (
+                    identity if type(value) is int and value == self.repo_id else value
+                )
+
+            responses = {
+                route.replace(self.repository, repository): convert(value)
+                for route, value in self.responses.items()
+            }
+            job = responses[
+                f"repos/{repository}/actions/runs/42/attempts/2/jobs?per_page=100"
+            ]["jobs"][0]
+            job["name"], job["steps"][0]["name"] = job_name, step_name
+            with self.subTest(repository=repository):
+                scope = reporting.verify_scope(
+                    convert(self.event),
+                    repository,
+                    lambda route: copy.deepcopy(responses[route]),
+                )
+                self.assertEqual(scope["repository"], repository)
+                self.assertIs(scope["eligible"], True)
+
     def test_foreign_repository_is_refused(self) -> None:
         self.run["head_repository"]["id"] = 17
         with self.assertRaises(reporting.Refused):
@@ -241,6 +285,13 @@ class ReportTests(unittest.TestCase):
         (self.reports / "coverage.xml").unlink()
         (self.root / "elsewhere").write_text("<coverage/>")
         (self.reports / "coverage.xml").symlink_to(self.root / "elsewhere")
+        with self.assertRaises(reporting.Refused):
+            reporting.validate_reports(self.reports)
+
+    def test_hardlink_is_refused(self) -> None:
+        (self.reports / "coverage.xml").unlink()
+        (self.root / "elsewhere").write_text("<coverage/>")
+        os.link(self.root / "elsewhere", self.reports / "coverage.xml")
         with self.assertRaises(reporting.Refused):
             reporting.validate_reports(self.reports)
 
