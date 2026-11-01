@@ -20,9 +20,13 @@ jobs:
   label_issue:
     if: >
       github.event_name == 'workflow_dispatch' ||
-      startsWith(github.event.issue.title, '[Bug]:') ||
-      startsWith(github.event.issue.title, '[Feature]:') ||
-      startsWith(github.event.issue.title, '[Device support]:')
+      (!contains(github.event.issue.labels.*.name, 'automation/hal') &&
+       !contains(github.event.issue.labels.*.name, 'automation/control') &&
+       (
+        startsWith(github.event.issue.title, '[Bug]:') ||
+        startsWith(github.event.issue.title, '[Feature]:') ||
+        startsWith(github.event.issue.title, '[Device support]:')
+       ))
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository

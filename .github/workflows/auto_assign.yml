@@ -26,6 +26,10 @@ jobs:
             }).catch(() => {});
 
             // Request review from self (no-op if author is same)
-            await github.rest.pulls.requestReviewers({
-              owner, repo, pull_number: pr.number, reviewers: [login],
-            }).catch(() => {});
+            const managed = pr.labels.some(label => label.name === 'automation/hal') ||
+              /^codex\/(?:issue-|bugfix-|release-|autonomous-maintenance(?:$|\/))/.test(pr.head.ref);
+            if (!managed) {
+              await github.rest.pulls.requestReviewers({
+                owner, repo, pull_number: pr.number, reviewers: [login],
+              }).catch(() => {});
+            }

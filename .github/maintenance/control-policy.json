@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "repository": "barneyonline/ha-enphase-energy",
+  "default_branch": "main",
+  "control_issue_number": 983,
+  "control_label": "automation/control",
+  "actor": {
+    "id": 38914183,
+    "login": "barneyonline"
+  },
+  "enabled_operations": [
+    "candidate",
+    "gate"
+  ]
+}

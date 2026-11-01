@@ -3,6 +3,11 @@ name: Tests
 on:
   pull_request:
     paths:
+      - '.github/maintenance/**'
+      - 'tests/scripts/test_maintenance_*.py'
+      - '.github/workflows/maintenance-*.yml'
+      - '.github/workflows/release-candidate.yml'
+      - '.github/workflows/release-assets.yml'
       - 'custom_components/**'
       - 'tests/components/enphase_ev/**'
       - 'scripts/**/*.py'
@@ -88,11 +93,14 @@ jobs:
 
           # Validate classifier and test-workflow edits with the script suite.
           test_infrastructure='^(\.github/workflows/tests\.yml|scripts/ci_manifest_metadata\.py|tests/scripts/test_ci_workflow\.py)$'
-          common='^(hacs\.json|\.github/workflows/ci\.yml|devtools/docker/(Dockerfile|docker-compose\.yml|constraints-[^/]+\.txt))$'
+          # Maintenance controls govern validation, merging and package delivery;
+          # changing them requires every validation group even without runtime edits.
+          maintenance='^(\.github/maintenance/|\.github/workflows/(maintenance-|release-(assets|candidate)\.yml$)|scripts/maintenance/|tests/scripts/test_maintenance_)'
+          common="${maintenance}|^(hacs\.json|\.github/workflows/ci\.yml|devtools/docker/(Dockerfile|docker-compose\.yml|constraints-[^/]+\.txt))$"
           set_output integration "${common}|^scripts/(benchmark_snapshots|check_statement_coverage)\.py$|^custom_components/enphase_ev/|^tests/components/enphase_ev/|^devtools/docker/requirements-dev\.txt$|^pytest\.ini$|^\.coveragerc$|^\.pre-commit-config\.yaml$|^\.ruff\.toml$" "$integration_files"
           set_output diagnostics "${common}|^custom_components/enphase_ev/.*\.py$|^scripts/importtime_profile\.py$|^tests/scripts/test_importtime_profile\.py$|^devtools/docker/requirements-dev\.txt$"
           set_output quality "${common}|${test_infrastructure}|^custom_components/enphase_ev/|^tests/components/enphase_ev/|^quality_scale\.yaml$|^scripts/validate_quality_scale\.py$|^tests/scripts/test_validate_quality_scale\.py$|^devtools/docker/requirements-(dev|ci-quality)\.txt$|^\.pre-commit-config\.yaml$|^\.strict-typing$"
-          set_output scripts "${common}|${test_infrastructure}|^scripts/.*\.py$|^tests/scripts/.*\.py$|^devtools/docker/requirements-ci-scripts\.txt$"
+          set_output scripts "${common}|${test_infrastructure}|^scripts/.*\.py$|^tests/scripts/.*\.py$|^devtools/docker/requirements-ci-scripts\.txt$|^custom_components/enphase_ev/|^tests/components/enphase_ev/" "$integration_files"
 
   pre-commit:
     runs-on: ubuntu-latest
@@ -188,6 +196,7 @@ jobs:
           path: importtime-enphase-ev.log
 
   pytest:
+    name: pytest
     runs-on: ubuntu-latest
     needs: changes
     if: ${{ needs.changes.outputs.integration == 'true' }}
@@ -195,17 +204,13 @@ jobs:
       contents: read
       checks: write
       pull-requests: write
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.14']
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.14'
       - name: Set up uv
         uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
@@ -257,6 +262,40 @@ jobs:
         if: ${{ steps.changed.outputs.include != '' }}
         continue-on-error: true
         run: python scripts/check_statement_coverage.py --report coverage.json --include="${{ steps.changed.outputs.include }}"
+      - name: Check report file budgets
+        id: report_budget
+        if: ${{ always() && (steps.pytest.outcome == 'success' || steps.pytest.outcome == 'failure') }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import stat
+          from pathlib import Path
+          reports = [Path('coverage.xml'), Path('junit.xml')]
+          optional = Path('coverage.json')
+          if optional.exists() or optional.is_symlink():
+              reports.append(optional)
+          total = 0
+          for path in reports:
+              info = path.lstat()
+              if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                  raise SystemExit('Report must be a regular file with one link')
+              if not 0 < info.st_size <= 16777216:
+                  raise SystemExit('Report file budget exceeded')
+              total += info.st_size
+          if total > 33554432:
+              raise SystemExit('Report aggregate budget exceeded')
+          PY
+      - name: Preserve attempt-specific test and coverage evidence
+        if: ${{ always() && steps.report_budget.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: coverage-evidence-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            coverage.xml
+            junit.xml
+            coverage.json
       - name: Import Codecov GPG key
         if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
         run: curl -fsSL https://keybase.io/codecovsecops/pgp_keys.asc | gpg --import

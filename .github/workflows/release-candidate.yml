@@ -1,0 +1,108 @@
+name: Release Candidate
+run-name: Release candidate ${{ inputs.version }} / ${{ inputs.candidate_sha }} / control ${{ inputs.control_request_id || 'manual' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact reviewed 40-character candidate commit SHA
+        required: true
+        type: string
+      version:
+        description: Candidate manifest version, optionally prefixed with v
+        required: true
+        type: string
+      control_request_id:
+        description: Correlation identifier set by the trusted control bridge
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      candidate_sha:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      control_request_id:
+        required: false
+        type: string
+    outputs:
+      artifact_name:
+        description: Validated package and provenance artifact
+        value: ${{ jobs.package.outputs.artifact_name }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-candidate-${{ inputs.candidate_sha }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    cache-mode: none
+    runs-on: ubuntu-26.04
+    outputs:
+      artifact_name: release-candidate-${{ inputs.candidate_sha }}
+    steps:
+      - name: Resolve trusted tooling and verify candidate identity
+        id: refs
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          CANDIDATE_VERSION: ${{ inputs.version }}
+        with:
+          script: |
+            const sha = process.env.CANDIDATE_SHA;
+            if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error('Candidate must be an exact commit SHA');
+            if (!/^v?[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.+-]*$/.test(process.env.CANDIDATE_VERSION)) {
+              throw new Error('Candidate version is invalid');
+            }
+            const candidate = await github.rest.git.getCommit({...context.repo, commit_sha: sha});
+            if (candidate.data.sha !== sha) throw new Error('Candidate repository commit mismatch');
+            const branch = await github.rest.repos.getBranch({
+              ...context.repo, branch: context.payload.repository.default_branch,
+            });
+            core.setOutput('tools_sha', branch.data.commit.sha);
+      - name: Checkout reviewed default-branch tooling
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ steps.refs.outputs.tools_sha }}
+          path: tools
+          persist-credentials: false
+      - name: Checkout exact candidate source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          path: candidate
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.14"
+      - name: Build and inspect candidate component
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          CANDIDATE_VERSION: ${{ inputs.version }}
+        run: >
+          python3 tools/scripts/maintenance/package_candidate.py
+          --root candidate --domain enphase_ev
+          --version "$CANDIDATE_VERSION" --expected-sha "$CANDIDATE_SHA"
+          --output-dir "$RUNNER_TEMP/release-candidate"
+      - name: Preserve package and provenance
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-candidate-${{ inputs.candidate_sha }}
+          if-no-files-found: error
+          path: ${{ runner.temp }}/release-candidate/*
+      - name: Record candidate scope
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          TOOLS_SHA: ${{ steps.refs.outputs.tools_sha }}
+        run: |
+          {
+            echo "Candidate source: $CANDIDATE_SHA"
+            echo "Trusted tooling: $TOOLS_SHA"
+            echo 'Package integrity passed. Full source CI, current-commit GitHub review, and the full release diff require separate approval by the maintenance gates.'
+            echo 'Maintenance branches must include the reviewed maintenance-control baseline; an old stable tag alone is insufficient.'
+          } >> "$GITHUB_STEP_SUMMARY"
