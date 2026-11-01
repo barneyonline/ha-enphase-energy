@@ -422,7 +422,12 @@ class ReadAPI:
         require(
             re.fullmatch(
                 prefix
-                + r"(?:actions/runs/[1-9][0-9]*(?:/artifacts\?per_page=100|/attempts/[1-9][0-9]*/jobs\?per_page=100)?|actions/workflows/(?:tests|ci)\.yml|commits/[a-f0-9]{40}/pulls\?per_page=100|pulls/[1-9][0-9]*)",
+                + (
+                    r"(?:actions/runs/[1-9][0-9]*"
+                    r"(?:/artifacts\?per_page=100|/attempts/[1-9][0-9]*/jobs\?per_page=100)?"
+                    r"|actions/workflows/(?:tests|ci)\.yml"
+                    r"|commits/[a-f0-9]{40}/pulls\?per_page=100|pulls/[1-9][0-9]*)"
+                ),
                 route,
             ),
             "read_route_refused",
