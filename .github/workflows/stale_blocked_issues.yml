@@ -1,35 +1,41 @@
-name: Stale Blocked Issues
+name: Reporter Follow-up
 
 on:
   schedule:
     - cron: "17 16 * * *"
   workflow_dispatch:
+    inputs:
+      apply_actions:
+        description: Apply reminders and incomplete closures (otherwise report only)
+        type: boolean
+        default: false
 
 permissions:
+  contents: read
   issues: write
 
+concurrency:
+  group: maintenance-reporter-followup
+  cancel-in-progress: false
+
 jobs:
-  close_inactive_issues:
-    runs-on: ubuntu-latest
+  reporter-followup:
+    runs-on: ubuntu-26.04
     steps:
-      - name: Mark and close inactive blocked issues
-        uses: actions/stale@v11
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          days-before-issue-stale: 14
-          days-before-issue-close: 16
-          days-before-pr-stale: -1
-          days-before-pr-close: -1
-          any-of-issue-labels: status/needs-diagnostics,status/blocked,question
-          exempt-issue-labels: status/accepted,help wanted,good first issue
-          stale-issue-label: status/stale
-          stale-issue-message: >
-            This issue is still waiting on reporter follow-up and has not had any activity for 14 days.
-            If the requested details are not added within the next 16 days, it will be closed automatically.
-            Reply here or attach the requested diagnostics to keep it open.
-          close-issue-message: >
-            Closing this issue due to inactivity while it was waiting on reporter follow-up.
-            If you can provide the requested details, reply here and a maintainer can reopen it.
-          close-issue-reason: not_planned
-          remove-stale-when-updated: true
-          operations-per-run: 100
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.14"
+      - name: Follow explicit unanswered reporter requests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLY_ACTIONS: ${{ github.event_name == 'schedule' || inputs.apply_actions }}
+        shell: bash
+        run: |
+          args=(--repository "$GITHUB_REPOSITORY")
+          if [[ "$APPLY_ACTIONS" == true ]]; then
+            args+=(--apply)
+          fi
+          python3 scripts/maintenance/reporter_followup.py "${args[@]}"

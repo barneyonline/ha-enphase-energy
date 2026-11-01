@@ -11,7 +11,10 @@ permissions:
 
 jobs:
   sync_comment:
-    if: github.event.label.name == 'status/needs-diagnostics'
+    if: >
+      github.event.label.name == 'status/needs-diagnostics' &&
+      !contains(github.event.issue.labels.*.name, 'automation/hal') &&
+      !contains(github.event.issue.labels.*.name, 'automation/control')
     runs-on: ubuntu-latest
     steps:
       - name: Create or remove diagnostics guidance comment

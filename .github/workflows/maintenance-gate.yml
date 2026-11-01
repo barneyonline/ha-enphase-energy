@@ -1,0 +1,135 @@
+name: Autonomous Maintenance Gate
+run-name: Maintenance gate / control ${{ inputs.control_request_id || 'event' }}
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review, edited, labeled, unlabeled]
+  issue_comment:
+    types: [created, edited, deleted]
+  check_run:
+    types: [completed]
+  check_suite:
+    types: [completed]
+  status:
+  workflow_run:
+    workflows: [CI, Tests, Codespell, Validate with hassfest, Quality Scale, Validate, Home Assistant Smoke]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pull_number:
+        description: Pull request number (blank reconciles managed open PRs)
+        required: false
+        type: string
+
+      control_request_id:
+        description: Correlation identifier set by the trusted control bridge
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+  actions: read
+  checks: write
+  statuses: read
+
+concurrency:
+  group: maintenance-gate-${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.head_sha || github.event.check_run.head_sha || github.event.check_suite.head_sha || github.event.sha || 'reconcile' }}
+  cancel-in-progress: true
+
+jobs:
+  maintenance-gate:
+    runs-on: ubuntu-26.04
+    if: >-
+      (github.event_name != 'issue_comment' || github.event.issue.pull_request) &&
+      (github.event_name != 'check_run' || github.event.check_run.name != 'Autonomous maintenance / merge gate')
+    steps:
+      - name: Resolve trusted default-branch tooling
+        id: tools
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const branch = await github.rest.repos.getBranch({
+              ...context.repo, branch: context.payload.repository.default_branch,
+            });
+            core.setOutput('sha', branch.data.commit.sha);
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ steps.tools.outputs.sha }}
+          path: tools
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.14"
+      - name: Reconcile current-commit review, checks and every feedback source
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          REQUESTED_PULL_NUMBER: ${{ inputs.pull_number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            const child = require('node:child_process');
+            const checkName = 'Autonomous maintenance / merge gate';
+            const managed = pr => pr.labels.some(label => label.name === 'automation/hal') ||
+              /^codex\/(?:issue-|bugfix-|release-|autonomous-maintenance(?:$|\/))/.test(pr.head.ref);
+            let numbers = [];
+            const payload = context.payload;
+            if (payload.pull_request) numbers = [payload.pull_request.number];
+            else if (payload.issue?.pull_request) numbers = [payload.issue.number];
+            else if (process.env.REQUESTED_PULL_NUMBER) {
+              if (!/^[1-9][0-9]*$/.test(process.env.REQUESTED_PULL_NUMBER)) throw new Error('Invalid pull number');
+              numbers = [Number(process.env.REQUESTED_PULL_NUMBER)];
+            } else {
+              const sha = payload.workflow_run?.head_sha || payload.check_run?.head_sha ||
+                payload.check_suite?.head_sha || payload.sha;
+              if (sha) {
+                const associated = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
+                  ...context.repo, commit_sha: sha, per_page: 100,
+                });
+                numbers = associated.filter(pr => pr.state === 'open').map(pr => pr.number);
+              } else {
+                const open = await github.paginate(github.rest.pulls.list, {...context.repo, state: 'open', per_page: 100});
+                numbers = open.filter(managed).map(pr => pr.number);
+              }
+            }
+            for (const number of [...new Set(numbers)]) {
+              const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: number});
+              if (pr.state !== 'open') continue;
+              const sha = pr.head.sha;
+              const externalId = `hal-maintenance-${number}-${sha}`;
+              const existing = await github.paginate(github.rest.checks.listForRef, {
+                ...context.repo, ref: sha, check_name: checkName, per_page: 100,
+              });
+              const previous = existing.find(check => check.external_id === externalId && check.app?.id === 15368);
+              const check = previous || (await github.rest.checks.create({
+                ...context.repo, name: checkName, head_sha: sha, external_id: externalId,
+                status: 'in_progress', details_url: `${process.env.GITHUB_SERVER_URL}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              })).data;
+              if (previous) await github.rest.checks.update({...context.repo, check_run_id: previous.id, status: 'in_progress'});
+              let report;
+              let allowed = false;
+              const execution = child.spawnSync('python3', [
+                'tools/scripts/maintenance/pr_gate.py', '--repository', `${context.repo.owner}/${context.repo.repo}`,
+                '--pull-number', String(number),
+              ], {encoding: 'utf8', env: process.env, timeout: 240000, maxBuffer: 4 * 1024 * 1024});
+              try {
+                report = JSON.parse(execution.stdout);
+                allowed = execution.status === 0 && report.allow === true && report.merge_authority === true && report.head_sha === sha;
+              } catch {
+                report = {allow: false, head_sha: sha, reasons: ['Gate collection failed or returned invalid evidence; inspect the trusted workflow.']};
+              }
+              const {data: current} = await github.rest.pulls.get({...context.repo, pull_number: number});
+              if (current.head.sha !== sha) {
+                allowed = false;
+                report = {allow: false, head_sha: sha, reasons: ['Head changed during evaluation; a new review is required.']};
+              }
+              const summary = JSON.stringify(report, null, 2).slice(0, 60000);
+              await github.rest.checks.update({
+                ...context.repo, check_run_id: check.id, status: 'completed',
+                conclusion: allowed ? 'success' : 'failure',
+                output: {title: allowed ? 'Review, checks and feedback are complete' : 'Merge blocked by incomplete or invalid evidence',
+                  summary: `\`\`\`json\n${summary}\n\`\`\``},
+              });
+              core.info(`PR #${number}: ${allowed ? 'eligible' : 'blocked'} at ${sha}`);
+            }

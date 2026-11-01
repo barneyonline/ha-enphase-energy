@@ -126,3 +126,13 @@ Follow this exact sequence to create a PR correctly:
     - Use `gh api repos/<owner>/<repo>/git/trees` to assemble a tree.
     - Use `gh api repos/<owner>/<repo>/git/commits` to create the commit.
     - Use `gh api repos/<owner>/<repo>/git/refs` to create/update the branch ref.
+
+## Autonomous Maintenance
+- When investigating a managed issue, following PR feedback, preparing a bug release, or recovering a managed regression, read `.github/maintenance/OPERATING_POLICY.md` and use `.agents/skills/maintain-github-issues/SKILL.md`. The policy records HAL's approved scope, verification gates, escalation boundaries and release-before-closure rule.
+- Use `.github/pull_request_template.md`, `.github/maintenance/CHANGELOG_ENTRY_TEMPLATE.md`, and `.github/maintenance/RELEASE_NOTES_TEMPLATE.md` for the corresponding artifacts. Preserve historical changelog entries and this repository's packaging/version conventions.
+
+## Code Review Rules
+- When HAL requests final acceptance of a managed PR, read `.github/maintenance/REVIEW_PROTOCOL.md` for independent feedback verification and the digest-bound GitHub verdict. Report findings normally and certify only evidence you independently verified.
+- Maintenance gates must bind independent GitHub review and every feedback disposition to the current head commit. Updated Codecov/bot reports, unresolved review threads, or failed/unknown applicable checks keep merging blocked.
+- Release changes must validate the exact candidate and package before public publication, exclude unapproved features, and verify delivered assets before closing linked issues.
+- Reporter timeouts apply only to explicit trusted information requests: a reporter response or changed issue body cancels the timeout; bot activity never extends it.

@@ -1,0 +1,97 @@
+name: HAL Control Requests
+run-name: HAL control request ${{ github.event.comment.id }}
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  actions: write
+  issues: write
+
+concurrency:
+  group: hal-control-${{ github.event.comment.id }}
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-26.04
+    if: >-
+      !github.event.issue.pull_request &&
+      contains(github.event.issue.labels.*.name, 'automation/control') &&
+      github.event.comment.user.id == 38914183
+    steps:
+      - name: Resolve trusted default-branch tooling
+        id: tools
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const branch = await github.rest.repos.getBranch({
+              ...context.repo, branch: context.payload.repository.default_branch,
+            });
+            core.setOutput('sha', branch.data.commit.sha);
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ steps.tools.outputs.sha }}
+          path: tools
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.14"
+      - name: Validate and dispatch a fixed owner-only operation
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const child = require('node:child_process');
+            const execution = child.spawnSync('python3', [
+              'tools/scripts/maintenance/control_commands.py', '--event', process.env.GITHUB_EVENT_PATH,
+              '--policy', 'tools/.github/maintenance/control-policy.json',
+              '--repository', `${context.repo.owner}/${context.repo.repo}`,
+            ], {encoding: 'utf8', timeout: 30000, maxBuffer: 65536});
+            let plan;
+            try { plan = JSON.parse(execution.stdout); }
+            catch { throw new Error('Control request validation failed'); }
+            if (plan.action === 'ignore' && execution.status === 0) return;
+            if (plan.action !== 'dispatch' || execution.status !== 0) throw new Error(plan.reason || 'Control operation blocked');
+            const issueNumber = plan.control_issue_number;
+            const currentIssue = (await github.rest.issues.get({...context.repo, issue_number: issueNumber})).data;
+            const currentRequest = (await github.rest.issues.getComment({...context.repo, comment_id: plan.request_comment_id})).data;
+            if (currentIssue.state !== 'open' || !currentIssue.labels.some(label => label.name === 'automation/control') ||
+                currentRequest.body !== context.payload.comment.body || currentRequest.updated_at !== context.payload.comment.updated_at ||
+                currentRequest.user.id !== context.payload.comment.user.id) {
+              throw new Error('Control issue or request changed; submit a new request after reconciliation');
+            }
+            const bot = (await github.rest.users.getByUsername({username: 'github-actions[bot]'})).data;
+            const marker = '<!-- hal-control-result:v1 ';
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo, issue_number: issueNumber, per_page: 100,
+            });
+            for (const comment of comments) {
+              if (comment.user.id !== bot.id || comment.user.login !== bot.login || !comment.body.startsWith(marker) || !comment.body.endsWith(' -->')) continue;
+              try {
+                const receipt = JSON.parse(comment.body.slice(marker.length, -4));
+                if (receipt.schema === 1 && receipt.request_comment_id === plan.request_comment_id) {
+                  core.info('Request already reserved; reconcile its existing receipt and child run instead of replaying it');
+                  return;
+                }
+              } catch { throw new Error('Malformed trusted control receipt requires maintainer review'); }
+            }
+            const receipt = {schema: 1, request_comment_id: plan.request_comment_id, operation: plan.operation,
+              workflow: plan.workflow, state: 'dispatching', workflow_run: `${process.env.GITHUB_SERVER_URL}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`};
+            const body = () => `${marker}${JSON.stringify(receipt)} -->`;
+            const reservation = (await github.rest.issues.createComment({
+              ...context.repo, issue_number: issueNumber, body: body(),
+            })).data;
+            try {
+              await github.rest.actions.createWorkflowDispatch({
+                ...context.repo, workflow_id: plan.workflow, ref: plan.ref, inputs: plan.inputs,
+              });
+              receipt.state = 'dispatched';
+              await github.rest.issues.updateComment({...context.repo, comment_id: reservation.id, body: body()});
+              core.info(`Dispatched ${plan.operation}; request ${plan.request_comment_id}`);
+            } catch {
+              receipt.state = 'dispatch-uncertain';
+              await github.rest.issues.updateComment({...context.repo, comment_id: reservation.id, body: body()});
+              throw new Error('Dispatch failed or its acknowledgement is uncertain; reconcile child runs before submitting another request');
+            }

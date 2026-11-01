@@ -5,19 +5,24 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
+
 - None
 
 ### ✨ New features
+
 - None
 
 ### 🐛 Bug fixes
+
 - None
 
 ### 🔧 Improvements
+
 - None
 
 ### 🔄 Other changes
-- None
+
+- Add repository controls and templates for HAL-managed issue investigation, complete PR-feedback review, and verified bug-release delivery.
 
 ## v5.2.3 - 2026-10-31
 
