@@ -18,6 +18,10 @@
     {
       "id": 199175422,
       "login": "chatgpt-codex-connector[bot]"
+    },
+    {
+      "id": 351004977,
+      "login": "barneyonline-hal-reviewer[bot]"
     }
   ],
   "gate_check": {
