@@ -264,6 +264,40 @@ jobs:
         if: ${{ steps.changed.outputs.include != '' }}
         continue-on-error: true
         run: python scripts/check_statement_coverage.py --report coverage.json --include="${{ steps.changed.outputs.include }}"
+      - name: Check report file budgets
+        id: report_budget
+        if: ${{ always() && (steps.pytest.outcome == 'success' || steps.pytest.outcome == 'failure') }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import stat
+          from pathlib import Path
+          reports = [Path('coverage.xml'), Path('junit.xml')]
+          optional = Path('coverage.json')
+          if optional.exists() or optional.is_symlink():
+              reports.append(optional)
+          total = 0
+          for path in reports:
+              info = path.lstat()
+              if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                  raise SystemExit('Report must be a regular file with one link')
+              if not 0 < info.st_size <= 16777216:
+                  raise SystemExit('Report file budget exceeded')
+              total += info.st_size
+          if total > 33554432:
+              raise SystemExit('Report aggregate budget exceeded')
+          PY
+      - name: Preserve attempt-specific test and coverage evidence
+        if: ${{ always() && steps.report_budget.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: coverage-evidence-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            coverage.xml
+            junit.xml
+            coverage.json
       - name: Import Codecov GPG key
         if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
         run: curl -fsSL https://keybase.io/codecovsecops/pgp_keys.asc | gpg --import

@@ -7,6 +7,7 @@ import io
 import json
 import os
 import stat
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -521,6 +522,81 @@ class WorkflowTests(unittest.TestCase):
             (ROOT / ".github/workflows/coverage-reporting.yml").read_text()
         )
         self.job = self.workflow["jobs"]["upload"]
+
+    def producer_steps(self) -> list[dict]:
+        policy = json.loads(
+            (ROOT / ".github/maintenance/merge-policy.json").read_text()
+        )
+        job_name, _ = reporting.PRODUCERS[policy["repository"]]
+        producer = yaml.safe_load((ROOT / ".github/workflows/tests.yml").read_text())
+        return producer["jobs"][job_name]["steps"]
+
+    def test_producer_and_consumer_share_attempt_specific_artifact_contract(
+        self,
+    ) -> None:
+        steps = self.producer_steps()
+        uploads = [
+            s
+            for s in steps
+            if s.get("with", {}).get("name")
+            == "coverage-evidence-${{ github.run_attempt }}"
+        ]
+        self.assertEqual(len(uploads), 1)
+        upload = uploads[0]
+        self.assertRegex(upload["uses"], r"^actions/upload-artifact@[a-f0-9]{40}$")
+        self.assertEqual(upload["with"]["retention-days"], 7)
+        self.assertEqual(upload["with"]["if-no-files-found"], "error")
+        self.assertEqual(
+            upload["with"]["path"].split(),
+            ["coverage.xml", "junit.xml", "coverage.json"],
+        )
+        self.assertIn("steps.report_budget.outcome == 'success'", upload["if"])
+        budget = next(s for s in steps if s.get("id") == "report_budget")
+        self.assertLess(steps.index(budget), steps.index(upload))
+        self.assertIn("steps.pytest.outcome == 'success'", budget["if"])
+        self.assertIn("steps.pytest.outcome == 'failure'", budget["if"])
+
+    def test_actual_producer_budget_refuses_missing_links_and_oversized_reports(
+        self,
+    ) -> None:
+        budget = next(
+            s for s in self.producer_steps() if s.get("id") == "report_budget"
+        )
+        for case in (
+            "valid",
+            "missing",
+            "symlink",
+            "hardlink",
+            "oversized",
+            "aggregate",
+        ):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                path = Path(temporary)
+                (path / "coverage.xml").write_text("<coverage/>")
+                (path / "junit.xml").write_text("<testsuites/>")
+                if case == "missing":
+                    (path / "junit.xml").unlink()
+                elif case == "symlink":
+                    (path / "coverage.xml").unlink()
+                    (path / "coverage.xml").symlink_to(path / "junit.xml")
+                elif case == "hardlink":
+                    os.link(path / "coverage.xml", path / "second-link")
+                elif case == "oversized":
+                    with (path / "coverage.xml").open("wb") as stream:
+                        stream.truncate(16777217)
+                elif case == "aggregate":
+                    for name in ("coverage.xml", "junit.xml", "coverage.json"):
+                        with (path / name).open("wb") as stream:
+                            stream.truncate(12000000)
+                result = subprocess.run(
+                    ["bash", "-eu", "-c", budget["run"]],
+                    cwd=path,
+                    env={"PATH": os.environ["PATH"]},
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode == 0, case == "valid", result.stderr)
 
     def test_definition_is_default_branch_only_and_automatic_activation_is_off(
         self,
