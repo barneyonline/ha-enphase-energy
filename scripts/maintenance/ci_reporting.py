@@ -5,16 +5,16 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from datetime import datetime
 import os
-from pathlib import Path
 import re
 import stat
 import sys
-import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
-from typing import Any, Callable
+from collections.abc import Callable
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 REPOSITORIES = {
     "barneyonline/ha-groq": 1233471561,
@@ -432,7 +432,9 @@ def main() -> int:
             outputs({"coverage": result["coverage"], "junit": result["junit"]})
         print("CI report boundary verified; no candidate program executed.")
         return 0
-    except Exception:
+    except (
+        Exception
+    ):  # noqa: BLE001 -- fixed refusal never echoes API data or credentials
         print(
             "CI reporting refused: missing, changed or unsafe evidence.",
             file=sys.stderr,

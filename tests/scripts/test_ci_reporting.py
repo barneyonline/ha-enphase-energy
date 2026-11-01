@@ -4,9 +4,9 @@ import copy
 import importlib.util
 import json
 import os
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import yaml
@@ -138,14 +138,12 @@ class ScopeTests(unittest.TestCase):
         ]
         for repository, identity, job_name, step_name in cases:
 
-            def convert(value):
+            def convert(value: object, target: int = identity) -> object:
                 if isinstance(value, dict):
                     return {key: convert(item) for key, item in value.items()}
                 if isinstance(value, list):
                     return [convert(item) for item in value]
-                return (
-                    identity if type(value) is int and value == self.repo_id else value
-                )
+                return target if type(value) is int and value == self.repo_id else value
 
             responses = {
                 route.replace(self.repository, repository): convert(value)
@@ -159,7 +157,7 @@ class ScopeTests(unittest.TestCase):
                 scope = reporting.verify_scope(
                     convert(self.event),
                     repository,
-                    lambda route: copy.deepcopy(responses[route]),
+                    lambda route, data=responses: copy.deepcopy(data[route]),
                 )
                 self.assertEqual(scope["repository"], repository)
                 self.assertIs(scope["eligible"], True)
