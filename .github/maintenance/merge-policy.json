@@ -116,5 +116,15 @@
     "name": "maintenance-gate",
     "app_id": 15368,
     "workflow_path": ".github/workflows/maintenance-gate.yml"
-  }
+  },
+  "empty_check_suite_apps": [
+    {
+      "app_id": 1210556,
+      "slug": "cursor"
+    },
+    {
+      "app_id": 158384,
+      "slug": "graphite-app"
+    }
+  ]
 }

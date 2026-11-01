@@ -22,7 +22,9 @@ All notable changes to this project will be documented in this file.
 
 ### 🔄 Other changes
 
-- Add repository controls and templates for HAL-managed issue investigation, complete PR-feedback review, and verified bug-release delivery. Bind final independent handling verdicts to settled checks in separate PR conversation comments.
+- Keep maintenance validation reachable and the pytest check name consistent across skipped and running validation.
+
+- Add repository controls and templates for HAL-managed issue investigation, complete PR-feedback review, and verified bug-release delivery. Bind final independent handling verdicts to settled checks in separate PR conversation comments. Verify native clean-review receipts and explicit zero-run app-suite evidence without waiving actual feedback or check failures.
 
 ## v5.2.3 - 2026-10-31
 

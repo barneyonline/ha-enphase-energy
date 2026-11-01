@@ -132,6 +132,8 @@ Follow this exact sequence to create a PR correctly:
 - Use `.github/pull_request_template.md`, `.github/maintenance/CHANGELOG_ENTRY_TEMPLATE.md`, and `.github/maintenance/RELEASE_NOTES_TEMPLATE.md` for the corresponding artifacts. Preserve historical changelog entries and this repository's packaging/version conventions.
 
 ## Code Review Rules
+- On later review passes, read prior findings and their evidenced resolutions. Repeat a finding only when the current change or new evidence invalidates its resolution.
+- Verify provider-specific claims against actual service evidence. Event variable names alone do not establish the contents of GitHub REST workflow or check responses.
 - When HAL requests final acceptance of a managed PR, read `.github/maintenance/REVIEW_PROTOCOL.md` for independent feedback verification and the digest-bound GitHub verdict. Report findings normally and certify only evidence you independently verified.
 - Maintenance gates must bind independent GitHub review and every feedback disposition to the current head commit. Updated Codecov/bot reports, unresolved review threads, or failed/unknown applicable checks keep merging blocked.
 - Release changes must validate the exact candidate and package before public publication, exclude unapproved features, and verify delivered assets before closing linked issues.

@@ -23,6 +23,8 @@ POLICY_PATH = ".github/maintenance/merge-policy.json"
 LEDGER_MARKER = "hal-feedback-ledger:v1"
 INDEPENDENT_MARKER = "hal-independent-review:v1"
 CLEAN_MARKER = "hal-clean-verdict:v1"
+NATIVE_SUMMARY = "<!-- codex-pull-request-review-summary -->"
+NATIVE_STATE = "codex-review-state:v1"
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
 DISPOSITIONS = {"addressed", "not-applicable", "duplicate", "false-positive"}
@@ -236,6 +238,7 @@ def operational_check_ids(
 def decision_view(snapshot: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
     """Self-only checks/suites/runs carry no independent merge evidence."""
     view = json.loads(json.dumps(snapshot))
+    view["empty_check_suite_receipts"] = empty_suite_receipts(snapshot, policy)
     own = operational_check_ids(view["checks"], view["workflows"], policy)
     by_suite: dict[int, list[dict[str, Any]]] = {}
     for check in view["checks"]:
@@ -315,7 +318,7 @@ def validate_policy(policy: dict[str, Any]) -> None:
         "checks",
         "statuses",
     }
-    if set(policy) != supported:
+    if set(policy) - {"empty_check_suite_apps"} != supported:
         raise GateError("missing or unsupported policy fields")
     if not REPO.fullmatch(text(policy.get("repository"), "policy repository")):
         raise GateError("invalid policy repository")
@@ -356,6 +359,150 @@ def validate_policy(policy: dict[str, Any]) -> None:
     for item in policy["checks"]:
         if type(item.get("required")) is not bool:
             raise GateError("check required must be boolean")
+    empty_apps = policy.get("empty_check_suite_apps", [])
+    if not isinstance(empty_apps, list):
+        raise GateError("empty_check_suite_apps must be a list")
+    app_ids, slugs = set(), set()
+    check_apps = {key[0] for key in checks}
+    for item in empty_apps:
+        if not isinstance(item, dict) or set(item) != {"app_id", "slug"}:
+            raise GateError("invalid empty-suite app fields")
+        app_id = integer(item["app_id"], "empty-suite app id")
+        slug = text(item["slug"], "empty-suite app slug")
+        if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slug):
+            raise GateError("invalid empty-suite app slug")
+        if (
+            app_id == 15368
+            or app_id in check_apps
+            or app_id in app_ids
+            or slug in slugs
+        ):
+            raise GateError("reserved, configured or duplicate empty-suite app")
+        app_ids.add(app_id)
+        slugs.add(slug)
+
+
+def empty_suite_candidates(
+    snapshot: dict[str, Any], policy: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Select only explicitly approved app suites with no observed check runs."""
+    configured = policy.get("empty_check_suite_apps", [])
+    if not configured:
+        return []
+    approved = {item["app_id"]: item["slug"] for item in configured}
+    observed = {
+        integer(check.get("check_suite", {}).get("id"), "check run suite id")
+        for check in snapshot["checks"]
+    }
+    candidates = []
+    for suite in snapshot["check_suites"]:
+        if integer(suite.get("id"), "check suite id") in observed:
+            continue
+        app = suite.get("app")
+        if not isinstance(app, dict) or type(app.get("id")) is not int:
+            continue
+        if app["id"] in approved and approved[app["id"]] == app.get("slug"):
+            candidates.append(suite)
+    return candidates
+
+
+def empty_suite_receipts(
+    snapshot: dict[str, Any], policy: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Validate exhaustive zero-run proofs without excluding real check feedback."""
+    receipts = []
+    for suite in empty_suite_candidates(snapshot, policy):
+        ident = integer(suite["id"], "empty suite id")
+        head = snapshot["pr"]["head"]["sha"]
+        repository = snapshot["pr"]["base"].get("repo")
+        if not isinstance(repository, dict):
+            raise GateError("empty suite PR repository metadata missing")
+        scope = {
+            "id": integer(repository.get("id"), "empty suite PR repository id"),
+            "full_name": text(repository.get("full_name"), "empty suite PR repository"),
+        }
+        if (
+            scope["full_name"] != snapshot["repository"]
+            or scope["full_name"] != policy["repository"]
+        ):
+            raise GateError("empty suite repository scope mismatch")
+        prefix = "https://api.github.com/repos/" + scope["full_name"] + "/"
+        url = prefix + f"check-suites/{ident}"
+        required = {
+            "head_sha",
+            "repository",
+            "app",
+            "status",
+            "conclusion",
+            "latest_check_runs_count",
+            "url",
+            "check_runs_url",
+        }
+        if not required.issubset(suite):
+            raise GateError("empty suite state or scope metadata missing")
+        suite_repo = suite["repository"]
+        if (
+            suite["head_sha"] != head
+            or not isinstance(suite_repo, dict)
+            or integer(suite_repo.get("id"), "empty suite repository id") != scope["id"]
+            or suite_repo.get("full_name") != scope["full_name"]
+            or suite["status"] != "queued"
+            or suite["conclusion"] is not None
+            or type(suite["latest_check_runs_count"]) is not int
+            or suite["latest_check_runs_count"] != 0
+            or suite["url"] != url
+            or suite["check_runs_url"] != url + "/check-runs"
+        ):
+            raise GateError("empty suite state or scope mismatch")
+        fixed = {
+            "method": "GET",
+            "request_url": url + "/check-runs?filter=all&per_page=100",
+            "repository": scope,
+            "head_sha": head,
+            "app": {"id": suite["app"]["id"], "slug": suite["app"]["slug"]},
+            "suite_id": ident,
+        }
+        proof = suite.get("_empty_runs_proof")
+        if not isinstance(proof, dict) or set(proof) != set(fixed) | {
+            "response",
+            "link_headers",
+        }:
+            raise GateError("empty suite exhaustive proof missing or malformed")
+        if canonical({key: proof[key] for key in fixed}) != canonical(fixed):
+            raise GateError("empty suite proof binding mismatch")
+        response = proof["response"]
+        if (
+            not isinstance(response, dict)
+            or set(response) != {"total_count", "check_runs"}
+            or type(response["total_count"]) is not int
+            or response["total_count"] != 0
+            or response["check_runs"] != []
+            or proof["link_headers"] != []
+        ):
+            raise GateError("empty suite proof is nonempty, incomplete or paginated")
+        for run in snapshot["workflows"]:
+            associated = integer(run.get("check_suite_id"), "workflow check suite id")
+            if (
+                run.get("check_suite_url") != prefix + f"check-suites/{associated}"
+                or associated == ident
+            ):
+                raise GateError(
+                    "empty suite workflow association missing or contradictory"
+                )
+        receipts.append(
+            {
+                "suite_id": ident,
+                "app_id": suite["app"]["id"],
+                "slug": suite["app"]["slug"],
+                "head_sha": head,
+                "repository": scope,
+                "request_url": fixed["request_url"],
+                "total_count": 0,
+                "proof_sha256": digest(proof),
+                "suite_sha256": digest(suite),
+            }
+        )
+    return sorted(receipts, key=lambda item: item["suite_id"])
 
 
 def source(
@@ -376,6 +523,92 @@ def source(
         "body": text(body, f"{kind} body", empty=True) if body is not None else None,
         "kind": kind,
     }
+
+
+def native_summary_state(item: dict[str, Any]) -> dict[str, Any]:
+    """Validate the observed v1 receipt and its independently read edit provenance."""
+    body = text(item.get("body"), "native summary body")
+    lines = body.splitlines()
+    if (
+        len(lines) < 2
+        or lines[0] != NATIVE_SUMMARY
+        or body.count(NATIVE_SUMMARY) != 1
+        or body.count("<!-- codex-review-state:") != 1
+    ):
+        raise GateError("ambiguous native summary envelope")
+    state = marker(lines[1], NATIVE_STATE)
+    fields = {"commit_sha", "has_any_findings", "has_unresolved_findings", "status"}
+    if not isinstance(state, dict) or set(state) != {"code_review", "security_review"}:
+        raise GateError("unsupported native review receipt schema")
+    for part in state.values():
+        if not isinstance(part, dict) or set(part) != fields:
+            raise GateError("unsupported native review state schema")
+        commit = part["commit_sha"]
+        if commit is not None and (
+            not isinstance(commit, str) or not SHA.fullmatch(commit)
+        ):
+            raise GateError("invalid native review commit SHA")
+        for name in ("has_any_findings", "has_unresolved_findings"):
+            if part[name] is not None and type(part[name]) is not bool:
+                raise GateError("invalid native review findings flag")
+        if part["status"] is not None and not isinstance(part["status"], str):
+            raise GateError("invalid native review status")
+
+    who = actor_key(item.get("user", {}))
+    meta = item.get("_native_review_meta")
+    required = {
+        "databaseId",
+        "body",
+        "updatedAt",
+        "lastEditedAt",
+        "includesCreatedEdit",
+        "author",
+        "editor",
+    }
+    if (
+        not isinstance(meta, dict)
+        or set(meta) != required
+        or type(meta["databaseId"]) is not int
+        or meta["databaseId"] != item["id"]
+        or meta["body"] != body
+        or meta["updatedAt"] != item["updated_at"]
+        or type(meta["includesCreatedEdit"]) is not bool
+    ):
+        raise GateError("native summary metadata missing or changed during collection")
+
+    def same_bot(actor: Any) -> bool:
+        return (
+            isinstance(actor, dict)
+            and actor.get("__typename") == "Bot"
+            and type(actor.get("databaseId")) is int
+            and actor["databaseId"] == who[0]
+            and who[1].endswith("[bot]")
+            and actor.get("login") == who[1].removesuffix("[bot]")
+        )
+
+    if not same_bot(meta["author"]):
+        raise GateError("native summary author provenance mismatch")
+    if meta["lastEditedAt"] is None:
+        if meta["editor"] is not None:
+            raise GateError("native summary editor provenance ambiguous")
+        if timestamp(
+            item.get("created_at"), "native summary creation time"
+        ) != timestamp(item.get("updated_at"), "native summary update time"):
+            raise GateError("native summary has an update without editor provenance")
+    elif timestamp(meta["lastEditedAt"], "native summary edit time") != item[
+        "updated_at"
+    ] or not same_bot(meta["editor"]):
+        raise GateError("native summary was not last edited by its configured bot")
+    return state
+
+
+def native_state_clean(state: dict[str, Any], head: str) -> bool:
+    return (
+        state["commit_sha"] == head
+        and state["status"] == "completed"
+        and state["has_any_findings"] is False
+        and state["has_unresolved_findings"] is False
+    )
 
 
 def inventory(
@@ -489,10 +722,17 @@ def inventory(
     suites = {integer(s.get("id"), "check suite id") for s in snapshot["check_suites"]}
     if len(suites) != len(snapshot["check_suites"]) or len(suites) >= 1000:
         raise GateError("check-suite inventory duplicate or at API completeness limit")
-    if suites - {
-        integer(check.get("check_suite", {}).get("id"), "check run suite id")
-        for check in snapshot["checks"]
-    }:
+    approved_empty = {
+        receipt["suite_id"] for receipt in empty_suite_receipts(snapshot, policy)
+    }
+    if (
+        suites
+        - {
+            integer(check.get("check_suite", {}).get("id"), "check run suite id")
+            for check in snapshot["checks"]
+        }
+        - approved_empty
+    ):
         raise GateError(
             "check suite has no observed check; operational identity cannot be proved"
         )
@@ -695,6 +935,7 @@ def evaluate(snapshot: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]
         "head_sha": None,
         "base_sha": None,
         "feedback": [],
+        "empty_check_suite_receipts": [],
         "validation_claimed": False,
         "merge_authority": False,
     }
@@ -759,6 +1000,7 @@ def evaluate(snapshot: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]
         ):
             block("current_base_ancestry_unproven")
         feedback, ledger, latest_checks = inventory(snapshot, policy)
+        result["empty_check_suite_receipts"] = empty_suite_receipts(snapshot, policy)
         result["inventory_digest"] = inventory_digest(feedback)
         result["feedback"] = [
             {k: f[k] for k in ("source", "updated_at", "content_sha256", "url", "kind")}
@@ -851,14 +1093,50 @@ def evaluate(snapshot: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]
             for r in codex_reviews
             if r.get("state") in {"COMMENTED", "APPROVED"} and r.get("submitted_at")
         ]
-        if not completed or (codex_reviews and codex_reviews[-1] not in completed):
-            block("codex_review_missing_or_stale")
-        else:
+        native_receipts = []
+        receipt_actors = set()
+        for comment in snapshot["issue_comments"]:
+            who = actor_key(comment["user"])
+            if who not in codex or not comment["body"].startswith(NATIVE_SUMMARY):
+                continue
+            if who in receipt_actors:
+                raise GateError("multiple native summary receipts for one reviewer")
+            receipt_actors.add(who)
+            state = native_summary_state(comment)
+            code, security = state["code_review"], state["security_review"]
+            if code["status"] not in {None, "completed"}:
+                block("codex_review_not_completed", source=comment["id"])
+            if (
+                code["commit_sha"] == head
+                and code["has_unresolved_findings"] is not False
+            ):
+                block("codex_review_has_unresolved_findings", source=comment["id"])
+            security_absent = all(value is None for value in security.values())
+            if not security_absent and not native_state_clean(security, head):
+                block(
+                    "codex_security_review_incomplete_or_adverse", source=comment["id"]
+                )
+            if native_state_clean(code, head) and (
+                security_absent or native_state_clean(security, head)
+            ):
+                native_receipts.append(comment)
+        formal_ready = bool(completed) and codex_reviews[-1] in completed
+        if formal_ready:
             result["codex_review"] = {
                 "id": completed[-1]["id"],
                 "head_sha": head,
                 "url": completed[-1]["html_url"],
             }
+        elif not codex_reviews and native_receipts:
+            receipt = max(native_receipts, key=lambda c: (c["updated_at"], c["id"]))
+            result["codex_review"] = {
+                "id": receipt["id"],
+                "kind": "issue_comment_summary",
+                "head_sha": head,
+                "url": receipt["html_url"],
+            }
+        else:
+            block("codex_review_missing_or_stale")
         allowed = {policy_check_key(c): c for c in policy["checks"]}
         observed = set()
         for check in latest_checks:
@@ -1146,6 +1424,34 @@ class GitHub:
         )
         snap["comparison"] = comparison
         snap["issue_comments"] = self.pages(f"issues/{number}/comments?per_page=100")
+        native_comments = [
+            item
+            for item in snap["issue_comments"]
+            if isinstance(item.get("body"), str)
+            and item["body"].startswith(NATIVE_SUMMARY)
+            and (
+                policy is None
+                or actor_key(item["user"])
+                in {actor_key(a) for a in policy["codex_reviewers"]}
+            )
+        ]
+        if native_comments:
+            fields = (
+                "databaseId body updatedAt lastEditedAt includesCreatedEdit "
+                "author{__typename login ... on Bot{databaseId} ... on User{databaseId}} "
+                "editor{__typename login ... on Bot{databaseId} ... on User{databaseId}}"
+            )
+            metadata = self.graphql_pages(number, "comments", fields)
+            by_id = {
+                integer(m.get("databaseId"), "native summary metadata id"): m
+                for m in metadata
+            }
+            if len(by_id) != len(metadata):
+                raise GateError("duplicate native summary metadata")
+            for item in native_comments:
+                if item["id"] not in by_id:
+                    raise GateError("native summary editor metadata missing")
+                item["_native_review_meta"] = by_id[item["id"]]
         snap["reviews"] = self.pages(f"pulls/{number}/reviews?per_page=100")
         snap["review_comments"] = self.pages(f"pulls/{number}/comments?per_page=100")
         snap["review_meta"] = self.graphql_pages(
@@ -1224,6 +1530,29 @@ class GitHub:
             if len(check["_annotations"]) != count:
                 raise GateError("incomplete check annotations")
         snap["checks"], snap["workflows"] = checks, workflows
+        if policy is not None:
+            for suite in empty_suite_candidates(snap, policy):
+                ident = integer(suite["id"], "empty suite id")
+                request_url = f"https://api.github.com/repos/{self.repository}/check-suites/{ident}/check-runs?filter=all&per_page=100"
+                response, headers = self.request(request_url)
+                suite["_empty_runs_proof"] = {
+                    "method": "GET",
+                    "request_url": request_url,
+                    "repository": {
+                        "id": pr["base"]["repo"]["id"],
+                        "full_name": self.repository,
+                    },
+                    "head_sha": head,
+                    "app": {"id": suite["app"]["id"], "slug": suite["app"]["slug"]},
+                    "suite_id": ident,
+                    "response": response,
+                    "link_headers": [
+                        {"name": key, "value": value}
+                        for key, value in headers.items()
+                        if key.lower() == "link"
+                    ],
+                }
+            empty_suite_receipts(snap, policy)
         # Head/base movement during an individual sweep invalidates all its evidence.
         after = self.get(f"pulls/{number}")
         if pr_state(after) != pr_state(pr):

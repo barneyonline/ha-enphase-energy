@@ -42,9 +42,9 @@ devices or proved semantic correctness of a fix.
 
 ## Policy schema 1
 
-Use `merge-policy.example.json` as a schema template. Its zero actor IDs and
-placeholder check deliberately fail validation until replaced with verified
-identities and actual contexts. Do not deploy the example unchanged.
+The installed `.github/maintenance/merge-policy.json` records this repository's
+verified identities and actual check contexts. Changes require the owner's
+approval under the operating policy.
 
 - `repository`, `base_branch`, `schema`: exact scope.
 - `trusted_ledger_authors`: numeric GitHub user ID **and** exact login, for the
@@ -66,12 +66,59 @@ identities and actual contexts. Do not deploy the example unchanged.
   contexts must be present. Every observed latest context must be allowlisted.
 - `statuses`: all allowed legacy commit-status contexts
   `{context, creator_id, required}`. The latest value per context must succeed.
+- `empty_check_suite_apps`: optional, default `[]`. Each explicitly reviewed entry
+  has exactly `{app_id, slug}`: a verified positive numeric App ID and its exact
+  lowercase GitHub app slug. IDs and slugs must each be unique. GitHub Actions
+  (`15368`) and every App already represented in `checks` are forbidden here.
+  The example deliberately enables no app identities.
 
 Unknown policy fields fail closed. There is no wildcard or implicit bot trust.
 Missing/pending/failed/cancelled/neutral/skipped checks block. There are initially
 no skip exceptions: a future per-context not-applicable rule needs explicit
 trusted policy, exact classifier/condition evidence and tests; never add a global
 "skipped is success" switch.
+
+## Explicitly approved zero-run app suites
+
+GitHub automatically creates check suites for installed Apps with `checks:write`
+when code is pushed. An unused App can therefore leave a queued suite without
+ever emitting a check. This is distinct from an actual queued check run.
+[GitHub checks guide](https://docs.github.com/en/rest/guides/using-the-rest-api-to-interact-with-checks).
+
+Only an App explicitly configured in the trusted base policy may receive this
+treatment. Its suite must have exactly the current head SHA, `status: queued`,
+an explicitly null conclusion, and an integer `latest_check_runs_count: 0`.
+Repository ID/full name must agree with the PR's base repository and policy;
+App ID/slug and canonical suite URLs must match. Every observed workflow must
+have complete suite ID/URL metadata, with no association to the empty suite.
+
+Each complete live sweep independently performs this fixed read:
+
+```text
+GET /repos/OWNER/REPOSITORY/check-suites/SUITE_ID/check-runs?filter=all&per_page=100
+```
+
+The raw response must contain integer `total_count: 0` and exactly an empty
+`check_runs` list. A Link header of any spelling or value blocks this conservative
+zero-page proof, including malformed pagination. `filter=all` is explicit because
+the endpoint defaults to `latest`; hidden historical runs cannot be treated as
+an unused placeholder. [GitHub per-suite check-run API](https://docs.github.com/en/rest/checks/runs#list-check-runs-in-a-check-suite).
+
+The collector preserves fixed request/repository/head/App/suite bindings, the
+raw response body and Link evidence in `suite._empty_runs_proof`. It never stores
+volatile Date, request-ID, rate-limit headers or capture times in this proof.
+Raw suite metadata and proofs remain in both stable-sweep decision hashes.
+Derived `empty_check_suite_receipts` are included in the decision view and JSON
+result, with suite/proof hashes and verified scope. Missing, contradictory,
+nonzero or moving proof blocks; no prior sweep or local policy substitutes.
+
+This exception applies only to an exhaustively verified suite with no emitted
+checks. All actual checks remain normal feedback: an App that begins emitting a
+check is unknown under this empty-suite-only policy and blocks until its real
+context is explicitly reviewed/configured. Required contexts, failures, pending
+workflows and every review/ledger/witness requirement remain unchanged. No real
+App identity is implicitly trusted, and an empty-suite receipt supplies no clean
+review witness or semantic approval.
 
 ## Complete feedback inventory and ledger
 
@@ -155,13 +202,28 @@ positive as independent evidence.
 
 A completed formal `COMMENTED` or `APPROVED` review from an explicitly trusted
 Codex identity must have API `commit_id` equal to the candidate head SHA. Its
-numeric identity must differ from the PR/ledger author. A `COMMENTED` review proves
-completion only; it does not itself prove clean handling. Its feedback still
-requires ledger accounting, independent clean evidence and thread resolution. A bare thumbs-up
-or eyes reaction, missing review, old review, matching text or PR comment cannot
-prove this binding and does not pass. Current official documentation describes
-standard GitHub reviews: [Codex GitHub integration](https://learn.chatgpt.com/docs/third-party/github).
-Rehearsal must verify real clean-review output before enabling unattended merge.
+numeric identity must differ from the PR and ledger author. A `COMMENTED` review
+proves completion; findings still require ledger accounting, independent clean
+handling evidence and thread resolution.
+
+Clean native GitHub reviews can emit a versioned summary without a formal review.
+The gate also accepts the observed `codex-review-state:v1` summary only from the
+configured Codex Bot, at the exact head, with code review `completed` and both
+findings flags strictly `false`. It cross-checks REST and GraphQL comment ID,
+complete body, update time, Bot author and Bot editor. A never-edited receipt must
+have matching creation/update times and no editor. Missing or contradictory
+provenance blocks. Security review must be unrequested (all fields null) or clean
+and completed at the exact head. In-flight, adverse, stale or unknown security
+work blocks even alongside a completed code review. A pending or dismissed formal
+review cannot be rescued by a summary.
+
+The summary remains ordinary fingerprinted feedback; its edits invalidate the
+ledger and handling witness. Neither completion path replaces the independent
+handling verdict. Reactions alone, guessed clean text, author copies and unknown
+receipt schemas cannot prove completion. The versioned receipt is observed
+service behavior, not a promised stable public API; format drift fails closed.
+See [Codex GitHub integration](https://learn.chatgpt.com/docs/third-party/github)
+for the documented native review feature.
 
 Every snapshot read fetches trusted `compare/{currentBaseSHA}...{headSHA}`. The exact
 requested SHAs, `base_commit.sha`, `merge_base_commit.sha`, zero `behind_by` and
@@ -176,8 +238,8 @@ are normalized consistently while their raw provenance is retained. The sole
 supported synthetic path is exact `dynamic/github-code-scanning/codeql`; there
 is no dynamic-path wildcard. The check-suite inventory must be below the API's
 1000-suite completeness boundary, otherwise collection blocks. A superseded failed attempt does not remain
-the current check failure after a successful rerun; its feedback must still have
-a ledger entry. A newer failure overrides an older success. A newly queued
+the current check failure after a successful rerun of the same workflow/event contract; its feedback must still have
+a ledger entry. A newer failure overrides an older success. A successful manual dispatch does not waive a failed or cancelled PR workflow: event-specific steps and inputs can differ even when job names match. Rerun the original event for that recovery. Manual dispatch can supply missing path-filtered validation or supersede skipped job contexts when the original workflow succeeded; every previous result remains feedback. A newly queued
 workflow with no check run yet also blocks. Unknown apps/contexts never silently
 disappear.
 

@@ -539,3 +539,9 @@ def test_maintenance_controls_require_every_validation_group(tmp_path, path):
         "quality=true",
         "scripts=true",
     }
+
+
+def test_pytest_context_is_stable_when_the_single_lane_is_skipped():
+    job = _jobs()["pytest"]
+    assert job["name"] == "pytest"
+    assert job["strategy"]["matrix"] == {"python-version": ["3.14"]}

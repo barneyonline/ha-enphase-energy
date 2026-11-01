@@ -196,6 +196,7 @@ jobs:
           path: importtime-enphase-ev.log
 
   pytest:
+    name: pytest
     runs-on: ubuntu-latest
     needs: changes
     if: ${{ needs.changes.outputs.integration == 'true' }}
