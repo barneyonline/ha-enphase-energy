@@ -2,6 +2,8 @@ name: Autonomous Maintenance Gate
 run-name: Maintenance gate / control ${{ inputs.control_request_id || 'event' }}
 
 on:
+  push:
+    branches: [main]
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review, edited, labeled, unlabeled]
   issue_comment:
@@ -98,6 +100,13 @@ jobs:
                 const open = await github.paginate(github.rest.pulls.list, {...context.repo, state: 'open', per_page: 100});
                 numbers = open.filter(managed).map(pr => pr.number);
               }
+            } else if ((context.eventName === 'push' &&
+                        payload.ref === `refs/heads/${payload.repository.default_branch}`) ||
+                       (context.eventName === 'workflow_run' &&
+                        payload.workflow_run?.head_branch === payload.repository.default_branch)) {
+              // A new base invalidates every managed PR, including unrelated heads.
+              const open = await github.paginate(github.rest.pulls.list, {...context.repo, state: 'open', per_page: 100});
+              numbers = open.filter(managed).map(pr => pr.number);
             } else if (payload.pull_request) numbers = [payload.pull_request.number];
             else if (payload.issue?.pull_request) numbers = [payload.issue.number];
             else if (process.env.REQUESTED_PULL_NUMBER) {
@@ -143,9 +152,15 @@ jobs:
                 report = {allow: false, head_sha: sha, reasons: ['Gate collection failed or returned invalid evidence; inspect the trusted workflow.']};
               }
               const {data: current} = await github.rest.pulls.get({...context.repo, pull_number: number});
-              if (current.head.sha !== sha) {
+              const {data: baseRef} = await github.rest.git.getRef({
+                ...context.repo, ref: `heads/${current.base.ref}`,
+              });
+              if (current.head.sha !== sha || current.state !== 'open' || current.draft || current.merged ||
+                  current.base.ref !== pr.base.ref || current.base.sha !== report.base_sha ||
+                  baseRef.ref !== `refs/heads/${current.base.ref}` || baseRef.object?.type !== 'commit' ||
+                  baseRef.object.sha !== report.base_sha) {
                 allowed = false;
-                report = {allow: false, head_sha: sha, reasons: ['Head changed during evaluation; a new review is required.']};
+                report = {allow: false, head_sha: sha, reasons: ['PR head, readiness or current base changed during evaluation; fresh evidence is required.']};
               }
               const summary = JSON.stringify(report, null, 2).slice(0, 60000);
               await github.rest.checks.update({
