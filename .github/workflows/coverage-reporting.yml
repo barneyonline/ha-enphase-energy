@@ -28,7 +28,7 @@ jobs:
       pull-requests: read
     steps:
       - id: scope
-        uses: barneyonline/hal-github-maintenance/actions/coverage-reporting@0bb8da1ff97cbae58c8b8f7a179ca6e112e751e3
+        uses: barneyonline/hal-github-maintenance/actions/coverage-reporting@472e3d51b9ce164734ff88545fc82716a181cfa6
         with:
           token: ${{ github.token }}
       - name: Upload coverage data to Codecov
@@ -59,6 +59,7 @@ jobs:
           files: ${{ runner.temp }}/hal-codecov-input/junit.xml
           root_dir: ${{ runner.temp }}/hal-codecov-source
           name: hal-junit-${{ github.run_id }}-${{ github.run_attempt }}
+          job_code: hal-junit-${{ github.run_id }}-${{ github.run_attempt }}
           plugins: noop
           disable_search: true
           disable_file_fixes: true
