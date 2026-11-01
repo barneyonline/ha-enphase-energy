@@ -29,9 +29,9 @@ on:
       - '.github/workflows/tests.yml'
   workflow_dispatch:
   workflow_call:
-    secrets:
-      CODECOV_TOKEN:
-        required: false
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ format('{0}-{1}', github.workflow_ref || github.workflow, github.ref) }}
@@ -50,6 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: Classify changed paths
         id: paths
@@ -109,6 +110,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
@@ -149,6 +151,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version: '3.14'
@@ -173,6 +177,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version: '3.14'
@@ -202,11 +208,10 @@ jobs:
     if: ${{ needs.changes.outputs.integration == 'true' }}
     permissions:
       contents: read
-      checks: write
-      pull-requests: write
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
@@ -296,26 +301,6 @@ jobs:
             coverage.xml
             junit.xml
             coverage.json
-      - name: Import Codecov GPG key
-        if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
-        run: curl -fsSL https://keybase.io/codecovsecops/pgp_keys.asc | gpg --import
-      - name: Upload coverage to Codecov
-        if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
-        uses: codecov/codecov-action@v7
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.xml
-          disable_search: true
-          plugins: noop
-          fail_ci_if_error: true
-      - name: Upload test results to Codecov
-        if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
-        uses: codecov/codecov-action@v7
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./junit.xml
-          disable_search: true
-          report_type: test_results
       - name: Fail if tests or targeted coverage failed
         if: ${{ steps.pytest.outcome == 'failure' || steps.targeted_coverage.outcome == 'failure' }}
         run: exit 1
@@ -328,6 +313,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version: '3.14'
