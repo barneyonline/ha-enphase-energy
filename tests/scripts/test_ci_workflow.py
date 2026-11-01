@@ -111,7 +111,7 @@ def test_path_classification_when_base_advances_after_checkout(tmp_path):
         "integration=true",
         "diagnostics=true",
         "quality=true",
-        "scripts=false",
+        "scripts=true",
     }
     assert (
         git(checkout, "rev-parse", "--is-shallow-repository").stdout.strip() == "false"
@@ -551,3 +551,21 @@ def test_pytest_context_is_stable_when_the_single_lane_is_skipped():
         if step.get("uses", "").startswith("actions/setup-python@")
     ]
     assert python_versions == ["3.14"]
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "custom_components/enphase_ev/example.py",
+        "tests/components/enphase_ev/test_example.py",
+    ],
+)
+def test_integration_changes_also_run_required_script_checks(
+    manifest_repo, path: str
+) -> None:
+    checkout, _, _, commit, classify = manifest_repo
+    target = checkout / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("# Runtime or component-test change\n")
+    commit()
+    assert classify()["scripts"] == "true"
