@@ -1008,6 +1008,23 @@ def pr_state(pr: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def base_ref_path(branch: Any) -> str:
+    branch = text(branch, "base branch")
+    if "\\" in branch or any(part in {"", ".", ".."} for part in branch.split("/")):
+        raise GateError("invalid base branch ref")
+    return "git/ref/heads/" + urllib.parse.quote(branch, safe="")
+
+
+def base_ref_proof(repository: str, branch: str, sha: str) -> dict[str, str]:
+    return {
+        "repository": repository,
+        "request_url": f"https://api.github.com/repos/{repository}/{base_ref_path(branch)}",
+        "ref": "refs/heads/" + branch,
+        "sha": sha,
+        "object_type": "commit",
+    }
+
+
 def evaluate(snapshot: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
     """Pure deterministic evaluator: no I/O, mutation, source execution or secrets."""
     result: dict[str, Any] = {
@@ -1061,6 +1078,10 @@ def evaluate(snapshot: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]
             or pr["base"].get("ref") != policy["base_branch"]
         ):
             block("repository_or_base_mismatch")
+        if snapshot.get("base_ref") != base_ref_proof(
+            policy["repository"], policy["base_branch"], base
+        ):
+            block("current_base_ref_unproven")
         if (
             pr.get("state") != "open"
             or pr.get("draft") is not False
@@ -1486,15 +1507,38 @@ class GitHub:
                 raise GateError("incomplete GraphQL response") from exc
         raise GateError("GraphQL pagination limit exceeded")
 
+    def current_base_ref(
+        self, pr: dict[str, Any], policy: dict[str, Any] | None = None
+    ) -> dict[str, str]:
+        branch = text(pr["base"].get("ref"), "PR base branch")
+        if policy is not None and branch != policy["base_branch"]:
+            raise GateError("PR base branch disagrees with trusted policy")
+        ref = self.get(base_ref_path(branch))
+        if not isinstance(ref, dict) or not isinstance(ref.get("object"), dict):
+            raise GateError("actual base branch ref unavailable")
+        sha = ref["object"].get("sha")
+        if (
+            ref.get("ref") != "refs/heads/" + branch
+            or ref["object"].get("type") != "commit"
+            or not isinstance(sha, str)
+            or not SHA.fullmatch(sha)
+        ):
+            raise GateError("actual base branch ref invalid")
+        if sha != pr["base"].get("sha"):
+            raise GateError("actual base branch ref disagrees with PR base SHA")
+        return base_ref_proof(self.repository, branch, sha)
+
     def collect_once(
         self, number: int, policy: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         pr = self.get(f"pulls/{number}")
+        base_ref = self.current_base_ref(pr, policy)
         head = pr["head"]["sha"]
         snap: dict[str, Any] = {
             "schema": 1,
             "repository": self.repository,
             "pr": pr,
+            "base_ref": base_ref,
             "errors": [],
             "stable": False,
             "complete": {name: True for name in COMPLETE_KEYS},
@@ -1654,11 +1698,13 @@ class GitHub:
         after = self.get(f"pulls/{number}")
         if pr_state(after) != pr_state(pr):
             raise GateError("PR state/head/base changed during collection")
+        self.current_base_ref(after, policy)
         return snap
 
     def collect(self, number: int) -> tuple[dict[str, Any], dict[str, Any]]:
         initial_pr = self.get(f"pulls/{number}")
-        policy_sha = initial_pr["base"]["sha"]
+        initial_base = self.current_base_ref(initial_pr)
+        policy_sha = initial_base["sha"]
         policy_file = self.get(f"contents/{POLICY_PATH}?ref={policy_sha}")
         if policy_file.get("encoding") != "base64" or policy_file.get("type") != "file":
             raise GateError("trusted base policy unavailable")
@@ -1674,6 +1720,9 @@ class GitHub:
             or second["pr"]["base"]["sha"] != policy_sha
         ):
             raise GateError("PR base changed after trusted policy was fetched")
+        if first["base_ref"] != initial_base:
+            raise GateError("actual base branch changed after policy was fetched")
+        self.current_base_ref(second["pr"], policy)
 
         if digest(decision_view(first, policy)) != digest(
             decision_view(second, policy)

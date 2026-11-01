@@ -772,7 +772,8 @@ class ProtocolAndBoundaryTests(unittest.TestCase):
                     data["base"]["sha"] = "f" * 40
             return data, headers
 
-        with self.assertRaisesRegex(gate.GateError, "base changed after"):
+        # The independent ref check rejects the contradictory PR base earlier.
+        with self.assertRaisesRegex(gate.GateError, "actual base branch ref disagrees"):
             gate.GitHub(REPOSITORY, "fixture", base_move).collect(1)
 
     def test_additional_review_thread_and_ledger_boundary_contracts(self):

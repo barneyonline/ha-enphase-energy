@@ -37,9 +37,18 @@ does not print it or API response bodies on errors. REST uses GET only; GraphQL
 uses query-only POST. API host/repository and pagination URLs are constrained;
 redirects and incomplete/partial responses block.
 
-Live mode fetches `.github/maintenance/merge-policy.json` from the exact current
-PR **base SHA**, before collecting two complete snapshots. It never falls back
-to a PR policy or a local override. The invoking workflow must also load the
+Live mode independently resolves the actual target branch using GitHub
+`GET /repos/OWNER/REPOSITORY/git/ref/heads/BRANCH` before loading policy. The
+returned ref must name the expected branch, point to a commit and agree with
+PR metadata. `.github/maintenance/merge-policy.json` is loaded only from that
+verified current SHA. Each complete sweep checks the actual branch at its start
+and end; collection checks it again before returning. A lagging PR base, missing
+ref, malformed response or branch movement blocks. The repository, fixed request
+URL, ref, object type and SHA are retained in `snapshot.base_ref` and included in
+stability checks; the pure evaluator requires the same bound proof.
+
+Two complete snapshots remain mandatory. Live mode never falls back to a PR
+policy or a local override. The invoking workflow must also load the
 gate code from a trusted base/default checkout and must not execute PR code.
 Bootstrap has no automatic bypass when the base lacks this policy.
 

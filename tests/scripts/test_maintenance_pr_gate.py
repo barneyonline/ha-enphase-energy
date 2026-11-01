@@ -114,6 +114,7 @@ def fixture() -> tuple[dict, dict]:
     snapshot = {
         "schema": 1,
         "repository": REPOSITORY,
+        "base_ref": gate.base_ref_proof(REPOSITORY, "main", BASE),
         "complete": {name: True for name in gate.COMPLETE_KEYS},
         "comparison": {
             "_requested_base_sha": BASE,
@@ -739,6 +740,11 @@ class ClientTests(unittest.TestCase):
                     }
                 }, {}
             path = url.split(f"/repos/{REPOSITORY}/", 1)[1]
+            if path == "git/ref/heads/main":
+                return {
+                    "ref": "refs/heads/main",
+                    "object": {"sha": BASE, "type": "commit"},
+                }, {}
             if path.startswith("contents/"):
                 self.assertEqual(path, f"contents/{gate.POLICY_PATH}?ref={BASE}")
                 return {
