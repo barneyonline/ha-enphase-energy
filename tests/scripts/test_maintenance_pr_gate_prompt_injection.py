@@ -63,6 +63,14 @@ class InjectionBoundaryTests(unittest.TestCase):
             "scripts/docker-validate.sh",
             ".env.local",
             "tests/conftest.py",
+            ".coveragerc",
+            ".ruff.toml",
+            "codecov.yml",
+            "scripts/service_status.py",
+            "scripts/firmware_catalog.py",
+            "scripts/issue_labeling.py",
+            "scripts/check_statement_coverage.py",
+            "scripts/validate_quality_scale.py",
         ]:
             with self.subTest(path=path):
                 self.changed(path)
@@ -81,6 +89,15 @@ class InjectionBoundaryTests(unittest.TestCase):
         )
         self.assertEqual(
             [".github/workflows/tests.yml"],
+            gate.sensitive_changes(self.snapshot, gate.source_files(self.snapshot)),
+        )
+        self.changed(
+            "documentation/ordinary.txt",
+            status="renamed",
+            previous_filename=".coveragerc",
+        )
+        self.assertEqual(
+            [".coveragerc"],
             gate.sensitive_changes(self.snapshot, gate.source_files(self.snapshot)),
         )
 

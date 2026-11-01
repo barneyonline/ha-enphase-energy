@@ -1187,6 +1187,21 @@ def sensitive_changes(
         "pytest.ini",
         "tox.ini",
         "conftest.py",
+        ".coveragerc",
+        ".ruff.toml",
+        "ruff.toml",
+        "mypy.ini",
+        "codecov.yml",
+        ".codecov.yml",
+        "codecov.yaml",
+        ".codecov.yaml",
+        ".python-version",
+        ".dockerignore",
+        ".pre-commit-hooks.yaml",
+        "hacs.json",
+        "makefile",
+        "justfile",
+        "taskfile.yml",
     }
     for item in files:
         for path in {item["filename"], item.get("previous_filename", item["filename"])}:
@@ -1194,11 +1209,7 @@ def sensitive_changes(
             parts, name = lower.split("/"), lower.rsplit("/", 1)[-1]
             if (
                 any(p in roots for p in parts)
-                or lower.startswith("scripts/maintenance/")
-                or (
-                    lower.startswith("scripts/")
-                    and (name.startswith("docker-") or name == "test")
-                )
+                or lower.startswith("scripts/")
                 or name in names
                 or name.startswith(
                     (
