@@ -1,0 +1,88 @@
+name: Coverage Reporting
+
+on:
+  workflow_run:
+    workflows: [Tests, CI]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      producer_run_id:
+        description: Exact completed producer run for an owner-started rehearsal
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: coverage-reporting-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (vars.HAL_CI_REPORTING_ACTIVE == 'true' && github.event.workflow_run.head_repository.id == github.event.repository.id)) }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    steps:
+      # workflow_run selects the default-branch definition and SHA.
+      - name: Check out trusted controller and metadata
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify producer scope and preserve the trusted controller
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I -B scripts/maintenance/ci_reporting.py verify-event
+      - name: Download only the verified producer artifact
+        if: ${{ steps.scope.outputs.eligible == 'true' }}
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          artifact-ids: ${{ steps.scope.outputs.artifact_id }}
+          run-id: ${{ steps.scope.outputs.run_id }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/hal-codecov-input
+      - name: Recheck scope and validate report data
+        if: ${{ steps.scope.outputs.eligible == 'true' }}
+        id: reports
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT_DIRECTORY: ${{ runner.temp }}/hal-codecov-input
+        run: python3 -I -B "$RUNNER_TEMP/hal-ci-reporting.py" validate-reports
+      - name: Upload coverage data to Codecov
+        if: ${{ steps.scope.outputs.eligible == 'true' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ runner.temp }}/hal-codecov-input/coverage.xml
+          plugins: noop
+          disable_search: true
+          disable_file_fixes: true
+          override_commit: ${{ steps.scope.outputs.head_sha }}
+          override_branch: ${{ steps.scope.outputs.branch }}
+          override_pr: ${{ steps.scope.outputs.pr_number != '0' && steps.scope.outputs.pr_number || '' }}
+          override_build: ${{ steps.scope.outputs.run_id }}.${{ steps.scope.outputs.run_attempt }}
+          override_build_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ steps.scope.outputs.run_id }}/attempts/${{ steps.scope.outputs.run_attempt }}
+          slug: ${{ github.repository }}
+          fail_ci_if_error: true
+      - name: Upload junit data to Codecov
+        if: ${{ steps.scope.outputs.eligible == 'true' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ runner.temp }}/hal-codecov-input/junit.xml
+          plugins: noop
+          disable_search: true
+          disable_file_fixes: true
+          override_commit: ${{ steps.scope.outputs.head_sha }}
+          override_branch: ${{ steps.scope.outputs.branch }}
+          override_pr: ${{ steps.scope.outputs.pr_number != '0' && steps.scope.outputs.pr_number || '' }}
+          override_build: ${{ steps.scope.outputs.run_id }}.${{ steps.scope.outputs.run_attempt }}
+          override_build_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ steps.scope.outputs.run_id }}/attempts/${{ steps.scope.outputs.run_attempt }}
+          slug: ${{ github.repository }}
+          report_type: test_results
