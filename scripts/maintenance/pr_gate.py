@@ -856,6 +856,36 @@ def evidence_urls(value: Any, repository: str) -> bool:
     return True
 
 
+def handling_marker(
+    comment: dict[str, Any], policy: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Accept the observed native task footer only from its configured Bot app."""
+    body = comment.get("body") or ""
+    verdict = marker(body, CLEAN_MARKER)
+    if verdict is not None:
+        return verdict
+    wrapped = re.fullmatch(
+        r"([\s\S]+)\n\n \[View task →\]\(https://chatgpt\.com/s/cd_[0-9a-f]{32}\)",
+        body,
+    )
+    if wrapped is None:
+        return None
+    app = comment.get("performed_via_github_app")
+    user = comment.get("user", {})
+    if (
+        user.get("type") != "Bot"
+        or not user.get("login", "").endswith("[bot]")
+        or actor_key(user) not in {actor_key(a) for a in policy["codex_reviewers"]}
+        or not isinstance(app, dict)
+        or app.get("id") != 1144995
+        or app.get("slug") != "chatgpt-codex-connector"
+    ):
+        return None
+    # Editor provenance and the complete unmodified body remain checked and
+    # fingerprinted by the caller; this only removes the known service envelope.
+    return marker(wrapped.group(1), CLEAN_MARKER)
+
+
 def handling_proof(
     feedback: list[dict[str, Any]],
     entries: dict[str, dict[str, Any]],
@@ -901,7 +931,12 @@ def handling_proof(
             or actor_key(item["actor"]) not in trusted
         ):
             continue
-        verdict = marker(item["body"] or "", CLEAN_MARKER)
+        comment = next(
+            comment
+            for comment in snapshot["issue_comments"]
+            if f"issue_comment:{comment['id']}" == item["source"]
+        )
+        verdict = handling_marker(comment, policy)
         if (
             verdict is None
             or set(verdict) != CLEAN_KEYS
@@ -918,11 +953,6 @@ def handling_proof(
             or not evidence_urls(verdict.get("evidence_urls"), policy["repository"])
         ):
             continue
-        comment = next(
-            comment
-            for comment in snapshot["issue_comments"]
-            if f"issue_comment:{comment['id']}" == item["source"]
-        )
         try:
             comment_edit_provenance(
                 comment, "_handling_review_meta", "handling witness"

@@ -84,7 +84,7 @@ def plan_dispatch(
         event.get("action") != "created"
         or event.get("repository", {}).get("full_name") != repository
         or issue.get("number") != policy["control_issue_number"]
-        or issue.get("state") != "open"
+        or issue.get("state") not in ("open", "closed")
         or "pull_request" in issue
     ):
         return {"action": "ignore", "reason": "Outside the configured control issue"}

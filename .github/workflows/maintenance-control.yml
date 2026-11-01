@@ -57,7 +57,7 @@ jobs:
             const issueNumber = plan.control_issue_number;
             const currentIssue = (await github.rest.issues.get({...context.repo, issue_number: issueNumber})).data;
             const currentRequest = (await github.rest.issues.getComment({...context.repo, comment_id: plan.request_comment_id})).data;
-            if (currentIssue.state !== 'open' || !currentIssue.labels.some(label => label.name === 'automation/control') ||
+            if (!['open', 'closed'].includes(currentIssue.state) || !currentIssue.labels.some(label => label.name === 'automation/control') ||
                 currentRequest.body !== context.payload.comment.body || currentRequest.updated_at !== context.payload.comment.updated_at ||
                 currentRequest.user.id !== context.payload.comment.user.id) {
               throw new Error('Control issue or request changed; submit a new request after reconciliation');

@@ -190,6 +190,27 @@ substitutes for these bindings: CheckRun output
 can change without changing `completed_at`, and ledger dispositions can change
 after a review.
 
+The native Codex task service appends a neutral task link to final answers. For
+that one observed transport, a witness may contain the exact marker above
+followed only by the service's exact envelope:
+
+```text
+
+ [View task →](https://chatgpt.com/s/cd_32_LOWERCASE_HEX_CHARACTERS)
+```
+
+This compatibility path requires a configured independent reviewer who is also
+a configured Codex reviewer, REST Bot type and `[bot]` login, and the verified
+OpenAI GitHub App identity `1144995` / `chatgpt-codex-connector`. All current
+author/editor checks, full-body fingerprints, ledger coverage and digest bindings
+still apply. Other links, hosts, paths, query strings, fragments, headings,
+explanations, quotes, fences or duplicate footers do not supply authority.
+Ordinary standalone markers and the ledger grammar are unchanged. A format
+change blocks until reviewed; this is not a promise of a stable service format.
+Observed normal final answers establish only the envelope and actor, not a
+genuine independent clean verdict. Rehearse actual authenticated review and
+acceptance before enabling unattended merge.
+
 A comment's original author does not authenticate a later edit: repository
 writers can edit other users' comments. Each live sweep independently reads
 GraphQL author/editor provenance for potential trusted clean-witness comments.

@@ -69,6 +69,31 @@ class ControlPlanTests(unittest.TestCase):
             plan["inputs"],
         )
 
+    def test_closed_control_record_accepts_only_the_same_owner_operations(self) -> None:
+        for command in (
+            {
+                "schema": 1,
+                "operation": "candidate",
+                "candidate_sha": SHA,
+                "version": "v1.2.4",
+            },
+            {"schema": 1, "operation": "gate", "pull_number": 10},
+        ):
+            current = event(command)
+            current["issue"]["state"] = "closed"
+            expected = control.plan_dispatch(event(command), policy(), REPOSITORY)
+            self.assertEqual(
+                expected, control.plan_dispatch(current, policy(), REPOSITORY)
+            )
+            current["comment"]["user"]["id"] = 1
+            self.assertEqual(
+                "ignore", control.plan_dispatch(current, policy(), REPOSITORY)["action"]
+            )
+            current["comment"]["user"]["id"] = 38914183
+            current["issue"]["labels"] = []
+            with self.assertRaises(ValueError):
+                control.plan_dispatch(current, policy(), REPOSITORY)
+
     def test_gate_plan_targets_only_one_pull_request(self) -> None:
         plan = control.plan_dispatch(
             event({"schema": 1, "operation": "gate", "pull_number": 10}),
@@ -80,12 +105,13 @@ class ControlPlanTests(unittest.TestCase):
             {"pull_number": "10", "control_request_id": "123"}, plan["inputs"]
         )
 
-    def test_unrelated_closed_and_pull_request_events_are_ignored(self) -> None:
+    def test_unrelated_invalid_state_and_pull_request_events_are_ignored(self) -> None:
         for mutate in [
             lambda e: e.update(action="edited"),
             lambda e: e["repository"].update(full_name="other/repository"),
             lambda e: e["issue"].update(number=99),
-            lambda e: e["issue"].update(state="closed"),
+            lambda e: e["issue"].update(state="unknown"),
+            lambda e: e["issue"].pop("state"),
             lambda e: e["issue"].update(pull_request={}),
         ]:
             current = event()
