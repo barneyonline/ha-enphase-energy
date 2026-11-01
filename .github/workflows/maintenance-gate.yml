@@ -35,8 +35,10 @@ permissions:
   statuses: read
 
 concurrency:
-  group: maintenance-gate-${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.head_sha || github.event.check_run.head_sha || github.event.check_suite.head_sha || github.event.sha || 'reconcile' }}
-  cancel-in-progress: true
+  # One publisher across every event family; keep pending reconciliations queued.
+  group: maintenance-gate-${{ github.repository }}
+  cancel-in-progress: false
+  queue: max
 
 jobs:
   maintenance-gate:

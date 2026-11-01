@@ -9,6 +9,22 @@ The implementation is `scripts/maintenance/pr_gate.py`. Its fixture tests are
 `tests/scripts/test_maintenance_pr_gate*.py`. Run
 `python3 -m unittest discover -s tests/scripts -p 'test_maintenance_pr_gate*.py'`.
 
+## Serialized publication
+
+The trusted workflow publishes through one repository-scoped concurrency group
+across PR, comment, workflow, check, status and manual events. `cancel-in-progress`
+is false, so an active evaluation finishes before the next publisher starts.
+`queue: max` retains up to 100 pending runs instead of replacing the pending wake
+for another PR. Every queued run collects current evidence when it executes;
+arrival order is never treated as evidence freshness. Routing remains scoped to
+the event's resolved targets, with complete managed-open fallback when required.
+
+This prevents a delayed older success from concurrently overwriting a newer
+blocked result for the same check. GitHub's queue has a finite capacity; canceled
+or failed reconciliation is not successful acceptance. The live gate still
+requires fresh complete evidence immediately before SHA-conditional merging.
+[GitHub concurrency contract](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
+
 ## CLI and trust boundary
 
 ```sh
