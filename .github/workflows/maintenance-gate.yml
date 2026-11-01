@@ -12,7 +12,7 @@ on:
     types: [completed]
   status:
   workflow_run:
-    workflows: [CI, Tests, Codespell, Validate with hassfest, Quality Scale, Validate, Home Assistant Smoke]
+    workflows: [CI, Tests, Codespell, Validate with hassfest, Quality Scale, Validate, Home Assistant Smoke, Autonomous Maintenance Review Events]
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -75,7 +75,28 @@ jobs:
               /^codex\/(?:issue-|bugfix-|release-|autonomous-maintenance(?:$|\/))/.test(pr.head.ref);
             let numbers = [];
             const payload = context.payload;
-            if (payload.pull_request) numbers = [payload.pull_request.number];
+            if (payload.workflow_run?.name === 'Autonomous Maintenance Review Events') {
+              const {data: observed} = await github.rest.actions.getWorkflowRun({
+                ...context.repo, run_id: payload.workflow_run.id,
+              });
+              if (observed.name !== 'Autonomous Maintenance Review Events' ||
+                  !['pull_request_review', 'pull_request_review_comment'].includes(observed.event) ||
+                  observed.repository?.id !== payload.repository.id ||
+                  !/^[0-9a-f]{40}$/.test(observed.head_sha)) {
+                throw new Error('Invalid review observer provenance');
+              }
+              const associated = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
+                ...context.repo, commit_sha: observed.head_sha, per_page: 100,
+              });
+              numbers = [
+                ...associated.filter(pr => pr.state === 'open').map(pr => pr.number),
+                ...(observed.pull_requests || []).map(pr => pr.number),
+              ].filter(number => Number.isSafeInteger(number) && number > 0);
+              if (!numbers.length) {
+                const open = await github.paginate(github.rest.pulls.list, {...context.repo, state: 'open', per_page: 100});
+                numbers = open.filter(managed).map(pr => pr.number);
+              }
+            } else if (payload.pull_request) numbers = [payload.pull_request.number];
             else if (payload.issue?.pull_request) numbers = [payload.issue.number];
             else if (process.env.REQUESTED_PULL_NUMBER) {
               if (!/^[1-9][0-9]*$/.test(process.env.REQUESTED_PULL_NUMBER)) throw new Error('Invalid pull number');

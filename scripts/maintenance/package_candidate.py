@@ -23,6 +23,7 @@ CONTROL_FILES = (
     ".github/maintenance/merge-policy.json",
     ".github/maintenance/control-policy.json",
     ".github/workflows/maintenance-gate.yml",
+    ".github/workflows/maintenance-review-events.yml",
     ".github/workflows/maintenance-control.yml",
     ".github/workflows/release-candidate.yml",
     ".github/workflows/release-assets.yml",
