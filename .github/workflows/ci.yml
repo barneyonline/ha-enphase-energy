@@ -9,6 +9,11 @@ on:
     branches:
       - main
     paths:
+      - '.github/maintenance/**'
+      - 'tests/scripts/test_maintenance_*.py'
+      - '.github/workflows/maintenance-*.yml'
+      - '.github/workflows/release-candidate.yml'
+      - '.github/workflows/release-assets.yml'
       - 'custom_components/**'
       - 'tests/components/enphase_ev/**'
       - 'scripts/**/*.py'

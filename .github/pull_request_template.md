@@ -1,49 +1,39 @@
 ## Summary
 
-Include a concise description of the change and its motivation. Reference related issues or discussions (e.g., `Fixes #123`).
+Refs #<!-- issue number; keep the issue open until its verified release -->
 
-## Related Issues
+<!-- Describe the user-visible problem and resulting behavior. State whether this is a bug fix, feature, maintenance, or release preparation. -->
 
-List related issues or discussions if this PR does not close them directly.
+```text
+Before: <concrete trigger and observed behavior>
+After:  <resulting behavior>
+```
 
-## Type of change
+<!-- For structural changes, replace the sketch with a small call tree or diagram that explains the change. -->
 
-- [ ] Bugfix
-- [ ] Device support / compatibility
-- [ ] New feature
-- [ ] Documentation
-- [ ] Refactor / tech debt
-- [ ] Translation update
-- [ ] Other (describe below)
+## Evidence
+
+- **Before:** <!-- Failing reproducer, test, or observed evidence; state when unavailable. -->
+- **After:** <!-- Passing verification of the same behavior. -->
+- **Feedback:** <!-- Link the current feedback ledger and independent GitHub review. Account for Codecov and all automated reports; disclose remaining blockers. -->
+- **Release:** <!-- Candidate version/scope, or state that this PR is not itself a release. -->
 
 ## Testing
 
-List the exact commands you ran. Prefer the pinned Docker environment from `devtools/docker/`.
+<!-- List exact commands and results from the repository's AGENTS.md validation contract, including applicable Docker checks, typing, quality, translations and touched-file coverage. Link CI and sanitized artifacts. Explain any unavailable or not-applicable check with evidence. -->
 
-```bash
-docker compose -f devtools/docker/docker-compose.yml up -d ha-dev
-docker compose -f devtools/docker/docker-compose.yml exec ha-dev ruff check .
-docker compose -f devtools/docker/docker-compose.yml exec ha-dev black <changed-python-files> tests/components/enphase_ev/<changed-test-files>
-docker compose -f devtools/docker/docker-compose.yml exec ha-dev python scripts/validate_quality_scale.py --validate-remote-brands
-docker compose -f devtools/docker/docker-compose.yml exec ha-dev python scripts/importtime_profile.py --strict-integration-warnings --output importtime-enphase-ev.log
-docker compose -f devtools/docker/docker-compose.yml exec ha-dev mypy --strict --ignore-missing-imports --follow-imports=skip custom_components/enphase_ev
-docker compose -f devtools/docker/docker-compose.yml exec ha-dev pre-commit run --all-files
-docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage run --source=custom_components.enphase_ev -m pytest -q tests/components/enphase_ev
-docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage report -m --fail-under=100
-docker compose -f devtools/docker/docker-compose.yml exec -e COVERAGE_FILE=/tmp/enphase_ev.coverage ha-dev python -m coverage report -m --include=<touched-module-paths-comma-separated> --fail-under=100
-```
+## Merge Danger
 
-Add any extra commands, targeted tests, or manual validation below.
+**Door:** <!-- two-way or one-way; explain any irreversible effect -->
+
+**Blast Radius:** <!-- One-word scope, followed by the concrete affected behavior. -->
+
+<!-- State the recovery/revert path and material limitations. Distinguish cloud tests from physical-device validation. -->
 
 ## Checklist
 
-- [ ] I updated `CHANGELOG.md` for user-facing changes.
-- [ ] I updated documentation (`README.md`, docs/) when behaviour or options changed.
-- [ ] I verified translations (`custom_components/enphase_ev/translations/`) are complete and valid.
-- [ ] I ran targeted coverage for each touched Python module and confirmed 100% coverage.
-- [ ] I reviewed GitHub Actions results (tests, hassfest, quality scale, validate).
-- [ ] I confirm this PR is scoped to a single logical change set.
-
-## Diagnostics / Screenshots / Notes
-
-Add screenshots, diagnostics, repair-issue context, or implementation notes that reviewers should see.
+- [ ] The change has a focused scope and meaningful verification.
+- [ ] Changelog and relevant user/contributor documentation are current.
+- [ ] Applicable translations, service schemas, diagnostics redaction and quality-scale evidence are current.
+- [ ] Required checks, touched-file coverage and all PR/automated feedback have been reviewed and actioned; unresolved items are disclosed.
+- [ ] The issue remains open until the verified release delivers its fix.

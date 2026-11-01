@@ -5,19 +5,26 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### 🚧 Breaking changes
+
 - None
 
 ### ✨ New features
+
 - None
 
 ### 🐛 Bug fixes
+
 - None
 
 ### 🔧 Improvements
+
 - None
 
 ### 🔄 Other changes
-- None
+
+- Keep maintenance validation reachable and the pytest check name consistent across skipped and running validation.
+
+- Add maintenance workflows and merge checks for HAL-managed issues and PR feedback, with shared operating instructions and changelog/release templates maintained in the central HAL plugin. Keep unattended activation gated by verification.
 
 ## v5.2.3 - 2026-10-31
 

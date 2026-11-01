@@ -1,0 +1,66 @@
+name: Coverage Reporting
+
+on:
+  workflow_run:
+    workflows: [Tests, CI]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      producer_run_id:
+        description: Exact completed producer run for an owner-started rehearsal
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: coverage-reporting-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    if: ${{ github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_dispatch' && github.actor_id == '38914183') || (github.event_name == 'workflow_run' && vars.HAL_CI_REPORTING_ACTIVE == 'true' && github.event.workflow_run.head_repository.id == github.event.repository.id)) }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    steps:
+      - id: scope
+        uses: barneyonline/hal-github-maintenance/actions/coverage-reporting@134f3edaa7c0c59d1e672e788ebebb8973860b10
+        with:
+          token: ${{ github.token }}
+      - name: Upload coverage data to Codecov
+        if: ${{ steps.scope.outputs.eligible == 'true' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ runner.temp }}/hal-codecov-input/coverage.xml
+          plugins: noop
+          disable_search: true
+          disable_file_fixes: true
+          override_commit: ${{ steps.scope.outputs.head_sha }}
+          override_branch: ${{ steps.scope.outputs.branch }}
+          override_pr: ${{ steps.scope.outputs.pr_number != '0' && steps.scope.outputs.pr_number || '' }}
+          override_build: ${{ steps.scope.outputs.run_id }}.${{ steps.scope.outputs.run_attempt }}
+          override_build_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ steps.scope.outputs.run_id }}/attempts/${{ steps.scope.outputs.run_attempt }}
+          slug: ${{ github.repository }}
+          fail_ci_if_error: true
+      - name: Upload junit data to Codecov
+        if: ${{ steps.scope.outputs.eligible == 'true' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ runner.temp }}/hal-codecov-input/junit.xml
+          plugins: noop
+          disable_search: true
+          disable_file_fixes: true
+          override_commit: ${{ steps.scope.outputs.head_sha }}
+          override_branch: ${{ steps.scope.outputs.branch }}
+          override_pr: ${{ steps.scope.outputs.pr_number != '0' && steps.scope.outputs.pr_number || '' }}
+          override_build: ${{ steps.scope.outputs.run_id }}.${{ steps.scope.outputs.run_attempt }}
+          override_build_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ steps.scope.outputs.run_id }}/attempts/${{ steps.scope.outputs.run_attempt }}
+          slug: ${{ github.repository }}
+          report_type: test_results
+          fail_ci_if_error: true
