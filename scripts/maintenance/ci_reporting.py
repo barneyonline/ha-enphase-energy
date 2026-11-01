@@ -432,9 +432,7 @@ def main() -> int:
             outputs({"coverage": result["coverage"], "junit": result["junit"]})
         print("CI report boundary verified; no candidate program executed.")
         return 0
-    except (
-        Exception
-    ):  # noqa: BLE001 -- fixed refusal never echoes API data or credentials
+    except Exception:  # noqa: BLE001 -- never echo API data or credentials
         print(
             "CI reporting refused: missing, changed or unsafe evidence.",
             file=sys.stderr,
