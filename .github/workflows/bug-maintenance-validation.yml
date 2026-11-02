@@ -39,7 +39,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Stage immutable exact candidate without executing it
-        uses: barneyonline/hal-github-maintenance/actions/maintenance-runtime@8fdf6f59d2f95361998fc3f2d89ad338cd141268
+        uses: barneyonline/hal-github-maintenance/actions/maintenance-runtime@847203b85032bdc0ba9a57e132dba1567e786b26
         with:
           module: validation
           phase: stage
@@ -75,7 +75,7 @@ jobs:
           name: maintenance-stage-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/candidate-stage
       - name: Run fixed full contract inside networkless credential-free Docker
-        uses: barneyonline/hal-github-maintenance/actions/maintenance-runtime@8fdf6f59d2f95361998fc3f2d89ad338cd141268
+        uses: barneyonline/hal-github-maintenance/actions/maintenance-runtime@847203b85032bdc0ba9a57e132dba1567e786b26
         with:
           module: validation
           phase: run
