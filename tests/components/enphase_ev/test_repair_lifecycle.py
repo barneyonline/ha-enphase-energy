@@ -14,8 +14,10 @@ from custom_components.enphase_ev import async_remove_entry
 from custom_components.enphase_ev import repair_issues
 from custom_components.enphase_ev.const import (
     DOMAIN,
+    ISSUE_AUTH_BLOCKED,
     ISSUE_CLOUD_ERRORS,
     ISSUE_REAUTH_REQUIRED,
+    ISSUE_TOO_MANY_ACTIVE_SESSIONS,
     OPT_SYSTEM_EVENT_REPAIR_ISSUES,
 )
 from custom_components.enphase_ev.coordinator import EnphaseCoordinator
@@ -122,6 +124,72 @@ async def test_alarm_ownership_updates_unowned_checkpoint(
     assert issue.dismissed_version is not None
     await runtime.async_refresh()
     assert registry.async_get_issue(DOMAIN, issue_id).dismissed_version is not None
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        ConfigEntryState.NOT_LOADED,
+        ConfigEntryState.SETUP_RETRY,
+        ConfigEntryState.SETUP_ERROR,
+    ],
+)
+@pytest.mark.parametrize(
+    "kind", [ISSUE_REAUTH_REQUIRED, ISSUE_AUTH_BLOCKED, ISSUE_TOO_MANY_ACTIVE_SESSIONS]
+)
+async def test_clear_owned_auth_repairs_without_loaded_runtime(
+    hass, config_entry, entry_issue_api, state, kind
+):
+    coord = EnphaseCoordinator(hass, dict(config_entry.data), config_entry=config_entry)
+    if kind == ISSUE_REAUTH_REQUIRED:
+        coord.diagnostics.create_reauth_issue()
+    else:
+        coord._auth_block_reason = (
+            "too_many_active_sessions"
+            if kind == ISSUE_TOO_MANY_ACTIVE_SESSIONS
+            else None
+        )
+        coord.diagnostics.create_auth_block_issue()
+    issue_id = coord.diagnostics._repair_issue_id(kind)
+    coord.diagnostics.report_cloud_issue()
+    cloud_id = coord.diagnostics._repair_issue_id(ISSUE_CLOUD_ERRORS)
+    coord.mark_runtime_stopped()
+    config_entry.runtime_data = None
+    config_entry._async_set_state(hass, state, None)
+    other = MockConfigEntry(domain=DOMAIN, data={"site_id": "another"})
+    other.add_to_hass(hass)
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        "other_auth",
+        config_entry_id=other.entry_id,
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key=kind,
+    )
+    ir.async_create_issue(
+        hass,
+        "other",
+        "foreign_domain",
+        config_entry_id=config_entry.entry_id,
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key=kind,
+    )
+    registry = ir.async_get(hass)
+    assert (
+        registry.async_get_issue(DOMAIN, issue_id).config_entry_id
+        == config_entry.entry_id
+    )
+    async_setup_services(hass)
+    await hass.services.async_call(
+        DOMAIN, "clear_reauth_issue", {"site_id": coord.site_id}, blocking=True
+    )
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
+    assert registry.async_get_issue(DOMAIN, cloud_id) is not None
+    assert registry.async_get_issue(DOMAIN, "other_auth") is not None
+    assert registry.async_get_issue("other", "foreign_domain") is not None
+    config_entry._async_set_state(hass, ConfigEntryState.NOT_LOADED, None)
 
 
 @pytest.mark.parametrize("native", [False, True])

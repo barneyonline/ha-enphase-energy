@@ -26,6 +26,7 @@ from .battery_schedule_editor import (
     battery_schedule_overlap_record,
 )
 from .const import (
+    CONF_SITE_ID,
     DOMAIN,
     ISSUE_AUTH_BLOCKED,
     ISSUE_REAUTH_REQUIRED,
@@ -1022,16 +1023,27 @@ def async_setup_services(
     async def _svc_clear_issue(call: ServiceCall) -> None:
         site_ids = await _resolve_site_ids_from_call(call)
 
-        if supports_entry_issues():
-            for coord in router._iter_loaded_coordinators():
-                if str(coord.site_id) in site_ids:
-                    coord.diagnostics.clear_reauth_issue()
-
-        issue_ids = {
+        auth_issue_keys = {
             ISSUE_REAUTH_REQUIRED,
             ISSUE_AUTH_BLOCKED,
             ISSUE_TOO_MANY_ACTIVE_SESSIONS,
         }
+        issue_ids = set(auth_issue_keys)
+        if supports_entry_issues():
+            # Authentication can fail before runtime_data becomes loaded. Resolve
+            # ownership from config entries, independently of live coordinators.
+            entry_ids = {
+                entry.entry_id
+                for entry in hass.config_entries.async_entries(DOMAIN)
+                if str(entry.data.get(CONF_SITE_ID, "")) in site_ids
+            }
+            for (issue_domain, issue_id), issue in ir.async_get(hass).issues.items():
+                if (
+                    issue_domain == DOMAIN
+                    and getattr(issue, "config_entry_id", None) in entry_ids
+                    and issue.translation_key in auth_issue_keys
+                ):
+                    issue_ids.add(issue_id)
         for site_id in site_ids:
             issue_ids.add(f"{ISSUE_REAUTH_REQUIRED}_{site_id}")
             issue_ids.add(f"{ISSUE_AUTH_BLOCKED}_{site_id}")
