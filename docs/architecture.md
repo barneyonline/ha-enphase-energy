@@ -22,6 +22,9 @@ and unconfirmed export requests; fresh agreement, confirmed readback or disablin
 the feature clears them. An authoritative empty battery inventory also clears a
 battery disagreement. Missing observations after reload cannot resolve a
 battery-profile repair, and old recovery-flow identities cannot authorize writes.
+Opening or continuing a retained repair with unavailable observations aborts the
+flow without clearing the issue or its ignore state. Completion requires a checked
+condition to have cleared the notice.
 
 Site sensors opt into the entity-ID rename hook, including derived classes with
 their own add/remove hooks. Freshness, tariff and retry timers, restored power

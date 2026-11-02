@@ -119,6 +119,50 @@ async def test_only_authoritative_absence_clears_a_retained_disagreement(
     )
 
 
+@pytest.mark.parametrize("observation", ["reload", "stale", "missing"])
+@pytest.mark.parametrize("action", ["open", "check_again", "confirm"])
+async def test_unobserved_repair_flow_keeps_ignored_issue(
+    mismatch_repair, hass, observation, action
+):
+    coord, clock, manager = mismatch_repair
+    entry = coord.config_entry
+    issue_id = coord.battery_runtime.profile_mismatch.issue_id
+    registry = ir.async_get(hass)
+    ir.async_ignore_issue(hass, DOMAIN, issue_id, True)
+    ignored = registry.async_get_issue(DOMAIN, issue_id).dismissed_version
+    if action != "open":
+        result = await start_repair(coord, manager)
+        if action == "confirm":
+            result = await manager.async_configure(
+                result["flow_id"], {"next_step_id": "retry_profile"}
+            )
+    active = coord
+    if observation == "reload":
+        coord.mark_runtime_stopped()
+        active = EnphaseCoordinator(hass, dict(entry.data), config_entry=entry)
+        entry.runtime_data = EnphaseRuntimeData(coordinator=active)
+    elif observation == "stale":
+        clock[0] += 601
+    else:
+        active.battery_runtime.parse_battery_status_payload(None)
+    active.client.storm_guard_profile = AsyncMock()
+    active.client.battery_status = AsyncMock()
+    active.client.set_battery_profile = AsyncMock()
+    if action == "open":
+        result = await start_repair(active, manager)
+    else:
+        result = await manager.async_configure(
+            result["flow_id"],
+            {"next_step_id": "check_again"} if action == "check_again" else {},
+        )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] in {"request_changed", "entry_unavailable"}
+    assert registry.async_get_issue(DOMAIN, issue_id).dismissed_version == ignored
+    active.client.storm_guard_profile.assert_not_awaited()
+    active.client.battery_status.assert_not_awaited()
+    active.client.set_battery_profile.assert_not_awaited()
+
+
 async def test_persistent_mismatch_has_fresh_scoped_context_and_check(
     mismatch_repair, hass
 ):
@@ -526,7 +570,14 @@ async def test_incomplete_battery_modes_cannot_authorize_retry(mismatch_repair, 
     )
     coord.client.battery_status.return_value["storages"].append(other)
     result = await manager.async_configure(result["flow_id"], {})
-    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "request_changed"
+    assert (
+        ir.async_get(coord.hass).async_get_issue(
+            DOMAIN, coord.battery_runtime.profile_mismatch.issue_id
+        )
+        is not None
+    )
     assert coord.battery_runtime.profile_mismatch.live is None
     coord.client.set_battery_profile.assert_not_awaited()
 
