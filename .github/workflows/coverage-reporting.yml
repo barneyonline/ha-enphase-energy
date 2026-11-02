@@ -28,7 +28,7 @@ jobs:
       pull-requests: read
     steps:
       - id: scope
-        uses: barneyonline/hal-github-maintenance/actions/coverage-reporting@ac687247f4006e65a2580f8c1eaebfefd5403c37
+        uses: barneyonline/hal-github-maintenance/actions/coverage-reporting@ef75c40d8b447fba99cf5d2a158c916ecca317b4
         with:
           token: ${{ github.token }}
       - name: Upload coverage data to Codecov

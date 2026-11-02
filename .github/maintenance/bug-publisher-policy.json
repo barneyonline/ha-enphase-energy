@@ -44,10 +44,10 @@
     "max_fixed_issues": 2,
     "transition_slots": 32,
     "trusted_tool_files": {
-      ".github/workflows/bug-maintenance.yml": "b9e10986286367ced1943e9897b05510a8f2418f047e62703db3b683bf044d42",
-      ".github/workflows/bug-maintenance-validation.yml": "7448d36e46fff0aedb3fd1d8f75366b11b7f1c1d2eb42ddf1cbe7205546a55fd",
-      ".github/workflows/bug-maintenance-package.yml": "00aab73959c372bad2fa93e66bc42d1634f7fb51314276d420d48686c40d0f3c",
-      ".github/workflows/bug-maintenance-prepare.yml": "2efe55c775d1a23b1dd12967dbcfcec3b1e6c1ed447ecee2766cb85d048c4c1f"
+      ".github/workflows/bug-maintenance.yml": "e63c72b17428c6df1bda63e9f3b299f9d81d769214bee70ecff8743375c67eb1",
+      ".github/workflows/bug-maintenance-validation.yml": "4d696b5ba98162750ed9af56e9495aadf8c9fe7ea6772429be2251af96881edb",
+      ".github/workflows/bug-maintenance-package.yml": "b085b7235b1c9033ce821c6b2a85894e72f285e2f46b40dbd378ffddecaa8851",
+      ".github/workflows/bug-maintenance-prepare.yml": "e4b3fcfe12e161490c3b4445e6e861bf166816f16fbbca419f99fb9c70955ebd"
     },
     "activation": {
       "runtime_isolation_verified": false,
@@ -60,13 +60,13 @@
     "central_layout": {
       "schema": 1,
       "repository": "barneyonline/hal-github-maintenance",
-      "commit": "ac687247f4006e65a2580f8c1eaebfefd5403c37",
-      "review_base_sha256": "367cd0d289774154bd9bb5ec4b926133515c34bed11e2c909ba8213c1f1ddc2c",
+      "commit": "ef75c40d8b447fba99cf5d2a158c916ecca317b4",
+      "review_base_sha256": "5cdddd8f0856bcb8bb6cb164d60de3fa9c805b2dc9e16ad4688f223db7ef86c2",
       "callers": {
-        ".github/workflows/coverage-reporting.yml": "8056f92b2d7f0297b7fbbe3a2b5c15811f0d4593de84f9b78420ee607693151e",
-        ".github/workflows/maintenance-control.yml": "513ecb211594dce30dd959d1ceda7f080d612ea0203f193b214775dab9940f91",
-        ".github/workflows/maintenance-gate.yml": "0082abe6294f97d9e6b481336fea033a9c2f6ae618161c96bb1e93ab45418b53",
-        ".github/workflows/stale_blocked_issues.yml": "f22f0ebc99a10d511f03a573d42ab65d0ddc3e6692bf747e5ab96ee2ba699a44"
+        ".github/workflows/coverage-reporting.yml": "42e6edb47947dc9e23023f25a6277b0ed759d46a1165db25e52aed1f89d22e75",
+        ".github/workflows/maintenance-control.yml": "707787c1060fe4bd232fb977f225a2f1005be21be2659df94e6b469a85c8534b",
+        ".github/workflows/maintenance-gate.yml": "2bbe11b4da0c4bf3205050fc313bdb0069b3ebd3fc65899458dc9dcc8f8c6f3d",
+        ".github/workflows/stale_blocked_issues.yml": "3646342c48014f17844a7df7954e9942cad9636802c7b5a77a433d61e6a5bb73"
       }
     },
     "maintenance_runtime": {
@@ -110,7 +110,7 @@
       "central_execution": {
         "schema": 1,
         "repository": "barneyonline/hal-github-maintenance",
-        "source_ref": "8fdf6f59d2f95361998fc3f2d89ad338cd141268",
+        "source_ref": "847203b85032bdc0ba9a57e132dba1567e786b26",
         "tool_files": {
           "actions/maintenance-runtime/action.yml": "7451d5e981f00a5bca11356cf193e3cafc1846433012bddae3eb278f24f98869",
           "scripts/maintenance/bug_publisher.py": "27045128af40c2738ba83425a2fc8e9a8ab74011094eb5894858210c28bedf17",
@@ -118,39 +118,42 @@
           "scripts/maintenance/generate_publisher_workflow.py": "133f8cf9e1f25ba55de9bd2328076827f801fa18a1f1dab310450f5ce9e27696",
           "scripts/maintenance/project_version.py": "a76c79dde4094bc5a0f644cd96fcb53e59f1bbf5a3813271dbaa17b1ec98447e",
           "scripts/maintenance/publisher_actions_state.py": "b6ea55319b2c547807d98d24aced69f97da1598cee2901acd4f378a7f4f3ce5f",
-          "scripts/maintenance/publisher_central_runtime.py": "8f53b105c8d0e386083eeddb06d1647bc9908f4555fd77dedefb798e2d8ab4db",
+          "scripts/maintenance/publisher_central_runtime.py": "64b2ff237c0c8d895644d04e430fb841f9f1a304de3557c6b586fe0e61bdd44b",
           "scripts/maintenance/publisher_evidence.py": "e42e53e0b61b0b96deacf096c9d36e09f47f103bfa84895c3ae528bdfa742a80",
           "scripts/maintenance/publisher_executor.py": "38f156c42180e32b428656dbc4ba4a411dddc23533a63c39ee92f4b32bfcbfbd",
           "scripts/maintenance/publisher_github.py": "463bdf368ea64b4809f2905b1c7d72e6f1c480e4bab493045467557aede62064",
-          "scripts/maintenance/publisher_maintenance.py": "6220fb32b536887a0b4f2086a0bb3c4949a1aab64d2a667893c8c9debf014aec",
-          "scripts/maintenance/publisher_maintenance_contract.py": "58c382cf3dd7715b2a570628d5e5753a1e57ed3b8373b3558502dd621a685dfc",
-          "scripts/maintenance/publisher_maintenance_driver.py": "79c5647dfa37efebeecf5c4047ae379c53570084ee15b05af34ef4164c0f49f8",
-          "scripts/maintenance/publisher_maintenance_evidence.py": "f21bcb32528bdc5e70212069397943f096ee99a69d658cd7113ea540a4ae30d6",
-          "scripts/maintenance/publisher_maintenance_gitdata.py": "08142230b3e2d199ab4b39e4eace0b87d6285aa4624f2c812526bf21d702c784",
+          "scripts/maintenance/publisher_maintenance.py": "f1c863d659b5cabc3763aef68bc0ae1a10d6d0d30f8b26d8c15248963a183aa4",
+          "scripts/maintenance/publisher_maintenance_contract.py": "beeb0360ef4ad6f3751db6147d67fe7a48387bfb7c7024b226ebaf0bb088c04d",
+          "scripts/maintenance/publisher_maintenance_driver.py": "f5e43a30ab927f37466e6ff8045a5abb057d9a9718bf8fd0190e051f3e1d74d0",
+          "scripts/maintenance/publisher_maintenance_evidence.py": "073291c404439517a716fd08f4fe7d8f40b5b4d33cf8ad89462fef27c0633dcd",
+          "scripts/maintenance/publisher_maintenance_gitdata.py": "0776112e536090ddf3eda372616aab53492b0f091cdd5f71c4b382a1c6da9ddb",
           "scripts/maintenance/publisher_maintenance_journal.py": "f9f382fc0b3ea38e1b2f7cc14d7eca03de14a954d07e7a07e2009135b0cac5fb",
-          "scripts/maintenance/publisher_maintenance_materialize.py": "cc5423911b3972f94f28ca206184aa8355d2fcb583055cfb6ce07b4c9ad81b57",
+          "scripts/maintenance/publisher_maintenance_materialize.py": "7a4848aeeecb741c1878465a9612de444bc8640958ab4f49bb9f0e6e1d022393",
           "scripts/maintenance/publisher_maintenance_preparation_state.py": "4d139dbc578efb3030171e30a485b44799645be82fa2620c2f916e5a0b909156",
-          "scripts/maintenance/publisher_maintenance_prepare.py": "3c0e04ea6e1e0bb0aeca730c0bbf4b2fcec33b83155d6bc1c8dfc178b88cafda",
+          "scripts/maintenance/publisher_maintenance_prepare.py": "9ff16f2f6e05112b8524538345d7ff81c02d444cbe41b52d44be29a4c47a3c9a",
+          "scripts/maintenance/publisher_maintenance_provenance.py": "2916dcdc13fa9cc27771c2fdad0347c1be41819743cc1402ff8561c1740c571b",
           "scripts/maintenance/publisher_maintenance_state.py": "ee2b74bf96951fd374622e7fa230e8308a5753151626ce70b21d32e70c3a592a",
           "scripts/maintenance/publisher_maintenance_validation.py": "e13b32dc714e73da0cb499f189e086cd6ffdddb079eada42b6f469064a759f66",
-          "scripts/maintenance/publisher_maintenance_worker.py": "b8a25e68df643d7031be59a3adb7e556dfc410d4f22d3063f59c82d30bdcba28",
+          "scripts/maintenance/publisher_maintenance_worker.py": "62fb844051615d79e51cee0d526e82f51159cc3cc848c735a9d99ff8a1358be9",
           "scripts/maintenance/publisher_owner_connector.py": "553ef32374d728c47ff44cf6999be812bc5437dcc8aae0f18e81090ef67c7e78",
           "scripts/maintenance/publisher_planner_docker.py": "d5c38efcc9527f275c45fd4d50f172931e151b5902f35033c77f1e81ab582eb9",
+          "scripts/maintenance/publisher_planner_patch_proof.py": "cda2846697c69d02ddcadd8c2ad7ca7741999454b0786d9f244514e4c698c813",
           "scripts/maintenance/publisher_producer.py": "4cb7adec50a3c44fe275e137027eb69dc308e9c25fb6e955b49080a4acf3843c",
           "scripts/maintenance/publisher_profile_groq.py": "11c5bc385ec7adc514db8a8349d49f843ab18b36fd241f108a60e658088226e1",
           "scripts/maintenance/publisher_profile_planner.py": "401a187124f9476a422deba4827db877c958c438558ad255634d027a5e411122",
           "scripts/maintenance/publisher_profiles.py": "f6405246fa74a5d33f8c856e8bc74db0c724d2a2799f1881c50409182beb6c23",
           "scripts/maintenance/publisher_release_clock.py": "c583adb9c4f437db49dea7cb377c0a44f664479ab7370fe8dd41c60cc69e1700",
-          "scripts/maintenance/publisher_review.py": "27b602f761f2130e3bd36dd26c3c0e5e20820669ca68e9f5611a143d1e7f7051",
-          "scripts/maintenance/publisher_review_base.py": "367cd0d289774154bd9bb5ec4b926133515c34bed11e2c909ba8213c1f1ddc2c",
+          "scripts/maintenance/publisher_review.py": "8d874fcc8d2c13fda4ca0101bd982347ee14ecc30b941761099e719e26c6696c",
+          "scripts/maintenance/publisher_review_base.py": "5cdddd8f0856bcb8bb6cb164d60de3fa9c805b2dc9e16ad4688f223db7ef86c2",
           "scripts/maintenance/publisher_runtime.py": "cfab3af0d31fc7e9cd8f9896b897217af43efbeafe0bb06c200fcab904ab00c7",
-          "scripts/maintenance/publisher_smoke.py": "7f1900bb4ef20fc31ec0a02ecae4e881b7b16127e8bc1ebb6ff80b4636a3fbd4"
+          "scripts/maintenance/publisher_smoke.py": "7f1900bb4ef20fc31ec0a02ecae4e881b7b16127e8bc1ebb6ff80b4636a3fbd4",
+          "scripts/maintenance/verify_branch_context.py": "2c496084b2ceec49fcdbea5b5057262d726cf4359ce5686379f3b6d350253b94"
         },
         "caller_files": {
-          ".github/workflows/bug-maintenance.yml": "b9e10986286367ced1943e9897b05510a8f2418f047e62703db3b683bf044d42",
-          ".github/workflows/bug-maintenance-validation.yml": "7448d36e46fff0aedb3fd1d8f75366b11b7f1c1d2eb42ddf1cbe7205546a55fd",
-          ".github/workflows/bug-maintenance-package.yml": "00aab73959c372bad2fa93e66bc42d1634f7fb51314276d420d48686c40d0f3c",
-          ".github/workflows/bug-maintenance-prepare.yml": "2efe55c775d1a23b1dd12967dbcfcec3b1e6c1ed447ecee2766cb85d048c4c1f"
+          ".github/workflows/bug-maintenance.yml": "e63c72b17428c6df1bda63e9f3b299f9d81d769214bee70ecff8743375c67eb1",
+          ".github/workflows/bug-maintenance-validation.yml": "4d696b5ba98162750ed9af56e9495aadf8c9fe7ea6772429be2251af96881edb",
+          ".github/workflows/bug-maintenance-package.yml": "b085b7235b1c9033ce821c6b2a85894e72f285e2f46b40dbd378ffddecaa8851",
+          ".github/workflows/bug-maintenance-prepare.yml": "e4b3fcfe12e161490c3b4445e6e861bf166816f16fbbca419f99fb9c70955ebd"
         }
       },
       "release_clock": {
