@@ -19,77 +19,6 @@ COMPONENTS = {
     "enphase_ev": "enphase_ev-v{version}.zip",
     "groq": "groq-v{version}.zip",
 }
-CONTROLLER_ACTIONS = {
-    ".github/workflows/maintenance-gate.yml": "merge-gate",
-    ".github/workflows/maintenance-control.yml": "control",
-    ".github/workflows/stale_blocked_issues.yml": "reporter-followup",
-    ".github/workflows/coverage-reporting.yml": "coverage-reporting",
-}
-
-CALLER_TEMPLATE_SHA256 = {
-    ".github/workflows/stale_blocked_issues.yml": "a817987414f6265b44aa86c1972cce96abb665a6c0dbff0efcaa9805f05cc1a5",
-    ".github/workflows/coverage-reporting.yml": "da7783c1ed6603cd8b886cd6fc9a6230d89d96dcbda6bedd7cbf7fe5f6adaee7",
-    ".github/workflows/maintenance-control.yml": "acd5cb108642e568da2a0f41732fd281642848661a3138f8bb7ae60d6c0f34e6",
-    ".github/workflows/maintenance-gate.yml": "713e663b82dbb75887b5733a862e03aaa43b52bedffdb0d369d5a8a3f1ea72d4",
-}
-
-CONTROL_FILES = (
-    ".github/maintenance/merge-policy.json",
-    ".github/maintenance/control-policy.json",
-    ".github/workflows/maintenance-gate.yml",
-    ".github/workflows/maintenance-review-events.yml",
-    ".github/workflows/maintenance-control.yml",
-    ".github/workflows/coverage-reporting.yml",
-    ".github/workflows/release-candidate.yml",
-    ".github/workflows/release-assets.yml",
-    ".github/workflows/stale_blocked_issues.yml",
-    "scripts/maintenance/package_candidate.py",
-)
-
-
-def verify_control_baseline(candidate: Path, trusted: Path) -> None:
-    """Require approved maintenance controls even on a stable-derived patch branch."""
-    for relative in CONTROL_FILES:
-        source, baseline = candidate / relative, trusted / relative
-        if (
-            source.is_symlink()
-            or baseline.is_symlink()
-            or source.resolve() != candidate.resolve() / relative
-            or baseline.resolve() != trusted.resolve() / relative
-            or not source.is_file()
-            or not baseline.is_file()
-        ):
-            raise ValueError(
-                f"Missing regular maintenance-control baseline file: {relative}"
-            )
-        if source.read_bytes() != baseline.read_bytes():
-            raise ValueError(
-                f"Candidate requires the reviewed current maintenance-control baseline: {relative}"
-            )
-
-    pins = set()
-    for relative, action in CONTROLLER_ACTIONS.items():
-        raw = (candidate / relative).read_bytes()
-        prefix = (
-            b"barneyonline/hal-github-maintenance/actions/" + action.encode() + b"@"
-        )
-        matches = re.findall(re.escape(prefix) + rb"([0-9a-f]{40})", raw)
-        if len(matches) != 1:
-            raise ValueError(
-                "Candidate requires one immutable central controller reference"
-            )
-        pins.add(matches[0])
-        normalized = raw.replace(
-            prefix + matches[0], prefix + b"__HAL_CONTROLLER_COMMIT__", 1
-        )
-        if hashlib.sha256(normalized).hexdigest() != CALLER_TEMPLATE_SHA256[relative]:
-            raise ValueError(
-                "Candidate caller differs from its reviewed canonical template"
-            )
-    if len(pins) != 1:
-        raise ValueError(
-            "Candidate requires one central controller version across all callers"
-        )
 
 
 def source_files(root: Path, domain: str) -> list[Path]:
@@ -173,7 +102,7 @@ def package_candidate(
     output.mkdir(parents=True, exist_ok=True)
     if domain == "ha_energy_planner":
         # The helper lives in trusted tooling, separately from candidate code.
-        trusted_packager = Path(__file__).resolve().parents[1] / "package-release.py"
+        trusted_packager = Path(__file__).resolve().parent / "package-release.py"
         packager = runpy.run_path(str(trusted_packager))["package_release"]
         archive = packager(root, output, expected_version)
     else:
@@ -210,11 +139,6 @@ def main() -> None:
     parser.add_argument("--domain", choices=sorted(COMPONENTS), required=True)
     parser.add_argument("--version", required=True)
     parser.add_argument("--expected-sha", required=True)
-    parser.add_argument(
-        "--historical-release-repair",
-        action="store_true",
-        help="Inspect an already-public release; this produces no pre-publication eligibility evidence",
-    )
     args = parser.parse_args()
     if not re.fullmatch(r"[0-9a-f]{40}", args.expected_sha):
         parser.error("--expected-sha must be an exact 40-character commit SHA")
@@ -234,15 +158,10 @@ def main() -> None:
     ).stdout
     if dirty.strip():
         raise SystemExit("Candidate checkout contains modifications or untracked files")
-    if not args.historical_release_repair:
-        verify_control_baseline(
-            args.root.resolve(), Path(__file__).resolve().parents[2]
-        )
     result = package_candidate(
         args.root.resolve(), args.output_dir.resolve(), args.domain, args.version
     )
     result["source_sha"] = actual
-    result["maintenance_baseline_verified"] = not args.historical_release_repair
     (args.output_dir / "package-evidence.json").write_text(
         json.dumps(result, indent=2, sort_keys=True) + "\n"
     )

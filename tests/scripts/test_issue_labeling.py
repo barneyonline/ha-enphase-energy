@@ -663,9 +663,9 @@ def test_github_api_request_handles_empty_204_response(
     )
 
 
-def test_managed_and_control_issues_keep_lifecycle_and_area_labels() -> None:
+def test_hal_issues_keep_lifecycle_and_area_labels() -> None:
     for action in ("opened", "edited", "workflow_dispatch"):
-        for managed in ("automation/hal", "automation/control"):
+        for managed in ("automation/hal",):
             for objects in (False, True):
                 labels = [managed, "status/awaiting-release", "area/climate"]
                 issue = {

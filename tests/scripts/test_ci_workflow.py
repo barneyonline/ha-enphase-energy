@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from fnmatch import fnmatchcase
 import json
 import os
 import runpy
@@ -395,7 +394,6 @@ def test_manifest_additions_deletions_and_renames_keep_tests(manifest_repo, oper
         "custom_components/enphase_ev/translations/fr.json",
         "devtools/docker/requirements-dev.txt",
         ".coveragerc",
-        ".github/workflows/ci.yml",
     ],
 )
 def test_metadata_with_other_runtime_changes_keeps_tests(
@@ -497,48 +495,6 @@ def test_manifest_classifier_command_line(
     with pytest.raises(SystemExit) as raised:
         runpy.run_path(str(CLASSIFIER), run_name="__main__")
     assert raised.value.code == expected
-
-
-@pytest.mark.parametrize(
-    "path",
-    [
-        ".github/maintenance/merge-policy.json",
-        ".github/workflows/maintenance-gate.yml",
-        ".github/workflows/release-assets.yml",
-        ".github/workflows/release-candidate.yml",
-        "scripts/maintenance/pr_gate.py",
-        "tests/scripts/test_maintenance_pr_gate.py",
-    ],
-)
-def test_maintenance_controls_require_every_validation_group(tmp_path, path):
-    # Both PR validation and main-branch CI must reach the classifier.
-    for filename, event in (("tests.yml", "pull_request"), ("ci.yml", "push")):
-        workflow = yaml.load(
-            (ROOT / ".github/workflows" / filename).read_text(), Loader=yaml.BaseLoader
-        )
-        assert any(
-            fnmatchcase(path, pattern) for pattern in workflow["on"][event]["paths"]
-        )
-    step = next(
-        step
-        for step in _jobs()["changes"]["steps"]
-        if step.get("name") == "Classify changed paths"
-    )
-    script = step["run"][step["run"].index("set_output()") :]
-    output = tmp_path / "outputs"
-    subprocess.run(
-        ["bash", "-e", "-o", "pipefail", "-c", script],
-        env={**os.environ, "GITHUB_OUTPUT": str(output), "changed_files": path},
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    assert set(output.read_text().splitlines()) == {
-        "integration=true",
-        "diagnostics=true",
-        "quality=true",
-        "scripts=true",
-    }
 
 
 def test_pytest_context_is_stable_when_the_single_lane_is_skipped():

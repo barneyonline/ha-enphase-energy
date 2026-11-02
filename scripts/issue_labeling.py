@@ -259,7 +259,7 @@ def desired_labels_for_issue(
         return LabelDecision(set(), set(), [], [])
 
     current_labels = _current_label_names(issue)
-    if {"automation/hal", "automation/control"}.intersection(current_labels):
+    if "automation/hal" in current_labels:
         return LabelDecision(set(), set(), [], [])
     desired_labels: set[str] = set()
 
