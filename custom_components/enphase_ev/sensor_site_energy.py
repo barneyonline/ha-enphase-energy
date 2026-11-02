@@ -281,6 +281,11 @@ class _SiteConsumptionPowerRestoreData(ExtraStoredData):  # type: ignore[misc]
 
 
 class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[misc]
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Preserve restored energy and source composition across renames."""
+        super().async_entity_id_changed(old_entity_id)
+
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
@@ -584,6 +589,11 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
 
 
 class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: ignore[misc]
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Preserve power history and its freshness deadline across renames."""
+        super().async_entity_id_changed(old_entity_id)
+
     _attr_device_class = SensorDeviceClass.POWER
     _attr_native_unit_of_measurement = UnitOfPower.WATT
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -1652,6 +1662,11 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
 class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type: ignore[misc]
     """Site power balance, with consumption energy as a fallback."""
 
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Keep the source-state listener and restored power history."""
+        super().async_entity_id_changed(old_entity_id)
+
     _attr_device_class = SensorDeviceClass.POWER
     _attr_native_unit_of_measurement = UnitOfPower.WATT
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -2441,6 +2456,11 @@ class EnphaseBatteryPowerSensor(_EnphaseSiteLifetimePowerSensor):
 
 
 class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[misc]
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Keep source freshness and restored power on in-place renames."""
+        super().async_entity_id_changed(old_entity_id)
+
     _attr_translation_key = "current_production_power"
     _attr_device_class = SensorDeviceClass.POWER
     _attr_native_unit_of_measurement = UnitOfPower.WATT

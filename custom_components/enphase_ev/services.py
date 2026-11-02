@@ -32,6 +32,7 @@ from .const import (
     ISSUE_TOO_MANY_ACTIVE_SESSIONS,
 )
 from .log_redaction import redact_site_id
+from .repair_issues import supports_entry_issues
 from .parsing_helpers import coerce_optional_bool
 from .export_limit_runtime import ExportLimitRuntime, validate_watts, validate_slew_rate
 from .grid_profile_runtime import SUPPORT_DENIED, SUPPORT_READ_ONLY, GridProfileRuntime
@@ -1020,6 +1021,11 @@ def async_setup_services(
 
     async def _svc_clear_issue(call: ServiceCall) -> None:
         site_ids = await _resolve_site_ids_from_call(call)
+
+        if supports_entry_issues():
+            for coord in router._iter_loaded_coordinators():
+                if str(coord.site_id) in site_ids:
+                    coord.diagnostics.clear_reauth_issue()
 
         issue_ids = {
             ISSUE_REAUTH_REQUIRED,

@@ -10,6 +10,7 @@ from homeassistant.helpers import issue_registry as ir
 
 from .const import BATTERY_PROFILE_PENDING_TIMEOUT_S, DOMAIN
 from .runtime_data import loaded_runtime_data
+from .repair_issues import entry_issue_kwargs
 
 if TYPE_CHECKING:  # pragma: no cover
     from .battery_runtime import BatteryRuntime
@@ -24,6 +25,7 @@ class BatteryProfileMismatch:
         self.runtime = runtime
         self.configured: str | None = None
         self.live: str | None = None
+        self.live_absent = False
         self.configured_seen = 0.0
         self.live_seen = 0.0
         self.configured_reads = 0
@@ -39,27 +41,31 @@ class BatteryProfileMismatch:
         assert entry is not None
         return f"{ISSUE_PROFILE_MISMATCH}_{entry.entry_id}"
 
-    def reset(self) -> None:
+    def reset(self, *, clear_issue: bool = True) -> None:
         """Retire the current disagreement and any open recovery flow."""
         self.started = None
         self.identity = None
         self._pair = None
-        if self._reported:
+        if clear_issue and self.runtime.coordinator.config_entry is not None:
             ir.async_delete_issue(self.runtime.coordinator.hass, DOMAIN, self.issue_id)
-            self._reported = False
+        self._reported = False
 
     def invalidate(self) -> None:
         """Require new observations after an accepted write or unload."""
         self.configured = self.live = None
-        self.reset()
+        self.live_absent = False
+        self.reset(clear_issue=self.runtime.coordinator.runtime_active)
 
     def note_configured(self, profile: str | None) -> None:
         self.configured = profile
         self.configured_seen = time.monotonic() if profile else 0.0
         self.configured_reads += 1
 
-    def note_live(self, profile: str | None) -> None:
+    def note_live(
+        self, profile: str | None, *, authoritative_absence: bool = False
+    ) -> None:
         self.live = profile
+        self.live_absent = authoritative_absence
         self.live_seen = time.monotonic() if profile else 0.0
         self.live_reads += 1
 
@@ -67,14 +73,26 @@ class BatteryProfileMismatch:
         """Report only a sustained disagreement supported by recent reads."""
         coord = self.runtime.coordinator
         now = time.monotonic()
+        if not coord.runtime_active or coord.config_entry is None:
+            self.reset(clear_issue=False)
+            return
+        if self.live_absent:
+            self.reset()
+            return
         if (
-            not coord.runtime_active
-            or coord.config_entry is None
-            or coord.battery_profile_pending
+            not self.configured
+            or not self.live
+            or now - min(self.configured_seen, self.live_seen)
+            > BATTERY_PROFILE_PENDING_TIMEOUT_S
+        ):
+            # Missing observations after a reload or failed fetch cannot resolve
+            # an existing repair. Recheck it once both sources are fresh.
+            self.reset(clear_issue=False)
+            return
+        if (
+            coord.battery_profile_pending
             or self.runtime.battery_state._battery_backend_profile_update_pending
             is True
-            or not self.configured
-            or not self.live
             or self.configured
             not in {
                 "self-consumption",
@@ -90,14 +108,12 @@ class BatteryProfileMismatch:
                 "ai_optimisation",
             }
             or self.configured == self.live
-            or now - min(self.configured_seen, self.live_seen)
-            > BATTERY_PROFILE_PENDING_TIMEOUT_S
         ):
             self.reset()
             return
         pair = (self.configured, self.live)
         if self._pair != pair:
-            self.reset()
+            self.reset(clear_issue=False)
             self._pair = pair
             self.started = now
             self.identity = uuid4().hex
@@ -112,6 +128,7 @@ class BatteryProfileMismatch:
             coord.hass,
             DOMAIN,
             self.issue_id,
+            **entry_issue_kwargs(coord.config_entry),
             is_fixable=True,
             severity=ir.IssueSeverity.WARNING,
             translation_key=ISSUE_PROFILE_MISMATCH,
