@@ -131,6 +131,17 @@ class EnphaseSiteSensorEntity(CoordinatorEntity, SensorEntity):  # type: ignore[
         await super().async_will_remove_from_hass()
 
     @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Keep the object-owned freshness timer and coordinator subscription.
+
+        The timer reads self.entity_id when it fires. Re-adding or resubscribing
+        here would duplicate work and reset restored source freshness.
+        """
+        parent_hook = getattr(super(), "async_entity_id_changed", None)
+        if parent_hook is not None:
+            parent_hook(old_entity_id)
+
+    @callback
     def _handle_coordinator_update(self) -> None:
         self._schedule_freshness_expiry()
         super()._handle_coordinator_update()

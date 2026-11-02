@@ -72,6 +72,53 @@ async def start_repair(coord, manager):
     )
 
 
+async def test_reload_preserves_ignore_until_fresh_observations_resolve(
+    mismatch_repair, hass
+):
+    coord, clock, _manager = mismatch_repair
+    entry = coord.config_entry
+    mismatch = coord.battery_runtime.profile_mismatch
+    issue_id = mismatch.issue_id
+    registry = ir.async_get(hass)
+    ir.async_ignore_issue(hass, DOMAIN, issue_id, True)
+    ignored = registry.async_get_issue(DOMAIN, issue_id).dismissed_version
+    old_identity = mismatch.identity
+    coord.mark_runtime_stopped()
+    assert registry.async_get_issue(DOMAIN, issue_id).dismissed_version == ignored
+    replacement = EnphaseCoordinator(hass, dict(entry.data), config_entry=entry)
+    entry.runtime_data = EnphaseRuntimeData(coordinator=replacement)
+    fresh = replacement.battery_runtime.profile_mismatch
+    fresh.sync()
+    assert registry.async_get_issue(DOMAIN, issue_id).dismissed_version == ignored
+    fresh.note_configured("backup_only")
+    fresh.note_live("self-consumption")
+    fresh.sync()
+    clock[0] += 601
+    fresh.note_configured("backup_only")
+    fresh.note_live("self-consumption")
+    fresh.sync()
+    assert fresh.identity != old_identity
+    assert fresh.diagnostics()["repair_reported"]
+    assert registry.async_get_issue(DOMAIN, issue_id).dismissed_version == ignored
+    fresh.note_live("backup_only")
+    fresh.sync()
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
+
+
+@pytest.mark.parametrize("payload", [None, {}, {"storages": None}, {"storages": []}])
+async def test_only_authoritative_absence_clears_a_retained_disagreement(
+    mismatch_repair, hass, payload
+):
+    coord, _clock, _manager = mismatch_repair
+    mismatch = coord.battery_runtime.profile_mismatch
+    issue_id = mismatch.issue_id
+    coord.battery_runtime.parse_battery_status_payload(payload)
+    mismatch.sync()
+    assert (ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None) == (
+        payload == {"storages": []}
+    )
+
+
 async def test_persistent_mismatch_has_fresh_scoped_context_and_check(
     mismatch_repair, hass
 ):
