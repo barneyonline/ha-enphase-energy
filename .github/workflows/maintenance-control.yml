@@ -22,6 +22,6 @@ jobs:
       contains(github.event.issue.labels.*.name, 'automation/control') &&
       github.event.comment.user.id == 38914183
     steps:
-      - uses: barneyonline/hal-github-maintenance/actions/control@472e3d51b9ce164734ff88545fc82716a181cfa6
+      - uses: barneyonline/hal-github-maintenance/actions/control@ac687247f4006e65a2580f8c1eaebfefd5403c37
         with:
           token: ${{ github.token }}
