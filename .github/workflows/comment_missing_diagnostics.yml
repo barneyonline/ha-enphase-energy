@@ -13,8 +13,7 @@ jobs:
   sync_comment:
     if: >
       github.event.label.name == 'status/needs-diagnostics' &&
-      !contains(github.event.issue.labels.*.name, 'automation/hal') &&
-      !contains(github.event.issue.labels.*.name, 'automation/control')
+      !contains(github.event.issue.labels.*.name, 'automation/hal')
     runs-on: ubuntu-latest
     steps:
       - name: Create or remove diagnostics guidance comment

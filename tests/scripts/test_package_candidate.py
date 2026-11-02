@@ -5,7 +5,6 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
-import re
 import runpy
 import shutil
 import stat
@@ -20,7 +19,7 @@ from zipfile import ZipFile, ZipInfo
 
 REPO = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location(
-    "package_candidate", REPO / "scripts/maintenance/package_candidate.py"
+    "package_candidate", REPO / "scripts/package_candidate.py"
 )
 assert SPEC and SPEC.loader
 package = importlib.util.module_from_spec(SPEC)
@@ -86,7 +85,7 @@ class CandidatePackageTests(unittest.TestCase):
         (self.root / "pyproject.toml").write_text('[project]\nversion = "1.2.3"\n')
         # Model the actual trusted tooling location when the real Planner helper
         # is available in a sibling checkout; candidate code remains untrusted.
-        trusted_module = planner_script.parent / "maintenance/package_candidate.py"
+        trusted_module = planner_script.parent / "package_candidate.py"
         with patch.object(package, "__file__", str(trusted_module)):
             result = self.build("ha_energy_planner")
             self.assertEqual("ha-energy-planner-v1.2.3.zip", result["archive"])
@@ -137,7 +136,7 @@ class CandidatePackageTests(unittest.TestCase):
         ) as load:
             result = self.build("ha_energy_planner")
         load.assert_called_once_with(
-            str(Path(package.__file__).resolve().parents[1] / "package-release.py")
+            str(Path(package.__file__).resolve().parent / "package-release.py")
         )
         self.assertEqual(archive.name, result["archive"])
 
@@ -230,96 +229,6 @@ class CandidatePackageTests(unittest.TestCase):
                 self.root / "dist" / result["archive"], self.root, "groq", "1.2.4"
             )
 
-    def test_stable_derived_candidates_require_current_control_baseline(self) -> None:
-        candidate, trusted = self.root / "candidate", self.root / "trusted"
-        for relative in package.CONTROL_FILES:
-            current = REPO / relative
-            self.assertTrue(current.is_file(), f"Missing current control: {relative}")
-            for directory in [candidate, trusted]:
-                path = directory / relative
-                path.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(current, path)
-        package.verify_control_baseline(candidate, trusted)
-        (candidate / package.CONTROL_FILES[0]).write_text("old controls")
-        with self.assertRaisesRegex(ValueError, "current maintenance-control baseline"):
-            package.verify_control_baseline(candidate, trusted)
-        (candidate / package.CONTROL_FILES[0]).unlink()
-        with self.assertRaisesRegex(
-            ValueError, "Missing regular maintenance-control baseline"
-        ):
-            package.verify_control_baseline(candidate, trusted)
-
-    def test_shared_controller_pins_are_immutable_and_consistent_even_in_matching_baselines(
-        self,
-    ) -> None:
-        for case in ("mutable", "foreign", "mixed"):
-            candidate, trusted = (
-                self.root / case / "candidate",
-                self.root / case / "trusted",
-            )
-            for relative in package.CONTROL_FILES:
-                for directory in (candidate, trusted):
-                    path = directory / relative
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    text = (REPO / relative).read_text()
-                    if relative in package.CONTROLLER_ACTIONS:
-                        if case == "mutable":
-                            text = re.sub(
-                                r"(barneyonline/hal-github-maintenance/actions/[a-z-]+)@[0-9a-f]{40}",
-                                r"\1@main",
-                                text,
-                            )
-                        elif case == "foreign":
-                            text = text.replace(
-                                "barneyonline/hal-github-maintenance",
-                                "attacker/hal-github-maintenance",
-                            )
-                        elif relative.endswith("maintenance-control.yml"):
-                            text = re.sub(
-                                r"(barneyonline/hal-github-maintenance/actions/[a-z-]+)@[0-9a-f]{40}",
-                                r"\1@" + "a" * 40,
-                                text,
-                            )
-                    path.write_text(text)
-            with self.subTest(case=case), self.assertRaises(ValueError):
-                package.verify_control_baseline(candidate, trusted)
-
-    def test_matching_baselines_cannot_hide_additional_controller_calls(self) -> None:
-        for case, extra in {
-            "mutable": "      - uses: barneyonline/hal-github-maintenance/actions/control@main\n",
-            "foreign": "      - uses: attacker/controller/actions/control@"
-            + "a" * 40
-            + "\n",
-            "other_pin": "      - uses: barneyonline/hal-github-maintenance/actions/control@"
-            + "a" * 40
-            + "\n",
-            "flow_mapping": "      - {uses: attacker/controller@main}\n",
-            "combined_quoted_key": '      -   "uses": attacker/controller@main\n',
-            "injected_command": "      - run: echo unreviewed-command\n",
-            "quoted_key": '      - "uses": attacker/controller@main\n',
-            "escaped_key": '      - "us'
-            + chr(92)
-            + 'u0065s": attacker/controller@main\n',
-            "alias": "      - <<: *foreign_action\n",
-            "additional_upload": "      - uses: codecov/codecov-action@"
-            + "a" * 40
-            + "\n",
-        }.items():
-            candidate, trusted = (
-                self.root / case / "candidate",
-                self.root / case / "trusted",
-            )
-            for relative in package.CONTROL_FILES:
-                for directory in (candidate, trusted):
-                    path = directory / relative
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    text = (REPO / relative).read_text()
-                    if relative == ".github/workflows/maintenance-control.yml":
-                        text += extra
-                    path.write_text(text)
-            with self.subTest(case=case), self.assertRaises(ValueError):
-                package.verify_control_baseline(candidate, trusted)
-
     def prepare_git(self) -> str:
         self.component()
         subprocess.run(
@@ -353,7 +262,7 @@ class CandidatePackageTests(unittest.TestCase):
             text=True,
         ).stdout.strip()
 
-    def invoke(self, sha: str, historical: bool = False) -> dict[str, str]:
+    def invoke(self, sha: str) -> dict[str, str]:
         output_directory = tempfile.TemporaryDirectory()
         self.addCleanup(output_directory.cleanup)
         args = [
@@ -369,27 +278,15 @@ class CandidatePackageTests(unittest.TestCase):
             "--expected-sha",
             sha,
         ]
-        if historical:
-            args.append("--historical-release-repair")
         output = io.StringIO()
         with patch.object(sys, "argv", args), redirect_stdout(output):
             package.main()
         return json.loads(output.getvalue())
 
-    def test_command_binds_provenance_to_clean_git_commit_and_baseline(self) -> None:
+    def test_command_binds_provenance_to_clean_git_commit(self) -> None:
         sha = self.prepare_git()
-        with patch.object(package, "verify_control_baseline") as baseline:
-            result = self.invoke(sha)
+        result = self.invoke(sha)
         self.assertEqual(sha, result["source_sha"])
-        self.assertTrue(result["maintenance_baseline_verified"])
-        baseline.assert_called_once()
-
-    def test_historical_repair_does_not_claim_prepublication_eligibility(self) -> None:
-        sha = self.prepare_git()
-        with patch.object(package, "verify_control_baseline") as baseline:
-            result = self.invoke(sha, historical=True)
-        self.assertFalse(result["maintenance_baseline_verified"])
-        baseline.assert_not_called()
 
     def test_wrong_sha_and_untracked_component_files_are_rejected(self) -> None:
         sha = self.prepare_git()
@@ -410,7 +307,7 @@ class CandidatePackageTests(unittest.TestCase):
             self.assertRaises(SystemExit),
         ):
             runpy.run_path(
-                str(REPO / "scripts/maintenance/package_candidate.py"),
+                str(REPO / "scripts/package_candidate.py"),
                 run_name="__main__",
             )
 

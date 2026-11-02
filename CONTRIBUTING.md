@@ -149,8 +149,9 @@ in either manifest keeps the full integration suite enabled.
 Changes limited to the classifier, its workflow regression tests, or
 `.github/workflows/tests.yml` run the script suite and quality checks instead of
 the integration suite. Integration source, integration tests, runtime dependencies,
-and `.github/workflows/ci.yml` still trigger the full suite. Pushes to main and
-manual runs retain all test jobs.
+still trigger the full suite. Pushes to main, release branches, and manual runs
+retain all test jobs. The `Repository checks` check reports the result of every
+applicable job, including changes that skip the expensive suites.
 
 The HACS validator copies Python source from a pinned AMD64-only upstream image
 onto the pinned Home Assistant runtime. `HACS_SOURCE_PLATFORM` selects that source

@@ -1,5 +1,5 @@
 name: Release Candidate
-run-name: Release candidate ${{ inputs.version }} / ${{ inputs.candidate_sha }} / control ${{ inputs.control_request_id || 'manual' }}
+run-name: Release candidate ${{ inputs.version }} / ${{ inputs.candidate_sha }}
 
 on:
   workflow_dispatch:
@@ -12,10 +12,6 @@ on:
         description: Candidate manifest version, optionally prefixed with v
         required: true
         type: string
-      control_request_id:
-        description: Correlation identifier set by the trusted control bridge
-        required: false
-        type: string
   workflow_call:
     inputs:
       candidate_sha:
@@ -23,9 +19,6 @@ on:
         type: string
       version:
         required: true
-        type: string
-      control_request_id:
-        required: false
         type: string
     outputs:
       artifact_name:
@@ -41,7 +34,6 @@ concurrency:
 
 jobs:
   package:
-    cache-mode: none
     runs-on: ubuntu-26.04
     outputs:
       artifact_name: release-candidate-${{ inputs.candidate_sha }}
@@ -85,7 +77,7 @@ jobs:
           CANDIDATE_SHA: ${{ inputs.candidate_sha }}
           CANDIDATE_VERSION: ${{ inputs.version }}
         run: >
-          python3 tools/scripts/maintenance/package_candidate.py
+          python3 tools/scripts/package_candidate.py
           --root candidate --domain enphase_ev
           --version "$CANDIDATE_VERSION" --expected-sha "$CANDIDATE_SHA"
           --output-dir "$RUNNER_TEMP/release-candidate"
@@ -103,6 +95,5 @@ jobs:
           {
             echo "Candidate source: $CANDIDATE_SHA"
             echo "Trusted tooling: $TOOLS_SHA"
-            echo 'Package integrity passed. Full source CI, current-commit GitHub review, and the full release diff require separate approval by the maintenance gates.'
-            echo 'Maintenance branches must include the reviewed maintenance-control baseline; an old stable tag alone is insufficient.'
+            echo 'Package integrity passed. Review the source CI results and GitHub review before publishing a release.'
           } >> "$GITHUB_STEP_SUMMARY"
