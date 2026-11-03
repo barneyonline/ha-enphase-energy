@@ -1551,7 +1551,7 @@ Notes:
   confirmation.
 - The normalized runtime field is `current_power_consumption_w` with source `app-api:get_latest_power`.
 - Production Power expires after 30 minutes, allowing cloud delivery delay beyond
-  a 15-minute source cadence. Successful validated responses within +/-1 W renew
+  a 15-minute source cadence. Successful validated responses within +/-2 W renew
   freshness even when a nonfuture timestamp repeats overnight; the value is held
   as reported, never synthesized from missing data. Other timestamped samples
   remain bounded by their source and first receipt times. Failed or invalid polls

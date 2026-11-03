@@ -255,15 +255,16 @@ async def test_invalid_balance_clock_cannot_seed(
     assert sensor.native_value is None
 
 
+@pytest.mark.parametrize("production_w", [0, 2])
 async def test_idle_production_and_acquisition_bound_balance(
-    hass, coordinator_factory, monkeypatch
+    hass, coordinator_factory, monkeypatch, production_w
 ):
     now = dt_util.utcnow()
     monkeypatch.setattr(dt_util, "utcnow", lambda: now)
     coord = coordinator_factory()
     sensor = EnphaseSiteConsumptionPowerSensor(coord)
     sensor.hass = hass
-    production = source(hass, coord, "current_production_power", 0)
+    production = source(hass, coord, "current_production_power", production_w)
     source(hass, coord, "grid_power", 1000)
     source(hass, coord, "battery_power", 0)
     attrs = {
@@ -271,21 +272,21 @@ async def test_idle_production_and_acquisition_bound_balance(
         "sampled_at_utc": (now - timedelta(hours=6)).isoformat(),
         "cached_at_utc": now.isoformat(),
     }
-    hass.states.async_set(production, 0, attrs)
+    hass.states.async_set(production, production_w, attrs)
     assert sensor.available
-    assert sensor.native_value == 1000
+    assert sensor.native_value == 1000 + production_w
     # A fresh source clock cannot hide a stale acquisition; a missing clock also
     # follows acquisition rather than a recent HA attribute publication.
     attrs["cached_at_utc"] = (now - timedelta(minutes=30)).isoformat()
     attrs["sampled_at_utc"] = now.isoformat()
     hass.states.async_set(production, 1000, attrs)
     assert sensor.available
-    assert sensor.native_value == 1000
+    assert sensor.native_value == 1000 + production_w
     assert sensor.extra_state_attributes["using_cached"] is True
     attrs.pop("sampled_at_utc")
     hass.states.async_set(production, 1000, attrs)
     assert sensor.available
-    assert sensor.native_value == 1000
+    assert sensor.native_value == 1000 + production_w
     assert sensor.extra_state_attributes["using_cached"] is True
 
 
