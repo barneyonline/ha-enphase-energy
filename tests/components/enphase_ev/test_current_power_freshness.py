@@ -1,7 +1,7 @@
 """Current production power uses its own bounded source freshness."""
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
@@ -17,7 +17,10 @@ from custom_components.enphase_ev.sensor_site_energy import (
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("value,units", [(0, "W"), (1, "W"), (-1, "W"), (0.001, "kW")])
+@pytest.mark.parametrize(
+    "value,units",
+    [(0, "W"), (1, "W"), (-1, "W"), (0.001, "kW"), (2, "W"), (-2, "W"), (0.002, "kW")],
+)
 @pytest.mark.parametrize(
     "failure", ["network", "invalid", "unit", "extreme", "backoff"]
 )
@@ -130,7 +133,7 @@ async def test_quarter_hour_samples_allow_delivery_delay(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("value", [1.001, -1.001, 2500])
+@pytest.mark.parametrize("value", [2.001, -2.001, 2500])
 async def test_non_idle_old_sample_still_expires(
     coordinator_factory, monkeypatch, value
 ):
@@ -329,7 +332,7 @@ async def test_runtime_uses_only_public_host_services(monkeypatch):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("value", [0, 100])
+@pytest.mark.parametrize("value", [0, 2, 100])
 async def test_identical_sample_recovers_after_expiry(
     hass, coordinator_factory, config_entry, monkeypatch, value
 ):
@@ -345,7 +348,7 @@ async def test_identical_sample_recovers_after_expiry(
     coord.client.latest_power = AsyncMock(
         return_value={
             "value": value,
-            "time": now[0].timestamp() if value == 0 else None,
+            "time": now[0].timestamp() if value in (0, 2) else None,
         }
     )
     monkeypatch.setattr(coord, "endpoint_family_should_run", lambda _family: True)
@@ -391,7 +394,7 @@ async def test_identical_sample_recovers_after_expiry(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("value", [0, 2500])
+@pytest.mark.parametrize("value", [0, 2, 2500])
 async def test_repeated_future_source_timestamp_is_rejected_and_recovers(
     coordinator_factory, monkeypatch, value
 ):
@@ -426,3 +429,77 @@ async def test_repeated_future_source_timestamp_is_rejected_and_recovers(
     runtime._cache_until_mono = None
     await runtime.async_refresh()
     assert runtime.received_utc == now[0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "value,expected", [(2, "2"), (2.001, "unavailable"), (2500, "unavailable")]
+)
+async def test_issue_988_reported_dusk_sample(
+    hass, coordinator_factory, config_entry, monkeypatch, caplog, value, expected
+):
+    """Replay #988's UTC source, expiry and debug receipt times without rounding watts."""
+    sampled_at = datetime.fromisoformat("2026-11-03T01:15:00+00:00")
+    now = [datetime.fromisoformat("2026-11-03T01:17:00+00:00")]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+    coord = coordinator_factory()
+    coord.update_interval = None
+    coord.last_success_utc = now[0]
+    monkeypatch.setattr(coord, "endpoint_family_should_run", lambda _family: True)
+    coord.client.latest_power = AsyncMock(
+        return_value={
+            "value": value,
+            "time": sampled_at.timestamp(),
+            "units": "W",
+            "precision": 0,
+        }
+    )
+    runtime = coord.current_power_runtime
+    await runtime.async_refresh()
+    entity = EnphaseCurrentPowerConsumptionSensor(coord)
+    entity.entity_id = "sensor.current_production_power"
+    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    component._platforms["sensor"].config_entry = config_entry
+    await component.async_add_entities([entity])
+    # Equal snapshots need not notify coordinator listeners. Poll each minute,
+    # then fire the entity's independent timer at the reported expiry boundary.
+    for _ in range(27):
+        now[0] += timedelta(minutes=1)
+        coord.last_success_utc = now[0]
+        runtime._cache_until_mono = None
+        await runtime.async_refresh()
+    now[0] = datetime.fromisoformat("2026-11-03T01:45:00.003+00:00")
+    coord.last_success_utc = now[0]
+    async_fire_time_changed(hass, now[0])
+    await hass.async_block_till_done()
+    assert hass.states.get(entity.entity_id).state == expected
+
+    now[0] = datetime.fromisoformat("2026-11-03T03:51:34.479795+00:00")
+    coord.last_success_utc = now[0]
+    runtime._cache_until_mono = None
+    with caplog.at_level(
+        logging.DEBUG, logger="custom_components.enphase_ev.current_power_runtime"
+    ):
+        await runtime.async_refresh()
+    entity._handle_coordinator_update()
+    assert hass.states.get(entity.entity_id).state == expected
+    assert "sampled_at_utc=2026-11-03 01:15:00+00:00" in caplog.text
+    assert "received_at_utc=2026-11-03 03:51:34.479795+00:00" in caplog.text
+    assert "validation_state=accepted" in caplog.text
+    assert runtime.snapshot.w == value
+    assert runtime.snapshot.sample_utc == sampled_at
+    if value == 2:
+        assert "value_w=2.0" in caplog.text
+        assert runtime.received_utc == now[0]
+        assert entity.extra_state_attributes["sampled_at_utc"] == sampled_at.isoformat()
+        assert entity._freshness_deadline() == now[0] + timedelta(minutes=30)
+
+    # Model #988's midnight recovery time with #923's timestamp-less zero shape.
+    now[0] = datetime.fromisoformat("2026-11-03T08:00:31+00:00")
+    coord.last_success_utc = now[0]
+    coord.client.latest_power.return_value = {"value": 0, "units": "W", "precision": 0}
+    runtime._cache_until_mono = None
+    await runtime.async_refresh()
+    entity._handle_coordinator_update()
+    assert hass.states.get(entity.entity_id).state == "0"
+    await component.async_remove_entity(entity.entity_id)

@@ -543,11 +543,14 @@ availability and expiry timers without publishing every identical successful pol
 
 Current Production Power uses the shared 30-minute cloud telemetry freshness
 window to tolerate delayed cloud updates. Both its source timestamp and first
-acquisition time bound nonzero readings, even while core polling remains healthy.
-Validated readings within +/-1 W with a nonfuture source timestamp instead use
+acquisition time bound readings outside the idle range, even while core polling
+remains healthy. Validated readings within +/-2 W with a nonfuture source
+timestamp instead use
 their latest successful acquisition: Enphase can repeat its last near-zero
 production sample overnight. The reported value and source timestamp are
-preserved. Missing timestamps also use acquisition time. Failed, malformed,
+preserved, including the residual 2 W dusk interval reported in #988. This bounded
+exception does not establish freshness for larger repeated readings. Missing
+timestamps also use acquisition time. Failed, malformed,
 unsupported-unit, quarantined, or skipped responses never renew that time, so
 even near-zero readings expire after 30 minutes without a valid response.
 Entity-owned expiry timers remain independent of core polling cadence. Grid,
