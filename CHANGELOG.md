@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 
-- None
+- Keep Production Power available when Enphase successfully repeats a residual 2 W dusk sample overnight. Preserve its reported watts and timestamp, source-based expiry for larger readings, and expiry after failed or invalid polls. (#988)
 
 ### 🔧 Improvements
 

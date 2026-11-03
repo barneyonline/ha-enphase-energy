@@ -144,8 +144,9 @@ async def test_premature_restored_sample_is_not_published(
     await component.async_remove_entity(entity.entity_id)
 
 
+@pytest.mark.parametrize("accepted_value,future_value", [(2500, 0), (2, 2)])
 async def test_future_polls_cannot_renew_power_expiry(
-    hass, config_entry, coordinator_factory, monkeypatch
+    hass, config_entry, coordinator_factory, monkeypatch, accepted_value, future_value
 ):
     now = [dt_util.utcnow()]
     monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
@@ -154,7 +155,7 @@ async def test_future_polls_cannot_renew_power_expiry(
     coord.last_success_utc = now[0]
     monkeypatch.setattr(coord, "endpoint_family_should_run", lambda _family: True)
     coord.client.latest_power = AsyncMock(
-        return_value={"value": 2500, "time": now[0].timestamp()}
+        return_value={"value": accepted_value, "time": now[0].timestamp()}
     )
     runtime = coord.current_power_runtime
     await runtime.async_refresh()
@@ -170,7 +171,7 @@ async def test_future_polls_cannot_renew_power_expiry(
         now[0] = accepted_at + timedelta(seconds=age)
         coord.last_success_utc = now[0]
         coord.client.latest_power.return_value = {
-            "value": 0,
+            "value": future_value,
             "time": (now[0] + timedelta(seconds=210)).timestamp(),
         }
         runtime._cache_until_mono = None
@@ -178,7 +179,7 @@ async def test_future_polls_cannot_renew_power_expiry(
         async_fire_time_changed(hass, now[0])
         await hass.async_block_till_done()
         assert hass.states.get(entity.entity_id).state == (
-            "2500" if age < 1800 else "unavailable"
+            str(accepted_value) if age < 1800 else "unavailable"
         )
         assert runtime.received_utc == accepted_at
     await component.async_remove_entity(entity.entity_id)
