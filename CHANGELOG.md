@@ -14,6 +14,28 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 
+- None
+
+### 🔧 Improvements
+
+- None
+
+### 🔄 Other changes
+
+- None
+
+## v5.2.4 - 2026-11-03
+
+### 🚧 Breaking changes
+
+- None
+
+### ✨ New features
+
+- None
+
+### 🐛 Bug fixes
+
 - Keep Production Power available when Enphase successfully repeats a residual 2 W dusk sample overnight. Preserve its reported watts and timestamp, source-based expiry for larger readings, and expiry after failed or invalid polls. (#988)
 
 ### 🔧 Improvements
@@ -22,9 +44,9 @@ All notable changes to this project will be documented in this file.
 
 ### 🔄 Other changes
 
-- Keep maintenance validation reachable and the pytest check name consistent across skipped and running validation.
-
-- Add maintenance workflows and merge checks for HAL-managed issues and PR feedback, with shared operating instructions and changelog/release templates maintained in the central HAL plugin. Keep unattended activation gated by verification.
+- Maintain source-repository validation, issue-label coordination, and required merge checks; keep the pytest check name consistent across skipped and running validation.
+- Build deterministic candidate packages with checksum and source-provenance evidence, and isolate coverage reporting from candidate test execution.
+- Update the pinned setup-uv action to 10.3.3. (#986)
 
 ## v5.2.3 - 2026-10-31
 
