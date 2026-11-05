@@ -83,26 +83,6 @@ jobs:
             core.setOutput('sha', run.head_sha);
             core.setOutput('branch', branch);
             core.setOutput('pr', prNumber);
-      - name: Read the verified producer source tree without fetching blobs
-        if: ${{ steps.source.outputs.artifact_id != '' }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        env:
-          SOURCE_SHA: ${{ steps.source.outputs.sha }}
-        with:
-          script: |
-            const fs = require('node:fs');
-            const path = require('node:path');
-            const sha = process.env.SOURCE_SHA;
-            const {data: commit} = await github.rest.git.getCommit({...context.repo, commit_sha: sha});
-            if (commit.sha !== sha) throw new Error('Source commit attribution differs');
-            const {data: tree} = await github.rest.git.getTree({
-              ...context.repo, tree_sha: commit.tree.sha, recursive: '1',
-            });
-            if (tree.sha !== commit.tree.sha || tree.truncated || tree.tree.length > 10000) {
-              throw new Error('Incomplete or oversized source tree');
-            }
-            fs.writeFileSync(path.join(process.env.RUNNER_TEMP, 'source-tree.json'),
-              JSON.stringify({...tree, source_sha: sha}), {flag: 'wx'});
       - name: Download only the selected producer reports
         if: ${{ steps.source.outputs.artifact_id != '' }}
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -138,23 +118,31 @@ jobs:
           if total > 33554432:
               raise SystemExit('Report aggregate budget exceeded')
           PYTHON
-      - name: Prepare inert source inventory and repository-relative coverage paths
+      - name: Prepare producer Git inventory without checking out producer files
         if: ${{ steps.source.outputs.artifact_id != '' }}
         env:
           SOURCE_SHA: ${{ steps.source.outputs.sha }}
         run: |
-          python3 -I -B "$GITHUB_WORKSPACE/trusted-reporter/scripts/codecov_reporting.py" prepare \
-            --sha "$SOURCE_SHA" --reports "$RUNNER_TEMP/reports" \
-            --tree "$RUNNER_TEMP/source-tree.json" --inventory "$RUNNER_TEMP/codecov-source"
+          mkdir "$RUNNER_TEMP/codecov-work"
+          git init "$RUNNER_TEMP/codecov-source"
+          git -C "$RUNNER_TEMP/codecov-source" config core.hooksPath /dev/null
+          git -C "$RUNNER_TEMP/codecov-source" fetch --no-tags --filter=blob:none --depth=1 \
+            "https://github.com/$GITHUB_REPOSITORY.git" "$SOURCE_SHA"
+          # read-tree updates the index only; it does not materialize source files.
+          git -C "$RUNNER_TEMP/codecov-source" read-tree FETCH_HEAD
+          git -C "$RUNNER_TEMP/codecov-source" update-ref HEAD "$SOURCE_SHA"
       - name: Upload coverage to Codecov
         id: coverage_upload
         if: ${{ steps.source.outputs.artifact_id != '' }}
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v6
+        env:
+          GIT_DIR: ${{ runner.temp }}/codecov-source/.git
+          GIT_WORK_TREE: ${{ runner.temp }}/codecov-source
         with:
           use_oidc: true
           files: ${{ runner.temp }}/reports/coverage.xml
           root_dir: ${{ runner.temp }}/codecov-source
-          working-directory: ${{ runner.temp }}/codecov-source
+          working-directory: ${{ runner.temp }}/codecov-work
           name: coverage-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
           plugins: noop
           disable_search: true
@@ -170,11 +158,14 @@ jobs:
         id: junit_upload
         if: ${{ steps.source.outputs.artifact_id != '' }}
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v6
+        env:
+          GIT_DIR: ${{ runner.temp }}/codecov-source/.git
+          GIT_WORK_TREE: ${{ runner.temp }}/codecov-source
         with:
           use_oidc: true
           files: ${{ runner.temp }}/reports/junit.xml
           root_dir: ${{ runner.temp }}/codecov-source
-          working-directory: ${{ runner.temp }}/codecov-source
+          working-directory: ${{ runner.temp }}/codecov-work
           name: junit-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
           job_code: junit-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
           report_type: test_results
@@ -194,6 +185,6 @@ jobs:
           SOURCE_SHA: ${{ steps.source.outputs.sha }}
           SOURCE_BUILD: ${{ github.event.workflow_run.id }}.${{ github.event.workflow_run.run_attempt }}
         run: |
-          python3 -I -B "$GITHUB_WORKSPACE/trusted-reporter/scripts/codecov_reporting.py" verify \
-            --sha "$SOURCE_SHA" --reports "$RUNNER_TEMP/reports" \
+          python3 -I -B "$GITHUB_WORKSPACE/trusted-reporter/scripts/codecov_reporting.py" \
+            --sha "$SOURCE_SHA" \
             --repository "$GITHUB_REPOSITORY" --build "$SOURCE_BUILD"
