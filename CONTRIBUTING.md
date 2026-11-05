@@ -138,6 +138,15 @@ separately while iterating on `scripts/`:
 docker compose -f devtools/docker/docker-compose.yml exec ha-dev pytest -q tests/scripts
 ```
 
+Coverage Reporting runs from the trusted default-branch workflow revision. Its
+helper builds an inert source-file inventory from the verified producer commit's
+Git tree metadata, normalizes coverage paths and checks Codecov's public API for
+nonempty processed project coverage and the same attempt's processed JUnit upload.
+It never fetches producer source blobs or executes producer code. Reporter changes
+need `tests/scripts/test_codecov_reporting.py`; live processing can only be proven
+after the reviewed reporter reaches main and a fresh source commit produces reports.
+Rerunning a commit whose first upload was unusable may retain Codecov's earlier error.
+
 Pull-request CI selects runtime, import-diagnostic, quality, and maintenance-script
 jobs from the changed paths. Manifest edits limited to `categories`, `codeowners`,
 `documentation`, `issue_tracker`, and `version` skip the full integration pytest job
