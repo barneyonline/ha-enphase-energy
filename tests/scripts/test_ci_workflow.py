@@ -418,6 +418,7 @@ def test_metadata_with_other_runtime_changes_keeps_tests(
     "paths",
     [
         (".github/workflows/tests.yml",),
+        (".github/workflows/coverage-reporting.yml",),
         ("scripts/ci_manifest_metadata.py",),
         ("tests/scripts/test_ci_workflow.py",),
         (
