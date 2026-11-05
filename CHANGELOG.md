@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🚧 Breaking changes
 
-- None
+- Production Power now reports an average derived from Site Solar Production's lifetime-energy feed, matching Grid/Battery Power, instead of the `get_latest_power` reading. Its entity identity is preserved. Old latest-power cache values are discarded on upgrade; two energy observations are required to calculate a new estimate, and unchanged overnight source timestamps follow the shared 30-minute expiry.
 
 ### ✨ New features
 
@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 
-- None
+- Use the existing `solar_production` energy flow for Production Power to avoid publishing the inaccurate daytime `get_latest_power` measurements reported in #934. Reuse Grid/Battery Power's timing, reset, outlier and restart safeguards; retain the raw endpoint only for diagnostics.
 
 ### 🔧 Improvements
 

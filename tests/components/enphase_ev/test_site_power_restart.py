@@ -48,6 +48,7 @@ def inputs(coord, timestamp, step):
             "interval_minutes": 5,
         }
         for key, value in (
+            ("solar_production", 100 + step * 0.175),
             ("grid_import", 100 + step * 0.2),
             ("grid_export", 80 + step * 0.1),
             ("battery_charge", 20 + step * 0.1),
@@ -140,9 +141,7 @@ async def test_all_power_first_publication_after_restart(
         state = hass.states.get(entity.entity_id)
         assert float(state.state) == value
         assert state.attributes["sampled_at_utc"] == accepted_at.isoformat()
-        assert state.attributes["using_cached"] is (
-            warmup != "same_bucket" or entity._key != "current_production_power"
-        )
+        assert state.attributes["using_cached"] is True
         assert all(
             state.state not in {"unavailable", "unknown"}
             for state in publications
@@ -412,10 +411,13 @@ async def test_production_bad_live_candidate_cannot_erase_restored_reading(
     now = [dt_util.utcnow()]
     monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
     coord = coordinator_factory()
-    inputs(coord, now[0], 0)
+    inputs(coord, now[0] - timedelta(minutes=5), 0)
     entities, component = await add_entities(
         hass, config_entry, coord, (EnphaseCurrentPowerConsumptionSensor,)
     )
+    inputs(coord, now[0], 1)
+    coord.async_update_listeners()
+    await hass.async_block_till_done()
     await remove_entities(component, entities)
     await async_mock_restore_state_shutdown_restart(hass)
     now[0] += timedelta(minutes=1)
@@ -425,8 +427,8 @@ async def test_production_bad_live_candidate_cannot_erase_restored_reading(
         hass, config_entry, coord, (EnphaseCurrentPowerConsumptionSensor,)
     )
     state = hass.states.get(entities[0].entity_id)
-    assert state.state == "2000"
-    assert state.attributes["using_cached"] is True
+    assert state.state == "unavailable"
+    assert entities[0]._power_history.latest(now[0].timestamp()).watts == 2100
     await remove_entities(component, entities)
 
 
@@ -489,44 +491,6 @@ async def test_sensor_restores_older_accepted_record_when_latest_is_corrupt(
         == (now[0] - timedelta(minutes=5)).isoformat()
     )
     await component.async_remove_entity(restored.entity_id)
-
-
-@pytest.mark.parametrize("sample_age,watts", [(300, 2000), (86400, 0)])
-async def test_production_retains_original_acquisition_and_overnight_rule(
-    hass, config_entry, coordinator_factory, monkeypatch, sample_age, watts
-):
-    now = [dt_util.utcnow()]
-    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
-    received = now[0] - timedelta(seconds=30)
-    coord = coordinator_factory()
-    coord.current_power_runtime.replace_snapshot(
-        w=watts, sample_utc=now[0] - timedelta(seconds=sample_age)
-    )
-    coord.current_power_runtime.received_utc = received
-    entities, component = await add_entities(
-        hass, config_entry, coord, (EnphaseCurrentPowerConsumptionSensor,)
-    )
-    record = entities[0].extra_restore_state_data.as_dict()["power_history"]["samples"][
-        -1
-    ]
-    assert record["received_ts"] == received.timestamp()
-    await remove_entities(component, entities)
-    await async_mock_restore_state_shutdown_restart(hass)
-    now[0] += timedelta(minutes=1)
-    entities, component = await add_entities(
-        hass,
-        config_entry,
-        coordinator_factory(),
-        (EnphaseCurrentPowerConsumptionSensor,),
-    )
-    state = hass.states.get(entities[0].entity_id)
-    assert float(state.state) == watts
-    assert state.attributes["cached_at_utc"] == received.isoformat()
-    assert (
-        entities[0].extra_restore_state_data.as_dict()["power_history"]["samples"][-1]
-        == record
-    )
-    await remove_entities(component, entities)
 
 
 async def test_unknown_private_production_format_does_not_resurrect_legacy_watts(
@@ -602,7 +566,7 @@ async def test_production_restore_cannot_extend_a_more_conservative_saved_deadli
         watts,
         (now[0] - timedelta(minutes=5)).timestamp(),
         original.timestamp(),
-        {},
+        {"method": "lifetime_energy_window"},
         now[0].timestamp(),
     )
     extra = RestoredExtraData(
@@ -626,6 +590,8 @@ async def test_production_restore_cannot_extend_a_more_conservative_saved_deadli
 
 def restored_power_extra(watts, sampled_at, *, freshness=None, received=None, **attrs):
     from homeassistant.helpers.restore_state import RestoredExtraData
+
+    attrs.setdefault("method", "lifetime_energy_window")
 
     record = PowerReading(
         watts,
