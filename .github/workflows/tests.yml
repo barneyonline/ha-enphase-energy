@@ -70,7 +70,7 @@ jobs:
           fi
 
           # Validate classifier and test-workflow edits with the script suite.
-          test_infrastructure='^(\.github/workflows/tests\.yml|scripts/ci_manifest_metadata\.py|tests/scripts/test_ci_workflow\.py)$'
+          test_infrastructure='^(\.github/workflows/(tests|coverage-reporting)\.yml|scripts/ci_manifest_metadata\.py|tests/scripts/test_ci_workflow\.py)$'
           common='^(hacs\.json|devtools/docker/(Dockerfile|docker-compose\.yml|constraints-[^/]+\.txt))$'
           set_output integration "${common}|^scripts/(benchmark_snapshots|check_statement_coverage)\.py$|^custom_components/enphase_ev/|^tests/components/enphase_ev/|^devtools/docker/requirements-dev\.txt$|^pytest\.ini$|^\.coveragerc$|^\.pre-commit-config\.yaml$|^\.ruff\.toml$" "$integration_files"
           set_output diagnostics "${common}|^custom_components/enphase_ev/.*\.py$|^scripts/importtime_profile\.py$|^tests/scripts/test_importtime_profile\.py$|^devtools/docker/requirements-dev\.txt$"
@@ -185,6 +185,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          # Coverage and workflow_run attribution must describe the same tree.
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - uses: actions/setup-python@v7
@@ -228,7 +230,7 @@ jobs:
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
           PYTEST_PLUGINS: pytest_asyncio.plugin,pytest_homeassistant_custom_component.plugins,pytest_cov.plugin,pytest_github_actions_annotate_failures.plugin
-        run: pytest -q tests/components/enphase_ev --cov=custom_components.enphase_ev --cov-branch --cov-report=term-missing --cov-report=xml --cov-report=json --cov-fail-under=100 --junitxml=junit.xml -o junit_family=legacy --log-file=pytest-runtime-warnings.log --log-file-level=WARNING
+        run: pytest -q tests/components/enphase_ev --cov --cov-branch --cov-report=term-missing --cov-report=xml --cov-report=json --cov-fail-under=100 --junitxml=junit.xml -o junit_family=legacy --log-file=pytest-runtime-warnings.log --log-file-level=WARNING
       - name: Upload runtime warning log
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
