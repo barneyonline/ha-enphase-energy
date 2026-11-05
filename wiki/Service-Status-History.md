@@ -1,11 +1,11 @@
 # Service Status History
 
 - Current status: **Fully Operational**
-- Last updated: `2026-11-04 21:23 UTC`
+- Last updated: `2026-11-05 01:37 UTC`
 - Failed checks in latest run: `0`
 - Latest failed checks: None
 - Retained hourly samples: `147`
-- Incident windows in last 30 days: `5`
+- Incident windows in last 30 days: `4`
 
 This page is generated from hourly synthetic checks against Enphase cloud endpoints. It may miss incidents that begin and recover between checks.
 
@@ -16,12 +16,11 @@ gantt
     title Enphase Service Status Incident Timeline (Last 30 Days)
     dateFormat  YYYY-MM-DDTHH:mm:ss
     axisFormat  %b %d
-    Window start :vert, window-start, 2026-10-05T21:23:57, 0ms
-    Window end :vert, window-end, 2026-11-04T21:23:57, 0ms
+    Window start :vert, window-start, 2026-10-06T01:37:54, 0ms
+    Window end :vert, window-end, 2026-11-05T01:37:54, 0ms
     section Down
-    Down 1 (2026-10-06 0035 UTC) :crit, down-1, 2026-10-06T00:35:21, 60m
-    Down 2 (2026-10-07 1755 UTC) :crit, down-2, 2026-10-07T17:55:16, 60m
-    Down 3 (2026-10-31 2242 UTC) :crit, down-3, 2026-10-31T22:42:18, 60m
+    Down 1 (2026-10-07 1755 UTC) :crit, down-1, 2026-10-07T17:55:16, 60m
+    Down 2 (2026-10-31 2242 UTC) :crit, down-2, 2026-10-31T22:42:18, 60m
     section Degraded
     Degraded 1 (2026-10-20 0849 UTC) :active, degraded-1, 2026-10-20T08:49:49, 60m
     Degraded 2 (2026-10-25 0050 UTC) :active, degraded-2, 2026-10-25T00:50:01, 60m
@@ -31,7 +30,6 @@ gantt
 
 | Status | Started (UTC) | Ended (UTC) | Duration | Failed checks |
 | --- | --- | --- | --- | --- |
-| Down | 2026-10-06 00:35 UTC | Unknown after last seen 2026-10-06 00:35 UTC | Observed 0m | battery_config, evse_runtime, evse_scheduler |
 | Down | 2026-10-07 17:55 UTC | Unknown after last seen 2026-10-07 17:55 UTC | Observed 0m | battery_config, evse_runtime |
 | Degraded | 2026-10-20 08:49 UTC | Unknown after last seen 2026-10-20 08:49 UTC | Observed 0m | battery_runtime, discovery, site_energy |
 | Degraded | 2026-10-25 00:50 UTC | Unknown after last seen 2026-10-25 00:50 UTC | Observed 0m | evse_timeseries, session_history |
