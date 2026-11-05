@@ -21,9 +21,9 @@ from homeassistant.util.unit_conversion import PowerConverter
 from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, CURRENT_POWER_STALE_AFTER_S, PRODUCTION_POWER_STALE_AFTER_S
+from .const import DOMAIN, CURRENT_POWER_STALE_AFTER_S
 from .coordinator import EnphaseCoordinator
-from .current_power_runtime import is_future_power_sample, is_idle_power_sample
+from .current_power_runtime import is_idle_power_sample
 from .device_info_helpers import _cloud_device_info
 from .energy import (
     LIFETIME_RESET_DROP_THRESHOLD_KWH,
@@ -45,7 +45,6 @@ from .sensor_common import (
     _energy_delta_to_power_w,
     _has_type,
     _lifetime_energy_delta,
-    _normalize_utc_datetime,
     _resolve_lifetime_power_window,
     _restore_optional_float_attribute,
     _restore_optional_int_value,
@@ -57,6 +56,7 @@ CURRENT_POWER_CACHE_TTL_MULTIPLIER = 2
 
 
 SITE_LIFETIME_FLOW_BUCKET_LENGTH_KEYS: dict[str, tuple[str, ...]] = {
+    "solar_production": ("production",),
     "grid_import": ("import", "grid_home", "grid_battery"),
     "grid_export": ("solar_grid", "battery_grid", "generator_grid"),
     "battery_charge": ("charge", "solar_battery", "grid_battery"),
@@ -2440,310 +2440,37 @@ class EnphaseBatteryPowerSensor(_EnphaseSiteLifetimePowerSensor):
         )
 
 
-class EnphaseCurrentPowerConsumptionSensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[misc]
-    _attr_translation_key = "current_production_power"
-    _attr_device_class = SensorDeviceClass.POWER
-    _attr_native_unit_of_measurement = UnitOfPower.WATT
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_entity_registry_enabled_default = True
-    _unrecorded_attributes = _SiteBaseEntity._unrecorded_attributes | frozenset(
-        {"freshness_reference_utc"}
-    )
+class EnphaseCurrentPowerConsumptionSensor(_EnphaseSiteLifetimePowerSensor):
+    """Production average from the same lifetime-energy source as grid/battery."""
 
     def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(
             coord,
             "current_production_power",
             "Production Power",
+            translation_key="current_production_power",
+            flow_signs={"solar_production": 1},
             type_key=None,
         )
-        self._last_good_value: float | None = None
-        self._last_good_sample_utc: datetime | None = None
-        self._last_good_cached_at_utc: datetime | None = None
-        self._last_good_source: str | None = None
-        self._last_good_reported_units: str | None = None
-        self._last_good_reported_precision: int | None = None
-        self._power_history = PowerHistory()
-        self._using_restored_power = False
-        self._restored_power_freshness: datetime | None = None
-
-    async def async_added_to_hass(self) -> None:
-        await self._async_restore_power()
-        await super().async_added_to_hass()
 
     async def _async_restore_power(self) -> None:
-        extra = await self.async_get_last_extra_data()
-        raw_extra = power_restore_data(extra)
-        self._power_history.restore(
-            raw_extra.get("power_history"), dt_util.utcnow().timestamp()
-        )
-        cached = self._power_history.latest(dt_util.utcnow().timestamp())
-        if cached is not None:
-            self._restored_power_freshness = datetime.fromtimestamp(
-                cached.freshness_ts, tz=timezone.utc
+        await super()._async_restore_power()
+        # The entity identity is unchanged, but old get_latest_power readings
+        # are not energy-derived averages. Restore only this calculation's data.
+        self._power_history.samples = [
+            reading
+            for reading in self._power_history.samples
+            if reading.attributes.get("method")
+            in (
+                "lifetime_energy_window",
+                "no_change",
+                "lifetime_reset",
+                "extreme_confirmed",
+                "restored_lifetime_energy_window",
+                "restored_no_change",
+                "restored_lifetime_reset",
             )
-            self._last_good_value = cached.watts
-            self._last_good_sample_utc = datetime.fromtimestamp(
-                cached.sampled_ts, tz=timezone.utc
-            )
-            self._last_good_cached_at_utc = datetime.fromtimestamp(
-                cached.received_ts or cached.freshness_ts, tz=timezone.utc
-            )
-            self._last_good_source = cached.attributes.get("source")
-            self._last_good_reported_units = cached.attributes.get("reported_units")
-            self._last_good_reported_precision = cached.attributes.get(
-                "reported_precision"
-            )
-            self._using_restored_power = True
-            return
-        if "power_history" in raw_extra or (extra is not None and not raw_extra):
-            return
-        last = await self.async_get_last_sensor_data()
-        if last is not None:
-            try:
-                restored = (
-                    float(last.native_value) if last.native_value is not None else None
-                )
-            except Exception:  # noqa: BLE001
-                restored = None
-            if (
-                restored is not None
-                and math.isfinite(restored)
-                and abs(restored) < EXTREME_SITE_POWER_W
-            ):
-                self._last_good_value = restored
-                self._using_restored_power = True
-
-        try:
-            last_state = await self.async_get_last_state()
-        except Exception:  # noqa: BLE001
-            last_state = None
-        if last_state is None:
-            return
-        attrs = last_state.attributes or {}
-        sample_raw = attrs.get("sampled_at_utc")
-        if isinstance(sample_raw, str):
-            parsed = dt_util.parse_datetime(sample_raw)
-            if parsed is not None:
-                self._last_good_sample_utc = _normalize_utc_datetime(parsed)
-        cached_raw = attrs.get("cached_at_utc")
-        if isinstance(cached_raw, str):
-            parsed_cached = dt_util.parse_datetime(cached_raw)
-            if parsed_cached is not None:
-                self._last_good_cached_at_utc = _normalize_utc_datetime(parsed_cached)
-        source = attrs.get("source")
-        if isinstance(source, str) and source.strip():
-            self._last_good_source = source
-        units = attrs.get("reported_units")
-        if isinstance(units, str) and units.strip():
-            self._last_good_reported_units = units
-        precision = attrs.get("reported_precision")
-        try:
-            if precision is not None:
-                self._last_good_reported_precision = int(precision)
-        except Exception:  # noqa: BLE001
-            self._last_good_reported_precision = None
-        freshness = self._sample_freshness_utc()
-        if (
-            self._last_good_value is not None
-            and self._last_good_sample_utc is not None
-            and freshness is not None
-            and self._cached_sample_is_fresh()
-        ):
-            self._power_history.remember(
-                PowerReading(
-                    self._last_good_value,
-                    self._last_good_sample_utc.timestamp(),
-                    freshness.timestamp(),
-                    {
-                        "source": self._last_good_source,
-                        "reported_units": self._last_good_reported_units,
-                        "reported_precision": self._last_good_reported_precision,
-                    },
-                    (
-                        self._last_good_cached_at_utc.timestamp()
-                        if self._last_good_cached_at_utc is not None
-                        else None
-                    ),
-                )
-            )
-        self._schedule_freshness_expiry()
-
-    def _cache_ttl(self) -> timedelta:
-        return timedelta(seconds=PRODUCTION_POWER_STALE_AFTER_S)
-
-    def _freshness_reference_utc(self) -> datetime:
-        success_utc = _normalize_utc_datetime(
-            getattr(self._coord, "last_success_utc", None)
-        )
-        try:
-            now = _normalize_utc_datetime(dt_util.utcnow())
-        except Exception:  # noqa: BLE001
-            now = None
-        if success_utc is not None and now is not None:
-            return max(success_utc, now)
-        if success_utc is not None:
-            return success_utc
-        if now is not None:
-            return now
-        return datetime.now(timezone.utc)
-
-    def _cached_sample_is_fresh(self) -> bool:
-        sample_utc = self._sample_freshness_utc()
-        if sample_utc is None:
-            return False
-        reference_utc = self._freshness_reference_utc()
-        if is_future_power_sample(
-            self._last_good_sample_utc,
-            self._last_good_cached_at_utc or reference_utc,
-        ):
-            return False
-        age = reference_utc - sample_utc
-        return timedelta(0) <= age < self._cache_ttl()
-
-    def _sample_freshness_utc(self) -> datetime | None:
-        """Bound freshness by both acquisition and the source timestamp."""
-
-        received_utc = self._last_good_cached_at_utc
-        if received_utc is not None and is_idle_power_sample(
-            self._last_good_value, self._last_good_sample_utc, received_utc
-        ):
-            return min(received_utc, self._restored_power_freshness or received_utc)
-        timestamps = [
-            stamp
-            for stamp in (
-                self._last_good_cached_at_utc,
-                self._last_good_sample_utc,
-                self._restored_power_freshness,
-            )
-            if stamp is not None
         ]
-        return min(timestamps) if timestamps else None
-
-    def _freshness_deadline(self) -> datetime | None:
-        """Expire this endpoint independently of successful core polling."""
-
-        self._current_or_cached_snapshot()
-        sample_utc = self._sample_freshness_utc()
-        return sample_utc + self._cache_ttl() if sample_utc is not None else None
-
-    def _clear_last_good_sample(self) -> None:
-        self._last_good_value = None
-        self._last_good_sample_utc = None
-        self._last_good_cached_at_utc = None
-        self._last_good_source = None
-        self._last_good_reported_units = None
-        self._last_good_reported_precision = None
-
-    def _current_or_cached_snapshot(
-        self,
-    ) -> tuple[float | None, datetime | None, str | None, str | None, int | None]:
-        value = self._coord.current_power_consumption_w
-        sample_utc = _normalize_utc_datetime(
-            self._coord.current_power_consumption_sample_utc
-        )
-        source = self._coord.current_power_consumption_source
-        units = self._coord.current_power_consumption_reported_units
-        precision = self._coord.current_power_consumption_reported_precision
-        received_utc = self._coord.current_power_runtime.received_utc
-        if value is not None:
-            if self._source_first_observed is None:
-                self._source_first_observed = self._freshness_reference_utc()
-            received_utc = received_utc or self._source_first_observed
-            freshness = (
-                received_utc
-                if is_idle_power_sample(value, sample_utc, received_utc)
-                else min(sample_utc or received_utc, received_utc)
-            )
-            age = self._freshness_reference_utc() - freshness
-            if (
-                not is_future_power_sample(sample_utc, received_utc)
-                and timedelta(0) <= age < self._cache_ttl()
-            ):
-                self._last_good_value = float(value)
-                self._last_good_sample_utc = sample_utc
-                self._last_good_cached_at_utc = freshness
-                self._last_good_source = source
-                self._last_good_reported_units = units
-                self._last_good_reported_precision = precision
-                self._using_restored_power = False
-                self._restored_power_freshness = None
-                if sample_utc is not None:
-                    self._power_history.remember(
-                        PowerReading(
-                            float(value),
-                            sample_utc.timestamp(),
-                            freshness.timestamp(),
-                            {
-                                "source": self._last_good_source,
-                                "reported_units": self._last_good_reported_units,
-                                "reported_precision": self._last_good_reported_precision,
-                            },
-                            received_utc.timestamp(),
-                        )
-                    )
-        if self._last_good_value is not None and not self._cached_sample_is_fresh():
-            self._clear_last_good_sample()
-        return (
-            self._last_good_value,
-            self._last_good_sample_utc,
-            self._last_good_source,
-            self._last_good_reported_units,
-            self._last_good_reported_precision,
-        )
-
-    @property
-    def extra_restore_state_data(self) -> ExtraStoredData | None:
-        return PowerStoredData(
-            SensorExtraStoredData(self._last_good_value, UnitOfPower.WATT),
-            self._power_history,
-        )
-
-    @property
-    def available(self) -> bool:
-        if not super().available:
-            return False
-        value, _sample_utc, _source, _units, _precision = (
-            self._current_or_cached_snapshot()
-        )
-        return value is not None
-
-    @property
-    def native_value(self) -> Any:
-        value, _sample_utc, _source, _units, _precision = (
-            self._current_or_cached_snapshot()
-        )
-        if value is None:
-            return None
-        rounded = round(value, 3)
-        if float(rounded).is_integer():
-            return int(rounded)
-        return rounded
-
-    @property
-    def extra_state_attributes(self) -> Any:
-        _value, sample_utc, source, units, precision = (
-            self._current_or_cached_snapshot()
-        )
-        freshness = self._sample_freshness_utc()
-        return {
-            "sampled_at_utc": (
-                sample_utc.isoformat() if sample_utc is not None else None
-            ),
-            "freshness_reference_utc": (
-                freshness.isoformat() if freshness is not None else None
-            ),
-            "cached_at_utc": (
-                self._last_good_cached_at_utc.isoformat()
-                if self._last_good_cached_at_utc is not None
-                else None
-            ),
-            "source": source,
-            "reported_units": units,
-            "reported_precision": precision,
-            "using_stale": bool(self._coord.current_power_runtime.using_stale),
-            "using_cached": self._using_restored_power,
-        }
 
     @property
     def device_info(self) -> Any:

@@ -541,29 +541,34 @@ healthy. Battery and heat-pump family recovery is published when freshness is
 restored, including when the measurement itself has not changed. This restores
 availability and expiry timers without publishing every identical successful poll.
 
-Current Production Power uses the shared 30-minute cloud telemetry freshness
-window to tolerate delayed cloud updates. Both its source timestamp and first
-acquisition time bound readings outside the idle range, even while core polling
-remains healthy. Validated readings within +/-2 W with a nonfuture source
-timestamp instead use
-their latest successful acquisition: Enphase can repeat its last near-zero
-production sample overnight. The reported value and source timestamp are
-preserved, including the residual 2 W dusk interval reported in #988. This bounded
-exception does not establish freshness for larger repeated readings. Missing
-timestamps also use acquisition time. Failed, malformed,
-unsupported-unit, quarantined, or skipped responses never renew that time, so
-even near-zero readings expire after 30 minutes without a valid response.
-Entity-owned expiry timers remain independent of core polling cadence. Grid,
-battery, consumption and heat-pump power use the same 30-minute limit. Aggregate
-and individual battery charge, available energy and available power expire after
-30 minutes without a successful battery-status acquisition. Battery health,
-cycle counts and historical readings retain their existing policies.
-Production samples more than 60 seconds ahead of receipt are rejected before
-publication or extreme-power confirmation. Healthy responses containing these
-samples do not renew the last accepted reading's freshness; the next fetch may
-accept a revised value with the same timestamp once it falls within the clock
-allowance. Restore rejects samples that were premature at their stored receipt
-time. Diagnostics and sanitized measurement logs expose `future_timestamp`.
+Production Power uses the same lifetime-energy delta calculation as Grid Power
+and Battery Power. Its `solar_production` flow is the guarded sum of the
+`production` Wh buckets from `/pv/systems/<site_id>/lifetime_energy`, already used
+by Site Solar Production. It reports average watts over the source-report window,
+respecting any reported minimum interval; it is not instantaneous local-gateway
+telemetry. The first valid energy observation seeds a baseline, and the next
+source timestamp permits a power calculation. Same-timestamp energy corrections
+are included in the next calculation rather than divided by a zero time window.
+Resets, missing channels, source changes, outliers, freshness and bounded restart
+history follow the shared Grid/Battery implementation. All three use a 30-minute
+source freshness limit; unchanged source timestamps, including overnight zeros,
+do not extend it. This differs from the former latest-power idle exception.
+Cloud energy corrections and batched delivery can be misaligned with the report
+clock, producing short-window spikes or under-reading even when daily energy
+totals agree. Sharing the calculation does not establish instantaneous accuracy.
+
+The Production Power entity retains its identity, translation and cloud device.
+Upgrade restoration discards old `get_latest_power` measurements instead of
+presenting them as energy-derived averages. Accepted energy-derived history
+retains its original expiry across restarts while new inputs warm up. Consumption
+Power's existing balance uses the published derived production estimate.
+
+The `current_power_runtime` still acquires `get_latest_power` for normalized
+endpoint diagnostics; it is not a Production Power fallback. Its raw sample
+validation and receipt metadata are independent of the derived sensor. Samples
+more than 60 seconds ahead of receipt are rejected before extreme-power
+confirmation; failed, malformed or rejected acquisitions cannot renew diagnostic
+receipt time. Diagnostics and sanitized measurement logs expose `future_timestamp`.
 
 The per-inverter Lifetime Energy and Power feature switches independently gate
 entity creation. Switching a feature off removes its registered entities, including

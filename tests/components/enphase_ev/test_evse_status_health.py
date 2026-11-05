@@ -86,6 +86,15 @@ async def test_status_500_keeps_sibling_readings_and_retries_independently(
         return_value={"value": 2484, "time": clock.now.timestamp(), "units": "W"}
     )
     coord.energy._async_refresh_site_energy = AsyncMock()
+    coord.energy.site_energy = {
+        "solar_production": {
+            "value_kwh": 1,
+            "fields_used": ["production"],
+            "last_report_date": clock.now - timedelta(minutes=5),
+        }
+    }
+    production = EnphaseCurrentPowerConsumptionSensor(coord)
+    assert production.native_value is None
     pending = coord.control_updates.begin(
         "charging", RANDOM_SERIAL, {"enabled": True}, {"enabled": False}
     )
@@ -103,8 +112,11 @@ async def test_status_500_keeps_sibling_readings_and_retries_independently(
         assert not coord.evse_status_available
         assert EnphaseBatteryOverallChargeSensor(coord).available
         assert EnphaseBatteryOverallChargeSensor(coord).native_value == 35
-        assert EnphaseCurrentPowerConsumptionSensor(coord).available
-        assert EnphaseCurrentPowerConsumptionSensor(coord).native_value == 2484
+        coord.energy.site_energy["solar_production"].update(
+            value_kwh=1.207, last_report_date=clock.now
+        )
+        assert production.available
+        assert production.native_value == 2484
         assert not EnphaseBaseEntity(coord, RANDOM_SERIAL).available
         assert RANDOM_SERIAL in coord.serials
         assert pending.status == "pending"

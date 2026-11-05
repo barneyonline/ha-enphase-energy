@@ -6,15 +6,7 @@ from unittest.mock import AsyncMock
 from zoneinfo import ZoneInfo
 
 import pytest
-from homeassistant.components.sensor import SensorExtraStoredData
-from homeassistant.core import State
-from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import async_fire_time_changed
-
-from custom_components.enphase_ev.sensor_site_energy import (
-    EnphaseCurrentPowerConsumptionSensor,
-)
 
 
 @pytest.mark.parametrize(
@@ -109,80 +101,6 @@ async def test_future_clock_tolerance_without_previous_reading(
     await coord.current_power_runtime.async_refresh()
     assert (coord.current_power_runtime.snapshot.w is not None) is accepted
     assert coord.current_power_runtime.received_utc == (now if accepted else None)
-
-
-@pytest.mark.parametrize("sample_offset,cached_offset", [(210, 0), (-120, -300)])
-async def test_premature_restored_sample_is_not_published(
-    hass, config_entry, coordinator_factory, monkeypatch, sample_offset, cached_offset
-):
-    now = dt_util.utcnow()
-    monkeypatch.setattr(dt_util, "utcnow", lambda: now)
-    coord = coordinator_factory()
-    coord.update_interval = None
-    coord.last_success_utc = now
-    entity = EnphaseCurrentPowerConsumptionSensor(coord)
-    entity.entity_id = "sensor.restored_premature_production"
-    entity.async_get_last_sensor_data = AsyncMock(
-        return_value=SensorExtraStoredData(17, "W")
-    )
-    entity.async_get_last_state = AsyncMock(
-        return_value=State(
-            entity.entity_id,
-            "17",
-            {
-                "sampled_at_utc": (now + timedelta(seconds=sample_offset)).isoformat(),
-                "cached_at_utc": (now + timedelta(seconds=cached_offset)).isoformat(),
-            },
-        )
-    )
-    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
-    component._platforms["sensor"].config_entry = config_entry
-    await component.async_add_entities([entity])
-    assert hass.states.get(entity.entity_id).state == "unavailable"
-    assert entity.native_value is None
-    assert entity._cancel_freshness_expiry is None
-    await component.async_remove_entity(entity.entity_id)
-
-
-@pytest.mark.parametrize("accepted_value,future_value", [(2500, 0), (2, 2)])
-async def test_future_polls_cannot_renew_power_expiry(
-    hass, config_entry, coordinator_factory, monkeypatch, accepted_value, future_value
-):
-    now = [dt_util.utcnow()]
-    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
-    coord = coordinator_factory()
-    coord.update_interval = None
-    coord.last_success_utc = now[0]
-    monkeypatch.setattr(coord, "endpoint_family_should_run", lambda _family: True)
-    coord.client.latest_power = AsyncMock(
-        return_value={"value": accepted_value, "time": now[0].timestamp()}
-    )
-    runtime = coord.current_power_runtime
-    await runtime.async_refresh()
-    accepted_at = now[0]
-    entity = EnphaseCurrentPowerConsumptionSensor(coord)
-    entity.entity_id = "sensor.future_poll_production"
-    entity.async_get_last_sensor_data = AsyncMock(return_value=None)
-    entity.async_get_last_state = AsyncMock(return_value=None)
-    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
-    component._platforms["sensor"].config_entry = config_entry
-    await component.async_add_entities([entity])
-    for age in (60, 1799, 1800):
-        now[0] = accepted_at + timedelta(seconds=age)
-        coord.last_success_utc = now[0]
-        coord.client.latest_power.return_value = {
-            "value": future_value,
-            "time": (now[0] + timedelta(seconds=210)).timestamp(),
-        }
-        runtime._cache_until_mono = None
-        await runtime.async_refresh()
-        async_fire_time_changed(hass, now[0])
-        await hass.async_block_till_done()
-        assert hass.states.get(entity.entity_id).state == (
-            str(accepted_value) if age < 1800 else "unavailable"
-        )
-        assert runtime.received_utc == accepted_at
-    await component.async_remove_entity(entity.entity_id)
 
 
 async def test_future_sample_cannot_change_extreme_confirmation(

@@ -406,8 +406,8 @@ async def test_restore_current_power_ignores_invalid_dates(
         ),
     )
     await entity._async_restore_power()
-    assert entity._last_good_sample_utc is None
-    assert entity._last_good_cached_at_utc is None
+    assert entity._last_sample_ts is None
+    assert not entity._power_history.samples
 
 
 def test_heatpump_energy_device_info_falls_back_to_cloud(

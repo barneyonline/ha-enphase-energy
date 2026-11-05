@@ -23,7 +23,7 @@ async def test_clear_resets_fields(coordinator_factory) -> None:
     coord.current_power_runtime.clear()
 
     assert coord._current_power_consumption_w is None
-    assert coord._current_power_consumption_sample_utc is None
+    assert coord.current_power_consumption_sample_utc is None
     assert coord._current_power_consumption_reported_units is None
     assert coord._current_power_consumption_reported_precision is None
     assert coord._current_power_consumption_source is None
@@ -145,7 +145,7 @@ async def test_async_refresh_success_ms_timestamp_and_units(
     assert coord._current_power_consumption_reported_units == "W"
     assert coord._current_power_consumption_reported_precision == 0
     assert coord._current_power_consumption_source == "app-api:get_latest_power"
-    assert coord._current_power_consumption_sample_utc is not None
+    assert coord.current_power_consumption_sample_utc is not None
     assert coord.current_power_runtime._cache_until_mono == 160.0  # noqa: SLF001
 
 
