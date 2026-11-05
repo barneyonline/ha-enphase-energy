@@ -169,6 +169,58 @@ onto the pinned Home Assistant runtime. `HACS_SOURCE_PLATFORM` selects that sour
 stage; the final image retains Docker's requested target platform. Keep both image
 digests and the Home Assistant version assertion when updating this validator.
 
+## Managed Cloud Environment
+
+The cloud adapter uses the same Dockerfile and dependency pins as local development.
+Configure the cloud environment's working directory as
+`/workspace/ha-enphase-energy`, and use this installation command:
+
+```bash
+bash devtools/cloud/environment.sh install
+```
+
+At the beginning of each cloud session, read `AGENTS.md` and this guide, then run:
+
+```bash
+bash devtools/cloud/environment.sh start
+```
+
+Installation reuses Docker build layers. Startup rebuilds only when the image is
+missing or its Dockerfile, dependency inputs, or cloud adapter have changed. It
+recreates `ha-dev` with current Docker proxy defaults and a read-only mount of the
+current system CA bundle, checks installed dependencies and pinned versions, and
+imports the integration. Neither command runs the full test suite. Reuse the
+running container for the checks appropriate to your changes:
+
+```bash
+bash devtools/cloud/environment.sh compose exec -T ha-dev pytest -q tests/components/enphase_ev
+bash devtools/cloud/environment.sh compose exec -T ha-dev pytest -q tests/scripts
+```
+
+Use `bash devtools/cloud/environment.sh rebuild` for an explicit uncached rebuild
+with a refreshed Python base image. Normal startup preserves source, HA config,
+images, and build caches. The adapter uses the managed local Docker socket, preserves
+Docker credentials and proxy configuration, and supplies CA trust through a
+BuildKit secret without changing the repository Dockerfile or disabling TLS.
+Generated state lives in `/workspace/.managed-ha`; `HA_CLOUD_STATE_DIR` can select
+another absolute directory on the Docker host.
+
+Start the optional manual UI only when needed:
+
+```bash
+mkdir -p .ha-config
+bash devtools/cloud/environment.sh compose up -d ha-runtime
+```
+
+The UI image is pinned to HA 2026.10.0. Keep it aligned with the development
+requirements when upgrading HA. Cloud runtime certificate trust is mounted for
+this service too. No Enphase credentials are needed for the mocked test suites.
+Saving or publishing a cloud template is a separate platform operation; running
+these commands in one session does not update its saved configuration.
+Export self-contained install and startup settings for the platform's environment
+editor with `bash devtools/cloud/environment.sh settings`. The exported installer
+includes the adapter, so it also works before these repository changes are merged.
+
 ## Dependency Maintenance
 
 Declare the dependencies this repository can choose directly. Keep the supported

@@ -12,7 +12,8 @@ services:
       - PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
 
   ha-runtime:
-    image: ghcr.io/home-assistant/home-assistant:stable
+    # Keep manual UI verification on the same HA release as requirements-dev.txt.
+    image: ghcr.io/home-assistant/home-assistant:2026.10.0
     restart: unless-stopped
     ports:
       - "8123:8123"
