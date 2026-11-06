@@ -46,11 +46,16 @@ jobs:
             let prNumber = '';
             let branch = run.head_branch;
             if (run.event === 'pull_request') {
-              // workflow_run.pull_requests can be empty for fork pull requests.
-              const associated = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
-                ...context.repo, commit_sha: run.head_sha, per_page: 100,
+              // Fork runs can lack both workflow_run.pull_requests and a
+              // base-repository commit association. Query the base PR inventory
+              // by producer owner/branch, then require the exact current head.
+              const pulls = await github.paginate(github.rest.pulls.list, {
+                ...context.repo, state: 'open',
+                head: `${run.head_repository.owner.login}:${run.head_branch}`, per_page: 100,
               });
-              const matches = associated.filter(pr => pr.base.repo.id === run.repository.id &&
+              const matches = pulls.filter(pr => pr.base.repo.id === run.repository.id &&
+                pr.head.repo?.id === run.head_repository.id &&
+                pr.head.ref === run.head_branch &&
                 pr.head.sha === run.head_sha &&
                 pr.state === 'open');
               if (matches.length !== 1) {
