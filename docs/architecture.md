@@ -551,6 +551,10 @@ source timestamp permits a power calculation. Same-timestamp energy corrections
 are included in the next calculation rather than divided by a zero time window.
 Older source timestamps cannot replace the accepted calculation or move its
 cumulative-energy baseline backwards, including while the sensor is warming up.
+An uninitialized placeholder is not an energy baseline: the first valid source
+report may seed from an earlier clock than that placeholder's receipt or metadata.
+If a newer accepted reading survives without its calculation baseline, older
+live reports cannot replace it or seed a calculation behind its source timestamp.
 Resets, missing channels, source changes, outliers, freshness and bounded restart
 history follow the shared Grid/Battery implementation. All three use a 30-minute
 source freshness limit; unchanged source timestamps, including overnight zeros,

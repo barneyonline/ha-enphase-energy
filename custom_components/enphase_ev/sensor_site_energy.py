@@ -1327,9 +1327,13 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
         previous_sample = self._last_sample_ts
         current_values, synthetic = self._current_flow_values()
         cached = self._power_history.latest(dt_util.utcnow().timestamp())
-        if cached is not None and not self._has_live_flow_values(
-            current_values, synthetic
+        source_sample_ts = self._source_sample_timestamp(self._site_energy_flows())
+        if cached is not None and (
+            not self._has_live_flow_values(current_values, synthetic)
+            or (source_sample_ts is not None and source_sample_ts < cached.sampled_ts)
         ):
+            # Accepted watts can survive an absent/discarded baseline. Older
+            # live reports must not reconstruct an estimate that replaces them.
             self._using_restored_power = True
             return cached.watts
         value = self._calculate_power()
@@ -1394,25 +1398,19 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
 
         source_sample_ts = self._source_sample_timestamp(flows)
         sample_ts, sample_iso = self._sample_timestamp(flows)
-        if self._last_sample_ts is not None and sample_ts < self._last_sample_ts:
-            # A monotonic energy guard can retain the accepted counter while an
-            # older response regresses its clock. Do not treat it as a zero delta
-            # or move the baseline used by the next valid source observation.
-            return self._last_power_w if self._live_flow_sample_count >= 2 else None
-        self._last_report_date_iso = sample_iso
-        # A corrected payload may seed a placeholder at the same source time.
-        # Rejected restored histories still require a new source observation.
+        # Placeholder clocks are not cumulative-energy baselines: the first
+        # valid source may predate a placeholder's receipt or metadata clock.
+        # Real and rejected restored histories still reject repeated/older data.
         if (
             self._last_sample_ts is not None
-            and sample_ts == self._last_sample_ts
+            and sample_ts <= self._last_sample_ts
             and (
                 self._live_flow_sample_count > 0
                 or self._last_method not in {"seeded", "no_live_data"}
             )
         ):
-            if self._live_flow_sample_count >= 2:
-                return self._last_power_w
-            return None
+            return self._last_power_w if self._live_flow_sample_count >= 2 else None
+        self._last_report_date_iso = sample_iso
 
         if self._last_flow_kwh:
             for flow_key in self._flow_signs:
