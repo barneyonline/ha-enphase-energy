@@ -6,6 +6,28 @@ All notable changes to this project will be documented in this file.
 
 ### 🚧 Breaking changes
 
+- None
+
+### ✨ New features
+
+- None
+
+### 🐛 Bug fixes
+
+- None
+
+### 🔧 Improvements
+
+- None
+
+### 🔄 Other changes
+
+- None
+
+## v5.2.5b1 - 2026-11-06
+
+### 🚧 Breaking changes
+
 - Production Power now reports an average derived from Site Solar Production's lifetime-energy feed, matching Grid/Battery Power, instead of the `get_latest_power` reading. Its entity identity is preserved. Old latest-power cache values are discarded on upgrade; two energy observations are required to calculate a new estimate, and unchanged overnight source timestamps follow the shared 30-minute expiry.
 
 ### ✨ New features
@@ -26,7 +48,9 @@ All notable changes to this project will be documented in this file.
 
 ### 🔄 Other changes
 
-- None
+- Restore usable Codecov coverage reports and verify that coverage and test results are processed for the correct validation run. (#991)
+- Add a reusable managed cloud development environment using the pinned Docker test stack. (#992)
+- Bump the integration manifest version to `5.2.5b1` for beta testing.
 
 ## v5.2.4 - 2026-11-03
 
