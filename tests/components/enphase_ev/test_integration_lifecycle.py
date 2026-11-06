@@ -37,7 +37,7 @@ def freezer():
 
 
 @pytest.fixture
-def platform_cloud(monkeypatch, load_fixture):
+def platform_cloud(monkeypatch, load_fixture, freezer):
     """Only replace cloud calls; retain coordinators, sessions and HA platforms."""
     monkeypatch.setattr(
         "custom_components.enphase_ev.async_create_clientsession",
@@ -109,6 +109,7 @@ def platform_cloud(monkeypatch, load_fixture):
             "production": [1000],
             "consumption": [2000],
             "interval": 15,
+            "last_report_date": dt_util.utcnow().timestamp(),
         },
         "get_schedules": {"data": [], "meta": {"serverTimeStamp": 1}},
     }
@@ -163,7 +164,17 @@ async def test_real_platform_setup_reload_and_unload(
     power = next(
         e for e in entries if e.unique_id.endswith("_current_production_power")
     )
-    assert hass.states.get(power.entity_id).state == "1250"
+    assert hass.states.get(power.entity_id).state == "unknown"
+    # A production average needs two energy observations. Exercise the actual
+    # acquisition and platforms while get_latest_power remains at 1250 W.
+    freezer.tick(timedelta(minutes=15))
+    responses["lifetime_energy"]["production"] = [1375]
+    responses["lifetime_energy"]["last_report_date"] = dt_util.utcnow().timestamp()
+    coord = config_entry.runtime_data.coordinator
+    await coord.energy._async_refresh_site_energy(force=True)
+    coord.async_set_updated_data(dict(coord.data))
+    await hass.async_block_till_done()
+    assert float(hass.states.get(power.entity_id).state) == 1500
     access = next(e for e in entries if e.unique_id.endswith("_account_access"))
     site_info = next(e for e in entries if e.unique_id.endswith("_site_information"))
     access_state = hass.states.get(access.entity_id)
@@ -214,10 +225,12 @@ async def test_real_platform_setup_reload_and_unload(
     assert all(
         restored[key] == identities[key] for key in identities.keys() - unsupported
     )
-    assert hass.states.get(power.entity_id).state == "1250"
+    assert float(hass.states.get(power.entity_id).state) == 1500
 
-    before = calls["latest_power"].await_count
-    responses["latest_power"]["value"] = 2500
+    before = calls["lifetime_energy"].await_count
+    responses["latest_power"]["value"] = 248
+    responses["lifetime_energy"]["production"] = [2000]
+    responses["lifetime_energy"]["last_report_date"] += 900
     responses["status"]["evChargerData"][0]["charging"] = True
     responses["status"]["evChargerData"][0]["connectorStatusType"] = "CHARGING"
     power_changed = asyncio.Event()
@@ -241,8 +254,8 @@ async def test_real_platform_setup_reload_and_unload(
     finally:
         unsubscribe()
     assert unexpected == [], ", ".join(unexpected)
-    assert calls["latest_power"].await_count > before
-    assert hass.states.get(power.entity_id).state == "2500"
+    assert calls["lifetime_energy"].await_count > before
+    assert float(hass.states.get(power.entity_id).state) == 2500
     if not site_only:
         assert hass.states.get("binary_sensor.garage_ev_charging").state == "on"
 

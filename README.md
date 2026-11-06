@@ -81,6 +81,14 @@ EV charging modes, current and session controls alongside battery reserve, grid 
 
 ### Cloud energy sensors
 
+Production, Grid and Battery Power are cloud energy-derived averages over their
+source-report windows. Production Power uses the same lifetime-energy feed as
+Site Solar Production. These readings can lag local gateway power; two valid
+energy observations are needed after an upgrade before Production Power can
+calculate its first average. Batched or corrected cloud energy updates can produce
+short-term spikes even when daily energy totals agree with the gateway.
+
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/cloud-sensors-dark.png">
