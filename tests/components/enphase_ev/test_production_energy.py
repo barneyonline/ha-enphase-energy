@@ -12,7 +12,9 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.enphase_ev.sensor_site_energy import (
+    EnphaseBatteryPowerSensor,
     EnphaseCurrentPowerConsumptionSensor,
+    EnphaseGridPowerSensor,
 )
 
 
@@ -119,6 +121,39 @@ def test_production_counter_reset_reseeds_without_power_spike(production):
     assert sensor.native_value == 6000
 
 
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf")])
+@pytest.mark.parametrize("warmed_up", [False, True])
+def test_nonfinite_production_bucket_cannot_poison_power(
+    production, invalid, warmed_up
+):
+    coord, sensor, now, sample = production
+    if warmed_up:
+        sample(100_000)
+        assert sensor.native_value is None
+        sample(100_500, seconds=300)
+        assert sensor.native_value == 6000
+    sample(invalid, seconds=60)
+    assert sensor.native_value == (6000 if warmed_up else None)
+    if not warmed_up:
+        # A corrected response may carry the same source timestamp. The invalid
+        # placeholder was not a live baseline and must not suppress this seed.
+        sample(100_000)
+        assert sensor.native_value is None
+    sample(101_000 if warmed_up else 100_500, seconds=240 if warmed_up else 300)
+    assert sensor.native_value == 6000
+
+
+@pytest.mark.parametrize("interval", [float("nan"), float("inf")])
+def test_nonfinite_interval_uses_existing_default(production, interval):
+    coord, sensor, now, sample = production
+    sample(100_000, interval=interval)
+    assert sensor.native_value is None
+    sample(100_600, seconds=300, interval=interval)
+    assert sensor.native_value == 7200
+    assert sensor.extra_state_attributes["last_window_seconds"] == 300
+    assert coord.energy.site_energy["solar_production"].interval_minutes == 5
+
+
 async def test_production_publishes_and_expires_like_grid_power(
     hass, config_entry, production
 ):
@@ -141,6 +176,77 @@ async def test_production_publishes_and_expires_like_grid_power(
         state = hass.states.get(sensor.entity_id)
         assert (state.state == "unavailable") is (age == 1800)
     await component.async_remove_entity(sensor.entity_id)
+
+
+@pytest.mark.parametrize(
+    ("sensor_class", "bucket"),
+    [
+        (EnphaseCurrentPowerConsumptionSensor, "production"),
+        (EnphaseGridPowerSensor, "import"),
+        (EnphaseBatteryPowerSensor, "discharge"),
+    ],
+)
+@pytest.mark.parametrize("warmed_up", [False, True])
+async def test_regressed_source_clock_cannot_rebase_power(
+    hass,
+    config_entry,
+    coordinator_factory,
+    monkeypatch,
+    sensor_class,
+    bucket,
+    warmed_up,
+):
+    """An older response must not zero watts or shorten the next valid window."""
+    now = [datetime(2026, 11, 4, 19, 30, tzinfo=timezone.utc)]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+    coord = coordinator_factory()
+    coord.update_interval = None
+    coord.last_success_utc = now[0]
+    sensor = sensor_class(coord)
+    sensor.entity_id = "sensor.regressed_" + bucket
+
+    def publish(wh, timestamp):
+        parsed = coord.energy._aggregate_site_energy(
+            {
+                bucket: [wh],
+                "last_report_date": timestamp.timestamp(),
+                "interval_minutes": 5,
+                "start_date": "2026-01-01",
+            }
+        )
+        assert parsed is not None
+        coord.energy.site_energy, coord.energy._site_energy_meta = parsed
+        coord.last_success_utc = now[0]
+        coord.async_update_listeners()
+
+    publish(100_000, now[0])
+    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    component._platforms["sensor"].config_entry = config_entry
+    await component.async_add_entities([sensor])
+    try:
+        if warmed_up:
+            now[0] += timedelta(minutes=5)
+            publish(100_500, now[0])
+            await hass.async_block_till_done()
+            assert float(hass.states.get(sensor.entity_id).state) == 6000
+        original = hass.states.get(sensor.entity_id)
+        accepted_at = now[0]
+        now[0] += timedelta(minutes=1)
+        # A stale payload can carry the guard's retained counter with an older
+        # source time that is still inside the 30-minute availability window.
+        publish(100_000, accepted_at - timedelta(minutes=1))
+        await hass.async_block_till_done()
+        current = hass.states.get(sensor.entity_id)
+        assert current.state == original.state
+        assert current.attributes["sampled_at_utc"] == accepted_at.isoformat()
+        now[0] = accepted_at + timedelta(minutes=5)
+        publish(101_000 if warmed_up else 100_500, now[0])
+        await hass.async_block_till_done()
+        current = hass.states.get(sensor.entity_id)
+        assert float(current.state) == 6000
+        assert current.attributes["last_window_seconds"] == 300
+    finally:
+        await component.async_remove_entity(sensor.entity_id)
 
 
 @pytest.mark.parametrize("method", [[], {}])
