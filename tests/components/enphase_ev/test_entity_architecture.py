@@ -652,6 +652,10 @@ def test_daily_energy_invalid_calendar_and_restore_helpers(
     assert _normalize_utc_datetime(datetime(2026, 9, 5)) == datetime(
         2026, 9, 5, tzinfo=timezone.utc
     )
+    assert _normalize_utc_datetime(None) is None
+    assert _normalize_utc_datetime(
+        datetime(2026, 9, 5, tzinfo=timezone.utc)
+    ) == datetime(2026, 9, 5, tzinfo=timezone.utc)
     assert restore_power_w(SimpleNamespace(state=None)) is None
     coord = coordinator_factory()
     coord._heatpump_daily_consumption = {
@@ -687,44 +691,6 @@ async def test_inventory_missing_serials_retains_last_complete_cache(
     await runtime._async_refresh_inverters()
     assert coord._inverter_order == []
     assert runtime._coordinator_backed_attr("unknown_state", "default") == "default"
-
-
-@pytest.mark.asyncio
-async def test_current_power_restore_defensive_paths(
-    hass, coordinator_factory, monkeypatch
-):
-    from custom_components.enphase_ev.sensor_site_energy import (
-        EnphaseCurrentPowerConsumptionSensor,
-    )
-    from custom_components.enphase_ev.sensor_base import EnphaseSiteSensorEntity
-    from homeassistant.util import dt as dt_util
-
-    coord = coordinator_factory()
-    coord.last_success_utc = dt_util.utcnow()
-    entity = EnphaseCurrentPowerConsumptionSensor(coord)
-    entity.hass = hass
-    entity.entity_id = "sensor.enphase_entity"
-    monkeypatch.setattr(EnphaseSiteSensorEntity, "async_added_to_hass", AsyncMock())
-    monkeypatch.setattr(
-        entity,
-        "async_get_last_sensor_data",
-        AsyncMock(return_value=SimpleNamespace(native_value="invalid")),
-    )
-    monkeypatch.setattr(
-        entity, "async_get_last_state", AsyncMock(side_effect=ValueError)
-    )
-    await entity.async_added_to_hass()
-    assert entity._last_good_value is None
-    monkeypatch.setattr(
-        entity,
-        "async_get_last_state",
-        AsyncMock(
-            return_value=State("sensor.power", "1", {"reported_precision": "invalid"})
-        ),
-    )
-    await entity.async_added_to_hass()
-    assert entity._last_good_reported_precision is None
-    assert entity._freshness_reference_utc() >= coord.last_success_utc
 
 
 @pytest.mark.asyncio

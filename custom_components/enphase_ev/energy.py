@@ -335,7 +335,7 @@ class EnergyManager:
         if interval_raw is None and "interval" in payload:
             interval_raw = payload.get("interval")
         minutes = self._coerce_energy_value(interval_raw)
-        if minutes is None or minutes <= 0:
+        if minutes is None or not math.isfinite(minutes) or minutes <= 0:
             minutes = SITE_ENERGY_DEFAULT_INTERVAL_MIN
         minutes_float = float(minutes)
         hours = minutes_float / 60.0
@@ -355,7 +355,7 @@ class EnergyManager:
             return total, count
         for val in values:
             num = self._coerce_energy_value(val)
-            if num is None:
+            if num is None or not math.isfinite(num):
                 continue
             bucket_wh = num
             if bucket_wh < 0:
