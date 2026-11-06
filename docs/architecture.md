@@ -5,6 +5,35 @@ This document is a contributor map for the Enphase Energy integration. It explai
 ## Runtime Shape
 
 Home Assistant 2026.10.0 and Python 3.14 are the minimum supported versions.
+Repair ownership and in-place entity-ID renames use the new Core 2026.11 APIs
+when available. The minimum and pinned development runtime remain 2026.10.0;
+the lifecycle preparation PR must remain draft and blocked from merge until the
+owner separately raises the minimum to 2026.11.
+
+On 2026.11, all entry-specific Repairs carry `config_entry_id`. Diagnostic issue
+IDs are entry-scoped; migrating an ignored legacy diagnostic retains its ignore
+state. System-event reconciliation uses `async_refresh_issues` around the checked
+alarm set, preserving checkpointed issues, incomplete snapshots and the existing
+missing-alarm grace period. It never wraps platform forwarding or a failed fetch.
+The 2026.10 fallback uses existing registry calls, and entry removal explicitly
+cleans up scoped legacy issues and unscoped diagnostics with matching site context.
+Unload preserves battery-profile disagreements
+and unconfirmed export requests; fresh agreement, confirmed readback or disabling
+the feature clears them. An authoritative empty battery inventory also clears a
+battery disagreement. Missing observations after reload cannot resolve a
+battery-profile repair, and old recovery-flow identities cannot authorize writes.
+Opening or continuing a retained repair with unavailable observations aborts the
+flow without clearing the issue or its ignore state. Completion requires a checked
+condition to have cleared the notice.
+
+Site sensors opt into the entity-ID rename hook, including derived classes with
+their own add/remove hooks. Freshness, tariff and retry timers, restored power
+history and source listeners stay attached to the same object. Callbacks use its
+current entity ID. Actual removal still cancels timers and subscriptions. Other
+entity families retain Core's compatibility lifecycle where they have not opted
+in. See the upstream [Repairs contract](https://contributors.home-assistant.io/blog/2026/10/28/issue-registry-refresh/)
+and [entity lifecycle contract](https://contributors.home-assistant.io/blog/2026/10/12/new-entity-lifecycle-hooks/).
+
 Service routing uses Home Assistant's target-selection API and reuses each
 expansion when resolving devices and entities. Device lookups use the
 entry-scoped registry API directly. Migrated composite device IDs remain valid
@@ -73,8 +102,8 @@ Export Limit controls are a default-off topology option. Toggling them reloads
 the entry to start or stop the dedicated PEL runtime and reconcile its entities.
 The runtime persists pending intent, never form tokens, and resumes readback
 after reload. It polls at the configured fast interval for ten minutes after a
-write, then at the standard interval; an unconfirmed-request repair is owned by
-that runtime and cleared on unload or matching readback.
+write, then at the standard interval; an unconfirmed-request repair survives
+reload and is cleared on matching readback, disabling the feature or entry removal.
 The guided Export Limit menu uses one Enable Export Limit action for both zero
 and nonzero limits: 0 W requests no grid export, and a positive value sets the
 maximum permitted export power. Both proceed through the same confirmation step.

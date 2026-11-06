@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import sys
@@ -16,7 +17,7 @@ import pytest
 import pytest_socket
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CoreState, HomeAssistant
 from unittest.mock import AsyncMock, patch
 
 try:
@@ -189,9 +190,29 @@ def pytest_fixture_setup(fixturedef, request):
 
 
 @pytest.fixture(autouse=True)
-def ensure_hass_stopped(stop_hass):
-    """Ensure manually constructed Home Assistant instances are stopped cleanly."""
+async def ensure_hass_stopped(monkeypatch):
+    """Track constructed instances without replacing Core's class with a function.
+
+    Core 2026.11 uses isinstance(HomeAssistant) in its event-loop checks. Patching
+    __init__ preserves those checks while retaining cleanup for manual instances.
+    """
+    initialize = HomeAssistant.__init__
+    created = []
+
+    @wraps(initialize)
+    def initialize_tracked(self, *args, **kwargs):
+        initialize(self, *args, **kwargs)
+        created.append(self)
+
+    monkeypatch.setattr(HomeAssistant, "__init__", initialize_tracked)
     yield
+    for instance in created:
+        if instance.state == CoreState.stopped:
+            continue
+        with patch.object(instance.loop, "stop"):
+            await instance.async_block_till_done()
+            await instance.async_stop(force=True)
+            await asyncio.get_running_loop().shutdown_default_executor()
 
 
 @pytest.fixture

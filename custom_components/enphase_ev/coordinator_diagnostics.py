@@ -35,6 +35,7 @@ from .coordinator_refresh_metrics import (
 )
 from .log_redaction import redact_text
 from .tariff import TARIFF_ENDPOINT_FAMILY
+from .repair_issues import entry_issue_kwargs, supports_entry_issues
 
 if TYPE_CHECKING:  # pragma: no cover
     from .coordinator import EnphaseCoordinator
@@ -55,6 +56,16 @@ _NON_DEGRADING_OPTIONAL_ENDPOINT_FAMILIES = frozenset({"activation_grid_profile"
 _NON_DEGRADING_RATE_LIMITED_ENDPOINT_FAMILIES = frozenset(
     {"inverter_parameter_telemetry"}
 )
+_ENTRY_REPAIR_ISSUE_IDS = _DEGRADED_SERVICE_REPAIR_ISSUE_IDS | {
+    ISSUE_BATTERY_PROFILE_PENDING,
+    ISSUE_CLOUD_ERRORS,
+    ISSUE_DNS_RESOLUTION,
+    ISSUE_NETWORK_UNREACHABLE,
+    ISSUE_RATE_LIMITED,
+    ISSUE_REAUTH_REQUIRED,
+    ISSUE_AUTH_BLOCKED,
+    ISSUE_TOO_MANY_ACTIVE_SESSIONS,
+}
 
 
 class CoordinatorDiagnostics:
@@ -64,14 +75,29 @@ class CoordinatorDiagnostics:
         self.coordinator = coordinator
         if self._entry_issue_suffix() is not None:
             self.clear_legacy_degraded_service_repair_issues()
-            self._delete_issue(ISSUE_BATTERY_PROFILE_PENDING)
+            self._delete_registry_issue(ISSUE_BATTERY_PROFILE_PENDING)
         if not self.degraded_service_repair_issues_enabled:
             self.clear_degraded_service_repair_issues()
 
     def _delete_issue(self, issue_id: str, *, preserve_ignored: bool = False) -> None:
+        registry_issue_id = self._repair_issue_id(issue_id)
+        self._delete_registry_issue(
+            registry_issue_id, preserve_ignored=preserve_ignored
+        )
+        if registry_issue_id != issue_id:
+            self._delete_registry_issue(issue_id, preserve_ignored=preserve_ignored)
+
+    def _delete_registry_issue(
+        self, issue_id: str, *, preserve_ignored: bool = False
+    ) -> None:
         coord = self.coordinator
+        issue = ir.async_get(coord.hass).async_get_issue(DOMAIN, issue_id)
+        owner = getattr(issue, "config_entry_id", None)
+        if owner is not None and owner != getattr(
+            getattr(coord, "config_entry", None), "entry_id", None
+        ):
+            return
         if preserve_ignored:
-            issue = ir.async_get(coord.hass).async_get_issue(DOMAIN, issue_id)
             if issue is not None and issue.dismissed_version is not None:
                 return
         ir.async_delete_issue(coord.hass, DOMAIN, issue_id)
@@ -87,8 +113,9 @@ class CoordinatorDiagnostics:
         return suffix or None
 
     def _repair_issue_id(self, issue_id: str) -> str:
-        if (
-            issue_id not in _DEGRADED_SERVICE_REPAIR_ISSUE_IDS
+        if issue_id not in _ENTRY_REPAIR_ISSUE_IDS or (
+            not supports_entry_issues()
+            and issue_id not in _DEGRADED_SERVICE_REPAIR_ISSUE_IDS
             and issue_id != ISSUE_BATTERY_PROFILE_PENDING
         ):
             return issue_id
@@ -100,13 +127,10 @@ class CoordinatorDiagnostics:
     def _delete_reported_issue(
         self, issue_id: str, *, preserve_ignored: bool = False
     ) -> None:
-        registry_issue_id = self._repair_issue_id(issue_id)
         self._delete_issue(
-            registry_issue_id,
+            issue_id,
             preserve_ignored=preserve_ignored,
         )
-        if registry_issue_id != issue_id:
-            self._delete_issue(issue_id, preserve_ignored=preserve_ignored)
 
     def _reported_issue_is_active(self, issue_id: str) -> bool:
         registry_issue_id = self._repair_issue_id(issue_id)
@@ -123,7 +147,7 @@ class CoordinatorDiagnostics:
         """Clear pre-scoped degraded-service repair issues after upgrade."""
 
         for issue_id in _DEGRADED_SERVICE_REPAIR_ISSUE_IDS:
-            self._delete_issue(issue_id)
+            self._delete_registry_issue(issue_id, preserve_ignored=True)
 
     @staticmethod
     def _repair_issue_metrics(
@@ -156,6 +180,11 @@ class CoordinatorDiagnostics:
     ) -> None:
         coord = self.coordinator
         registry_issue_id = self._repair_issue_id(issue_id)
+        legacy_issue = (
+            ir.async_get(coord.hass).async_get_issue(DOMAIN, issue_id)
+            if registry_issue_id != issue_id and supports_entry_issues()
+            else None
+        )
         metrics = self._repair_issue_metrics(issue_id, self.collect_site_metrics())
         base_placeholders = self.issue_translation_placeholders(metrics)
         # Repair issues store the current diagnostic snapshot so users can share
@@ -176,6 +205,7 @@ class CoordinatorDiagnostics:
             coord.hass,
             DOMAIN,
             registry_issue_id,
+            **entry_issue_kwargs(getattr(coord, "config_entry", None)),
             is_fixable=profile_repair,
             severity=severity,
             translation_key=issue_id,
@@ -183,7 +213,9 @@ class CoordinatorDiagnostics:
             data=issue_data,
         )
         if registry_issue_id != issue_id:
-            self._delete_issue(issue_id)
+            if legacy_issue is not None and legacy_issue.dismissed_version is not None:
+                ir.async_ignore_issue(coord.hass, DOMAIN, registry_issue_id, True)
+            self._delete_registry_issue(issue_id)
 
     def _clear_reported_issue(self, flag_attr: str, issue_id: str) -> None:
         coord = self.coordinator

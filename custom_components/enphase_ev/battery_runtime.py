@@ -3000,9 +3000,13 @@ class BatteryRuntime:
             state._battery_live_profile_label = None
             state._battery_live_profile_sample_utc = None
         self.profile_mismatch.note_live(
-            state._battery_live_profile
-            if complete_live_profiles and len({p for p, _label in live_profiles}) <= 1
-            else None
+            (
+                state._battery_live_profile
+                if complete_live_profiles
+                and len({p for p, _label in live_profiles}) <= 1
+                else None
+            ),
+            authoritative_absence=isinstance(storages, list) and not storages,
         )
         state._battery_aggregate_status_details = {
             "status": aggregate_status,
