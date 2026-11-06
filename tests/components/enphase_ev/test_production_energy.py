@@ -237,7 +237,11 @@ async def test_regressed_source_clock_cannot_rebase_power(
         publish(100_000, accepted_at - timedelta(minutes=1))
         await hass.async_block_till_done()
         current = hass.states.get(sensor.entity_id)
-        assert current.state == original.state
+        if warmed_up:
+            assert float(current.state) == float(original.state)
+            assert current.attributes["using_cached"] is True
+        else:
+            assert current.state == original.state
         assert current.attributes["sampled_at_utc"] == accepted_at.isoformat()
         now[0] = accepted_at + timedelta(minutes=5)
         publish(101_000 if warmed_up else 100_500, now[0])
@@ -245,6 +249,159 @@ async def test_regressed_source_clock_cannot_rebase_power(
         current = hass.states.get(sensor.entity_id)
         assert float(current.state) == 6000
         assert current.attributes["last_window_seconds"] == 300
+    finally:
+        await component.async_remove_entity(sensor.entity_id)
+
+
+@pytest.mark.parametrize(
+    ("sensor_class", "bucket"),
+    [
+        (EnphaseCurrentPowerConsumptionSensor, "production"),
+        (EnphaseGridPowerSensor, "import"),
+        (EnphaseBatteryPowerSensor, "discharge"),
+    ],
+)
+@pytest.mark.parametrize("placeholder_has_source_clock", [False, True])
+async def test_placeholder_clock_cannot_block_first_valid_energy_sample(
+    hass,
+    config_entry,
+    coordinator_factory,
+    monkeypatch,
+    sensor_class,
+    bucket,
+    placeholder_has_source_clock,
+):
+    """A placeholder is not an authoritative lower bound on source time."""
+    now = [datetime(2026, 11, 4, 19, 30, tzinfo=timezone.utc)]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+    coord = coordinator_factory()
+    coord.update_interval = None
+    coord.last_success_utc = now[0]
+    sensor = sensor_class(coord)
+    sensor.entity_id = "sensor.placeholder_clock_" + bucket
+    payload = {bucket: [float("nan")]}
+    if placeholder_has_source_clock:
+        payload["last_report_date"] = now[0].timestamp()
+    parsed = coord.energy._aggregate_site_energy(payload)
+    assert parsed is not None
+    coord.energy.site_energy, coord.energy._site_energy_meta = parsed
+    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    component._platforms["sensor"].config_entry = config_entry
+    await component.async_add_entities([sensor])
+
+    def publish(wh, timestamp):
+        parsed = coord.energy._aggregate_site_energy(
+            {
+                bucket: [wh],
+                "last_report_date": timestamp.timestamp(),
+                "interval_minutes": 5,
+            }
+        )
+        assert parsed is not None
+        coord.energy.site_energy, coord.energy._site_energy_meta = parsed
+        coord.last_success_utc = now[0]
+        coord.async_update_listeners()
+
+    try:
+        assert hass.states.get(sensor.entity_id).attributes["method"] == "seeded"
+        # Cloud reports are commonly older than the receipt time recorded while
+        # discovery/invalid data supplies only a synthetic placeholder.
+        source = now[0] - timedelta(minutes=5)
+        now[0] += timedelta(minutes=1)
+        publish(100_000, source)
+        await hass.async_block_till_done()
+        state = hass.states.get(sensor.entity_id)
+        assert state.attributes["sampled_at_utc"] == source.isoformat()
+        assert state.state == "unknown"
+        source += timedelta(minutes=5)
+        now[0] += timedelta(minutes=5)
+        publish(100_500, source)
+        await hass.async_block_till_done()
+        state = hass.states.get(sensor.entity_id)
+        assert float(state.state) == 6000
+        assert state.attributes["last_window_seconds"] == 300
+    finally:
+        await component.async_remove_entity(sensor.entity_id)
+
+
+@pytest.mark.parametrize(
+    ("sensor_class", "bucket"),
+    [
+        (EnphaseCurrentPowerConsumptionSensor, "production"),
+        (EnphaseGridPowerSensor, "import"),
+        (EnphaseBatteryPowerSensor, "discharge"),
+    ],
+)
+async def test_older_live_reports_cannot_replace_newer_restored_power(
+    hass, config_entry, coordinator_factory, monkeypatch, sensor_class, bucket
+):
+    """A valid accepted reading remains authoritative when its baseline is absent."""
+    now = [datetime(2026, 11, 4, 19, 30, tzinfo=timezone.utc)]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+    accepted_at = now[0]
+    coord = coordinator_factory()
+    coord.update_interval = None
+    coord.last_success_utc = now[0]
+    sensor = sensor_class(coord)
+    sensor.entity_id = "sensor.newer_restored_" + bucket
+    sensor.async_get_last_state = AsyncMock(return_value=None)
+    sensor.async_get_last_extra_data = AsyncMock(
+        return_value=RestoredExtraData(
+            {
+                "power_history": {
+                    "version": 1,
+                    "samples": [
+                        {
+                            "watts": 6000,
+                            "sampled_ts": accepted_at.timestamp(),
+                            "freshness_ts": accepted_at.timestamp(),
+                            "attributes": {
+                                "method": "lifetime_energy_window",
+                                "last_window_seconds": 300,
+                            },
+                        }
+                    ],
+                }
+            }
+        )
+    )
+    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    component._platforms["sensor"].config_entry = config_entry
+    await component.async_add_entities([sensor])
+
+    def publish(wh, timestamp):
+        parsed = coord.energy._aggregate_site_energy(
+            {
+                bucket: [wh],
+                "last_report_date": timestamp.timestamp(),
+                "interval_minutes": 5,
+            }
+        )
+        assert parsed is not None
+        coord.energy.site_energy, coord.energy._site_energy_meta = parsed
+        coord.last_success_utc = now[0]
+        coord.async_update_listeners()
+
+    try:
+        assert float(hass.states.get(sensor.entity_id).state) == 6000
+        for i, minutes in enumerate((-10, -5)):
+            now[0] += timedelta(minutes=1)
+            publish(100_000 + i * 100, accepted_at + timedelta(minutes=minutes))
+            await hass.async_block_till_done()
+            state = hass.states.get(sensor.entity_id)
+            assert float(state.state) == 6000
+            assert state.attributes["sampled_at_utc"] == accepted_at.isoformat()
+            assert state.attributes["using_cached"] is True
+        publish(100_200, accepted_at)
+        await hass.async_block_till_done()
+        assert float(hass.states.get(sensor.entity_id).state) == 6000
+        now[0] = accepted_at + timedelta(minutes=5)
+        publish(100_700, now[0])
+        await hass.async_block_till_done()
+        state = hass.states.get(sensor.entity_id)
+        assert float(state.state) == 6000
+        assert state.attributes["sampled_at_utc"] == now[0].isoformat()
+        assert state.attributes["using_cached"] is False
     finally:
         await component.async_remove_entity(sensor.entity_id)
 
