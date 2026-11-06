@@ -1394,8 +1394,22 @@ class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: 
 
         source_sample_ts = self._source_sample_timestamp(flows)
         sample_ts, sample_iso = self._sample_timestamp(flows)
+        if self._last_sample_ts is not None and sample_ts < self._last_sample_ts:
+            # A monotonic energy guard can retain the accepted counter while an
+            # older response regresses its clock. Do not treat it as a zero delta
+            # or move the baseline used by the next valid source observation.
+            return self._last_power_w if self._live_flow_sample_count >= 2 else None
         self._last_report_date_iso = sample_iso
-        if self._last_sample_ts is not None and sample_ts == self._last_sample_ts:
+        # A corrected payload may seed a placeholder at the same source time.
+        # Rejected restored histories still require a new source observation.
+        if (
+            self._last_sample_ts is not None
+            and sample_ts == self._last_sample_ts
+            and (
+                self._live_flow_sample_count > 0
+                or self._last_method not in {"seeded", "no_live_data"}
+            )
+        ):
             if self._live_flow_sample_count >= 2:
                 return self._last_power_w
             return None
@@ -2452,6 +2466,18 @@ class EnphaseCurrentPowerConsumptionSensor(_EnphaseSiteLifetimePowerSensor):
             flow_signs={"solar_production": 1},
             type_key=None,
         )
+
+    @property
+    def native_value(self) -> Any:
+        value = super().native_value
+        # Missing/invalid production buckets can establish only placeholders,
+        # never a measured zero before two valid observations or saved watts.
+        if (
+            self._live_flow_sample_count < 2
+            and self._power_history.latest(dt_util.utcnow().timestamp()) is None
+        ):
+            return None
+        return value
 
     async def _async_restore_power(self) -> None:
         await super()._async_restore_power()

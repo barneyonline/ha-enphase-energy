@@ -15,6 +15,8 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug fixes
 
 - Use the existing `solar_production` energy flow for Production Power to avoid publishing the inaccurate daytime `get_latest_power` measurements reported in #934. Reuse Grid/Battery Power's timing, reset, outlier and restart safeguards; retain the raw endpoint only for diagnostics.
+- Ignore regressed source timestamps in the shared Production/Grid/Battery power calculation so older responses cannot publish a false zero or distort the next averaging window.
+- Reject non-finite lifetime-energy buckets and default non-finite reporting intervals so malformed cloud data cannot poison the production baseline or turn valid generation into zero watts.
 
 ### 🔧 Improvements
 

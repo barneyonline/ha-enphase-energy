@@ -549,6 +549,8 @@ respecting any reported minimum interval; it is not instantaneous local-gateway
 telemetry. The first valid energy observation seeds a baseline, and the next
 source timestamp permits a power calculation. Same-timestamp energy corrections
 are included in the next calculation rather than divided by a zero time window.
+Older source timestamps cannot replace the accepted calculation or move its
+cumulative-energy baseline backwards, including while the sensor is warming up.
 Resets, missing channels, source changes, outliers, freshness and bounded restart
 history follow the shared Grid/Battery implementation. All three use a 30-minute
 source freshness limit; unchanged source timestamps, including overnight zeros,
@@ -785,11 +787,11 @@ Larger gaps reseed the baseline; decreasing buckets, incompatible rollovers,
 changed intervals, and invalid timestamps remain guarded. The actual averaging
 window is exposed in `last_window_seconds` and consumption-power diagnostics.
 When consumption is calculated from published production, grid and battery watts,
-the oldest contributing sample bounds its 30-minute expiry. Successful near-zero
-production acquisitions follow the production sensor's overnight rule. Missing
+the oldest contributing sample bounds its 30-minute expiry. Production uses the
+same source-based freshness rule as Grid and Battery, including overnight. Missing
 inputs retain the last valid calculation only until its original expiry; fresh
 consumption buckets can supply the existing fallback.
-Grid and Battery Power expose `freshness_reference_utc` separately from their
+Production, Grid and Battery Power expose `freshness_reference_utc` separately from their
 calculation timestamp, so consumption also respects the oldest contributing flow
 when import/export or charge/discharge clocks differ. Stale numeric candidates
 cannot overwrite a still-valid retained balance or its original deadline.
@@ -817,7 +819,7 @@ evidence for the consumption-bucket fallback. A healthy power balance can coexis
 with an older `missing_consumption` rejection. `power_balance_source_freshness`
 records the effective clock used for each input to the last accepted balance;
 `power_balance_source_timestamps` retains the reported calculation clocks.
-These clocks can differ for retained grid/battery watts and overnight production.
+These clocks can differ when contributing sensors retain an accepted reading.
 
 Consumption Power persists its last valid power balance in Home Assistant's
 restore data, separately from the consumption-bucket delta baseline. During
@@ -835,10 +837,10 @@ calculation from the restored watts or bypass bucket-baseline validation.
 Production, Grid, Battery, and Consumption Power retain the last two distinct
 accepted readings in versioned private Home Assistant restore data. Each reading
 stores native watts, its source timestamp, its effective freshness reference,
-and calculation metadata. Production also preserves its acquisition timestamp.
+and calculation metadata.
 Repeated unchanged observations, rejected candidates, and restarts do not renew
-the accepted clocks. Successful overnight near-zero production acquisitions
-retain the existing acquisition-based freshness rule.
+the accepted clocks. Overnight near-zero energy-derived production follows the
+same source timestamp expiry as Grid and Battery Power.
 
 Restoration finishes before entity freshness evaluation and first publication.
 Supported entities reuse persisted discovery metadata. A valid live reading takes
@@ -849,8 +851,8 @@ at their original 30-minute deadline through entity timers without another poll.
 This continuity starts once integration setup permits entity creation; it does
 not bypass authentication, setup failures, or coordinator health checks.
 
-Grid and Battery persist both cumulative samples, source signatures, and interval
-metadata privately, independently of display-state attributes. Their accepted
+Production, Grid and Battery persist both cumulative samples, source signatures,
+and interval metadata privately, independently of display-state attributes. Their accepted
 watts are separate from mutable calculation baselines, so missing startup data
 and synthetic zero placeholders cannot erase the accepted history. Restored
 watts never become cumulative-energy samples. Source changes, resets, partial
@@ -858,7 +860,7 @@ channels, and invalid deltas retain the existing baseline-validation safeguards.
 Consumption can bridge startup with either a saved balance or a saved accepted
 bucket-derived reading while its calculation baseline awaits live validation.
 The oldest contributing source still bounds balance freshness. Production exposes
-its effective `freshness_reference_utc` separately from acquisition time so a
+its effective `freshness_reference_utc` separately from calculation time so a
 restored source cannot extend a dependent balance's deadline. Accepted cached
 watts retain their calculation metadata while a new cumulative baseline seeds;
 Consumption diagnostics describe the same reading as the displayed state.
