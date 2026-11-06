@@ -140,6 +140,10 @@ docker compose -f devtools/docker/docker-compose.yml exec ha-dev pytest -q tests
 
 Coverage Reporting uses the [official Codecov action inputs](https://github.com/codecov/codecov-action#arguments)
 and coverage.py's [relative file paths](https://coverage.readthedocs.io/en/7.16.2/config.html#run-relative-files).
+Fork PR attribution uses GitHub's [head owner/branch filter](https://docs.github.com/en/rest/pulls/pulls#list-pull-requests)
+and requires one open PR with the exact producer SHA, source repository, branch,
+and base repository. Run `node --test tests/scripts/test_coverage_attribution.cjs`
+to exercise the workflow's attribution guards without API access.
 Its trusted workflow reads the verified producer's Git index without checking out
 or executing producer files. Codecov's working directory is separate from that
 source inventory. A small public-API check confirms nonempty project coverage and
