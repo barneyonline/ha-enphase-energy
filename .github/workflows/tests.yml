@@ -70,7 +70,7 @@ jobs:
           fi
 
           # Validate classifier and test-workflow edits with the script suite.
-          test_infrastructure='^(\.github/workflows/(tests|coverage-reporting)\.yml|scripts/ci_manifest_metadata\.py|tests/scripts/test_ci_workflow\.py)$'
+          test_infrastructure='^(\.github/workflows/(tests|coverage-reporting)\.yml|scripts/ci_manifest_metadata\.py|tests/scripts/(test_ci_workflow\.py|test_coverage_attribution\.cjs))$'
           common='^(hacs\.json|devtools/docker/(Dockerfile|docker-compose\.yml|constraints-[^/]+\.txt))$'
           set_output integration "${common}|^scripts/(benchmark_snapshots|check_statement_coverage)\.py$|^custom_components/enphase_ev/|^tests/components/enphase_ev/|^devtools/docker/requirements-dev\.txt$|^pytest\.ini$|^\.coveragerc$|^\.pre-commit-config\.yaml$|^\.ruff\.toml$" "$integration_files"
           set_output diagnostics "${common}|^custom_components/enphase_ev/.*\.py$|^scripts/importtime_profile\.py$|^tests/scripts/test_importtime_profile\.py$|^devtools/docker/requirements-dev\.txt$"
@@ -307,6 +307,8 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
           PYTEST_PLUGINS: pytest_asyncio.plugin
         run: pytest -q tests/scripts --log-file=script-runtime-warnings.log --log-file-level=WARNING
+      - name: Test coverage source attribution
+        run: node --test tests/scripts/test_coverage_attribution.cjs
       - name: Upload maintenance script warning log
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
