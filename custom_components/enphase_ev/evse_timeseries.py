@@ -2,22 +2,36 @@
 
 from __future__ import annotations
 
+import asyncio
+from dataclasses import dataclass, field
 import logging
 import time
 from datetime import datetime, timedelta
-from typing import Callable
+from typing import Callable, Iterable, cast
 
 import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
 from .api import EVSETimeseriesUnavailable, InvalidPayloadError
+from .cloud_retry import retry_after_delay, transient_backoff_delay
 from .log_redaction import redact_text
 
 _LOGGER = logging.getLogger(__name__)
 
 EVSE_TIMESERIES_CACHE_TTL = 15 * 60
 EVSE_TIMESERIES_FAILURE_BACKOFF_S = 15 * 60
+EVSE_TIMESERIES_CACHE_DAYS = 3
+
+
+@dataclass(slots=True)
+class _Acquisition:
+    """Share an endpoint attempt among overlapping callers without owning tasks."""
+
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    completion: int = 0
+    generation: int = -1
+    callers: int = 0
 
 
 class EVSETimeseriesManager:
@@ -41,6 +55,11 @@ class EVSETimeseriesManager:
         self._failure_backoff = max(60.0, float(failure_backoff or 0))
         self._daily_cache: dict[str, tuple[float, dict[str, dict[str, object]]]] = {}
         self._lifetime_cache: tuple[float, dict[str, dict[str, object]]] | None = None
+        self._acquisitions: dict[tuple[str, str], _Acquisition] = {}
+        self._generation = 0
+        self._stopped = False
+        self._active_serials: frozenset[str] | None = None
+        self._transient_failures = {"daily": 0, "lifetime": 0}
         self._endpoint_state: dict[str, dict[str, object]] = {
             "daily": {
                 "available": True,
@@ -202,6 +221,7 @@ class EVSETimeseriesManager:
         return bool(backoff_until and time.monotonic() < float(str(backoff_until)))
 
     def _mark_endpoint_available(self, endpoint: str) -> None:
+        self._transient_failures[endpoint] = 0
         state = self._endpoint_state_for(endpoint)
         state["available"] = True
         state["using_stale"] = False
@@ -218,6 +238,7 @@ class EVSETimeseriesManager:
         err: Exception | str | None,
         *,
         using_stale: bool = False,
+        transient: bool = False,
     ) -> None:
         state = self._endpoint_state_for(endpoint)
         reason = self._redact_error(err) if err else "EVSE timeseries unavailable"
@@ -230,6 +251,14 @@ class EVSETimeseriesManager:
             err.signature_dict() if isinstance(err, InvalidPayloadError) else None
         )
         delay = max(self._failure_backoff, 60.0)
+        if transient:
+            self._transient_failures[endpoint] += 1
+            delay = transient_backoff_delay(self._transient_failures[endpoint])
+        if isinstance(err, BaseException):
+            delay = max(delay, retry_after_delay(err) or 0.0)
+        delay = max(
+            delay, float(str(state.get("backoff_until") or 0.0)) - time.monotonic()
+        )
         state["backoff_until"] = time.monotonic() + delay
         try:
             state["backoff_ends_utc"] = dt_util.utcnow() + timedelta(seconds=delay)
@@ -258,35 +287,34 @@ class EVSETimeseriesManager:
         except Exception:
             return False
 
+    def _endpoint_due(self, endpoint: str, day_key: str, *, force: bool) -> bool:
+        fresh = (
+            self._lifetime_cache_fresh()
+            if endpoint == "lifetime"
+            else self._daily_cache_fresh(day_key)
+        )
+        return (
+            not self._stopped
+            and not self._endpoint_backoff_active(endpoint)
+            and (force or not fresh)
+        )
+
     def refresh_due(
         self,
         *,
         day_local: datetime | None = None,
         force: bool = False,
     ) -> bool:
-        """Return True when EVSE timeseries data should be refreshed."""
-
+        """Return whether a supported family is due, respecting provider cooldowns."""
         if day_local is None:
             day_local = dt_util.as_local(dt_util.now())
         day_key = self._day_key(day_local)
         client = self._client_provider()
-        refresh_lifetime = (force or not self._lifetime_cache_fresh()) and (
-            force or not self.lifetime_backoff_active
+        return any(
+            self._endpoint_due(endpoint, day_key, force=force)
+            and callable(getattr(client, f"evse_timeseries_{endpoint}_energy", None))
+            for endpoint in ("lifetime", "daily")
         )
-        refresh_daily = (force or not self._daily_cache_fresh(day_key)) and (
-            force or not self.daily_backoff_active
-        )
-        if not (refresh_lifetime or refresh_daily):
-            return False
-        if refresh_lifetime and not callable(
-            getattr(client, "evse_timeseries_lifetime_energy", None)
-        ):
-            refresh_lifetime = False
-        if refresh_daily and not callable(
-            getattr(client, "evse_timeseries_daily_energy", None)
-        ):
-            refresh_daily = False
-        return refresh_lifetime or refresh_daily
 
     async def async_refresh(
         self,
@@ -297,82 +325,130 @@ class EVSETimeseriesManager:
         if day_local is None:
             day_local = dt_util.as_local(dt_util.now())
         day_key = self._day_key(day_local)
+        calls: list[tuple[str, tuple[str, str], _Acquisition, int]] = []
+        # Register both families before the first await so callers queued on
+        # lifetime also share the overlapping daily acquisition.
+        for endpoint in ("lifetime", "daily"):
+            if not self._endpoint_due(endpoint, day_key, force=force):
+                continue
+            key = (endpoint, day_key if endpoint == "daily" else "")
+            acquisition = self._acquisitions.get(key)
+            if acquisition is None:
+                acquisition = self._acquisitions[key] = _Acquisition()
+            acquisition.callers += 1
+            calls.append((endpoint, key, acquisition, acquisition.completion))
+        try:
+            for endpoint, _key, acquisition, completion in calls:
+                async with acquisition.lock:
+                    if (
+                        completion != acquisition.completion
+                        and acquisition.generation == self._generation
+                    ):
+                        continue
+                    if not self._endpoint_due(endpoint, day_key, force=force):
+                        continue
+                    await self._async_acquire(endpoint, day_local, acquisition)
+        finally:
+            for _endpoint, key, acquisition, _completion in calls:
+                acquisition.callers -= 1
+                if not acquisition.callers:
+                    self._acquisitions.pop(key)
 
-        client = self._client_provider()
-        refresh_lifetime = (force or not self._lifetime_cache_fresh()) and (
-            force or not self.lifetime_backoff_active
+    async def _async_acquire(
+        self, endpoint: str, day_local: datetime, acquisition: _Acquisition
+    ) -> None:
+        fetcher = getattr(
+            self._client_provider(), f"evse_timeseries_{endpoint}_energy", None
         )
-        refresh_daily = (force or not self._daily_cache_fresh(day_key)) and (
-            force or not self.daily_backoff_active
-        )
-        if not refresh_lifetime and not refresh_daily:
+        if not callable(fetcher):
             return
-
-        if refresh_lifetime:
-            fetcher = getattr(client, "evse_timeseries_lifetime_energy", None)
-            if callable(fetcher):
-                try:
-                    payload = await fetcher()
-                except EVSETimeseriesUnavailable as err:
-                    self._note_service_unavailable(
-                        "lifetime",
-                        err,
-                        using_stale=self._lifetime_cache is not None,
-                    )
-                except InvalidPayloadError as err:
-                    self._note_service_unavailable(
-                        "lifetime",
-                        err,
-                        using_stale=self._lifetime_cache is not None,
-                    )
-                except aiohttp.ClientResponseError as err:
-                    self._note_service_unavailable(
-                        "lifetime",
-                        err,
-                        using_stale=self._lifetime_cache is not None,
-                    )
-                except Exception as err:  # noqa: BLE001
-                    self._logger.debug(
-                        "Failed to refresh EVSE lifetime timeseries: %s", err
-                    )
+        generation = self._generation
+        day_key = self._day_key(day_local)
+        using_stale = (
+            self._lifetime_cache is not None
+            if endpoint == "lifetime"
+            else day_key in self._daily_cache
+        )
+        try:
+            payload = await fetcher(
+                **({"start_date": day_local} if endpoint == "daily" else {})
+            )
+        except Exception as err:  # noqa: BLE001
+            if generation != self._generation:
+                return
+            acquisition.completion += 1
+            acquisition.generation = generation
+            self._note_service_unavailable(
+                endpoint,
+                err,
+                using_stale=using_stale,
+                transient=not isinstance(
+                    err,
+                    (
+                        EVSETimeseriesUnavailable,
+                        InvalidPayloadError,
+                        aiohttp.ClientResponseError,
+                    ),
+                ),
+            )
+        else:
+            if generation != self._generation:
+                return
+            acquisition.completion += 1
+            acquisition.generation = generation
+            if isinstance(payload, dict):
+                data = self._filter_serials(cast(dict[str, dict[str, object]], payload))
+                if endpoint == "lifetime":
+                    self._lifetime_cache = (time.monotonic(), data)
                 else:
-                    if isinstance(payload, dict):
-                        self._lifetime_cache = (time.monotonic(), payload)
-                        self._mark_endpoint_available("lifetime")
+                    self._daily_cache[day_key] = (time.monotonic(), data)
+                    self._prune_days()
+                self._mark_endpoint_available(endpoint)
 
-        if refresh_daily:
-            fetcher = getattr(client, "evse_timeseries_daily_energy", None)
-            if callable(fetcher):
-                try:
-                    payload = await fetcher(start_date=day_local)
-                except EVSETimeseriesUnavailable as err:
-                    self._note_service_unavailable(
-                        "daily",
-                        err,
-                        using_stale=day_key in self._daily_cache,
-                    )
-                except InvalidPayloadError as err:
-                    self._note_service_unavailable(
-                        "daily",
-                        err,
-                        using_stale=day_key in self._daily_cache,
-                    )
-                except aiohttp.ClientResponseError as err:
-                    self._note_service_unavailable(
-                        "daily",
-                        err,
-                        using_stale=day_key in self._daily_cache,
-                    )
-                except Exception as err:  # noqa: BLE001
-                    self._logger.debug(
-                        "Failed to refresh EVSE daily timeseries for %s: %s",
-                        day_key,
-                        err,
-                    )
-                else:
-                    if isinstance(payload, dict):
-                        self._daily_cache[day_key] = (time.monotonic(), payload)
-                        self._mark_endpoint_available("daily")
+    def _filter_serials(
+        self, payload: dict[str, dict[str, object]]
+    ) -> dict[str, dict[str, object]]:
+        if self._active_serials is None:
+            return payload
+        return {
+            serial: value
+            for serial, value in payload.items()
+            if serial in self._active_serials
+        }
+
+    def _prune_days(self) -> None:
+        for day_key in sorted(self._daily_cache, reverse=True)[
+            EVSE_TIMESERIES_CACHE_DAYS:
+        ]:
+            del self._daily_cache[day_key]
+
+    def prune(self, *, active_serials: Iterable[str]) -> None:
+        """Bound retained dates and drop records for authoritatively retired chargers."""
+        active = frozenset(active_serials)
+        if active == self._active_serials:
+            return
+        if self._active_serials is not None and active != self._active_serials:
+            self._generation += 1
+        self._active_serials = active
+        self._daily_cache = {
+            day: (stamp, self._filter_serials(data))
+            for day, (stamp, data) in self._daily_cache.items()
+        }
+        if self._lifetime_cache is not None:
+            stamp, data = self._lifetime_cache
+            self._lifetime_cache = (stamp, self._filter_serials(data))
+        self._prune_days()
+
+    def clear(self) -> None:
+        """Invalidate outstanding reads before dropping their cached payloads."""
+        self._generation += 1
+        self._daily_cache.clear()
+        self._lifetime_cache = None
+
+    def stop(self) -> None:
+        """Retire the manager without creating or retaining background tasks."""
+        self._stopped = True
+        self.clear()
 
     def daily_entry(
         self,

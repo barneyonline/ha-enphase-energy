@@ -1236,7 +1236,8 @@ async def test_async_refresh_site_energy_handles_generic_fetch_failure(
     await coord.energy._async_refresh_site_energy(force=True)  # noqa: SLF001
 
     assert coord.energy.site_energy == {}
-    assert coord.energy.service_available is True
+    assert coord.energy.service_available is False
+    assert coord.energy.service_backoff_active is True
 
 
 def test_site_energy_mark_service_available_resets_state(coordinator_factory) -> None:
@@ -5454,6 +5455,14 @@ async def test_site_energy_fetch_diagnostics_distinguish_failures_and_source_pro
     energy = coord.energy
     base = datetime.now(timezone.utc)
     now = [base]
+    monotonic_base = time.monotonic()
+    monkeypatch.setattr(
+        energy_mod,
+        "time",
+        SimpleNamespace(
+            monotonic=lambda: monotonic_base + (now[0] - base).total_seconds()
+        ),
+    )
     monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now[0])
     client = SimpleNamespace(lifetime_energy=AsyncMock())
     energy._client_provider = lambda: client

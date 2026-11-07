@@ -1151,6 +1151,10 @@ class EnphaseCoordinator(
         """Retire this lifecycle before awaited shutdown steps release control."""
 
         self._runtime_stopped = True
+        for name, method in (("summary", "stop"), ("evse_timeseries", "stop")):
+            retire = getattr(self.__dict__.get(name), method, None)
+            if callable(retire):
+                retire()
         self.battery_runtime.profile_mismatch.invalidate()
         runtime = getattr(self, "control_updates", None)
         if runtime:
@@ -2198,6 +2202,10 @@ class EnphaseCoordinator(
         """
 
         self._runtime_stopped = True
+        for name, method in (("summary", "stop"), ("evse_timeseries", "stop")):
+            retire = getattr(self.__dict__.get(name), method, None)
+            if callable(retire):
+                retire()
         runtime = getattr(self, "control_updates", None)
         if runtime:
             runtime.cleanup()
