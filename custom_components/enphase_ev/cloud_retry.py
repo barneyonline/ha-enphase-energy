@@ -4,9 +4,17 @@ from __future__ import annotations
 
 from datetime import datetime
 from email.utils import parsedate_to_datetime
+import random
 
 import aiohttp
 from homeassistant.util import dt as dt_util
+
+
+def transient_backoff_delay(failures: int) -> float:
+    """Back off transient reads for one to fifteen minutes with positive jitter."""
+    return float(
+        min(900.0, 60.0 * 2 ** min(max(failures - 1, 0), 4) * random.uniform(1.0, 1.1))
+    )
 
 
 def retry_after_seconds(

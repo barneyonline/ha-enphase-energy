@@ -14,7 +14,7 @@ from homeassistant.const import UnitOfPower
 from homeassistant.util import dt as dt_util
 
 from .api import SiteEnergyUnavailable
-from .cloud_retry import retry_after_delay
+from .cloud_retry import retry_after_delay, transient_backoff_delay
 from .log_redaction import redact_site_id, redact_text
 
 LIFETIME_DROP_JITTER_KWH = 0.02
@@ -103,6 +103,7 @@ class EnergyManager:
         self._lifetime_guard: dict[str, LifetimeGuardState] = {}
         self._service_available = True
         self._service_failures = 0
+        self._transient_failures = 0
         self._service_last_error: str | None = None
         self._service_last_failure_utc: datetime | None = None
         self._service_backoff_until: float | None = None
@@ -240,6 +241,7 @@ class EnergyManager:
         )
 
     def _mark_service_available(self) -> None:
+        self._transient_failures = 0
         if self._service_available:
             return
         self._service_available = True
@@ -249,7 +251,9 @@ class EnergyManager:
         self._service_backoff_until = None
         self._service_backoff_ends_utc = None
 
-    def _note_service_unavailable(self, err: Exception | str | None) -> None:
+    def _note_service_unavailable(
+        self, err: Exception | str | None, *, transient: bool = False
+    ) -> None:
         reason = redact_text(err, site_ids=(self.site_id,)) if err else ""
         if not reason:
             reason = "Site energy unavailable"
@@ -260,8 +264,12 @@ class EnergyManager:
         delay = max(
             SITE_ENERGY_FAILURE_BACKOFF_S, SITE_ENERGY_DEFAULT_INTERVAL_MIN * 60
         )
+        if transient:
+            self._transient_failures += 1
+            delay = transient_backoff_delay(self._transient_failures)
         if isinstance(err, BaseException):
             delay = max(delay, retry_after_delay(err) or 0.0)
+        delay = max(delay, (self._service_backoff_until or 0.0) - time.monotonic())
         self._service_backoff_until = time.monotonic() + delay
         try:
             self._service_backoff_ends_utc = dt_util.utcnow() + timedelta(seconds=delay)
@@ -1024,8 +1032,17 @@ class EnergyManager:
             self._hems_lifetime_supported = False
             self._hems_lifetime_backoff_until = None
             return
-        self._hems_lifetime_backoff_until = (
-            time.monotonic() + HEMS_LIFETIME_FAILURE_BACKOFF_S
+        self._hems_lifetime_backoff_until = max(
+            self._hems_lifetime_backoff_until or 0.0,
+            time.monotonic()
+            + max(
+                HEMS_LIFETIME_FAILURE_BACKOFF_S,
+                (
+                    (retry_after_delay(err) or 0.0)
+                    if isinstance(err, BaseException)
+                    else 0.0
+                ),
+            ),
         )
 
     async def _async_refresh_site_energy(self, *, force: bool = False) -> None:
@@ -1066,6 +1083,9 @@ class EnergyManager:
             self._record_site_energy_fetch("cancelled")
             raise
         except SiteEnergyUnavailable as err:
+            if revision != self._site_energy_invalidation_revision:
+                self._record_site_energy_fetch("superseded")
+                return
             self._record_site_energy_fetch("service_unavailable")
             self._logger.debug(
                 "Site energy service unavailable for site %s: %s",
@@ -1075,9 +1095,16 @@ class EnergyManager:
             self._note_service_unavailable(err)
             return
         except Exception as err:  # noqa: BLE001
+            if revision != self._site_energy_invalidation_revision:
+                self._record_site_energy_fetch("superseded")
+                return
             self._record_site_energy_fetch("request_error")
-            if isinstance(err, aiohttp.ClientResponseError) and err.status == 429:
-                self._note_service_unavailable(err)
+            self._note_service_unavailable(
+                err,
+                transient=not (
+                    isinstance(err, aiohttp.ClientResponseError) and err.status == 429
+                ),
+            )
             self._logger.debug(
                 "Failed to fetch lifetime energy for site %s: %s",
                 redact_site_id(self.site_id),

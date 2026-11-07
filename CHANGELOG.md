@@ -14,7 +14,9 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 
-- None
+- Back off repeated site-energy and EV charger timeseries fetch failures while retaining accepted readings, and honor longer provider retry deadlines for optional HEMS lifetime reads.
+- Share overlapping charger timeseries and summary acquisitions, including forced reads, without suppressing later sequential refreshes or accepting invalidated results.
+- Bound EV charger daily timeseries caches to three dates and remove retired charger records and cached reads during runtime cleanup.
 
 ### 🔧 Improvements
 

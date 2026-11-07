@@ -38,6 +38,10 @@ class SummaryStore:
         self._cache: tuple[float, list[dict[str, Any]], float] | None = None
         self._ttl: float = SUMMARY_IDLE_TTL
         self._lock = asyncio.Lock()
+        self._completion_revision = 0
+        self._completion_generation = -1
+        self._invalidation_revision = 0
+        self._stopped = False
         self._state: dict[str, object] = {
             "available": True,
             "using_stale": False,
@@ -72,7 +76,13 @@ class SummaryStore:
 
     def invalidate(self) -> None:
         """Drop the cached payload."""
+        self._invalidation_revision += 1
         self._cache = None
+
+    def stop(self) -> None:
+        """Retire queued readers and invalidate the current acquisition."""
+        self._stopped = True
+        self.invalidate()
 
     def _backoff_active(self) -> bool:
         backoff_until = self._state.get("backoff_until")
@@ -129,6 +139,9 @@ class SummaryStore:
 
     async def async_fetch(self, *, force: bool = False) -> list[dict[str, Any]]:
         """Return the cached summary, optionally forcing a refresh."""
+        if self._stopped:
+            return []
+        completion = self._completion_revision
         cache = self._get_cache()
         if not force and cache:
             cache_ts, cache_data, cache_ttl = cache
@@ -136,7 +149,14 @@ class SummaryStore:
                 return cache_data
 
         async with self._lock:
+            if self._stopped:
+                return []
             cached = self._get_cache()
+            if (
+                completion != self._completion_revision
+                and self._completion_generation == self._invalidation_revision
+            ):
+                return cached[1] if cached else []
             if not force and cached:
                 cache_ts, cache_data, cache_ttl = cached
                 if time.monotonic() - cache_ts < cache_ttl:
@@ -148,9 +168,15 @@ class SummaryStore:
             if client is None:
                 self._logger.debug("Summary v2 fetch skipped; client unavailable")
                 return cached[1] if cached else []
+            revision = self._invalidation_revision
             try:
                 summary = await client.summary_v2()
             except Exception as err:  # noqa: BLE001
+                if revision != self._invalidation_revision:
+                    current = self._get_cache()
+                    return current[1] if current else []
+                self._completion_revision += 1
+                self._completion_generation = revision
                 failures = int(str(self._state.get("failures", 0) or 0)) + 1
                 delay = self._failure_backoff_delay(err, failures)
                 self._state["available"] = False
@@ -183,6 +209,11 @@ class SummaryStore:
                 )
                 return []
 
+            if revision != self._invalidation_revision:
+                current = self._get_cache()
+                return current[1] if current else []
+            self._completion_revision += 1
+            self._completion_generation = revision
             summary_list = self._as_list(summary)
             self._cache = (time.monotonic(), summary_list, self._ttl)
             self._state["available"] = True

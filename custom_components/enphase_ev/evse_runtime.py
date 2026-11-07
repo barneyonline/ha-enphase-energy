@@ -479,6 +479,11 @@ class EvseRuntime:
         manager = getattr(self.coordinator, "session_history", None)
         if manager is not None and hasattr(manager, "prune"):
             manager.prune(active_serials=keep_serials, keep_day_keys=keep_day_keys)
+        prune_timeseries = getattr(
+            getattr(self.coordinator, "evse_timeseries", None), "prune", None
+        )
+        if callable(prune_timeseries):
+            prune_timeseries(active_serials=keep_serials)
 
     def sync_desired_charging(self, data: dict[str, dict[str, object]]) -> None:
         if not data:

@@ -894,6 +894,32 @@ callers acquire fresh data. Invalidation rejects the older result before parsing
 can change guards or published source metadata. Sequential forced reads retain
 the existing treatment of legitimate cloud corrections.
 
+Site-energy and EVSE timeseries transport/general fetch failures use independent
+transient streaks with local delays of 60, 120, 240, 480 and at most 900 seconds,
+including up to ten percent positive jitter below the cap. Valid acquisitions
+reset those streaks; cancellation is not a failure. Recognized service outages
+retain their existing cooldowns, and malformed-payload handling is unchanged.
+Forced reads bypass successful-cache freshness, never an active failure or
+provider deadline. Accepted payloads and source clocks are retained during errors.
+The HEMS lifetime fallback uses the longer of its one-hour local cooldown, a
+numeric or HTTP-date Retry-After (including wrapped HTTP errors), and any existing
+later deadline. Its authentication circuit remains independent.
+
+EVSE timeseries registers acquisition ownership for both endpoint families
+before awaiting either. Lifetime callers share one acquisition; daily callers
+share by requested calendar date. Locks and completion revisions distinguish
+overlapping forced reads from later sequential requests. Acquisition records
+are removed when their last caller finishes; no background tasks are created.
+Summary reads use the same completion/invalidation distinction around their
+existing lock. Cancelled owners release waiters, and invalidation rejects late
+successes and failures before cache or health state changes.
+
+Daily EVSE timeseries retains only the three newest requested date keys. Older
+requests cannot displace newer dates. Authoritative serial pruning removes
+retired charger records from daily and lifetime payloads, and runtime retirement
+invalidates outstanding reads before clearing caches. These policies are local
+runtime state and introduce no persisted settings or migrations.
+
 ### Microinverter Telemetry Rate Limits
 
 `inverter_telemetry_cooldown.py` persists the telemetry endpoint's HTTP 429 retry
