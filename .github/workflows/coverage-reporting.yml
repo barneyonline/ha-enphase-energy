@@ -139,7 +139,7 @@ jobs:
       - name: Upload coverage to Codecov
         id: coverage_upload
         if: ${{ steps.source.outputs.artifact_id != '' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v6
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         env:
           GIT_DIR: ${{ runner.temp }}/codecov-source/.git
           GIT_WORK_TREE: ${{ runner.temp }}/codecov-source
@@ -162,7 +162,7 @@ jobs:
       - name: Upload test results to Codecov
         id: junit_upload
         if: ${{ steps.source.outputs.artifact_id != '' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v6
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         env:
           GIT_DIR: ${{ runner.temp }}/codecov-source/.git
           GIT_WORK_TREE: ${{ runner.temp }}/codecov-source
