@@ -31,7 +31,7 @@ jobs:
       # Track current metadata rules independently of the supported HA runtime.
       HASSFEST_IMAGE: ghcr.io/home-assistant/hassfest:latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - name: Pull latest hassfest image
         run: docker pull "$HASSFEST_IMAGE"
       - name: Log hassfest Home Assistant version
