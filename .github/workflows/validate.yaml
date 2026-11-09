@@ -21,7 +21,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - name: Build pinned HACS validator on Home Assistant 2026.10.0
         run: docker build --file devtools/docker/Dockerfile.hacs --tag enphase-hacs-validator .
       - name: Verify HACS Home Assistant version
