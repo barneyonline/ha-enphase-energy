@@ -295,7 +295,10 @@ def test_documented_paths_and_isolated_uploader_settings():
     )
     source = next(step for step in steps if step.get("id") == "source")
     assert source["env"]["REPORTER_WORKFLOW_SHA"] == "${{ github.workflow_sha }}"
-    assert checkout["with"]["ref"] == "${{ steps.source.outputs.tools_sha }}"
+    assert checkout["with"]["ref"] == (
+        "${{ github.event_name == 'workflow_dispatch' && "
+        "github.event.repository.default_branch || github.workflow_sha }}"
+    )
     assert checkout["with"]["persist-credentials"] is False
     assert checkout["with"]["sparse-checkout"] == "scripts/codecov_reporting.py"
     for step in steps:

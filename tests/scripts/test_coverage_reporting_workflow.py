@@ -43,7 +43,10 @@ def test_manual_validation_preserves_permissions_and_trusted_data_flow():
     steps = job["steps"]
     by_name = {step["name"]: step for step in steps}
     checkout = by_name["Check out only the trusted reporter helper"]["with"]
-    assert checkout["ref"] == "${{ steps.source.outputs.tools_sha }}"
+    assert checkout["ref"] == (
+        "${{ github.event_name == 'workflow_dispatch' && "
+        "github.event.repository.default_branch || github.workflow_sha }}"
+    )
     assert checkout["sparse-checkout"] == "scripts/codecov_reporting.py"
     assert checkout["persist-credentials"] is False
     download = by_name["Download only the selected producer reports"]["with"]

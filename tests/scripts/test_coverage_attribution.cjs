@@ -66,7 +66,6 @@ function github(f) {
         getWorkflowRunAttempt: async params => record('attempt', params, f.attempt ?? f.run),
         getWorkflow: async params => record('workflow', params, f.workflow),
       },
-      repos: { getBranch: async params => record('branch', params, { commit: { sha: trustedSha } }) },
     },
     paginate: async (endpoint, params) => {
       record(endpoint, params);
@@ -86,10 +85,10 @@ async function resolveSource(f) {
   }, { env: f.env });
   return { outputs, notices };
 }
-function expected(pr = '78', headRepo = '2', toolsSha = trustedSha) {
+function expected(pr = '78', headRepo = '2') {
   return { artifact_id: '456', sha, branch: 'feature/speech', pr,
     run_id: '123', run_attempt: '2', run_url: 'https://github.com/maintainer/integration/actions/runs/123',
-    head_repository_id: headRepo, tools_sha: toolsSha };
+    head_repository_id: headRepo };
 }
 async function confirm(f, outputs) {
   await recheck(f.context, github(f), {}, { env: {
@@ -167,13 +166,12 @@ test('automatic failed producer without reports fails', async () => {
   await assert.rejects(resolveSource(f), /did not preserve reports/);
 });
 
-test('owner dispatch selects exact latest producer and keeps helper on main', async () => {
+test('owner dispatch selects exact latest producer without deriving executable code refs', async () => {
   const f = fixture(true);
   assert.deepEqual(await resolveSource(f), { outputs: expected('78', '1'), notices: [] });
-  assert.deepEqual(f.calls.map(call => call.endpoint), ['pr', 'run', 'workflow', 'branch', 'attempt', 'artifacts']);
+  assert.deepEqual(f.calls.map(call => call.endpoint), ['pr', 'run', 'workflow', 'attempt', 'artifacts']);
   assert.equal(f.calls.find(call => call.endpoint === 'run').params.run_id, 123);
   assert.equal(f.calls.find(call => call.endpoint === 'workflow').params.workflow_id, 'tests.yml');
-  assert.equal(f.calls.find(call => call.endpoint === 'branch').params.branch, 'main');
   assert.equal(f.calls.find(call => call.endpoint === 'attempt').params.run_id, 123);
   assert.equal(f.calls.find(call => call.endpoint === 'attempt').params.attempt_number, 2);
 });

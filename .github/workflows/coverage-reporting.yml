@@ -60,7 +60,7 @@ jobs:
             const validSha = sha => /^[0-9a-f]{40}$/.test(sha ?? '');
             let run = context.payload.workflow_run;
             let prNumber = '';
-            let toolsSha = process.env.REPORTER_WORKFLOW_SHA;
+            const reporterSha = process.env.REPORTER_WORKFLOW_SHA;
             let selectedPr;
             if (manual) {
               // Dispatch authority trusts the reviewed workflow definition,
@@ -83,7 +83,7 @@ jobs:
               const attempt = positiveInteger('producer_run_attempt');
               const number = positiveInteger('pull_request_number');
               const sha = inputs.expected_head_sha;
-              if (!validSha(sha) || context.sha !== sha || toolsSha !== sha) {
+              if (!validSha(sha) || context.sha !== sha || reporterSha !== sha) {
                 throw new Error('Reporter must execute the exact reviewed PR head');
               }
               selectedPr = (await github.rest.pulls.get({...context.repo, pull_number: number})).data;
@@ -111,16 +111,11 @@ jobs:
                    run.triggering_actor?.login?.toLowerCase() !== owner)) {
                 throw new Error('Manual Tests producer must be dispatched and rerun by the owner');
               }
-              // Execute only default-branch helper code, even when the reporter
-              // definition is deliberately being validated from a reviewed PR.
-              toolsSha = (await github.rest.repos.getBranch({
-                ...context.repo, branch: repository.default_branch,
-              })).data.commit.sha;
               prNumber = String(number);
             }
             if (!run || run.repository?.id !== repository.id ||
                 run.path !== '.github/workflows/tests.yml' ||
-                !validSha(run.head_sha) || !validSha(toolsSha) ||
+                !validSha(run.head_sha) || !validSha(reporterSha) ||
                 !Number.isSafeInteger(run.id) || run.id <= 0 ||
                 !Number.isSafeInteger(run.head_repository?.id) || run.head_repository.id <= 0 ||
                 !Number.isSafeInteger(run.run_attempt) || run.run_attempt <= 0) {
@@ -205,12 +200,13 @@ jobs:
             core.setOutput('run_attempt', String(run.run_attempt));
             core.setOutput('run_url', `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${run.id}`);
             core.setOutput('head_repository_id', String(run.head_repository.id));
-            core.setOutput('tools_sha', toolsSha);
       - name: Check out only the trusted reporter helper
         if: ${{ steps.source.outputs.artifact_id != '' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ steps.source.outputs.tools_sha }}
+          # These platform-owned contexts keep executable helper code separate
+          # from every producer/PR output, including a reviewed manual reporter.
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.repository.default_branch || github.workflow_sha }}
           persist-credentials: false
           path: trusted-reporter
           sparse-checkout: scripts/codecov_reporting.py
