@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 
+- Confirm extreme averaged Consumption Power before publishing it, retain accepted readings and their expiry during quarantine, and discard unsafe restored averages.
 - Reseed smoothed Grid and Battery Power when a contributing energy channel first appears, so its lifetime total cannot become a false power spike.
 - Preserve the next averaging interval after an extreme power reading passes confirmation on large sites.
 - Preserve the first accepted energy interval after a counter reset or source change when 15-minute power averaging is enabled, including a restart immediately after a source reseed. Restored points retain source-identity validation and the first live counter-reset checks.

@@ -1819,6 +1819,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._balance_window_s: float | None = None
         self._balance_sample_ts: float | None = None
         self._average = EnergyPowerAverage()
+        self._extreme_power_validator = ExtremePowerValidator()
         self._averaging_enabled = _power_averaging_enabled(coord)
         self._balance_blocker: dict[str, str] | None = None
         self._last_bucket_wh: float | None = None
@@ -2043,6 +2044,10 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             or restored.interval_minutes <= 0
             or restored.last_power_w is None
             or restored.last_power_w < 0
+            or (
+                self._averaging_enabled
+                and restored.last_power_w >= EXTREME_SITE_POWER_W
+            )
             or restored.power_sample_ts is None
             or restored.power_sample_ts <= 0
             or restored.power_sample_ts > restored.energy_ts
@@ -2242,6 +2247,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         method: str,
     ) -> None:
         self._average.clear()
+        self._extreme_power_validator.clear()
         # Retention applies only after validation against the live source.
         # Reseeding an incompatible restored baseline cannot validate its power.
         if self._restored_pending_validation:
@@ -2545,17 +2551,29 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             return
 
         window_s = max(elapsed_s, interval_s)
+        accepted = True
         if self._averaging_enabled:
-            self._last_power_w, window_s = self._average.add_delta(
+            candidate_power_w, window_s = self._average.add_delta(
                 self._last_energy_ts, energy_ts, delta_wh / 1000
             )
-            self._last_power_w = max(self._last_power_w, 0)
+            validation = self._extreme_power_validator.evaluate(
+                candidate_power_w, sample_ts=energy_ts
+            )
+            accepted = validation.accepted
+            if validation.confirmed_extreme:
+                method = "extreme_confirmed"
         else:
-            self._last_power_w = max(round(delta_wh * 3600.0 / window_s), 0)
-        self._last_power_ts = energy_ts
-        self._using_cached = False
-        self._last_window_s = window_s
-        self._last_method = method
+            candidate_power_w = round(delta_wh * 3600.0 / window_s)
+        if accepted:
+            self._last_power_w = max(candidate_power_w, 0)
+            self._last_power_ts = energy_ts
+            self._using_cached = False
+            self._last_window_s = window_s
+            self._last_method = method
+        else:
+            self._reject_sample("extreme_pending", data)
+        # Valid advancing energy remains the next calculation baseline even
+        # while its average is quarantined. Accepted watts keep their clock.
         self._last_bucket_wh = latest_bucket_wh
         self._last_bucket_count = bucket_count
         self._last_start_date = start_date

@@ -770,3 +770,167 @@ async def test_enabled_average_advances_on_real_publication(
         )
     finally:
         await remove_entities(component, entities)
+
+
+@pytest.fixture
+def consumption_average(averaged, monkeypatch):
+    now = [dt_util.utcnow()]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+
+    def sample(sensor, wh, *, seconds=0, **metadata):
+        now[0] += timedelta(seconds=seconds)
+        averaged.last_success_utc = now[0]
+        averaged.energy.site_energy = {
+            "consumption": {
+                "latest_bucket_wh": wh,
+                "raw_bucket_count": 1,
+                "start_date": "2026-01-01",
+                "last_report_date": now[0],
+                "interval_minutes": 5,
+                **metadata,
+            }
+        }
+        return read(sensor)
+
+    return averaged, now, sample
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+async def test_consumption_average_confirms_extremes_and_ignores_duplicates(
+    consumption_average, hass, enabled
+):
+    coord, now, sample = consumption_average
+    hass.config_entries.async_update_entry(
+        coord.config_entry, options={OPT_USE_15_MINUTE_POWER_AVERAGE: enabled}
+    )
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    assert sample(sensor, 100) is None
+    assert sample(sensor, 700, seconds=1) == (None if enabled else 7200)
+    for _ in range(3):
+        assert sample(sensor, 700) == (None if enabled else 7200)
+    if enabled:
+        assert sensor.extra_state_attributes["method"] == "extreme_pending"
+        assert sensor.extra_state_attributes["sampled_at_utc"] is None
+    assert sample(sensor, 1300, seconds=1) == (2_160_000 if enabled else 7200)
+    assert sensor.extra_state_attributes["method"] == (
+        "extreme_confirmed" if enabled else "consumption_bucket_delta"
+    )
+
+
+async def test_consumption_average_retains_accepted_clock_and_recovers(
+    consumption_average,
+):
+    coord, now, sample = consumption_average
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    assert sample(sensor, 100) is None
+    assert sample(sensor, 101, seconds=1) == 3600
+    accepted = now[0].isoformat()
+    assert sample(sensor, 10_101, seconds=1) == 3600
+    for _ in range(3):
+        assert sample(sensor, 10_101) == 3600
+        assert sensor.extra_state_attributes["sampled_at_utc"] == accepted
+        assert sensor.extra_state_attributes["last_window_seconds"] == 1
+        assert coord.energy.consumption_power_diagnostics["using_cached"]
+    # The quarantined energy remains in the observed window, but its clock
+    # cannot renew accepted watts. A later ordinary average recovers directly.
+    assert sample(sensor, 10_201, seconds=300) == 120_409
+    assert sensor.extra_state_attributes["sampled_at_utc"] == now[0].isoformat()
+    assert not coord.energy.consumption_power_diagnostics["using_cached"]
+    assert sensor.extra_state_attributes["method"] == "consumption_bucket_delta"
+
+
+async def test_consumption_average_pending_does_not_extend_expiry(consumption_average):
+    coord, now, sample = consumption_average
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    sample(sensor, 100)
+    assert sample(sensor, 101, seconds=1) == 3600
+    accepted = now[0]
+    assert sample(sensor, 10_101, seconds=1) == 3600
+    now[0] = accepted + timedelta(seconds=1800)
+    coord.last_success_utc = now[0]
+    assert read(sensor) == 3600
+    assert not sensor.available
+    assert sensor.extra_state_attributes["sampled_at_utc"] == accepted.isoformat()
+
+
+@pytest.mark.parametrize("boundary", ["gap", "start_date", "interval"])
+async def test_consumption_average_reseed_clears_extreme_confirmation(
+    consumption_average, boundary
+):
+    coord, now, sample = consumption_average
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    assert sample(sensor, 100) is None
+    assert sample(sensor, 700, seconds=1) is None
+    metadata = (
+        {"start_date": "2026-01-02"}
+        if boundary == "start_date"
+        else {"interval_minutes": 10} if boundary == "interval" else {}
+    )
+    assert (
+        sample(sensor, 1000, seconds=1801 if boundary == "gap" else 1, **metadata)
+        is None
+    )
+    # A different source window must not confirm the old pending extreme.
+    assert sample(sensor, 1600, seconds=1, **metadata) is None
+    assert sample(sensor, 2200, seconds=1, **metadata) == 2_160_000
+
+
+async def test_consumption_average_restart_retains_only_accepted_power(
+    consumption_average, hass
+):
+    coord, now, sample = consumption_average
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    assert sample(sensor, 100) is None
+    assert sample(sensor, 101, seconds=1) == 3600
+    accepted = now[0].isoformat()
+    assert sample(sensor, 10_101, seconds=1) == 3600
+    saved = sensor.extra_restore_state_data.as_dict()
+    restored = EnphaseSiteConsumptionPowerSensor(coord)
+    restored.hass = hass
+    restored.async_get_last_state = AsyncMock(return_value=None)
+    restored.async_get_last_extra_data = AsyncMock(
+        return_value=RestoredExtraData(saved)
+    )
+    try:
+        await restored._async_restore_power()
+        assert read(restored) == 3600
+        assert restored.extra_state_attributes["sampled_at_utc"] == accepted
+        assert sample(restored, 20_101, seconds=1) == 3600
+        assert sample(restored, 20_101) == 3600
+        assert restored.extra_state_attributes["sampled_at_utc"] == accepted
+        assert sample(restored, 30_101, seconds=1) == 36_000_000
+        assert restored.extra_state_attributes["method"] == "extreme_confirmed"
+    finally:
+        await restored.async_will_remove_from_hass()
+
+
+@pytest.mark.parametrize("method", ["consumption_bucket_delta", "extreme_confirmed"])
+async def test_consumption_average_restore_does_not_authorize_extreme_watts(
+    consumption_average, hass, method
+):
+    coord, now, sample = consumption_average
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    sample(sensor, 100)
+    sample(sensor, 700, seconds=1)
+    saved = sensor.extra_restore_state_data.as_dict()
+    # The original opt-in implementation could save an unconfirmed short
+    # average here. Even a previously confirmed extreme needs new live proof.
+    saved.update(
+        last_power_w=2_160_000,
+        power_sample_ts=now[0].timestamp(),
+        last_window_seconds=1,
+        method=method,
+    )
+    restored = EnphaseSiteConsumptionPowerSensor(coord)
+    restored.hass = hass
+    restored.async_get_last_state = AsyncMock(return_value=None)
+    restored.async_get_last_extra_data = AsyncMock(
+        return_value=RestoredExtraData(saved)
+    )
+    try:
+        await restored._async_restore_power()
+        assert read(restored) is None
+        assert sample(restored, 1300, seconds=1) is None
+        assert sample(restored, 1900, seconds=1) == 2_160_000
+    finally:
+        await restored.async_will_remove_from_hass()
