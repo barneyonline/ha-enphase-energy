@@ -594,7 +594,8 @@
           "fast_while_streaming": "Föredra snabb pollning när molnströmmen är aktiv",
           "api_timeout": "API-timeout (s)",
           "session_history_interval": "Sessionshistorikintervall (min)",
-          "degraded_service_repair_issues": "Aktivera reparationer för degraderade tjänster"
+          "degraded_service_repair_issues": "Aktivera reparationer för degraderade tjänster",
+          "use_15_minute_power_average": "Använd 15 minuters medeleffekt"
         },
         "data_description": {
           "fast_poll_interval": "Intervall att använda under laddning eller strömning. Standard: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "När aktiverad, snabb pollning under aktiv molnströmning. Standard: Aktiverat.",
           "api_timeout": "Sekunder innan API-begäranden får timeout. Standard: 15 s.",
           "session_history_interval": "Minuter att vänta mellan hämtningar av moln-sessionshistorik. Standard: 10 min.",
-          "degraded_service_repair_issues": "Skapar Repairs-problem när valfria Enphase-tjänster är degraderade. Standard: Inaktiverat."
+          "degraded_service_repair_issues": "Skapar Repairs-problem när valfria Enphase-tjänster är degraderade. Standard: Inaktiverat.",
+          "use_15_minute_power_average": "Beräkna medelvärdet av produktions-, nät-, batteri- och förbrukningseffekt över 15 minuter för att minska toppar. Värdena reagerar långsammare. Standard: Inaktiverat."
         }
       },
       "devices": {

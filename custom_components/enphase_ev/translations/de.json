@@ -594,7 +594,8 @@
           "fast_while_streaming": "Schnelle Abfrage während aktivem Cloud-Stream bevorzugen",
           "api_timeout": "API-Zeitlimit (s)",
           "session_history_interval": "Intervall für Sitzungsverlauf (min)",
-          "degraded_service_repair_issues": "Reparaturen für beeinträchtigte Dienste aktivieren"
+          "degraded_service_repair_issues": "Reparaturen für beeinträchtigte Dienste aktivieren",
+          "use_15_minute_power_average": "15-Minuten-Leistungsmittelwert verwenden"
         },
         "data_description": {
           "fast_poll_interval": "Intervall während des Ladevorgangs oder Streams. Standard: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Wenn aktiviert, wird während eines aktiven Cloud-Streams schnell abgefragt. Standard: Aktiviert.",
           "api_timeout": "Sekunden, bevor API-Anfragen abbrechen. Standard: 15 s.",
           "session_history_interval": "Minuten zwischen Abrufen des Cloud-Sitzungsverlaufs. Standard: 10 min.",
-          "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind. Standard: Deaktiviert."
+          "degraded_service_repair_issues": "Erstellt Repairs-Probleme, wenn optionale Enphase-Dienste beeinträchtigt sind. Standard: Deaktiviert.",
+          "use_15_minute_power_average": "Mittelt Erzeugungs-, Netz-, Batterie- und Verbrauchsleistung über 15 Minuten, um Spitzen zu reduzieren. Die Werte reagieren langsamer. Standard: Deaktiviert."
         }
       },
       "devices": {

@@ -58,6 +58,7 @@ from .const import (
     OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
     OPT_FAST_POLL_INTERVAL,
     OPT_FAST_WHILE_STREAMING,
+    OPT_USE_15_MINUTE_POWER_AVERAGE,
     OPT_GRID_PROFILE_CONTROLS_ENABLED,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_MICROINVERTER_POWER_ENABLED,
@@ -412,6 +413,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             vol.Optional(
                 OPT_FAST_WHILE_STREAMING,
                 default=self._entry.options.get(OPT_FAST_WHILE_STREAMING, True),
+            ): bool,
+            vol.Optional(
+                OPT_USE_15_MINUTE_POWER_AVERAGE,
+                default=self._entry.options.get(OPT_USE_15_MINUTE_POWER_AVERAGE, False),
             ): bool,
             vol.Optional(
                 OPT_API_TIMEOUT,

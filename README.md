@@ -83,10 +83,17 @@ EV charging modes, current and session controls alongside battery reserve, grid 
 
 Production, Grid and Battery Power are cloud energy-derived averages over their
 source-report windows. Production Power uses the same lifetime-energy feed as
-Site Solar Production. These readings can lag local gateway power; two valid
-energy observations are needed after an upgrade before Production Power can
-calculate its first average. Batched or corrected cloud energy updates can produce
-short-term spikes even when daily energy totals agree with the gateway.
+Site Solar Production. These readings can lag local gateway power; batched cloud
+updates can produce spikes even when daily energy totals agree.
+
+Enable **Use 15-minute Power Average** under **Configure → Polling** to smooth
+Production, Grid and Battery Power over a rolling 15-minute window. Consumption
+Power uses matching windows for its power balance and smooths its energy fallback.
+The option defaults to off, preserving the previous calculations. Smoothing makes
+readings respond more slowly. During startup, averages use the available history
+and expose the actual window in `last_window_seconds`. Changing the option reloads
+the integration and starts a new calculation history. Other power sensors and
+energy counters are unchanged.
 
 
 <p align="center">

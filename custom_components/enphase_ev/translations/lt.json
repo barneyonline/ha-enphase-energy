@@ -594,7 +594,8 @@
           "fast_while_streaming": "Pirmenybė greitai apklausai, kai aktyvi debesies srauto funkcija",
           "api_timeout": "API užklausos laiko limitas (s)",
           "session_history_interval": "Sesijos istorijos intervalas (min)",
-          "degraded_service_repair_issues": "Įgalinti suprastėjusių paslaugų taisymus"
+          "degraded_service_repair_issues": "Įgalinti suprastėjusių paslaugų taisymus",
+          "use_15_minute_power_average": "Naudoti 15 minučių galios vidurkį"
         },
         "data_description": {
           "fast_poll_interval": "Intervalas, kai įkraunama arba transliuojama. Numatytoji reikšmė: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Kai įjungta, greita apklausa aktyvios debesies transliacijos metu. Numatytoji reikšmė: Įjungta.",
           "api_timeout": "Sekundės iki API užklausų laiko limito pabaigos. Numatytoji reikšmė: 15 s.",
           "session_history_interval": "Minutės, kurias reikia palaukti tarp debesies sesijų istorijos užklausų. Numatytoji reikšmė: 10 min.",
-          "degraded_service_repair_issues": "Sukuria Repairs problemas, kai pasirenkamos Enphase paslaugos veikia suprastėjusiai. Numatytoji reikšmė: Išjungta."
+          "degraded_service_repair_issues": "Sukuria Repairs problemas, kai pasirenkamos Enphase paslaugos veikia suprastėjusiai. Numatytoji reikšmė: Išjungta.",
+          "use_15_minute_power_average": "Apskaičiuoja gamybos, tinklo, baterijos ir vartojimo galios vidurkį per 15 minučių, kad sumažintų šuolius. Rodmenys reaguoja lėčiau. Numatyta: išjungta."
         }
       },
       "devices": {

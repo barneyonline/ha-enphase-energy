@@ -14,13 +14,21 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 
+- Confirm extreme averaged Consumption Power before publishing it, retain accepted readings and their expiry during quarantine, and discard unsafe restored averages.
+- Reseed smoothed Grid and Battery Power when a contributing energy channel first appears, so its lifetime total cannot become a false power spike.
+- Preserve the next averaging interval after an extreme power reading passes confirmation on large sites.
+- Preserve the first accepted energy interval after a counter reset or source change when 15-minute power averaging is enabled, including a restart immediately after a source reseed. Restored points retain source-identity validation and the first live counter-reset checks.
+- Keep Polling saves live when the new power-averaging option remains disabled; reload only when its effective value changes.
+- Discard malformed or unsafe averaging restore data without failing sensor setup, and apply extreme-power confirmation to the calculated average as well as the raw interval.
+- Ignore untagged legacy power readings when enabling smoothing, so cached estimates from the previous calculation mode cannot appear as rolling averages.
+
 - Back off repeated site-energy and EV charger timeseries fetch failures while retaining accepted readings, and honor longer provider retry deadlines for optional HEMS lifetime reads.
 - Share overlapping charger timeseries and summary acquisitions, including forced reads, without suppressing later sequential refreshes or accepting invalidated results.
 - Bound EV charger daily timeseries caches to three dates and remove retired charger records and cached reads during runtime cleanup.
 
 ### 🔧 Improvements
 
-- None
+- Add **Use 15-minute Power Average** to Polling settings, disabled by default. When enabled, smooth Production, Grid and Battery Power with elapsed-time-weighted cumulative-energy windows and require matching windows for the Consumption Power balance. Smooth the consumption-energy fallback as well; preserve the original calculations when disabled. Other power sensors and energy counters are unchanged.
 
 ### 🔄 Other changes
 

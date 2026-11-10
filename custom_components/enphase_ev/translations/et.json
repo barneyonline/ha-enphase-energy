@@ -594,7 +594,8 @@
           "fast_while_streaming": "Eelistage kiiret küsitlust, kui pilvevoog on aktiivne",
           "api_timeout": "API aegumine (s)",
           "session_history_interval": "Seansi ajaloo intervall (min)",
-          "degraded_service_repair_issues": "Luba halvenenud teenuste parandused"
+          "degraded_service_repair_issues": "Luba halvenenud teenuste parandused",
+          "use_15_minute_power_average": "Kasuta 15 minuti keskmist võimsust"
         },
         "data_description": {
           "fast_poll_interval": "Intervall, mida kasutada laadimise või voogedastuse ajal. Vaikimisi: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Kui lubatud, kiire küsitlus aktiivse pilvevoo ajal. Vaikimisi: Lubatud.",
           "api_timeout": "Sekundid enne API-päringute aegumist. Vaikimisi: 15 s.",
           "session_history_interval": "Minutid, mida oodata pilve seansiajaloo päringute vahel. Vaikimisi: 10 min.",
-          "degraded_service_repair_issues": "Loob Repairsi probleemid, kui valikulised Enphase teenused on halvenenud. Vaikimisi: Keelatud."
+          "degraded_service_repair_issues": "Loob Repairsi probleemid, kui valikulised Enphase teenused on halvenenud. Vaikimisi: Keelatud.",
+          "use_15_minute_power_average": "Keskmistab tootmise, võrgu, aku ja tarbimise võimsuse 15 minuti jooksul, et vähendada tippe. Näidud reageerivad aeglasemalt. Vaikimisi: keelatud."
         }
       },
       "devices": {
