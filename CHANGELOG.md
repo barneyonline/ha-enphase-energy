@@ -14,6 +14,28 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 
+- None
+
+### 🔧 Improvements
+
+- None
+
+### 🔄 Other changes
+
+- None
+
+## v5.2.5b2 - 2026-11-10
+
+### 🚧 Breaking changes
+
+- None
+
+### ✨ New features
+
+- None
+
+### 🐛 Bug fixes
+
 - Confirm extreme averaged Consumption Power before publishing it, retain accepted readings and their expiry during quarantine, and discard unsafe restored averages.
 - Reseed smoothed Grid and Battery Power when a contributing energy channel first appears, so its lifetime total cannot become a false power spike.
 - Preserve the next averaging interval after an extreme power reading passes confirmation on large sites.
@@ -21,7 +43,6 @@ All notable changes to this project will be documented in this file.
 - Keep Polling saves live when the new power-averaging option remains disabled; reload only when its effective value changes.
 - Discard malformed or unsafe averaging restore data without failing sensor setup, and apply extreme-power confirmation to the calculated average as well as the raw interval.
 - Ignore untagged legacy power readings when enabling smoothing, so cached estimates from the previous calculation mode cannot appear as rolling averages.
-
 - Back off repeated site-energy and EV charger timeseries fetch failures while retaining accepted readings, and honor longer provider retry deadlines for optional HEMS lifetime reads.
 - Share overlapping charger timeseries and summary acquisitions, including forced reads, without suppressing later sequential refreshes or accepting invalidated results.
 - Bound EV charger daily timeseries caches to three dates and remove retired charger records and cached reads during runtime cleanup.
@@ -32,7 +53,9 @@ All notable changes to this project will be documented in this file.
 
 ### 🔄 Other changes
 
-- None
+- Correct Codecov attribution for fork pull requests and add selected-run validation for Codecov 7.1.1. (#995, #997)
+- Update the pinned checkout action to 7.0.1. (#998)
+- Bump the integration manifest version to `5.2.5b2` for beta testing.
 
 ## v5.2.5b1 - 2026-11-06
 
