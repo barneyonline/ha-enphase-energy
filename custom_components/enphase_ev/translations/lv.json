@@ -594,7 +594,8 @@
           "fast_while_streaming": "Dod priekšroku ātrai aptaujai, kad mākoņa straume aktīva",
           "api_timeout": "API noildze (s)",
           "session_history_interval": "Sesijas vēstures intervāls (min)",
-          "degraded_service_repair_issues": "Iespējot degradētu pakalpojumu labojumus"
+          "degraded_service_repair_issues": "Iespējot degradētu pakalpojumu labojumus",
+          "use_15_minute_power_average": "Izmantot 15 minūšu jaudas vidējo"
         },
         "data_description": {
           "fast_poll_interval": "Intervāls, ko izmantot uzlādes vai straumēšanas laikā. Noklusējums: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Ja iespējots, ātra aptauja aktīvas mākoņa straumes laikā. Noklusējums: Ieslēgts.",
           "api_timeout": "Sekundes līdz API pieprasījumu noildzei. Noklusējums: 15 s.",
           "session_history_interval": "Minūtes starp mākoņa sesiju vēstures pieprasījumiem. Noklusējums: 10 min.",
-          "degraded_service_repair_issues": "Izveido Repairs problēmas, kad izvēles Enphase pakalpojumi darbojas pasliktināti. Noklusējums: Izslēgts."
+          "degraded_service_repair_issues": "Izveido Repairs problēmas, kad izvēles Enphase pakalpojumi darbojas pasliktināti. Noklusējums: Izslēgts.",
+          "use_15_minute_power_average": "Aprēķina ražošanas, tīkla, akumulatora un patēriņa jaudas vidējo 15 minūtēs, lai mazinātu lēcienus. Rādījumi reaģē lēnāk. Pēc noklusējuma: izslēgts."
         }
       },
       "devices": {

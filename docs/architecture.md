@@ -541,6 +541,47 @@ healthy. Battery and heat-pump family recovery is published when freshness is
 restored, including when the measurement itself has not changed. This restores
 availability and expiry timers without publishing every identical successful poll.
 
+The Polling option `use_15_minute_power_average` defaults to false. Disabled
+entries retain the existing Production/Grid/Battery delta and Consumption Power
+calculations. When enabled, `power_average.EnergyPowerAverage` retains bounded,
+accepted cumulative-energy observations for a rolling 900-second average. It
+interpolates only the left edge between already observed cursors, weights actual
+elapsed time, and uses the shorter available window during startup. Repeated
+source clocks do not add observations; corrections are included at the next
+advancing clock. Gaps over 30 minutes, changed clock provenance, resets, missing
+channels and rejected/reseeded calculations clear averaging continuity. Newly
+discovered contributing flows also reseed the smoothed baseline, so their entire
+lifetime totals cannot be mistaken for an increment in an existing window.
+Accepted reset/source-reseed observations and confirmed extreme readings seed
+the next window; rejected observations do not. Reseed and confirmed-extreme
+checkpoints with fully identified live flows omit the predecessor that cannot
+be restored as watts, so restore validation retains the accepted baseline for
+the next interval. Synthetic or unidentified flows still undergo the original
+conservative restore validation. A validated saved rolling point also establishes
+the live counter baseline, so the first report after restart passes the normal
+per-flow reset and outlier checks before averaging. The domain helper owns
+continuity and signed energy accumulation. Enabled entities advance it during
+coordinator/source updates and startup, while properties only present their
+stored result. This is a delayed estimate, not instantaneous telemetry or a
+completed-bucket guarantee.
+
+Enabled Consumption Power balances published Production, Grid and Battery Power
+only when their calculation end times and actual window lengths match. Otherwise
+it retains the last valid balance with its original expiry or uses its separately
+averaged consumption-energy fallback. Calculation and freshness clocks remain
+separate. Other power entities and cumulative energy sensors do not use this
+option. Changing the option reloads the integration; private restore data tags the
+mode so cached watts and baselines from the other mode cannot be reused. Same-mode
+restore retains the bounded averaging buffer without extending accepted expiry.
+Averaging validates its final watts independently of the consecutive interval
+calculation so short startup windows cannot bypass extreme-power confirmation.
+Duplicate reports preserve quarantine and the last accepted average. Restored
+buffers reject invalid clock types, overflowing numbers, and unsafe averages.
+Saving the default-off value on older entries does not trigger a reload.
+Untagged legacy power restore data belongs to the original calculation mode:
+it remains usable with smoothing disabled and is discarded when smoothing is
+enabled, including the Consumption Power restore history.
+
 Production Power uses the same lifetime-energy delta calculation as Grid Power
 and Battery Power. Its `solar_production` flow is the guarded sum of the
 `production` Wh buckets from `/pv/systems/<site_id>/lifetime_energy`, already used

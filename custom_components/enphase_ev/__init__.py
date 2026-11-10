@@ -36,6 +36,7 @@ from .const import (
     OPT_MICROINVERTER_POWER_ENABLED,
     OPT_WEATHER_ENABLED,
     OPT_VPP_EVENTS_ENABLED,
+    OPT_USE_15_MINUTE_POWER_AVERAGE,
 )
 from .device_info_helpers import (
     _cloud_device_info as _cloud_device_info,
@@ -117,6 +118,7 @@ _LOGGER = logging.getLogger(__name__)
 _RUNTIME_HANDOFF_KEY = f"{DOMAIN}_runtime_handoffs"
 _RELOAD_REQUIRED_OPTION_KEYS = frozenset(
     {
+        OPT_USE_15_MINUTE_POWER_AVERAGE,
         OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
         OPT_EXPORT_LIMIT_CONTROLS_ENABLED,
         OPT_GRID_PROFILE_CONTROLS_ENABLED,
@@ -325,6 +327,12 @@ async def _async_update_listener_locked(
             if not changed_data_keys and not changed_option_keys:
                 return
             changed_reload_options = changed_option_keys & _RELOAD_REQUIRED_OPTION_KEYS
+            # Saving Polling may materialize the new default-off checkbox.
+            # Reload only when the effective averaging mode actually changes.
+            if bool(
+                previous_options.get(OPT_USE_15_MINUTE_POWER_AVERAGE, False)
+            ) == bool(target_options.get(OPT_USE_15_MINUTE_POWER_AVERAGE, False)):
+                changed_reload_options.discard(OPT_USE_15_MINUTE_POWER_AVERAGE)
             # Saving Notifications adds the default-off key to older entries.
             # Only changing its effective value needs a publisher restart.
             if bool(
