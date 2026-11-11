@@ -2539,6 +2539,26 @@
             "name": "Naudojami talpykloje saugomi įvykių duomenys"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Šliuzo ryšys",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Šliuzų skaičius"
+          },
+          "gateway_connected_count": {
+            "name": "Prijungti šliuzai"
+          },
+          "gateway_last_connection_at": {
+            "name": "Paskutinis šliuzo prisijungimas"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetrijos gavimas"
+          },
+          "charger_last_reported_at": {
+            "name": "Paskutinė įkroviklio ataskaita"
+          }
+        }
       }
     },
     "switch": {

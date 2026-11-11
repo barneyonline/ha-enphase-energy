@@ -2539,6 +2539,26 @@
             "name": "Bruger cachelagrede hændelsesdata"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Gatewayforbindelse",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Antal gateways"
+          },
+          "gateway_connected_count": {
+            "name": "Tilsluttede gateways"
+          },
+          "gateway_last_connection_at": {
+            "name": "Seneste gatewayforbindelse"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetri modtaget"
+          },
+          "charger_last_reported_at": {
+            "name": "Laderens seneste rapport"
+          }
+        }
       }
     },
     "switch": {

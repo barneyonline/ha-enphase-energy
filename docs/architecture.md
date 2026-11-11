@@ -222,6 +222,19 @@ milestones for core readiness, entity forwarding, power readiness, setup complet
 and warmup completion. Keep optional network work out of the config-entry critical
 path unless Home Assistant cannot safely create the integration without it.
 
+### EV charger gateway connectivity diagnostic
+
+`SummaryStore.gateway_connectivity` projects the currently cached summary into an
+identifier-free observation via `evse_gateway_connectivity.py`. It never fetches
+or falls back to persisted coordinator metadata. Missing/duplicate charger rows,
+failed/stale summary responses and conflicting flags cannot report connectivity.
+`binary_sensor_gateway.py` exposes a connectivity diagnostic with unknown state
+when evidence is unavailable. It owns one cancellable local expiry timer per
+entity, with no independent polling, and discards observations older than fifteen
+minutes using both the acquisition time and charger `lastReportedAt`. The
+connection-event timestamp is deliberately separate and never renews freshness.
+Unload cancels the timer; normal updates replace it and preserve entity identity.
+
 ## Cloud Client
 
 `api.py` is the stable public compatibility facade for the HTTP boundary. It

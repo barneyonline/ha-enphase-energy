@@ -2539,6 +2539,26 @@
             "name": "Zwischengespeicherte Ereignisdaten werden verwendet"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Gateway-Verbindung",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Anzahl der Gateways"
+          },
+          "gateway_connected_count": {
+            "name": "Verbundene Gateways"
+          },
+          "gateway_last_connection_at": {
+            "name": "Letzte Gateway-Verbindung"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetrie empfangen"
+          },
+          "charger_last_reported_at": {
+            "name": "Letzte Meldung der Ladestation"
+          }
+        }
       }
     },
     "switch": {

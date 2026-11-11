@@ -8264,6 +8264,7 @@ retained; access has not been verified by this capture.
 | `activeConnection` | Active network transport label from summary v2; observed value so far: `ethernet` |
 | `isConnected` | Connectivity flag from summary v2; observed value so far: `true` |
 | `isLocallyConnected` | Local-network connectivity flag from summary v2; observed value so far: `true` |
+
 | `isRetired` | Retirement flag from summary v2; observed value so far: `false` |
 | `commissioningStatus` | Summary v2 commissioning state code; observed value so far: `1` |
 | `status` (EV summary) | Summary v2 charger health label; observed value so far: `NORMAL` |
@@ -8339,6 +8340,15 @@ retained; access has not been verified by this capture.
 | `sg-ready-mode` | SG Ready operating mode label from `/heatpump/<device_uid>/state`; observed values: `MODE_2` (normal), `MODE_3` (recommended consumption / SG Ready on) |
 | `vpp-sgready-mode-override` | SG Ready override label from `/heatpump/<device_uid>/state`; observed value so far: `NONE` |
 | `last-report-at` | ISO-8601 last telemetry timestamp from `/heatpump/<device_uid>/state` |
+
+The Gateway Connectivity diagnostic reuses this summary response without extra
+polling. It prefers the explicit local-connectivity flag and treats conflicting
+gateway details as unknown. Only gateway status `0` has an observed connected
+meaning; nonzero codes are not independently interpreted as disconnected. Counts
+are reported entries, not a configured expected inventory. Fresh cloud receipt
+and `lastReportedAt` are required; `lastConnTime` is a separate connection event
+in epoch milliseconds and does not establish telemetry freshness. These are
+cloud-reported observations, not verified physical-link health.
 
 ---
 

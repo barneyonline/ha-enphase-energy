@@ -2539,6 +2539,26 @@
             "name": "Usando dados de eventos em cache"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Conectividade do gateway",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Número de gateways"
+          },
+          "gateway_connected_count": {
+            "name": "Gateways conectados"
+          },
+          "gateway_last_connection_at": {
+            "name": "Última conexão ao gateway"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetria recebida"
+          },
+          "charger_last_reported_at": {
+            "name": "Último relatório do carregador"
+          }
+        }
       }
     },
     "switch": {

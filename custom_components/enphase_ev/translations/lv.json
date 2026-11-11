@@ -2539,6 +2539,26 @@
             "name": "Tiek izmantoti kešatmiņā saglabāti notikumu dati"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Vārtejas savienojums",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Vārteju skaits"
+          },
+          "gateway_connected_count": {
+            "name": "Savienotās vārtejas"
+          },
+          "gateway_last_connection_at": {
+            "name": "Pēdējais vārtejas savienojums"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetrijas saņemšana"
+          },
+          "charger_last_reported_at": {
+            "name": "Pēdējais lādētāja ziņojums"
+          }
+        }
       }
     },
     "switch": {

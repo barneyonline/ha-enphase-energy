@@ -2539,6 +2539,26 @@
             "name": "Usando datos de eventos en caché"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Conectividad de la puerta de enlace",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Número de puertas de enlace"
+          },
+          "gateway_connected_count": {
+            "name": "Puertas de enlace conectadas"
+          },
+          "gateway_last_connection_at": {
+            "name": "Última conexión a la puerta de enlace"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetría recibida"
+          },
+          "charger_last_reported_at": {
+            "name": "Último informe del cargador"
+          }
+        }
       }
     },
     "switch": {

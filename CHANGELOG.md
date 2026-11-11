@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### ✨ New features
 
-- None
+- Add a diagnostic Gateway Connectivity binary sensor for each EV charger, using existing summary telemetry with explicit unknown states for missing, stale or conflicting evidence. Include gateway counts and separate connection-event, charger-report and cloud-receipt timestamps.
 
 ### 🐛 Bug fixes
 

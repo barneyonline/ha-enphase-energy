@@ -2539,6 +2539,26 @@
             "name": "Gyorsítótárazott eseményadatok használata"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Átjárókapcsolat",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Átjárók száma"
+          },
+          "gateway_connected_count": {
+            "name": "Csatlakoztatott átjárók"
+          },
+          "gateway_last_connection_at": {
+            "name": "Utolsó átjárókapcsolat"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetria fogadása"
+          },
+          "charger_last_reported_at": {
+            "name": "Töltő utolsó jelentése"
+          }
+        }
       }
     },
     "switch": {

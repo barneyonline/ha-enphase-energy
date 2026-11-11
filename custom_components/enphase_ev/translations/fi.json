@@ -2539,6 +2539,26 @@
             "name": "Käytetään välimuistissa olevia tapahtumatietoja"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Yhdyskäytävän yhteys",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Yhdyskäytävien määrä"
+          },
+          "gateway_connected_count": {
+            "name": "Yhdistetyt yhdyskäytävät"
+          },
+          "gateway_last_connection_at": {
+            "name": "Viimeisin yhdyskäytäväyhteys"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetrian vastaanotto"
+          },
+          "charger_last_reported_at": {
+            "name": "Laturin viimeisin raportti"
+          }
+        }
       }
     },
     "switch": {

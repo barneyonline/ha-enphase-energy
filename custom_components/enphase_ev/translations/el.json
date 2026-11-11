@@ -2539,6 +2539,26 @@
             "name": "Χρήση αποθηκευμένων δεδομένων συμβάντων"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Συνδεσιμότητα πύλης",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Αριθμός πυλών"
+          },
+          "gateway_connected_count": {
+            "name": "Συνδεδεμένες πύλες"
+          },
+          "gateway_last_connection_at": {
+            "name": "Τελευταία σύνδεση πύλης"
+          },
+          "telemetry_received_at": {
+            "name": "Λήψη τηλεμετρίας"
+          },
+          "charger_last_reported_at": {
+            "name": "Τελευταία αναφορά φορτιστή"
+          }
+        }
       }
     },
     "switch": {

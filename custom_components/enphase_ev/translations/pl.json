@@ -2539,6 +2539,26 @@
             "name": "Używanie danych zdarzeń z pamięci podręcznej"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Połączenie z bramą",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Liczba bram"
+          },
+          "gateway_connected_count": {
+            "name": "Połączone bramy"
+          },
+          "gateway_last_connection_at": {
+            "name": "Ostatnie połączenie z bramą"
+          },
+          "telemetry_received_at": {
+            "name": "Odebranie telemetrii"
+          },
+          "charger_last_reported_at": {
+            "name": "Ostatni raport ładowarki"
+          }
+        }
       }
     },
     "switch": {

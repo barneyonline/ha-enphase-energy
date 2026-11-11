@@ -12,6 +12,7 @@ from homeassistant.util import dt as dt_util
 
 from .api import InvalidPayloadError
 from .cloud_retry import retry_after_delay
+from .evse_gateway_connectivity import GatewayConnectivity, gateway_connectivity
 from .log_redaction import redact_text
 
 _LOGGER = logging.getLogger(__name__)
@@ -278,3 +279,17 @@ class SummaryStore:
             "last_success_age_s": last_success_age,
             "last_payload_signature": self._state.get("last_payload_signature"),
         }
+
+    def gateway_connectivity(self, serial: str) -> GatewayConnectivity | None:
+        """Interpret one cached charger observation without fetching or retaining IDs."""
+        cache = self._get_cache()
+        if cache is None or not self._state["available"] or self._state["using_stale"]:
+            return None
+        matches = [
+            item
+            for item in cache[1]
+            if isinstance(item, dict) and str(item.get("serialNumber")) == serial
+        ]
+        if len(matches) != 1:
+            return None
+        return gateway_connectivity(matches[0], self._state["last_success_utc"])

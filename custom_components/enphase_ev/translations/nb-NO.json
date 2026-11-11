@@ -2539,6 +2539,26 @@
             "name": "Bruker bufrede hendelsesdata"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Gatewaytilkobling",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Antall gatewayer"
+          },
+          "gateway_connected_count": {
+            "name": "Tilkoblede gatewayer"
+          },
+          "gateway_last_connection_at": {
+            "name": "Siste gatewaytilkobling"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetri mottatt"
+          },
+          "charger_last_reported_at": {
+            "name": "Laderens siste rapport"
+          }
+        }
       }
     },
     "switch": {

@@ -2539,6 +2539,26 @@
             "name": "Använder cachelagrade händelsedata"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Gatewayanslutning",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Antal gatewayenheter"
+          },
+          "gateway_connected_count": {
+            "name": "Anslutna gatewayenheter"
+          },
+          "gateway_last_connection_at": {
+            "name": "Senaste gatewayanslutning"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetri mottagen"
+          },
+          "charger_last_reported_at": {
+            "name": "Laddarens senaste rapport"
+          }
+        }
       }
     },
     "switch": {
