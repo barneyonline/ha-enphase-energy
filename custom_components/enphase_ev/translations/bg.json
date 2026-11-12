@@ -2539,6 +2539,26 @@
             "name": "Използват се кеширани данни за събития"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Свързаност с шлюза",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Брой шлюзове"
+          },
+          "gateway_connected_count": {
+            "name": "Свързани шлюзове"
+          },
+          "gateway_last_connection_at": {
+            "name": "Последна връзка с шлюза"
+          },
+          "telemetry_received_at": {
+            "name": "Получена телеметрия"
+          },
+          "charger_last_reported_at": {
+            "name": "Последен отчет на зарядното"
+          }
+        }
       }
     },
     "switch": {

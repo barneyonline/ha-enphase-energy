@@ -79,6 +79,25 @@ EV charging modes, current and session controls alongside battery reserve, grid 
   </picture>
 </p>
 
+### EV charger gateway connectivity
+
+Each EV charger has a diagnostic **Gateway connectivity** binary sensor. It uses
+existing Enphase summary reads; it makes no extra requests or reconnection attempts.
+Connected/disconnected describes Enphase’s reported local connectivity, not a
+live test of the physical link. Missing, contradictory or stale telemetry shows
+**Unknown**, including during failed summary reads. Both the cloud observation
+and the charger report must be less than 15 minutes old; a local expiry timer
+updates History even if no new poll completes.
+
+Attributes show the number of reported gateways, the number with observed status
+code `0`, the latest connection event, and separate cloud-receipt and charger-report
+timestamps. A connection event may legitimately be old while current telemetry
+is fresh. Counts describe reported entries, not a configured expected inventory;
+unknown status codes do not establish disconnection. No gateway identifiers,
+network addresses or raw payloads are exposed by this sensor. Green Charging
+operation and physical-link reliability cannot be inferred from this diagnostic
+alone.
+
 ### Cloud energy sensors
 
 Production, Grid and Battery Power are cloud energy-derived averages over their

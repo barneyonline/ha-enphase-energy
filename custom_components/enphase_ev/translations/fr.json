@@ -2539,6 +2539,26 @@
             "name": "Utilisation des données d’événements en cache"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Connexion à la passerelle",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Nombre de passerelles"
+          },
+          "gateway_connected_count": {
+            "name": "Passerelles connectées"
+          },
+          "gateway_last_connection_at": {
+            "name": "Dernière connexion à la passerelle"
+          },
+          "telemetry_received_at": {
+            "name": "Télémétrie reçue"
+          },
+          "charger_last_reported_at": {
+            "name": "Dernier rapport du chargeur"
+          }
+        }
       }
     },
     "switch": {

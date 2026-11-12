@@ -2539,6 +2539,26 @@
             "name": "Gebeurtenisgegevens uit cache worden gebruikt"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Gatewayverbinding",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Aantal gateways"
+          },
+          "gateway_connected_count": {
+            "name": "Verbonden gateways"
+          },
+          "gateway_last_connection_at": {
+            "name": "Laatste gatewayverbinding"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetrie ontvangen"
+          },
+          "charger_last_reported_at": {
+            "name": "Laatste melding van lader"
+          }
+        }
       }
     },
     "switch": {

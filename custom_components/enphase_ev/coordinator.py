@@ -1178,6 +1178,7 @@ class EnphaseCoordinator(
     ) -> IntegrationSnapshot:
         """Build and retain the aggregate state used for update equality."""
 
+        summary = self.__dict__.get("summary")
         current_power_runtime = self.__dict__.get("current_power_runtime")
         current_power = (
             current_power_runtime.snapshot
@@ -1270,6 +1271,14 @@ class EnphaseCoordinator(
             ),
             health=(
                 self.evse_status_available,
+                (
+                    (
+                        summary.publication_health,
+                        summary.gateway_publication_state(data),
+                    )
+                    if isinstance(summary, SummaryStore)
+                    else None
+                ),
                 self.cloud_next_retry_utc,
                 getattr(self, "_last_error", None),
                 getattr(self, "last_failure_status", None),

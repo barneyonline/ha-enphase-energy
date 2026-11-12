@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Iterable
 from datetime import datetime, timedelta
 from typing import Any, Callable
 
@@ -12,6 +13,7 @@ from homeassistant.util import dt as dt_util
 
 from .api import InvalidPayloadError
 from .cloud_retry import retry_after_delay
+from .evse_gateway_connectivity import GatewayConnectivity, gateway_connectivity
 from .log_redaction import redact_text
 
 _LOGGER = logging.getLogger(__name__)
@@ -73,6 +75,15 @@ class SummaryStore:
     def ttl(self) -> float:
         """Return the current cache TTL in seconds."""
         return self._ttl
+
+    @property
+    def publication_health(self) -> tuple[bool, bool, bool]:
+        """Capture source availability without acquisition clocks or retry noise."""
+        return (
+            bool(self._state["available"]),
+            bool(self._state["using_stale"]),
+            self._get_cache() is not None,
+        )
 
     def invalidate(self) -> None:
         """Drop the cached payload."""
@@ -278,3 +289,41 @@ class SummaryStore:
             "last_success_age_s": last_success_age,
             "last_payload_signature": self._state.get("last_payload_signature"),
         }
+
+    def gateway_connectivity(self, serial: str) -> GatewayConnectivity | None:
+        """Interpret one cached charger observation without fetching or retaining IDs."""
+        cache = self._get_cache()
+        if cache is None or not self._state["available"] or self._state["using_stale"]:
+            return None
+        matches = [
+            item
+            for item in cache[1]
+            if isinstance(item, dict) and str(item.get("serialNumber")) == serial
+        ]
+        if len(matches) != 1:
+            return None
+        return gateway_connectivity(matches[0], self._state["last_success_utc"])
+
+    def gateway_publication_state(
+        self, serials: Iterable[str]
+    ) -> tuple[tuple[str, tuple[object, ...] | None], ...]:
+        """Capture each reader's validity and values, excluding receipt clocks."""
+        now = dt_util.utcnow()
+        return tuple(
+            (
+                serial,
+                (
+                    (
+                        observation.fresh(now),
+                        observation.connected,
+                        observation.gateway_count,
+                        observation.connected_count,
+                        observation.last_connection,
+                        observation.reported_at,
+                    )
+                    if (observation := self.gateway_connectivity(serial)) is not None
+                    else None
+                ),
+            )
+            for serial in sorted(serials)
+        )

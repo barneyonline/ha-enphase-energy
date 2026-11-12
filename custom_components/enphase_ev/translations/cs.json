@@ -2539,6 +2539,26 @@
             "name": "Používají se data událostí z mezipaměti"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Připojení k bráně",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Počet bran"
+          },
+          "gateway_connected_count": {
+            "name": "Připojené brány"
+          },
+          "gateway_last_connection_at": {
+            "name": "Poslední připojení k bráně"
+          },
+          "telemetry_received_at": {
+            "name": "Přijetí telemetrie"
+          },
+          "charger_last_reported_at": {
+            "name": "Poslední hlášení nabíječky"
+          }
+        }
       }
     },
     "switch": {

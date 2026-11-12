@@ -2539,6 +2539,26 @@
             "name": "Se folosesc date de evenimente din memoria cache"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Conectivitate gateway",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Număr de gateway-uri"
+          },
+          "gateway_connected_count": {
+            "name": "Gateway-uri conectate"
+          },
+          "gateway_last_connection_at": {
+            "name": "Ultima conexiune la gateway"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetrie primită"
+          },
+          "charger_last_reported_at": {
+            "name": "Ultima raportare a încărcătorului"
+          }
+        }
       }
     },
     "switch": {

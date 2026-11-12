@@ -2539,6 +2539,26 @@
             "name": "IP Address"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Gateway connectivity",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Gateway count"
+          },
+          "gateway_connected_count": {
+            "name": "Connected gateways"
+          },
+          "gateway_last_connection_at": {
+            "name": "Last gateway connection"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetry received"
+          },
+          "charger_last_reported_at": {
+            "name": "Charger last reported"
+          }
+        }
       }
     },
     "switch": {

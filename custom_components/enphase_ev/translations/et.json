@@ -2539,6 +2539,26 @@
             "name": "Kasutatakse puhverdatud sündmuste andmeid"
           }
         }
+      },
+      "gateway_connected": {
+        "name": "Lüüsi ühenduvus",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Lüüside arv"
+          },
+          "gateway_connected_count": {
+            "name": "Ühendatud lüüsid"
+          },
+          "gateway_last_connection_at": {
+            "name": "Viimane lüüsiühendus"
+          },
+          "telemetry_received_at": {
+            "name": "Telemeetria vastuvõtt"
+          },
+          "charger_last_reported_at": {
+            "name": "Laadija viimane aruanne"
+          }
+        }
       }
     },
     "switch": {

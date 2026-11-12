@@ -304,3 +304,79 @@ async def test_real_platform_setup_reload_and_unload(
     await hass.async_block_till_done()
     assert {name: call.await_count for name, call in calls.items()} == call_counts
     assert unexpected == [], ", ".join(unexpected)
+
+
+@pytest.mark.parametrize("connected", [True, False])
+@pytest.mark.parametrize("change", ["failure", "duplicate"])
+async def test_gateway_connectivity_publishes_summary_invalidity_and_recovery(
+    hass, config_entry, platform_cloud, monkeypatch, connected, change
+):
+    """An unchanged charger must publish invalid summary evidence immediately."""
+    responses, calls, unexpected = platform_cloud
+    hass.config_entries.async_update_entry(
+        config_entry,
+        data={**config_entry.data, CONF_SELECTED_TYPE_KEYS: ["envoy", "iqevse"]},
+    )
+    responses["summary_v2"] = [
+        {
+            "serialNumber": RANDOM_SERIAL,
+            "isLocallyConnected": connected,
+            "lastReportedAt": dt_util.utcnow().isoformat(),
+        }
+    ]
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await _finish_startup(hass, config_entry)
+    coord = config_entry.runtime_data.coordinator
+    # Exercise the normal coordinator refresh/HA equality path. Force only the
+    # optional summary acquisition; keep its cache so a failure reuses payload.
+    monkeypatch.setattr(coord.summary, "prepare_refresh", lambda **_: True)
+    await coord.async_refresh()
+    await hass.async_block_till_done()
+    registry = er.async_get(hass)
+    sensor_id = registry.async_get_entity_id(
+        "binary_sensor", "enphase_ev", f"enphase_ev_{RANDOM_SERIAL}_gateway_connected"
+    )
+    assert sensor_id is not None
+    assert coord.always_update is False
+    expected_state = "on" if connected else "off"
+    assert hass.states.get(sensor_id).state == expected_state
+    previous_data = deepcopy(dict(coord.data))
+    publications = []
+    summary_response = calls["summary_v2"].side_effect
+    unsubscribe = coord.async_add_listener(lambda: publications.append(True))
+    try:
+        if change == "failure":
+            calls["summary_v2"].side_effect = RuntimeError("Summary unavailable")
+        else:
+            responses["summary_v2"] *= 2
+        await coord.async_refresh()
+        await hass.async_block_till_done()
+        assert coord.last_update_success
+        assert dict(coord.data) == previous_data
+        assert coord.summary.diagnostics()["using_stale"] is (change == "failure")
+        assert hass.states.get(sensor_id).state == "unknown"
+        assert len(publications) == 1
+
+        # Retry/backoff counters alone must not generate duplicate publications.
+        await coord.async_refresh()
+        await hass.async_block_till_done()
+        assert len(publications) == 1
+
+        # Simulate expiry of the existing retry deadline without changing either
+        # the cloud payload or the sensor's source timestamps.
+        monkeypatch.setitem(coord.summary._state, "backoff_until", None)
+        calls["summary_v2"].side_effect = summary_response
+        responses["summary_v2"] = responses["summary_v2"][:1]
+        await coord.async_refresh()
+        await hass.async_block_till_done()
+        assert dict(coord.data) == previous_data
+        assert hass.states.get(sensor_id).state == expected_state
+        assert len(publications) == 2
+        await coord.async_refresh()
+        await hass.async_block_till_done()
+        assert len(publications) == 2
+        assert unexpected == []
+    finally:
+        unsubscribe()
+        assert await hass.config_entries.async_unload(config_entry.entry_id)
+        await hass.async_block_till_done()

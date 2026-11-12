@@ -15,6 +15,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .binary_sensor_gateway import GatewayConnectedBinarySensor
 from .coordinator import EnphaseCoordinator
 from .device_info_helpers import _cloud_device_info
 from .entity import EnphaseBaseEntity
@@ -179,6 +180,7 @@ async def async_setup_entry(
             entities.append(PluggedInBinarySensor(coord, sn))
             entities.append(ChargingBinarySensor(coord, sn))
             entities.append(ConnectedBinarySensor(coord, sn))
+            entities.append(GatewayConnectedBinarySensor(coord, sn))
         async_add_entities(entities, update_before_add=False)
         known_serials.update(serials)
 
