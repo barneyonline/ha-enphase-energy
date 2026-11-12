@@ -307,10 +307,11 @@ async def test_real_platform_setup_reload_and_unload(
 
 
 @pytest.mark.parametrize("connected", [True, False])
-async def test_gateway_connectivity_publishes_summary_failure_and_recovery(
-    hass, config_entry, platform_cloud, monkeypatch, connected
+@pytest.mark.parametrize("change", ["failure", "duplicate"])
+async def test_gateway_connectivity_publishes_summary_invalidity_and_recovery(
+    hass, config_entry, platform_cloud, monkeypatch, connected, change
 ):
-    """An unchanged charger must publish summary health, not wait for expiry."""
+    """An unchanged charger must publish invalid summary evidence immediately."""
     responses, calls, unexpected = platform_cloud
     hass.config_entries.async_update_entry(
         config_entry,
@@ -344,12 +345,15 @@ async def test_gateway_connectivity_publishes_summary_failure_and_recovery(
     summary_response = calls["summary_v2"].side_effect
     unsubscribe = coord.async_add_listener(lambda: publications.append(True))
     try:
-        calls["summary_v2"].side_effect = RuntimeError("Summary unavailable")
+        if change == "failure":
+            calls["summary_v2"].side_effect = RuntimeError("Summary unavailable")
+        else:
+            responses["summary_v2"] *= 2
         await coord.async_refresh()
         await hass.async_block_till_done()
         assert coord.last_update_success
         assert dict(coord.data) == previous_data
-        assert coord.summary.diagnostics()["using_stale"] is True
+        assert coord.summary.diagnostics()["using_stale"] is (change == "failure")
         assert hass.states.get(sensor_id).state == "unknown"
         assert len(publications) == 1
 
@@ -362,6 +366,7 @@ async def test_gateway_connectivity_publishes_summary_failure_and_recovery(
         # the cloud payload or the sensor's source timestamps.
         monkeypatch.setitem(coord.summary._state, "backoff_until", None)
         calls["summary_v2"].side_effect = summary_response
+        responses["summary_v2"] = responses["summary_v2"][:1]
         await coord.async_refresh()
         await hass.async_block_till_done()
         assert dict(coord.data) == previous_data

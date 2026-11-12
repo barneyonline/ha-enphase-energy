@@ -259,3 +259,32 @@ async def test_entity_unknown_expiry_updates_recovery_and_unload(
     assert sensor._cancel_expiry is None
     # Removal with no pending timer is safe as well.
     await sensor.async_will_remove_from_hass()
+
+
+def test_gateway_publication_tracks_reader_state_not_acquisition_noise(monkeypatch):
+    """Retain validity, freshness and values without publishing every receipt."""
+    monkeypatch.setattr(dt_util, "utcnow", lambda: NOW)
+    store = SummaryStore(lambda: None)
+    row = payload()
+    store._cache = (0, [row], 600)
+    store._state["last_success_utc"] = NOW - timedelta(seconds=1)
+    initial = store.gateway_publication_state([RANDOM_SERIAL, "absent"])
+    assert initial == store.gateway_publication_state(["absent", RANDOM_SERIAL])
+    assert "PRIVATE" not in str(initial)
+    store._state["last_success_utc"] = NOW
+    store._state["failures"] = 3
+    store._state["last_error"] = "different error"
+    store._cache = (1, [row], 5)
+    assert store.gateway_publication_state([RANDOM_SERIAL, "absent"]) == initial
+
+    store._cache = (1, [row, row], 5)
+    assert store.gateway_publication_state([RANDOM_SERIAL, "absent"]) != initial
+    store._cache = (1, [row], 5)
+    assert store.gateway_publication_state([RANDOM_SERIAL, "absent"]) == initial
+
+    # Freshness is semantic even when the underlying raw values do not move.
+    monkeypatch.setattr(dt_util, "utcnow", lambda: NOW + GATEWAY_CONNECTIVITY_MAX_AGE)
+    assert store.gateway_publication_state([RANDOM_SERIAL, "absent"]) != initial
+    monkeypatch.setattr(dt_util, "utcnow", lambda: NOW)
+    store._state["last_success_utc"] = None
+    assert store.gateway_publication_state([RANDOM_SERIAL, "absent"]) != initial

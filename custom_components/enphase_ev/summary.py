@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Iterable
 from datetime import datetime, timedelta
 from typing import Any, Callable
 
@@ -302,3 +303,27 @@ class SummaryStore:
         if len(matches) != 1:
             return None
         return gateway_connectivity(matches[0], self._state["last_success_utc"])
+
+    def gateway_publication_state(
+        self, serials: Iterable[str]
+    ) -> tuple[tuple[str, tuple[object, ...] | None], ...]:
+        """Capture each reader's validity and values, excluding receipt clocks."""
+        now = dt_util.utcnow()
+        return tuple(
+            (
+                serial,
+                (
+                    (
+                        observation.fresh(now),
+                        observation.connected,
+                        observation.gateway_count,
+                        observation.connected_count,
+                        observation.last_connection,
+                        observation.reported_at,
+                    )
+                    if (observation := self.gateway_connectivity(serial)) is not None
+                    else None
+                ),
+            )
+            for serial in sorted(serials)
+        )

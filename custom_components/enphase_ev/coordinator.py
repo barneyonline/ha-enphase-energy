@@ -1272,7 +1272,10 @@ class EnphaseCoordinator(
             health=(
                 self.evse_status_available,
                 (
-                    summary.publication_health
+                    (
+                        summary.publication_health,
+                        summary.gateway_publication_state(data),
+                    )
                     if isinstance(summary, SummaryStore)
                     else None
                 ),
