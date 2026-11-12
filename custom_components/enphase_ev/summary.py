@@ -75,6 +75,15 @@ class SummaryStore:
         """Return the current cache TTL in seconds."""
         return self._ttl
 
+    @property
+    def publication_health(self) -> tuple[bool, bool, bool]:
+        """Capture source availability without acquisition clocks or retry noise."""
+        return (
+            bool(self._state["available"]),
+            bool(self._state["using_stale"]),
+            self._get_cache() is not None,
+        )
+
     def invalidate(self) -> None:
         """Drop the cached payload."""
         self._invalidation_revision += 1

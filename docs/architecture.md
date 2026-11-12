@@ -500,6 +500,12 @@ inventory remains included because editor entities read it.
 Stored-credential login counters publish auth snapshots and notify entities without
 marking cloud telemetry successful or resetting the coordinator's polling schedule.
 
+Summary availability, stale-cache use and cache presence also participate in
+publication equality. This publishes charger gateway-connectivity failures and
+recoveries even when charger values are identical. Acquisition clocks, retry
+counts and error text remain excluded so repeated unchanged polls do not notify
+entities unnecessarily.
+
 Auth and EVSE state live with their runtimes. Battery, heat-pump, and inventory
 runtimes receive their state explicitly; compatibility coordinator projections
 remain for existing consumers. Migrate those consumers incrementally instead of
