@@ -10,15 +10,11 @@ All notable changes to this project will be documented in this file.
 
 ### ✨ New features
 
-- Add a diagnostic Gateway Connectivity binary sensor for each EV charger, using existing summary telemetry with explicit unknown states for missing, stale or conflicting evidence. Include gateway counts and separate connection-event, charger-report and cloud-receipt timestamps.
+- None
 
 ### 🐛 Bug fixes
 
-- Require a new energy increment to confirm a rolling power spike and apply the same check to the Consumption Power fallback.
-- Switch to a fresh Consumption Power fallback when the retained balance expires, including after a rejected sample. Preserve its calculation method through a reseed and discard unvalidated fallback watts when the first advancing interval after restart is quarantined.
-- Keep malformed, future-dated, and regressed lifetime-energy reports from changing accepted counters or cache age. Keep normal request throttling when a rejected report contains no usable flows.
-- Isolate malformed HEMS timestamps from primary energy updates and require usable HEMS buckets before advancing the optional source clock.
-- Allow Energy Planner to recheck Export Limit write authority at the HTTP send boundary. Preserve pending intent until cleanup is acknowledged and drain Export Limit transactions before reload.
+- None
 
 ### 🔧 Improvements
 
@@ -27,6 +23,34 @@ All notable changes to this project will be documented in this file.
 ### 🔄 Other changes
 
 - None
+
+## v5.3.0 - 2026-11-13
+
+### 🚧 Breaking changes
+
+- Production Power now uses changes in Site Solar Production’s lifetime energy to calculate an average between reports. Its entity identity is preserved. On upgrade, cached readings from the previous cloud power endpoint are discarded and two valid energy observations are required before power is available. Production Power becomes unavailable when its source timestamp is unchanged for 30 minutes, including overnight. (#934, #993)
+
+### ✨ New features
+
+- Add a Gateway Connectivity diagnostic binary sensor for each EV charger. It reports unknown when telemetry is missing, stale or conflicting, and includes gateway counts plus connection-event, charger-report and cloud-receipt timestamps. (#1002)
+
+### 🐛 Bug fixes
+
+- Reject malformed, future-dated and regressed lifetime-energy reports without overwriting accepted counters or refreshing cache age. Keep normal request throttling for rejected reports and isolate invalid optional HEMS timestamps from primary energy updates. (#993, #1004)
+- Make rolling site power more reliable across counter resets, source changes and restarts. Require a new energy increment to confirm extreme readings, and switch to fresh consumption-energy data when the last valid power balance expires. (#999, #1004)
+- Back off repeated site-energy and EV charger timeseries failures while retaining accepted readings, honor longer retry deadlines for optional HEMS reads, and share overlapping charger requests. Bound charger daily timeseries caches to three dates and clean up retired charger data. (#996)
+- Allow Energy Planner to recheck Export Limit write authority immediately before the cloud request is sent. Preserve pending intent until cleanup is acknowledged and wait for in-flight Export Limit transactions before reloading. (#1003)
+
+### 🔧 Improvements
+
+- Add **Use 15-minute Power Average** in Polling settings, disabled by default. When enabled, use elapsed-time-weighted energy readings for Production, Grid and Battery Power, and use matching windows for the Consumption Power balance. The consumption-energy fallback is also averaged. (#999)
+
+### 🔄 Other changes
+
+- Restore Codecov reporting, correct fork PR coverage attribution and validate Codecov 7.1.1 against selected runs. (#991, #995, #997)
+- Add a reusable managed cloud development environment based on the pinned Docker test stack. (#992)
+- Update the pinned checkout action to 7.0.1. (#998)
+- Bump the integration manifest version to `5.3.0`.
 
 ## v5.2.5b2 - 2026-11-10
 
