@@ -2317,6 +2317,9 @@ class EnphaseCoordinator(
         """Cancel and await entry-owned runtime work before client shutdown."""
 
         cancelled_tasks = self.cleanup_runtime_state()
+        export_limit_runtime = getattr(self, "export_limit_runtime", None)
+        if export_limit_runtime is not None:
+            await export_limit_runtime.async_wait_for_intent_transactions()
         if cancelled_tasks:
             done, pending = await asyncio.wait(
                 cancelled_tasks,

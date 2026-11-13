@@ -293,6 +293,16 @@ retirement.
 
 Runtime managers keep endpoint-family behavior out of the main coordinator:
 
+- `export_limit_runtime.py` exposes guarded apply for Energy Planner recovery.
+  It compares the prepared gateway snapshot under the write lock and checks the
+  caller's authority after the HTTP connection is acquired and before request
+  headers are serialized. The runtime saves intent before connecting and clears
+  it only after storage acknowledges confirmation or rejection.
+  The intent store acknowledges atomic writes, including during Core shutdown.
+  A failed cleanup keeps the pending record blocked until a later refresh can
+  clear it durably. Reload drains active Export Limit transactions before
+  another runtime opens the same intent file.
+
 - `battery_runtime.py` handles BatteryConfig controls, profile state, schedules, pending writes, and battery diagnostics payloads.
   Each accepted profile or reserve write invalidates profile, settings, and live
   status reads already in flight. Their responses cannot confirm the new request

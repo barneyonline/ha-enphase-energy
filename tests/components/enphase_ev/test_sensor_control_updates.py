@@ -155,6 +155,7 @@ def test_gateway_export_and_profile_confirmation(coordinator_factory):
     sensor = EnphaseDeviceUpdateStatusSensor(coord, "envoy")
     coord.export_limit_runtime = SimpleNamespace(
         stop=Mock(return_value=None),
+        async_wait_for_intent_transactions=AsyncMock(),
         enabled=True,
         pending=None,
         request_status="confirmed",

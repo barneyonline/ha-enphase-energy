@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - Switch to a fresh Consumption Power fallback when the retained balance expires, including after a rejected sample. Preserve its calculation method through a reseed and discard unvalidated fallback watts when the first advancing interval after restart is quarantined.
 - Keep malformed, future-dated, and regressed lifetime-energy reports from changing accepted counters or cache age. Keep normal request throttling when a rejected report contains no usable flows.
 - Isolate malformed HEMS timestamps from primary energy updates and require usable HEMS buckets before advancing the optional source clock.
+- Allow Energy Planner to recheck Export Limit write authority at the HTTP send boundary. Preserve pending intent until cleanup is acknowledged and drain Export Limit transactions before reload.
 
 ### 🔧 Improvements
 

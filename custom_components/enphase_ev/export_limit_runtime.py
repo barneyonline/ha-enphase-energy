@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import math
@@ -12,6 +13,8 @@ from typing import Any, NoReturn, cast
 import aiohttp
 from homeassistant.exceptions import ConfigEntryAuthFailed, ServiceValidationError
 from homeassistant.helpers.storage import Store
+from homeassistant.util.file import WriteError
+from homeassistant.util.json import SerializationError
 from homeassistant.helpers import issue_registry as ir
 
 from .api import ActivationAccessDenied, Unauthorized
@@ -167,6 +170,45 @@ def parse_settings(
     )
 
 
+class ExportLimitIntentStore(Store[dict[str, Any]]):  # type: ignore[misc]
+    """Acknowledge atomic intent writes before the runtime changes authority."""
+
+    def __init__(self, hass: Any, version: int, key: str) -> None:
+        super().__init__(hass, version, key, atomic_writes=True)
+        self._written = False
+
+    async def async_save(self, data: dict[str, Any]) -> None:
+        # The runtime lock serializes saves. Drain a cancelled disk write
+        # before releasing that lock or trying to clear the record.
+        task = asyncio.create_task(self._async_save_checked(data))
+        cancelled = False
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                cancelled = True
+        task.result()
+        if cancelled:
+            raise asyncio.CancelledError
+
+    async def _async_save_checked(self, data: dict[str, Any]) -> None:
+        self._written = False
+        await super().async_save(data)
+        if not self._written:
+            # Core may have deferred the save until final_write.
+            await self._async_handle_write_data()
+        if not self._written:
+            raise OSError("Export Limit intent write was not acknowledged")
+
+    async def _async_write_data(self, data: dict[str, Any]) -> None:
+        try:
+            await super()._async_write_data(data)
+        except (WriteError, SerializationError) as err:
+            # HA Store logs these and returns. Surface the failure to the caller.
+            raise OSError("Could not persist Export Limit intent") from err
+        self._written = True
+
+
 class ExportLimitRuntime:
     """Own all write gates and one durable pending request per config entry."""
 
@@ -181,8 +223,9 @@ class ExportLimitRuntime:
         self._wake = asyncio.Event()
         self._task: asyncio.Task[None] | None = None
         self._stopped = False
+        self._unsent_intent = False
         entry = coordinator.config_entry
-        self._store: Store[dict[str, Any]] = Store(
+        self._store: Store[dict[str, Any]] = ExportLimitIntentStore(
             coordinator.hass,
             1,
             f"{DOMAIN}.export_limit.{getattr(entry, "entry_id", coordinator.site_id)}",
@@ -196,7 +239,11 @@ class ExportLimitRuntime:
         )
 
     def _require_enabled(self) -> None:
-        if not self.enabled or self._stopped:
+        if (
+            not self.enabled
+            or self._stopped
+            or not getattr(self.coordinator, "runtime_active", True)
+        ):
             fail("export_limit_disabled")
 
     def _publish(self) -> None:
@@ -311,8 +358,27 @@ class ExportLimitRuntime:
     async def _save(self) -> None:
         await self._store.async_save({"pending": self.pending})
 
+    async def _clear_unsent_intent(self) -> None:
+        """Keep rejected intent blocked until its removal is acknowledged."""
+        self._unsent_intent = True
+        try:
+            await self._clear_intent("rejected")
+        except BaseException:
+            self._publish()
+            self._schedule()
+            raise
+
+    async def _clear_intent(self, status: str) -> None:
+        await self._store.async_save({"pending": None})
+        self.pending = None
+        self._unsent_intent = False
+        self.request_status = status
+        self._publish()
+
     async def _read(self, *, require_gateway_identity: bool = False) -> None:
         self._require_enabled()
+        if self._unsent_intent:
+            await self._clear_unsent_intent()
         try:
             payload = await self.coordinator.client.async_get_export_limit_settings()
         except Exception:
@@ -370,9 +436,7 @@ class ExportLimitRuntime:
                     and snapshot.watts == pending["watts"]
                 )
             if matches:
-                self.pending = None
-                self.request_status = "confirmed"
-                await self._save()
+                await self._clear_intent("confirmed")
             elif time.time() - pending["started"] >= OBSERVATION_SECONDS:
                 self.request_status = "unconfirmed"
         self._publish()
@@ -461,6 +525,22 @@ class ExportLimitRuntime:
         assert self.snapshot is not None
         return self.snapshot
 
+    async def async_apply_guarded(
+        self,
+        watts: int | None,
+        *,
+        expected: ExportLimitSnapshot,
+        before_write: Callable[[], None],
+    ) -> dict[str, object]:
+        """Apply a prepared setting only while the caller still authorizes it.
+
+        The synchronous guard may raise ServiceValidationError to revoke the
+        write. Run it with the provider lock held after persisting intent.
+        """
+        return await self.async_apply(
+            watts, confirm=True, expected=expected, before_write=before_write
+        )
+
     async def async_apply(
         self,
         watts: int | None,
@@ -468,6 +548,7 @@ class ExportLimitRuntime:
         confirm: bool,
         expected: ExportLimitSnapshot | None = None,
         slew_rate: float | None = None,
+        before_write: Callable[[], None] | None = None,
     ) -> dict[str, object]:
         if confirm is not True:
             fail("export_limit_confirmation")
@@ -552,35 +633,50 @@ class ExportLimitRuntime:
             try:
                 await self._save()
             except asyncio.CancelledError:
-                self.pending = None
-                self.request_status = "rejected"
-                await self._save()
-                self._publish()
+                await self._clear_unsent_intent()
                 raise
             except Exception as err:
                 # Nothing has been sent when durable intent cannot be recorded.
                 self.pending = None
                 self.request_status = "rejected"
                 self._publish()
+                if before_write is not None:
+                    raise
                 raise ServiceValidationError(
                     translation_domain=DOMAIN,
                     translation_key="export_limit_unavailable",
                 ) from err
             self._publish()
+            dispatched = False
+
+            def authorize(guard: Callable[[], None]) -> None:
+                nonlocal dispatched
+                self._require_enabled()
+                guard()
+                dispatched = True
+
             try:
                 self._require_enabled()
-            except ServiceValidationError:
-                self.pending = None
-                self.request_status = "rejected"
-                await self._save()
-                self._publish()
-                raise
-            try:
-                await self.coordinator.client.async_set_export_limit(
-                    fields, watts, requested_slew
-                )
+                if before_write is None:
+                    dispatched = True
+                    await self.coordinator.client.async_set_export_limit(
+                        fields, watts, requested_slew
+                    )
+                else:
+                    await self.coordinator.client.async_set_export_limit(
+                        fields,
+                        watts,
+                        requested_slew,
+                        before_write=lambda: authorize(before_write),
+                    )
             except asyncio.CancelledError:
-                self.request_status = "unconfirmed"
+                if dispatched:
+                    self.request_status = "unconfirmed"
+                else:
+                    await self._clear_unsent_intent()
+                raise
+            except ServiceValidationError:
+                await self._clear_unsent_intent()
                 raise
             except (Unauthorized, ActivationAccessDenied) as err:
                 session_expired = isinstance(
@@ -590,9 +686,7 @@ class ExportLimitRuntime:
                     self.snapshot = None
                     self._publish()
                     request_session_reauthentication(self.coordinator)
-                self.pending = None
-                self.request_status = "rejected"
-                await self._save()
+                await self._clear_unsent_intent()
                 fail(
                     "export_limit_session_expired"
                     if session_expired
@@ -600,12 +694,13 @@ class ExportLimitRuntime:
                 )
             except aiohttp.ClientResponseError as err:
                 if err.status in (400, 403, 422):
-                    self.pending = None
-                    self.request_status = "rejected"
-                    await self._save()
+                    await self._clear_unsent_intent()
                     fail("export_limit_unavailable")
                 self.request_status = "unconfirmed"
-            except Exception:  # A timeout cannot establish rejection.
+            except Exception:
+                if not dispatched:
+                    await self._clear_unsent_intent()
+                    raise
                 self.request_status = "unconfirmed"
             finally:
                 self._publish()
@@ -644,6 +739,16 @@ class ExportLimitRuntime:
                     pass
         finally:
             self._task = None
+
+    async def async_wait_for_intent_transactions(self) -> None:
+        """Drain operations on the shared file before replacing this runtime."""
+        async with self._lock:
+            if self._unsent_intent:
+                try:
+                    await self._clear_unsent_intent()
+                except OSError:
+                    # Keep the durable blocker if storage is still unavailable.
+                    pass
 
     def stop(self) -> asyncio.Task[None] | None:
         self._stopped = True

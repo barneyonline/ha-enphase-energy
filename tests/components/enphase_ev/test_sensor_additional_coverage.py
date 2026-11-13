@@ -98,7 +98,9 @@ async def test_async_setup_entry_registers_entities(
         ),
     )
     coord.export_limit_runtime = SimpleNamespace(
-        enabled=True, stop=MagicMock(return_value=None)
+        enabled=True,
+        stop=MagicMock(return_value=None),
+        async_wait_for_intent_transactions=AsyncMock(),
     )
     callbacks: list[Any] = []
 
