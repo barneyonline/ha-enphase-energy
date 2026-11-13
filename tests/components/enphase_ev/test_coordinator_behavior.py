@@ -2128,6 +2128,25 @@ async def test_runtime_cleanup_timeout_is_bounded(
     assert "Timed out waiting for 1 Enphase runtime task" in caplog.text
 
 
+@pytest.mark.parametrize("has_export_limit_runtime", [False, True])
+async def test_runtime_cleanup_drains_export_limit_transactions(
+    coordinator_factory, monkeypatch, has_export_limit_runtime
+) -> None:
+    coord = coordinator_factory()
+    drain = AsyncMock()
+    if has_export_limit_runtime:
+        monkeypatch.setattr(
+            coord.export_limit_runtime, "async_wait_for_intent_transactions", drain
+        )
+    else:
+        monkeypatch.setattr(coord, "export_limit_runtime", None)
+
+    await coord.async_cleanup_runtime_state()
+
+    if has_export_limit_runtime:
+        drain.assert_awaited_once_with()
+
+
 @pytest.mark.asyncio
 async def test_reload_quiesce_cancels_background_work_without_clearing_state(
     coordinator_factory,

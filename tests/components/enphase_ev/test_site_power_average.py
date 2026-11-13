@@ -7,6 +7,10 @@ from types import SimpleNamespace
 import pytest
 from homeassistant.util import dt as dt_util
 from homeassistant.helpers.restore_state import RestoredExtraData
+from pytest_homeassistant_custom_component.common import (
+    async_fire_time_changed,
+    async_mock_restore_state_shutdown_restart,
+)
 
 from custom_components.enphase_ev.const import OPT_USE_15_MINUTE_POWER_AVERAGE
 from custom_components.enphase_ev.sensor_site_energy import (
@@ -831,9 +835,8 @@ async def test_consumption_average_retains_accepted_clock_and_recovers(
         assert sensor.extra_state_attributes["sampled_at_utc"] == accepted
         assert sensor.extra_state_attributes["last_window_seconds"] == 1
         assert coord.energy.consumption_power_diagnostics["using_cached"]
-    # The quarantined energy remains in the observed window, but its clock
-    # cannot renew accepted watts. A later ordinary average recovers directly.
-    assert sample(sensor, 10_201, seconds=300) == 120_409
+    # Recover from the newest interval without retaining the suspect jump.
+    assert sample(sensor, 10_201, seconds=300) == 1200
     assert sensor.extra_state_attributes["sampled_at_utc"] == now[0].isoformat()
     assert not coord.energy.consumption_power_diagnostics["using_cached"]
     assert sensor.extra_state_attributes["method"] == "consumption_bucket_delta"
@@ -934,3 +937,216 @@ async def test_consumption_average_restore_does_not_authorize_extreme_watts(
         assert sample(restored, 1900, seconds=1) == 2_160_000
     finally:
         await restored.async_will_remove_from_hass()
+
+
+async def test_rolling_extreme_requires_new_energy(averaged, monkeypatch):
+    now = [dt_util.utcnow()]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+    sensor = EnphaseGridPowerSensor(averaged)
+    results = []
+    for energy in (1000, 1010, 1010, 1010):
+        averaged.last_success_utc = now[0]
+        averaged.energy.site_energy = {
+            "grid_import": {
+                "value_kwh": energy,
+                "fields_used": ["import"],
+                "last_report_date": now[0],
+                "interval_minutes": 5,
+            }
+        }
+        results.append(read(sensor))
+        now[0] += timedelta(seconds=1)
+    assert results == [None, None, 0, 0]
+
+
+async def test_first_consumption_average_cannot_publish_extreme(averaged, monkeypatch):
+    now = [dt_util.utcnow()]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+    sensor = EnphaseSiteConsumptionPowerSensor(averaged)
+    for wh in (0, 1000):
+        averaged.energy.site_energy = {
+            "consumption": {
+                "latest_bucket_wh": wh,
+                "raw_bucket_count": 1,
+                "start_date": "2026-01-01",
+                "last_report_date": now[0],
+                "interval_minutes": 5,
+            }
+        }
+        assert read(sensor) is None
+        assert sensor._last_power_ts is None
+        now[0] += timedelta(seconds=1)
+
+
+@pytest.mark.parametrize(
+    ("increments", "expected"),
+    [
+        ((1, 1001, 1001), (3600, 3600, 0)),
+        ((1, 1001, 2001), (3600, 3600, 3_600_000)),
+    ],
+)
+async def test_consumption_fallback_quarantines_rolling_extremes(
+    averaged, monkeypatch, increments, expected
+):
+    now = [dt_util.utcnow()]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+    sensor = EnphaseSiteConsumptionPowerSensor(averaged)
+    accepted_at = now[0] + timedelta(seconds=1)
+    stamps = tuple(now[0] + timedelta(seconds=i) for i in range(4))
+    for index, (wh, stamp) in enumerate(zip((0, *increments), stamps, strict=True)):
+        now[0] = stamp
+        averaged.last_success_utc = stamp
+        averaged.energy.site_energy = {
+            "consumption": {
+                "latest_bucket_wh": wh,
+                "raw_bucket_count": 1,
+                "start_date": "2026-01-01",
+                "last_report_date": stamp,
+                "interval_minutes": 5,
+            }
+        }
+        assert read(sensor) == (None if index == 0 else expected[index - 1])
+        if index == 2:
+            assert sensor._last_power_ts == accepted_at.timestamp()
+            assert sensor._last_rejection["reason"] == "extreme_pending"
+
+
+@pytest.mark.parametrize(
+    "rejection", [None, "extreme_pending", "interval_discontinuity"]
+)
+async def test_averaged_balance_expiry_publishes_newer_fallback(
+    averaged, hass, config_entry, monkeypatch, rejection
+):
+    from tests.components.enphase_ev.test_site_power_restart import (
+        add_entities,
+        inputs,
+        remove_entities,
+    )
+
+    now = [dt_util.utcnow()]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+    averaged.last_success_utc = now[0]
+    # These published source states have no timers of their own. The
+    # consumption timer must transition to the fallback without a source event.
+    for key, value in (
+        ("current_production_power", 6000),
+        ("grid_power", -1000),
+        ("battery_power", -2000),
+    ):
+        entity_id = source(hass, averaged, key, None)
+        hass.states.async_set(
+            entity_id,
+            value,
+            {
+                "unit_of_measurement": "W",
+                "sampled_at_utc": now[0].isoformat(),
+                "last_window_seconds": 900,
+            },
+        )
+    inputs(averaged, now[0], 0)
+    entities, component = await add_entities(
+        hass, config_entry, averaged, (EnphaseSiteConsumptionPowerSensor,)
+    )
+    consumption = entities[0]
+    try:
+        assert hass.states.get(consumption.entity_id).state == "3000"
+
+        if rejection is not None:
+            await remove_entities(component, entities)
+            await async_mock_restore_state_shutdown_restart(hass)
+            entities, component = await add_entities(
+                hass, config_entry, averaged, (EnphaseSiteConsumptionPowerSensor,)
+            )
+            consumption = entities[0]
+            assert consumption._restored_reading is not None
+
+        now[0] += timedelta(minutes=5)
+        averaged.last_success_utc = now[0]
+        inputs(averaged, now[0], 1)
+        averaged.async_update_listeners()
+        await hass.async_block_till_done()
+        assert hass.states.get(consumption.entity_id).state == "3000"
+
+        expiry = now[0] + timedelta(minutes=25)
+        fallback_clock = now[0].isoformat()
+        if rejection is not None:
+            now[0] += timedelta(seconds=1)
+            averaged.last_success_utc = now[0]
+            fallback = averaged.energy.site_energy["consumption"]
+            fallback["last_report_date"] = now[0]
+            if rejection == "extreme_pending":
+                fallback["latest_bucket_wh"] = 100_600
+            else:
+                fallback["interval_minutes"] = 10
+            averaged.async_update_listeners()
+            await hass.async_block_till_done()
+            assert consumption._last_rejection["reason"] == rejection
+
+        now[0] = expiry
+        async_fire_time_changed(hass, now[0])
+        await hass.async_block_till_done()
+        state = hass.states.get(consumption.entity_id)
+        assert state.state == "1200"
+        assert state.attributes["method"] == "consumption_bucket_delta"
+        assert state.attributes["sampled_at_utc"] == fallback_clock
+        diagnostics = averaged.energy.consumption_power_diagnostics
+        assert diagnostics["using_cached"] is (rejection is not None)
+        assert diagnostics["method"] == "consumption_bucket_delta"
+        assert diagnostics["last_valid_power_w"] == 1200
+        assert consumption._restored_reading is None
+
+        now[0] += timedelta(minutes=5)
+        async_fire_time_changed(hass, now[0])
+        await hass.async_block_till_done()
+        assert hass.states.get(consumption.entity_id).state == "unavailable"
+    finally:
+        await remove_entities(component, entities)
+
+
+async def test_rejected_advancing_sample_cannot_validate_private_restore(
+    averaged, hass, monkeypatch
+):
+    now = [dt_util.utcnow()]
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now[0])
+    averaged.last_success_utc = now[0]
+    sensor = EnphaseSiteConsumptionPowerSensor(averaged)
+    sensor.hass = hass
+    sensor.async_get_last_state = AsyncMock(return_value=None)
+    saved = sensor.extra_restore_state_data.as_dict()
+    saved.update(
+        latest_bucket_wh=600,
+        raw_bucket_count=1,
+        start_date="2026-01-01",
+        energy_ts=now[0].timestamp(),
+        interval_minutes=5,
+        last_power_w=1200,
+        last_window_seconds=300,
+        method="consumption_bucket_delta",
+        power_sample_ts=now[0].timestamp(),
+    )
+    sensor.async_get_last_extra_data = AsyncMock(return_value=RestoredExtraData(saved))
+    try:
+        await sensor._async_restore_power()
+        assert not sensor.available
+        now[0] += timedelta(seconds=1)
+        averaged.energy.site_energy = {
+            "consumption": {
+                "latest_bucket_wh": 1600,
+                "raw_bucket_count": 1,
+                "start_date": "2026-01-01",
+                "last_report_date": now[0],
+                "interval_minutes": 5,
+            }
+        }
+        for _ in range(2):
+            assert read(sensor) is None
+            assert not sensor.available
+            assert sensor._last_power_ts is None
+        assert sensor._last_rejection["reason"] == "extreme_pending"
+
+        now[0] += timedelta(seconds=1)
+        averaged.energy.site_energy["consumption"]["last_report_date"] = now[0]
+        assert read(sensor) == 0
+        assert sensor.available
+    finally:
+        await sensor.async_will_remove_from_hass()

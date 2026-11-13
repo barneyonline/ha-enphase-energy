@@ -2478,7 +2478,9 @@ async def test_prepare_preserves_non_authentication_form_failure(runtime):
     assert caught.value.__cause__ is failure
 
 
-@pytest.mark.parametrize("authorized", [False, True])
+@pytest.mark.parametrize(
+    "authorized", [False, True, None], ids=["revoked", "authorized", "unguarded"]
+)
 async def test_export_limit_transport_guard_runs_after_connection(
     monkeypatch, authorized, loopback_sockets
 ):
@@ -2520,22 +2522,27 @@ async def test_export_limit_transport_guard_runs_after_connection(
             session, "123", "token", "cookie", cookie_header_session=session
         )
         request = asyncio.create_task(
-            client.async_set_export_limit(fields, 0, 6000, before_write=guard)
+            client.async_set_export_limit(
+                fields, 0, 6000, before_write=None if authorized is None else guard
+            )
         )
         await asyncio.wait_for(connecting.wait(), 2)
         guard.assert_not_called()
-        if not authorized:
+        if authorized is False:
             guard.side_effect = ServiceValidationError(
                 "authority revoked during connection"
             )
         release.set()
-        if authorized:
-            await request
-        else:
+        if authorized is False:
             with pytest.raises(ServiceValidationError, match="authority revoked"):
                 await request
-        guard.assert_called_once_with()
-        assert received.is_set() is authorized
+        else:
+            await request
+        if authorized is None:
+            guard.assert_not_called()
+        else:
+            guard.assert_called_once_with()
+        assert received.is_set() is (authorized is not False)
 
 
 async def test_export_guard_requires_transport_trace(runtime):

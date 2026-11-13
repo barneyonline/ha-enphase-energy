@@ -31,6 +31,7 @@ SITE_ENERGY_FAILURE_BACKOFF_S = 15 * 60
 HEMS_LIFETIME_FAILURE_BACKOFF_S = 60 * 60
 DEVICE_LIFETIME_CHANNELS: tuple[str, ...] = ("evse", "heatpump", "water_heater")
 HEMS_DEVICE_CHANNELS_META_KEY = "_hems_device_channels"
+HEMS_DEVICE_METADATA_KEY = "_hems_device_metadata"
 
 
 class EnergyClient(Protocol):
@@ -93,6 +94,7 @@ class EnergyManager:
         self._site_energy_fetch_diagnostics: dict[str, object] = {}
         self._site_energy_meta: dict[str, object] = {}
         self._site_energy_cache_ts: float | None = None
+        self._site_energy_refresh_ts: float | None = None
         self._site_energy_cache_ttl: float = SITE_ENERGY_CACHE_TTL
         self._site_energy_guard: dict[str, LifetimeGuardState] = {}
         self._site_energy_last_reset: dict[str, str | None] = {}
@@ -108,6 +110,7 @@ class EnergyManager:
         self._service_last_failure_utc: datetime | None = None
         self._service_backoff_until: float | None = None
         self._service_backoff_ends_utc: datetime | None = None
+        self._hems_lifetime_source_timestamp: datetime | None = None
         self._hems_lifetime_supported: bool | None = None
         self._hems_lifetime_backoff_until: float | None = None
         self._hems_lifetime_last_error: str | None = None
@@ -152,30 +155,33 @@ class EnergyManager:
             self._site_energy_fetch_failures
         )
 
-    def _record_site_energy_source(self, meta: dict[str, object]) -> None:
-        """Track the source watermark separately from successful HTTP requests."""
-        source_raw = meta.get("last_report_date")
-        source = source_raw if isinstance(source_raw, datetime) else None
-        previous = self._site_energy_source_timestamp
-        delta = (source - previous).total_seconds() if source and previous else None
+    def _site_energy_source_progress(
+        self, source: datetime | None, previous: datetime | None
+    ) -> str:
+        """Classify a source clock before applying lifetime guards."""
         if source is None:
-            progress = "missing"
-        elif (
+            return "missing"
+        if (
             source - dt_util.utcnow()
         ).total_seconds() > SITE_ENERGY_SOURCE_FUTURE_SKEW_S:
-            # A rejected future sample must not prevent normal cloud timestamps
-            # from being recognized as advancing on subsequent requests.
-            progress = "future"
-        elif previous is None or source > previous:
-            progress = "initial" if previous is None else "advanced"
+            return "future"
+        if previous is None:
+            return "initial"
+        if source > previous:
+            return "advanced"
+        return "unchanged" if source == previous else "regressed"
+
+    def _record_site_energy_source(
+        self, source: datetime | None, progress: str
+    ) -> None:
+        """Track the source watermark separately from successful HTTP requests."""
+        previous = self._site_energy_source_timestamp
+        delta = (source - previous).total_seconds() if source and previous else None
+        if progress in {"initial", "advanced"}:
             self._site_energy_source_timestamp = source
             self._site_energy_fetch_diagnostics["last_source_advance_utc"] = (
                 dt_util.utcnow().isoformat()
             )
-        elif source == previous:
-            progress = "unchanged"
-        else:
-            progress = "regressed"
         self._site_energy_unchanged_responses = (
             self._site_energy_unchanged_responses + 1 if progress == "unchanged" else 0
         )
@@ -191,6 +197,7 @@ class EnergyManager:
         """Drop the cached site energy payload."""
         self._site_energy_invalidation_revision += 1
         self._site_energy_cache_ts = None
+        self._site_energy_refresh_ts = None
 
     def site_energy_refresh_due(self, *, force: bool = False) -> bool:
         """Return True when the site-energy cache should be refreshed."""
@@ -201,8 +208,8 @@ class EnergyManager:
         now_mono = time.monotonic()
         if (
             not force_refresh
-            and self._site_energy_cache_ts is not None
-            and (now_mono - self._site_energy_cache_ts) < self._site_energy_cache_ttl
+            and self._site_energy_refresh_ts is not None
+            and (now_mono - self._site_energy_refresh_ts) < self._site_energy_cache_ttl
         ):
             return False
         client = self._client_provider()
@@ -278,7 +285,7 @@ class EnergyManager:
 
     def _parse_site_energy_timestamp(self, value: object) -> datetime | None:
         """Best-effort parsing for last_report_date fields."""
-        if value is None:
+        if value is None or isinstance(value, bool):
             return None
         if isinstance(value, (int, float)):
             try:
@@ -293,7 +300,11 @@ class EnergyManager:
             if not cleaned:
                 return None
             if cleaned.isdigit():
-                return self._parse_site_energy_timestamp(int(cleaned))
+                try:
+                    numeric = int(cleaned)
+                except ValueError:
+                    return None
+                return self._parse_site_energy_timestamp(numeric)
             parsed_dt = None
             try:
                 parsed_dt = dt_util.parse_datetime(cleaned)
@@ -312,7 +323,10 @@ class EnergyManager:
                 return None
             if parsed_dt.tzinfo is None:
                 parsed_dt = parsed_dt.replace(tzinfo=_tz.utc)
-            return parsed_dt.astimezone(_tz.utc)
+            try:
+                return parsed_dt.astimezone(_tz.utc)
+            except OverflowError:
+                return None
         return None
 
     @staticmethod
@@ -349,6 +363,14 @@ class EnergyManager:
         hours = minutes_float / 60.0
         return hours, minutes_float
 
+    def _coerce_lifetime_bucket(self, value: object) -> float | None:
+        numeric = self._coerce_energy_value(value)
+        return (
+            numeric
+            if numeric is not None and math.isfinite(numeric) and numeric >= 0
+            else None
+        )
+
     def _sum_energy_buckets(
         self, values: object, _interval_hours: float | None
     ) -> tuple[float, int]:
@@ -362,14 +384,10 @@ class EnergyManager:
         if not isinstance(values, list):
             return total, count
         for val in values:
-            num = self._coerce_energy_value(val)
-            if num is None or not math.isfinite(num):
-                continue
-            bucket_wh = num
-            if bucket_wh < 0:
-                continue
-            total += bucket_wh
-            count += 1
+            bucket_wh = self._coerce_lifetime_bucket(val)
+            if bucket_wh is not None:
+                total += bucket_wh
+                count += 1
         return total, count
 
     def _latest_energy_buckets(
@@ -381,10 +399,7 @@ class EnergyManager:
             return None, None, 0
 
         def _bucket_at(index: int) -> float | None:
-            numeric = self._coerce_energy_value(values[index])
-            if numeric is None or not math.isfinite(numeric) or numeric < 0:
-                return None
-            return numeric
+            return self._coerce_lifetime_bucket(values[index])
 
         return (
             _bucket_at(-1),
@@ -587,7 +602,7 @@ class EnergyManager:
         return last, None
 
     def _aggregate_site_energy(
-        self, payload: dict[str, object] | None
+        self, payload: dict[str, object] | None, *, apply_guards: bool = True
     ) -> tuple[dict[str, SiteEnergyFlow], dict[str, object]] | None:
         """Aggregate lifetime energy payload into kWh totals."""
         if not isinstance(payload, dict):
@@ -613,6 +628,22 @@ class EnergyManager:
             if isinstance(hems_device_channels_raw, (set, tuple, list))
             else set()
         )
+
+        hems_start_date = start_date
+        hems_report_date = last_report_date
+        hems_pending = update_pending
+        hems_interval_minutes = interval_minutes
+        hems_metadata = payload.get(HEMS_DEVICE_METADATA_KEY)
+        if isinstance(hems_metadata, dict):
+            hems_start_date_raw = hems_metadata.get("start_date")
+            hems_start_date = (
+                str(hems_start_date_raw) if hems_start_date_raw is not None else None
+            )
+            hems_report_date = self._parse_site_energy_timestamp(
+                hems_metadata.get("last_report_date")
+            )
+            hems_pending = hems_metadata.get("update_pending")
+            _, hems_interval_minutes = self._site_energy_interval_hours(hems_metadata)
 
         def _store(
             flow: str,
@@ -649,7 +680,11 @@ class EnergyManager:
             filtered: float | None
             reset_at: str | None
             power_sample_error = None
-            if (
+            if not apply_guards:
+                # Keep enough parsed information to recognize a valid response,
+                # without changing any counter or reset state.
+                filtered, reset_at = total_kwh, None
+            elif (
                 hold_zero_after_positive
                 and total_kwh == 0
                 and accepted_baseline is not None
@@ -681,25 +716,27 @@ class EnergyManager:
             last_reset = (
                 reset_at or prev_reset_at or self._site_energy_last_reset.get(flow)
             )
+            from_hems = fields[0] in hems_device_channels
+            pending = hems_pending if from_hems else update_pending
             flows[flow] = SiteEnergyFlow(
                 value_kwh=filtered,
                 bucket_count=bucket_count,
                 fields_used=fields,
-                start_date=start_date,
-                last_report_date=last_report_date,
-                update_pending=(
-                    bool(update_pending) if update_pending is not None else None
-                ),
+                start_date=hems_start_date if from_hems else start_date,
+                last_report_date=hems_report_date if from_hems else last_report_date,
+                update_pending=bool(pending) if pending is not None else None,
                 source_unit=source_unit,
                 last_reset_at=last_reset,
-                interval_minutes=interval_minutes,
+                interval_minutes=(
+                    hems_interval_minutes if from_hems else interval_minutes
+                ),
                 legacy_offset_kwh=round(legacy_offset_wh / 1000.0, 3),
                 latest_bucket_wh=latest_bucket_wh,
                 previous_bucket_wh=previous_bucket_wh,
                 raw_bucket_count=raw_bucket_count,
                 power_sample_error=power_sample_error,
             )
-            if last_reset:
+            if last_reset and apply_guards:
                 self._site_energy_last_reset[flow] = last_reset
 
         # Solar production
@@ -933,8 +970,7 @@ class EnergyManager:
             return True
         # Lists containing only None/non-numeric/negative values are treated as missing.
         for value in values:
-            numeric = self._coerce_energy_value(value)
-            if numeric is not None and numeric >= 0:
+            if self._coerce_lifetime_bucket(value) is not None:
                 return False
         return True
 
@@ -942,15 +978,7 @@ class EnergyManager:
         self, payload: dict[str, object], channel: str
     ) -> bool:
         """Treat zero-only device arrays as missing so HEMS can fill them."""
-
-        values = payload.get(channel)
-        if not isinstance(values, list) or len(values) == 0:
-            return True
-        for value in values:
-            numeric = self._coerce_energy_value(value)
-            if numeric is not None and numeric > 0:
-                return False
-        return True
+        return not self._device_lifetime_channel_has_positive(payload, channel)
 
     def _device_lifetime_channel_has_positive(
         self, payload: dict[str, object], channel: str
@@ -961,7 +989,7 @@ class EnergyManager:
         if not isinstance(values, list) or len(values) == 0:
             return False
         for value in values:
-            numeric = self._coerce_energy_value(value)
+            numeric = self._coerce_lifetime_bucket(value)
             if numeric is not None and numeric > 0:
                 return True
         return False
@@ -974,16 +1002,7 @@ class EnergyManager:
         """Merge device lifetime channels from fallback when primary is missing."""
 
         merged = dict(primary)
-        hems_device_channels_raw = merged.get(HEMS_DEVICE_CHANNELS_META_KEY)
-        hems_device_channels = (
-            {
-                str(channel).strip()
-                for channel in hems_device_channels_raw
-                if str(channel).strip()
-            }
-            if isinstance(hems_device_channels_raw, (set, tuple, list))
-            else set()
-        )
+        hems_device_channels: set[str] = set()
         for channel in DEVICE_LIFETIME_CHANNELS:
             if not self._device_lifetime_channel_missing(merged, channel):
                 continue
@@ -996,20 +1015,18 @@ class EnergyManager:
                 merged[channel] = list(fallback_values)
                 hems_device_channels.add(channel)
 
-        for metadata_key in (
-            "start_date",
-            "last_report_date",
-            "update_pending",
-            "interval_minutes",
-            "system_id",
-        ):
-            if (
-                merged.get(metadata_key) is None
-                and fallback.get(metadata_key) is not None
-            ):
-                merged[metadata_key] = fallback.get(metadata_key)
-        if hems_device_channels:
-            merged[HEMS_DEVICE_CHANNELS_META_KEY] = hems_device_channels
+        if not hems_device_channels:
+            return primary
+        merged[HEMS_DEVICE_CHANNELS_META_KEY] = hems_device_channels
+        merged[HEMS_DEVICE_METADATA_KEY] = {
+            key: fallback.get(key)
+            for key in (
+                "start_date",
+                "last_report_date",
+                "update_pending",
+                "interval_minutes",
+            )
+        }
         return merged
 
     def _hems_lifetime_backoff_active(self) -> bool:
@@ -1066,8 +1083,8 @@ class EnergyManager:
             return
         if (
             not force_refresh
-            and self._site_energy_cache_ts is not None
-            and (now_mono - self._site_energy_cache_ts) < self._site_energy_cache_ttl
+            and self._site_energy_refresh_ts is not None
+            and (now_mono - self._site_energy_refresh_ts) < self._site_energy_cache_ttl
         ):
             return
         self._site_energy_fetch_attempts += 1
@@ -1111,7 +1128,17 @@ class EnergyManager:
                 redact_text(err, site_ids=(self.site_id,)),
             )
             return
-        if isinstance(payload, dict):
+        raw_source = (
+            payload.get("last_report_date") if isinstance(payload, dict) else None
+        )
+        source = self._parse_site_energy_timestamp(raw_source)
+        malformed_source = raw_source is not None and source is None
+        progress = self._site_energy_source_progress(
+            source, self._site_energy_source_timestamp
+        )
+        accept = not malformed_source and progress not in {"future", "regressed"}
+        accepted_hems_source = None
+        if accept and isinstance(payload, dict):
             missing_channels = [
                 channel
                 for channel in DEVICE_LIFETIME_CHANNELS
@@ -1157,25 +1184,52 @@ class EnergyManager:
                                 if self._hems_auth_success is not None:
                                     self._hems_auth_success("hems_consumption_lifetime")
                                 self._mark_hems_lifetime_available()
-                                payload = self._merge_device_lifetime_channels(
-                                    payload, hems_payload
+                                raw_hems_source = hems_payload.get("last_report_date")
+                                hems_source = self._parse_site_energy_timestamp(
+                                    raw_hems_source
                                 )
+                                hems_progress = self._site_energy_source_progress(
+                                    hems_source, self._hems_lifetime_source_timestamp
+                                )
+                                if (
+                                    raw_hems_source is None or hems_source is not None
+                                ) and hems_progress not in {"future", "regressed"}:
+                                    merged = self._merge_device_lifetime_channels(
+                                        payload, hems_payload
+                                    )
+                                    if merged is not payload:
+                                        accepted_hems_source = hems_source
+                                        payload = merged
                             else:
                                 self._note_hems_lifetime_unavailable(None)
         if revision != self._site_energy_invalidation_revision:
             self._record_site_energy_fetch("superseded")
             return
-        parsed = self._aggregate_site_energy(payload)
+        if malformed_source:
+            self._site_energy_refresh_ts = time.monotonic()
+            self._record_site_energy_fetch("invalid_payload")
+            return
+        parsed = (
+            self._aggregate_site_energy(payload)
+            if accept
+            else self._aggregate_site_energy(payload, apply_guards=False)
+        )
         if parsed is None or not parsed[0]:
+            if not accept:
+                self._site_energy_refresh_ts = time.monotonic()
             self._record_site_energy_fetch("invalid_payload")
             return
         self._record_site_energy_fetch("success")
         flows, meta = parsed
-        self._record_site_energy_source(meta)
+        self._record_site_energy_source(source, progress)
         self._mark_service_available()
-        self.site_energy = flows
-        self._site_energy_meta = meta
-        self._site_energy_cache_ts = time.monotonic()
+        self._site_energy_refresh_ts = time.monotonic()
+        if accept:
+            self._site_energy_cache_ts = self._site_energy_refresh_ts
+            if accepted_hems_source is not None:
+                self._hems_lifetime_source_timestamp = accepted_hems_source
+            self.site_energy = flows
+            self._site_energy_meta = meta
 
     def _apply_lifetime_guard(
         self,
