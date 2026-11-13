@@ -479,6 +479,8 @@ async def _async_setup_entry_impl(
     reused_runtime = isinstance(preserved_snapshot, ReloadSnapshot)
     import aiohttp
 
+    from .api_client.export_limit_surface import export_limit_write_trace
+
     coord = EnphaseCoordinator(
         hass,
         entry.data,
@@ -487,6 +489,7 @@ async def _async_setup_entry_impl(
             hass,
             auto_cleanup=True,
             cookie_jar=aiohttp.DummyCookieJar(),
+            trace_configs=[export_limit_write_trace()],
         ),
     )
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)

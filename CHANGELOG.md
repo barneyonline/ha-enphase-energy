@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 
-- None
+- Allow Energy Planner to recheck Export Limit write authority at the HTTP send boundary. Preserve pending intent until cleanup is acknowledged and drain Export Limit transactions before reload.
 
 ### 🔧 Improvements
 

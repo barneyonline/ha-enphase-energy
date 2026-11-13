@@ -2,15 +2,35 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from html.parser import HTMLParser
-from typing import TYPE_CHECKING
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode, urljoin, urlsplit
+
+import aiohttp
 
 from ..const import BASE_URL
 from .errors import ActivationSessionExpired, Unauthorized
 
 if TYPE_CHECKING:
     from ..api import EnphaseEVClient
+
+
+async def authorize_export_limit_headers(
+    _session: aiohttp.ClientSession,
+    context: SimpleNamespace,
+    _params: aiohttp.TraceRequestHeadersSentParams,
+) -> None:
+    if context.trace_request_ctx is not None:
+        context.trace_request_ctx()
+
+
+def export_limit_write_trace() -> aiohttp.TraceConfig:
+    """Check authority after connection acquisition, before header serialization."""
+    trace = aiohttp.TraceConfig()
+    trace.on_request_headers_sent.append(authorize_export_limit_headers)
+    return trace
 
 
 class InvalidExportLimitForm(ValueError):
@@ -227,6 +247,8 @@ async def write_settings(
     fields: list[tuple[str, str]],
     watts: int | None,
     slew_rate: float,
+    *,
+    before_write: Callable[[], None] | None = None,
 ) -> None:
     """Submit once; only subsequent settings readback establishes success."""
     _required_fields(fields)
@@ -247,6 +269,9 @@ async def write_settings(
         )
     body = [(k, v) for k, v in fields if k not in overrides and k != "_method"]
     body.extend(overrides.items())
+    request_options: dict[str, Any] = (
+        {"trace_request_ctx": before_write} if before_write is not None else {}
+    )
     try:
         response = await client._text_response(
             "PUT",
@@ -262,6 +287,7 @@ async def write_settings(
             allow_replay=False,
             use_cookie_header_only=True,
             mark_payload_success=False,
+            **request_options,
         )
     except Unauthorized as err:
         raise ActivationSessionExpired("PEL session rejected") from err

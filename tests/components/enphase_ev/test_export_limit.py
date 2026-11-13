@@ -16,6 +16,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.enphase_ev.api import EnphaseEVClient, Unauthorized
 from custom_components.enphase_ev.api_client.export_limit_surface import (
+    export_limit_write_trace,
     InvalidExportLimitForm,
     parse_form,
     read_form,
@@ -253,6 +254,12 @@ def runtime(hass):
             async_set_export_limit=AsyncMock(),
         ),
     )
+
+    async def set_export_limit(_fields, _watts, _slew, *, before_write=None):
+        if before_write is not None:
+            before_write()
+
+    coord.client.async_set_export_limit.side_effect = set_export_limit
     runtime = ExportLimitRuntime(coord)
     coord.export_limit_runtime = runtime
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
@@ -1255,6 +1262,135 @@ async def test_disable_while_saving_intent_clears_unsent_request(runtime, hass):
     assert runtime.pending is None
     assert runtime._store.async_save.call_args.args == ({"pending": None},)
     runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
+
+
+@pytest.mark.parametrize("authorized", [True, False])
+async def test_guarded_export_write_rechecks_after_persisting_intent(
+    runtime, authorized
+):
+    client = runtime.coordinator.client
+    snapshot = await runtime.async_prepare()
+    saving, release = asyncio.Event(), asyncio.Event()
+    allowed = True
+    guard_calls = 0
+    denial = ServiceValidationError("caller withdrew write authority")
+
+    async def save(data):
+        if data["pending"] is not None:
+            saving.set()
+            await release.wait()
+
+    def before_write():
+        nonlocal guard_calls
+        guard_calls += 1
+        assert runtime._lock.locked()
+        assert runtime.pending is not None
+        if not allowed:
+            raise denial
+
+    runtime._store.async_save.side_effect = save
+    applying = asyncio.create_task(
+        runtime.async_apply_guarded(0, expected=snapshot, before_write=before_write)
+    )
+    await asyncio.wait_for(saving.wait(), 1)
+    assert guard_calls == 0
+    client.async_set_export_limit.assert_not_awaited()
+    allowed = authorized
+    release.set()
+    if authorized:
+        await applying
+        client.async_set_export_limit.assert_awaited_once()
+    else:
+        with pytest.raises(ServiceValidationError) as err:
+            await applying
+        assert err.value is denial
+        assert runtime.pending is None
+        assert runtime.request_status == "rejected"
+        runtime._store.async_save.assert_awaited_with({"pending": None})
+    assert guard_calls == 1
+
+
+@pytest.mark.parametrize("failure", ["initial", "cleanup", "cancel", "stopping"])
+async def test_guarded_intent_store_checks_real_write_results(runtime, failure):
+    from homeassistant.core import CoreState
+    from homeassistant.helpers.storage import Store
+    from homeassistant.util.file import WriteError
+
+    coord = runtime.coordinator
+    fresh_runtime = ExportLimitRuntime(coord)
+    runtime._store = fresh_runtime._store
+    snapshot = await runtime.async_prepare()
+    storage = runtime._store
+    saving, release = asyncio.Event(), asyncio.Event()
+    original = Store._async_write_data
+    writes = 0
+    denial = ServiceValidationError("write revoked")
+
+    async def write(store, data):
+        nonlocal writes
+        writes += 1
+        if failure == "cancel" and writes == 1:
+            saving.set()
+            await release.wait()
+        if (failure == "initial" and writes == 1) or (
+            failure == "cleanup" and writes == 2
+        ):
+            raise WriteError("disk write failed")
+        await original(store, data)
+
+    def before_write():
+        raise denial
+
+    with patch.object(Store, "_async_write_data", write):
+        if failure == "cancel":
+            task = asyncio.create_task(
+                runtime.async_apply_guarded(
+                    0, expected=snapshot, before_write=before_write
+                )
+            )
+            await asyncio.wait_for(saving.wait(), 1)
+            task.cancel()
+            await asyncio.sleep(0)
+            assert not task.done()
+            release.set()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        elif failure == "stopping":
+            with patch.object(coord.hass, "state", CoreState.stopping):
+                with pytest.raises(ServiceValidationError) as error:
+                    await runtime.async_apply_guarded(
+                        0, expected=snapshot, before_write=before_write
+                    )
+                assert error.value is denial
+                assert writes == 2
+        else:
+            with pytest.raises(OSError, match="Could not persist"):
+                await runtime.async_apply_guarded(
+                    0, expected=snapshot, before_write=before_write
+                )
+        assert coord.client.async_set_export_limit.await_count == int(
+            failure in {"cleanup", "stopping"}
+        )
+        if failure == "cleanup":
+            assert runtime.pending is not None
+            assert (await storage.async_load())["pending"]["watts"] == 0
+            await runtime.async_refresh()
+        assert runtime.pending is None
+        if failure != "initial":
+            assert await fresh_runtime._store.async_load() == {"pending": None}
+
+
+async def test_guarded_intent_rejects_store_that_cannot_write(runtime):
+    coord = runtime.coordinator
+    runtime._store = ExportLimitRuntime(coord)._store
+    snapshot = await runtime.async_prepare()
+    guard = MagicMock()
+    with patch.object(runtime._store, "_read_only", True):
+        with pytest.raises(OSError, match="write was not acknowledged"):
+            await runtime.async_apply_guarded(0, expected=snapshot, before_write=guard)
+    guard.assert_not_called()
+    coord.client.async_set_export_limit.assert_not_awaited()
+    assert runtime.pending is None
 
 
 async def test_cancel_before_send_clears_durable_intent(runtime):
@@ -2340,3 +2476,166 @@ async def test_prepare_preserves_non_authentication_form_failure(runtime):
     with pytest.raises(ServiceValidationError) as caught:
         await runtime.async_prepare()
     assert caught.value.__cause__ is failure
+
+
+@pytest.mark.parametrize("authorized", [False, True])
+async def test_export_limit_transport_guard_runs_after_connection(
+    monkeypatch, authorized, loopback_sockets
+):
+    from custom_components.enphase_ev.api_client import export_limit_surface
+
+    connecting, release, received = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+    class HeldConnector(aiohttp.TCPConnector):
+        async def connect(self, *args, **kwargs):
+            connection = await super().connect(*args, **kwargs)
+            connecting.set()
+            await release.wait()
+            return connection
+
+    async def respond(reader, writer):
+        data = await reader.read(8192)
+        if data:
+            assert data.startswith(b"PUT /site_pel_settings/123 ")
+            received.set()
+            writer.write(
+                b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            )
+            await writer.drain()
+        writer.close()
+        await writer.wait_closed()
+
+    server = await asyncio.start_server(respond, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    fields = parse_form(form(), "123")
+    monkeypatch.setattr(export_limit_surface, "BASE_URL", f"http://127.0.0.1:{port}")
+    guard = MagicMock()
+
+    async with server, aiohttp.ClientSession(
+        connector=HeldConnector(),
+        cookie_jar=aiohttp.DummyCookieJar(),
+        trace_configs=[export_limit_write_trace()],
+    ) as session:
+        client = EnphaseEVClient(
+            session, "123", "token", "cookie", cookie_header_session=session
+        )
+        request = asyncio.create_task(
+            client.async_set_export_limit(fields, 0, 6000, before_write=guard)
+        )
+        await asyncio.wait_for(connecting.wait(), 2)
+        guard.assert_not_called()
+        if not authorized:
+            guard.side_effect = ServiceValidationError(
+                "authority revoked during connection"
+            )
+        release.set()
+        if authorized:
+            await request
+        else:
+            with pytest.raises(ServiceValidationError, match="authority revoked"):
+                await request
+        guard.assert_called_once_with()
+        assert received.is_set() is authorized
+
+
+async def test_export_guard_requires_transport_trace(runtime):
+    async with aiohttp.ClientSession(cookie_jar=aiohttp.DummyCookieJar()) as session:
+        client = EnphaseEVClient(
+            session, "123", "token", "cookie", cookie_header_session=session
+        )
+        with pytest.raises(RuntimeError, match="requires the request trace"):
+            await client.async_set_export_limit(
+                parse_form(form(), "123"), 0, 6000, before_write=MagicMock()
+            )
+
+
+@pytest.mark.parametrize("confirmed", [False, True])
+async def test_intent_cleanup_failure_retains_pending(runtime, confirmed):
+    client = runtime.coordinator.client
+    fail_cleanup = True
+
+    async def save(data):
+        if fail_cleanup and data["pending"] is None:
+            raise OSError("disk unavailable")
+
+    runtime._store.async_save.side_effect = save
+    if confirmed:
+
+        async def set_limit(*_args):
+            client.async_get_export_limit_settings.return_value = payload(
+                free_limit_value=0
+            )
+
+        client.async_set_export_limit.side_effect = set_limit
+        await runtime.async_apply(0, confirm=True)
+    else:
+        client.async_set_export_limit.side_effect = Unauthorized()
+        with pytest.raises(OSError, match="disk unavailable"):
+            await runtime.async_apply(0, confirm=True)
+
+    assert runtime.pending["watts"] == 0
+    with pytest.raises(ServiceValidationError):
+        await runtime.async_apply(100, confirm=True)
+    client.async_set_export_limit.assert_awaited_once()
+    fail_cleanup = False
+    await runtime.async_refresh()
+    assert runtime.pending is None
+
+
+async def test_reload_drains_export_intent_before_replacement(runtime):
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def save(data):
+        if data["pending"] is not None:
+            entered.set()
+            await release.wait()
+
+    runtime._store.async_save.side_effect = save
+    apply = asyncio.create_task(runtime.async_apply(0, confirm=True))
+    await asyncio.wait_for(entered.wait(), 1)
+    runtime.stop()
+    drain = asyncio.create_task(runtime.async_wait_for_intent_transactions())
+    await asyncio.sleep(0)
+    assert not drain.done()
+    release.set()
+    with pytest.raises(ServiceValidationError):
+        await apply
+    await drain
+    runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
+    runtime._store.async_save.assert_awaited_with({"pending": None})
+    assert runtime.pending is None
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+async def test_guarded_connection_failure_retires_unsent_intent(runtime, cancel):
+    snapshot = await runtime.async_prepare()
+    failure = asyncio.CancelledError if cancel else TimeoutError
+    runtime.coordinator.client.async_set_export_limit.side_effect = failure
+    guard = MagicMock()
+    with pytest.raises(failure):
+        await runtime.async_apply_guarded(0, expected=snapshot, before_write=guard)
+    guard.assert_not_called()
+    assert runtime.pending is None
+    runtime._store.async_save.assert_awaited_with({"pending": None})
+
+
+@pytest.mark.parametrize("storage_recovers", [False, True])
+async def test_reload_retries_unacknowledged_unsent_cleanup(runtime, storage_recovers):
+    snapshot = await runtime.async_prepare()
+    fail_clear = True
+
+    async def save(data):
+        if fail_clear and data["pending"] is None:
+            raise OSError("disk unavailable")
+
+    def deny():
+        raise ServiceValidationError("operator paused")
+
+    runtime._store.async_save.side_effect = save
+    with pytest.raises(OSError):
+        await runtime.async_apply_guarded(0, expected=snapshot, before_write=deny)
+    assert runtime.pending is not None
+    runtime.stop()
+    fail_clear = not storage_recovers
+    await runtime.async_wait_for_intent_transactions()
+    assert (runtime.pending is None) is storage_recovers

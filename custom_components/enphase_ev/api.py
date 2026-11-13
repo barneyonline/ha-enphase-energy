@@ -1793,9 +1793,22 @@ class EnphaseEVClient(MqttStreamSurface):
         return await export_limit_surface.read_form(self)
 
     async def async_set_export_limit(
-        self, fields: list[tuple[str, str]], watts: int | None, slew_rate: float
+        self,
+        fields: list[tuple[str, str]],
+        watts: int | None,
+        slew_rate: float,
+        *,
+        before_write: Callable[[], None] | None = None,
     ) -> None:
-        await export_limit_surface.write_settings(self, fields, watts, slew_rate)
+        if before_write is not None and not any(
+            export_limit_surface.authorize_export_limit_headers
+            in trace.on_request_headers_sent
+            for trace in getattr(self._cookie_header_session, "trace_configs", ())
+        ):
+            raise RuntimeError("Guarded Export Limit requires the request trace")
+        await export_limit_surface.write_settings(
+            self, fields, watts, slew_rate, before_write=before_write
+        )
 
     async def async_get_grid_profiles_filtered(
         self,
