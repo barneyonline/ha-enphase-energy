@@ -1819,7 +1819,6 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._balance_window_s: float | None = None
         self._balance_sample_ts: float | None = None
         self._average = EnergyPowerAverage()
-        self._extreme_power_validator = ExtremePowerValidator()
         self._averaging_enabled = _power_averaging_enabled(coord)
         self._balance_blocker: dict[str, str] | None = None
         self._last_bucket_wh: float | None = None
@@ -2186,8 +2185,9 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
     ) -> None:
         """Retain the last valid reading and a numeric rejection snapshot."""
 
-        self._last_method = method or reason
         self._using_cached = self._last_power_w is not None
+        if not self._averaging_enabled or not self._using_cached:
+            self._last_method = method or reason
         rejected = {
             "reason": reason,
             "latest_bucket_wh": self._diagnostic_number(data.get("latest_bucket_wh")),
@@ -2236,6 +2236,14 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             else None
         )
 
+    def _discard_unvalidated_fallback(self) -> None:
+        # The saved bucket cursor can advance without validating saved watts.
+        if self._restored_pending_validation:
+            self._last_power_w = None
+            self._last_power_ts = None
+            self._last_window_s = None
+            self._using_cached = False
+
     def _seed(
         self,
         *,
@@ -2247,26 +2255,25 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         method: str,
     ) -> None:
         self._average.clear()
-        self._extreme_power_validator.clear()
-        # Retention applies only after validation against the live source.
-        # Reseeding an incompatible restored baseline cannot validate its power.
-        if self._restored_pending_validation:
-            self._last_power_w = None
-            self._last_power_ts = None
-            self._last_window_s = None
-            self._using_cached = False
+        self._discard_unvalidated_fallback()
         self._last_bucket_wh = latest_bucket_wh
         self._last_bucket_count = bucket_count
         self._last_start_date = start_date
         self._last_energy_ts = energy_ts
         self._last_interval_minutes = interval_minutes
-        self._last_method = method
+        if not self._averaging_enabled or self._last_power_w is None:
+            self._last_method = method
         self._restored_pending_validation = False
 
     @callback
     def _handle_coordinator_update(self) -> None:
         self._update_averaged_power()
         super()._handle_coordinator_update()
+
+    @callback
+    def _handle_freshness_expiry(self) -> None:
+        self._update_averaged_power()
+        super()._handle_freshness_expiry()
 
     def _update_averaged_power(self) -> None:
         if self._averaging_enabled:
@@ -2308,11 +2315,17 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             >= CURRENT_POWER_STALE_AFTER_S
         ):
             self._balance_power_w = None
+        if (
+            self._restored_reading is not None
+            and self._timestamp_age_seconds(self._restored_reading.freshness_ts)
+            >= CURRENT_POWER_STALE_AFTER_S
+        ):
+            self._restored_reading = None
         reading = self._balance_reading()
         if (
             reading is None
             and not self._restored_pending_validation
-            and not self._using_cached
+            and (self._averaging_enabled or not self._using_cached)
             and self._last_power_w is not None
             and self._last_power_ts is not None
         ):
@@ -2551,29 +2564,24 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
             return
 
         window_s = max(elapsed_s, interval_s)
-        accepted = True
         if self._averaging_enabled:
-            candidate_power_w, window_s = self._average.add_delta(
-                self._last_energy_ts, energy_ts, delta_wh / 1000
+            update = self._average.add_delta(
+                self._last_energy_ts, energy_ts, delta_wh / 1000, method
             )
-            validation = self._extreme_power_validator.evaluate(
-                candidate_power_w, sample_ts=energy_ts
-            )
-            accepted = validation.accepted
-            if validation.confirmed_extreme:
-                method = "extreme_confirmed"
         else:
-            candidate_power_w = round(delta_wh * 3600.0 / window_s)
-        if accepted:
-            self._last_power_w = max(candidate_power_w, 0)
+            update = AverageUpdate(
+                round(delta_wh * 3600.0 / window_s), window_s, method
+            )
+        if update.method == "extreme_pending" or update.watts is None:
+            self._discard_unvalidated_fallback()
+            self._reject_sample("extreme_pending", data)
+        else:
+            self._last_power_w = max(update.watts, 0)
             self._last_power_ts = energy_ts
             self._using_cached = False
-            self._last_window_s = window_s
-            self._last_method = method
-        else:
-            self._reject_sample("extreme_pending", data)
-        # Valid advancing energy remains the next calculation baseline even
-        # while its average is quarantined. Accepted watts keep their clock.
+            self._last_window_s = update.window_seconds
+            self._last_method = update.method
+        # Advance the bucket cursor independently of the accepted power clock.
         self._last_bucket_wh = latest_bucket_wh
         self._last_bucket_count = bucket_count
         self._last_start_date = start_date

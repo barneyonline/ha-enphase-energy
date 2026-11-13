@@ -111,14 +111,18 @@ class EnphaseSiteSensorEntity(CoordinatorEntity, SensorEntity):  # type: ignore[
         @callback
         def expire(_now: datetime) -> None:
             self._cancel_freshness_expiry = None
-            # Successful unchanged polls may advance source freshness without
-            # notifying listeners; follow their new deadline before publishing.
-            self._schedule_freshness_expiry()
-            self.async_write_ha_state()
+            self._handle_freshness_expiry()
 
         self._cancel_freshness_expiry = async_track_point_in_utc_time(
             self.hass, expire, deadline
         )
+
+    @callback
+    def _handle_freshness_expiry(self) -> None:
+        # Successful unchanged polls may advance source freshness without
+        # notifying listeners; follow their new deadline before publishing.
+        self._schedule_freshness_expiry()
+        self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()

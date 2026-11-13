@@ -587,15 +587,24 @@ completed-bucket guarantee.
 Enabled Consumption Power balances published Production, Grid and Battery Power
 only when their calculation end times and actual window lengths match. Otherwise
 it retains the last valid balance with its original expiry or uses its separately
-averaged consumption-energy fallback. Calculation and freshness clocks remain
-separate. Other power entities and cumulative energy sensors do not use this
-option. Changing the option reloads the integration; private restore data tags the
-mode so cached watts and baselines from the other mode cannot be reused. Same-mode
+averaged consumption-energy fallback. The expiry timer selects a still-fresh
+fallback when the retained balance expires, even when a subsequent rejected
+sample left the accepted fallback cached. A reseed preserves the accepted
+fallback's calculation method while those watts remain eligible. An advancing
+rejected interval cannot validate fallback watts loaded privately at restart.
+Independently accepted
+restore history remains eligible until its original deadline. Calculation and
+freshness clocks remain separate. Other power entities and cumulative energy
+sensors do not use this option. Changing the option reloads the integration.
+Private restore data tags the mode so cached watts and baselines from the other
+mode cannot be reused. Same-mode
 restore retains the bounded averaging buffer without extending accepted expiry.
 Averaging validates its final watts independently of the consecutive interval
-calculation so short startup windows cannot bypass extreme-power confirmation.
-Duplicate reports preserve quarantine and the last accepted average. Restored
-buffers reject invalid clock types, overflowing numbers, and unsafe averages.
+calculation, including the consumption-energy fallback. An extreme average
+requires a comparable, independently measured increment in the next interval.
+That interval starts a new rolling window, so a single suspect increment cannot
+confirm itself or affect later averages. Duplicate reports preserve quarantine
+and the last accepted average and its freshness. Restored buffers reject invalid clock types, overflowing numbers, and unsafe averages.
 Saving the default-off value on older entries does not trigger a reload.
 Untagged legacy power restore data belongs to the original calculation mode:
 it remains usable with smoothing disabled and is discarded when smoothing is
@@ -609,8 +618,9 @@ respecting any reported minimum interval; it is not instantaneous local-gateway
 telemetry. The first valid energy observation seeds a baseline, and the next
 source timestamp permits a power calculation. Same-timestamp energy corrections
 are included in the next calculation rather than divided by a zero time window.
-Older source timestamps cannot replace the accepted calculation or move its
-cumulative-energy baseline backwards, including while the sensor is warming up.
+Lifetime-energy responses with regressed or excessively future-dated source
+timestamps are recorded in fetch diagnostics. Their counters and reset markers
+cannot replace the published flows or change the guard used by later reports.
 An uninitialized placeholder is not an energy baseline: the first valid source
 report may seed from an earlier clock than that placeholder's receipt or metadata.
 If a newer accepted reading survives without its calculation baseline, older
@@ -951,8 +961,17 @@ policy. They contain no raw payloads or exception messages.
 Site-energy acquisition is serialized within its manager. Callers overlapping one
 attempt reuse its completion, while cancellation or invalidation lets queued
 callers acquire fresh data. Invalidation rejects the older result before parsing
-can change guards or published source metadata. Sequential forced reads retain
-the existing treatment of legitimate cloud corrections.
+can change guards or published source metadata. Sequential forced reads accept
+same-clock corrections. Regressed and excessively future-dated reports leave
+the last accepted flows and their source metadata intact. Request throttling
+also applies when a clock-rejected primary response has no usable flows.
+A supplied malformed primary timestamp is recorded as an invalid payload
+before optional enrichment or counter aggregation. An absent timestamp remains
+supported. The accepted cache retains its original age. Optional HEMS lifetime
+data has its own source watermark and can supply metadata only to the device flows it
+fills. Malformed, future-dated, and regressed HEMS timestamps leave primary
+flows eligible for publication. A HEMS response advances its watermark only
+when it fills a device channel with usable buckets.
 
 Site-energy and EVSE timeseries transport/general fetch failures use independent
 transient streaks with local delays of 60, 120, 240, 480 and at most 900 seconds,

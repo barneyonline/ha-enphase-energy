@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import Any
 
 from .power_validation import EXTREME_SITE_POWER_W, ExtremePowerValidator
 
@@ -101,13 +101,29 @@ class EnergyPowerAverage:
             # A reset/reseed or confirmed extreme is a valid new baseline. Its
             # first following increment belongs in the rolling energy window.
             return self._result(interval)
+        return self._validate_average(interval.method)
+
+    def add_delta(
+        self, baseline: float, timestamp: float, delta_kwh: float, method: str
+    ) -> AverageUpdate:
+        """Accumulate and validate an advancing consumption-energy delta."""
+        if not self.samples or self.samples[-1][0] != baseline:
+            self.clear()
+            self.add(baseline, 0.0, "source")
+        self.add(timestamp, self.samples[-1][1] + delta_kwh, "source")
+        return self._validate_average(method)
+
+    def _validate_average(self, method: str) -> AverageUpdate:
+        if self._extreme_validator.pending_count:
+            # Overlapping averages share the suspect increment. Discard that
+            # increment and confirm against the newest interval on its own.
+            self.samples = self.samples[-2:]
         average = self.value()
         if average is None:
-            return self._result(AverageUpdate(None, None, interval.method))
+            return self._result(AverageUpdate(None, None, method))
         watts, seconds = average
-        validation = self._extreme_validator.evaluate(
-            watts, sample_ts=timestamp if source_clock else None
-        )
+        sample_ts = self.samples[-1][0] if self.clock == "source" else None
+        validation = self._extreme_validator.evaluate(watts, sample_ts=sample_ts)
         if not validation.accepted:
             return self._result(
                 AverageUpdate(
@@ -116,24 +132,12 @@ class EnergyPowerAverage:
                     "extreme_pending",
                 )
             )
-        method = (
-            "extreme_confirmed"
-            if validation.confirmed_extreme
-            else "no_change" if watts == 0 else "lifetime_energy_window"
-        )
+        if validation.confirmed_extreme:
+            method = "extreme_confirmed"
+        elif method in {"seeded", "lifetime_energy_window", "no_change"}:
+            method = "no_change" if watts == 0 else "lifetime_energy_window"
         self._accepted = AverageUpdate(watts, seconds, method)
         return self._result(self._accepted)
-
-    def add_delta(
-        self, baseline: float, timestamp: float, delta_kwh: float
-    ) -> tuple[int, float]:
-        """Accumulate a validated advancing consumption delta in the same clock."""
-
-        if not self.samples or self.samples[-1][0] != baseline:
-            self.clear()
-            self.add(baseline, 0.0, "source")
-        self.add(timestamp, self.samples[-1][1] + delta_kwh, "source")
-        return cast(tuple[int, float], self.value())
 
     def add(self, timestamp: float, energy_kwh: float, clock: str) -> None:
         if not math.isfinite(timestamp) or not math.isfinite(energy_kwh):

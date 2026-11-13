@@ -14,7 +14,10 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 
-- None
+- Require a new energy increment to confirm a rolling power spike and apply the same check to the Consumption Power fallback.
+- Switch to a fresh Consumption Power fallback when the retained balance expires, including after a rejected sample. Preserve its calculation method through a reseed and discard unvalidated fallback watts when the first advancing interval after restart is quarantined.
+- Keep malformed, future-dated, and regressed lifetime-energy reports from changing accepted counters or cache age. Keep normal request throttling when a rejected report contains no usable flows.
+- Isolate malformed HEMS timestamps from primary energy updates and require usable HEMS buckets before advancing the optional source clock.
 
 ### 🔧 Improvements
 
