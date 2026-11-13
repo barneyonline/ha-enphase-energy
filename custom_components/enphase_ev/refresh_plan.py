@@ -231,16 +231,24 @@ WARMUP_STATE_STAGE = RefreshStage(
             "battery backup history",
             "_async_refresh_battery_backup_history",
         ),
-        method_task(
-            "battery_settings_s", "battery settings", "_async_refresh_battery_settings"
+        callback_task(
+            "battery_settings_s",
+            "battery settings",
+            lambda owner: owner.refresh_runner.async_refresh_storm_guard_for_warmup(
+                owner._async_refresh_battery_settings
+            ),
         ),
         method_task(
             "battery_schedules_s",
             "battery schedules",
             "_async_refresh_battery_schedules",
         ),
-        method_task(
-            "storm_guard_s", "storm guard", "_async_refresh_storm_guard_profile"
+        callback_task(
+            "storm_guard_s",
+            "storm guard",
+            lambda owner: owner.refresh_runner.async_refresh_storm_guard_for_warmup(
+                owner._async_refresh_storm_guard_profile
+            ),
         ),
         method_task("storm_alert_s", "storm alert", "_async_refresh_storm_alert"),
         object_method_task(
@@ -612,12 +620,11 @@ def warmup_plan(
         defer_topology=WARMUP_DISCOVERY_STAGE.defer_topology,
         deadline_s=WARMUP_DISCOVERY_STAGE.deadline_s,
         parallel_tasks=(
-            callback_task(
+            object_method_task(
                 "evse_summary_s",
                 "EVSE summary",
-                lambda inner_owner: inner_owner.refresh_runner.async_refresh_evse_summary_for_warmup(
-                    working_data=working_data
-                ),
+                "refresh_runner",
+                "async_refresh_evse_summary_for_warmup",
             ),
             *WARMUP_DISCOVERY_STAGE.parallel_tasks,
         ),

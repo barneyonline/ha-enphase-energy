@@ -444,12 +444,8 @@ class _RefreshOwner:
         self.calls.append("warmup_site_energy")
         return "warmup-site-energy"
 
-    def async_refresh_evse_summary_for_warmup(
-        self,
-        *,
-        working_data: dict[str, dict[str, object]],
-    ) -> str:
-        self.calls.append(f"warmup_summary:{sorted(working_data)}")
+    def async_refresh_evse_summary_for_warmup(self) -> str:
+        self.calls.append("warmup_summary")
         return "warmup-summary"
 
     def async_refresh_evse_timeseries_for_warmup(

@@ -42,8 +42,10 @@ forwarding platforms, with degraded setup permitted for charger-status HTTP 5xx
 failures as described under [charger-status recovery](#charger-status-recovery).
 Translation and integration-version priming run concurrently with that work.
 Optional endpoint families then warm up in feature-aware stages, publishing after
-each stage so one slow family does not hold back unrelated state. Schedule sync and
-other long-running work start in the background.
+each stage. Charger Status and Electrical Phase publish when the charger summary
+returns. Storm Guard publishes when the battery settings or profile provides its
+state. Startup publications preserve core poll health and scheduling. Schedule
+sync and other long-running work start in the background.
 
 Config-entry update handling distinguishes live-applicable options from topology
 changes. Polling, timeout, history, voltage, scheduler, pricing, and notification
@@ -229,11 +231,8 @@ identifier-free observation via `evse_gateway_connectivity.py`. It never fetches
 or falls back to persisted coordinator metadata. Missing/duplicate charger rows,
 failed/stale summary responses and conflicting flags cannot report connectivity.
 `binary_sensor_gateway.py` exposes a connectivity diagnostic with unknown state
-when evidence is unavailable. It owns one cancellable local expiry timer per
-entity, with no independent polling, and discards observations older than fifteen
-minutes using both the acquisition time and charger `lastReportedAt`. The
-connection-event timestamp is deliberately separate and never renews freshness.
-Unload cancels the timer; normal updates replace it and preserve entity identity.
+when evidence is unavailable. The sensor uses the existing summary polling and
+exposes the cloud receipt, charger report, and connection event as attributes.
 
 ## Cloud Client
 
@@ -511,10 +510,11 @@ Stored-credential login counters publish auth snapshots and notify entities with
 marking cloud telemetry successful or resetting the coordinator's polling schedule.
 
 Summary availability, stale-cache use, cache presence and each charger's parsed
-gateway-connectivity observation and freshness also participate in publication equality. This
+gateway-connectivity observation also participate in publication equality. This
 publishes source failures, ambiguous duplicate rows and recoveries even when
-normalized charger values are identical. Receipt clocks, retry counts and error
-text remain excluded so repeated unchanged polls do not notify entities unnecessarily.
+normalized charger values are identical. A new summary receipt also publishes
+its timestamp. Cache hits preserve that timestamp, and retry counts and error
+text are excluded from equality.
 
 Auth and EVSE state live with their runtimes. Battery, heat-pump, and inventory
 runtimes receive their state explicitly; compatibility coordinator projections

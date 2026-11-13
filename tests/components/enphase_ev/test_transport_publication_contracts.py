@@ -260,7 +260,7 @@ async def test_warmup_publishes_current_charger_state_between_stages(
         publications.append(deepcopy(data))
         coord.data = data
 
-    coord.async_set_updated_data = Mock(side_effect=publish)
+    coord.publish_enrichment = Mock(side_effect=publish)
     await coord.refresh_runner.async_startup_warmup_runner()
     assert publications
     assert all(data["EVSE"]["charging"] is True for data in publications)

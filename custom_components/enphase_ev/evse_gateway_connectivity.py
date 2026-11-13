@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from homeassistant.util import dt as dt_util
-
-GATEWAY_CONNECTIVITY_MAX_AGE = timedelta(minutes=15)
 
 
 def _timestamp(value: object) -> datetime | None:
@@ -37,23 +35,6 @@ class GatewayConnectivity:
     last_connection: datetime | None
     received_at: datetime | None
     reported_at: datetime | None
-
-    @property
-    def expires_at(self) -> datetime | None:
-        if self.received_at is None or self.reported_at is None:
-            return None
-        return min(self.received_at, self.reported_at) + GATEWAY_CONNECTIVITY_MAX_AGE
-
-    def fresh(self, now: datetime) -> bool:
-        deadline = self.expires_at
-        return bool(
-            deadline is not None
-            and self.received_at is not None
-            and self.reported_at is not None
-            and self.received_at <= now
-            and self.reported_at <= now
-            and now < deadline
-        )
 
 
 def gateway_connectivity(

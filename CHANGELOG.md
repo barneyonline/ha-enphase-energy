@@ -14,7 +14,8 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 
-- None
+- Update Charger Status, Electrical Phase, and Storm Guard as soon as their cloud data is loaded after a Home Assistant restart.
+- Show the reported EV charger Gateway connectivity state even when the charger report is older than 15 minutes.
 
 ### 🔧 Improvements
 

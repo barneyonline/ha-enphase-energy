@@ -321,7 +321,7 @@ async def test_gateway_connectivity_publishes_summary_invalidity_and_recovery(
         {
             "serialNumber": RANDOM_SERIAL,
             "isLocallyConnected": connected,
-            "lastReportedAt": dt_util.utcnow().isoformat(),
+            "lastReportedAt": (dt_util.utcnow() - timedelta(hours=1)).isoformat(),
         }
     ]
     assert await hass.config_entries.async_setup(config_entry.entry_id)
@@ -375,6 +375,33 @@ async def test_gateway_connectivity_publishes_summary_invalidity_and_recovery(
         await coord.async_refresh()
         await hass.async_block_till_done()
         assert len(publications) == 2
+
+        received = hass.states.get(sensor_id).attributes["telemetry_received_at"]
+        next_receipt = received + timedelta(minutes=1)
+        monkeypatch.setattr(
+            "custom_components.enphase_ev.summary.dt_util",
+            SimpleNamespace(utcnow=lambda: next_receipt),
+        )
+        await coord.async_refresh()
+        await hass.async_block_till_done()
+        assert hass.states.get(sensor_id).state == expected_state
+        assert (
+            hass.states.get(sensor_id).attributes["telemetry_received_at"]
+            == next_receipt
+        )
+        assert len(publications) == 3
+
+        # Cache hits keep the actual receipt timestamp and cause no publication.
+        monkeypatch.setattr(coord.summary, "prepare_refresh", lambda **_: False)
+        summary_calls = calls["summary_v2"].await_count
+        await coord.async_refresh()
+        await hass.async_block_till_done()
+        assert calls["summary_v2"].await_count == summary_calls
+        assert (
+            hass.states.get(sensor_id).attributes["telemetry_received_at"]
+            == next_receipt
+        )
+        assert len(publications) == 3
         assert unexpected == []
     finally:
         unsubscribe()
