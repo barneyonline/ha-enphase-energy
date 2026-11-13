@@ -16,6 +16,7 @@ from homeassistant.components.schedule.const import (
 )
 from homeassistant.components.schedule.const import DOMAIN as SCHEDULE_DOMAIN
 from homeassistant.components import websocket_api
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers import entity_registry as er
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
@@ -27,7 +28,13 @@ from custom_components.enphase_ev.api import (
     EnphaseLoginWallUnauthorized,
     SchedulerUnavailable,
 )
-from custom_components.enphase_ev.const import DOMAIN, OPT_SCHEDULE_SYNC_ENABLED
+from custom_components.enphase_ev import _async_update_listener, async_unload_entry
+from custom_components.enphase_ev.const import (
+    DOMAIN,
+    OPT_SCHEDULE_SYNC_ENABLED,
+    OPT_USE_15_MINUTE_POWER_AVERAGE,
+)
+from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from custom_components.enphase_ev import schedule_sync as schedule_sync_mod
 from custom_components.enphase_ev.schedule_sync import ScheduleSync
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL, RANDOM_SITE_ID
@@ -665,6 +672,123 @@ async def test_schedule_sync_serializes_overlapping_start_stop_start(
     assert sync._unsub_interval is unsubscribe_interval
     assert sync._unsub_coordinator is unsubscribe_coordinator
     await sync.async_stop()
+
+
+@pytest.mark.parametrize("sync_enabled", [False, True])
+@pytest.mark.parametrize("stored_helper", [False, True])
+@pytest.mark.parametrize("trigger", ["options", "data"])
+async def test_schedule_start_does_not_wait_for_listener_unloading_entry(
+    hass, config_entry, monkeypatch, sync_enabled, stored_helper, trigger
+) -> None:
+    """Startup must not drain HA tasks that need its lifecycle lock to unload."""
+    previous_options = {OPT_SCHEDULE_SYNC_ENABLED: sync_enabled}
+    hass.config_entries.async_update_entry(config_entry, options=previous_options)
+    client = SimpleNamespace(
+        get_schedules=AsyncMock(return_value={"slots": []}),
+        scheduler_bearer=lambda: "fixture-token",
+    )
+    coord = DummyCoordinator(hass, client, config_entry, data={})
+    coord.mark_runtime_stopped = MagicMock()
+    coord.async_cleanup_runtime_state = AsyncMock()
+    coord.async_close = AsyncMock()
+    sync = ScheduleSync(hass, coord, config_entry)
+    coord.schedule_sync = sync
+    collection = await sync._ensure_storage_collection()
+    assert collection is not None
+    helper_id = f"{DOMAIN}:{RANDOM_SERIAL}:schedule:reload-slot"
+    registry = er.async_get(hass)
+    if stored_helper:
+        collection.data[helper_id] = {"id": helper_id, "name": "Legacy schedule"}
+        registry.async_get_or_create(
+            SCHEDULE_DOMAIN,
+            SCHEDULE_DOMAIN,
+            helper_id,
+            config_entry=config_entry,
+        )
+        registry.async_get_or_create(
+            "switch", DOMAIN, f"{helper_id}:enabled", config_entry=config_entry
+        )
+    runtime = EnphaseRuntimeData(
+        coordinator=coord,
+        applied_data=dict(config_entry.data),
+        applied_options=previous_options,
+    )
+    config_entry.runtime_data = runtime
+    config_entry._async_set_state(hass, ConfigEntryState.LOADED, None)
+    if trigger == "options":
+        hass.config_entries.async_update_entry(
+            config_entry,
+            options={**previous_options, OPT_USE_15_MINUTE_POWER_AVERAGE: True},
+        )
+    else:
+        # Model a setup-time data update without assuming the reporter's source.
+        hass.config_entries.async_update_entry(
+            config_entry, data={**config_entry.data, "site_name": "Updated site"}
+        )
+
+    startup_entered = asyncio.Event()
+    reload_started = asyncio.Event()
+
+    async def _storage_during_reload():
+        startup_entered.set()
+        await reload_started.wait()
+        return collection
+
+    async def _reload(entry_id):
+        assert entry_id == config_entry.entry_id
+        config_entry._async_set_state(hass, ConfigEntryState.UNLOAD_IN_PROGRESS, None)
+        reload_started.set()
+        result = await async_unload_entry(hass, config_entry)
+        config_entry._async_set_state(hass, ConfigEntryState.NOT_LOADED, None)
+        return result
+
+    monkeypatch.setattr(sync, "_ensure_storage_collection", _storage_during_reload)
+    reload_entry = AsyncMock(side_effect=_reload)
+    monkeypatch.setattr(hass.config_entries, "async_reload", reload_entry)
+    monkeypatch.setattr(
+        hass.config_entries, "async_forward_entry_unload", AsyncMock(return_value=True)
+    )
+    tasks = [
+        hass.async_create_background_task(
+            sync.async_start(), "enphase_ev_schedule_sync_start", eager_start=False
+        )
+    ]
+    try:
+        await asyncio.wait_for(startup_entered.wait(), 1)
+        for _ in range(2):
+            tasks.append(
+                hass.async_create_task(
+                    _async_update_listener(hass, config_entry),
+                    "config entry update listener enphase_ev",
+                    eager_start=False,
+                )
+            )
+        await asyncio.wait_for(asyncio.gather(*tasks), 1)
+        reload_entry.assert_awaited_once_with(config_entry.entry_id)
+        coord.mark_runtime_stopped.assert_called_once_with()
+        coord.async_cleanup_runtime_state.assert_awaited_once_with()
+        coord.async_close.assert_awaited_once_with()
+        assert config_entry.state is ConfigEntryState.NOT_LOADED
+        assert config_entry.runtime_data is None
+        assert not sync._lifecycle_lock.locked()
+        assert not runtime.update_listener_lock.locked()
+        assert sync._unsub_interval is None
+        assert sync._unsub_coordinator is None
+        assert helper_id not in collection.data
+        assert (
+            registry.async_get_entity_id(SCHEDULE_DOMAIN, SCHEDULE_DOMAIN, helper_id)
+            is None
+        )
+        assert (
+            registry.async_get_entity_id("switch", DOMAIN, f"{helper_id}:enabled")
+            is None
+        )
+    finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await sync.async_stop()
+        config_entry._async_set_state(hass, ConfigEntryState.NOT_LOADED, None)
 
 
 def test_schedule_sync_notify_listeners_handles_exception(hass) -> None:

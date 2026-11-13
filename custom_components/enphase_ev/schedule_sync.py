@@ -370,8 +370,10 @@ class ScheduleSync:
                 serial, slot_id = self._parse_slot_id(item_id)
                 if serial and slot_id:
                     slot_keys.add((serial, slot_id))
+                # Deletion awaits the collection listeners and entity removal.
+                # Draining all HA tasks here can wait for the update listener
+                # whose unload is waiting for our lifecycle lock.
                 await collection.async_delete_item(item_id)
-            await self.hass.async_block_till_done()
 
         for serial, slot_id in slot_keys:
             switch_unique_id = f"{DOMAIN}:{serial}:schedule:{slot_id}:enabled"
