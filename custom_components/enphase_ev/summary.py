@@ -307,19 +307,18 @@ class SummaryStore:
     def gateway_publication_state(
         self, serials: Iterable[str]
     ) -> tuple[tuple[str, tuple[object, ...] | None], ...]:
-        """Capture each reader's validity and values, excluding receipt clocks."""
-        now = dt_util.utcnow()
+        """Capture gateway evidence and its receipt from the last successful read."""
         return tuple(
             (
                 serial,
                 (
                     (
-                        observation.fresh(now),
                         observation.connected,
                         observation.gateway_count,
                         observation.connected_count,
                         observation.last_connection,
                         observation.reported_at,
+                        observation.received_at,
                     )
                     if (observation := self.gateway_connectivity(serial)) is not None
                     else None

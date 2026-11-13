@@ -8345,10 +8345,10 @@ The Gateway Connectivity diagnostic reuses this summary response without extra
 polling. It prefers the explicit local-connectivity flag and treats conflicting
 gateway details as unknown. Only gateway status `0` has an observed connected
 meaning; nonzero codes are not independently interpreted as disconnected. Counts
-are reported entries, not a configured expected inventory. Fresh cloud receipt
-and `lastReportedAt` are required; `lastConnTime` is a separate connection event
-in epoch milliseconds and does not establish telemetry freshness. These are
-cloud-reported observations, not verified physical-link health.
+are reported entries, not a configured expected inventory. The diagnostic
+exposes cloud receipt, `lastReportedAt`, and the separate `lastConnTime`
+connection event (epoch milliseconds) as attributes. The state reflects the
+gateway flags from a successful summary read.
 
 ---
 

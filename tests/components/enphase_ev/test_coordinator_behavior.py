@@ -1442,11 +1442,11 @@ def test_summary_type_bucket_source_guards_invalid_inputs(coordinator_factory) -
 
 def test_publish_internal_state_update_copies_current_data(coordinator_factory) -> None:
     coord = coordinator_factory()
-    coord.async_set_updated_data = Mock()  # type: ignore[assignment]
+    coord.publish_enrichment = Mock()  # type: ignore[assignment]
 
     coord._publish_internal_state_update()  # noqa: SLF001
 
-    coord.async_set_updated_data.assert_called_once_with(dict(coord.data))
+    coord.publish_enrichment.assert_called_once_with(dict(coord.data))
 
 
 def test_site_only_coordinator_notifies_listeners_for_equal_payloads(
@@ -4623,6 +4623,137 @@ async def test_startup_warmup_populates_storm_guard_state_after_first_refresh(
     assert StormGuardSwitch(coord).available is True
 
 
+@pytest.mark.parametrize("storm_guard_source", ["battery_settings", "storm_guard"])
+@pytest.mark.parametrize("core_poll_fails", [False, True])
+@pytest.mark.asyncio
+async def test_startup_publishes_charger_diagnostics_as_their_sources_finish(
+    hass, monkeypatch, config_entry, storm_guard_source, core_poll_fails
+) -> None:
+    from homeassistant.config_entries import ConfigEntryState
+    from homeassistant.helpers.entity_component import EntityComponent
+    from homeassistant.helpers.update_coordinator import UpdateFailed
+
+    from custom_components.enphase_ev.sensor import (
+        EnphaseElectricalPhaseSensor,
+        EnphasePowerSensor,
+        EnphaseStatusSensor,
+        EnphaseStormGuardStateSensor,
+    )
+
+    coord = _make_coordinator(hass, monkeypatch)
+    coord.config_entry = config_entry
+    config_entry._async_set_state(hass, ConfigEntryState.SETUP_IN_PROGRESS, None)
+    coord._selected_type_keys = {"iqevse", "encharge"}  # noqa: SLF001
+    coord.client.status = AsyncMock(
+        return_value={
+            "evChargerData": [
+                {"sn": RANDOM_SERIAL, "name": "Garage EV", "connected": True}
+            ],
+        }
+    )
+    summary_started = asyncio.Event()
+    release_summary = asyncio.Event()
+
+    async def fetch_summary():
+        summary_started.set()
+        await release_summary.wait()
+        return [{"serialNumber": RANDOM_SERIAL, "status": "NORMAL", "phaseMode": 1}]
+
+    coord.client.summary_v2 = AsyncMock(side_effect=fetch_summary)
+    battery_payload = {"data": {"stormGuardState": "active"}}
+    coord.client.battery_settings_details = AsyncMock(
+        return_value=battery_payload if storm_guard_source == "battery_settings" else {}
+    )
+    coord.client.storm_guard_profile = AsyncMock(
+        return_value=battery_payload if storm_guard_source == "storm_guard" else {}
+    )
+    coord._async_refresh_battery_site_settings = AsyncMock()
+    coord.battery_runtime.async_refresh_battery_status = AsyncMock()
+    coord.battery_runtime.async_refresh_battery_backup_history = AsyncMock()
+
+    discovery_started = asyncio.Event()
+    release_discovery = asyncio.Event()
+    state_started = asyncio.Event()
+    release_state = asyncio.Event()
+
+    async def wait_for_discovery() -> None:
+        discovery_started.set()
+        await release_discovery.wait()
+
+    async def wait_for_state() -> None:
+        state_started.set()
+        await release_state.wait()
+
+    coord.inventory_runtime._async_refresh_devices_inventory = wait_for_discovery
+    coord.client.storm_guard_alert = AsyncMock(side_effect=wait_for_state)
+    coord._async_refresh_current_power_consumption = AsyncMock()
+    coord.energy._async_refresh_site_energy = AsyncMock()
+    await coord.async_bootstrap_first_refresh()
+
+    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    component._platforms["sensor"].config_entry = config_entry
+    charger_status = EnphaseStatusSensor(coord, RANDOM_SERIAL)
+    electrical_phase = EnphaseElectricalPhaseSensor(coord, RANDOM_SERIAL)
+    storm_guard = EnphaseStormGuardStateSensor(coord, RANDOM_SERIAL)
+    power = EnphasePowerSensor(coord, RANDOM_SERIAL)
+    await component.async_add_entities(
+        [charger_status, electrical_phase, storm_guard, power]
+    )
+
+    assert hass.states.get(charger_status.entity_id).state == "unknown"
+    assert hass.states.get(electrical_phase.entity_id).state == "unknown"
+    assert hass.states.get(storm_guard.entity_id).state == "unavailable"
+    coord.client.summary_v2.assert_not_awaited()
+
+    warmup = asyncio.create_task(coord.refresh_runner.async_startup_warmup_runner())
+    try:
+        await asyncio.wait_for(summary_started.wait(), timeout=5)
+        if core_poll_fails:
+            monkeypatch.setattr(
+                coord,
+                "_async_update_data_locked",
+                AsyncMock(side_effect=UpdateFailed("core poll failed")),
+            )
+            await coord.async_refresh()
+            assert not coord.last_update_success
+            assert hass.states.get(power.entity_id).state == "unavailable"
+
+        scheduled_refresh = coord._unsub_refresh
+        assert scheduled_refresh is not None
+        cancel_debounce = Mock(wraps=coord._debounced_refresh.async_cancel)
+        monkeypatch.setattr(coord._debounced_refresh, "async_cancel", cancel_debounce)
+        release_summary.set()
+        await asyncio.wait_for(discovery_started.wait(), timeout=5)
+        discovery_states = (
+            hass.states.get(charger_status.entity_id).state,
+            hass.states.get(electrical_phase.entity_id).state,
+        )
+        assert hass.states.get(storm_guard.entity_id).state == "unavailable"
+
+        release_discovery.set()
+        await asyncio.wait_for(state_started.wait(), timeout=5)
+        if core_poll_fails:
+            assert discovery_states == ("unavailable", "unavailable")
+            assert hass.states.get(power.entity_id).state == "unavailable"
+            assert hass.states.get(storm_guard.entity_id).state == "unavailable"
+            assert coord.data[RANDOM_SERIAL]["status"] == "NORMAL"
+            assert coord.storm_guard_state == "enabled"
+        else:
+            assert discovery_states == ("Normal", "Single Phase")
+            assert hass.states.get(storm_guard.entity_id).state == "Enabled"
+
+        assert coord.last_update_success is not core_poll_fails
+        assert coord._unsub_refresh is scheduled_refresh
+        cancel_debounce.assert_not_called()
+        assert not warmup.done()
+        coord.client.status.assert_awaited_once()
+        coord.client.summary_v2.assert_awaited_once()
+    finally:
+        warmup.cancel()
+        await asyncio.gather(warmup, return_exceptions=True)
+        await coord.async_cleanup_runtime_state()
+
+
 def test_apply_warmup_evse_summary_updates_startup_critical_fields(
     hass, monkeypatch
 ) -> None:
@@ -5020,7 +5151,7 @@ async def test_startup_warmup_publishes_power_before_discovery(
     coord._async_refresh_battery_site_settings = AsyncMock(  # noqa: SLF001
         side_effect=_refresh_discovery
     )
-    coord.async_set_updated_data = Mock(side_effect=_publish)  # type: ignore[assignment]
+    coord.publish_enrichment = Mock(side_effect=_publish)  # type: ignore[assignment]
 
     await coord.refresh_runner.async_startup_warmup_runner()
 
@@ -5028,7 +5159,7 @@ async def test_startup_warmup_publishes_power_before_discovery(
     assert order.index("current_power") < first_publish
     assert order.index("site_energy") < first_publish
     assert first_publish < order.index("discovery")
-    assert coord.async_set_updated_data.call_count == 5  # type: ignore[attr-defined]
+    assert coord.publish_enrichment.call_count == 5  # type: ignore[attr-defined]
     assert "power_s" in coord._warmup_phase_timings  # noqa: SLF001
 
 
@@ -5047,10 +5178,10 @@ async def test_startup_warmup_publishes_vpp_only_state(coordinator_factory) -> N
         "tariff_rates_last_refresh_utc",
     ):
         setattr(coord, attr, None)
-    coord.async_set_updated_data({})
+    coord.publish_enrichment({})
     baseline_revision = coord.integration_snapshot.revision
     sequence: list[str] = []
-    original_publish = coord.async_set_updated_data
+    original_publish = coord.publish_enrichment
 
     def _publish(data) -> None:
         sequence.append("publish")
@@ -5065,7 +5196,7 @@ async def test_startup_warmup_publishes_vpp_only_state(coordinator_factory) -> N
                 time.monotonic()
             )  # noqa: SLF001
 
-    coord.async_set_updated_data = Mock(side_effect=_publish)  # type: ignore[assignment]
+    coord.publish_enrichment = Mock(side_effect=_publish)  # type: ignore[assignment]
     coord.refresh_runner.async_start_startup_power = AsyncMock()  # type: ignore[method-assign]
     coord.refresh_runner.async_run_refresh_plan = AsyncMock(  # type: ignore[method-assign]
         side_effect=_run_plan
@@ -5075,7 +5206,7 @@ async def test_startup_warmup_publishes_vpp_only_state(coordinator_factory) -> N
     await coord.refresh_runner.async_startup_warmup_runner()
 
     assert sequence.index("state") < sequence.index("publish")
-    assert coord.async_set_updated_data.call_count == 1  # type: ignore[attr-defined]
+    assert coord.publish_enrichment.call_count == 1  # type: ignore[attr-defined]
     assert coord.integration_snapshot.revision == baseline_revision + 1
 
 
@@ -5085,7 +5216,7 @@ async def test_startup_warmup_runner_and_task_edge_paths(
 ) -> None:
     coord = coordinator_factory()
     coord._current_power_consumption_w = 1.0  # noqa: SLF001
-    coord.async_set_updated_data = Mock(  # type: ignore[assignment]
+    coord.publish_enrichment = Mock(  # type: ignore[assignment]
         side_effect=[None, RuntimeError("publish")]
     )
     coord.discovery_snapshot.schedule_save = Mock()  # type: ignore[assignment]
@@ -5135,13 +5266,13 @@ async def test_startup_warmup_runner_and_task_edge_paths(
     coord = coordinator_factory(data={})
     coord.data = {}
     coord.discovery_snapshot.schedule_save = Mock()  # type: ignore[assignment]
-    coord.async_set_updated_data = Mock()  # type: ignore[assignment]
+    coord.publish_enrichment = Mock()  # type: ignore[assignment]
     coord.tariff_runtime.async_refresh = AsyncMock()  # type: ignore[method-assign]
     coord.tariff_last_refresh_utc = datetime.now(timezone.utc)
 
     await coord.refresh_runner.async_startup_warmup_runner()
 
-    assert coord.async_set_updated_data.call_args_list == [call({})] * 5  # type: ignore[attr-defined]
+    assert coord.publish_enrichment.call_args_list == [call({})] * 5  # type: ignore[attr-defined]
     coord.discovery_snapshot.schedule_save.assert_called_once()  # type: ignore[attr-defined]
 
     coord = coordinator_factory(data={})
@@ -5274,7 +5405,7 @@ async def test_startup_warmup_helper_refreshes_cover_fallback_and_merge_paths(
     coord = coordinator_factory(serials=[RANDOM_SERIAL])
     coord.data = {RANDOM_SERIAL: {"name": "Garage EV"}}
     set_updated = Mock()
-    coord.async_set_updated_data = set_updated  # type: ignore[assignment]
+    coord.publish_enrichment = set_updated  # type: ignore[assignment]
 
     from custom_components.enphase_ev import refresh_runner as runner_mod
 

@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 from freezegun import freeze_time
-from homeassistant.core import State
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
@@ -15,10 +14,7 @@ from pytest_homeassistant_custom_component.common import async_fire_time_changed
 from custom_components.enphase_ev.binary_sensor_gateway import (
     GatewayConnectedBinarySensor,
 )
-from custom_components.enphase_ev.evse_gateway_connectivity import (
-    GATEWAY_CONNECTIVITY_MAX_AGE,
-    gateway_connectivity,
-)
+from custom_components.enphase_ev.evse_gateway_connectivity import gateway_connectivity
 from custom_components.enphase_ev.summary import SummaryStore
 from .random_ids import RANDOM_SERIAL
 
@@ -81,21 +77,16 @@ def test_state_requires_consistent_evidence(local, details, expected):
         payload(isLocallyConnected=local, gatewayConnectivityDetails=details), NOW
     )
     assert snapshot.connected is expected
-    assert snapshot.fresh(NOW)
 
 
 @pytest.mark.parametrize(
     "received",
-    [
-        None,
-        "bad",
-        NOW.replace(tzinfo=None),
-        NOW + timedelta(seconds=1),
-        NOW - GATEWAY_CONNECTIVITY_MAX_AGE,
-    ],
+    [None, "bad", NOW.replace(tzinfo=None)],
 )
-def test_invalid_future_expired_observation(received):
-    assert not gateway_connectivity(payload(), received).fresh(NOW)
+def test_invalid_receipt_timestamp_is_optional_metadata(received):
+    snapshot = gateway_connectivity(payload(), received)
+    assert snapshot.received_at is None
+    assert snapshot.connected is True
 
 
 @pytest.mark.parametrize(
@@ -105,12 +96,12 @@ def test_invalid_future_expired_observation(received):
         123,
         "bad",
         "2026-11-11T12:00:00",
-        (NOW + timedelta(seconds=1)).isoformat(),
-        (NOW - GATEWAY_CONNECTIVITY_MAX_AGE).isoformat(),
     ],
 )
-def test_invalid_future_expired_charger_report(reported):
-    assert not gateway_connectivity(payload(lastReportedAt=reported), NOW).fresh(NOW)
+def test_invalid_charger_report_timestamp_is_optional_metadata(reported):
+    snapshot = gateway_connectivity(payload(lastReportedAt=reported), NOW)
+    assert snapshot.reported_at is None
+    assert snapshot.connected is True
 
 
 @pytest.mark.parametrize(
@@ -125,7 +116,7 @@ def test_invalid_future_expired_charger_report(reported):
         int((NOW + timedelta(days=1)).timestamp() * 1000),
     ],
 )
-def test_invalid_connection_event_is_not_freshness(stamp):
+def test_invalid_connection_event_is_optional_metadata(stamp):
     snapshot = gateway_connectivity(
         payload(
             gatewayConnectivityDetails=[{"gwConnStatus": 0, "lastConnTime": stamp}]
@@ -154,14 +145,9 @@ def test_multiple_gateway_counts_and_latest_connection():
     )
     assert snapshot.gateway_count == snapshot.connected_count == 2
     assert snapshot.last_connection == old + timedelta(hours=1)
-    assert snapshot.expires_at == NOW + GATEWAY_CONNECTIVITY_MAX_AGE
-    assert snapshot.fresh(
-        NOW + GATEWAY_CONNECTIVITY_MAX_AGE - timedelta(microseconds=1)
-    )
-    assert not snapshot.fresh(NOW + GATEWAY_CONNECTIVITY_MAX_AGE)
 
 
-async def test_cache_has_per_charger_freshness_failure_and_recovery(monkeypatch):
+async def test_cache_has_per_charger_evidence_failure_and_recovery(monkeypatch):
     monkeypatch.setattr(dt_util, "utcnow", lambda: NOW)
     client = SimpleNamespace(summary_v2=AsyncMock(return_value=[payload()]))
     store = SummaryStore(lambda: client)
@@ -169,7 +155,7 @@ async def test_cache_has_per_charger_freshness_failure_and_recovery(monkeypatch)
     await store.async_fetch(force=True)
     assert store.gateway_connectivity(RANDOM_SERIAL).connected is True
     assert store.gateway_connectivity("other") is None
-    # Cached reads cannot renew telemetry freshness or make network calls.
+    # Cached reads keep the original receipt time and make no network calls.
     await store.async_fetch()
     assert client.summary_v2.await_count == 1
     assert store.gateway_connectivity(RANDOM_SERIAL).received_at == NOW
@@ -195,7 +181,7 @@ async def test_cache_has_per_charger_freshness_failure_and_recovery(monkeypatch)
     assert store.gateway_connectivity(RANDOM_SERIAL) is None
 
 
-async def test_entity_unknown_expiry_updates_recovery_and_unload(
+async def test_entity_keeps_reported_state_until_summary_fails(
     hass, coordinator_factory, freezer, config_entry
 ):
     freezer.move_to(NOW)
@@ -219,22 +205,17 @@ async def test_entity_unknown_expiry_updates_recovery_and_unload(
     component = EntityComponent(logging.getLogger(__name__), "binary_sensor", hass)
     component._platforms["binary_sensor"].config_entry = config_entry
     await component.async_add_entities([sensor])
-    assert isinstance(hass.states.get(sensor.entity_id), State)
     assert hass.states.get(sensor.entity_id).state == "on"
-    coord.async_set_updated_data(coord.data)
-    await hass.async_block_till_done()
-    assert sensor._cancel_expiry is not None
-    freezer.move_to(NOW + GATEWAY_CONNECTIVITY_MAX_AGE)
+    freezer.move_to(NOW + timedelta(hours=1))
     async_fire_time_changed(hass, dt_util.utcnow())
     await hass.async_block_till_done()
-    assert hass.states.get(sensor.entity_id).state == "unknown"
-    assert sensor.extra_state_attributes == {}
-    assert sensor._cancel_expiry is None
-    # No source timestamp / stale cache must stay unknown even with successful status polls.
+    assert hass.states.get(sensor.entity_id).state == "on"
+    assert sensor.extra_state_attributes["charger_last_reported_at"] == NOW
+    # A failed summary read makes its cached flags unavailable.
     coord.summary._state["using_stale"] = True
     coord.async_set_updated_data(coord.data)
     await hass.async_block_till_done()
-    assert sensor.is_on is None
+    assert hass.states.get(sensor.entity_id).state == "unknown"
     assert sensor.extra_state_attributes == {}
     coord.summary._state["using_stale"] = False
     coord.summary._state["last_success_utc"] = dt_util.utcnow()
@@ -242,7 +223,7 @@ async def test_entity_unknown_expiry_updates_recovery_and_unload(
         0,
         [
             payload(
-                lastReportedAt=dt_util.utcnow().isoformat(),
+                lastReportedAt=None,
                 isLocallyConnected=False,
                 gatewayConnectivityDetails=None,
             )
@@ -252,18 +233,13 @@ async def test_entity_unknown_expiry_updates_recovery_and_unload(
     coord.async_set_updated_data(coord.data)
     await hass.async_block_till_done()
     assert hass.states.get(sensor.entity_id).state == "off"
-    assert sensor._cancel_expiry is not None
+    assert sensor.extra_state_attributes["charger_last_reported_at"] is None
     coord.last_update_success = False
     assert sensor.is_on is None
     await component.async_remove_entity(sensor.entity_id)
-    assert sensor._cancel_expiry is None
-    # Removal with no pending timer is safe as well.
-    await sensor.async_will_remove_from_hass()
 
 
-def test_gateway_publication_tracks_reader_state_not_acquisition_noise(monkeypatch):
-    """Retain validity, freshness and values without publishing every receipt."""
-    monkeypatch.setattr(dt_util, "utcnow", lambda: NOW)
+def test_gateway_publication_tracks_receipt_and_evidence():
     store = SummaryStore(lambda: None)
     row = payload()
     store._cache = (0, [row], 600)
@@ -271,20 +247,18 @@ def test_gateway_publication_tracks_reader_state_not_acquisition_noise(monkeypat
     initial = store.gateway_publication_state([RANDOM_SERIAL, "absent"])
     assert initial == store.gateway_publication_state(["absent", RANDOM_SERIAL])
     assert "PRIVATE" not in str(initial)
-    store._state["last_success_utc"] = NOW
     store._state["failures"] = 3
     store._state["last_error"] = "different error"
     store._cache = (1, [row], 5)
     assert store.gateway_publication_state([RANDOM_SERIAL, "absent"]) == initial
+    store._state["last_success_utc"] = NOW
+    received = store.gateway_publication_state([RANDOM_SERIAL, "absent"])
+    assert received != initial
 
     store._cache = (1, [row, row], 5)
-    assert store.gateway_publication_state([RANDOM_SERIAL, "absent"]) != initial
+    assert store.gateway_publication_state([RANDOM_SERIAL, "absent"]) != received
     store._cache = (1, [row], 5)
-    assert store.gateway_publication_state([RANDOM_SERIAL, "absent"]) == initial
+    assert store.gateway_publication_state([RANDOM_SERIAL, "absent"]) == received
 
-    # Freshness is semantic even when the underlying raw values do not move.
-    monkeypatch.setattr(dt_util, "utcnow", lambda: NOW + GATEWAY_CONNECTIVITY_MAX_AGE)
-    assert store.gateway_publication_state([RANDOM_SERIAL, "absent"]) != initial
-    monkeypatch.setattr(dt_util, "utcnow", lambda: NOW)
-    store._state["last_success_utc"] = None
-    assert store.gateway_publication_state([RANDOM_SERIAL, "absent"]) != initial
+    store._cache = (1, [payload(lastReportedAt=None)], 5)
+    assert store.gateway_publication_state([RANDOM_SERIAL, "absent"]) != received
