@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import replace
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 import aiohttp
 import pytest
@@ -53,7 +53,7 @@ def payload(**changes):
         "data": {
             "gateway_settings": [
                 {
-                    "device_id": "gateway",
+                    "device_id": "200",
                     "site_id": "123",
                     "device_type": "ENVOY",
                     "pel_settings_infos": settings,
@@ -248,6 +248,9 @@ def runtime(hass):
             async_get_export_limit_settings=AsyncMock(return_value=payload()),
             async_prepare_activation_auth=AsyncMock(return_value=True),
             async_get_activation_device_list=AsyncMock(return_value={"devices": []}),
+            devices_details=AsyncMock(
+                return_value={"envoys": [{"id": 200, "serial_number": "test-envoy"}]}
+            ),
             async_get_export_limit_form=AsyncMock(
                 return_value=parse_form(form(), "123")
             ),
@@ -545,7 +548,11 @@ async def test_sensor_readback_and_availability(runtime):
         assert sensor.native_value == "limited"
         assert sensor.available
         assert sensor.extra_state_attributes["confirmed_watts"] == 5000
-        assert "gateway" not in str(sensor.extra_state_attributes)
+        assert (
+            sensor.extra_state_attributes["gateway_identity"]
+            == runtime.snapshot.gateway_identity
+        )
+        assert runtime.snapshot.gateway not in sensor.extra_state_attributes.values()
 
 
 async def test_options_readonly_labels_and_default_save(runtime, hass):
@@ -628,13 +635,10 @@ async def test_concurrent_requests_submit_only_once(runtime):
 
 
 async def test_actual_store_reload_does_not_replay(runtime):
-    from homeassistant.helpers.storage import Store
-
     coord = runtime.coordinator
-    runtime._store = Store(
-        coord.hass, 1, f"{DOMAIN}.export_limit.{coord.config_entry.entry_id}"
-    )
-    await runtime.async_apply(0, confirm=True)
+    with patch.object(ExportLimitRuntime, "_schedule"):
+        runtime = ExportLimitRuntime(coord)
+        await runtime.async_apply(0, confirm=True)
     restored = ExportLimitRuntime(coord)
     with patch.object(restored, "_schedule"):
         await restored.async_refresh()
@@ -646,6 +650,223 @@ async def test_actual_store_reload_does_not_replay(runtime):
         await restored.async_refresh()
         assert restored.pending is None
     coord.client.async_set_export_limit.assert_awaited_once()
+
+
+async def test_confirmation_retries_failed_store_clear_before_reload(runtime):
+    from homeassistant.helpers.storage import Store
+    from homeassistant.util.file import WriteError
+
+    coord = runtime.coordinator
+    runtime = ExportLimitRuntime(coord)
+    write_data = Store._async_write_data
+    failed_once = False
+
+    async def fail_first_clear(store, data):
+        nonlocal failed_once
+        if data["data"]["pending"] is None and not failed_once:
+            failed_once = True
+            raise WriteError("simulated confirmation write failure")
+        await write_data(store, data)
+
+    with (
+        patch.object(ExportLimitRuntime, "_schedule"),
+        patch.object(Store, "_async_write_data", fail_first_clear),
+    ):
+        await runtime.async_apply(0, confirm=True)
+        coord.client.async_get_export_limit_settings.return_value = payload(
+            free_limit_value=0
+        )
+        with pytest.raises(ServiceValidationError):
+            await runtime.async_refresh()
+        assert runtime.pending["watts"] == 0
+        assert runtime.attributes()["request_status"] == "pending"
+        assert (await runtime._store.async_load())["pending"]["watts"] == 0
+        assert (await runtime.async_refresh())["request_status"] == "confirmed"
+        assert runtime.pending is None
+        coord.client.async_get_export_limit_settings.return_value = payload()
+        restored = ExportLimitRuntime(coord)
+        await restored.async_refresh()
+        assert restored.pending is None
+        assert await restored._store.async_load() == {"pending": None}
+    coord.client.async_set_export_limit.assert_awaited_once()
+
+
+@pytest.mark.parametrize("fail_cleanup", [False, True])
+async def test_unacknowledged_store_write_blocks_dispatch_or_preserves_cleanup(
+    runtime, fail_cleanup
+):
+    from homeassistant.helpers.storage import Store
+    from homeassistant.util.file import WriteError
+
+    coord = runtime.coordinator
+    runtime = ExportLimitRuntime(coord)
+    write_data = Store._async_write_data
+
+    async def fail_disk_write(store, data):
+        if (data["data"]["pending"] is None) == fail_cleanup:
+            raise WriteError("simulated file write failure")
+        await write_data(store, data)
+
+    def deny():
+        raise ServiceValidationError("Planner withdrew authority")
+
+    async def write(fields, watts, slew, *, before_write):
+        before_write()
+
+    coord.client.async_set_export_limit.side_effect = write
+    with patch.object(ExportLimitRuntime, "_schedule"):
+        expected = await runtime.async_prepare()
+        with patch.object(Store, "_async_write_data", new=fail_disk_write):
+            with pytest.raises(
+                ServiceValidationError if fail_cleanup else OSError
+            ) as error:
+                await runtime.async_apply_guarded(
+                    0, expected=expected, before_write=deny
+                )
+        if fail_cleanup:
+            assert str(error.value) == "Planner withdrew authority"
+            assert runtime._unsent_cleanup_key in coord.hass.data
+            assert (await runtime._store.async_load())["pending"]["watts"] == 0
+        else:
+            assert isinstance(error.value, OSError)
+            coord.client.async_set_export_limit.assert_not_awaited()
+        replacement = ExportLimitRuntime(coord)
+        await replacement.async_refresh()
+        assert replacement.pending is None
+        assert runtime._unsent_cleanup_key not in coord.hass.data
+
+
+@pytest.mark.parametrize("session_expired", [False, True])
+@pytest.mark.parametrize("cleanup_timeout", [False, True])
+async def test_rejection_survives_failed_store_cleanup_and_runtime_reload(
+    runtime, session_expired, cleanup_timeout
+):
+    from homeassistant.helpers.storage import Store
+    from homeassistant.util.file import WriteError
+
+    from custom_components.enphase_ev.api_client.errors import ActivationSessionExpired
+
+    coord = runtime.coordinator
+    runtime = ExportLimitRuntime(coord)
+    write_data = Store._async_write_data
+    cleanup_entered, release_cleanup = asyncio.Event(), asyncio.Event()
+
+    async def fail_cleanup(store, data):
+        if data["data"]["pending"] is None:
+            if cleanup_timeout:
+                cleanup_entered.set()
+                await release_cleanup.wait()
+                await write_data(store, data)
+                return
+            raise WriteError("simulated cleanup failure")
+        await write_data(store, data)
+
+    async def reject(fields, watts, slew, *, before_write):
+        before_write()
+        if session_expired:
+            raise ActivationSessionExpired("expired")
+        raise aiohttp.ClientResponseError(None, (), status=422)
+
+    coord.client.async_set_export_limit.side_effect = reject
+    guard = MagicMock()
+    with patch.object(ExportLimitRuntime, "_schedule"):
+        expected = await runtime.async_prepare()
+        with (
+            patch.object(Store, "_async_write_data", new=fail_cleanup),
+            patch.object(type(coord.config_entry), "async_start_reauth"),
+        ):
+
+            async def apply():
+                async with asyncio.timeout(None) as timeout:
+                    deadline.set_result(timeout)
+                    return await runtime.async_apply_guarded(
+                        0, expected=expected, before_write=guard
+                    )
+
+            deadline = asyncio.get_running_loop().create_future()
+            task = asyncio.create_task(apply())
+            if cleanup_timeout:
+                timeout = await deadline
+                await asyncio.wait_for(cleanup_entered.wait(), 1)
+                timeout.reschedule(asyncio.get_running_loop().time())
+                await asyncio.sleep(0)
+                assert task.cancelling()
+                assert not task.done()
+                release_cleanup.set()
+            with pytest.raises(ServiceValidationError) as error:
+                await task
+        assert error.value.translation_key == (
+            "export_limit_session_expired"
+            if session_expired
+            else "export_limit_unavailable"
+        )
+        assert runtime.pending["watts"] == 0
+        assert runtime._unsent_cleanup_key in coord.hass.data
+        saved = await runtime._store.async_load()
+        assert (
+            saved["pending"] is None
+            if cleanup_timeout
+            else saved["pending"]["watts"] == 0
+        )
+        runtime.stop()
+        replacement = ExportLimitRuntime(coord)
+        await replacement.async_refresh()
+        assert replacement.pending is None
+        assert await replacement._store.async_load() == {"pending": None}
+        assert runtime._unsent_cleanup_key not in coord.hass.data
+    guard.assert_called_once_with()
+    coord.client.async_set_export_limit.assert_awaited_once()
+
+
+async def test_cancelled_store_write_drains_before_replacement_loads(runtime):
+    coord = runtime.coordinator
+    runtime = ExportLimitRuntime(coord)
+    write_entered, release_write = asyncio.Event(), asyncio.Event()
+    write_data = runtime._store._async_write_data
+
+    async def wait_before_writing(data):
+        if data["data"]["pending"] is not None:
+            write_entered.set()
+            await release_write.wait()
+        await write_data(data)
+
+    with (
+        patch.object(ExportLimitRuntime, "_schedule"),
+        patch.object(
+            runtime._store, "_async_write_data", side_effect=wait_before_writing
+        ),
+    ):
+        expected = await runtime.async_prepare()
+        guard = MagicMock()
+        command = asyncio.create_task(
+            runtime.async_apply_guarded(0, expected=expected, before_write=guard)
+        )
+        await asyncio.wait_for(write_entered.wait(), 1)
+        command.cancel()
+        runtime.stop()
+        assert runtime.stopped
+        replacement = ExportLimitRuntime(coord)
+        refresh = asyncio.create_task(replacement.async_refresh())
+        await asyncio.sleep(0)
+        assert not command.done() and not refresh.done()
+        release_write.set()
+        with pytest.raises(asyncio.CancelledError):
+            await command
+        await refresh
+        assert replacement.pending is None
+        assert (await replacement._store.async_load()) == {"pending": None}
+    guard.assert_not_called()
+    coord.client.async_set_export_limit.assert_not_awaited()
+
+
+async def test_export_store_acknowledges_save_during_core_shutdown(runtime):
+    from homeassistant.core import CoreState
+
+    coord = runtime.coordinator
+    store = ExportLimitRuntime(coord)._store
+    with patch.object(coord.hass, "state", CoreState.stopping):
+        await store.async_save({"pending": None})
+    assert await store.async_load() == {"pending": None}
 
 
 async def test_options_without_loaded_runtime(hass):
@@ -675,7 +896,7 @@ async def test_storage_failure_prevents_submission_and_can_retry(runtime):
     runtime._store.async_save.side_effect = OSError("disk unavailable")
     with pytest.raises(ServiceValidationError):
         await runtime.async_apply(0, confirm=True)
-    assert runtime.pending is None
+    assert runtime._unsent_cleanup_key in runtime.coordinator.hass.data
     runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
     runtime._store.async_save.side_effect = None
     await runtime.async_apply(0, confirm=True)
@@ -988,9 +1209,10 @@ async def test_export_limit_select_setup(runtime, hass):
     coord._devices_inventory_ready = True
     coord.async_add_listener = MagicMock(return_value=lambda: None)
     added = []
-    with patch.object(
-        select, "_retain_system_profile", return_value=False
-    ), patch.object(select, "_retain_battery_schedule_editor", return_value=False):
+    with (
+        patch.object(select, "_retain_system_profile", return_value=False),
+        patch.object(select, "_retain_battery_schedule_editor", return_value=False),
+    ):
         await select.async_setup_entry(
             hass, coord.config_entry, lambda entities, **kwargs: added.extend(entities)
         )
@@ -1111,7 +1333,7 @@ async def test_readback_window_intervals_and_repairs(runtime, hass):
         "started": started - 601,
         "watts": 0,
         "slew": 6000,
-        "gateway": "gateway",
+        "gateway": "200",
     }
     runtime._publish()
     assert registry.async_get_issue(DOMAIN, issue_id) is not None
@@ -1363,6 +1585,12 @@ async def test_guarded_intent_store_checks_real_write_results(runtime, failure):
                     )
                 assert error.value is denial
                 assert writes == 2
+        elif failure == "cleanup":
+            with pytest.raises(ServiceValidationError) as error:
+                await runtime.async_apply_guarded(
+                    0, expected=snapshot, before_write=before_write
+                )
+            assert error.value is denial
         else:
             with pytest.raises(OSError, match="Could not persist"):
                 await runtime.async_apply_guarded(
@@ -1390,7 +1618,7 @@ async def test_guarded_intent_rejects_store_that_cannot_write(runtime):
             await runtime.async_apply_guarded(0, expected=snapshot, before_write=guard)
     guard.assert_not_called()
     coord.client.async_set_export_limit.assert_not_awaited()
-    assert runtime.pending is None
+    assert runtime._unsent_cleanup_key in coord.hass.data
 
 
 async def test_cancel_before_send_clears_durable_intent(runtime):
@@ -1734,8 +1962,8 @@ def test_gateway_identity_selection_rejects_duplicate_or_foreign_records():
     settings = payload()
     record = settings["data"]["gateway_settings"][0]
     settings["data"]["gateway_settings"].append(dict(record))
-    assert parse_settings(settings, "123", gateway_id="gateway") is None
-    assert parse_settings(payload(), "other-site", gateway_id="gateway") is None
+    assert parse_settings(settings, "123", gateway_id="200") is None
+    assert parse_settings(payload(), "other-site", gateway_id="200") is None
 
 
 async def test_historical_gateway_lookup_failure_invalidates_prior_snapshot(runtime):
@@ -1932,6 +2160,23 @@ async def test_zero_slew_reconciliation_rejects_unsafe_context(runtime, case):
     with pytest.raises(ServiceValidationError):
         await runtime.async_apply(1000, **kwargs)
     runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
+    assert runtime.pending is None
+
+
+async def test_guarded_apply_cannot_identify_gateway_after_successful_prepare(runtime):
+    _zero_slew_form(runtime)
+    client = runtime.coordinator.client
+    client.devices_details.return_value = {"envoys": []}
+    expected = await runtime.async_prepare()
+    guard = MagicMock()
+
+    with pytest.raises(ServiceValidationError) as error:
+        await runtime.async_apply_guarded(0, expected=expected, before_write=guard)
+
+    assert error.value.translation_key == "export_limit_unavailable"
+    assert error.value.__cause__ is None
+    guard.assert_not_called()
+    client.async_set_export_limit.assert_not_awaited()
     assert runtime.pending is None
 
 
@@ -2177,7 +2422,9 @@ async def test_zero_default_enables_and_disables_through_shared_validation(
     client.async_set_export_limit.assert_awaited_once_with(
         refreshed_fields, watts, 6980.0
     )
-    client.devices_details.assert_awaited_once_with("envoy")
+    assert client.devices_details.await_args_list == [call("envoy")] * (
+        2 if caller == "guided" else 1
+    )
     assert runtime.pending["slew"] == 6980.0
     assert runtime.request_status == "pending"
     settings["data"]["gateway_settings"][0]["pel_settings_infos"].update(
@@ -2513,11 +2760,14 @@ async def test_export_limit_transport_guard_runs_after_connection(
     monkeypatch.setattr(export_limit_surface, "BASE_URL", f"http://127.0.0.1:{port}")
     guard = MagicMock()
 
-    async with server, aiohttp.ClientSession(
-        connector=HeldConnector(),
-        cookie_jar=aiohttp.DummyCookieJar(),
-        trace_configs=[export_limit_write_trace()],
-    ) as session:
+    async with (
+        server,
+        aiohttp.ClientSession(
+            connector=HeldConnector(),
+            cookie_jar=aiohttp.DummyCookieJar(),
+            trace_configs=[export_limit_write_trace()],
+        ) as session,
+    ):
         client = EnphaseEVClient(
             session, "123", "token", "cookie", cookie_header_session=session
         )
@@ -2577,8 +2827,9 @@ async def test_intent_cleanup_failure_retains_pending(runtime, confirmed):
         await runtime.async_apply(0, confirm=True)
     else:
         client.async_set_export_limit.side_effect = Unauthorized()
-        with pytest.raises(OSError, match="disk unavailable"):
+        with pytest.raises(ServiceValidationError) as error:
             await runtime.async_apply(0, confirm=True)
+        assert error.value.translation_key == "export_limit_unavailable"
 
     assert runtime.pending["watts"] == 0
     with pytest.raises(ServiceValidationError):
@@ -2626,6 +2877,26 @@ async def test_guarded_connection_failure_retires_unsent_intent(runtime, cancel)
     runtime._store.async_save.assert_awaited_with({"pending": None})
 
 
+async def test_guarded_validation_error_after_send_keeps_pending_intent(runtime):
+    snapshot = await runtime.async_prepare()
+    guard = MagicMock()
+    failure = ServiceValidationError("transport failed after authorization")
+
+    async def write(fields, watts, slew, *, before_write):
+        before_write()
+        raise failure
+
+    runtime.coordinator.client.async_set_export_limit.side_effect = write
+    with pytest.raises(ServiceValidationError) as error:
+        await runtime.async_apply_guarded(0, expected=snapshot, before_write=guard)
+
+    assert error.value is failure
+    guard.assert_called_once_with()
+    assert runtime.pending["watts"] == 0
+    assert runtime.request_status == "unconfirmed"
+    runtime._store.async_save.assert_awaited_once_with({"pending": runtime.pending})
+
+
 @pytest.mark.parametrize("storage_recovers", [False, True])
 async def test_reload_retries_unacknowledged_unsent_cleanup(runtime, storage_recovers):
     snapshot = await runtime.async_prepare()
@@ -2639,10 +2910,293 @@ async def test_reload_retries_unacknowledged_unsent_cleanup(runtime, storage_rec
         raise ServiceValidationError("operator paused")
 
     runtime._store.async_save.side_effect = save
-    with pytest.raises(OSError):
+    with pytest.raises(ServiceValidationError, match="operator paused"):
         await runtime.async_apply_guarded(0, expected=snapshot, before_write=deny)
     assert runtime.pending is not None
     runtime.stop()
     fail_clear = not storage_recovers
     await runtime.async_wait_for_intent_transactions()
     assert (runtime.pending is None) is storage_recovers
+
+
+@pytest.mark.parametrize("caller", ["set", "disable", "guarded"])
+@pytest.mark.parametrize("stale_settings", [False, True])
+async def test_export_write_rejects_a_replacement_gateway(
+    runtime, caller, stale_settings
+):
+    from homeassistant.config_entries import ConfigEntryState
+
+    from custom_components.enphase_ev.services import async_setup_services
+
+    coord = runtime.coordinator
+    entry = coord.config_entry
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
+    async_setup_services(coord.hass)
+    original = await runtime.async_prepare()
+    coord.client.devices_details.return_value["envoys"][0]["id"] = 300
+    if not stale_settings:
+        settings = payload()
+        settings["data"]["gateway_settings"][0]["device_id"] = "300"
+        coord.client.async_get_export_limit_settings.return_value = settings
+    guard = MagicMock()
+    with pytest.raises(ServiceValidationError) as error:
+        if caller == "guarded":
+            await runtime.async_apply_guarded(0, expected=original, before_write=guard)
+        else:
+            await coord.hass.services.async_call(
+                DOMAIN,
+                f"{caller}_export_limit",
+                {
+                    "config_entry_id": entry.entry_id,
+                    "expected_gateway": original.gateway_identity,
+                    **({"limit_watts": 0} if caller == "set" else {}),
+                },
+                blocking=True,
+            )
+    assert error.value.translation_key == (
+        "export_limit_unavailable" if stale_settings else "export_limit_changed"
+    )
+    coord.client.devices_details.assert_awaited_once_with("envoy")
+    assert runtime.attributes()["gateway_identity"] != original.gateway_identity
+    guard.assert_not_called()
+    coord.client.async_set_export_limit.assert_not_awaited()
+    runtime._store.async_save.assert_not_awaited()
+
+
+@pytest.mark.parametrize("status", [422, 302])
+async def test_export_write_classifies_rejection_without_waiting_for_body(
+    runtime, monkeypatch, loopback_sockets, status
+):
+    from aiohttp import web
+    from aiohttp.test_utils import TestServer
+
+    from custom_components.enphase_ev.api_client.export_limit_surface import (
+        export_limit_write_trace,
+    )
+
+    release_body = asyncio.Event()
+    headers_sent = asyncio.Event()
+
+    async def put(request):
+        headers = {"Location": "/login"} if status == 302 else {}
+        response = web.StreamResponse(status=status, headers=headers)
+        await response.prepare(request)
+        headers_sent.set()
+        await release_body.wait()
+        return response
+
+    app = web.Application()
+    app.router.add_put("/site_pel_settings/123", put)
+    async with TestServer(app) as server:
+        monkeypatch.setattr(
+            "custom_components.enphase_ev.api_client.export_limit_surface.BASE_URL",
+            str(server.make_url("/")).rstrip("/"),
+        )
+        async with aiohttp.ClientSession(
+            cookie_jar=aiohttp.DummyCookieJar(),
+            trace_configs=[export_limit_write_trace()],
+        ) as session:
+            client = EnphaseEVClient(
+                session, "123", "token", "cookie", cookie_header_session=session
+            )
+            snapshot = await runtime.async_prepare()
+            runtime.coordinator.client.async_set_export_limit.side_effect = (
+                client.async_set_export_limit
+            )
+            guard = MagicMock()
+            try:
+                with (
+                    patch.object(
+                        type(runtime.coordinator.config_entry), "async_start_reauth"
+                    ),
+                    pytest.raises(ServiceValidationError) as error,
+                ):
+                    async with asyncio.timeout(1):
+                        await runtime.async_apply_guarded(
+                            0, expected=snapshot, before_write=guard
+                        )
+                assert headers_sent.is_set()
+                assert error.value.translation_key == (
+                    "export_limit_session_expired"
+                    if status == 302
+                    else "export_limit_unavailable"
+                )
+                guard.assert_called_once_with()
+                assert runtime.pending is None
+                runtime._store.async_save.assert_awaited_with({"pending": None})
+            finally:
+                release_body.set()
+
+
+@pytest.mark.parametrize("failure", ["timeout", "cancelled", "guard_cleanup"])
+async def test_guarded_unsent_intent_cleanup_preserves_failure(runtime, failure):
+    client = runtime.coordinator.client
+    snapshot = await runtime.async_prepare()
+    denial = ServiceValidationError("Planner withdrew authority")
+    original = {
+        "timeout": TimeoutError(),
+        "cancelled": asyncio.CancelledError(),
+        "guard_cleanup": denial,
+    }[failure]
+    if failure == "guard_cleanup":
+        runtime._store.async_save.side_effect = [
+            None,
+            OSError("disk"),
+            OSError("disk"),
+            None,
+        ]
+
+    def guard():
+        raise denial
+
+    async def write(fields, watts, slew, *, before_write):
+        if failure == "guard_cleanup":
+            before_write()
+        raise original
+
+    client.async_set_export_limit.side_effect = write
+    with pytest.raises(type(original)) as error:
+        await runtime.async_apply_guarded(0, expected=snapshot, before_write=guard)
+    assert error.value is original
+    if failure == "guard_cleanup":
+        assert runtime.pending["watts"] == 0
+        with pytest.raises(ServiceValidationError):
+            await runtime.async_refresh()
+        await runtime.async_refresh()
+    assert runtime.pending is None
+    assert runtime.request_status == "rejected"
+    runtime._store.async_save.assert_awaited_with({"pending": None})
+
+
+@pytest.mark.parametrize(
+    ("reload_during_cleanup", "cleanup_fails"),
+    [(False, True), (True, True), (True, False)],
+)
+async def test_failed_unsent_intent_cleanup_survives_runtime_reload(
+    runtime, reload_during_cleanup, cleanup_fails
+):
+    coord = runtime.coordinator
+    snapshot = await runtime.async_prepare()
+    entered, release = asyncio.Event(), asyncio.Event()
+    saved = None
+    cleanup_attempts = 0
+
+    async def save(data):
+        nonlocal saved, cleanup_attempts
+        if data["pending"] is None:
+            cleanup_attempts += 1
+            if cleanup_attempts == 1:
+                entered.set()
+                await release.wait()
+                if cleanup_fails:
+                    raise OSError("cleanup unavailable")
+        saved = data
+
+    async def load():
+        return saved
+
+    def deny():
+        raise ServiceValidationError("Planner withdrew authority")
+
+    async def write(fields, watts, slew, *, before_write):
+        before_write()
+
+    runtime._store.async_save.side_effect = save
+    runtime._store.async_load.side_effect = load
+    coord.client.async_set_export_limit.side_effect = write
+    rejected = asyncio.create_task(
+        runtime.async_apply_guarded(0, expected=snapshot, before_write=deny)
+    )
+    await asyncio.wait_for(entered.wait(), 1)
+    assert saved["pending"]["watts"] == 0
+    runtime.stop()
+    restored = ExportLimitRuntime(coord)
+    restored._store = runtime._store
+    with patch.object(restored, "_schedule"):
+        if reload_during_cleanup:
+            refresh = asyncio.create_task(restored.async_refresh())
+            await asyncio.sleep(0)
+            assert not refresh.done()
+        release.set()
+        with pytest.raises(ServiceValidationError, match="Planner withdrew authority"):
+            await rejected
+        if reload_during_cleanup:
+            await refresh
+        else:
+            await restored.async_refresh()
+        assert saved == {"pending": None}
+        assert restored.pending is None
+        assert restored.request_status == ("rejected" if cleanup_fails else "idle")
+        assert cleanup_attempts == 1 + cleanup_fails
+        assert restored._unsent_cleanup_key not in coord.hass.data
+        coord.client.async_set_export_limit.assert_awaited_once()
+
+
+async def test_config_entry_reload_waits_for_retiring_guarded_write(runtime, hass):
+    from custom_components.enphase_ev import async_setup_entry, async_unload_entry
+
+    coord = runtime.coordinator
+    entry = coord.config_entry
+    snapshot = await runtime.async_prepare()
+    write_waiting, release_write, setup_waiting = (asyncio.Event() for _ in range(3))
+    saved = None
+
+    async def save(data):
+        nonlocal saved
+        saved = data
+
+    async def write(fields, watts, slew, *, before_write):
+        write_waiting.set()
+        await release_write.wait()
+        before_write()
+
+    async def cleanup():
+        runtime.stop()
+
+    runtime._store.async_save.side_effect = save
+    coord.client.async_set_export_limit.side_effect = write
+    coord.async_cleanup_runtime_state = cleanup
+    guard = MagicMock()
+
+    async def setup_replacement(hass, entry, snapshot):
+        replacement = ExportLimitRuntime(coord)
+
+        async def load():
+            return saved
+
+        replacement._store = SimpleNamespace(async_load=AsyncMock(side_effect=load))
+        coord.export_limit_runtime = replacement
+        entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+        setup_waiting.set()
+        with patch.object(replacement, "_schedule"):
+            await replacement.async_start()
+        return True
+
+    old_write = asyncio.create_task(
+        runtime.async_apply_guarded(0, expected=snapshot, before_write=guard)
+    )
+    await asyncio.wait_for(write_waiting.wait(), 1)
+    assert saved["pending"]["watts"] == 0
+    with patch(
+        "custom_components.enphase_ev._async_unload_platforms_safe", return_value=True
+    ):
+        assert await async_unload_entry(hass, entry)
+    with patch(
+        "custom_components.enphase_ev._async_setup_entry_impl",
+        side_effect=setup_replacement,
+    ):
+        reloading = asyncio.create_task(async_setup_entry(hass, entry))
+        await asyncio.wait_for(setup_waiting.wait(), 1)
+        replacement = coord.export_limit_runtime
+        assert not reloading.done()
+        replacement._store.async_load.assert_not_awaited()
+        release_write.set()
+        with pytest.raises(ServiceValidationError) as error:
+            await old_write
+        assert error.value.translation_key == "export_limit_disabled"
+        assert await reloading
+
+    guard.assert_not_called()
+    assert saved == {"pending": None}
+    assert replacement.pending is None
+    assert replacement.request_status == "idle"

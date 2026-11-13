@@ -53,10 +53,9 @@ options are applied to the existing coordinator and published without unloading
 entities. Changes that alter platform topology still reload the config entry, but
 `reload_snapshot.py` transfers detached discovery metadata and charger data so
 platforms can recreate entities promptly. Setup constructs a new coordinator and
-private session; the previous lifecycle fully cancels its tasks and shuts down.
-No session, manager, lock, or task crosses the reload. New option and device
-selections are applied before restored data is published, followed by a background
-refresh. Cold setup requires an authoritative first refresh except for isolated
+private session. The previous lifecycle cancels its tasks and shuts down.
+New option and device selections are applied before restored data is published,
+followed by a background refresh. Cold setup requires an authoritative first refresh except for isolated
 charger-status server failures.
 Battery status and inverter inventory readiness also participate in topology
 comparison. Restored discovery metadata preserves device identities without
@@ -301,6 +300,14 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   A failed cleanup keeps the pending record blocked until a later refresh can
   clear it durably. Reload drains active Export Limit transactions before
   another runtime opens the same intent file.
+  Overlapping runtimes share a per-entry lock and retry failed rejection cleanup.
+  Definitive rejection statuses and login redirects are handled from response
+  headers, so a stalled body cannot hide the rejection.
+  The feedback sensor and installer snapshot expose the same opaque
+  `gateway_identity`. Automatic controllers can pass it as `expected_gateway`
+  to the set and disable services. Identity-bound writes check the active
+  gateway inventory against fresh installer settings, even when the settings
+  endpoint returns a single row.
 
 - `battery_runtime.py` handles BatteryConfig controls, profile state, schedules, pending writes, and battery diagnostics payloads.
   Each accepted profile or reserve write invalidates profile, settings, and live

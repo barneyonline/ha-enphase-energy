@@ -926,13 +926,27 @@ def async_setup_services(
     async def _svc_set_export_limit(call: ServiceCall) -> dict[str, object]:
         coord = await _resolve_single_site_coordinator(call)
         return await cast(ExportLimitRuntime, coord.export_limit_runtime).async_apply(
-            call.data["limit_watts"], confirm=True, slew_rate=call.data.get("slew_rate")
+            call.data["limit_watts"],
+            confirm=True,
+            slew_rate=call.data.get("slew_rate"),
+            **(
+                {"expected_gateway": call.data["expected_gateway"]}
+                if "expected_gateway" in call.data
+                else {}
+            ),
         )
 
     async def _svc_disable_export_limit(call: ServiceCall) -> dict[str, object]:
         coord = await _resolve_single_site_coordinator(call)
         return await cast(ExportLimitRuntime, coord.export_limit_runtime).async_apply(
-            None, confirm=True, slew_rate=call.data.get("slew_rate")
+            None,
+            confirm=True,
+            slew_rate=call.data.get("slew_rate"),
+            **(
+                {"expected_gateway": call.data["expected_gateway"]}
+                if "expected_gateway" in call.data
+                else {}
+            ),
         )
 
     async def _svc_refresh_export_limit(call: ServiceCall) -> dict[str, object]:
@@ -1454,12 +1468,16 @@ def async_setup_services(
             {
                 vol.Required("limit_watts"): validate_watts,
                 vol.Optional("slew_rate"): validate_slew_rate,
+                vol.Optional("expected_gateway"): vol.Match(r"^[0-9a-f]{64}$"),
             },
         ),
         (
             "disable_export_limit",
             _svc_disable_export_limit,
-            {vol.Optional("slew_rate"): validate_slew_rate},
+            {
+                vol.Optional("slew_rate"): validate_slew_rate,
+                vol.Optional("expected_gateway"): vol.Match(r"^[0-9a-f]{64}$"),
+            },
         ),
         ("refresh_export_limit", _svc_refresh_export_limit, {}),
     ):

@@ -285,6 +285,7 @@ async def write_settings(
             allow_redirects=False,
             allow_reauth=False,
             allow_replay=False,
+            reject_statuses_from_headers=(400, 403, 422),
             use_cookie_header_only=True,
             mark_payload_success=False,
             **request_options,
