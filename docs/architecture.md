@@ -314,6 +314,13 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   after form retrieval and intent persistence. The provider's write targets the
   site, so a gateway replacement after the final client check can still race
   the write.
+  Planner's operator Resume can call `async_retire_replaced_intent` on the
+  loaded runtime. Under the same lock, Enphase re-reads settings and inventory,
+  checks the expected replacement and the original intent's gateway when
+  supplied, and clears only an expired intent belonging to a different gateway.
+  It publishes the outcome as unconfirmed and issues no write. The identity-bound
+  set and disable services report `export_limit_pending`, `export_limit_mismatch`
+  and `export_limit_changed` only before sending a write.
 
 - `battery_runtime.py` handles BatteryConfig controls, profile state, schedules, pending writes, and battery diagnostics payloads.
   Each accepted profile or reserve write invalidates profile, settings, and live

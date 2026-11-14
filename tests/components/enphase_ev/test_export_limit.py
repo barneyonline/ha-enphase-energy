@@ -3084,6 +3084,46 @@ async def test_failed_final_inventory_read_retires_unsent_intent(runtime):
     client.async_set_export_limit.assert_not_awaited()
 
 
+@pytest.mark.parametrize("service", ["set", "disable"])
+@pytest.mark.parametrize("reason", ["export_limit_pending", "export_limit_mismatch"])
+async def test_identity_bound_service_preparation_rejects_before_saving_or_sending(
+    runtime, service, reason
+):
+    from homeassistant.config_entries import ConfigEntryState
+
+    from custom_components.enphase_ev.services import async_setup_services
+
+    coord = runtime.coordinator
+    entry = coord.config_entry
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
+    async_setup_services(coord.hass)
+    original = await runtime.async_prepare()
+    if reason == "export_limit_pending":
+        await runtime.async_apply(3000, confirm=True)
+    else:
+        coord.client.async_get_export_limit_form.return_value = parse_form(
+            form().replace('value="5000"', 'value="9000"'), "123"
+        )
+    runtime._store.async_save.reset_mock()
+    coord.client.async_set_export_limit.reset_mock()
+
+    with pytest.raises(ServiceValidationError) as error:
+        await coord.hass.services.async_call(
+            DOMAIN,
+            f"{service}_export_limit",
+            {
+                "config_entry_id": entry.entry_id,
+                "expected_gateway": original.gateway_identity,
+                **({"limit_watts": 0} if service == "set" else {}),
+            },
+            blocking=True,
+        )
+    assert error.value.translation_domain == DOMAIN
+    assert error.value.translation_key == reason
+    runtime._store.async_save.assert_not_awaited()
+    coord.client.async_set_export_limit.assert_not_awaited()
+
+
 @pytest.mark.parametrize("prepare", [False, True])
 @pytest.mark.parametrize("pending", [False, True])
 async def test_stale_single_settings_row_cannot_confirm_replaced_gateway(
@@ -3125,6 +3165,81 @@ async def test_stale_single_settings_row_cannot_confirm_replaced_gateway(
     await runtime.async_refresh()
     assert runtime.attributes()["gateway_identity"] != original.gateway_identity
     assert (runtime.pending is not None) is pending
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "replacement",
+        "legacy",
+        "settled",
+        "too_early",
+        "same_gateway",
+        "wrong_original",
+        "wrong_replacement",
+        "stale_settings",
+        "unsupported",
+        "save_failed",
+    ],
+)
+async def test_operator_can_retire_only_expired_intent_for_a_verified_replaced_gateway(
+    runtime, case
+):
+    from custom_components.enphase_ev.export_limit_runtime import OBSERVATION_SECONDS
+
+    client = runtime.coordinator.client
+    original = await runtime.async_prepare()
+    await runtime.async_apply(
+        0, confirm=True, expected_gateway=original.gateway_identity
+    )
+    assert runtime.pending is not None
+    if case == "settled":
+        runtime.pending = None
+    elif case != "too_early":
+        runtime.pending["started"] -= OBSERVATION_SECONDS + 1
+    pending = runtime.pending
+    client.async_set_export_limit.reset_mock()
+    runtime._store.async_save.reset_mock()
+    if case != "same_gateway":
+        client.devices_details.return_value["envoys"][0]["id"] = 300
+        if case != "stale_settings":
+            settings = payload(enable_dynamic_limiting=case == "unsupported")
+            settings["data"]["gateway_settings"][0]["device_id"] = "300"
+            client.async_get_export_limit_settings.return_value = settings
+    from hashlib import sha256
+
+    replacement = sha256(b"300").hexdigest()
+    if case == "same_gateway":
+        replacement = original.gateway_identity
+    elif case == "wrong_replacement":
+        replacement = "b" * 64
+    expected_original = (
+        None
+        if case in {"legacy", "same_gateway"}
+        else "a" * 64 if case == "wrong_original" else original.gateway_identity
+    )
+    if case == "save_failed":
+        runtime._store.async_save.side_effect = OSError
+        with pytest.raises(ServiceValidationError) as error:
+            await runtime.async_retire_replaced_intent(
+                replacement, original_gateway=expected_original
+            )
+        assert error.value.translation_key == "export_limit_unavailable"
+        assert runtime.pending is pending
+        runtime._store.async_save.side_effect = None
+        runtime._store.async_save.reset_mock()
+    retired = await runtime.async_retire_replaced_intent(
+        replacement, original_gateway=expected_original
+    )
+    assert retired is (case in {"replacement", "legacy", "settled", "save_failed"})
+    assert runtime.pending is (None if retired else pending)
+    client.async_set_export_limit.assert_not_awaited()
+    if retired and pending is not None:
+        runtime._store.async_save.assert_awaited_once_with({"pending": None})
+        assert runtime.attributes()["request_status"] == "unconfirmed"
+        assert runtime.attributes()["gateway_identity"] == replacement
+    else:
+        runtime._store.async_save.assert_not_awaited()
 
 
 @pytest.mark.parametrize("status", [422, 302])

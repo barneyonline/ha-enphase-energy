@@ -485,47 +485,82 @@ class ExportLimitRuntime:
 
     async def async_refresh(self) -> dict[str, object]:
         async with self._lock:
-            self._require_enabled()
-            await self._load()
+            await self._refresh_locked()
+            return self.attributes()
+
+    async def _refresh_locked(self) -> None:
+        """Refresh settings with the entry's intent lock held."""
+        self._require_enabled()
+        await self._load()
+        if (
+            self.pending
+            and time.time() - self.pending["started"] >= OBSERVATION_SECONDS
+        ):
+            self.request_status = "unconfirmed"
+            self._publish()
+        try:
+            await self.coordinator.client.async_prepare_activation_auth()
+            await self.coordinator.client.async_get_activation_device_list()
+            await self._read()
+        except Exception as err:
+            session_expired = isinstance(
+                err,
+                (
+                    ActivationSessionExpired,
+                    EnphaseLoginWallUnauthorized,
+                    ConfigEntryAuthFailed,
+                ),
+            )
+            if session_expired:
+                request_session_reauthentication(self.coordinator)
+            self.snapshot = None
+            self._publish()
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key=(
+                    "export_limit_session_expired"
+                    if session_expired
+                    else "export_limit_unavailable"
+                ),
+            ) from err
+        self._schedule()
+
+    async def async_retire_replaced_intent(
+        self, replacement_gateway: str, *, original_gateway: str | None
+    ) -> bool:
+        """Acknowledge an expired intent for a gateway verified to be replaced."""
+        async with self._lock:
+            await self._refresh_locked()
+            snapshot = self.snapshot
             if (
-                self.pending
-                and time.time() - self.pending["started"] >= OBSERVATION_SECONDS
+                snapshot is None
+                or not snapshot.supported
+                or snapshot.gateway_identity != replacement_gateway
+                or replacement_gateway == original_gateway
             ):
-                self.request_status = "unconfirmed"
-                self._publish()
+                return False
+            pending = self.pending
+            if pending is None:
+                return True
+            if (
+                snapshot.gateway == pending["gateway"]
+                or (
+                    original_gateway is not None
+                    and sha256(pending["gateway"].encode()).hexdigest()
+                    != original_gateway
+                )
+                or time.time() - pending["started"] < OBSERVATION_SECONDS
+            ):
+                return False
+            self._require_enabled()
             try:
-                await self.coordinator.client.async_prepare_activation_auth()
-                await self.coordinator.client.async_get_activation_device_list()
-                await self._read()
-            except Exception as err:
-                if isinstance(
-                    err,
-                    (
-                        ActivationSessionExpired,
-                        EnphaseLoginWallUnauthorized,
-                        ConfigEntryAuthFailed,
-                    ),
-                ):
-                    request_session_reauthentication(self.coordinator)
-                self.snapshot = None
-                self._publish()
+                await self._clear_intent("unconfirmed")
+            except OSError as err:
                 raise ServiceValidationError(
                     translation_domain=DOMAIN,
-                    translation_key=(
-                        "export_limit_session_expired"
-                        if isinstance(
-                            err,
-                            (
-                                ActivationSessionExpired,
-                                EnphaseLoginWallUnauthorized,
-                                ConfigEntryAuthFailed,
-                            ),
-                        )
-                        else "export_limit_unavailable"
-                    ),
+                    translation_key="export_limit_unavailable",
                 ) from err
-            self._schedule()
-            return self.attributes()
+            return True
 
     async def async_prepare(self) -> ExportLimitSnapshot:
         """Check installer and PEL form access without changing configuration."""

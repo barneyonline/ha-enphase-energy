@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - Recognize definitive Export Limit write rejections even when the installer response body stalls.
 - Let automatic controllers bind Export Limit commands to the original gateway and reject a replacement observed before submission.
 - Verify the active gateway inventory before showing Export Limit settings or confirming requests, including when installer settings return one gateway. Retry failed confirmation saves on a later poll.
+- Let Energy Planner acknowledge an expired Export Limit intent after Enphase verifies that the original gateway was replaced.
 
 ### 🔧 Improvements
 
