@@ -951,6 +951,8 @@ def test_battery_runtime_set_pending_records_current_time(monkeypatch) -> None:
         _normalize_battery_sub_type=lambda value: value,
         _sync_battery_profile_pending_issue=lambda: None,
         publish_runtime_state_update=Mock(),
+        runtime_active=True,
+        config_entry=None,
     )
     runtime = BatteryRuntime(coordinator)
 
@@ -2245,7 +2247,9 @@ async def test_battery_runtime_async_set_grid_connection_uses_runtime_grid_mode(
     runtime.async_set_grid_mode.assert_awaited_once_with("on_grid", "1234")
 
 
-def test_profile_readback_window_uses_configured_intervals(coordinator_factory):
+def test_profile_readback_window_uses_configured_intervals(
+    coordinator_factory, config_entry, hass
+):
     from datetime import datetime, timedelta, timezone
     from custom_components.enphase_ev.const import (
         OPT_FAST_POLL_INTERVAL,
@@ -2253,9 +2257,10 @@ def test_profile_readback_window_uses_configured_intervals(coordinator_factory):
     )
 
     coord = coordinator_factory()
-    coord.config_entry = SimpleNamespace(
-        options={OPT_FAST_POLL_INTERVAL: 45, OPT_SLOW_POLL_INTERVAL: 120}
+    hass.config_entries.async_update_entry(
+        config_entry, options={OPT_FAST_POLL_INTERVAL: 45, OPT_SLOW_POLL_INTERVAL: 120}
     )
+    coord.config_entry = config_entry
     runtime = coord.battery_runtime
     assert not runtime.profile_readback_fast
     runtime.set_battery_pending(profile="self-consumption", reserve=20, sub_type=None)

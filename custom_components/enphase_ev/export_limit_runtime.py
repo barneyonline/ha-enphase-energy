@@ -31,6 +31,7 @@ from .const import (
     OPT_SLOW_POLL_INTERVAL,
 )
 from .runtime_helpers import normalize_poll_intervals
+from .repair_issues import entry_issue_kwargs
 
 OBSERVATION_SECONDS = BATTERY_PROFILE_PENDING_TIMEOUT_S
 
@@ -251,6 +252,10 @@ class ExportLimitRuntime:
         self.coordinator.async_update_listeners()
 
     def _sync_pending_issue(self) -> None:
+        # Reloads must not turn an ignored, still-unconfirmed request into a new
+        # issue. Wait for durable intent to load before checking it again.
+        if self.enabled and (self._stopped or not self._loaded):
+            return
         entry = self.coordinator.config_entry
         issue_id = f"export_limit_pending_{getattr(entry, 'entry_id', self.coordinator.site_id)}"
         if (
@@ -263,6 +268,7 @@ class ExportLimitRuntime:
                 self.coordinator.hass,
                 DOMAIN,
                 issue_id,
+                **entry_issue_kwargs(entry),
                 is_fixable=False,
                 severity=ir.IssueSeverity.WARNING,
                 translation_key="export_limit_pending",

@@ -70,7 +70,7 @@
 - Keep commits focused and use concise imperative summaries.
 - Repository contributor docs use branch names like `feature/...`, `bugfix/...`, or `docs/...`.
 - Before opening or updating a PR, run the relevant quality gates above and fill out `.github/pull_request_template.md`.
-- Include exact commands run in the PR testing section and call out coverage for touched modules.
+- Include exact commands run in the PR Validation section or linked evidence and call out coverage for touched modules.
 - Include diagnostics when changing repairs or diagnostics output.
 
 ### PR Creation Workflow (Required)
@@ -108,7 +108,7 @@ Follow this exact sequence to create a PR correctly:
    - `gh pr list --head <branch-name> --state open --json number,url,title,headRefName,baseRefName`
 6. Create or update the PR with `gh` using a body file (do not inline Markdown with backticks in shell):
    - `cat > /tmp/pr_body.md <<'EOF'`
-   - Include `## Summary` and `## Testing` sections with exact commands run
+   - Include `## Summary`, `## Validation`, and `## Risks and rollback`; summarize results and link exact commands and evidence
    - `EOF`
    - If no PR exists: `gh pr create --base main --head <branch-name> --title "<PR title>" --body-file /tmp/pr_body.md`
    - If a PR exists: `gh pr edit <number> --title "<updated title>" --body-file /tmp/pr_body.md`

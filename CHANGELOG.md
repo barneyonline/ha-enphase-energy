@@ -20,7 +20,12 @@ All notable changes to this project will be documented in this file.
 
 ### 🔧 Improvements
 
-- None
+- Prepare entry-owned Repairs and scoped alarm refreshes for Home Assistant
+  2026.11, keeping ignored battery and export-limit repairs through reloads and
+  removing legacy repairs when their entry is removed. Keep 2026.10 compatibility
+  while the minimum-version bump remains a separate owner action.
+- Preserve site-sensor freshness timers, source listeners and restored history
+  during Home Assistant 2026.11 entity-ID renames.
 
 ### 🔄 Other changes
 

@@ -3507,6 +3507,11 @@ class EnphaseSiteServiceStatusSensor(_SiteBaseEntity):
 
 
 class EnphaseSiteBackoffEndsSensor(_SiteBaseEntity):
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Keep the retry timer, which writes using the current entity ID."""
+        super().async_entity_id_changed(old_entity_id)
+
     _attr_translation_key = "cloud_backoff_ends"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_device_class = SensorDeviceClass.TIMESTAMP

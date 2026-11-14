@@ -1413,7 +1413,7 @@ async def test_cancel_during_send_retains_uncertain_intent(runtime):
     assert runtime._store.async_save.call_args.args[0]["pending"] is not None
 
 
-async def test_unload_clears_pending_repair_and_resume_restores(runtime, hass):
+async def test_unload_preserves_ignored_pending_repair_and_resume_checks(runtime, hass):
     from homeassistant.helpers import issue_registry as ir
 
     await runtime.async_apply(0, confirm=True)
@@ -1422,11 +1422,18 @@ async def test_unload_clears_pending_repair_and_resume_restores(runtime, hass):
     issue_id = f"export_limit_pending_{runtime.coordinator.config_entry.entry_id}"
     registry = ir.async_get(hass)
     assert registry.async_get_issue(DOMAIN, issue_id) is not None
+    ir.async_ignore_issue(hass, DOMAIN, issue_id, True)
+    ignored = registry.async_get_issue(DOMAIN, issue_id).dismissed_version
     runtime.stop()
-    assert registry.async_get_issue(DOMAIN, issue_id) is None
+    assert registry.async_get_issue(DOMAIN, issue_id).dismissed_version == ignored
     assert runtime.pending is not None
     await runtime.async_start()
-    assert registry.async_get_issue(DOMAIN, issue_id) is not None
+    assert registry.async_get_issue(DOMAIN, issue_id).dismissed_version == ignored
+    runtime.coordinator.client.async_get_export_limit_settings.return_value = payload(
+        free_limit_value=0
+    )
+    await runtime.async_refresh()
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
 
 
 @pytest.mark.parametrize("protect", [False, True])
