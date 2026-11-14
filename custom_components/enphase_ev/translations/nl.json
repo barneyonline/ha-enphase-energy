@@ -3614,6 +3614,10 @@
           "name": "Apparaten",
           "description": "Apparaten"
         },
+        "expected_gateway": {
+          "name": "Verwachte gateway-identiteit",
+          "description": "Optioneel. Gebruik gateway_identity van de sensor voor de terugleverlimiet om een overeenkomende gateway te vereisen."
+        },
         "slew_rate": {
           "name": "Veranderingssnelheid (W/sec)",
           "description": "Optioneel. Indien weggelaten wordt de huidige gatewaywaarde gebruikt."
@@ -3635,6 +3639,10 @@
         "device_id": {
           "name": "Apparaten",
           "description": "Apparaten"
+        },
+        "expected_gateway": {
+          "name": "Verwachte gateway-identiteit",
+          "description": "Optioneel. Gebruik gateway_identity van de sensor voor de terugleverlimiet om een overeenkomende gateway te vereisen."
         },
         "slew_rate": {
           "name": "Veranderingssnelheid (W/sec)",

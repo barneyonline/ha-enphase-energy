@@ -3614,6 +3614,10 @@
           "name": "Enheder",
           "description": "Enheder"
         },
+        "expected_gateway": {
+          "name": "Forventet gatewayidentitet",
+          "description": "Valgfrit. Brug gateway_identity fra sensoren for eksportgrænse til at kræve en matchende gateway."
+        },
         "slew_rate": {
           "name": "Ændringshastighed (W/sec)",
           "description": "Valgfrit. Hvis udeladt bruges gatewayens aktuelle værdi."
@@ -3635,6 +3639,10 @@
         "device_id": {
           "name": "Enheder",
           "description": "Enheder"
+        },
+        "expected_gateway": {
+          "name": "Forventet gatewayidentitet",
+          "description": "Valgfrit. Brug gateway_identity fra sensoren for eksportgrænse til at kræve en matchende gateway."
         },
         "slew_rate": {
           "name": "Ændringshastighed (W/sec)",

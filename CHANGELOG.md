@@ -17,6 +17,10 @@ All notable changes to this project will be documented in this file.
 - Prevent config-entry reloads from hanging when schedule startup overlaps an options or setup-time data update.
 - Update Charger Status, Electrical Phase, and Storm Guard as soon as their cloud data is loaded after a Home Assistant restart.
 - Show the reported EV charger Gateway connectivity state even when the charger report is older than 15 minutes.
+- Recognize definitive Export Limit write rejections even when the installer response body stalls.
+- Let automatic controllers bind Export Limit commands to the original gateway and reject a replacement observed before submission.
+- Verify the active gateway inventory before showing Export Limit settings or confirming requests, including when installer settings return one gateway. Retry failed confirmation saves on a later poll.
+- Let Energy Planner acknowledge an expired Export Limit intent after Enphase verifies that the original gateway was replaced.
 
 ### 🔧 Improvements
 

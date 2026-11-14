@@ -6,9 +6,11 @@ import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from hashlib import sha256
 import math
 import time
 from typing import Any, NoReturn, cast
+from weakref import WeakValueDictionary
 
 import aiohttp
 from homeassistant.exceptions import ConfigEntryAuthFailed, ServiceValidationError
@@ -30,9 +32,11 @@ from .const import (
     OPT_FAST_POLL_INTERVAL,
     OPT_SLOW_POLL_INTERVAL,
 )
+from .device_types import member_is_retired
 from .runtime_helpers import normalize_poll_intervals
 
 OBSERVATION_SECONDS = BATTERY_PROFILE_PENDING_TIMEOUT_S
+_ENTRY_LOCKS = f"{DOMAIN}.export_limit.locks"
 
 
 def fail(key: str) -> NoReturn:
@@ -75,6 +79,11 @@ class ExportLimitSnapshot:
     reference: float
     watts: float
     slew: float
+
+    @property
+    def gateway_identity(self) -> str:
+        """Identify the gateway without exposing its upstream identifier."""
+        return sha256(self.gateway.encode()).hexdigest()
 
     @property
     def supported(self) -> bool:
@@ -212,6 +221,8 @@ class ExportLimitIntentStore(Store[dict[str, Any]]):  # type: ignore[misc]
 class ExportLimitRuntime:
     """Own all write gates and one durable pending request per config entry."""
 
+    verifies_export_limit_gateway = True
+
     def __init__(self, coordinator: Any) -> None:
         self.coordinator = coordinator
         self.snapshot: ExportLimitSnapshot | None = None
@@ -219,16 +230,23 @@ class ExportLimitRuntime:
         self.pending: dict[str, Any] | None = None
         self.request_status = "idle"
         self._loaded = False
-        self._lock = asyncio.Lock()
         self._wake = asyncio.Event()
         self._task: asyncio.Task[None] | None = None
         self._stopped = False
-        self._unsent_intent = False
         entry = coordinator.config_entry
+        storage_key = (
+            f"{DOMAIN}.export_limit.{getattr(entry, 'entry_id', coordinator.site_id)}"
+        )
+        # A retiring runtime can still hold a durable reservation while a new
+        # runtime starts. Serialize Store access across both lifetimes.
+        locks: WeakValueDictionary[str, asyncio.Lock] = (
+            coordinator.hass.data.setdefault(_ENTRY_LOCKS, WeakValueDictionary())
+        )
+        self._lock = locks.setdefault(storage_key, asyncio.Lock())
+        # The entry may reload while its old Store still contains unsent intent.
+        self._unsent_cleanup_key = f"{storage_key}.unsent_cleanup"
         self._store: Store[dict[str, Any]] = ExportLimitIntentStore(
-            coordinator.hass,
-            1,
-            f"{DOMAIN}.export_limit.{getattr(entry, "entry_id", coordinator.site_id)}",
+            coordinator.hass, 1, storage_key
         )
 
     @property
@@ -237,6 +255,11 @@ class ExportLimitRuntime:
         return bool(
             entry and entry.options.get(OPT_EXPORT_LIMIT_CONTROLS_ENABLED, False)
         )
+
+    @property
+    def stopped(self) -> bool:
+        """Distinguish a retiring runtime from a disabled control selector."""
+        return self._stopped
 
     def _require_enabled(self) -> None:
         if (
@@ -326,9 +349,19 @@ class ExportLimitRuntime:
             "slew_rate": snapshot.slew if snapshot else None,
             "requested_slew_rate": self.pending.get("slew") if self.pending else None,
             "last_successful_readback": self.last_readback,
+            "gateway_identity": snapshot.gateway_identity if snapshot else None,
+            "gateway_identity_verified": snapshot is not None,
         }
 
     async def _load(self) -> None:
+        if self._unsent_cleanup_key in self.coordinator.hass.data:
+            try:
+                await self._clear_unsent_intent()
+            except Exception as err:
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="export_limit_unavailable",
+                ) from err
         if self._loaded:
             return
         saved = await self._store.async_load()
@@ -360,7 +393,7 @@ class ExportLimitRuntime:
 
     async def _clear_unsent_intent(self) -> None:
         """Keep rejected intent blocked until its removal is acknowledged."""
-        self._unsent_intent = True
+        self.coordinator.hass.data[self._unsent_cleanup_key] = True
         try:
             await self._clear_intent("rejected")
         except BaseException:
@@ -371,14 +404,42 @@ class ExportLimitRuntime:
     async def _clear_intent(self, status: str) -> None:
         await self._store.async_save({"pending": None})
         self.pending = None
-        self._unsent_intent = False
+        self.coordinator.hass.data.pop(self._unsent_cleanup_key, None)
         self.request_status = status
         self._publish()
 
+    async def _retire_rejected_intent(self) -> None:
+        """Preserve the provider result while retaining failed cleanup for retry."""
+        try:
+            await self._clear_unsent_intent()
+        except (OSError, asyncio.CancelledError):
+            # The shared marker and any pending intent remain until the Store
+            # acknowledges the clear, including when a replacement starts.
+            pass
+
+    async def _reject_write(self, translation_key: str) -> NoReturn:
+        await self._retire_rejected_intent()
+        fail(translation_key)
+
+    async def _active_gateway_id(self) -> str | None:
+        details = await self.coordinator.client.devices_details("envoy")
+        envoys = details.get("envoys") if isinstance(details, dict) else None
+        if isinstance(envoys, list) and len(envoys) == 1:
+            envoy = envoys[0]
+            if (
+                isinstance(envoy, dict)
+                and not member_is_retired(envoy)
+                and isinstance(envoy.get("serial_number"), str)
+                and envoy["serial_number"].strip()
+                and type(envoy.get("id")) in (int, str)
+                and str(envoy["id"]).isdigit()
+                and int(envoy["id"]) > 0
+            ):
+                return str(envoy["id"])
+        return None
+
     async def _read(self, *, require_gateway_identity: bool = False) -> None:
         self._require_enabled()
-        if self._unsent_intent:
-            await self._clear_unsent_intent()
         try:
             payload = await self.coordinator.client.async_get_export_limit_settings()
         except Exception:
@@ -386,39 +447,20 @@ class ExportLimitRuntime:
             self._publish()
             raise
         self.snapshot = None
-        gateway_id = None
-        records = (
-            (payload.get("data") or {}).get("gateway_settings")
-            if isinstance(payload, dict) and isinstance(payload.get("data"), dict)
-            else None
-        )
-        if require_gateway_identity or (isinstance(records, list) and len(records) > 1):
-            # Settings retain replaced gateways. Resolve the active identity from
-            # the current dashboard inventory, never from ordering or PEL values.
-            try:
-                details = await self.coordinator.client.devices_details("envoy")
-            except Exception:
-                self._publish()
-                raise
-            envoys = details.get("envoys") if isinstance(details, dict) else None
-            if isinstance(envoys, list) and len(envoys) == 1:
-                envoy = envoys[0]
-                if (
-                    isinstance(envoy, dict)
-                    and envoy.get("status") != "retired"
-                    and isinstance(envoy.get("serial_number"), str)
-                    and envoy["serial_number"].strip()
-                    and type(envoy.get("id")) in (int, str)
-                    and str(envoy["id"]).isdigit()
-                    and int(envoy["id"]) > 0
-                ):
-                    gateway_id = str(envoy["id"])
-            if require_gateway_identity and gateway_id is None:
-                self._publish()
-                fail("export_limit_unavailable")
-        self.snapshot = parse_settings(
-            payload, str(self.coordinator.site_id), gateway_id=gateway_id
-        )
+        # Even a single settings row can belong to a replaced gateway. Polls
+        # and installer preparation can settle requests without a write.
+        try:
+            gateway_id = await self._active_gateway_id()
+        except Exception:
+            self._publish()
+            raise
+        if gateway_id is not None:
+            self.snapshot = parse_settings(
+                payload, str(self.coordinator.site_id), gateway_id=gateway_id
+            )
+        elif require_gateway_identity:
+            self._publish()
+            fail("export_limit_unavailable")
         if self.snapshot is not None:
             self.last_readback = time.time()
         snapshot, pending = self.snapshot, self.pending
@@ -443,47 +485,82 @@ class ExportLimitRuntime:
 
     async def async_refresh(self) -> dict[str, object]:
         async with self._lock:
-            self._require_enabled()
-            await self._load()
+            await self._refresh_locked()
+            return self.attributes()
+
+    async def _refresh_locked(self) -> None:
+        """Refresh settings with the entry's intent lock held."""
+        self._require_enabled()
+        await self._load()
+        if (
+            self.pending
+            and time.time() - self.pending["started"] >= OBSERVATION_SECONDS
+        ):
+            self.request_status = "unconfirmed"
+            self._publish()
+        try:
+            await self.coordinator.client.async_prepare_activation_auth()
+            await self.coordinator.client.async_get_activation_device_list()
+            await self._read()
+        except Exception as err:
+            session_expired = isinstance(
+                err,
+                (
+                    ActivationSessionExpired,
+                    EnphaseLoginWallUnauthorized,
+                    ConfigEntryAuthFailed,
+                ),
+            )
+            if session_expired:
+                request_session_reauthentication(self.coordinator)
+            self.snapshot = None
+            self._publish()
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key=(
+                    "export_limit_session_expired"
+                    if session_expired
+                    else "export_limit_unavailable"
+                ),
+            ) from err
+        self._schedule()
+
+    async def async_retire_replaced_intent(
+        self, replacement_gateway: str, *, original_gateway: str | None
+    ) -> bool:
+        """Acknowledge an expired intent for a gateway verified to be replaced."""
+        async with self._lock:
+            await self._refresh_locked()
+            snapshot = self.snapshot
             if (
-                self.pending
-                and time.time() - self.pending["started"] >= OBSERVATION_SECONDS
+                snapshot is None
+                or not snapshot.supported
+                or snapshot.gateway_identity != replacement_gateway
+                or replacement_gateway == original_gateway
             ):
-                self.request_status = "unconfirmed"
-                self._publish()
+                return False
+            pending = self.pending
+            if pending is None:
+                return True
+            if (
+                snapshot.gateway == pending["gateway"]
+                or (
+                    original_gateway is not None
+                    and sha256(pending["gateway"].encode()).hexdigest()
+                    != original_gateway
+                )
+                or time.time() - pending["started"] < OBSERVATION_SECONDS
+            ):
+                return False
+            self._require_enabled()
             try:
-                await self.coordinator.client.async_prepare_activation_auth()
-                await self.coordinator.client.async_get_activation_device_list()
-                await self._read()
-            except Exception as err:
-                if isinstance(
-                    err,
-                    (
-                        ActivationSessionExpired,
-                        EnphaseLoginWallUnauthorized,
-                        ConfigEntryAuthFailed,
-                    ),
-                ):
-                    request_session_reauthentication(self.coordinator)
-                self.snapshot = None
-                self._publish()
+                await self._clear_intent("unconfirmed")
+            except OSError as err:
                 raise ServiceValidationError(
                     translation_domain=DOMAIN,
-                    translation_key=(
-                        "export_limit_session_expired"
-                        if isinstance(
-                            err,
-                            (
-                                ActivationSessionExpired,
-                                EnphaseLoginWallUnauthorized,
-                                ConfigEntryAuthFailed,
-                            ),
-                        )
-                        else "export_limit_unavailable"
-                    ),
+                    translation_key="export_limit_unavailable",
                 ) from err
-            self._schedule()
-            return self.attributes()
+            return True
 
     async def async_prepare(self) -> ExportLimitSnapshot:
         """Check installer and PEL form access without changing configuration."""
@@ -547,6 +624,7 @@ class ExportLimitRuntime:
         *,
         confirm: bool,
         expected: ExportLimitSnapshot | None = None,
+        expected_gateway: str | None = None,
         slew_rate: float | None = None,
         before_write: Callable[[], None] | None = None,
     ) -> dict[str, object]:
@@ -562,7 +640,11 @@ class ExportLimitRuntime:
             try:
                 await self.coordinator.client.async_prepare_activation_auth()
                 await self.coordinator.client.async_get_activation_device_list()
-                await self._read()
+                await self._read(
+                    require_gateway_identity=(
+                        expected is not None or expected_gateway is not None
+                    )
+                )
                 if self.pending is not None:
                     fail("export_limit_pending")
                 # Acquire the token after any read-side session renewal.
@@ -571,7 +653,10 @@ class ExportLimitRuntime:
                 if snapshot is None or not snapshot.supported:
                     fail("export_limit_unavailable")
                 assert snapshot is not None
-                if expected is not None and snapshot != expected:
+                if (expected is not None and snapshot != expected) or (
+                    expected_gateway is not None
+                    and snapshot.gateway_identity != expected_gateway
+                ):
                     fail("export_limit_changed")
                 requested_slew = snapshot.slew if slew_rate is None else slew_rate
                 if requested_slew == snapshot.slew and (
@@ -637,9 +722,7 @@ class ExportLimitRuntime:
                 raise
             except Exception as err:
                 # Nothing has been sent when durable intent cannot be recorded.
-                self.pending = None
-                self.request_status = "rejected"
-                self._publish()
+                await self._retire_rejected_intent()
                 if before_write is not None:
                     raise
                 raise ServiceValidationError(
@@ -649,25 +732,36 @@ class ExportLimitRuntime:
             self._publish()
             dispatched = False
 
-            def authorize(guard: Callable[[], None]) -> None:
+            def authorize() -> None:
                 nonlocal dispatched
                 self._require_enabled()
-                guard()
+                if before_write is not None:
+                    before_write()
                 dispatched = True
 
             try:
                 self._require_enabled()
-                if before_write is None:
+                if expected_gateway is not None or before_write is not None:
+                    # The provider's form targets the site. Recheck inventory
+                    # after the form and Store awaits, just before sending it.
+                    try:
+                        gateway_id = await self._active_gateway_id()
+                    except Exception as err:
+                        self.snapshot = None
+                        raise ServiceValidationError(
+                            translation_domain=DOMAIN,
+                            translation_key="export_limit_unavailable",
+                        ) from err
+                    if gateway_id != snapshot.gateway:
+                        self.snapshot = None
+                        fail("export_limit_changed")
+                    await self.coordinator.client.async_set_export_limit(
+                        fields, watts, requested_slew, before_write=authorize
+                    )
+                else:
                     dispatched = True
                     await self.coordinator.client.async_set_export_limit(
                         fields, watts, requested_slew
-                    )
-                else:
-                    await self.coordinator.client.async_set_export_limit(
-                        fields,
-                        watts,
-                        requested_slew,
-                        before_write=lambda: authorize(before_write),
                     )
             except asyncio.CancelledError:
                 if dispatched:
@@ -676,7 +770,10 @@ class ExportLimitRuntime:
                     await self._clear_unsent_intent()
                 raise
             except ServiceValidationError:
-                await self._clear_unsent_intent()
+                if dispatched:
+                    self.request_status = "unconfirmed"
+                else:
+                    await self._retire_rejected_intent()
                 raise
             except (Unauthorized, ActivationAccessDenied) as err:
                 session_expired = isinstance(
@@ -686,20 +783,18 @@ class ExportLimitRuntime:
                     self.snapshot = None
                     self._publish()
                     request_session_reauthentication(self.coordinator)
-                await self._clear_unsent_intent()
-                fail(
+                await self._reject_write(
                     "export_limit_session_expired"
                     if session_expired
                     else "export_limit_unavailable"
                 )
             except aiohttp.ClientResponseError as err:
                 if err.status in (400, 403, 422):
-                    await self._clear_unsent_intent()
-                    fail("export_limit_unavailable")
+                    await self._reject_write("export_limit_unavailable")
                 self.request_status = "unconfirmed"
             except Exception:
                 if not dispatched:
-                    await self._clear_unsent_intent()
+                    await self._retire_rejected_intent()
                     raise
                 self.request_status = "unconfirmed"
             finally:
@@ -743,12 +838,8 @@ class ExportLimitRuntime:
     async def async_wait_for_intent_transactions(self) -> None:
         """Drain operations on the shared file before replacing this runtime."""
         async with self._lock:
-            if self._unsent_intent:
-                try:
-                    await self._clear_unsent_intent()
-                except OSError:
-                    # Keep the durable blocker if storage is still unavailable.
-                    pass
+            if self._unsent_cleanup_key in self.coordinator.hass.data:
+                await self._retire_rejected_intent()
 
     def stop(self) -> asyncio.Task[None] | None:
         self._stopped = True

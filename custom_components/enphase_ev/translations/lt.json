@@ -3614,6 +3614,10 @@
           "name": "Įrenginiai",
           "description": "Įrenginiai"
         },
+        "expected_gateway": {
+          "name": "Numatytas šliuzo identifikatorius",
+          "description": "Pasirinktinai. Kad šliuzas sutaptų, naudokite eksporto ribos jutiklio atributą gateway_identity."
+        },
         "slew_rate": {
           "name": "Kitimo greitis (W/sec)",
           "description": "Neprivaloma. Nenurodžius naudojama dabartinė šliuzo reikšmė."
@@ -3635,6 +3639,10 @@
         "device_id": {
           "name": "Įrenginiai",
           "description": "Įrenginiai"
+        },
+        "expected_gateway": {
+          "name": "Numatytas šliuzo identifikatorius",
+          "description": "Pasirinktinai. Kad šliuzas sutaptų, naudokite eksporto ribos jutiklio atributą gateway_identity."
         },
         "slew_rate": {
           "name": "Kitimo greitis (W/sec)",

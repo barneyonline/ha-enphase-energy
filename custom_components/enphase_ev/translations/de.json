@@ -3614,6 +3614,10 @@
           "name": "Geräte",
           "description": "Geräte"
         },
+        "expected_gateway": {
+          "name": "Erwartete Gateway-Identität",
+          "description": "Optional. Verwende gateway_identity vom Einspeisebegrenzungssensor, um ein passendes Gateway vorauszusetzen."
+        },
         "slew_rate": {
           "name": "Änderungsrate (W/sec)",
           "description": "Optional. Ohne Angabe wird der aktuelle Gateway-Wert verwendet."
@@ -3635,6 +3639,10 @@
         "device_id": {
           "name": "Geräte",
           "description": "Geräte"
+        },
+        "expected_gateway": {
+          "name": "Erwartete Gateway-Identität",
+          "description": "Optional. Verwende gateway_identity vom Einspeisebegrenzungssensor, um ein passendes Gateway vorauszusetzen."
         },
         "slew_rate": {
           "name": "Änderungsrate (W/sec)",

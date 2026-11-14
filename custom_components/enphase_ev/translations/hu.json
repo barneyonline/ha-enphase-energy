@@ -3614,6 +3614,10 @@
           "name": "Eszközök",
           "description": "Eszközök"
         },
+        "expected_gateway": {
+          "name": "Az átjáró elvárt azonosítója",
+          "description": "Opcionális. Az átjáró egyezéséhez használja a visszatáplálási korlát érzékelőjének gateway_identity attribútumát."
+        },
         "slew_rate": {
           "name": "Változási sebesség (W/sec)",
           "description": "Opcionális. Ha nincs megadva, az átjáró aktuális értékét használja."
@@ -3635,6 +3639,10 @@
         "device_id": {
           "name": "Eszközök",
           "description": "Eszközök"
+        },
+        "expected_gateway": {
+          "name": "Az átjáró elvárt azonosítója",
+          "description": "Opcionális. Az átjáró egyezéséhez használja a visszatáplálási korlát érzékelőjének gateway_identity attribútumát."
         },
         "slew_rate": {
           "name": "Változási sebesség (W/sec)",

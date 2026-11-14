@@ -53,10 +53,9 @@ options are applied to the existing coordinator and published without unloading
 entities. Changes that alter platform topology still reload the config entry, but
 `reload_snapshot.py` transfers detached discovery metadata and charger data so
 platforms can recreate entities promptly. Setup constructs a new coordinator and
-private session; the previous lifecycle fully cancels its tasks and shuts down.
-No session, manager, lock, or task crosses the reload. New option and device
-selections are applied before restored data is published, followed by a background
-refresh. Cold setup requires an authoritative first refresh except for isolated
+private session. The previous lifecycle cancels its tasks and shuts down.
+New option and device selections are applied before restored data is published,
+followed by a background refresh. Cold setup requires an authoritative first refresh except for isolated
 charger-status server failures.
 Battery status and inverter inventory readiness also participate in topology
 comparison. Restored discovery metadata preserves device identities without
@@ -301,6 +300,27 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   A failed cleanup keeps the pending record blocked until a later refresh can
   clear it durably. Reload drains active Export Limit transactions before
   another runtime opens the same intent file.
+  Overlapping runtimes share a per-entry lock and retry failed rejection cleanup.
+  Definitive rejection statuses and login redirects are handled from response
+  headers, so a stalled body cannot hide the rejection.
+  The feedback sensor and installer snapshot expose the same opaque
+  `gateway_identity`. Automatic controllers can pass it as `expected_gateway`
+  to the set and disable services. Every read of installer settings checks
+  the active gateway inventory, including polls, installer preparation and
+  single-row responses. The runtime exposes `verifies_export_limit_gateway`.
+  Its sensor reports `gateway_identity_verified` when settings match the
+  active gateway. Other responses leave the last successful readback and
+  pending intent unchanged. Identity-bound writes recheck active inventory
+  after form retrieval and intent persistence. The provider's write targets the
+  site, so a gateway replacement after the final client check can still race
+  the write.
+  Planner's operator Resume can call `async_retire_replaced_intent` on the
+  loaded runtime. Under the same lock, Enphase re-reads settings and inventory,
+  checks the expected replacement and the original intent's gateway when
+  supplied, and clears only an expired intent belonging to a different gateway.
+  It publishes the outcome as unconfirmed and issues no write. The identity-bound
+  set and disable services report `export_limit_pending`, `export_limit_mismatch`
+  and `export_limit_changed` only before sending a write.
 
 - `battery_runtime.py` handles BatteryConfig controls, profile state, schedules, pending writes, and battery diagnostics payloads.
   Each accepted profile or reserve write invalidates profile, settings, and live

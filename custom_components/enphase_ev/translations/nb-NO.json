@@ -3614,6 +3614,10 @@
           "name": "Enheter",
           "description": "Enheter"
         },
+        "expected_gateway": {
+          "name": "Forventet gatewayidentitet",
+          "description": "Valgfritt. Bruk gateway_identity fra sensoren for eksportgrense for å kreve at gatewayen samsvarer."
+        },
         "slew_rate": {
           "name": "Endringshastighet (W/sec)",
           "description": "Valgfritt. Hvis utelatt brukes gatewayens gjeldende verdi."
@@ -3635,6 +3639,10 @@
         "device_id": {
           "name": "Enheter",
           "description": "Enheter"
+        },
+        "expected_gateway": {
+          "name": "Forventet gatewayidentitet",
+          "description": "Valgfritt. Bruk gateway_identity fra sensoren for eksportgrense for å kreve at gatewayen samsvarer."
         },
         "slew_rate": {
           "name": "Endringshastighet (W/sec)",

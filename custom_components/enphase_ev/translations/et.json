@@ -3614,6 +3614,10 @@
           "name": "Seadmed",
           "description": "Seadmed"
         },
+        "expected_gateway": {
+          "name": "Lüüsi eeldatav identifikaator",
+          "description": "Valikuline. Lüüsi vaste nõudmiseks kasuta ekspordipiirangu anduri atribuuti gateway_identity."
+        },
         "slew_rate": {
           "name": "Muutumiskiirus (W/sec)",
           "description": "Valikuline. Puudumisel kasutatakse lüüsi praegust väärtust."
@@ -3635,6 +3639,10 @@
         "device_id": {
           "name": "Seadmed",
           "description": "Seadmed"
+        },
+        "expected_gateway": {
+          "name": "Lüüsi eeldatav identifikaator",
+          "description": "Valikuline. Lüüsi vaste nõudmiseks kasuta ekspordipiirangu anduri atribuuti gateway_identity."
         },
         "slew_rate": {
           "name": "Muutumiskiirus (W/sec)",

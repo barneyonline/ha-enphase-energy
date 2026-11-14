@@ -500,6 +500,7 @@ async def _text_response(
 
     use_cookie_header_only = bool(kwargs.pop("use_cookie_header_only", False))
     allow_reauth = bool(kwargs.pop("allow_reauth", True))
+    reject_statuses_from_headers = kwargs.pop("reject_statuses_from_headers", ())
     if not kwargs.pop("allow_replay", True):
         allow_reauth = False
         middlewares = kwargs.get("middlewares")
@@ -553,6 +554,8 @@ async def _text_response(
                                 if reauth_ok:
                                     continue
                             raise HttpUnauthorized()
+                        if r.status in reject_statuses_from_headers:
+                            raise make_response_error(r, None)
                         if r.status >= 400 and not (
                             expected_statuses and r.status in expected_statuses
                         ):
@@ -563,10 +566,10 @@ async def _text_response(
                                 body_text = None
                             response_error = make_response_error(r, body_text)
                             raise response_error
-                        text = await _timed_response_text(r)
                         login_redirect = 300 <= r.status < 400 and URL(
                             r.headers.get("Location", "")
                         ).path.rstrip("/") in {"/login", "/login/login"}
+                        text = "" if login_redirect else await _timed_response_text(r)
                         if login_redirect or _is_enphase_login_wall(
                             endpoint=endpoint or None, payload=text, expected_html=True
                         ):

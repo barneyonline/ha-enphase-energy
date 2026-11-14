@@ -3614,6 +3614,10 @@
           "name": "Laitteet",
           "description": "Laitteet"
         },
+        "expected_gateway": {
+          "name": "Yhdyskäytävän odotettu tunniste",
+          "description": "Valinnainen. Varmista yhdyskäytävän vastaavuus käyttämällä vientirajan anturin gateway_identity-arvoa."
+        },
         "slew_rate": {
           "name": "Muutosnopeus (W/sec)",
           "description": "Valinnainen. Jos jätetään pois, käytetään yhdyskäytävän nykyistä arvoa."
@@ -3635,6 +3639,10 @@
         "device_id": {
           "name": "Laitteet",
           "description": "Laitteet"
+        },
+        "expected_gateway": {
+          "name": "Yhdyskäytävän odotettu tunniste",
+          "description": "Valinnainen. Varmista yhdyskäytävän vastaavuus käyttämällä vientirajan anturin gateway_identity-arvoa."
         },
         "slew_rate": {
           "name": "Muutosnopeus (W/sec)",

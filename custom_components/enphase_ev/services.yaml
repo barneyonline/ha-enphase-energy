@@ -888,6 +888,9 @@ set_export_limit:
           step: 0.01
           mode: box
           unit_of_measurement: W/sec
+    expected_gateway:
+      selector:
+        text:
     site_id:
       selector:
         text:
@@ -912,6 +915,9 @@ disable_export_limit:
           step: 0.01
           mode: box
           unit_of_measurement: W/sec
+    expected_gateway:
+      selector:
+        text:
     site_id:
       selector:
         text:
