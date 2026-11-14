@@ -71,7 +71,9 @@ async def test_scoped_diagnostics_preserve_ignore_and_clearing_targets_entry(
     entry = config_entry
     entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
     entry._async_set_state(hass, ConfigEntryState.LOADED, None)
-    create_issue(hass, ISSUE_CLOUD_ERRORS)
+    create_issue(
+        hass, ISSUE_CLOUD_ERRORS, data={"site_metrics": {"site_id": coord.site_id}}
+    )
     ir.async_ignore_issue(hass, DOMAIN, ISSUE_CLOUD_ERRORS, True)
     coord.diagnostics.report_cloud_issue()
     registry = ir.async_get(hass)
@@ -303,7 +305,9 @@ async def test_native_diagnostic_ownership_migration_and_entry_removal(
     hass, config_entry
 ):
     coord = EnphaseCoordinator(hass, dict(config_entry.data), config_entry=config_entry)
-    create_issue(hass, ISSUE_CLOUD_ERRORS)
+    create_issue(
+        hass, ISSUE_CLOUD_ERRORS, data={"site_metrics": {"site_id": coord.site_id}}
+    )
     ir.async_ignore_issue(hass, DOMAIN, ISSUE_CLOUD_ERRORS, True)
     diagnostics = coord.diagnostics
     diagnostics.report_cloud_issue()
@@ -385,3 +389,27 @@ async def test_native_alarm_refresh_migrates_checkpoint_preserves_ignore_and_can
     coord.client.system_dashboard_standing_alarms.return_value = {"alarms": []}
     await replacement.async_refresh()
     assert registry.async_get_issue(DOMAIN, issue_id) is None
+
+
+@pytest.mark.parametrize(
+    "legacy_data",
+    [None, {}, {"site_metrics": {}}, {"site_metrics": {"site_id": "another"}}],
+)
+async def test_legacy_issue_dismissal_does_not_leak_between_sites(
+    hass, config_entry, entry_issue_api, legacy_data
+):
+    coord = EnphaseCoordinator(hass, dict(config_entry.data), config_entry=config_entry)
+    create_issue(hass, ISSUE_CLOUD_ERRORS, data=legacy_data)
+    ir.async_ignore_issue(hass, DOMAIN, ISSUE_CLOUD_ERRORS, True)
+    registry = ir.async_get(hass)
+    legacy = registry.async_get_issue(DOMAIN, ISSUE_CLOUD_ERRORS)
+
+    assert not coord.diagnostics._reported_issue_is_active(ISSUE_CLOUD_ERRORS)
+    coord.diagnostics.report_cloud_issue()
+
+    own_id = coord.diagnostics._repair_issue_id(ISSUE_CLOUD_ERRORS)
+    assert registry.async_get_issue(DOMAIN, own_id).dismissed_version is None
+    assert registry.async_get_issue(DOMAIN, ISSUE_CLOUD_ERRORS) is legacy
+    coord.diagnostics._delete_issue(ISSUE_CLOUD_ERRORS)
+    assert registry.async_get_issue(DOMAIN, own_id) is None
+    assert registry.async_get_issue(DOMAIN, ISSUE_CLOUD_ERRORS) is legacy

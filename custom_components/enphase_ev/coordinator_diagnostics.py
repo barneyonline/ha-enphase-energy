@@ -97,10 +97,26 @@ class CoordinatorDiagnostics:
             getattr(coord, "config_entry", None), "entry_id", None
         ):
             return
+        if (
+            issue is not None
+            and owner is None
+            and self._repair_issue_id(issue_id) != issue_id
+            and not self._legacy_issue_matches_site(issue)
+        ):
+            return
         if preserve_ignored:
             if issue is not None and issue.dismissed_version is not None:
                 return
         ir.async_delete_issue(coord.hass, DOMAIN, issue_id)
+
+    def _legacy_issue_matches_site(self, issue: ir.IssueEntry) -> bool:
+        data = issue.data
+        metrics = data.get("site_metrics") if isinstance(data, dict) else None
+        return (
+            isinstance(metrics, dict)
+            and metrics.get("site_id") is not None
+            and str(metrics["site_id"]) == str(self.coordinator.site_id)
+        )
 
     def _entry_issue_suffix(self) -> str | None:
         config_entry = getattr(self.coordinator, "config_entry", None)
@@ -141,7 +157,11 @@ class CoordinatorDiagnostics:
         if registry_issue_id == issue_id:
             return False
         legacy_issue = issue_registry.async_get_issue(DOMAIN, issue_id)
-        return legacy_issue is not None and legacy_issue.active
+        return (
+            legacy_issue is not None
+            and legacy_issue.active
+            and self._legacy_issue_matches_site(legacy_issue)
+        )
 
     def clear_legacy_degraded_service_repair_issues(self) -> None:
         """Clear pre-scoped degraded-service repair issues after upgrade."""
@@ -213,7 +233,12 @@ class CoordinatorDiagnostics:
             data=issue_data,
         )
         if registry_issue_id != issue_id:
-            if legacy_issue is not None and legacy_issue.dismissed_version is not None:
+            if (
+                legacy_issue is not None
+                and legacy_issue.dismissed_version is not None
+                and getattr(legacy_issue, "config_entry_id", None) is None
+                and self._legacy_issue_matches_site(legacy_issue)
+            ):
                 ir.async_ignore_issue(coord.hass, DOMAIN, registry_issue_id, True)
             self._delete_registry_issue(issue_id)
 

@@ -11,10 +11,10 @@ the lifecycle preparation PR must remain draft and blocked from merge until the
 owner separately raises the minimum to 2026.11.
 
 On 2026.11, all entry-specific Repairs carry `config_entry_id`. Diagnostic issue
-IDs are entry-scoped; migrating an ignored legacy diagnostic retains its ignore
-state. System-event reconciliation uses `async_refresh_issues` around the checked
-alarm set, preserving checkpointed issues, incomplete snapshots and the existing
-missing-alarm grace period. It never wraps platform forwarding or a failed fetch.
+IDs are entry-scoped. Migrating a legacy diagnostic preserves its dismissal only
+when its saved site matches the entry. System-event reconciliation uses
+`async_refresh_issues` around the checked alarm set, preserving checkpointed
+issues, incomplete snapshots and the existing missing-alarm grace period. It never wraps platform forwarding or a failed fetch.
 The 2026.10 fallback uses existing registry calls, and entry removal explicitly
 cleans up scoped legacy issues and unscoped diagnostics with matching site context.
 Unload preserves battery-profile disagreements
