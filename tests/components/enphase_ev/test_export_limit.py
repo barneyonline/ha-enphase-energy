@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, call, patch
@@ -2166,8 +2167,8 @@ async def test_zero_slew_reconciliation_rejects_unsafe_context(runtime, case):
 async def test_guarded_apply_cannot_identify_gateway_after_successful_prepare(runtime):
     _zero_slew_form(runtime)
     client = runtime.coordinator.client
-    client.devices_details.return_value = {"envoys": []}
     expected = await runtime.async_prepare()
+    client.devices_details.return_value = {"envoys": []}
     guard = MagicMock()
 
     with pytest.raises(ServiceValidationError) as error:
@@ -2423,7 +2424,7 @@ async def test_zero_default_enables_and_disables_through_shared_validation(
         refreshed_fields, watts, 6980.0
     )
     assert client.devices_details.await_args_list == [call("envoy")] * (
-        2 if caller == "guided" else 1
+        4 if caller == "guided" else 3
     )
     assert runtime.pending["slew"] == 6980.0
     assert runtime.request_status == "pending"
@@ -2454,7 +2455,10 @@ async def test_automatic_reconciliation_rejects_settings_changed_during_identity
     record = changed["data"]["gateway_settings"][0]
     if change == "gateway":
         record["device_id"] = "400"
-        runtime.coordinator.client.devices_details.return_value["envoys"][0]["id"] = 400
+        runtime.coordinator.client.devices_details.side_effect = [
+            {"envoys": [{"id": 300, "serial_number": "original"}]},
+            {"envoys": [{"id": 400, "serial_number": "replacement"}]},
+        ]
     else:
         record["pel_settings_infos"].update(
             {
@@ -2933,6 +2937,7 @@ async def test_export_write_rejects_a_replacement_gateway(
     object.__setattr__(entry, "state", ConfigEntryState.LOADED)
     async_setup_services(coord.hass)
     original = await runtime.async_prepare()
+    coord.client.devices_details.reset_mock()
     coord.client.devices_details.return_value["envoys"][0]["id"] = 300
     if not stale_settings:
         settings = payload()
@@ -2961,6 +2966,49 @@ async def test_export_write_rejects_a_replacement_gateway(
     guard.assert_not_called()
     coord.client.async_set_export_limit.assert_not_awaited()
     runtime._store.async_save.assert_not_awaited()
+
+
+@pytest.mark.parametrize("prepare", [False, True])
+@pytest.mark.parametrize("pending", [False, True])
+async def test_stale_single_settings_row_cannot_confirm_replaced_gateway(
+    runtime, prepare, pending
+):
+    client = runtime.coordinator.client
+    original = await runtime.async_prepare()
+    assert runtime.verifies_export_limit_gateway
+    assert runtime.attributes()["gateway_identity_verified"] is True
+    last_readback = runtime.last_readback
+    if pending:
+        runtime.pending = {
+            "gateway": original.gateway,
+            "watts": original.watts,
+            "slew": original.slew,
+            "started": time.time(),
+        }
+        runtime.request_status = "pending"
+
+    # The inventory changes while settings still return the original gateway
+    # and a value that would satisfy a retry, confirmation or restoration.
+    client.devices_details.return_value["envoys"][0]["id"] = 300
+    if prepare:
+        with pytest.raises(ServiceValidationError) as error:
+            await runtime.async_prepare()
+        assert error.value.translation_key == "export_limit_unavailable"
+    else:
+        await runtime.async_refresh()
+    assert runtime.attributes()["gateway_identity"] is None
+    assert runtime.attributes()["gateway_identity_verified"] is False
+    assert runtime.last_readback == last_readback
+    assert (runtime.pending is not None) is pending
+    runtime._store.async_save.assert_not_awaited()
+    client.async_set_export_limit.assert_not_awaited()
+
+    settings = payload()
+    settings["data"]["gateway_settings"][0]["device_id"] = "300"
+    client.async_get_export_limit_settings.return_value = settings
+    await runtime.async_refresh()
+    assert runtime.attributes()["gateway_identity"] != original.gateway_identity
+    assert (runtime.pending is not None) is pending
 
 
 @pytest.mark.parametrize("status", [422, 302])

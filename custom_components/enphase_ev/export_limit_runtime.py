@@ -220,6 +220,8 @@ class ExportLimitIntentStore(Store[dict[str, Any]]):  # type: ignore[misc]
 class ExportLimitRuntime:
     """Own all write gates and one durable pending request per config entry."""
 
+    verifies_export_limit_gateway = True
+
     def __init__(self, coordinator: Any) -> None:
         self.coordinator = coordinator
         self.snapshot: ExportLimitSnapshot | None = None
@@ -347,6 +349,7 @@ class ExportLimitRuntime:
             "requested_slew_rate": self.pending.get("slew") if self.pending else None,
             "last_successful_readback": self.last_readback,
             "gateway_identity": snapshot.gateway_identity if snapshot else None,
+            "gateway_identity_verified": snapshot is not None,
         }
 
     async def _load(self) -> None:
@@ -426,39 +429,34 @@ class ExportLimitRuntime:
             self._publish()
             raise
         self.snapshot = None
+        # Even a single settings row can belong to a replaced gateway. Polls
+        # and installer preparation can settle requests without a write.
+        try:
+            details = await self.coordinator.client.devices_details("envoy")
+        except Exception:
+            self._publish()
+            raise
         gateway_id = None
-        records = (
-            (payload.get("data") or {}).get("gateway_settings")
-            if isinstance(payload, dict) and isinstance(payload.get("data"), dict)
-            else None
-        )
-        if require_gateway_identity or (isinstance(records, list) and len(records) > 1):
-            # Settings retain replaced gateways. Resolve the active identity from
-            # the current dashboard inventory, never from ordering or PEL values.
-            try:
-                details = await self.coordinator.client.devices_details("envoy")
-            except Exception:
-                self._publish()
-                raise
-            envoys = details.get("envoys") if isinstance(details, dict) else None
-            if isinstance(envoys, list) and len(envoys) == 1:
-                envoy = envoys[0]
-                if (
-                    isinstance(envoy, dict)
-                    and envoy.get("status") != "retired"
-                    and isinstance(envoy.get("serial_number"), str)
-                    and envoy["serial_number"].strip()
-                    and type(envoy.get("id")) in (int, str)
-                    and str(envoy["id"]).isdigit()
-                    and int(envoy["id"]) > 0
-                ):
-                    gateway_id = str(envoy["id"])
-            if require_gateway_identity and gateway_id is None:
-                self._publish()
-                fail("export_limit_unavailable")
-        self.snapshot = parse_settings(
-            payload, str(self.coordinator.site_id), gateway_id=gateway_id
-        )
+        envoys = details.get("envoys") if isinstance(details, dict) else None
+        if isinstance(envoys, list) and len(envoys) == 1:
+            envoy = envoys[0]
+            if (
+                isinstance(envoy, dict)
+                and envoy.get("status") != "retired"
+                and isinstance(envoy.get("serial_number"), str)
+                and envoy["serial_number"].strip()
+                and type(envoy.get("id")) in (int, str)
+                and str(envoy["id"]).isdigit()
+                and int(envoy["id"]) > 0
+            ):
+                gateway_id = str(envoy["id"])
+        if gateway_id is not None:
+            self.snapshot = parse_settings(
+                payload, str(self.coordinator.site_id), gateway_id=gateway_id
+            )
+        elif require_gateway_identity:
+            self._publish()
+            fail("export_limit_unavailable")
         if self.snapshot is not None:
             self.last_readback = time.time()
         snapshot, pending = self.snapshot, self.pending

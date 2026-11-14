@@ -305,9 +305,12 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   headers, so a stalled body cannot hide the rejection.
   The feedback sensor and installer snapshot expose the same opaque
   `gateway_identity`. Automatic controllers can pass it as `expected_gateway`
-  to the set and disable services. Identity-bound writes check the active
-  gateway inventory against fresh installer settings, even when the settings
-  endpoint returns a single row.
+  to the set and disable services. Every read of installer settings checks
+  the active gateway inventory, including polls, installer preparation and
+  single-row responses. The runtime exposes `verifies_export_limit_gateway`.
+  Its sensor reports `gateway_identity_verified` when settings match the
+  active gateway. Other responses leave the last successful readback and
+  pending intent unchanged.
 
 - `battery_runtime.py` handles BatteryConfig controls, profile state, schedules, pending writes, and battery diagnostics payloads.
   Each accepted profile or reserve write invalidates profile, settings, and live

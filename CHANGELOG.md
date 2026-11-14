@@ -19,7 +19,7 @@ All notable changes to this project will be documented in this file.
 - Show the reported EV charger Gateway connectivity state even when the charger report is older than 15 minutes.
 - Recognize definitive Export Limit write rejections even when the installer response body stalls.
 - Let automatic controllers bind Export Limit commands to the original gateway so a replacement cannot receive an old restoration.
-- Verify the active gateway inventory for identity-bound Export Limit writes and retry failed confirmation saves on a later poll.
+- Verify the active gateway inventory before showing Export Limit settings or confirming requests, including when installer settings return one gateway. Retry failed confirmation saves on a later poll.
 
 ### 🔧 Improvements
 
