@@ -310,7 +310,10 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   single-row responses. The runtime exposes `verifies_export_limit_gateway`.
   Its sensor reports `gateway_identity_verified` when settings match the
   active gateway. Other responses leave the last successful readback and
-  pending intent unchanged.
+  pending intent unchanged. Identity-bound writes recheck active inventory
+  after form retrieval and intent persistence. The provider's write targets the
+  site, so a gateway replacement after the final client check can still race
+  the write.
 
 - `battery_runtime.py` handles BatteryConfig controls, profile state, schedules, pending writes, and battery diagnostics payloads.
   Each accepted profile or reserve write invalidates profile, settings, and live

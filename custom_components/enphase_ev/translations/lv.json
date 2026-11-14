@@ -3614,6 +3614,10 @@
           "name": "Ierīces",
           "description": "Ierīces"
         },
+        "expected_gateway": {
+          "name": "Paredzētais vārtejas identifikators",
+          "description": "Neobligāti. Lai pieprasītu vārtejas atbilstību, izmantojiet eksporta ierobežojuma sensora atribūtu gateway_identity."
+        },
         "slew_rate": {
           "name": "Izmaiņu ātrums (W/sec)",
           "description": "Neobligāti. Ja nav norādīts, izmanto pašreizējo vārtejas vērtību."
@@ -3635,6 +3639,10 @@
         "device_id": {
           "name": "Ierīces",
           "description": "Ierīces"
+        },
+        "expected_gateway": {
+          "name": "Paredzētais vārtejas identifikators",
+          "description": "Neobligāti. Lai pieprasītu vārtejas atbilstību, izmantojiet eksporta ierobežojuma sensora atribūtu gateway_identity."
         },
         "slew_rate": {
           "name": "Izmaiņu ātrums (W/sec)",

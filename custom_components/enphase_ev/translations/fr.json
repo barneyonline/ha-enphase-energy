@@ -3614,6 +3614,10 @@
           "name": "Appareils",
           "description": "Appareils"
         },
+        "expected_gateway": {
+          "name": "Identité attendue de la passerelle",
+          "description": "Facultatif. Utilisez gateway_identity du capteur de limite d’injection pour exiger une passerelle correspondante."
+        },
         "slew_rate": {
           "name": "Vitesse de variation (W/sec)",
           "description": "Facultatif. Si omis, la valeur actuelle de la passerelle est utilisée."
@@ -3635,6 +3639,10 @@
         "device_id": {
           "name": "Appareils",
           "description": "Appareils"
+        },
+        "expected_gateway": {
+          "name": "Identité attendue de la passerelle",
+          "description": "Facultatif. Utilisez gateway_identity du capteur de limite d’injection pour exiger une passerelle correspondante."
         },
         "slew_rate": {
           "name": "Vitesse de variation (W/sec)",

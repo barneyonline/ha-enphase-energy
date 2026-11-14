@@ -2968,6 +2968,88 @@ async def test_export_write_rejects_a_replacement_gateway(
     runtime._store.async_save.assert_not_awaited()
 
 
+@pytest.mark.parametrize(
+    "retired",
+    [
+        {"isRetired": True},
+        {"status": " Retired "},
+        {"statusText": "Retired"},
+        {"status_text": "retired"},
+    ],
+)
+async def test_retired_gateway_cannot_verify_export_limit_readback(runtime, retired):
+    client = runtime.coordinator.client
+    await runtime.async_refresh()
+    last_readback = runtime.last_readback
+    client.devices_details.return_value["envoys"][0].update(retired)
+
+    result = await runtime.async_refresh()
+
+    assert result["gateway_identity_verified"] is False
+    assert result["gateway_identity"] is None
+    assert runtime.last_readback == last_readback
+
+
+@pytest.mark.parametrize("during", ["form", "save"])
+@pytest.mark.parametrize("caller", ["service", "guarded"])
+async def test_late_gateway_replacement_retires_unsent_intent(runtime, during, caller):
+    client = runtime.coordinator.client
+    original = await runtime.async_prepare()
+    fields = client.async_get_export_limit_form.return_value
+
+    def replace_gateway():
+        client.devices_details.return_value["envoys"][0]["id"] = 300
+
+    def read_form():
+        replace_gateway()
+        return fields
+
+    def save(data):
+        if data["pending"] is not None:
+            replace_gateway()
+
+    if during == "form":
+        client.async_get_export_limit_form.side_effect = read_form
+    else:
+        runtime._store.async_save.side_effect = save
+
+    guard = MagicMock()
+    with pytest.raises(ServiceValidationError) as error:
+        if caller == "guarded":
+            await runtime.async_apply_guarded(0, expected=original, before_write=guard)
+        else:
+            await runtime.async_apply(
+                0, confirm=True, expected_gateway=original.gateway_identity
+            )
+
+    assert error.value.translation_key == "export_limit_changed"
+    assert runtime.snapshot is None
+    assert runtime.pending is None
+    assert runtime.request_status == "rejected"
+    runtime._store.async_save.assert_awaited_with({"pending": None})
+    client.async_set_export_limit.assert_not_awaited()
+    guard.assert_not_called()
+
+
+async def test_failed_final_inventory_read_retires_unsent_intent(runtime):
+    client = runtime.coordinator.client
+    original = await runtime.async_prepare()
+    client.devices_details.side_effect = [
+        client.devices_details.return_value,
+        TimeoutError(),
+    ]
+
+    with pytest.raises(ServiceValidationError) as error:
+        await runtime.async_apply(
+            0, confirm=True, expected_gateway=original.gateway_identity
+        )
+
+    assert error.value.translation_key == "export_limit_unavailable"
+    assert runtime.snapshot is None
+    assert runtime.pending is None
+    client.async_set_export_limit.assert_not_awaited()
+
+
 @pytest.mark.parametrize("prepare", [False, True])
 @pytest.mark.parametrize("pending", [False, True])
 async def test_stale_single_settings_row_cannot_confirm_replaced_gateway(

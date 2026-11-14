@@ -32,6 +32,7 @@ from .const import (
     OPT_FAST_POLL_INTERVAL,
     OPT_SLOW_POLL_INTERVAL,
 )
+from .device_types import member_is_retired
 from .runtime_helpers import normalize_poll_intervals
 
 OBSERVATION_SECONDS = BATTERY_PROFILE_PENDING_TIMEOUT_S
@@ -420,6 +421,23 @@ class ExportLimitRuntime:
         await self._retire_rejected_intent()
         fail(translation_key)
 
+    async def _active_gateway_id(self) -> str | None:
+        details = await self.coordinator.client.devices_details("envoy")
+        envoys = details.get("envoys") if isinstance(details, dict) else None
+        if isinstance(envoys, list) and len(envoys) == 1:
+            envoy = envoys[0]
+            if (
+                isinstance(envoy, dict)
+                and not member_is_retired(envoy)
+                and isinstance(envoy.get("serial_number"), str)
+                and envoy["serial_number"].strip()
+                and type(envoy.get("id")) in (int, str)
+                and str(envoy["id"]).isdigit()
+                and int(envoy["id"]) > 0
+            ):
+                return str(envoy["id"])
+        return None
+
     async def _read(self, *, require_gateway_identity: bool = False) -> None:
         self._require_enabled()
         try:
@@ -432,24 +450,10 @@ class ExportLimitRuntime:
         # Even a single settings row can belong to a replaced gateway. Polls
         # and installer preparation can settle requests without a write.
         try:
-            details = await self.coordinator.client.devices_details("envoy")
+            gateway_id = await self._active_gateway_id()
         except Exception:
             self._publish()
             raise
-        gateway_id = None
-        envoys = details.get("envoys") if isinstance(details, dict) else None
-        if isinstance(envoys, list) and len(envoys) == 1:
-            envoy = envoys[0]
-            if (
-                isinstance(envoy, dict)
-                and envoy.get("status") != "retired"
-                and isinstance(envoy.get("serial_number"), str)
-                and envoy["serial_number"].strip()
-                and type(envoy.get("id")) in (int, str)
-                and str(envoy["id"]).isdigit()
-                and int(envoy["id"]) > 0
-            ):
-                gateway_id = str(envoy["id"])
         if gateway_id is not None:
             self.snapshot = parse_settings(
                 payload, str(self.coordinator.site_id), gateway_id=gateway_id
@@ -693,25 +697,36 @@ class ExportLimitRuntime:
             self._publish()
             dispatched = False
 
-            def authorize(guard: Callable[[], None]) -> None:
+            def authorize() -> None:
                 nonlocal dispatched
                 self._require_enabled()
-                guard()
+                if before_write is not None:
+                    before_write()
                 dispatched = True
 
             try:
                 self._require_enabled()
-                if before_write is None:
+                if expected_gateway is not None or before_write is not None:
+                    # The provider's form targets the site. Recheck inventory
+                    # after the form and Store awaits, just before sending it.
+                    try:
+                        gateway_id = await self._active_gateway_id()
+                    except Exception as err:
+                        self.snapshot = None
+                        raise ServiceValidationError(
+                            translation_domain=DOMAIN,
+                            translation_key="export_limit_unavailable",
+                        ) from err
+                    if gateway_id != snapshot.gateway:
+                        self.snapshot = None
+                        fail("export_limit_changed")
+                    await self.coordinator.client.async_set_export_limit(
+                        fields, watts, requested_slew, before_write=authorize
+                    )
+                else:
                     dispatched = True
                     await self.coordinator.client.async_set_export_limit(
                         fields, watts, requested_slew
-                    )
-                else:
-                    await self.coordinator.client.async_set_export_limit(
-                        fields,
-                        watts,
-                        requested_slew,
-                        before_write=lambda: authorize(before_write),
                     )
             except asyncio.CancelledError:
                 if dispatched:

@@ -3614,6 +3614,10 @@
           "name": "Dispozitive",
           "description": "Dispozitive"
         },
+        "expected_gateway": {
+          "name": "Identitatea așteptată a gateway-ului",
+          "description": "Opțional. Folosește gateway_identity de la senzorul limitei de export pentru a cere ca gateway-ul să coincidă."
+        },
         "slew_rate": {
           "name": "Rata de variație (W/sec)",
           "description": "Opțional. Dacă lipsește, se folosește valoarea curentă a gateway-ului."
@@ -3635,6 +3639,10 @@
         "device_id": {
           "name": "Dispozitive",
           "description": "Dispozitive"
+        },
+        "expected_gateway": {
+          "name": "Identitatea așteptată a gateway-ului",
+          "description": "Opțional. Folosește gateway_identity de la senzorul limitei de export pentru a cere ca gateway-ul să coincidă."
         },
         "slew_rate": {
           "name": "Rata de variație (W/sec)",

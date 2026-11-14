@@ -3614,6 +3614,10 @@
           "name": "Zařízení",
           "description": "Zařízení"
         },
+        "expected_gateway": {
+          "name": "Očekávaná identita brány",
+          "description": "Volitelné. Použijte gateway_identity ze snímače omezení přetoků a vyžadujte shodu brány."
+        },
         "slew_rate": {
           "name": "Rychlost změny (W/sec)",
           "description": "Volitelné. Při vynechání se použije aktuální hodnota brány."
@@ -3635,6 +3639,10 @@
         "device_id": {
           "name": "Zařízení",
           "description": "Zařízení"
+        },
+        "expected_gateway": {
+          "name": "Očekávaná identita brány",
+          "description": "Volitelné. Použijte gateway_identity ze snímače omezení přetoků a vyžadujte shodu brány."
         },
         "slew_rate": {
           "name": "Rychlost změny (W/sec)",

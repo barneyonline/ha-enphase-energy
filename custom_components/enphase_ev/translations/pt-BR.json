@@ -3614,6 +3614,10 @@
           "name": "Dispositivos",
           "description": "Dispositivos"
         },
+        "expected_gateway": {
+          "name": "Identidade esperada do gateway",
+          "description": "Opcional. Use gateway_identity do sensor de limite de exportação para exigir que o gateway corresponda."
+        },
         "slew_rate": {
           "name": "Taxa de variação (W/sec)",
           "description": "Opcional. Se omitido, usa o valor atual do gateway."
@@ -3635,6 +3639,10 @@
         "device_id": {
           "name": "Dispositivos",
           "description": "Dispositivos"
+        },
+        "expected_gateway": {
+          "name": "Identidade esperada do gateway",
+          "description": "Opcional. Use gateway_identity do sensor de limite de exportação para exigir que o gateway corresponda."
         },
         "slew_rate": {
           "name": "Taxa de variação (W/sec)",

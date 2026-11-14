@@ -3614,6 +3614,10 @@
           "name": "Dispositivos",
           "description": "Dispositivos"
         },
+        "expected_gateway": {
+          "name": "Identidad esperada de la pasarela",
+          "description": "Opcional. Usa gateway_identity del sensor de límite de exportación para exigir que coincida la pasarela."
+        },
         "slew_rate": {
           "name": "Tasa de variación (W/sec)",
           "description": "Opcional. Si se omite, se usa el valor actual de la puerta de enlace."
@@ -3635,6 +3639,10 @@
         "device_id": {
           "name": "Dispositivos",
           "description": "Dispositivos"
+        },
+        "expected_gateway": {
+          "name": "Identidad esperada de la pasarela",
+          "description": "Opcional. Usa gateway_identity del sensor de límite de exportación para exigir que coincida la pasarela."
         },
         "slew_rate": {
           "name": "Tasa de variación (W/sec)",

@@ -3614,6 +3614,10 @@
           "name": "Urządzenia",
           "description": "Urządzenia"
         },
+        "expected_gateway": {
+          "name": "Oczekiwana tożsamość bramy",
+          "description": "Opcjonalnie. Użyj atrybutu gateway_identity czujnika limitu eksportu, aby wymagać zgodności bramy."
+        },
         "slew_rate": {
           "name": "Szybkość zmiany (W/sec)",
           "description": "Opcjonalnie. Jeśli pominięto, używana jest bieżąca wartość bramy."
@@ -3635,6 +3639,10 @@
         "device_id": {
           "name": "Urządzenia",
           "description": "Urządzenia"
+        },
+        "expected_gateway": {
+          "name": "Oczekiwana tożsamość bramy",
+          "description": "Opcjonalnie. Użyj atrybutu gateway_identity czujnika limitu eksportu, aby wymagać zgodności bramy."
         },
         "slew_rate": {
           "name": "Szybkość zmiany (W/sec)",
