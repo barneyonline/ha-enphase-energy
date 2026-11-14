@@ -775,6 +775,11 @@ transport failure as a successful action. Lifecycle checks prevent writes that
 finish after shutdown from publishing stale state or restarting refresh timers.
 All schedule mutations use the same authentication-failure handling.
 
+Schedule startup and shutdown serialize on a lifecycle lock. Legacy helper
+cleanup awaits each storage-collection deletion, which also awaits its entity
+listeners. It must not drain all Home Assistant tasks while holding that lock:
+a config-entry update listener can be waiting for schedule shutdown during reload.
+
 Writes are serialized per charger, including collection preparation and the
 read-modify-write enabled-state map. Reads capture the mutation revision before
 requesting data and discard results superseded by accepted writes or lifecycle
