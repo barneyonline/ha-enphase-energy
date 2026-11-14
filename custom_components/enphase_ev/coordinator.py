@@ -3796,7 +3796,7 @@ class EnphaseCoordinator(
     ) -> None:
         self._record_refresh_pipeline_performance(context, outcome="success")
         self._refresh_cached_topology()
-        self.discovery_snapshot.schedule_save()
+        self.discovery_snapshot.schedule_save(reuse_inventory=True)
 
     async def async_refresh_grid_profile_metadata(self, *, force: bool = False) -> None:
         """Refresh optional grid-profile status outside the core pipeline."""

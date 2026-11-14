@@ -482,7 +482,7 @@ class RefreshRunner:
             coordinator._warmup_in_progress = False
             coordinator._warmup_phase_timings = warmup_timings
             self._record_setup_milestone("warmup_complete")
-            coordinator.discovery_snapshot.schedule_save()
+            coordinator.discovery_snapshot.schedule_save(reuse_inventory=True)
 
     async def async_start_startup_warmup(self) -> None:
         coordinator = self._coordinator

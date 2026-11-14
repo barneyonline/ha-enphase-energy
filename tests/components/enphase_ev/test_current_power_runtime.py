@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 import time
 from types import SimpleNamespace
@@ -398,3 +399,59 @@ async def test_async_refresh_timestamp_less_extreme_remains_pending(
     assert coord._current_power_consumption_w is None
     assert diagnostics["validation_reason"] == "extreme_sample_missing_timestamp"
     assert diagnostics["pending_extreme_count"] == 1
+
+
+async def test_overlapping_diagnostic_reads_share_request(coordinator_factory):
+    coord = coordinator_factory()
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def read():
+        started.set()
+        await release.wait()
+        return {"value": 150, "units": "W"}
+
+    fetch = AsyncMock(side_effect=read)
+    coord.client.latest_power = fetch
+    runtime = coord.current_power_runtime
+    first = asyncio.create_task(runtime.async_refresh())
+    await started.wait()
+    second = asyncio.create_task(runtime.async_refresh())
+    await asyncio.sleep(0)
+    release.set()
+    await asyncio.gather(first, second)
+    fetch.assert_awaited_once()
+    before = coord._build_integration_snapshot(coord.data)
+    runtime.replace_snapshot(w=200)
+    after = coord._build_integration_snapshot(coord.data)
+    assert after == before
+    assert after.current_power.w == 200
+
+
+@pytest.mark.parametrize("fails", [False, True])
+async def test_clear_discards_in_flight_diagnostic_read(coordinator_factory, fails):
+    coord = coordinator_factory()
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def read():
+        started.set()
+        await release.wait()
+        if fails:
+            raise TimeoutError
+        return {"value": 150, "units": "W"}
+
+    fetch = AsyncMock(side_effect=read)
+    coord.client.latest_power = fetch
+    runtime = coord.current_power_runtime
+    task = asyncio.create_task(runtime.async_refresh())
+    await started.wait()
+    runtime.clear()
+    release.set()
+    await task
+    assert runtime.snapshot.w is None
+    assert coord._endpoint_family_state("current_power").consecutive_failures == 0
+    fetch.side_effect = None
+    fetch.return_value = {"value": 150, "units": "W"}
+    await runtime.async_refresh()
+    assert runtime.snapshot.w == 150

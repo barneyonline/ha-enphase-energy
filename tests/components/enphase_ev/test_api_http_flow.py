@@ -113,6 +113,16 @@ def test_should_limit_enlighten_read_request_handles_bad_string_casts() -> None:
     assert api._should_limit_enlighten_read_request("GET", BadUrl()) is False
 
 
+def test_export_limit_readback_post_shares_the_enlighten_read_budget() -> None:
+    origin = api.BASE_URL
+    assert api._should_limit_enlighten_read_request(
+        "POST", f"{origin}/service/site-device/api/v1/123/site-device-settings"
+    )
+    assert not api._should_limit_enlighten_read_request(
+        "PUT", f"{origin}/site_pel_settings/123"
+    )
+
+
 @pytest.mark.asyncio
 async def test_enlighten_request_timeout_includes_limiter_queue(monkeypatch) -> None:
     limiter = asyncio.Semaphore(0)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Callable
 import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -13,10 +15,11 @@ from homeassistant.components.sensor import (
     SensorExtraStoredData,
     SensorStateClass,
 )
-from homeassistant.const import EVENT_STATE_CHANGED, UnitOfEnergy, UnitOfPower
+from homeassistant.const import UnitOfEnergy, UnitOfPower
 from homeassistant.core import Event
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util.unit_conversion import PowerConverter
 from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 from homeassistant.util import dt as dt_util
@@ -1836,22 +1839,85 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         self._last_rejected_sample: dict[str, object] | None = None
         self._power_history = PowerHistory()
         self._restored_reading: PowerReading | None = None
+        self._power_source_ids: tuple[str, ...] = ()
+        self._remove_power_sources: Callable[[], None] | None = None
+        self._power_update_handle: asyncio.Handle | None = None
+        self._tracking_power_sources = False
 
-    def _power_source_key(self, entity_id: str) -> str | None:
-        entry = er.async_get(self.hass).async_get(entity_id)
-        if entry is None or entry.platform != DOMAIN:
-            return None
-        for key in ("current_production_power", "grid_power", "battery_power"):
-            if entry.unique_id == f"{DOMAIN}_site_{self._coord.site_id}_{key}":
-                return key
-        return None
+    _POWER_SOURCES = ("current_production_power", "grid_power", "battery_power")
 
     @callback
-    def _power_source_changed(self, event: Event) -> None:
-        if self._power_source_key(event.data["entity_id"]) is not None:
-            self._update_averaged_power()
-            self._schedule_freshness_expiry()
-            self.async_write_ha_state()
+    def _bind_power_sources(self) -> None:
+        registry = er.async_get(self.hass)
+        source_ids = tuple(
+            entity_id
+            for key in self._POWER_SOURCES
+            if (
+                entity_id := registry.async_get_entity_id(
+                    "sensor", DOMAIN, f"{DOMAIN}_site_{self._coord.site_id}_{key}"
+                )
+            )
+            is not None
+        )
+        if source_ids == self._power_source_ids:
+            return
+        self._unbind_power_sources()
+        self._power_source_ids = source_ids
+        if source_ids:
+            self._remove_power_sources = async_track_state_change_event(
+                self.hass, source_ids, self._power_source_changed
+            )
+        self._queue_power_update()
+
+    @callback
+    def _unbind_power_sources(self) -> None:
+        if self._remove_power_sources is not None:
+            self._remove_power_sources()
+            self._remove_power_sources = None
+        self._power_source_ids = ()
+
+    @callback
+    def _power_registry_changed(self, event: Event[Any]) -> None:
+        entity_id = event.data["entity_id"]
+        old_id = event.data.get("changes", {}).get("entity_id", entity_id)
+        entry = er.async_get(self.hass).async_get(entity_id)
+        if old_id in self._power_source_ids or (
+            entry is not None
+            and entry.platform == DOMAIN
+            and entry.domain == "sensor"
+            and entry.unique_id
+            in {
+                f"{DOMAIN}_site_{self._coord.site_id}_{key}"
+                for key in self._POWER_SOURCES
+            }
+        ):
+            self._bind_power_sources()
+
+    @callback
+    def _power_source_changed(self, _event: Event[Any]) -> None:
+        self._queue_power_update()
+
+    @callback
+    def _queue_power_update(self) -> None:
+        if self._power_update_handle is None:
+            self._power_update_handle = self.hass.loop.call_soon(
+                self._flush_power_update
+            )
+
+    @callback
+    def _flush_power_update(self) -> None:
+        self._power_update_handle = None
+        self._process_current_sample()
+        self._schedule_freshness_expiry()
+        self.async_write_ha_state()
+
+    @callback
+    def _stop_power_updates(self) -> None:
+        self._unbind_power_sources()
+        if self._power_update_handle is not None:
+            self._power_update_handle.cancel()
+            self._power_update_handle = None
+        self._tracking_power_sources = False
 
     def _update_power_balance(self) -> None:
         """Use published source values, including user-selected power units."""
@@ -1866,7 +1932,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
         using_cached = False
         total = 0.0
         windows: list[tuple[float, float]] = []
-        for key in ("current_production_power", "grid_power", "battery_power"):
+        for key in self._POWER_SOURCES:
             self._balance_blocker = {"source": key, "reason": "missing_entity"}
             entity_id = registry.async_get_entity_id(
                 "sensor", DOMAIN, f"{DOMAIN}_site_{self._coord.site_id}_{key}"
@@ -2002,13 +2068,18 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
 
     async def async_added_to_hass(self) -> None:
         await self._async_restore_power()
-        self._update_averaged_power()
+        self._process_current_sample()
+        self._tracking_power_sources = True
         await super().async_added_to_hass()
+        self.async_on_remove(
+            self.hass.bus.async_listen(
+                er.EVENT_ENTITY_REGISTRY_UPDATED, self._power_registry_changed
+            )
+        )
+        self.async_on_remove(self._stop_power_updates)
+        self._bind_power_sources()
 
     async def _async_restore_power(self) -> None:
-        self.async_on_remove(
-            self.hass.bus.async_listen(EVENT_STATE_CHANGED, self._power_source_changed)
-        )
         last_extra = await self.async_get_last_extra_data()
         raw_extra = power_restore_data(last_extra)
         baseline = raw_extra.get("power_baseline")
@@ -2220,7 +2291,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
 
     def _freshness_deadline(self) -> datetime | None:
         """Bound retained watts by the last valid contributing source sample."""
-        if not self._averaging_enabled:
+        if not self._averaging_enabled and not self._tracking_power_sources:
             self._process_current_sample()
         timestamp = (
             self._balance_power_ts
@@ -2267,12 +2338,11 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        self._update_averaged_power()
-        super()._handle_coordinator_update()
+        self._queue_power_update()
 
     @callback
     def _handle_freshness_expiry(self) -> None:
-        self._update_averaged_power()
+        self._process_current_sample()
         super()._handle_freshness_expiry()
 
     def _update_averaged_power(self) -> None:
@@ -2591,7 +2661,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
 
     @property
     def available(self) -> bool:
-        if not self._averaging_enabled:
+        if not self._averaging_enabled and not self._tracking_power_sources:
             self._process_current_sample()
         if not super().available:
             return False
@@ -2605,7 +2675,7 @@ class EnphaseSiteConsumptionPowerSensor(_SiteBaseEntity, RestoreEntity):  # type
 
     @property
     def native_value(self) -> int | None:
-        if not self._averaging_enabled:
+        if not self._averaging_enabled and not self._tracking_power_sources:
             self._process_current_sample()
         if self._balance_power_w is None and self._restored_reading is not None:
             return round(self._restored_reading.watts)

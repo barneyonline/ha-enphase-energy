@@ -361,6 +361,11 @@ class ExportLimitSelect(CoordinatorEntity, SelectEntity):  # type: ignore[misc]
         self._coord = coord
         self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_export_limit"
 
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        runtime = self._coord.export_limit_runtime
+        self.async_on_remove(runtime.async_add_listener(self.async_write_ha_state))
+
     @property
     def device_info(self) -> DeviceInfo | None:
         return _type_device_info(self._coord, "envoy")

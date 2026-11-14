@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
+import logging
 import math
 import time
 from typing import Any, NoReturn, cast
@@ -20,9 +21,11 @@ from homeassistant.util.json import SerializationError
 from homeassistant.helpers import issue_registry as ir
 
 from .api import ActivationAccessDenied, Unauthorized
+from .api_client.common import enlighten_optional_read_scope
 from .api_client.errors import ActivationSessionExpired, EnphaseLoginWallUnauthorized
 from .grid_profile_runtime import request_session_reauthentication
 from .api_client.export_limit_surface import form_matches_configuration
+from .cloud_retry import retry_after_delay, transient_backoff_delay
 from .const import (
     DOMAIN,
     OPT_EXPORT_LIMIT_CONTROLS_ENABLED,
@@ -37,6 +40,8 @@ from .runtime_helpers import normalize_poll_intervals
 
 OBSERVATION_SECONDS = BATTERY_PROFILE_PENDING_TIMEOUT_S
 _ENTRY_LOCKS = f"{DOMAIN}.export_limit.locks"
+PERMISSION_TTL_SECONDS = 300.0
+_LOGGER = logging.getLogger(__name__)
 
 
 def fail(key: str) -> NoReturn:
@@ -233,6 +238,14 @@ class ExportLimitRuntime:
         self._wake = asyncio.Event()
         self._task: asyncio.Task[None] | None = None
         self._stopped = False
+        self._read_failures = 0
+        self._retry_at = 0.0
+        self._permission_until = 0.0
+        self._permission_revision: int | None = None
+        self._listeners: dict[Callable[[], None], bool] = {}
+        self._published_state: tuple[object, ...] | None = None
+        self._published_readback: float | None = None
+        self._pending_issue_visible: bool | None = None
         entry = coordinator.config_entry
         storage_key = (
             f"{DOMAIN}.export_limit.{getattr(entry, 'entry_id', coordinator.site_id)}"
@@ -269,19 +282,50 @@ class ExportLimitRuntime:
         ):
             fail("export_limit_disabled")
 
+    def async_add_listener(
+        self, listener: Callable[[], None], *, include_readback: bool = False
+    ) -> Callable[[], None]:
+        """Subscribe to this runtime's settings and request state."""
+        self._listeners[listener] = include_readback
+
+        def remove() -> None:
+            self._listeners.pop(listener, None)
+
+        return remove
+
     def _publish(self) -> None:
         self._sync_pending_issue()
-        self.coordinator.async_update_listeners()
+        if self._stopped or not getattr(self.coordinator, "runtime_active", True):
+            return
+        state = (
+            self.snapshot,
+            self.request_status,
+            self.pending and dict(self.pending),
+        )
+        changed = state != self._published_state
+        readback_changed = self.last_readback != self._published_readback
+        self._published_state = state
+        self._published_readback = self.last_readback
+        for listener, include_readback in tuple(self._listeners.items()):
+            if changed or (include_readback and readback_changed):
+                try:
+                    listener()
+                except Exception:  # noqa: BLE001 - subscribers are independent
+                    _LOGGER.exception("Error notifying Export Limit listener")
 
     def _sync_pending_issue(self) -> None:
         entry = self.coordinator.config_entry
         issue_id = f"export_limit_pending_{getattr(entry, 'entry_id', self.coordinator.site_id)}"
-        if (
+        visible = bool(
             self.enabled
             and not self._stopped
             and self.pending
             and time.time() - self.pending["started"] >= OBSERVATION_SECONDS
-        ):
+        )
+        if visible == self._pending_issue_visible:
+            return
+        self._pending_issue_visible = visible
+        if visible:
             ir.async_create_issue(
                 self.coordinator.hass,
                 DOMAIN,
@@ -310,10 +354,15 @@ class ExportLimitRuntime:
                 ),
             ),
         )
+        retry_in = self._retry_at - time.monotonic()
         if self.pending:
-            remaining = OBSERVATION_SECONDS - (time.time() - self.pending["started"])
+            remaining = OBSERVATION_SECONDS - (
+                time.time() - float(self.pending["started"])
+            )
             if remaining > 0:
-                return min(float(fast), float(remaining))
+                return min(retry_in if retry_in > 0 else float(fast), remaining)
+        if retry_in > 0:
+            return retry_in
         return float(slow)
 
     async def _wait_for_poll(self, delay: float) -> None:
@@ -483,12 +532,12 @@ class ExportLimitRuntime:
                 self.request_status = "unconfirmed"
         self._publish()
 
-    async def async_refresh(self) -> dict[str, object]:
+    async def async_refresh(self, *, background: bool = False) -> dict[str, object]:
         async with self._lock:
-            await self._refresh_locked()
+            await self._refresh_locked(background=background)
             return self.attributes()
 
-    async def _refresh_locked(self) -> None:
+    async def _refresh_locked(self, *, background: bool = False) -> None:
         """Refresh settings with the entry's intent lock held."""
         self._require_enabled()
         await self._load()
@@ -497,21 +546,25 @@ class ExportLimitRuntime:
             and time.time() - self.pending["started"] >= OBSERVATION_SECONDS
         ):
             self.request_status = "unconfirmed"
+        if background and time.monotonic() < self._retry_at:
             self._publish()
+            return
         try:
-            await self.coordinator.client.async_prepare_activation_auth()
-            await self.coordinator.client.async_get_activation_device_list()
-            await self._read()
+            if background:
+                with enlighten_optional_read_scope():
+                    await self._refresh_readback(background=True)
+            else:
+                await self._refresh_readback(background=False)
         except Exception as err:
-            session_expired = isinstance(
+            self._record_read_failure(err, background=background)
+            if isinstance(
                 err,
                 (
                     ActivationSessionExpired,
                     EnphaseLoginWallUnauthorized,
                     ConfigEntryAuthFailed,
                 ),
-            )
-            if session_expired:
+            ):
                 request_session_reauthentication(self.coordinator)
             self.snapshot = None
             self._publish()
@@ -519,10 +572,20 @@ class ExportLimitRuntime:
                 translation_domain=DOMAIN,
                 translation_key=(
                     "export_limit_session_expired"
-                    if session_expired
+                    if isinstance(
+                        err,
+                        (
+                            ActivationSessionExpired,
+                            EnphaseLoginWallUnauthorized,
+                            ConfigEntryAuthFailed,
+                        ),
+                    )
                     else "export_limit_unavailable"
                 ),
             ) from err
+        if time.monotonic() >= self._retry_at:
+            self._read_failures = 0
+            self._retry_at = 0.0
         self._schedule()
 
     async def async_retire_replaced_intent(
@@ -562,6 +625,35 @@ class ExportLimitRuntime:
                 ) from err
             return True
 
+    def _record_read_failure(
+        self, error: Exception, *, background: bool = False
+    ) -> None:
+        self._permission_until = 0.0
+        delay = retry_after_delay(error) or 0.0
+        if background:
+            self._read_failures += 1
+            delay = max(delay, transient_backoff_delay(self._read_failures))
+        if delay > 0:
+            self._retry_at = max(self._retry_at, time.monotonic() + delay)
+
+    async def _refresh_readback(self, *, background: bool) -> None:
+        client = self.coordinator.client
+        if (
+            not background
+            or time.monotonic() >= self._permission_until
+            or self._permission_revision
+            != getattr(client, "activation_auth_revision", None)
+        ):
+            await client.async_prepare_activation_auth()
+            revision = getattr(client, "activation_auth_revision", None)
+            await client.async_get_activation_device_list()
+            if revision == getattr(client, "activation_auth_revision", None):
+                self._permission_until = time.monotonic() + PERMISSION_TTL_SECONDS
+                self._permission_revision = revision
+            else:
+                self._permission_until = 0.0
+        await self._read()
+
     async def async_prepare(self) -> ExportLimitSnapshot:
         """Check installer and PEL form access without changing configuration."""
         self._require_enabled()
@@ -571,6 +663,7 @@ class ExportLimitRuntime:
         except ServiceValidationError:
             raise
         except Exception as err:
+            self._record_read_failure(err)
             if isinstance(
                 err,
                 (
@@ -688,6 +781,7 @@ class ExportLimitRuntime:
             except ServiceValidationError:
                 raise
             except Exception as err:
+                self._record_read_failure(err)
                 session_expired = isinstance(
                     err,
                     (
@@ -747,6 +841,7 @@ class ExportLimitRuntime:
                     try:
                         gateway_id = await self._active_gateway_id()
                     except Exception as err:
+                        self._record_read_failure(err)
                         self.snapshot = None
                         raise ServiceValidationError(
                             translation_domain=DOMAIN,
@@ -804,7 +899,8 @@ class ExportLimitRuntime:
                 self._schedule()
             try:
                 await self._read()
-            except Exception:
+            except Exception as err:
+                self._record_read_failure(err)
                 self.request_status = "unconfirmed"
                 self._publish()
             return self.attributes()
@@ -820,7 +916,7 @@ class ExportLimitRuntime:
         self._sync_pending_issue()
         if self.enabled:
             try:
-                await self.async_refresh()
+                await self.async_refresh(background=True)
             except ServiceValidationError:
                 self._schedule()
 
@@ -828,8 +924,10 @@ class ExportLimitRuntime:
         try:
             while self.enabled and not self._stopped:
                 await self._wait_for_poll(self._poll_delay())
+                if not self.enabled or self._stopped:
+                    break
                 try:
-                    await self.async_refresh()
+                    await self.async_refresh(background=True)
                 except ServiceValidationError:
                     pass
         finally:

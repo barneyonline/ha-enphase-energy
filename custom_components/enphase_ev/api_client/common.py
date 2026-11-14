@@ -721,12 +721,12 @@ def _should_limit_enlighten_read_request(method: object, url: object) -> bool:
         return False
     if not url_text.startswith((f"{BASE_URL}/", f"{GS_BASE_URL}/")):
         return False
-    # Session-history retrieval uses POST but consumes the same cloud read
-    # capacity as GET. Keep mutating POST endpoints outside the read budget.
+    # These endpoints use POST for reads and share the GET read budget.
     return method_text != "POST" or bool(
         re.fullmatch(
-            rf"{re.escape(BASE_URL)}/service/enho_historical_events_ms/"
-            r"[^/?#]+/sessions/[^/?#]+/history(?:[?#].*)?",
+            rf"{re.escape(BASE_URL)}/service/(?:enho_historical_events_ms/"
+            r"[^/?#]+/sessions/[^/?#]+/history|site-device/api/v1/"
+            r"[^/?#]+/site-device-settings)(?:[?#].*)?",
             url_text,
         )
     )

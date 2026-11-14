@@ -140,6 +140,8 @@ async def async_prepare_activation_auth(
             ) from err
         if isinstance(err, aiohttp.ClientResponseError) and err.status == 403:
             raise ActivationAccessDenied("Activation access denied") from err
+        if isinstance(err, aiohttp.ClientResponseError) and err.status == 429:
+            raise
         _LOGGER.debug(
             "Activation auth bootstrap unavailable for site %s: %s",
             redact_site_id(self._site),
@@ -156,7 +158,9 @@ async def async_prepare_activation_auth(
             redact_site_id(self._site),
         )
         return False
-    self._activation_token, self._activation_referer = context
+    if context != (self._activation_token, self._activation_referer):
+        self._activation_token, self._activation_referer = context
+        self.activation_auth_revision += 1
     return True
 
 

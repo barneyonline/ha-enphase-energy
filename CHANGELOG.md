@@ -21,10 +21,12 @@ All notable changes to this project will be documented in this file.
 - Let automatic controllers bind Export Limit commands to the original gateway and reject a replacement observed before submission.
 - Verify the active gateway inventory before showing Export Limit settings or confirming requests, including when installer settings return one gateway. Retry failed confirmation saves on a later poll.
 - Let Energy Planner acknowledge an expired Export Limit intent after Enphase verifies that the original gateway was replaced.
+- Honor provider retry deadlines for Export Limit readback, including after a write. Retry the first Grid Profile probe after Activation throttling and isolate listener errors from Export Limit writes.
 
 ### 🔧 Improvements
 
-- None
+- Reuse Export Limit permission checks for up to five minutes during background polling and revalidate them when the Activation session changes.
+- Reduce repeated Consumption Power updates and discovery metadata processing. Share overlapping diagnostic power reads.
 
 ### 🔄 Other changes
 

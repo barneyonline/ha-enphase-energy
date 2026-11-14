@@ -49,7 +49,7 @@ class IntegrationSnapshot:
 
     chargers: ChargerPayloads
     evse_feature_flags: EvseFeatureFlagsSnapshot
-    current_power: CurrentPowerSample
+    current_power: CurrentPowerSample = field(compare=False)
     vpp: VppSnapshot = field(default_factory=VppSnapshot)
     evse: EvseControlSnapshot = field(default_factory=EvseControlSnapshot)
     auth: AuthRefreshSnapshot = field(default_factory=AuthRefreshSnapshot)

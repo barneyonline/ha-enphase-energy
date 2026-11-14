@@ -10,6 +10,7 @@ from homeassistant.helpers.entity import EntityCategory
 from .const import DOMAIN
 from .coordinator import EnphaseCoordinator
 from .entity import EnphaseBaseEntity
+from .export_limit_runtime import ExportLimitRuntime
 from .runtime_helpers import inventory_type_device_info
 from .sensor_base import EnphaseSiteSensorEntity
 
@@ -78,6 +79,15 @@ class EnphaseDeviceUpdateStatusSensor(EnphaseSiteSensorEntity):
             "Update Status",
             None if type_key == "cloud" else type_key,
         )
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self._type_key == "envoy":
+            runtime = self._coord.export_limit_runtime
+            if isinstance(runtime, ExportLimitRuntime) and runtime.enabled:
+                self.async_on_remove(
+                    runtime.async_add_listener(self.async_write_ha_state)
+                )
 
     @property
     def extra_state_attributes(self) -> dict[str, object]:

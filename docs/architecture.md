@@ -76,6 +76,16 @@ The runtime persists pending intent, never form tokens, and resumes readback
 after reload. It polls at the configured fast interval for ten minutes after a
 write, then at the standard interval; an unconfirmed-request repair is owned by
 that runtime and cleared on unload or matching readback.
+Background reads reuse successful Activation permission checks for up to five
+minutes, scoped to the current Activation session. Explicit checks and writes
+still validate permissions directly. Failed background reads use bounded
+backoff and honor longer provider Retry-After deadlines. The pending observation
+deadline still updates the repair during backoff. A provider retry deadline from
+an explicit check or post-write readback also delays the next background
+request. A throttled first Grid Profile probe can retry after cooldown.
+Export Limit settings and intent changes notify the associated entities.
+The Export Limit sensor also publishes successful readback timestamps for
+freshness consumers. Recorder excludes this timestamp from stored attributes.
 The guided Export Limit menu uses one Enable Export Limit action for both zero
 and nonzero limits: 0 W requests no grid export, and a positive value sets the
 maximum permitted export power. Both proceed through the same confirmation step.
@@ -267,9 +277,9 @@ Keep new endpoint handling inside `api_client/` or narrow parser modules so
 coordinator and entity code remain normalized. Preserve compatibility exports
 from `api.py` when moving existing behavior.
 
-The shared Enlighten read budget also covers the session-history POST endpoint,
-which is logically a read. Optional history enrichment reserves core read capacity;
-mutating POST requests remain outside the read limiter. Endpoint-family cooldowns
+The shared Enlighten read budget covers the POST endpoints for session history
+and Export Limit settings readback. Optional enrichment and background Export
+Limit reads reserve core read capacity. Endpoint-family cooldowns
 use `cloud_retry.py` to interpret numeric and HTTP-date Retry-After headers.
 
 ### Weather child coordinator
@@ -675,6 +685,9 @@ validation and receipt metadata are independent of the derived sensor. Samples
 more than 60 seconds ahead of receipt are rejected before extreme-power
 confirmation; failed, malformed or rejected acquisitions cannot renew diagnostic
 receipt time. Diagnostics and sanitized measurement logs expose `future_timestamp`.
+Overlapping reads share an acquisition while the endpoint keeps its existing
+cache and health checks. Diagnostic sample values do not participate in
+coordinator snapshot equality.
 
 The per-inverter Lifetime Energy and Power feature switches independently gate
 entity creation. Switching a feature off removes its registered entities, including
@@ -921,6 +934,11 @@ or future-dated responses cannot change cumulative baselines or the accepted
 clock, so the next valid reading uses the previous valid calculation window.
 Consumption marks retained source watts as
 `using_cached`, and ignores numeric `seeded`/`no_live_data` placeholders.
+
+Consumption Power listens to its three registered source entities and follows
+registry changes. It combines coordinator and source events in one evaluation
+after the source states have settled. An unchanged expiry deadline keeps its
+existing timer.
 
 Consumption diagnostics separate the current `power_balance_blocker` (source
 key and categorical reason) from `last_rejection`, which is historical rejection

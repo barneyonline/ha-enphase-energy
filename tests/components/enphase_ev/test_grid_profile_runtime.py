@@ -23,6 +23,7 @@ from custom_components.enphase_ev.api import (
 )
 from custom_components.enphase_ev.coordinator import EnphaseCoordinator
 from custom_components.enphase_ev.grid_profile_runtime import (
+    ACTIVATION_GRID_PROFILE_FAMILY,
     ALL_PROFILES_OPTION,
     COMMONLY_USED_OPTION,
     SUPPORT_CONFIRMED,
@@ -282,6 +283,93 @@ async def test_activation_auth_bootstrap_soft_fails_when_settings_unavailable() 
     assert (
         client._activation_headers()["Authorization"] == "Bearer TOKEN"
     )  # noqa: SLF001
+
+
+async def test_activation_auth_bootstrap_propagates_rate_limit() -> None:
+    client = _make_api_client()
+    error = aiohttp.ClientResponseError(
+        None, (), status=429, headers={"Retry-After": "600"}
+    )
+    client._text = AsyncMock(side_effect=error)
+
+    with pytest.raises(aiohttp.ClientResponseError) as caught:
+        await client.async_prepare_activation_auth()
+    assert caught.value is error
+
+
+async def test_grid_profile_bootstrap_throttling_preserves_profile(
+    coordinator_factory,
+) -> None:
+    coordinator = coordinator_factory()
+    runtime = coordinator.grid_profile_runtime
+    runtime.support_state = SUPPORT_CONFIRMED
+    runtime.installer_access_ever_confirmed = True
+    runtime.current_profile_name = "Australia A Region"
+    client = coordinator.client
+    client._text = AsyncMock(
+        side_effect=aiohttp.ClientResponseError(
+            SimpleNamespace(real_url="https://example.invalid/settings"),
+            (),
+            status=429,
+            headers={"Retry-After": "7200"},
+        )
+    )
+    client.async_get_activation_device_list = AsyncMock()
+
+    result = await runtime.async_refresh(force=True, load_profiles=False)
+    await runtime.async_refresh(load_profiles=False)
+
+    assert result.support_state == SUPPORT_CONFIRMED
+    assert runtime.current_profile_display() == "Australia A Region"
+    health = coordinator._endpoint_family_state(ACTIVATION_GRID_PROFILE_FAMILY)
+    assert health.last_status == 429
+    assert (health.next_retry_utc - health.last_request_utc).total_seconds() == 7200
+    client._text.assert_awaited_once()
+    client.async_get_activation_device_list.assert_not_awaited()
+
+
+async def test_throttled_first_grid_profile_probe_recovers(coordinator_factory):
+    from custom_components.enphase_ev.const import OPT_GRID_PROFILE_CONTROLS_ENABLED
+
+    coordinator = coordinator_factory()
+    coordinator.config_entry = SimpleNamespace(
+        options={OPT_GRID_PROFILE_CONTROLS_ENABLED: True}
+    )
+    runtime = coordinator.grid_profile_runtime
+    assert runtime.support_state == SUPPORT_UNKNOWN
+    client = coordinator.client
+    client._text = AsyncMock(
+        side_effect=aiohttp.ClientResponseError(
+            SimpleNamespace(real_url="https://example.invalid/settings"),
+            (),
+            status=429,
+            headers={"Retry-After": "600"},
+        )
+    )
+
+    await coordinator.async_refresh_grid_profile_metadata(force=True)
+
+    assert runtime.support_state == SUPPORT_UNAVAILABLE
+    health = coordinator._endpoint_family_state(ACTIVATION_GRID_PROFILE_FAMILY)
+    assert health.last_status == 429
+    client._text.side_effect = None
+    client._text.return_value = ""
+    client.async_get_activation_reference_data = AsyncMock(
+        return_value={"country_regions": {}}
+    )
+    client.async_get_activation_record = AsyncMock(return_value={})
+    client.async_get_activation_device_list = AsyncMock(return_value={})
+
+    steady_refresh = SimpleNamespace(first_refresh=False)
+    coordinator._schedule_grid_profile_metadata_refresh(steady_refresh)
+    await coordinator._grid_profile_metadata_task
+    client.async_get_activation_device_list.assert_not_awaited()
+
+    health.next_retry_mono = 0.0
+    coordinator._schedule_grid_profile_metadata_refresh(steady_refresh)
+    await coordinator._grid_profile_metadata_task
+    client.async_get_activation_device_list.assert_awaited_once()
+    assert runtime.support_state == SUPPORT_CONFIRMED
 
 
 async def test_activation_api_helpers_use_cloud_payloads() -> None:
