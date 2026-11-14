@@ -3031,6 +3031,40 @@ async def test_late_gateway_replacement_retires_unsent_intent(runtime, during, c
     guard.assert_not_called()
 
 
+async def test_expected_gateway_service_write_uses_send_boundary(runtime):
+    from homeassistant.config_entries import ConfigEntryState
+
+    from custom_components.enphase_ev.services import async_setup_services
+
+    coord = runtime.coordinator
+    object.__setattr__(coord.config_entry, "state", ConfigEntryState.LOADED)
+    async_setup_services(coord.hass)
+    original = await runtime.async_prepare()
+    client = coord.client
+
+    async def write(_fields, watts, _slew, *, before_write):
+        before_write()
+        client.async_get_export_limit_settings.return_value = payload(
+            free_limit_value=watts
+        )
+
+    client.async_set_export_limit.side_effect = write
+    await coord.hass.services.async_call(
+        DOMAIN,
+        "set_export_limit",
+        {
+            "config_entry_id": coord.config_entry.entry_id,
+            "expected_gateway": original.gateway_identity,
+            "limit_watts": 0,
+        },
+        blocking=True,
+    )
+
+    client.async_set_export_limit.assert_awaited_once()
+    assert runtime.request_status == "confirmed"
+    assert runtime.pending is None
+
+
 async def test_failed_final_inventory_read_retires_unsent_intent(runtime):
     client = runtime.coordinator.client
     original = await runtime.async_prepare()
