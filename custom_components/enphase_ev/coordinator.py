@@ -1103,7 +1103,7 @@ class EnphaseCoordinator(
             failure_backoff=SESSION_HISTORY_FAILURE_BACKOFF_S,
             concurrency=SESSION_HISTORY_CONCURRENCY,
             data_supplier=lambda: self.data,
-            publish_callback=self.async_set_updated_data,
+            publish_callback=self.publish_enrichment,
             site_id_getter=lambda: self.site_id,
             logger=_LOGGER,
         )
@@ -1151,6 +1151,10 @@ class EnphaseCoordinator(
         """Retire this lifecycle before awaited shutdown steps release control."""
 
         self._runtime_stopped = True
+        for name, method in (("summary", "stop"), ("evse_timeseries", "stop")):
+            retire = getattr(self.__dict__.get(name), method, None)
+            if callable(retire):
+                retire()
         self.battery_runtime.profile_mismatch.invalidate()
         runtime = getattr(self, "control_updates", None)
         if runtime:
@@ -1174,6 +1178,7 @@ class EnphaseCoordinator(
     ) -> IntegrationSnapshot:
         """Build and retain the aggregate state used for update equality."""
 
+        summary = self.__dict__.get("summary")
         current_power_runtime = self.__dict__.get("current_power_runtime")
         current_power = (
             current_power_runtime.snapshot
@@ -1266,6 +1271,14 @@ class EnphaseCoordinator(
             ),
             health=(
                 self.evse_status_available,
+                (
+                    (
+                        summary.publication_health,
+                        summary.gateway_publication_state(data),
+                    )
+                    if isinstance(summary, SummaryStore)
+                    else None
+                ),
                 self.cloud_next_retry_utc,
                 getattr(self, "_last_error", None),
                 getattr(self, "last_failure_status", None),
@@ -1317,14 +1330,18 @@ class EnphaseCoordinator(
         snapshot = self._build_integration_snapshot(data)
         super().async_set_updated_data(CoordinatorData(data, snapshot))
 
-    def publish_auth_refresh_update(self) -> None:
-        """Notify auth observers without marking telemetry fresh or rescheduling polls."""
+    def publish_enrichment(self, data: dict[str, dict[str, object]]) -> None:
+        """Publish a snapshot while preserving core poll health and scheduling."""
 
         if not self.runtime_active:
             return
-        current = dict(self.data)
-        self.data = CoordinatorData(current, self._build_integration_snapshot(current))
+        self.data = CoordinatorData(data, self._build_integration_snapshot(data))
         self.async_update_listeners()
+
+    def publish_auth_refresh_update(self) -> None:
+        """Publish auth counters independently of core telemetry."""
+
+        self.publish_enrichment(dict(self.data or {}))
 
     def publish_runtime_state_update(self, source: str) -> None:
         """Publish a manager-owned state transition with unchanged charger data."""
@@ -1336,7 +1353,7 @@ class EnphaseCoordinator(
             self._runtime_publication_revisions.get(source_key, 0) + 1
         )
         current = self.data if isinstance(self.data, dict) else {}
-        self.async_set_updated_data(dict(current))
+        self.publish_enrichment(dict(current))
 
     def _ensure_coordinator_runtime(self, attr_name: str) -> object:
         """Instantiate and cache a coordinator sub-runtime (single factory for __init__ / __getattr__)."""
@@ -2198,6 +2215,10 @@ class EnphaseCoordinator(
         """
 
         self._runtime_stopped = True
+        for name, method in (("summary", "stop"), ("evse_timeseries", "stop")):
+            retire = getattr(self.__dict__.get(name), method, None)
+            if callable(retire):
+                retire()
         runtime = getattr(self, "control_updates", None)
         if runtime:
             runtime.cleanup()
@@ -2300,6 +2321,9 @@ class EnphaseCoordinator(
         """Cancel and await entry-owned runtime work before client shutdown."""
 
         cancelled_tasks = self.cleanup_runtime_state()
+        export_limit_runtime = getattr(self, "export_limit_runtime", None)
+        if export_limit_runtime is not None:
+            await export_limit_runtime.async_wait_for_intent_transactions()
         if cancelled_tasks:
             done, pending = await asyncio.wait(
                 cancelled_tasks,
@@ -3694,6 +3718,8 @@ class EnphaseCoordinator(
             for source, destination in (
                 ("displayName", "display_name"),
                 ("lastReportedAt", "last_reported_at"),
+                ("status", "status"),
+                ("phaseMode", "phase_mode"),
                 ("firmwareVersion", "firmware_version"),
                 ("firmwareVersion", "sw_version"),
                 ("processorBoardVersion", "hw_version"),

@@ -594,7 +594,8 @@
           "fast_while_streaming": "Preferuj szybkie odpytywanie podczas aktywnego strumienia chmury",
           "api_timeout": "Limit czasu API (s)",
           "session_history_interval": "Interwał historii sesji (min)",
-          "degraded_service_repair_issues": "Włącz naprawy usług zdegradowanych"
+          "degraded_service_repair_issues": "Włącz naprawy usług zdegradowanych",
+          "use_15_minute_power_average": "Używaj 15-minutowej średniej mocy"
         },
         "data_description": {
           "fast_poll_interval": "Interwał używany podczas ładowania lub strumieniowania. Domyślnie: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Gdy włączone, szybkie odpytywanie podczas aktywnego strumienia chmury. Domyślnie: Włączone.",
           "api_timeout": "Liczba sekund przed przekroczeniem limitu czasu żądań API. Domyślnie: 15 s.",
           "session_history_interval": "Minuty oczekiwania między pobieraniem historii sesji z chmury. Domyślnie: 10 min.",
-          "degraded_service_repair_issues": "Tworzy problemy w Repairs, gdy opcjonalne usługi Enphase są zdegradowane. Domyślnie: Wyłączone."
+          "degraded_service_repair_issues": "Tworzy problemy w Repairs, gdy opcjonalne usługi Enphase są zdegradowane. Domyślnie: Wyłączone.",
+          "use_15_minute_power_average": "Uśrednia moc produkcji, sieci, akumulatora i zużycia z 15 minut, aby ograniczyć skoki. Odczyty reagują wolniej. Domyślnie: wyłączone."
         }
       },
       "devices": {
@@ -2535,6 +2537,26 @@
           },
           "using_cached_data": {
             "name": "Używanie danych zdarzeń z pamięci podręcznej"
+          }
+        }
+      },
+      "gateway_connected": {
+        "name": "Połączenie z bramą",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Liczba bram"
+          },
+          "gateway_connected_count": {
+            "name": "Połączone bramy"
+          },
+          "gateway_last_connection_at": {
+            "name": "Ostatnie połączenie z bramą"
+          },
+          "telemetry_received_at": {
+            "name": "Odebranie telemetrii"
+          },
+          "charger_last_reported_at": {
+            "name": "Ostatni raport ładowarki"
           }
         }
       }

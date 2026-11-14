@@ -2722,14 +2722,19 @@ class EnphaseStormGuardStateSensor(EnphaseBaseEntity, SensorEntity):  # type: ig
         self._attr_unique_id = f"{DOMAIN}_{sn}_storm_guard_state"
 
     @property
+    def _storm_guard_state(self) -> object:
+        state = getattr(self._coord, "storm_guard_state", None)
+        if state is not None:
+            return state
+        return self.data.get("storm_guard_state")
+
+    @property
     def available(self) -> bool:
-        if not super().available:
-            return False
-        return self.data.get("storm_guard_state") is not None
+        return super().available and self._storm_guard_state is not None
 
     @property
     def native_value(self) -> Any:
-        raw = self.data.get("storm_guard_state")
+        raw = self._storm_guard_state
         if raw is None:
             return None
         if isinstance(raw, bool):

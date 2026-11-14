@@ -37,7 +37,7 @@ def freezer():
 
 
 @pytest.fixture
-def platform_cloud(monkeypatch, load_fixture):
+def platform_cloud(monkeypatch, load_fixture, freezer):
     """Only replace cloud calls; retain coordinators, sessions and HA platforms."""
     monkeypatch.setattr(
         "custom_components.enphase_ev.async_create_clientsession",
@@ -109,6 +109,7 @@ def platform_cloud(monkeypatch, load_fixture):
             "production": [1000],
             "consumption": [2000],
             "interval": 15,
+            "last_report_date": dt_util.utcnow().timestamp(),
         },
         "get_schedules": {"data": [], "meta": {"serverTimeStamp": 1}},
     }
@@ -163,7 +164,17 @@ async def test_real_platform_setup_reload_and_unload(
     power = next(
         e for e in entries if e.unique_id.endswith("_current_production_power")
     )
-    assert hass.states.get(power.entity_id).state == "1250"
+    assert hass.states.get(power.entity_id).state == "unknown"
+    # A production average needs two energy observations. Exercise the actual
+    # acquisition and platforms while get_latest_power remains at 1250 W.
+    freezer.tick(timedelta(minutes=15))
+    responses["lifetime_energy"]["production"] = [1375]
+    responses["lifetime_energy"]["last_report_date"] = dt_util.utcnow().timestamp()
+    coord = config_entry.runtime_data.coordinator
+    await coord.energy._async_refresh_site_energy(force=True)
+    coord.async_set_updated_data(dict(coord.data))
+    await hass.async_block_till_done()
+    assert float(hass.states.get(power.entity_id).state) == 1500
     access = next(e for e in entries if e.unique_id.endswith("_account_access"))
     site_info = next(e for e in entries if e.unique_id.endswith("_site_information"))
     access_state = hass.states.get(access.entity_id)
@@ -214,10 +225,12 @@ async def test_real_platform_setup_reload_and_unload(
     assert all(
         restored[key] == identities[key] for key in identities.keys() - unsupported
     )
-    assert hass.states.get(power.entity_id).state == "1250"
+    assert float(hass.states.get(power.entity_id).state) == 1500
 
-    before = calls["latest_power"].await_count
-    responses["latest_power"]["value"] = 2500
+    before = calls["lifetime_energy"].await_count
+    responses["latest_power"]["value"] = 248
+    responses["lifetime_energy"]["production"] = [2000]
+    responses["lifetime_energy"]["last_report_date"] += 900
     responses["status"]["evChargerData"][0]["charging"] = True
     responses["status"]["evChargerData"][0]["connectorStatusType"] = "CHARGING"
     power_changed = asyncio.Event()
@@ -241,8 +254,8 @@ async def test_real_platform_setup_reload_and_unload(
     finally:
         unsubscribe()
     assert unexpected == [], ", ".join(unexpected)
-    assert calls["latest_power"].await_count > before
-    assert hass.states.get(power.entity_id).state == "2500"
+    assert calls["lifetime_energy"].await_count > before
+    assert float(hass.states.get(power.entity_id).state) == 2500
     if not site_only:
         assert hass.states.get("binary_sensor.garage_ev_charging").state == "on"
 
@@ -291,3 +304,106 @@ async def test_real_platform_setup_reload_and_unload(
     await hass.async_block_till_done()
     assert {name: call.await_count for name, call in calls.items()} == call_counts
     assert unexpected == [], ", ".join(unexpected)
+
+
+@pytest.mark.parametrize("connected", [True, False])
+@pytest.mark.parametrize("change", ["failure", "duplicate"])
+async def test_gateway_connectivity_publishes_summary_invalidity_and_recovery(
+    hass, config_entry, platform_cloud, monkeypatch, connected, change
+):
+    """An unchanged charger must publish invalid summary evidence immediately."""
+    responses, calls, unexpected = platform_cloud
+    hass.config_entries.async_update_entry(
+        config_entry,
+        data={**config_entry.data, CONF_SELECTED_TYPE_KEYS: ["envoy", "iqevse"]},
+    )
+    responses["summary_v2"] = [
+        {
+            "serialNumber": RANDOM_SERIAL,
+            "isLocallyConnected": connected,
+            "lastReportedAt": (dt_util.utcnow() - timedelta(hours=1)).isoformat(),
+        }
+    ]
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await _finish_startup(hass, config_entry)
+    coord = config_entry.runtime_data.coordinator
+    # Exercise the normal coordinator refresh/HA equality path. Force only the
+    # optional summary acquisition; keep its cache so a failure reuses payload.
+    monkeypatch.setattr(coord.summary, "prepare_refresh", lambda **_: True)
+    await coord.async_refresh()
+    await hass.async_block_till_done()
+    registry = er.async_get(hass)
+    sensor_id = registry.async_get_entity_id(
+        "binary_sensor", "enphase_ev", f"enphase_ev_{RANDOM_SERIAL}_gateway_connected"
+    )
+    assert sensor_id is not None
+    assert coord.always_update is False
+    expected_state = "on" if connected else "off"
+    assert hass.states.get(sensor_id).state == expected_state
+    previous_data = deepcopy(dict(coord.data))
+    publications = []
+    summary_response = calls["summary_v2"].side_effect
+    unsubscribe = coord.async_add_listener(lambda: publications.append(True))
+    try:
+        if change == "failure":
+            calls["summary_v2"].side_effect = RuntimeError("Summary unavailable")
+        else:
+            responses["summary_v2"] *= 2
+        await coord.async_refresh()
+        await hass.async_block_till_done()
+        assert coord.last_update_success
+        assert dict(coord.data) == previous_data
+        assert coord.summary.diagnostics()["using_stale"] is (change == "failure")
+        assert hass.states.get(sensor_id).state == "unknown"
+        assert len(publications) == 1
+
+        # Retry/backoff counters alone must not generate duplicate publications.
+        await coord.async_refresh()
+        await hass.async_block_till_done()
+        assert len(publications) == 1
+
+        # Simulate expiry of the existing retry deadline without changing either
+        # the cloud payload or the sensor's source timestamps.
+        monkeypatch.setitem(coord.summary._state, "backoff_until", None)
+        calls["summary_v2"].side_effect = summary_response
+        responses["summary_v2"] = responses["summary_v2"][:1]
+        await coord.async_refresh()
+        await hass.async_block_till_done()
+        assert dict(coord.data) == previous_data
+        assert hass.states.get(sensor_id).state == expected_state
+        assert len(publications) == 2
+        await coord.async_refresh()
+        await hass.async_block_till_done()
+        assert len(publications) == 2
+
+        received = hass.states.get(sensor_id).attributes["telemetry_received_at"]
+        next_receipt = received + timedelta(minutes=1)
+        monkeypatch.setattr(
+            "custom_components.enphase_ev.summary.dt_util",
+            SimpleNamespace(utcnow=lambda: next_receipt),
+        )
+        await coord.async_refresh()
+        await hass.async_block_till_done()
+        assert hass.states.get(sensor_id).state == expected_state
+        assert (
+            hass.states.get(sensor_id).attributes["telemetry_received_at"]
+            == next_receipt
+        )
+        assert len(publications) == 3
+
+        # Cache hits keep the actual receipt timestamp and cause no publication.
+        monkeypatch.setattr(coord.summary, "prepare_refresh", lambda **_: False)
+        summary_calls = calls["summary_v2"].await_count
+        await coord.async_refresh()
+        await hass.async_block_till_done()
+        assert calls["summary_v2"].await_count == summary_calls
+        assert (
+            hass.states.get(sensor_id).attributes["telemetry_received_at"]
+            == next_receipt
+        )
+        assert len(publications) == 3
+        assert unexpected == []
+    finally:
+        unsubscribe()
+        assert await hass.config_entries.async_unload(config_entry.entry_id)
+        await hass.async_block_till_done()

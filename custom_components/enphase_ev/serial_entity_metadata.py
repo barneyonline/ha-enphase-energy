@@ -8,6 +8,7 @@ CHARGER_BINARY_SENSOR_UNIQUE_SUFFIXES: tuple[str, ...] = (
     "_plugged",
     "_charging",
     "_connected",
+    "_gateway_connected",
 )
 HISTORICAL_CHARGER_BINARY_SENSOR_UNIQUE_SUFFIXES: tuple[str, ...] = (
     "_commissioned",

@@ -594,7 +594,8 @@
           "fast_while_streaming": "Preferă interogarea rapidă când fluxul cloud este activ",
           "api_timeout": "Timeout API (s)",
           "session_history_interval": "Interval istoric sesiuni (min)",
-          "degraded_service_repair_issues": "Activează reparațiile pentru servicii degradate"
+          "degraded_service_repair_issues": "Activează reparațiile pentru servicii degradate",
+          "use_15_minute_power_average": "Folosește puterea medie pe 15 minute"
         },
         "data_description": {
           "fast_poll_interval": "Interval de folosit în timpul încărcării sau streamingului. Implicit: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Când este activat, interogare rapidă în timpul fluxului cloud activ. Implicit: Activat.",
           "api_timeout": "Secunde până la expirarea solicitărilor API. Implicit: 15 s.",
           "session_history_interval": "Minute de așteptare între preluările istoricului sesiunilor din cloud. Implicit: 10 min.",
-          "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate. Implicit: Dezactivat."
+          "degraded_service_repair_issues": "Creează probleme în Repairs când serviciile opționale Enphase sunt degradate. Implicit: Dezactivat.",
+          "use_15_minute_power_average": "Calculează media puterii de producție, rețea, baterie și consum pe 15 minute pentru a reduce vârfurile. Valorile reacționează mai lent. Implicit: dezactivat."
         }
       },
       "devices": {
@@ -2535,6 +2537,26 @@
           },
           "using_cached_data": {
             "name": "Se folosesc date de evenimente din memoria cache"
+          }
+        }
+      },
+      "gateway_connected": {
+        "name": "Conectivitate gateway",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Număr de gateway-uri"
+          },
+          "gateway_connected_count": {
+            "name": "Gateway-uri conectate"
+          },
+          "gateway_last_connection_at": {
+            "name": "Ultima conexiune la gateway"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetrie primită"
+          },
+          "charger_last_reported_at": {
+            "name": "Ultima raportare a încărcătorului"
           }
         }
       }

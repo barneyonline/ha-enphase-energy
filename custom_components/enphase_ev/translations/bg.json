@@ -594,7 +594,8 @@
           "fast_while_streaming": "Предпочитай бързо опресняване при активен cloud stream",
           "api_timeout": "Изчакване на API (s)",
           "session_history_interval": "Интервал на историята на сесиите (min)",
-          "degraded_service_repair_issues": "Активиране на поправки за влошени услуги"
+          "degraded_service_repair_issues": "Активиране на поправки за влошени услуги",
+          "use_15_minute_power_average": "Използване на 15-минутна средна мощност"
         },
         "data_description": {
           "fast_poll_interval": "Интервал при зареждане или стрийминг. По подразбиране: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Когато е включено, бързо опресняване по време на активен cloud стрийм. По подразбиране: Включено.",
           "api_timeout": "Секунди преди заявките към API да изтекат. По подразбиране: 15 s.",
           "session_history_interval": "Минути за изчакване между извличанията на историята на сесиите в облака. По подразбиране: 10 min.",
-          "degraded_service_repair_issues": "Създава проблеми в Repairs, когато незадължителни услуги на Enphase са влошени. По подразбиране: Изключено."
+          "degraded_service_repair_issues": "Създава проблеми в Repairs, когато незадължителни услуги на Enphase са влошени. По подразбиране: Изключено.",
+          "use_15_minute_power_average": "Осреднява мощността на производството, мрежата, батерията и потреблението за 15 минути, за да намали пиковете. Показанията реагират по-бавно. По подразбиране: изключено."
         }
       },
       "devices": {
@@ -2535,6 +2537,26 @@
           },
           "using_cached_data": {
             "name": "Използват се кеширани данни за събития"
+          }
+        }
+      },
+      "gateway_connected": {
+        "name": "Свързаност с шлюза",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Брой шлюзове"
+          },
+          "gateway_connected_count": {
+            "name": "Свързани шлюзове"
+          },
+          "gateway_last_connection_at": {
+            "name": "Последна връзка с шлюза"
+          },
+          "telemetry_received_at": {
+            "name": "Получена телеметрия"
+          },
+          "charger_last_reported_at": {
+            "name": "Последен отчет на зарядното"
           }
         }
       }

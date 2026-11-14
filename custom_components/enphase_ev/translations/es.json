@@ -594,7 +594,8 @@
           "fast_while_streaming": "Preferir sondeo rápido mientras el flujo en la nube esté activo",
           "api_timeout": "Tiempo de espera de API (s)",
           "session_history_interval": "Intervalo del historial de sesiones (min)",
-          "degraded_service_repair_issues": "Activar reparaciones por servicios degradados"
+          "degraded_service_repair_issues": "Activar reparaciones por servicios degradados",
+          "use_15_minute_power_average": "Usar potencia media de 15 minutos"
         },
         "data_description": {
           "fast_poll_interval": "Intervalo que se usa durante la carga o cuando hay streaming. Valor predeterminado: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Si se activa, realiza sondeo rápido durante el streaming en la nube. Valor predeterminado: Activado.",
           "api_timeout": "Segundos antes de que las solicitudes a la API agoten el tiempo de espera. Valor predeterminado: 15 s.",
           "session_history_interval": "Minutos de espera entre obtenciones del historial de sesiones en la nube. Valor predeterminado: 10 min.",
-          "degraded_service_repair_issues": "Crea problemas de Repairs cuando los servicios opcionales de Enphase están degradados. Valor predeterminado: Desactivado."
+          "degraded_service_repair_issues": "Crea problemas de Repairs cuando los servicios opcionales de Enphase están degradados. Valor predeterminado: Desactivado.",
+          "use_15_minute_power_average": "Promedia la potencia de producción, red, batería y consumo durante 15 minutos para reducir los picos. Las lecturas responden más despacio. Por defecto: Desactivado."
         }
       },
       "devices": {
@@ -2535,6 +2537,26 @@
           },
           "using_cached_data": {
             "name": "Usando datos de eventos en caché"
+          }
+        }
+      },
+      "gateway_connected": {
+        "name": "Conectividad de la puerta de enlace",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Número de puertas de enlace"
+          },
+          "gateway_connected_count": {
+            "name": "Puertas de enlace conectadas"
+          },
+          "gateway_last_connection_at": {
+            "name": "Última conexión a la puerta de enlace"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetría recibida"
+          },
+          "charger_last_reported_at": {
+            "name": "Último informe del cargador"
           }
         }
       }

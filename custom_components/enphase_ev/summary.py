@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Iterable
 from datetime import datetime, timedelta
 from typing import Any, Callable
 
@@ -12,6 +13,7 @@ from homeassistant.util import dt as dt_util
 
 from .api import InvalidPayloadError
 from .cloud_retry import retry_after_delay
+from .evse_gateway_connectivity import GatewayConnectivity, gateway_connectivity
 from .log_redaction import redact_text
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,6 +40,10 @@ class SummaryStore:
         self._cache: tuple[float, list[dict[str, Any]], float] | None = None
         self._ttl: float = SUMMARY_IDLE_TTL
         self._lock = asyncio.Lock()
+        self._completion_revision = 0
+        self._completion_generation = -1
+        self._invalidation_revision = 0
+        self._stopped = False
         self._state: dict[str, object] = {
             "available": True,
             "using_stale": False,
@@ -70,9 +76,24 @@ class SummaryStore:
         """Return the current cache TTL in seconds."""
         return self._ttl
 
+    @property
+    def publication_health(self) -> tuple[bool, bool, bool]:
+        """Capture source availability without acquisition clocks or retry noise."""
+        return (
+            bool(self._state["available"]),
+            bool(self._state["using_stale"]),
+            self._get_cache() is not None,
+        )
+
     def invalidate(self) -> None:
         """Drop the cached payload."""
+        self._invalidation_revision += 1
         self._cache = None
+
+    def stop(self) -> None:
+        """Retire queued readers and invalidate the current acquisition."""
+        self._stopped = True
+        self.invalidate()
 
     def _backoff_active(self) -> bool:
         backoff_until = self._state.get("backoff_until")
@@ -129,6 +150,9 @@ class SummaryStore:
 
     async def async_fetch(self, *, force: bool = False) -> list[dict[str, Any]]:
         """Return the cached summary, optionally forcing a refresh."""
+        if self._stopped:
+            return []
+        completion = self._completion_revision
         cache = self._get_cache()
         if not force and cache:
             cache_ts, cache_data, cache_ttl = cache
@@ -136,7 +160,14 @@ class SummaryStore:
                 return cache_data
 
         async with self._lock:
+            if self._stopped:
+                return []
             cached = self._get_cache()
+            if (
+                completion != self._completion_revision
+                and self._completion_generation == self._invalidation_revision
+            ):
+                return cached[1] if cached else []
             if not force and cached:
                 cache_ts, cache_data, cache_ttl = cached
                 if time.monotonic() - cache_ts < cache_ttl:
@@ -148,9 +179,15 @@ class SummaryStore:
             if client is None:
                 self._logger.debug("Summary v2 fetch skipped; client unavailable")
                 return cached[1] if cached else []
+            revision = self._invalidation_revision
             try:
                 summary = await client.summary_v2()
             except Exception as err:  # noqa: BLE001
+                if revision != self._invalidation_revision:
+                    current = self._get_cache()
+                    return current[1] if current else []
+                self._completion_revision += 1
+                self._completion_generation = revision
                 failures = int(str(self._state.get("failures", 0) or 0)) + 1
                 delay = self._failure_backoff_delay(err, failures)
                 self._state["available"] = False
@@ -183,6 +220,11 @@ class SummaryStore:
                 )
                 return []
 
+            if revision != self._invalidation_revision:
+                current = self._get_cache()
+                return current[1] if current else []
+            self._completion_revision += 1
+            self._completion_generation = revision
             summary_list = self._as_list(summary)
             self._cache = (time.monotonic(), summary_list, self._ttl)
             self._state["available"] = True
@@ -247,3 +289,40 @@ class SummaryStore:
             "last_success_age_s": last_success_age,
             "last_payload_signature": self._state.get("last_payload_signature"),
         }
+
+    def gateway_connectivity(self, serial: str) -> GatewayConnectivity | None:
+        """Interpret one cached charger observation without fetching or retaining IDs."""
+        cache = self._get_cache()
+        if cache is None or not self._state["available"] or self._state["using_stale"]:
+            return None
+        matches = [
+            item
+            for item in cache[1]
+            if isinstance(item, dict) and str(item.get("serialNumber")) == serial
+        ]
+        if len(matches) != 1:
+            return None
+        return gateway_connectivity(matches[0], self._state["last_success_utc"])
+
+    def gateway_publication_state(
+        self, serials: Iterable[str]
+    ) -> tuple[tuple[str, tuple[object, ...] | None], ...]:
+        """Capture gateway evidence and its receipt from the last successful read."""
+        return tuple(
+            (
+                serial,
+                (
+                    (
+                        observation.connected,
+                        observation.gateway_count,
+                        observation.connected_count,
+                        observation.last_connection,
+                        observation.reported_at,
+                        observation.received_at,
+                    )
+                    if (observation := self.gateway_connectivity(serial)) is not None
+                    else None
+                ),
+            )
+            for serial in sorted(serials)
+        )

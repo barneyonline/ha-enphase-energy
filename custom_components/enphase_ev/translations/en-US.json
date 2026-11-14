@@ -594,7 +594,8 @@
           "fast_while_streaming": "Prefer Fast Polling While Cloud Stream Active",
           "api_timeout": "API Timeout (s)",
           "session_history_interval": "Session History Interval (min)",
-          "degraded_service_repair_issues": "Enable Degraded Service Repairs"
+          "degraded_service_repair_issues": "Enable Degraded Service Repairs",
+          "use_15_minute_power_average": "Use 15-minute Power Average"
         },
         "data_description": {
           "fast_poll_interval": "Time between updates while charging or using fast cloud-stream polling. Default: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Use the fast polling interval while an Enphase cloud stream is active, even when chargers are idle. Default: Enabled.",
           "api_timeout": "Maximum time to wait for an Enphase API request before it times out. Default: 15 s.",
           "session_history_interval": "Minimum time between cloud charging-session history requests. Default: 10 min.",
-          "degraded_service_repair_issues": "Create Home Assistant Repairs issues when optional Enphase cloud services are degraded. Default: Disabled."
+          "degraded_service_repair_issues": "Create Home Assistant Repairs issues when optional Enphase cloud services are degraded. Default: Disabled.",
+          "use_15_minute_power_average": "Average Production, Grid, Battery and Consumption Power over 15 minutes to reduce spikes. Readings respond more slowly. Default: Disabled."
         }
       },
       "devices": {
@@ -2535,6 +2537,26 @@
           },
           "using_cached_data": {
             "name": "Using Cached Event Data"
+          }
+        }
+      },
+      "gateway_connected": {
+        "name": "Gateway connectivity",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Gateway count"
+          },
+          "gateway_connected_count": {
+            "name": "Connected gateways"
+          },
+          "gateway_last_connection_at": {
+            "name": "Last gateway connection"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetry received"
+          },
+          "charger_last_reported_at": {
+            "name": "Charger last reported"
           }
         }
       }

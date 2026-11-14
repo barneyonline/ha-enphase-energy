@@ -594,7 +594,8 @@
           "fast_while_streaming": "Foretrekk rask oppdatering mens skystrømmen er aktiv",
           "api_timeout": "API-tidsavbrudd (s)",
           "session_history_interval": "Intervall for øktshistorikk (min)",
-          "degraded_service_repair_issues": "Aktiver reparasjoner for degraderte tjenester"
+          "degraded_service_repair_issues": "Aktiver reparasjoner for degraderte tjenester",
+          "use_15_minute_power_average": "Bruk 15-minutters gjennomsnittseffekt"
         },
         "data_description": {
           "fast_poll_interval": "Intervall som brukes under lading eller strømming. Standard: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Når aktivert, rask oppdatering under aktiv skystrømming. Standard: Aktivert.",
           "api_timeout": "Sekunder før API-forespørsler får tidsavbrudd. Standard: 15 s.",
           "session_history_interval": "Minutter å vente mellom henting av sky-øktshistorikk. Standard: 10 min.",
-          "degraded_service_repair_issues": "Oppretter Repairs-problemer når valgfrie Enphase-tjenester er degraderte. Standard: Deaktivert."
+          "degraded_service_repair_issues": "Oppretter Repairs-problemer når valgfrie Enphase-tjenester er degraderte. Standard: Deaktivert.",
+          "use_15_minute_power_average": "Beregn gjennomsnittet av produksjon, nett-, batteri- og forbrukseffekt over 15 minutter for å redusere topper. Verdiene reagerer saktere. Standard: Deaktivert."
         }
       },
       "devices": {
@@ -2535,6 +2537,26 @@
           },
           "using_cached_data": {
             "name": "Bruker bufrede hendelsesdata"
+          }
+        }
+      },
+      "gateway_connected": {
+        "name": "Gatewaytilkobling",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Antall gatewayer"
+          },
+          "gateway_connected_count": {
+            "name": "Tilkoblede gatewayer"
+          },
+          "gateway_last_connection_at": {
+            "name": "Siste gatewaytilkobling"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetri mottatt"
+          },
+          "charger_last_reported_at": {
+            "name": "Laderens siste rapport"
           }
         }
       }

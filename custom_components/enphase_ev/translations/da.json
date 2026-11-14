@@ -594,7 +594,8 @@
           "fast_while_streaming": "Foretræk hurtig polling mens cloud-stream er aktiv",
           "api_timeout": "API-timeout (s)",
           "session_history_interval": "Sessionshistorik-interval (min)",
-          "degraded_service_repair_issues": "Aktivér reparationer for forringede tjenester"
+          "degraded_service_repair_issues": "Aktivér reparationer for forringede tjenester",
+          "use_15_minute_power_average": "Brug 15-minutters gennemsnitseffekt"
         },
         "data_description": {
           "fast_poll_interval": "Interval der bruges under opladning eller streaming. Standard: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Når aktiveret, hurtig polling under aktiv cloud-streaming. Standard: Aktiveret.",
           "api_timeout": "Sekunder før API-anmodninger udløber. Standard: 15 s.",
           "session_history_interval": "Minutter at vente mellem hentninger af cloud-sessionhistorik. Standard: 10 min.",
-          "degraded_service_repair_issues": "Opretter Repairs-problemer, når valgfrie Enphase-tjenester er forringede. Standard: Deaktiveret."
+          "degraded_service_repair_issues": "Opretter Repairs-problemer, når valgfrie Enphase-tjenester er forringede. Standard: Deaktiveret.",
+          "use_15_minute_power_average": "Beregn gennemsnittet af produktion, net-, batteri- og forbrugseffekt over 15 minutter for at reducere spidser. Værdierne reagerer langsommere. Standard: Deaktiveret."
         }
       },
       "devices": {
@@ -2535,6 +2537,26 @@
           },
           "using_cached_data": {
             "name": "Bruger cachelagrede hændelsesdata"
+          }
+        }
+      },
+      "gateway_connected": {
+        "name": "Gatewayforbindelse",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Antal gateways"
+          },
+          "gateway_connected_count": {
+            "name": "Tilsluttede gateways"
+          },
+          "gateway_last_connection_at": {
+            "name": "Seneste gatewayforbindelse"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetri modtaget"
+          },
+          "charger_last_reported_at": {
+            "name": "Laderens seneste rapport"
           }
         }
       }

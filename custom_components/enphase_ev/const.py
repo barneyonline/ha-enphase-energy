@@ -43,6 +43,7 @@ OPT_EXPORT_LIMIT_SLEW_RATE = "export_limit_slew_rate"
 OPT_FAST_POLL_INTERVAL = "fast_poll_interval"
 OPT_SLOW_POLL_INTERVAL = "slow_poll_interval"
 OPT_FAST_WHILE_STREAMING = "fast_while_streaming"
+OPT_USE_15_MINUTE_POWER_AVERAGE = "use_15_minute_power_average"
 OPT_NOMINAL_VOLTAGE = "nominal_voltage"
 OPT_API_TIMEOUT = "api_timeout"
 OPT_SESSION_HISTORY_INTERVAL = "session_history_interval"
@@ -125,7 +126,8 @@ CLOUD_TELEMETRY_STALE_AFTER_S = 1800.0
 HEATPUMP_POWER_STALE_AFTER_S = CLOUD_TELEMETRY_STALE_AFTER_S
 CURRENT_POWER_STALE_AFTER_S = CLOUD_TELEMETRY_STALE_AFTER_S
 PRODUCTION_POWER_STALE_AFTER_S = CLOUD_TELEMETRY_STALE_AFTER_S
-PRODUCTION_POWER_IDLE_MAX_W = 1.0
+# The cloud can repeat a residual 2 W dusk interval overnight (#988).
+PRODUCTION_POWER_IDLE_MAX_W = 2.0
 BATTERY_PROFILE_LABELS = {
     "self-consumption": "Self-Consumption",
     "cost_savings": "Savings",

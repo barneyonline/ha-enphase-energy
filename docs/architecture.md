@@ -71,8 +71,10 @@ forwarding platforms, with degraded setup permitted for charger-status HTTP 5xx
 failures as described under [charger-status recovery](#charger-status-recovery).
 Translation and integration-version priming run concurrently with that work.
 Optional endpoint families then warm up in feature-aware stages, publishing after
-each stage so one slow family does not hold back unrelated state. Schedule sync and
-other long-running work start in the background.
+each stage. Charger Status and Electrical Phase publish when the charger summary
+returns. Storm Guard publishes when the battery settings or profile provides its
+state. Startup publications preserve core poll health and scheduling. Schedule
+sync and other long-running work start in the background.
 
 Config-entry update handling distinguishes live-applicable options from topology
 changes. Polling, timeout, history, voltage, scheduler, pricing, and notification
@@ -251,6 +253,16 @@ milestones for core readiness, entity forwarding, power readiness, setup complet
 and warmup completion. Keep optional network work out of the config-entry critical
 path unless Home Assistant cannot safely create the integration without it.
 
+### EV charger gateway connectivity diagnostic
+
+`SummaryStore.gateway_connectivity` projects the currently cached summary into an
+identifier-free observation via `evse_gateway_connectivity.py`. It never fetches
+or falls back to persisted coordinator metadata. Missing/duplicate charger rows,
+failed/stale summary responses and conflicting flags cannot report connectivity.
+`binary_sensor_gateway.py` exposes a connectivity diagnostic with unknown state
+when evidence is unavailable. The sensor uses the existing summary polling and
+exposes the cloud receipt, charger report, and connection event as attributes.
+
 ## Cloud Client
 
 `api.py` is the stable public compatibility facade for the HTTP boundary. It
@@ -308,6 +320,16 @@ retirement.
 ## Runtime Managers
 
 Runtime managers keep endpoint-family behavior out of the main coordinator:
+
+- `export_limit_runtime.py` exposes guarded apply for Energy Planner recovery.
+  It compares the prepared gateway snapshot under the write lock and checks the
+  caller's authority after the HTTP connection is acquired and before request
+  headers are serialized. The runtime saves intent before connecting and clears
+  it only after storage acknowledges confirmation or rejection.
+  The intent store acknowledges atomic writes, including during Core shutdown.
+  A failed cleanup keeps the pending record blocked until a later refresh can
+  clear it durably. Reload drains active Export Limit transactions before
+  another runtime opens the same intent file.
 
 - `battery_runtime.py` handles BatteryConfig controls, profile state, schedules, pending writes, and battery diagnostics payloads.
   Each accepted profile or reserve write invalidates profile, settings, and live
@@ -516,6 +538,13 @@ inventory remains included because editor entities read it.
 Stored-credential login counters publish auth snapshots and notify entities without
 marking cloud telemetry successful or resetting the coordinator's polling schedule.
 
+Summary availability, stale-cache use, cache presence and each charger's parsed
+gateway-connectivity observation also participate in publication equality. This
+publishes source failures, ambiguous duplicate rows and recoveries even when
+normalized charger values are identical. A new summary receipt also publishes
+its timestamp. Cache hits preserve that timestamp, and retry counts and error
+text are excluded from equality.
+
 Auth and EVSE state live with their runtimes. Battery, heat-pump, and inventory
 runtimes receive their state explicitly; compatibility coordinator projections
 remain for existing consumers. Migrate those consumers incrementally instead of
@@ -570,26 +599,91 @@ healthy. Battery and heat-pump family recovery is published when freshness is
 restored, including when the measurement itself has not changed. This restores
 availability and expiry timers without publishing every identical successful poll.
 
-Current Production Power uses the shared 30-minute cloud telemetry freshness
-window to tolerate delayed cloud updates. Both its source timestamp and first
-acquisition time bound nonzero readings, even while core polling remains healthy.
-Validated readings within +/-1 W with a nonfuture source timestamp instead use
-their latest successful acquisition: Enphase can repeat its last near-zero
-production sample overnight. The reported value and source timestamp are
-preserved. Missing timestamps also use acquisition time. Failed, malformed,
-unsupported-unit, quarantined, or skipped responses never renew that time, so
-even near-zero readings expire after 30 minutes without a valid response.
-Entity-owned expiry timers remain independent of core polling cadence. Grid,
-battery, consumption and heat-pump power use the same 30-minute limit. Aggregate
-and individual battery charge, available energy and available power expire after
-30 minutes without a successful battery-status acquisition. Battery health,
-cycle counts and historical readings retain their existing policies.
-Production samples more than 60 seconds ahead of receipt are rejected before
-publication or extreme-power confirmation. Healthy responses containing these
-samples do not renew the last accepted reading's freshness; the next fetch may
-accept a revised value with the same timestamp once it falls within the clock
-allowance. Restore rejects samples that were premature at their stored receipt
-time. Diagnostics and sanitized measurement logs expose `future_timestamp`.
+The Polling option `use_15_minute_power_average` defaults to false. Disabled
+entries retain the existing Production/Grid/Battery delta and Consumption Power
+calculations. When enabled, `power_average.EnergyPowerAverage` retains bounded,
+accepted cumulative-energy observations for a rolling 900-second average. It
+interpolates only the left edge between already observed cursors, weights actual
+elapsed time, and uses the shorter available window during startup. Repeated
+source clocks do not add observations; corrections are included at the next
+advancing clock. Gaps over 30 minutes, changed clock provenance, resets, missing
+channels and rejected/reseeded calculations clear averaging continuity. Newly
+discovered contributing flows also reseed the smoothed baseline, so their entire
+lifetime totals cannot be mistaken for an increment in an existing window.
+Accepted reset/source-reseed observations and confirmed extreme readings seed
+the next window; rejected observations do not. Reseed and confirmed-extreme
+checkpoints with fully identified live flows omit the predecessor that cannot
+be restored as watts, so restore validation retains the accepted baseline for
+the next interval. Synthetic or unidentified flows still undergo the original
+conservative restore validation. A validated saved rolling point also establishes
+the live counter baseline, so the first report after restart passes the normal
+per-flow reset and outlier checks before averaging. The domain helper owns
+continuity and signed energy accumulation. Enabled entities advance it during
+coordinator/source updates and startup, while properties only present their
+stored result. This is a delayed estimate, not instantaneous telemetry or a
+completed-bucket guarantee.
+
+Enabled Consumption Power balances published Production, Grid and Battery Power
+only when their calculation end times and actual window lengths match. Otherwise
+it retains the last valid balance with its original expiry or uses its separately
+averaged consumption-energy fallback. The expiry timer selects a still-fresh
+fallback when the retained balance expires, even when a subsequent rejected
+sample left the accepted fallback cached. A reseed preserves the accepted
+fallback's calculation method while those watts remain eligible. An advancing
+rejected interval cannot validate fallback watts loaded privately at restart.
+Independently accepted
+restore history remains eligible until its original deadline. Calculation and
+freshness clocks remain separate. Other power entities and cumulative energy
+sensors do not use this option. Changing the option reloads the integration.
+Private restore data tags the mode so cached watts and baselines from the other
+mode cannot be reused. Same-mode
+restore retains the bounded averaging buffer without extending accepted expiry.
+Averaging validates its final watts independently of the consecutive interval
+calculation, including the consumption-energy fallback. An extreme average
+requires a comparable, independently measured increment in the next interval.
+That interval starts a new rolling window, so a single suspect increment cannot
+confirm itself or affect later averages. Duplicate reports preserve quarantine
+and the last accepted average and its freshness. Restored buffers reject invalid clock types, overflowing numbers, and unsafe averages.
+Saving the default-off value on older entries does not trigger a reload.
+Untagged legacy power restore data belongs to the original calculation mode:
+it remains usable with smoothing disabled and is discarded when smoothing is
+enabled, including the Consumption Power restore history.
+
+Production Power uses the same lifetime-energy delta calculation as Grid Power
+and Battery Power. Its `solar_production` flow is the guarded sum of the
+`production` Wh buckets from `/pv/systems/<site_id>/lifetime_energy`, already used
+by Site Solar Production. It reports average watts over the source-report window,
+respecting any reported minimum interval; it is not instantaneous local-gateway
+telemetry. The first valid energy observation seeds a baseline, and the next
+source timestamp permits a power calculation. Same-timestamp energy corrections
+are included in the next calculation rather than divided by a zero time window.
+Lifetime-energy responses with regressed or excessively future-dated source
+timestamps are recorded in fetch diagnostics. Their counters and reset markers
+cannot replace the published flows or change the guard used by later reports.
+An uninitialized placeholder is not an energy baseline: the first valid source
+report may seed from an earlier clock than that placeholder's receipt or metadata.
+If a newer accepted reading survives without its calculation baseline, older
+live reports cannot replace it or seed a calculation behind its source timestamp.
+Resets, missing channels, source changes, outliers, freshness and bounded restart
+history follow the shared Grid/Battery implementation. All three use a 30-minute
+source freshness limit; unchanged source timestamps, including overnight zeros,
+do not extend it. This differs from the former latest-power idle exception.
+Cloud energy corrections and batched delivery can be misaligned with the report
+clock, producing short-window spikes or under-reading even when daily energy
+totals agree. Sharing the calculation does not establish instantaneous accuracy.
+
+The Production Power entity retains its identity, translation and cloud device.
+Upgrade restoration discards old `get_latest_power` measurements instead of
+presenting them as energy-derived averages. Accepted energy-derived history
+retains its original expiry across restarts while new inputs warm up. Consumption
+Power's existing balance uses the published derived production estimate.
+
+The `current_power_runtime` still acquires `get_latest_power` for normalized
+endpoint diagnostics; it is not a Production Power fallback. Its raw sample
+validation and receipt metadata are independent of the derived sensor. Samples
+more than 60 seconds ahead of receipt are rejected before extreme-power
+confirmation; failed, malformed or rejected acquisitions cannot renew diagnostic
+receipt time. Diagnostics and sanitized measurement logs expose `future_timestamp`.
 
 The per-inverter Lifetime Energy and Power feature switches independently gate
 entity creation. Switching a feature off removes its registered entities, including
@@ -710,6 +804,11 @@ transport failure as a successful action. Lifecycle checks prevent writes that
 finish after shutdown from publishing stale state or restarting refresh timers.
 All schedule mutations use the same authentication-failure handling.
 
+Schedule startup and shutdown serialize on a lifecycle lock. Legacy helper
+cleanup awaits each storage-collection deletion, which also awaits its entity
+listeners. It must not drain all Home Assistant tasks while holding that lock:
+a config-entry update listener can be waiting for schedule shutdown during reload.
+
 Writes are serialized per charger, including collection preparation and the
 read-modify-write enabled-state map. Reads capture the mutation revision before
 requesting data and discard results superseded by accepted writes or lifecycle
@@ -806,11 +905,11 @@ Larger gaps reseed the baseline; decreasing buckets, incompatible rollovers,
 changed intervals, and invalid timestamps remain guarded. The actual averaging
 window is exposed in `last_window_seconds` and consumption-power diagnostics.
 When consumption is calculated from published production, grid and battery watts,
-the oldest contributing sample bounds its 30-minute expiry. Successful near-zero
-production acquisitions follow the production sensor's overnight rule. Missing
+the oldest contributing sample bounds its 30-minute expiry. Production uses the
+same source-based freshness rule as Grid and Battery, including overnight. Missing
 inputs retain the last valid calculation only until its original expiry; fresh
 consumption buckets can supply the existing fallback.
-Grid and Battery Power expose `freshness_reference_utc` separately from their
+Production, Grid and Battery Power expose `freshness_reference_utc` separately from their
 calculation timestamp, so consumption also respects the oldest contributing flow
 when import/export or charge/discharge clocks differ. Stale numeric candidates
 cannot overwrite a still-valid retained balance or its original deadline.
@@ -838,7 +937,7 @@ evidence for the consumption-bucket fallback. A healthy power balance can coexis
 with an older `missing_consumption` rejection. `power_balance_source_freshness`
 records the effective clock used for each input to the last accepted balance;
 `power_balance_source_timestamps` retains the reported calculation clocks.
-These clocks can differ for retained grid/battery watts and overnight production.
+These clocks can differ when contributing sensors retain an accepted reading.
 
 Consumption Power persists its last valid power balance in Home Assistant's
 restore data, separately from the consumption-bucket delta baseline. During
@@ -856,10 +955,10 @@ calculation from the restored watts or bypass bucket-baseline validation.
 Production, Grid, Battery, and Consumption Power retain the last two distinct
 accepted readings in versioned private Home Assistant restore data. Each reading
 stores native watts, its source timestamp, its effective freshness reference,
-and calculation metadata. Production also preserves its acquisition timestamp.
+and calculation metadata.
 Repeated unchanged observations, rejected candidates, and restarts do not renew
-the accepted clocks. Successful overnight near-zero production acquisitions
-retain the existing acquisition-based freshness rule.
+the accepted clocks. Overnight near-zero energy-derived production follows the
+same source timestamp expiry as Grid and Battery Power.
 
 Restoration finishes before entity freshness evaluation and first publication.
 Supported entities reuse persisted discovery metadata. A valid live reading takes
@@ -870,8 +969,8 @@ at their original 30-minute deadline through entity timers without another poll.
 This continuity starts once integration setup permits entity creation; it does
 not bypass authentication, setup failures, or coordinator health checks.
 
-Grid and Battery persist both cumulative samples, source signatures, and interval
-metadata privately, independently of display-state attributes. Their accepted
+Production, Grid and Battery persist both cumulative samples, source signatures,
+and interval metadata privately, independently of display-state attributes. Their accepted
 watts are separate from mutable calculation baselines, so missing startup data
 and synthetic zero placeholders cannot erase the accepted history. Restored
 watts never become cumulative-energy samples. Source changes, resets, partial
@@ -879,7 +978,7 @@ channels, and invalid deltas retain the existing baseline-validation safeguards.
 Consumption can bridge startup with either a saved balance or a saved accepted
 bucket-derived reading while its calculation baseline awaits live validation.
 The oldest contributing source still bounds balance freshness. Production exposes
-its effective `freshness_reference_utc` separately from acquisition time so a
+its effective `freshness_reference_utc` separately from calculation time so a
 restored source cannot extend a dependent balance's deadline. Accepted cached
 watts retain their calculation metadata while a new cumulative baseline seeds;
 Consumption diagnostics describe the same reading as the displayed state.
@@ -906,8 +1005,43 @@ policy. They contain no raw payloads or exception messages.
 Site-energy acquisition is serialized within its manager. Callers overlapping one
 attempt reuse its completion, while cancellation or invalidation lets queued
 callers acquire fresh data. Invalidation rejects the older result before parsing
-can change guards or published source metadata. Sequential forced reads retain
-the existing treatment of legitimate cloud corrections.
+can change guards or published source metadata. Sequential forced reads accept
+same-clock corrections. Regressed and excessively future-dated reports leave
+the last accepted flows and their source metadata intact. Request throttling
+also applies when a clock-rejected primary response has no usable flows.
+A supplied malformed primary timestamp is recorded as an invalid payload
+before optional enrichment or counter aggregation. An absent timestamp remains
+supported. The accepted cache retains its original age. Optional HEMS lifetime
+data has its own source watermark and can supply metadata only to the device flows it
+fills. Malformed, future-dated, and regressed HEMS timestamps leave primary
+flows eligible for publication. A HEMS response advances its watermark only
+when it fills a device channel with usable buckets.
+
+Site-energy and EVSE timeseries transport/general fetch failures use independent
+transient streaks with local delays of 60, 120, 240, 480 and at most 900 seconds,
+including up to ten percent positive jitter below the cap. Valid acquisitions
+reset those streaks; cancellation is not a failure. Recognized service outages
+retain their existing cooldowns, and malformed-payload handling is unchanged.
+Forced reads bypass successful-cache freshness, never an active failure or
+provider deadline. Accepted payloads and source clocks are retained during errors.
+The HEMS lifetime fallback uses the longer of its one-hour local cooldown, a
+numeric or HTTP-date Retry-After (including wrapped HTTP errors), and any existing
+later deadline. Its authentication circuit remains independent.
+
+EVSE timeseries registers acquisition ownership for both endpoint families
+before awaiting either. Lifetime callers share one acquisition; daily callers
+share by requested calendar date. Locks and completion revisions distinguish
+overlapping forced reads from later sequential requests. Acquisition records
+are removed when their last caller finishes; no background tasks are created.
+Summary reads use the same completion/invalidation distinction around their
+existing lock. Cancelled owners release waiters, and invalidation rejects late
+successes and failures before cache or health state changes.
+
+Daily EVSE timeseries retains only the three newest requested date keys. Older
+requests cannot displace newer dates. Authoritative serial pruning removes
+retired charger records from daily and lifetime payloads, and runtime retirement
+invalidates outstanding reads before clearing caches. These policies are local
+runtime state and introduce no persisted settings or migrations.
 
 ### Microinverter Telemetry Rate Limits
 

@@ -135,7 +135,7 @@ def test_site_energy_refresh_due_skips_when_cache_is_fresh(
 ) -> None:
     coord = coordinator_factory()
     manager = coord.energy
-    manager._site_energy_cache_ts = 95.0  # noqa: SLF001
+    manager._site_energy_refresh_ts = 95.0  # noqa: SLF001
     manager._site_energy_cache_ttl = 10.0  # noqa: SLF001
     manager._service_backoff_until = None  # noqa: SLF001
     coord.client.lifetime_energy = AsyncMock(return_value={})
@@ -202,14 +202,28 @@ def test_merge_device_lifetime_channels_keeps_present_primary_values(
             "evse": [999.0],
             "heatpump": [20.0],
             "water_heater": [30.0],
+            "start_date": "2023-11-14",
             "last_report_date": 1_700_000_000,
+            "update_pending": True,
+            "interval_minutes": 30,
         },
     )
 
     assert merged["evse"] == [10.0]
     assert merged["heatpump"] == [20.0]
     assert merged["water_heater"] == [30.0]
-    assert merged["last_report_date"] == 1_700_000_000
+    assert merged["last_report_date"] is None
+    flows, meta = coord.energy._aggregate_site_energy(merged)
+    assert meta["last_report_date"] is None
+    assert flows["evse_charging"].last_report_date is None
+    assert flows["evse_charging"].start_date == "2024-01-01"
+    assert flows["evse_charging"].update_pending is None
+    assert flows["heat_pump"].start_date == "2023-11-14"
+    assert flows["heat_pump"].update_pending is True
+    assert flows["heat_pump"].interval_minutes == 30
+    assert flows["heat_pump"].last_report_date == datetime.fromtimestamp(
+        1_700_000_000, tz=timezone.utc
+    )
 
 
 def test_lifetime_channel_missing_accepts_zero_values(coordinator_factory) -> None:
@@ -1236,7 +1250,8 @@ async def test_async_refresh_site_energy_handles_generic_fetch_failure(
     await coord.energy._async_refresh_site_energy(force=True)  # noqa: SLF001
 
     assert coord.energy.site_energy == {}
-    assert coord.energy.service_available is True
+    assert coord.energy.service_available is False
+    assert coord.energy.service_backoff_active is True
 
 
 def test_site_energy_mark_service_available_resets_state(coordinator_factory) -> None:
@@ -5454,6 +5469,14 @@ async def test_site_energy_fetch_diagnostics_distinguish_failures_and_source_pro
     energy = coord.energy
     base = datetime.now(timezone.utc)
     now = [base]
+    monotonic_base = time.monotonic()
+    monkeypatch.setattr(
+        energy_mod,
+        "time",
+        SimpleNamespace(
+            monotonic=lambda: monotonic_base + (now[0] - base).total_seconds()
+        ),
+    )
     monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now[0])
     client = SimpleNamespace(lifetime_energy=AsyncMock())
     energy._client_provider = lambda: client
@@ -5854,3 +5877,251 @@ async def test_grid_power_restore_does_not_reconstruct_reseeded_partial_history(
     assert sensor.native_value is None
     sample(1_700_001_500, 49.5)
     assert sensor.native_value == -1200
+
+
+@pytest.mark.parametrize("clock_error", ["future", "regressed"])
+async def test_bad_lifetime_clock_cannot_poison_production_power(
+    coordinator_factory, monkeypatch, clock_error
+):
+    from custom_components.enphase_ev.sensor_site_energy import (
+        EnphaseCurrentPowerConsumptionSensor,
+    )
+
+    coord = coordinator_factory()
+    energy = coord.energy
+    now = [datetime.now(timezone.utc).replace(microsecond=0)]
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now[0])
+    client = SimpleNamespace(lifetime_energy=AsyncMock())
+    energy._client_provider = lambda: client
+    sensor = EnphaseCurrentPowerConsumptionSensor(coord)
+
+    async def refresh(source, production_wh):
+        client.lifetime_energy.return_value = {
+            "production": [production_wh],
+            "last_report_date": source.timestamp(),
+            "interval_minutes": 5,
+        }
+        await energy._async_refresh_site_energy(force=True)
+
+    coord.last_success_utc = now[0]
+    await refresh(now[0], 100_000)
+    assert sensor.native_value is None
+    baseline = energy.site_energy
+    offset = timedelta(hours=1) if clock_error == "future" else timedelta(minutes=-1)
+    await refresh(now[0] + offset, 110_000)
+    assert energy.site_energy_fetch_diagnostics["source_progress"] == clock_error
+    assert energy.site_energy is baseline
+    assert sensor.native_value is None
+    now[0] += timedelta(minutes=5)
+    coord.last_success_utc = now[0]
+    await refresh(now[0], 101_000)
+    assert sensor.native_value == 12_000
+
+
+@pytest.mark.parametrize(
+    "clock_error", ["future", "regressed", "malformed", "unicode_digit", "utc_overflow"]
+)
+@pytest.mark.parametrize("primary_has_clock", [False, True])
+async def test_bad_hems_clock_does_not_replace_primary_source(
+    coordinator_factory, monkeypatch, clock_error, primary_has_clock
+):
+    coord = coordinator_factory()
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    primary_clock = now - timedelta(minutes=5)
+    hems_clock = now - timedelta(minutes=10)
+    primary = AsyncMock(
+        return_value={
+            "production": [1000],
+            "last_report_date": primary_clock.timestamp(),
+        }
+    )
+    hems = AsyncMock(
+        return_value={"heatpump": [1000], "last_report_date": hems_clock.timestamp()}
+    )
+    coord.energy._client_provider = lambda: SimpleNamespace(
+        lifetime_energy=primary, hems_consumption_lifetime=hems
+    )
+    await coord.energy._async_refresh_site_energy(force=True)
+    assert coord.energy.site_energy["heat_pump"].value_kwh == 1
+
+    new_primary_clock = now.timestamp() if primary_has_clock else None
+    bad_hems_clock = {
+        "future": (now + timedelta(hours=1)).timestamp(),
+        "regressed": (hems_clock - timedelta(minutes=5)).timestamp(),
+        "malformed": "not a timestamp",
+        "unicode_digit": "²",
+        "utc_overflow": "9999-12-31T23:59:59-01:00",
+    }[clock_error]
+    primary.return_value = {"production": [2000], "last_report_date": new_primary_clock}
+    hems.return_value = {
+        "heatpump": [5000],
+        "last_report_date": bad_hems_clock,
+    }
+    await coord.energy._async_refresh_site_energy(force=True)
+    assert coord.energy.site_energy["solar_production"].value_kwh == 2
+    assert coord.energy.site_energy["solar_production"].last_report_date == (
+        now if primary_has_clock else None
+    )
+    assert "heat_pump" not in coord.energy.site_energy
+    assert coord.energy.site_energy_fetch_diagnostics["source_progress"] == (
+        "advanced" if primary_has_clock else "missing"
+    )
+
+    hems.return_value = {"heatpump": [2000], "last_report_date": hems_clock.timestamp()}
+    await coord.energy._async_refresh_site_energy(force=True)
+    assert coord.energy.site_energy["heat_pump"].value_kwh == 2
+    assert coord.energy.site_energy["heat_pump"].last_report_date == hems_clock
+    assert coord.energy.site_energy["solar_production"].last_report_date == (
+        now if primary_has_clock else None
+    )
+
+
+@pytest.mark.parametrize("has_cache", [False, True])
+@pytest.mark.parametrize("has_usable_primary", [False, True])
+async def test_rejected_clock_preserves_accepted_cache_age(
+    coordinator_factory, monkeypatch, has_cache, has_usable_primary
+):
+    coord = coordinator_factory()
+    energy = coord.energy
+    now = datetime.now(timezone.utc)
+    mono = [1000.0]
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    monkeypatch.setattr(energy_mod, "time", SimpleNamespace(monotonic=lambda: mono[0]))
+    fetch = AsyncMock(
+        return_value={"production": [1000], "last_report_date": now.timestamp()}
+    )
+    hems = AsyncMock(return_value={"heatpump": [1000]})
+    energy._client_provider = lambda: SimpleNamespace(
+        lifetime_energy=fetch, hems_consumption_lifetime=hems
+    )
+    if has_cache:
+        await energy._async_refresh_site_energy()
+    mono[0] += 400
+    fetch.return_value = {
+        "production": [2000] if has_usable_primary else [],
+        "last_report_date": (now + timedelta(hours=1)).timestamp(),
+    }
+    await energy._async_refresh_site_energy()
+    assert energy.site_energy_cache_age == (400 if has_cache else None)
+    diagnostics = energy.site_energy_fetch_diagnostics
+    if has_usable_primary:
+        assert diagnostics["source_progress"] == "future"
+    else:
+        assert diagnostics["last_outcome"] == "invalid_payload"
+    assert hems.await_count == int(has_cache)
+    assert not energy.site_energy_refresh_due()
+    await energy._async_refresh_site_energy()
+    assert fetch.await_count == (2 if has_cache else 1)
+    energy._invalidate_site_energy_cache()
+    assert energy.site_energy_cache_age is None
+    assert energy.site_energy_refresh_due()
+
+
+@pytest.mark.parametrize("unusable_buckets", [[], ["inf"], [float("nan"), -1]])
+async def test_unusable_hems_buckets_do_not_advance_source_clock(
+    coordinator_factory, monkeypatch, unusable_buckets
+):
+    coord = coordinator_factory()
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    earlier = now - timedelta(minutes=5)
+    primary = AsyncMock(
+        return_value={"production": [1000], "last_report_date": now.timestamp()}
+    )
+    hems = AsyncMock(
+        return_value={"heatpump": unusable_buckets, "last_report_date": now.timestamp()}
+    )
+    coord.energy._client_provider = lambda: SimpleNamespace(
+        lifetime_energy=primary, hems_consumption_lifetime=hems
+    )
+
+    await coord.energy._async_refresh_site_energy(force=True)
+    assert coord.energy.site_energy["solar_production"].value_kwh == 1
+    assert "heat_pump" not in coord.energy.site_energy
+
+    hems.return_value = {"heatpump": [2000], "last_report_date": earlier.timestamp()}
+    await coord.energy._async_refresh_site_energy(force=True)
+    assert coord.energy.site_energy["heat_pump"].value_kwh == 2
+    assert coord.energy.site_energy["heat_pump"].last_report_date == earlier
+
+
+@pytest.mark.parametrize(
+    "malformed_clock", ["²", "9999-12-31T23:59:59-01:00", "not a timestamp", True]
+)
+async def test_malformed_primary_clock_preserves_cache_and_recovers(
+    coordinator_factory, monkeypatch, malformed_clock
+):
+    from custom_components.enphase_ev.api_parsers import (
+        normalize_lifetime_energy_payload,
+    )
+    from custom_components.enphase_ev.sensor_site_energy import (
+        EnphaseCurrentPowerConsumptionSensor,
+    )
+
+    coord = coordinator_factory()
+    energy = coord.energy
+    sensor = EnphaseCurrentPowerConsumptionSensor(coord)
+    now = [datetime.now(timezone.utc).replace(microsecond=0)]
+    mono = [1000.0]
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now[0])
+    monkeypatch.setattr(energy_mod, "time", SimpleNamespace(monotonic=lambda: mono[0]))
+    primary = AsyncMock()
+    hems = AsyncMock(return_value={"heatpump": [1000]})
+    energy._client_provider = lambda: SimpleNamespace(
+        lifetime_energy=primary, hems_consumption_lifetime=hems
+    )
+
+    async def refresh(source, production_wh):
+        primary.return_value = normalize_lifetime_energy_payload(
+            {
+                "production": [production_wh],
+                "last_report_date": source,
+                "interval_minutes": 5,
+            }
+        )
+        coord.last_success_utc = now[0]
+        await energy._async_refresh_site_energy(force=True)
+
+    await refresh(now[0].timestamp(), 100_000)
+    assert sensor.native_value is None
+    accepted_flows = energy.site_energy
+    accepted_meta = energy.site_energy_meta
+    accepted_diagnostics = energy.site_energy_fetch_diagnostics
+
+    now[0] += timedelta(seconds=300)
+    mono[0] += 300
+    await refresh(malformed_clock, 110_000)
+    assert energy.site_energy is accepted_flows
+    assert energy.site_energy_meta == accepted_meta
+    assert energy.site_energy_cache_age == 300
+    assert hems.await_count == 1
+    assert not energy.site_energy_refresh_due()
+    await energy._async_refresh_site_energy()
+    assert primary.await_count == 2
+    diagnostics = energy.site_energy_fetch_diagnostics
+    assert diagnostics["last_outcome"] == "invalid_payload"
+    assert diagnostics["failure_count"] == 1
+    assert diagnostics["last_success_utc"] == accepted_diagnostics["last_success_utc"]
+    assert diagnostics["source_timestamp"] == accepted_diagnostics["source_timestamp"]
+
+    await refresh(now[0].timestamp(), 101_000)
+    assert energy.site_energy["solar_production"].value_kwh == 101
+    assert energy.site_energy_cache_age == 0
+    assert sensor.native_value == 12_000
+    assert energy.site_energy_fetch_diagnostics["source_progress"] == "advanced"
+
+
+@pytest.mark.parametrize("metadata", [{}, {"last_report_date": None}])
+async def test_absent_primary_clock_can_publish_totals(coordinator_factory, metadata):
+    coord = coordinator_factory()
+    coord.client.lifetime_energy = AsyncMock(
+        return_value={"production": [101_000], **metadata}
+    )
+    coord.client.hems_consumption_lifetime = AsyncMock(return_value=None)
+
+    await coord.energy._async_refresh_site_energy(force=True)
+
+    assert coord.energy.site_energy["solar_production"].value_kwh == 101
+    assert coord.energy.site_energy_meta["last_report_date"] is None
+    assert coord.energy.site_energy_fetch_diagnostics["source_progress"] == "missing"

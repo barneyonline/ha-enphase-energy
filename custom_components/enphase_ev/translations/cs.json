@@ -594,7 +594,8 @@
           "fast_while_streaming": "Preferovat rychlé dotazování při aktivním cloud streamu",
           "api_timeout": "Časový limit API (s)",
           "session_history_interval": "Interval historie relací (min)",
-          "degraded_service_repair_issues": "Povolit opravy zhoršených služeb"
+          "degraded_service_repair_issues": "Povolit opravy zhoršených služeb",
+          "use_15_minute_power_average": "Použít 15minutový průměr výkonu"
         },
         "data_description": {
           "fast_poll_interval": "Interval používaný při nabíjení nebo streamování. Výchozí: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Když je povoleno, rychlé dotazování během aktivního cloudového streamu. Výchozí: Zapnuto.",
           "api_timeout": "Sekundy, než požadavky API vyprší. Výchozí: 15 s.",
           "session_history_interval": "Minuty čekání mezi načítáním historie relací z cloudu. Výchozí: 10 min.",
-          "degraded_service_repair_issues": "Vytváří problémy v Repairs, když jsou volitelné služby Enphase zhoršené. Výchozí: Vypnuto."
+          "degraded_service_repair_issues": "Vytváří problémy v Repairs, když jsou volitelné služby Enphase zhoršené. Výchozí: Vypnuto.",
+          "use_15_minute_power_average": "Průměruje výkon výroby, sítě, baterie a spotřeby za 15 minut a omezuje špičky. Hodnoty reagují pomaleji. Výchozí: vypnuto."
         }
       },
       "devices": {
@@ -2535,6 +2537,26 @@
           },
           "using_cached_data": {
             "name": "Používají se data událostí z mezipaměti"
+          }
+        }
+      },
+      "gateway_connected": {
+        "name": "Připojení k bráně",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Počet bran"
+          },
+          "gateway_connected_count": {
+            "name": "Připojené brány"
+          },
+          "gateway_last_connection_at": {
+            "name": "Poslední připojení k bráně"
+          },
+          "telemetry_received_at": {
+            "name": "Přijetí telemetrie"
+          },
+          "charger_last_reported_at": {
+            "name": "Poslední hlášení nabíječky"
           }
         }
       }

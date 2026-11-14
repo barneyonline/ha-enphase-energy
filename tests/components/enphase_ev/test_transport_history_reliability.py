@@ -295,13 +295,28 @@ async def test_overlapping_energy_reads_coalesce_before_cloud_acquisition(force)
     await asyncio.gather(first, joined)
     assert client.lifetime_energy.await_count == 1
     assert energy.site_energy_meta["last_report_date"] == source.replace(microsecond=0)
-    # Sequential requests still accept provider corrections (including dates).
-    corrected = source - timedelta(minutes=5)
+    # Sequential forced reads still process a correction at the same clock.
     client.lifetime_energy.side_effect = None
-    client.lifetime_energy.return_value = _energy_payload(corrected)
+    client.lifetime_energy.return_value = {
+        **_energy_payload(source),
+        "production": [4000],
+    }
     await energy._async_refresh_site_energy(force=True)
-    assert energy.site_energy_meta["last_report_date"] == corrected.replace(
-        microsecond=0
+    assert client.lifetime_energy.await_count == 2
+    assert energy.site_energy["solar_production"].value_kwh == 4
+    assert energy.site_energy_fetch_diagnostics["source_progress"] == "unchanged"
+
+    # An older report remains visible in diagnostics without replacing flows.
+    regressed = source - timedelta(minutes=5)
+    client.lifetime_energy.return_value = _energy_payload(regressed)
+    await energy._async_refresh_site_energy(force=True)
+    assert client.lifetime_energy.await_count == 3
+    assert energy.site_energy["solar_production"].value_kwh == 4
+    assert energy.site_energy_meta["last_report_date"] == source.replace(microsecond=0)
+    diagnostics = energy.site_energy_fetch_diagnostics
+    assert diagnostics["source_progress"] == "regressed"
+    assert (
+        diagnostics["source_timestamp"] == regressed.replace(microsecond=0).isoformat()
     )
 
 

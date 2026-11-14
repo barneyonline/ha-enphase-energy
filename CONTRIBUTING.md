@@ -138,6 +138,21 @@ separately while iterating on `scripts/`:
 docker compose -f devtools/docker/docker-compose.yml exec ha-dev pytest -q tests/scripts
 ```
 
+Coverage Reporting uses the [official Codecov action inputs](https://github.com/codecov/codecov-action#arguments)
+and coverage.py's [relative file paths](https://coverage.readthedocs.io/en/7.16.2/config.html#run-relative-files).
+Fork PR attribution uses GitHub's [head owner/branch filter](https://docs.github.com/en/rest/pulls/pulls#list-pull-requests)
+and requires one open PR with the exact producer SHA, source repository, branch,
+and base repository. Run `node --test tests/scripts/test_coverage_attribution.cjs`
+to exercise the workflow's attribution guards without API access.
+Its trusted workflow reads the verified producer's Git index without checking out
+or executing producer files. Codecov's working directory is separate from that
+source inventory. A small public-API check confirms nonempty project coverage and
+the same attempt's coverage/JUnit uploads. The coverage-producing pytest job tests
+the reported PR head; classifier, lint, quality and import checks retain GitHub's
+merge checkout. Live processing can only be proven after
+the reviewed reporter reaches main and a fresh source commit produces reports;
+rerunning an already-errored commit may retain Codecov's earlier page error.
+
 Pull-request CI selects runtime, import-diagnostic, quality, and maintenance-script
 jobs from the changed paths. Manifest edits limited to `categories`, `codeowners`,
 `documentation`, `issue_tracker`, and `version` skip the full integration pytest job
@@ -157,6 +172,58 @@ The HACS validator copies Python source from a pinned AMD64-only upstream image
 onto the pinned Home Assistant runtime. `HACS_SOURCE_PLATFORM` selects that source
 stage; the final image retains Docker's requested target platform. Keep both image
 digests and the Home Assistant version assertion when updating this validator.
+
+## Managed Cloud Environment
+
+The cloud adapter uses the same Dockerfile and dependency pins as local development.
+Configure the cloud environment's working directory as
+`/workspace/ha-enphase-energy`, and use this installation command:
+
+```bash
+bash devtools/cloud/environment.sh install
+```
+
+At the beginning of each cloud session, read `AGENTS.md` and this guide, then run:
+
+```bash
+bash devtools/cloud/environment.sh start
+```
+
+Installation reuses Docker build layers. Startup rebuilds only when the image is
+missing or its Dockerfile, dependency inputs, or cloud adapter have changed. It
+recreates `ha-dev` with current Docker proxy defaults and a read-only mount of the
+current system CA bundle, checks installed dependencies and pinned versions, and
+imports the integration. Neither command runs the full test suite. Reuse the
+running container for the checks appropriate to your changes:
+
+```bash
+bash devtools/cloud/environment.sh compose exec -T ha-dev pytest -q tests/components/enphase_ev
+bash devtools/cloud/environment.sh compose exec -T ha-dev pytest -q tests/scripts
+```
+
+Use `bash devtools/cloud/environment.sh rebuild` for an explicit uncached rebuild
+with a refreshed Python base image. Normal startup preserves source, HA config,
+images, and build caches. The adapter uses the managed local Docker socket, preserves
+Docker credentials and proxy configuration, and supplies CA trust through a
+BuildKit secret without changing the repository Dockerfile or disabling TLS.
+Generated state lives in `/workspace/.managed-ha`; `HA_CLOUD_STATE_DIR` can select
+another absolute directory on the Docker host.
+
+Start the optional manual UI only when needed:
+
+```bash
+mkdir -p .ha-config
+bash devtools/cloud/environment.sh compose up -d ha-runtime
+```
+
+The UI image is pinned to HA 2026.10.0. Keep it aligned with the development
+requirements when upgrading HA. Cloud runtime certificate trust is mounted for
+this service too. No Enphase credentials are needed for the mocked test suites.
+Saving or publishing a cloud template is a separate platform operation; running
+these commands in one session does not update its saved configuration.
+Export self-contained install and startup settings for the platform's environment
+editor with `bash devtools/cloud/environment.sh settings`. The exported installer
+includes the adapter, so it also works before these repository changes are merged.
 
 ## Dependency Maintenance
 

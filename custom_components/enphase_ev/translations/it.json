@@ -594,7 +594,8 @@
           "fast_while_streaming": "Preferisci polling rapido mentre lo streaming cloud è attivo",
           "api_timeout": "Timeout API (s)",
           "session_history_interval": "Intervallo cronologia sessioni (min)",
-          "degraded_service_repair_issues": "Abilita riparazioni per servizi degradati"
+          "degraded_service_repair_issues": "Abilita riparazioni per servizi degradati",
+          "use_15_minute_power_average": "Usa la potenza media su 15 minuti"
         },
         "data_description": {
           "fast_poll_interval": "Intervallo da usare durante la ricarica o lo streaming. Predefinito: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Quando abilitato, polling rapido durante lo streaming cloud attivo. Predefinito: Attivato.",
           "api_timeout": "Secondi prima del timeout delle richieste API. Predefinito: 15 s.",
           "session_history_interval": "Minuti di attesa tra i recuperi della cronologia sessioni cloud. Predefinito: 10 min.",
-          "degraded_service_repair_issues": "Crea problemi in Repairs quando i servizi Enphase opzionali sono degradati. Predefinito: Disattivato."
+          "degraded_service_repair_issues": "Crea problemi in Repairs quando i servizi Enphase opzionali sono degradati. Predefinito: Disattivato.",
+          "use_15_minute_power_average": "Calcola la media della potenza di produzione, rete, batteria e consumo su 15 minuti per ridurre i picchi. Le letture rispondono più lentamente. Predefinito: disattivato."
         }
       },
       "devices": {
@@ -2535,6 +2537,26 @@
           },
           "using_cached_data": {
             "name": "Uso dei dati degli eventi memorizzati nella cache"
+          }
+        }
+      },
+      "gateway_connected": {
+        "name": "Connettività del gateway",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Numero di gateway"
+          },
+          "gateway_connected_count": {
+            "name": "Gateway connessi"
+          },
+          "gateway_last_connection_at": {
+            "name": "Ultima connessione al gateway"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetria ricevuta"
+          },
+          "charger_last_reported_at": {
+            "name": "Ultima segnalazione del caricatore"
           }
         }
       }

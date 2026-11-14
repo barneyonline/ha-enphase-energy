@@ -10,6 +10,7 @@
 ## Build, Test, and Development Commands
 - Prefer the pinned Docker environment for agent-driven validation:
 - Use the pinned Docker environment for all linting, formatting, coverage, and test commands. Do not use a local virtualenv in this repository.
+  - In a managed cloud session, run `bash devtools/cloud/environment.sh start` once, then use `bash devtools/cloud/environment.sh compose exec -T ha-dev <command>` for the checks below. This adapter supplies the cloud proxy and CA trust while using the same pinned Docker lane. Reuse the running container; routine startup performs dependency/version checks without running the full suite.
   - `docker compose -f devtools/docker/docker-compose.yml build ha-dev`
   - `docker compose -f devtools/docker/docker-compose.yml run --rm ha-dev bash -lc "<command>"`
 - For manual Home Assistant UI verification, start the runtime container against this checkout:

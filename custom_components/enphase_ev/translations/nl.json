@@ -594,7 +594,8 @@
           "fast_while_streaming": "Geef voorkeur aan snelle polling terwijl cloudstream actief is",
           "api_timeout": "API-time-out (s)",
           "session_history_interval": "Sessieverleden-interval (min)",
-          "degraded_service_repair_issues": "Reparaties voor verminderde diensten inschakelen"
+          "degraded_service_repair_issues": "Reparaties voor verminderde diensten inschakelen",
+          "use_15_minute_power_average": "Gemiddeld vermogen over 15 minuten gebruiken"
         },
         "data_description": {
           "fast_poll_interval": "Interval voor gebruik tijdens laden of streamen. Standaard: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Wanneer ingeschakeld, snelle polling tijdens actieve cloudstreaming. Standaard: Ingeschakeld.",
           "api_timeout": "Seconden voordat API-aanvragen een time-out krijgen. Standaard: 15 s.",
           "session_history_interval": "Minuten om te wachten tussen het ophalen van cloudsessiegeschiedenis. Standaard: 10 min.",
-          "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken. Standaard: Uitgeschakeld."
+          "degraded_service_repair_issues": "Maakt Repairs-problemen aan wanneer optionele Enphase-diensten verminderd werken. Standaard: Uitgeschakeld.",
+          "use_15_minute_power_average": "Middelt productie-, net-, batterij- en verbruiksvermogen over 15 minuten om pieken te verminderen. Metingen reageren langzamer. Standaard: uitgeschakeld."
         }
       },
       "devices": {
@@ -2535,6 +2537,26 @@
           },
           "using_cached_data": {
             "name": "Gebeurtenisgegevens uit cache worden gebruikt"
+          }
+        }
+      },
+      "gateway_connected": {
+        "name": "Gatewayverbinding",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Aantal gateways"
+          },
+          "gateway_connected_count": {
+            "name": "Verbonden gateways"
+          },
+          "gateway_last_connection_at": {
+            "name": "Laatste gatewayverbinding"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetrie ontvangen"
+          },
+          "charger_last_reported_at": {
+            "name": "Laatste melding van lader"
           }
         }
       }

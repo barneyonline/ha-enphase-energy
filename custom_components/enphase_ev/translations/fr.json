@@ -594,7 +594,8 @@
           "fast_while_streaming": "Préférer la scrutation rapide pendant le streaming cloud actif",
           "api_timeout": "Délai d'expiration API (s)",
           "session_history_interval": "Intervalle d'historique de session (min)",
-          "degraded_service_repair_issues": "Activer les réparations des services dégradés"
+          "degraded_service_repair_issues": "Activer les réparations des services dégradés",
+          "use_15_minute_power_average": "Utiliser la puissance moyenne sur 15 minutes"
         },
         "data_description": {
           "fast_poll_interval": "Intervalle à utiliser pendant la charge ou le streaming. Par défaut: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Lorsqu'activé, scrutation rapide pendant le streaming cloud actif. Par défaut: Activé.",
           "api_timeout": "Secondes avant l’expiration des requêtes API. Par défaut: 15 s.",
           "session_history_interval": "Minutes d'attente entre les récupérations de l'historique de session depuis le cloud. Par défaut: 10 min.",
-          "degraded_service_repair_issues": "Crée des problèmes Repairs lorsque des services Enphase facultatifs sont dégradés. Par défaut: Désactivé."
+          "degraded_service_repair_issues": "Crée des problèmes Repairs lorsque des services Enphase facultatifs sont dégradés. Par défaut: Désactivé.",
+          "use_15_minute_power_average": "Calcule la moyenne des puissances de production, du réseau, de la batterie et de consommation sur 15 minutes pour réduire les pics. Les valeurs réagissent plus lentement. Par défaut : désactivé."
         }
       },
       "devices": {
@@ -2535,6 +2537,26 @@
           },
           "using_cached_data": {
             "name": "Utilisation des données d’événements en cache"
+          }
+        }
+      },
+      "gateway_connected": {
+        "name": "Connexion à la passerelle",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Nombre de passerelles"
+          },
+          "gateway_connected_count": {
+            "name": "Passerelles connectées"
+          },
+          "gateway_last_connection_at": {
+            "name": "Dernière connexion à la passerelle"
+          },
+          "telemetry_received_at": {
+            "name": "Télémétrie reçue"
+          },
+          "charger_last_reported_at": {
+            "name": "Dernier rapport du chargeur"
           }
         }
       }

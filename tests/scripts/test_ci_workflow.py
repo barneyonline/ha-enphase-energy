@@ -134,6 +134,17 @@ def test_pytest_reuses_one_coverage_run_and_loads_only_required_plugins() -> Non
     assert "--cov-report=json" in test_step["run"]
 
 
+def test_coverage_producer_tests_the_reported_head_and_keeps_other_merge_checks():
+    jobs = _jobs()
+    checkout = jobs["pytest"]["steps"][0]["with"]
+    assert checkout["ref"] == (
+        "${{ github.event_name == 'pull_request' && "
+        "github.event.pull_request.head.sha || github.sha }}"
+    )
+    for name in ("changes", "pre-commit", "quality-scale", "python314-diagnostics"):
+        assert "ref" not in jobs[name]["steps"][0]["with"]
+
+
 def test_uv_caches_depend_only_on_dependency_inputs() -> None:
     for job in _jobs().values():
         for step in job.get("steps", []):
@@ -418,8 +429,10 @@ def test_metadata_with_other_runtime_changes_keeps_tests(
     "paths",
     [
         (".github/workflows/tests.yml",),
+        (".github/workflows/coverage-reporting.yml",),
         ("scripts/ci_manifest_metadata.py",),
         ("tests/scripts/test_ci_workflow.py",),
+        ("tests/scripts/test_coverage_attribution.cjs",),
         (
             ".github/workflows/tests.yml",
             "scripts/ci_manifest_metadata.py",

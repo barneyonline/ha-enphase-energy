@@ -594,7 +594,8 @@
           "fast_while_streaming": "Valitse nopea kysely, kun pilvivirta on aktiivinen",
           "api_timeout": "API-aikakatkaisu (s)",
           "session_history_interval": "Istuntohistorian väli (min)",
-          "degraded_service_repair_issues": "Ota heikentyneiden palvelujen korjaukset käyttöön"
+          "degraded_service_repair_issues": "Ota heikentyneiden palvelujen korjaukset käyttöön",
+          "use_15_minute_power_average": "Käytä 15 minuutin keskitehoa"
         },
         "data_description": {
           "fast_poll_interval": "Latauksen tai suoratoiston aikana käytettävä aikaväli. Oletus: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Kun tämä on käytössä, nopea kysely aktiivisen pilvisuoratoiston aikana. Oletus: Käytössä.",
           "api_timeout": "Sekuntia ennen kuin API-pyynnöt aikakatkaistaan. Oletus: 15 s.",
           "session_history_interval": "Minuuttia odotettavana pilvikäyttöhistorian hakujen välillä. Oletus: 10 min.",
-          "degraded_service_repair_issues": "Luo Repairs-ongelmia, kun valinnaiset Enphase-palvelut ovat heikentyneet. Oletus: Pois käytöstä."
+          "degraded_service_repair_issues": "Luo Repairs-ongelmia, kun valinnaiset Enphase-palvelut ovat heikentyneet. Oletus: Pois käytöstä.",
+          "use_15_minute_power_average": "Laskee tuotannon, sähköverkon, akun ja kulutuksen tehon keskiarvon 15 minuutin ajalta piikkien vähentämiseksi. Lukemat reagoivat hitaammin. Oletus: pois käytöstä."
         }
       },
       "devices": {
@@ -2535,6 +2537,26 @@
           },
           "using_cached_data": {
             "name": "Käytetään välimuistissa olevia tapahtumatietoja"
+          }
+        }
+      },
+      "gateway_connected": {
+        "name": "Yhdyskäytävän yhteys",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Yhdyskäytävien määrä"
+          },
+          "gateway_connected_count": {
+            "name": "Yhdistetyt yhdyskäytävät"
+          },
+          "gateway_last_connection_at": {
+            "name": "Viimeisin yhdyskäytäväyhteys"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetrian vastaanotto"
+          },
+          "charger_last_reported_at": {
+            "name": "Laturin viimeisin raportti"
           }
         }
       }

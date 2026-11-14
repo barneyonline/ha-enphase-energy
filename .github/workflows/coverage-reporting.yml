@@ -1,21 +1,41 @@
 name: Coverage Reporting
 
 # Test jobs have no reporting credentials. This default-branch workflow only
-# downloads their report files; it never checks out or executes pull-request code.
+# reads report files and source-tree metadata; it never executes producer code.
 on:
   workflow_run:
     workflows: [Tests]
     types: [completed]
+  # The owner dispatches only a reviewed reporter ref, after manually running
+  # Tests on that same current PR head. Producer files remain data, never code.
+  workflow_dispatch:
+    inputs:
+      producer_run_id:
+        description: Successful Tests run for the exact current PR head
+        required: true
+        type: string
+      producer_run_attempt:
+        description: Latest completed attempt of the selected Tests run
+        required: true
+        type: string
+      pull_request_number:
+        description: Open non-draft same-repository PR containing this reviewed reporter
+        required: true
+        type: string
+      expected_head_sha:
+        description: Exact reviewed 40-character PR head and reporter workflow SHA
+        required: true
+        type: string
 
 permissions: {}
 
 concurrency:
-  group: coverage-reporting-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+  group: coverage-reporting-${{ github.event.workflow_run.id || inputs.producer_run_id }}-${{ github.event.workflow_run.run_attempt || inputs.producer_run_attempt }}
   cancel-in-progress: false
 
 jobs:
   upload:
-    if: ${{ github.event.workflow_run.event == 'pull_request' || github.event.workflow_run.event == 'push' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request' || github.event.workflow_run.event == 'push' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
@@ -27,36 +47,124 @@ jobs:
       - name: Resolve report artifact and source attribution
         id: source
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          REPORTER_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          REPORTER_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
         with:
           script: |
-            const run = context.payload.workflow_run;
-            if (run.repository.id !== context.payload.repository.id ||
+            const manual = context.eventName === 'workflow_dispatch';
+            if (!manual && context.eventName !== 'workflow_run') {
+              throw new Error('Unexpected reporter event');
+            }
+            const repository = context.payload.repository;
+            const validSha = sha => /^[0-9a-f]{40}$/.test(sha ?? '');
+            let run = context.payload.workflow_run;
+            let prNumber = '';
+            const reporterSha = process.env.REPORTER_WORKFLOW_SHA;
+            let selectedPr;
+            if (manual) {
+              // Dispatch authority trusts the reviewed workflow definition,
+              // never the producer checkout. Ref/SHA checks also reject a
+              // stale branch, a tag, or a reporter from a different PR head.
+              const owner = context.repo.owner.toLowerCase();
+              if (context.actor.toLowerCase() !== owner ||
+                  process.env.REPORTER_TRIGGERING_ACTOR?.toLowerCase() !== owner) {
+                throw new Error('Only the repository owner may dispatch or rerun validation');
+              }
+              const inputs = context.payload.inputs ?? {};
+              const positiveInteger = name => {
+                const raw = inputs[name];
+                if (!/^[1-9][0-9]*$/.test(raw ?? '') || !Number.isSafeInteger(Number(raw))) {
+                  throw new Error(`Invalid ${name}`);
+                }
+                return Number(raw);
+              };
+              const runId = positiveInteger('producer_run_id');
+              const attempt = positiveInteger('producer_run_attempt');
+              const number = positiveInteger('pull_request_number');
+              const sha = inputs.expected_head_sha;
+              if (!validSha(sha) || context.sha !== sha || reporterSha !== sha) {
+                throw new Error('Reporter must execute the exact reviewed PR head');
+              }
+              selectedPr = (await github.rest.pulls.get({...context.repo, pull_number: number})).data;
+              if (selectedPr.number !== number || selectedPr.state !== 'open' || selectedPr.draft ||
+                  selectedPr.base.repo.id !== repository.id ||
+                  selectedPr.base.ref !== repository.default_branch ||
+                  selectedPr.head.repo?.id !== repository.id || selectedPr.head.sha !== sha ||
+                  context.ref !== `refs/heads/${selectedPr.head.ref}`) {
+                throw new Error('Validation requires the current non-draft same-repository PR head');
+              }
+              run = (await github.rest.actions.getWorkflowRun({...context.repo, run_id: runId})).data;
+              const workflow = (await github.rest.actions.getWorkflow({
+                ...context.repo, workflow_id: 'tests.yml',
+              })).data;
+              if (run.id !== runId || run.run_attempt !== attempt ||
+                  run.status !== 'completed' || run.conclusion !== 'success' ||
+                  run.workflow_id !== workflow.id || workflow.path !== '.github/workflows/tests.yml' ||
+                  !['workflow_dispatch', 'pull_request'].includes(run.event) ||
+                  run.head_repository?.id !== repository.id || run.head_sha !== sha ||
+                  run.head_branch !== selectedPr.head.ref) {
+                throw new Error('Selected Tests run must be the successful latest attempt for this PR head');
+              }
+              if (run.event === 'workflow_dispatch' &&
+                  (run.actor?.login?.toLowerCase() !== owner ||
+                   run.triggering_actor?.login?.toLowerCase() !== owner)) {
+                throw new Error('Manual Tests producer must be dispatched and rerun by the owner');
+              }
+              prNumber = String(number);
+            }
+            if (!run || run.repository?.id !== repository.id ||
                 run.path !== '.github/workflows/tests.yml' ||
-                !/^[0-9a-f]{40}$/.test(run.head_sha)) {
+                !validSha(run.head_sha) || !validSha(reporterSha) ||
+                !Number.isSafeInteger(run.id) || run.id <= 0 ||
+                !Number.isSafeInteger(run.head_repository?.id) || run.head_repository.id <= 0 ||
+                !Number.isSafeInteger(run.run_attempt) || run.run_attempt <= 0) {
               throw new Error('Unexpected report producer');
             }
-            let prNumber = '';
             let branch = run.head_branch;
-            if (run.event === 'pull_request') {
-              // workflow_run.pull_requests can be empty for fork pull requests.
-              const associated = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
-                ...context.repo, commit_sha: run.head_sha, per_page: 100,
+            if (!manual && run.event === 'pull_request') {
+              // Fork runs can lack both workflow_run.pull_requests and a
+              // base-repository commit association. Query the base PR inventory
+              // by producer owner/branch, then require the exact current head.
+              const pulls = await github.paginate(github.rest.pulls.list, {
+                ...context.repo, state: 'open',
+                head: `${run.head_repository.owner.login}:${run.head_branch}`, per_page: 100,
               });
-              const matches = associated.filter(pr => pr.base.repo.id === run.repository.id &&
+              const matches = pulls.filter(pr => pr.base.repo.id === run.repository.id &&
+                pr.head.repo?.id === run.head_repository.id &&
+                pr.head.ref === run.head_branch &&
                 pr.head.sha === run.head_sha &&
-                pr.state === 'open');
+                pr.state === 'open' && !pr.draft);
               if (matches.length !== 1) {
                 core.notice('No unique current pull request for this producer commit; skipping reports');
                 return;
               }
               prNumber = String(matches[0].number);
               branch = matches[0].head.ref;
-            } else if (run.head_repository.id !== run.repository.id ||
-                       (branch !== 'main' && !branch.startsWith('release/'))) {
+            } else if (!manual && (run.event !== 'push' ||
+                       run.head_repository?.id !== run.repository.id ||
+                       (branch !== 'main' && !branch.startsWith('release/')))) {
               throw new Error('Unexpected push report source');
             }
             if (!/^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$/.test(branch)) {
               throw new Error('Report branch contains unsupported characters');
+            }
+            // Artifact metadata has a run ID but no attempt ID. An attempt-
+            // specific name alone can be pre-created by an earlier attempt.
+            const attempt = (await github.rest.actions.getWorkflowRunAttempt({
+              ...context.repo, run_id: run.id, attempt_number: run.run_attempt,
+            })).data;
+            const started = Date.parse(attempt.run_started_at ?? '');
+            const finished = Date.parse(attempt.updated_at ?? '');
+            if (attempt.id !== run.id || attempt.run_attempt !== run.run_attempt ||
+                attempt.workflow_id !== run.workflow_id || attempt.path !== run.path ||
+                attempt.repository?.id !== run.repository.id ||
+                attempt.head_repository?.id !== run.head_repository.id ||
+                attempt.head_sha !== run.head_sha || attempt.head_branch !== branch ||
+                attempt.event !== run.event || attempt.status !== 'completed' ||
+                attempt.conclusion !== run.conclusion ||
+                !Number.isFinite(started) || !Number.isFinite(finished) || finished < started) {
+              throw new Error('Selected attempt identity or execution interval is invalid');
             }
             const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
               ...context.repo, run_id: run.id, per_page: 100,
@@ -64,17 +172,45 @@ jobs:
             const matches = artifacts.filter(artifact =>
               artifact.name === `coverage-evidence-${run.run_attempt}` && !artifact.expired);
             if (!matches.length) {
-              if (run.conclusion !== 'success') throw new Error('Failed producer did not preserve reports');
+              if (manual || run.conclusion !== 'success') throw new Error('Selected producer did not preserve reports');
               core.notice('This change did not produce coverage reports');
               return;
             }
-            if (matches.length !== 1 || matches[0].size_in_bytes > 33554432) {
+            if (matches.length !== 1 || !Number.isSafeInteger(matches[0].size_in_bytes) ||
+                matches[0].size_in_bytes <= 0 || matches[0].size_in_bytes > 33554432) {
               throw new Error('Unexpected report artifact count or size');
             }
-            core.setOutput('artifact_id', String(matches[0].id));
+            const artifact = matches[0];
+            const provenance = artifact.workflow_run;
+            const created = Date.parse(artifact.created_at ?? '');
+            if (!Number.isSafeInteger(artifact.id) || artifact.id <= 0 ||
+                !provenance || provenance.id !== run.id || provenance.repository_id !== repository.id ||
+                provenance.head_repository_id !== run.head_repository?.id ||
+                provenance.head_sha !== run.head_sha || provenance.head_branch !== run.head_branch) {
+              throw new Error('Report artifact provenance does not match the selected producer');
+            }
+            if (!Number.isFinite(created) || created < started || created > finished) {
+              throw new Error('Report artifact was not created during the selected attempt');
+            }
+            core.setOutput('artifact_id', String(artifact.id));
             core.setOutput('sha', run.head_sha);
             core.setOutput('branch', branch);
             core.setOutput('pr', prNumber);
+            core.setOutput('run_id', String(run.id));
+            core.setOutput('run_attempt', String(run.run_attempt));
+            core.setOutput('run_url', `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${run.id}`);
+            core.setOutput('head_repository_id', String(run.head_repository.id));
+      - name: Check out only the trusted reporter helper
+        if: ${{ steps.source.outputs.artifact_id != '' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # These platform-owned contexts keep executable helper code separate
+          # from every producer/PR output, including a reviewed manual reporter.
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.repository.default_branch || github.workflow_sha }}
+          persist-credentials: false
+          path: trusted-reporter
+          sparse-checkout: scripts/codecov_reporting.py
+          sparse-checkout-cone-mode: false
       - name: Download only the selected producer reports
         if: ${{ steps.source.outputs.artifact_id != '' }}
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -82,7 +218,7 @@ jobs:
           artifact-ids: ${{ steps.source.outputs.artifact_id }}
           merge-multiple: true
           path: ${{ runner.temp }}/reports
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ steps.source.outputs.run_id }}
           github-token: ${{ github.token }}
       - name: Validate report files
         if: ${{ steps.source.outputs.artifact_id != '' }}
@@ -110,33 +246,94 @@ jobs:
           if total > 33554432:
               raise SystemExit('Report aggregate budget exceeded')
           PYTHON
-      - name: Upload coverage to Codecov
+      - name: Prepare producer Git inventory without checking out producer files
         if: ${{ steps.source.outputs.artifact_id != '' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v6
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          mkdir "$RUNNER_TEMP/codecov-work"
+          git init "$RUNNER_TEMP/codecov-source"
+          git -C "$RUNNER_TEMP/codecov-source" config core.hooksPath /dev/null
+          git -C "$RUNNER_TEMP/codecov-source" fetch --no-tags --filter=blob:none --depth=1 \
+            "https://github.com/$GITHUB_REPOSITORY.git" "$SOURCE_SHA"
+          # read-tree updates the index only; it does not materialize source files.
+          git -C "$RUNNER_TEMP/codecov-source" read-tree FETCH_HEAD
+          git -C "$RUNNER_TEMP/codecov-source" update-ref HEAD "$SOURCE_SHA"
+      - name: Recheck producer and PR before uploading
+        if: ${{ steps.source.outputs.artifact_id != '' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          SOURCE_RUN_ID: ${{ steps.source.outputs.run_id }}
+          SOURCE_RUN_ATTEMPT: ${{ steps.source.outputs.run_attempt }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          SOURCE_BRANCH: ${{ steps.source.outputs.branch }}
+          SOURCE_PR: ${{ steps.source.outputs.pr }}
+          SOURCE_HEAD_REPOSITORY_ID: ${{ steps.source.outputs.head_repository_id }}
+        with:
+          script: |
+            const source = process.env;
+            const run = (await github.rest.actions.getWorkflowRun({
+              ...context.repo, run_id: Number(source.SOURCE_RUN_ID),
+            })).data;
+            if (run.id !== Number(source.SOURCE_RUN_ID) ||
+                run.run_attempt !== Number(source.SOURCE_RUN_ATTEMPT) || run.status !== 'completed' ||
+                run.repository?.id !== context.payload.repository.id ||
+                run.path !== '.github/workflows/tests.yml' || run.head_sha !== source.SOURCE_SHA ||
+                run.head_branch !== source.SOURCE_BRANCH ||
+                run.head_repository?.id !== Number(source.SOURCE_HEAD_REPOSITORY_ID) ||
+                (context.eventName === 'workflow_dispatch' && run.conclusion !== 'success')) {
+              throw new Error('Producer changed after artifact selection');
+            }
+            if (source.SOURCE_PR) {
+              const pr = (await github.rest.pulls.get({
+                ...context.repo, pull_number: Number(source.SOURCE_PR),
+              })).data;
+              if (pr.number !== Number(source.SOURCE_PR) || pr.state !== 'open' || pr.draft ||
+                  pr.base.repo.id !== context.payload.repository.id ||
+                  (context.eventName === 'workflow_dispatch' &&
+                   pr.base.ref !== context.payload.repository.default_branch) ||
+                  pr.head.repo?.id !== Number(source.SOURCE_HEAD_REPOSITORY_ID) ||
+                  pr.head.sha !== source.SOURCE_SHA || pr.head.ref !== source.SOURCE_BRANCH) {
+                throw new Error('PR changed after artifact selection');
+              }
+            }
+      - name: Upload coverage to Codecov
+        id: coverage_upload
+        if: ${{ steps.source.outputs.artifact_id != '' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        env:
+          GIT_DIR: ${{ runner.temp }}/codecov-source/.git
+          GIT_WORK_TREE: ${{ runner.temp }}/codecov-source
         with:
           use_oidc: true
           files: ${{ runner.temp }}/reports/coverage.xml
-          root_dir: ${{ runner.temp }}/reports
-          name: coverage-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          root_dir: ${{ runner.temp }}/codecov-source
+          working-directory: ${{ runner.temp }}/codecov-work
+          name: coverage-${{ steps.source.outputs.run_id }}-${{ steps.source.outputs.run_attempt }}
           plugins: noop
           disable_search: true
           disable_file_fixes: true
           override_commit: ${{ steps.source.outputs.sha }}
           override_branch: ${{ steps.source.outputs.branch }}
           override_pr: ${{ steps.source.outputs.pr }}
-          override_build: ${{ github.event.workflow_run.id }}.${{ github.event.workflow_run.run_attempt }}
-          override_build_url: ${{ github.event.workflow_run.html_url }}
+          override_build: ${{ steps.source.outputs.run_id }}.${{ steps.source.outputs.run_attempt }}
+          override_build_url: ${{ steps.source.outputs.run_url }}
           slug: ${{ github.repository }}
           fail_ci_if_error: true
       - name: Upload test results to Codecov
+        id: junit_upload
         if: ${{ steps.source.outputs.artifact_id != '' }}
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v6
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        env:
+          GIT_DIR: ${{ runner.temp }}/codecov-source/.git
+          GIT_WORK_TREE: ${{ runner.temp }}/codecov-source
         with:
           use_oidc: true
           files: ${{ runner.temp }}/reports/junit.xml
-          root_dir: ${{ runner.temp }}/reports
-          name: junit-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
-          job_code: junit-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          root_dir: ${{ runner.temp }}/codecov-source
+          working-directory: ${{ runner.temp }}/codecov-work
+          name: junit-${{ steps.source.outputs.run_id }}-${{ steps.source.outputs.run_attempt }}
+          job_code: junit-${{ steps.source.outputs.run_id }}-${{ steps.source.outputs.run_attempt }}
           report_type: test_results
           plugins: noop
           disable_file_fixes: true
@@ -144,7 +341,16 @@ jobs:
           override_commit: ${{ steps.source.outputs.sha }}
           override_branch: ${{ steps.source.outputs.branch }}
           override_pr: ${{ steps.source.outputs.pr }}
-          override_build: ${{ github.event.workflow_run.id }}.${{ github.event.workflow_run.run_attempt }}
-          override_build_url: ${{ github.event.workflow_run.html_url }}
+          override_build: ${{ steps.source.outputs.run_id }}.${{ steps.source.outputs.run_attempt }}
+          override_build_url: ${{ steps.source.outputs.run_url }}
           slug: ${{ github.repository }}
           fail_ci_if_error: true
+      - name: Verify processed project coverage and test results for this attempt
+        if: ${{ always() && steps.source.outputs.artifact_id != '' && steps.coverage_upload.outcome == 'success' && steps.junit_upload.outcome == 'success' }}
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          SOURCE_BUILD: ${{ steps.source.outputs.run_id }}.${{ steps.source.outputs.run_attempt }}
+        run: |
+          python3 -I -B "$GITHUB_WORKSPACE/trusted-reporter/scripts/codecov_reporting.py" \
+            --sha "$SOURCE_SHA" \
+            --repository "$GITHUB_REPOSITORY" --build "$SOURCE_BUILD"

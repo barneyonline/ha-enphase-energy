@@ -14,7 +14,9 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 
-- None
+- Prevent config-entry reloads from hanging when schedule startup overlaps an options or setup-time data update.
+- Update Charger Status, Electrical Phase, and Storm Guard as soon as their cloud data is loaded after a Home Assistant restart.
+- Show the reported EV charger Gateway connectivity state even when the charger report is older than 15 minutes.
 
 ### 🔧 Improvements
 
@@ -27,9 +29,120 @@ All notable changes to this project will be documented in this file.
 
 ### 🔄 Other changes
 
-- Keep maintenance validation reachable and the pytest check name consistent across skipped and running validation.
+- None
 
-- Add maintenance workflows and merge checks for HAL-managed issues and PR feedback, with shared operating instructions and changelog/release templates maintained in the central HAL plugin. Keep unattended activation gated by verification.
+## v5.3.0 - 2026-11-13
+
+### 🚧 Breaking changes
+
+- Production Power now uses changes in Site Solar Production’s lifetime energy to calculate an average between reports. Its entity identity is preserved. On upgrade, cached readings from the previous cloud power endpoint are discarded and two valid energy observations are required before power is available. Production Power becomes unavailable when its source timestamp is unchanged for 30 minutes, including overnight. (#934, #993)
+
+### ✨ New features
+
+- Add a Gateway Connectivity diagnostic binary sensor for each EV charger. It reports unknown when telemetry is missing, stale or conflicting, and includes gateway counts plus connection-event, charger-report and cloud-receipt timestamps. (#1002)
+
+### 🐛 Bug fixes
+
+- Reject malformed, future-dated and regressed lifetime-energy reports without overwriting accepted counters or refreshing cache age. Keep normal request throttling for rejected reports and isolate invalid optional HEMS timestamps from primary energy updates. (#993, #1004)
+- Make rolling site power more reliable across counter resets, source changes and restarts. Require a new energy increment to confirm extreme readings, and switch to fresh consumption-energy data when the last valid power balance expires. (#999, #1004)
+- Back off repeated site-energy and EV charger timeseries failures while retaining accepted readings, honor longer retry deadlines for optional HEMS reads, and share overlapping charger requests. Bound charger daily timeseries caches to three dates and clean up retired charger data. (#996)
+- Allow Energy Planner to recheck Export Limit write authority immediately before the cloud request is sent. Preserve pending intent until cleanup is acknowledged and wait for in-flight Export Limit transactions before reloading. (#1003)
+
+### 🔧 Improvements
+
+- Add **Use 15-minute Power Average** in Polling settings, disabled by default. When enabled, use elapsed-time-weighted energy readings for Production, Grid and Battery Power, and use matching windows for the Consumption Power balance. The consumption-energy fallback is also averaged. (#999)
+
+### 🔄 Other changes
+
+- Restore Codecov reporting, correct fork PR coverage attribution and validate Codecov 7.1.1 against selected runs. (#991, #995, #997)
+- Add a reusable managed cloud development environment based on the pinned Docker test stack. (#992)
+- Update the pinned checkout action to 7.0.1. (#998)
+- Bump the integration manifest version to `5.3.0`.
+
+## v5.2.5b2 - 2026-11-10
+
+### 🚧 Breaking changes
+
+- None
+
+### ✨ New features
+
+- None
+
+### 🐛 Bug fixes
+
+- Confirm extreme averaged Consumption Power before publishing it, retain accepted readings and their expiry during quarantine, and discard unsafe restored averages.
+- Reseed smoothed Grid and Battery Power when a contributing energy channel first appears, so its lifetime total cannot become a false power spike.
+- Preserve the next averaging interval after an extreme power reading passes confirmation on large sites.
+- Preserve the first accepted energy interval after a counter reset or source change when 15-minute power averaging is enabled, including a restart immediately after a source reseed. Restored points retain source-identity validation and the first live counter-reset checks.
+- Keep Polling saves live when the new power-averaging option remains disabled; reload only when its effective value changes.
+- Discard malformed or unsafe averaging restore data without failing sensor setup, and apply extreme-power confirmation to the calculated average as well as the raw interval.
+- Ignore untagged legacy power readings when enabling smoothing, so cached estimates from the previous calculation mode cannot appear as rolling averages.
+- Back off repeated site-energy and EV charger timeseries fetch failures while retaining accepted readings, and honor longer provider retry deadlines for optional HEMS lifetime reads.
+- Share overlapping charger timeseries and summary acquisitions, including forced reads, without suppressing later sequential refreshes or accepting invalidated results.
+- Bound EV charger daily timeseries caches to three dates and remove retired charger records and cached reads during runtime cleanup.
+
+### 🔧 Improvements
+
+- Add **Use 15-minute Power Average** to Polling settings, disabled by default. When enabled, smooth Production, Grid and Battery Power with elapsed-time-weighted cumulative-energy windows and require matching windows for the Consumption Power balance. Smooth the consumption-energy fallback as well; preserve the original calculations when disabled. Other power sensors and energy counters are unchanged.
+
+### 🔄 Other changes
+
+- Correct Codecov attribution for fork pull requests and add selected-run validation for Codecov 7.1.1. (#995, #997)
+- Update the pinned checkout action to 7.0.1. (#998)
+- Bump the integration manifest version to `5.2.5b2` for beta testing.
+
+## v5.2.5b1 - 2026-11-06
+
+### 🚧 Breaking changes
+
+- Production Power now reports an average derived from Site Solar Production's lifetime-energy feed, matching Grid/Battery Power, instead of the `get_latest_power` reading. Its entity identity is preserved. Old latest-power cache values are discarded on upgrade; two energy observations are required to calculate a new estimate, and unchanged overnight source timestamps follow the shared 30-minute expiry.
+
+### ✨ New features
+
+- None
+
+### 🐛 Bug fixes
+
+- Use the existing `solar_production` energy flow for Production Power to avoid publishing the inaccurate daytime `get_latest_power` measurements reported in #934. Reuse Grid/Battery Power's timing, reset, outlier and restart safeguards; retain the raw endpoint only for diagnostics.
+- Ignore regressed source timestamps in the shared Production/Grid/Battery power calculation so older responses cannot publish a false zero or distort the next averaging window.
+- Let the first valid energy report seed an uninitialized power sensor even when its source time predates a synthetic startup placeholder; retain regression guards for real and rejected restored histories.
+- Preserve newer accepted power when replayed cloud reports are older than a saved reading whose calculation baseline is absent; resume calculation once the source catches up.
+- Reject non-finite lifetime-energy buckets and default non-finite reporting intervals so malformed cloud data cannot poison the production baseline or turn valid generation into zero watts.
+
+### 🔧 Improvements
+
+- None
+
+### 🔄 Other changes
+
+- Restore usable Codecov coverage reports and verify that coverage and test results are processed for the correct validation run. (#991)
+- Add a reusable managed cloud development environment using the pinned Docker test stack. (#992)
+- Bump the integration manifest version to `5.2.5b1` for beta testing.
+
+## v5.2.4 - 2026-11-03
+
+### 🚧 Breaking changes
+
+- None
+
+### ✨ New features
+
+- None
+
+### 🐛 Bug fixes
+
+- Keep Production Power available when Enphase successfully repeats a residual 2 W dusk sample overnight. Preserve its reported watts and timestamp, source-based expiry for larger readings, and expiry after failed or invalid polls. (#988)
+
+### 🔧 Improvements
+
+- None
+
+### 🔄 Other changes
+
+- Maintain source-repository validation, issue-label coordination, and required merge checks; keep the pytest check name consistent across skipped and running validation.
+- Build deterministic candidate packages with checksum and source-provenance evidence, and isolate coverage reporting from candidate test execution.
+- Update the pinned setup-uv action to 10.3.3. (#986)
 
 ## v5.2.3 - 2026-10-31
 

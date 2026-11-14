@@ -350,16 +350,29 @@ class RefreshRunner:
         timings["cloud_calls"] = float(request_metrics.attempts)
         coordinator._warmup_phase_timings = timings
 
-    async def async_refresh_evse_summary_for_warmup(
-        self,
-        *,
-        working_data: dict[str, dict[str, object]],
-    ) -> None:
-        """Fetch and apply optional EVSE summary data after entry setup."""
+    async def async_refresh_evse_summary_for_warmup(self) -> None:
+        """Publish the EVSE summary before the rest of discovery finishes."""
 
         coordinator = self._coordinator
+        baseline = deepcopy(dict(coordinator.data or {}))
         summary = await coordinator.summary.async_fetch(force=True)
-        coordinator.apply_warmup_evse_summary(summary, working_data)
+        if summary and coordinator.runtime_active:
+            enriched = deepcopy(baseline)
+            coordinator.apply_warmup_evse_summary(summary, enriched)
+            coordinator.publish_enrichment(
+                merge_warmup_enrichment(baseline, enriched, coordinator.data or {})
+            )
+
+    async def async_refresh_storm_guard_for_warmup(
+        self, refresh: Callable[[], Awaitable[None]]
+    ) -> None:
+        """Publish a changed Storm Guard setting before other reads finish."""
+
+        coordinator = self._coordinator
+        previous = coordinator.storm_guard_state
+        await refresh()
+        if coordinator.storm_guard_state != previous:
+            coordinator.publish_runtime_state_update("storm_guard")
 
     def _record_setup_milestone(self, key: str) -> None:
         coordinator = self._coordinator
@@ -416,11 +429,11 @@ class RefreshRunner:
         )
         warmup_data = deepcopy(baseline)
 
-        def publish_enrichment() -> None:
+        def publish_stage() -> None:
             nonlocal baseline
             current = coordinator.data if isinstance(coordinator.data, dict) else {}
             merged = merge_warmup_enrichment(baseline, warmup_data, current)
-            coordinator.async_set_updated_data(merged)
+            coordinator.publish_enrichment(merged)
             baseline = deepcopy(merged)
             # Bound plan callbacks retain this dictionary, so update it in place.
             warmup_data.clear()
@@ -443,7 +456,7 @@ class RefreshRunner:
                 dict(getattr(coordinator, "_startup_power_phase_timings", {}) or {})
             )
             if warmup_data or self._warmup_site_state_available():
-                publish_enrichment()
+                publish_stage()
             plan = warmup_plan(warmup_data, owner=coordinator)
             for stage in plan.stages:
                 await self.async_run_refresh_plan(
@@ -451,7 +464,7 @@ class RefreshRunner:
                     plan=RefreshPlan(stages=(stage,)),
                 )
                 if warmup_data or self._warmup_site_state_available():
-                    publish_enrichment()
+                    publish_stage()
         except asyncio.CancelledError:
             raise
         except Exception as err:  # noqa: BLE001
@@ -510,7 +523,7 @@ class RefreshRunner:
                 target, day_local=day_local
             )
             if working_data is None:
-                coordinator.async_set_updated_data(target)
+                coordinator.publish_enrichment(target)
 
     async def async_refresh_session_state_for_warmup(
         self,
@@ -549,7 +562,7 @@ class RefreshRunner:
                 sessions
             )
         if working_data is None:
-            coordinator.async_set_updated_data(
+            coordinator.publish_enrichment(
                 merge_warmup_enrichment(baseline, merged, coordinator.data or {})
             )
         coordinator._sync_session_history_issue()
@@ -638,7 +651,7 @@ class RefreshRunner:
                     payload["default_charge_level_supported"] = False
                     payload["default_charge_level_supported_source"] = "charger_config"
         if working_data is None:
-            coordinator.async_set_updated_data(
+            coordinator.publish_enrichment(
                 merge_warmup_enrichment(baseline, merged, coordinator.data or {})
             )
 

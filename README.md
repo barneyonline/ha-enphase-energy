@@ -79,7 +79,38 @@ EV charging modes, current and session controls alongside battery reserve, grid 
   </picture>
 </p>
 
+### EV charger gateway connectivity
+
+Each EV charger has a diagnostic **Gateway connectivity** binary sensor. It uses
+existing Enphase summary reads; it makes no extra requests or reconnection attempts.
+The sensor shows the local connectivity Enphase reports in its charger summary.
+Missing or contradictory gateway data and failed summary reads show **Unknown**.
+
+Attributes show the number of reported gateways, the number with observed status
+code `0`, the latest connection event, and separate cloud-receipt and charger-report
+timestamps when available. These timestamps provide context for the reported state.
+Counts describe reported entries, not a configured expected inventory;
+unknown status codes do not establish disconnection. No gateway identifiers,
+network addresses or raw payloads are exposed by this sensor. Green Charging
+operation and physical-link reliability cannot be inferred from this diagnostic
+alone.
+
 ### Cloud energy sensors
+
+Production, Grid and Battery Power are cloud energy-derived averages over their
+source-report windows. Production Power uses the same lifetime-energy feed as
+Site Solar Production. These readings can lag local gateway power; batched cloud
+updates can produce spikes even when daily energy totals agree.
+
+Enable **Use 15-minute Power Average** under **Configure → Polling** to smooth
+Production, Grid and Battery Power over a rolling 15-minute window. Consumption
+Power uses matching windows for its power balance and smooths its energy fallback.
+The option defaults to off, preserving the previous calculations. Smoothing makes
+readings respond more slowly. During startup, averages use the available history
+and expose the actual window in `last_window_seconds`. Changing the option reloads
+the integration and starts a new calculation history. Other power sensors and
+energy counters are unchanged.
+
 
 <p align="center">
   <picture>

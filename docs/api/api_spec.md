@@ -1550,19 +1550,19 @@ Notes:
   with the same timestamp and timestamp-less extreme samples are not sufficient
   confirmation.
 - The normalized runtime field is `current_power_consumption_w` with source `app-api:get_latest_power`.
-- Production Power expires after 30 minutes, allowing cloud delivery delay beyond
-  a 15-minute source cadence. Successful validated responses within +/-1 W renew
-  freshness even when a nonfuture timestamp repeats overnight; the value is held
-  as reported, never synthesized from missing data. Other timestamped samples
-  remain bounded by their source and first receipt times. Failed or invalid polls
-  cannot renew freshness.
-- Samples more than 60 seconds ahead of receipt are not yet valid for publication
-  or extreme-power confirmation. Retain the prior validated reading only for its
-  original freshness window; a later fetch can accept a revised value bearing the
-  same timestamp. The rejection is `future_timestamp` / `sample_timestamp_in_future`
-  in normalized diagnostics. Restored samples are also checked against their
-  original acquisition time. This guard does not infer interval completion or
-  correct the separate daytime under-reading reported in issue #934.
+- Production Power now uses energy deltas from the `production` channel of
+  `/pv/systems/<site_id>/lifetime_energy`, sharing Grid/Battery Power's source,
+  minimum-interval, reset, freshness and restart safeguards. It reports a delayed
+  average, not this endpoint's watts. The existing `current_production_power`
+  entity identity is retained, but old endpoint measurements are discarded on
+  upgrade until energy-derived observations are available. See `2.8`.
+- This endpoint remains available to normalized runtime diagnostics. It is not
+  an alternative source when the energy-derived sensor has no valid estimate.
+- Diagnostic samples more than 60 seconds ahead of receipt are rejected before
+  extreme-power confirmation, with `future_timestamp` /
+  `sample_timestamp_in_future`. A later fetch may accept a revised value bearing
+  the same timestamp. This does not infer interval completion or correct the
+  endpoint's daytime under-reading reported in issue #934.
 - Issue [#923](https://github.com/barneyonline/ha-enphase-energy/issues/923) reports
   daytime revisions of values sharing a timestamp. The response exposes no
   interval duration, completion flag, or previous completed interval. Do not
@@ -8264,6 +8264,7 @@ retained; access has not been verified by this capture.
 | `activeConnection` | Active network transport label from summary v2; observed value so far: `ethernet` |
 | `isConnected` | Connectivity flag from summary v2; observed value so far: `true` |
 | `isLocallyConnected` | Local-network connectivity flag from summary v2; observed value so far: `true` |
+
 | `isRetired` | Retirement flag from summary v2; observed value so far: `false` |
 | `commissioningStatus` | Summary v2 commissioning state code; observed value so far: `1` |
 | `status` (EV summary) | Summary v2 charger health label; observed value so far: `NORMAL` |
@@ -8339,6 +8340,15 @@ retained; access has not been verified by this capture.
 | `sg-ready-mode` | SG Ready operating mode label from `/heatpump/<device_uid>/state`; observed values: `MODE_2` (normal), `MODE_3` (recommended consumption / SG Ready on) |
 | `vpp-sgready-mode-override` | SG Ready override label from `/heatpump/<device_uid>/state`; observed value so far: `NONE` |
 | `last-report-at` | ISO-8601 last telemetry timestamp from `/heatpump/<device_uid>/state` |
+
+The Gateway Connectivity diagnostic reuses this summary response without extra
+polling. It prefers the explicit local-connectivity flag and treats conflicting
+gateway details as unknown. Only gateway status `0` has an observed connected
+meaning; nonzero codes are not independently interpreted as disconnected. Counts
+are reported entries, not a configured expected inventory. The diagnostic
+exposes cloud receipt, `lastReportedAt`, and the separate `lastConnTime`
+connection event (epoch milliseconds) as attributes. The state reflects the
+gateway flags from a successful summary read.
 
 ---
 

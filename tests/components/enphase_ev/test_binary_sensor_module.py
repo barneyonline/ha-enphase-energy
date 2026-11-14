@@ -17,6 +17,7 @@ from custom_components.enphase_ev import binary_sensor
 from custom_components.enphase_ev.binary_sensor import (
     ChargingBinarySensor,
     ConnectedBinarySensor,
+    GatewayConnectedBinarySensor,
     HeatPumpSgReadyActiveBinarySensor,
     PluggedInBinarySensor,
     SiteActiveSystemEventsBinarySensor,
@@ -83,18 +84,19 @@ async def test_async_setup_entry_syncs_binary_sensors(
         == 1
     )
     per_serial = [ent for ent in added if hasattr(ent, "_sn")]
-    assert len(per_serial) == 3
+    assert len(per_serial) == 4
     assert {type(ent) for ent in per_serial} == {
         PluggedInBinarySensor,
         ChargingBinarySensor,
         ConnectedBinarySensor,
+        GatewayConnectedBinarySensor,
     }
     assert config_entry._on_unload and callable(config_entry._on_unload[0])
 
     sync_cb = next(cb for cb in callbacks if cb.__name__ == "_async_sync_chargers")
 
     sync_cb()
-    assert len(added) == 5
+    assert len(added) == 6
 
     new_serial = "EV0002"
     coord.data[new_serial] = {
@@ -122,14 +124,14 @@ async def test_async_setup_entry_syncs_binary_sensors(
     )
 
     sync_cb()
-    assert len(added) == 8
+    assert len(added) == 10
     assert {ent._sn for ent in added if hasattr(ent, "_sn")} == {
         RANDOM_SERIAL,
         new_serial,
     }
 
     sync_cb()
-    assert len(added) == 8
+    assert len(added) == 10
 
 
 @pytest.mark.asyncio
@@ -556,7 +558,7 @@ async def test_async_setup_entry_keeps_site_sensor_without_gateway_type(
     await async_setup_entry(hass, config_entry, _collect)
 
     assert any(isinstance(ent, SiteCloudReachableBinarySensor) for ent in added)
-    assert len([ent for ent in added if hasattr(ent, "_sn")]) == 3
+    assert len([ent for ent in added if hasattr(ent, "_sn")]) == 4
 
 
 @pytest.mark.asyncio
@@ -592,7 +594,7 @@ async def test_async_setup_entry_keeps_site_sensor_when_inventory_unknown(
     await async_setup_entry(hass, config_entry, _collect)
 
     assert any(isinstance(ent, SiteCloudReachableBinarySensor) for ent in added)
-    assert len([ent for ent in added if hasattr(ent, "_sn")]) == 3
+    assert len([ent for ent in added if hasattr(ent, "_sn")]) == 4
     assert not any(isinstance(ent, HeatPumpSgReadyActiveBinarySensor) for ent in added)
 
 

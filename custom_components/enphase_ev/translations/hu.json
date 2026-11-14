@@ -594,7 +594,8 @@
           "fast_while_streaming": "Gyors lekérdezés előnyben részesítése, ha a cloud stream aktív",
           "api_timeout": "API-időtúllépés (s)",
           "session_history_interval": "Munkamenet előzmény intervallum (min)",
-          "degraded_service_repair_issues": "Csökkent működésű szolgáltatások javításainak engedélyezése"
+          "degraded_service_repair_issues": "Csökkent működésű szolgáltatások javításainak engedélyezése",
+          "use_15_minute_power_average": "15 perces átlagteljesítmény használata"
         },
         "data_description": {
           "fast_poll_interval": "Intervallum töltés vagy streamelés közben. Alapértelmezés: 30 s.",
@@ -602,7 +603,8 @@
           "fast_while_streaming": "Engedélyezve gyors lekérdezés aktív cloud stream közben. Alapértelmezés: Bekapcsolva.",
           "api_timeout": "Ennyi másodperc után jár le az API-kérések időkorlátja. Alapértelmezés: 15 s.",
           "session_history_interval": "Várakozási percek a felhő munkamenet-előzmények lekérései között. Alapértelmezés: 10 min.",
-          "degraded_service_repair_issues": "Repairs-problémákat hoz létre, amikor az opcionális Enphase-szolgáltatások csökkent működésűek. Alapértelmezés: Kikapcsolva."
+          "degraded_service_repair_issues": "Repairs-problémákat hoz létre, amikor az opcionális Enphase-szolgáltatások csökkent működésűek. Alapértelmezés: Kikapcsolva.",
+          "use_15_minute_power_average": "A termelés, a hálózat, az akkumulátor és a fogyasztás teljesítményét 15 percre átlagolja a kiugrások csökkentéséhez. Az értékek lassabban követik a változásokat. Alapértelmezés: kikapcsolva."
         }
       },
       "devices": {
@@ -2535,6 +2537,26 @@
           },
           "using_cached_data": {
             "name": "Gyorsítótárazott eseményadatok használata"
+          }
+        }
+      },
+      "gateway_connected": {
+        "name": "Átjárókapcsolat",
+        "state_attributes": {
+          "gateway_connection_count": {
+            "name": "Átjárók száma"
+          },
+          "gateway_connected_count": {
+            "name": "Csatlakoztatott átjárók"
+          },
+          "gateway_last_connection_at": {
+            "name": "Utolsó átjárókapcsolat"
+          },
+          "telemetry_received_at": {
+            "name": "Telemetria fogadása"
+          },
+          "charger_last_reported_at": {
+            "name": "Töltő utolsó jelentése"
           }
         }
       }
