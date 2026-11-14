@@ -14,23 +14,45 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 
-- Prevent config-entry reloads from hanging when schedule startup overlaps an options or setup-time data update.
-- Update Charger Status, Electrical Phase, and Storm Guard as soon as their cloud data is loaded after a Home Assistant restart.
-- Show the reported EV charger Gateway connectivity state even when the charger report is older than 15 minutes.
-- Recognize definitive Export Limit write rejections even when the installer response body stalls.
-- Let automatic controllers bind Export Limit commands to the original gateway and reject a replacement observed before submission.
-- Verify the active gateway inventory before showing Export Limit settings or confirming requests, including when installer settings return one gateway. Retry failed confirmation saves on a later poll.
-- Let Energy Planner acknowledge an expired Export Limit intent after Enphase verifies that the original gateway was replaced.
-- Honor provider retry deadlines for Export Limit readback, including after a write. Retry the first Grid Profile probe after Activation throttling and isolate listener errors from Export Limit writes.
+- None
 
 ### 🔧 Improvements
 
-- Reuse Export Limit permission checks for up to five minutes during background polling and revalidate them when the Activation session changes.
-- Reduce repeated Consumption Power updates and discovery metadata processing. Share overlapping diagnostic power reads.
+- None
 
 ### 🔄 Other changes
 
 - None
+
+## v5.3.1 - 2026-11-14
+
+### 🚧 Breaking changes
+
+- None
+
+### ✨ New features
+
+- None
+
+### 🐛 Bug fixes
+
+- Prevent config-entry reloads from hanging when schedule startup overlaps an options or setup-time data update. (#1010)
+- Update Charger Status, Electrical Phase, and Storm Guard as soon as their cloud data is loaded after a Home Assistant restart. (#1006)
+- Show the reported EV charger Gateway connectivity state even when the charger report is older than 15 minutes. (#1006)
+- Recognize definitive Export Limit write rejections even when the installer response body stalls. (#1009)
+- Let automatic controllers bind Export Limit commands to the original gateway and reject a replacement observed before submission. (#1009)
+- Verify the active gateway inventory before showing Export Limit settings or confirming requests, including when installer settings return one gateway. Retry failed confirmation saves on a later poll. (#1009)
+- Let Energy Planner acknowledge an expired Export Limit intent after Enphase verifies that the original gateway was replaced. (#1009)
+- Honor provider retry deadlines for Export Limit readback, including after a write. Retry the first Grid Profile probe after Activation throttling and isolate listener errors from Export Limit writes. (#1011)
+
+### 🔧 Improvements
+
+- Reuse Export Limit permission checks for up to five minutes during background polling and revalidate them when the Activation session changes. (#1011)
+- Reduce repeated Consumption Power updates and discovery metadata processing. Share overlapping diagnostic power reads. (#1011)
+
+### 🔄 Other changes
+
+- Bump the integration manifest version to `5.3.1`.
 
 ## v5.3.0 - 2026-11-13
 
