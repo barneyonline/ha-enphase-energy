@@ -1165,6 +1165,12 @@ class GridProfileRuntime:
                 self._mark_denied(err)
                 self._publish_state_update()
                 return self.browse()
+            except aiohttp.ClientResponseError as err:
+                if self.support_state == SUPPORT_UNKNOWN:
+                    self.support_state = SUPPORT_UNAVAILABLE
+                self.coordinator._note_endpoint_family_failure(family, err)
+                self._publish_state_update()
+                return self.browse()
             if force or self.reference_payload is None:
                 try:
                     reference = await self.client.async_get_activation_reference_data()

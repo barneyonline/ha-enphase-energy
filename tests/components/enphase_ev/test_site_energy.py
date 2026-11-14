@@ -6,7 +6,7 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 import time
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from homeassistant.const import UnitOfEnergy, UnitOfPower
@@ -1133,10 +1133,13 @@ async def test_consumption_newer_incompatible_sample_discards_unvalidated_restor
         coord.energy.site_energy["consumption"] = _consumption_flow(
             latest_bucket_wh=1250, reported_at=now[0], **changes
         )
+        sensor.async_write_ha_state = Mock()
+        coord.async_update_listeners()
+        await hass.async_block_till_done()
         assert sensor.available
         assert sensor.native_value == round(100 * 60 / interval_minutes)
         assert sensor.extra_state_attributes["sampled_at_utc"] == now[0].isoformat()
-        assert sensor._cancel_freshness_expiry is None
+        assert sensor._cancel_freshness_expiry is not None
     finally:
         await sensor.async_will_remove_from_hass()
 

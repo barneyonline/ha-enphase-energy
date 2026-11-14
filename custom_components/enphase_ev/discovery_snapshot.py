@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import Callable
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -187,6 +188,7 @@ class DiscoverySnapshotManager:
         self._revision = 0
         self._persisted_revision = -1
         self._last_observed_key: object | None = None
+        self._inventory_key_cache: dict[str, tuple[object, object]] = {}
         self._pending_snapshot: dict[str, object] | None = None
         self._pending_signature: str | None = None
         self._pending_revision: int | None = None
@@ -214,10 +216,24 @@ class DiscoverySnapshotManager:
         compact = _compact_discovery_record(record)
         return tuple(sorted((key, repr(value)) for key, value in compact.items()))
 
-    def _discovery_key(self) -> tuple[object, ...]:
+    def _inventory_key(
+        self,
+        attribute: str,
+        build: Callable[[object], object],
+        *,
+        reuse_inventory: bool,
+    ) -> object:
+        value = getattr(self.coordinator, attribute, None)
+        previous = self._inventory_key_cache.get(attribute)
+        if reuse_inventory and previous is not None and previous[0] is value:
+            return previous[1]
+        key = build(value)
+        self._inventory_key_cache[attribute] = (value, key)
+        return key
+
+    def _type_bucket_key(self, type_buckets: object) -> tuple[object, ...]:
         """Build a lightweight key for discovery-affecting coordinator state."""
 
-        type_buckets = getattr(self.coordinator, "_type_device_buckets", {}) or {}
         type_key: list[object] = []
         if isinstance(type_buckets, dict):
             for raw_key, raw_bucket in type_buckets.items():
@@ -234,37 +250,43 @@ class DiscoverySnapshotManager:
                         str(raw_key),
                         raw_bucket.get("count"),
                         raw_bucket.get("type_label"),
+                        repr(raw_bucket.get("model_counts")),
+                        repr(raw_bucket.get("model_summary")),
                         member_keys,
                     )
                 )
-        battery_data = getattr(self.coordinator, "_battery_storage_data", {}) or {}
-        battery_key = (
-            tuple(
-                (str(key), self._record_key(record))
-                for key, record in battery_data.items()
-            )
-            if isinstance(battery_data, dict)
+        return tuple(type_key)
+
+    def _keyed_records_key(self, data: object) -> tuple[object, ...]:
+        return (
+            tuple((str(key), self._record_key(record)) for key, record in data.items())
+            if isinstance(data, dict)
             else ()
         )
-        inverter_data = getattr(self.coordinator, "_inverter_data", {}) or {}
-        inverter_key = (
-            tuple(
-                (str(key), self._record_key(record))
-                for key, record in inverter_data.items()
-            )
-            if isinstance(inverter_data, dict)
-            else ()
-        )
+
+    def _discovery_key(self, *, reuse_inventory: bool = False) -> tuple[object, ...]:
         preferences = preferences_for(self.coordinator)
         return (
             bool(preferences is not None and preferences.seen),
             tuple(self.coordinator.iter_serials()),
             tuple(getattr(self.coordinator, "_type_device_order", []) or []),
-            tuple(type_key),
+            self._inventory_key(
+                "_type_device_buckets",
+                self._type_bucket_key,
+                reuse_inventory=reuse_inventory,
+            ),
             tuple(getattr(self.coordinator, "_battery_storage_order", []) or []),
-            battery_key,
+            self._inventory_key(
+                "_battery_storage_data",
+                self._keyed_records_key,
+                reuse_inventory=reuse_inventory,
+            ),
             tuple(getattr(self.coordinator, "_inverter_order", []) or []),
-            inverter_key,
+            self._inventory_key(
+                "_inverter_data",
+                self._keyed_records_key,
+                reuse_inventory=reuse_inventory,
+            ),
             getattr(self.coordinator, "_battery_has_encharge", None),
             getattr(self.coordinator, "_battery_has_enpower", None),
             bool(getattr(self.coordinator, "_heatpump_known_present", False)),
@@ -276,8 +298,8 @@ class DiscoverySnapshotManager:
             ),
         )
 
-    def _observe_revision(self) -> bool:
-        key = self._discovery_key()
+    def _observe_revision(self, *, reuse_inventory: bool = False) -> bool:
+        key = self._discovery_key(reuse_inventory=reuse_inventory)
         if key == self._last_observed_key:
             return False
         self._last_observed_key = key
@@ -613,8 +635,10 @@ class DiscoverySnapshotManager:
             self.coordinator._discovery_snapshot_pending = True
             self._schedule_pending_save()
 
-    def schedule_save(self) -> None:
-        changed = self._observe_revision()
+    def schedule_save(self, *, reuse_inventory: bool = False) -> None:
+        # The refresh runtimes replace these inventory mappings on acquisition.
+        # Explicit callers can also save edits to an existing mapping in place.
+        changed = self._observe_revision(reuse_inventory=reuse_inventory)
         if not changed and self._pending_snapshot is None:
             self.coordinator._discovery_snapshot_pending = False
             return

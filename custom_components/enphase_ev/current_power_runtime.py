@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from dataclasses import dataclass
@@ -82,6 +83,8 @@ class CurrentPowerRuntime:
     def __init__(self, coordinator: CurrentPowerHost) -> None:
         self.coordinator = coordinator
         self._sample = CurrentPowerSample()
+        self._refresh_lock = asyncio.Lock()
+        self._refresh_revision = 0
         self.received_utc: datetime | None = None
         self._cache_until_mono: float | None = None
         self.using_stale = False
@@ -134,6 +137,7 @@ class CurrentPowerRuntime:
     def clear(self) -> None:
         """Reset cached current power consumption samples."""
 
+        self._refresh_revision += 1
         self._cache_until_mono = None
         self.received_utc = None
         self.using_stale = False
@@ -228,6 +232,12 @@ class CurrentPowerRuntime:
     async def async_refresh(self) -> None:
         """Refresh cached current power consumption from ``client.latest_power``."""
 
+        revision = self._refresh_revision
+        async with self._refresh_lock:
+            if revision == self._refresh_revision:
+                await self._async_refresh_locked(revision)
+
+    async def _async_refresh_locked(self, revision: int) -> None:
         coord = self.coordinator
         fetcher = getattr(coord.client, "latest_power", None)
         if not callable(fetcher):
@@ -244,6 +254,9 @@ class CurrentPowerRuntime:
         try:
             payload = await fetcher()
         except Exception as err:  # noqa: BLE001
+            if revision != self._refresh_revision:
+                return
+            self._refresh_revision += 1
             coord.note_endpoint_family_failure(CURRENT_POWER_ENDPOINT_FAMILY, err)
             self.using_stale = self._cached_state_present()
             _LOGGER.debug(
@@ -253,6 +266,9 @@ class CurrentPowerRuntime:
             )
             return
 
+        if revision != self._refresh_revision:
+            return
+        self._refresh_revision += 1
         if not isinstance(payload, dict):
             self._validation_state = "invalid_payload"
             self._validation_reason = "response_not_object"

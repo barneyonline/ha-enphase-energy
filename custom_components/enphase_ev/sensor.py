@@ -3290,6 +3290,9 @@ class EnphaseExportLimitSensor(_SiteBaseEntity):
     """Show gateway-confirmed export limiting separately from command progress."""
 
     _attr_translation_key = "export_limit"
+    _unrecorded_attributes = _SiteBaseEntity._unrecorded_attributes | frozenset(
+        {"last_successful_readback"}
+    )
     _attr_icon = "mdi:transmission-tower-export"
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = [
@@ -3301,6 +3304,13 @@ class EnphaseExportLimitSensor(_SiteBaseEntity):
 
     def __init__(self, coord: EnphaseCoordinator) -> None:
         super().__init__(coord, "export_limit", "Export Limit", type_key="envoy")
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        runtime = cast(ExportLimitRuntime, self._coord.export_limit_runtime)
+        self.async_on_remove(
+            runtime.async_add_listener(self.async_write_ha_state, include_readback=True)
+        )
 
     @property
     def available(self) -> bool:

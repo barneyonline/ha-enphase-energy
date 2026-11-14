@@ -6,7 +6,7 @@ import asyncio
 import time
 from dataclasses import replace
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
 
 import aiohttp
 import pytest
@@ -1974,11 +1974,12 @@ async def test_historical_gateway_lookup_failure_invalidates_prior_snapshot(runt
     settings["data"]["gateway_settings"].append({"device_id": "retired"})
     runtime.coordinator.client.async_get_export_limit_settings.return_value = settings
     runtime.coordinator.client.devices_details = AsyncMock(side_effect=TimeoutError())
-    runtime.coordinator.async_update_listeners.reset_mock()
+    listener = MagicMock()
+    runtime.async_add_listener(listener)
     with pytest.raises(ServiceValidationError):
         await runtime.async_apply(0, confirm=True)
     assert runtime.snapshot is None
-    runtime.coordinator.async_update_listeners.assert_called_once()
+    listener.assert_called_once()
     runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
 
 
@@ -2362,9 +2363,7 @@ async def test_guided_disable_preserves_gateway_slew_despite_saved_override(runt
 async def test_saved_pending_intent_published_before_write(runtime):
     """Activity can capture the target before immediate readback clears it."""
     observations = []
-    runtime.coordinator.async_update_listeners.side_effect = (
-        lambda: observations.append(dict(runtime.attributes()))
-    )
+    runtime.async_add_listener(lambda: observations.append(dict(runtime.attributes())))
 
     async def write(*_args):
         assert runtime._store.async_save.await_count == 1
@@ -3479,3 +3478,363 @@ async def test_config_entry_reload_waits_for_retiring_guarded_write(runtime, has
     assert saved == {"pending": None}
     assert replacement.pending is None
     assert replacement.request_status == "idle"
+
+
+async def test_background_poll_respects_retry_after(runtime, monkeypatch):
+    from custom_components.enphase_ev import export_limit_runtime
+
+    client = runtime.coordinator.client
+    client.async_get_export_limit_settings.side_effect = [
+        aiohttp.ClientResponseError(
+            None, (), status=429, headers={"Retry-After": "600"}
+        ),
+        payload(),
+    ]
+    clock = 1000.0
+    delays = []
+
+    async def wait(delay):
+        nonlocal clock
+        delays.append(delay)
+        clock += delay
+        if len(delays) == 3:
+            runtime.stop()
+
+    monkeypatch.setattr(
+        export_limit_runtime,
+        "time",
+        SimpleNamespace(time=lambda: clock, monotonic=lambda: clock),
+    )
+    monkeypatch.setattr(runtime, "_wait_for_poll", wait)
+    await runtime._poll()
+    assert delays == [60.0, 600.0, 60.0]
+    assert client.async_get_export_limit_settings.await_count == 2
+    assert runtime.snapshot is not None
+
+
+async def test_background_refresh_reuses_permission_and_scopes_readback(
+    runtime, monkeypatch
+):
+    from custom_components.enphase_ev import export_limit_runtime
+
+    clock = 1000.0
+    monkeypatch.setattr(
+        export_limit_runtime,
+        "time",
+        SimpleNamespace(time=lambda: clock, monotonic=lambda: clock),
+    )
+    client = runtime.coordinator.client
+    client.activation_auth_revision = 0
+    changed = Mock()
+    readback = Mock()
+    remove_changed = runtime.async_add_listener(changed)
+    runtime.async_add_listener(readback, include_readback=True)
+
+    await runtime.async_refresh(background=True)
+    clock += 60
+    await runtime.async_refresh(background=True)
+    client.async_get_activation_device_list.assert_awaited_once()
+    assert readback.call_count == 2
+    changed.assert_called_once()
+
+    client.activation_auth_revision += 1
+    clock += 60
+    await runtime.async_refresh(background=True)
+    assert client.async_get_activation_device_list.await_count == 2
+    clock += 300
+    await runtime.async_refresh(background=True)
+    assert client.async_get_activation_device_list.await_count == 3
+
+    remove_changed()
+    await runtime.async_refresh()
+    assert client.async_get_activation_device_list.await_count == 4
+    changed.assert_called_once()
+    runtime.coordinator.async_update_listeners.assert_not_called()
+
+
+async def test_forced_activation_bootstrap_revalidates_export_permission(runtime):
+    client = EnphaseEVClient(MagicMock(), "123", None, "")
+    runtime.coordinator.client = client
+    token = "first.payload.signature"
+    page = '<iframe src="/app/activation_ui/?token={token}&amp;siteid=123"></iframe>'
+    client._text = AsyncMock(return_value=page.format(token=token))
+    client.async_get_activation_device_list = AsyncMock(return_value={})
+    client.async_get_export_limit_settings = AsyncMock(return_value=payload())
+    client.devices_details = AsyncMock(
+        return_value={"envoys": [{"id": 200, "serial_number": "test-envoy"}]}
+    )
+
+    await runtime.async_refresh(background=True)
+    await client.async_prepare_activation_auth(force=True)
+    await runtime.async_refresh(background=True)
+    client.async_get_activation_device_list.assert_awaited_once()
+
+    client._text.return_value = page.format(token="second.payload.signature")
+    await client.async_prepare_activation_auth(force=True)
+    await runtime.async_refresh(background=True)
+    assert client.async_get_activation_device_list.await_count == 2
+
+    client._text.return_value = page.format(token="second.payload.signature").replace(
+        "siteid=123", "siteid=123&amp;locale=en-AU"
+    )
+    await client.async_prepare_activation_auth(force=True)
+    await runtime.async_refresh(background=True)
+    assert client.async_get_activation_device_list.await_count == 3
+
+
+async def test_failing_listener_does_not_strand_export_intent(runtime, caplog):
+    client = runtime.coordinator.client
+    await runtime.async_prepare()
+
+    def check_pending():
+        if runtime.request_status == "pending":
+            raise RuntimeError("subscriber failure")
+
+    observed = []
+    runtime.async_add_listener(check_pending)
+    runtime.async_add_listener(lambda: observed.append(runtime.request_status))
+
+    async def apply(*_args):
+        client.async_get_export_limit_settings.return_value = payload(
+            free_limit_value=0
+        )
+
+    client.async_set_export_limit.side_effect = apply
+    result = await runtime.async_apply(0, confirm=True)
+
+    client.async_set_export_limit.assert_awaited_once()
+    assert observed == ["pending", "confirmed"]
+    assert result["request_status"] == "confirmed"
+    runtime._store.async_save.assert_awaited_with({"pending": None})
+    assert "subscriber failure" in caplog.text
+
+
+async def test_manual_retry_after_delays_background_export_poll(runtime, monkeypatch):
+    from custom_components.enphase_ev import export_limit_runtime
+
+    client = runtime.coordinator.client
+    clock = 1000.0
+    monkeypatch.setattr(
+        export_limit_runtime,
+        "time",
+        SimpleNamespace(time=lambda: clock, monotonic=lambda: clock),
+    )
+    for delay in (600, 120):
+        client.async_get_export_limit_settings.side_effect = (
+            aiohttp.ClientResponseError(
+                None, (), status=429, headers={"Retry-After": str(delay)}
+            )
+        )
+        with pytest.raises(ServiceValidationError):
+            await runtime.async_refresh()
+        assert runtime._poll_delay() == 1600 - clock
+        clock += 60
+
+    client.async_get_export_limit_settings.side_effect = None
+    await runtime.async_refresh(background=True)
+    assert client.async_get_export_limit_settings.await_count == 2
+    clock = 1600
+    await runtime.async_refresh(background=True)
+    assert client.async_get_export_limit_settings.await_count == 3
+
+
+@pytest.mark.parametrize(
+    "operation", ["prepare", "pre_write", "post_write", "final_inventory"]
+)
+async def test_retry_after_from_export_limit_checks_delays_poll(
+    runtime, monkeypatch, operation
+):
+    from custom_components.enphase_ev import export_limit_runtime
+
+    client = runtime.coordinator.client
+    original = await runtime.async_prepare()
+    clock = 1000.0
+    monkeypatch.setattr(
+        export_limit_runtime,
+        "time",
+        SimpleNamespace(time=lambda: clock, monotonic=lambda: clock),
+    )
+    error = aiohttp.ClientResponseError(
+        None, (), status=429, headers={"Retry-After": "600"}
+    )
+    if operation == "prepare":
+        client.async_get_export_limit_form.side_effect = error
+        with pytest.raises(ServiceValidationError):
+            await runtime.async_prepare()
+        client.async_get_export_limit_form.side_effect = None
+    elif operation == "pre_write":
+        client.async_get_export_limit_settings.side_effect = error
+        with pytest.raises(ServiceValidationError):
+            await runtime.async_apply(0, confirm=True)
+    elif operation == "post_write":
+        client.async_get_export_limit_settings.side_effect = [payload(), error]
+        runtime._task = asyncio.current_task()
+        try:
+            await runtime.async_apply(0, confirm=True)
+            assert runtime._wake.is_set()
+        finally:
+            runtime._task = None
+    else:
+        client.devices_details.side_effect = [
+            client.devices_details.return_value,
+            error,
+        ]
+        with pytest.raises(ServiceValidationError) as caught:
+            await runtime.async_apply(
+                0, confirm=True, expected_gateway=original.gateway_identity
+            )
+        assert caught.value.translation_key == "export_limit_unavailable"
+        assert runtime.pending is None
+        client.devices_details.side_effect = None
+        client.async_set_export_limit.assert_not_awaited()
+
+    before_poll = client.async_get_export_limit_settings.await_count
+    client.async_get_export_limit_settings.side_effect = None
+    assert runtime._poll_delay() == 600
+    await runtime.async_refresh(background=True)
+    assert client.async_get_export_limit_settings.await_count == before_poll
+    clock += 600
+    await runtime.async_refresh(background=True)
+    assert client.async_get_export_limit_settings.await_count == before_poll + 1
+
+
+async def test_pending_observation_expires_while_readback_is_rate_limited(
+    runtime, monkeypatch
+):
+    from custom_components.enphase_ev import export_limit_runtime
+
+    clock = 1000.0
+    monkeypatch.setattr(
+        export_limit_runtime,
+        "time",
+        SimpleNamespace(time=lambda: clock, monotonic=lambda: clock),
+    )
+    client = runtime.coordinator.client
+    client.async_get_export_limit_settings.side_effect = aiohttp.ClientResponseError(
+        None, (), status=429, headers={"Retry-After": "600"}
+    )
+    runtime.pending = {
+        "gateway": "gateway",
+        "started": clock - 590,
+        "watts": 0,
+        "slew": 6000,
+    }
+    runtime.request_status = "pending"
+    listener = Mock()
+    runtime.async_add_listener(listener)
+
+    with pytest.raises(ServiceValidationError):
+        await runtime.async_refresh(background=True)
+    listener.assert_called_once()
+    assert runtime._poll_delay() == 10
+    clock += 10
+    await runtime.async_refresh(background=True)
+    await runtime.async_refresh(background=True)
+    assert runtime.request_status == "unconfirmed"
+    assert listener.call_count == 2
+    assert runtime._poll_delay() == 590
+    client.async_get_export_limit_settings.assert_awaited_once()
+    client.async_get_export_limit_settings.side_effect = None
+    await runtime.async_refresh()
+    assert runtime._poll_delay() == 590
+
+
+async def test_poll_exits_without_read_when_runtime_is_disabled(runtime, hass):
+    hass.config_entries.async_update_entry(runtime.coordinator.config_entry, options={})
+    await runtime._poll()
+    runtime.coordinator.client.async_get_export_limit_settings.assert_not_awaited()
+
+
+async def test_activation_context_change_during_permission_read_is_not_cached(
+    runtime,
+):
+    client = runtime.coordinator.client
+    client.activation_auth_revision = 0
+
+    async def inventory():
+        client.activation_auth_revision += 1
+        return {}
+
+    client.async_get_activation_device_list.side_effect = inventory
+    await runtime.async_refresh(background=True)
+    await runtime.async_refresh(background=True)
+    assert client.async_get_activation_device_list.await_count == 2
+
+
+async def test_export_entities_subscribe_only_to_relevant_updates(
+    hass, config_entry, coordinator_factory, monkeypatch
+):
+    from homeassistant.helpers.entity_component import EntityComponent
+    import logging
+
+    from custom_components.enphase_ev.select import ExportLimitSelect
+    from custom_components.enphase_ev.sensor_control_updates import (
+        EnphaseDeviceUpdateStatusSensor,
+    )
+
+    coord = coordinator_factory()
+    coord.config_entry = config_entry
+    coord.last_update_success = True
+    hass.config_entries.async_update_entry(
+        config_entry, options={OPT_EXPORT_LIMIT_CONTROLS_ENABLED: True}
+    )
+    coord.client.async_prepare_activation_auth = AsyncMock(return_value=True)
+    coord.client.async_get_activation_device_list = AsyncMock(return_value={})
+    settings = payload()
+    settings["data"]["gateway_settings"][0]["site_id"] = str(coord.site_id)
+    coord.client.async_get_export_limit_settings = AsyncMock(return_value=settings)
+    coord.client.devices_details = AsyncMock(
+        return_value={"envoys": [{"id": 200, "serial_number": "test-envoy"}]}
+    )
+    runtime = coord.export_limit_runtime
+    runtime._store = SimpleNamespace(async_load=AsyncMock(return_value=None))
+    monkeypatch.setattr(runtime, "_schedule", Mock())
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.sensor_base.inventory_type_available",
+        lambda *_args: True,
+    )
+    clock = 1000.0
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.export_limit_runtime.time.time", lambda: clock
+    )
+    export_sensor = EnphaseExportLimitSensor(coord)
+    status_sensor = EnphaseDeviceUpdateStatusSensor(coord, "envoy")
+    battery_status_sensor = EnphaseDeviceUpdateStatusSensor(coord, "encharge")
+    export_select = ExportLimitSelect(coord)
+    sensor_component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    select_component = EntityComponent(logging.getLogger(__name__), "select", hass)
+    sensor_component._platforms["sensor"].config_entry = config_entry
+    select_component._platforms["select"].config_entry = config_entry
+    await sensor_component.async_add_entities(
+        [export_sensor, status_sensor, battery_status_sensor]
+    )
+    await select_component.async_add_entities([export_select])
+    unrelated = Mock()
+    remove_unrelated = coord.async_add_listener(unrelated)
+    try:
+        await runtime.async_refresh(background=True)
+        assert hass.states.get(export_sensor.entity_id).state == "limited"
+        assert hass.states.get(export_select.entity_id).state == "enable_limit"
+        previous_status = hass.states.get(status_sensor.entity_id)
+        previous_battery_status = hass.states.get(battery_status_sensor.entity_id)
+
+        clock += 60
+        await runtime.async_refresh(background=True)
+        assert (
+            hass.states.get(export_sensor.entity_id).attributes[
+                "last_successful_readback"
+            ]
+            == clock
+        )
+        assert hass.states.get(status_sensor.entity_id) is previous_status
+        assert (
+            hass.states.get(battery_status_sensor.entity_id) is previous_battery_status
+        )
+        unrelated.assert_not_called()
+    finally:
+        remove_unrelated()
+        await sensor_component.async_remove_entity(export_sensor.entity_id)
+        await sensor_component.async_remove_entity(status_sensor.entity_id)
+        await sensor_component.async_remove_entity(battery_status_sensor.entity_id)
+        await select_component.async_remove_entity(export_select.entity_id)
+    assert not runtime._listeners

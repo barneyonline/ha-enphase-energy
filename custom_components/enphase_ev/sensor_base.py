@@ -46,6 +46,7 @@ class EnphaseSiteSensorEntity(CoordinatorEntity, SensorEntity):  # type: ignore[
         self._key = key
         self._type_key = type_key
         self._cancel_freshness_expiry: Callable[[], None] | None = None
+        self._scheduled_freshness_deadline: datetime | None = None
         self._source_first_observed: datetime | None = None
         self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_{key}"
 
@@ -101,18 +102,26 @@ class EnphaseSiteSensorEntity(CoordinatorEntity, SensorEntity):  # type: ignore[
 
     @callback
     def _schedule_freshness_expiry(self) -> None:
+        deadline = self._freshness_deadline()
+        if (
+            self._cancel_freshness_expiry is not None
+            and deadline == self._scheduled_freshness_deadline
+        ):
+            return
         if self._cancel_freshness_expiry is not None:
             self._cancel_freshness_expiry()
             self._cancel_freshness_expiry = None
-        deadline = self._freshness_deadline()
+        self._scheduled_freshness_deadline = None
         if self.hass is None or deadline is None or deadline <= dt_util.utcnow():
             return
 
         @callback
         def expire(_now: datetime) -> None:
             self._cancel_freshness_expiry = None
+            self._scheduled_freshness_deadline = None
             self._handle_freshness_expiry()
 
+        self._scheduled_freshness_deadline = deadline
         self._cancel_freshness_expiry = async_track_point_in_utc_time(
             self.hass, expire, deadline
         )
@@ -132,6 +141,7 @@ class EnphaseSiteSensorEntity(CoordinatorEntity, SensorEntity):  # type: ignore[
         if self._cancel_freshness_expiry is not None:
             self._cancel_freshness_expiry()
             self._cancel_freshness_expiry = None
+        self._scheduled_freshness_deadline = None
         await super().async_will_remove_from_hass()
 
     @callback

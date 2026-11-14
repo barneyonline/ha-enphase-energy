@@ -165,6 +165,22 @@ async def test_snapshot_skips_telemetry_only_updates_at_scale(
     manager._store.async_save.assert_awaited_once()  # type: ignore[attr-defined]
 
 
+def test_refresh_save_reuses_unchanged_inventory_keys(coordinator_factory):
+    coord = coordinator_factory()
+    manager = coord.discovery_snapshot
+    coord._inverter_data = {"inverter": {"name": "Original"}}
+    coord._discovery_snapshot_save_cancel = lambda: None
+    manager.schedule_save(reuse_inventory=True)
+    original = manager._keyed_records_key
+    manager._keyed_records_key = Mock(wraps=original)
+    manager.schedule_save(reuse_inventory=True)
+    manager._keyed_records_key.assert_not_called()
+    coord._inverter_data = {"inverter": {"name": "Renamed"}}
+    manager.schedule_save(reuse_inventory=True)
+    manager._keyed_records_key.assert_called_once_with(coord._inverter_data)
+    assert manager._pending_snapshot["inverter_data"] == coord._inverter_data
+
+
 @pytest.mark.asyncio
 async def test_snapshot_save_coalesces_mutation_during_write(
     coordinator_factory, monkeypatch

@@ -3,6 +3,7 @@
 import logging
 from datetime import timedelta
 from unittest.mock import AsyncMock
+from unittest.mock import Mock
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.entity_platform import EntityPlatform
 
@@ -74,6 +75,16 @@ async def test_source_updates_renames_and_late_creation(
     battery = source(hass, coord, "battery_power", 0)
     await hass.async_block_till_done()
     assert hass.states.get(sensor.entity_id).state == "1992"
+    evaluate = Mock(wraps=sensor._process_current_sample)
+    sensor._process_current_sample = evaluate
+    hass.states.async_set(production, "1.8", {"unit_of_measurement": "kW"})
+    hass.states.async_set(grid, 192, {"unit_of_measurement": "W"})
+    coord.async_update_listeners()
+    await hass.async_block_till_done()
+    evaluate.assert_called_once_with()
+    assert hass.states.get(sensor.entity_id).state == "1992"
+    hass.states.async_set(grid, 0, {"unit_of_measurement": "W"})
+    hass.states.async_set(production, "1.992", {"unit_of_measurement": "kW"})
     hass.states.async_set(battery, -500, {"unit_of_measurement": "W"})
     await hass.async_block_till_done()
     assert hass.states.get(sensor.entity_id).state == "1492"
@@ -85,10 +96,12 @@ async def test_source_updates_renames_and_late_creation(
     )
     await hass.async_block_till_done()
     assert hass.states.get(sensor.entity_id).state == "500"
+    evaluate.reset_mock()
     source(hass, coord, "unrelated_power", 4000)
     hass.states.async_set("sensor.unregistered_power", 5000)
     await hass.async_block_till_done()
     assert hass.states.get(sensor.entity_id).state == "500"
+    evaluate.assert_not_called()
 
     hass.states.async_set(grid, 300, {"unit_of_measurement": "W"})
     await hass.async_block_till_done()
@@ -99,6 +112,25 @@ async def test_source_updates_renames_and_late_creation(
     await hass.async_block_till_done()
     assert hass.states.get(sensor.entity_id) is removed_state
     assert sensor._balance_power_w == 800
+
+
+async def test_removing_last_power_source_releases_subscription(
+    hass, config_entry, coordinator_factory
+):
+    coord = coordinator_factory()
+    production = source(hass, coord, "current_production_power", 1000)
+    sensor = EnphaseSiteConsumptionPowerSensor(coord)
+    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    component._platforms["sensor"].config_entry = config_entry
+    await component.async_add_entities([sensor])
+    await hass.async_block_till_done()
+    assert sensor._power_source_ids == (production,)
+
+    er.async_get(hass).async_remove(production)
+    await hass.async_block_till_done()
+    assert sensor._power_source_ids == ()
+    assert sensor._remove_power_sources is None
+    await component.async_remove_entity(sensor.entity_id)
 
 
 @pytest.mark.parametrize(

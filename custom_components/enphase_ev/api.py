@@ -386,6 +386,7 @@ class EnphaseEVClient(MqttStreamSurface):
         self._vpp_ignored_live_token: str | None = None
         self._vpp_credential_diagnostics: dict[str, object] | None = None
         self._activation_token: str | None = None
+        self.activation_auth_revision = 0
         self._activation_referer: str | None = None
         self._activation_settings_grid_profiles: list[tuple[str, str]] = []
         self._hems_site_supported: bool | None = None
@@ -758,6 +759,7 @@ class EnphaseEVClient(MqttStreamSurface):
     def _clear_activation_auth_context(self) -> None:
         """Discard the in-memory Activation data tied to the current session."""
 
+        self.activation_auth_revision += 1
         self._activation_token = None
         self._activation_referer = None
         self._activation_settings_grid_profiles = []
