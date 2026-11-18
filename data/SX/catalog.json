@@ -21,14 +21,14 @@
       "product_media_name_id": null
     }
   },
-  "generated_at": "2026-11-04T10:59:13.669679Z",
+  "generated_at": "2026-11-18T11:47:35.660111Z",
   "schema_version": 1,
   "source": {
     "apps_url": "https://enphase.com/installers/resources/documentation/communication",
     "crawl": {
       "envoy": {
         "bootstrap_error_targets": [],
-        "count": 534,
+        "count": 536,
         "crawl_error_targets": [],
         "empty_release_targets": [
           "https://enphase.com/en-my/|en-my",
@@ -776,7 +776,7 @@
           "https://enphase.com/|en": {
             "apps_url": "https://enphase.com/installers/resources/documentation/communication",
             "bootstrap_error": null,
-            "count": 66,
+            "count": 67,
             "crawl_error": null,
             "pages": [
               "https://enphase.com/installers/resources/documentation/communication?product_type=141&f%5B0%5D=document%3A217&search_api_language=en&field_alternative_language=en&page=0",
@@ -804,7 +804,7 @@
           "https://enphase.com/|en-ca": {
             "apps_url": "https://enphase.com/installers/resources/documentation/communication",
             "bootstrap_error": null,
-            "count": 13,
+            "count": 14,
             "crawl_error": null,
             "pages": [
               "https://enphase.com/installers/resources/documentation/communication?product_type=141&f%5B0%5D=document%3A217&search_api_language=en-ca&field_alternative_language=en-ca&page=0"
