@@ -1,11 +1,11 @@
 # Service Status History
 
 - Current status: **Fully Operational**
-- Last updated: `2026-11-19 02:15 UTC`
+- Last updated: `2026-11-19 10:36 UTC`
 - Failed checks in latest run: `0`
 - Latest failed checks: None
-- Retained hourly samples: `128`
-- Incident windows in last 30 days: `3`
+- Retained hourly samples: `127`
+- Incident windows in last 30 days: `2`
 
 This page is generated from hourly synthetic checks against Enphase cloud endpoints. It may miss incidents that begin and recover between checks.
 
@@ -16,20 +16,18 @@ gantt
     title Enphase Service Status Incident Timeline (Last 30 Days)
     dateFormat  YYYY-MM-DDTHH:mm:ss
     axisFormat  %b %d
-    Window start :vert, window-start, 2026-10-20T02:15:41, 0ms
-    Window end :vert, window-end, 2026-11-19T02:15:41, 0ms
+    Window start :vert, window-start, 2026-10-20T10:36:19, 0ms
+    Window end :vert, window-end, 2026-11-19T10:36:19, 0ms
     section Down
     Down 1 (2026-10-31 2242 UTC) :crit, down-1, 2026-10-31T22:42:18, 60m
     section Degraded
-    Degraded 1 (2026-10-20 0849 UTC) :active, degraded-1, 2026-10-20T08:49:49, 60m
-    Degraded 2 (2026-10-25 0050 UTC) :active, degraded-2, 2026-10-25T00:50:01, 60m
+    Degraded 1 (2026-10-25 0050 UTC) :active, degraded-1, 2026-10-25T00:50:01, 60m
 ```
 
 ## Incident Summary
 
 | Status | Started (UTC) | Ended (UTC) | Duration | Failed checks |
 | --- | --- | --- | --- | --- |
-| Degraded | 2026-10-20 08:49 UTC | Unknown after last seen 2026-10-20 08:49 UTC | Observed 0m | battery_runtime, discovery, site_energy |
 | Degraded | 2026-10-25 00:50 UTC | Unknown after last seen 2026-10-25 00:50 UTC | Observed 0m | evse_timeseries, session_history |
 | Down | 2026-10-31 22:42 UTC | Unknown after last seen 2026-10-31 22:42 UTC | Observed 0m | auth |
 
