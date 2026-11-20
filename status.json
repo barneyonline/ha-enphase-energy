@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-11-20T17:32:20.860017Z",
+  "checked_at": "2026-11-20T23:41:25.221332Z",
   "checks": [
     {
       "affects": true,
@@ -133,7 +133,7 @@
       ],
       "group": "degraded",
       "name": "inventory",
-      "ok": true
+      "ok": false
     },
     {
       "affects": false,
@@ -334,7 +334,7 @@
       "name": "session_history_criteria",
       "ok": true,
       "status": 200,
-      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=54b7a2f8-e1ba-4a51-bb25-3b84bba47bb3&username=2999024"
+      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=460ac105-cfa3-404c-b52e-64c9dabc8756&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -404,7 +404,7 @@
       "name": "evse_timeseries_daily_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=54b7a2f8-e1ba-4a51-bb25-3b84bba47bb3&start_date=2026-11-20&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=460ac105-cfa3-404c-b52e-64c9dabc8756&start_date=2026-11-20&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -418,7 +418,7 @@
       "name": "evse_timeseries_lifetime_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=54b7a2f8-e1ba-4a51-bb25-3b84bba47bb3&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=460ac105-cfa3-404c-b52e-64c9dabc8756&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -538,12 +538,12 @@
       "category": "inventory",
       "check_group": "inventory",
       "check_mode": "all",
-      "error": null,
+      "error": "Remote end closed connection without response",
       "group": "degraded",
       "method": "GET",
       "name": "devices_inventory",
-      "ok": true,
-      "status": 200,
+      "ok": false,
+      "status": null,
       "url": "/app-api/{site_id}/devices.json"
     },
     {
@@ -731,14 +731,14 @@
   ],
   "status": "Fully Operational",
   "summary": {
-    "checks_failed": 0,
+    "checks_failed": 1,
     "checks_failed_affecting": 0,
-    "checks_failed_broad_outage": 0,
-    "checks_failed_non_affecting": 0,
-    "checks_ok": 17,
+    "checks_failed_broad_outage": 1,
+    "checks_failed_non_affecting": 1,
+    "checks_ok": 16,
     "checks_total": 17,
-    "endpoints_failed": 0,
-    "endpoints_ok": 37,
+    "endpoints_failed": 1,
+    "endpoints_ok": 36,
     "endpoints_total": 37
   }
 }
