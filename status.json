@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-11-20T23:41:25.221332Z",
+  "checked_at": "2026-11-21T05:42:31.219387Z",
   "checks": [
     {
       "affects": true,
@@ -133,7 +133,7 @@
       ],
       "group": "degraded",
       "name": "inventory",
-      "ok": false
+      "ok": true
     },
     {
       "affects": false,
@@ -334,7 +334,7 @@
       "name": "session_history_criteria",
       "ok": true,
       "status": 200,
-      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=460ac105-cfa3-404c-b52e-64c9dabc8756&username=2999024"
+      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=e3a48865-6853-4712-bc1b-336fbf7f7ac3&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -404,7 +404,7 @@
       "name": "evse_timeseries_daily_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=460ac105-cfa3-404c-b52e-64c9dabc8756&start_date=2026-11-20&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=e3a48865-6853-4712-bc1b-336fbf7f7ac3&start_date=2026-11-21&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -418,7 +418,7 @@
       "name": "evse_timeseries_lifetime_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=460ac105-cfa3-404c-b52e-64c9dabc8756&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=e3a48865-6853-4712-bc1b-336fbf7f7ac3&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -538,12 +538,12 @@
       "category": "inventory",
       "check_group": "inventory",
       "check_mode": "all",
-      "error": "Remote end closed connection without response",
+      "error": null,
       "group": "degraded",
       "method": "GET",
       "name": "devices_inventory",
-      "ok": false,
-      "status": null,
+      "ok": true,
+      "status": 200,
       "url": "/app-api/{site_id}/devices.json"
     },
     {
@@ -712,7 +712,7 @@
       "name": "inverter_production",
       "ok": true,
       "status": 200,
-      "url": "/systems/{site_id}/inverter_data_x/energy.json?start_date=2026-11-19&end_date=2026-11-20"
+      "url": "/systems/{site_id}/inverter_data_x/energy.json?start_date=2026-11-20&end_date=2026-11-21"
     },
     {
       "affects_broad_outage": true,
@@ -731,14 +731,14 @@
   ],
   "status": "Fully Operational",
   "summary": {
-    "checks_failed": 1,
+    "checks_failed": 0,
     "checks_failed_affecting": 0,
-    "checks_failed_broad_outage": 1,
-    "checks_failed_non_affecting": 1,
-    "checks_ok": 16,
+    "checks_failed_broad_outage": 0,
+    "checks_failed_non_affecting": 0,
+    "checks_ok": 17,
     "checks_total": 17,
-    "endpoints_failed": 1,
-    "endpoints_ok": 36,
+    "endpoints_failed": 0,
+    "endpoints_ok": 37,
     "endpoints_total": 37
   }
 }
