@@ -41,6 +41,8 @@ from custom_components.enphase_ev.time import (
 )
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
 
+from .device_info_helpers import device_info_fields
+
 
 def _slot_cache() -> dict[str, dict[str, dict[str, object]]]:
     return {
@@ -607,8 +609,8 @@ async def test_evse_schedule_editor_entities_update_state_and_call_schedule_sync
     with pytest.raises(Exception, match="must be different"):
         await save.async_press()
 
-    assert schedule_select.device_info["name"] == "Garage Charger"
-    assert start.device_info["name"] == "Garage Charger"
+    assert device_info_fields(schedule_select.device_info)["name"] == "Garage Charger"
+    assert device_info_fields(start.device_info)["name"] == "Garage Charger"
 
 
 @pytest.mark.asyncio

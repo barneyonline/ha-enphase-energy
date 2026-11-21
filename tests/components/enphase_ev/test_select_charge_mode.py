@@ -12,6 +12,8 @@ from homeassistant.exceptions import ServiceValidationError
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL, RANDOM_SITE_ID
 
+from .device_info_helpers import device_info_fields
+
 
 @pytest.mark.asyncio
 async def test_charge_mode_select(hass, monkeypatch):
@@ -1814,7 +1816,9 @@ def test_system_profile_select_availability_fallback_and_device_info(
 
     sel = SystemProfileSelect(coord)
     assert sel.available is False
-    assert sel.device_info["identifiers"] == {("enphase_ev", "type:site:envoy")}
+    assert device_info_fields(sel.device_info)["identifiers"] == {
+        ("enphase_ev", "type:site:envoy")
+    }
 
     coord.battery_controls_available = True
     coord.battery_user_is_owner = False

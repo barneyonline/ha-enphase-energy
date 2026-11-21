@@ -13,6 +13,8 @@ from custom_components.enphase_ev.sensor_cloud_metadata import (
     EnphaseSiteInformationSensor,
 )
 
+from .device_info_helpers import device_info_fields
+
 
 def bootstrap(**flags):
     return {
@@ -75,7 +77,7 @@ async def test_metadata_refresh_and_sensors(coordinator_factory, monkeypatch):
         "consumption_data": True,
         "viewer": False,
     }
-    assert site.device_info["sw_version"] is None
+    assert device_info_fields(site.device_info)["sw_version"] is None
     monkeypatch.setattr(
         type(coord), "last_success_utc", property(lambda _self: None), raising=False
     )

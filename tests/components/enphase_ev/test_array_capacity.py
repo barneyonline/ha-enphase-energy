@@ -18,6 +18,8 @@ from custom_components.enphase_ev.sensor_array_capacity import (
     EnphaseArrayCapacitySensor,
 )
 
+from .device_info_helpers import device_info_fields
+
 
 @pytest.fixture
 def builder():
@@ -238,9 +240,9 @@ def test_sensor_contract(coordinator_factory, builder):
     attributes = dc.extra_state_attributes
     attributes["arrays"]["West"] = -1
     assert dc.extra_state_attributes["arrays"]["West"] == 0.435
-    assert ("enphase_ev", f"type:{coord.site_id}:microinverter") in dc.device_info[
-        "identifiers"
-    ]
+    assert ("enphase_ev", f"type:{coord.site_id}:microinverter") in device_info_fields(
+        dc.device_info
+    )["identifiers"]
     coord.include_inverters = False
     assert not dc.available
     coord.include_inverters = True

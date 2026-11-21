@@ -7,6 +7,8 @@ from custom_components.enphase_ev.inventory_view import InventoryView
 from custom_components.enphase_ev.feature_snapshot import capture_feature_snapshot
 from custom_components.enphase_ev.state_models import BatteryControlCapability
 
+from .device_info_helpers import device_info_fields
+
 
 def test_large_mixed_inventory_registration_reuses_metadata_and_snapshots(
     coordinator_factory,
@@ -31,11 +33,14 @@ def test_large_mixed_inventory_registration_reuses_metadata_and_snapshots(
     view = coord.inventory_view
     with patch.object(view, "type_bucket", wraps=view.type_bucket) as buckets:
         for _ in range(500):
-            inverter = view.type_device_info("microinverter")
+            inverter = device_info_fields(view.type_device_info("microinverter"))
             assert inverter["model"] == "IQ8"
             assert inverter["sw_version"] == "1.0"
         for _ in range(20):
-            assert view.type_device_info("encharge")["model"] == "IQ Battery"
+            assert (
+                device_info_fields(view.type_device_info("encharge"))["model"]
+                == "IQ Battery"
+            )
         assert buckets.call_count <= 12
     first = capture_feature_snapshot(
         coord.battery_state, coord.heatpump_state, coord.inventory_state
@@ -56,18 +61,23 @@ def test_shared_device_metadata_defensive_copies_and_stable_topology_updates(
     coord._type_device_buckets = {"microinverter": {"count": 1, "devices": members}}
     view = coord.inventory_view
     first = view.type_device_info("microinverter")
-    first["identifiers"].clear()
-    first["model"] = "Modified outside runtime"
-    assert view.type_device_info("microinverter")["model"] == "IQ8"
-    assert view.type_device_info("microinverter")["identifiers"]
+    assert first is not None
+    if isinstance(first, dict):
+        first["identifiers"].clear()
+        first["model"] = "Modified outside runtime"
+    else:
+        first.identifiers.clear()
+        first.model = "Modified outside runtime"
+    assert device_info_fields(view.type_device_info("microinverter"))["model"] == "IQ8"
+    assert device_info_fields(view.type_device_info("microinverter"))["identifiers"]
     members[0]["sw_version"] = "2.0"
     members[0]["name"] = "IQ8 Updated"
     coord.inventory_runtime._rebuild_inventory_summary_caches()
-    updated = view.type_device_info("microinverter")
+    updated = device_info_fields(view.type_device_info("microinverter"))
     assert updated["sw_version"] == "2.0"
     assert updated["model"] == "IQ8 Updated"
     coord._type_device_buckets["microinverter"]["devices"] = [{"name": "IQ9"}]
-    assert view.type_device_info("microinverter")["model"] == "IQ9"
+    assert device_info_fields(view.type_device_info("microinverter"))["model"] == "IQ9"
 
 
 @pytest.mark.parametrize(
@@ -134,8 +144,7 @@ def test_inventory_device_metadata_tracks_real_members(coordinator_factory, kind
         }
     }
     view = InventoryView(coord)
-    info = view.type_device_info(kind)
-    assert info is not None
+    info = device_info_fields(view.type_device_info(kind))
     assert info["identifiers"] == {("enphase_ev", f"type:{coord.site_id}:{kind}")}
     assert info["manufacturer"] == "Enphase"
     assert view.type_device_name(kind)
@@ -271,9 +280,12 @@ def test_battery_friendly_model_preserves_sku(coordinator_factory, name):
     view = coord.inventory_view
     assert view.type_device_model("encharge") == (name or sku)
     assert view.type_device_model_id("encharge") == (sku if name else None)
-    info = view.type_device_info("encharge")
+    info = device_info_fields(view.type_device_info("encharge"))
     assert info["model"] == (name or sku)
-    assert info.get("model_id") == (sku if name else None)
+    if name:
+        assert info["model_id"] == sku
+    else:
+        assert "model_id" not in info
 
 
 @pytest.mark.parametrize("kind", ["encharge", "microinverter"])
@@ -301,7 +313,7 @@ def test_grouped_cards_keep_models_firmware_and_serials_unambiguous(
             ],
         }
     }
-    info = coord.inventory_view.type_device_info(kind)
+    info = device_info_fields(coord.inventory_view.type_device_info(kind))
     assert info["model"] == "Model A x1, Model B x1"
     assert info["sw_version"] == "520-long-release-1 x1, 520-long-release-2 x1"
     assert "serial_number" not in info
@@ -320,7 +332,7 @@ def test_grouped_cards_keep_models_firmware_and_serials_unambiguous(
             "sw_version": "520-long-release-1",
         }
     ]
-    info = coord.inventory_view.type_device_info(kind)
+    info = device_info_fields(coord.inventory_view.type_device_info(kind))
     assert info["model"] == "IQ7A"
     assert info["model_id"] == "IQ7A-72-E-ACM-INT"
     assert info["serial_number"] == "A"

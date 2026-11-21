@@ -6,6 +6,8 @@ from tests.components.enphase_ev.random_ids import (
     RANDOM_SITE_ID,
 )
 
+from .device_info_helpers import device_info_fields
+
 
 def _with_inventory_view(coord):
     coord.inventory_view = SimpleNamespace(type_identifier=lambda _type_key: None)
@@ -44,7 +46,7 @@ def test_entity_naming_and_availability():
     assert ent.has_entity_name is True
     assert ent.translation_key == "last_session"
     # Device name comes from coordinator data
-    assert ent.device_info["name"] == "Garage EV"
+    assert device_info_fields(ent.device_info)["name"] == "Garage EV"
     # Unique ID includes domain, serial, and key
     assert ent.unique_id.endswith(f"{RANDOM_SERIAL}_energy_today")
 
@@ -142,7 +144,7 @@ def test_device_info_includes_model_name_when_available():
     }
 
     ent = EnphaseEnergyTodaySensor(coord, RANDOM_SERIAL_ALT)
-    info = ent.device_info
+    info = device_info_fields(ent.device_info)
     assert info["name"] == "IQ EV Charger"
     assert info["model"] == "IQ EV Charger"
     assert info["model_id"] == coord.data[RANDOM_SERIAL_ALT]["model_name"]
@@ -169,7 +171,7 @@ def test_device_info_suppresses_duplicate_extended_evse_model_suffix():
     }
 
     ent = EnphaseEnergyTodaySensor(coord, RANDOM_SERIAL_ALT)
-    info = ent.device_info
+    info = device_info_fields(ent.device_info)
     assert info["name"] == "IQ EV Charger (IQ-EVSE-EU-3032)"
     assert info["model"] == "IQ EV Charger"
     assert info["model_id"] == coord.data[RANDOM_SERIAL_ALT]["model_name"]
@@ -199,7 +201,7 @@ def test_device_info_handles_empty_or_invalid_model_name():
         }
     }
     ent = EnphaseEnergyTodaySensor(coord, RANDOM_SERIAL_ALT)
-    assert ent.device_info["model"] == "Garage Charger"
+    assert device_info_fields(ent.device_info)["model"] == "Garage Charger"
 
     coord.data[RANDOM_SERIAL_ALT]["model_name"] = _BadStr()
-    assert ent.device_info["model"] == "Garage Charger"
+    assert device_info_fields(ent.device_info)["model"] == "Garage Charger"

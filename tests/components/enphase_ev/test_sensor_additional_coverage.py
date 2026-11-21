@@ -28,6 +28,8 @@ from custom_components.enphase_ev.sensor_battery_helpers import (
 
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
 
+from .device_info_helpers import device_info_fields
+
 pytest.importorskip("homeassistant")
 
 
@@ -1519,7 +1521,7 @@ def test_inverter_telemetry_sensor(coordinator_factory) -> None:
     coord.inventory_view.type_device_info = lambda _type: {"name": "Shared"}
     assert entity.device_info == {"name": "Shared"}
     coord.inventory_view.type_device_info = lambda _type: None
-    assert entity.device_info["name"] == "IQ Microinverters"
+    assert device_info_fields(entity.device_info)["name"] == "IQ Microinverters"
     coord._inverter_data["INV-A"]["telemetry"]["power"] = "bad"  # noqa: SLF001
     assert entity.native_value is None
     coord._inverter_data = {}  # noqa: SLF001
@@ -1878,8 +1880,7 @@ def test_inverter_lifetime_sensor_device_info_fallback(coordinator_factory) -> N
     coord._inverter_order = ["INV-A"]  # noqa: SLF001
     entity = EnphaseInverterLifetimeEnergySensor(coord, "INV-A")
 
-    info = entity.device_info
-    assert info is not None
+    info = device_info_fields(entity.device_info)
     assert (DOMAIN, "type:123456:microinverter") in info["identifiers"]
 
 
@@ -2053,7 +2054,7 @@ def test_type_inventory_sensor_device_info_prefers_provider_and_fallback(
     assert entity.device_info is provided
 
     coord.inventory_view.type_device_info = lambda _type_key: None
-    fallback = entity.device_info
+    fallback = device_info_fields(entity.device_info)
     assert fallback["identifiers"] == {
         (sensor_mod.DOMAIN, f"type:{coord.site_id}:wind_turbine")
     }
@@ -3611,7 +3612,7 @@ def test_gateway_iq_energy_router_sensor_state_and_attributes(
     assert attrs["last_reported_utc"] == "2026-02-27T09:14:41+00:00"
     assert attrs["ip_address"] == "192.0.2.99"
     assert attrs["created_at"] == "2025-08-11T08:11:08Z"
-    assert sensor.device_info["identifiers"] == {
+    assert device_info_fields(sensor.device_info)["identifiers"] == {
         ("enphase_ev", f"type:{coord.site_id}:envoy")
     }
 
@@ -3684,7 +3685,7 @@ async def test_async_setup_entry_adds_gateway_iq_energy_router_entities(
         f"enphase_ev_site_{coord.site_id}_gateway_iq_energy_router_lgx_026",
     }
     assert not any("retired" in entity.unique_id for entity in router_entities)
-    assert router_entities[0].device_info["identifiers"] == {
+    assert device_info_fields(router_entities[0].device_info)["identifiers"] == {
         ("enphase_ev", f"type:{coord.site_id}:envoy")
     }
     assert any(entity.native_value == "Warning" for entity in router_entities)
@@ -3800,7 +3801,7 @@ async def test_async_setup_entry_adds_gateway_iq_energy_router_entities_without_
     assert router_entities[0].unique_id == (
         f"enphase_ev_site_{coord.site_id}_gateway_iq_energy_router_5956621_iq_energy_router_1"
     )
-    assert router_entities[0].device_info["identifiers"] == {
+    assert device_info_fields(router_entities[0].device_info)["identifiers"] == {
         ("enphase_ev", f"type:{coord.site_id}:envoy")
     }
 
@@ -6013,13 +6014,32 @@ def test_cloud_sensor_device_info_falls_back_to_default_cloud_device(
     backoff = EnphaseSiteBackoffEndsSensor(coord)
 
     expected_identifiers = {("enphase_ev", f"type:{coord.site_id}:cloud")}
-    assert site_energy.device_info["identifiers"] == expected_identifiers
-    assert current_power.device_info["identifiers"] == expected_identifiers
-    assert latency.device_info["identifiers"] == expected_identifiers
-    assert auth_counter.device_info["identifiers"] == expected_identifiers
-    assert last_error.device_info["identifiers"] == expected_identifiers
-    assert service_status.device_info["identifiers"] == expected_identifiers
-    assert backoff.device_info["identifiers"] == expected_identifiers
+    assert (
+        device_info_fields(site_energy.device_info)["identifiers"]
+        == expected_identifiers
+    )
+    assert (
+        device_info_fields(current_power.device_info)["identifiers"]
+        == expected_identifiers
+    )
+    assert (
+        device_info_fields(latency.device_info)["identifiers"] == expected_identifiers
+    )
+    assert (
+        device_info_fields(auth_counter.device_info)["identifiers"]
+        == expected_identifiers
+    )
+    assert (
+        device_info_fields(last_error.device_info)["identifiers"]
+        == expected_identifiers
+    )
+    assert (
+        device_info_fields(service_status.device_info)["identifiers"]
+        == expected_identifiers
+    )
+    assert (
+        device_info_fields(backoff.device_info)["identifiers"] == expected_identifiers
+    )
 
 
 def test_cloud_latency_sensor_device_info_falls_back_without_type_device_info(
@@ -6032,7 +6052,7 @@ def test_cloud_latency_sensor_device_info_falls_back_without_type_device_info(
 
     sensor = EnphaseCloudLatencySensor(coord)
 
-    assert sensor.device_info["identifiers"] == {
+    assert device_info_fields(sensor.device_info)["identifiers"] == {
         ("enphase_ev", f"type:{coord.site_id}:cloud")
     }
 
@@ -6954,7 +6974,7 @@ async def test_async_setup_entry_adds_type_inventory_sensors(
     )  # noqa: SLF001
     assert wind.native_value == 2
     assert wind.extra_state_attributes["type_label"] == "Wind Turbine"
-    assert wind.device_info["name"] == "Wind Turbine"
+    assert device_info_fields(wind.device_info)["name"] == "Wind Turbine"
 
 
 @pytest.mark.asyncio

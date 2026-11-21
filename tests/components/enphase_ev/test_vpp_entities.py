@@ -30,6 +30,8 @@ from custom_components.enphase_ev.sensor_vpp import (
 )
 from custom_components.enphase_ev.vpp_runtime import VppEvent
 
+from .device_info_helpers import device_info_fields
+
 
 def _enable_with_events(coord, events: tuple[VppEvent, ...]) -> None:
     if coord.config_entry is None:
@@ -89,7 +91,7 @@ def test_vpp_calendar_exposes_all_records_and_next_actionable(
     assert entity.event.description == (
         "type=battery_discharge\n" "subtype=Discharge_To_Load_Grid\n" "status=scheduled"
     )
-    assert entity.device_info["identifiers"] == {
+    assert device_info_fields(entity.device_info)["identifiers"] == {
         (DOMAIN, f"type:{coord.site_id}:cloud")
     }
 
@@ -142,7 +144,8 @@ def test_vpp_sensors_share_next_actionable_event(coordinator_factory) -> None:
     ]
     assert all(sensor.available for sensor in sensors)
     assert all(
-        sensor.device_info["identifiers"] == {(DOMAIN, f"type:{coord.site_id}:cloud")}
+        device_info_fields(sensor.device_info)["identifiers"]
+        == {(DOMAIN, f"type:{coord.site_id}:cloud")}
         for sensor in sensors
     )
 
@@ -166,8 +169,8 @@ def test_vpp_entities_fall_back_to_cloud_device_info(
     calendar = VppEventsCalendarEntity(coord)
     sensor = EnphaseVppNextEventStartSensor(coord)
 
-    assert calendar.device_info["model"] == "Cloud Service"
-    assert sensor.device_info["identifiers"] == {
+    assert device_info_fields(calendar.device_info)["model"] == "Cloud Service"
+    assert device_info_fields(sensor.device_info)["identifiers"] == {
         (DOMAIN, f"type:{coord.site_id}:cloud")
     }
 

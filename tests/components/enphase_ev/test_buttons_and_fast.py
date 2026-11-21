@@ -12,6 +12,8 @@ from homeassistant.exceptions import ServiceValidationError
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL, RANDOM_SITE_ID
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 
+from .device_info_helpers import device_info_fields
+
 
 def test_button_type_available_uses_inventory_view() -> None:
     from custom_components.enphase_ev import button as button_mod
@@ -643,8 +645,10 @@ def test_storm_alert_opt_out_button_device_info_fallback() -> None:
         ),
     )
     button = StormAlertOptOutButton(coord)
-    assert button.device_info["identifiers"] == {("enphase_ev", "type:site:envoy")}
-    assert button.device_info["manufacturer"] == "Enphase"
+    assert device_info_fields(button.device_info)["identifiers"] == {
+        ("enphase_ev", "type:site:envoy")
+    }
+    assert device_info_fields(button.device_info)["manufacturer"] == "Enphase"
 
 
 @pytest.mark.asyncio

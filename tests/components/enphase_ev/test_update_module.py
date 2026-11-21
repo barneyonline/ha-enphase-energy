@@ -32,6 +32,8 @@ from custom_components.enphase_ev.update import (
     async_setup_entry,
 )
 
+from .device_info_helpers import device_info_fields
+
 TEST_EVSE_SERIAL = "EVSE-SERIAL-0001"
 TEST_EVSE_SITE_ID = 1234567
 
@@ -978,7 +980,7 @@ def test_firmware_update_entities_fall_back_to_type_device_identifiers() -> None
         description=UpdateEntityDescription(key="gateway_firmware"),
         installed_version_getter=_gateway_installed_version,
     )
-    assert gateway.device_info == {
+    assert device_info_fields(gateway.device_info) == {
         "identifiers": {(DOMAIN, f"type:{coord.site_id}:envoy")},
         "manufacturer": "Enphase",
     }
@@ -1005,7 +1007,9 @@ async def test_charger_update_entity_uses_fw_details_payload(hass) -> None:
     assert entity.state == "on"
     assert entity.available is True
     assert entity.supported_features == 0
-    assert entity.device_info["identifiers"] == {("enphase_ev", TEST_EVSE_SERIAL)}
+    assert device_info_fields(entity.device_info)["identifiers"] == {
+        ("enphase_ev", TEST_EVSE_SERIAL)
+    }
     assert entity.release_url == "https://example.test/charger/fr"
     assert entity.release_summary == "Charger firmware update"
 
@@ -1551,7 +1555,7 @@ def test_device_info_falls_back_when_coordinator_does_not_supply_info() -> None:
         description=UpdateEntityDescription(key="gateway_firmware"),
         installed_version_getter=_gateway_installed_version,
     )
-    assert entity.device_info == {
+    assert device_info_fields(entity.device_info) == {
         "identifiers": {(DOMAIN, f"type:{coord.site_id}:envoy")},
         "manufacturer": "Enphase",
     }

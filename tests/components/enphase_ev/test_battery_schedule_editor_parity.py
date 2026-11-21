@@ -30,6 +30,8 @@ from custom_components.enphase_ev.const import DOMAIN, OPT_BATTERY_SCHEDULES_ENA
 from custom_components.enphase_ev.labels import battery_schedule_create_label
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 
+from .device_info_helpers import device_info_fields
+
 
 @pytest.fixture(autouse=True)
 def _expose_admin_service_handlers_for_unit_tests(monkeypatch) -> None:
@@ -1460,11 +1462,11 @@ async def test_battery_schedule_editor_guard_paths_cover_missing_editor_and_fall
         dt_time(9)
     )
 
-    assert save_button.device_info["manufacturer"] == "Enphase"
-    assert schedule_select.device_info["manufacturer"] == "Enphase"
-    assert edit_limit.device_info["manufacturer"] == "Enphase"
-    assert edit_time.device_info["manufacturer"] == "Enphase"
-    assert edit_day.device_info["manufacturer"] == "Enphase"
+    assert device_info_fields(save_button.device_info)["manufacturer"] == "Enphase"
+    assert device_info_fields(schedule_select.device_info)["manufacturer"] == "Enphase"
+    assert device_info_fields(edit_limit.device_info)["manufacturer"] == "Enphase"
+    assert device_info_fields(edit_time.device_info)["manufacturer"] == "Enphase"
+    assert device_info_fields(edit_day.device_info)["manufacturer"] == "Enphase"
 
 
 def test_battery_schedule_inventory_sensors_expose_per_mode_counts(

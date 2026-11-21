@@ -27,6 +27,8 @@ from custom_components.enphase_ev.binary_sensor import (
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
 
+from .device_info_helpers import device_info_fields
+
 
 def _stub_listener() -> Callable[[], None]:
     """Return a reusable unsubscribe stub for coordinator listeners."""
@@ -1165,7 +1167,7 @@ def test_site_cloud_reachable_binary_sensor_metadata(
         "_type_device_info",
         lambda _coord, _type_key: None,
     )
-    info = sensor.device_info
+    info = device_info_fields(sensor.device_info)
     assert info["identifiers"] == {(DOMAIN, f"type:{coord.site_id}:cloud")}
     assert info["manufacturer"] == "Enphase"
     assert info["model"] == "Cloud Service"
@@ -1267,7 +1269,7 @@ def test_site_active_system_events_binary_sensor_metadata(
         "_type_device_info",
         lambda _coord, _type_key: None,
     )
-    info = sensor.device_info
+    info = device_info_fields(sensor.device_info)
     assert info["identifiers"] == {(DOMAIN, f"type:{coord.site_id}:cloud")}
 
     monkeypatch.setattr(
@@ -1355,7 +1357,7 @@ def test_heatpump_sg_ready_active_binary_sensor_metadata(
 
     assert sensor.extra_state_attributes == {}
 
-    info = sensor.device_info
+    info = device_info_fields(sensor.device_info)
     assert info["name"] == "Heat Pump"
     assert info["model"] == "Europa Mini WP"
     assert info["serial_number"] == "HP-1"
@@ -1620,7 +1622,7 @@ def test_site_cloud_reachable_binary_sensor_fallback_paths(
     coord.last_success_utc = None
     assert sensor.is_on is False
 
-    info = sensor.device_info
+    info = device_info_fields(sensor.device_info)
     assert info["identifiers"] == {(DOMAIN, f"type:{coord.site_id}:cloud")}
 
     custom_info = {"name": "Custom Cloud"}

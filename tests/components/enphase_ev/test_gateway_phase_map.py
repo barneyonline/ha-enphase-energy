@@ -15,6 +15,8 @@ from custom_components.enphase_ev.inventory_runtime import (
 )
 from custom_components.enphase_ev.sensor import EnphaseGatewayConnectivityStatusSensor
 
+from .device_info_helpers import device_info_fields
+
 PHASE_MAP = {
     "GW-1": {
         "isPrimaryGateway": False,
@@ -315,7 +317,7 @@ async def test_phase_map_invalidates_cached_gateway_metadata_with_inventory_cach
         InventoryRuntime._normalize_gateway_phase_map(old_phase_map),
     )
     view = coord.inventory_view
-    before = view.type_device_info("envoy")
+    before = device_info_fields(view.type_device_info("envoy"))
     assert before["serial_number"] == "GW-1"
     assert before["sw_version"] == "1.0"
     phase_fetcher = AsyncMock(return_value=PHASE_MAP)
@@ -332,7 +334,7 @@ async def test_phase_map_invalidates_cached_gateway_metadata_with_inventory_cach
         view, "invalidate_device_metadata", wraps=view.invalidate_device_metadata
     ) as invalidate:
         await coord.inventory_runtime._async_refresh_devices_inventory()
-        after = view.type_device_info("envoy")
+        after = device_info_fields(view.type_device_info("envoy"))
         assert after["serial_number"] == "GW-2"
         assert after["sw_version"] == "2.0"
         assert after["model"] == "Gateway Two"

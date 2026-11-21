@@ -20,6 +20,8 @@ from custom_components.enphase_ev.time import (
     async_setup_entry,
 )
 
+from .device_info_helpers import device_info_fields
+
 
 def _schedule_payload() -> dict[str, object]:
     return {
@@ -226,7 +228,7 @@ def test_time_entities_expose_editor_values_and_device_info_fallback(
     assert start.available is True
     assert start.native_value == dt_time(2, 0)
     assert end.native_value == dt_time(5, 0)
-    assert start.device_info["identifiers"] == {
+    assert device_info_fields(start.device_info)["identifiers"] == {
         ("enphase_ev", f"type:{coord.site_id}:encharge")
     }
 
