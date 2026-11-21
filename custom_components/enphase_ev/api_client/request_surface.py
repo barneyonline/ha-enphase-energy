@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 import aiohttp
@@ -48,6 +50,29 @@ from .common import (
     check_enlighten_read_current,
     has_guarded_read_scope,
 )
+
+
+@dataclass(slots=True)
+class _JsonRequestPhase:
+    awaiting_headers: bool = False
+
+
+@asynccontextmanager
+async def _json_request_deadline(seconds: float) -> AsyncIterator[_JsonRequestPhase]:
+    """Identify transport failures while waiting for an HTTP response."""
+
+    phase = _JsonRequestPhase()
+    try:
+        async with asyncio.timeout(seconds):
+            yield phase
+    except (aiohttp.ClientConnectionError, TimeoutError) as err:
+        # The same timeout can expire in the local queue, while awaiting
+        # headers, or while reading the body or refreshing credentials.
+        if phase.awaiting_headers and not isinstance(
+            err, (aiohttp.ClientSSLError, aiohttp.ServerFingerprintMismatch)
+        ):
+            setattr(err, "enphase_unreachable", True)
+        raise
 
 
 def _mark_payload_healthy(self: EnphaseEVClient, endpoint: str | None) -> None:
@@ -204,7 +229,7 @@ async def _json(
         if isinstance(attempt_headers, dict):
             base_headers = self._merge_request_headers(base_headers, attempt_headers)
 
-        async with asyncio.timeout(self._timeout):
+        async with _json_request_deadline(self._timeout) as phase:
             async with _timed_enlighten_read_request_guard(method, url):
                 async with self._request_session(
                     cookie_header_only=use_cookie_header_only
@@ -224,11 +249,13 @@ async def _json(
                         }
                     self._request_count += 1
                     record_request_attempt()
+                    phase.awaiting_headers = True
                     async with _timed_response_context(
                         request_session.request(
                             method, url, headers=base_headers, **request_kwargs
                         )
                     ) as r:
+                        phase.awaiting_headers = False
                         check_enlighten_read_current()
                         if r.status == 401:
                             self._last_unauthorized_request = safe_request_label

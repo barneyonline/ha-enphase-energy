@@ -180,6 +180,11 @@ The coordinator distinguishes core failures from optional endpoint failures:
   The active backoff guard requests at least one second before a coordinator retry
   to avoid immediate rescheduling from Home Assistant clock rounding. The separate
   expiry timer still clears backoff state and requests recovery at the deadline.
+- If charger status has no reusable cache, transport failures before response
+  headers use Home Assistant's info-level `UpdateFailedUnreachable` when available.
+  Home Assistant 2026.10 and 2026.11 use `UpdateFailed`. TLS validation failures,
+  local queue timeouts, and failures after headers arrive retain their existing
+  error handling.
 - Optional endpoint failures mark that family stale, preserve recent useful data where safe, and report repairs when needed.
 
 `endpoint_policies.py` defines immutable cache and cooldown policies separately
