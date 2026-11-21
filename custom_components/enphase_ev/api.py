@@ -8,6 +8,7 @@ entity code consume the data.
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import json
 import re
@@ -111,6 +112,9 @@ from .api_client.authentication import (
     async_validate_login_otp as async_validate_login_otp,
 )
 from .api_client.common import (
+    guarded_read_scope as guarded_read_scope,
+    runtime_read_scope as runtime_read_scope,
+    has_guarded_read_scope,
     _LOGGER as _LOGGER,
     _EMAIL_RE as _EMAIL_RE,
     _DEBUG_KV_RE as _DEBUG_KV_RE,
@@ -361,10 +365,14 @@ class EnphaseEVClient(MqttStreamSurface):
         timeout: int = 15,
         reauth_callback: Callable[[], Awaitable[bool]] | None = None,
         cookie_header_session: aiohttp.ClientSession | None = None,
+        guarded_read_session: aiohttp.ClientSession | None = None,
     ):
         self._timeout = int(timeout)
         self._s = session
         self._cookie_header_session = cookie_header_session
+        self._guarded_read_session = guarded_read_session
+        self._guarded_read_requests: dict[asyncio.Future[None], asyncio.Task[Any]] = {}
+        self._session_close_task: asyncio.Task[None] | None = None
         self._site = site_id
         # Cache working API variant indexes per action to avoid retries once discovered
         self._start_variant_idx: int | None = None
@@ -383,6 +391,7 @@ class EnphaseEVClient(MqttStreamSurface):
         self._battery_config_write_bases: dict[str, dict[str, Any]] = {}
         self._cookie = cookie or ""
         self._eauth = eauth or None
+        self.credential_revision = 0
         self._vpp_ignored_live_token: str | None = None
         self._vpp_credential_diagnostics: dict[str, object] | None = None
         self._activation_token: str | None = None
@@ -416,12 +425,28 @@ class EnphaseEVClient(MqttStreamSurface):
         self._reauth_cb = callback
 
     async def async_close(self) -> None:
-        """Detach the private session while preserving Home Assistant's connector."""
+        """Detach entry-owned sessions while preserving Home Assistant's connector."""
 
-        session = self._cookie_header_session
+        if self._session_close_task is None:
+            self._session_close_task = asyncio.create_task(
+                self._async_close_sessions(), name="enphase_ev_close_sessions"
+            )
+        await asyncio.shield(self._session_close_task)
+
+    async def _async_close_sessions(self) -> None:
+        sessions = (self._cookie_header_session, self._guarded_read_session)
         self._cookie_header_session = None
-        if session is not None and not session.closed:
-            session.detach()
+        self._guarded_read_session = None
+        pending = tuple(self._guarded_read_requests)
+        for request_finished in pending:
+            owner = self._guarded_read_requests[request_finished]
+            if not owner.cancelling():
+                owner.cancel()
+        if pending:
+            await asyncio.wait(pending)
+        for session in sessions:
+            if session is not None and not session.closed:
+                session.detach()
 
     @staticmethod
     def _is_hems_api_endpoint(endpoint: str | None) -> bool:
@@ -1510,7 +1535,20 @@ class EnphaseEVClient(MqttStreamSurface):
         """
 
         if not cookie_header_only:
-            yield self._s
+            session = self._guarded_read_session
+            if session is None or not has_guarded_read_scope():
+                yield self._s
+                return
+
+            task = asyncio.current_task()
+            assert task is not None
+            request_finished = asyncio.get_running_loop().create_future()
+            self._guarded_read_requests[request_finished] = task
+            try:
+                yield session
+            finally:
+                del self._guarded_read_requests[request_finished]
+                request_finished.set_result(None)
             return
 
         session = self._cookie_header_session
@@ -2274,8 +2312,15 @@ class EnphaseEVClient(MqttStreamSurface):
             JsonDict | None, api_parsers.normalize_lifetime_energy_payload(payload)
         )
 
+    def hems_lifetime_read_guard(
+        self, is_current: Callable[[], bool]
+    ) -> Callable[[], bool]:
+        """Bind a HEMS lifetime read to this client's current credentials."""
+
+        return api_dashboard_surface.hems_lifetime_read_guard(self, is_current)
+
     async def hems_consumption_lifetime(self) -> JsonDict | None:
-        "Return HEMS lifetime consumption buckets when available."
+        """Return HEMS lifetime buckets when available."""
 
         return await api_dashboard_surface.hems_consumption_lifetime(self)
 

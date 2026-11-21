@@ -44,6 +44,7 @@ class EnphaseRuntimeData:
     applied_data: dict[str, Any] | None = None
     applied_options: dict[str, Any] | None = None
     preserve_for_reload: bool = False
+    unload_task: asyncio.Task[bool] | None = field(default=None, repr=False)
     update_listener_lock: asyncio.Lock = field(
         default_factory=asyncio.Lock,
         repr=False,
@@ -85,14 +86,16 @@ class EnphaseRuntimeData:
 
         task = self.weather_discovery_task
         self.weather_discovery_task = None
-        if isinstance(task, asyncio.Task) and not task.done():
-            task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
-        coordinator = self.weather_coordinator
-        self.weather_coordinator = None
-        if coordinator is not None:
-            coordinator.mark_stopped()
+        try:
+            if isinstance(task, asyncio.Task) and not task.done():
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+        finally:
+            coordinator = self.weather_coordinator
+            self.weather_coordinator = None
+            if coordinator is not None:
+                coordinator.mark_stopped()
 
 
 type EnphaseConfigEntry = ConfigEntry[EnphaseRuntimeData]

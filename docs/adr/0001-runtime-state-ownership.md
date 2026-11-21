@@ -73,9 +73,12 @@ invalidation revision so cached type-level summaries update with model, firmware
 or preferred-gateway changes even when topology stays stable.
 
 The coordinator exposes `runtime_active` as the lifecycle boundary for delayed
-work. Successful unload and failed setup retire it before awaited cleanup;
-failed unload leaves the loaded entry active. Acknowledged cloud writes retain
-their results after retirement without creating new requests or publications.
+work. Successful platform unload and failed setup retire it before awaited
+cleanup. A platform-unload failure leaves the loaded runtime active. After all
+platforms unload, the remaining cleanup steps run even if one fails or the
+unload is cancelled, and cleanup errors discard the reload handoff.
+Acknowledged cloud writes retain their results after retirement without
+creating new requests or publications.
 
 ## Consequences
 

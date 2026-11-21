@@ -39,7 +39,9 @@ from homeassistant.exceptions import (
     ServiceValidationError,
 )  # noqa: F401
 from homeassistant.helpers.event import async_call_later
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.aiohttp_client import (
+    async_get_clientsession as async_get_clientsession,
+)
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -54,6 +56,7 @@ from .api import (
     OptionalEndpointUnavailable,
     Unauthorized,
     enlighten_optional_read_scope,
+    runtime_read_scope,
     is_scheduler_unavailable_error,
 )
 from .auth_refresh_runtime import AuthRefreshRuntime, ManualAuthRefreshResult
@@ -789,6 +792,8 @@ class EnphaseCoordinator(
         config_entry: EnphaseConfigEntry | None = None,
         *,
         cookie_header_session: aiohttp.ClientSession | None = None,
+        session: aiohttp.ClientSession | None = None,
+        guarded_read_session: aiohttp.ClientSession | None = None,
     ) -> None:
         self.hass = hass
         self._integration_snapshot: IntegrationSnapshot | None = None
@@ -910,12 +915,13 @@ class EnphaseCoordinator(
         self._runtime_stopped = False
         self._entry_background_tasks = set()
         self.client = EnphaseEVClient(
-            async_get_clientsession(hass),
+            async_get_clientsession(hass) if session is None else session,
             self.site_id,
             self._tokens.access_token,
             self._tokens.cookie,
             timeout=timeout,
             cookie_header_session=cookie_header_session,
+            guarded_read_session=guarded_read_session,
         )
         set_reauth_cb = getattr(self.client, "set_reauth_callback", None)
         if callable(set_reauth_cb):
@@ -1037,6 +1043,7 @@ class EnphaseCoordinator(
             client_provider=lambda: self.client,
             site_id=self.site_id,
             logger=_LOGGER,
+            runtime_active=lambda: self.runtime_active,
             summary_invalidator=self.summary.invalidate,
             hems_auth_skip=lambda endpoint: self._skip_hems_polling_due_to_auth_circuit(
                 endpoint=endpoint
@@ -1151,6 +1158,7 @@ class EnphaseCoordinator(
         """Retire this lifecycle before awaited shutdown steps release control."""
 
         self._runtime_stopped = True
+        self.auth_refresh_runtime.cancel_pending_refresh()
         for name, method in (("summary", "stop"), ("evse_timeseries", "stop")):
             retire = getattr(self.__dict__.get(name), method, None)
             if callable(retire):
@@ -1371,6 +1379,7 @@ class EnphaseCoordinator(
                 client_provider=lambda: self.client,
                 site_id=str(getattr(self, "site_id", "")),
                 logger=_LOGGER,
+                runtime_active=lambda: self.runtime_active,
                 summary_invalidator=getattr(
                     getattr(self, "summary", None), "invalidate", None
                 ),
@@ -2272,11 +2281,11 @@ class EnphaseCoordinator(
                 self._streaming_stop_task.cancel()
                 cancelled_tasks.append(self._streaming_stop_task)
             self._streaming_stop_task = None
-        if self._auth_refresh_task is not None:
-            if not _task_done(self._auth_refresh_task):
-                self._auth_refresh_task.cancel()
-                cancelled_tasks.append(self._auth_refresh_task)
-            self._auth_refresh_task = None
+        auth_refresh = self.auth_refresh_runtime
+        auth_task = auth_refresh.cancel_pending_refresh()
+        if auth_task is not None:
+            auth_refresh.clear_auth_refresh_task(auth_task)
+            cancelled_tasks.append(auth_task)
         self._clear_backoff_timer()
         status_health = self.__dict__.get("_evse_status_health")
         if status_health is not None:
@@ -3358,7 +3367,9 @@ class EnphaseCoordinator(
         site_energy_start = time.monotonic()
         try:
             await self.energy._async_refresh_site_energy()
-        except Exception:
+            if not self.runtime_active:
+                raise asyncio.CancelledError
+        except (asyncio.CancelledError, Exception):
             await self._async_cancel_first_refresh_followups(context)
             raise
         self.discovery_snapshot.sync_site_energy_discovery_state()
@@ -3376,6 +3387,8 @@ class EnphaseCoordinator(
                     phase_timings,
                     plan=followup_plan,
                 )
+        if not self.runtime_active:
+            raise asyncio.CancelledError
         self._clear_auth_refresh_rejection_state_if_unchanged(context)
         if not status_degraded:
             self._prune_runtime_caches(active_serials=(), keep_day_keys=())
@@ -3452,6 +3465,8 @@ class EnphaseCoordinator(
                     context.phase_timings,
                     plan=followup_plan,
                 )
+        if not self.runtime_active:
+            raise asyncio.CancelledError
         self._clear_auth_refresh_rejection_state_if_unchanged(context)
 
     def _first_refresh_followup_calls(
@@ -3569,6 +3584,8 @@ class EnphaseCoordinator(
                 context.phase_timings,
                 plan=post_session_plan,
             )
+        if not self.runtime_active:
+            raise asyncio.CancelledError
         try:
             self.evse_timeseries.merge_charger_payloads(
                 out, day_local=day_local_default
@@ -3587,6 +3604,8 @@ class EnphaseCoordinator(
                 context.phase_timings,
                 plan=heatpump_plan,
             )
+        if not self.runtime_active:
+            raise asyncio.CancelledError
 
     def _apply_refresh_polling_interval(self, polling_state: dict[str, object]) -> None:
         if self.config_entry is None:
@@ -3882,6 +3901,12 @@ class EnphaseCoordinator(
             finally:
                 self._record_refresh_pipeline_performance(context, outcome=outcome)
 
+    async def _async_read_core_status(self) -> dict[str, Any]:
+        """Guard charger status across transport admission and result handling."""
+
+        with runtime_read_scope(lambda: self.runtime_active):
+            return await self.client.status()
+
     async def _async_update_data_impl(
         self,
         context: RefreshPipelineContext,
@@ -3926,7 +3951,7 @@ class EnphaseCoordinator(
         try:
             status_control_tokens = self.control_updates.read_tokens()
             status_start = time.monotonic()
-            data = await self.client.status()
+            data = await self._async_read_core_status()
             phase_timings["status_s"] = round(time.monotonic() - status_start, 3)
             if isinstance(data, dict):
                 fresh_status_payload = dict(data)
@@ -6088,9 +6113,14 @@ class EnphaseCoordinator(
     async def _handle_client_unauthorized(self) -> bool:
         """Handle client Unauthorized responses and retry when possible."""
 
+        if not self.runtime_active:
+            return False
         self._last_error = "unauthorized"
         self._unauth_errors += 1
-        if await self._attempt_auto_refresh():
+        refreshed = await self._attempt_auto_refresh()
+        if not self.runtime_active:
+            return False
+        if refreshed:
             self._unauth_errors = 0
             self.diagnostics.clear_reauth_issue()
             return True

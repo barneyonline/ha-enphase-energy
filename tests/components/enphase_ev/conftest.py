@@ -125,6 +125,17 @@ def _seed_default_type_buckets(coord: Any) -> None:
     setter(grouped, list(grouped))
 
 
+@pytest.fixture
+def loopback_sockets():
+    """Allow only loopback connections for real HTTP transport regression tests."""
+    pytest_socket.enable_socket()
+    pytest_socket.socket_allow_hosts(["127.0.0.1"], allow_unix_socket=True)
+    try:
+        yield
+    finally:
+        pytest_socket.disable_socket(allow_unix_socket=True)
+
+
 @pytest.hookimpl(tryfirst=True)
 def pytest_runtest_setup(item) -> None:
     """Reset socket monkeypatching before HA plugin reapplies restrictions.
@@ -322,7 +333,7 @@ def mock_issue_registry(monkeypatch) -> SimpleNamespace:
 @pytest.fixture(autouse=True)
 def mock_clientsession(monkeypatch):
     """Stub out aiohttp client session factory used by the integration."""
-    session = object()
+    session = SimpleNamespace(cookie_jar=SimpleNamespace(filter_cookies=lambda _: {}))
 
     class StatelessSession:
         closed = False
@@ -331,7 +342,15 @@ def mock_clientsession(monkeypatch):
             self.closed = True
 
     stateless_session = StatelessSession()
+    lifetime_session = StatelessSession()
     create_calls = []
+
+    def create_session(*args, **kwargs):
+        create_calls.append((args, kwargs))
+        if kwargs.get("cookie_jar") is session.cookie_jar:
+            return lifetime_session
+        return stateless_session
+
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.async_get_clientsession",
         lambda *args, **kwargs: session,
@@ -349,8 +368,7 @@ def mock_clientsession(monkeypatch):
     )
     monkeypatch.setattr(
         "custom_components.enphase_ev.async_create_clientsession",
-        lambda *args, **kwargs: create_calls.append((args, kwargs))
-        or stateless_session,
+        create_session,
     )
     return SimpleNamespace(
         shared=session,

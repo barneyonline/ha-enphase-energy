@@ -18,7 +18,12 @@ import aiohttp
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.util import dt as dt_util
 
-from .api import AuthSettingsUnavailable, ChargerConfigUnavailable, SchedulerUnavailable
+from .api import (
+    AuthSettingsUnavailable,
+    ChargerConfigUnavailable,
+    SchedulerUnavailable,
+    runtime_read_scope,
+)
 from .ev_battery_preferences import preferences_for
 from .control_updates import control_readback, tracked_control
 from .const import (
@@ -1662,7 +1667,8 @@ class EvseRuntime:
             return None
 
         try:
-            settings = await coord.client.charger_config(sn, requested)
+            with runtime_read_scope(lambda: coord.runtime_active):
+                settings = await coord.client.charger_config(sn, requested)
         except Exception:
             self.state._charger_config_backoff_until[sn] = (
                 time.monotonic() + CHARGER_CONFIG_FAILURE_BACKOFF_S

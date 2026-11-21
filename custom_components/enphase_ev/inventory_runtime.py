@@ -19,7 +19,7 @@ from homeassistant.core import callback
 from homeassistant.util import dt as dt_util
 
 from .array_capacity import async_refresh_array_capacity
-from .api import OptionalEndpointUnavailable
+from .api import OptionalEndpointUnavailable, runtime_read_scope
 from .const import DEFAULT_FAST_POLL_INTERVAL, DOMAIN
 from .device_types import (
     member_is_retired as device_member_is_retired,
@@ -431,7 +431,8 @@ class InventoryRuntime:
         )
         now = time.monotonic()
         try:
-            payload = await fetcher()
+            with runtime_read_scope(lambda: self.coordinator.runtime_active):
+                payload = await fetcher()
         except Exception as err:  # noqa: BLE001
             self._set_shared_state_attr(
                 "_gateway_phase_map_failure_backoff_until",
@@ -927,6 +928,8 @@ class InventoryRuntime:
         if self._topology_refresh_suppressed > 0 or not self._topology_refresh_pending:
             return False
         self._topology_refresh_pending = False
+        if not self.coordinator.runtime_active:
+            return False
         override = getattr(self.coordinator, "__dict__", {}).get(
             "_refresh_cached_topology"
         )
@@ -2138,7 +2141,10 @@ class InventoryRuntime:
         if not callable(fetcher):
             return
         try:
-            payload = await self._async_call_refreshable_fetcher(fetcher, force=force)
+            with runtime_read_scope(lambda: self.coordinator.runtime_active):
+                payload = await self._async_call_refreshable_fetcher(
+                    fetcher, force=force
+                )
         except Exception as err:  # noqa: BLE001
             self.health.note_endpoint_family_failure(family, err)
             return
