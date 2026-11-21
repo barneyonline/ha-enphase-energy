@@ -6,7 +6,7 @@ import base64
 import asyncio
 import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import aiohttp
 import pytest
@@ -135,6 +135,293 @@ async def test_enlighten_request_timeout_includes_limiter_queue(monkeypatch) -> 
         )
 
     assert session.calls == []
+
+
+@pytest.mark.parametrize("endpoint", ["lifetime", "status"])
+@pytest.mark.parametrize("retired", [False, True])
+@pytest.mark.parametrize("replay", ["redirect", "disconnect", "response"])
+async def test_guarded_http_replay_checks_entry_lifecycle(
+    coordinator_factory, monkeypatch, loopback_sockets, endpoint, replay, retired
+):
+    from aiohttp import web
+    from aiohttp.test_utils import TestServer
+
+    from custom_components.enphase_ev.api_client import dashboard_surface, evse_surface
+
+    coord = coordinator_factory()
+    entered, release = asyncio.Event(), asyncio.Event()
+    dispatched = []
+    middleware_calls = []
+
+    async def observe_default(request, handler):
+        middleware_calls.append("default")
+        response = await handler(request)
+        if replay == "response":
+            entered.set()
+            await release.wait()
+        return response
+
+    async def observe_override(request, handler):
+        middleware_calls.append("override")
+        return await handler(request)
+
+    async def respond(request):
+        dispatched.append(request.path)
+        if len(dispatched) == 1 and replay != "response":
+            entered.set()
+            await release.wait()
+            if replay == "redirect":
+                response = web.Response(status=302, headers={"Location": "/redirected"})
+                response.set_cookie("refresh_fixture", "cookie")
+                return response
+            request.transport.close()
+        response = web.json_response(
+            {
+                "evChargerData": [],
+                "consumption": [3000],
+                "evse": [100],
+                "heatpump": [100],
+                "water_heater": [100],
+            }
+        )
+        if replay == "response":
+            response.set_cookie("refresh_fixture", "cookie")
+        return response
+
+    app = web.Application()
+    app.router.add_get("/{path:.*}", respond)
+    async with (
+        TestServer(app) as server,
+        aiohttp.ClientSession(
+            cookie_jar=aiohttp.CookieJar(unsafe=True),
+            middlewares=(observe_default,),
+        ) as session,
+    ):
+        surface = dashboard_surface if endpoint == "lifetime" else evse_surface
+        monkeypatch.setattr(surface, "BASE_URL", str(server.make_url("/")).rstrip("/"))
+        monkeypatch.setattr(coord.client, "_s", session)
+        expected_middleware = "default"
+        if replay == "disconnect":
+            expected_middleware = "override"
+            original_json = coord.client._json
+
+            async def request_json(method, url, **kwargs):
+                return await original_json(
+                    method, url, middlewares=(observe_override,), **kwargs
+                )
+
+            monkeypatch.setattr(coord.client, "_json", request_json)
+
+        read = (
+            coord.energy._async_refresh_site_energy()
+            if endpoint == "lifetime"
+            else coord._async_read_core_status()
+        )
+        refresh = asyncio.create_task(read)
+        try:
+            await asyncio.wait_for(entered.wait(), timeout=1)
+            if retired:
+                coord.mark_runtime_stopped()
+        finally:
+            release.set()
+            (result,) = await asyncio.gather(refresh, return_exceptions=True)
+        if replay != "disconnect":
+            cookies = session.cookie_jar.filter_cookies(server.make_url("/"))
+            assert ("refresh_fixture" in cookies) is not retired
+
+    assert set(middleware_calls) == {expected_middleware}
+    assert len(dispatched) == (1 if retired or replay == "response" else 2)
+    if not retired:
+        if replay != "response":
+            assert dispatched[1] == (
+                "/redirected" if replay == "redirect" else dispatched[0]
+            )
+        if endpoint == "lifetime":
+            assert coord.energy.site_energy["consumption"].value_kwh == 3
+        else:
+            assert result["evChargerData"] == []
+    elif endpoint == "status":
+        assert isinstance(result, asyncio.CancelledError)
+
+
+@pytest.mark.parametrize(
+    "superseded",
+    ["active", "retired", "invalidated", "credentials", "closed", "retired_status"],
+)
+async def test_guarded_read_checks_validity_after_connector_queue(
+    coordinator_factory, monkeypatch, loopback_sockets, superseded
+):
+    from aiohttp import web
+    from aiohttp.test_utils import TestServer
+
+    from custom_components.enphase_ev.api_client import dashboard_surface, evse_surface
+    from custom_components.enphase_ev.api_client.common import guarded_read_trace
+
+    coord = coordinator_factory()
+    blocked, queued, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    dispatched = []
+
+    async def hold_connection(_request):
+        blocked.set()
+        await release.wait()
+        return web.Response()
+
+    async def respond(request):
+        dispatched.append((request.path, request.cookies.get("shared_fixture")))
+        return web.json_response(
+            {
+                "consumption": [3000],
+                "evse": [100],
+                "heatpump": [100],
+                "water_heater": [100],
+            }
+        )
+
+    async def mark_queued(*_args):
+        queued.set()
+
+    app = web.Application()
+    app.router.add_get("/hold", hold_connection)
+    app.router.add_get("/{path:.*}", respond)
+    observe_queue = aiohttp.TraceConfig()
+    observe_queue.on_connection_queued_start.append(mark_queued)
+    async with (
+        TestServer(app) as server,
+        aiohttp.ClientSession(
+            connector=aiohttp.TCPConnector(limit=1),
+            cookie_jar=aiohttp.CookieJar(unsafe=True),
+            trace_configs=[observe_queue],
+        ) as session,
+        aiohttp.ClientSession(
+            connector=session.connector,
+            connector_owner=False,
+            cookie_jar=session.cookie_jar,
+            trace_configs=[observe_queue, guarded_read_trace()],
+        ) as guarded,
+    ):
+        surface = evse_surface if superseded == "retired_status" else dashboard_surface
+        monkeypatch.setattr(surface, "BASE_URL", str(server.make_url("/")).rstrip("/"))
+        monkeypatch.setattr(coord.client, "_s", session)
+        monkeypatch.setattr(coord.client, "_guarded_read_session", guarded)
+        session.cookie_jar.update_cookies(
+            {"shared_fixture": "original"}, response_url=server.make_url("/")
+        )
+        if superseded == "credentials":
+            monkeypatch.setattr(
+                coord.client,
+                "lifetime_energy",
+                AsyncMock(return_value={"consumption": [3000]}),
+            )
+
+        async def use_connection():
+            async with session.get(server.make_url("/hold")):
+                pass
+
+        blocker = asyncio.create_task(use_connection())
+        await asyncio.wait_for(blocked.wait(), timeout=1)
+        read = (
+            coord._async_read_core_status()
+            if superseded == "retired_status"
+            else coord.energy._async_refresh_site_energy()
+        )
+        refresh = asyncio.create_task(read)
+        try:
+            await asyncio.wait_for(queued.wait(), timeout=1)
+            if superseded in {"retired", "closed", "retired_status"}:
+                coord.mark_runtime_stopped()
+                if superseded == "closed":
+                    await asyncio.wait_for(coord.async_close(), timeout=1)
+                    assert guarded.closed
+                    assert not session.closed
+            elif superseded == "invalidated":
+                coord.energy._invalidate_site_energy_cache()
+            elif superseded == "credentials":
+                coord.client.update_credentials(cookie="session=replacement")
+        finally:
+            release.set()
+            _, result = await asyncio.gather(blocker, refresh, return_exceptions=True)
+        if superseded in {"closed", "retired_status"}:
+            assert isinstance(result, asyncio.CancelledError)
+        else:
+            assert result is None
+        await asyncio.wait_for(use_connection(), timeout=1)
+
+    if superseded == "active":
+        [(path, cookie)] = dispatched
+        assert path.endswith("/lifetime_energy")
+        assert cookie == "original"
+        assert coord.energy.site_energy["consumption"].value_kwh == 3
+    else:
+        assert not dispatched
+        if superseded == "credentials":
+            assert coord.energy.site_energy["consumption"].value_kwh == 3
+
+
+@pytest.mark.parametrize("already_cancelling", [False, True])
+async def test_cancelled_close_still_drains_and_detaches_entry_sessions(
+    coordinator_factory, monkeypatch, already_cancelling
+):
+    from custom_components.enphase_ev.api import guarded_read_scope
+
+    coord = coordinator_factory()
+    entered, draining, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    close_started = asyncio.Event()
+    cookie_session, lifetime_session = (
+        SimpleNamespace(closed=False, detach=Mock()),
+        SimpleNamespace(closed=False, detach=Mock()),
+    )
+    monkeypatch.setattr(coord.client, "_cookie_header_session", cookie_session)
+    monkeypatch.setattr(coord.client, "_guarded_read_session", lifetime_session)
+    close_sessions = coord.client._async_close_sessions
+
+    async def observe_close():
+        close_started.set()
+        await close_sessions()
+
+    monkeypatch.setattr(coord.client, "_async_close_sessions", observe_close)
+
+    async def hold_request():
+        with guarded_read_scope(lambda: coord.runtime_active):
+            async with coord.client._request_session() as session:
+                assert session is lifetime_session
+                entered.set()
+                try:
+                    await asyncio.Future()
+                except asyncio.CancelledError:
+                    draining.set()
+                    await release.wait()
+                    raise
+
+    request = asyncio.create_task(hold_request())
+    await asyncio.wait_for(entered.wait(), timeout=1)
+    closes = []
+    try:
+        if already_cancelling:
+            request.cancel()
+            await asyncio.wait_for(draining.wait(), timeout=1)
+        close = asyncio.create_task(coord.async_close())
+        closes.append(close)
+        await asyncio.wait_for(close_started.wait(), timeout=1)
+        await asyncio.wait_for(draining.wait(), timeout=1)
+        assert request.cancelling() == 1
+        close.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await close
+
+        retry = asyncio.create_task(coord.async_close())
+        closes.append(retry)
+        await asyncio.sleep(0)
+        assert not retry.done()
+        cookie_session.detach.assert_not_called()
+        lifetime_session.detach.assert_not_called()
+    finally:
+        release.set()
+        results = await asyncio.gather(request, *closes, return_exceptions=True)
+
+    assert isinstance(results[0], asyncio.CancelledError)
+    assert results[-1] is None
+    cookie_session.detach.assert_called_once_with()
+    lifetime_session.detach.assert_called_once_with()
 
 
 @pytest.mark.asyncio

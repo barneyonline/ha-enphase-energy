@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from builtins import ExceptionGroup
+from collections.abc import Callable
 from datetime import date, datetime, timezone
 from functools import partial
 from typing import TYPE_CHECKING, Any, cast
@@ -45,6 +46,7 @@ from .common import (
     _SYSTEM_EVENTS_PAGE_SIZE,
     JsonDict,
     _system_dashboard_query_type,
+    check_enlighten_read_current,
     is_evse_timeseries_unavailable_error,
     is_session_history_unavailable_error,
     is_site_energy_unavailable_error,
@@ -222,6 +224,7 @@ async def lifetime_energy(self: EnphaseEVClient) -> JsonDict | None:
         if is_site_energy_unavailable_error(err.message, err.status, url):
             raise SiteEnergyUnavailable(str(err)) from err
         raise
+    check_enlighten_read_current()
     return self._normalize_lifetime_energy_payload(data)
 
 
@@ -375,6 +378,19 @@ async def evse_timeseries_lifetime_energy(
     return self._normalize_evse_timeseries_payload(data, daily=False)
 
 
+def hems_lifetime_read_guard(
+    self: EnphaseEVClient, is_current: Callable[[], bool]
+) -> Callable[[], bool]:
+    """Keep optional HEMS reads tied to their original credentials."""
+
+    revision = self.credential_revision
+
+    def read_is_current() -> bool:
+        return is_current() and self.credential_revision == revision
+
+    return read_is_current
+
+
 async def hems_consumption_lifetime(self: EnphaseEVClient) -> JsonDict | None:
     """Return HEMS lifetime consumption buckets when available.
 
@@ -390,7 +406,6 @@ async def hems_consumption_lifetime(self: EnphaseEVClient) -> JsonDict | None:
             log_invalid_payload=False,
             allow_reauth=False,
         )
-        self._hems_site_supported = True
     except Unauthorized:
         _LOGGER.debug(
             "HEMS lifetime endpoint unavailable for site %s (unauthorized)",
@@ -415,8 +430,10 @@ async def hems_consumption_lifetime(self: EnphaseEVClient) -> JsonDict | None:
                 err.status,
             )
             raise
-        if err.status == 404 or _is_hems_invalid_site_error(err):
-            if _is_hems_invalid_site_error(err):
+        invalid_site = _is_hems_invalid_site_error(err)
+        if err.status == 404 or invalid_site:
+            if invalid_site:
+                check_enlighten_read_current()
                 self._hems_site_supported = False
             _LOGGER.debug(
                 "HEMS lifetime endpoint unavailable for site %s (status=%s)",
@@ -425,6 +442,8 @@ async def hems_consumption_lifetime(self: EnphaseEVClient) -> JsonDict | None:
             )
             return None
         raise
+    check_enlighten_read_current()
+    self._hems_site_supported = True
     return self._normalize_lifetime_energy_payload(data)
 
 

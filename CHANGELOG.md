@@ -14,11 +14,13 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug fixes
 
-- None
+- Keep empty lifetime-energy responses on the normal retry interval while preserving the age of the last accepted data.
+- Finish unloading the config entry after cancellation or a cleanup error so Home Assistant can load it again.
+- Stop pending charger status, startup EVSE, and device inventory reads after unload. Discard late results and errors before they can change caches, auth Repairs, or retry timers.
 
 ### 🔧 Improvements
 
-- None
+- Reuse per-channel lifetime-energy totals across calculations.
 
 ### 🔄 Other changes
 

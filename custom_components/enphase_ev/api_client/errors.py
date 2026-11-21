@@ -16,6 +16,10 @@ from ..log_redaction import redact_text
 _ENPHASE_ERROR_STATUS_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
 
 
+class EnlightenReadSuperseded(Exception):
+    """An in-flight read no longer belongs to the active acquisition."""
+
+
 class Unauthorized(Exception):
     pass
 

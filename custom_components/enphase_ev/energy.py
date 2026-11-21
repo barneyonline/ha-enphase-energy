@@ -4,16 +4,17 @@ import asyncio
 import logging
 import math
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from datetime import timezone as _tz
-from typing import Callable, Iterable, Protocol
+from typing import Callable, Iterable, Protocol, runtime_checkable
 
 import aiohttp
 from homeassistant.const import UnitOfPower
 from homeassistant.util import dt as dt_util
 
-from .api import SiteEnergyUnavailable
+from .api import SiteEnergyUnavailable, guarded_read_scope
 from .cloud_retry import retry_after_delay, transient_backoff_delay
 from .log_redaction import redact_site_id, redact_text
 
@@ -36,6 +37,15 @@ HEMS_DEVICE_METADATA_KEY = "_hems_device_metadata"
 
 class EnergyClient(Protocol):
     async def lifetime_energy(self) -> dict[str, object] | None: ...
+
+
+@runtime_checkable
+class HemsLifetimeCredentialGuard(Protocol):
+    """Optional credential binding for providers that own a HEMS session."""
+
+    def hems_lifetime_read_guard(
+        self, is_current: Callable[[], bool]
+    ) -> Callable[[], bool]: ...
 
 
 @dataclass(slots=True)
@@ -73,6 +83,7 @@ class EnergyManager:
         client_provider: Callable[[], EnergyClient],
         site_id: str,
         logger: logging.Logger,
+        runtime_active: Callable[[], bool] | None = None,
         summary_invalidator: Callable[[], None] | None = None,
         hems_auth_skip: Callable[[str], bool] | None = None,
         hems_auth_failure: Callable[[BaseException, str], bool] | None = None,
@@ -81,6 +92,9 @@ class EnergyManager:
         self._client_provider = client_provider
         self.site_id = site_id
         self._logger = logger
+        self._runtime_active = (
+            runtime_active if runtime_active is not None else (lambda: True)
+        )
         self._summary_invalidator = summary_invalidator
         self._hems_auth_skip = hems_auth_skip
         self._hems_auth_failure = hems_auth_failure
@@ -100,8 +114,9 @@ class EnergyManager:
         self._site_energy_last_reset: dict[str, str | None] = {}
         self._site_energy_force_refresh = False
         self._site_energy_refresh_lock = asyncio.Lock()
-        self._site_energy_completion_revision = 0
-        self._site_energy_invalidation_revision = 0
+        self._site_energy_completed_attempts = 0
+        self._site_energy_last_completed_generation = -1
+        self._site_energy_cache_generation = 0
         self._lifetime_guard: dict[str, LifetimeGuardState] = {}
         self._service_available = True
         self._service_failures = 0
@@ -195,16 +210,16 @@ class EnergyManager:
 
     def _invalidate_site_energy_cache(self) -> None:
         """Drop the cached site energy payload."""
-        self._site_energy_invalidation_revision += 1
+        self._site_energy_cache_generation += 1
         self._site_energy_cache_ts = None
         self._site_energy_refresh_ts = None
 
     def site_energy_refresh_due(self, *, force: bool = False) -> bool:
         """Return True when the site-energy cache should be refreshed."""
 
-        force_refresh = force or self._site_energy_force_refresh
-        if self._service_backoff_active():
+        if not self._runtime_active() or self._service_backoff_active():
             return False
+        force_refresh = force or self._site_energy_force_refresh
         now_mono = time.monotonic()
         if (
             not force_refresh
@@ -347,10 +362,8 @@ class EnergyManager:
                 return None
         return None
 
-    def _site_energy_interval_hours(
-        self, payload: dict[str, object] | None
-    ) -> tuple[float | None, float | None]:
-        """Extract reporting interval (minutes -> hours) from payload; defaults to 5 min."""
+    def _site_energy_interval_minutes(self, payload: dict[str, object] | None) -> float:
+        """Read the reporting interval in minutes, defaulting to five."""
         if not isinstance(payload, dict):
             payload = {}
         interval_raw = payload.get("interval_minutes")
@@ -358,10 +371,8 @@ class EnergyManager:
             interval_raw = payload.get("interval")
         minutes = self._coerce_energy_value(interval_raw)
         if minutes is None or not math.isfinite(minutes) or minutes <= 0:
-            minutes = SITE_ENERGY_DEFAULT_INTERVAL_MIN
-        minutes_float = float(minutes)
-        hours = minutes_float / 60.0
-        return hours, minutes_float
+            return SITE_ENERGY_DEFAULT_INTERVAL_MIN
+        return minutes
 
     def _coerce_lifetime_bucket(self, value: object) -> float | None:
         numeric = self._coerce_energy_value(value)
@@ -371,9 +382,7 @@ class EnergyManager:
             else None
         )
 
-    def _sum_energy_buckets(
-        self, values: object, _interval_hours: float | None
-    ) -> tuple[float, int]:
+    def _sum_energy_buckets(self, values: object) -> tuple[float, int]:
         """Return total Wh and bucket count for a field.
 
         The lifetime_energy endpoint returns bucket values already expressed in Wh.
@@ -409,18 +418,15 @@ class EnergyManager:
 
     def _sum_energy_fields(
         self,
-        payload: dict[str, object],
+        bucket_total: Callable[[str], tuple[float, int]],
         fields: Iterable[str],
-        interval_hours: float | None,
     ) -> tuple[float, int, list[str]]:
         """Aggregate Wh totals across multiple fields."""
         total = 0.0
         max_count = 0
         used: list[str] = []
         for field in fields:
-            field_total, field_count = self._sum_energy_buckets(
-                payload.get(field), interval_hours
-            )
+            field_total, field_count = bucket_total(field)
             if field_count <= 0 or field_total <= 0:
                 continue
             total += field_total
@@ -430,18 +436,13 @@ class EnergyManager:
 
     def _diff_energy_fields(
         self,
-        payload: dict[str, object],
+        bucket_total: Callable[[str], tuple[float, int]],
         minuend: str,
         subtrahend: str,
-        interval_hours: float | None,
     ) -> tuple[float, int, list[str]]:
         """Derive a flow by subtracting one field from another."""
-        pos_total, pos_count = self._sum_energy_buckets(
-            payload.get(minuend), interval_hours
-        )
-        neg_total, neg_count = self._sum_energy_buckets(
-            payload.get(subtrahend), interval_hours
-        )
+        pos_total, pos_count = bucket_total(minuend)
+        neg_total, neg_count = bucket_total(subtrahend)
         if pos_total <= 0 or pos_count <= 0:
             return 0.0, 0, []
         if neg_count <= 0:
@@ -456,16 +457,13 @@ class EnergyManager:
 
     def _diff_energy_fields_multi(
         self,
-        payload: dict[str, object],
+        bucket_total: Callable[[str], tuple[float, int]],
         minuend: str,
         subtrahends: Iterable[str],
-        interval_hours: float | None,
     ) -> tuple[float, int, list[str]]:
         """Derive a flow by subtracting multiple fields from another."""
 
-        pos_total, pos_count = self._sum_energy_buckets(
-            payload.get(minuend), interval_hours
-        )
+        pos_total, pos_count = bucket_total(minuend)
         if pos_total <= 0 or pos_count <= 0:
             return 0.0, 0, []
 
@@ -473,9 +471,7 @@ class EnergyManager:
         neg_counts: list[int] = []
         used_fields: list[str] = []
         for field in subtrahends:
-            field_total, field_count = self._sum_energy_buckets(
-                payload.get(field), interval_hours
-            )
+            field_total, field_count = bucket_total(field)
             if field_count <= 0:
                 continue
             neg_total += field_total
@@ -602,9 +598,13 @@ class EnergyManager:
         return last, None
 
     def _aggregate_site_energy(
-        self, payload: dict[str, object] | None, *, apply_guards: bool = True
+        self,
+        payload: dict[str, object] | None,
+        *,
+        apply_guards: bool = True,
+        device_totals: Mapping[str, tuple[float, int]] | None = None,
     ) -> tuple[dict[str, SiteEnergyFlow], dict[str, object]] | None:
-        """Aggregate lifetime energy payload into kWh totals."""
+        """Aggregate energy, reusing any totals for this payload's device arrays."""
         if not isinstance(payload, dict):
             return None
 
@@ -616,7 +616,14 @@ class EnergyManager:
         update_pending = payload.get("update_pending")
         prev = self.site_energy or {}
         flows: dict[str, SiteEnergyFlow] = {}
-        interval_hours, interval_minutes = self._site_energy_interval_hours(payload)
+        interval_minutes = self._site_energy_interval_minutes(payload)
+        totals = dict(device_totals or {})
+
+        def bucket_total(field: str) -> tuple[float, int]:
+            if field not in totals:
+                totals[field] = self._sum_energy_buckets(payload.get(field))
+            return totals[field]
+
         source_unit = "Wh"
         hems_device_channels_raw = payload.get(HEMS_DEVICE_CHANNELS_META_KEY)
         hems_device_channels = (
@@ -643,7 +650,7 @@ class EnergyManager:
                 hems_metadata.get("last_report_date")
             )
             hems_pending = hems_metadata.get("update_pending")
-            _, hems_interval_minutes = self._site_energy_interval_hours(hems_metadata)
+            hems_interval_minutes = self._site_energy_interval_minutes(hems_metadata)
 
         def _store(
             flow: str,
@@ -740,15 +747,11 @@ class EnergyManager:
                 self._site_energy_last_reset[flow] = last_reset
 
         # Solar production
-        prod_total, prod_count = self._sum_energy_buckets(
-            payload.get("production"), interval_hours
-        )
+        prod_total, prod_count = bucket_total("production")
         _store("solar_production", prod_total, ["production"], prod_count)
 
         # Site consumption (total energy consumed)
-        cons_total, cons_count = self._sum_energy_buckets(
-            payload.get("consumption"), interval_hours
-        )
+        cons_total, cons_count = bucket_total("consumption")
         cons_latest, cons_previous, cons_raw_count = self._latest_energy_buckets(
             payload.get("consumption")
         )
@@ -765,9 +768,7 @@ class EnergyManager:
         )
 
         # EVSE lifetime charging energy when the backend provides a dedicated flow.
-        evse_total, evse_count = self._sum_energy_buckets(
-            payload.get("evse"), interval_hours
-        )
+        evse_total, evse_count = bucket_total("evse")
         _store(
             "evse_charging",
             evse_total,
@@ -777,9 +778,7 @@ class EnergyManager:
         )
 
         # Heat pump lifetime consumption.
-        heat_pump_total, heat_pump_count = self._sum_energy_buckets(
-            payload.get("heatpump"), interval_hours
-        )
+        heat_pump_total, heat_pump_count = bucket_total("heatpump")
         _store(
             "heat_pump",
             heat_pump_total,
@@ -789,9 +788,7 @@ class EnergyManager:
         )
 
         # Water heater lifetime consumption.
-        water_heater_total, water_heater_count = self._sum_energy_buckets(
-            payload.get("water_heater"), interval_hours
-        )
+        water_heater_total, water_heater_count = bucket_total("water_heater")
         _store(
             "water_heater",
             water_heater_total,
@@ -801,18 +798,11 @@ class EnergyManager:
         )
 
         # Grid import (total site import).
-        direct_import_total, direct_import_count = self._sum_energy_buckets(
-            payload.get("import"), interval_hours
-        )
-        direct_grid_home_total, direct_grid_home_count = self._sum_energy_buckets(
-            payload.get("grid_home"), interval_hours
-        )
+        direct_import_total, direct_import_count = bucket_total("import")
+        direct_grid_home_total, direct_grid_home_count = bucket_total("grid_home")
         derived_grid_home_total, derived_grid_home_count, derived_grid_home_fields = (
             self._diff_energy_fields_multi(
-                payload,
-                "consumption",
-                ("solar_home", "battery_home"),
-                interval_hours,
+                bucket_total, "consumption", ("solar_home", "battery_home")
             )
         )
         grid_home_total, grid_home_count, grid_home_fields = (
@@ -826,14 +816,14 @@ class EnergyManager:
             )
         )
 
-        direct_grid_battery_total, direct_grid_battery_count = self._sum_energy_buckets(
-            payload.get("grid_battery"), interval_hours
+        direct_grid_battery_total, direct_grid_battery_count = bucket_total(
+            "grid_battery"
         )
         (
             derived_grid_battery_total,
             derived_grid_battery_count,
             derived_grid_battery_fields,
-        ) = self._diff_energy_fields(payload, "charge", "solar_battery", interval_hours)
+        ) = self._diff_energy_fields(bucket_total, "charge", "solar_battery")
         grid_battery_total, grid_battery_count, grid_battery_fields = (
             self._prefer_direct_energy_source(
                 direct_total=direct_grid_battery_total,
@@ -880,9 +870,7 @@ class EnergyManager:
         exp_fields: list[str] = []
         legacy_offset_wh = 0.0
         for field in ("solar_grid", "battery_grid", "generator_grid"):
-            field_total, field_count = self._sum_energy_buckets(
-                payload.get(field), interval_hours
-            )
+            field_total, field_count = bucket_total(field)
             if field_count <= 0:
                 continue
             exp_total += field_total
@@ -901,22 +889,18 @@ class EnergyManager:
             )
 
         # Battery charge (into battery)
-        charge_total, charge_count = self._sum_energy_buckets(
-            payload.get("charge"), interval_hours
-        )
+        charge_total, charge_count = bucket_total("charge")
         if charge_total > 0 and charge_count > 0:
             _store("battery_charge", charge_total, ["charge"], charge_count)
         else:
             charge_total, charge_count, charge_fields = self._sum_energy_fields(
-                payload, ("solar_battery", "grid_battery"), interval_hours
+                bucket_total, ("solar_battery", "grid_battery")
             )
             if charge_total > 0 and charge_fields:
                 _store("battery_charge", charge_total, charge_fields, charge_count)
 
         # Battery discharge (out of battery)
-        discharge_total, discharge_count = self._sum_energy_buckets(
-            payload.get("discharge"), interval_hours
-        )
+        discharge_total, discharge_count = bucket_total("discharge")
         if discharge_total > 0 and discharge_count > 0:
             _store(
                 "battery_discharge",
@@ -926,9 +910,7 @@ class EnergyManager:
             )
         else:
             discharge_total, discharge_count, discharge_fields = (
-                self._sum_energy_fields(
-                    payload, ("battery_home", "battery_grid"), interval_hours
-                )
+                self._sum_energy_fields(bucket_total, ("battery_home", "battery_grid"))
             )
             if discharge_total > 0 and discharge_fields:
                 _store(
@@ -943,7 +925,7 @@ class EnergyManager:
         }
         bucket_lengths = dict(raw_bucket_lengths)
         for channel in DEVICE_LIFETIME_CHANNELS:
-            if self._device_lifetime_channel_has_positive(payload, channel):
+            if bucket_total(channel)[0] > 0:
                 continue
             if channel in hems_device_channels:
                 continue
@@ -962,58 +944,26 @@ class EnergyManager:
         }
         return flows, meta
 
-    def _lifetime_channel_missing(
-        self, payload: dict[str, object], channel: str
-    ) -> bool:
-        values = payload.get(channel)
-        if not isinstance(values, list) or len(values) == 0:
-            return True
-        # Lists containing only None/non-numeric/negative values are treated as missing.
-        for value in values:
-            if self._coerce_lifetime_bucket(value) is not None:
-                return False
-        return True
-
-    def _device_lifetime_channel_missing(
-        self, payload: dict[str, object], channel: str
-    ) -> bool:
-        """Treat zero-only device arrays as missing so HEMS can fill them."""
-        return not self._device_lifetime_channel_has_positive(payload, channel)
-
-    def _device_lifetime_channel_has_positive(
-        self, payload: dict[str, object], channel: str
-    ) -> bool:
-        """Return True when a device channel contains a positive numeric sample."""
-
-        values = payload.get(channel)
-        if not isinstance(values, list) or len(values) == 0:
-            return False
-        for value in values:
-            numeric = self._coerce_lifetime_bucket(value)
-            if numeric is not None and numeric > 0:
-                return True
-        return False
-
     def _merge_device_lifetime_channels(
         self,
         primary: dict[str, object],
         fallback: dict[str, object],
+        device_totals: dict[str, tuple[float, int]],
     ) -> dict[str, object]:
-        """Merge device lifetime channels from fallback when primary is missing."""
+        """Merge fallback device channels and update their request-local totals."""
 
         merged = dict(primary)
         hems_device_channels: set[str] = set()
         for channel in DEVICE_LIFETIME_CHANNELS:
-            if not self._device_lifetime_channel_missing(merged, channel):
+            if device_totals[channel][0] > 0:
                 continue
             fallback_values = fallback.get(channel)
-            if (
-                isinstance(fallback_values, list)
-                and fallback_values
-                and not self._lifetime_channel_missing(fallback, channel)
-            ):
-                merged[channel] = list(fallback_values)
-                hems_device_channels.add(channel)
+            if isinstance(fallback_values, list):
+                total, count = self._sum_energy_buckets(fallback_values)
+                if count > 0:
+                    device_totals[channel] = (total, count)
+                    merged[channel] = fallback_values
+                    hems_device_channels.add(channel)
 
         if not hems_device_channels:
             return primary
@@ -1064,20 +1014,103 @@ class EnergyManager:
 
     async def _async_refresh_site_energy(self, *, force: bool = False) -> None:
         """Serialize acquisition and coalesce callers waiting on the same read."""
-        completion = self._site_energy_completion_revision
+        if not self._runtime_active():
+            return
+        completed_attempts = self._site_energy_completed_attempts
         async with self._site_energy_refresh_lock:
-            if completion != self._site_energy_completion_revision:
+            if not self._runtime_active():
                 return
-            revision = self._site_energy_invalidation_revision
-            await self._async_refresh_site_energy_locked(force=force)
-            if revision == self._site_energy_invalidation_revision:
-                self._site_energy_completion_revision += 1
+            generation = self._site_energy_cache_generation
+            if (
+                completed_attempts != self._site_energy_completed_attempts
+                and generation == self._site_energy_last_completed_generation
+            ):
+                return
+            attempts = self._site_energy_fetch_attempts
+            reset_confirmation_due = self._site_energy_force_refresh
+            try:
+                await self._async_refresh_site_energy_locked(force=force)
+            except asyncio.CancelledError:
+                if reset_confirmation_due and self._site_energy_read_is_current(
+                    generation
+                ):
+                    self._site_energy_force_refresh = True
+                self._record_site_energy_fetch("cancelled")
+                raise
+            if (
+                self._site_energy_fetch_attempts != attempts
+                and self._site_energy_read_is_current(generation)
+            ):
+                self._site_energy_completed_attempts += 1
+                self._site_energy_last_completed_generation = generation
+
+    def _site_energy_read_is_current(self, generation: int) -> bool:
+        return (
+            self._runtime_active() and generation == self._site_energy_cache_generation
+        )
+
+    def _site_energy_read_superseded(self, generation: int) -> bool:
+        if self._site_energy_read_is_current(generation):
+            return False
+        self._record_site_energy_fetch("superseded")
+        return True
+
+    async def _async_read_hems_lifetime(
+        self, client: EnergyClient, generation: int
+    ) -> dict[str, object] | None:
+        endpoint = "hems_consumption_lifetime"
+        fetch = getattr(client, endpoint, None)
+        if not callable(fetch):
+            return None
+        support = getattr(client, "hems_site_supported", None)
+        if isinstance(support, bool):
+            self._hems_lifetime_supported = support
+        if (
+            self._hems_lifetime_supported is False
+            or self._hems_lifetime_backoff_active()
+            or (self._hems_auth_skip is not None and self._hems_auth_skip(endpoint))
+        ):
+            return None
+
+        def acquisition_is_current() -> bool:
+            return self._site_energy_read_is_current(generation)
+
+        is_current = (
+            client.hems_lifetime_read_guard(acquisition_is_current)
+            if isinstance(client, HemsLifetimeCredentialGuard)
+            else acquisition_is_current
+        )
+
+        try:
+            with guarded_read_scope(is_current):
+                payload = await fetch()
+        except Exception as err:  # noqa: BLE001
+            if not is_current():
+                return None
+            if self._hems_auth_failure is not None:
+                self._hems_auth_failure(err, endpoint)
+            self._note_hems_lifetime_unavailable(err)
+            self._logger.debug(
+                "Optional HEMS lifetime fallback failed for site %s: %s",
+                redact_site_id(self.site_id),
+                redact_text(err, site_ids=(self.site_id,)),
+            )
+            return None
+
+        if not is_current():
+            return None
+        if not isinstance(payload, dict):
+            self._note_hems_lifetime_unavailable(None)
+            return None
+        if self._hems_auth_success is not None:
+            self._hems_auth_success(endpoint)
+        self._mark_hems_lifetime_available()
+        return payload
 
     async def _async_refresh_site_energy_locked(self, *, force: bool) -> None:
         """Refresh lifetime energy cache with TTL enforcement."""
-        revision = self._site_energy_invalidation_revision
+        generation = self._site_energy_cache_generation
         force_refresh = force or self._site_energy_force_refresh
-        self._site_energy_force_refresh = False
         now_mono = time.monotonic()
         if self._service_backoff_active():
             return
@@ -1087,6 +1120,7 @@ class EnergyManager:
             and (now_mono - self._site_energy_refresh_ts) < self._site_energy_cache_ttl
         ):
             return
+        self._site_energy_force_refresh = False
         self._site_energy_fetch_attempts += 1
         self._site_energy_fetch_diagnostics.update(
             attempt_count=self._site_energy_fetch_attempts,
@@ -1095,13 +1129,12 @@ class EnergyManager:
         )
         try:
             client = self._client_provider()
-            payload = await client.lifetime_energy()
-        except asyncio.CancelledError:
-            self._record_site_energy_fetch("cancelled")
-            raise
+            with guarded_read_scope(
+                lambda: self._site_energy_read_is_current(generation)
+            ):
+                payload = await client.lifetime_energy()
         except SiteEnergyUnavailable as err:
-            if revision != self._site_energy_invalidation_revision:
-                self._record_site_energy_fetch("superseded")
+            if self._site_energy_read_superseded(generation):
                 return
             self._record_site_energy_fetch("service_unavailable")
             self._logger.debug(
@@ -1112,8 +1145,7 @@ class EnergyManager:
             self._note_service_unavailable(err)
             return
         except Exception as err:  # noqa: BLE001
-            if revision != self._site_energy_invalidation_revision:
-                self._record_site_energy_fetch("superseded")
+            if self._site_energy_read_superseded(generation):
                 return
             self._record_site_energy_fetch("request_error")
             self._note_service_unavailable(
@@ -1128,6 +1160,8 @@ class EnergyManager:
                 redact_text(err, site_ids=(self.site_id,)),
             )
             return
+        if self._site_energy_read_superseded(generation):
+            return
         raw_source = (
             payload.get("last_report_date") if isinstance(payload, dict) else None
         )
@@ -1138,92 +1172,48 @@ class EnergyManager:
         )
         accept = not malformed_source and progress not in {"future", "regressed"}
         accepted_hems_source = None
+        device_totals = {}
         if accept and isinstance(payload, dict):
-            missing_channels = [
-                channel
+            device_totals = {
+                channel: self._sum_energy_buckets(payload.get(channel))
                 for channel in DEVICE_LIFETIME_CHANNELS
-                if self._device_lifetime_channel_missing(payload, channel)
-            ]
-            if missing_channels:
-                hems_fetcher = getattr(client, "hems_consumption_lifetime", None)
-                if callable(hems_fetcher):
-                    hems_site_supported = getattr(client, "hems_site_supported", None)
-                    if hems_site_supported is True:
-                        self._hems_lifetime_supported = True
-                    elif hems_site_supported is False:
-                        self._hems_lifetime_supported = False
+            }
+            if any(total == 0 for total, _ in device_totals.values()):
+                hems_payload = await self._async_read_hems_lifetime(client, generation)
+                if hems_payload is not None:
+                    raw_hems_source = hems_payload.get("last_report_date")
+                    hems_source = self._parse_site_energy_timestamp(raw_hems_source)
+                    hems_progress = self._site_energy_source_progress(
+                        hems_source, self._hems_lifetime_source_timestamp
+                    )
                     if (
-                        self._hems_lifetime_supported is False
-                        or self._hems_lifetime_backoff_active()
-                        or (
-                            self._hems_auth_skip is not None
-                            and self._hems_auth_skip("hems_consumption_lifetime")
+                        raw_hems_source is None or hems_source is not None
+                    ) and hems_progress not in {"future", "regressed"}:
+                        merged = self._merge_device_lifetime_channels(
+                            payload, hems_payload, device_totals
                         )
-                    ):
-                        hems_payload = None
-                    else:
-                        try:
-                            hems_payload = await hems_fetcher()
-                        except asyncio.CancelledError:
-                            self._record_site_energy_fetch("cancelled")
-                            raise
-                        except Exception as err:  # noqa: BLE001
-                            if self._hems_auth_failure is not None:
-                                self._hems_auth_failure(
-                                    err,
-                                    "hems_consumption_lifetime",
-                                )
-                            self._note_hems_lifetime_unavailable(err)
-                            self._logger.debug(
-                                "Optional HEMS lifetime fallback failed for site %s: %s",
-                                redact_site_id(self.site_id),
-                                redact_text(err, site_ids=(self.site_id,)),
-                            )
-                        else:
-                            if isinstance(hems_payload, dict):
-                                if self._hems_auth_success is not None:
-                                    self._hems_auth_success("hems_consumption_lifetime")
-                                self._mark_hems_lifetime_available()
-                                raw_hems_source = hems_payload.get("last_report_date")
-                                hems_source = self._parse_site_energy_timestamp(
-                                    raw_hems_source
-                                )
-                                hems_progress = self._site_energy_source_progress(
-                                    hems_source, self._hems_lifetime_source_timestamp
-                                )
-                                if (
-                                    raw_hems_source is None or hems_source is not None
-                                ) and hems_progress not in {"future", "regressed"}:
-                                    merged = self._merge_device_lifetime_channels(
-                                        payload, hems_payload
-                                    )
-                                    if merged is not payload:
-                                        accepted_hems_source = hems_source
-                                        payload = merged
-                            else:
-                                self._note_hems_lifetime_unavailable(None)
-        if revision != self._site_energy_invalidation_revision:
-            self._record_site_energy_fetch("superseded")
-            return
-        if malformed_source:
-            self._site_energy_refresh_ts = time.monotonic()
-            self._record_site_energy_fetch("invalid_payload")
+                        if merged is not payload:
+                            accepted_hems_source = hems_source
+                            payload = merged
+        if self._site_energy_read_superseded(generation):
             return
         parsed = (
-            self._aggregate_site_energy(payload)
-            if accept
-            else self._aggregate_site_energy(payload, apply_guards=False)
+            None
+            if malformed_source
+            else self._aggregate_site_energy(
+                payload, apply_guards=accept, device_totals=device_totals
+            )
         )
+        # A completed read consumes the polling interval even if none of its
+        # flows are usable. Only accepted flows advance the cache's freshness.
+        self._site_energy_refresh_ts = time.monotonic()
         if parsed is None or not parsed[0]:
-            if not accept:
-                self._site_energy_refresh_ts = time.monotonic()
             self._record_site_energy_fetch("invalid_payload")
             return
         self._record_site_energy_fetch("success")
         flows, meta = parsed
         self._record_site_energy_source(source, progress)
         self._mark_service_available()
-        self._site_energy_refresh_ts = time.monotonic()
         if accept:
             self._site_energy_cache_ts = self._site_energy_refresh_ts
             if accepted_hems_source is not None:

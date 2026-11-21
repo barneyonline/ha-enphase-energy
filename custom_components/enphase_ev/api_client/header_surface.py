@@ -37,6 +37,7 @@ def update_credentials(
     if cookie is not None:
         self._cookie = cookie or ""
     if credentials_changed:
+        self.credential_revision += 1
         self._clear_activation_auth_context()
         live = live_manager_token(getattr(self._s, "cookie_jar", None))
         self._vpp_ignored_live_token = (

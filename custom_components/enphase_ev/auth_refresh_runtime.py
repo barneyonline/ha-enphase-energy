@@ -44,6 +44,9 @@ class ManualAuthRefreshResult:
     performed_refresh: bool = False
 
 
+_MANUAL_REFRESH_FAILED = ManualAuthRefreshResult(success=False, reason="reauth_failed")
+
+
 class AuthRefreshRuntime:
     """Stored-credential Enlighten token refresh with coalescing and cooldown."""
 
@@ -104,7 +107,7 @@ class AuthRefreshRuntime:
             return await asyncio.shield(task)
 
         async with self._task_lock:
-            if coord._auth_refresh_suspended_active():
+            if not coord.runtime_active or coord._auth_refresh_suspended_active():
                 return False
 
             if self.auth_refresh_rejected_active():
@@ -140,6 +143,8 @@ class AuthRefreshRuntime:
         in-flight auth task.
         """
 
+        if not self.coordinator.runtime_active:
+            return _MANUAL_REFRESH_FAILED
         if not self.stored_credentials_available():
             return ManualAuthRefreshResult(
                 success=False, reason="stored_credentials_unavailable"
@@ -161,6 +166,8 @@ class AuthRefreshRuntime:
             return await self._await_manual_refresh_task(task)
 
         async with self._task_lock:
+            if not self.coordinator.runtime_active:
+                return _MANUAL_REFRESH_FAILED
             retry_after = self.manual_refresh_retry_after_seconds()
             if retry_after is not None:
                 return ManualAuthRefreshResult(
@@ -227,7 +234,16 @@ class AuthRefreshRuntime:
     ) -> ManualAuthRefreshResult:
         """Await a manual refresh task and throttle only failed manual attempts."""
 
-        result = await asyncio.shield(task)
+        try:
+            result = await asyncio.shield(task)
+        except asyncio.CancelledError:
+            waiter = asyncio.current_task()
+            assert waiter is not None
+            if waiter.cancelling() or self.coordinator.runtime_active:
+                raise
+            return _MANUAL_REFRESH_FAILED
+        if not self.coordinator.runtime_active:
+            return _MANUAL_REFRESH_FAILED
         if result:
             self.state._auth_refresh_manual_retry_until = None
             return ManualAuthRefreshResult(success=True, performed_refresh=True)
@@ -235,10 +251,23 @@ class AuthRefreshRuntime:
             self.state._auth_refresh_manual_retry_until = (
                 time.monotonic() + AUTH_REFRESH_MANUAL_RETRY_COOLDOWN_S
             )
-            return ManualAuthRefreshResult(success=False, reason="reauth_failed")
+            return _MANUAL_REFRESH_FAILED
+
+    def cancel_pending_refresh(self) -> asyncio.Task[bool] | None:
+        """Request cancellation once and return any login still unwinding."""
+
+        task = self.state._auth_refresh_task
+        if task is None:
+            return None
+        if task.done():
+            self.clear_auth_refresh_task(task)
+            return None
+        if not task.cancelling():
+            task.cancel()
+        return task
 
     def clear_auth_refresh_task(self, task: asyncio.Task[bool]) -> None:
-        """Clear the shared auth-refresh task once it completes."""
+        """Release the supplied login task if it is still current."""
 
         if self.state._auth_refresh_task is task:
             self.state._auth_refresh_task = None
@@ -317,6 +346,8 @@ class AuthRefreshRuntime:
         """Run one stored-credential refresh attempt for all concurrent waiters."""
 
         coord = self.coordinator
+        if not coord.runtime_active:
+            return False
         session = async_get_clientsession(coord.hass)
         self.state._auth_refresh_last_attempt_utc = dt_util.utcnow()
         email = coord._email
@@ -328,38 +359,11 @@ class AuthRefreshRuntime:
         self._publish_counters()
         try:
             tokens, _ = await async_authenticate(session, email, password)
-        except EnlightenAuthInvalidCredentials:
-            self._record_failure("invalid_credentials")
-            self.note_auth_refresh_rejected(
-                "Stored Enlighten credentials were rejected; reauthenticate via the integration options"
-            )
-            return False
-        except EnlightenAuthMFARequired:
-            self._record_failure("mfa_required")
-            self.note_auth_refresh_rejected(
-                "Enphase account requires multi-factor authentication; complete MFA in the browser and reauthenticate"
-            )
-            return False
-        except EnlightenAuthTooManySessions:
-            self._record_failure("too_many_active_sessions")
-            self.note_login_wall_block(reason="too_many_active_sessions")
-            _LOGGER.warning(
-                "Enphase rejected stored-credential reauthentication because too many account sessions are active; automatic retries are paused for %s seconds",
-                int(AUTH_BLOCKED_COOLDOWN_S),
-            )
-            return False
-        except EnlightenAuthUnavailable:
-            self._record_failure("auth_service_unavailable")
-            _LOGGER.debug(
-                "Auth service unavailable while refreshing tokens; will retry later"
-            )
-            return False
         except Exception as err:  # noqa: BLE001
-            self._record_failure(err.__class__.__name__)
-            _LOGGER.debug(
-                "Unexpected error refreshing Enlighten auth: %s",
-                redact_text(err),
-            )
+            if coord.runtime_active:
+                self._note_authentication_failure(err)
+            return False
+        if not coord.runtime_active:
             return False
 
         self.state._auth_refresh_success_count += 1
@@ -381,6 +385,36 @@ class AuthRefreshRuntime:
         coord._persist_tokens(tokens)
         self._publish_counters()
         return True
+
+    def _note_authentication_failure(self, err: Exception) -> None:
+        if isinstance(err, EnlightenAuthInvalidCredentials):
+            self._record_failure("invalid_credentials")
+            self.note_auth_refresh_rejected(
+                "Stored Enlighten credentials were rejected; reauthenticate via the integration options"
+            )
+        elif isinstance(err, EnlightenAuthMFARequired):
+            self._record_failure("mfa_required")
+            self.note_auth_refresh_rejected(
+                "Enphase account requires multi-factor authentication; complete MFA in the browser and reauthenticate"
+            )
+        elif isinstance(err, EnlightenAuthTooManySessions):
+            self._record_failure("too_many_active_sessions")
+            self.note_login_wall_block(reason="too_many_active_sessions")
+            _LOGGER.warning(
+                "Enphase rejected stored-credential reauthentication because too many account sessions are active; automatic retries are paused for %s seconds",
+                int(AUTH_BLOCKED_COOLDOWN_S),
+            )
+        elif isinstance(err, EnlightenAuthUnavailable):
+            self._record_failure("auth_service_unavailable")
+            _LOGGER.debug(
+                "Auth service unavailable while refreshing tokens; will retry later"
+            )
+        else:
+            self._record_failure(err.__class__.__name__)
+            _LOGGER.debug(
+                "Unexpected error refreshing Enlighten auth: %s",
+                redact_text(err),
+            )
 
     def _record_failure(self, reason: str) -> None:
         """Record and publish one completed stored-credential login failure."""

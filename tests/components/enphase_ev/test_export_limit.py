@@ -1735,19 +1735,6 @@ async def test_protected_transport_success_and_auth_failure(loopback_sockets):
         await runner.cleanup()
 
 
-@pytest.fixture
-def loopback_sockets():
-    """Allow only loopback connections for real HTTP transport regression tests."""
-    import pytest_socket
-
-    pytest_socket.enable_socket()
-    pytest_socket.socket_allow_hosts(["127.0.0.1"], allow_unix_socket=True)
-    try:
-        yield
-    finally:
-        pytest_socket.disable_socket(allow_unix_socket=True)
-
-
 @pytest.mark.parametrize(
     "operation", ["async_prepare_activation_auth", "async_get_export_limit_form"]
 )

@@ -7,6 +7,7 @@ import importlib
 import inspect
 import logging
 import time as _time
+from contextlib import ExitStack
 from typing import TYPE_CHECKING, Any, Coroutine, cast
 
 from homeassistant.config_entries import ConfigEntryState, OperationNotAllowed
@@ -461,6 +462,7 @@ async def _async_setup_entry_impl(
     # Create and prime the coordinator once, used by all platforms
     from .coordinator import (
         EnphaseCoordinator as EnphaseCoordinator,
+        async_get_clientsession,
     )
     from .battery_schedule_editor import (
         BatteryScheduleEditorManager as BatteryScheduleEditorManager,
@@ -479,20 +481,35 @@ async def _async_setup_entry_impl(
     reused_runtime = isinstance(preserved_snapshot, ReloadSnapshot)
     import aiohttp
 
+    from .api_client.common import guarded_read_trace
     from .api_client.export_limit_surface import export_limit_write_trace
 
-    coord = EnphaseCoordinator(
-        hass,
-        entry.data,
-        config_entry=entry,
-        cookie_header_session=async_create_clientsession(
+    shared_session = async_get_clientsession(hass)
+    with ExitStack() as sessions:
+        guarded_session = async_create_clientsession(
+            hass,
+            auto_cleanup=True,
+            cookie_jar=shared_session.cookie_jar,
+            trace_configs=[guarded_read_trace()],
+        )
+        sessions.callback(guarded_session.detach)
+        cookie_header_session = async_create_clientsession(
             hass,
             auto_cleanup=True,
             cookie_jar=aiohttp.DummyCookieJar(),
             trace_configs=[export_limit_write_trace()],
-        ),
-    )
-    entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+        )
+        sessions.callback(cookie_header_session.detach)
+        coord = EnphaseCoordinator(
+            hass,
+            entry.data,
+            config_entry=entry,
+            session=shared_session,
+            cookie_header_session=cookie_header_session,
+            guarded_read_session=guarded_session,
+        )
+        entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+        sessions.pop_all()
     firmware_catalog = get_firmware_catalog_manager(hass)
     evse_firmware_details = EvseFirmwareDetailsManager(lambda: coord.client)
     gateway_software_update = GatewaySoftwareUpdateManager(
@@ -743,21 +760,40 @@ async def _async_setup_entry_impl(
     return True
 
 
-async def _async_cleanup_failed_runtime(
+async def _async_release_runtime(
     entry: EnphaseConfigEntry,
     runtime_data: EnphaseRuntimeData,
-) -> None:
-    """Release all runtime resources when config-entry setup does not complete."""
+    *,
+    preserve_for_reload: bool = False,
+) -> ReloadSnapshot | None:
+    """Run all cleanup steps and retain a handoff only after a clean release."""
 
     coord = runtime_data.coordinator
-    mark_stopped = getattr(coord, "mark_runtime_stopped", None)
-    if callable(mark_stopped):
-        mark_stopped()
+    snapshot: ReloadSnapshot | None = None
+    cleanup_failed = False
+
+    async def prepare_handoff() -> None:
+        nonlocal snapshot
+        if cleanup_failed:
+            return
+        quiesce = getattr(coord, "async_quiesce_for_reload", None)
+        if callable(quiesce) and await quiesce() is False:
+            runtime_data.preserve_for_reload = False
+            return
+        capture = getattr(coord, "capture_reload_snapshot", None)
+        if callable(capture):
+            snapshot = capture()
+
+    cleanup_runtime = getattr(coord, "async_cleanup_runtime_state", None)
+    if not callable(cleanup_runtime):
+        cleanup_runtime = getattr(coord, "cleanup_runtime_state", None)
     cleanup_steps = (
+        getattr(coord, "mark_runtime_stopped", None),
         getattr(runtime_data.activity_publisher, "stop", None),
         runtime_data.async_stop_weather,
         getattr(getattr(coord, "schedule_sync", None), "async_stop", None),
-        getattr(coord, "async_cleanup_runtime_state", None),
+        prepare_handoff if preserve_for_reload else None,
+        cleanup_runtime,
         getattr(coord, "async_close", None),
     )
     for cleanup in cleanup_steps:
@@ -768,10 +804,15 @@ async def _async_cleanup_failed_runtime(
             if inspect.isawaitable(result):
                 await result
         except Exception:  # noqa: BLE001 - continue releasing the remaining resources
+            cleanup_failed = True
             _LOGGER.exception(
                 "Failed cleaning up runtime for entry %s",
                 entry.entry_id,
             )
+    if cleanup_failed:
+        runtime_data.preserve_for_reload = False
+        return None
+    return snapshot
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> bool:
@@ -788,54 +829,76 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
     except BaseException:
         runtime_data = getattr(entry, "runtime_data", None)
         if isinstance(runtime_data, EnphaseRuntimeData):
-            await _async_cleanup_failed_runtime(entry, runtime_data)
+            await _async_release_runtime(entry, runtime_data)
             if getattr(entry, "runtime_data", None) is runtime_data:
                 entry.runtime_data = None
         raise
 
 
+async def _async_finish_unload(
+    hass: HomeAssistant, entry: EnphaseConfigEntry, runtime_data: EnphaseRuntimeData
+) -> bool:
+    """Release the runtime and publish a handoff only if the entry still owns it."""
+
+    snapshot = await _async_release_runtime(
+        entry, runtime_data, preserve_for_reload=runtime_data.preserve_for_reload
+    )
+    if getattr(entry, "runtime_data", None) is runtime_data:
+        if snapshot is not None:
+            handoffs = hass.data.setdefault(_RUNTIME_HANDOFF_KEY, {})
+            handoffs[entry.entry_id] = snapshot
+        entry.runtime_data = None
+    return True
+
+
+async def _async_unload_platforms_and_runtime(
+    hass: HomeAssistant,
+    entry: EnphaseConfigEntry,
+    runtime_data: EnphaseRuntimeData | None,
+) -> bool:
+    if not await _async_unload_platforms_safe(hass, entry):
+        return False
+    if runtime_data is None:
+        entry.runtime_data = None
+        return True
+
+    # Platform unload has succeeded. Keep release running even if the
+    # operation that unloaded the platforms is cancelled.
+    teardown = asyncio.create_task(
+        _async_finish_unload(hass, entry, runtime_data),
+        name=f"{DOMAIN}_release_runtime",
+        eager_start=True,
+    )
+    return await _async_wait_for_unload_result(teardown)
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> bool:
-    coord = None
-    runtime_data = None
     try:
         runtime_data = get_runtime_data(entry)
-        coord = runtime_data.coordinator
     except RuntimeError:
-        pass
-    unload_ok = await _async_unload_platforms_safe(hass, entry)
-    if unload_ok:
-        mark_stopped = getattr(coord, "mark_runtime_stopped", None)
-        if callable(mark_stopped):
-            mark_stopped()
+        runtime_data = None
+
+    unload = runtime_data.unload_task if runtime_data is not None else None
+    if unload is None or unload.done():
+        unload = hass.async_create_task(
+            _async_unload_platforms_and_runtime(hass, entry, runtime_data),
+            f"{DOMAIN}_unload",
+        )
         if runtime_data is not None:
-            if runtime_data.activity_publisher is not None:
-                runtime_data.activity_publisher.stop()
-            await runtime_data.async_stop_weather()
-        if coord is not None and hasattr(coord, "schedule_sync"):
-            await coord.schedule_sync.async_stop()
-        preserve_runtime = bool(
-            runtime_data is not None and runtime_data.preserve_for_reload
-        )
-        if preserve_runtime:
-            async_quiesce_for_reload = getattr(coord, "async_quiesce_for_reload", None)
-            if callable(async_quiesce_for_reload):
-                preserve_runtime = await async_quiesce_for_reload() is not False
-            if not preserve_runtime and runtime_data is not None:
-                runtime_data.preserve_for_reload = False
-        if preserve_runtime:
-            capture = getattr(coord, "capture_reload_snapshot", None)
-            if callable(capture):
-                snapshot = capture()
-                handoffs = hass.data.setdefault(_RUNTIME_HANDOFF_KEY, {})
-                handoffs[entry.entry_id] = snapshot
-        async_cleanup_runtime_state = getattr(
-            coord, "async_cleanup_runtime_state", None
-        )
-        if callable(async_cleanup_runtime_state):
-            await async_cleanup_runtime_state()
-        elif coord is not None and hasattr(coord, "cleanup_runtime_state"):
-            coord.cleanup_runtime_state()
-        if coord is not None and hasattr(coord, "async_close"):
-            await coord.async_close()
-        entry.runtime_data = None
-    return unload_ok
+            runtime_data.unload_task = unload
+
+    return await _async_wait_for_unload_result(unload)
+
+
+async def _async_wait_for_unload_result(unload: asyncio.Task[bool]) -> bool:
+    """Keep the unload waiter alive until Home Assistant has a result."""
+
+    while True:
+        try:
+            return await asyncio.shield(unload)
+        except asyncio.CancelledError:
+            if unload.cancelled():
+                return False
+            waiter = asyncio.current_task()
+            assert waiter is not None
+            waiter.uncancel()

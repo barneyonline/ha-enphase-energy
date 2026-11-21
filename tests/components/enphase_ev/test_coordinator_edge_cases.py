@@ -1988,6 +1988,137 @@ async def test_manual_auth_refresh_shares_in_flight_refresh_task(hass):
     assert result.reason is None
 
 
+async def test_retired_runtime_rejects_queued_and_new_stored_login(
+    coordinator_factory, monkeypatch
+):
+    from custom_components.enphase_ev import auth_refresh_runtime
+
+    coord = coordinator_factory()
+    coord._email = "offline@example.invalid"
+    coord._remember_password = True
+    coord._stored_password = "fixture"
+    authenticate = AsyncMock()
+    monkeypatch.setattr(auth_refresh_runtime, "async_authenticate", authenticate)
+    runtime = coord.auth_refresh_runtime
+
+    async with runtime._task_lock:
+        queued = asyncio.create_task(coord._handle_client_unauthorized())
+        await asyncio.sleep(0)
+        assert not queued.done()
+        coord.mark_runtime_stopped()
+
+    assert await queued is False
+    assert await coord._handle_client_unauthorized() is False
+    assert await runtime.async_run_auto_refresh() is False
+    assert coord._unauth_errors == 1
+    assert coord._auth_refresh_task is None
+    authenticate.assert_not_awaited()
+
+
+@pytest.mark.parametrize("phase", ["queued", "returning"])
+async def test_manual_reauth_leaves_no_cooldown_after_retirement(
+    coordinator_factory, monkeypatch, phase
+):
+    from custom_components.enphase_ev import auth_refresh_runtime
+    from custom_components.enphase_ev.api_models import AuthTokens
+
+    coord = coordinator_factory()
+    coord._email = "offline@example.invalid"
+    coord._remember_password = True
+    coord._stored_password = "fixture"
+    entered = asyncio.Event()
+
+    async def authenticate(*_args):
+        entered.set()
+        try:
+            await asyncio.Future()
+        except asyncio.CancelledError:
+            return AuthTokens(cookie="session=fresh", access_token="fresh"), []
+
+    mock_authenticate = AsyncMock(side_effect=authenticate)
+    monkeypatch.setattr(auth_refresh_runtime, "async_authenticate", mock_authenticate)
+    if phase == "queued":
+        async with coord.auth_refresh_runtime._task_lock:
+            manual = asyncio.create_task(coord.async_try_reauth_now())
+            await asyncio.sleep(0)
+            assert not manual.done()
+            coord.mark_runtime_stopped()
+    else:
+        manual = asyncio.create_task(coord.async_try_reauth_now())
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        coord.mark_runtime_stopped()
+
+    result = await manual
+    assert not result.success
+    assert result.reason == "reauth_failed"
+    assert result.retry_after_seconds is None
+    assert coord._auth_refresh_manual_retry_until is None
+    assert mock_authenticate.await_count == (1 if phase == "returning" else 0)
+    before = coord._auth_refresh_attempt_count
+    assert not (await coord.async_try_reauth_now()).success
+    assert coord._auth_refresh_attempt_count == before
+    assert coord._auth_refresh_manual_retry_until is None
+
+
+async def test_manual_reauth_reports_when_retirement_cancels_its_login(
+    coordinator_factory, monkeypatch
+):
+    from custom_components.enphase_ev import auth_refresh_runtime
+
+    coord = coordinator_factory()
+    coord._email = "offline@example.invalid"
+    coord._remember_password = True
+    coord._stored_password = "fixture"
+    entered = asyncio.Event()
+
+    async def authenticate(*_args):
+        entered.set()
+        await asyncio.Future()
+
+    monkeypatch.setattr(auth_refresh_runtime, "async_authenticate", authenticate)
+    manual = asyncio.create_task(coord.async_try_reauth_now())
+    await asyncio.wait_for(entered.wait(), timeout=1)
+    coord.mark_runtime_stopped()
+
+    result = await manual
+    assert result.reason == "reauth_failed"
+    assert not result.success and not result.performed_refresh
+    assert result.retry_after_seconds is None
+    assert coord._auth_refresh_manual_retry_until is None
+
+
+@pytest.mark.parametrize("cancel_waiter", [False, True])
+async def test_manual_reauth_preserves_other_cancellations(
+    coordinator_factory, monkeypatch, cancel_waiter
+):
+    from custom_components.enphase_ev import auth_refresh_runtime
+
+    coord = coordinator_factory()
+    coord._email = "offline@example.invalid"
+    coord._remember_password = True
+    coord._stored_password = "fixture"
+    entered = asyncio.Event()
+
+    async def authenticate(*_args):
+        entered.set()
+        await asyncio.Future()
+
+    monkeypatch.setattr(auth_refresh_runtime, "async_authenticate", authenticate)
+    manual = asyncio.create_task(coord.async_try_reauth_now())
+    await asyncio.wait_for(entered.wait(), timeout=1)
+    login = coord._auth_refresh_task
+    if cancel_waiter:
+        manual.cancel()
+        coord.mark_runtime_stopped()
+    else:
+        login.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await manual
+    await asyncio.gather(login, return_exceptions=True)
+    assert coord._auth_refresh_manual_retry_until is None
+
+
 @pytest.mark.asyncio
 async def test_attempt_auto_refresh_skips_when_auth_refresh_suspended(hass):
     from custom_components.enphase_ev.coordinator import EnphaseCoordinator

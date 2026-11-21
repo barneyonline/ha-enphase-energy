@@ -832,14 +832,14 @@ async def test_actual_translation_cache(activity, hass):
 
 async def test_failed_setup_cleanup_stops_activity_publisher(activity, hass):
     from unittest.mock import AsyncMock
-    from custom_components.enphase_ev import _async_cleanup_failed_runtime
+    from custom_components.enphase_ev import _async_release_runtime
     from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 
     record = activity.make("cloud_reachable", "on", domain="binary_sensor")
     await hass.async_block_till_done()
     publisher = activity.start()
     activity.coord.async_close = AsyncMock()
-    await _async_cleanup_failed_runtime(
+    await _async_release_runtime(
         activity.entry,
         EnphaseRuntimeData(coordinator=activity.coord, activity_publisher=publisher),
     )

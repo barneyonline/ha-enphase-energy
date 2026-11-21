@@ -2025,13 +2025,14 @@ async def test_async_unload_entry_cancels_background_lifecycle_tasks(
     amp_task = _RecordingTask()
     completed_amp_task = _RecordingTask(done=True)
     stream_stop_task = _RecordingTask()
-    auth_refresh_task = _RecordingTask()
+    auth_refresh_task = asyncio.create_task(asyncio.Event().wait())
     battery_restore_task = _RecordingTask()
     backoff_refresh_task = _RecordingTask()
     backoff_cancel = Mock()
     schedule_sync = SimpleNamespace(async_stop=AsyncMock())
     session_history = SimpleNamespace(_enrichment_tasks={session_task})
 
+    from custom_components.enphase_ev.auth_refresh_runtime import AuthRefreshRuntime
     from custom_components.enphase_ev.coordinator import EnphaseCoordinator
 
     def _clear_session_history() -> None:
@@ -2051,7 +2052,8 @@ async def test_async_unload_entry_cancels_background_lifecycle_tasks(
                 "EV456": completed_amp_task,
             }
             self._streaming_stop_task = stream_stop_task
-            self._auth_refresh_task = auth_refresh_task
+            self.auth_refresh_runtime = AuthRefreshRuntime(self)
+            self.auth_refresh_runtime.state._auth_refresh_task = auth_refresh_task
             self._battery_profile_recovery_restore_task = battery_restore_task
             self._backoff_cancel = backoff_cancel
             self._backoff_refresh_tasks = {backoff_refresh_task}
@@ -2083,6 +2085,7 @@ async def test_async_unload_entry_cancels_background_lifecycle_tasks(
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_unload", unload)
 
     assert await async_unload_entry(hass, config_entry)
+    await asyncio.gather(auth_refresh_task, return_exceptions=True)
 
     schedule_sync.async_stop.assert_awaited_once()
     assert warmup_task.cancelled
@@ -2090,14 +2093,14 @@ async def test_async_unload_entry_cancels_background_lifecycle_tasks(
     assert amp_task.cancelled
     assert not completed_amp_task.cancelled
     assert stream_stop_task.cancelled
-    assert auth_refresh_task.cancelled
+    assert auth_refresh_task.cancelled()
     assert battery_restore_task.cancelled
     assert backoff_refresh_task.cancelled
     backoff_cancel.assert_called_once_with()
     assert coord._warmup_task is None
     assert coord._amp_restart_tasks == {}
     assert coord._streaming_stop_task is None
-    assert coord._auth_refresh_task is None
+    assert coord.auth_refresh_runtime.state._auth_refresh_task is None
     assert coord._battery_profile_recovery_restore_task is None
     assert coord._backoff_cancel is None
     assert coord._backoff_refresh_tasks == set()
@@ -6215,7 +6218,7 @@ async def test_failed_setup_retires_before_awaited_runtime_cleanup(
     coord.async_close = AsyncMock()
     runtime = EnphaseRuntimeData(coordinator=coord)
     pending = asyncio.create_task(
-        enphase_init._async_cleanup_failed_runtime(config_entry, runtime)
+        enphase_init._async_release_runtime(config_entry, runtime)
     )
     await entered.wait()
     assert coord.runtime_active is False
@@ -6327,7 +6330,7 @@ async def test_failed_setup_retains_only_newer_runtime(
         "_async_setup_entry_impl",
         AsyncMock(side_effect=RuntimeError("setup failed")),
     )
-    monkeypatch.setitem(namespace, "_async_cleanup_failed_runtime", cleanup)
+    monkeypatch.setitem(namespace, "_async_release_runtime", cleanup)
     with pytest.raises(RuntimeError, match="setup failed"):
         await async_setup_entry(hass, config_entry)
     assert config_entry.runtime_data is (replacement if replace_runtime else None)

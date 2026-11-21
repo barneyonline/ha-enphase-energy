@@ -8,12 +8,13 @@ import hashlib
 import json
 import logging
 import re
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from html import unescape
 from time import monotonic
+from types import SimpleNamespace
 from typing import Any, Iterable
 from urllib.parse import unquote
 
@@ -38,6 +39,7 @@ from . import transport as api_transport
 from .errors import (
     EnlightenAuthTooManySessions,
     EnlightenAuthUnavailable,
+    EnlightenReadSuperseded,
     _safe_response_error_message,
 )
 
@@ -170,6 +172,11 @@ _enlighten_optional_read: ContextVar[bool] = ContextVar(
 
 _enlighten_read_limiter_bypass: ContextVar[bool] = ContextVar(
     "enphase_ev_enlighten_read_limiter_bypass", default=False
+)
+
+
+_enlighten_read_is_current: ContextVar[Callable[[], bool] | None] = ContextVar(
+    "enphase_ev_enlighten_read_is_current", default=None
 )
 
 
@@ -764,12 +771,73 @@ def enlighten_optional_read_scope() -> Iterator[None]:
 
 
 @contextmanager
+def guarded_read_scope(
+    is_current: Callable[[], bool] | None,
+) -> Iterator[None]:
+    """Give the transport access to the read's validity check."""
+
+    token = _enlighten_read_is_current.set(is_current)
+    try:
+        yield
+    finally:
+        _enlighten_read_is_current.reset(token)
+
+
+@contextmanager
+def runtime_read_scope(is_active: Callable[[], bool]) -> Iterator[None]:
+    """Fence the transport and cancel a retired runtime's results and errors."""
+
+    if not is_active():
+        raise asyncio.CancelledError
+    with guarded_read_scope(is_active):
+        try:
+            yield
+        except Exception:
+            if not is_active():
+                raise asyncio.CancelledError from None
+            raise
+        if not is_active():
+            raise asyncio.CancelledError
+
+
+def has_guarded_read_scope() -> bool:
+    """Report whether this request has an acquisition validity check."""
+
+    return _enlighten_read_is_current.get() is not None
+
+
+def check_enlighten_read_current() -> None:
+    """Stop an obsolete read before dispatch or response side effects."""
+
+    is_current = _enlighten_read_is_current.get()
+    if is_current is not None and not is_current():
+        raise EnlightenReadSuperseded
+
+
+async def _check_guarded_read_headers(
+    _session: aiohttp.ClientSession,
+    _context: SimpleNamespace,
+    _params: aiohttp.TraceRequestHeadersSentParams,
+) -> None:
+    check_enlighten_read_current()
+
+
+def guarded_read_trace() -> aiohttp.TraceConfig:
+    """Check the read after aiohttp connects and before it serializes headers."""
+
+    trace = aiohttp.TraceConfig()
+    trace.on_request_headers_sent.append(_check_guarded_read_headers)
+    return trace
+
+
+@contextmanager
 def _enlighten_reauth_read_scope() -> Iterator[None]:
     """Let nested credential refreshes escape a limiter held by their caller."""
 
     token = _enlighten_read_limiter_bypass.set(True)
     try:
-        yield
+        with guarded_read_scope(None):
+            yield
     finally:
         _enlighten_read_limiter_bypass.reset(token)
 

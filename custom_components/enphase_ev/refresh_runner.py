@@ -20,6 +20,7 @@ from .api import (
     InvalidPayloadError,
     OptionalEndpointUnavailable,
     enlighten_optional_read_scope,
+    guarded_read_scope,
 )
 from .const import DOMAIN, DEFAULT_CHARGE_LEVEL_SETTING, PHASE_SWITCH_CONFIG_SETTING
 from .log_redaction import redact_site_id, redact_text
@@ -86,6 +87,10 @@ class RefreshRunner:
     def __init__(self, coordinator: EnphaseCoordinator) -> None:
         self._coordinator = coordinator
 
+    def _raise_if_retired(self) -> None:
+        if not self._coordinator.runtime_active:
+            raise asyncio.CancelledError
+
     def _warmup_site_state_available(self) -> bool:
         coordinator = self._coordinator
         vpp_runtime = getattr(coordinator, "vpp_runtime", None)
@@ -133,38 +138,41 @@ class RefreshRunner:
         *,
         endpoint_family: str | None = None,
     ) -> tuple[str, float]:
+        self._raise_if_retired()
         started = time.monotonic()
         try:
             with enlighten_optional_read_scope():
                 await callback_factory()
-        except asyncio.CancelledError:
-            raise
-        except EnphaseLoginWallUnauthorized as err:
-            if self._coordinator._activate_auth_block_from_login_wall(err):
-                raise self._coordinator._auth_block_update_failed() from err
-            raise ConfigEntryAuthFailed from err
-        except ConfigEntryAuthFailed:
-            raise
-        except _SKIPPABLE_REFRESH_ERRORS as err:
-            if endpoint_family is not None:
-                self._coordinator._note_endpoint_family_failure(endpoint_family, err)
-            _LOGGER.debug(
-                "Skipping %s refresh for site %s: %s",
-                log_label,
-                redact_site_id(self._coordinator.site_id),
-                redact_text(err, site_ids=(self._coordinator.site_id,)),
-            )
         except Exception as err:
-            self._coordinator.last_failure_utc = dt_util.utcnow()
-            self._coordinator.last_failure_status = None
-            self._coordinator.last_failure_description = (
-                redact_text(err, site_ids=(self._coordinator.site_id,))
-                or err.__class__.__name__
-            )
-            self._coordinator.last_failure_response = None
-            self._coordinator.last_failure_source = "refresh_stage"
-            self._coordinator.last_failure_endpoint = timing_key
-            raise
+            self._raise_if_retired()
+            if isinstance(err, EnphaseLoginWallUnauthorized):
+                if self._coordinator._activate_auth_block_from_login_wall(err):
+                    raise self._coordinator._auth_block_update_failed() from err
+                raise ConfigEntryAuthFailed from err
+            if isinstance(err, ConfigEntryAuthFailed):
+                raise
+            if isinstance(err, _SKIPPABLE_REFRESH_ERRORS):
+                if endpoint_family is not None:
+                    self._coordinator._note_endpoint_family_failure(
+                        endpoint_family, err
+                    )
+                _LOGGER.debug(
+                    "Skipping %s refresh for site %s: %s",
+                    log_label,
+                    redact_site_id(self._coordinator.site_id),
+                    redact_text(err, site_ids=(self._coordinator.site_id,)),
+                )
+            else:
+                self._coordinator.last_failure_utc = dt_util.utcnow()
+                self._coordinator.last_failure_status = None
+                self._coordinator.last_failure_description = (
+                    redact_text(err, site_ids=(self._coordinator.site_id,))
+                    or err.__class__.__name__
+                )
+                self._coordinator.last_failure_response = None
+                self._coordinator.last_failure_source = "refresh_stage"
+                self._coordinator.last_failure_endpoint = timing_key
+                raise
         return timing_key, round(time.monotonic() - started, 3)
 
     async def _async_run_refresh_call_for_group(
@@ -196,6 +204,7 @@ class RefreshRunner:
         stage_key: str | None = None,
         defer_topology: bool = False,
     ) -> None:
+        self._raise_if_retired()
         if defer_topology:
             self._coordinator._begin_topology_refresh_batch()
 
@@ -332,6 +341,7 @@ class RefreshRunner:
     ) -> None:
         bound_plan = bind_refresh_plan(self._coordinator, plan)
         for stage in bound_plan.stages:
+            self._raise_if_retired()
             await self.async_run_staged_refresh_calls(
                 phase_timings,
                 stage_key=stage.stage_key,
@@ -374,15 +384,6 @@ class RefreshRunner:
         if coordinator.storm_guard_state != previous:
             coordinator.publish_runtime_state_update("storm_guard")
 
-    def _record_setup_milestone(self, key: str) -> None:
-        coordinator = self._coordinator
-        started = getattr(coordinator, "_setup_started_mono", None)
-        if not isinstance(started, (int, float)):
-            return
-        milestones = dict(getattr(coordinator, "_setup_milestones", {}) or {})
-        milestones[key] = round(max(0.0, time.monotonic() - float(started)), 3)
-        coordinator._setup_milestones = milestones
-
     async def _async_startup_power_runner_impl(self) -> None:
         coordinator = self._coordinator
         timings: dict[str, float] = {}
@@ -393,10 +394,12 @@ class RefreshRunner:
         )
         with request_metrics_scope("startup_power") as request_metrics:
             await self.async_run_refresh_plan(timings, plan=plan)
+        if not coordinator.runtime_active:
+            return
         timings.update(request_metrics.phase_timings())
         timings["cloud_calls"] = float(request_metrics.attempts)
         coordinator._startup_power_phase_timings = timings
-        self._record_setup_milestone("power_ready")
+        coordinator.mark_setup_milestone("power_ready")
 
     async def async_start_startup_power(self) -> None:
         """Start the absolute startup power budget before the core refresh."""
@@ -452,6 +455,8 @@ class RefreshRunner:
                         redact_text(err, site_ids=(coordinator.site_id,))
                         or err.__class__.__name__
                     )
+            if not coordinator.runtime_active:
+                return
             warmup_timings.update(
                 dict(getattr(coordinator, "_startup_power_phase_timings", {}) or {})
             )
@@ -463,6 +468,8 @@ class RefreshRunner:
                     warmup_timings,
                     plan=RefreshPlan(stages=(stage,)),
                 )
+                if not coordinator.runtime_active:
+                    return
                 if warmup_data or self._warmup_site_state_available():
                     publish_stage()
         except asyncio.CancelledError:
@@ -481,8 +488,9 @@ class RefreshRunner:
         finally:
             coordinator._warmup_in_progress = False
             coordinator._warmup_phase_timings = warmup_timings
-            self._record_setup_milestone("warmup_complete")
-            coordinator.discovery_snapshot.schedule_save(reuse_inventory=True)
+            if coordinator.runtime_active:
+                coordinator.mark_setup_milestone("warmup_complete")
+                coordinator.discovery_snapshot.schedule_save(reuse_inventory=True)
 
     async def async_start_startup_warmup(self) -> None:
         coordinator = self._coordinator
@@ -501,6 +509,8 @@ class RefreshRunner:
     async def async_refresh_site_energy_for_warmup(self) -> None:
         coordinator = self._coordinator
         await coordinator.energy._async_refresh_site_energy()
+        if not coordinator.runtime_active:
+            return
         coordinator.discovery_snapshot.sync_site_energy_discovery_state()
         coordinator._sync_site_energy_issue()
 
@@ -582,19 +592,29 @@ class RefreshRunner:
         serials = [sn for sn in coordinator.iter_serials() if sn]
         if not serials:
             return
-        charge_modes = await coordinator.evse_runtime.async_resolve_charge_modes(
-            serials
-        )
-        green_settings = (
-            await coordinator.evse_runtime.async_resolve_green_battery_settings(serials)
-        )
-        auth_settings = await coordinator.evse_runtime.async_resolve_auth_settings(
-            serials
-        )
-        charger_config = await coordinator.evse_runtime.async_resolve_charger_config(
-            serials,
-            keys=(DEFAULT_CHARGE_LEVEL_SETTING, PHASE_SWITCH_CONFIG_SETTING),
-        )
+        self._raise_if_retired()
+        with guarded_read_scope(lambda: coordinator.runtime_active):
+            charge_modes = await coordinator.evse_runtime.async_resolve_charge_modes(
+                serials
+            )
+            self._raise_if_retired()
+            green_settings = (
+                await coordinator.evse_runtime.async_resolve_green_battery_settings(
+                    serials
+                )
+            )
+            self._raise_if_retired()
+            auth_settings = await coordinator.evse_runtime.async_resolve_auth_settings(
+                serials
+            )
+            self._raise_if_retired()
+            charger_config = (
+                await coordinator.evse_runtime.async_resolve_charger_config(
+                    serials,
+                    keys=(DEFAULT_CHARGE_LEVEL_SETTING, PHASE_SWITCH_CONFIG_SETTING),
+                )
+            )
+            self._raise_if_retired()
         merged = (
             target
             if working_data is not None

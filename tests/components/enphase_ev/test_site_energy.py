@@ -186,72 +186,76 @@ def test_site_energy_aggregation_skips_zero_only_primary_device_channels(
     assert "water_heater" not in flows
 
 
-def test_merge_device_lifetime_channels_keeps_present_primary_values(
+@pytest.mark.asyncio
+async def test_site_energy_aggregates_primary_and_hems_buckets_once(
     coordinator_factory,
-) -> None:
-    coord = coordinator_factory()
-    merged = coord.energy._merge_device_lifetime_channels(  # noqa: SLF001
-        {
-            "evse": [10.0],
-            "heatpump": [],
-            "water_heater": [],
-            "start_date": "2024-01-01",
-            "last_report_date": None,
-        },
-        {
-            "evse": [999.0],
-            "heatpump": [20.0],
-            "water_heater": [30.0],
-            "start_date": "2023-11-14",
-            "last_report_date": 1_700_000_000,
-            "update_pending": True,
-            "interval_minutes": 30,
-        },
-    )
+):
+    class CountedBuckets(list):
+        scans = 0
 
-    assert merged["evse"] == [10.0]
-    assert merged["heatpump"] == [20.0]
-    assert merged["water_heater"] == [30.0]
-    assert merged["last_report_date"] is None
-    flows, meta = coord.energy._aggregate_site_energy(merged)
-    assert meta["last_report_date"] is None
+        def __iter__(self):
+            self.scans += 1
+            return super().__iter__()
+
+    manager = coordinator_factory().energy
+    primary = {
+        "consumption": CountedBuckets([400, 500]),
+        "solar_home": CountedBuckets([150, 200]),
+        "charge": CountedBuckets([50, 60]),
+        "solar_battery": CountedBuckets([10, 15]),
+        "evse": CountedBuckets([0, 10]),
+        "heatpump": CountedBuckets([0, "0"]),
+        "water_heater": CountedBuckets([]),
+        "start_date": "2024-01-01",
+    }
+    hems = {
+        "evse": CountedBuckets([999.0]),
+        "heatpump": CountedBuckets([20.0]),
+        "water_heater": CountedBuckets([None, "bad", -1]),
+        "start_date": "2023-11-14",
+        "last_report_date": 1_700_000_000,
+        "update_pending": True,
+        "interval_minutes": 30,
+    }
+
+    async def fetch_hems():
+        return hems
+
+    client = SimpleNamespace(
+        lifetime_energy=AsyncMock(return_value=primary),
+        hems_consumption_lifetime=AsyncMock(side_effect=fetch_hems),
+    )
+    manager._client_provider = lambda: client
+
+    await manager._async_refresh_site_energy()
+
+    client.hems_consumption_lifetime.assert_awaited_once_with()
+    assert all(
+        values.scans == 1
+        for values in primary.values()
+        if isinstance(values, CountedBuckets)
+    )
+    assert hems["evse"].scans == 0
+    assert hems["heatpump"].scans == 1
+    assert hems["water_heater"].scans == 1
+    flows = manager.site_energy
+    assert flows["consumption"].value_kwh == pytest.approx(0.9)
+    assert flows["consumption"].latest_bucket_wh == 500
+    assert flows["consumption"].previous_bucket_wh == 400
+    assert flows["battery_charge"].value_kwh == pytest.approx(0.11)
+    assert manager.site_energy_meta["last_report_date"] is None
+    assert flows["evse_charging"].value_kwh == pytest.approx(0.01)
     assert flows["evse_charging"].last_report_date is None
     assert flows["evse_charging"].start_date == "2024-01-01"
     assert flows["evse_charging"].update_pending is None
+    assert flows["heat_pump"].value_kwh == pytest.approx(0.02)
     assert flows["heat_pump"].start_date == "2023-11-14"
     assert flows["heat_pump"].update_pending is True
     assert flows["heat_pump"].interval_minutes == 30
     assert flows["heat_pump"].last_report_date == datetime.fromtimestamp(
         1_700_000_000, tz=timezone.utc
     )
-
-
-def test_lifetime_channel_missing_accepts_zero_values(coordinator_factory) -> None:
-    coord = coordinator_factory()
-
-    assert coord.energy._lifetime_channel_missing({}, "evse") is True  # noqa: SLF001
-    assert (  # noqa: SLF001
-        coord.energy._lifetime_channel_missing({"evse": ["bad", None, -1]}, "evse")
-        is True
-    )
-    assert (
-        coord.energy._lifetime_channel_missing({"evse": [0]}, "evse") is False
-    )  # noqa: SLF001
-
-
-def test_device_lifetime_channel_missing_requires_positive_values(
-    coordinator_factory,
-) -> None:
-    coord = coordinator_factory()
-
-    assert (
-        coord.energy._device_lifetime_channel_missing({"evse": [0, "0"]}, "evse")
-        is True
-    )  # noqa: SLF001
-    assert (
-        coord.energy._device_lifetime_channel_missing({"evse": [0, 25]}, "evse")
-        is False
-    )  # noqa: SLF001
+    assert "water_heater" not in flows
 
 
 def test_aggregate_site_energy_supports_zero_device_channels_from_hems_fallback(
@@ -411,18 +415,18 @@ def test_site_energy_sampled_at_utc_requires_parseable_timestamp(
 
 def test_diff_energy_fields_when_neg_exceeds(coordinator_factory) -> None:
     coord = coordinator_factory()
-    payload = {"consumption": [100], "solar_home": [200]}
+    totals = {"consumption": (100.0, 1), "solar_home": (200.0, 1)}
     total, count, fields = coord.energy._diff_energy_fields(
-        payload, "consumption", "solar_home", None
+        totals.__getitem__, "consumption", "solar_home"
     )  # noqa: SLF001
     assert total == 0.0 and count == 0 and fields == []
 
 
 def test_diff_energy_fields_allows_zero_subtrahend(coordinator_factory) -> None:
     coord = coordinator_factory()
-    payload = {"consumption": [100], "solar_home": [0]}
+    totals = {"consumption": (100.0, 1), "solar_home": (0.0, 1)}
     total, count, fields = coord.energy._diff_energy_fields(
-        payload, "consumption", "solar_home", None
+        totals.__getitem__, "consumption", "solar_home"
     )  # noqa: SLF001
     assert total == pytest.approx(100.0)
     assert count == 1
@@ -431,9 +435,9 @@ def test_diff_energy_fields_allows_zero_subtrahend(coordinator_factory) -> None:
 
 def test_diff_energy_fields_returns_positive_delta(coordinator_factory) -> None:
     coord = coordinator_factory()
-    payload = {"consumption": [200, 150], "solar_home": [100, 50]}
+    totals = {"consumption": (350.0, 2), "solar_home": (150.0, 2)}
     total, count, fields = coord.energy._diff_energy_fields(
-        payload, "consumption", "solar_home", None
+        totals.__getitem__, "consumption", "solar_home"
     )  # noqa: SLF001
     assert total == pytest.approx(200.0)
     assert count == 2
@@ -444,9 +448,13 @@ def test_diff_energy_fields_multi_returns_empty_when_no_subtrahends_match(
     coordinator_factory,
 ) -> None:
     coord = coordinator_factory()
-    payload = {"consumption": [200], "solar_home": [], "battery_home": [None]}
+    totals = {
+        "consumption": (200.0, 1),
+        "solar_home": (0.0, 0),
+        "battery_home": (0.0, 0),
+    }
     total, count, fields = coord.energy._diff_energy_fields_multi(
-        payload, "consumption", ("solar_home", "battery_home"), None
+        totals.__getitem__, "consumption", ("solar_home", "battery_home")
     )  # noqa: SLF001
     assert total == 0.0
     assert count == 0
@@ -1197,12 +1205,14 @@ def test_site_consumption_power_guard_paths(coordinator_factory, monkeypatch) ->
     assert missing_timestamp.native_value is None
 
 
-def test_site_energy_interval_hours_edge_cases(coordinator_factory) -> None:
-    coord = coordinator_factory()
-    # Non-dict payload falls back to default interval
-    hours, minutes = coord.energy._site_energy_interval_hours(None)  # noqa: SLF001
-    assert minutes == pytest.approx(5.0)
-    assert hours == pytest.approx(5.0 / 60.0)
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [(None, 5.0), ({"interval": 10}, 10.0), ({"interval_minutes": 0}, 5.0)],
+)
+def test_site_energy_interval_minutes(coordinator_factory, payload, expected) -> None:
+    manager = coordinator_factory().energy
+
+    assert manager._site_energy_interval_minutes(payload) == expected
 
 
 def test_latest_energy_buckets_rejects_invalid_tail_values(coordinator_factory) -> None:
@@ -1211,21 +1221,15 @@ def test_latest_energy_buckets_rejects_invalid_tail_values(coordinator_factory) 
     assert manager._latest_energy_buckets(None) == (None, None, 0)
     assert manager._latest_energy_buckets([100.0, -1.0]) == (None, 100.0, 2)
     assert manager._latest_energy_buckets([float("nan")]) == (None, None, 1)
-    # Fallback "interval" key is honored
-    hours, minutes = manager._site_energy_interval_hours({"interval": 10})
-    assert minutes == pytest.approx(10.0)
-    assert hours == pytest.approx(10.0 / 60.0)
-
-    hours, minutes = manager._site_energy_interval_hours({"interval_minutes": 0})
-    assert minutes == pytest.approx(5.0)
-    assert hours == pytest.approx(5.0 / 60.0)
 
 
 @pytest.mark.asyncio
 async def test_async_refresh_site_energy_parsed_none(monkeypatch, coordinator_factory):
     coord = coordinator_factory()
     coord.client.lifetime_energy = AsyncMock(return_value={"bad": "payload"})
-    monkeypatch.setattr(coord.energy, "_aggregate_site_energy", lambda payload: None)
+    monkeypatch.setattr(
+        coord.energy, "_aggregate_site_energy", lambda payload, **kwargs: None
+    )
     await coord.energy._async_refresh_site_energy()  # noqa: SLF001
     assert coord.energy.site_energy == {}
     assert (
@@ -5674,45 +5678,100 @@ def test_consumption_interval_floor_cannot_exceed_maximum_window(coordinator_fac
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "raw_payload",
-    [
-        {},
-        {"error": "temporarily unavailable"},
-        {"consumption": "invalid", "last_report_date": 1789098320},
-    ],
+    "clock_kind", ["absent", "valid", "malformed", "future", "regressed"]
 )
-async def test_site_energy_fetch_diagnostics_reject_empty_normalized_payload(
-    coordinator_factory, monkeypatch, raw_payload
+@pytest.mark.parametrize("hems_enabled", [False, True])
+async def test_site_energy_empty_payload_is_throttled_and_preserves_cache(
+    coordinator_factory, monkeypatch, clock_kind, hems_enabled
 ):
     from custom_components.enphase_ev.api_parsers import (
         normalize_lifetime_energy_payload,
     )
 
-    coord = coordinator_factory()
-    energy = coord.energy
-    now = [datetime.now(timezone.utc)]
-    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now[0])
+    manager = coordinator_factory().energy
+    now = datetime(2026, 9, 5, 1, tzinfo=timezone.utc).timestamp()
+    mono = 1000.0
+    monkeypatch.setattr(energy_mod, "time", SimpleNamespace(monotonic=lambda: mono))
+    monkeypatch.setattr(
+        energy_mod.dt_util, "utcnow", lambda: datetime.fromtimestamp(now, timezone.utc)
+    )
     client = SimpleNamespace(
         lifetime_energy=AsyncMock(
-            return_value={
-                "consumption": [1000, 2000],
-                "last_report_date": now[0].timestamp(),
-            }
+            return_value={"consumption": [1000, 2000], "last_report_date": now}
         )
     )
-    energy._client_provider = lambda: client
-    await energy._async_refresh_site_energy(force=True)
-    accepted = energy.site_energy
-    success = energy.site_energy_fetch_diagnostics["last_success_utc"]
-    now[0] += timedelta(minutes=5)
-    client.lifetime_energy.return_value = normalize_lifetime_energy_payload(raw_payload)
-    await energy._async_refresh_site_energy(force=True)
-    diag = energy.site_energy_fetch_diagnostics
-    assert diag["last_outcome"] == "invalid_payload"
-    assert diag["failure_count"] == 1
-    assert diag["last_failure_utc"] == now[0].isoformat()
-    assert diag["last_success_utc"] == success
-    assert energy.site_energy is accepted
+    manager._client_provider = lambda: client
+    await manager._async_refresh_site_energy()
+    accepted = manager.site_energy
+    success = manager.site_energy_fetch_diagnostics["last_success_utc"]
+
+    mono += 300
+    now += 300
+    raw = {"consumption": ["invalid", None]}
+    if clock_kind != "absent":
+        raw["last_report_date"] = {
+            "valid": now,
+            "malformed": "invalid",
+            "future": now + 3600,
+            "regressed": now - 301,
+        }[clock_kind]
+    client.lifetime_energy.return_value = normalize_lifetime_energy_payload(raw)
+    if hems_enabled:
+        client.hems_site_supported = True
+        client.hems_consumption_lifetime = AsyncMock(
+            return_value={"heatpump": [], "last_report_date": now}
+        )
+
+    assert manager.site_energy_refresh_due()
+    await manager._async_refresh_site_energy()
+    failure = manager.site_energy_fetch_diagnostics
+    assert failure["last_outcome"] == "invalid_payload"
+    assert failure["failure_count"] == 1
+    assert (
+        failure["last_failure_utc"]
+        == datetime.fromtimestamp(now, timezone.utc).isoformat()
+    )
+    assert failure["last_success_utc"] == success
+    assert manager.site_energy is accepted
+
+    for _ in range(9):
+        mono += 30
+        now += 30
+        assert not manager.site_energy_refresh_due()
+        await manager._async_refresh_site_energy()
+
+    assert manager.site_energy_cache_age == 570
+    assert client.lifetime_energy.await_count == 2
+    if hems_enabled:
+        assert client.hems_consumption_lifetime.await_count == (
+            1 if clock_kind in {"absent", "valid"} else 0
+        )
+
+    mono += 30
+    now += 30
+    client.lifetime_energy.return_value = {
+        "consumption": [1000, 2000, 3000],
+        "last_report_date": now,
+    }
+    assert manager.site_energy_refresh_due()
+    await manager._async_refresh_site_energy()
+    assert client.lifetime_energy.await_count == 3
+    assert manager.site_energy["consumption"].value_kwh == 6
+    assert manager.site_energy_cache_age == 0
+
+
+@pytest.mark.asyncio
+async def test_site_energy_can_force_read_after_empty_payload(coordinator_factory):
+    manager = coordinator_factory().energy
+    client = SimpleNamespace(
+        lifetime_energy=AsyncMock(side_effect=[None, {"consumption": [1000]}])
+    )
+    manager._client_provider = lambda: client
+    await manager._async_refresh_site_energy()
+    assert not manager.site_energy_refresh_due()
+    await manager._async_refresh_site_energy(force=True)
+    assert client.lifetime_energy.await_count == 2
+    assert manager.site_energy["consumption"].value_kwh == 1
 
 
 @pytest.mark.asyncio

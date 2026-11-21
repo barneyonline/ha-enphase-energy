@@ -205,10 +205,15 @@ does not obtain missing credentials. Use the integration options' Authentication
 menu to start reauthentication when the stored credentials are incomplete.
 
 An entry's public `runtime_active` boundary prevents retired coordinators from
-publishing updates, refreshing, or retaining new background tasks. Unload retires
-the runtime before awaited resource cleanup. Tariff follow-up stages check that
-boundary around external awaits; an already acknowledged cloud write keeps its
-result without starting additional work on the retired entry.
+publishing updates, refreshing, or retaining new background tasks. Entry unload
+waits for platform shutdown and runtime teardown even if its caller is cancelled,
+so Home Assistant can finish the config entry state transition. Tariff follow-up
+stages check retirement around external awaits. An acknowledged cloud write
+keeps its result without starting additional work on the retired entry.
+Refresh plans check retirement before invoking each scheduled callback and skip
+its late error handling. Device inventory also guards both the gateway phase-map
+and the inventory request at the transport and result boundaries. Retired inventory batches discard pending topology notifications
+as they unwind.
 
 Authentication refresh uses its own lock and one shared, cancellation-shielded
 login task, so a 401 during a poll cannot reacquire the poll lock. JSON and HTML login-wall
@@ -217,7 +222,10 @@ retry once before surfacing an authentication failure. Both paths preserve
 endpoint policies that disable stored-credential refresh. Failed login-wall
 refreshes retain the typed login-wall error so BatteryConfig can try alternate
 credentials and the refresh runner can apply rejected-login cooldowns. Each retry
-builds authentication headers from current credentials. Startup enrichment
+builds authentication headers from current credentials. Entry retirement cancels
+the shared login and discards its late result before any auth state or Repairs
+update. A waiting manual reauthentication call returns failure without setting
+a retry cooldown when retirement cancels its login. Startup enrichment
 merges its changes into current charger data after awaits, preserving intervening
 commands, polls, and removals.
 
@@ -1011,13 +1019,29 @@ the last successful cache and source-progress timestamps intact. These fetch dia
 before any successful payload, independently of the existing service/backoff
 policy. They contain no raw payloads or exception messages.
 
-Site-energy acquisition is serialized within its manager. Callers overlapping one
-attempt reuse its completion, while cancellation or invalidation lets queued
-callers acquire fresh data. Invalidation rejects the older result before parsing
-can change guards or published source metadata. Sequential forced reads accept
-same-clock corrections. Regressed and excessively future-dated reports leave
-the last accepted flows and their source metadata intact. Request throttling
-also applies when a clock-rejected primary response has no usable flows.
+Site-energy acquisition is serialized within its manager. Queued callers share
+a completed fetch in the current cache generation. Skipped polls leave queued
+forced reads eligible to run. Cancellation releases waiters and preserves a
+pending reset confirmation in the active generation. Entry retirement prevents
+queued reads and further enrichment. Warmup and polling exit before syncing site
+energy discovery or Repairs for a retired entry. Charger status and secondary
+EVSE warmup reads are guarded before transport dispatch. Warmup also checks
+retirement between the charge mode, green battery, auth, and charger
+configuration lookups. A late status response cannot update status, auth
+Repairs, or retry backoff. The primary and HEMS lifetime paths discard superseded
+results before changing energy data, shared HEMS capability, or the manager's
+fallback cooldown and auth state. Guarded reads check validity before HTTP
+dispatch, including redirects and retries, before accepting response cookies,
+and before reauthentication. The guarded read session shares Home Assistant's
+connector and cookie jar and checks validity again after acquiring a
+connection. Pending guarded requests unwind before session detachment, even if
+the unload caller is cancelled. An in-flight HEMS
+lifetime response from replaced credentials leaves primary flows eligible for
+publication and cannot change the fallback state for the new credentials.
+Sequential forced reads accept same-clock corrections. Regressed and excessively
+future-dated reports leave the last accepted flows and their source metadata
+intact. Ordinary refresh throttling applies to every completed response,
+including one with no usable flows.
 A supplied malformed primary timestamp is recorded as an invalid payload
 before optional enrichment or counter aggregation. An absent timestamp remains
 supported. The accepted cache retains its original age. Optional HEMS lifetime
@@ -1030,9 +1054,9 @@ Site-energy and EVSE timeseries transport/general fetch failures use independent
 transient streaks with local delays of 60, 120, 240, 480 and at most 900 seconds,
 including up to ten percent positive jitter below the cap. Valid acquisitions
 reset those streaks; cancellation is not a failure. Recognized service outages
-retain their existing cooldowns, and malformed-payload handling is unchanged.
-Forced reads bypass successful-cache freshness, never an active failure or
-provider deadline. Accepted payloads and source clocks are retained during errors.
+retain their existing cooldowns. Forced reads bypass the ordinary refresh
+interval while respecting active failure or provider deadlines. Accepted
+payloads and source clocks are retained during errors.
 The HEMS lifetime fallback uses the longer of its one-hour local cooldown, a
 numeric or HTTP-date Retry-After (including wrapped HTTP errors), and any existing
 later deadline. Its authentication circuit remains independent.
@@ -1051,6 +1075,10 @@ requests cannot displace newer dates. Authoritative serial pruning removes
 retired charger records from daily and lifetime payloads, and runtime retirement
 invalidates outstanding reads before clearing caches. These policies are local
 runtime state and introduce no persisted settings or migrations.
+
+Within one lifetime-energy response, grid and battery fallback calculations
+reuse the totals and usable counts for site channels. When HEMS fills a device
+channel, aggregation reuses its separately computed total and count.
 
 ### Microinverter Telemetry Rate Limits
 

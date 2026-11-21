@@ -21,6 +21,7 @@ from ..request_metrics import record_request_attempt
 from .vpp_auth import select_vpp_fallback
 from .errors import (
     EnphaseLoginWallUnauthorized,
+    EnlightenReadSuperseded,
     InvalidPayloadError,
     HttpUnauthorized,
     _is_enphase_login_wall,
@@ -44,6 +45,8 @@ from .common import (
     _timed_response_context,
     _timed_response_json,
     _timed_response_text,
+    check_enlighten_read_current,
+    has_guarded_read_scope,
 )
 
 
@@ -206,13 +209,27 @@ async def _json(
                 async with self._request_session(
                     cookie_header_only=use_cookie_header_only
                 ) as request_session:
+                    check_enlighten_read_current()
+                    request_kwargs = kwargs
+                    if has_guarded_read_scope():
+                        request_kwargs = {
+                            **kwargs,
+                            "middlewares": (
+                                _guard_enlighten_read_response,
+                                *_request_middlewares(
+                                    request_session, kwargs.get("middlewares")
+                                ),
+                                _guard_enlighten_read_attempt,
+                            ),
+                        }
                     self._request_count += 1
                     record_request_attempt()
                     async with _timed_response_context(
                         request_session.request(
-                            method, url, headers=base_headers, **kwargs
+                            method, url, headers=base_headers, **request_kwargs
                         )
                     ) as r:
+                        check_enlighten_read_current()
                         if r.status == 401:
                             self._last_unauthorized_request = safe_request_label
                             hems_api_endpoint = self._is_hems_api_endpoint(
@@ -232,6 +249,7 @@ async def _json(
                                 attempt += 1
                                 with _enlighten_reauth_read_scope():
                                     reauth_ok = await self._reauth_cb()
+                                check_enlighten_read_current()
                                 if reauth_ok:
                                     _LOGGER.debug(
                                         "Stored-credential refresh succeeded for %s; retrying request",
@@ -287,6 +305,7 @@ async def _json(
                                 Exception
                             ):  # noqa: BLE001 - fall back to generic message
                                 body_text = None
+                            check_enlighten_read_current()
                             response_error = make_response_error(r, body_text)
                             message = response_error.message
                             family = _request_failure_debug_family(
@@ -410,6 +429,7 @@ async def _json(
                                 body_text = (
                                     f"<unavailable:{text_err.__class__.__name__}>"
                                 )
+                            check_enlighten_read_current()
                             if _is_enphase_login_wall(
                                 endpoint=endpoint or None,
                                 payload=body_text,
@@ -435,6 +455,7 @@ async def _json(
                                         # Preserve login-wall-specific token variants
                                         # and rejected-refresh cooldown handling.
                                         reauth_ok = False
+                                    check_enlighten_read_current()
                                     if reauth_ok:
                                         continue
                                 raise self._login_wall_unauthorized(
@@ -462,11 +483,51 @@ async def _json(
                                 payload=body_text,
                                 log_warning=log_invalid_payload,
                             ) from err
+                        check_enlighten_read_current()
                         if allow_empty_success and payload is None:
                             payload = {}
                         if mark_payload_success:
                             self._mark_payload_healthy(endpoint or None)
                         return payload
+
+
+def _request_middlewares(
+    session: aiohttp.ClientSession,
+    override: Sequence[aiohttp.ClientMiddlewareType] | None,
+) -> Sequence[aiohttp.ClientMiddlewareType]:
+    """Resolve an explicit middleware chain or the session defaults."""
+
+    if override is not None:
+        return override
+    # aiohttp has no public accessor for the injected session's defaults.
+    return cast(
+        Sequence[aiohttp.ClientMiddlewareType], getattr(session, "_middlewares", ())
+    )
+
+
+async def _guard_enlighten_read_attempt(
+    request: aiohttp.ClientRequest,
+    handler: Callable[[aiohttp.ClientRequest], Awaitable[aiohttp.ClientResponse]],
+) -> aiohttp.ClientResponse:
+    """Check again on each redirect or transparent retry before sending it."""
+
+    check_enlighten_read_current()
+    return await handler(request)
+
+
+async def _guard_enlighten_read_response(
+    request: aiohttp.ClientRequest,
+    handler: Callable[[aiohttp.ClientRequest], Awaitable[aiohttp.ClientResponse]],
+) -> aiohttp.ClientResponse:
+    """Reject obsolete responses before aiohttp applies shared session cookies."""
+
+    response = await handler(request)
+    try:
+        check_enlighten_read_current()
+    except EnlightenReadSuperseded:
+        response.close()
+        raise
+    return response
 
 
 def _single_attempt_middleware() -> aiohttp.ClientMiddlewareType:
@@ -503,12 +564,8 @@ async def _text_response(
     reject_statuses_from_headers = kwargs.pop("reject_statuses_from_headers", ())
     if not kwargs.pop("allow_replay", True):
         allow_reauth = False
-        middlewares = kwargs.get("middlewares")
-        if middlewares is None:
-            # aiohttp has no public accessor for the injected session's defaults.
-            middlewares = getattr(self._s, "_middlewares", ())
         kwargs["middlewares"] = (
-            *cast(Sequence[aiohttp.ClientMiddlewareType], middlewares),
+            *_request_middlewares(self._s, kwargs.get("middlewares")),
             _single_attempt_middleware(),
         )
     extra_headers = kwargs.pop("headers", None)
