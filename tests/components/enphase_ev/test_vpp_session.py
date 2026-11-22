@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock
 import aiohttp
 import pytest
 import pytest_asyncio
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 from homeassistant.helpers.redact import async_redact_data
 from homeassistant.util import dt as dt_util
 from yarl import URL

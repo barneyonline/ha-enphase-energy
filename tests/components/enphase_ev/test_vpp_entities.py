@@ -254,7 +254,7 @@ async def test_disabled_vpp_removes_registered_calendar(
 async def test_vpp_deadlines_publish_state_without_polling(
     hass, coordinator_factory, config_entry, monkeypatch, kind
 ):
-    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+    from pytest_homeassistant.common import async_fire_time_changed
     from custom_components.enphase_ev import vpp_runtime as runtime_module
 
     now = [dt_util.utcnow()]

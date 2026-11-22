@@ -8,7 +8,7 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTEST_DISABLE_PLUGIN_AUTOLOAD=0 \
-    PYTEST_PLUGINS=pytest_asyncio.plugin,pytest_homeassistant_custom_component.plugins \
+    PYTEST_PLUGINS=pytest_asyncio.plugin,pytest_socket,pytest_homeassistant.bootstrap \
     PYTEST_ASYNCIO_MODE=strict \
     PYTEST_ASYNCIO_DEFAULT_FIXTURE_LOOP_SCOPE=function
 

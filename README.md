@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/barneyonline/ha-enphase-energy/releases"><img src="https://img.shields.io/github/v/release/barneyonline/ha-enphase-energy?display_name=tag&amp;sort=semver" alt="Latest release"></a>
-  <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=barneyonline&amp;repository=ha-enphase-energy&amp;category=integration"><img src="https://img.shields.io/badge/HACS-Default-41BDF5.svg" alt="Open Enphase Energy in HACS"></a>
+  <a href="https://my.home-assistant.io/redirect/marketplace_repository/?owner=barneyonline&amp;repository=ha-enphase-energy&amp;category=integration"><img src="https://my.home-assistant.io/badges/marketplace_repository.svg" alt="Open Enphase Energy in Home Assistant Marketplace"></a>
   <a href="https://github.com/barneyonline/ha-enphase-energy/wiki/Service-Status-History"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fbarneyonline%2Fha-enphase-energy%40service-status%2Fstatus_badge.json&amp;cacheSeconds=60" alt="Enphase service status"></a>
 </p>
 
@@ -124,13 +124,15 @@ energy counters are unchanged.
 
 ## Get started
 
-1. [Open Enphase Energy in HACS](https://my.home-assistant.io/redirect/hacs_repository/?owner=barneyonline&repository=ha-enphase-energy&category=integration).
-2. Install and restart Home Assistant.
-3. Add the integration and sign in with your Enlighten credentials. MFA is supported.
+1. [Open Enphase Energy in Home Assistant Marketplace](https://my.home-assistant.io/redirect/marketplace_repository/?owner=barneyonline&repository=ha-enphase-energy&category=integration).
+2. Select **Install** to open the integration setup.
+3. Sign in with your Enlighten credentials. MFA is supported.
 
 Enter your Home Assistant URL if prompted by the link.
 
-Requires **Home Assistant 2026.10.0+** (Python 3.14+).
+Requires **Home Assistant 2026.11.0+** (Python 3.14+).
+
+Home Assistant migrates existing HACS installations to Marketplace when you upgrade.
 
 See the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki) for installation, setup and troubleshooting.
 
@@ -150,6 +152,7 @@ See the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki) for insta
 - Guided setup with site, device-category, and multi-gateway selection
 - Site and battery energy monitoring for the Home Assistant Energy Dashboard
 - EV charging controls, actual charging status, and session history
+- Charging and schedule sync actions can target an area or group and exclude individual charger devices.
 - Battery profiles, reserve settings, schedules, and supported PowerMatch controls
 - Array monitoring and optional per-microinverter energy and power sensors
 - Heat-pump status, SG-Ready mode, and energy monitoring
@@ -161,7 +164,35 @@ See the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki) for insta
 - Cloud recovery, health diagnostics, and automation actions
 - User-facing strings localized in more than 20 languages
 
+For a manual Grid Mode change, open the integration's options and select
+**Advanced → Grid Mode**. Enter the one-time code in that form. Administrators
+can see codes submitted through the `enphase_ev.set_grid_mode` action in
+**Settings → Tools → Action history**.
+
 </details>
+
+### Action target exclusions
+
+To remove a whole charger from an area action, exclude the **device**. Excluding
+its switch removes the switch from entity selection. The charger can still be
+selected through the area as a device. [Home Assistant target exclusions](https://www.home-assistant.io/blog/2026/11/04/release-202611/#exclude-items-from-a-target)
+
+For site actions with exclusions, a supplied site or config entry must match a
+site left in the target. Tariff writes also have to match a supplied Home
+Assistant target when the call names rates directly. A single-rate update through
+an area or group requires one eligible rate. If the target contains rates at
+several sites, use a site or config entry to narrow the selection. A batch that
+explicitly includes an excluded rate is rejected before any rates are written.
+
+### Energy dashboard statistics
+
+Use Enphase's native energy totals where available. For eligible sources that
+only expose power, the Energy dashboard can offer to create or reuse an energy
+helper. [Home Assistant power-to-energy setup](https://www.home-assistant.io/blog/2026/11/04/release-202611/#from-power-to-energy-in-one-step)
+
+If a bad reading affected an existing statistic, open **Settings → Tools →
+Statistics**, select the affected statistic, and preview the exact time range
+before deleting it. [Home Assistant statistics troubleshooting](https://www.home-assistant.io/blog/2026/11/04/release-202611/#remove-bad-readings-from-your-history)
 
 <details>
 <summary>Migrating from Enphase Envoy</summary>

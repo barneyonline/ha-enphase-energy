@@ -7,7 +7,7 @@ from homeassistant import config_entries
 from homeassistant.const import UnitOfEnergy
 from homeassistant.core import State
 from homeassistant.helpers import entity_registry as er
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.enphase_ev.const import CONF_SITE_ID, DOMAIN
 from custom_components.enphase_ev.envoy_history import (

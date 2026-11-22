@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 from homeassistant.core import ServiceCall
 from homeassistant.helpers import device_registry as dr, entity_registry as er, target
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.enphase_ev.const import DOMAIN
 from custom_components.enphase_ev.service_routing import ServiceRouter
@@ -74,7 +74,9 @@ async def test_service_routing_expands_targets_once(hass, monkeypatch, resolve_s
     if resolve_site:
         assert await router._resolve_site_ids_from_call(call) == {"selected-site"}
     else:
-        assert set(router._extract_device_ids(call)) == {
+        assert router._device_ids_from_target_references(
+            router._resolve_target(call)
+        ) == {
             devices[0].id,
             devices[1].id,
             "missing-device",

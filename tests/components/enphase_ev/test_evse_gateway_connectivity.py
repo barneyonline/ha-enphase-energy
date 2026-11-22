@@ -9,7 +9,7 @@ import pytest
 from freezegun import freeze_time
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import async_fire_time_changed
+from pytest_homeassistant.common import async_fire_time_changed
 
 from custom_components.enphase_ev.binary_sensor_gateway import (
     GatewayConnectedBinarySensor,

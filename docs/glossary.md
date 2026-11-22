@@ -61,7 +61,7 @@ Home Energy Management System. In this integration, HEMS endpoints provide extra
 A HEMS-supported load type. Heat-pump entities may come from dedicated HEMS inventory and runtime endpoints rather than generic site inventory alone.
 
 **Dry contact**  
-Relay-style auxiliary contacts exposed by some Enphase systems. These are treated as concrete child devices rather than aggregate inventory type devices.
+Relay-style auxiliary contacts reported in the gateway's Dry Contacts inventory sensor.
 
 ## API And Data Terms
 

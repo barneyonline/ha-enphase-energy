@@ -854,7 +854,7 @@ def test_remove_empty_inactive_serial_devices_handles_guard_paths(
 async def test_retire_ac_battery_entities_preserves_other_families_and_owners(
     hass: HomeAssistant, config_entry, keep_device: bool
 ) -> None:
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from pytest_homeassistant.common import MockConfigEntry
 
     from custom_components.enphase_ev.registry_migrations import (
         _remove_retired_ac_battery_entities,

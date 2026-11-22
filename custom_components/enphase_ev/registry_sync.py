@@ -55,7 +55,6 @@ _CHARGER_ENTITY_UNIQUE_ID_SUFFIXES_BY_DOMAIN: dict[str, tuple[str, ...]] = {
     "binary_sensor": CHARGER_BINARY_SENSOR_UNIQUE_SUFFIXES,
     "sensor": CHARGER_SENSOR_UNIQUE_SUFFIXES,
 }
-_TYPE_DEVICE_KEYS_WITH_DIRECT_CHILD_DEVICES: tuple[str, ...] = ("iqevse",)
 
 
 def _sync_type_devices(
@@ -63,26 +62,20 @@ def _sync_type_devices(
     coord: EnphaseCoordinator,
     dev_reg: dr.DeviceRegistry,
     site_id: object,
-) -> dict[str, object]:
+) -> None:
     """Create or update type devices from coordinator inventory."""
 
     inventory_view = coord.inventory_view
-    type_devices: dict[str, object] = {}
-    type_devices_by_identifier: dict[tuple[str, str], object] = {}
+    registered_identifiers: set[tuple[str, str]] = set()
     type_keys = list(inventory_view.iter_type_keys())
     for type_key in type_keys:
         normalized = normalize_type_key(type_key)
-        if is_dry_contact_type_key(type_key) or (
-            normalized in _TYPE_DEVICE_KEYS_WITH_DIRECT_CHILD_DEVICES
-        ):
-            # Dry-contact and EV charger members get concrete child devices, so
-            # adding another aggregate type device would duplicate the hierarchy.
+        if is_dry_contact_type_key(type_key) or normalized == "iqevse":
+            # Chargers have a device per serial. Dry contacts are reported on
+            # the gateway's inventory sensor.
             continue
         ident = inventory_view.type_identifier(type_key)
-        if ident is None:
-            continue
-        if ident in type_devices_by_identifier:
-            type_devices[type_key] = type_devices_by_identifier[ident]
+        if ident is None or ident in registered_identifiers:
             continue
         label = inventory_view.type_label(type_key)
         name = inventory_view.type_device_name(type_key)
@@ -103,20 +96,19 @@ def _sync_type_devices(
         )
         if not label or not name:
             continue
-        kwargs = {
-            "config_entry_id": entry.entry_id,
-            "identifiers": {ident},
-            "manufacturer": "Enphase",
-            "configuration_url": _site_configuration_url(site_id),
-            "name": name,
-            "model": model,
-        }
         # Keep registry fields aligned with current coordinator data: clear stale
         # values by passing explicit None when helper methods return no value.
-        kwargs["hw_version"] = hw_version
-        kwargs["serial_number"] = serial_number
-        kwargs["model_id"] = model_id
-        kwargs["sw_version"] = sw_version
+        info = dr.DeviceInfo(
+            identifiers={ident},
+            manufacturer="Enphase",
+            configuration_url=_site_configuration_url(site_id),
+            name=name,
+            model=model,
+            hw_version=hw_version,
+            serial_number=serial_number,
+            model_id=model_id,
+            sw_version=sw_version,
+        )
         existing = dev_reg.async_get_device_by_identifier(ident, entry.entry_id)
         changes: list[str] = []
         if existing is None:
@@ -128,13 +120,13 @@ def _sync_type_devices(
                 changes.append("manufacturer")
             if existing.model != model:
                 changes.append("model")
-            if existing.hw_version != kwargs.get("hw_version"):
+            if existing.hw_version != info.hw_version:
                 changes.append("hw_version")
-            if getattr(existing, "serial_number", None) != kwargs.get("serial_number"):
+            if existing.serial_number != info.serial_number:
                 changes.append("serial_number")
-            if getattr(existing, "model_id", None) != kwargs.get("model_id"):
+            if existing.model_id != info.model_id:
                 changes.append("model_id")
-            if getattr(existing, "sw_version", None) != kwargs.get("sw_version"):
+            if existing.sw_version != info.sw_version:
                 changes.append("sw_version")
         if changes:
             _LOGGER.debug(
@@ -143,10 +135,10 @@ def _sync_type_devices(
                 type_key,
                 redact_site_id(site_id),
             )
-        created = dev_reg.async_get_or_create(**kwargs)
-        type_devices[type_key] = created
-        type_devices_by_identifier[ident] = created
-    return type_devices
+        dev_reg.async_get_or_create_from_info(
+            config_entry_id=entry.entry_id, device_info=info
+        )
+        registered_identifiers.add(ident)
 
 
 def _inventory_type_device_sw_version_for_registry(
@@ -172,9 +164,8 @@ def _sync_charger_devices(
     coord: EnphaseCoordinator,
     dev_reg: dr.DeviceRegistry,
     site_id: object,
-    type_devices: dict[str, object],
 ) -> None:
-    """Create or update charger devices and parent links."""
+    """Create or update charger devices and clear obsolete hub links."""
     iter_serials = getattr(coord, "iter_serials", None)
     serials = list(iter_serials()) if callable(iter_serials) else []
     data_source = coord.data if isinstance(getattr(coord, "data", None), dict) else {}
@@ -183,33 +174,33 @@ def _sync_charger_devices(
         display_name = _normalize_evse_display_name(d.get("display_name"))
         fallback_name = _normalize_evse_display_name(d.get("name"))
         dev_name = display_name or fallback_name or f"Charger {sn}"
-        kwargs = {
-            "config_entry_id": entry.entry_id,
-            "identifiers": {(DOMAIN, sn)},
-            "manufacturer": "Enphase",
-            "configuration_url": _site_configuration_url(site_id),
-            "name": dev_name,
-            "serial_number": str(sn),
-            "via_device_id": None,
-        }
         model_name_raw = d.get("model_name")
         model_display = _compose_charger_model_display(
             display_name,
             model_name_raw,
             dev_name,
         )
-        if model_display:
-            kwargs["model"] = model_display
         model_id = _clean_optional_text(d.get("model_id") or model_name_raw)
-        kwargs["model_id"] = (
-            None if _is_redundant_model_id(model_display, model_id) else model_id
+        info = dr.DeviceInfo(
+            identifiers={(DOMAIN, sn)},
+            manufacturer="Enphase",
+            configuration_url=_site_configuration_url(site_id),
+            name=dev_name,
+            serial_number=str(sn),
+            model_id=(
+                None if _is_redundant_model_id(model_display, model_id) else model_id
+            ),
+            via_device_id=None,
         )
+        # Omit model and version fields when charger telemetry is incomplete.
+        if model_display:
+            info.model = model_display
         hw = d.get("hw_version")
         if hw:
-            kwargs["hw_version"] = str(hw)
+            info.hw_version = str(hw)
         sw = d.get("sw_version")
         if sw:
-            kwargs["sw_version"] = str(sw)
+            info.sw_version = str(sw)
 
         changes: list[str] = []
         existing = dev_reg.async_get_device_by_identifier((DOMAIN, sn), entry.entry_id)
@@ -234,7 +225,7 @@ def _sync_charger_devices(
                 changes.append("manufacturer")
             if model_display and existing.model != model_display:
                 changes.append("model")
-            if getattr(existing, "model_id", None) != kwargs["model_id"]:
+            if existing.model_id != info.model_id:
                 changes.append("model_id")
             if hw and existing.hw_version != str(hw):
                 changes.append("hw_version")
@@ -249,7 +240,9 @@ def _sync_charger_devices(
                 redact_identifier(sn),
                 redact_site_id(site_id),
             )
-        dev_reg.async_get_or_create(**kwargs)
+        dev_reg.async_get_or_create_from_info(
+            config_entry_id=entry.entry_id, device_info=info
+        )
 
 
 def _serial_entity_group_from_unique_id(
@@ -462,8 +455,8 @@ def _sync_registry_devices(
     hass: HomeAssistant | None = None,
     cleanup: bool = True,
 ) -> None:
-    type_devices = _sync_type_devices(entry, coord, dev_reg, site_id)
-    _sync_charger_devices(entry, coord, dev_reg, site_id, type_devices)
+    _sync_type_devices(entry, coord, dev_reg, site_id)
+    _sync_charger_devices(entry, coord, dev_reg, site_id)
     if hass is not None and cleanup:
         _prune_inactive_serial_entities(hass, entry, coord, site_id)
         _remove_empty_inactive_serial_devices(hass, entry, coord, dev_reg, site_id)
@@ -478,9 +471,7 @@ def _registry_type_metadata_signature(
     signature: list[tuple[object, ...]] = []
     for type_key in type_keys:
         normalized = normalize_type_key(type_key)
-        if is_dry_contact_type_key(type_key) or (
-            normalized in _TYPE_DEVICE_KEYS_WITH_DIRECT_CHILD_DEVICES
-        ):
+        if is_dry_contact_type_key(type_key) or normalized == "iqevse":
             continue
         normalized = normalized or _clean_optional_text(type_key) or ""
         ident = inventory_view.type_identifier(type_key)
@@ -488,11 +479,7 @@ def _registry_type_metadata_signature(
         device_info = (
             device_info_getter(type_key) if callable(device_info_getter) else None
         )
-        # HA 2026.11 DeviceInfo is a dataclass; as_dict omits its unset fields.
-        device_info_as_dict = getattr(device_info, "as_dict", None)
-        if callable(device_info_as_dict):
-            device_info = device_info_as_dict()
-        if isinstance(device_info, dict):
+        if isinstance(device_info, dr.DeviceInfo):
             # InventoryView caches this compact metadata independently of
             # telemetry. Avoid rescanning every member for each scalar getter.
             signature.append(
@@ -501,14 +488,14 @@ def _registry_type_metadata_signature(
                     ident,
                     _clean_optional_text(inventory_view.type_label(type_key)),
                     *(
-                        _clean_optional_text(device_info.get(key))
-                        for key in (
-                            "name",
-                            "model",
-                            "hw_version",
-                            "serial_number",
-                            "model_id",
-                            "sw_version",
+                        _clean_optional_text(value) if isinstance(value, str) else None
+                        for value in (
+                            device_info.name,
+                            device_info.model,
+                            device_info.hw_version,
+                            device_info.serial_number,
+                            device_info.model_id,
+                            device_info.sw_version,
                         )
                     ),
                 )

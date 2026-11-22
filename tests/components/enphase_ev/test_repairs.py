@@ -13,7 +13,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.enphase_ev.api import EnphaseLoginWallUnauthorized, Unauthorized
 from custom_components.enphase_ev.const import DOMAIN, ISSUE_BATTERY_PROFILE_PENDING

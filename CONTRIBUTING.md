@@ -33,6 +33,10 @@ Before opening a bug or device-support issue, capture diagnostics in Home Assist
 
 Include the integration version, Home Assistant version, affected entity IDs, device model or firmware details, and whether the issue started after an update.
 
+For a reproducible problem, enable debug logging from the Enphase Energy
+integration menu and select **Show logs** in the debug banner. Review the log
+before sharing it and omit Grid Mode action history that contains an OTP.
+
 ## Development Workflow
 
 1. **Fork and clone** the repository.
@@ -48,11 +52,11 @@ Include the integration version, Home Assistant version, affected entity IDs, de
    ```
    Reuse the running container with `docker compose exec` for subsequent checks
    to avoid paying container startup costs on every command.
-   The default `ha-dev` lane pins Home Assistant 2026.10.0, the matching test
+   The default `ha-dev` lane pins Home Assistant 2026.11.0, the matching test
    plugin, and independently upgradable tooling constraints in
    `devtools/docker/constraints-dev.txt`. Rebuild after changing requirements.
-   The minimum supported Home Assistant version is 2026.10.0, paired with
-   `pytest-homeassistant-custom-component==0.13.371`. The full integration suite
+   The minimum supported Home Assistant version is 2026.11.0, paired with
+   `pytest-homeassistant==2026.11.0`. The full integration suite
    runs on this exact version in Docker and CI, so a separate minimum-version
    environment and repeated compatibility subset are unnecessary.
    Upgrade Home Assistant together with its matching test plugin and validate
@@ -216,7 +220,7 @@ mkdir -p .ha-config
 bash devtools/cloud/environment.sh compose up -d ha-runtime
 ```
 
-The UI image is pinned to HA 2026.10.0. Keep it aligned with the development
+The UI image is pinned to HA 2026.11.0. Keep it aligned with the development
 requirements when upgrading HA. Cloud runtime certificate trust is mounted for
 this service too. No Enphase credentials are needed for the mocked test suites.
 Saving or publishing a cloud template is a separate platform operation; running

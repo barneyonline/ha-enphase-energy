@@ -42,6 +42,7 @@ AREA_LABEL_MAP = {
 NO_SOURCE_SELECTIONS = {"Other"}
 
 SOURCE_LABEL_MAP = {
+    "Home Assistant Marketplace": "source/marketplace",
     "HACS": "source/hacs",
     "Manual install in custom_components": "source/manual-install",
     "Development checkout": "source/dev-checkout",
@@ -113,6 +114,10 @@ LABEL_DEFINITIONS = {
     "area/tooling": {
         "color": "1D76DB",
         "description": "Developer workflow or repository tooling",
+    },
+    "source/marketplace": {
+        "color": "5319E7",
+        "description": "Installed via Home Assistant Marketplace",
     },
     "source/hacs": {
         "color": "5319E7",

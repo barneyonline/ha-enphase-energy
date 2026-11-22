@@ -30,6 +30,7 @@ body:
     attributes:
       label: Installation method
       options:
+        - Home Assistant Marketplace
         - HACS
         - Manual install in custom_components
         - Development checkout

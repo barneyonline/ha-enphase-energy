@@ -447,7 +447,7 @@ async def test_runtime_isolates_authorization_failures_and_recovers(
 async def test_coordinator_refresh_isolates_vpp_401_with_cooldown(
     hass, coordinator_factory, monkeypatch, method: str, family: str
 ) -> None:
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from pytest_homeassistant.common import MockConfigEntry
 
     from custom_components.enphase_ev.const import DOMAIN
     from custom_components.enphase_ev.coordinator import RefreshPipelineContext

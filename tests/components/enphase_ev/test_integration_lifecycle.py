@@ -7,6 +7,7 @@ import inspect
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+from aiohttp import ClientResponseError, RequestInfo
 import pytest
 from freezegun import freeze_time
 from homeassistant.config_entries import ConfigEntryState
@@ -18,13 +19,15 @@ from homeassistant.helpers.aiohttp_client import (
     async_get_clientsession,
 )
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import async_fire_time_changed
+from pytest_homeassistant.common import async_fire_time_changed
+from yarl import URL
 
 from custom_components.enphase_ev.api import EnphaseEVClient
 from custom_components.enphase_ev.const import (
     CONF_SELECTED_TYPE_KEYS,
     CONF_SERIALS,
     CONF_SITE_ONLY,
+    OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_WEATHER_ENABLED,
 )
 from .random_ids import RANDOM_SERIAL
@@ -138,6 +141,86 @@ async def _finish_startup(hass, entry):
     assert warmup is not None
     await asyncio.wait_for(asyncio.shield(warmup), 5)
     await hass.async_block_till_done()
+
+
+@pytest.mark.session_history_real
+async def test_computed_names_of_grouped_devices_and_main_charger(
+    hass, config_entry, platform_cloud
+):
+    """Core composes names from the device and independent entity names."""
+    responses, _, unexpected = platform_cloud
+    inverter_serials = ("INV-A", "INV-B")
+    battery_names = {"BAT-A": "Rack left", "BAT-B": None}
+    responses["devices_inventory"]["result"].append(
+        {
+            "type": "encharge",
+            "devices": [{"serial_number": serial} for serial in battery_names],
+        }
+    )
+    responses["battery_site_settings"] = {"data": {"hasEncharge": True}}
+    responses["battery_status"] = {
+        "storages": [
+            {"serial_number": serial, "name": name, "current_charge": 70}
+            for serial, name in battery_names.items()
+        ]
+    }
+    responses["inverters_inventory"] = {
+        "inverters": [{"serial_number": serial} for serial in inverter_serials],
+        "total": len(inverter_serials),
+    }
+    responses["system_dashboard_master_data"] = {}
+    responses["system_dashboard_data_columns"] = {}
+    hass.config_entries.async_update_entry(
+        config_entry,
+        data={
+            **config_entry.data,
+            CONF_SELECTED_TYPE_KEYS: ["envoy", "encharge", "microinverter", "iqevse"],
+        },
+        options={
+            **config_entry.options,
+            OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED: True,
+        },
+    )
+
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await _finish_startup(hass, config_entry)
+    registry = er.async_get(hass)
+    entries = {
+        entry.unique_id: entry
+        for entry in er.async_entries_for_config_entry(registry, config_entry.entry_id)
+    }
+    site = config_entry.runtime_data.coordinator.site_id
+
+    batteries = [
+        entries[f"enphase_ev_site_{site}_battery_{serial}_charge_level"]
+        for serial in battery_names
+    ]
+    assert len({entry.device_id for entry in batteries}) == 1
+    assert [er.async_get_full_entity_name(hass, entry) for entry in batteries] == [
+        "IQ Battery Rack left",
+        "IQ Battery BAT-B",
+    ]
+    inverters = [
+        entries[f"enphase_ev_inverter_{serial}_lifetime_energy"]
+        for serial in inverter_serials
+    ]
+    assert len({entry.device_id for entry in inverters}) == 1
+    assert [er.async_get_full_entity_name(hass, entry) for entry in inverters] == [
+        "IQ Microinverters INV-A Lifetime Energy",
+        "IQ Microinverters INV-B Lifetime Energy",
+    ]
+
+    charger = entries[f"enphase_ev_{RANDOM_SERIAL}_charging_switch"]
+    assert charger.original_name is None
+    assert er.async_get_full_entity_name(hass, charger) == "Garage EV"
+    dr.async_get(hass).async_update_device(
+        charger.device_id, name_by_user="Driveway EV"
+    )
+    assert er.async_get_full_entity_name(hass, charger) == "Driveway EV"
+    assert registry.async_get_entity_id("switch", "enphase_ev", charger.unique_id) == (
+        charger.entity_id
+    )
+    assert unexpected == [], ", ".join(unexpected)
 
 
 @pytest.mark.session_history_real
@@ -407,3 +490,55 @@ async def test_gateway_connectivity_publishes_summary_invalidity_and_recovery(
         unsubscribe()
         assert await hass.config_entries.async_unload(config_entry.entry_id)
         await hass.async_block_till_done()
+
+
+async def test_cold_setup_retries_after_enphase_rate_limit(
+    hass, config_entry, platform_cloud, freezer
+):
+    """Let Core schedule a second setup at the first refresh's retry deadline."""
+    _, calls, unexpected = platform_cloud
+    hass.config_entries.async_update_entry(
+        config_entry, data={**config_entry.data, CONF_SELECTED_TYPE_KEYS: ["iqevse"]}
+    )
+    status = calls["status"]
+    healthy_status = status.side_effect
+    status_url = URL("https://enphase.example.test/evse/status")
+    status.side_effect = ClientResponseError(
+        RequestInfo(status_url, "GET", {}, status_url),
+        (),
+        status=429,
+        headers={"Retry-After": "1200"},
+    )
+
+    assert not await hass.config_entries.async_setup(config_entry.entry_id)
+    assert config_entry.state is ConfigEntryState.SETUP_RETRY
+    assert getattr(config_entry, "runtime_data", None) is None
+    status.assert_awaited_once()
+
+    status.side_effect = healthy_status
+    freezer.tick(timedelta(seconds=1199))
+    async_fire_time_changed(hass, dt_util.utcnow())
+    await hass.async_block_till_done()
+    assert config_entry.state is ConfigEntryState.SETUP_RETRY
+    status.assert_awaited_once()
+
+    loaded = asyncio.Event()
+
+    @callback
+    def signal_loaded():
+        if config_entry.state is ConfigEntryState.LOADED:
+            loaded.set()
+
+    unsubscribe = config_entry.async_on_state_change(signal_loaded)
+    try:
+        freezer.tick(timedelta(seconds=2))
+        async_fire_time_changed(hass, dt_util.utcnow())
+        await asyncio.wait_for(loaded.wait(), timeout=5)
+    finally:
+        unsubscribe()
+
+    assert config_entry.state is ConfigEntryState.LOADED
+    await _finish_startup(hass, config_entry)
+    assert status.await_count == 2
+    assert unexpected == []
+    assert await hass.config_entries.async_unload(config_entry.entry_id)

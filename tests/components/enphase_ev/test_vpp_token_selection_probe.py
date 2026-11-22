@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp
 import pytest
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 from yarl import URL
 
 from custom_components.enphase_ev import api

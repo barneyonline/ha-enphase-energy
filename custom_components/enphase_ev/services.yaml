@@ -149,6 +149,10 @@ stop_live_stream:
           example: "1234567"
 
 sync_schedules:
+  target:
+    entity:
+      integration: enphase_ev
+      domain: switch
   fields:
     device_id:
       required: false

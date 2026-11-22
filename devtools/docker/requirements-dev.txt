@@ -1,8 +1,12 @@
 # Keep the minimum Home Assistant version and its matching test plugin together.
 # Only independently upgradable repository tooling is constrained locally.
 -c constraints-dev.txt
-homeassistant==2026.10.0
-pytest-homeassistant-custom-component==0.13.371
+homeassistant==2026.11.0
+pytest-homeassistant==2026.11.0
+# Coverage and CI reporting are repository tools, independent of the HA plugin.
+coverage==7.16.2
+pytest-cov==7.1.0
+pytest-github-actions-annotate-failures==0.4.2
 packaging==26.3
 mypy==2.2.0
 ruff==0.16.4

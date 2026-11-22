@@ -6,11 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### 🚧 Breaking changes
 
-- None
+- Require Home Assistant `2026.11.0` or newer (Python `3.14`+).
 
 ### ✨ New features
 
-- None
+- Support native Home Assistant targets and exclusions in charger schedule sync and tariff actions. A site or config entry can narrow a tariff rate selection across sites.
 
 ### 🐛 Bug fixes
 
@@ -22,10 +22,16 @@ All notable changes to this project will be documented in this file.
 
 - Reuse per-channel lifetime-energy totals across calculations.
 - On Home Assistant 2026.12 and newer, log charger-status outages at info level when Enphase cannot be reached.
+- Hide the manual Slew Rate in Export Limit Defaults using Home Assistant's conditional field.
+- Show the one-time code field and archived-entity option after their confirmation checkboxes are selected. Show Forget Password when Enphase credentials or the remember-password setting are stored.
+- Support excluding individual charger devices from area targets in charging actions. Charging and schedule sync skip non-chargers reached through a group.
+- Report platform unload failures using Home Assistant's translated error and keep the integration runtime active for platforms that remain loaded.
 
 ### 🔄 Other changes
 
-- None
+- Use the built-in Home Assistant Marketplace in the installation guide.
+- List Enphase Energy under Solar & Batteries and EV Charging in the Marketplace catalog.
+- Run development and CI tests against Home Assistant `2026.11.0` and its matching `pytest-homeassistant` plugin.
 
 ## v5.3.1 - 2026-11-14
 

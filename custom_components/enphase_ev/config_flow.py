@@ -149,39 +149,14 @@ class EnphaseEVConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ig
         reason: str,
         title: str | None = None,
     ) -> FlowResult:
-        has_update_listeners = bool(getattr(entry, "update_listeners", ()))
-        if has_update_listeners and callable(
-            update_and_abort := getattr(self, "async_update_and_abort", None)
-        ):
-            if title is not None:
-                return update_and_abort(
-                    entry,
-                    title=title,
-                    data=data,
-                    reason=reason,
-                )
-            return update_and_abort(entry, data=data, reason=reason)
-
-        update_reload_and_abort = getattr(self, "async_update_reload_and_abort", None)
-        if callable(update_reload_and_abort):
-            if title is not None:
-                return update_reload_and_abort(
-                    entry,
-                    title=title,
-                    data=data,
-                    reason=reason,
-                )
-            return update_reload_and_abort(entry, data=data, reason=reason)
-
-        update_kwargs: dict[str, Any] = {"data": data}
-        if title is not None:
-            update_kwargs["title"] = title
-        self.hass.config_entries.async_update_entry(entry, **update_kwargs)
-        self.hass.async_create_task(
-            self.hass.config_entries.async_reload(entry.entry_id),
-            f"reload {entry.domain} config entry {entry.entry_id}",
+        finish = (
+            self.async_update_and_abort
+            if entry.update_listeners
+            else self.async_update_reload_and_abort
         )
-        return self.async_abort(reason=reason)
+        if title is not None:
+            return finish(entry, title=title, data=data, reason=reason)
+        return finish(entry, data=data, reason=reason)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None

@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from custom_components.enphase_ev.const import OPT_EXPORT_LIMIT_CONTROLS_ENABLED
+from custom_components.enphase_ev.const import (
+    OPT_EXPORT_LIMIT_CONTROLS_ENABLED,
+    OPT_EXPORT_LIMIT_DEFAULT_WATTS,
+    OPT_EXPORT_LIMIT_SLEW_RATE,
+)
 from custom_components.enphase_ev.export_limit_runtime import (
     ExportLimitRuntime,
     ExportLimitSnapshot,
@@ -26,7 +30,11 @@ async def test_export_limit_action_menu_routes_through_flow_manager(
     hass, config_entry, action, watts
 ):
     hass.config_entries.async_update_entry(
-        config_entry, options={OPT_EXPORT_LIMIT_CONTROLS_ENABLED: True}
+        config_entry,
+        options={
+            OPT_EXPORT_LIMIT_CONTROLS_ENABLED: True,
+            OPT_EXPORT_LIMIT_SLEW_RATE: 1200.0,
+        },
     )
     coord = SimpleNamespace(hass=hass, config_entry=config_entry, site_id="test-site")
     runtime = ExportLimitRuntime(coord)
@@ -65,5 +73,16 @@ async def test_export_limit_action_menu_routes_through_flow_manager(
         )
         assert result["step_id"] == "export_limit_confirm"
         assert result["description_placeholders"]["requested"] == f"{watts} W"
-    runtime.async_prepare.assert_awaited_once()
+    if action == "export_limit_defaults":
+        # Core must strip the hidden, invalid manual value before validation.
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {"limit_watts": 2500, "restore_slew_rate": True, "slew_rate": 0},
+        )
+        assert result["type"] == "create_entry"
+        assert config_entry.options[OPT_EXPORT_LIMIT_DEFAULT_WATTS] == 2500
+        assert OPT_EXPORT_LIMIT_SLEW_RATE not in config_entry.options
+        assert runtime.async_prepare.await_count == 2
+    else:
+        runtime.async_prepare.assert_awaited_once()
     runtime.async_apply.assert_not_awaited()

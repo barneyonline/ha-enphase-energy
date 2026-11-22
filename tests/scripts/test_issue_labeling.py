@@ -167,6 +167,7 @@ I cannot capture diagnostics
 
 def test_bug_install_method_source_labels_are_mapped_correctly() -> None:
     expectations = {
+        "Home Assistant Marketplace": "source/marketplace",
         "HACS": "source/hacs",
         "Manual install in custom_components": "source/manual-install",
         "Development checkout": "source/dev-checkout",

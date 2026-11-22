@@ -14,9 +14,9 @@ from homeassistant.helpers.aiohttp_client import (
     async_get_clientsession,
 )
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import async_fire_time_changed
+from pytest_homeassistant.common import async_fire_time_changed
 
-from custom_components.enphase_ev import async_unload_entry
+from custom_components.enphase_ev import PLATFORMS, async_unload_entry
 from custom_components.enphase_ev.const import CONF_SERIALS, DOMAIN
 from custom_components.enphase_ev.coordinator import EnphaseCoordinator
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
@@ -66,7 +66,12 @@ def lifecycle_cloud(hass, monkeypatch):
     "phase", ["platform", "schedule", "unload_owner", "teardown_owner"]
 )
 async def test_framework_unload_cancellation_reaches_not_loaded(
-    hass, config_entry, lifecycle_cloud, monkeypatch, phase
+    hass,
+    config_entry,
+    lifecycle_cloud,
+    monkeypatch,
+    phase,
+    assert_expected_config_entry_unload_error,
 ):
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     coord = config_entry.runtime_data.coordinator
@@ -116,6 +121,7 @@ async def test_framework_unload_cancellation_reaches_not_loaded(
         assert result is False
         assert config_entry.state is ConfigEntryState.FAILED_UNLOAD
         assert coord.runtime_active
+        assert_expected_config_entry_unload_error(config_entry.title)
         await coord.async_close()
         return
 
@@ -429,6 +435,77 @@ async def test_reload_does_not_rediscover_retired_configured_charger(
     assert forwarded == [active_serials]
     assert config_entry.runtime_data.coordinator.iter_serials() == active_serials
     assert await hass.config_entries.async_unload(config_entry.entry_id)
+
+
+@pytest.mark.asyncio
+async def test_framework_platform_unload_failure_retains_runtime_and_translation(
+    hass,
+    config_entry,
+    lifecycle_cloud,
+    monkeypatch,
+    assert_expected_config_entry_unload_error,
+):
+    """A partially failed unload leaves the runtime active for remaining platforms."""
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    runtime = config_entry.runtime_data
+    coord = runtime.coordinator
+    platform_unload = AsyncMock(
+        side_effect=lambda entry, platform: platform != "calendar"
+    )
+    monkeypatch.setattr(
+        hass.config_entries, "async_forward_entry_unload", platform_unload
+    )
+
+    assert not await hass.config_entries.async_unload(config_entry.entry_id)
+    assert config_entry.state is ConfigEntryState.FAILED_UNLOAD
+    assert config_entry.error_reason_translation_domain == "homeassistant"
+    assert config_entry.error_reason_translation_key == "unload_platforms_failed"
+    assert_expected_config_entry_unload_error(
+        config_entry.title, "unload_platforms_failed"
+    )
+    assert {call.args[1] for call in platform_unload.await_args_list} == set(PLATFORMS)
+    assert config_entry.runtime_data is runtime
+    assert coord.runtime_active
+    assert not coord.client._cookie_header_session.closed
+
+    await coord.async_close()
+
+
+async def test_framework_unload_drains_background_schedule_start(
+    hass, config_entry, lifecycle_cloud, monkeypatch
+):
+    """Schedule startup runs in the background and exits before its session closes."""
+    started = asyncio.Event()
+    finished = asyncio.Event()
+    release = asyncio.Event()
+
+    async def block_schedule_start(_manager):
+        session = config_entry.runtime_data.coordinator.client._cookie_header_session
+        started.set()
+        try:
+            await release.wait()
+        finally:
+            assert not session.closed
+            finished.set()
+
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.schedule_sync.ScheduleSync.async_start",
+        block_schedule_start,
+    )
+    try:
+        assert await asyncio.wait_for(
+            hass.config_entries.async_setup(config_entry.entry_id), timeout=5
+        )
+        await asyncio.wait_for(started.wait(), timeout=5)
+        await asyncio.wait_for(hass.async_block_till_done(), timeout=5)
+        assert not finished.is_set()
+
+        session = config_entry.runtime_data.coordinator.client._cookie_header_session
+        assert await hass.config_entries.async_unload(config_entry.entry_id)
+        assert finished.is_set()
+        assert session.closed
+    finally:
+        release.set()
 
 
 @pytest.mark.asyncio

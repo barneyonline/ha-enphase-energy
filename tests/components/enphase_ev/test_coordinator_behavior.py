@@ -11,7 +11,7 @@ import aiohttp
 import pytest
 from homeassistant.exceptions import ServiceValidationError
 
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from homeassistant.util import dt as dt_util
 
@@ -5333,18 +5333,16 @@ async def test_startup_warmup_runner_and_task_edge_paths(
 
     coord = coordinator_factory()
     coord._warmup_task = SimpleNamespace(done=lambda: False)  # type: ignore[assignment]  # noqa: SLF001
-    create_calls: list[object] = []
+    create_calls: list[str] = []
 
     async def _runner() -> None:
         return None
 
     coord.refresh_runner.async_startup_warmup_runner = _runner  # type: ignore[method-assign]
 
-    def _create_task(coro, name=None):
+    def _create_task(coro, name: str):
         create_calls.append(name)
         coro.close()
-        if name is not None:
-            raise TypeError("no name support")
         return "task"
 
     object.__setattr__(coord.hass, "async_create_background_task", _create_task)
@@ -5353,29 +5351,27 @@ async def test_startup_warmup_runner_and_task_edge_paths(
 
     coord._warmup_task = None  # noqa: SLF001
     await coord.async_start_startup_warmup()
-    assert create_calls == [f"{DOMAIN}_warmup_site", None]
+    assert create_calls == [f"{DOMAIN}_warmup_site"]
     assert coord.site_id not in str(create_calls[0])
     assert coord._warmup_task == "task"  # noqa: SLF001
     coord._warmup_task = None  # noqa: SLF001
 
     coord = coordinator_factory()
-    power_create_calls: list[object] = []
+    power_create_calls: list[str] = []
 
     async def _power_runner() -> None:
         return None
 
     coord.refresh_runner._async_startup_power_runner_impl = _power_runner  # type: ignore[method-assign]  # noqa: SLF001
 
-    def _create_power_task(coro, name=None):
+    def _create_power_task(coro, name: str):
         power_create_calls.append(name)
         coro.close()
-        if name is not None:
-            raise TypeError("no name support")
         return "power-task"
 
     object.__setattr__(coord.hass, "async_create_background_task", _create_power_task)
     await coord.refresh_runner.async_start_startup_power()
-    assert power_create_calls == [f"{DOMAIN}_startup_power", None]
+    assert power_create_calls == [f"{DOMAIN}_startup_power"]
     assert coord._startup_power_task == "power-task"  # noqa: SLF001
     coord._startup_power_task = None  # noqa: SLF001
 

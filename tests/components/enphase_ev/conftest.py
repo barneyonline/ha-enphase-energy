@@ -14,9 +14,10 @@ from typing import Any
 
 import pytest
 import pytest_socket
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryError
 from unittest.mock import AsyncMock, patch
 
 try:
@@ -138,14 +139,7 @@ def loopback_sockets():
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_runtest_setup(item) -> None:
-    """Reset socket monkeypatching before HA plugin reapplies restrictions.
-
-    In this test environment, ``pytest_homeassistant_custom_component`` invokes
-    ``pytest_socket.disable_socket()`` during setup, but pytest-socket teardown
-    hooks may not be active. Ensuring sockets are re-enabled first prevents
-    recursive GuardedSocket subclass wrapping across long test runs.
-    """
-    pytest_socket.enable_socket()
+    """Capture unexpected lifecycle and transport errors."""
     handler = _LifecycleLogCapture()
     item.stash[_LIFECYCLE_LOGS] = handler
     logging.getLogger().addHandler(handler)
@@ -177,32 +171,28 @@ def pytest_runtest_makereport(item, call):
         report.longrepr = f"{report.longrepr}\n{detail}" if report.longrepr else detail
 
 
-@pytest.hookimpl(hookwrapper=True)
-def pytest_fixture_setup(fixturedef, request):
-    """Enable custom integrations whenever the HA fixture is actually used.
+@pytest.fixture
+def assert_expected_config_entry_unload_error(request):
+    """Account for the error Core logs when an intentional unload failure returns."""
 
-    Making this an autouse fixture with a ``hass`` dependency constructed a full
-    Home Assistant instance for every pure unit test in this package. Wrapping
-    setup keeps the behavior for HA tests without adding ``hass`` to unrelated
-    fixture closures.
-    """
-    outcome = yield
-    if fixturedef.argname != "hass":
-        return
+    def assert_error(
+        entry_title: str, translation_key: str = "async_unload_entry_failed"
+    ) -> None:
+        handler = request.node.stash[_LIFECYCLE_LOGS]
+        message = f"Error unloading entry {entry_title} for {DOMAIN}"
+        expected = [
+            record
+            for record in handler.records
+            if record.name == "homeassistant.config_entries"
+            and record.getMessage() == message
+            and record.exc_info
+            and isinstance(record.exc_info[1], ConfigEntryError)
+            and record.exc_info[1].translation_key == translation_key
+        ]
+        (record,) = expected
+        handler.records.remove(record)
 
-    hass = outcome.get_result()
-    try:
-        from homeassistant import loader
-
-        hass.data.pop(loader.DATA_CUSTOM_COMPONENTS, None)
-    except Exception:
-        pass
-
-
-@pytest.fixture(autouse=True)
-def ensure_hass_stopped(stop_hass):
-    """Ensure manually constructed Home Assistant instances are stopped cleanly."""
-    yield
+    return assert_error
 
 
 @pytest.fixture

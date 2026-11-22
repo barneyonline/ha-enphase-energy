@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 from homeassistant.util import dt as dt_util
 from yarl import URL
 

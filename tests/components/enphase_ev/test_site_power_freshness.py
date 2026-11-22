@@ -7,7 +7,7 @@ import pytest
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import async_fire_time_changed
+from pytest_homeassistant.common import async_fire_time_changed
 from custom_components.enphase_ev.sensor_base import EnphaseSiteSensorEntity
 from custom_components.enphase_ev.integration_snapshot import CoordinatorData
 
