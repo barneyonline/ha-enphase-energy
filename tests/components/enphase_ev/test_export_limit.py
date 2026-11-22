@@ -10,10 +10,9 @@ from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
 
 import aiohttp
 import pytest
-import voluptuous as vol
 from homeassistant import data_entry_flow
 from homeassistant.exceptions import ServiceValidationError
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.enphase_ev.api import EnphaseEVClient, Unauthorized
 from custom_components.enphase_ev.api_client.export_limit_surface import (
@@ -993,27 +992,7 @@ async def test_default_settings_and_restore(runtime, hass):
     runtime.coordinator.client.async_set_export_limit.assert_not_called()
 
 
-@pytest.fixture(params=["conditional", "legacy_typing", "legacy_missing"])
-def slew_visibility_api(request, monkeypatch):
-    """Model the published 2026.11 marker contract, without claiming runtime QA."""
-
-    class ConditionalRequired(vol.Required):
-        def __init__(self, *args, visible=None, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.visible = visible
-
-    if request.param == "conditional":
-        monkeypatch.setattr(data_entry_flow, "Required", ConditionalRequired)
-    elif request.param == "legacy_typing":
-        from typing import Required
-
-        monkeypatch.setattr(data_entry_flow, "Required", Required)
-    else:
-        monkeypatch.delattr(data_entry_flow, "Required")
-    return request.param == "conditional"
-
-
-async def test_defaults_slew_visibility_contract(runtime, slew_visibility_api):
+async def test_defaults_slew_visibility_contract(runtime):
     flow = OptionsFlowHandler(runtime.coordinator.config_entry)
     flow.hass = runtime.coordinator.hass
     await flow.async_step_export_limit()
@@ -1026,19 +1005,15 @@ async def test_defaults_slew_visibility_contract(runtime, slew_visibility_api):
         "slew_rate": 6000,
         "restore_slew_rate": False,
     }
-    if slew_visibility_api:
-        assert marker.visible == {"field": "restore_slew_rate", "value": False}
-    else:
-        assert type(marker) is vol.Required
-        assert not hasattr(marker, "visible")
-        assert schema({"restore_slew_rate": True})["slew_rate"] == 6000
+    assert isinstance(marker, data_entry_flow.Required)
+    fields = [{"name": "slew_rate"}]
+    data_entry_flow.add_visible_conditions_to_serialized_schema(schema, fields)
+    assert fields[0]["visible"] == {"field": "restore_slew_rate", "value": False}
     runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
 
 
 @pytest.mark.parametrize("manual", [{}, {"slew_rate": 0}, {"slew_rate": 40.25}])
-async def test_defaults_restore_omitted_or_stale_manual(
-    runtime, slew_visibility_api, manual
-):
+async def test_defaults_restore_omitted_or_stale_manual(runtime, manual):
     entry = runtime.coordinator.config_entry
     hass = runtime.coordinator.hass
     hass.config_entries.async_update_entry(
@@ -1062,9 +1037,7 @@ async def test_defaults_restore_omitted_or_stale_manual(
 
 
 @pytest.mark.parametrize("saved", [None, 40.25])
-async def test_defaults_manual_omission_uses_current_default(
-    runtime, slew_visibility_api, saved
-):
+async def test_defaults_manual_omission_uses_current_default(runtime, saved):
     entry = runtime.coordinator.config_entry
     if saved is not None:
         runtime.coordinator.hass.config_entries.async_update_entry(
@@ -1086,7 +1059,7 @@ async def test_defaults_manual_omission_uses_current_default(
 @pytest.mark.parametrize(
     "value", [None, 0, -1, True, "5", float("nan"), float("inf"), 0.001]
 )
-async def test_defaults_manual_validation(runtime, slew_visibility_api, value):
+async def test_defaults_manual_validation(runtime, value):
     flow = OptionsFlowHandler(runtime.coordinator.config_entry)
     flow.hass = runtime.coordinator.hass
     await flow.async_step_export_limit()
@@ -1098,7 +1071,7 @@ async def test_defaults_manual_validation(runtime, slew_visibility_api, value):
     runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
 
 
-async def test_defaults_repeated_manual_restore_edits(runtime, slew_visibility_api):
+async def test_defaults_repeated_manual_restore_edits(runtime):
     entry = runtime.coordinator.config_entry
     hass = runtime.coordinator.hass
     # Reopen the flow after each successful edit, as HA does.
@@ -1123,9 +1096,7 @@ async def test_defaults_repeated_manual_restore_edits(runtime, slew_visibility_a
     runtime.coordinator.client.async_set_export_limit.assert_not_awaited()
 
 
-async def test_defaults_failed_restore_keeps_checkbox_and_override(
-    runtime, slew_visibility_api
-):
+async def test_defaults_failed_restore_keeps_checkbox_and_override(runtime):
     entry = runtime.coordinator.config_entry
     hass = runtime.coordinator.hass
     hass.config_entries.async_update_entry(
@@ -3442,9 +3413,7 @@ async def test_config_entry_reload_waits_for_retiring_guarded_write(runtime, has
     )
     await asyncio.wait_for(write_waiting.wait(), 1)
     assert saved["pending"]["watts"] == 0
-    with patch(
-        "custom_components.enphase_ev._async_unload_platforms_safe", return_value=True
-    ):
+    with patch.object(hass.config_entries, "async_unload_platforms_or_raise"):
         assert await async_unload_entry(hass, entry)
     with patch(
         "custom_components.enphase_ev._async_setup_entry_impl",

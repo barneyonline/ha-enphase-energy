@@ -4,11 +4,12 @@ This document is a contributor map for the Enphase Energy integration. It explai
 
 ## Runtime Shape
 
-Home Assistant 2026.10.0 and Python 3.14 are the minimum supported versions.
-Service routing uses Home Assistant's target-selection API and reuses each
-expansion when resolving devices and entities. Device lookups use the
-entry-scoped registry API directly. Migrated composite device IDs remain valid
-saved targets and are resolved through their current split devices.
+Home Assistant 2026.11.0 and Python 3.14 are the minimum supported versions.
+Service routing expands Home Assistant targets and exclusions before resolving
+devices, sites, or tariff entities. A site or config-entry ID supplied alongside
+exclusions narrows the surviving sites. Device lookups use the entry-scoped
+registry API directly. Migrated composite device IDs resolve through their
+current split devices.
 
 Each Home Assistant config entry owns one `EnphaseCoordinator`. The coordinator is the integration boundary for entities: platforms read normalized state from the coordinator and call coordinator/service helpers for writes. Entities should not call the cloud client directly unless a local helper already establishes that pattern.
 
@@ -112,9 +113,12 @@ The options menu separates device category selection (Devices) from feature
 configuration (Features). Features contains Device Features and Advanced Features;
 the latter groups installer Grid Profile controls, Export Limit controls, and
 Microinverter Power.
-Export Limit Defaults conditionally hides the manual Slew Rate while Restore Slew
-Rate is checked on Home Assistant 2026.11 and newer. Older supported versions keep
-the unconditional form. Restoration ignores any manual value, reads fresh gateway
+Authentication shows Forget Password when credentials or the remember-password
+preference are stored. Grid Mode shows the one-time code field once the change
+is confirmed. Envoy History Migration shows the archived-entity option once
+the user confirms the reassignment.
+Export Limit Defaults hides the manual Slew Rate while Restore Slew Rate is
+checked. Restoration ignores any manual value, reads fresh gateway
 settings, and clears the saved override; saving defaults never writes the gateway.
 Installer Grid Profile controls are also a default-off topology option. Disabled
 entries skip both the startup Activation probe and steady metadata refreshes;

@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp
 import pytest
 
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 from homeassistant.exceptions import ServiceValidationError
 
 from custom_components.enphase_ev.const import (

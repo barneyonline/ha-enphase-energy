@@ -2,15 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
 import voluptuous as vol
 import yaml
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from homeassistant.auth.const import GROUP_ID_ADMIN, GROUP_ID_USER
+from homeassistant.const import ATTR_ENTITY_ID, EntityCategory
 from homeassistant.core import Context, HomeAssistant
 from homeassistant.exceptions import ServiceValidationError, Unauthorized
 from homeassistant.helpers import area_registry as ar
@@ -1509,6 +1510,421 @@ async def test_update_tariff_accepts_rate_entities(
     )
 
 
+async def test_tariff_area_target_honors_exclusions_before_writing(
+    hass: HomeAssistant,
+) -> None:
+    site_id = "tariff-site"
+    coord = _fake_service_coordinator(site_id=site_id, serials=set())
+    update_tariff = AsyncMock()
+    coord.tariff_runtime = SimpleNamespace(async_update_tariff=update_tariff)
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: site_id})
+    entry.add_to_hass(hass)
+    entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
+    area = ar.async_get(hass).async_create("Tariff Site")
+    entities = er.async_get(hass)
+    rates = []
+    for index, period in enumerate(("peak", "off_peak"), 1):
+        entity = entities.async_get_or_create(
+            "number",
+            DOMAIN,
+            f"{DOMAIN}_site_{site_id}_tariff_import_rate_{period}_number",
+            config_entry=entry,
+            entity_category=EntityCategory.CONFIG,
+        )
+        entities.async_update_entity(entity.entity_id, area_id=area.id)
+        locator = {
+            "branch": "purchase",
+            "kind": "period",
+            "season_index": 1,
+            "day_index": 1,
+            "period_index": index,
+        }
+        hass.states.async_set(entity.entity_id, 0.18, {"tariff_locator": locator})
+        rates.append((entity.entity_id, locator))
+    sensor = entities.async_get_or_create(
+        "sensor", DOMAIN, "site-power", config_entry=entry
+    )
+    entities.async_update_entity(sensor.entity_id, area_id=area.id)
+    for label in ("absent", "without_locator"):
+        sensor = entities.async_get_or_create(
+            "sensor",
+            DOMAIN,
+            f"{DOMAIN}_site_{site_id}_tariff_import_rate_{label}",
+            config_entry=entry,
+        )
+        entities.async_update_entity(sensor.entity_id, area_id=area.id)
+        if label == "without_locator":
+            hass.states.async_set(sensor.entity_id, 0.18)
+    (peak, peak_locator), (off_peak, _) = rates
+    async_setup_services(hass)
+
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            "update_tariff",
+            {"rate": 0.25},
+            target={"area_id": area.id},
+            blocking=True,
+        )
+    assert err.value.translation_key == "tariff_rate_entity_required"
+    update_tariff.assert_not_awaited()
+
+    await hass.services.async_call(
+        DOMAIN,
+        "update_tariff",
+        {"rate": 0.25},
+        target={"area_id": area.id, "entity_id": peak},
+        blocking=True,
+    )
+    update_tariff.assert_awaited_once_with(
+        billing=None, rate_updates=[{"locator": peak_locator, "rate": 0.25}]
+    )
+    update_tariff.reset_mock()
+
+    hass.states.async_set(peak, 0.18)
+    for selector in ({}, {"site_id": site_id}):
+        with pytest.raises(ServiceValidationError) as err:
+            await hass.services.async_call(
+                DOMAIN,
+                "update_tariff",
+                {"rate": 0.25, **selector},
+                target={"area_id": area.id, "entity_id": peak},
+                blocking=True,
+            )
+        assert err.value.translation_key == "tariff_rate_target_invalid"
+    update_tariff.assert_not_awaited()
+    hass.states.async_set(peak, 0.18, {"tariff_locator": peak_locator})
+
+    target = {"area_id": area.id, "exclude": {"entity_id": off_peak}}
+    await hass.services.async_call(
+        DOMAIN, "update_tariff", {"rate": 0.25}, target=target, blocking=True
+    )
+    update_tariff.assert_awaited_once_with(
+        billing=None, rate_updates=[{"locator": peak_locator, "rate": 0.25}]
+    )
+    update_tariff.reset_mock()
+
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            "update_tariff",
+            {
+                "rates": [
+                    {"entity_id": peak, "rate": 0.26},
+                    {"entity_id": off_peak, "rate": 0.1},
+                ]
+            },
+            target=target,
+            blocking=True,
+        )
+    assert err.value.translation_key == "tariff_rate_target_invalid"
+    update_tariff.assert_not_awaited()
+
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            "update_tariff",
+            {"rate_entity": peak, "rate": 0.25, "config_entry_id": entry.entry_id},
+            target={"entity_id": off_peak, "exclude": {"entity_id": off_peak}},
+            blocking=True,
+        )
+    assert err.value.translation_key == "grid_site_required"
+    update_tariff.assert_not_awaited()
+
+    other_site_id = "other-tariff-site"
+    other_coord = _fake_service_coordinator(site_id=other_site_id, serials=set())
+    other_entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: other_site_id})
+    other_entry.add_to_hass(hass)
+    other_entry.runtime_data = EnphaseRuntimeData(coordinator=other_coord)
+    object.__setattr__(other_entry, "state", ConfigEntryState.LOADED)
+    other_sensor = entities.async_get_or_create(
+        "sensor", DOMAIN, "other-site-power", config_entry=other_entry
+    )
+    entities.async_update_entity(other_sensor.entity_id, area_id=area.id)
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            "update_tariff",
+            {"rate_entity": peak, "rate": 0.25},
+            target=target,
+            blocking=True,
+        )
+    assert err.value.translation_key == "grid_site_ambiguous"
+    update_tariff.assert_not_awaited()
+
+    await hass.services.async_call(
+        DOMAIN,
+        "update_tariff",
+        {"rate_entity": peak, "rate": 0.25, "config_entry_id": entry.entry_id},
+        target=target,
+        blocking=True,
+    )
+    update_tariff.assert_awaited_once_with(
+        billing=None, rate_updates=[{"locator": peak_locator, "rate": 0.25}]
+    )
+
+
+async def test_tariff_positive_targets_bound_explicit_rate_writes(
+    hass: HomeAssistant,
+) -> None:
+    areas = ar.async_get(hass)
+    entities = er.async_get(hass)
+    sites = []
+    locator = {
+        "branch": "purchase",
+        "kind": "period",
+        "season_index": 1,
+        "day_index": 1,
+        "period_index": 1,
+    }
+    for site_id in ("north", "south"):
+        coord = _fake_service_coordinator(site_id=site_id, serials=set())
+        update = AsyncMock()
+        coord.tariff_runtime = SimpleNamespace(async_update_tariff=update)
+        entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: site_id})
+        entry.add_to_hass(hass)
+        entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+        object.__setattr__(entry, "state", ConfigEntryState.LOADED)
+        area = areas.async_create(site_id.capitalize())
+        entity = entities.async_get_or_create(
+            "number",
+            DOMAIN,
+            f"{DOMAIN}_site_{site_id}_tariff_import_rate_peak_number",
+            config_entry=entry,
+            entity_category=EntityCategory.CONFIG,
+        )
+        entities.async_update_entity(entity.entity_id, area_id=area.id)
+        hass.states.async_set(entity.entity_id, 0.18, {"tariff_locator": locator})
+        sites.append((entry, area.id, entity.entity_id, update))
+    _, north_area, north_rate, north_update = sites[0]
+    south, south_area, south_rate, south_update = sites[1]
+    async_setup_services(hass)
+
+    for data in (
+        {"rate_entity": south_rate, "rate": 0.25},
+        {"rates": [{"entity_id": south_rate, "rate": 0.25}]},
+        {"import_rate_entity": south_rate, "import_rate": 0.25},
+    ):
+        with pytest.raises(ServiceValidationError) as err:
+            await hass.services.async_call(
+                DOMAIN,
+                "update_tariff",
+                data,
+                target={"area_id": north_area},
+                blocking=True,
+            )
+        assert err.value.translation_key == "tariff_site_mismatch"
+    north_update.assert_not_awaited()
+    south_update.assert_not_awaited()
+
+    data = {"rate_entity": south_rate, "rate": 0.25}
+    for direct_selector in ({"config_entry_id": south.entry_id}, {"site_id": "south"}):
+        with pytest.raises(ServiceValidationError) as err:
+            await hass.services.async_call(
+                DOMAIN,
+                "update_tariff",
+                {**data, **direct_selector},
+                target={"area_id": north_area},
+                blocking=True,
+            )
+        assert err.value.translation_key == "grid_site_required"
+    south_update.assert_not_awaited()
+
+    await hass.services.async_call(
+        DOMAIN, "update_tariff", data, target={"area_id": south_area}, blocking=True
+    )
+    south_update.assert_awaited_once_with(
+        billing=None, rate_updates=[{"locator": locator, "rate": 0.25}]
+    )
+
+    alternate = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "north"})
+    alternate.add_to_hass(hass)
+    alternate_coord = _fake_service_coordinator(site_id="north", serials=set())
+    alternate_update = AsyncMock()
+    alternate_coord.tariff_runtime = SimpleNamespace(
+        async_update_tariff=alternate_update
+    )
+    alternate.runtime_data = EnphaseRuntimeData(coordinator=alternate_coord)
+    object.__setattr__(alternate, "state", ConfigEntryState.LOADED)
+
+    await hass.services.async_call(
+        DOMAIN,
+        "update_tariff",
+        {
+            "rate_entity": north_rate,
+            "rate": 0.25,
+            "config_entry_id": alternate.entry_id,
+        },
+        target={"area_id": [north_area, south_area]},
+        blocking=True,
+    )
+    north_update.assert_awaited_once_with(
+        billing=None, rate_updates=[{"locator": locator, "rate": 0.25}]
+    )
+    alternate_update.assert_not_awaited()
+    assert south_update.await_count == 1
+
+    south_update.reset_mock()
+    batch = {"rates": [{"entity_id": south_rate, "rate": 0.25}]}
+    for selector in ("entity_id", "device_id", "area_id"):
+        with pytest.raises(ServiceValidationError) as err:
+            await hass.services.async_call(
+                DOMAIN,
+                "update_tariff",
+                batch.copy(),
+                target={selector: "none"},
+                blocking=True,
+            )
+        assert err.value.translation_key == "grid_site_required"
+    south_update.assert_not_awaited()
+
+    await hass.services.async_call(
+        DOMAIN,
+        "update_tariff",
+        batch,
+        blocking=True,
+    )
+    south_update.assert_awaited_once_with(
+        billing=None, rate_updates=[{"locator": locator, "rate": 0.25}]
+    )
+
+
+@pytest.mark.parametrize("target_kind", ["area", "group"])
+@pytest.mark.parametrize("selector", ["site_id", "config_entry_id", None])
+async def test_tariff_shorthand_narrows_native_target_before_counting_rates(
+    hass: HomeAssistant, target_kind: str, selector: str | None
+) -> None:
+    area = ar.async_get(hass).async_create("Shared Tariff Area")
+    entities = er.async_get(hass)
+    rates = []
+    updates = {}
+    for period_index, site_id in enumerate(("north", "south"), 1):
+        coord = _fake_service_coordinator(site_id=site_id, serials=set())
+        update_tariff = AsyncMock()
+        updates[site_id] = update_tariff
+        coord.tariff_runtime = SimpleNamespace(async_update_tariff=update_tariff)
+        entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: site_id})
+        entry.add_to_hass(hass)
+        entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+        object.__setattr__(entry, "state", ConfigEntryState.LOADED)
+        rate = entities.async_get_or_create(
+            "number",
+            DOMAIN,
+            f"{DOMAIN}_site_{site_id}_tariff_import_rate_peak_number",
+            config_entry=entry,
+            entity_category=EntityCategory.CONFIG,
+        )
+        locator = {
+            "branch": "purchase",
+            "kind": "period",
+            "season_index": 1,
+            "day_index": 1,
+            "period_index": period_index,
+        }
+        entities.async_update_entity(rate.entity_id, area_id=area.id)
+        hass.states.async_set(rate.entity_id, 0.18, {"tariff_locator": locator})
+        rates.append((rate.entity_id, locator, entry))
+
+    alternate = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "north"})
+    alternate.add_to_hass(hass)
+    alternate_coord = _fake_service_coordinator(site_id="north", serials=set())
+    alternate_update = AsyncMock()
+    alternate_coord.tariff_runtime = SimpleNamespace(
+        async_update_tariff=alternate_update
+    )
+    alternate.runtime_data = EnphaseRuntimeData(coordinator=alternate_coord)
+    object.__setattr__(alternate, "state", ConfigEntryState.LOADED)
+    north_rate, north_locator, north_entry = rates[0]
+    south_rate, _, south_entry = rates[1]
+    power = entities.async_get_or_create(
+        "sensor", DOMAIN, "south-site-power", config_entry=south_entry
+    )
+    entities.async_update_entity(power.entity_id, area_id=area.id)
+    hass.states.async_set(power.entity_id, 1200)
+    if selector is None:
+        hass.states.async_remove(south_rate)
+
+    target = {"area_id": area.id}
+    if target_kind == "group":
+        group_id = "group.enphase_rates"
+        members = [north_rate, power.entity_id]
+        if selector is not None:
+            members.append(south_rate)
+        hass.states.async_set(group_id, "on", {ATTR_ENTITY_ID: members})
+        target = {"entity_id": group_id}
+    async_setup_services(hass)
+
+    if target_kind == "group" and selector == "site_id":
+        north_group = "group.north_enphase_rates"
+        hass.states.async_set(north_group, "on", {ATTR_ENTITY_ID: [north_rate]})
+        with pytest.raises(ServiceValidationError) as err:
+            await hass.services.async_call(
+                DOMAIN,
+                "update_tariff",
+                {"rate": 0.25},
+                target={"entity_id": north_group, "area_id": area.id},
+                blocking=True,
+            )
+        assert err.value.translation_key == "tariff_rate_entity_required"
+
+    if selector is None:
+        extra_rate = entities.async_get_or_create(
+            "number",
+            DOMAIN,
+            f"{DOMAIN}_site_north_tariff_import_rate_off_peak_number",
+            config_entry=north_entry,
+        )
+        hass.states.async_set(
+            extra_rate.entity_id,
+            0.18,
+            {"tariff_locator": {**north_locator, "period_index": 3}},
+        )
+        with pytest.raises(ServiceValidationError) as err:
+            await hass.services.async_call(
+                DOMAIN,
+                "update_tariff",
+                {
+                    "rate": 0.25,
+                    "rates": [{"entity_id": extra_rate.entity_id, "rate": 0.30}],
+                },
+                target=target,
+                blocking=True,
+            )
+        assert err.value.translation_key == "grid_site_ambiguous"
+
+    data = {"rate": 0.25}
+    if selector is not None:
+        data[selector] = "north" if selector == "site_id" else alternate.entry_id
+    await hass.services.async_call(
+        DOMAIN,
+        "update_tariff",
+        data,
+        target=target,
+        blocking=True,
+    )
+
+    updates["north"].assert_awaited_once_with(
+        billing=None, rate_updates=[{"locator": north_locator, "rate": 0.25}]
+    )
+    updates["south"].assert_not_awaited()
+    alternate_update.assert_not_awaited()
+
+    if selector is not None and target_kind == "area":
+        with pytest.raises(ServiceValidationError) as err:
+            await hass.services.async_call(
+                DOMAIN,
+                "update_tariff",
+                data,
+                target={**target, "entity_id": south_rate},
+                blocking=True,
+            )
+        assert err.value.translation_key == "tariff_rate_entity_required"
+        assert updates["north"].await_count == 1
+        updates["south"].assert_not_awaited()
+        alternate_update.assert_not_awaited()
+
+
 @pytest.mark.asyncio
 async def test_update_tariff_accepts_friendly_rate_fields(
     hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
@@ -2277,7 +2693,12 @@ def test_advertised_entity_targets_pass_registered_schemas(
 
 def test_charger_actions_target_the_charging_switch() -> None:
     descriptions = yaml.safe_load(SERVICES_YAML.read_text())
-    for action in ("start_charging", "stop_charging", "trigger_message"):
+    for action in (
+        "start_charging",
+        "stop_charging",
+        "trigger_message",
+        "sync_schedules",
+    ):
         assert descriptions[action]["target"]["entity"] == {
             "integration": DOMAIN,
             "domain": "switch",
@@ -2381,6 +2802,332 @@ async def test_charging_service_routes_ui_targets(
             )
         assert coord.async_start_charging.await_count == 1
         assert coord.async_stop_charging.await_count == 1
+
+
+@pytest.mark.parametrize("action", ["stop_charging", "sync_schedules"])
+async def test_charger_actions_skip_non_chargers_reached_through_a_group(
+    hass: HomeAssistant, action: str
+) -> None:
+    site_id = "group-site"
+    serial = "garage-charger"
+    coord = _fake_service_coordinator(site_id=site_id, serials={serial})
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: site_id})
+    entry.add_to_hass(hass)
+    entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
+    devices = dr.async_get(hass)
+    charger = devices.async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={(DOMAIN, serial)}
+    )
+    gateway = devices.async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={(DOMAIN, f"type:{site_id}:envoy")}
+    )
+    entities = er.async_get(hass)
+    charging = entities.async_get_or_create(
+        "switch",
+        DOMAIN,
+        f"{DOMAIN}_{serial}_charging_switch",
+        config_entry=entry,
+        device_id=charger.id,
+    )
+    storm_guard = entities.async_get_or_create(
+        "switch",
+        DOMAIN,
+        f"{DOMAIN}_site_{site_id}_storm_guard",
+        config_entry=entry,
+        device_id=gateway.id,
+    )
+    group_id = "group.garage_switches"
+    hass.states.async_set(
+        group_id, "off", {ATTR_ENTITY_ID: [charging.entity_id, storm_guard.entity_id]}
+    )
+    async_setup_services(hass)
+
+    if action == "sync_schedules":
+        handler = coord.schedule_sync.async_refresh
+        expected = call(reason="service", serials=[serial])
+    else:
+        handler = coord.async_stop_charging
+        expected = call(serial)
+
+    await hass.services.async_call(
+        DOMAIN, action, target={"entity_id": group_id}, blocking=True
+    )
+    assert handler.await_args_list == [expected]
+    handler.reset_mock()
+
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            action,
+            target={"entity_id": group_id, "device_id": gateway.id},
+            blocking=True,
+        )
+    assert err.value.translation_key == "grid_site_required"
+    handler.assert_not_awaited()
+
+
+@pytest.mark.parametrize("action", ["stop_charging", "sync_schedules"])
+async def test_charger_actions_honor_device_exclusions(
+    hass: HomeAssistant, action: str
+) -> None:
+    """Exclude whole chargers from an area target before dispatching a command."""
+    serials = ("driveway", "garage")
+    coord = _fake_service_coordinator(site_id="target-site", serials=set(serials))
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "target-site"})
+    entry.add_to_hass(hass)
+    entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
+    area = ar.async_get(hass).async_create("Charging")
+    registry = dr.async_get(hass)
+    devices = [
+        registry.async_get_or_create(
+            config_entry_id=entry.entry_id, identifiers={(DOMAIN, serial)}
+        )
+        for serial in serials
+    ]
+    for device in devices:
+        registry.async_update_device(device.id, area_id=area.id)
+    async_setup_services(hass)
+
+    if action == "sync_schedules":
+        handler = coord.schedule_sync.async_refresh
+        expected = call(reason="service", serials=["garage"])
+        await hass.services.async_call(
+            DOMAIN, action, {"device_id": devices[1].id}, blocking=True
+        )
+        assert handler.await_args_list == [expected]
+        handler.reset_mock()
+    else:
+        handler = coord.async_stop_charging
+        expected = call("garage")
+
+    await hass.services.async_call(
+        DOMAIN,
+        action,
+        target={"area_id": area.id, "exclude": {"device_id": devices[0].id}},
+        blocking=True,
+    )
+    assert handler.await_args_list == [expected]
+    handler.reset_mock()
+
+    exclude_all = {"device_id": [device.id for device in devices]}
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            action,
+            target={"area_id": area.id, "exclude": exclude_all},
+            blocking=True,
+        )
+    handler.assert_not_awaited()
+
+
+async def test_charger_exclusions_preserve_device_and_entity_scope(
+    hass: HomeAssistant,
+) -> None:
+    """An entity exclusion cannot replace a positive device selection."""
+    site_id = "charging-site"
+    serial = "charger-1"
+    coord = _fake_service_coordinator(site_id=site_id, serials={serial})
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: site_id})
+    entry.add_to_hass(hass)
+    entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(entry, "state", ConfigEntryState.LOADED)
+    areas = ar.async_get(hass)
+    device_area = areas.async_create("Garage")
+    entity_area = areas.async_create("Driveway")
+    registry = dr.async_get(hass)
+    device = registry.async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={(DOMAIN, serial)}
+    )
+    registry.async_update_device(device.id, area_id=device_area.id)
+    entities = er.async_get(hass)
+    switch = entities.async_get_or_create(
+        "switch",
+        DOMAIN,
+        "charger-switch",
+        config_entry=entry,
+        device_id=device.id,
+        original_name="Charging",
+    )
+    entities.async_update_entity(switch.entity_id, area_id=entity_area.id)
+    async_setup_services(hass)
+
+    exclude_entity = {"entity_id": switch.entity_id}
+    await hass.services.async_call(
+        DOMAIN,
+        "stop_charging",
+        target={"device_id": device.id, "exclude": exclude_entity},
+        blocking=True,
+    )
+    coord.async_stop_charging.assert_awaited_once_with(serial)
+    coord.async_stop_charging.reset_mock()
+
+    for exclude in (exclude_entity, {"area_id": device_area.id}):
+        with pytest.raises(ServiceValidationError) as err:
+            await hass.services.async_call(
+                DOMAIN,
+                "stop_charging",
+                target={"entity_id": switch.entity_id, "exclude": exclude},
+                blocking=True,
+            )
+        assert err.value.translation_key == "grid_site_required"
+    coord.async_stop_charging.assert_not_awaited()
+
+
+@pytest.mark.parametrize("selector", ["site_id", "config_entry_id"])
+async def test_site_actions_keep_explicit_routing_within_the_remaining_target(
+    hass: HomeAssistant, selector: str
+) -> None:
+    areas = ar.async_get(hass)
+    area = areas.async_create("Sites")
+    registry = dr.async_get(hass)
+    site_routes = []
+    for site_id in ("north", "south"):
+        coord = _fake_service_coordinator(site_id=site_id, serials=set())
+        entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: site_id})
+        entry.add_to_hass(hass)
+        entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
+        object.__setattr__(entry, "state", ConfigEntryState.LOADED)
+        device = registry.async_get_or_create(
+            config_entry_id=entry.entry_id, identifiers={(DOMAIN, f"site:{site_id}")}
+        )
+        registry.async_update_device(device.id, area_id=area.id)
+        site_routes.append((coord, entry, device))
+    (north, north_entry, north_device), (south, south_entry, south_device) = site_routes
+    north_selector = (
+        north_entry.entry_id if selector == "config_entry_id" else north.site_id
+    )
+    south_selector = (
+        south_entry.entry_id if selector == "config_entry_id" else south.site_id
+    )
+    async_setup_services(hass)
+
+    target = {"area_id": area.id, "exclude": {"device_id": south_device.id}}
+    await hass.services.async_call(
+        DOMAIN,
+        "force_refresh",
+        {selector: north_selector},
+        target=target,
+        blocking=True,
+    )
+    north.async_request_refresh.assert_awaited_once_with()
+    south.async_request_refresh.assert_not_awaited()
+    north.async_request_refresh.reset_mock()
+
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            "force_refresh",
+            {selector: south_selector},
+            target=target,
+            blocking=True,
+        )
+    assert err.value.translation_key == "grid_site_required"
+
+    entities = er.async_get(hass)
+    sensor = entities.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        "north-power",
+        config_entry=north_entry,
+        device_id=north_device.id,
+        original_name="Power",
+    )
+    entities.async_update_entity(
+        sensor.entity_id, area_id=areas.async_create("Other area").id
+    )
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            "force_refresh",
+            {selector: north_selector},
+            target={"entity_id": sensor.entity_id, "exclude": {"area_id": area.id}},
+            blocking=True,
+        )
+    assert err.value.translation_key == "grid_site_required"
+    north.async_request_refresh.assert_not_awaited()
+    south.async_request_refresh.assert_not_awaited()
+
+
+def test_targeted_service_rejects_exclude_without_positive_target(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An exclusion alone cannot be combined with direct routing data."""
+    registered = _register_service_metadata(hass, monkeypatch)
+    schema = registered[(DOMAIN, "force_refresh")]["schema"]
+    with pytest.raises(vol.Invalid):
+        schema({"site_id": "target-site", "exclude": {"device_id": "excluded"}})
+
+
+async def test_site_action_uses_loaded_owner_of_a_standalone_charger(
+    hass: HomeAssistant,
+) -> None:
+    site_id = "charger-site"
+    serial = "standalone-charger"
+    coord = _fake_service_coordinator(site_id=site_id, serials={serial})
+    owner = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: site_id})
+    owner.add_to_hass(hass)
+    owner.runtime_data = EnphaseRuntimeData(coordinator=coord)
+    object.__setattr__(owner, "state", ConfigEntryState.LOADED)
+    unloaded = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "unloaded"})
+    unloaded.add_to_hass(hass)
+    registry = dr.async_get(hass)
+    charger = registry.async_get_or_create(
+        config_entry_id=owner.entry_id, identifiers={(DOMAIN, serial)}
+    )
+    # A registry association alone cannot turn a foreign device into a charger.
+    unrelated = registry.async_get_or_create(
+        config_entry_id=owner.entry_id, identifiers={("hue", "light")}
+    )
+    offline_charger = registry.async_get_or_create(
+        config_entry_id=unloaded.entry_id, identifiers={(DOMAIN, "offline-charger")}
+    )
+    async_setup_services(hass)
+
+    target = {
+        "device_id": [charger.id, unrelated.id],
+        "exclude": {"device_id": unrelated.id},
+    }
+    for selector in ({"site_id": site_id}, {"config_entry_id": owner.entry_id}):
+        await hass.services.async_call(
+            DOMAIN, "force_refresh", selector, target=target, blocking=True
+        )
+    assert coord.async_request_refresh.await_count == 2
+    coord.async_request_refresh.reset_mock()
+
+    for device in (unrelated, offline_charger):
+        with pytest.raises(ServiceValidationError) as err:
+            await hass.services.async_call(
+                DOMAIN,
+                "force_refresh",
+                {"site_id": site_id},
+                target={"device_id": device.id, "exclude": {"device_id": charger.id}},
+                blocking=True,
+            )
+        assert err.value.translation_key == "grid_site_required"
+    coord.async_request_refresh.assert_not_awaited()
+
+
+async def test_clear_reauth_issue_rejects_a_fully_excluded_target(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    issue_delete = MagicMock()
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.services.ir.async_delete_issue", issue_delete
+    )
+    async_setup_services(hass)
+
+    selected = {"entity_id": "sensor.enphase_excluded"}
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            "clear_reauth_issue",
+            target={**selected, "exclude": selected},
+            blocking=True,
+        )
+    assert err.value.translation_key == "grid_site_required"
+    issue_delete.assert_not_called()
 
 
 @pytest.mark.asyncio

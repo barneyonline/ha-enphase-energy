@@ -408,15 +408,10 @@ class RefreshRunner:
         task = getattr(coordinator, "_startup_power_task", None)
         if task is not None:
             return
-        try:
-            task = coordinator.hass.async_create_background_task(
-                self._async_startup_power_runner_impl(),
-                name=f"{DOMAIN}_startup_power",
-            )
-        except TypeError:
-            task = coordinator.hass.async_create_background_task(
-                self._async_startup_power_runner_impl()
-            )
+        task = coordinator.hass.async_create_background_task(
+            self._async_startup_power_runner_impl(),
+            name=f"{DOMAIN}_startup_power",
+        )
         coordinator._startup_power_task = task
         coordinator.track_entry_background_task(task)
 
@@ -496,15 +491,10 @@ class RefreshRunner:
         coordinator = self._coordinator
         if coordinator._warmup_task is not None and not coordinator._warmup_task.done():
             return
-        try:
-            coordinator._warmup_task = coordinator.hass.async_create_background_task(
-                self.async_startup_warmup_runner(),
-                name=f"{DOMAIN}_warmup_site",
-            )
-        except TypeError:
-            coordinator._warmup_task = coordinator.hass.async_create_background_task(
-                self.async_startup_warmup_runner()
-            )
+        coordinator._warmup_task = coordinator.hass.async_create_background_task(
+            self.async_startup_warmup_runner(),
+            name=f"{DOMAIN}_warmup_site",
+        )
 
     async def async_refresh_site_energy_for_warmup(self) -> None:
         coordinator = self._coordinator

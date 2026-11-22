@@ -6,7 +6,7 @@ from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 import yaml
 
-MIN_HOME_ASSISTANT_VERSION = "2026.10.0"
+MIN_HOME_ASSISTANT_VERSION = "2026.11.0"
 
 
 def test_manifest_keys_present():
@@ -27,6 +27,7 @@ def test_manifest_keys_present():
     ), "iot_class should be 'cloud_polling'"
     assert data.get("quality_scale") == "platinum", "quality_scale should be 'platinum'"
     assert data.get("after_dependencies") == ["logbook", "recorder"]
+    assert data.get("categories") == ["energy.solar_batteries", "energy.ev_charging"]
 
 
 def test_branding_name_is_aligned_across_manifest_hacs_and_strings():
@@ -74,6 +75,7 @@ def test_development_requirements_cover_minimum_homeassistant_version():
     )
     # The single runtime lane must exercise the exact advertised minimum.
     assert current_pin == MIN_HOME_ASSISTANT_VERSION
+    assert f"pytest-homeassistant=={current_pin}" in requirements_dev.splitlines()
     assert "-c constraints-dev.txt" in requirements_dev
     constraints = (root / "devtools/docker/constraints-dev.txt").read_text()
     local_constraints = {
@@ -83,7 +85,7 @@ def test_development_requirements_cover_minimum_homeassistant_version():
     }
     upstream_pins = {
         canonicalize_name(Requirement(declaration).name)
-        for owner in ("homeassistant", "pytest-homeassistant-custom-component")
+        for owner in ("homeassistant", "pytest-homeassistant")
         for declaration in requires(owner) or []
         if any(
             spec.operator in ("==", "===")

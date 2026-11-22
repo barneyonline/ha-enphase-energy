@@ -5,8 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import TYPE_CHECKING, Iterable
 
-from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
 
 from .device_info_helpers import _cloud_device_info
 from .device_info_helpers import _is_redundant_model_id, _site_configuration_url
@@ -768,9 +767,7 @@ class InventoryView:
             )
         return None
 
-    def type_device_info(
-        self, type_key: object
-    ) -> DeviceInfo | dict[str, object] | None:
+    def type_device_info(self, type_key: object) -> DeviceInfo | None:
         normalized = normalize_type_key(type_key)
         if not normalized:
             return None
@@ -794,30 +791,29 @@ class InventoryView:
         label = self.type_label(type_key) or "Device"
         name = self.type_device_name(type_key) or label
         model = self.type_device_model(type_key) or label
-        info_kwargs: dict[str, object] = {
-            "identifiers": {identifier},
-            "manufacturer": "Enphase",
-            "model": model,
-            "name": name,
-            "configuration_url": _site_configuration_url(self.site_id),
-        }
+        info = DeviceInfo(
+            identifiers={identifier},
+            manufacturer="Enphase",
+            model=model,
+            name=name,
+            configuration_url=_site_configuration_url(self.site_id),
+        )
         serial_number = self.type_device_serial_number(type_key)
         if serial_number:
-            info_kwargs["serial_number"] = serial_number
+            info.serial_number = serial_number
         model_id = self.type_device_model_id(type_key)
         if model_id:
-            info_kwargs["model_id"] = model_id
+            info.model_id = model_id
         sw_version = self.type_device_sw_version_summary(type_key)
         if sw_version:
-            info_kwargs["sw_version"] = sw_version
+            info.sw_version = sw_version
         hw_summary = self.type_device_hw_version(type_key)
         if hw_summary:
-            info_kwargs["hw_version"] = hw_summary
+            info.hw_version = hw_summary
         if normalized == "envoy":
             controller_mac = self._envoy_controller_mac()
             if controller_mac:
-                info_kwargs["connections"] = {(CONNECTION_NETWORK_MAC, controller_mac)}
-        info = DeviceInfo(**info_kwargs)
+                info.connections = {(CONNECTION_NETWORK_MAC, controller_mac)}
         self._device_metadata_cache[normalized] = (
             bucket,
             members,

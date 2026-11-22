@@ -5,9 +5,9 @@
 ARG HACS_SOURCE_PLATFORM=linux/amd64
 FROM --platform=${HACS_SOURCE_PLATFORM} ghcr.io/hacs/action@sha256:a0336b447da4500204122cabea01cac1e0992840d8b927535782ddd5b601f698 AS hacs-validator
 
-# Copy validator files only; retain the immutable HA 2026.10.0 runtime/dependencies.
-FROM ghcr.io/home-assistant/home-assistant@sha256:1b64d38f38d922bf9d59336451fd6453e1d614f934456af4ee3d2a51061be3a4
+# Copy validator files only; retain the immutable HA 2026.11.0 runtime/dependencies.
+FROM ghcr.io/home-assistant/home-assistant@sha256:c6c1ca9931036bf3a2c4cc088d8db25dfea3b33935a5ecc83c40349462e2f69e
 COPY --from=hacs-validator /hacs /hacs
 WORKDIR /hacs
-RUN python3 -c "from homeassistant.const import __version__; assert __version__ == '2026.10.0', __version__; print(f'Home Assistant {__version__}')"
+RUN python3 -c "from homeassistant.const import __version__; assert __version__ == '2026.11.0', __version__; print(f'Home Assistant {__version__}')"
 ENTRYPOINT ["python3", "/hacs/action.py"]

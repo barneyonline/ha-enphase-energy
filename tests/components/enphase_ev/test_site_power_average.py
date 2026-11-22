@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 from homeassistant.util import dt as dt_util
 from homeassistant.helpers.restore_state import RestoredExtraData
-from pytest_homeassistant_custom_component.common import (
+from pytest_homeassistant.common import (
     async_fire_time_changed,
     async_mock_restore_state_shutdown_restart,
 )

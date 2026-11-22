@@ -5306,7 +5306,7 @@ async def test_consumption_retains_value_without_polling_and_updates_from_source
 ):
     import logging
     from homeassistant.helpers.entity_component import EntityComponent
-    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+    from pytest_homeassistant.common import async_fire_time_changed
 
     coord = coordinator_factory()
     coord.update_interval = None

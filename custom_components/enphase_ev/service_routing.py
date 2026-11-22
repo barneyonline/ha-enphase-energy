@@ -1,8 +1,11 @@
 """Resolve Home Assistant service targets to loaded Enphase runtimes."""
 
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, cast
+from homeassistant.const import CONF_EXCLUDE
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import target as ha_target
@@ -14,6 +17,15 @@ from homeassistant.exceptions import ServiceValidationError
 
 if TYPE_CHECKING:
     from .coordinator import EnphaseCoordinator
+
+
+@dataclass(slots=True)
+class ResolvedTarget:
+    """Keep the native selection and its surviving references for one call."""
+
+    selection: ha_target.TargetSelection
+    selected: ha_target.SelectedEntities
+    excluded_device_ids: set[str]
 
 
 class ServiceRouter:
@@ -60,7 +72,18 @@ class ServiceRouter:
         dev = dev_reg.async_get(device_id)
         if not dev:
             return None
-        return self._site_id_from_device(dev_reg, dev)
+        site_id = self._site_id_from_device(dev_reg, dev)
+        if site_id is not None or self._serial_from_device(dev) is None:
+            return site_id
+
+        # A retained charger can have no matching entities or inventory parent.
+        # Its entry-scoped registry ownership still identifies one loaded site.
+        owner_sites = {
+            str(coord.site_id)
+            for entry_id in self._device_config_entry_ids(dev_reg, dev)
+            if (coord := self._get_coordinator_for_entry_id(entry_id)) is not None
+        }
+        return next(iter(owner_sites)) if len(owner_sites) == 1 else None
 
     def _iter_loaded_coordinators(self) -> list[EnphaseCoordinator]:
         coordinators: list[EnphaseCoordinator] = []
@@ -185,40 +208,88 @@ class ServiceRouter:
                 return runtime_data.coordinator
         return None
 
-    def _extract_target_references(
-        self, call: ServiceCall
-    ) -> ha_target.SelectedEntities:
-        return ha_target.async_extract_referenced_entity_ids(
-            self.hass, ha_target.TargetSelection(call.data)
+    def _resolve_target(
+        self, call: ServiceCall, *, primary_entities_only: bool = True
+    ) -> ResolvedTarget:
+        selection = ha_target.TargetSelection(call.data)
+        selected = ha_target.async_extract_referenced_entity_ids(
+            self.hass,
+            selection,
+            primary_entities_only=primary_entities_only,
         )
+        excluded_device_ids: set[str] = set()
+        if selection.exclude is not None:
+            excluded_device_ids = ha_target.async_extract_referenced_entity_ids(
+                self.hass, selection.exclude, primary_entities_only=False
+            ).referenced_devices
+        return ResolvedTarget(selection, selected, excluded_device_ids)
 
-    def _extract_device_ids(self, call: ServiceCall) -> list[str]:
-        return self._device_ids_from_target_references(
-            self._extract_target_references(call)
-        )
+    def _has_target(self, call: ServiceCall) -> bool:
+        """Distinguish an omitted target from an explicit empty selection."""
+        return not call.data.keys().isdisjoint(cv.TARGET_ID_KEYS)
 
-    def _device_ids_from_target_references(
-        self, selected: ha_target.SelectedEntities
-    ) -> list[str]:
-        device_ids = set(selected.referenced_devices)
+    def _enphase_device_ids_for_entities(self, entity_ids: set[str]) -> set[str]:
         ent_reg = er.async_get(self.hass)
-        for entity_id in selected.referenced | selected.indirectly_referenced:
-            reg_entry = ent_reg.async_get(entity_id)
-            if (
-                reg_entry is not None
-                and reg_entry.platform == DOMAIN
-                and reg_entry.device_id
-            ):
-                device_ids.add(reg_entry.device_id)
-        return list(device_ids)
+        return {
+            reg_entry.device_id
+            for entity_id in entity_ids
+            if (reg_entry := ent_reg.async_get(entity_id)) is not None
+            and reg_entry.platform == DOMAIN
+            and reg_entry.device_id
+        }
 
-    def _extract_entity_ids(self, call: ServiceCall) -> list[str]:
-        return list(self._extract_target_references(call).referenced)
+    def _device_ids_from_target_references(self, target: ResolvedTarget) -> set[str]:
+        selected = target.selected
+        selected_device_ids: set[str] = selected.referenced_devices
+        entity_devices = self._enphase_device_ids_for_entities(
+            selected.referenced | selected.indirectly_referenced
+        )
+        # An entity can belong to a different area from its device. It may
+        # survive a Core entity selection even when its device was excluded.
+        return (selected_device_ids | entity_devices) - target.excluded_device_ids
 
-    async def _resolve_site_ids_from_call(self, call: ServiceCall) -> set[str]:
-        selected = self._extract_target_references(call)
+    def _extract_tariff_entity_ids(
+        self, target: ResolvedTarget, *, site_id: str | None
+    ) -> set[str]:
+        selected = target.selected
+        directly_named: set[str] = target.selection.entity_ids & selected.referenced
+        if directly_named:
+            if site_id is None:
+                return directly_named
+            return {
+                entity_id
+                for entity_id in directly_named
+                if (coord := self._coordinator_from_tariff_entity(entity_id))
+                is not None
+                and str(coord.site_id) == site_id
+            }
+        return {
+            entity_id
+            for entity_id in selected.referenced | selected.indirectly_referenced
+            if (coord := self._coordinator_from_tariff_entity(entity_id)) is not None
+            and (site_id is None or str(coord.site_id) == site_id)
+            and (state := self.hass.states.get(entity_id)) is not None
+            and isinstance(state.attributes.get("tariff_locator"), dict)
+        }
+
+    def _extract_excluded_entity_ids(self, target: ResolvedTarget) -> set[str]:
+        return cast(
+            set[str],
+            ha_target.async_extract_excluded_entity_ids(self.hass, target.selection),
+        )
+
+    async def _resolve_site_ids_from_call(
+        self,
+        call: ServiceCall,
+        *,
+        target: ResolvedTarget | None = None,
+        restrict_to_target: bool = False,
+    ) -> set[str]:
+        if target is None:
+            target = self._resolve_target(call)
+        selected = target.selected
         site_ids: set[str] = set()
-        for device_id in self._device_ids_from_target_references(selected):
+        for device_id in self._device_ids_from_target_references(target):
             site_id = await self._resolve_site_id(device_id)
             if site_id:
                 site_ids.add(site_id)
@@ -228,6 +299,8 @@ class ServiceRouter:
             if reg_entry is None or reg_entry.platform != DOMAIN:
                 continue
             device_id = reg_entry.device_id
+            if device_id in target.excluded_device_ids:
+                continue
             if device_id and (site_id := (await self._resolve_site_id(device_id))):
                 site_ids.add(site_id)
                 continue
@@ -237,23 +310,46 @@ class ServiceRouter:
             ):
                 site_ids.add(str(coord.site_id))
         explicit = call.data.get("site_id")
-        if explicit:
+        if restrict_to_target or call.data.get(CONF_EXCLUDE):
+            if explicit:
+                site_ids.intersection_update({str(explicit)})
+            if not site_ids:
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN, translation_key="grid_site_required"
+                )
+        elif explicit:
             site_ids.add(str(explicit))
         return site_ids
 
     async def _resolve_single_site_coordinator(
-        self, call: ServiceCall
+        self,
+        call: ServiceCall,
+        *,
+        target: ResolvedTarget | None = None,
+        restrict_to_target: bool = False,
     ) -> EnphaseCoordinator:
         config_entry_id = call.data.get("config_entry_id")
         if config_entry_id:
             coord = self._get_coordinator_for_entry_id(str(config_entry_id))
-            if coord is not None:
+            if coord is not None and (
+                not (restrict_to_target or call.data.get(CONF_EXCLUDE))
+                or str(coord.site_id)
+                in await self._resolve_site_ids_from_call(
+                    call,
+                    target=target,
+                    restrict_to_target=restrict_to_target,
+                )
+            ):
                 return coord
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="grid_site_required",
             )
-        site_ids = await self._resolve_site_ids_from_call(call)
+        site_ids = await self._resolve_site_ids_from_call(
+            call,
+            target=target,
+            restrict_to_target=restrict_to_target,
+        )
         if not site_ids:
             raise ServiceValidationError(
                 translation_domain=DOMAIN, translation_key="grid_site_required"
@@ -264,8 +360,8 @@ class ServiceRouter:
                 translation_key="grid_site_ambiguous",
                 translation_placeholders={"count": str(len(site_ids))},
             )
-        target = next(iter(site_ids))
-        coordinators = iter_coordinators(self.hass, site_ids={target})
+        site_id = next(iter(site_ids))
+        coordinators = iter_coordinators(self.hass, site_ids={site_id})
         if coordinators:
             return coordinators[0]
         raise ServiceValidationError(
@@ -308,20 +404,26 @@ class ServiceRouter:
     async def _resolve_charger_targets(
         self, call: ServiceCall
     ) -> list[tuple[str, str, EnphaseCoordinator]]:
-        device_ids = self._extract_device_ids(call)
-        explicit_device_ids = set(device_ids)
-        if any((key in call.data for key in ("area_id", "floor_id", "label_id"))):
-            direct_call = ServiceCall(
-                self.hass,
-                call.domain,
-                call.service,
-                {
-                    key: value
-                    for key, value in call.data.items()
-                    if key not in {"area_id", "floor_id", "label_id"}
-                },
-            )
-            explicit_device_ids = set(self._extract_device_ids(direct_call))
+        target = self._resolve_target(call)
+        device_ids = self._device_ids_from_target_references(target)
+        # Core puts group members in referenced. Only entity IDs named in
+        # the call require a charger; skip other devices reached by a group.
+        explicit_device_ids = self._enphase_device_ids_for_entities(
+            target.selection.entity_ids & target.selected.referenced
+        )
+        selection = target.selection
+        if selection.device_ids:
+            if selection.area_ids or selection.floor_ids or selection.label_ids:
+                direct_devices = ha_target.TargetSelection(
+                    {"device_id": list(selection.device_ids)}
+                )
+                explicit_device_ids.update(
+                    ha_target.async_extract_referenced_entity_ids(
+                        self.hass, direct_devices
+                    ).referenced_devices
+                )
+            else:
+                explicit_device_ids.update(target.selected.referenced_devices)
         targets: list[tuple[str, str, EnphaseCoordinator]] = []
         for device_id in device_ids:
             routing_context = await self._resolve_device_routing_context(device_id)

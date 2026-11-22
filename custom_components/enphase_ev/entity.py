@@ -6,7 +6,7 @@ from datetime import time as dt_time
 from typing import Any, TypeVar, cast
 
 from homeassistant.core import callback as ha_callback
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -192,27 +192,23 @@ class EnphaseBaseEntity(
             dev_name = "Enphase Energy Charger"
 
         model_display = _compose_charger_model_display(display_name, model_name_raw)
-        # Build DeviceInfo using keyword arguments as per HA dev docs
-        info_kwargs: dict[str, object] = {
-            "identifiers": {(DOMAIN, self._sn)},
-            "manufacturer": "Enphase",
-            "name": dev_name,
-            "serial_number": str(self._sn),
-            "configuration_url": _site_configuration_url(self._coord.site_id),
-        }
-        # Optional enrichment when available
+        info = DeviceInfo(
+            identifiers={(DOMAIN, self._sn)},
+            manufacturer="Enphase",
+            name=dev_name,
+            serial_number=str(self._sn),
+            configuration_url=_site_configuration_url(self._coord.site_id),
+        )
         if model_display:
-            info_kwargs["model"] = model_display
+            info.model = model_display
         model_id_value = _clean_text(d.get("model_id") or model_name_raw)
-        if model_id_value and not _is_redundant_model_id(
-            info_kwargs.get("model"), model_id_value
-        ):
-            info_kwargs["model_id"] = str(model_id_value)
-        if d.get("hw_version"):
-            info_kwargs["hw_version"] = str(d.get("hw_version"))
-        if d.get("sw_version"):
-            info_kwargs["sw_version"] = str(d.get("sw_version"))
-        return DeviceInfo(**info_kwargs)
+        if model_id_value and not _is_redundant_model_id(model_display, model_id_value):
+            info.model_id = model_id_value
+        if hw_version := d.get("hw_version"):
+            info.hw_version = str(hw_version)
+        if sw_version := d.get("sw_version"):
+            info.sw_version = str(sw_version)
+        return info
 
 
 def evse_safe_limit_active(value: object) -> bool:

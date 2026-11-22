@@ -21,7 +21,7 @@ from yarl import URL
 import builtins
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from http import HTTPStatus
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.enphase_ev import auth_refresh_runtime as arr_mod
 from custom_components.enphase_ev import coordinator as coord_mod

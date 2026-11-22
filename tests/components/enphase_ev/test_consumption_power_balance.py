@@ -10,7 +10,7 @@ from homeassistant.helpers.entity_platform import EntityPlatform
 import pytest
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import async_fire_time_changed
+from pytest_homeassistant.common import async_fire_time_changed
 
 from custom_components.enphase_ev.const import DOMAIN
 from custom_components.enphase_ev.sensor_site_energy import (

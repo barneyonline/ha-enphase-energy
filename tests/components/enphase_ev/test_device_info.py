@@ -105,7 +105,7 @@ async def test_charger_registry_does_not_use_bare_sku_as_friendly_model(
     coord = SimpleNamespace(
         iter_serials=lambda: ["EV"], data={"EV": {"display_name": "(IQ-EVSE-EU-3032)"}}
     )
-    _sync_charger_devices(config_entry, coord, registry, "SITE", {})
+    _sync_charger_devices(config_entry, coord, registry, "SITE")
     assert (
         registry.async_get_device_by_identifier(
             (DOMAIN, "EV"), config_entry.entry_id
@@ -175,27 +175,6 @@ def test_cloud_device_info_handles_bad_site_id_str():
 
     info = device_info_fields(_cloud_device_info(BadStr()))
     assert info["identifiers"] == {("enphase_ev", "type:unknown:cloud")}
-
-
-def test_device_info_helpers_imports_without_home_assistant(monkeypatch):
-    import builtins
-    import importlib
-
-    import custom_components.enphase_ev.device_info_helpers as helpers
-
-    original_import = builtins.__import__
-
-    def _blocked_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name.startswith("homeassistant"):
-            raise ModuleNotFoundError(name)
-        return original_import(name, globals, locals, fromlist, level)
-
-    monkeypatch.setattr(builtins, "__import__", _blocked_import)
-    helpers = importlib.reload(helpers)
-
-    info = helpers._cloud_device_info("12345")
-    assert info["identifiers"] == {("enphase_ev", "type:12345:cloud")}
-    assert info["name"] == "Enphase Cloud"
 
 
 def test_evse_display_name_normalization_and_model_deduping() -> None:
@@ -335,6 +314,8 @@ async def test_charger_registry_refresh_keeps_full_sku_and_user_name(
         identifiers={(DOMAIN, "charger-test")},
         model="IQ EV Charger (IQ-EVSE-EU-3032)",
         name="IQ EV Charger",
+        hw_version="2.0",
+        sw_version="5.0",
     )
     registry.async_update_device(device.id, name_by_user="Garage")
     coord = SimpleNamespace(
@@ -347,11 +328,13 @@ async def test_charger_registry_refresh_keeps_full_sku_and_user_name(
         },
     )
     for _ in range(2):
-        _sync_charger_devices(config_entry, coord, registry, "site-test", {})
+        _sync_charger_devices(config_entry, coord, registry, "site-test")
         updated = registry.async_get(device.id)
         assert updated.model == "IQ EV Charger"
         assert updated.model_id == "IQ-EVSE-EU-3032-0105-1300"
         assert updated.name_by_user == "Garage"
+        assert updated.hw_version == "2.0"
+        assert updated.sw_version == "5.0"
         assert (
             updated.configuration_url
             == "https://enlighten.enphaseenergy.com/app/system_dashboard/sites/site-test/summary"
@@ -404,7 +387,7 @@ async def test_charger_registry_refresh_removes_only_its_mac_connections(
         identifiers={(DOMAIN, "gateway-mac-test")},
         connections={(dr.CONNECTION_NETWORK_MAC, "00:11:22:33:44:77")},
     )
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from pytest_homeassistant.common import MockConfigEntry
 
     other_entry = MockConfigEntry(domain="other_integration")
     other_entry.add_to_hass(hass)
@@ -419,7 +402,7 @@ async def test_charger_registry_refresh_removes_only_its_mac_connections(
         data={"charger-mac-test": {"mac_address": "00:11:22:33:44:55"}},
     )
     for _ in range(2):
-        _sync_charger_devices(config_entry, coord, registry, "site-test", {})
+        _sync_charger_devices(config_entry, coord, registry, "site-test")
         updated = registry.async_get(device.id)
         assert updated.connections == {other_connection}
         assert updated.identifiers == {(DOMAIN, "charger-mac-test")}

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, NoReturn, cast
 import aiohttp
 import voluptuous as vol
 
+from homeassistant.const import CONF_EXCLUDE
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import issue_registry as ir
@@ -57,8 +58,6 @@ def async_setup_services(
 
     router = ServiceRouter(hass)
     _coordinator_from_tariff_entity = router._coordinator_from_tariff_entity
-    _extract_device_ids = router._extract_device_ids
-    _extract_entity_ids = router._extract_entity_ids
     _get_coordinator_for_entry_id = router._get_coordinator_for_entry_id
     _resolve_charger_targets = router._resolve_charger_targets
     _resolve_single_site_coordinator = router._resolve_single_site_coordinator
@@ -160,7 +159,7 @@ def async_setup_services(
             vol.Optional("config_entry_id"): cv.string,
         }
     )
-    SYNC_SCHEMA = vol.Schema({vol.Optional("device_id"): DEVICE_ID_LIST})
+    SYNC_SCHEMA = _target_schema({vol.Optional("device_id"): DEVICE_ID_LIST})
     FORCE_REFRESH_SCHEMA = _target_schema(
         {
             vol.Optional("device_id"): DEVICE_ID_LIST,
@@ -504,7 +503,7 @@ def async_setup_services(
         return data
 
     UPDATE_TARIFF_SCHEMA = vol.All(
-        vol.Schema(
+        _target_schema(
             {
                 vol.Optional("entity_id"): cv.entity_ids,
                 vol.Optional("device_id"): DEVICE_ID_LIST,
@@ -1341,19 +1340,42 @@ def async_setup_services(
             await coord.schedule_sync.async_refresh(reason="service", serials=[sn])
 
     async def _svc_update_tariff(call: ServiceCall) -> None:
+        target = router._resolve_target(call, primary_entities_only=False)
+        has_target = router._has_target(call)
+        has_site_selector = bool(
+            call.data.get("site_id") or call.data.get("config_entry_id")
+        )
+        site_coord: EnphaseCoordinator | None = None
         rates = list(call.data.get("rates") or [])
+        rate_entity = call.data.get("rate_entity")
+        inferred_rate = "rate" in call.data and not rate_entity
+        has_explicit_rates = bool(
+            rates
+            or rate_entity
+            or "import_rate" in call.data
+            or "export_rate" in call.data
+        )
         if "rate" in call.data:
-            entity_ids = list(_extract_entity_ids(call))
-            rate_entity = call.data.get("rate_entity")
             if rate_entity:
-                entity_ids.append(str(rate_entity))
-            entity_ids = list(dict.fromkeys(entity_ids))
+                entity_ids = (
+                    target.selection.entity_ids & target.selected.referenced
+                ) | {str(rate_entity)}
+            else:
+                if has_target and has_site_selector:
+                    site_coord = await _resolve_single_site_coordinator(
+                        call, target=target, restrict_to_target=True
+                    )
+                entity_ids = router._extract_tariff_entity_ids(
+                    target, site_id=str(site_coord.site_id) if site_coord else None
+                )
             if len(entity_ids) != 1:
                 _raise_service_validation(
                     "tariff_rate_entity_required",
                     message="Select exactly one tariff rate entity.",
                 )
-            rates.append({"entity_id": entity_ids[0], "rate": call.data["rate"]})
+            rates.append(
+                {"entity_id": next(iter(entity_ids)), "rate": call.data["rate"]}
+            )
         if "import_rate" in call.data:
             rates.append(
                 {
@@ -1394,8 +1416,17 @@ def async_setup_services(
         rate_updates: list[dict[str, object]] = []
         rate_coord: EnphaseCoordinator | None = None
         seen_entities: set[str] = set()
+        # The native target has already removed exclusions from inferred rates.
+        excluded_entities = (
+            router._extract_excluded_entity_ids(target) if has_explicit_rates else set()
+        )
         for item in rates:
             entity_id = str(item.get("entity_id", "")).strip()
+            if entity_id in excluded_entities:
+                _raise_service_validation(
+                    "tariff_rate_target_invalid",
+                    message="Tariff rate target is invalid.",
+                )
             if entity_id in seen_entities:
                 _raise_service_validation(
                     "tariff_rate_entity_duplicate",
@@ -1428,26 +1459,42 @@ def async_setup_services(
         purchase_tariff = call.data.get("purchase_tariff") or guided_purchase_tariff
         buyback_tariff = call.data.get("buyback_tariff") or guided_buyback_tariff
 
-        target_coord: EnphaseCoordinator
-        has_explicit_site_target = bool(
-            call.data.get("config_entry_id")
-            or call.data.get("site_id")
-            or _extract_device_ids(call)
-        )
-        if (billing_requested or structure_requested) and (
-            has_explicit_site_target or rate_coord is None
+        target_coord = rate_coord
+        site_update = billing_requested or structure_requested
+        selected_site_ids: set[str] | None = None
+        if (
+            inferred_rate
+            and has_target
+            and not has_explicit_rates
+            and not has_site_selector
+            and not site_update
         ):
-            target_coord = await _resolve_single_site_coordinator(call)
-            if rate_coord is not None and str(target_coord.site_id) != str(
-                rate_coord.site_id
-            ):
-                _raise_service_validation(
-                    "tariff_site_mismatch",
-                    message="All tariff updates must target the same Enphase site.",
+            selected_site_ids = await _resolve_site_ids_from_call(
+                call, target=target, restrict_to_target=True
+            )
+        elif (
+            has_target
+            or call.data.get(CONF_EXCLUDE)
+            or has_site_selector
+            or rate_coord is None
+        ):
+            if site_coord is None:
+                site_coord = await _resolve_single_site_coordinator(
+                    call, target=target, restrict_to_target=has_target
                 )
-        else:
-            assert rate_coord is not None
-            target_coord = rate_coord
+            selected_site_ids = {str(site_coord.site_id)}
+            if site_update:
+                target_coord = site_coord
+        if (
+            rate_coord is not None
+            and selected_site_ids is not None
+            and str(rate_coord.site_id) not in selected_site_ids
+        ):
+            _raise_service_validation(
+                "tariff_site_mismatch",
+                message="All tariff updates must target the same Enphase site.",
+            )
+        assert target_coord is not None
 
         kwargs: dict[str, object] = {"billing": billing, "rate_updates": rate_updates}
         if tariff_payload is not None:

@@ -420,7 +420,7 @@ async def test_live_sensor_expires_without_another_poll(
     hass, coordinator_factory, config_entry, monkeypatch
 ):
     """A suppressed repeat failure still publishes unavailable at its deadline."""
-    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+    from pytest_homeassistant.common import async_fire_time_changed
     from custom_components.enphase_ev.sensor_base import EnphaseSiteSensorEntity
     from homeassistant.components.sensor import SensorDeviceClass
     from homeassistant.helpers.entity_component import EntityComponent
@@ -568,7 +568,7 @@ async def test_family_freshness_reschedules_without_coordinator_notification(
     hass, coordinator_factory, config_entry, monkeypatch
 ):
     """Unchanged successful refreshes advance the eventual outage deadline."""
-    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+    from pytest_homeassistant.common import async_fire_time_changed
     from custom_components.enphase_ev.sensor_base import EnphaseSiteSensorEntity
     from homeassistant.components.sensor import SensorDeviceClass
     from homeassistant.helpers.entity_component import EntityComponent

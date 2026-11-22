@@ -465,6 +465,30 @@ def test_classifier_and_test_workflow_changes_use_script_tests(
     }
 
 
+def test_path_classification_keeps_early_matches_in_large_diffs(manifest_repo):
+    checkout, _, _, commit, classify = manifest_repo
+    workflow = checkout / ".github/workflows/tests.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("# Test workflow change\n")
+    manifest = checkout / MANIFEST
+    metadata = json.loads(manifest.read_text())
+    metadata["version"] = "99.0.0"
+    manifest.write_text(json.dumps(metadata))
+    docs = checkout / "docs"
+    docs.mkdir()
+    # Keep writing changed paths after grep finds the workflow near the start.
+    for index in range(1024):
+        (docs / f"{index:04d}-{'x' * 180}.md").touch()
+    commit()
+
+    assert classify() == {
+        "integration": "false",
+        "diagnostics": "false",
+        "quality": "true",
+        "scripts": "true",
+    }
+
+
 def test_cross_group_source_rename_keeps_runtime_tests(manifest_repo):
     checkout, _, _, commit, classify = manifest_repo
     (checkout / "custom_components/enphase_ev/example.py").rename(

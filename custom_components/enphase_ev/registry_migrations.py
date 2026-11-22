@@ -260,25 +260,9 @@ def _migrate_cloud_entities_to_cloud_device(
         )
         return
 
-    create_device = getattr(dev_reg, "async_get_or_create", None)
-    if not callable(create_device):
-        return
-    cloud_info = _cloud_device_info(site_id_text)
-    cloud_model = cloud_info.get("model")
-    if not isinstance(cloud_model, str) or not cloud_model.strip():
-        cloud_model = "Cloud Service"
-    cloud_sw_version = cloud_info.get("sw_version")
-    if not isinstance(cloud_sw_version, str) or not cloud_sw_version.strip():
-        cloud_sw_version = None
-    cloud_device = create_device(
-        config_entry_id=getattr(entry, "entry_id", None),
-        identifiers={(DOMAIN, f"type:{site_id_text}:cloud")},
-        manufacturer="Enphase",
-        name="Enphase Cloud",
-        model=cloud_model,
-        configuration_url=cloud_info.get("configuration_url"),
-        sw_version=cloud_sw_version,
-        entry_type=getattr(getattr(dr, "DeviceEntryType", None), "SERVICE", None),
+    cloud_device = dev_reg.async_get_or_create_from_info(
+        config_entry_id=entry.entry_id,
+        device_info=_cloud_device_info(site_id_text),
     )
     cloud_device_id = getattr(cloud_device, "id", None)
     if cloud_device_id is None:

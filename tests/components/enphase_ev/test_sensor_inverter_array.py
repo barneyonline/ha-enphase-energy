@@ -176,7 +176,7 @@ async def test_power_expires_without_coordinator_updates(
     hass, array_coord, monkeypatch, provider_timestamp
 ):
     from datetime import timedelta
-    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+    from pytest_homeassistant.common import async_fire_time_changed
 
     from custom_components.enphase_ev import sensor_inverter_array as array_module
 

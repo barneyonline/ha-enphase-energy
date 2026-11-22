@@ -143,7 +143,7 @@ requirements = (docker_dir / 'requirements-dev.txt').read_text()
 python_pin = re.search(r'^FROM python:(\d+)\.(\d+)-slim\b', (docker_dir / 'Dockerfile').read_text(), re.M)
 assert python_pin, 'Expected an explicit Python major/minor in the Dockerfile'
 assert sys.version_info[:2] == tuple(map(int, python_pin.groups())), sys.version
-for package in ('homeassistant', 'pytest-homeassistant-custom-component'):
+for package in ('homeassistant', 'pytest-homeassistant'):
     pin = re.search(rf'^{re.escape(package)}==([^\s#]+)', requirements, re.M)
     assert pin, f'Missing exact {package} pin'
     actual = metadata.version(package)

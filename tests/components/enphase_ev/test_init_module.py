@@ -3,9 +3,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 from collections import UserDict
-from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
-from enum import Enum, auto
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, Mock, call
 
@@ -13,12 +11,17 @@ import aiohttp
 import pytest
 from homeassistant.config_entries import ConfigEntryState, OperationNotAllowed
 import voluptuous as vol
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady, ServiceValidationError
+from homeassistant.exceptions import (
+    ConfigEntryError,
+    ConfigEntryNotReady,
+    ServiceValidationError,
+)
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.update_coordinator import UpdateFailed
+from homeassistant.setup import async_setup_component
 
 import custom_components.enphase_ev as enphase_init
 from custom_components.enphase_ev import registry_sync, registry_migrations
@@ -1562,101 +1565,6 @@ def test_remove_legacy_site_device_handles_guard_paths(
 
 
 @pytest.mark.asyncio
-async def test_async_setup_entry_schedule_sync_falls_back_to_entry_background_task(
-    hass: HomeAssistant, config_entry, monkeypatch
-) -> None:
-    site_id = config_entry.data[CONF_SITE_ID]
-
-    class DummyCoordinator:
-        def __init__(self) -> None:
-            self.site_id = site_id
-            self.schedule_sync = SimpleNamespace(async_start=AsyncMock())
-
-        async def async_config_entry_first_refresh(self) -> None:
-            return None
-
-        def iter_serials(self) -> list[str]:
-            return []
-
-        def iter_type_keys(self) -> list[str]:
-            return []
-
-    dummy_coord = _with_inventory_view(DummyCoordinator())
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
-    )
-    monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", AsyncMock())
-    monkeypatch.setattr(hass, "async_create_background_task", None)
-
-    calls: list[tuple[HomeAssistant, str, bool]] = []
-
-    def _capture_entry_background_task(
-        hass_arg: HomeAssistant, target, name: str, eager_start: bool = True
-    ):
-        calls.append((hass_arg, name, eager_start))
-        target.close()
-        return None
-
-    monkeypatch.setattr(
-        config_entry, "async_create_background_task", _capture_entry_background_task
-    )
-
-    assert await async_setup_entry(hass, config_entry)
-
-    assert calls == [(hass, "enphase_ev_schedule_sync_start", True)]
-    dummy_coord.schedule_sync.async_start.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_async_setup_entry_schedule_sync_falls_back_to_hass_create_task(
-    hass: HomeAssistant, config_entry, monkeypatch
-) -> None:
-    site_id = config_entry.data[CONF_SITE_ID]
-
-    class DummyCoordinator:
-        def __init__(self) -> None:
-            self.site_id = site_id
-            self.schedule_sync = SimpleNamespace(async_start=AsyncMock())
-
-        async def async_config_entry_first_refresh(self) -> None:
-            return None
-
-        def iter_serials(self) -> list[str]:
-            return []
-
-        def iter_type_keys(self) -> list[str]:
-            return []
-
-    dummy_coord = _with_inventory_view(DummyCoordinator())
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.coordinator.EnphaseCoordinator",
-        lambda hass_, entry_data, config_entry=None, **kwargs: dummy_coord,
-    )
-    monkeypatch.setattr(hass.config_entries, "async_forward_entry_setups", AsyncMock())
-    monkeypatch.setattr(config_entry, "async_create_background_task", None)
-    monkeypatch.setattr(hass, "async_create_background_task", None)
-    hass.config_entries.async_update_entry(
-        config_entry,
-        data={**config_entry.data, "startup_migration_version": 1},
-    )
-
-    created: list[str] = []
-
-    def _capture_hass_create_task(target, name=None):
-        created.append("created")
-        target.close()
-        return None
-
-    monkeypatch.setattr(hass, "async_create_task", _capture_hass_create_task)
-
-    assert await async_setup_entry(hass, config_entry)
-
-    assert created == ["created"]
-    dummy_coord.schedule_sync.async_start.assert_not_awaited()
-
-
-@pytest.mark.asyncio
 async def test_async_setup_entry_updates_title_to_prefixed_site_id(
     hass: HomeAssistant, config_entry, monkeypatch
 ) -> None:
@@ -2132,7 +2040,9 @@ async def test_async_unload_entry_does_not_cleanup_when_unload_fails(
 
     monkeypatch.setattr(hass.config_entries, "async_forward_entry_unload", unload)
 
-    assert await async_unload_entry(hass, config_entry) is False
+    with pytest.raises(ConfigEntryError) as err:
+        await async_unload_entry(hass, config_entry)
+    assert err.value.translation_key == "unload_platforms_failed"
     schedule_sync.async_stop.assert_not_awaited()
     coord.cleanup_runtime_state.assert_not_called()
     assert config_entry.runtime_data is runtime_data
@@ -2421,7 +2331,7 @@ async def test_update_listener_ignores_operation_not_allowed(
 
 @pytest.mark.asyncio
 async def test_async_unload_entry_tolerates_platform_never_loaded(
-    hass: HomeAssistant, config_entry, monkeypatch
+    hass: HomeAssistant, config_entry
 ) -> None:
     schedule_sync = SimpleNamespace(async_stop=AsyncMock())
     coord = SimpleNamespace(
@@ -2430,13 +2340,7 @@ async def test_async_unload_entry_tolerates_platform_never_loaded(
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
     object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
 
-    async def unload(_entry, platform):
-        if platform == "calendar":
-            raise ValueError("Config entry was never loaded!")
-        return True
-
-    monkeypatch.setattr(hass.config_entries, "async_forward_entry_unload", unload)
-
+    assert await async_setup_component(hass, "calendar", {})
     assert await async_unload_entry(hass, config_entry)
 
     schedule_sync.async_stop.assert_awaited_once()
@@ -3548,6 +3452,11 @@ class _FakeDeviceRegistry:
     def async_get_device_by_identifier(self, identifier, config_entry_id):
         return self._by_owner_and_identifier.get((config_entry_id, identifier))
 
+    def async_get_or_create_from_info(self, *, config_entry_id, device_info):
+        return self.async_get_or_create(
+            config_entry_id=config_entry_id, **device_info.as_dict()
+        )
+
     def async_get_or_create(self, **kwargs):
         identifier = next(iter(kwargs["identifiers"]))
         config_entry_id = kwargs["config_entry_id"]
@@ -3669,9 +3578,11 @@ def test_inactive_device_cleanup_only_removes_owned_duplicate(
     )
 
 
-def test_sync_type_devices_skips_invalid_and_updates_existing(config_entry) -> None:
+def test_sync_type_devices_skips_invalid_and_updates_existing(
+    hass, config_entry
+) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
-    dev_reg = _FakeDeviceRegistry()
+    dev_reg = dr.async_get(hass)
     existing = dev_reg.async_get_or_create(
         config_entry_id=config_entry.entry_id,
         identifiers={(DOMAIN, f"type:{site_id}:envoy")},
@@ -3691,10 +3602,13 @@ def test_sync_type_devices_skips_invalid_and_updates_existing(config_entry) -> N
         )
     )
 
-    type_devices = _sync_type_devices(config_entry, coord, dev_reg, site_id)
+    _sync_type_devices(config_entry, coord, dev_reg, site_id)
 
-    assert "envoy" in type_devices
-    updated = type_devices["envoy"]
+    updated = dev_reg.async_get_device_by_identifier(
+        (DOMAIN, f"type:{site_id}:envoy"), config_entry.entry_id
+    )
+    assert updated is not None
+    assert len(dr.async_entries_for_config_entry(dev_reg, config_entry.entry_id)) == 1
     assert updated.id == existing.id
     assert updated.manufacturer == "Enphase"
     assert updated.name == "Gateway (1)"
@@ -3707,8 +3621,7 @@ def test_sync_registry_devices_runs_cleanup_when_requested(
     coord = SimpleNamespace()
     dev_reg = SimpleNamespace()
     hass = SimpleNamespace()
-    type_devices = {"envoy": object()}
-    sync_types = Mock(return_value=type_devices)
+    sync_types = Mock()
     sync_chargers = Mock()
     prune = Mock()
     remove_empty = Mock()
@@ -3728,35 +3641,38 @@ def test_sync_registry_devices_runs_cleanup_when_requested(
     )
 
     sync_types.assert_called_once_with(config_entry, coord, dev_reg, "site")
-    sync_chargers.assert_called_once_with(
-        config_entry, coord, dev_reg, "site", type_devices
-    )
+    sync_chargers.assert_called_once_with(config_entry, coord, dev_reg, "site")
     prune.assert_called_once_with(hass, config_entry, coord, "site")
     remove_empty.assert_called_once_with(hass, config_entry, coord, dev_reg, "site")
 
 
-def test_sync_type_devices_deduplicates_merged_identifiers(config_entry) -> None:
+def test_sync_type_devices_deduplicates_merged_identifiers(
+    hass, config_entry, monkeypatch
+) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
-    dev_reg = _FakeDeviceRegistry()
+    dev_reg = dr.async_get(hass)
+    register = Mock(wraps=dev_reg.async_get_or_create_from_info)
+    monkeypatch.setattr(dev_reg, "async_get_or_create_from_info", register)
     coord = _with_inventory_view(
         SimpleNamespace(
             iter_type_keys=lambda: ["envoy", "meter", "enpower"],
             type_identifier=lambda _key: (DOMAIN, f"type:{site_id}:envoy"),
             type_label=lambda _key: "Gateway",
-            type_device_name=lambda _key: "Gateway (1)",
+            type_device_name=lambda key: "Gateway (1)" if key == "envoy" else key,
         )
     )
 
-    type_devices = _sync_type_devices(config_entry, coord, dev_reg, site_id)
+    _sync_type_devices(config_entry, coord, dev_reg, site_id)
 
-    assert set(type_devices) == {"envoy", "meter", "enpower"}
-    assert len({type_devices[key].id for key in type_devices}) == 1
-    assert len(dev_reg.devices) == 1
+    register.assert_called_once()
+    (gateway,) = dr.async_entries_for_config_entry(dev_reg, config_entry.entry_id)
+    assert gateway.identifiers == {(DOMAIN, f"type:{site_id}:envoy")}
+    assert gateway.name == "Gateway (1)"
 
 
-def test_sync_type_devices_uses_model_and_hw_summary(config_entry) -> None:
+def test_sync_type_devices_uses_model_and_hw_summary(hass, config_entry) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
-    dev_reg = _FakeDeviceRegistry()
+    dev_reg = dr.async_get(hass)
 
     coord = _with_inventory_view(
         SimpleNamespace(
@@ -3772,8 +3688,11 @@ def test_sync_type_devices_uses_model_and_hw_summary(config_entry) -> None:
         )
     )
 
-    type_devices = _sync_type_devices(config_entry, coord, dev_reg, site_id)
-    device = type_devices["microinverter"]
+    _sync_type_devices(config_entry, coord, dev_reg, site_id)
+    device = dev_reg.async_get_device_by_identifier(
+        (DOMAIN, f"type:{site_id}:microinverter"), config_entry.entry_id
+    )
+    assert device is not None
     assert device.model == "IQ7A x16"
     assert device.serial_number == "INV-1 x16"
     assert device.model_id == "IQ7A-72-2-US x16"
@@ -3782,12 +3701,13 @@ def test_sync_type_devices_uses_model_and_hw_summary(config_entry) -> None:
 
 
 def test_sync_type_devices_uses_inventory_view_firmware_summaries(
+    hass,
     config_entry,
 ) -> None:
     from custom_components.enphase_ev.inventory_view import InventoryView
 
     site_id = config_entry.data[CONF_SITE_ID]
-    dev_reg = _FakeDeviceRegistry()
+    dev_reg = dr.async_get(hass)
     heatpump_member = {
         "device_type": "HEAT_PUMP",
         "device_uid": "HP-1",
@@ -3834,11 +3754,18 @@ def test_sync_type_devices_uses_inventory_view_firmware_summaries(
     )
     coord.inventory_view = InventoryView(coord)
 
-    type_devices = _sync_type_devices(config_entry, coord, dev_reg, site_id)
+    _sync_type_devices(config_entry, coord, dev_reg, site_id)
 
-    assert type_devices["encharge"].sw_version == "1.0 x2, 2.0 x1"
-    assert type_devices["microinverter"].sw_version == "4.0 x2, 5.0 x1"
-    assert type_devices["heatpump"].sw_version == "3.0"
+    devices = dr.async_entries_for_config_entry(dev_reg, config_entry.entry_id)
+    assert {
+        identifier: device.sw_version
+        for device in devices
+        for identifier in device.identifiers
+    } == {
+        (DOMAIN, f"type:{site_id}:encharge"): "1.0 x2, 2.0 x1",
+        (DOMAIN, f"type:{site_id}:microinverter"): "4.0 x2, 5.0 x1",
+        (DOMAIN, f"type:{site_id}:heatpump"): "3.0",
+    }
 
 
 def test_inventory_type_device_sw_version_for_registry_fallbacks() -> None:
@@ -3871,9 +3798,9 @@ def test_inventory_type_device_sw_version_for_registry_fallbacks() -> None:
     )
 
 
-def test_sync_type_devices_updates_existing_hw_summary(config_entry) -> None:
+def test_sync_type_devices_updates_existing_hw_summary(hass, config_entry) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
-    dev_reg = _FakeDeviceRegistry()
+    dev_reg = dr.async_get(hass)
     dev_reg.async_get_or_create(
         config_entry_id=config_entry.entry_id,
         identifiers={(DOMAIN, f"type:{site_id}:microinverter")},
@@ -3894,16 +3821,20 @@ def test_sync_type_devices_updates_existing_hw_summary(config_entry) -> None:
         )
     )
 
-    type_devices = _sync_type_devices(config_entry, coord, dev_reg, site_id)
-    device = type_devices["microinverter"]
+    _sync_type_devices(config_entry, coord, dev_reg, site_id)
+    device = dev_reg.async_get_device_by_identifier(
+        (DOMAIN, f"type:{site_id}:microinverter"), config_entry.entry_id
+    )
+    assert device is not None
     assert device.hw_version == "IQ7A-72-2-US x16"
 
 
 def test_sync_type_devices_updates_existing_serial_model_id_and_sw(
+    hass,
     config_entry,
 ) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
-    dev_reg = _FakeDeviceRegistry()
+    dev_reg = dr.async_get(hass)
     dev_reg.async_get_or_create(
         config_entry_id=config_entry.entry_id,
         identifiers={(DOMAIN, f"type:{site_id}:envoy")},
@@ -3928,8 +3859,11 @@ def test_sync_type_devices_updates_existing_serial_model_id_and_sw(
         )
     )
 
-    type_devices = _sync_type_devices(config_entry, coord, dev_reg, site_id)
-    device = type_devices["envoy"]
+    _sync_type_devices(config_entry, coord, dev_reg, site_id)
+    device = dev_reg.async_get_device_by_identifier(
+        (DOMAIN, f"type:{site_id}:envoy"), config_entry.entry_id
+    )
+    assert device is not None
     assert device.name == "IQ System Controller 3 INT"
     assert device.model == "IQ System Controller 3 INT"
     assert device.serial_number == "Controller: NEW-SN"
@@ -3937,9 +3871,9 @@ def test_sync_type_devices_updates_existing_serial_model_id_and_sw(
     assert device.sw_version == "9.0.0 x1"
 
 
-def test_sync_type_devices_omits_redundant_model_id(config_entry) -> None:
+def test_sync_type_devices_omits_redundant_model_id(hass, config_entry) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
-    dev_reg = _FakeDeviceRegistry()
+    dev_reg = dr.async_get(hass)
 
     coord = _with_inventory_view(
         SimpleNamespace(
@@ -3960,15 +3894,20 @@ def test_sync_type_devices_omits_redundant_model_id(config_entry) -> None:
         )
     )
 
-    type_devices = _sync_type_devices(config_entry, coord, dev_reg, site_id)
-    assert type_devices["encharge"].model_id is None
+    _sync_type_devices(config_entry, coord, dev_reg, site_id)
+    device = dev_reg.async_get_device_by_identifier(
+        (DOMAIN, f"type:{site_id}:encharge"), config_entry.entry_id
+    )
+    assert device is not None
+    assert device.model_id is None
 
 
 def test_sync_type_devices_clears_stale_metadata_when_helpers_return_none(
+    hass,
     config_entry,
 ) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
-    dev_reg = _FakeDeviceRegistry()
+    dev_reg = dr.async_get(hass)
     dev_reg.async_get_or_create(
         config_entry_id=config_entry.entry_id,
         identifiers={(DOMAIN, f"type:{site_id}:envoy")},
@@ -3999,8 +3938,11 @@ def test_sync_type_devices_clears_stale_metadata_when_helpers_return_none(
         )
     )
 
-    type_devices = _sync_type_devices(config_entry, coord, dev_reg, site_id)
-    device = type_devices["envoy"]
+    _sync_type_devices(config_entry, coord, dev_reg, site_id)
+    device = dev_reg.async_get_device_by_identifier(
+        (DOMAIN, f"type:{site_id}:envoy"), config_entry.entry_id
+    )
+    assert device is not None
     assert device.serial_number is None
     assert device.model_id is None
     assert device.sw_version is None
@@ -4008,10 +3950,11 @@ def test_sync_type_devices_clears_stale_metadata_when_helpers_return_none(
 
 
 def test_sync_type_devices_clears_metadata_when_inventory_view_returns_none(
+    hass,
     config_entry,
 ) -> None:
     site_id = config_entry.data[CONF_SITE_ID]
-    dev_reg = _FakeDeviceRegistry()
+    dev_reg = dr.async_get(hass)
     dev_reg.async_get_or_create(
         config_entry_id=config_entry.entry_id,
         identifiers={(DOMAIN, f"type:{site_id}:envoy")},
@@ -4034,8 +3977,11 @@ def test_sync_type_devices_clears_metadata_when_inventory_view_returns_none(
         )
     )
 
-    type_devices = _sync_type_devices(config_entry, coord, dev_reg, site_id)
-    device = type_devices["envoy"]
+    _sync_type_devices(config_entry, coord, dev_reg, site_id)
+    device = dev_reg.async_get_device_by_identifier(
+        (DOMAIN, f"type:{site_id}:envoy"), config_entry.entry_id
+    )
+    assert device is not None
     assert device.serial_number is None
     assert device.model_id is None
     assert device.sw_version is None
@@ -4068,7 +4014,7 @@ def test_sync_charger_devices_clears_legacy_type_parent(config_entry) -> None:
         )
     )
 
-    _sync_charger_devices(config_entry, coord, dev_reg, site_id, type_devices={})
+    _sync_charger_devices(config_entry, coord, dev_reg, site_id)
     charger = dev_reg.async_get_device_by_identifier(
         (DOMAIN, RANDOM_SERIAL), config_entry.entry_id
     )
@@ -4104,7 +4050,7 @@ def test_sync_charger_devices_marks_existing_legacy_parent_for_update(
         )
     )
 
-    _sync_charger_devices(config_entry, coord, dev_reg, site_id, type_devices={})
+    _sync_charger_devices(config_entry, coord, dev_reg, site_id)
 
     charger = dev_reg.async_get_device_by_identifier(
         (DOMAIN, RANDOM_SERIAL), config_entry.entry_id
@@ -4221,7 +4167,7 @@ def test_sync_charger_devices_dedupes_extended_evse_model_display(config_entry) 
         )
     )
 
-    _sync_charger_devices(config_entry, coord, dev_reg, site_id, type_devices={})
+    _sync_charger_devices(config_entry, coord, dev_reg, site_id)
     charger = dev_reg.async_get_device_by_identifier(
         (DOMAIN, RANDOM_SERIAL), config_entry.entry_id
     )
@@ -4727,10 +4673,8 @@ async def test_migrate_legacy_gateway_type_devices_rehomes_entities_and_prunes(
         assert dev_reg.async_get(site_device.id) is None
 
 
-def test_sync_type_devices_skips_dry_contact_types(config_entry) -> None:
-    dev_reg = SimpleNamespace(
-        async_get_device_by_identifier=Mock(), async_get_or_create=Mock()
-    )
+def test_sync_type_devices_skips_dry_contact_types(hass, config_entry) -> None:
+    dev_reg = dr.async_get(hass)
     coord = _with_inventory_view(
         SimpleNamespace(
             iter_type_keys=lambda: ["envoy", "dry_contact", "nc1"],
@@ -4746,20 +4690,18 @@ def test_sync_type_devices_skips_dry_contact_types(config_entry) -> None:
         )
     )
 
-    type_devices = _sync_type_devices(config_entry, coord, dev_reg, "site-1")
+    _sync_type_devices(config_entry, coord, dev_reg, "site-1")
 
-    assert "envoy" in type_devices
-    assert "dry_contact" not in type_devices
-    assert "nc1" not in type_devices
-    dev_reg.async_get_or_create.assert_called_once()
+    (gateway,) = dr.async_entries_for_config_entry(dev_reg, config_entry.entry_id)
+    assert gateway.identifiers == {(DOMAIN, "type:site-1:envoy")}
 
 
-def test_sync_type_devices_skips_selected_type_without_bucket(config_entry) -> None:
+def test_sync_type_devices_skips_selected_type_without_bucket(
+    hass, config_entry
+) -> None:
     from custom_components.enphase_ev.inventory_view import InventoryView
 
-    dev_reg = SimpleNamespace(
-        async_get_device_by_identifier=Mock(), async_get_or_create=Mock()
-    )
+    dev_reg = dr.async_get(hass)
     coord = SimpleNamespace(
         site_id="site-1",
         inventory_runtime=SimpleNamespace(),
@@ -4770,10 +4712,9 @@ def test_sync_type_devices_skips_selected_type_without_bucket(config_entry) -> N
     )
     coord.inventory_view = InventoryView(coord)
 
-    type_devices = _sync_type_devices(config_entry, coord, dev_reg, "site-1")
+    _sync_type_devices(config_entry, coord, dev_reg, "site-1")
 
-    assert type_devices == {}
-    dev_reg.async_get_or_create.assert_not_called()
+    assert not dr.async_entries_for_config_entry(dev_reg, config_entry.entry_id)
 
 
 def test_migrate_legacy_gateway_type_devices_handles_internal_edge_paths(
@@ -5306,6 +5247,13 @@ async def test_migrate_cloud_entities_to_cloud_device_rehomes_legacy_cloud_suffi
         manufacturer="Enphase",
         name="Gateway (1)",
     )
+    previous_cloud = dev_reg.async_get_or_create(
+        config_entry_id=config_entry.entry_id,
+        identifiers={(DOMAIN, f"type:{site_id}:cloud")},
+        name="Enphase Cloud",
+        sw_version="obsolete",
+    )
+    dev_reg.async_update_device(previous_cloud.id, name_by_user="My Enphase")
     legacy_cloud_error = ent_reg.async_get_or_create(
         domain="sensor",
         platform=DOMAIN,
@@ -5321,6 +5269,10 @@ async def test_migrate_cloud_entities_to_cloud_device_rehomes_legacy_cloud_suffi
         (DOMAIN, f"type:{site_id}:cloud"), config_entry.entry_id
     )
     assert cloud_device is not None
+    assert cloud_device.id == previous_cloud.id
+    assert cloud_device.name_by_user == "My Enphase"
+    assert cloud_device.entry_type is dr.DeviceEntryType.SERVICE
+    assert cloud_device.sw_version is None
     reg_entry = ent_reg.async_get(legacy_cloud_error.entity_id)
     assert reg_entry is not None
     assert reg_entry.device_id == cloud_device.id
@@ -5329,7 +5281,7 @@ async def test_migrate_cloud_entities_to_cloud_device_rehomes_legacy_cloud_suffi
 def test_migrate_cloud_entities_to_cloud_device_handles_edge_paths(
     hass: HomeAssistant, config_entry, monkeypatch
 ) -> None:
-    module = importlib.import_module("custom_components.enphase_ev")
+    module = importlib.import_module("custom_components.enphase_ev.registry_migrations")
     original_er = module.er
 
     monkeypatch.setattr(module, "er", None)
@@ -5357,19 +5309,7 @@ def test_migrate_cloud_entities_to_cloud_device_handles_edge_paths(
         hass,
         config_entry,
         SimpleNamespace(site_id="site-1"),
-        SimpleNamespace(async_get_or_create=lambda **_kwargs: None),
-        "site-1",
-    )
-
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.er.async_get",
-        lambda _hass: SimpleNamespace(),
-    )
-    _migrate_cloud_entities_to_cloud_device(
-        hass,
-        config_entry,
-        SimpleNamespace(site_id="site-1"),
-        SimpleNamespace(),
+        SimpleNamespace(async_get_or_create_from_info=lambda **_kwargs: None),
         "site-1",
     )
 
@@ -5392,7 +5332,9 @@ def test_migrate_cloud_entities_to_cloud_device_handles_edge_paths(
         hass,
         config_entry,
         SimpleNamespace(site_id="site-2"),
-        SimpleNamespace(async_get_or_create=lambda **_kwargs: SimpleNamespace(id=None)),
+        SimpleNamespace(
+            async_get_or_create_from_info=Mock(return_value=SimpleNamespace(id=None))
+        ),
         "site-2",
     )
     _migrate_cloud_entities_to_cloud_device(
@@ -5400,7 +5342,9 @@ def test_migrate_cloud_entities_to_cloud_device_handles_edge_paths(
         config_entry,
         SimpleNamespace(site_id="site-3"),
         SimpleNamespace(
-            async_get_or_create=lambda **_kwargs: SimpleNamespace(id="cloud-device")
+            async_get_or_create_from_info=Mock(
+                return_value=SimpleNamespace(id="cloud-device")
+            )
         ),
         "site-3",
     )
@@ -5427,47 +5371,11 @@ def test_migrate_cloud_entities_to_cloud_device_handles_edge_paths(
         config_entry,
         SimpleNamespace(site_id="site-4"),
         SimpleNamespace(
-            async_get_or_create=lambda **_kwargs: SimpleNamespace(id="cloud-device")
+            async_get_or_create_from_info=Mock(
+                return_value=SimpleNamespace(id="cloud-device")
+            )
         ),
         "site-4",
-    )
-
-
-@pytest.mark.parametrize("sw_version", [object(), "5.2.2"])
-def test_migrate_cloud_entities_to_cloud_device_cloud_info_fallbacks(
-    hass: HomeAssistant, config_entry, monkeypatch, sw_version
-) -> None:
-    site_id = config_entry.data[CONF_SITE_ID]
-    captured: dict[str, object] = {}
-
-    def _create_device(**kwargs):
-        captured.update(kwargs)
-        return SimpleNamespace(id="cloud-device")
-
-    ent_reg = SimpleNamespace(
-        async_get_entity_id=lambda *_args, **_kwargs: None,
-        async_get=lambda *_args, **_kwargs: None,
-        async_update_entity=lambda *_args, **_kwargs: None,
-    )
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.er.async_get", lambda _hass: ent_reg
-    )
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.registry_migrations._cloud_device_info",
-        lambda _site_id: {"model": object(), "sw_version": sw_version},
-    )
-
-    _migrate_cloud_entities_to_cloud_device(
-        hass,
-        config_entry,
-        SimpleNamespace(site_id=site_id),
-        SimpleNamespace(async_get_or_create=_create_device),
-        site_id,
-    )
-
-    assert captured["model"] == "Cloud Service"
-    assert captured["sw_version"] == (
-        sw_version if isinstance(sw_version, str) else None
     )
 
 
@@ -5561,7 +5469,9 @@ def test_migrate_cloud_entities_to_cloud_device_fallback_sweep_branch_coverage(
         config_entry,
         SimpleNamespace(site_id=site_id),
         SimpleNamespace(
-            async_get_or_create=lambda **_kwargs: SimpleNamespace(id="cloud-device")
+            async_get_or_create_from_info=Mock(
+                return_value=SimpleNamespace(id="cloud-device")
+            )
         ),
         None,
     )
@@ -5598,7 +5508,9 @@ def test_migrate_cloud_entities_to_cloud_device_skips_updates_when_no_changes_ne
         config_entry,
         SimpleNamespace(site_id="site-noop"),
         SimpleNamespace(
-            async_get_or_create=lambda **_kwargs: SimpleNamespace(id="cloud-device")
+            async_get_or_create_from_info=Mock(
+                return_value=SimpleNamespace(id="cloud-device")
+            )
         ),
         "site-noop",
     )
@@ -5633,7 +5545,9 @@ def test_migrate_cloud_entities_to_cloud_device_logs_update_failures(
         config_entry,
         SimpleNamespace(site_id="site-fail"),
         SimpleNamespace(
-            async_get_or_create=lambda **_kwargs: SimpleNamespace(id="cloud-device")
+            async_get_or_create_from_info=Mock(
+                return_value=SimpleNamespace(id="cloud-device")
+            )
         ),
         "site-fail",
     )
@@ -6070,31 +5984,7 @@ async def test_activity_default_normalization_does_not_reload(
     assert config_entry.runtime_data is runtime
 
 
-class _DeviceInfoField(Enum):
-    UNSET = auto()
-
-
-@dataclass(slots=True)
-class _DataclassDeviceInfo:
-    """Subset of HA 2026.11 DeviceInfo, including its unset-field contract."""
-
-    name: str | None | _DeviceInfoField = _DeviceInfoField.UNSET
-    model: str | None | _DeviceInfoField = _DeviceInfoField.UNSET
-    hw_version: str | None | _DeviceInfoField = _DeviceInfoField.UNSET
-    serial_number: str | None | _DeviceInfoField = _DeviceInfoField.UNSET
-    model_id: str | None | _DeviceInfoField = _DeviceInfoField.UNSET
-    sw_version: str | None | _DeviceInfoField = _DeviceInfoField.UNSET
-
-    def as_dict(self):
-        return {
-            key: value
-            for key, value in asdict(self).items()
-            if value is not _DeviceInfoField.UNSET
-        }
-
-
-@pytest.mark.parametrize("info_factory", [dict, _DataclassDeviceInfo])
-def test_registry_metadata_signature_uses_cached_type_device_info(info_factory):
+def test_registry_metadata_signature_uses_cached_type_device_info():
     fields = {
         "name": "IQ Battery",
         "model": "IQ Battery 5P",
@@ -6103,7 +5993,7 @@ def test_registry_metadata_signature_uses_cached_type_device_info(info_factory):
         "model_id": "5P",
         "sw_version": "1.2.3",
     }
-    info = info_factory(**fields)
+    info = dr.DeviceInfo(**fields)
     scalar_getter = Mock(side_effect=AssertionError("cached metadata was bypassed"))
     view = SimpleNamespace(
         iter_type_keys=lambda: ["encharge"],
@@ -6131,15 +6021,11 @@ def test_registry_metadata_signature_uses_cached_type_device_info(info_factory):
             "1.2.3",
         ),
     )
-    if isinstance(info, dict):
-        info["sw_version"] = "1.2.4"
-    else:
-        info.sw_version = "1.2.4"
+    info.sw_version = "1.2.4"
     assert _registry_type_metadata_signature(coord)[0][-1] == "1.2.4"
     scalar_getter.assert_not_called()
 
 
-@pytest.mark.parametrize("info_factory", [dict, _DataclassDeviceInfo])
 @pytest.mark.parametrize(
     "fields,expected",
     [
@@ -6150,12 +6036,9 @@ def test_registry_metadata_signature_uses_cached_type_device_info(info_factory):
         ),
     ],
 )
-def test_registry_metadata_signature_handles_optional_cached_fields(
-    info_factory, fields, expected
-):
-    info = info_factory(**fields)
-    if isinstance(info, _DataclassDeviceInfo):
-        assert info.as_dict() == fields
+def test_registry_metadata_signature_handles_optional_cached_fields(fields, expected):
+    info = dr.DeviceInfo(**fields)
+    assert info.as_dict() == fields
     # Omit scalar helpers so even empty cached metadata must use the fast path.
     view = SimpleNamespace(
         iter_type_keys=lambda: ["encharge"],
@@ -6245,12 +6128,16 @@ async def test_failed_platform_unload_preserves_active_runtime(
     coord = coordinator_factory()
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
     object.__setattr__(config_entry, "state", ConfigEntryState.LOADED)
+    unload_platform = AsyncMock(return_value=False)
     monkeypatch.setattr(
-        hass.config_entries, "async_forward_entry_unload", AsyncMock(return_value=False)
+        hass.config_entries, "async_forward_entry_unload", unload_platform
     )
-    assert await async_unload_entry(hass, config_entry) is False
+    with pytest.raises(ConfigEntryError):
+        await async_unload_entry(hass, config_entry)
     assert coord.runtime_active is True
     assert config_entry.runtime_data.coordinator is coord
+    unload_platform.return_value = True
+    assert await hass.config_entries.async_unload(config_entry.entry_id)
 
 
 @pytest.mark.parametrize("supports_remove", [False, True])

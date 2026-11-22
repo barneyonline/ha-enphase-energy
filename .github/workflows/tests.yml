@@ -52,7 +52,8 @@ jobs:
             local pattern="$2"
             local paths="${3-$changed_files}"
             local value="false"
-            if printf '%s\n' "$paths" | grep -Eq "$pattern"; then
+            # An early grep match must not fail because the writer gets SIGPIPE.
+            if grep -Eq "$pattern" <<< "$paths"; then
               value="true"
             fi
             echo "${name}=${value}" >> "$GITHUB_OUTPUT"
@@ -62,7 +63,7 @@ jobs:
           # and quality checks. Dependency or discovery edits cannot skip pytest.
           integration_files="$changed_files"
           manifest='custom_components/enphase_ev/manifest.json'
-          if printf '%s\n' "$changed_files" | grep -Fxq "$manifest"; then
+          if grep -Fxq "$manifest" <<< "$changed_files"; then
             if python3 scripts/ci_manifest_metadata.py --base-ref "origin/${{ github.base_ref }}"; then
               integration_files="$(printf '%s\n' "$changed_files" | grep -Fxv "$manifest" || true)"
               echo "Manifest metadata or version change; checking other paths for runtime tests."
@@ -166,7 +167,7 @@ jobs:
       - name: Install deps
         run: |
           uv pip install --system -r devtools/docker/requirements-dev.txt
-          python -c "from homeassistant.const import __version__; assert __version__ == '2026.10.0', __version__; print(f'Home Assistant {__version__}')"
+          python -c "from homeassistant.const import __version__; assert __version__ == '2026.11.0', __version__; print(f'Home Assistant {__version__}')"
       - name: Gate integration import deprecations and profile import time
         run: python scripts/importtime_profile.py --strict-integration-warnings --output importtime-enphase-ev.log
       - name: Upload import-time profile
@@ -202,7 +203,7 @@ jobs:
       - name: Install deps
         run: |
           uv pip install --system -r devtools/docker/requirements-dev.txt
-          python -c "from homeassistant.const import __version__; assert __version__ == '2026.10.0', __version__; print(f'Home Assistant {__version__}')"
+          python -c "from homeassistant.const import __version__; assert __version__ == '2026.11.0', __version__; print(f'Home Assistant {__version__}')"
       - name: Detect changed integration modules
         id: changed
         if: ${{ github.event_name == 'pull_request' }}
@@ -229,7 +230,7 @@ jobs:
         continue-on-error: true
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-          PYTEST_PLUGINS: pytest_asyncio.plugin,pytest_homeassistant_custom_component.plugins,pytest_cov.plugin,pytest_github_actions_annotate_failures.plugin
+          PYTEST_PLUGINS: pytest_asyncio.plugin,pytest_socket,pytest_homeassistant.bootstrap,pytest_cov.plugin,pytest_github_actions_annotate_failures.plugin
         run: pytest -q tests/components/enphase_ev --cov --cov-branch --cov-report=term-missing --cov-report=xml --cov-report=json --cov-fail-under=100 --junitxml=junit.xml -o junit_family=legacy --log-file=pytest-runtime-warnings.log --log-file-level=WARNING
       - name: Upload runtime warning log
         if: ${{ always() }}

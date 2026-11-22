@@ -8,7 +8,7 @@ import inspect
 import logging
 import time as _time
 from contextlib import ExitStack
-from typing import TYPE_CHECKING, Any, Coroutine, cast
+from typing import TYPE_CHECKING, Any, Coroutine
 
 from homeassistant.config_entries import ConfigEntryState, OperationNotAllowed
 from homeassistant.core import HomeAssistant, SupportsResponse
@@ -88,9 +88,6 @@ from .registry_migrations import (
 
 from .registry_sync import (
     _CHARGER_ENTITY_UNIQUE_ID_SUFFIXES_BY_DOMAIN as _CHARGER_ENTITY_UNIQUE_ID_SUFFIXES_BY_DOMAIN,
-)
-from .registry_sync import (
-    _TYPE_DEVICE_KEYS_WITH_DIRECT_CHILD_DEVICES as _TYPE_DEVICE_KEYS_WITH_DIRECT_CHILD_DEVICES,
 )
 from .registry_migrations import _LEGACY_GATEWAY_TYPE_KEYS as _LEGACY_GATEWAY_TYPE_KEYS
 from .registry_migrations import (
@@ -401,32 +398,6 @@ async def _async_update_listener(
         await _async_update_listener_locked(hass, entry, runtime_data)
 
 
-async def _async_unload_platforms_safe(
-    hass: HomeAssistant, entry: EnphaseConfigEntry
-) -> bool:
-    """Unload forwarded platforms, tolerating components that never loaded the entry."""
-
-    async def _unload_platform(platform: str) -> bool:
-        try:
-            return cast(
-                bool,
-                await hass.config_entries.async_forward_entry_unload(entry, platform),
-            )
-        except ValueError as err:
-            if str(err) != "Config entry was never loaded!":
-                raise
-            _LOGGER.debug(
-                "Skipping unload for platform %s on entry %s because it never loaded",
-                platform,
-                entry.entry_id,
-            )
-            return True
-
-    return all(
-        await asyncio.gather(*(_unload_platform(platform) for platform in PLATFORMS))
-    )
-
-
 async def async_setup(hass: HomeAssistant, _config: dict[str, Any]) -> bool:
     """Set up the integration domain and register services."""
 
@@ -671,14 +642,7 @@ async def _async_setup_entry_impl(
         )
 
     def _schedule_background_task(coro: Coroutine[Any, Any, Any], name: str) -> None:
-        entry_create_background = getattr(entry, "async_create_background_task", None)
-        hass_create_background = getattr(hass, "async_create_background_task", None)
-        if callable(hass_create_background):
-            task = hass_create_background(coro, name)
-        elif callable(entry_create_background):
-            task = entry_create_background(hass, coro, name)
-        else:
-            task = hass.async_create_task(coro, name=name)
+        task = hass.async_create_background_task(coro, name)
         track_background_task = getattr(coord, "track_entry_background_task", None)
         if callable(track_background_task):
             track_background_task(task)
@@ -856,8 +820,7 @@ async def _async_unload_platforms_and_runtime(
     entry: EnphaseConfigEntry,
     runtime_data: EnphaseRuntimeData | None,
 ) -> bool:
-    if not await _async_unload_platforms_safe(hass, entry):
-        return False
+    await hass.config_entries.async_unload_platforms_or_raise(entry, PLATFORMS)
     if runtime_data is None:
         entry.runtime_data = None
         return True

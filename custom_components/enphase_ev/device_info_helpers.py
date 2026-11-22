@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
-    from homeassistant.helpers.entity import DeviceInfo
+    from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import BASE_URL, DOMAIN
 from .runtime_helpers import coerce_optional_text as _clean_text
@@ -135,24 +135,22 @@ async def async_prime_integration_version(hass: HomeAssistant) -> None:
     await hass.async_add_executor_job(_integration_version)
 
 
-def _cloud_device_info(site_id: object) -> DeviceInfo | dict[str, object]:
+def _cloud_device_info(site_id: object) -> DeviceInfo:
     """Return DeviceInfo for cloud-level connectivity entities."""
+    from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
+
     try:
         site_text = str(site_id).strip()
     except Exception:
         site_text = ""
     if not site_text:
         site_text = "unknown"
-    payload: dict[str, object] = {
-        "identifiers": {(DOMAIN, f"type:{site_text}:cloud")},
-        "manufacturer": "Enphase",
-        "name": "Enphase Cloud",
-        "model": "Cloud Service",
-        "configuration_url": _site_configuration_url(site_id),
-    }
-    payload["sw_version"] = None
-    try:
-        from homeassistant.helpers.entity import DeviceInfo
-    except Exception:
-        return payload
-    return DeviceInfo(**payload)
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"type:{site_text}:cloud")},
+        manufacturer="Enphase",
+        name="Enphase Cloud",
+        model="Cloud Service",
+        configuration_url=_site_configuration_url(site_id),
+        sw_version=None,
+        entry_type=DeviceEntryType.SERVICE,
+    )

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 from typing import Any
-import voluptuous as vol
-from homeassistant import config_entries, data_entry_flow
+import probatio
+from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD
-from homeassistant.data_entry_flow import FlowResult, section
+from homeassistant.data_entry_flow import FlowResult, Optional, Required, section
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.selector import selector
 from homeassistant.helpers.translation import (
@@ -248,89 +248,91 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 visible.append(type_key)
         return visible
 
-    def _build_devices_schema(self, visible_type_keys: list[str]) -> vol.Schema:
+    def _build_devices_schema(self, visible_type_keys: list[str]) -> probatio.Schema:
         default_selected_type_keys = self._default_selected_type_keys()
-        category_fields: dict[vol.Marker, object] = {}
+        category_fields: dict[probatio.Marker, object] = {}
         for type_key in visible_type_keys:
             field_key = _TYPE_FIELD_BY_KEY.get(type_key)
             if field_key is None:
                 continue
             category_fields[
-                vol.Optional(field_key, default=type_key in default_selected_type_keys)
+                probatio.Optional(
+                    field_key, default=type_key in default_selected_type_keys
+                )
             ] = bool
-        return vol.Schema(
+        return probatio.Schema(
             {
-                vol.Required(CONF_DEVICE_CATEGORIES_SECTION): section(
-                    vol.Schema(category_fields)
+                probatio.Required(CONF_DEVICE_CATEGORIES_SECTION): section(
+                    probatio.Schema(category_fields)
                 )
             }
         )
 
-    def _build_features_schema(self) -> vol.Schema:
-        feature_fields: dict[vol.Marker, object] = {
-            vol.Optional(
+    def _build_features_schema(self) -> probatio.Schema:
+        feature_fields: dict[probatio.Marker, object] = {
+            probatio.Optional(
                 OPT_SCHEDULE_SYNC_ENABLED,
                 default=self._entry.options.get(
                     OPT_SCHEDULE_SYNC_ENABLED,
                     DEFAULT_SCHEDULE_SYNC_ENABLED,
                 ),
             ): bool,
-            vol.Optional(
+            probatio.Optional(
                 OPT_BATTERY_SCHEDULES_ENABLED,
                 default=self._entry.options.get(
                     OPT_BATTERY_SCHEDULES_ENABLED,
                     DEFAULT_BATTERY_SCHEDULES_ENABLED,
                 ),
             ): bool,
-            vol.Optional(
+            probatio.Optional(
                 OPT_PRICING_EDITS_ENABLED,
                 default=self._entry.options.get(
                     OPT_PRICING_EDITS_ENABLED,
                     DEFAULT_PRICING_EDITS_ENABLED,
                 ),
             ): bool,
-            vol.Optional(
+            probatio.Optional(
                 OPT_WEATHER_ENABLED,
                 default=self._entry.options.get(
                     OPT_WEATHER_ENABLED,
                     DEFAULT_WEATHER_ENABLED,
                 ),
             ): bool,
-            vol.Optional(
+            probatio.Optional(
                 OPT_VPP_EVENTS_ENABLED,
                 default=self._entry.options.get(
                     OPT_VPP_EVENTS_ENABLED,
                     DEFAULT_VPP_EVENTS_ENABLED,
                 ),
             ): bool,
-            vol.Optional(
+            probatio.Optional(
                 OPT_EXPORT_LIMIT_CONTROLS_ENABLED,
                 default=self._entry.options.get(
                     OPT_EXPORT_LIMIT_CONTROLS_ENABLED, False
                 ),
             ): bool,
-            vol.Optional(
+            probatio.Optional(
                 OPT_GRID_PROFILE_CONTROLS_ENABLED,
                 default=self._entry.options.get(
                     OPT_GRID_PROFILE_CONTROLS_ENABLED,
                     DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
                 ),
             ): bool,
-            vol.Optional(
+            probatio.Optional(
                 OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
                 default=self._entry.options.get(
                     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
                     DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
                 ),
             ): bool,
-            vol.Optional(
+            probatio.Optional(
                 OPT_MICROINVERTER_POWER_ENABLED,
                 default=self._entry.options.get(
                     OPT_MICROINVERTER_POWER_ENABLED,
                     DEFAULT_MICROINVERTER_POWER_ENABLED,
                 ),
             ): bool,
-            vol.Optional(
+            probatio.Optional(
                 OPT_NOMINAL_VOLTAGE,
                 default=self._default_nominal_voltage(),
             ): int,
@@ -345,42 +347,50 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 OPT_MICROINVERTER_POWER_ENABLED,
             }
         }
-        return vol.Schema(
+        return probatio.Schema(
             {
-                vol.Required(CONF_DEVICE_FEATURES_SECTION): section(
-                    vol.Schema(feature_fields)
+                probatio.Required(CONF_DEVICE_FEATURES_SECTION): section(
+                    probatio.Schema(feature_fields)
                 ),
-                vol.Required("advanced_features"): section(vol.Schema(advanced_fields)),
+                probatio.Required("advanced_features"): section(
+                    probatio.Schema(advanced_fields)
+                ),
             }
         )
 
-    @staticmethod
-    def _build_authentication_schema() -> vol.Schema:
-        return vol.Schema(
+    def _build_authentication_schema(self) -> probatio.Schema:
+        return probatio.Schema(
             {
-                vol.Optional("reauth", default=False): bool,
-                vol.Optional("forget_password", default=False): bool,
+                probatio.Optional("reauth", default=False): bool,
+                Optional(
+                    "forget_password",
+                    default=False,
+                    visible=bool(
+                        self._entry.data.get(CONF_PASSWORD)
+                        or self._entry.data.get(CONF_REMEMBER_PASSWORD)
+                    ),
+                ): bool,
             }
         )
 
-    def _build_repair_notifications_schema(self) -> vol.Schema:
-        return vol.Schema(
+    def _build_repair_notifications_schema(self) -> probatio.Schema:
+        return probatio.Schema(
             {
-                vol.Optional(
+                probatio.Optional(
                     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
                     default=self._entry.options.get(
                         OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
                         DEFAULT_DEGRADED_SERVICE_REPAIR_ISSUES,
                     ),
                 ): bool,
-                vol.Optional(
+                probatio.Optional(
                     OPT_SYSTEM_EVENT_REPAIR_ISSUES,
                     default=self._entry.options.get(
                         OPT_SYSTEM_EVENT_REPAIR_ISSUES,
                         DEFAULT_SYSTEM_EVENT_REPAIR_ISSUES,
                     ),
                 ): bool,
-                vol.Optional(
+                probatio.Optional(
                     OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
                     default=self._entry.options.get(
                         OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
@@ -390,35 +400,35 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             }
         )
 
-    def _build_general_settings_schema(self) -> vol.Schema:
+    def _build_general_settings_schema(self) -> probatio.Schema:
         fast_default, slow_default = normalize_poll_intervals(
             self._entry.options.get(OPT_FAST_POLL_INTERVAL, DEFAULT_FAST_POLL_INTERVAL),
             self._entry.options.get(OPT_SLOW_POLL_INTERVAL, DEFAULT_SLOW_POLL_INTERVAL),
         )
-        schema_fields: dict[vol.Marker, object] = {
-            vol.Optional(
+        schema_fields: dict[probatio.Marker, object] = {
+            probatio.Optional(
                 OPT_FAST_POLL_INTERVAL,
                 default=fast_default,
-            ): vol.All(
-                vol.Coerce(int),
-                vol.Range(min=MIN_FAST_POLL_INTERVAL, max=MAX_POLL_INTERVAL),
+            ): probatio.All(
+                probatio.Coerce(int),
+                probatio.Range(min=MIN_FAST_POLL_INTERVAL, max=MAX_POLL_INTERVAL),
             ),
-            vol.Optional(
+            probatio.Optional(
                 OPT_SLOW_POLL_INTERVAL,
                 default=slow_default,
-            ): vol.All(
-                vol.Coerce(int),
-                vol.Range(min=MIN_SLOW_POLL_INTERVAL, max=MAX_POLL_INTERVAL),
+            ): probatio.All(
+                probatio.Coerce(int),
+                probatio.Range(min=MIN_SLOW_POLL_INTERVAL, max=MAX_POLL_INTERVAL),
             ),
-            vol.Optional(
+            probatio.Optional(
                 OPT_FAST_WHILE_STREAMING,
                 default=self._entry.options.get(OPT_FAST_WHILE_STREAMING, True),
             ): bool,
-            vol.Optional(
+            probatio.Optional(
                 OPT_USE_15_MINUTE_POWER_AVERAGE,
                 default=self._entry.options.get(OPT_USE_15_MINUTE_POWER_AVERAGE, False),
             ): bool,
-            vol.Optional(
+            probatio.Optional(
                 OPT_API_TIMEOUT,
                 default=self._entry.options.get(OPT_API_TIMEOUT, DEFAULT_API_TIMEOUT),
             ): selector(
@@ -432,27 +442,27 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                     }
                 }
             ),
-            vol.Optional(
+            probatio.Optional(
                 OPT_SESSION_HISTORY_INTERVAL,
                 default=self._entry.options.get(
                     OPT_SESSION_HISTORY_INTERVAL,
                     DEFAULT_SESSION_HISTORY_INTERVAL_MIN,
                 ),
-            ): vol.All(
-                vol.Coerce(int),
-                vol.Range(
+            ): probatio.All(
+                probatio.Coerce(int),
+                probatio.Range(
                     min=MIN_SESSION_HISTORY_INTERVAL_MIN,
                     max=MAX_SESSION_HISTORY_INTERVAL_MIN,
                 ),
             ),
         }
-        base_schema = vol.Schema(schema_fields)
+        base_schema = probatio.Schema(schema_fields)
         return self.add_suggested_values_to_schema(base_schema, self._entry.options)
 
-    def _build_settings_schema(self) -> vol.Schema:
+    def _build_settings_schema(self) -> probatio.Schema:
         return self._build_general_settings_schema()
 
-    def _build_schema(self) -> vol.Schema:
+    def _build_schema(self) -> probatio.Schema:
         """Backward-compatible alias for tests and legacy direct calls."""
 
         return self._build_general_settings_schema()
@@ -512,10 +522,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
 
     def _build_migration_source_schema(
         self, sources: list[EnvoyHistorySource]
-    ) -> vol.Schema:
-        return vol.Schema(
+    ) -> probatio.Schema:
+        return probatio.Schema(
             {
-                vol.Required(CONF_MIGRATION_SOURCE_ENTRY): selector(
+                probatio.Required(CONF_MIGRATION_SOURCE_ENTRY): selector(
                     {
                         "select": {
                             "options": source_options(sources),
@@ -526,9 +536,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             }
         )
 
-    def _build_migration_intro_schema(self) -> vol.Schema:
-        return vol.Schema(
-            {vol.Required(CONF_MIGRATION_BACKUP_CONFIRMED, default=False): bool}
+    def _build_migration_intro_schema(self) -> probatio.Schema:
+        return probatio.Schema(
+            {probatio.Required(CONF_MIGRATION_BACKUP_CONFIRMED, default=False): bool}
         )
 
     def _build_migration_mapping_schema(
@@ -536,9 +546,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         source: EnvoyHistorySource,
         extra_candidates: list[EnvoyHistoryCandidate],
         defaults: dict[str, str] | None = None,
-    ) -> vol.Schema:
+    ) -> probatio.Schema:
         defaults = defaults or {}
-        field_schema: dict[vol.Marker, object] = {}
+        field_schema: dict[probatio.Marker, object] = {}
         selector_config = {
             "select": {
                 "options": candidate_options(source, extra_candidates),
@@ -548,22 +558,23 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         for flow_key in self._migration_flow_keys():
             default_value = defaults.get(flow_key)
             marker = (
-                vol.Optional(flow_key)
+                probatio.Optional(flow_key)
                 if default_value is None
-                else vol.Optional(flow_key, default=default_value)
+                else probatio.Optional(flow_key, default=default_value)
             )
             field_schema[marker] = selector(selector_config)
-        return vol.Schema(field_schema)
+        return probatio.Schema(field_schema)
 
     def _build_migration_confirm_schema(
         self, *, disable_archived_default: bool
-    ) -> vol.Schema:
-        return vol.Schema(
+    ) -> probatio.Schema:
+        return probatio.Schema(
             {
-                vol.Required(CONF_MIGRATION_CONFIRM_REASSIGN, default=False): bool,
-                vol.Required(
+                probatio.Required(CONF_MIGRATION_CONFIRM_REASSIGN, default=False): bool,
+                Required(
                     CONF_MIGRATION_DISABLE_ARCHIVED,
                     default=disable_archived_default,
+                    visible={"field": CONF_MIGRATION_CONFIRM_REASSIGN, "value": True},
                 ): bool,
             }
         )
@@ -720,13 +731,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             return value
         return bool(value != ALL_PROFILES_OPTION)
 
-    def _grid_profile_filter_schema(self, runtime: GridProfileRuntime) -> vol.Schema:
+    def _grid_profile_filter_schema(
+        self, runtime: GridProfileRuntime
+    ) -> probatio.Schema:
         selected_region = runtime.staged_region_code
         if selected_region is None and runtime.regions:
             selected_region = runtime.regions[0].region_code
-        return vol.Schema(
+        return probatio.Schema(
             {
-                vol.Required(
+                probatio.Required(
                     CONF_GRID_PROFILE_REGION,
                     default=selected_region,
                 ): selector(
@@ -737,7 +750,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                         }
                     }
                 ),
-                vol.Optional(
+                probatio.Optional(
                     CONF_GRID_PROFILE_COMMONLY_USED,
                     default=runtime.list_mode_option,
                 ): selector(
@@ -752,10 +765,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             }
         )
 
-    def _grid_profile_select_schema(self, profiles: list[GridProfile]) -> vol.Schema:
-        return vol.Schema(
+    def _grid_profile_select_schema(
+        self, profiles: list[GridProfile]
+    ) -> probatio.Schema:
+        return probatio.Schema(
             {
-                vol.Required(CONF_GRID_PROFILE_ID): selector(
+                probatio.Required(CONF_GRID_PROFILE_ID): selector(
                     {
                         "select": {
                             "options": self._grid_profile_options(profiles),
@@ -766,11 +781,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             }
         )
 
-    def _grid_profile_confirm_schema(self, runtime: GridProfileRuntime) -> vol.Schema:
+    def _grid_profile_confirm_schema(
+        self, runtime: GridProfileRuntime
+    ) -> probatio.Schema:
         if not runtime.apply_available:
-            return vol.Schema({})
-        return vol.Schema(
-            {vol.Required(CONF_GRID_PROFILE_CONFIRM_APPLY, default=False): bool}
+            return probatio.Schema({})
+        return probatio.Schema(
+            {probatio.Required(CONF_GRID_PROFILE_CONFIRM_APPLY, default=False): bool}
         )
 
     async def _async_prime_grid_profile_labels(self) -> None:
@@ -935,7 +952,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 if not self._export_snapshot.supported:
                     return self.async_show_form(
                         step_id="export_limit_readonly",
-                        data_schema=vol.Schema({}),
+                        data_schema=probatio.Schema({}),
                         description_placeholders={
                             "current": await self._export_current_label()
                         },
@@ -944,7 +961,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         else:
             errors["base"] = "export_limit_disabled"
         return self.async_show_form(
-            step_id="export_limit", data_schema=vol.Schema({}), errors=errors
+            step_id="export_limit", data_schema=probatio.Schema({}), errors=errors
         )
 
     async def async_step_export_limit_action(
@@ -1009,20 +1026,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         slew_default = self._entry.options.get(
             OPT_EXPORT_LIMIT_SLEW_RATE, self._export_snapshot.slew
         )
-        slew_field = vol.Required("slew_rate", default=slew_default)
-        # Older HA exposes typing.Required here, not the conditional form marker.
-        marker_type = getattr(data_entry_flow, "Required", None)
-        if isinstance(marker_type, type) and issubclass(marker_type, vol.Required):
-            slew_field = marker_type(
-                "slew_rate",
-                default=slew_default,
-                visible={"field": "restore_slew_rate", "value": False},
-            )
         return self.async_show_form(
             step_id="export_limit_defaults",
-            data_schema=vol.Schema(
+            data_schema=probatio.Schema(
                 {
-                    vol.Required(
+                    probatio.Required(
                         "limit_watts",
                         default=self._entry.options.get(
                             OPT_EXPORT_LIMIT_DEFAULT_WATTS, 0
@@ -1038,7 +1046,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                             }
                         }
                     ),
-                    slew_field: selector(
+                    Required(
+                        "slew_rate",
+                        default=slew_default,
+                        visible={"field": "restore_slew_rate", "value": False},
+                    ): selector(
                         {
                             "number": {
                                 "min": 0.01,
@@ -1048,7 +1060,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                             }
                         }
                     ),
-                    vol.Optional(
+                    probatio.Optional(
                         "restore_slew_rate",
                         default=(user_input or {}).get("restore_slew_rate", False),
                     ): bool,
@@ -1072,9 +1084,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         return self.async_show_form(
             step_id="export_limit_set",
             last_step=False,
-            data_schema=vol.Schema(
+            data_schema=probatio.Schema(
                 {
-                    vol.Required(
+                    probatio.Required(
                         "limit_watts",
                         default=self._entry.options.get(
                             OPT_EXPORT_LIMIT_DEFAULT_WATTS, 0
@@ -1145,7 +1157,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 status = runtime.request_status
                 return self.async_show_form(
                     step_id="export_limit_submitted",
-                    data_schema=vol.Schema({}),
+                    data_schema=probatio.Schema({}),
                     description_placeholders={
                         "status": await self._export_label(
                             f"state_attributes.request_status.state.{status}", status
@@ -1154,9 +1166,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 )
         return self.async_show_form(
             step_id="export_limit_confirm",
-            data_schema=vol.Schema(
+            data_schema=probatio.Schema(
                 {
-                    vol.Required("confirm", default=False): bool,
+                    probatio.Required("confirm", default=False): bool,
                 }
             ),
             errors=errors,
@@ -1238,9 +1250,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
         return self.async_show_form(
             step_id="grid_toggle",
             last_step=False,
-            data_schema=vol.Schema(
+            data_schema=probatio.Schema(
                 {
-                    vol.Required(CONF_GRID_MODE): selector(
+                    probatio.Required(CONF_GRID_MODE): selector(
                         {
                             "select": {
                                 "options": ["on_grid", "off_grid"],
@@ -1283,10 +1295,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
 
         return self.async_show_form(
             step_id="grid_toggle_otp",
-            data_schema=vol.Schema(
+            data_schema=probatio.Schema(
                 {
-                    vol.Required(CONF_OTP): selector({"text": {"type": "password"}}),
-                    vol.Required(CONF_GRID_MODE_CONFIRM, default=False): bool,
+                    probatio.Required(CONF_GRID_MODE_CONFIRM, default=False): bool,
+                    Required(
+                        CONF_OTP,
+                        visible={"field": CONF_GRID_MODE_CONFIRM, "value": True},
+                    ): selector({"text": {"type": "password"}}),
                 }
             ),
             description_placeholders=self._grid_mode_placeholders(),
@@ -1301,7 +1316,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             return self.async_create_entry(title="", data=dict(self._entry.options))
         return self.async_show_form(
             step_id="grid_toggle_applied",
-            data_schema=vol.Schema({}),
+            data_schema=probatio.Schema({}),
             description_placeholders=self._grid_mode_placeholders(),
         )
 
@@ -1448,7 +1463,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
             placeholders = self._grid_profile_applied_placeholders(runtime)
         return self.async_show_form(
             step_id="grid_profile_applied",
-            data_schema=vol.Schema({}),
+            data_schema=probatio.Schema({}),
             description_placeholders=placeholders,
         )
 

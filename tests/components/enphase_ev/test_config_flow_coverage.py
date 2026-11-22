@@ -10,11 +10,15 @@ from voluptuous.schema_builder import Optional as VolOptional
 from voluptuous.schema_builder import Required as VolRequired
 from homeassistant import config_entries
 from homeassistant.const import UnitOfEnergy
-from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.data_entry_flow import (
+    FlowResultType,
+    InvalidData,
+    add_visible_conditions_to_serialized_schema,
+)
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.translation import async_get_translations
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.enphase_ev import config_flow
 from custom_components.enphase_ev.api import (
@@ -65,6 +69,7 @@ from custom_components.enphase_ev.const import (
     CONF_SELECTED_TYPE_KEYS,
     CONF_SESSION_ID,
     CONF_SITE_ID,
+    CONF_SITE_NAME,
     CONF_SERIALS,
     CONF_SITE_ONLY,
     CONF_ACCESS_TOKEN,
@@ -1424,29 +1429,39 @@ def test_update_entry_helper_uses_reload_helper_without_title_when_no_listener(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("title", [None, "Site: 12345"])
-async def test_update_entry_helper_falls_back_for_legacy_core(hass, title) -> None:
+@pytest.mark.parametrize("has_listener", [False, True])
+async def test_update_entry_helper_uses_native_reload_path(
+    hass, title, has_listener
+) -> None:
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_SITE_ID: "12345"})
     entry.add_to_hass(hass)
+    listener = AsyncMock()
+    if has_listener:
+        entry.add_update_listener(listener)
 
     flow = _make_flow(hass)
-    flow.async_update_and_abort = None  # type: ignore[method-assign]
-    flow.async_update_reload_and_abort = None  # type: ignore[method-assign]
     reload_entry = AsyncMock(return_value=True)
+    data = {CONF_SITE_ID: "12345", CONF_SITE_NAME: "Garage"}
 
     with patch.object(hass.config_entries, "async_reload", reload_entry):
         result = flow._async_update_entry_and_abort(
             entry,
             title=title,
-            data={CONF_SITE_ID: "12345"},
+            data=data,
             reason="reconfigure_successful",
         )
         await hass.async_block_till_done()
 
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
+    assert entry.data == data
     if title is not None:
         assert entry.title == title
-    reload_entry.assert_awaited_once_with(entry.entry_id)
+    if has_listener:
+        listener.assert_awaited_once_with(hass, entry)
+        reload_entry.assert_not_awaited()
+    else:
+        reload_entry.assert_awaited_once_with(entry.entry_id)
 
 
 @pytest.mark.asyncio
@@ -2796,23 +2811,48 @@ async def test_options_flow_reauth_invokes_callback(hass) -> None:
 
 
 @pytest.mark.asyncio
-async def test_options_flow_authentication_has_heading_form(hass) -> None:
+@pytest.mark.parametrize(
+    ("credentials", "can_forget"),
+    [
+        ({}, False),
+        ({CONF_PASSWORD: "secret"}, True),
+        ({CONF_REMEMBER_PASSWORD: True}, True),
+    ],
+)
+async def test_options_flow_authentication_has_heading_form(
+    hass, credentials, can_forget
+) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
-        data={CONF_SITE_ID: "12345"},
+        data={CONF_SITE_ID: "12345", **credentials},
         options={"existing": True},
     )
-    handler = OptionsFlowHandler(entry)
-    handler.hass = hass
+    entry.add_to_hass(hass)
 
-    form = await handler.async_step_authentication_settings()
+    options_flow = hass.config_entries.options
+    menu = await options_flow.async_init(entry.entry_id)
+    flow_id = menu["flow_id"]
+    form = await options_flow.async_configure(
+        flow_id, {"next_step_id": "authentication_settings"}
+    )
 
     assert form["type"] is FlowResultType.FORM
     assert form["step_id"] == "authentication_settings"
-    assert form["data_schema"]({}) == {
-        "reauth": False,
-        "forget_password": False,
-    }
+    fields = [{"name": "reauth"}, {"name": "forget_password"}]
+    add_visible_conditions_to_serialized_schema(form["data_schema"], fields)
+    assert fields == [
+        {"name": "reauth"},
+        {"name": "forget_password", "visible": can_forget},
+    ]
+    submitted = {"forget_password": True if can_forget else "stale"}
+    result = await options_flow.async_configure(flow_id, submitted)
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options == {"existing": True}
+    assert CONF_PASSWORD not in entry.data
+    if can_forget:
+        assert entry.data[CONF_REMEMBER_PASSWORD] is False
+    else:
+        assert CONF_REMEMBER_PASSWORD not in entry.data
 
 
 @pytest.mark.asyncio
@@ -2970,10 +3010,13 @@ async def test_options_flow_grid_toggle_completes_otp_workflow(hass) -> None:
         async_set_grid_mode=AsyncMock(),
     )
     entry.runtime_data = SimpleNamespace(coordinator=coordinator)
-    handler = OptionsFlowHandler(entry)
-    handler.hass = hass
+    entry.add_to_hass(hass)
 
-    form = await handler.async_step_grid_toggle()
+    options_flow = hass.config_entries.options
+    menu = await options_flow.async_init(entry.entry_id)
+    flow_id = menu["flow_id"]
+    await options_flow.async_configure(flow_id, {"next_step_id": "advanced"})
+    form = await options_flow.async_configure(flow_id, {"next_step_id": "grid_toggle"})
     assert form["type"] is FlowResultType.FORM
     assert form["step_id"] == "grid_toggle"
     assert form["last_step"] is False
@@ -2981,31 +3024,40 @@ async def test_options_flow_grid_toggle_completes_otp_workflow(hass) -> None:
         force=True
     )
 
-    same_mode = await handler.async_step_grid_toggle({CONF_GRID_MODE: "off_grid"})
+    same_mode = await options_flow.async_configure(
+        flow_id, {CONF_GRID_MODE: "off_grid"}
+    )
     assert same_mode["errors"] == {CONF_GRID_MODE: "grid_mode_already_active"}
     coordinator.async_request_grid_toggle_otp.assert_not_awaited()
 
-    otp_form = await handler.async_step_grid_toggle({CONF_GRID_MODE: "on_grid"})
+    otp_form = await options_flow.async_configure(flow_id, {CONF_GRID_MODE: "on_grid"})
     assert otp_form["step_id"] == "grid_toggle_otp"
     coordinator.async_request_grid_toggle_otp.assert_awaited_once()
     assert coordinator.battery_runtime.async_refresh_grid_control_check.await_count == 1
 
-    missing_confirmation = await handler.async_step_grid_toggle_otp(
-        {CONF_OTP: "1234", CONF_GRID_MODE_CONFIRM: False}
+    fields = [{"name": CONF_OTP}]
+    add_visible_conditions_to_serialized_schema(otp_form["data_schema"], fields)
+    assert fields[0]["visible"] == {"field": CONF_GRID_MODE_CONFIRM, "value": True}
+
+    missing_confirmation = await options_flow.async_configure(
+        flow_id, {CONF_OTP: [], CONF_GRID_MODE_CONFIRM: False}
     )
     assert missing_confirmation["errors"] == {"base": "grid_mode_confirm_required"}
     coordinator.async_set_grid_mode.assert_not_awaited()
 
-    applied = await handler.async_step_grid_toggle_otp(
-        {CONF_OTP: "1234", CONF_GRID_MODE_CONFIRM: True}
+    with pytest.raises(InvalidData):
+        await options_flow.async_configure(flow_id, {CONF_GRID_MODE_CONFIRM: True})
+
+    applied = await options_flow.async_configure(
+        flow_id, {CONF_OTP: "0123", CONF_GRID_MODE_CONFIRM: True}
     )
     assert applied["step_id"] == "grid_toggle_applied"
-    coordinator.async_set_grid_mode.assert_awaited_once_with("on_grid", "1234")
+    coordinator.async_set_grid_mode.assert_awaited_once_with("on_grid", "0123")
 
-    result = await handler.async_step_grid_toggle_applied({})
+    result = await options_flow.async_configure(flow_id, {})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"] == {"existing": True}
+    assert entry.options == {"existing": True}
 
 
 @pytest.mark.asyncio
@@ -5409,7 +5461,13 @@ async def test_options_flow_migrate_confirm_skips_envoy_unload_for_external_sour
     handler._migration_selection = {"solar_production": template_entity}
 
     form = await handler.async_step_migrate_envoy_confirm()
-    validated = form["data_schema"]({CONF_MIGRATION_CONFIRM_REASSIGN: False})
+    fields = [{"name": CONF_MIGRATION_DISABLE_ARCHIVED}]
+    add_visible_conditions_to_serialized_schema(form["data_schema"], fields)
+    assert fields[0]["visible"] == {
+        "field": CONF_MIGRATION_CONFIRM_REASSIGN,
+        "value": True,
+    }
+    validated = form["data_schema"]({CONF_MIGRATION_CONFIRM_REASSIGN: True})
     assert validated[CONF_MIGRATION_DISABLE_ARCHIVED] is False
 
     unload_spy = AsyncMock(return_value=True)
