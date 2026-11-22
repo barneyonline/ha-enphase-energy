@@ -11,6 +11,30 @@ exclusions narrows the surviving sites. Device lookups use the entry-scoped
 registry API directly. Migrated composite device IDs resolve through their
 current split devices.
 
+Entry-specific Repairs carry `config_entry_id`. Diagnostic issue
+IDs are entry-scoped. Migrating a legacy diagnostic preserves its dismissal only
+when its saved site matches the entry. System-event reconciliation uses
+`async_refresh_issues` around the checked alarm set, preserving checkpointed
+issues, incomplete snapshots and the missing-alarm grace period. It runs after
+a successful fetch. Entry removal cleans up scoped legacy issues and unscoped
+diagnostics with matching site context.
+Unload preserves battery-profile disagreements
+and unconfirmed export requests; fresh agreement, confirmed readback or disabling
+the feature clears them. An authoritative empty battery inventory also clears a
+battery disagreement. Missing observations after reload cannot resolve a
+battery-profile repair, and old recovery-flow identities cannot authorize writes.
+Opening or continuing a retained repair with unavailable observations aborts the
+flow without clearing the issue or its ignore state. Completion requires a checked
+condition to have cleared the notice.
+
+Site sensors opt into the entity-ID rename hook, including derived classes with
+their own add/remove hooks. Freshness, tariff and retry timers, restored power
+history and source listeners stay attached to the same object. Callbacks use its
+current entity ID. Actual removal still cancels timers and subscriptions. Other
+entity families retain Core's compatibility lifecycle where they have not opted
+in. See the upstream [Repairs contract](https://contributors.home-assistant.io/blog/2026/10/28/issue-registry-refresh/)
+and [entity lifecycle contract](https://contributors.home-assistant.io/blog/2026/10/12/new-entity-lifecycle-hooks/).
+
 Each Home Assistant config entry owns one `EnphaseCoordinator`. The coordinator is the integration boundary for entities: platforms read normalized state from the coordinator and call coordinator/service helpers for writes. Entities should not call the cloud client directly unless a local helper already establishes that pattern.
 
 ```mermaid
@@ -75,8 +99,8 @@ Export Limit controls are a default-off topology option. Toggling them reloads
 the entry to start or stop the dedicated PEL runtime and reconcile its entities.
 The runtime persists pending intent, never form tokens, and resumes readback
 after reload. It polls at the configured fast interval for ten minutes after a
-write, then at the standard interval; an unconfirmed-request repair is owned by
-that runtime and cleared on unload or matching readback.
+write, then at the standard interval; an unconfirmed-request repair survives
+reload and is cleared on matching readback, disabling the feature or entry removal.
 Background reads reuse successful Activation permission checks for up to five
 minutes, scoped to the current Activation session. Explicit checks and writes
 still validate permissions directly. Failed background reads use bounded

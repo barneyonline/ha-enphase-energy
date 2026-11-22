@@ -27,12 +27,14 @@ from .battery_schedule_editor import (
     battery_schedule_overlap_record,
 )
 from .const import (
+    CONF_SITE_ID,
     DOMAIN,
     ISSUE_AUTH_BLOCKED,
     ISSUE_REAUTH_REQUIRED,
     ISSUE_TOO_MANY_ACTIVE_SESSIONS,
 )
 from .log_redaction import redact_site_id
+from .repair_issues import legacy_issue_site_id
 from .parsing_helpers import coerce_optional_bool
 from .export_limit_runtime import ExportLimitRuntime, validate_watts, validate_slew_rate
 from .grid_profile_runtime import SUPPORT_DENIED, SUPPORT_READ_ONLY, GridProfileRuntime
@@ -1033,16 +1035,38 @@ def async_setup_services(
 
     async def _svc_clear_issue(call: ServiceCall) -> None:
         site_ids = await _resolve_site_ids_from_call(call)
+        all_sites = not router._has_target(call) and "site_id" not in call.data
+        if not all_sites and not site_ids:
+            return
 
-        issue_ids = {
+        auth_issue_keys = {
             ISSUE_REAUTH_REQUIRED,
             ISSUE_AUTH_BLOCKED,
             ISSUE_TOO_MANY_ACTIVE_SESSIONS,
         }
-        for site_id in site_ids:
-            issue_ids.add(f"{ISSUE_REAUTH_REQUIRED}_{site_id}")
-            issue_ids.add(f"{ISSUE_AUTH_BLOCKED}_{site_id}")
-            issue_ids.add(f"{ISSUE_TOO_MANY_ACTIVE_SESSIONS}_{site_id}")
+        # Authentication can fail before runtime_data becomes loaded.
+        entry_ids = {
+            entry.entry_id
+            for entry in hass.config_entries.async_entries(DOMAIN)
+            if all_sites or str(entry.data.get(CONF_SITE_ID, "")) in site_ids
+        }
+        legacy_ids = auth_issue_keys | {
+            f"{key}_{site_id}" for key in auth_issue_keys for site_id in site_ids
+        }
+        issue_ids: list[str] = []
+        for (issue_domain, issue_id), issue in ir.async_get(hass).issues.items():
+            if issue_domain != DOMAIN:
+                continue
+            if issue.config_entry_id is not None:
+                if (
+                    issue.config_entry_id in entry_ids
+                    and issue.translation_key in auth_issue_keys
+                ):
+                    issue_ids.append(issue_id)
+            elif issue_id in legacy_ids:
+                saved_site = legacy_issue_site_id(issue)
+                if all_sites or saved_site is None or saved_site in site_ids:
+                    issue_ids.append(issue_id)
         for issue_id in issue_ids:
             ir.async_delete_issue(hass, DOMAIN, issue_id)
 

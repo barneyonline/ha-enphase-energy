@@ -6989,6 +6989,7 @@ async def test_session_history_inflight_session_counts_energy(hass, monkeypatch)
 
 @pytest.mark.asyncio
 async def test_timeout_backoff_issue_recovery(hass, monkeypatch):
+    from homeassistant.helpers import issue_registry as ir
     from homeassistant.helpers.update_coordinator import UpdateFailed
 
     from custom_components.enphase_ev.const import (
@@ -7012,14 +7013,12 @@ async def test_timeout_backoff_issue_recovery(hass, monkeypatch):
         CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,
     }
 
-    class DummyEntry:
-        def __init__(self):
-            self.options = {OPT_DEGRADED_SERVICE_REPAIR_ISSUES: True}
-
-        def async_on_unload(self, cb):
-            return None
-
-    entry = DummyEntry()
+    entry = MockConfigEntry(
+        domain="enphase_ev",
+        data=cfg,
+        options={OPT_DEGRADED_SERVICE_REPAIR_ISSUES: True},
+    )
+    entry.add_to_hass(hass)
     monkeypatch.setattr(
         coord_mod, "async_get_clientsession", lambda *args, **kwargs: object()
     )
@@ -7029,20 +7028,8 @@ async def test_timeout_backoff_issue_recovery(hass, monkeypatch):
         lambda *_args, **_kwargs: (lambda: None),
     )
 
-    create_calls: list[tuple[str, str, dict]] = []
-    delete_calls: list[tuple[str, str]] = []
-
-    def stub_create_issue(hass_arg, domain, issue_id, **kwargs):
-        create_calls.append((domain, issue_id, kwargs))
-
-    def stub_delete_issue(hass_arg, domain, issue_id):
-        delete_calls.append((domain, issue_id))
-
-    from custom_components.enphase_ev import coordinator_diagnostics as diag_mod
-
-    monkeypatch.setattr(diag_mod.ir, "async_create_issue", stub_create_issue)
-    monkeypatch.setattr(diag_mod.ir, "async_delete_issue", stub_delete_issue)
-
+    registry = ir.async_get(hass)
+    issue_id = f"{ISSUE_NETWORK_UNREACHABLE}_{entry.entry_id.lower()}"
     coord = EnphaseCoordinator(hass, cfg, config_entry=entry)
 
     class TimeoutClient:
@@ -7057,16 +7044,16 @@ async def test_timeout_backoff_issue_recovery(hass, monkeypatch):
             await coord._async_update_data()
         assert coord._network_errors == idx + 1
         assert coord._backoff_until is not None
-        assert not create_calls
+        assert registry.async_get_issue("enphase_ev", issue_id) is None
         coord._backoff_until = 0
 
     with pytest.raises(UpdateFailed):
         await coord._async_update_data()
     assert coord._network_errors == 3
-    assert create_calls
-    assert create_calls[0][0] == "enphase_ev"
-    assert create_calls[0][1] == ISSUE_NETWORK_UNREACHABLE
-    assert len(create_calls) == 1
+    issue = registry.async_get_issue("enphase_ev", issue_id)
+    assert issue is not None
+    assert issue.config_entry_id == entry.entry_id
+    assert issue.translation_key == ISSUE_NETWORK_UNREACHABLE
     coord._backoff_until = 0
 
     class SuccessClient:
@@ -7077,15 +7064,7 @@ async def test_timeout_backoff_issue_recovery(hass, monkeypatch):
     await coord._async_update_data()
     assert coord._network_errors == 0
     assert coord._last_error is None
-    assert delete_calls
-    assert delete_calls[-1][1] == ISSUE_NETWORK_UNREACHABLE
-    assert [issue_id for _, issue_id in delete_calls] == [
-        "reauth_required",
-        "auth_blocked",
-        "too_many_active_sessions",
-        "rate_limited",
-        ISSUE_NETWORK_UNREACHABLE,
-    ]
+    assert registry.async_get_issue("enphase_ev", issue_id) is None
     assert coord._backoff_until is None
 
 

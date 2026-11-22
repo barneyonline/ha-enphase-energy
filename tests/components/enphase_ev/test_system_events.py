@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from homeassistant.helpers import issue_registry as ir
 
 from custom_components.enphase_ev.api import (
     EnphaseLoginWallUnauthorized,
@@ -798,26 +799,22 @@ async def test_runtime_history_preserves_login_wall_failure(hass) -> None:
     coordinator._note_endpoint_family_failure.assert_not_called()
 
 
+@pytest.fixture
+def alarm_repair_entry(hass, config_entry):
+    hass.config_entries.async_update_entry(
+        config_entry, options={OPT_SYSTEM_EVENT_REPAIR_ISSUES: True}
+    )
+    return config_entry
+
+
 @pytest.mark.asyncio
 async def test_runtime_refresh_uses_standing_alarms_for_repairs(
-    hass, monkeypatch
+    hass, alarm_repair_entry
 ) -> None:
     coordinator = _runtime_coordinator(hass, payload=_event_payload())
+    coordinator.config_entry = alarm_repair_entry
     runtime = SystemEventsRuntime(coordinator)
-    created: list[tuple[str, dict[str, object]]] = []
-    deleted: list[str] = []
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_get",
-        lambda _hass: SimpleNamespace(issues={}),
-    )
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_create_issue",
-        lambda _hass, _domain, issue_id, **kwargs: created.append((issue_id, kwargs)),
-    )
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_delete_issue",
-        lambda _hass, _domain, issue_id: deleted.append(issue_id),
-    )
+    registry = ir.async_get(hass)
 
     await runtime.async_refresh()
 
@@ -826,14 +823,16 @@ async def test_runtime_refresh_uses_standing_alarms_for_repairs(
     assert runtime.high_impact_count == 1
     assert runtime.standing_alarm_count == 1
     assert runtime.problem_active is True
-    assert len(created) == 1
-    issue_id, issue = created[0]
-    assert issue_id.startswith(f"{SYSTEM_EVENT_REPAIR_PREFIX}entry_id_")
+    (((domain, issue_id), issue),) = registry.issues.items()
+    assert domain == DOMAIN
+    assert issue_id.startswith(
+        f"{SYSTEM_EVENT_REPAIR_PREFIX}{alarm_repair_entry.entry_id.lower()}_"
+    )
     assert "SERIAL-PRIVATE" not in issue_id
-    assert issue["translation_key"] == "active_system_event"
-    assert issue["severity"].value == "error"
-    assert issue["translation_placeholders"]["device_type"] == "Gateway SERI...TE-1"
-    assert issue["data"] == {
+    assert issue.translation_key == "active_system_event"
+    assert issue.severity.value == "error"
+    assert issue.translation_placeholders["device_type"] == "Gateway SERI...TE-1"
+    assert issue.data == {
         "severity": "4",
         "device_type": "Gateway SERI...TE-1",
         "event_date": "2026/07/11 01:02:03 +0000 (UTC)",
@@ -845,11 +844,11 @@ async def test_runtime_refresh_uses_standing_alarms_for_repairs(
 
     # Repeated identical data does not recreate or update the repair.
     await runtime.async_refresh()
-    assert len(created) == 1
+    assert registry.async_get_issue(DOMAIN, issue_id) is issue
 
     coordinator.client.system_dashboard_events.return_value = {"events": []}
     await runtime.async_refresh()
-    assert deleted == []
+    assert registry.async_get_issue(DOMAIN, issue_id) is issue
     assert runtime.active_count == 1
     assert runtime.high_impact_count == 0
     assert runtime.standing_alarm_count == 1
@@ -858,7 +857,7 @@ async def test_runtime_refresh_uses_standing_alarms_for_repairs(
 
 @pytest.mark.asyncio
 async def test_runtime_clears_repair_immediately_for_resolved_event(
-    hass, monkeypatch
+    hass, alarm_repair_entry
 ) -> None:
     event_id = "matching-event"
     coordinator = _runtime_coordinator(
@@ -885,24 +884,13 @@ async def test_runtime_clears_repair_immediately_for_resolved_event(
             ]
         },
     )
+    coordinator.config_entry = alarm_repair_entry
     runtime = SystemEventsRuntime(coordinator)
-    created: list[str] = []
-    deleted: list[str] = []
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_get",
-        lambda _hass: SimpleNamespace(issues={}),
-    )
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_create_issue",
-        lambda _hass, _domain, issue_id, **_kwargs: created.append(issue_id),
-    )
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_delete_issue",
-        lambda _hass, _domain, issue_id: deleted.append(issue_id),
-    )
+    registry = ir.async_get(hass)
 
     await runtime.async_refresh()
-    assert len(created) == 1
+    ((domain, issue_id),) = registry.issues
+    assert domain == DOMAIN
 
     coordinator.client.system_dashboard_events.return_value = {
         "events": [
@@ -917,7 +905,7 @@ async def test_runtime_clears_repair_immediately_for_resolved_event(
     }
     await runtime.async_refresh()
 
-    assert deleted == created
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
     assert runtime.active_count == 0
     assert runtime.problem_active is False
 
@@ -1004,22 +992,20 @@ async def test_runtime_diagnostics_and_persisted_issue_cleanup(
     runtime = SystemEventsRuntime(coordinator)
     fallback_suffix = runtime._entry_suffix()  # noqa: SLF001
     stale_issue = f"{SYSTEM_EVENT_REPAIR_PREFIX}{fallback_suffix}_stale"
-    deleted: list[str] = []
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_get",
-        lambda _hass: SimpleNamespace(
-            issues={
-                (DOMAIN, stale_issue): object(),
-                ("other", stale_issue): object(),
-                (DOMAIN, "unrelated"): object(),
-                "malformed": object(),
-            }
-        ),
-    )
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_delete_issue",
-        lambda _hass, _domain, issue_id: deleted.append(issue_id),
-    )
+    registry = ir.async_get(hass)
+    for domain, name in (
+        (DOMAIN, stale_issue),
+        ("other", stale_issue),
+        (DOMAIN, "unrelated"),
+    ):
+        ir.async_create_issue(
+            hass,
+            domain,
+            name,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="active_system_event",
+        )
 
     await runtime.async_refresh()
     coordinator._endpoint_family_state(
@@ -1027,7 +1013,7 @@ async def test_runtime_diagnostics_and_persisted_issue_cleanup(
     ).consecutive_failures = 1
     snapshot = runtime.diagnostics()
 
-    assert deleted == []
+    assert registry.async_get_issue(DOMAIN, stale_issue) is not None
     assert snapshot["available"] is True
     assert snapshot["active_count"] == 0
     assert snapshot["high_impact_count"] == 0
@@ -1047,6 +1033,12 @@ async def test_runtime_diagnostics_and_persisted_issue_cleanup(
     )
     assert runtime._existing_issue_ids() == {stale_issue}  # noqa: SLF001
 
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.system_events.ir.async_get",
+        lambda _hass: SimpleNamespace(issues={"malformed": object()}),
+    )
+    assert runtime._registry_issue_entries() == {}  # noqa: SLF001
+
     active_issue = f"{SYSTEM_EVENT_REPAIR_PREFIX}{fallback_suffix}_active"
     inactive_issue = f"{SYSTEM_EVENT_REPAIR_PREFIX}{fallback_suffix}_inactive"
     monkeypatch.setattr(
@@ -1064,7 +1056,7 @@ async def test_runtime_diagnostics_and_persisted_issue_cleanup(
 
 
 @pytest.mark.asyncio
-async def test_runtime_bounds_active_event_attributes(hass, monkeypatch) -> None:
+async def test_runtime_bounds_active_event_attributes(hass) -> None:
     rows = [
         {
             "id": f"event-{index}",
@@ -1083,10 +1075,6 @@ async def test_runtime_bounds_active_event_attributes(hass, monkeypatch) -> None
             payload={"events": rows},
             alarm_payload={"alarms": []},
         )
-    )
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_get",
-        lambda _hass: SimpleNamespace(issues={}),
     )
 
     await runtime.async_refresh()
@@ -1141,143 +1129,98 @@ def test_runtime_ignores_invalid_persisted_last_seen(hass, monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_runtime_expires_missing_repair_after_complete_snapshot_grace(
-    hass, monkeypatch
+    hass, alarm_repair_entry, monkeypatch
 ) -> None:
     coordinator = _runtime_coordinator(hass, payload=_event_payload())
+    coordinator.config_entry = alarm_repair_entry
     runtime = SystemEventsRuntime(coordinator)
-    created: list[str] = []
-    deleted: list[str] = []
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_get",
-        lambda _hass: SimpleNamespace(issues={}),
-    )
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_create_issue",
-        lambda _hass, _domain, issue_id, **_kwargs: created.append(issue_id),
-    )
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_delete_issue",
-        lambda _hass, _domain, issue_id: deleted.append(issue_id),
-    )
+    registry = ir.async_get(hass)
     first_seen = datetime(2026, 7, 11, 23, 55, tzinfo=timezone.utc)
-    observed_times = iter(
-        (
-            first_seen,
-            first_seen + SYSTEM_EVENT_REPAIR_MISSING_GRACE - timedelta(seconds=1),
-            first_seen + SYSTEM_EVENT_REPAIR_MISSING_GRACE,
-        )
-    )
+    observed_at = first_seen
     monkeypatch.setattr(
         "custom_components.enphase_ev.system_events.dt_util.utcnow",
-        lambda: next(observed_times),
+        lambda: observed_at,
     )
 
     await runtime.async_refresh()
+    ((domain, issue_id),) = registry.issues
+    assert domain == DOMAIN
     coordinator.client.system_dashboard_standing_alarms.return_value = {"alarms": []}
+    observed_at = first_seen + SYSTEM_EVENT_REPAIR_MISSING_GRACE - timedelta(seconds=1)
     await runtime.async_refresh()
-    assert deleted == []
+    assert registry.async_get_issue(DOMAIN, issue_id) is not None
 
+    observed_at = first_seen + SYSTEM_EVENT_REPAIR_MISSING_GRACE
     await runtime.async_refresh()
-    assert deleted == created
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
 
 
 @pytest.mark.asyncio
 async def test_runtime_does_not_expire_repairs_from_truncated_snapshot(
-    hass, monkeypatch
+    hass, alarm_repair_entry, monkeypatch
 ) -> None:
     coordinator = _runtime_coordinator(hass, payload=_event_payload())
+    coordinator.config_entry = alarm_repair_entry
     runtime = SystemEventsRuntime(coordinator)
-    deleted: list[str] = []
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_get",
-        lambda _hass: SimpleNamespace(issues={}),
-    )
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_create_issue",
-        lambda *_args, **_kwargs: None,
-    )
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_delete_issue",
-        lambda _hass, _domain, issue_id: deleted.append(issue_id),
-    )
+    registry = ir.async_get(hass)
     first_seen = datetime(2026, 7, 11, tzinfo=timezone.utc)
-    observed_times = iter(
-        (first_seen, first_seen + SYSTEM_EVENT_REPAIR_MISSING_GRACE * 2)
-    )
+    observed_at = first_seen
     monkeypatch.setattr(
         "custom_components.enphase_ev.system_events.dt_util.utcnow",
-        lambda: next(observed_times),
+        lambda: observed_at,
     )
 
     await runtime.async_refresh()
+    ((domain, issue_id),) = registry.issues
+    assert domain == DOMAIN
     coordinator.client.system_dashboard_standing_alarms.return_value = {
         "alarms": [],
         "_enphase_ev_truncated": True,
     }
+    observed_at = first_seen + SYSTEM_EVENT_REPAIR_MISSING_GRACE * 2
     await runtime.async_refresh()
 
-    assert deleted == []
+    assert registry.async_get_issue(DOMAIN, issue_id) is not None
     assert runtime.diagnostics()["truncated"] is True
 
 
 @pytest.mark.asyncio
 async def test_runtime_persists_last_seen_checkpoint_across_reload(
-    hass, monkeypatch
+    hass, alarm_repair_entry, monkeypatch
 ) -> None:
-    issues: dict[tuple[str, str], object] = {}
-    created: list[str] = []
-    deleted: list[str] = []
-
-    def _create(_hass, domain, issue_id, **kwargs) -> None:
-        created.append(issue_id)
-        issues[(domain, issue_id)] = SimpleNamespace(
-            active=True,
-            data=kwargs["data"],
-        )
-
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_get",
-        lambda _hass: SimpleNamespace(issues=issues),
-    )
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_create_issue",
-        _create,
-    )
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.system_events.ir.async_delete_issue",
-        lambda _hass, _domain, issue_id: deleted.append(issue_id),
-    )
+    registry = ir.async_get(hass)
     first_seen = datetime(2026, 7, 11, 23, 55, tzinfo=timezone.utc)
     checkpoint = first_seen + SYSTEM_EVENT_REPAIR_CHECKPOINT_INTERVAL
-    observed_times = iter(
-        (
-            first_seen,
-            checkpoint,
-            checkpoint + SYSTEM_EVENT_REPAIR_MISSING_GRACE,
-        )
-    )
+    observed_at = first_seen
     monkeypatch.setattr(
         "custom_components.enphase_ev.system_events.dt_util.utcnow",
-        lambda: next(observed_times),
+        lambda: observed_at,
     )
 
-    runtime = SystemEventsRuntime(_runtime_coordinator(hass, payload=_event_payload()))
+    coordinator = _runtime_coordinator(hass, payload=_event_payload())
+    coordinator.config_entry = alarm_repair_entry
+    runtime = SystemEventsRuntime(coordinator)
     await runtime.async_refresh()
-    await runtime.async_refresh()
-    assert len(created) == 2
-    issue_id = created[-1]
-    assert issues[(DOMAIN, issue_id)].data["last_seen_utc"] == checkpoint.isoformat()
-
-    reloaded = SystemEventsRuntime(
-        _runtime_coordinator(
-            hass,
-            payload={"events": []},
-            alarm_payload={"alarms": []},
-        )
+    ((domain, issue_id),) = registry.issues
+    assert domain == DOMAIN
+    assert (
+        registry.async_get_issue(DOMAIN, issue_id).data["last_seen_utc"]
+        == first_seen.isoformat()
     )
+    observed_at = checkpoint
+    await runtime.async_refresh()
+    assert (
+        registry.async_get_issue(DOMAIN, issue_id).data["last_seen_utc"]
+        == checkpoint.isoformat()
+    )
+
+    coordinator.client.system_dashboard_events.return_value = {"events": []}
+    coordinator.client.system_dashboard_standing_alarms.return_value = {"alarms": []}
+    reloaded = SystemEventsRuntime(coordinator)
+    observed_at = checkpoint + SYSTEM_EVENT_REPAIR_MISSING_GRACE
     await reloaded.async_refresh()
 
-    assert deleted == [issue_id]
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
 
 
 def test_activity_descriptions_are_sanitized_and_bounded():

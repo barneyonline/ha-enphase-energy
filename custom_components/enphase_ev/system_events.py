@@ -23,6 +23,7 @@ from .const import (
     OPT_SYSTEM_EVENT_REPAIR_ISSUES,
 )
 from .log_redaction import redact_text
+from .repair_issues import async_refresh_issue_set, entry_issue_kwargs
 
 if TYPE_CHECKING:  # pragma: no cover
     from .coordinator import EnphaseCoordinator
@@ -1025,13 +1026,35 @@ class SystemEventsRuntime:
         }
         delete_issue_ids = stale_issue_ids | (existing & resolved_issue_ids)
         for issue_id in delete_issue_ids:
-            ir.async_delete_issue(self.coordinator.hass, DOMAIN, issue_id)
             self._repair_last_seen_utc.pop(issue_id, None)
             self._repair_checkpoint_utc.pop(issue_id, None)
+        with async_refresh_issue_set(
+            self.coordinator.hass, existing, existing - delete_issue_ids
+        ):
+            self._create_alarm_issues(active_alarms, active_existing, observed_at)
+        self._reported_issue_ids = (existing | set(active_alarms)) - delete_issue_ids
+        self._active_reported_issue_ids = set(active_alarms)
+
+    def _create_alarm_issues(
+        self,
+        active_alarms: dict[str, StandingAlarm],
+        active_existing: set[str],
+        observed_at: datetime,
+    ) -> None:
+        """Update alarm checkpoints without deleting and recreating repairs."""
         for issue_id, alarm in active_alarms.items():
             checkpoint = self._repair_checkpoint_utc.get(issue_id)
             if (
                 issue_id in active_existing
+                and (
+                    not entry_issue_kwargs(self.coordinator.config_entry)
+                    or getattr(
+                        (self._registry_issue_entries() or {}).get(issue_id),
+                        "config_entry_id",
+                        None,
+                    )
+                    == getattr(self.coordinator.config_entry, "entry_id", None)
+                )
                 and checkpoint is not None
                 and observed_at - checkpoint < SYSTEM_EVENT_REPAIR_CHECKPOINT_INTERVAL
             ):
@@ -1040,6 +1063,7 @@ class SystemEventsRuntime:
                 self.coordinator.hass,
                 DOMAIN,
                 issue_id,
+                **entry_issue_kwargs(self.coordinator.config_entry),
                 is_fixable=False,
                 is_persistent=False,
                 severity=ir.IssueSeverity.ERROR,
@@ -1058,8 +1082,6 @@ class SystemEventsRuntime:
                 },
             )
             self._repair_checkpoint_utc[issue_id] = observed_at
-        self._reported_issue_ids = (existing | set(active_alarms)) - delete_issue_ids
-        self._active_reported_issue_ids = set(active_alarms)
 
     async def async_refresh(self) -> None:
         """Refresh events, retaining cached state across optional failures."""
