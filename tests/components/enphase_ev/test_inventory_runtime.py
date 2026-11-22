@@ -19,6 +19,8 @@ from custom_components.enphase_ev.inventory_runtime import (
     InventoryRuntime,
 )
 
+from .device_info_helpers import device_info_fields
+
 
 @pytest.fixture(autouse=True)
 def _skip_parameter_pacing_delay(monkeypatch):
@@ -255,10 +257,9 @@ def test_inventory_runtime_summary_and_inverter_helper_paths(
     assert bucket is not None
     assert bucket["extra_list"] == ["a", "b"]
 
-    info = coord.inventory_view.type_device_info("microinverter")
-    assert info is not None
+    info = device_info_fields(coord.inventory_view.type_device_info("microinverter"))
     assert "hw_version" not in info
-    assert info.get("model_id") is None
+    assert "model_id" not in info
     assert coord.inventory_view.type_device_model_id("microinverter") is None
     assert coord.inventory_view.type_device_model(None) is None
     assert coord.inventory_view.type_device_serial_number(None) is None
@@ -318,10 +319,10 @@ def test_inventory_runtime_summary_and_inverter_helper_paths(
             ],
         },
     }
-    battery_info = coord.inventory_view.type_device_info("encharge")
-    inverter_info = coord.inventory_view.type_device_info("microinverter")
-    assert battery_info is not None
-    assert inverter_info is not None
+    battery_info = device_info_fields(coord.inventory_view.type_device_info("encharge"))
+    inverter_info = device_info_fields(
+        coord.inventory_view.type_device_info("microinverter")
+    )
     assert battery_info["sw_version"] == "1.0 x2, 2.0 x1"
     assert inverter_info["sw_version"] == "4.0 x2, 5.0 x1"
     coord._type_device_buckets = {"encharge": "bad"}  # noqa: SLF001
@@ -3073,8 +3074,7 @@ def test_inventory_runtime_merge_heatpump_bucket_uses_worst_status_fallback(
     }
     assert bucket["model_summary"] == "PN-1 x1"
     assert bucket["firmware_summary"] == "1.2.3 x1"
-    info = coord.inventory_view.type_device_info("heatpump")
-    assert info is not None
+    info = device_info_fields(coord.inventory_view.type_device_info("heatpump"))
     assert info["sw_version"] == "1.2.3"
 
 

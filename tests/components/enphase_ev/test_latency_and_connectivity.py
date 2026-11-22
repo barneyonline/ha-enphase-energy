@@ -6,6 +6,8 @@ from homeassistant.util import dt as dt_util
 
 from tests.components.enphase_ev.random_ids import RANDOM_SITE_ID
 
+from .device_info_helpers import device_info_fields
+
 
 def _make_site_coord():
     from custom_components.enphase_ev.coordinator import EnphaseCoordinator
@@ -64,7 +66,7 @@ def test_cloud_site_sensors_are_not_gated_by_envoy_type():
     assert EnphaseCurrentPowerConsumptionSensor(coord).available is True
     assert SiteCloudReachableBinarySensor(coord).available is True
     base_entity = _SiteBaseEntity(coord, "cloud_base", "Cloud Base", type_key=None)
-    assert base_entity.device_info["identifiers"] == {
+    assert device_info_fields(base_entity.device_info)["identifiers"] == {
         ("enphase_ev", f"type:{coord.site_id}:cloud")
     }
     assert base_entity.extra_state_attributes == {
@@ -114,7 +116,7 @@ def test_site_error_code_sensor_state_and_attributes():
 
     coord = _make_site_coord()
     sensor = EnphaseSiteLastErrorCodeSensor(coord)
-    info = sensor.device_info
+    info = device_info_fields(sensor.device_info)
     assert info["identifiers"] == {(DOMAIN, f"type:{coord.site_id}:cloud")}
     assert info["name"] == "Enphase Cloud"
     assert info["model"] == "Cloud Service"
@@ -195,7 +197,7 @@ def test_site_backoff_sensor_handles_none_and_datetime(monkeypatch):
 
     coord = _make_site_coord()
     sensor = EnphaseSiteBackoffEndsSensor(coord)
-    info = sensor.device_info
+    info = device_info_fields(sensor.device_info)
     assert info["identifiers"] == {(DOMAIN, f"type:{coord.site_id}:cloud")}
 
     assert sensor.native_value is None

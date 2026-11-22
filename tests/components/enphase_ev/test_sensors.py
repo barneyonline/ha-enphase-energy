@@ -7,6 +7,8 @@ import pytest
 from custom_components.enphase_ev.const import PHASE_SWITCH_CONFIG_SETTING
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
 
+from .device_info_helpers import device_info_fields
+
 pytest.importorskip("homeassistant")
 
 
@@ -425,7 +427,9 @@ def test_storm_alert_sensor_states():
     sensor = EnphaseStormAlertSensor(coord)
     assert sensor.entity_category is EntityCategory.DIAGNOSTIC
     assert sensor.native_value is None
-    assert sensor.device_info["identifiers"] == {("enphase_ev", "type:site:envoy")}
+    assert device_info_fields(sensor.device_info)["identifiers"] == {
+        ("enphase_ev", "type:site:envoy")
+    }
     assert sensor.extra_state_attributes["storm_alert_active"] is None
 
     coord.storm_alert_active = True
@@ -500,7 +504,9 @@ def test_battery_overall_charge_sensor_states(charge_pct, expected):
     assert sensor.native_value == expected
     assert isinstance(sensor.native_value, int)
     assert sensor.state_class == SensorStateClass.MEASUREMENT
-    assert sensor.device_info["identifiers"] == {("enphase_ev", "type:site:encharge")}
+    assert device_info_fields(sensor.device_info)["identifiers"] == {
+        ("enphase_ev", "type:site:encharge")
+    }
     provided = {"identifiers": {("enphase_ev", "type:site:encharge")}}
     coord.inventory_view.type_device_info = lambda _key: provided
     assert sensor.device_info is provided
@@ -637,7 +643,9 @@ def test_battery_storage_charge_sensor_snapshot():
     assert sensor.native_value == 48.0
     assert sensor.state_class == SensorStateClass.MEASUREMENT
     assert sensor.extra_state_attributes["serial_number"] == "BAT-1"
-    assert sensor.device_info["identifiers"] == {("enphase_ev", "type:site:encharge")}
+    assert device_info_fields(sensor.device_info)["identifiers"] == {
+        ("enphase_ev", "type:site:encharge")
+    }
 
 
 def test_battery_storage_charge_sensor_edge_paths():
@@ -672,7 +680,7 @@ def test_battery_storage_charge_sensor_edge_paths():
     }
     assert sensor.name == "Edge Battery"
     assert sensor.native_value is None
-    info = sensor.device_info
+    info = device_info_fields(sensor.device_info)
     assert info["name"] == "IQ Battery"
 
     coord.battery_storage = lambda _serial: ["bad"]
@@ -1512,7 +1520,9 @@ def test_system_profile_status_sensor_states():
     sensor = EnphaseSystemProfileStatusSensor(coord)
     assert sensor.available is True
     assert sensor.native_value == "Self-Consumption"
-    assert sensor.device_info["identifiers"] == {("enphase_ev", "type:site:envoy")}
+    assert device_info_fields(sensor.device_info)["identifiers"] == {
+        ("enphase_ev", "type:site:envoy")
+    }
 
     coord.battery_profile_pending = True
     coord.battery_pending_profile = "ai_optimisation"

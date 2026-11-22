@@ -17,6 +17,8 @@ from custom_components.enphase_ev.sensor_tariff import (
     EnphaseTariffRateValueSensor,
 )
 
+from .device_info_helpers import device_info_fields
+
 
 def legacy_coord(buckets, **extra):
     return SimpleNamespace(
@@ -421,7 +423,7 @@ def test_heatpump_energy_device_info_falls_back_to_cloud(
     entity = EnphaseSiteEnergySensor(
         coord, "heat_pump", "heat_pump_energy", "Heat Pump Energy"
     )
-    assert entity.device_info
+    assert device_info_fields(entity.device_info)
 
 
 async def test_negative_restored_cumulative_flow_is_discarded(

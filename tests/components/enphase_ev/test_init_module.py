@@ -5,6 +5,7 @@ import importlib
 from collections import UserDict
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
+from enum import Enum, auto
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, Mock, call
 
@@ -17,7 +18,6 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady, ServiceValidationError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
-from homeassistant.helpers.typing import UNDEFINED, UndefinedType
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 import custom_components.enphase_ev as enphase_init
@@ -6070,20 +6070,26 @@ async def test_activity_default_normalization_does_not_reload(
     assert config_entry.runtime_data is runtime
 
 
+class _DeviceInfoField(Enum):
+    UNSET = auto()
+
+
 @dataclass(slots=True)
 class _DataclassDeviceInfo:
     """Subset of HA 2026.11 DeviceInfo, including its unset-field contract."""
 
-    name: str | None | UndefinedType = UNDEFINED
-    model: str | None | UndefinedType = UNDEFINED
-    hw_version: str | None | UndefinedType = UNDEFINED
-    serial_number: str | None | UndefinedType = UNDEFINED
-    model_id: str | None | UndefinedType = UNDEFINED
-    sw_version: str | None | UndefinedType = UNDEFINED
+    name: str | None | _DeviceInfoField = _DeviceInfoField.UNSET
+    model: str | None | _DeviceInfoField = _DeviceInfoField.UNSET
+    hw_version: str | None | _DeviceInfoField = _DeviceInfoField.UNSET
+    serial_number: str | None | _DeviceInfoField = _DeviceInfoField.UNSET
+    model_id: str | None | _DeviceInfoField = _DeviceInfoField.UNSET
+    sw_version: str | None | _DeviceInfoField = _DeviceInfoField.UNSET
 
     def as_dict(self):
         return {
-            key: value for key, value in asdict(self).items() if value is not UNDEFINED
+            key: value
+            for key, value in asdict(self).items()
+            if value is not _DeviceInfoField.UNSET
         }
 
 
@@ -6148,6 +6154,8 @@ def test_registry_metadata_signature_handles_optional_cached_fields(
     info_factory, fields, expected
 ):
     info = info_factory(**fields)
+    if isinstance(info, _DataclassDeviceInfo):
+        assert info.as_dict() == fields
     # Omit scalar helpers so even empty cached metadata must use the fast path.
     view = SimpleNamespace(
         iter_type_keys=lambda: ["encharge"],

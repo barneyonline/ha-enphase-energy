@@ -22,6 +22,8 @@ from custom_components.enphase_ev.sensor import (
 )
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
 
+from .device_info_helpers import device_info_fields
+
 
 @pytest.mark.parametrize("timestamp", [1_700_000_000, "1700000000", 1_700_000_000_000])
 def test_gateway_seconds_and_milliseconds_represent_same_utc_time(timestamp):
@@ -891,7 +893,7 @@ def test_site_base_entity_diagnostics(monkeypatch, coordinator_factory):
     assert site_sensor._backoff_remaining_seconds() == 1
     attrs = site_sensor._cloud_diag_attrs(include_last_success=False)
     assert attrs["backoff_ends_utc"] == coord.backoff_ends_utc.isoformat()
-    assert site_sensor.device_info["identifiers"]
+    assert device_info_fields(site_sensor.device_info)["identifiers"]
 
     coord.last_success_utc = None
     assert isinstance(site_sensor.available, bool)

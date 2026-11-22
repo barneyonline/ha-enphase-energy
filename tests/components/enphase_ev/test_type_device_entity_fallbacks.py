@@ -29,6 +29,8 @@ from custom_components.enphase_ev.switch import (
 )
 from custom_components.enphase_ev.time import BatteryScheduleEditStartTimeEntity
 
+from .device_info_helpers import device_info_fields
+
 
 def test_site_binary_sensor_not_gated_by_envoy_type() -> None:
     coord = SimpleNamespace(
@@ -61,7 +63,7 @@ def test_site_binary_sensor_device_info_falls_back_without_type_info() -> None:
         backoff_ends_utc=None,
         update_interval=None,
     )
-    info = SiteCloudReachableBinarySensor(coord).device_info
+    info = device_info_fields(SiteCloudReachableBinarySensor(coord).device_info)
     assert info["identifiers"] == {("enphase_ev", "type:12345:cloud")}
 
 
@@ -98,25 +100,25 @@ def test_site_device_info_fallbacks_without_type_device_info_provider() -> None:
         storm_evse_enabled=True,
     )
 
-    assert BatteryReserveNumber(coord).device_info["identifiers"] == {
-        ("enphase_ev", "type:site-1:encharge")
-    }
-    assert BatteryShutdownLevelNumber(coord).device_info["identifiers"] == {
-        ("enphase_ev", "type:site-1:encharge")
-    }
-    assert SystemProfileSelect(coord).device_info["identifiers"] == {
-        ("enphase_ev", "type:site-1:envoy")
-    }
-    assert SavingsUseBatteryAfterPeakSwitch(coord).device_info["identifiers"] == {
-        ("enphase_ev", "type:site-1:encharge")
-    }
-    assert ChargeFromGridSwitch(coord).device_info["identifiers"] == {
-        ("enphase_ev", "type:site-1:encharge")
-    }
-    assert ChargeFromGridScheduleSwitch(coord).device_info["identifiers"] == {
-        ("enphase_ev", "type:site-1:encharge")
-    }
-    assert StormGuardSwitch(coord).device_info["identifiers"] == {
+    assert device_info_fields(BatteryReserveNumber(coord).device_info)[
+        "identifiers"
+    ] == {("enphase_ev", "type:site-1:encharge")}
+    assert device_info_fields(BatteryShutdownLevelNumber(coord).device_info)[
+        "identifiers"
+    ] == {("enphase_ev", "type:site-1:encharge")}
+    assert device_info_fields(SystemProfileSelect(coord).device_info)[
+        "identifiers"
+    ] == {("enphase_ev", "type:site-1:envoy")}
+    assert device_info_fields(SavingsUseBatteryAfterPeakSwitch(coord).device_info)[
+        "identifiers"
+    ] == {("enphase_ev", "type:site-1:encharge")}
+    assert device_info_fields(ChargeFromGridSwitch(coord).device_info)[
+        "identifiers"
+    ] == {("enphase_ev", "type:site-1:encharge")}
+    assert device_info_fields(ChargeFromGridScheduleSwitch(coord).device_info)[
+        "identifiers"
+    ] == {("enphase_ev", "type:site-1:encharge")}
+    assert device_info_fields(StormGuardSwitch(coord).device_info)["identifiers"] == {
         ("enphase_ev", "type:site-1:envoy")
     }
     entry = SimpleNamespace(
@@ -127,12 +129,12 @@ def test_site_device_info_fallbacks_without_type_device_info_provider() -> None:
             battery_schedule_editor=BatteryScheduleEditorManager(coord),
         ),
     )
-    assert BatteryScheduleEditStartTimeEntity(coord, entry).device_info[
+    assert device_info_fields(
+        BatteryScheduleEditStartTimeEntity(coord, entry).device_info
+    )["identifiers"] == {("enphase_ev", "type:site-1:encharge")}
+    assert device_info_fields(EnphaseGridModeSensor(coord).device_info)[
         "identifiers"
-    ] == {("enphase_ev", "type:site-1:encharge")}
-    assert EnphaseGridModeSensor(coord).device_info["identifiers"] == {
-        ("enphase_ev", "type:site-1:envoy")
-    }
+    ] == {("enphase_ev", "type:site-1:envoy")}
 
 
 def test_system_profile_select_and_storm_guard_availability_type_checks() -> None:
@@ -242,7 +244,7 @@ def test_base_entity_device_info_does_not_set_via_device_for_chargers() -> None:
         type_identifier=lambda _key: ("enphase_ev", "type:site-1:iqevse"),
     )
     entity = DummyEntity(coord, "SN1")
-    info = entity.device_info
+    info = device_info_fields(entity.device_info)
     assert "via_device" not in info
 
 
@@ -325,15 +327,15 @@ def test_site_and_type_inventory_device_info_fallback_identifiers() -> None:
         backoff_ends_utc=None,
         latency_ms=None,
     )
-    assert EnphaseTypeInventorySensor(coord, "envoy").device_info["identifiers"] == {
-        ("enphase_ev", "type:site-fallback:envoy")
-    }
-    assert EnphaseSiteLastUpdateSensor(coord).device_info["identifiers"] == {
-        ("enphase_ev", "type:site-fallback:cloud")
-    }
-    assert EnphaseCloudLatencySensor(coord).device_info["identifiers"] == {
-        ("enphase_ev", "type:site-fallback:cloud")
-    }
+    assert device_info_fields(EnphaseTypeInventorySensor(coord, "envoy").device_info)[
+        "identifiers"
+    ] == {("enphase_ev", "type:site-fallback:envoy")}
+    assert device_info_fields(EnphaseSiteLastUpdateSensor(coord).device_info)[
+        "identifiers"
+    ] == {("enphase_ev", "type:site-fallback:cloud")}
+    assert device_info_fields(EnphaseCloudLatencySensor(coord).device_info)[
+        "identifiers"
+    ] == {("enphase_ev", "type:site-fallback:cloud")}
 
 
 def test_site_sensor_attributes_and_latency_attrs_paths() -> None:

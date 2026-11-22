@@ -25,6 +25,8 @@ from custom_components.enphase_ev.inverter_inventory import (
 )
 from custom_components.enphase_ev.sensor_snapshot_helpers import restore_power_w
 
+from .device_info_helpers import device_info_fields
+
 
 @pytest.mark.parametrize("flow", ["grid_export", "grid_import", "solar_production"])
 @pytest.mark.parametrize(
@@ -491,7 +493,7 @@ def test_gateway_firmware_falls_back_to_controller(coordinator_factory):
     }
     view = InventoryView(coord)
     assert view.type_device_sw_version("envoy") == "1.2.3"
-    assert view.type_device_info("envoy")["sw_version"] == "1.2.3"
+    assert device_info_fields(view.type_device_info("envoy"))["sw_version"] == "1.2.3"
     members = view._type_bucket_members("envoy")
     members[0]["name"] = "changed"
     assert view._type_bucket_members("envoy")[0]["name"] == "IQ Gateway"

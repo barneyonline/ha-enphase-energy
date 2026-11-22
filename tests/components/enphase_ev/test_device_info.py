@@ -2,6 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from .device_info_helpers import device_info_fields
+
 
 def test_device_info_uses_display_name_and_model():
     from custom_components.enphase_ev.entity import EnphaseBaseEntity
@@ -22,7 +24,7 @@ def test_device_info_uses_display_name_and_model():
     )
     entity._sn = "555555555555"
 
-    info = entity.device_info
+    info = device_info_fields(entity.device_info)
 
     assert info["name"] == "Garage Charger"
     assert info["model"] == "Garage Charger"
@@ -48,7 +50,7 @@ def test_device_info_keeps_non_redundant_model_id():
     )
     entity._sn = "1000"
 
-    info = entity.device_info
+    info = device_info_fields(entity.device_info)
     assert info["model"] == "Garage Charger"
     assert info["model_id"] == "IQ-EVSE-BOARD-REV-A"
 
@@ -68,7 +70,7 @@ def test_device_info_falls_back_to_model_name():
     )
     entity._sn = "1234"
 
-    info = entity.device_info
+    info = device_info_fields(entity.device_info)
 
     assert info["name"] == "IQ-EVSE-EU-3032"
     assert info["model"] == "IQ-EVSE-EU-3032"
@@ -85,10 +87,10 @@ def test_device_info_defaults_when_metadata_missing():
     )
     entity._sn = "321"
 
-    info = entity.device_info
+    info = device_info_fields(entity.device_info)
 
     assert info["name"] == "Enphase Energy Charger"
-    assert info.get("model") is None
+    assert "model" not in info
 
 
 @pytest.mark.asyncio
@@ -131,7 +133,7 @@ def test_device_info_ignores_bad_mac_values():
     )
     entity._sn = "321"
 
-    info = entity.device_info
+    info = device_info_fields(entity.device_info)
     assert "connections" not in info
 
 
@@ -149,7 +151,7 @@ def test_device_info_uses_display_name_when_model_missing():
     )
     entity._sn = "999"
 
-    info = entity.device_info
+    info = device_info_fields(entity.device_info)
 
     assert info["name"] == "Driveway Charger"
     assert info["model"] == "Driveway Charger"
@@ -158,7 +160,7 @@ def test_device_info_uses_display_name_when_model_missing():
 def test_cloud_device_info_uses_unknown_for_blank_site_id():
     from custom_components.enphase_ev.device_info_helpers import _cloud_device_info
 
-    info = _cloud_device_info("   ")
+    info = device_info_fields(_cloud_device_info("   "))
     assert info["identifiers"] == {("enphase_ev", "type:unknown:cloud")}
     assert info["name"] == "Enphase Cloud"
     assert info["model"] == "Cloud Service"
@@ -171,7 +173,7 @@ def test_cloud_device_info_handles_bad_site_id_str():
         def __str__(self) -> str:
             raise ValueError("boom")
 
-    info = _cloud_device_info(BadStr())
+    info = device_info_fields(_cloud_device_info(BadStr()))
     assert info["identifiers"] == {("enphase_ev", "type:unknown:cloud")}
 
 
@@ -373,7 +375,7 @@ def test_site_management_link(site, suffix):
 
     expected = "https://enlighten.enphaseenergy.com" + suffix
     assert _site_configuration_url(site) == expected
-    assert _cloud_device_info(site)["configuration_url"] == expected
+    assert device_info_fields(_cloud_device_info(site))["configuration_url"] == expected
 
 
 @pytest.mark.asyncio

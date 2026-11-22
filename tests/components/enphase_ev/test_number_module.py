@@ -29,6 +29,8 @@ from custom_components.enphase_ev.tariff import (
 )
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
 
+from .device_info_helpers import device_info_fields
+
 
 def _enable_battery_schedule_editor(coord) -> BatteryScheduleEditorManager:
     payload = {
@@ -597,7 +599,7 @@ def test_battery_reserve_number_dynamic_bounds_and_device_info(
     assert number.native_value == 25.0
     assert number.native_min_value == 10.0
     assert number.native_max_value == 90.0
-    assert number.device_info["identifiers"] == {
+    assert device_info_fields(number.device_info)["identifiers"] == {
         ("enphase_ev", f"type:{coord.site_id}:encharge")
     }
 
@@ -871,7 +873,7 @@ def test_tariff_rate_number_fallback_paths(hass, config_entry) -> None:
     assert number.native_value is None
     assert number.native_unit_of_measurement is None
     assert number.extra_state_attributes == {}
-    assert number.device_info["identifiers"] == {
+    assert device_info_fields(number.device_info)["identifiers"] == {
         ("enphase_ev", f"site:{coord.site_id}")
     }
 

@@ -46,6 +46,8 @@ from custom_components.enphase_ev.tariff import (
     tariff_rate_sensor_specs,
 )
 
+from .device_info_helpers import device_info_fields
+
 
 def test_parse_tariff_billing_monthly_and_day_based() -> None:
     monthly = parse_tariff_billing(
@@ -2954,7 +2956,7 @@ def test_tariff_sensors_expose_state_attributes_and_gateway_device(
     assert import_sensor.icon == "mdi:cash-minus"
     assert export_sensor.icon == "mdi:cash-plus"
     assert import_sensor.extra_state_attributes["seasons"][0]["id"] == "default"
-    assert billing_sensor.device_info["identifiers"]
+    assert device_info_fields(billing_sensor.device_info)["identifiers"]
 
 
 def test_export_rate_value_sensor_exposes_rate_state_and_attributes(
@@ -3436,9 +3438,9 @@ def test_tariff_sensor_falls_back_to_cloud_device(
     sensor = EnphaseTariffBillingSensor(coord)
 
     assert sensor.native_value == date(2026, 5, 1)
-    assert ("enphase_ev", f"type:{coord.site_id}:cloud") in sensor.device_info[
-        "identifiers"
-    ]
+    assert ("enphase_ev", f"type:{coord.site_id}:cloud") in device_info_fields(
+        sensor.device_info
+    )["identifiers"]
 
 
 def test_tariff_sensor_uses_cloud_type_device_when_gateway_absent(

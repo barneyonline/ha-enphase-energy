@@ -29,6 +29,8 @@ from custom_components.enphase_ev.sensor import (
     _lifetime_energy_delta,
 )
 
+from .device_info_helpers import device_info_fields
+
 
 def test_site_energy_aggregation_with_fallbacks(coordinator_factory) -> None:
     coord = coordinator_factory()
@@ -2249,7 +2251,7 @@ def test_site_battery_power_sensor_stays_available_at_zero_when_channel_known(
 
     assert sensor.available is True
     assert sensor.native_value == 0
-    assert sensor.device_info["identifiers"] == {
+    assert device_info_fields(sensor.device_info)["identifiers"] == {
         ("enphase_ev", f"type:{coord.site_id}:cloud")
     }
     assert sensor.extra_state_attributes["source_flows"] == [
@@ -4720,7 +4722,7 @@ def test_site_energy_sensor_device_info_targets_cloud(coordinator_factory) -> No
     sensor = EnphaseSiteEnergySensor(
         coord, "grid_import", "site_grid_import", "Grid Import"
     )
-    info = sensor.device_info
+    info = device_info_fields(sensor.device_info)
     assert info["identifiers"] == {("enphase_ev", f"type:{coord.site_id}:cloud")}
 
 

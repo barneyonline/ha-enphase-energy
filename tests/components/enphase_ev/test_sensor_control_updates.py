@@ -23,6 +23,8 @@ from custom_components.enphase_ev.tariff import (
     tariff_rate_sensor_specs,
 )
 
+from .device_info_helpers import device_info_fields
+
 
 def _seed_devices(coord, types):
     coord.inventory_runtime._set_type_device_buckets(
@@ -65,7 +67,7 @@ def test_device_status_tracks_only_owned_controls(coordinator_factory):
         assert sensor.extra_state_attributes == {"updates": {}}
     assert charger.entity_category == EntityCategory.DIAGNOSTIC
     assert charger.unique_id == f"{DOMAIN}_EV1_update_status"
-    assert charger.device_info["identifiers"] == {(DOMAIN, "EV1")}
+    assert device_info_fields(charger.device_info)["identifiers"] == {(DOMAIN, "EV1")}
 
     reserve = coord.control_updates.begin(
         "battery_reserve", None, {"reserve": 30}, {"reserve": 20}

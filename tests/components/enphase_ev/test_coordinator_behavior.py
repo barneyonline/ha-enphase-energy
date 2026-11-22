@@ -66,6 +66,8 @@ from custom_components.enphase_ev.vpp_runtime import (
 
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL, RANDOM_SITE_ID
 
+from .device_info_helpers import device_info_fields
+
 
 def _make_coordinator(hass, monkeypatch):
     from custom_components.enphase_ev.coordinator import EnphaseCoordinator
@@ -619,8 +621,7 @@ def test_type_device_envoy_prefers_system_controller_metadata(
     assert coord.inventory_view.type_device_model_id("envoy") == "SC-SKU"
     assert coord.inventory_view.type_device_sw_version("envoy") == "8.2.1"
 
-    info = coord.inventory_view.type_device_info("envoy")
-    assert info is not None
+    info = device_info_fields(coord.inventory_view.type_device_info("envoy"))
     assert info["name"] == "IQ Gateway"
     assert info["model"] == "IQ System Controller 3 INT"
     assert info["serial_number"] == "SC-123"
@@ -703,8 +704,7 @@ def test_type_device_envoy_falls_back_to_gateway_member_metadata(
     assert coord.inventory_view.type_device_model_id("envoy") == "SC100G-M230ROW"
     assert coord.inventory_view.type_device_sw_version("envoy") == "D8.3.5167"
 
-    info = coord.inventory_view.type_device_info("envoy")
-    assert info is not None
+    info = device_info_fields(coord.inventory_view.type_device_info("envoy"))
     assert info["name"] == "IQ Gateway"
     assert info["model"] == "IQ Gateway"
     assert info["serial_number"] == "GW-123"
@@ -745,8 +745,7 @@ def test_type_device_envoy_prefers_gateway_firmware_over_controller_version(
     assert coord.inventory_view.type_device_serial_number("envoy") == "GW-123"
     assert coord.inventory_view.type_device_model_id("envoy") == "SC-IQG-PCBA-ROW"
     assert coord.inventory_view.type_device_sw_version("envoy") == "D8.3.5232"
-    info = coord.inventory_view.type_device_info("envoy")
-    assert info is not None
+    info = device_info_fields(coord.inventory_view.type_device_info("envoy"))
     assert info["model"] == "IQ Gateway"
     assert info["serial_number"] == "GW-123"
     assert info["model_id"] == "SC-IQG-PCBA-ROW"
@@ -786,8 +785,7 @@ def test_type_device_envoy_does_not_promote_localized_meters_to_gateway(
     assert coord.inventory_view.type_device_model_id("envoy") is None
     assert coord.inventory_view.type_device_sw_version("envoy") is None
 
-    info = coord.inventory_view.type_device_info("envoy")
-    assert info is not None
+    info = device_info_fields(coord.inventory_view.type_device_info("envoy"))
     assert info["name"] == "IQ Gateway"
     assert info["model"] == "IQ Gateway"
     assert "serial_number" not in info
@@ -912,9 +910,9 @@ def test_type_device_helper_branches_for_mac_and_labels(hass, monkeypatch) -> No
     assert (
         coord.inventory_view._envoy_controller_mac() == "aa:bb:cc:dd:ee:ff"
     )  # noqa: SLF001
-    assert coord.inventory_view.type_device_info("envoy")["connections"] == {
-        (CONNECTION_NETWORK_MAC, "aa:bb:cc:dd:ee:ff")
-    }
+    assert device_info_fields(coord.inventory_view.type_device_info("envoy"))[
+        "connections"
+    ] == {(CONNECTION_NETWORK_MAC, "aa:bb:cc:dd:ee:ff")}
     assert (
         coord.inventory_view._envoy_member_kind({"channel_type": "production_meter"})
         == "production"

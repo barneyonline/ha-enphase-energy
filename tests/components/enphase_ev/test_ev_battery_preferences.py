@@ -19,6 +19,8 @@ from custom_components.enphase_ev.switch import GreenBatterySwitch
 
 from .random_ids import RANDOM_SERIAL
 
+from .device_info_helpers import device_info_fields
+
 
 def payload(enabled=False, limit=90, minimum=10):
     return {
@@ -435,7 +437,7 @@ async def test_number_registry_survives_cold_optional_warmup(
     )
     entity = next(e for e in added if isinstance(e, EVBatteryLimitNumber))
     assert not entity.available
-    assert entity.device_info["identifiers"] == {
+    assert device_info_fields(entity.device_info)["identifiers"] == {
         ("enphase_ev", f"type:{coord.site_id}:encharge")
     }
     assert registry.async_get(old.entity_id).name == "Existing EV threshold"

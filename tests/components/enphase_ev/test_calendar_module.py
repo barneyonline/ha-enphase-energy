@@ -15,6 +15,8 @@ from custom_components.enphase_ev.calendar import (
 from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from custom_components.enphase_ev.system_events import SystemEventHistoryEntry
 
+from .device_info_helpers import device_info_fields
+
 
 def test_site_has_battery_helper_defaults_and_strict() -> None:
     from custom_components.enphase_ev import calendar as calendar_mod
@@ -230,7 +232,7 @@ def test_system_event_history_calendar_metadata_and_availability(
     assert entity.unique_id == f"{DOMAIN}_site_{coord.site_id}_system_event_history"
     assert entity.available is False
     assert entity.event is None
-    assert entity.device_info["identifiers"] == {
+    assert device_info_fields(entity.device_info)["identifiers"] == {
         (DOMAIN, f"type:{coord.site_id}:cloud")
     }
 
@@ -251,7 +253,7 @@ def test_system_event_history_calendar_device_info_fallback(
     coord = coordinator_factory()
     monkeypatch.setattr(calendar_mod, "_type_device_info", lambda *_args: None)
 
-    assert SystemEventHistoryCalendarEntity(coord).device_info == {
+    assert device_info_fields(SystemEventHistoryCalendarEntity(coord).device_info) == {
         "identifiers": {(DOMAIN, f"type:{coord.site_id}:cloud")},
         "manufacturer": "Enphase",
     }
@@ -372,7 +374,7 @@ def test_backup_history_calendar_device_info_uses_encharge(coordinator_factory) 
     coord = coordinator_factory()
     entity = BackupHistoryCalendarEntity(coord)
 
-    info = entity.device_info
+    info = device_info_fields(entity.device_info)
     assert (DOMAIN, f"type:{coord.site_id}:encharge") in info["identifiers"]
 
 
@@ -381,7 +383,7 @@ def test_backup_history_calendar_device_info_fallback(coordinator_factory) -> No
     coord.inventory_view.type_device_info = lambda _type_key: None
     entity = BackupHistoryCalendarEntity(coord)
 
-    info = entity.device_info
+    info = device_info_fields(entity.device_info)
     assert info["manufacturer"] == "Enphase"
     assert (DOMAIN, f"type:{coord.site_id}:encharge") in info["identifiers"]
 

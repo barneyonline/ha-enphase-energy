@@ -49,6 +49,8 @@ from custom_components.enphase_ev.switch import (
 )
 from tests.components.enphase_ev.random_ids import RANDOM_SERIAL
 
+from .device_info_helpers import device_info_fields
+
 
 def _attach_evse_editor_runtime(config_entry, coord) -> EvseScheduleEditorManager:
     coord._devices_inventory_ready = True  # noqa: SLF001
@@ -1852,7 +1854,7 @@ def test_battery_schedule_editor_day_switch_uses_inventory_device_info(
     _attach_battery_editor_runtime(config_entry, coord)
     sw = BatteryScheduleEditorDaySwitch(coord, config_entry, day_key="mon")
 
-    assert sw.device_info["name"] == "IQ Battery"
+    assert device_info_fields(sw.device_info)["name"] == "IQ Battery"
 
 
 @pytest.mark.asyncio
@@ -1864,8 +1866,8 @@ async def test_battery_schedule_editor_day_switch_fallback_device_info_and_guard
     coord.inventory_view.type_device_info = lambda *_args: None
     sw = BatteryScheduleEditorDaySwitch(coord, config_entry, day_key="sun")
 
-    assert sw.device_info["manufacturer"] == "Enphase"
-    assert sw.device_info["identifiers"] == {
+    assert device_info_fields(sw.device_info)["manufacturer"] == "Enphase"
+    assert device_info_fields(sw.device_info)["identifiers"] == {
         ("enphase_ev", f"type:{coord.site_id}:encharge")
     }
 
@@ -2484,7 +2486,7 @@ def test_base_battery_schedule_switch_fallbacks(coordinator_factory) -> None:
 
     assert switch.suggested_object_id == "custom_schedule"
     assert switch.is_on is False
-    assert switch.device_info["identifiers"] == {
+    assert device_info_fields(switch.device_info)["identifiers"] == {
         ("enphase_ev", f"type:{coord.site_id}:encharge")
     }
 
@@ -2500,21 +2502,21 @@ def test_site_switch_device_info_fallbacks(coordinator_factory) -> None:
     coord = coordinator_factory()
     coord.inventory_view.type_device_info = lambda _type_key: None
 
-    assert StormGuardSwitch(coord).device_info["identifiers"] == {
+    assert device_info_fields(StormGuardSwitch(coord).device_info)["identifiers"] == {
         ("enphase_ev", f"type:{coord.site_id}:envoy")
     }
-    assert SavingsUseBatteryAfterPeakSwitch(coord).device_info["identifiers"] == {
+    assert device_info_fields(SavingsUseBatteryAfterPeakSwitch(coord).device_info)[
+        "identifiers"
+    ] == {("enphase_ev", f"type:{coord.site_id}:encharge")}
+    assert device_info_fields(ChargeFromGridSwitch(coord).device_info)[
+        "identifiers"
+    ] == {("enphase_ev", f"type:{coord.site_id}:encharge")}
+    assert device_info_fields(PowerMatchSwitch(coord).device_info)["identifiers"] == {
         ("enphase_ev", f"type:{coord.site_id}:encharge")
     }
-    assert ChargeFromGridSwitch(coord).device_info["identifiers"] == {
-        ("enphase_ev", f"type:{coord.site_id}:encharge")
-    }
-    assert PowerMatchSwitch(coord).device_info["identifiers"] == {
-        ("enphase_ev", f"type:{coord.site_id}:encharge")
-    }
-    assert ChargeFromGridScheduleSwitch(coord).device_info["identifiers"] == {
-        ("enphase_ev", f"type:{coord.site_id}:encharge")
-    }
+    assert device_info_fields(ChargeFromGridScheduleSwitch(coord).device_info)[
+        "identifiers"
+    ] == {("enphase_ev", f"type:{coord.site_id}:encharge")}
 
 
 def test_site_switch_device_info_prefers_type_info_and_storm_guard_envoy_gate(

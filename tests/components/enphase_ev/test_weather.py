@@ -31,6 +31,8 @@ from custom_components.enphase_ev.weather import (
 )
 from tests.components.enphase_ev.random_ids import RANDOM_SITE_ID
 
+from .device_info_helpers import device_info_fields
+
 
 def _payload(
     *,
@@ -277,7 +279,7 @@ async def test_setup_schedules_discovery_and_creates_cloud_weather_after_success
     assert "temperature_min" not in state_attributes
     assert "temperature_max" not in state_attributes
     assert "enphase_condition" not in state_attributes
-    assert entity.device_info["identifiers"] == {
+    assert device_info_fields(entity.device_info)["identifiers"] == {
         ("enphase_ev", f"type:{RANDOM_SITE_ID}:cloud")
     }
     client.weather.assert_awaited_once_with(locale="en-AU")
