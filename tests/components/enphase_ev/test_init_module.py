@@ -20,6 +20,7 @@ from homeassistant.exceptions import (
     ServiceValidationError,
 )
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import UpdateFailed
 from homeassistant.setup import async_setup_component
 
@@ -71,6 +72,7 @@ from custom_components.enphase_ev.const import (
     CONF_SITE_ID,
     CONF_SITE_ONLY,
     ISSUE_AUTH_BLOCKED,
+    ISSUE_REAUTH_REQUIRED,
     ISSUE_TOO_MANY_ACTIVE_SESSIONS,
     OPT_API_TIMEOUT,
     OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
@@ -2479,16 +2481,6 @@ async def test_registered_services_cover_branches(
         fake_register_admin,
     )
 
-    fake_ir_deletes: list[str] = []
-    monkeypatch.setattr(
-        "custom_components.enphase_ev.services.ir",
-        SimpleNamespace(
-            async_delete_issue=lambda hass_, domain, issue_id: fake_ir_deletes.append(
-                issue_id
-            )
-        ),
-    )
-
     site_device = device_registry.async_get_or_create(
         config_entry_id=config_entry.entry_id,
         identifiers={(DOMAIN, f"site:{site_id}")},
@@ -2771,8 +2763,7 @@ async def test_registered_services_cover_branches(
     clear_call = SimpleNamespace(
         data={"device_id": [charger_one.id], "site_id": "explicit-site"}
     )
-    await svc_clear(clear_call)
-    assert set(fake_ir_deletes) == {
+    legacy_issue_ids = {
         "auth_blocked",
         f"{ISSUE_AUTH_BLOCKED}_{site_id}",
         f"{ISSUE_AUTH_BLOCKED}_explicit-site",
@@ -2783,6 +2774,20 @@ async def test_registered_services_cover_branches(
         f"reauth_required_{site_id}",
         "reauth_required_explicit-site",
     }
+    for issue_id in legacy_issue_ids:
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key=ISSUE_REAUTH_REQUIRED,
+        )
+    await svc_clear(clear_call)
+    assert all(
+        ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
+        for issue_id in legacy_issue_ids
+    )
 
     await svc_start_stream(SimpleNamespace(data={"site_id": site_id}))
     await svc_start_stream(SimpleNamespace(data={"device_id": [charger_one.id]}))

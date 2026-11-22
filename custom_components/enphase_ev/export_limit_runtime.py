@@ -37,6 +37,7 @@ from .const import (
 )
 from .device_types import member_is_retired
 from .runtime_helpers import normalize_poll_intervals
+from .repair_issues import entry_issue_kwargs
 
 OBSERVATION_SECONDS = BATTERY_PROFILE_PENDING_TIMEOUT_S
 _ENTRY_LOCKS = f"{DOMAIN}.export_limit.locks"
@@ -314,6 +315,10 @@ class ExportLimitRuntime:
                     _LOGGER.exception("Error notifying Export Limit listener")
 
     def _sync_pending_issue(self) -> None:
+        # Reloads must not turn an ignored, still-unconfirmed request into a new
+        # issue. Wait for durable intent to load before checking it again.
+        if self.enabled and (self._stopped or not self._loaded):
+            return
         entry = self.coordinator.config_entry
         issue_id = f"export_limit_pending_{getattr(entry, 'entry_id', self.coordinator.site_id)}"
         visible = bool(
@@ -330,6 +335,7 @@ class ExportLimitRuntime:
                 self.coordinator.hass,
                 DOMAIN,
                 issue_id,
+                **entry_issue_kwargs(entry),
                 is_fixable=False,
                 severity=ir.IssueSeverity.WARNING,
                 translation_key="export_limit_pending",

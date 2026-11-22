@@ -156,6 +156,14 @@ class BatteryProfileMismatchRepairFlow(RepairsFlow):  # type: ignore[misc]
         if sync_mismatch:
             mismatch.sync()
         if mismatch.identity is None:
+            # Reloads and stale observations retire the writable identity while
+            # retaining the issue. Only a checked resolution removes that issue;
+            # completing this flow earlier would delete a still-valid repair.
+            if (
+                ir.async_get(self.hass).async_get_issue(DOMAIN, self.issue_id)
+                is not None
+            ):
+                return None, self.async_abort(reason="request_changed")
             return None, self.async_create_entry(data={})
         if mismatch.identity != self._identity:
             return None, self.async_abort(reason="request_changed")

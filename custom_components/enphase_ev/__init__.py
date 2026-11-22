@@ -55,6 +55,7 @@ from .entity_cleanup import (
 from .log_redaction import redact_site_id, redact_text
 from .runtime_data import EnphaseConfigEntry, EnphaseRuntimeData, get_runtime_data
 from .reload_snapshot import ReloadSnapshot
+from .repair_issues import async_remove_entry_issues
 from .config_selection import (
     normalize_selected_type_keys as _normalize_selected_type_keys,
 )
@@ -797,6 +798,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> b
             if getattr(entry, "runtime_data", None) is runtime_data:
                 entry.runtime_data = None
         raise
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: EnphaseConfigEntry) -> None:
+    """Clean up legacy Repairs only when the config entry is removed."""
+    async_remove_entry_issues(hass, entry)
 
 
 async def _async_finish_unload(

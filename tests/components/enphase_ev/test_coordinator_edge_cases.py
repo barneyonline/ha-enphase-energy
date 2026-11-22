@@ -1035,25 +1035,20 @@ async def test_http_server_errors_raise_endpoint_issue_and_clear_on_success(
 @pytest.mark.asyncio
 async def test_network_error_dns_issue_reporting(hass, monkeypatch):
     from custom_components.enphase_ev import coordinator as coord_mod
-    from custom_components.enphase_ev import coordinator_diagnostics as diag_mod
+    from homeassistant.helpers import issue_registry as ir
     from custom_components.enphase_ev.const import ISSUE_DNS_RESOLUTION
     from custom_components.enphase_ev.coordinator import EnphaseCoordinator
 
     entry = _make_entry(hass)
 
-    issue_calls: list[tuple] = []
+    registry = ir.async_get(hass)
+    issue_id = f"{ISSUE_DNS_RESOLUTION}_{entry.entry_id.lower()}"
 
     monkeypatch.setattr(
         coord_mod, "async_get_clientsession", lambda *args, **kwargs: object()
     )
     monkeypatch.setattr(coord_mod.time, "monotonic", lambda: 3_000.0)
     monkeypatch.setattr(coord_mod.random, "uniform", lambda *args, **kwargs: 1.25)
-    monkeypatch.setattr(
-        diag_mod.ir,
-        "async_create_issue",
-        lambda *args, **kwargs: issue_calls.append((args, kwargs)),
-    )
-    monkeypatch.setattr(diag_mod.ir, "async_delete_issue", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         coord_mod, "async_call_later", lambda *args, **kwargs: lambda: None
     )
@@ -1074,6 +1069,7 @@ async def test_network_error_dns_issue_reporting(hass, monkeypatch):
 
     assert coord._dns_failures == 1
     assert coord._dns_issue_reported is False
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
 
     coord._backoff_until = None
     coord.backoff_ends_utc = None
@@ -1083,9 +1079,10 @@ async def test_network_error_dns_issue_reporting(hass, monkeypatch):
 
     assert coord._dns_failures == 2
     assert coord._dns_issue_reported is True
-    assert any(
-        call[0][2] == ISSUE_DNS_RESOLUTION for call in issue_calls
-    ), "DNS resolution issue should be raised"
+    issue = registry.async_get_issue(DOMAIN, issue_id)
+    assert issue is not None
+    assert issue.config_entry_id == entry.entry_id
+    assert issue.translation_key == ISSUE_DNS_RESOLUTION
 
 
 @pytest.mark.asyncio

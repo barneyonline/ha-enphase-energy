@@ -153,6 +153,11 @@ class EnphaseTariffRateSensor(_EnphaseTariffBaseSensor):
 
 
 class EnphaseCurrentTariffRateSensor(_EnphaseTariffBaseSensor):
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Keep the tariff boundary timer, which follows the entity object."""
+        super().async_entity_id_changed(old_entity_id)
+
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 4
 

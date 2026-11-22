@@ -26,6 +26,10 @@ All notable changes to this project will be documented in this file.
 - Show the one-time code field and archived-entity option after their confirmation checkboxes are selected. Show Forget Password when Enphase credentials or the remember-password setting are stored.
 - Support excluding individual charger devices from area targets in charging actions. Charging and schedule sync skip non-chargers reached through a group.
 - Report platform unload failures using Home Assistant's translated error and keep the integration runtime active for platforms that remain loaded.
+- Keep ignored battery and export-limit Repairs through reloads and clean up
+  legacy repairs when their config entry is removed.
+- Preserve site-sensor freshness timers, listeners and restored history when
+  entity IDs are renamed.
 
 ### 🔄 Other changes
 
