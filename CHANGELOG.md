@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## v5.4.0 - 2026-11-22
 
 ### 🚧 Breaking changes
 
@@ -36,6 +36,7 @@ All notable changes to this project will be documented in this file.
 - Use the built-in Home Assistant Marketplace in the installation guide.
 - List Enphase Energy under Solar & Batteries and EV Charging in the Marketplace catalog.
 - Run development and CI tests against Home Assistant `2026.11.0` and its matching `pytest-homeassistant` plugin.
+- Bump the integration manifest version to `5.4.0`.
 
 ## v5.3.1 - 2026-11-14
 
