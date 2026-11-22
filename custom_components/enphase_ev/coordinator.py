@@ -38,6 +38,7 @@ from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     ServiceValidationError,
 )  # noqa: F401
+from homeassistant.helpers import update_coordinator
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.aiohttp_client import (
     async_get_clientsession as async_get_clientsession,
@@ -4270,7 +4271,12 @@ class EnphaseCoordinator(
                     self.diagnostics.report_dns_issue()
                 self.payload_using_stale = False
                 self.payload_failure_kind = None
-                raise UpdateFailed(
+                failure_type = UpdateFailed
+                if getattr(err, "enphase_unreachable", False):
+                    failure_type = getattr(
+                        update_coordinator, "UpdateFailedUnreachable", UpdateFailed
+                    )
+                raise failure_type(
                     f"Error communicating with API: {msg}",
                     retry_after=backoff,
                 )

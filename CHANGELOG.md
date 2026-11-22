@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file.
 ### 🔧 Improvements
 
 - Reuse per-channel lifetime-energy totals across calculations.
+- On Home Assistant 2026.12 and newer, log charger-status outages at info level when Enphase cannot be reached.
 
 ### 🔄 Other changes
 
