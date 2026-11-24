@@ -1,19 +1,7 @@
 {
   "current_status": "Fully Operational",
-  "generated_at": "2026-11-23T22:49:14.970982Z",
+  "generated_at": "2026-11-24T06:45:40.693021Z",
   "incidents": [
-    {
-      "active": false,
-      "duration_minutes": 0,
-      "ended_at": null,
-      "failed_checks": [
-        "evse_timeseries",
-        "session_history"
-      ],
-      "last_seen_at": "2026-10-25T00:50:01.370556Z",
-      "started_at": "2026-10-25T00:50:01.370556Z",
-      "status": "Degraded"
-    },
     {
       "active": false,
       "duration_minutes": 0,
