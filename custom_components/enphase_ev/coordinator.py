@@ -5409,24 +5409,15 @@ class EnphaseCoordinator(
         return False
 
     def _has_embedded_charge_mode_preference(self, obj: dict[str, object]) -> bool:
-        """Check whether status embeds a charge-mode preference."""
+        """Check for a preference that can stand in for a scheduler read."""
         if not isinstance(obj, dict):
             return False
         for key in ("chargeMode", "chargingMode", "charge_mode"):
             if obj.get(key) is not None:
                 return True
-        sch = obj.get("sch_d")
-        if isinstance(sch, dict):
-            if sch.get("mode") or sch.get("status"):
-                return True
-            info = sch.get("info")
-            if isinstance(info, list):
-                for entry in info:
-                    if isinstance(entry, dict) and (
-                        entry.get("type") or entry.get("mode") or entry.get("status")
-                    ):
-                        return True
-        return False
+        # Schedule status and window type describe policy activity, so they
+        # cannot replace the selected preference reported by the scheduler.
+        return bool(_mapping_or_empty(obj.get("sch_d")).get("mode"))
 
     @staticmethod
     def _coerce_utc_datetime(value: object) -> datetime | None:

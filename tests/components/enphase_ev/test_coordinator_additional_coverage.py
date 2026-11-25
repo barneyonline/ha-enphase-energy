@@ -2588,8 +2588,10 @@ async def test_async_update_data_preserves_known_charge_preference_when_status_o
 
 
 @pytest.mark.asyncio
-async def test_async_update_data_uses_cached_charge_preference_when_status_only_has_custom_schedule(
+@pytest.mark.parametrize("embedded_mode", [None, "MANUAL_CHARGING"])
+async def test_async_update_data_uses_cached_charge_preference_with_custom_schedule(
     coordinator_factory,
+    embedded_mode,
 ):
     coord = coordinator_factory(
         serials=["EV1"],
@@ -2614,6 +2616,7 @@ async def test_async_update_data_uses_cached_charge_preference_when_status_only_
                 {
                     "sn": "EV1",
                     "name": "Garage EV",
+                    "chargeMode": embedded_mode,
                     "connectors": [
                         {
                             "connectorStatusType": coord_mod.SUSPENDED_EVSE_STATUS,
@@ -2664,7 +2667,8 @@ async def test_async_update_data_uses_cached_charge_preference_when_status_only_
     result = await coord._async_update_data()  # noqa: SLF001
 
     assert result["EV1"]["charge_mode_pref"] == "GREEN_CHARGING"
-    assert result["EV1"]["charge_mode"] == "GREEN_CHARGING"
+    assert result["EV1"]["charge_mode_pref_source"] == "cache"
+    assert result["EV1"]["charge_mode"] == (embedded_mode or "GREEN_CHARGING")
 
 
 @pytest.mark.asyncio
@@ -3297,7 +3301,10 @@ def test_has_embedded_charge_mode_detects_nested():
     assert coord._has_embedded_charge_mode({"foo": "bar"}) is False
     assert coord._has_embedded_charge_mode({"mode": 0}) is True
     assert coord._has_embedded_charge_mode_preference({"mode": 0}) is False
-    assert coord._has_embedded_charge_mode_preference(payload) is True
+    assert coord._has_embedded_charge_mode_preference(payload) is False
+    assert coord._has_embedded_charge_mode_preference(
+        {"sch_d": {"mode": "SCHEDULED_CHARGING"}}
+    )
     assert (
         coord._has_embedded_charge_mode_preference({"chargeMode": "MANUAL_CHARGING"})
         is True
