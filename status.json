@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-11-25T02:55:52.299132Z",
+  "checked_at": "2026-11-25T12:12:09.994759Z",
   "checks": [
     {
       "affects": true,
@@ -122,7 +122,7 @@
       ],
       "group": "degraded",
       "name": "battery_config",
-      "ok": false
+      "ok": true
     },
     {
       "affects": false,
@@ -334,7 +334,7 @@
       "name": "session_history_criteria",
       "ok": true,
       "status": 200,
-      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=41faf8b9-012d-4594-ae57-37f9f5d7f15a&username=2999024"
+      "url": "/service/enho_historical_events_ms/{site_id}/filter_criteria?source=evse&requestId=7288a6c3-864a-4521-b426-f919ef84f8d1&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -404,7 +404,7 @@
       "name": "evse_timeseries_daily_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=41faf8b9-012d-4594-ae57-37f9f5d7f15a&start_date=2026-11-25&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/daily_energy?site_id={site_id}&source=evse&requestId=7288a6c3-864a-4521-b426-f919ef84f8d1&start_date=2026-11-25&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -418,7 +418,7 @@
       "name": "evse_timeseries_lifetime_energy",
       "ok": true,
       "status": 200,
-      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=41faf8b9-012d-4594-ae57-37f9f5d7f15a&username=2999024"
+      "url": "/service/timeseries/evse/timeseries/lifetime_energy?site_id={site_id}&source=evse&requestId=7288a6c3-864a-4521-b426-f919ef84f8d1&username=2999024"
     },
     {
       "affects_broad_outage": true,
@@ -454,12 +454,12 @@
       "category": "battery_config",
       "check_group": "battery_config",
       "check_mode": "all",
-      "error": "HTTP 503",
+      "error": null,
       "group": "degraded",
       "method": "GET",
       "name": "battery_site_settings",
-      "ok": false,
-      "status": 503,
+      "ok": true,
+      "status": 200,
       "url": "/service/batteryConfig/api/v1/siteSettings/{site_id}?userId=2999024"
     },
     {
@@ -731,14 +731,14 @@
   ],
   "status": "Fully Operational",
   "summary": {
-    "checks_failed": 1,
+    "checks_failed": 0,
     "checks_failed_affecting": 0,
-    "checks_failed_broad_outage": 1,
-    "checks_failed_non_affecting": 1,
-    "checks_ok": 16,
+    "checks_failed_broad_outage": 0,
+    "checks_failed_non_affecting": 0,
+    "checks_ok": 17,
     "checks_total": 17,
-    "endpoints_failed": 1,
-    "endpoints_ok": 36,
+    "endpoints_failed": 0,
+    "endpoints_ok": 37,
     "endpoints_total": 37
   }
 }
