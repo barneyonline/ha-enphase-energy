@@ -2,11 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## v5.4.1 - 2026-11-26
+
+### 🚧 Breaking changes
+
+- None
+
+### ✨ New features
+
+- None
 
 ### 🐛 Bug fixes
 
 - Refresh the EV charger's selected charge mode even when charger status contains schedule window information. (#1020)
+
+### 🔧 Improvements
+
+- None
+
+### 🔄 Other changes
+
+- Update the `setup-uv` GitHub Action from 10.3.3 to 10.4.0. (#1018)
 
 ## v5.4.0 - 2026-11-22
 
