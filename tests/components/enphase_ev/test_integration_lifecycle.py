@@ -23,6 +23,7 @@ from pytest_homeassistant.common import async_fire_time_changed
 from yarl import URL
 
 from custom_components.enphase_ev.api import EnphaseEVClient
+from custom_components.enphase_ev.api_client import evse_surface
 from custom_components.enphase_ev.const import (
     CONF_SELECTED_TYPE_KEYS,
     CONF_SERIALS,
@@ -542,3 +543,103 @@ async def test_cold_setup_retries_after_enphase_rate_limit(
     assert status.await_count == 2
     assert unexpected == []
     assert await hass.config_entries.async_unload(config_entry.entry_id)
+
+
+@pytest.mark.parametrize(
+    ("enabled_mode", "sensor_state", "select_state", "source"),
+    [
+        ("scheduledCharging", "SCHEDULED_CHARGING", "Scheduled", "scheduler_endpoint"),
+        ("manualCharging", "MANUAL_CHARGING", "Manual", "scheduler_endpoint"),
+        ("smartCharging", "SMART_CHARGING", "Smart", "scheduler_endpoint"),
+        ("greenCharging", "GREEN_CHARGING", "Green", "scheduler_endpoint"),
+        (None, "GREEN_CHARGING", "unknown", "schedule_type_fallback"),
+    ],
+)
+async def test_charge_mode_preference_refresh_reaches_both_entities(
+    hass,
+    config_entry,
+    platform_cloud,
+    freezer,
+    monkeypatch,
+    enabled_mode,
+    sensor_state,
+    select_state,
+    source,
+):
+    """Recheck scheduler preference when status only describes the policy window."""
+    responses, calls, unexpected = platform_cloud
+    hass.config_entries.async_update_entry(
+        config_entry,
+        data={**config_entry.data, CONF_SELECTED_TYPE_KEYS: ["envoy", "iqevse"]},
+    )
+    charger = responses["status"]["evChargerData"][0]
+    charger["mode"] = 1
+    responses["get_schedules"]["slots"] = [
+        {
+            "id": "slot-1",
+            "startTime": "08:00:00",
+            "endTime": "09:30:00",
+            "days": [1, 3, 5],
+            "scheduleType": "CUSTOM",
+            "enabled": True,
+            "chargingLevelAmp": 24,
+        }
+    ]
+    modes = {
+        "smartCharging": {"enabled": True, "chargingMode": "SMART_CHARGING"},
+        "scheduledCharging": {"enabled": False, "chargingMode": "SCHEDULED_CHARGING"},
+        "manualCharging": {"enabled": False, "chargingMode": "MANUAL_CHARGING"},
+    }
+
+    async def scheduler_response(method, url, **_kwargs):
+        assert method == "GET"
+        assert url.endswith(f"/{RANDOM_SERIAL}/preference")
+        return {"data": {"modes": deepcopy(modes)}}
+
+    preference_requests = AsyncMock(side_effect=scheduler_response)
+    monkeypatch.setattr(EnphaseEVClient, "charge_mode", evse_surface.charge_mode)
+    monkeypatch.setattr(EnphaseEVClient, "_json", preference_requests)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    try:
+        await _finish_startup(hass, config_entry)
+        coordinator = config_entry.runtime_data.coordinator
+        assert coordinator.schedule_sync.get_slot(RANDOM_SERIAL, "slot-1")["enabled"]
+        registry = er.async_get(hass)
+        sensor_id = registry.async_get_entity_id(
+            "sensor", "enphase_ev", f"enphase_ev_{RANDOM_SERIAL}_charge_mode"
+        )
+        select_id = registry.async_get_entity_id(
+            "select", "enphase_ev", f"enphase_ev_{RANDOM_SERIAL}_charge_mode_select"
+        )
+        assert sensor_id is not None
+        assert select_id is not None
+        assert hass.states.get(sensor_id).state == "SMART_CHARGING"
+        assert hass.states.get(select_id).state == "Smart"
+
+        # This status window is independent of which scheduler preference is enabled.
+        charger["sch_d"] = {"status": 1, "info": [{"type": "greencharging"}]}
+        if enabled_mode == "greenCharging":
+            modes["greenCharging"] = {"chargingMode": "GREEN_CHARGING"}
+        for key, mode in modes.items():
+            mode["enabled"] = key == enabled_mode
+        previous_reads = preference_requests.await_count
+        previous_status_reads = calls["status"].await_count
+        freezer.tick(timedelta(minutes=6))
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+        assert calls["status"].await_count == previous_status_reads + 1
+        snapshot = coordinator.data[RANDOM_SERIAL]
+        assert snapshot["charge_mode_source"] == "explicit_status"
+        assert (
+            hass.states.get(sensor_id).state,
+            hass.states.get(select_id).state,
+            snapshot["charge_mode_pref_source"],
+        ) == (sensor_state, select_state, source)
+        assert preference_requests.await_count == previous_reads + 1
+        calls["set_charge_mode"].assert_not_awaited()
+        calls["patch_schedules"].assert_not_awaited()
+        assert unexpected == []
+    finally:
+        assert await hass.config_entries.async_unload(config_entry.entry_id)
+        await hass.async_block_till_done()

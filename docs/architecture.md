@@ -394,6 +394,8 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   Scheduler preference reads retain each charger's visible Smart/Green choices
   separately from its enabled mode. Charge Mode selects use those choices during
   Manual/Scheduled intervals, preserving the distinct scheduler write values.
+  An explicit mode field in status can substitute for a preference read. Schedule
+  window status and type alone leave the normal scheduler refresh eligible.
   Missing/malformed solar metadata retains prior choices. A newer explicit
   charger solar preference invalidates contradictory cached visible choices and
   takes precedence over the weaker single-charger battery-profile fallback.
