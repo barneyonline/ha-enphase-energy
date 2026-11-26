@@ -2,11 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## v5.5.0 - 2026-11-26
+
+### 🚧 Breaking changes
+
+- None
+
+### ✨ New features
+
+- Add a Home Assistant Repairs warning when Enphase continues to report a pending battery profile after Storm Guard opt-out, while live battery status shows Self-Consumption. **Check again** refreshes both readings and clears the warning when they confirm recovery. (#1019)
+
+### 🐛 Bug fixes
+
+- None
 
 ### 🔧 Improvements
 
-- Show a Home Assistant Repairs warning when fresh Enphase observations repeatedly show a stuck battery profile after a Storm Guard opt-out. **Check again** refreshes both battery data sources and clears the warning if they show recovery.
+- None
+
+### 🔄 Other changes
+
+- None
 
 ## v5.4.1 - 2026-11-26
 
