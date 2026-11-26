@@ -7,8 +7,12 @@ import json
 import logging
 import math
 import time
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from datetime import datetime, time as dt_time, timedelta
 from datetime import timezone as _tz
+from functools import partial
 from http import HTTPStatus
 from typing import TYPE_CHECKING, cast
 from zoneinfo import ZoneInfo
@@ -17,6 +21,8 @@ import aiohttp
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.util import dt as dt_util
 
+from .api_client.common import guarded_read_scope
+from .api_client.errors import EnlightenReadSuperseded
 from .battery_profile_mismatch import BatteryProfileMismatch
 from .battery_schedule_editor import (
     BatteryScheduleRecord,
@@ -86,6 +92,7 @@ from .runtime_helpers import coerce_int, coerce_optional_int
 from .service_validation import raise_translated_service_validation
 from .runtime_health import RuntimeHealthServices
 from .state_models import BatteryControlCapability, BatteryState
+from .storm_guard_stuck_profile import StormGuardStuckProfile
 
 if TYPE_CHECKING:  # pragma: no cover
     from .coordinator import EnphaseCoordinator
@@ -113,6 +120,11 @@ _LIVE_BATTERY_MODE_PROFILE_ALIASES = {
 }
 
 
+@dataclass(slots=True)
+class _RepairProfileStage:
+    read: tuple[float, int, object] | None = None
+
+
 class BatteryRuntime:
     """Battery profile selection and pending-state helpers."""
 
@@ -124,6 +136,16 @@ class BatteryRuntime:
         self._state = state
         self.ev_preferences = EVBatteryPreferences(self)
         self.profile_mismatch = BatteryProfileMismatch(self)
+        self.storm_guard_stuck_profile = StormGuardStuckProfile(self)
+        self._settings_reads_in_flight = 0
+        self._profile_read_locks = {
+            "storm_guard": asyncio.Lock(),
+            "battery_status": asyncio.Lock(),
+        }
+        self._repair_profile_stage: _RepairProfileStage | None = None
+        self._repair_profile_started = float("-inf")
+        self._settings_system_task_started = float("-inf")
+        self._settings_system_task: bool | None = None
         self.storm_alert_opt_in_targets: set[str] = set()
         self.storm_alert_reads = 0
 
@@ -1161,6 +1183,8 @@ class BatteryRuntime:
         data: dict[str, object],
         *,
         clear_missing_controls: bool = False,
+        settings_read_started: float | None = None,
+        apply_system_task: bool = True,
     ) -> None:
         state = self.battery_state
         for schedule_type in ("dtg", "rbd"):
@@ -1207,10 +1231,20 @@ class BatteryRuntime:
                 data.get("powerMatchControl"),
                 preserve_missing=not clear_missing_controls,
             )
-        if "systemTask" in data:
-            state._battery_system_task = self._coerce_optional_bool(
-                data.get("systemTask")
+        if (
+            apply_system_task
+            and "systemTask" in data
+            and (
+                settings_read_started is None
+                or settings_read_started
+                >= max(self._repair_profile_started, self._settings_system_task_started)
             )
+        ):
+            system_task = self._coerce_optional_bool(data.get("systemTask"))
+            state._battery_system_task = system_task
+            if settings_read_started is not None:
+                self._settings_system_task_started = settings_read_started
+                self._settings_system_task = system_task
 
     def _apply_battery_user_details(self, user_details: object) -> None:
         if not isinstance(user_details, dict):
@@ -1223,14 +1257,18 @@ class BatteryRuntime:
         if installer is not None:
             state._battery_user_is_installer = installer
 
-    def _apply_battery_permission_payload(self, payload: object) -> None:
+    def _apply_battery_permission_payload(
+        self, payload: object, *, settings_read_started: float | None = None
+    ) -> None:
         if not isinstance(payload, dict):
             return
         data = payload.get("data")
         if not isinstance(data, dict):
             data = payload
         self.ev_preferences.observe_capabilities(data)
-        self._apply_battery_capability_blocks(data)
+        self._apply_battery_capability_blocks(
+            data, settings_read_started=settings_read_started
+        )
         self._apply_battery_user_details(data.get("userDetails"))
 
     def _assert_battery_system_not_busy(
@@ -1335,6 +1373,7 @@ class BatteryRuntime:
             self._raise_validation(denied_key, message=denied_message)
         fetcher = getattr(coord.client, "battery_site_settings", None)
         if callable(fetcher):
+            started = time.monotonic()
             try:
                 payload = await fetcher()
             except Exception as err:  # noqa: BLE001
@@ -1350,7 +1389,9 @@ class BatteryRuntime:
                     state._battery_site_settings_payload = redacted_payload
                 else:
                     state._battery_site_settings_payload = {"value": redacted_payload}
-                self._apply_battery_permission_payload(payload)
+                self._apply_battery_permission_payload(
+                    payload, settings_read_started=started
+                )
         if coord.battery_write_access_confirmed:
             return
         owner = coord.battery_user_is_owner
@@ -2742,7 +2783,9 @@ class BatteryRuntime:
                 )
         return events
 
-    def parse_battery_profile_payload(self, payload: object) -> None:
+    def parse_battery_profile_payload(
+        self, payload: object, *, apply_system_task: bool = True
+    ) -> None:
         state = self.battery_state
         if not isinstance(payload, dict):
             return
@@ -2760,7 +2803,7 @@ class BatteryRuntime:
         self.remember_previous_battery_reserves(
             data.get("previousBatteryBackupPercentage")
         )
-        self._apply_battery_capability_blocks(data)
+        self._apply_battery_capability_blocks(data, apply_system_task=apply_system_task)
         devices: list[dict[str, object]] = []
         profile_evse_device: dict[str, object] | None = None
         profile_devices_authoritative = False
@@ -3056,7 +3099,9 @@ class BatteryRuntime:
         ):
             self.confirm_battery_pending()
 
-    def parse_battery_site_settings_payload(self, payload: object) -> None:
+    def parse_battery_site_settings_payload(
+        self, payload: object, *, settings_read_started: float | None = None
+    ) -> None:
         state = self.battery_state
         if not isinstance(payload, dict):
             return
@@ -3134,7 +3179,9 @@ class BatteryRuntime:
                 if isinstance(value, (str, int, float)):
                     feature_details[key_text] = value
         state._battery_feature_details = feature_details
-        self._apply_battery_capability_blocks(data)
+        self._apply_battery_capability_blocks(
+            data, settings_read_started=settings_read_started
+        )
         self._apply_battery_user_details(data.get("userDetails"))
         site_status = data.get("siteStatus")
         if isinstance(site_status, dict):
@@ -3149,6 +3196,7 @@ class BatteryRuntime:
         clear_missing_schedule_times: bool = True,
         clear_missing_reserve_bounds: bool = True,
         clear_missing_controls: bool = False,
+        settings_read_started: float | None = None,
     ) -> None:
         state = self.battery_state
         if not isinstance(payload, dict):
@@ -3274,6 +3322,7 @@ class BatteryRuntime:
         self._apply_battery_capability_blocks(
             data,
             clear_missing_controls=clear_missing_controls,
+            settings_read_started=settings_read_started,
         )
         dtg_enabled = self._coerce_optional_bool(
             (data.get("dtgControl") or {}).get("enabled")
@@ -3620,41 +3669,83 @@ class BatteryRuntime:
             return cast(_tz | ZoneInfo, default_tz)
         return _tz.utc
 
+    async def async_refresh_battery_status(
+        self, *, force: bool = False, repair: bool = False
+    ) -> bool:
+        return await self._async_read_profile_source(
+            "battery_status",
+            self._async_read_battery_status,
+            force=force,
+            repair=repair,
+        )
+
+    async def _async_read_profile_source(
+        self,
+        family: str,
+        fetch: Callable[[bool], Awaitable[bool]],
+        *,
+        force: bool,
+        repair: bool,
+    ) -> bool:
+        """Keep each source's read, state update, and endpoint health in order."""
+        lock = self._profile_read_locks[family]
+        if repair and lock.locked():
+            return False
+        async with lock:
+            if not repair:
+                return await fetch(force)
+            coord = self.coordinator
+            if not coord.endpoint_family_can_refresh_readback(family):
+                return False
+            # Backoff can start while the request waits for transport capacity.
+            # Keep the repair to a read even if it encounters expired credentials.
+            with guarded_read_scope(
+                lambda: coord.runtime_active,
+                can_dispatch=lambda: coord.endpoint_family_can_refresh_readback(family),
+                allow_reauth=False,
+            ):
+                return await fetch(True)
+
     @control_readback("battery_status")
-    async def async_refresh_battery_status(self, *, force: bool = False) -> None:
+    async def _async_read_battery_status(self, force: bool) -> bool:
         coord = self.coordinator
         state = self.battery_state
         now = time.monotonic()
         family = "battery_status"
         if not force and state._battery_status_cache_until:
             if now < state._battery_status_cache_until:
-                return
+                return False
         if not self.health.endpoint_family_should_run(family, force=force):
-            return
+            return False
         fetcher = getattr(coord.client, "battery_status", None)
         if not callable(fetcher):
-            return
+            return False
         read_generation = getattr(state, "_battery_profile_read_generation", 0)
         try:
             payload = await fetcher()
+        except EnlightenReadSuperseded:
+            return False
         except Exception as err:  # noqa: BLE001
+            self.storm_guard_stuck_profile.note_live(None, now)
             self.health.note_endpoint_family_failure(family, err)
             state._battery_status_cache_until = coord._endpoint_family_next_retry_mono(
                 family
             )
-            return
+            return False
         if read_generation != getattr(state, "_battery_profile_read_generation", 0):
-            return
+            return False
         redacted_payload = coord.redact_battery_payload(payload)
         if isinstance(redacted_payload, dict):
             state._battery_status_payload = redacted_payload
         else:
             state._battery_status_payload = {"value": redacted_payload}
         self.parse_battery_status_payload(payload)
+        self.storm_guard_stuck_profile.note_live(payload, now)
         self.health.note_endpoint_family_success(family)
         state._battery_status_cache_until = coord._endpoint_family_next_retry_mono(
             family
         )
+        return True
 
     async def async_refresh_battery_backup_history(
         self, *, force: bool = False
@@ -3702,6 +3793,11 @@ class BatteryRuntime:
         )
         self.health.note_endpoint_family_success(family)
 
+    @property
+    def settings_read_in_flight(self) -> bool:
+        """Report whether Settings may still return pending-work evidence."""
+        return self._settings_reads_in_flight > 0
+
     @control_readback("battery_settings")
     async def async_refresh_battery_settings(self, *, force: bool = False) -> bool:
         coord = self.coordinator
@@ -3725,6 +3821,7 @@ class BatteryRuntime:
             return False
         ev_generation = self.ev_preferences.generation
         read_generation = getattr(state, "_battery_profile_read_generation", 0)
+        self._settings_reads_in_flight += 1
         try:
             payload = await fetcher()
         except Exception as err:  # noqa: BLE001
@@ -3735,7 +3832,15 @@ class BatteryRuntime:
                 self.ev_preferences.value = None
             self.health.note_endpoint_family_failure(family, err)
             return False
+        finally:
+            self._settings_reads_in_flight -= 1
         if read_generation != getattr(state, "_battery_profile_read_generation", 0):
+            return False
+        # Observe work queued on Settings even when its shared state is older.
+        self.storm_guard_stuck_profile.note_settings(payload, now)
+        if now < self._repair_profile_started:
+            # Settings and Profile share guard-facing state. A Settings GET
+            # already in flight cannot override a newer successful Repair read.
             return False
         if ev_generation == self.ev_preferences.generation and ev_generation % 2 == 0:
             self.ev_preferences.observe(payload)
@@ -3748,6 +3853,7 @@ class BatteryRuntime:
             payload,
             clear_missing_schedule_times=True,
             clear_missing_controls=True,
+            settings_read_started=now,
         )
         self.sync_cfg_settings_pending()
         success_ttl = self._battery_control_refresh_success_ttl_seconds(
@@ -3813,7 +3919,7 @@ class BatteryRuntime:
             state._battery_site_settings_payload = redacted_payload
         else:
             state._battery_site_settings_payload = {"value": redacted_payload}
-        self.parse_battery_site_settings_payload(payload)
+        self.parse_battery_site_settings_payload(payload, settings_read_started=now)
         state._battery_site_settings_cache_until = now + BATTERY_SITE_SETTINGS_CACHE_TTL
         self.health.note_endpoint_family_success(family)
 
@@ -4207,8 +4313,51 @@ class BatteryRuntime:
             return derived_alert_active
         return critical_active or derived_alert_active
 
+    async def async_refresh_storm_guard_profile(
+        self, *, force: bool = False, repair: bool = False
+    ) -> bool:
+        return await self._async_read_profile_source(
+            "storm_guard",
+            partial(self._async_read_storm_guard_profile, repair=repair),
+            force=force,
+            repair=repair,
+        )
+
+    @asynccontextmanager
+    async def repair_profile_context(self) -> AsyncIterator[None]:
+        """Keep the candidate write context local to the current paired read."""
+        self._repair_profile_stage = _RepairProfileStage()
+        try:
+            yield
+        finally:
+            self._repair_profile_stage = None
+
+    def settings_allow_idle_profile(self, started: float) -> bool:
+        """Check whether Settings supplied a newer conflicting task flag."""
+        return (
+            started >= self._settings_system_task_started
+            or self._settings_system_task is False
+        )
+
+    def confirm_repair_profile_idle(self) -> bool:
+        """Apply the verified Profile write context and idle state together."""
+        stage = self._repair_profile_stage
+        assert stage is not None and stage.read is not None
+        started, generation, payload = stage.read
+        if (
+            generation != self.battery_state._battery_profile_read_generation
+            or started < self._settings_system_task_started
+        ):
+            return False
+        self.coordinator.client.remember_battery_profile_write_context(payload)
+        self.battery_state._battery_system_task = False
+        self._repair_profile_started = started
+        return True
+
     @control_readback("storm_guard")
-    async def async_refresh_storm_guard_profile(self, *, force: bool = False) -> None:
+    async def _async_read_storm_guard_profile(
+        self, force: bool, *, repair: bool
+    ) -> bool:
         coord = self.coordinator
         state = self.battery_state
         now = time.monotonic()
@@ -4218,34 +4367,51 @@ class BatteryRuntime:
         )
         if not force and not pending_profile and state._storm_guard_cache_until:
             if now < state._storm_guard_cache_until:
-                return
+                return False
         if not self.control_refresh_should_run(
             family,
             force=force,
             pending=bool(pending_profile),
         ):
-            return
+            return False
         try:
             locale = getattr(coord.hass.config, "language", None)
         except Exception:  # noqa: BLE001
             locale = None
         fetcher = getattr(coord.client, "storm_guard_profile", None)
         if not callable(fetcher):
-            return
+            return False
         read_generation = getattr(state, "_battery_profile_read_generation", 0)
         try:
-            payload = await fetcher(locale=locale)
+            if repair:
+                payload = await fetcher(locale=locale, remember_write_context=False)
+            else:
+                payload = await fetcher(locale=locale)
+        except EnlightenReadSuperseded:
+            return False
         except Exception as err:  # noqa: BLE001
+            self.storm_guard_stuck_profile.note_profile(None, now)
             self.health.note_endpoint_family_failure(family, err)
-            return
+            return False
         if read_generation != getattr(state, "_battery_profile_read_generation", 0):
-            return
+            return False
+        if repair and now < self._settings_system_task_started:
+            # A newer Settings read has already supplied guard-facing state.
+            return False
         redacted_payload = coord.redact_battery_payload(payload)
         if isinstance(redacted_payload, dict):
             state._battery_profile_payload = redacted_payload
         else:
             state._battery_profile_payload = {"value": redacted_payload}
-        self.parse_battery_profile_payload(payload)
+        system_task = self.storm_guard_stuck_profile.note_profile(payload, now)
+        if repair and system_task is None:
+            # An inconclusive manual read cannot replace the write guard.
+            return False
+        # Busy evidence can apply immediately. Idle evidence needs agreement
+        # with the live status before a Repair can release the write guard.
+        self.parse_battery_profile_payload(
+            payload, apply_system_task=not repair or system_task is True
+        )
         storm_state, evse = self.parse_storm_guard_profile(payload)
         if storm_state is not None:
             state._storm_guard_state = storm_state
@@ -4261,6 +4427,12 @@ class BatteryRuntime:
                 STORM_GUARD_CACHE_TTL
             ),
         )
+        if repair:
+            if system_task is True:
+                self._repair_profile_started = now
+            elif self._repair_profile_stage is not None:
+                self._repair_profile_stage.read = (now, read_generation, payload)
+        return True
 
     async def async_refresh_storm_alert(
         self,
@@ -4285,10 +4457,12 @@ class BatteryRuntime:
         try:
             payload = await fetcher()
         except Exception as err:  # noqa: BLE001
+            self.storm_guard_stuck_profile.note_alert(None, now)
             self.health.note_endpoint_family_failure(family, err)
             if raise_on_error:
                 raise
             return
+        self.storm_guard_stuck_profile.note_alert(payload, now)
         active = self.parse_storm_alert(payload)
         if (
             active is not None

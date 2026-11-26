@@ -1521,13 +1521,20 @@ async def _set_storm_alert_status(
 
 
 async def storm_guard_profile(
-    self: EnphaseEVClient, *, locale: str | None = None
+    self: EnphaseEVClient,
+    *,
+    locale: str | None = None,
+    remember_write_context: bool = True,
 ) -> JsonDict:
     """Return Storm Guard state and EVSE settings for the site.
 
     GET /service/batteryConfig/api/v1/profile/<site_id>?source=enho&userId=<user_id>&locale=<locale>
     """
-    return await self.battery_profile_details(locale=locale)
+    if remember_write_context:
+        return await self.battery_profile_details(locale=locale)
+    return await self.battery_profile_details(
+        locale=locale, remember_write_context=False
+    )
 
 
 async def battery_site_settings(self: EnphaseEVClient) -> JsonDict:
@@ -1539,7 +1546,10 @@ async def battery_site_settings(self: EnphaseEVClient) -> JsonDict:
 
 
 async def battery_profile_details(
-    self: EnphaseEVClient, *, locale: str | None = None
+    self: EnphaseEVClient,
+    *,
+    locale: str | None = None,
+    remember_write_context: bool = True,
 ) -> JsonDict:
     """Return BatteryConfig profile details for system + EVSE settings."""
 
@@ -1551,8 +1561,8 @@ async def battery_profile_details(
         params=params,
         endpoint_family="profile",
     )
-    self._remember_battery_config_capabilities(result)
-    self._remember_battery_config_write_base("profile", result)
+    if remember_write_context:
+        self.remember_battery_profile_write_context(result)
     return result
 
 

@@ -2913,6 +2913,37 @@
       "title": "Lādētāja statuss nav pieejams",
       "description": "Objekta {site_id} lādētāja statuss atgrieza HTTP {status}. Rādījumi un vadība nav pieejami, līdz tiek saņemts aktuāls statuss. Nākamais mēģinājums: {next_retry}. Pārējo galapunktu aptauja turpinās neatkarīgi."
     },
+    "storm_guard_stuck_profile": {
+      "title": "Šķiet, ka akumulatora profils ir iestrēdzis pēc atteikšanās no Storm Guard brīdinājuma",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Šķiet, ka akumulatora profils ir iestrēdzis pēc atteikšanās no Storm Guard brīdinājuma",
+            "description": "Pēc atteikšanās no Storm Guard brīdinājuma Enphase joprojām norāda pilnas rezerves režīmu objektā {site_id}. Akumulatori norāda pašpatēriņa režīmu. Profila un rezerves vadīklas nav pieejamas, kamēr Enphase ziņo par notiekošu uzdevumu. Enlighten pārslēgšanās uz citu profilu un pēc tam atpakaļ uz vēlamo profilu var novērst problēmu.\n\nAtkārtota pārbaude nolasa abus Enphase avotus. Saglabāto profilu var mainīt Enphase sistēmā.",
+            "menu_options": {
+              "check_again": "Pārbaudīt vēlreiz"
+            }
+          },
+          "pending": {
+            "title": "Šķiet, ka akumulatora profils ir iestrēdzis pēc atteikšanās no Storm Guard brīdinājuma",
+            "description": "Jaunie rādījumi joprojām atšķiras. Pārbaudiet sistēmas profilu Enlighten vai sazinieties ar Enphase atbalstu, ja problēma saglabājas.",
+            "menu_options": {
+              "check_again": "Pārbaudīt vēlreiz"
+            }
+          },
+          "check_failed": {
+            "title": "Šķiet, ka akumulatora profils ir iestrēdzis pēc atteikšanās no Storm Guard brīdinājuma",
+            "description": "Neizdevās pārbaudīt akumulatora profila stāvokli. Uzgaidiet un pārbaudiet vēlreiz vai skatiet sistēmas profilu Enlighten.",
+            "menu_options": {
+              "check_again": "Pārbaudīt vēlreiz"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "Integrācija nav ielādēta. Ielādējiet to un atkārtoti atveriet šo labojumu."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "Akumulatora profila avoti nesakrīt",
       "fix_flow": {

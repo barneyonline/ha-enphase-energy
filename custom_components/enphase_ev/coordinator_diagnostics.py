@@ -655,6 +655,11 @@ class CoordinatorDiagnostics:
                 if getattr(coord, "battery_runtime", None) is not None
                 else None
             ),
+            "storm_guard_stuck_profile": (
+                coord.battery_runtime.storm_guard_stuck_profile.diagnostics()
+                if getattr(coord, "battery_runtime", None) is not None
+                else None
+            ),
             "battery_pending_profile": getattr(coord, "_battery_pending_profile", None),
             "battery_pending_reserve": getattr(coord, "_battery_pending_reserve", None),
             "battery_pending_sub_type": getattr(
@@ -1576,8 +1581,9 @@ class CoordinatorDiagnostics:
         )
 
     def sync_battery_profile_pending_issue(self) -> None:
-        self.coordinator.battery_runtime.profile_mismatch.sync()
         coord = self.coordinator
+        coord.battery_runtime.profile_mismatch.sync()
+        coord.battery_runtime.storm_guard_stuck_profile.sync()
         pending_profile = getattr(coord, "_battery_pending_profile", None)
         requested_at = getattr(coord, "_battery_pending_requested_at", None)
         age_s = coord.battery_pending_age_seconds

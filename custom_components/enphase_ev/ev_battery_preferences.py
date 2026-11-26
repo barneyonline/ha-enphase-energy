@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+import time
 from typing import TYPE_CHECKING
 
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -87,6 +88,11 @@ class EVBatteryPreferences:
             and coord.battery_system_task is not True
         )
 
+    @property
+    def update_in_progress(self) -> bool:
+        """Report an in-flight Settings read or preference write."""
+        return self._lock.locked()
+
     async def async_update(
         self, *, enabled: bool | None = None, limit: float | None = None
     ) -> None:
@@ -96,8 +102,12 @@ class EVBatteryPreferences:
             await self.runtime.async_ensure_battery_write_access_confirmed()
             self.generation += 1
             try:
+                started = time.monotonic()
                 payload = await coord.client.battery_settings_details()
-                self.runtime._apply_battery_permission_payload(payload)
+                self.runtime.storm_guard_stuck_profile.note_settings(payload, started)
+                self.runtime._apply_battery_permission_payload(
+                    payload, settings_read_started=started
+                )
                 self.observe(payload)
                 if not self.available or self.value is None:
                     raise ServiceValidationError(

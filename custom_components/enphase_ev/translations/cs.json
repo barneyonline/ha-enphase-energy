@@ -2913,6 +2913,37 @@
       "title": "Stav nabíječky není dostupný",
       "description": "Stav nabíječky pro lokalitu {site_id} vrátil HTTP {status}. Hodnoty a ovládání nabíječky nejsou dostupné, dokud se neobnoví aktuální stav. Další pokus: {next_retry}. Ostatní koncové body se nadále dotazují nezávisle."
     },
+    "storm_guard_stuck_profile": {
+      "title": "Profil baterie se po odmítnutí výstrahy Storm Guard zřejmě zasekl",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Profil baterie se po odmítnutí výstrahy Storm Guard zřejmě zasekl",
+            "description": "Po odmítnutí výstrahy Storm Guard hlásí Enphase pro lokalitu {site_id} stále režim plné zálohy. Baterie hlásí režim vlastní spotřeby. Ovládání profilu a rezervy zůstává nedostupné, dokud Enphase hlásí probíhající úlohu. V Enlighten může pomoci přepnout na jiný profil a potom zpět na preferovaný profil.\n\nOpakovaná kontrola načte oba zdroje Enphase. Uložený profil lze změnit v Enphase.",
+            "menu_options": {
+              "check_again": "Zkontrolovat znovu"
+            }
+          },
+          "pending": {
+            "title": "Profil baterie se po odmítnutí výstrahy Storm Guard zřejmě zasekl",
+            "description": "Nové údaje se stále rozcházejí. Zkontrolujte systémový profil v Enlighten. Pokud potíže přetrvávají, kontaktujte podporu Enphase.",
+            "menu_options": {
+              "check_again": "Zkontrolovat znovu"
+            }
+          },
+          "check_failed": {
+            "title": "Profil baterie se po odmítnutí výstrahy Storm Guard zřejmě zasekl",
+            "description": "Nepodařilo se ověřit stav profilu baterie. Počkejte a zkuste kontrolu znovu nebo zkontrolujte systémový profil v Enlighten.",
+            "menu_options": {
+              "check_again": "Zkontrolovat znovu"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "Integrace není načtena. Načtěte ji a znovu otevřete tuto opravu."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "Zdroje profilu baterie se neshodují",
       "fix_flow": {

@@ -52,6 +52,7 @@ def preferences():
         coordinator=coord,
         async_ensure_battery_write_access_confirmed=AsyncMock(),
         _apply_battery_permission_payload=Mock(),
+        storm_guard_stuck_profile=SimpleNamespace(note_settings=Mock()),
     )
     prefs = EVBatteryPreferences(runtime)
     coord.battery_runtime = runtime

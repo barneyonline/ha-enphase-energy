@@ -2913,6 +2913,37 @@
       "title": "Ladestatus nicht verfügbar",
       "description": "Der Ladestatus für Anlage {site_id} lieferte HTTP {status}. Messwerte und Steuerung des Ladegeräts sind bis zum Empfang aktueller Statusdaten nicht verfügbar. Nächster Versuch: {next_retry}. Andere Endpunkte werden weiterhin unabhängig abgefragt."
     },
+    "storm_guard_stuck_profile": {
+      "title": "Batterieprofil scheint nach Ablehnung einer Storm Guard-Warnung festzuhängen",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Batterieprofil scheint nach Ablehnung einer Storm Guard-Warnung festzuhängen",
+            "description": "Nach Ablehnung einer Storm Guard-Warnung meldet Enphase für Anlage {site_id} weiterhin den vollständigen Notstrombetrieb. Die Batterien melden Eigenverbrauch. Profil und Reserve bleiben gesperrt, solange Enphase einen laufenden Vorgang meldet. Ein Wechsel zu einem anderen Profil in Enlighten und anschließend zurück zum gewünschten Profil kann das Problem beheben.\n\nEine erneute Prüfung liest beide Enphase-Quellen. Änderungen am gespeicherten Profil erfolgen in Enphase.",
+            "menu_options": {
+              "check_again": "Erneut prüfen"
+            }
+          },
+          "pending": {
+            "title": "Batterieprofil scheint nach Ablehnung einer Storm Guard-Warnung festzuhängen",
+            "description": "Die aktuellen Werte weichen weiterhin voneinander ab. Prüfe das Systemprofil in Enlighten. Wende dich bei anhaltenden Problemen an den Enphase-Support.",
+            "menu_options": {
+              "check_again": "Erneut prüfen"
+            }
+          },
+          "check_failed": {
+            "title": "Batterieprofil scheint nach Ablehnung einer Storm Guard-Warnung festzuhängen",
+            "description": "Der Status des Batterieprofils konnte nicht überprüft werden. Warte und prüfe erneut oder kontrolliere das Systemprofil in Enlighten.",
+            "menu_options": {
+              "check_again": "Erneut prüfen"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "Die Integration ist nicht geladen. Lade sie und öffne diese Reparatur erneut."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "Batterieprofilquellen stimmen nicht überein",
       "fix_flow": {

@@ -2913,6 +2913,37 @@
       "title": "Starea încărcătorului nu este disponibilă",
       "description": "Starea încărcătorului pentru locația {site_id} a returnat HTTP {status}. Citirile și comenzile nu sunt disponibile până la primirea unei stări actualizate. Următoarea încercare: {next_retry}. Celelalte puncte finale sunt interogate în continuare independent."
     },
+    "storm_guard_stuck_profile": {
+      "title": "Profilul bateriei pare blocat după refuzarea unei alerte Storm Guard",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Profilul bateriei pare blocat după refuzarea unei alerte Storm Guard",
+            "description": "După refuzarea unei alerte Storm Guard, Enphase raportează în continuare modul de rezervă completă pentru instalația {site_id}. Bateriile raportează modul autoconsum. Comenzile pentru profil și rezervă rămân indisponibile cât timp Enphase raportează o sarcină în curs. În Enlighten, trecerea la alt profil și apoi revenirea la profilul preferat poate rezolva problema.\n\nO nouă verificare citește ambele surse Enphase. Profilul salvat se poate modifica în Enphase.",
+            "menu_options": {
+              "check_again": "Verifică din nou"
+            }
+          },
+          "pending": {
+            "title": "Profilul bateriei pare blocat după refuzarea unei alerte Storm Guard",
+            "description": "Citirile recente diferă în continuare. Verificați profilul sistemului în Enlighten sau contactați serviciul de asistență Enphase dacă problema persistă.",
+            "menu_options": {
+              "check_again": "Verifică din nou"
+            }
+          },
+          "check_failed": {
+            "title": "Profilul bateriei pare blocat după refuzarea unei alerte Storm Guard",
+            "description": "Starea profilului bateriei nu a putut fi verificată. Așteptați și verificați din nou sau consultați profilul sistemului în Enlighten.",
+            "menu_options": {
+              "check_again": "Verifică din nou"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "Integrarea nu este încărcată. Încărcați-o și redeschideți această reparație."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "Sursele profilului bateriei nu concordă",
       "fix_flow": {

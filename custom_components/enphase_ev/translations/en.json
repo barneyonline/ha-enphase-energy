@@ -2913,6 +2913,37 @@
       "title": "Charger status unavailable",
       "description": "Charger status for site {site_id} returned HTTP {status}. Charger readings and controls are unavailable until fresh status returns. Next retry: {next_retry}. Other endpoints continue polling independently."
     },
+    "storm_guard_stuck_profile": {
+      "title": "Battery profile appears stuck after Storm Guard opt-out",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Battery profile appears stuck after Storm Guard opt-out",
+            "description": "Enphase still reports Full Backup at site {site_id} after a Storm Guard opt-out. The batteries report Self-Consumption. Profile and reserve controls stay unavailable while Enphase reports a task in progress. In Enlighten, switching to a different profile and then back to your preferred profile may clear this state.\n\nCheck again reads both Enphase sources. Any change to the stored profile must happen in Enphase.",
+            "menu_options": {
+              "check_again": "Check again"
+            }
+          },
+          "pending": {
+            "title": "Battery profile appears stuck after Storm Guard opt-out",
+            "description": "Fresh readings still show the mismatch. Check the system profile in Enlighten or contact Enphase Support if it persists.",
+            "menu_options": {
+              "check_again": "Check again"
+            }
+          },
+          "check_failed": {
+            "title": "Battery profile appears stuck after Storm Guard opt-out",
+            "description": "Could not verify the battery profile state. Wait and check again, or review the system profile in Enlighten.",
+            "menu_options": {
+              "check_again": "Check again"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "The integration is not loaded. Load it and reopen this repair."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "Battery profile sources disagree",
       "fix_flow": {

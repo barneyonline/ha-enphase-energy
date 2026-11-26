@@ -17,6 +17,7 @@ from .battery_profile_mismatch import ISSUE_PROFILE_MISMATCH
 from .const import DOMAIN, ISSUE_BATTERY_PROFILE_PENDING
 from .coordinator import EnphaseCoordinator
 from .runtime_data import loaded_runtime_data
+from .storm_guard_stuck_profile import ISSUE_STORM_GUARD_STUCK_PROFILE
 
 
 class BatteryProfileRepairFlow(RepairsFlow):  # type: ignore[misc]
@@ -288,12 +289,87 @@ class BatteryProfileMismatchRepairFlow(RepairsFlow):  # type: ignore[misc]
         )
 
 
+class StormGuardStuckProfileRepairFlow(RepairsFlow):  # type: ignore[misc]
+    """Check whether fresh Enphase battery readings resolve the warning."""
+
+    def __init__(self, entry_id: str) -> None:
+        self._entry_id = entry_id
+        self._coord: EnphaseCoordinator | None = None
+
+    def _current(
+        self,
+    ) -> tuple[EnphaseCoordinator | None, RepairsFlowResult | None]:
+        entry = self.hass.config_entries.async_get_entry(self._entry_id)
+        runtime = (
+            loaded_runtime_data(entry) if entry and entry.domain == DOMAIN else None
+        )
+        if runtime is None or not runtime.coordinator.runtime_active:
+            return None, self.async_abort(reason="entry_unavailable")
+        coord = runtime.coordinator
+        if self._coord is not None and self._coord is not coord:
+            return None, self.async_abort(reason="entry_unavailable")
+        self._coord = coord
+        if ir.async_get(self.hass).async_get_issue(DOMAIN, self.issue_id) is None:
+            return None, self.async_create_entry(data={})
+        return coord, None
+
+    def _menu(self, site_id: str, step_id: str) -> RepairsFlowResult:
+        return self.async_show_menu(
+            step_id=step_id,
+            menu_options=["check_again"],
+            description_placeholders={"site_id": site_id},
+        )
+
+    def _current_menu(self, step_id: str) -> RepairsFlowResult:
+        coord, result = self._current()
+        if result is not None:
+            return result
+        assert coord is not None
+        return self._menu(coord.site_id, step_id)
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> RepairsFlowResult:
+        return self._current_menu("init")
+
+    async def async_step_pending(
+        self, user_input: dict[str, Any] | None = None
+    ) -> RepairsFlowResult:
+        return self._current_menu("pending")
+
+    async def async_step_check_failed(
+        self, user_input: dict[str, Any] | None = None
+    ) -> RepairsFlowResult:
+        return self._current_menu("check_failed")
+
+    async def async_step_check_again(
+        self, user_input: dict[str, Any] | None = None
+    ) -> RepairsFlowResult:
+        coord, result = self._current()
+        if result is not None:
+            return result
+        assert coord is not None
+        refreshed = await coord.battery_runtime.storm_guard_stuck_profile.async_check()
+        coord.publish_runtime_state_update("system_profile")
+        _coord, result = self._current()
+        if result is not None:
+            return result
+        return self._menu(coord.site_id, "pending" if refreshed else "check_failed")
+
+
 async def async_create_fix_flow(
     hass: HomeAssistant,
     issue_id: str,
     data: dict[str, str | int | float | None] | None,
 ) -> RepairsFlow:
     """Route the repair using entry and request identity stored by diagnostics."""
+    if data and issue_id.startswith(f"{ISSUE_STORM_GUARD_STUCK_PROFILE}_"):
+        entry_id = data.get("entry_id")
+        if (
+            isinstance(entry_id, str)
+            and issue_id == f"{ISSUE_STORM_GUARD_STUCK_PROFILE}_{entry_id}"
+        ):
+            return StormGuardStuckProfileRepairFlow(entry_id)
     if data and issue_id.startswith(f"{ISSUE_PROFILE_MISMATCH}_"):
         entry_id = data.get("entry_id")
         identity = data.get("identity")

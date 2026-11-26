@@ -2913,6 +2913,37 @@
       "title": "État du chargeur indisponible",
       "description": "L’état du chargeur du site {site_id} a renvoyé HTTP {status}. Les relevés et les commandes sont indisponibles jusqu’au retour de données actualisées. Prochaine tentative : {next_retry}. Les autres points de terminaison restent interrogés indépendamment."
     },
+    "storm_guard_stuck_profile": {
+      "title": "Le profil de la batterie semble bloqué après le refus d’une alerte Storm Guard",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Le profil de la batterie semble bloqué après le refus d’une alerte Storm Guard",
+            "description": "Après le refus d’une alerte Storm Guard, Enphase indique toujours le mode de secours intégral pour le site {site_id}. Les batteries indiquent le mode autoconsommation. Les commandes de profil et de réserve restent indisponibles tant qu’Enphase signale une tâche en cours. Dans Enlighten, passer à un autre profil puis revenir au profil souhaité peut résoudre le problème.\n\nLa nouvelle vérification consulte les deux sources Enphase. Le profil enregistré se modifie dans Enphase.",
+            "menu_options": {
+              "check_again": "Vérifier à nouveau"
+            }
+          },
+          "pending": {
+            "title": "Le profil de la batterie semble bloqué après le refus d’une alerte Storm Guard",
+            "description": "Les nouvelles données divergent toujours. Vérifiez le profil système dans Enlighten ou contactez l’assistance Enphase si le problème persiste.",
+            "menu_options": {
+              "check_again": "Vérifier à nouveau"
+            }
+          },
+          "check_failed": {
+            "title": "Le profil de la batterie semble bloqué après le refus d’une alerte Storm Guard",
+            "description": "Impossible de vérifier l’état du profil de la batterie. Attendez et vérifiez à nouveau, ou consultez le profil système dans Enlighten.",
+            "menu_options": {
+              "check_again": "Vérifier à nouveau"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "L’intégration n’est pas chargée. Chargez-la et rouvrez cette réparation."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "Les sources du profil de batterie divergent",
       "fix_flow": {

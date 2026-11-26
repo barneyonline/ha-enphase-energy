@@ -5,10 +5,12 @@ from __future__ import annotations
 import base64
 import asyncio
 import json
+import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import aiohttp
+from homeassistant.util import dt as dt_util
 import pytest
 from yarl import URL
 
@@ -242,6 +244,281 @@ async def test_guarded_http_replay_checks_entry_lifecycle(
             assert result["evChargerData"] == []
     elif endpoint == "status":
         assert isinstance(result, asyncio.CancelledError)
+
+
+@pytest.mark.parametrize("family", ["storm_guard", "battery_status"])
+async def test_repair_read_preserves_dispatched_retry_after_during_global_backoff(
+    coordinator_factory, monkeypatch, loopback_sockets, family
+):
+    from aiohttp import web
+    from aiohttp.test_utils import TestServer
+
+    from custom_components.enphase_ev.api_client import (
+        battery_surface,
+        dashboard_surface,
+    )
+
+    coord = coordinator_factory()
+    entered, release = asyncio.Event(), asyncio.Event()
+    requests = []
+
+    async def respond(request):
+        requests.append(request.path)
+        entered.set()
+        await release.wait()
+        return web.Response(status=429, headers={"Retry-After": "1800"})
+
+    app = web.Application()
+    if family == "storm_guard":
+        surface = battery_surface
+        path = f"/service/batteryConfig/api/v1/profile/{coord.site_id}"
+        refresh = coord.battery_runtime.async_refresh_storm_guard_profile
+    else:
+        surface = dashboard_surface
+        path = f"/pv/settings/{coord.site_id}/battery_status.json"
+        refresh = coord.battery_runtime.async_refresh_battery_status
+    app.router.add_get(path, respond)
+    async with TestServer(app) as server, aiohttp.ClientSession() as session:
+        monkeypatch.setattr(surface, "BASE_URL", str(server.make_url("/")).rstrip("/"))
+        monkeypatch.setattr(coord.client, "_s", session)
+        check = asyncio.create_task(refresh(repair=True))
+        try:
+            await asyncio.wait_for(entered.wait(), timeout=1)
+            coord._backoff_until = time.monotonic() + 60
+        finally:
+            release.set()
+            assert not await check
+
+        health = coord._endpoint_family_state(family)
+        assert health.last_status == 429
+        assert health.next_retry_mono is not None
+        assert health.next_retry_mono - time.monotonic() > 1700
+        coord._backoff_until = time.monotonic() - 1
+        assert not await refresh(repair=True)
+        assert requests == [path]
+
+
+@pytest.mark.parametrize("family", ["storm_guard", "battery_status"])
+@pytest.mark.parametrize("login_wall", [False, True])
+async def test_repair_auth_failure_leaves_reauthentication_to_normal_reads(
+    coordinator_factory, monkeypatch, loopback_sockets, family, login_wall
+):
+    from aiohttp import web
+    from aiohttp.test_utils import TestServer
+
+    from custom_components.enphase_ev.api_client import (
+        battery_surface,
+        dashboard_surface,
+    )
+
+    coord = coordinator_factory()
+    entered, release = asyncio.Event(), asyncio.Event()
+    requests = []
+
+    async def respond(request):
+        requests.append(request.method)
+        if len(requests) == 1:
+            entered.set()
+            await release.wait()
+        if len(requests) <= 2:
+            if login_wall:
+                return web.Response(
+                    text='<html><form action="/login/login"></form></html>',
+                    content_type="text/html",
+                )
+            return web.Response(status=401)
+        return web.json_response(payload)
+
+    if family == "storm_guard":
+        surface = battery_surface
+        path = f"/service/batteryConfig/api/v1/profile/{coord.site_id}"
+        refresh = coord.battery_runtime.async_refresh_storm_guard_profile
+        payload = {"data": {"profile": "self-consumption", "systemTask": False}}
+    else:
+        surface = dashboard_surface
+        path = f"/pv/settings/{coord.site_id}/battery_status.json"
+        refresh = coord.battery_runtime.async_refresh_battery_status
+        payload = {"storages": []}
+
+    reauth = AsyncMock(return_value=True)
+    coord.client.set_reauth_callback(reauth)
+    app = web.Application()
+    app.router.add_get(path, respond)
+
+    async def repair_then_poll():
+        assert not await refresh(repair=True)
+        reauth.assert_not_awaited()
+        assert requests == ["GET"]
+        coord._backoff_until = time.monotonic() - 1
+        assert await refresh(force=True)
+        reauth.assert_awaited_once()
+        assert requests == ["GET", "GET", "GET"]
+
+    async with TestServer(app) as server, aiohttp.ClientSession() as session:
+        monkeypatch.setattr(surface, "BASE_URL", str(server.make_url("/")).rstrip("/"))
+        monkeypatch.setattr(coord.client, "_s", session)
+        check = asyncio.create_task(repair_then_poll())
+        try:
+            await asyncio.wait_for(entered.wait(), timeout=1)
+            coord._backoff_until = time.monotonic() + 60
+        finally:
+            release.set()
+            await check
+
+
+async def test_rejected_repair_profile_cannot_replace_battery_config_write_context(
+    coordinator_factory, monkeypatch, loopback_sockets
+):
+    from aiohttp import web
+    from aiohttp.test_utils import TestServer
+
+    from custom_components.enphase_ev.api_client import battery_surface
+
+    coord = coordinator_factory()
+    client = coord.client
+    profile = {
+        "profile": "backup_only",
+        "batteryBackupPercentage": 100,
+        "systemTask": True,
+        "supportsMqtt": True,
+    }
+    responses = iter([profile, {"systemTask": False, "supportsMqtt": False}])
+    queries = []
+
+    async def respond(request):
+        queries.append(dict(request.query))
+        return web.json_response({"data": next(responses)})
+
+    app = web.Application()
+    app.router.add_get(
+        f"/service/batteryConfig/api/v1/profile/{coord.site_id}", respond
+    )
+    async with TestServer(app) as server, aiohttp.ClientSession() as session:
+        monkeypatch.setattr(
+            battery_surface, "BASE_URL", str(server.make_url("/")).rstrip("/")
+        )
+        monkeypatch.setattr(client, "_s", session)
+        runtime = coord.battery_runtime
+
+        assert await runtime.async_refresh_storm_guard_profile()
+        expected_base = profile.copy()
+        del expected_base["supportsMqtt"]
+        assert client._battery_config_write_bases["profile"] == expected_base
+        assert client._battery_config_supports_mqtt is True
+        assert coord.battery_system_task is True
+
+        assert not await runtime.async_refresh_storm_guard_profile(repair=True)
+        assert client._battery_config_write_bases["profile"] == expected_base
+        assert client._battery_config_supports_mqtt is True
+        assert coord.battery_system_task is True
+        assert len(queries) == 2
+        assert queries[0] == queries[1]
+        assert queries[0]["source"] == "enho"
+
+
+@pytest.mark.parametrize("outcome", ["idle", "stuck", "status_failed", "superseded"])
+async def test_repair_commits_profile_write_context_only_after_confirmation(
+    coordinator_factory, monkeypatch, loopback_sockets, outcome
+):
+    from aiohttp import web
+    from aiohttp.test_utils import TestServer
+
+    from custom_components.enphase_ev.api_client import (
+        battery_surface,
+        dashboard_surface,
+    )
+
+    coord = coordinator_factory()
+    client = coord.client
+    runtime = coord.battery_runtime
+    stuck_profile = {
+        "profile": "backup_only",
+        "siteProfileStatus": "PROFILE_SWITCH_PENDING",
+        "requestedConfig": {},
+        "requestedConfigMqtt": {},
+        "systemTask": True,
+        "supportsMqtt": True,
+        "acceptedStormGuardDisclaimer": False,
+    }
+    repair_profile = (
+        stuck_profile | {"acceptedStormGuardDisclaimer": True, "supportsMqtt": False}
+        if outcome == "stuck"
+        else {
+            "profile": "self-consumption",
+            "siteProfileStatus": "READY",
+            "systemTask": False,
+            "supportsMqtt": False,
+            "acceptedStormGuardDisclaimer": True,
+        }
+    )
+    responses = iter([stuck_profile, repair_profile])
+    requests = []
+
+    async def respond_profile(request):
+        requests.append(request.method)
+        return web.json_response({"data": next(responses)})
+
+    async def respond_status(request):
+        requests.append(request.method)
+        assert client._battery_config_write_bases["profile"]["systemTask"] is True
+        assert client._battery_config_supports_mqtt is True
+        assert coord.battery_system_task is True
+        if outcome == "status_failed":
+            return web.Response(status=500)
+        return web.json_response(
+            {
+                "storages": [
+                    {
+                        "id": "battery-a",
+                        "battery_mode": "Self-Consumption",
+                        "last_report": dt_util.utcnow().timestamp(),
+                    }
+                ]
+            }
+        )
+
+    if outcome == "superseded":
+        read_status = runtime.async_refresh_battery_status
+
+        async def status_after_new_intent(**kwargs):
+            runtime.set_battery_pending(
+                profile="self-consumption", reserve=20, sub_type=None
+            )
+            runtime.clear_battery_pending()
+            return await read_status(**kwargs)
+
+        monkeypatch.setattr(
+            runtime, "async_refresh_battery_status", status_after_new_intent
+        )
+
+    app = web.Application()
+    app.router.add_get(
+        f"/service/batteryConfig/api/v1/profile/{coord.site_id}", respond_profile
+    )
+    app.router.add_get(
+        f"/pv/settings/{coord.site_id}/battery_status.json", respond_status
+    )
+    async with TestServer(app) as server, aiohttp.ClientSession() as session:
+        base_url = str(server.make_url("/")).rstrip("/")
+        monkeypatch.setattr(battery_surface, "BASE_URL", base_url)
+        monkeypatch.setattr(dashboard_surface, "BASE_URL", base_url)
+        monkeypatch.setattr(client, "_s", session)
+
+        assert await runtime.async_refresh_storm_guard_profile()
+        assert await runtime.storm_guard_stuck_profile.async_check() is (
+            outcome in {"idle", "stuck"}
+        )
+
+        recovered = outcome == "idle"
+        assert coord.battery_system_task is not recovered
+        assert client._battery_config_supports_mqtt is not recovered
+        merged = client._battery_config_merged_write_payload(
+            "profile", {"profile": "cost_savings"}
+        )
+        assert merged["systemTask"] is not recovered
+        assert merged["acceptedStormGuardDisclaimer"] is recovered
+        assert runtime._repair_profile_stage is None
+        assert requests == ["GET", "GET", "GET"]
 
 
 @pytest.mark.parametrize(

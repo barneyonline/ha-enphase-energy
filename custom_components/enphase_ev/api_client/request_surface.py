@@ -47,7 +47,9 @@ from .common import (
     _timed_response_context,
     _timed_response_json,
     _timed_response_text,
+    check_enlighten_read_admission,
     check_enlighten_read_current,
+    guarded_read_allows_reauth,
     has_guarded_read_scope,
 )
 
@@ -202,7 +204,9 @@ async def _json(
         None,
     )
     redaction_identifiers = kwargs.pop("redaction_identifiers", None)
-    allow_reauth = bool(kwargs.pop("allow_reauth", True))
+    allow_reauth = (
+        bool(kwargs.pop("allow_reauth", True)) and guarded_read_allows_reauth()
+    )
     allow_empty_success = bool(kwargs.pop("allow_empty_success", False))
     vpp_token_fallback = bool(kwargs.pop("vpp_token_fallback", False))
     attempt = 0
@@ -234,7 +238,7 @@ async def _json(
                 async with self._request_session(
                     cookie_header_only=use_cookie_header_only
                 ) as request_session:
-                    check_enlighten_read_current()
+                    check_enlighten_read_admission()
                     request_kwargs = kwargs
                     if has_guarded_read_scope():
                         request_kwargs = {
@@ -538,7 +542,7 @@ async def _guard_enlighten_read_attempt(
 ) -> aiohttp.ClientResponse:
     """Check again on each redirect or transparent retry before sending it."""
 
-    check_enlighten_read_current()
+    check_enlighten_read_admission()
     return await handler(request)
 
 

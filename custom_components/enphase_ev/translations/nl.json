@@ -2913,6 +2913,37 @@
       "title": "Laadpaalstatus niet beschikbaar",
       "description": "De laadpaalstatus voor locatie {site_id} gaf HTTP {status}. Metingen en bediening zijn niet beschikbaar totdat actuele statusgegevens terugkeren. Volgende poging: {next_retry}. Andere eindpunten worden onafhankelijk verder opgevraagd."
     },
+    "storm_guard_stuck_profile": {
+      "title": "Batterijprofiel lijkt vast te zitten na afmelden voor een Storm Guard-waarschuwing",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Batterijprofiel lijkt vast te zitten na afmelden voor een Storm Guard-waarschuwing",
+            "description": "Na afmelden voor een Storm Guard-waarschuwing meldt Enphase voor installatie {site_id} nog steeds volledige back-up. De batterijen melden eigen verbruik. Profiel- en reserve-instellingen blijven onbeschikbaar zolang Enphase een lopende taak meldt. In Enlighten kan wisselen naar een ander profiel en terug naar het gewenste profiel het probleem verhelpen.\n\nOpnieuw controleren leest beide Enphase-bronnen. Je kunt het opgeslagen profiel wijzigen in Enphase.",
+            "menu_options": {
+              "check_again": "Opnieuw controleren"
+            }
+          },
+          "pending": {
+            "title": "Batterijprofiel lijkt vast te zitten na afmelden voor een Storm Guard-waarschuwing",
+            "description": "De nieuwe metingen wijken nog steeds af. Controleer het systeemprofiel in Enlighten of neem contact op met Enphase Support als het probleem blijft bestaan.",
+            "menu_options": {
+              "check_again": "Opnieuw controleren"
+            }
+          },
+          "check_failed": {
+            "title": "Batterijprofiel lijkt vast te zitten na afmelden voor een Storm Guard-waarschuwing",
+            "description": "De status van het batterijprofiel kon niet worden vastgesteld. Wacht en controleer opnieuw, of bekijk het systeemprofiel in Enlighten.",
+            "menu_options": {
+              "check_again": "Opnieuw controleren"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "De integratie is niet geladen. Laad deze en open deze reparatie opnieuw."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "Bronnen van het batterijprofiel verschillen",
       "fix_flow": {

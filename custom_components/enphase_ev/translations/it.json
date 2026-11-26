@@ -2913,6 +2913,37 @@
       "title": "Stato del caricatore non disponibile",
       "description": "Lo stato del caricatore del sito {site_id} ha restituito HTTP {status}. Letture e comandi non sono disponibili finché non arriva uno stato aggiornato. Prossimo tentativo: {next_retry}. Gli altri endpoint continuano a essere interrogati indipendentemente."
     },
+    "storm_guard_stuck_profile": {
+      "title": "Il profilo della batteria sembra bloccato dopo la rinuncia a un avviso Storm Guard",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Il profilo della batteria sembra bloccato dopo la rinuncia a un avviso Storm Guard",
+            "description": "Dopo la rinuncia a un avviso Storm Guard, Enphase continua a segnalare la modalità di riserva completa per il sito {site_id}. Le batterie segnalano la modalità autoconsumo. I controlli del profilo e della riserva rimangono indisponibili mentre Enphase segnala un'operazione in corso. In Enlighten, passare a un altro profilo e poi tornare a quello preferito può risolvere il problema.\n\nLa nuova verifica consulta entrambe le fonti Enphase. Il profilo salvato si modifica in Enphase.",
+            "menu_options": {
+              "check_again": "Controlla di nuovo"
+            }
+          },
+          "pending": {
+            "title": "Il profilo della batteria sembra bloccato dopo la rinuncia a un avviso Storm Guard",
+            "description": "Le letture aggiornate mostrano ancora una discrepanza. Controlla il profilo del sistema in Enlighten o contatta l’assistenza Enphase se il problema persiste.",
+            "menu_options": {
+              "check_again": "Controlla di nuovo"
+            }
+          },
+          "check_failed": {
+            "title": "Il profilo della batteria sembra bloccato dopo la rinuncia a un avviso Storm Guard",
+            "description": "Non è stato possibile verificare lo stato del profilo della batteria. Attendi e riprova oppure verifica il profilo del sistema in Enlighten.",
+            "menu_options": {
+              "check_again": "Controlla di nuovo"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "L’integrazione non è caricata. Caricala e riapri questa riparazione."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "Le fonti del profilo batteria non concordano",
       "fix_flow": {
