@@ -2913,6 +2913,37 @@
       "title": "Laturin tila ei ole saatavilla",
       "description": "Kohteen {site_id} laturin tila palautti HTTP {status}. Laturin lukemat ja ohjaus eivät ole saatavilla ennen uusien tilatietojen saapumista. Seuraava yritys: {next_retry}. Muiden rajapintojen kysely jatkuu itsenäisesti."
     },
+    "storm_guard_stuck_profile": {
+      "title": "Akun profiili näyttää juuttuneen Storm Guard -hälytyksen hylkäämisen jälkeen",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Akun profiili näyttää juuttuneen Storm Guard -hälytyksen hylkäämisen jälkeen",
+            "description": "Enphase ilmoittaa kohteen {site_id} tilaksi edelleen täyden varavoiman Storm Guard -hälytyksen hylkäämisen jälkeen. Akut ilmoittavat omakäyttötilan. Profiilia ja varaustasoa ei voi muuttaa, kun Enphase ilmoittaa toiminnon olevan kesken. Vaihtaminen toiseen profiiliin Enlightenissa ja sitten takaisin haluttuun profiiliin voi ratkaista ongelman.\n\nUusi tarkistus lukee molemmat Enphase-lähteet. Tallennettua profiilia voi muuttaa Enphasessa.",
+            "menu_options": {
+              "check_again": "Tarkista uudelleen"
+            }
+          },
+          "pending": {
+            "title": "Akun profiili näyttää juuttuneen Storm Guard -hälytyksen hylkäämisen jälkeen",
+            "description": "Tuoreet tiedot ovat edelleen ristiriidassa. Tarkista järjestelmäprofiili Enlightenissa tai ota yhteyttä Enphasen tukeen, jos ongelma jatkuu.",
+            "menu_options": {
+              "check_again": "Tarkista uudelleen"
+            }
+          },
+          "check_failed": {
+            "title": "Akun profiili näyttää juuttuneen Storm Guard -hälytyksen hylkäämisen jälkeen",
+            "description": "Akkuprofiilin tilaa ei voitu varmistaa. Odota ja tarkista uudelleen tai katso järjestelmäprofiili Enlightenista.",
+            "menu_options": {
+              "check_again": "Tarkista uudelleen"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "Integraatiota ei ole ladattu. Lataa se ja avaa tämä korjaus uudelleen."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "Akkuprofiilin lähteet ovat ristiriidassa",
       "fix_flow": {

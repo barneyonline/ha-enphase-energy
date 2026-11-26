@@ -2913,6 +2913,37 @@
       "title": "Laddarstatus är inte tillgänglig",
       "description": "Laddarstatus för anläggning {site_id} returnerade HTTP {status}. Laddarens mätvärden och styrning är inte tillgängliga tills aktuell status återkommer. Nästa försök: {next_retry}. Andra ändpunkter fortsätter att hämtas oberoende."
     },
+    "storm_guard_stuck_profile": {
+      "title": "Batteriprofilen verkar ha fastnat efter att en Storm Guard-varning valts bort",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Batteriprofilen verkar ha fastnat efter att en Storm Guard-varning valts bort",
+            "description": "När en Storm Guard-varning har valts bort rapporterar Enphase fortfarande full reservkraft för anläggning {site_id}. Batterierna rapporterar egenförbrukning. Profil och reserv går inte att ändra medan Enphase rapporterar en pågående åtgärd. I Enlighten kan ett byte till en annan profil och sedan tillbaka till den önskade profilen lösa problemet.\n\nEn ny kontroll läser båda Enphase-källorna. Den sparade profilen ändras i Enphase.",
+            "menu_options": {
+              "check_again": "Kontrollera igen"
+            }
+          },
+          "pending": {
+            "title": "Batteriprofilen verkar ha fastnat efter att en Storm Guard-varning valts bort",
+            "description": "De nya avläsningarna skiljer sig fortfarande åt. Kontrollera systemprofilen i Enlighten eller kontakta Enphase support om problemet kvarstår.",
+            "menu_options": {
+              "check_again": "Kontrollera igen"
+            }
+          },
+          "check_failed": {
+            "title": "Batteriprofilen verkar ha fastnat efter att en Storm Guard-varning valts bort",
+            "description": "Det gick inte att verifiera batteriprofilens status. Vänta och kontrollera igen eller granska systemprofilen i Enlighten.",
+            "menu_options": {
+              "check_again": "Kontrollera igen"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "Integrationen är inte inläst. Läs in den och öppna den här reparationen igen."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "Batteriets profilkällor skiljer sig åt",
       "fix_flow": {

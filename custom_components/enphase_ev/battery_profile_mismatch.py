@@ -111,6 +111,11 @@ class BatteryProfileMismatch:
         ):
             self.reset()
             return
+        if coord.battery_system_task is True:
+            # Pause guided recovery during a provider task. A busy flag alone
+            # cannot resolve an existing disagreement or its dismissal.
+            self.reset(clear_issue=False)
+            return
         pair = (self.configured, self.live)
         if self._pair != pair:
             self.reset(clear_issue=False)

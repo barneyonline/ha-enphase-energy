@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### 🔧 Improvements
+
+- Show a Home Assistant Repairs warning when fresh Enphase observations repeatedly show a stuck battery profile after a Storm Guard opt-out. **Check again** refreshes both battery data sources and clears the warning if they show recovery.
+
 ## v5.4.1 - 2026-11-26
 
 ### 🚧 Breaking changes

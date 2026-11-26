@@ -2913,6 +2913,37 @@
       "title": "Opladerstatus er utilgængelig",
       "description": "Opladerstatus for anlæg {site_id} returnerede HTTP {status}. Opladerens målinger og styring er utilgængelige, indtil frisk status modtages. Næste forsøg: {next_retry}. Andre slutpunkter forespørges fortsat uafhængigt."
     },
+    "storm_guard_stuck_profile": {
+      "title": "Batteriprofilen ser ud til at sidde fast efter fravalg af en Storm Guard-advarsel",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Batteriprofilen ser ud til at sidde fast efter fravalg af en Storm Guard-advarsel",
+            "description": "Efter fravalg af en Storm Guard-advarsel melder Enphase fortsat fuld backup for anlæg {site_id}. Batterierne melder egetforbrug. Profil og reserve kan ikke ændres, mens Enphase melder, at en opgave er i gang. Prøv at skifte til en anden profil i Enlighten og derefter tilbage til din foretrukne profil.\n\nEn ny kontrol læser begge Enphase-kilder. Den gemte profil kan ændres i Enphase.",
+            "menu_options": {
+              "check_again": "Kontrollér igen"
+            }
+          },
+          "pending": {
+            "title": "Batteriprofilen ser ud til at sidde fast efter fravalg af en Storm Guard-advarsel",
+            "description": "De nye aflæsninger afviger stadig. Kontrollér systemprofilen i Enlighten, eller kontakt Enphase Support, hvis problemet fortsætter.",
+            "menu_options": {
+              "check_again": "Kontrollér igen"
+            }
+          },
+          "check_failed": {
+            "title": "Batteriprofilen ser ud til at sidde fast efter fravalg af en Storm Guard-advarsel",
+            "description": "Batteriprofilens status kunne ikke bekræftes. Vent, og kontrollér igen, eller se systemprofilen i Enlighten.",
+            "menu_options": {
+              "check_again": "Kontrollér igen"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "Integrationen er ikke indlæst. Indlæs den, og åbn denne reparation igen."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "Batteriets profilkilder er uenige",
       "fix_flow": {

@@ -163,6 +163,39 @@ async def test_unobserved_repair_flow_keeps_ignored_issue(
     active.client.set_battery_profile.assert_not_awaited()
 
 
+async def test_busy_task_pauses_existing_guided_recovery_without_losing_dismissal(
+    mismatch_repair, hass
+):
+    coord, clock, manager = mismatch_repair
+    mismatch = coord.battery_runtime.profile_mismatch
+    registry = ir.async_get(hass)
+    ir.async_ignore_issue(hass, DOMAIN, mismatch.issue_id, True)
+    dismissed = registry.async_get_issue(DOMAIN, mismatch.issue_id).dismissed_version
+    flow = await start_repair(coord, manager)
+
+    coord._battery_system_task = True
+    flow = await manager.async_configure(
+        flow["flow_id"], {"next_step_id": "check_again"}
+    )
+    assert flow["reason"] == "request_changed"
+    assert (
+        registry.async_get_issue(DOMAIN, mismatch.issue_id).dismissed_version
+        == dismissed
+    )
+    coord.client.set_battery_profile.assert_not_awaited()
+
+    coord._battery_system_task = False
+    mismatch.sync()
+    clock[0] += 601
+    mismatch.note_configured("backup_only")
+    mismatch.note_live("self-consumption")
+    mismatch.sync()
+    assert (
+        registry.async_get_issue(DOMAIN, mismatch.issue_id).dismissed_version
+        == dismissed
+    )
+
+
 async def test_persistent_mismatch_has_fresh_scoped_context_and_check(
     mismatch_repair, hass
 ):

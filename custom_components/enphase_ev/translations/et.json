@@ -2913,6 +2913,37 @@
       "title": "Laadija olek pole saadaval",
       "description": "Paigaldise {site_id} laadija olek tagastas HTTP {status}. Laadija näidud ja juhtimine pole saadaval, kuni saabuvad värsked olekuandmed. Järgmine katse: {next_retry}. Teisi lõpp-punkte küsitletakse jätkuvalt sõltumatult."
     },
+    "storm_guard_stuck_profile": {
+      "title": "Aku profiil näib olevat takerdunud pärast Storm Guardi hoiatusest loobumist",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Aku profiil näib olevat takerdunud pärast Storm Guardi hoiatusest loobumist",
+            "description": "Pärast Storm Guardi hoiatusest loobumist näitab Enphase paigaldises {site_id} endiselt täieliku varutoite režiimi. Akud näitavad omatarbe režiimi. Profiili ja reservi ei saa muuta, kuni Enphase teatab pooleliolevast toimingust. Enlightenis mõnele teisele profiilile lülitumine ja seejärel eelistatud profiili taastamine võib probleemi lahendada.\n\nUus kontroll loeb mõlemat Enphase’i andmeallikat. Salvestatud profiili saab muuta Enphase’is.",
+            "menu_options": {
+              "check_again": "Kontrolli uuesti"
+            }
+          },
+          "pending": {
+            "title": "Aku profiil näib olevat takerdunud pärast Storm Guardi hoiatusest loobumist",
+            "description": "Värsked näidud ei ühti endiselt. Kontrolli süsteemiprofiili Enlightenis või võta püsiva tõrke korral ühendust Enphase’i toega.",
+            "menu_options": {
+              "check_again": "Kontrolli uuesti"
+            }
+          },
+          "check_failed": {
+            "title": "Aku profiil näib olevat takerdunud pärast Storm Guardi hoiatusest loobumist",
+            "description": "Akuprofiili olekut ei õnnestunud kontrollida. Oota ja kontrolli uuesti või vaata süsteemiprofiili Enlightenis.",
+            "menu_options": {
+              "check_again": "Kontrolli uuesti"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "Integratsioon pole laaditud. Laadi see ja ava see parandus uuesti."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "Aku profiili allikad ei ühti",
       "fix_flow": {

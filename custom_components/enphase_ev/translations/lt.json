@@ -2913,6 +2913,37 @@
       "title": "Įkroviklio būsena nepasiekiama",
       "description": "Objekto {site_id} įkroviklio būsena grąžino HTTP {status}. Įkroviklio rodmenys ir valdymas nepasiekiami, kol bus gauta nauja būsena. Kitas bandymas: {next_retry}. Kiti galiniai taškai toliau apklausiami nepriklausomai."
     },
+    "storm_guard_stuck_profile": {
+      "title": "Atmetus „Storm Guard“ įspėjimą, akumuliatoriaus profilis, regis, užstrigo",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Atmetus „Storm Guard“ įspėjimą, akumuliatoriaus profilis, regis, užstrigo",
+            "description": "Atmetus „Storm Guard“ įspėjimą, „Enphase“ vis dar nurodo visiško rezervinio maitinimo režimą sistemoje {site_id}. Akumuliatoriai nurodo savosios energijos vartojimo režimą. Profilio ir rezervo negalima keisti, kol „Enphase“ rodo vykdomą užduotį. Gali padėti perjungimas į kitą profilį „Enlighten“ sistemoje ir grįžimas prie pageidaujamo profilio.\n\nPakartotinė patikra nuskaito abu „Enphase“ šaltinius. Išsaugotas profilis keičiamas „Enphase“ sistemoje.",
+            "menu_options": {
+              "check_again": "Tikrinti dar kartą"
+            }
+          },
+          "pending": {
+            "title": "Atmetus „Storm Guard“ įspėjimą, akumuliatoriaus profilis, regis, užstrigo",
+            "description": "Nauji rodmenys vis dar nesutampa. Patikrinkite sistemos profilį „Enlighten“ arba, jei problema išlieka, kreipkitės į „Enphase“ pagalbą.",
+            "menu_options": {
+              "check_again": "Tikrinti dar kartą"
+            }
+          },
+          "check_failed": {
+            "title": "Atmetus „Storm Guard“ įspėjimą, akumuliatoriaus profilis, regis, užstrigo",
+            "description": "Nepavyko patikrinti akumuliatoriaus profilio būsenos. Palaukite ir patikrinkite dar kartą arba peržiūrėkite sistemos profilį „Enlighten“.",
+            "menu_options": {
+              "check_again": "Tikrinti dar kartą"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "Integracija neįkelta. Įkelkite ją ir vėl atidarykite šį taisymą."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "Akumuliatoriaus profilio šaltiniai nesutampa",
       "fix_flow": {

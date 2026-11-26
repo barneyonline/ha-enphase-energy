@@ -2913,6 +2913,37 @@
       "title": "Stan ładowarki niedostępny",
       "description": "Stan ładowarki dla instalacji {site_id} zwrócił HTTP {status}. Odczyty i sterowanie są niedostępne do czasu otrzymania aktualnego stanu. Następna próba: {next_retry}. Pozostałe punkty końcowe są nadal odpytywane niezależnie."
     },
+    "storm_guard_stuck_profile": {
+      "title": "Profil akumulatora mógł się zablokować po odrzuceniu alertu Storm Guard",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Profil akumulatora mógł się zablokować po odrzuceniu alertu Storm Guard",
+            "description": "Po odrzuceniu alertu Storm Guard Enphase nadal zgłasza tryb pełnego zasilania awaryjnego dla instalacji {site_id}. Akumulatory zgłaszają tryb autokonsumpcji. Ustawienia profilu i rezerwy pozostają niedostępne, dopóki Enphase zgłasza trwające zadanie. W Enlighten zmiana na inny profil i powrót do preferowanego profilu mogą rozwiązać problem.\n\nPonowne sprawdzenie odczytuje oba źródła Enphase. Zapisany profil można zmienić w Enphase.",
+            "menu_options": {
+              "check_again": "Sprawdź ponownie"
+            }
+          },
+          "pending": {
+            "title": "Profil akumulatora mógł się zablokować po odrzuceniu alertu Storm Guard",
+            "description": "Nowe odczyty nadal się różnią. Sprawdź profil systemu w Enlighten lub skontaktuj się z pomocą Enphase, jeśli problem nie ustąpi.",
+            "menu_options": {
+              "check_again": "Sprawdź ponownie"
+            }
+          },
+          "check_failed": {
+            "title": "Profil akumulatora mógł się zablokować po odrzuceniu alertu Storm Guard",
+            "description": "Nie udało się zweryfikować stanu profilu akumulatora. Poczekaj i sprawdź ponownie lub przejrzyj profil systemu w Enlighten.",
+            "menu_options": {
+              "check_again": "Sprawdź ponownie"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "Integracja nie jest załadowana. Załaduj ją i ponownie otwórz tę naprawę."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "Źródła profilu akumulatora są niezgodne",
       "fix_flow": {

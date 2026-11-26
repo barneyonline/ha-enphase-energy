@@ -3,6 +3,7 @@
 import asyncio
 from copy import deepcopy
 from datetime import timedelta
+from http import HTTPStatus
 import inspect
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -11,13 +12,17 @@ from aiohttp import ClientResponseError, RequestInfo
 import pytest
 from freezegun import freeze_time
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import callback
+from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import (
     async_create_clientsession,
     async_get_clientsession,
 )
+from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant.common import async_fire_time_changed
 from yarl import URL
@@ -25,18 +30,24 @@ from yarl import URL
 from custom_components.enphase_ev.api import EnphaseEVClient
 from custom_components.enphase_ev.api_client import evse_surface
 from custom_components.enphase_ev.const import (
+    CONF_EAUTH,
     CONF_SELECTED_TYPE_KEYS,
     CONF_SERIALS,
     CONF_SITE_ONLY,
+    DOMAIN,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_WEATHER_ENABLED,
 )
+from custom_components.enphase_ev.diagnostics import async_get_config_entry_diagnostics
 from .random_ids import RANDOM_SERIAL
 
 
 @pytest.fixture
 def freezer():
-    with freeze_time("2026-09-05 01:00:00", real_asyncio=True) as clock:
+    # aiohttp needs a real localtime result with a timezone offset for access logs.
+    with freeze_time(
+        "2026-09-05 01:00:00", real_asyncio=True, ignore=["aiohttp.web_log"]
+    ) as clock:
         yield clock
 
 
@@ -50,6 +61,10 @@ def platform_cloud(monkeypatch, load_fixture, freezer):
     monkeypatch.setattr(
         "custom_components.enphase_ev.coordinator.async_get_clientsession",
         async_get_clientsession,
+    )
+    monkeypatch.setattr(
+        "custom_components.enphase_ev.firmware_catalog.FirmwareCatalogManager.async_get_catalog",
+        AsyncMock(return_value=None),
     )
     responses = {
         "site_bootstrap": {
@@ -643,3 +658,245 @@ async def test_charge_mode_preference_refresh_reaches_both_entities(
     finally:
         assert await hass.config_entries.async_unload(config_entry.entry_id)
         await hass.async_block_till_done()
+
+
+@pytest.mark.session_history_real
+@pytest.mark.parametrize(
+    "outcome",
+    [
+        "recovered",
+        "pending",
+        "rate_limited",
+        "status_failed",
+        "different_live",
+        "stale",
+        "empty_storage",
+        "queued_work",
+        "cooldown",
+    ],
+)
+async def test_storm_guard_stuck_profile_warning_through_repairs(
+    hass,
+    config_entry,
+    platform_cloud,
+    freezer,
+    hass_client,
+    hass_ws_client,
+    hass_owner_user,
+    outcome,
+):
+    """Expose the warning and handle Check again through Home Assistant Repairs."""
+    responses, calls, unexpected = platform_cloud
+    hass.config_entries.async_update_entry(
+        config_entry,
+        data={
+            **config_entry.data,
+            CONF_SELECTED_TYPE_KEYS: ["envoy", "encharge", "iqevse"],
+        },
+    )
+    responses["devices_inventory"]["result"].append(
+        {"type": "encharge", "devices": [{"serial_number": "BAT-A"}]}
+    )
+    responses["battery_site_settings"] = {
+        "data": {"hasEncharge": True, "userDetails": {"isOwner": True}}
+    }
+    responses["battery_status"] = {
+        "storages": [
+            {
+                "serial_number": "BAT-A",
+                "current_charge": 90,
+                "battery_mode": "Self-Consumption",
+                "last_report": dt_util.utcnow().timestamp(),
+            }
+        ]
+    }
+    responses["storm_guard_profile"] = {
+        "data": {
+            "profile": "backup_only",
+            "batteryBackupPercentage": 100,
+            "siteProfileStatus": "PROFILE_SWITCH_PENDING",
+            "systemTask": True,
+            "requestedConfig": {},
+            "requestedConfigMqtt": {},
+        }
+    }
+    advisory_id = "test-private-advisory-id"
+    responses["storm_guard_alert"] = {
+        "stormAlerts": [
+            {
+                "id": advisory_id,
+                "status": "opted-out",
+                "endTime": (dt_util.utcnow() + timedelta(hours=2)).timestamp() * 1000,
+            }
+        ],
+        "criticalAlertActive": False,
+    }
+
+    assert await async_setup_component(hass, "http", {})
+    assert await async_setup_component(hass, "repairs", {})
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await _finish_startup(hass, config_entry)
+    coord = config_entry.runtime_data.coordinator
+    issue_id = f"storm_guard_stuck_profile_{config_entry.entry_id}"
+    registry = ir.async_get(hass)
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
+    for _ in range(7):
+        freezer.tick(timedelta(minutes=5, seconds=1))
+        responses["battery_status"]["storages"][0][
+            "last_report"
+        ] = dt_util.utcnow().timestamp()
+        await coord.async_refresh()
+        await hass.async_block_till_done()
+
+    entities = er.async_get(hass)
+    profile_id = entities.async_get_entity_id(
+        "select", DOMAIN, f"{DOMAIN}_site_{coord.site_id}_system_profile"
+    )
+    reserve_id = entities.async_get_entity_id(
+        "number", DOMAIN, f"{DOMAIN}_site_{coord.site_id}_battery_reserve"
+    )
+    assert hass.states.get(profile_id).state == STATE_UNAVAILABLE
+    assert hass.states.get(reserve_id).state == STATE_UNAVAILABLE
+
+    diagnostics = await async_get_config_entry_diagnostics(hass, config_entry)
+    metrics = diagnostics["coordinator"]["site_metrics"]
+    assert metrics["storm_guard_stuck_profile"] == {
+        "profile_matches": True,
+        "live_self_consumption": True,
+        "fresh_opt_out": True,
+        "repair_reported": True,
+    }
+    assert diagnostics["entry_data"][CONF_EAUTH] == "**REDACTED**"
+    assert advisory_id not in repr(diagnostics)
+
+    refresh_token = await hass.auth.async_create_refresh_token(
+        hass_owner_user, client_id="http://localhost"
+    )
+    access_token = hass.auth.async_create_access_token(refresh_token)
+    client = await hass_ws_client(hass, access_token)
+    try:
+        http_client = await hass_client(access_token)
+        await client.send_json({"id": 1, "type": "repairs/list_issues"})
+        result = await client.receive_json()
+        assert result["success"]
+        issues = result["result"]["issues"]
+        matching = [issue for issue in issues if issue["issue_id"] == issue_id]
+        assert len(matching) == 1
+        (issue,) = matching
+        assert issue["severity"] == "warning"
+        assert issue["is_fixable"] is True
+        assert issue["translation_key"] == "storm_guard_stuck_profile"
+        assert issue["translation_placeholders"] == {"site_id": coord.site_id}
+        assert registry.async_get_issue(DOMAIN, issue_id).config_entry_id == (
+            config_entry.entry_id
+        )
+        assert not any(
+            item["translation_key"] == "battery_profile_mismatch" for item in issues
+        )
+
+        fix_url = "/api/repairs/issues/fix"
+        response = await http_client.post(
+            fix_url, json={"handler": DOMAIN, "issue_id": issue_id}
+        )
+        assert response.status == HTTPStatus.OK
+        flow = await response.json()
+        assert flow["type"] == FlowResultType.MENU
+        assert flow["step_id"] == "init"
+        assert flow["menu_options"] == ["check_again"]
+        assert flow["description_placeholders"] == {"site_id": coord.site_id}
+        check_url = f"{fix_url}/{flow['flow_id']}"
+
+        profile_read = calls["storm_guard_profile"]
+        live_read = calls["battery_status"]
+        profile_read.reset_mock()
+        live_read.reset_mock()
+        calls["storm_guard_alert"].reset_mock()
+
+        rate_limit = ClientResponseError(
+            RequestInfo(
+                URL("https://example.com"), "GET", {}, URL("https://example.com")
+            ),
+            (),
+            status=429,
+            headers={"Retry-After": "180"},
+        )
+        if outcome in {"recovered", "status_failed", "different_live"}:
+            responses["storm_guard_profile"] = {
+                "data": {
+                    "profile": "self-consumption",
+                    "batteryBackupPercentage": 20,
+                    "siteProfileStatus": "READY",
+                    "systemTask": False,
+                }
+            }
+        if outcome == "rate_limited":
+            profile_read.side_effect = rate_limit
+        elif outcome == "status_failed":
+            live_read.side_effect = TimeoutError
+        elif outcome == "different_live":
+            responses["battery_status"]["storages"][0]["battery_mode"] = "Full Backup"
+        elif outcome == "stale":
+            responses["battery_status"]["storages"][0]["last_report"] = (
+                dt_util.utcnow() - timedelta(minutes=11)
+            ).timestamp()
+        elif outcome == "empty_storage":
+            responses["battery_status"] = {"storages": []}
+        elif outcome == "queued_work":
+            responses["storm_guard_profile"]["data"]["requestedConfigMqtt"] = {
+                "pendingGateways": ["test-gateway"]
+            }
+        elif outcome == "cooldown":
+            coord.note_endpoint_family_failure("storm_guard", rate_limit)
+
+        response = await http_client.post(
+            check_url, json={"next_step_id": "check_again"}
+        )
+        assert response.status == HTTPStatus.OK
+        flow = await response.json()
+        await hass.async_block_till_done()
+        if outcome == "recovered":
+            assert flow["type"] == FlowResultType.CREATE_ENTRY
+            assert hass.states.get(profile_id).state == "Self-Consumption"
+            assert float(hass.states.get(reserve_id).state) == 20
+        else:
+            assert flow["type"] == FlowResultType.MENU
+            assert flow["step_id"] == (
+                "pending" if outcome == "pending" else "check_failed"
+            )
+            assert flow["menu_options"] == ["check_again"]
+            assert coord.battery_system_task is True
+            assert hass.states.get(profile_id).state == STATE_UNAVAILABLE
+            assert hass.states.get(reserve_id).state == STATE_UNAVAILABLE
+            response = await http_client.get(check_url)
+            assert response.status == HTTPStatus.OK
+            assert await response.json() == flow
+        assert profile_read.await_count == (0 if outcome == "cooldown" else 1)
+        assert live_read.await_count == (
+            0 if outcome in {"cooldown", "rate_limited"} else 1
+        )
+        calls["storm_guard_alert"].assert_not_awaited()
+
+        if outcome == "rate_limited":
+            profile_read.reset_mock()
+            response = await http_client.post(
+                check_url, json={"next_step_id": "check_again"}
+            )
+            assert response.status == HTTPStatus.OK
+            flow = await response.json()
+            assert flow["step_id"] == "check_failed"
+            profile_read.assert_not_awaited()
+
+        if outcome == "status_failed":
+            coord.sync_battery_profile_pending_issue()
+        await client.send_json({"id": 2, "type": "repairs/list_issues"})
+        result = await client.receive_json()
+        assert result["success"]
+        assert any(
+            item["issue_id"] == issue_id for item in result["result"]["issues"]
+        ) is (outcome != "recovered")
+        calls["set_battery_profile"].assert_not_awaited()
+        calls["set_battery_settings"].assert_not_awaited()
+        assert unexpected == [], ", ".join(unexpected)
+    finally:
+        await client.close()
+        await hass.config_entries.async_unload(config_entry.entry_id)

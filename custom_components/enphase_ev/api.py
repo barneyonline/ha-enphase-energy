@@ -1067,6 +1067,11 @@ class EnphaseEVClient(MqttStreamSurface):
 
         return api_battery_surface._battery_config_payload_data(payload)
 
+    def remember_battery_profile_write_context(self, payload: object) -> None:
+        """Cache the capability and merge base of an accepted Profile read."""
+        self._remember_battery_config_capabilities(payload)
+        self._remember_battery_config_write_base("profile", payload)
+
     def _remember_battery_config_write_base(
         self, endpoint_family: str, payload: object
     ) -> None:
@@ -1752,10 +1757,14 @@ class EnphaseEVClient(MqttStreamSurface):
             self, alert_id=alert_id, name=name
         )
 
-    async def storm_guard_profile(self, *, locale: str | None = None) -> JsonDict:
+    async def storm_guard_profile(
+        self, *, locale: str | None = None, remember_write_context: bool = True
+    ) -> JsonDict:
         "Return Storm Guard state and EVSE settings for the site."
 
-        return await api_battery_surface.storm_guard_profile(self, locale=locale)
+        return await api_battery_surface.storm_guard_profile(
+            self, locale=locale, remember_write_context=remember_write_context
+        )
 
     async def battery_site_settings(self) -> JsonDict:
         "Return BatteryConfig site settings and feature flags."
@@ -1881,10 +1890,14 @@ class EnphaseEVClient(MqttStreamSurface):
             profile_id=profile_id,
         )
 
-    async def battery_profile_details(self, *, locale: str | None = None) -> JsonDict:
+    async def battery_profile_details(
+        self, *, locale: str | None = None, remember_write_context: bool = True
+    ) -> JsonDict:
         "Return BatteryConfig profile details for system + EVSE settings."
 
-        return await api_battery_surface.battery_profile_details(self, locale=locale)
+        return await api_battery_surface.battery_profile_details(
+            self, locale=locale, remember_write_context=remember_write_context
+        )
 
     async def battery_settings_details(self) -> JsonDict:
         "Return BatteryConfig battery details for charge-grid and shutdown controls."

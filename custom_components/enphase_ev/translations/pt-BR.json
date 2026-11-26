@@ -2913,6 +2913,37 @@
       "title": "Status do carregador indisponível",
       "description": "O status do carregador da instalação {site_id} retornou HTTP {status}. As leituras e os controles ficam indisponíveis até receber um status atualizado. Próxima tentativa: {next_retry}. Os outros endpoints continuam sendo consultados de forma independente."
     },
+    "storm_guard_stuck_profile": {
+      "title": "O perfil da bateria parece travado após recusar um alerta do Storm Guard",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "O perfil da bateria parece travado após recusar um alerta do Storm Guard",
+            "description": "Após a recusa de um alerta do Storm Guard, a Enphase ainda informa o modo de backup completo na instalação {site_id}. As baterias informam o modo de autoconsumo. Os controles de perfil e reserva ficam indisponíveis enquanto a Enphase indicar uma tarefa em andamento. No Enlighten, mudar para outro perfil e depois retornar ao perfil de sua preferência pode resolver o problema.\n\nUma nova verificação consulta as duas fontes da Enphase. Qualquer alteração no perfil salvo deve ser feita na Enphase.",
+            "menu_options": {
+              "check_again": "Verificar novamente"
+            }
+          },
+          "pending": {
+            "title": "O perfil da bateria parece travado após recusar um alerta do Storm Guard",
+            "description": "As leituras atualizadas ainda divergem. Verifique o perfil do sistema no Enlighten ou contate o suporte da Enphase se o problema persistir.",
+            "menu_options": {
+              "check_again": "Verificar novamente"
+            }
+          },
+          "check_failed": {
+            "title": "O perfil da bateria parece travado após recusar um alerta do Storm Guard",
+            "description": "Não foi possível verificar o estado do perfil da bateria. Aguarde e verifique novamente ou consulte o perfil do sistema no Enlighten.",
+            "menu_options": {
+              "check_again": "Verificar novamente"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "A integração não está carregada. Carregue-a e reabra este reparo."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "As fontes do perfil da bateria divergem",
       "fix_flow": {

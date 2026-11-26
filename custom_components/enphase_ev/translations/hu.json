@@ -2913,6 +2913,37 @@
       "title": "A töltő állapota nem érhető el",
       "description": "A(z) {site_id} helyszín töltőállapota HTTP {status} választ adott. A töltő adatai és vezérlése nem érhetők el a friss állapot visszatéréséig. Következő próbálkozás: {next_retry}. A többi végpont lekérdezése egymástól függetlenül folytatódik."
     },
+    "storm_guard_stuck_profile": {
+      "title": "Úgy tűnik, az akkumulátorprofil beragadt egy Storm Guard-riasztás elutasítása után",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Úgy tűnik, az akkumulátorprofil beragadt egy Storm Guard-riasztás elutasítása után",
+            "description": "A Storm Guard-riasztás elutasítása után az Enphase a(z) {site_id} helyszínen továbbra is teljes tartalék üzemmódot jelez. Az akkumulátorok önfogyasztási üzemmódot jeleznek. A profil és a tartalék nem állítható, amíg az Enphase folyamatban lévő feladatot jelez. Segíthet, ha az Enlighten felületén másik profilra vált, majd visszaállítja a kívánt profilt.\n\nAz újbóli ellenőrzés mindkét Enphase-forrást lekérdezi. A mentett profil az Enphase felületén módosítható.",
+            "menu_options": {
+              "check_again": "Újraellenőrzés"
+            }
+          },
+          "pending": {
+            "title": "Úgy tűnik, az akkumulátorprofil beragadt egy Storm Guard-riasztás elutasítása után",
+            "description": "A friss adatok továbbra is eltérnek. Ellenőrizze a rendszerprofilt az Enlighten felületén, vagy forduljon az Enphase ügyfélszolgálatához, ha a probléma fennmarad.",
+            "menu_options": {
+              "check_again": "Újraellenőrzés"
+            }
+          },
+          "check_failed": {
+            "title": "Úgy tűnik, az akkumulátorprofil beragadt egy Storm Guard-riasztás elutasítása után",
+            "description": "Nem sikerült ellenőrizni az akkumulátorprofil állapotát. Várjon és ellenőrizze újra, vagy nézze meg a rendszerprofilt az Enlighten felületén.",
+            "menu_options": {
+              "check_again": "Újraellenőrzés"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "Az integráció nincs betöltve. Töltse be, és nyissa meg újra ezt a javítást."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "Az akkumulátorprofil forrásai eltérnek",
       "fix_flow": {

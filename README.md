@@ -156,6 +156,7 @@ See the [Wiki](https://github.com/barneyonline/ha-enphase-energy/wiki) for insta
 - Gateway and charger firmware information with release-note links
 - Editable tariffs, optional installer Grid Profile controls, and OTP-confirmed Grid Mode changes
 - Storm Alert controls and guided battery profile recovery through Repairs
+- If a battery profile appears stuck after opting out of Storm Guard, open the warning in **Settings → System → Repairs** and choose **Check again** to refresh the profile and battery status from Enphase.
 - System events, alarms, and calendars, plus optional VPP/ELRP monitoring
 - Optional site weather from Enphase
 - Cloud recovery, health diagnostics, and automation actions

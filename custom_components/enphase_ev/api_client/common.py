@@ -178,6 +178,12 @@ _enlighten_read_limiter_bypass: ContextVar[bool] = ContextVar(
 _enlighten_read_is_current: ContextVar[Callable[[], bool] | None] = ContextVar(
     "enphase_ev_enlighten_read_is_current", default=None
 )
+_enlighten_read_can_dispatch: ContextVar[Callable[[], bool] | None] = ContextVar(
+    "enphase_ev_enlighten_read_can_dispatch", default=None
+)
+_enlighten_read_allows_reauth: ContextVar[bool] = ContextVar(
+    "enphase_ev_enlighten_read_allows_reauth", default=True
+)
 
 
 JsonDict = dict[str, Any]
@@ -773,13 +779,22 @@ def enlighten_optional_read_scope() -> Iterator[None]:
 @contextmanager
 def guarded_read_scope(
     is_current: Callable[[], bool] | None,
+    *,
+    can_dispatch: Callable[[], bool] | None = None,
+    allow_reauth: bool = True,
 ) -> Iterator[None]:
-    """Give the transport access to the read's validity check."""
+    """Set the read's validity, admission, and authentication policy."""
 
     token = _enlighten_read_is_current.set(is_current)
+    admission_token = _enlighten_read_can_dispatch.set(can_dispatch)
+    reauth_token = _enlighten_read_allows_reauth.set(
+        allow_reauth and _enlighten_read_allows_reauth.get()
+    )
     try:
         yield
     finally:
+        _enlighten_read_allows_reauth.reset(reauth_token)
+        _enlighten_read_can_dispatch.reset(admission_token)
         _enlighten_read_is_current.reset(token)
 
 
@@ -803,7 +818,16 @@ def runtime_read_scope(is_active: Callable[[], bool]) -> Iterator[None]:
 def has_guarded_read_scope() -> bool:
     """Report whether this request has an acquisition validity check."""
 
-    return _enlighten_read_is_current.get() is not None
+    return (
+        _enlighten_read_is_current.get() is not None
+        or _enlighten_read_can_dispatch.get() is not None
+    )
+
+
+def guarded_read_allows_reauth() -> bool:
+    """Return whether this read can start a credential refresh."""
+
+    return _enlighten_read_allows_reauth.get()
 
 
 def check_enlighten_read_current() -> None:
@@ -814,12 +838,21 @@ def check_enlighten_read_current() -> None:
         raise EnlightenReadSuperseded
 
 
+def check_enlighten_read_admission() -> None:
+    """Enforce dispatch limits without ignoring an already sent read's response."""
+
+    check_enlighten_read_current()
+    can_dispatch = _enlighten_read_can_dispatch.get()
+    if can_dispatch is not None and not can_dispatch():
+        raise EnlightenReadSuperseded
+
+
 async def _check_guarded_read_headers(
     _session: aiohttp.ClientSession,
     _context: SimpleNamespace,
     _params: aiohttp.TraceRequestHeadersSentParams,
 ) -> None:
-    check_enlighten_read_current()
+    check_enlighten_read_admission()
 
 
 def guarded_read_trace() -> aiohttp.TraceConfig:

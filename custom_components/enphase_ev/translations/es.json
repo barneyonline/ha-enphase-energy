@@ -2913,6 +2913,37 @@
       "title": "Estado del cargador no disponible",
       "description": "El estado del cargador del sitio {site_id} devolvió HTTP {status}. Las lecturas y los controles no están disponibles hasta recibir un estado actualizado. Próximo intento: {next_retry}. Los demás puntos de conexión se siguen consultando de forma independiente."
     },
+    "storm_guard_stuck_profile": {
+      "title": "El perfil de la batería parece bloqueado tras rechazar una alerta de Storm Guard",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "El perfil de la batería parece bloqueado tras rechazar una alerta de Storm Guard",
+            "description": "Tras rechazar una alerta de Storm Guard, Enphase sigue mostrando el modo de respaldo completo en la instalación {site_id}. Las baterías indican autoconsumo. Los controles del perfil y de la reserva siguen sin estar disponibles mientras Enphase indique que hay una tarea en curso. Cambiar a otro perfil en Enlighten y volver al perfil preferido puede resolver el problema.\n\nLa nueva comprobación consulta ambas fuentes de Enphase. Cualquier cambio del perfil guardado se realiza en Enphase.",
+            "menu_options": {
+              "check_again": "Comprobar de nuevo"
+            }
+          },
+          "pending": {
+            "title": "El perfil de la batería parece bloqueado tras rechazar una alerta de Storm Guard",
+            "description": "Las lecturas recientes siguen mostrando la discrepancia. Revisa el perfil del sistema en Enlighten o contacta con el soporte de Enphase si persiste.",
+            "menu_options": {
+              "check_again": "Comprobar de nuevo"
+            }
+          },
+          "check_failed": {
+            "title": "El perfil de la batería parece bloqueado tras rechazar una alerta de Storm Guard",
+            "description": "No se pudo verificar el estado del perfil de la batería. Espera y vuelve a comprobar, o revisa el perfil del sistema en Enlighten.",
+            "menu_options": {
+              "check_again": "Comprobar de nuevo"
+            }
+          }
+        },
+        "abort": {
+          "entry_unavailable": "La integración no está cargada. Cárgala y vuelve a abrir esta reparación."
+        }
+      }
+    },
     "battery_profile_mismatch": {
       "title": "Las fuentes del perfil de batería no coinciden",
       "fix_flow": {

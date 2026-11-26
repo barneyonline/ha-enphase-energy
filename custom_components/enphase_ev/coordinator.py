@@ -1686,6 +1686,19 @@ class EnphaseCoordinator(
 
         return self._endpoint_family_should_run(family, force=force)
 
+    def endpoint_family_can_refresh_readback(self, family: str) -> bool:
+        """Allow a fresh read outside cache TTLs while enforcing cooldowns."""
+        if (
+            not self.runtime_active
+            or self._auth_block_active()
+            or (self._backoff_until and time.monotonic() < self._backoff_until)
+        ):
+            return False
+        health = self._endpoint_family_state(family)
+        return not health.cooldown_active or not self._endpoint_family_wait_active(
+            family
+        )
+
     def note_endpoint_family_success(
         self, family: str, *, success_ttl_s: float | None = None
     ) -> None:

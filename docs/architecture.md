@@ -389,7 +389,26 @@ Runtime managers keep endpoint-family behavior out of the main coordinator:
   context again after permission I/O and acquiring the profile write lock.
   Every storage record must supply a mode for recovery, and retries cannot
   overlap pending Storm Alert commands. Opt-in rejects an in-flight profile write.
-  The monitor adds no polling or automatic writes; unload removes its Repair.
+  The monitor adds no polling or automatic writes. Guided recovery pauses
+  while BatteryConfig reports a system task. Existing issues retain their
+  dismissal until fresh evidence resolves the disagreement.
+  A separate, informational Storm Guard Repair uses the existing polls. It
+  requires 30 minutes of fresh reads showing a current opted-out advisory
+  with no active alerts, a busy Full Backup profile with empty request records,
+  and Self-Consumption on all reported batteries. All three reads and each
+  battery's last report must be at most ten minutes old. Empty alerts, expired
+  advisories, missing timestamps, unavailable sources and queued work break the
+  observation window. A reload restarts the dwell. A previously raised warning
+  clears after fresh responses agree on the profile and BatteryConfig explicitly
+  reports that the system task has ended. Replayed or conflicting telemetry for
+  a known battery cannot confirm recovery.
+  **Check again** in Repairs reads the profile and live battery status once
+  outside their cache TTLs. It shares endpoint ordering with normal polling and
+  respects active cooldowns. Authentication recovery stays with normal polling.
+  Inconclusive or failed checks keep the warning,
+  including when a Battery Settings read is still in flight. The check applies
+  a reported idle task state and refreshes the Profile write context together
+  after the paired reads agree and the Profile response is still current.
 - `evse_runtime.py` handles charger commands, fast polling, streaming, charge-mode cache, auth settings, and EVSE control side effects.
   Scheduler preference reads retain each charger's visible Smart/Green choices
   separately from its enabled mode. Charge Mode selects use those choices during
