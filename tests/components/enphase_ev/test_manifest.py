@@ -1,9 +1,10 @@
-from importlib.metadata import requires
+from importlib.metadata import requires, version
 import json
 import pathlib
 
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
+import pytest
 import yaml
 
 MIN_HOME_ASSISTANT_VERSION = "2026.11.0"
@@ -73,26 +74,10 @@ def test_development_requirements_cover_minimum_homeassistant_version():
         for line in requirements_dev.splitlines()
         if line.startswith("homeassistant==")
     )
-    # The single runtime lane must exercise the exact advertised minimum.
+    # The pinned runtime must exercise the exact advertised minimum.
     assert current_pin == MIN_HOME_ASSISTANT_VERSION
     assert f"pytest-homeassistant=={current_pin}" in requirements_dev.splitlines()
     assert "-c constraints-dev.txt" in requirements_dev
-    constraints = (root / "devtools/docker/constraints-dev.txt").read_text()
-    local_constraints = {
-        canonicalize_name(Requirement(line).name)
-        for line in constraints.splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
-    }
-    upstream_pins = {
-        canonicalize_name(Requirement(declaration).name)
-        for owner in ("homeassistant", "pytest-homeassistant")
-        for declaration in requires(owner) or []
-        if any(
-            spec.operator in ("==", "===")
-            for spec in Requirement(declaration).specifier
-        )
-    }
-    assert local_constraints.isdisjoint(upstream_pins)
     workflow = yaml.safe_load((root / ".github/workflows/tests.yml").read_text())
     for job_name in ("pytest", "python314-diagnostics"):
         install_step = next(
@@ -102,6 +87,30 @@ def test_development_requirements_cover_minimum_homeassistant_version():
         )
         assert "-r devtools/docker/requirements-dev.txt" in install_step["run"]
         assert f"== '{current_pin}'" in install_step["run"]
+
+
+def test_development_constraints_leave_minimum_runtime_dependency_pins_to_upstream():
+    owners = ("homeassistant", "pytest-homeassistant")
+    if any(version(owner) != MIN_HOME_ASSISTANT_VERSION for owner in owners):
+        pytest.skip("Checks dependency ownership for the pinned development runtime")
+
+    root = pathlib.Path(__file__).resolve().parents[3]
+    constraints = (root / "devtools/docker/constraints-dev.txt").read_text()
+    local_constraints = {
+        canonicalize_name(Requirement(line).name)
+        for line in constraints.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    upstream_pins = {
+        canonicalize_name(Requirement(declaration).name)
+        for owner in owners
+        for declaration in requires(owner) or []
+        if any(
+            spec.operator in ("==", "===")
+            for spec in Requirement(declaration).specifier
+        )
+    }
+    assert local_constraints.isdisjoint(upstream_pins)
 
 
 def test_hacs_validator_uses_supported_homeassistant_version():

@@ -68,7 +68,7 @@ async def mismatch_repair(hass, config_entry, monkeypatch):
 
 async def start_repair(coord, manager):
     return await manager.async_init(
-        DOMAIN, data={"issue_id": coord.battery_runtime.profile_mismatch.issue_id}
+        DOMAIN, context={"issue_id": coord.battery_runtime.profile_mismatch.issue_id}
     )
 
 

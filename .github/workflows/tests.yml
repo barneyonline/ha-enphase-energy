@@ -5,6 +5,11 @@ on:
   push:
     branches: [main, "release/**"]
   workflow_dispatch:
+    inputs:
+      compatibility_core_version:
+        description: Exact Home Assistant version for the compatibility job (blank uses latest stable)
+        required: false
+        type: string
   workflow_call:
 
 permissions:
@@ -282,6 +287,67 @@ jobs:
         if: ${{ steps.pytest.outcome == 'failure' || steps.targeted_coverage.outcome == 'failure' }}
         run: exit 1
 
+  pytest-compatibility:
+    name: pytest (current Home Assistant)
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.integration == 'true' }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+      - name: Install Home Assistant and matching test plugin
+        env:
+          COMPATIBILITY_CORE_VERSION: ${{ inputs.compatibility_core_version }}
+        shell: bash
+        run: |
+          core_version="$COMPATIBILITY_CORE_VERSION"
+          if [ -z "$core_version" ]; then
+            # Select Core first so a missing test plugin cannot downgrade it.
+            core_pin=$(uv pip compile --no-deps --no-header --no-annotate \
+              --prerelease disallow - <<< homeassistant)
+            core_version="${core_pin#homeassistant==}"
+          fi
+          uv pip install --system --upgrade --prerelease explicit \
+            "homeassistant==${core_version}" "pytest-homeassistant==${core_version}"
+          CORE_VERSION="$core_version" python - <<'PY'
+          import os
+          from importlib.metadata import version
+
+          from homeassistant.const import __version__
+          from packaging.version import Version
+
+          core = Version(__version__)
+          plugin = Version(version('pytest-homeassistant'))
+          expected = Version(os.environ['CORE_VERSION'])
+          if core != plugin:
+              raise SystemExit(f'Home Assistant {core} and test plugin {plugin} differ')
+          if core != expected:
+              raise SystemExit(f'Expected Home Assistant {expected}, got {core}')
+          if not os.environ['COMPATIBILITY_CORE_VERSION'] and core.is_prerelease:
+              raise SystemExit(f'Expected a stable Home Assistant release, got {core}')
+          print(f'Home Assistant and test plugin {core}')
+          PY
+      - name: Run compatibility tests
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTEST_PLUGINS: pytest_asyncio.plugin,pytest_socket,pytest_homeassistant.bootstrap
+        run: pytest -q tests/components/enphase_ev --log-file=pytest-compatibility-warnings.log --log-file-level=WARNING
+      - name: Upload compatibility warning log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: pytest-compatibility-warnings-${{ github.run_attempt }}
+          path: pytest-compatibility-warnings.log
+          if-no-files-found: ignore
+
   script-tests:
     runs-on: ubuntu-latest
     needs: changes
@@ -321,7 +387,7 @@ jobs:
   repository-checks:
     name: Repository checks
     if: ${{ always() }}
-    needs: [changes, pre-commit, quality-scale, python314-diagnostics, pytest, script-tests]
+    needs: [changes, pre-commit, quality-scale, python314-diagnostics, pytest, pytest-compatibility, script-tests]
     runs-on: ubuntu-26.04
     permissions: {}
     steps:

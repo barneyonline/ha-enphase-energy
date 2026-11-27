@@ -34,6 +34,7 @@ def test_slow_jobs_use_path_classification_instead_of_precommit_gate() -> None:
     assert "translation-regressions" not in jobs
     for name in (
         "pytest",
+        "pytest-compatibility",
         "python314-diagnostics",
         "quality-scale",
         "script-tests",
@@ -41,6 +42,118 @@ def test_slow_jobs_use_path_classification_instead_of_precommit_gate() -> None:
         job = jobs[name]
         assert job["needs"] == "changes"
         assert job["if"].startswith("${{ needs.changes.outputs.")
+    assert jobs["pytest-compatibility"]["if"] == jobs["pytest"]["if"]
+
+
+@pytest.mark.parametrize(
+    ("requested", "latest", "installed", "expected_status", "expected_error"),
+    [
+        pytest.param("", "2026.11.3", ("2026.11.3", "2026.11.3"), 0, "", id="stable"),
+        pytest.param(
+            "2026.12.0b2",
+            "2026.11.3",
+            ("2026.12.0b2", "2026.12.0b2"),
+            0,
+            "",
+            id="requested-beta",
+        ),
+        pytest.param("", "2026.11.3", None, 42, "", id="missing-plugin"),
+        pytest.param(
+            "",
+            "2026.11.3",
+            ("2026.11.3", "2026.11.2"),
+            1,
+            "Home Assistant 2026.11.3 and test plugin 2026.11.2 differ",
+            id="mismatched-pair",
+        ),
+        pytest.param(
+            "2026.12.0b2",
+            "2026.11.3",
+            ("2026.11.3", "2026.11.3"),
+            1,
+            "Expected Home Assistant 2026.12.0b2, got 2026.11.3",
+            id="wrong-release",
+        ),
+        pytest.param(
+            "",
+            "2026.12.0b2",
+            ("2026.12.0b2", "2026.12.0b2"),
+            1,
+            "Expected a stable Home Assistant release, got 2026.12.0b2",
+            id="unexpected-beta",
+        ),
+    ],
+)
+def test_compatibility_job_validates_the_exact_core_and_test_plugin(
+    tmp_path, requested, latest, installed, expected_status, expected_error
+):
+    step = next(
+        step
+        for step in _jobs()["pytest-compatibility"]["steps"]
+        if step.get("name") == "Install Home Assistant and matching test plugin"
+    )
+    assert step["env"]["COMPATIBILITY_CORE_VERSION"] == (
+        "${{ inputs.compatibility_core_version }}"
+    )
+    command_log = tmp_path / "uv-commands"
+    if installed:
+        core_version, plugin_version = installed
+        core = tmp_path / "homeassistant"
+        core.mkdir()
+        (core / "__init__.py").touch()
+        (core / "const.py").write_text(f"__version__ = {core_version!r}\n")
+        plugin = tmp_path / f"pytest_homeassistant-{plugin_version}.dist-info"
+        plugin.mkdir()
+        (plugin / "METADATA").write_text(
+            f"Name: pytest-homeassistant\nVersion: {plugin_version}\n"
+        )
+
+    uv = tmp_path / "uv"
+    uv.write_text("""#!/usr/bin/env bash
+set -eu
+printf '%s\\n' "$*" >> "$UV_COMMAND_LOG"
+case "$2" in
+  compile)
+    read -r package
+    test "$package" = homeassistant
+    printf 'homeassistant==%s\\n' "$UV_TEST_LATEST"
+    ;;
+  install) exit "$UV_TEST_INSTALL_STATUS" ;;
+  *) exit 1 ;;
+esac
+""")
+    uv.chmod(0o755)
+    result = subprocess.run(
+        ["bash", "-e", "-o", "pipefail", "-c", step["run"]],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "PATH": os.pathsep.join((str(tmp_path), os.environ["PATH"])),
+            "UV_COMMAND_LOG": str(command_log),
+            "UV_TEST_LATEST": latest,
+            "UV_TEST_INSTALL_STATUS": "0" if installed else "42",
+            "COMPATIBILITY_CORE_VERSION": requested,
+        },
+        capture_output=True,
+        text=True,
+    )
+
+    commands = command_log.read_text().splitlines()
+    selection = (
+        []
+        if requested
+        else ["pip compile --no-deps --no-header --no-annotate --prerelease disallow -"]
+    )
+    expected = requested or latest
+    assert commands == selection + [
+        f"pip install --system --upgrade --prerelease explicit "
+        f"homeassistant=={expected} pytest-homeassistant=={expected}"
+    ]
+    assert result.returncode == expected_status, result.stderr
+    if expected_error:
+        assert expected_error in result.stderr
+    if expected_status == 0:
+        assert f"Home Assistant and test plugin {expected}" in result.stdout
 
 
 def test_path_classification_exposes_both_sides_of_renames() -> None:

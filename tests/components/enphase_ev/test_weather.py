@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import contextmanager
+import logging
 from collections.abc import Coroutine
+from contextlib import contextmanager
+from datetime import timedelta
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -13,12 +15,14 @@ import aiohttp
 import pytest
 from homeassistant.const import UnitOfTemperature
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.entity_platform import EntityPlatform
 from homeassistant.helpers.update_coordinator import UpdateFailed
+from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
 
-from custom_components.enphase_ev.const import OPT_WEATHER_ENABLED
-from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
-from custom_components.enphase_ev import weather as weather_module
 from custom_components.enphase_ev import cloud_retry
+from custom_components.enphase_ev import weather as weather_module
+from custom_components.enphase_ev.const import DOMAIN, OPT_WEATHER_ENABLED
+from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from custom_components.enphase_ev.weather import (
     EnphaseSiteWeather,
     EnphaseWeatherCoordinator,
@@ -224,8 +228,23 @@ async def test_setup_skips_weather_when_option_disabled(hass, config_entry) -> N
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("track_background", [False, True])
+@pytest.mark.parametrize(
+    ("units", "published_temp", "published_unit"),
+    [
+        pytest.param(METRIC_SYSTEM, 8, UnitOfTemperature.CELSIUS, id="metric"),
+        pytest.param(
+            US_CUSTOMARY_SYSTEM, 46, UnitOfTemperature.FAHRENHEIT, id="us-customary"
+        ),
+    ],
+)
 async def test_setup_schedules_discovery_and_creates_cloud_weather_after_success(
-    hass, config_entry, monkeypatch, track_background
+    hass,
+    config_entry,
+    monkeypatch,
+    track_background,
+    units,
+    published_temp,
+    published_unit,
 ) -> None:
     client = SimpleNamespace(weather=AsyncMock(return_value=_payload()))
     coordinator = SimpleNamespace(
@@ -236,6 +255,7 @@ async def test_setup_schedules_discovery_and_creates_cloud_weather_after_success
     object.__setattr__(config_entry, "options", {OPT_WEATHER_ENABLED: True})
     config_entry.runtime_data = EnphaseRuntimeData(coordinator=coordinator)
     hass.config.language = "en-AU"
+    hass.config.units = units
     added: list[EnphaseSiteWeather] = []
     scheduled: list[tuple[Coroutine[Any, Any, None], str]] = []
 
@@ -272,10 +292,25 @@ async def test_setup_schedules_discovery_and_creates_cloud_weather_after_success
     assert entity.condition == "cloudy"
     assert entity.native_temperature == 8
     assert entity.native_temperature_unit == UnitOfTemperature.CELSIUS
-    entity.hass = hass
-    state_attributes = entity.state_attributes
-    assert state_attributes["temperature"] == 8
-    assert state_attributes["temperature_unit"] == UnitOfTemperature.CELSIUS
+    platform = EntityPlatform(
+        hass=hass,
+        logger=logging.getLogger(__name__),
+        domain="weather",
+        platform_name=DOMAIN,
+        platform=None,
+        scan_interval=timedelta(seconds=30),
+        entity_namespace=None,
+    )
+    platform.config_entry = config_entry
+    await platform.async_add_entities([entity])
+    state = hass.states.get(entity.entity_id)
+    await platform.async_reset()
+
+    assert state is not None
+    assert state.state == "cloudy"
+    state_attributes = state.attributes
+    assert state_attributes["temperature"] == published_temp
+    assert state_attributes["temperature_unit"] == published_unit
     assert "temperature_min" not in state_attributes
     assert "temperature_max" not in state_attributes
     assert "enphase_condition" not in state_attributes

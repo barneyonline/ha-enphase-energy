@@ -56,7 +56,7 @@ async def profile_repair(hass, config_entry):
 
 
 async def start(manager, issue_id):
-    return await manager.async_init(DOMAIN, data={"issue_id": issue_id})
+    return await manager.async_init(DOMAIN, context={"issue_id": issue_id})
 
 
 async def test_overdue_issue_has_scoped_fixable_diagnostic_context(
