@@ -172,6 +172,13 @@ still trigger the full suite. Pushes to main, release branches, and manual runs
 retain all test jobs. The `Repository checks` check reports the result of every
 applicable job, including changes that skip the expensive suites.
 
+For changes that run integration tests, CI also runs the suite against the latest
+stable Home Assistant release available for Python 3.14. This job requires the
+`pytest-homeassistant` package for that exact release. The pinned minimum-version
+job produces the coverage reports. To test a specific release or beta, manually
+run **Tests** with `compatibility_core_version` set to the exact version, such as
+`2026.12.0b2`. The minimum-version job also runs on manual dispatch.
+
 The HACS validator copies Python source from a pinned AMD64-only upstream image
 onto the pinned Home Assistant runtime. `HACS_SOURCE_PLATFORM` selects that source
 stage; the final image retains Docker's requested target platform. Keep both image
