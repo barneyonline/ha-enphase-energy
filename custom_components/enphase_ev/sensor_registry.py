@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from typing import Any, cast
 
+from homeassistant.helpers.entity_registry import RegistryEntryDisabler
+
 from .const import DOMAIN
 from .device_types import is_dry_contact_type_key
 from .runtime_helpers import coerce_optional_text as _clean_text
@@ -137,6 +139,27 @@ class EnphaseSensorRegistrySetup:
         router_prefix = "gateway_iq_energy_router_"
         if key.startswith(router_prefix):
             self.known_gateway_iq_router_keys.discard(key[len(router_prefix) :])
+
+    def sync_site_sensor_option(self, keys: Iterable[str], *, enabled: bool) -> bool:
+        """Apply a feature toggle and return whether any of its sensors exist."""
+        known = False
+        get_entity = getattr(self._ent_reg, "async_get", None)
+        if not callable(get_entity):
+            return known
+        for key in keys:
+            entity_id = self._async_get_sensor_entity_id(
+                self.site_sensor_unique_id(key)
+            )
+            if entity_id is None or (entry := get_entity(entity_id)) is None:
+                continue
+            known = True
+            if not enabled and entry.disabled_by is None:
+                self._ent_reg.async_update_entity(
+                    entity_id, disabled_by=RegistryEntryDisabler.INTEGRATION
+                )
+            elif enabled and self._is_disabled_by_integration(entry.disabled_by):
+                self._ent_reg.async_update_entity(entity_id, disabled_by=None)
+        return known
 
     def remove_type_sensor_entity(self, type_key: str) -> None:
         """Remove a type inventory sensor entity by type key."""

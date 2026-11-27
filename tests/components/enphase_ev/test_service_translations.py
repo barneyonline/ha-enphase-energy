@@ -2605,3 +2605,34 @@ def test_descriptive_activity_option_is_localized_in_all_locales() -> None:
                 assert strings[category][key] != source[category][key]
             else:
                 assert strings[category][key] == source[category][key]
+
+
+def test_directional_battery_energy_strings_are_localized() -> None:
+    root = (
+        pathlib.Path(__file__).resolve().parents[3] / "custom_components" / "enphase_ev"
+    )
+    key = "directional_battery_energy_enabled"
+    directions = ("from_grid", "from_solar", "to_home", "to_grid")
+
+    def translated_texts(path):
+        data = json.loads(path.read_text())
+        features = data["options"]["step"]["features"]
+        device_features = features["sections"]["device_features"]
+        sensors = data["entity"]["sensor"]
+        for category in ("data", "data_description"):
+            assert features[category][key] == device_features[category][key]
+            yield device_features[category][key]
+        for direction in directions:
+            sensor = sensors[f"battery_energy_{direction}"]
+            assert (
+                sensor["state_attributes"]
+                == sensors["site_battery_charge"]["state_attributes"]
+            )
+            yield sensor["name"]
+
+    source = tuple(translated_texts(root / "strings.json"))
+    assert source[0] == "Enable Directional Battery Energy"
+    for locale in (root / "translations").glob("*.json"):
+        for actual, english in zip(translated_texts(locale), source, strict=True):
+            assert actual.strip()
+            assert (actual == english) == locale.stem.startswith("en")

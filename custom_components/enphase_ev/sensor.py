@@ -45,11 +45,13 @@ from .entity import evse_safe_limit_active, evse_charging_active
 from .control_updates import current_control_value
 from .labels import battery_profile_label
 from .const import (
+    DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
     DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     DEFAULT_MICROINVERTER_POWER_ENABLED,
     DEFAULT_NOMINAL_VOLTAGE,
     DEFAULT_VPP_EVENTS_ENABLED,
     DOMAIN,
+    OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_MICROINVERTER_POWER_ENABLED,
     OPT_VPP_EVENTS_ENABLED,
@@ -59,6 +61,7 @@ from .const import (
 from .coordinator import EnphaseCoordinator
 from .cloud_errors import cloud_error_code
 from .device_info_helpers import _cloud_device_info
+from .energy import DIRECTIONAL_BATTERY_ENERGY_FIELDS
 from .entity import (
     EnphaseBaseEntity,
     evse_amp_control_applicable,
@@ -215,6 +218,7 @@ from .sensor_site_energy import (
     CURRENT_POWER_CACHE_TTL_MULTIPLIER as CURRENT_POWER_CACHE_TTL_MULTIPLIER,
     EnphaseBatteryPowerSensor as EnphaseBatteryPowerSensor,
     EnphaseCurrentPowerConsumptionSensor as EnphaseCurrentPowerConsumptionSensor,
+    EnphaseDirectionalBatteryEnergySensor,
     EnphaseGridPowerSensor as EnphaseGridPowerSensor,
     EnphaseSiteConsumptionPowerSensor as EnphaseSiteConsumptionPowerSensor,
     EnphaseSiteEnergySensor as EnphaseSiteEnergySensor,
@@ -325,6 +329,15 @@ async def async_setup_entry(
         ent_reg,
         config_entry_id=entry.entry_id,
         site_id=str(coord.site_id),
+    )
+    directional_battery_energy_enabled = bool(
+        entry.options.get(
+            OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+            DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+        )
+    )
+    known_directional_battery_energy = registry_setup.sync_site_sensor_option(
+        DIRECTIONAL_BATTERY_ENERGY_FIELDS, enabled=directional_battery_energy_enabled
     )
     microinverter_lifetime_energy_enabled = bool(
         entry.options.get(
@@ -830,6 +843,14 @@ async def async_setup_entry(
             "battery_charge"
         ) and _site_lifetime_power_channel_present("battery_discharge")
         if site_has_battery and battery_device_available:
+            if directional_battery_energy_enabled and (
+                known_directional_battery_energy
+                or DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys() <= site_energy.keys()
+            ):
+                for flow_key in DIRECTIONAL_BATTERY_ENERGY_FIELDS:
+                    _add_site_entity(
+                        flow_key, EnphaseDirectionalBatteryEnergySensor(coord, flow_key)
+                    )
             if battery_power_supported:
                 _add_site_entity("battery_power", EnphaseBatteryPowerSensor(coord))
             else:

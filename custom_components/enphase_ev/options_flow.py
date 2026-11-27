@@ -34,6 +34,7 @@ from .const import (
     DEFAULT_API_TIMEOUT,
     DEFAULT_DEGRADED_SERVICE_REPAIR_ISSUES,
     DEFAULT_DESCRIPTIVE_ACTIVITY_ENTRIES,
+    DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
     DEFAULT_FAST_POLL_INTERVAL,
     DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
     DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
@@ -56,6 +57,7 @@ from .const import (
     OPT_BATTERY_SCHEDULES_ENABLED,
     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
     OPT_DESCRIPTIVE_ACTIVITY_ENTRIES,
+    OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
     OPT_FAST_POLL_INTERVAL,
     OPT_FAST_WHILE_STREAMING,
     OPT_USE_15_MINUTE_POWER_AVERAGE,
@@ -282,6 +284,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 default=self._entry.options.get(
                     OPT_BATTERY_SCHEDULES_ENABLED,
                     DEFAULT_BATTERY_SCHEDULES_ENABLED,
+                ),
+            ): bool,
+            probatio.Optional(
+                OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+                default=self._entry.options.get(
+                    OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+                    DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
                 ),
             ): bool,
             probatio.Optional(
@@ -1512,6 +1521,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 option_data.pop(field_key, None)
             option_data.pop(OPT_SCHEDULE_SYNC_ENABLED, None)
             option_data.pop(OPT_BATTERY_SCHEDULES_ENABLED, None)
+            option_data.pop(OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED, None)
             option_data.pop(OPT_DEGRADED_SERVICE_REPAIR_ISSUES, None)
             option_data.pop(OPT_SYSTEM_EVENT_REPAIR_ISSUES, None)
             option_data.pop(OPT_DESCRIPTIVE_ACTIVITY_ENTRIES, None)
@@ -1611,6 +1621,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):  # type: ignore[misc]
                 options.get(
                     OPT_BATTERY_SCHEDULES_ENABLED,
                     DEFAULT_BATTERY_SCHEDULES_ENABLED,
+                ),
+            )
+        )
+        options[OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED] = bool(
+            device_data.get(
+                OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+                options.get(
+                    OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+                    DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
                 ),
             )
         )

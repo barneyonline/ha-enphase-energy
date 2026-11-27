@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### ✨ New features
+
+- Add four lifetime battery energy sensors to the IQ Battery device on supported sites. Directional Battery Energy is enabled by default and can be turned off under Features → Device Features.
+
 ### 🐛 Bug fixes
 
 - Honor Enphase session-history cooldowns for queued reads and preserve longer Retry-After deadlines.

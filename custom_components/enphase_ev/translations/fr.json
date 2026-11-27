@@ -785,6 +785,7 @@
             "data": {
               "schedule_sync_enabled": "Activer le planificateur de chargeur EV",
               "battery_schedules_enabled": "Activer le planificateur de batterie",
+              "directional_battery_energy_enabled": "Activer le suivi directionnel de l’énergie de la batterie",
               "system_event_repair_issues": "Activer les notifications de réparation des événements système",
               "pricing_edits_enabled": "Activer la modification des tarifs",
               "weather_enabled": "Activer la météo",
@@ -799,6 +800,7 @@
               "nominal_voltage": "Tension d’alimentation CA habituelle utilisée pour estimer la puissance lorsque la tension en direct est indisponible. Par défaut: Déterminé par la télémétrie du chargeur lorsqu’elle est disponible ; sinon selon la région de Home Assistant, avec une valeur de repli de 230 V.",
               "schedule_sync_enabled": "Gérer les plannings de l’IQ EV Charger. Par défaut: Activé.",
               "battery_schedules_enabled": "Gérer les programmes de l’IQ Battery. Par défaut: Activé.",
+              "directional_battery_energy_enabled": "Affiche pour le tableau de bord Énergie les cumuls du réseau et des panneaux solaires vers la batterie, ainsi que de la batterie vers le logement et le réseau. Activé par défaut.",
               "microinverter_lifetime_energy_enabled": "Active tous les capteurs d’énergie totale par micro-onduleur. Par défaut: Désactivé.",
               "vpp_events_enabled": "Récupère les calendriers VPP/ELRP auprès d’Enphase et crée des entités d’événement uniquement pour les sites inscrits. Désactivé par défaut. Par défaut: Désactivé."
             }
@@ -822,6 +824,7 @@
           "advanced_features": "Fonctionnalités avancées",
           "schedule_sync_enabled": "Activer le planificateur de chargeur EV",
           "battery_schedules_enabled": "Activer le planificateur de batterie",
+          "directional_battery_energy_enabled": "Activer le suivi directionnel de l’énergie de la batterie",
           "system_event_repair_issues": "Activer les notifications de réparation des événements système",
           "pricing_edits_enabled": "Activer la modification des tarifs",
           "weather_enabled": "Activer la météo",
@@ -839,6 +842,7 @@
           "nominal_voltage": "Tension d’alimentation CA habituelle utilisée pour estimer la puissance lorsque la tension en direct est indisponible. Par défaut: Déterminé par la télémétrie du chargeur lorsqu’elle est disponible ; sinon selon la région de Home Assistant, avec une valeur de repli de 230 V.",
           "schedule_sync_enabled": "Gérer les plannings de l’IQ EV Charger. Par défaut: Activé.",
           "battery_schedules_enabled": "Gérer les programmes de l’IQ Battery. Par défaut: Activé.",
+          "directional_battery_energy_enabled": "Affiche pour le tableau de bord Énergie les cumuls du réseau et des panneaux solaires vers la batterie, ainsi que de la batterie vers le logement et le réseau. Activé par défaut.",
           "microinverter_lifetime_energy_enabled": "Active tous les capteurs d’énergie totale par micro-onduleur. Par défaut: Désactivé.",
           "microinverter_power_enabled": "Active tous les capteurs de puissance par micro-onduleur lorsque la télémétrie installateur est disponible. Nécessite un accès installateur. Par défaut: Désactivé.",
           "vpp_events_enabled": "Récupère les calendriers VPP/ELRP auprès d’Enphase et crée des entités d’événement uniquement pour les sites inscrits. Désactivé par défaut. Par défaut: Désactivé.",
@@ -1431,6 +1435,50 @@
       },
       "site_battery_discharge": {
         "name": "Décharge batterie du site",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Mesuré à (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Dernière réinitialisation"
+          }
+        }
+      },
+      "battery_energy_from_grid": {
+        "name": "Énergie du réseau vers la batterie",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Mesuré à (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Dernière réinitialisation"
+          }
+        }
+      },
+      "battery_energy_from_solar": {
+        "name": "Énergie solaire vers la batterie",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Mesuré à (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Dernière réinitialisation"
+          }
+        }
+      },
+      "battery_energy_to_home": {
+        "name": "Énergie de la batterie vers le logement",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Mesuré à (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Dernière réinitialisation"
+          }
+        }
+      },
+      "battery_energy_to_grid": {
+        "name": "Énergie de la batterie vers le réseau",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Mesuré à (UTC)"

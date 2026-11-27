@@ -785,6 +785,7 @@
             "data": {
               "schedule_sync_enabled": "Włącz obsługę harmonogramu",
               "battery_schedules_enabled": "Włącz harmonogram baterii",
+              "directional_battery_energy_enabled": "Włącz pomiar energii akumulatora według kierunku",
               "system_event_repair_issues": "Włącz powiadomienia o naprawach zdarzeń systemowych",
               "pricing_edits_enabled": "Włącz edycję cen",
               "weather_enabled": "Włącz pogodę",
@@ -799,6 +800,7 @@
               "nominal_voltage": "Typowe napięcie zasilania AC używane do szacowania mocy, gdy napięcie bieżące jest niedostępne. Domyślnie: Na podstawie telemetrii ładowarki, jeśli jest dostępna; w przeciwnym razie według regionu Home Assistant, z wartością zastępczą 230 V.",
               "schedule_sync_enabled": "Zarządzaj harmonogramami IQ EV Charger. Domyślnie: Włączone.",
               "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery. Domyślnie: Włączone.",
+              "directional_battery_energy_enabled": "Udostępnia w panelu Energia skumulowane ilości energii z sieci i paneli słonecznych do akumulatora oraz z akumulatora do domu i sieci. Domyślnie włączone.",
               "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów. Domyślnie: Wyłączone.",
               "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone. Domyślnie: Wyłączone."
             }
@@ -822,6 +824,7 @@
           "advanced_features": "Funkcje zaawansowane",
           "schedule_sync_enabled": "Włącz obsługę harmonogramu",
           "battery_schedules_enabled": "Włącz harmonogram baterii",
+          "directional_battery_energy_enabled": "Włącz pomiar energii akumulatora według kierunku",
           "system_event_repair_issues": "Włącz powiadomienia o naprawach zdarzeń systemowych",
           "pricing_edits_enabled": "Włącz edycję cen",
           "weather_enabled": "Włącz pogodę",
@@ -839,6 +842,7 @@
           "nominal_voltage": "Typowe napięcie zasilania AC używane do szacowania mocy, gdy napięcie bieżące jest niedostępne. Domyślnie: Na podstawie telemetrii ładowarki, jeśli jest dostępna; w przeciwnym razie według regionu Home Assistant, z wartością zastępczą 230 V.",
           "schedule_sync_enabled": "Zarządzaj harmonogramami IQ EV Charger. Domyślnie: Włączone.",
           "battery_schedules_enabled": "Zarządzaj harmonogramami IQ Battery. Domyślnie: Włączone.",
+          "directional_battery_energy_enabled": "Udostępnia w panelu Energia skumulowane ilości energii z sieci i paneli słonecznych do akumulatora oraz z akumulatora do domu i sieci. Domyślnie włączone.",
           "microinverter_lifetime_energy_enabled": "Włącza wszystkie czujniki energii całkowitej poszczególnych mikroinwerterów. Domyślnie: Wyłączone.",
           "microinverter_power_enabled": "Włącza wszystkie czujniki mocy poszczególnych mikroinwerterów, gdy telemetria instalatora jest dostępna. Wymaga dostępu instalatora. Domyślnie: Wyłączone.",
           "vpp_events_enabled": "Pobiera harmonogramy VPP/ELRP z Enphase i tworzy encje zdarzeń tylko dla zapisanych lokalizacji. Domyślnie wyłączone. Domyślnie: Wyłączone.",
@@ -1431,6 +1435,50 @@
       },
       "site_battery_discharge": {
         "name": "Rozładowanie baterii lokalizacji",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Próbka z godz. (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Ostatni reset"
+          }
+        }
+      },
+      "battery_energy_from_grid": {
+        "name": "Energia z sieci do akumulatora",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Próbka z godz. (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Ostatni reset"
+          }
+        }
+      },
+      "battery_energy_from_solar": {
+        "name": "Energia słoneczna do akumulatora",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Próbka z godz. (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Ostatni reset"
+          }
+        }
+      },
+      "battery_energy_to_home": {
+        "name": "Energia z akumulatora do domu",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Próbka z godz. (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Ostatni reset"
+          }
+        }
+      },
+      "battery_energy_to_grid": {
+        "name": "Energia z akumulatora do sieci",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Próbka z godz. (UTC)"

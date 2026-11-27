@@ -31,6 +31,12 @@ SITE_ENERGY_DEFAULT_INTERVAL_MIN = 5.0
 SITE_ENERGY_FAILURE_BACKOFF_S = 15 * 60
 HEMS_LIFETIME_FAILURE_BACKOFF_S = 60 * 60
 DEVICE_LIFETIME_CHANNELS: tuple[str, ...] = ("evse", "heatpump", "water_heater")
+DIRECTIONAL_BATTERY_ENERGY_FIELDS = {
+    "battery_energy_from_grid": "grid_battery",
+    "battery_energy_from_solar": "solar_battery",
+    "battery_energy_to_home": "battery_home",
+    "battery_energy_to_grid": "battery_grid",
+}
 HEMS_DEVICE_CHANNELS_META_KEY = "_hems_device_channels"
 HEMS_DEVICE_METADATA_KEY = "_hems_device_metadata"
 
@@ -399,6 +405,49 @@ class EnergyManager:
                 count += 1
         return total, count
 
+    def _directional_battery_bucket_totals(
+        self, payload: dict[str, object]
+    ) -> dict[str, tuple[float, int]]:
+        """Accept the four directions as a set with aligned observations."""
+        fields = tuple(DIRECTIONAL_BATTERY_ENERGY_FIELDS.values())
+        series: list[list[object]] = []
+        for field in fields:
+            values = payload.get(field)
+            if (
+                not isinstance(values, list)
+                or not values
+                or (series and len(values) != len(series[0]))
+                or self._coerce_lifetime_bucket(values[-1]) is None
+            ):
+                return {}
+            series.append(values)
+
+        aggregates = [
+            values
+            for field in ("charge", "discharge")
+            if isinstance(values := payload.get(field), list)
+        ]
+        totals = dict.fromkeys(fields, 0.0)
+        count = 0
+        for index, row in enumerate(zip(*series, strict=True)):
+            samples = [self._coerce_lifetime_bucket(value) for value in row]
+            reported = [sample for sample in samples if sample is not None]
+            if not reported:
+                # Sites can have common gaps before battery reporting began.
+                if any(
+                    index < len(values)
+                    and (self._coerce_lifetime_bucket(values[index]) or 0) > 0
+                    for values in aggregates
+                ):
+                    return {}
+                continue
+            if len(reported) != len(fields):
+                return {}
+            for field, sample in zip(fields, reported, strict=True):
+                totals[field] += sample
+            count += 1
+        return {field: (total, count) for field, total in totals.items()}
+
     def _latest_energy_buckets(
         self, values: object
     ) -> tuple[float | None, float | None, int]:
@@ -618,6 +667,12 @@ class EnergyManager:
         flows: dict[str, SiteEnergyFlow] = {}
         interval_minutes = self._site_energy_interval_minutes(payload)
         totals = dict(device_totals or {})
+        directional_totals = (
+            self._directional_battery_bucket_totals(payload)
+            if last_report_date is not None and not update_pending
+            else {}
+        )
+        totals.update(directional_totals)
 
         def bucket_total(field: str) -> tuple[float, int]:
             if field not in totals:
@@ -918,6 +973,25 @@ class EnergyManager:
                     discharge_total,
                     discharge_fields,
                     discharge_count,
+                )
+
+        if directional_totals and all(
+            bucket_total(total_field)[0] == 0
+            or bucket_total(first)[0] + bucket_total(second)[0] > 0
+            for total_field, first, second in (
+                ("charge", "grid_battery", "solar_battery"),
+                ("discharge", "battery_home", "battery_grid"),
+            )
+        ):
+            for flow, field in DIRECTIONAL_BATTERY_ENERGY_FIELDS.items():
+                total, count = directional_totals[field]
+                _store(
+                    flow,
+                    total,
+                    [field],
+                    count,
+                    allow_zero=True,
+                    hold_zero_after_positive=True,
                 )
 
         raw_bucket_lengths = {

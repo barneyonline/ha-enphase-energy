@@ -785,6 +785,7 @@
             "data": {
               "schedule_sync_enabled": "Enable EV Charger Scheduler",
               "battery_schedules_enabled": "Enable Battery Scheduler",
+              "directional_battery_energy_enabled": "Enable Directional Battery Energy",
               "system_event_repair_issues": "Enable System Event Repair Notifications",
               "pricing_edits_enabled": "Enable Pricing Edits",
               "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
@@ -795,6 +796,7 @@
             "data_description": {
               "schedule_sync_enabled": "Enable controls to view and manage IQ EV Charger charging schedules. Default: Enabled.",
               "battery_schedules_enabled": "Enable controls to view and manage IQ Battery schedules. Default: Enabled.",
+              "directional_battery_energy_enabled": "Add lifetime Energy Dashboard sensors for grid-to-battery, solar-to-battery, battery-to-home, and battery-to-grid. Default: Enabled.",
               "system_event_repair_issues": "Create Home Assistant Repairs issues for active system alarms reported by Enphase. Default: Disabled.",
               "pricing_edits_enabled": "Enable controls to edit electricity rates used by the IQ Gateway. Default: Enabled.",
               "microinverter_lifetime_energy_enabled": "Enable individual lifetime energy sensors for each microinverter. Default: Disabled.",
@@ -822,6 +824,7 @@
           "advanced_features": "Advanced Features",
           "schedule_sync_enabled": "Enable EV Charger Scheduler",
           "battery_schedules_enabled": "Enable Battery Scheduler",
+          "directional_battery_energy_enabled": "Enable Directional Battery Energy",
           "system_event_repair_issues": "Enable System Event Repair Notifications",
           "pricing_edits_enabled": "Enable Pricing Edits",
           "microinverter_lifetime_energy_enabled": "Enable Microinverter Lifetime Energy",
@@ -835,6 +838,7 @@
         "data_description": {
           "schedule_sync_enabled": "Enable controls to view and manage IQ EV Charger charging schedules. Default: Enabled.",
           "battery_schedules_enabled": "Enable controls to view and manage IQ Battery schedules. Default: Enabled.",
+          "directional_battery_energy_enabled": "Add lifetime Energy Dashboard sensors for grid-to-battery, solar-to-battery, battery-to-home, and battery-to-grid. Default: Enabled.",
           "system_event_repair_issues": "Create Home Assistant Repairs issues for active system alarms reported by Enphase. Default: Disabled.",
           "pricing_edits_enabled": "Enable controls to edit electricity rates used by the IQ Gateway. Default: Enabled.",
           "microinverter_lifetime_energy_enabled": "Enable individual lifetime energy sensors for each microinverter. Default: Disabled.",
@@ -1539,6 +1543,50 @@
       },
       "site_battery_discharge": {
         "name": "Site Battery Discharge",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Sampled At (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Last Reset At"
+          }
+        }
+      },
+      "battery_energy_from_grid": {
+        "name": "Battery Energy From Grid",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Sampled At (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Last Reset At"
+          }
+        }
+      },
+      "battery_energy_from_solar": {
+        "name": "Battery Energy From Solar",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Sampled At (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Last Reset At"
+          }
+        }
+      },
+      "battery_energy_to_home": {
+        "name": "Battery Energy To Home",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Sampled At (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Last Reset At"
+          }
+        }
+      },
+      "battery_energy_to_grid": {
+        "name": "Battery Energy To Grid",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Sampled At (UTC)"

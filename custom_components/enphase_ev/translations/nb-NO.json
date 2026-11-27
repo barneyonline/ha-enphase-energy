@@ -785,6 +785,7 @@
             "data": {
               "schedule_sync_enabled": "Aktiver planleggerstøtte",
               "battery_schedules_enabled": "Aktiver batteriplanlegger",
+              "directional_battery_energy_enabled": "Aktiver batterienergi etter retning",
               "system_event_repair_issues": "Aktiver reparasjonsvarsler for systemhendelser",
               "pricing_edits_enabled": "Aktiver prisredigering",
               "weather_enabled": "Aktiver vær",
@@ -799,6 +800,7 @@
               "nominal_voltage": "Typisk vekselspenning for å beregne effekten når sanntidsspenning ikke er tilgjengelig. Standard: Fra laderens telemetri når den er tilgjengelig; ellers basert på Home Assistant-regionen, med en reserveverdi på 230 V.",
               "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger. Standard: Aktivert.",
               "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery. Standard: Aktivert.",
+              "directional_battery_energy_enabled": "Viser akkumulert energi fra strømnettet og solcellene til batteriet og fra batteriet til hjemmet og strømnettet i energidashbordet. Standard: aktivert.",
               "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter. Standard: Deaktivert.",
               "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og oppretter hendelsesenheter bare for påmeldte anlegg. Deaktivert som standard. Standard: Deaktivert."
             }
@@ -822,6 +824,7 @@
           "advanced_features": "Avanserte funksjoner",
           "schedule_sync_enabled": "Aktiver planleggerstøtte",
           "battery_schedules_enabled": "Aktiver batteriplanlegger",
+          "directional_battery_energy_enabled": "Aktiver batterienergi etter retning",
           "system_event_repair_issues": "Aktiver reparasjonsvarsler for systemhendelser",
           "pricing_edits_enabled": "Aktiver prisredigering",
           "weather_enabled": "Aktiver vær",
@@ -839,6 +842,7 @@
           "nominal_voltage": "Typisk vekselspenning for å beregne effekten når sanntidsspenning ikke er tilgjengelig. Standard: Fra laderens telemetri når den er tilgjengelig; ellers basert på Home Assistant-regionen, med en reserveverdi på 230 V.",
           "schedule_sync_enabled": "Administrer tidsplaner for IQ EV Charger. Standard: Aktivert.",
           "battery_schedules_enabled": "Administrer tidsplaner for IQ Battery. Standard: Aktivert.",
+          "directional_battery_energy_enabled": "Viser akkumulert energi fra strømnettet og solcellene til batteriet og fra batteriet til hjemmet og strømnettet i energidashbordet. Standard: aktivert.",
           "microinverter_lifetime_energy_enabled": "Aktiverer alle sensorer for levetidsenergi per mikroinverter. Standard: Deaktivert.",
           "microinverter_power_enabled": "Aktiverer alle effektsensorer per mikroinverter når installatørtelemetri er tilgjengelig. Krever installatørtilgang. Standard: Deaktivert.",
           "vpp_events_enabled": "Henter VPP/ELRP-planer fra Enphase og oppretter hendelsesenheter bare for påmeldte anlegg. Deaktivert som standard. Standard: Deaktivert.",
@@ -1431,6 +1435,50 @@
       },
       "site_battery_discharge": {
         "name": "Anleggsbatteriutlading",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Målt kl. (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Sist tilbakestilt"
+          }
+        }
+      },
+      "battery_energy_from_grid": {
+        "name": "Batterienergi fra strømnettet",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Målt kl. (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Sist tilbakestilt"
+          }
+        }
+      },
+      "battery_energy_from_solar": {
+        "name": "Batterienergi fra solcellene",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Målt kl. (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Sist tilbakestilt"
+          }
+        }
+      },
+      "battery_energy_to_home": {
+        "name": "Batterienergi til hjemmet",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Målt kl. (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Sist tilbakestilt"
+          }
+        }
+      },
+      "battery_energy_to_grid": {
+        "name": "Batterienergi til strømnettet",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Målt kl. (UTC)"

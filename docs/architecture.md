@@ -652,6 +652,12 @@ clearing and entity attribute reads. Invalid flow metadata cannot clear migratio
 offsets and lose that baseline across another restart. Repeated equal totals remain
 valid `total_increasing` states.
 
+Directional battery energy uses the four reported lifetime Wh arrays as one
+set. The manager requires aligned observations and a report timestamp, preserves
+observed zeroes, and holds the last accepted totals through missing data. The
+four IQ Battery sensors retain Wh precision for statistics. The Device Features
+option disables their registry entries without removing entity IDs or history.
+
 Current Grid Power and Current Battery Power reseed their cumulative-energy
 baselines when missing source channels return, including during reload or reauth.
 Synthetic zero placeholders never authorize a delta from zero to a lifetime total.

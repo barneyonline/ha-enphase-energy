@@ -785,6 +785,7 @@
             "data": {
               "schedule_sync_enabled": "Ota ajoitustuki käyttöön",
               "battery_schedules_enabled": "Ota akun aikataulutus käyttöön",
+              "directional_battery_energy_enabled": "Ota akun energiavirrat käyttöön",
               "system_event_repair_issues": "Ota järjestelmätapahtumien korjausilmoitukset käyttöön",
               "pricing_edits_enabled": "Ota hintojen muokkaus käyttöön",
               "weather_enabled": "Ota sää käyttöön",
@@ -799,6 +800,7 @@
               "nominal_voltage": "Tyypillinen vaihtovirtasyöttöjännite tehon arviointiin, kun reaaliaikaista jännitettä ei ole saatavilla. Oletus: Laturin telemetriasta, kun se on saatavilla; muuten Home Assistantin alueen mukaan, varaarvona 230 V.",
               "schedule_sync_enabled": "Hallitse IQ EV Chargerin aikatauluja. Oletus: Käytössä.",
               "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja. Oletus: Käytössä.",
+              "directional_battery_energy_enabled": "Näyttää energianäkymää varten kertyneen energian sähköverkosta ja aurinkopaneeleista akkuun sekä akusta kotiin ja sähköverkkoon. Oletus: käytössä.",
               "microinverter_lifetime_energy_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset elinkaarienergia-anturit. Oletus: Pois käytöstä.",
               "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä. Oletus: Pois käytöstä."
             }
@@ -822,6 +824,7 @@
           "advanced_features": "Lisäominaisuudet",
           "schedule_sync_enabled": "Ota ajoitustuki käyttöön",
           "battery_schedules_enabled": "Ota akun aikataulutus käyttöön",
+          "directional_battery_energy_enabled": "Ota akun energiavirrat käyttöön",
           "system_event_repair_issues": "Ota järjestelmätapahtumien korjausilmoitukset käyttöön",
           "pricing_edits_enabled": "Ota hintojen muokkaus käyttöön",
           "weather_enabled": "Ota sää käyttöön",
@@ -839,6 +842,7 @@
           "nominal_voltage": "Tyypillinen vaihtovirtasyöttöjännite tehon arviointiin, kun reaaliaikaista jännitettä ei ole saatavilla. Oletus: Laturin telemetriasta, kun se on saatavilla; muuten Home Assistantin alueen mukaan, varaarvona 230 V.",
           "schedule_sync_enabled": "Hallitse IQ EV Chargerin aikatauluja. Oletus: Käytössä.",
           "battery_schedules_enabled": "Hallitse IQ Batteryn aikatauluja. Oletus: Käytössä.",
+          "directional_battery_energy_enabled": "Näyttää energianäkymää varten kertyneen energian sähköverkosta ja aurinkopaneeleista akkuun sekä akusta kotiin ja sähköverkkoon. Oletus: käytössä.",
           "microinverter_lifetime_energy_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset elinkaarienergia-anturit. Oletus: Pois käytöstä.",
           "microinverter_power_enabled": "Ottaa käyttöön kaikki mikroinvertterikohtaiset tehoanturit, kun asentajan telemetria on saatavilla. Edellyttää asentajan käyttöoikeuksia. Oletus: Pois käytöstä.",
           "vpp_events_enabled": "Noutaa VPP/ELRP-aikataulut Enphaselta ja luo tapahtumaentiteetit vain ohjelmaan liitetyille kohteille. Oletuksena pois käytöstä. Oletus: Pois käytöstä.",
@@ -1431,6 +1435,50 @@
       },
       "site_battery_discharge": {
         "name": "Kohteen akun purkautuminen",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Näyte otettu (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Viimeinen nollaus klo"
+          }
+        }
+      },
+      "battery_energy_from_grid": {
+        "name": "Energia sähköverkosta akkuun",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Näyte otettu (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Viimeinen nollaus klo"
+          }
+        }
+      },
+      "battery_energy_from_solar": {
+        "name": "Energia aurinkopaneeleista akkuun",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Näyte otettu (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Viimeinen nollaus klo"
+          }
+        }
+      },
+      "battery_energy_to_home": {
+        "name": "Energia akusta kotiin",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Näyte otettu (UTC)"
+          },
+          "last_reset_at": {
+            "name": "Viimeinen nollaus klo"
+          }
+        }
+      },
+      "battery_energy_to_grid": {
+        "name": "Energia akusta sähköverkkoon",
         "state_attributes": {
           "sampled_at_utc": {
             "name": "Näyte otettu (UTC)"
