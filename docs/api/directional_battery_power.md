@@ -79,8 +79,10 @@ The implementation checks both directional pairs for every candidate window.
 When both sides have activity it uses the lifetime validator's rounding and
 attribution allowance, the larger of 1 Wh or 5% of the direct delta. A 1 Wh
 residual is 12 W over five minutes, even though its contribution to a lifetime
-total is negligible. A directional pair can report zero only when its direct
-counter also has zero change. These checks have fixture coverage. The available
+total is negligible. The calculator accepts an unchanged directional pair
+only when its direct counter also has zero raw change. The final readings round
+to the nearest watt, so movement below half a watt can display as 0 W.
+These checks have fixture coverage. The available
 recordings do not establish a real-world window error bound. The registration
 gate in the integration stays closed.
 

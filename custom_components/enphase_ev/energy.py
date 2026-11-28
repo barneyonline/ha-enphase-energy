@@ -1352,7 +1352,7 @@ class EnergyManager:
                         dt_util.utcnow(),
                         power_totals,
                         self._coerce_lifetime_bucket,
-                        startup_wh=self._directional_battery.power_startup_wh(),
+                        startup=self._directional_battery.power_startup_reference(),
                     )
                     power_wh = power.recovery_wh(directional_source)
             if directional_totals or power_wh is not None:

@@ -384,7 +384,7 @@ class DirectionalBatteryEnergy:
         self._pending_power_source_history = None
         return True
 
-    def power_startup_wh(self) -> dict[str, float] | None:
+    def power_startup_reference(self) -> tuple[datetime, dict[str, float]] | None:
         """Return saved same-day counters to guard a reload during a dropout."""
         current = self._power_source_history
         assert current is not None
@@ -394,7 +394,7 @@ class DirectionalBatteryEnergy:
             and checkpoint.same_source(current)
             and current.size == checkpoint.size
         ):
-            return checkpoint.wh
+            return checkpoint.reported_at, checkpoint.wh
         saved = self._saved_history
         if (
             saved is None
@@ -404,7 +404,7 @@ class DirectionalBatteryEnergy:
         ):
             return None
         # The saved cumulative sums can round by a fraction of a raw Wh.
-        return {
+        return saved.reported_at, {
             field: max(
                 0.0,
                 saved.totals[field]

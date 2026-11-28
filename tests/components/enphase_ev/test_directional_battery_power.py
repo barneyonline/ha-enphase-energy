@@ -38,6 +38,7 @@ def replay():
         delay=0,
         rollover=False,
         overrides=None,
+        startup=None,
     ):
         """Supply the raw partial bucket and exact lifetime direction sums."""
         values = (grid, solar, home, export)
@@ -64,6 +65,7 @@ def replay():
                 for field, value in zip(_FIELDS, values, strict=True)
             },
             manager._coerce_lifetime_bucket,
+            startup=startup,
         )
         power.publish()
         return power
@@ -85,6 +87,13 @@ def test_source_window_baseline_fractional_wh_and_confirmed_zero(replay):
     power = replay(600, grid=1050, solar=2000.4, home=3010, export=4000.1)
     assert power.interval.watts == dict.fromkeys(_FIELDS, 0)
     assert power.average.watts["grid_battery"] == 300
+
+
+def test_subwatt_movement_rounds_to_zero_in_both_modes(replay):
+    replay(0)
+    power = replay(300, grid=1000.02)
+    assert power.interval.watts["grid_battery"] == 0
+    assert power.average.watts["grid_battery"] == 0
 
 
 def test_entity_starts_without_value_or_source_attributes(coordinator_factory):
@@ -383,12 +392,46 @@ def test_staggered_directional_and_direct_reductions_are_held(replay):
     assert replay(1500, grid=2050, solar=3000).interval.watts["grid_battery"] == 600
 
 
-def test_rejected_outlier_cannot_pin_the_dropout_guard(replay):
+@pytest.mark.parametrize("linger", [False, True])
+def test_rejected_outlier_cannot_pin_the_dropout_guard(replay, linger):
     replay(0)
     assert replay(300, grid=1050).interval.watts["grid_battery"] == 600
     assert replay(600, grid=111050).interval is None
-    assert replay(900, grid=1100).interval is None
-    assert replay(1200, grid=1150).interval.watts["grid_battery"] == 600
+    seconds = 900
+    if linger:
+        assert replay(seconds, grid=111100).interval.watts["grid_battery"] == 600
+        seconds += 300
+    assert replay(seconds, grid=1100).interval is None
+    assert replay(seconds + 300, grid=1150).interval.watts["grid_battery"] == 600
+
+
+def test_implausible_recovery_preserves_restart_watermark(replay):
+    startup_wh = {
+        "charge": 3050,
+        "grid_battery": 1050,
+        "solar_battery": 2000,
+    }
+    startup = (_START - timedelta(minutes=5), startup_wh)
+    assert replay(0, grid=0, startup=startup).interval is None
+    power = replay(300, grid=111050)
+    assert power.interval is None
+    assert power.recovery_wh(_START + timedelta(seconds=300))["grid_battery"] == 1050
+    assert replay(600, grid=850).interval is None
+    assert replay(900, grid=900).interval is None
+    assert replay(1200, grid=1050).interval is None
+    assert replay(1500, grid=1100).interval.watts["grid_battery"] == 600
+
+
+def test_implausible_startup_report_does_not_poison_recovery_reference(replay):
+    startup = (
+        _START - timedelta(minutes=5),
+        {"charge": 3050, "grid_battery": 1050, "solar_battery": 2000},
+    )
+    power = replay(0, grid=111050, startup=startup)
+    assert power.interval is None
+    assert power.recovery_wh(_START)["grid_battery"] == 1050
+    assert replay(300, grid=1100).interval is None
+    assert replay(600, grid=1150).interval.watts["grid_battery"] == 600
 
 
 def test_rejected_outlier_in_other_pair_cannot_pin_the_dropout_guard(replay):
