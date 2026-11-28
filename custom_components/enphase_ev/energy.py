@@ -649,6 +649,8 @@ class EnergyManager:
         self,
         payload: dict[str, object],
         source: datetime | None,
+        *,
+        for_power: bool = False,
     ) -> dict[str, tuple[float, int]]:
         start = payload.get("start_date")
         interval = payload.get(
@@ -662,7 +664,9 @@ class EnergyManager:
             or (start_date := dt_util.parse_date(start)) is None
         ):
             return {}
-        return self._directional_battery.totals(payload, start_date, source)
+        return self._directional_battery.totals(
+            payload, start_date, source, for_power=for_power
+        )
 
     def directional_battery_context_refresh_due(self) -> bool:
         """Check whether later site metadata can qualify a fresh lifetime read."""
@@ -1320,6 +1324,7 @@ class EnergyManager:
         if self._site_energy_read_superseded(generation):
             return
         directional_totals: dict[str, tuple[float, int]] = {}
+        power_totals: dict[str, tuple[float, int]] = {}
         power = self.directional_battery_power
         if (
             accept
@@ -1332,25 +1337,31 @@ class EnergyManager:
             directional_totals = self._directional_battery_totals(
                 payload, directional_source
             )
+            saved = True
             if directional_totals:
                 self._directional_battery_save_idle.clear()
                 try:
-                    if not await self._directional_battery.async_save():
+                    saved = await self._directional_battery.async_save()
+                    if not saved:
                         directional_totals = {}
                 finally:
                     self._directional_battery_save_idle.set()
             if self._site_energy_read_superseded(generation):
                 return
-            if power is not None and directional_totals:
-                assert directional_source is not None
-                power.observe(
-                    payload,
-                    directional_source,
-                    dt_util.utcnow(),
-                    directional_totals,
-                    self._coerce_lifetime_bucket,
+            if power is not None and saved:
+                power_totals = self._directional_battery_totals(
+                    payload, directional_source, for_power=True
                 )
-        if power is not None and not directional_totals:
+                if power_totals:
+                    assert directional_source is not None
+                    power.observe(
+                        payload,
+                        directional_source,
+                        dt_util.utcnow(),
+                        power_totals,
+                        self._coerce_lifetime_bucket,
+                    )
+        if power is not None and not power_totals:
             power.invalidate()
         parsed = (
             None

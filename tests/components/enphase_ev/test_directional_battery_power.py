@@ -1,9 +1,12 @@
 """Replay constructed daily lifetime reports at source precision."""
 
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
+from custom_components.enphase_ev import energy as energy_mod
 from custom_components.enphase_ev.directional_battery_power import (
     DIRECTIONAL_BATTERY_POWER_FIELDS,
     DirectionalBatteryPower,
@@ -100,6 +103,94 @@ def test_replay_recorded_partial_day_window(replay):
     assert power.average == power.interval
 
 
+async def test_power_reseeds_after_revision_without_rebasing_lifetime_energy(
+    coordinator_factory, monkeypatch
+):
+    monkeypatch.setattr(energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", True)
+    now = _START
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    read = AsyncMock()
+    manager = coordinator_factory(client=SimpleNamespace(lifetime_energy=read)).energy
+    power = manager.directional_battery_power
+
+    async def refresh(seconds, grid_in, home, grid_out, discharge):
+        nonlocal now
+        now = _START + timedelta(seconds=seconds)
+        read.return_value = {
+            "start_date": _START.date().isoformat(),
+            "last_report_date": now.timestamp(),
+            "grid_battery": [grid_in],
+            "solar_battery": [100],
+            "battery_home": [home],
+            "battery_grid": [grid_out],
+            "charge": [grid_in + 100],
+            "discharge": [discharge],
+        }
+        await manager._async_refresh_site_energy(force=True)
+
+    await refresh(0, 1000, 100, 0, 101)
+    await refresh(300, 1005, 110, 2, 112)
+    assert power.interval.watts["battery_grid"] == 24
+    assert manager.site_energy["battery_energy_to_grid"].value_kwh == 0.002
+
+    await refresh(607, 1008, 142, 0, 143)
+    assert power.interval is power.average is None
+    assert "battery_energy_to_grid" not in manager.site_energy
+    await refresh(895, 1009, 178, 0, 179)
+    assert power.interval is power.average is None
+
+    await refresh(1255, 1010, 217, 1, 218)
+    assert "battery_energy_to_grid" not in manager.site_energy
+    assert power.interval is not None
+    assert power.interval.window_seconds == 648
+    assert power.interval.watts == dict(zip(_FIELDS, (11, 0, 417, 6), strict=True))
+    assert power.average == power.interval
+
+
+async def test_failed_lifetime_save_breaks_the_power_window(
+    coordinator_factory, monkeypatch
+):
+    monkeypatch.setattr(energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", True)
+    now = _START
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    read = AsyncMock()
+    manager = coordinator_factory(client=SimpleNamespace(lifetime_energy=read)).energy
+    monkeypatch.setattr(
+        manager._directional_battery,
+        "async_save",
+        AsyncMock(side_effect=[True, True, False, True, True]),
+    )
+    power = manager.directional_battery_power
+
+    async def refresh(grid):
+        nonlocal now
+        now += timedelta(minutes=5)
+        read.return_value = {
+            "start_date": now.date().isoformat(),
+            "last_report_date": now.timestamp(),
+            "grid_battery": [grid],
+            "solar_battery": [0],
+            "battery_home": [0],
+            "battery_grid": [0],
+            "charge": [grid],
+            "discharge": [0],
+        }
+        await manager._async_refresh_site_energy(force=True)
+
+    await refresh(1000)
+    await refresh(1050)
+    assert power.interval.watts["grid_battery"] == 600
+
+    await refresh(1100)
+    assert power.interval is power.average is None
+
+    await refresh(1150)
+    assert power.interval is power.average is None
+    await refresh(1200)
+    assert power.interval.watts["grid_battery"] == 600
+    assert power.average == power.interval
+
+
 def test_smoothing_uses_elapsed_time_and_interpolates_left_edge(replay):
     replay(0)
     replay(300, grid=1050)
@@ -119,7 +210,6 @@ def test_smoothing_uses_elapsed_time_and_interpolates_left_edge(replay):
         {"grid": 1100, "charge": 3050},  # Clock advances before the direct tally.
         {"home": 3050, "discharge": 7000},  # Direct counter is unchanged.
         {"discharge": 7001},  # No confirmed zero while the direct counter moves.
-        {"charge": 2999},  # Direct meter reset during the same partial day.
         {"overrides": {"charge": None}},
         {"overrides": {"charge": []}},
         {"overrides": {"charge": [True]}},
@@ -133,6 +223,17 @@ def test_bad_window_invalidates_all_directions_and_recovery_reseeds(replay, bad_
     assert power.interval is power.average is None
     assert replay(900, grid=1150).interval is None
     assert replay(1200, grid=1200).interval.watts["grid_battery"] == 600
+
+
+def test_advancing_direct_counter_revision_seeds_new_window(replay):
+    replay(0)
+    assert replay(300).interval is not None
+    power = replay(600, charge=2999)
+    assert power.interval is power.average is None
+    assert replay(600, charge=2999).interval is None
+    power = replay(900, grid=1050)
+    assert power.interval.watts["grid_battery"] == 600
+    assert power.average == power.interval
 
 
 @pytest.mark.parametrize("bad_time", [150, 300])

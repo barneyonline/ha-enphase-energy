@@ -149,6 +149,7 @@ class DirectionalBatteryEnergy:
         self._loaded = store is None
         self._history: _BatteryHistory | None = None
         self._saved_history: _BatteryHistory | None = None
+        self._power_source_history: _BatteryHistory | None = None
         self._load_warning_logged = False
 
     def site_context_refresh_due(self) -> bool:
@@ -217,21 +218,34 @@ class DirectionalBatteryEnergy:
         payload: dict[str, object],
         start: date,
         reported_at: datetime,
+        *,
+        for_power: bool = False,
     ) -> dict[str, tuple[float, int]]:
         """Return all four cumulative Wh totals only for a coherent observation."""
         if not self._enabled or not self._loaded or self._zone is None:
             return {}
-        result = self._evaluate(payload, start, reported_at)
+        previous = self._power_source_history if for_power else self._history
+        result = self._evaluate(
+            payload, start, reported_at, previous, for_power=for_power
+        )
         if result is None:
             return {}
         history, count = result
-        self._history = history
+        if for_power:
+            self._power_source_history = history
+        else:
+            self._history = history
         return {field: (total, count) for field, total in history.totals.items()}
 
     def _evaluate(
-        self, payload: dict[str, object], start: date, reported_at: datetime
+        self,
+        payload: dict[str, object],
+        start: date,
+        reported_at: datetime,
+        previous: _BatteryHistory | None,
+        *,
+        for_power: bool,
     ) -> tuple[_BatteryHistory, int] | None:
-        previous = self._history
         zone_name = self._zone_name
         zone = self._zone
         assert zone_name is not None and zone is not None
@@ -326,9 +340,15 @@ class DirectionalBatteryEnergy:
                 and any(
                     total < previous.totals[field] for field, total in totals.items()
                 )
+                and not (
+                    for_power
+                    and size == previous.size
+                    and reported_at > previous.reported_at
+                )
             ):
                 # A correction in any previously counted direction invalidates
-                # the group's increases, even if a later bucket compensates.
+                # cumulative energy. Power can seed from a revised open bucket
+                # on an advancing clock, without trusting the revised delta.
                 return None
             count += 1
         if not any(totals.values()) or not all(

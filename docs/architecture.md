@@ -674,12 +674,16 @@ Recorder also retains its statistics. The IQ Battery sensors retain Wh precision
 The Device Features option controls whether the platform adds the sensors.
 Home Assistant retains the registry entries and their original enablement settings.
 
-Directional battery power reuses the same accepted lifetime read. One in-memory
-calculator checks all four source-precision partial-day counters against the
-direct charge and discharge deltas for the same report window. The first
-observation seeds a baseline. Missing, stale, reset, and inconsistent data
-break the group's calculation history. Site-local day rollover also requires
-a fresh baseline because the previous bucket can be finalized by the cloud.
+Directional battery power shares the lifetime read and validates it against an
+in-memory source history. The calculator checks all four source-precision
+partial-day counters against the direct charge and discharge deltas for the
+same report window. A reconciled revision of the current battery bucket on an
+advancing source clock clears both power estimates and seeds a fresh baseline.
+The next estimate uses only a complete, reconciled window after the revision.
+The power baseline is independent of the saved cumulative energy baseline.
+Missing, stale, or inconsistent data break the group's calculation history.
+Corrections to closed directional history fail source validation. Same-clock
+revisions break the window. Site-local day rollover requires a fresh baseline.
 Each entity uses the group's source timestamp for freshness. Reloads seed from
 fresh upstream data and never restore a watts estimate. Entity registration
 is gated pending [short-window source validation](api/directional_battery_power.md).

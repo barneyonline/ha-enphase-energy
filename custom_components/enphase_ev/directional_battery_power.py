@@ -77,7 +77,7 @@ class DirectionalBatteryPower:
         totals: dict[str, tuple[float, int]],
         coerce_bucket: Callable[[object], float | None],
     ) -> None:
-        """Use a daily payload already accepted by the lifetime energy guard."""
+        """Use a daily payload accepted for power by the lifetime source validator."""
         wh: dict[str, float] = {}
         directional_buckets = payload[_FIELDS[0]]
         assert isinstance(directional_buckets, list)
@@ -120,15 +120,17 @@ class DirectionalBatteryPower:
             >= CLOUD_TELEMETRY_STALE_AFTER_S
             or (received_at - baseline.reported_at).total_seconds()
             >= CLOUD_TELEMETRY_STALE_AFTER_S
+            or (
+                previous is not None
+                and any(
+                    value < previous.wh[field] for field, value in report.wh.items()
+                )
+            )
         ):
             self.invalidate()
             self._baseline = report
             return
 
-        assert previous is not None
-        if any(value < previous.wh[field] for field, value in report.wh.items()):
-            self.invalidate()
-            return
         seconds = (report.reported_at - baseline.reported_at).total_seconds()
         if seconds < self._minimum_window_seconds:
             return

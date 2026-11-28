@@ -19,8 +19,12 @@ between Enphase report timestamps. For example, 50 Wh over 300 seconds is
 Daily bucket width describes the aggregation period and can contain several
 closer report timestamps for the current partial day. A valid interval with
 unchanged counters can report 0 W. Missing channels or an invalid interval make
-the group unavailable. The group stops reporting after 30 minutes without a
-fresh accepted window. **Use 15-minute Power Average** applies the same rolling,
+the group unavailable. A reconciled decrease in the current day's counters on
+an advancing report clock discards both estimates and seeds a new power baseline.
+Power resumes after a full, reconciled window following that baseline. The
+cumulative energy history retains its own persisted baseline. The group stops
+reporting after 30 minutes without a fresh accepted window.
+**Use 15-minute Power Average** applies the same rolling,
 elapsed-time-weighted averaging used by Battery Power. Cloud updates can arrive
 late, and the five-minute refresh cadence adds up to roughly another poll
 interval under normal conditions. The source delay itself remains unmeasured.

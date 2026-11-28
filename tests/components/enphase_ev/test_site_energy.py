@@ -42,12 +42,15 @@ from custom_components.enphase_ev.sensor import (
 from .device_info_helpers import device_info_fields
 
 
-def _assemble_directional_site_energy(manager, payload):
+def _assemble_directional_site_energy(manager, payload, *, for_power=False):
     source = manager._parse_site_energy_timestamp(
         payload.get("last_report_date"), require_time=True
     )
     return manager._aggregate_site_energy(
-        payload, directional_totals=manager._directional_battery_totals(payload, source)
+        payload,
+        directional_totals=manager._directional_battery_totals(
+            payload, source, for_power=for_power
+        ),
     )
 
 
@@ -318,14 +321,17 @@ def test_directional_battery_requires_previously_accepted_coverage(
     assert manager.site_energy["battery_energy_from_grid"].value_kwh == 2.952
 
 
+@pytest.mark.parametrize("for_power", [False, True])
 @pytest.mark.parametrize("corrected", [False, True])
 def test_directional_battery_reconciles_across_bucket_rollover(
-    coordinator_factory, directional_battery_payload, corrected
+    coordinator_factory, directional_battery_payload, corrected, for_power
 ) -> None:
     manager = coordinator_factory().energy
     payload = directional_battery_payload
     keys = DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
-    manager.site_energy, _ = _assemble_directional_site_energy(manager, payload)
+    manager.site_energy, _ = _assemble_directional_site_energy(
+        manager, payload, for_power=for_power
+    )
     assert manager.site_energy.keys() >= keys
     latest_grid, latest_solar = (102, 420) if corrected else (202, 320)
     next_payload = {
@@ -338,12 +344,45 @@ def test_directional_battery_reconciles_across_bucket_rollover(
         "battery_grid": [None, 0, 0, 100],
         "discharge": [None, 1301, 902, 100],
     }
-    flows, _ = _assemble_directional_site_energy(manager, next_payload)
+    flows, _ = _assemble_directional_site_energy(
+        manager, next_payload, for_power=for_power
+    )
     if corrected:
         assert not flows.keys() & keys
     else:
         assert flows["battery_energy_from_grid"].value_kwh == 3.452
         assert flows["battery_energy_to_grid"].value_kwh == 0.1
+
+
+@pytest.mark.parametrize("closed_bucket", [False, True])
+def test_directional_power_rejects_closed_or_same_clock_revision(
+    coordinator_factory, directional_battery_payload, closed_bucket
+):
+    manager = coordinator_factory().energy
+    source = manager._parse_site_energy_timestamp(
+        directional_battery_payload["last_report_date"], require_time=True
+    )
+    assert source is not None
+    assert manager._directional_battery_totals(
+        directional_battery_payload, source, for_power=True
+    )
+    if closed_bucket:
+        revision = {
+            "grid_battery": [None, 2650, 202],
+            "solar_battery": [None, 850, 320],
+        }
+        source += timedelta(minutes=5)
+    else:
+        revision = {
+            "grid_battery": [None, 2750, 102],
+            "solar_battery": [None, 750, 420],
+        }
+    assert not manager._directional_battery_totals(
+        {**directional_battery_payload, **revision}, source, for_power=True
+    )
+    assert manager._directional_battery_totals(
+        directional_battery_payload, source + timedelta(minutes=5), for_power=True
+    )
 
 
 @pytest.mark.parametrize(
