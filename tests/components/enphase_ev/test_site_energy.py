@@ -83,24 +83,30 @@ def test_site_energy_directional_battery_totals(
 
 
 @pytest.mark.parametrize("has_aggregates", [False, True])
+@pytest.mark.parametrize("has_activity", [False, True])
 def test_directional_battery_zero_history_requires_observations(
-    coordinator_factory, has_aggregates
+    coordinator_factory, has_aggregates, has_activity
 ) -> None:
     payload = {
         "start_date": "2023-11-14",
         "last_report_date": 1_700_000_001,
         **dict.fromkeys(DIRECTIONAL_BATTERY_ENERGY_FIELDS.values(), [0]),
     }
+    discharge = 375 if has_activity else 0
+    payload["battery_home"] = [discharge]
     if has_aggregates:
-        payload.update(charge=[0], discharge=[0])
+        payload.update(charge=[0], discharge=[discharge])
     parsed = coordinator_factory().energy._aggregate_site_energy(
         payload
     )  # noqa: SLF001
     assert parsed is not None
     flows, _ = parsed
     directions = flows.keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
-    assert len(directions) == (4 if has_aggregates else 0)
-    assert all(flows[key].value_kwh == 0 for key in directions)
+    assert len(directions) == (4 if has_aggregates and has_activity else 0)
+    assert all(
+        flows[key].value_kwh == (0.375 if key == "battery_energy_to_home" else 0.0)
+        for key in directions
+    )
 
 
 @pytest.mark.parametrize("leading_total", [None, 0])

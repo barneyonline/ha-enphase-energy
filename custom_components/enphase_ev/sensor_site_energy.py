@@ -49,6 +49,7 @@ from .power_restore import (
     power_restore_data,
 )
 from .runtime_helpers import inventory_type_device_info as _type_device_info
+from .runtime_helpers import site_battery_device_available
 from .serial_entity_metadata import site_sensor_unique_id
 from .sensor_base import EnphaseSiteSensorEntity as _SiteBaseEntity
 from .sensor_common import (
@@ -629,7 +630,8 @@ class EnphaseDirectionalBatteryEnergySensor(EnphaseSiteEnergySensor):
     def available(self) -> bool:
         source = self._flow_data().get("last_report_date")
         return (
-            isinstance(source, datetime)
+            site_battery_device_available(self._coord)
+            and isinstance(source, datetime)
             and directional_battery_source_is_fresh(source)
             and self._current_value() is not None
             and super().available

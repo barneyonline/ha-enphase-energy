@@ -32,6 +32,7 @@ from custom_components.enphase_ev.api import EnphaseEVClient
 from custom_components.enphase_ev.api_client import evse_surface
 from custom_components.enphase_ev.const import (
     CONF_EAUTH,
+    CONF_HEMS_AUTH_FAILURE_COUNT,
     CONF_INCLUDE_INVERTERS,
     CONF_SELECTED_TYPE_KEYS,
     CONF_SERIALS,
@@ -230,6 +231,18 @@ async def test_directional_battery_real_platform_lifecycle(
     assert state.attributes["state_class"] == "total_increasing"
     assert float(hass.states.get(disabled_id).state) == 0.0
 
+    async def set_battery_support(supported: bool) -> None:
+        responses["battery_site_settings"]["data"]["hasEncharge"] = supported
+        await coord._async_refresh_battery_site_settings(force=True)
+        coord.async_set_updated_data(dict(coord.data))
+        await hass.async_block_till_done()
+
+    await set_battery_support(False)
+    assert hass.states.get(grid_id).state == STATE_UNAVAILABLE
+    assert registry.async_get(grid_id) is not None
+    await set_battery_support(True)
+    assert float(hass.states.get(grid_id).state) == 12.0
+
     registry.async_update_entity(disabled_id, disabled_by=er.RegistryEntryDisabler.USER)
     reload = AsyncMock(wraps=hass.config_entries.async_reload)
     monkeypatch.setattr(hass.config_entries, "async_reload", reload)
@@ -248,6 +261,12 @@ async def test_directional_battery_real_platform_lifecycle(
     hass.config_entries.async_update_entry(
         config_entry, options={OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED: True}
     )
+    await hass.async_block_till_done()
+    reload.assert_awaited_once_with(config_entry.entry_id)
+    previous_data = dict(config_entry.data)
+    updated_data = {**previous_data, CONF_HEMS_AUTH_FAILURE_COUNT: 1}
+    config_entry.runtime_data.mark_internal_data_update(previous_data, updated_data)
+    hass.config_entries.async_update_entry(config_entry, data=updated_data)
     await hass.async_block_till_done()
     reload.assert_awaited_once_with(config_entry.entry_id)
     freezer.tick(timedelta(seconds=RELOAD_AFTER_UPDATE_DELAY + 1))

@@ -312,7 +312,9 @@ class DirectionalBatteryEnergy:
         for key, (left, right) in _AGGREGATE_PAIRS.items():
             if not (totals[left] or totals[right] or key in idle_pairs):
                 return None
-        if not all(math.isfinite(total) for total in totals.values()):
+        if not any(totals.values()) or not all(
+            math.isfinite(total) for total in totals.values()
+        ):
             return None
         if (
             previous is not None

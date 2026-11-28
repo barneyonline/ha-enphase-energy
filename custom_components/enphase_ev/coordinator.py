@@ -205,6 +205,7 @@ from .runtime_helpers import (
     resolve_inverter_start_date,
     resolve_site_local_current_date,
     resolve_site_timezone_name,
+    site_battery_device_available,
 )
 from .session_history import (
     MIN_SESSION_HISTORY_CACHE_TTL,
@@ -2834,6 +2835,8 @@ class EnphaseCoordinator(
         return resolve_site_timezone_name(getattr(self, "_battery_timezone", None))
 
     def _directional_battery_site_timezone(self) -> str | None:
+        if not site_battery_device_available(self):
+            return None
         return self.battery_timezone or coerce_optional_text(
             self.inventory_state.cloud_metadata.get("timezone")
         )

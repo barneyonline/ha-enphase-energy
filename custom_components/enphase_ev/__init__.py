@@ -370,6 +370,11 @@ async def _async_update_listener_locked(
             preserve_runtime = not bool(
                 changed_data_keys - _HOT_APPLY_DATA_KEYS - _RUNTIME_HANDOFF_DATA_KEYS
             )
+            if runtime_data.registry_reload_pending:
+                # The scheduled Core reload will apply the latest entry data
+                # and options together, including intervening internal saves.
+                runtime_data.preserve_for_reload = preserve_runtime
+                return
             if (
                 OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED in changed_reload_options
                 and target_options.get(
@@ -390,6 +395,7 @@ async def _async_update_listener_locked(
                 )
                 if reenabled:
                     # Core reloads after clearing a registry disabler.
+                    runtime_data.registry_reload_pending = True
                     runtime_data.preserve_for_reload = preserve_runtime
                     return
             if not reload_required:

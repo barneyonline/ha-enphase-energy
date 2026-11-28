@@ -121,6 +121,7 @@ from .sensor_heatpump import (
 from .runtime_helpers import (
     coerce_optional_text as _gateway_clean_text,
     inventory_type_available as _type_available,
+    site_has_battery as _site_has_battery,
     inventory_type_device_info as _type_device_info,
     normalize_evse_session_energy,
 )
@@ -283,11 +284,6 @@ _battery_last_reported_members = _battery_helpers.battery_last_reported_members
 _battery_last_reported_snapshot = _battery_helpers.battery_last_reported_snapshot
 _battery_optional_bool = _battery_helpers.battery_optional_bool
 _battery_snapshot_last_reported = _battery_helpers.battery_snapshot_last_reported
-
-
-def _site_has_battery(coord: EnphaseCoordinator) -> bool:
-    has_encharge = getattr(coord, "battery_has_encharge", None)
-    return has_encharge is not False
 
 
 def _grid_control_site_applicable(coord: EnphaseCoordinator) -> bool:
