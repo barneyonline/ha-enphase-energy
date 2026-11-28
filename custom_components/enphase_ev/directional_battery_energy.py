@@ -156,7 +156,7 @@ class _PowerCheckpoint:
     start: str
     timezone: str
     size: int
-    closed_signature: str
+    closed_signature: str | None
     recovery: DirectionalBatteryRecovery
 
     def same_source(self, history: _BatteryHistory) -> bool:
@@ -198,8 +198,10 @@ class _PowerCheckpoint:
             or not isinstance(zone_name, str)
             or type(size) is not int
             or size < 1
-            or not isinstance(signature, str)
-            or len(signature) != 64
+            or (
+                signature is not None
+                and (not isinstance(signature, str) or len(signature) != 64)
+            )
             or reported_at is None
             or reported_at
             > dt_util.utcnow() + timedelta(seconds=SITE_ENERGY_SOURCE_FUTURE_SKEW_S)
@@ -272,6 +274,27 @@ def _decode_pair_reference(
 def _closed_signature(history: _BatteryHistory, size: int) -> str:
     closed = history.closed_buckets[: size - 1]
     return sha256(repr(closed).encode()).hexdigest()
+
+
+def _legacy_recovery(saved: _BatteryHistory) -> DirectionalBatteryRecovery:
+    # The saved cumulative sums can round by a fraction of a raw Wh.
+    counters = {
+        field: max(
+            0.0,
+            saved.totals[field] - saved.closed[field] - math.ulp(saved.totals[field]),
+        )
+        for field in _FIELDS
+    }
+    return DirectionalBatteryRecovery(
+        saved.reported_at,
+        saved.size,
+        {
+            aggregate: DirectionalBatteryPairReference(
+                saved.reported_at, {field: counters[field] for field in fields}
+            )
+            for aggregate, fields in _AGGREGATE_PAIRS.items()
+        },
+    )
 
 
 class DirectionalBatteryEnergy:
@@ -361,8 +384,19 @@ class DirectionalBatteryEnergy:
         power_source = self._power_source_history
         if recovery is not None:
             if power_source is None:
-                assert checkpoint is not None
-                checkpoint = replace(checkpoint, recovery=recovery)
+                if checkpoint is not None:
+                    checkpoint = replace(checkpoint, recovery=recovery)
+                else:
+                    saved = self._saved_history
+                    assert saved is not None
+                    # Legacy energy storage has totals but no closed buckets.
+                    checkpoint = _PowerCheckpoint(
+                        saved.start.isoformat(),
+                        saved.timezone,
+                        saved.size,
+                        None,
+                        recovery,
+                    )
             else:
                 checkpoint = _PowerCheckpoint(
                     power_source.start.isoformat(),
@@ -402,7 +436,7 @@ class DirectionalBatteryEnergy:
         for_power: bool = False,
     ) -> dict[str, tuple[float, int]]:
         """Return all four cumulative Wh totals only for a coherent observation."""
-        if not self._enabled or not self._loaded or self._zone is None:
+        if not self.source_context_ready:
             return {}
         previous = self._power_source_history if for_power else self._history
         if (
@@ -425,6 +459,10 @@ class DirectionalBatteryEnergy:
             self._history = history
         return {field: (total, count) for field, total in history.totals.items()}
 
+    @property
+    def source_context_ready(self) -> bool:
+        return self._enabled and self._loaded and self._zone is not None
+
     def _accept_power_source_history(self, history: _BatteryHistory) -> bool:
         previous = self._power_source_history
         pending = self._pending_power_source_history
@@ -441,7 +479,7 @@ class DirectionalBatteryEnergy:
         ) is not None and checkpoint.same_source(history):
             if history.reported_at <= checkpoint.recovery.reported_at:
                 return False
-            changed = (
+            changed = checkpoint.closed_signature is not None and (
                 _closed_signature(history, checkpoint.size)
                 != checkpoint.closed_signature
             )
@@ -477,40 +515,25 @@ class DirectionalBatteryEnergy:
             or saved.size != current.size
         ):
             return None
-        # The saved cumulative sums can round by a fraction of a raw Wh.
-        counters = {
-            field: max(
-                0.0,
-                saved.totals[field]
-                - saved.closed[field]
-                - math.ulp(saved.totals[field]),
-            )
-            for field in _FIELDS
-        }
-        return DirectionalBatteryRecovery(
-            saved.reported_at,
-            saved.size,
-            {
-                aggregate: DirectionalBatteryPairReference(
-                    saved.reported_at,
-                    {field: counters[field] for field in fields},
-                )
-                for aggregate, fields in _AGGREGATE_PAIRS.items()
-            },
-        )
+        return _legacy_recovery(saved)
 
     def power_startup_for_rejected_report(
         self, start: object
     ) -> DirectionalBatteryRecovery | None:
         """Reuse a known source checkpoint without trusting a rejected payload."""
         checkpoint = self._saved_power_checkpoint
-        if (
-            checkpoint is None
-            or start != checkpoint.start
-            or self._zone_name != checkpoint.timezone
-        ):
+        if checkpoint is not None:
+            if start == checkpoint.start and self._zone_name == checkpoint.timezone:
+                return checkpoint.recovery
             return None
-        return checkpoint.recovery
+        saved = self._saved_history
+        if (
+            saved is not None
+            and start == saved.start.isoformat()
+            and self._zone_name == saved.timezone
+        ):
+            return _legacy_recovery(saved)
+        return None
 
     def _evaluate(
         self,

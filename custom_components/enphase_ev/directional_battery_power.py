@@ -87,15 +87,22 @@ class DirectionalBatteryPower:
     ) -> None:
         """Retain the first unavailable interval without trusting its counters."""
         self._reset_window()
-        if self._recovery_size is None:
-            if startup is None:
-                return
-            self._recovery_references = startup.pairs.copy()
-            self._recovery_size = startup.bucket_count
-            self._source_cursor = startup.reported_at
+        if self._recovery_size is None and startup is not None:
+            self._restore_recovery(startup)
         if self._source_cursor is not None and reported_at <= self._source_cursor:
             return
         self._source_cursor = reported_at
+        self._limit_recovery_elapsed(reported_at)
+
+    def _restore_recovery(self, startup: DirectionalBatteryRecovery) -> None:
+        self._recovery_references = startup.pairs.copy()
+        self._recovery_size = startup.bucket_count
+        if self._source_cursor is None or self._source_cursor <= startup.reported_at:
+            self._source_cursor = startup.reported_at
+        else:
+            self._limit_recovery_elapsed(self._source_cursor)
+
+    def _limit_recovery_elapsed(self, reported_at: datetime) -> None:
         for aggregate, reference in self._recovery_references.items():
             elapsed = (reported_at - reference.reported_at).total_seconds()
             self._recovery_references[aggregate] = replace(
@@ -154,6 +161,12 @@ class DirectionalBatteryPower:
         startup: DirectionalBatteryRecovery | None,
     ) -> None:
         previous = self._last_report
+        if (
+            self._recovery_size is None
+            and startup is not None
+            and self._source_cursor is not None
+        ):
+            self._restore_recovery(startup)
         if (
             self._source_cursor is not None
             and report.reported_at <= self._source_cursor

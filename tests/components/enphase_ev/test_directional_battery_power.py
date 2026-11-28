@@ -449,6 +449,20 @@ def test_implausible_startup_report_does_not_poison_recovery_reference(replay):
     assert replay(600, grid=1150).interval.watts["grid_battery"] == 600
 
 
+def test_legacy_report_at_saved_clock_can_seed_without_publishing(replay):
+    startup = DirectionalBatteryRecovery(
+        _START,
+        1,
+        {
+            "charge": DirectionalBatteryPairReference(
+                _START, {"grid_battery": 1050, "solar_battery": 2000}
+            )
+        },
+    )
+    assert replay(0, grid=1050, startup=startup).interval is None
+    assert replay(300, grid=1100).interval.watts["grid_battery"] == 600
+
+
 def test_rejected_outlier_in_other_pair_cannot_pin_the_dropout_guard(replay):
     replay(0)
     assert replay(300).interval is not None
@@ -552,6 +566,8 @@ def test_dropout_recovery_compares_paired_and_direct_deltas(replay):
         "invalid_report",
         "invalid_before_reload",
         "invalid_after_reload",
+        "invalid_after_legacy_reload",
+        "invalid_origin_after_reload",
     ],
 )
 async def test_reload_during_dropout_uses_saved_same_day_counters(
@@ -583,7 +599,15 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
     manager = new_manager()
     closed_grid = 500
 
-    async def refresh(seconds, grid, *, solar=2000, charge=None, receipt_seconds=None):
+    async def refresh(
+        seconds,
+        grid,
+        *,
+        solar=2000,
+        charge=None,
+        receipt_seconds=None,
+        known_start=True,
+    ):
         nonlocal now
         reported_at = _START + timedelta(seconds=seconds)
         now = (
@@ -592,7 +616,9 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
             else _START + timedelta(seconds=receipt_seconds)
         )
         read.return_value = {
-            "start_date": (_START.date() - timedelta(days=1)).isoformat(),
+            "start_date": (
+                (_START.date() - timedelta(days=1)).isoformat() if known_start else None
+            ),
             "last_report_date": reported_at.timestamp(),
             "grid_battery": [closed_grid, grid],
             "solar_battery": [0, solar],
@@ -613,7 +639,7 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         assert (await refresh(1200, 1300)).watts["grid_battery"] == 600
         assert "battery_energy_from_grid" not in manager.site_energy
         assert saved["totals"]["grid_battery"] == 1550
-    elif history_kind == "legacy":
+    elif history_kind in ("legacy", "invalid_after_legacy_reload"):
         del saved["power"]
     elif history_kind == "corrupt_checkpoint":
         del saved["power"]["pairs"]["charge"]["wh"]["grid_battery"]
@@ -643,12 +669,24 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         "invalid_report",
         "invalid_before_reload",
         "invalid_after_reload",
+        "invalid_after_legacy_reload",
+        "invalid_origin_after_reload",
     ):
-        if history_kind == "invalid_after_reload":
+        if history_kind not in ("invalid_report", "invalid_before_reload"):
             manager = new_manager()
-        assert await refresh(600, 1050, charge=13050) is None
+        assert (
+            await refresh(
+                600,
+                1050,
+                charge=13050,
+                known_start=history_kind != "invalid_origin_after_reload",
+            )
+            is None
+        )
         assert await refresh(600, 1050) is None
-        if history_kind == "invalid_before_reload":
+        if history_kind == "invalid_after_legacy_reload":
+            assert saved["power"]["closed_signature"] is None
+        if history_kind in ("invalid_before_reload", "invalid_after_legacy_reload"):
             manager = new_manager()
         assert await refresh(900, 11050) is None
         assert await refresh(1200, 1100) is None
@@ -797,3 +835,6 @@ def test_finite_counter_can_still_overflow_conversion(replay):
 def test_invalid_report_cannot_supply_a_new_recovery_checkpoint(replay):
     power = replay(0, overrides={"charge": [True]})
     assert power.recovery_checkpoint(_START) is None
+    assert replay(0).interval is None
+    assert replay(300, grid=1050).interval is None
+    assert replay(600, grid=1100).interval.watts["grid_battery"] == 600

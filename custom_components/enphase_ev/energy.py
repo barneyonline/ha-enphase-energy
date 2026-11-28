@@ -1354,7 +1354,7 @@ class EnergyManager:
                         self._coerce_lifetime_bucket,
                         startup=self._directional_battery.power_startup_reference(),
                     )
-                else:
+                elif self._directional_battery.source_context_ready:
                     power.reject_report(
                         directional_source,
                         self._directional_battery.power_startup_for_rejected_report(
