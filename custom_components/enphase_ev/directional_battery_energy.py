@@ -27,6 +27,13 @@ _AGGREGATE_PAIRS = {
 _LOGGER = logging.getLogger(__name__)
 
 
+def _pairs_reconcile(aggregate_wh: float, directional_wh: float) -> bool:
+    # Observed daily attribution differed by up to 3.17%.
+    # One Wh also accommodates rounding in small buckets.
+    tolerance = max(1.0, aggregate_wh * 0.05) if directional_wh else 1.0
+    return abs(aggregate_wh - directional_wh) <= tolerance
+
+
 def directional_battery_store(
     hass: HomeAssistant, site_id: str
 ) -> Store[dict[str, object]]:
@@ -269,7 +276,7 @@ class DirectionalBatteryEnergy:
 
         totals = dict.fromkeys(_FIELDS, 0.0)
         closed = totals.copy()
-        idle_pairs: set[str] = set()
+        direct_totals = dict.fromkeys(_AGGREGATE_PAIRS, 0.0)
         reporting_started = False
         count = 0
         for index in range(size):
@@ -307,14 +314,10 @@ class DirectionalBatteryEnergy:
                 if not total:
                     if pair_total:
                         return None
-                    if total == 0 and (reporting_started or index == size - 1):
-                        idle_pairs.add(key)
                     continue
-                # Observed daily attribution differed by up to 3.17%.
-                # One Wh also accommodates rounding in small buckets.
-                tolerance = max(1.0, total * 0.05) if pair_total else 1.0
-                if abs(total - pair_total) > tolerance:
+                if not _pairs_reconcile(total, pair_total):
                     return None
+                direct_totals[key] += total
             for field, sample in reported.items():
                 totals[field] += sample
             if (
@@ -328,13 +331,20 @@ class DirectionalBatteryEnergy:
                 # the group's increases, even if a later bucket compensates.
                 return None
             count += 1
-        for key, (left, right) in _AGGREGATE_PAIRS.items():
-            if not (totals[left] or totals[right] or key in idle_pairs):
-                return None
         if not any(totals.values()) or not all(
             math.isfinite(total) for total in totals.values()
         ):
             return None
+        for key, (left, right) in _AGGREGATE_PAIRS.items():
+            pair_total = totals[left] + totals[right]
+            direct_total = direct_totals[key]
+            if pair_total:
+                if not _pairs_reconcile(direct_total, pair_total):
+                    return None
+            elif direct_total:
+                # An entirely inactive directional pair requires an entirely
+                # inactive direct aggregate, even if each bucket was within 1 Wh.
+                return None
         if (
             previous is not None
             and reported_at == previous.reported_at

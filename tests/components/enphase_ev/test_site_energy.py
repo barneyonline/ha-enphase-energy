@@ -171,6 +171,27 @@ def test_directional_battery_accepts_empty_aggregate_padding(
     assert flows["battery_energy_from_grid"].value_kwh == 2.952
 
 
+@pytest.mark.parametrize("initial_charge", [0, 1])
+def test_directional_battery_rounding_tolerance_cannot_hide_lifetime_energy(
+    coordinator_factory, directional_battery_payload, initial_charge
+) -> None:
+    payload = {
+        **directional_battery_payload,
+        "charge": [initial_charge, 1, 1],
+        "grid_battery": [initial_charge, 0, 0],
+        "solar_battery": [0, 0, 0],
+        "discharge": [1000, 1000, 1000],
+        "battery_home": [1000, 1000, 1000],
+        "battery_grid": [0, 0, 0],
+    }
+    manager = coordinator_factory().energy
+    flows, _ = _assemble_directional_site_energy(manager, payload)
+    assert not flows.keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
+    payload["charge"] = [initial_charge, 0, 0]
+    flows, _ = _assemble_directional_site_energy(manager, payload)
+    assert flows["battery_energy_from_grid"].value_kwh == initial_charge / 1000
+
+
 def test_directional_battery_boolean_does_not_become_measured_zero(
     coordinator_factory, directional_battery_payload
 ) -> None:
