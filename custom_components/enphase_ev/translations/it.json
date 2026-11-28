@@ -785,6 +785,7 @@
             "data": {
               "schedule_sync_enabled": "Abilita il supporto dello scheduler",
               "battery_schedules_enabled": "Attiva pianificatore batteria",
+              "directional_battery_energy_enabled": "Abilita l’energia della batteria per direzione",
               "system_event_repair_issues": "Abilita notifiche di riparazione per eventi di sistema",
               "pricing_edits_enabled": "Attiva le modifiche dei prezzi",
               "weather_enabled": "Abilita meteo",
@@ -799,6 +800,7 @@
               "nominal_voltage": "Tensione di alimentazione CA tipica usata per stimare la potenza quando la tensione in tempo reale non è disponibile. Predefinito: Ricavato dalla telemetria del caricatore quando disponibile; altrimenti in base alla regione di Home Assistant, con un valore di riserva di 230 V.",
               "schedule_sync_enabled": "Gestisci le pianificazioni di IQ EV Charger. Predefinito: Attivato.",
               "battery_schedules_enabled": "Gestisci le pianificazioni di IQ Battery. Predefinito: Attivato.",
+              "directional_battery_energy_enabled": "Mostra per il pannello Energia i totali accumulati dalla rete e dai pannelli solari alla batteria e dalla batteria alla casa e alla rete. Impostazione predefinita: attiva.",
               "microinverter_lifetime_energy_enabled": "Abilita tutti i sensori di energia totale per ciascun microinverter. Predefinito: Disattivato.",
               "vpp_events_enabled": "Recupera le pianificazioni VPP/ELRP da Enphase e crea entità evento solo per i siti iscritti. Disabilitato per impostazione predefinita. Predefinito: Disattivato."
             }
@@ -822,6 +824,7 @@
           "advanced_features": "Funzionalità avanzate",
           "schedule_sync_enabled": "Abilita il supporto dello scheduler",
           "battery_schedules_enabled": "Attiva pianificatore batteria",
+          "directional_battery_energy_enabled": "Abilita l’energia della batteria per direzione",
           "system_event_repair_issues": "Abilita notifiche di riparazione per eventi di sistema",
           "pricing_edits_enabled": "Attiva le modifiche dei prezzi",
           "weather_enabled": "Abilita meteo",
@@ -839,6 +842,7 @@
           "nominal_voltage": "Tensione di alimentazione CA tipica usata per stimare la potenza quando la tensione in tempo reale non è disponibile. Predefinito: Ricavato dalla telemetria del caricatore quando disponibile; altrimenti in base alla regione di Home Assistant, con un valore di riserva di 230 V.",
           "schedule_sync_enabled": "Gestisci le pianificazioni di IQ EV Charger. Predefinito: Attivato.",
           "battery_schedules_enabled": "Gestisci le pianificazioni di IQ Battery. Predefinito: Attivato.",
+          "directional_battery_energy_enabled": "Mostra per il pannello Energia i totali accumulati dalla rete e dai pannelli solari alla batteria e dalla batteria alla casa e alla rete. Impostazione predefinita: attiva.",
           "microinverter_lifetime_energy_enabled": "Abilita tutti i sensori di energia totale per ciascun microinverter. Predefinito: Disattivato.",
           "microinverter_power_enabled": "Abilita tutti i sensori di potenza per ciascun microinverter quando è disponibile la telemetria dell’installatore. Richiede l’accesso installatore. Predefinito: Disattivato.",
           "vpp_events_enabled": "Recupera le pianificazioni VPP/ELRP da Enphase e crea entità evento solo per i siti iscritti. Disabilitato per impostazione predefinita. Predefinito: Disattivato.",
@@ -1437,6 +1441,38 @@
           },
           "last_reset_at": {
             "name": "Ultimo reset"
+          }
+        }
+      },
+      "battery_energy_from_grid": {
+        "name": "Energia dalla rete alla batteria",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Campionato alle (UTC)"
+          }
+        }
+      },
+      "battery_energy_from_solar": {
+        "name": "Energia solare alla batteria",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Campionato alle (UTC)"
+          }
+        }
+      },
+      "battery_energy_to_grid": {
+        "name": "Energia dalla batteria alla rete",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Campionato alle (UTC)"
+          }
+        }
+      },
+      "battery_energy_to_home": {
+        "name": "Energia dalla batteria alla casa",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Campionato alle (UTC)"
           }
         }
       },

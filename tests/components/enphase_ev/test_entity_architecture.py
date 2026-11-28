@@ -1,15 +1,21 @@
 """Regression coverage for the architectural entity/state corrections."""
 
 from datetime import datetime, timedelta, timezone
+import logging
 from unittest.mock import AsyncMock, MagicMock
 from types import SimpleNamespace
 import asyncio
 
 import pytest
+from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import State
 from homeassistant.components.sensor import SensorStateClass
 from homeassistant.components.sensor import recorder as sensor_recorder
+from homeassistant.helpers.entity_component import EntityComponent
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant.common import async_fire_time_changed
 from custom_components.enphase_ev.sensor import (
+    EnphaseDirectionalBatteryEnergySensor,
     EnphaseInverterLifetimeEnergySensor,
     EnphaseSiteEnergySensor,
 )
@@ -26,6 +32,30 @@ from custom_components.enphase_ev.inverter_inventory import (
 from custom_components.enphase_ev.sensor_snapshot_helpers import restore_power_w
 
 from .device_info_helpers import device_info_fields
+
+
+def _compile_energy_sum(hass, monkeypatch, history, start, *, baseline):
+    monkeypatch.setattr(sensor_recorder, "_get_sensor_states", lambda _: [history[-1]])
+    monkeypatch.setattr(sensor_recorder, "get_instance", lambda _: MagicMock())
+    monkeypatch.setattr(
+        sensor_recorder.history,
+        "get_full_significant_states_with_session",
+        lambda *a, **k: {"sensor.site_energy": history},
+    )
+    monkeypatch.setattr(
+        sensor_recorder.statistics, "get_metadata_with_session", lambda *a, **k: {}
+    )
+    monkeypatch.setattr(
+        sensor_recorder.statistics,
+        "get_latest_short_term_statistics_with_session",
+        lambda *a, **k: {
+            "sensor.site_energy": [{"state": baseline, "sum": 42.0, "last_reset": None}]
+        },
+    )
+    result = sensor_recorder.compile_statistics(
+        hass, MagicMock(), start, start + timedelta(minutes=5), {}
+    )
+    return result.platform_stats[0]["stat"]["sum"]
 
 
 @pytest.mark.parametrize("flow", ["grid_export", "grid_import", "solar_production"])
@@ -93,27 +123,9 @@ async def test_site_energy_recorder_preserves_restored_total(
     assert [state.state for state in history] == expected_states
     assert entity.state_class == SensorStateClass.TOTAL_INCREASING
 
-    monkeypatch.setattr(sensor_recorder, "_get_sensor_states", lambda _: [history[-1]])
-    monkeypatch.setattr(sensor_recorder, "get_instance", lambda _: MagicMock())
-    monkeypatch.setattr(
-        sensor_recorder.history,
-        "get_full_significant_states_with_session",
-        lambda *a, **k: {"sensor.site_energy": history},
-    )
-    monkeypatch.setattr(
-        sensor_recorder.statistics, "get_metadata_with_session", lambda *a, **k: {}
-    )
-    monkeypatch.setattr(
-        sensor_recorder.statistics,
-        "get_latest_short_term_statistics_with_session",
-        lambda *a, **k: {
-            "sensor.site_energy": [{"state": 19753.49, "sum": 42.0, "last_reset": None}]
-        },
-    )
-    result = sensor_recorder.compile_statistics(
-        hass, MagicMock(), start, start + timedelta(minutes=5), {}
-    )
-    assert result.platform_stats[0]["stat"]["sum"] == pytest.approx(expected_sum)
+    assert _compile_energy_sum(
+        hass, monkeypatch, history, start, baseline=19753.49
+    ) == pytest.approx(expected_sum)
     assert "sensor.site_energy" not in hass.data.get(sensor_recorder.SEEN_DIP, set())
     assert "not strictly increasing" not in caplog.text
 
@@ -121,6 +133,102 @@ async def test_site_energy_recorder_preserves_restored_total(
     coord.energy.site_energy = {}
     assert entity.native_value == float(expected_states[-1])
     assert entity.extra_restore_state_data.native_value == float(expected_states[-1])
+
+
+@pytest.mark.parametrize(
+    ("original", "corrected", "recovered"),
+    [
+        ([5500], [5000], [5600]),
+        ([5500], [100], [5600]),
+        ([None, 5500], [3000, 5500], [None, 5600]),
+        ([3000, 2500], [3100, 2500], [3000, 2600]),
+    ],
+    ids=["shallow-correction", "large-correction", "backfill", "closed-correction"],
+)
+async def test_directional_battery_does_not_record_source_corrections(
+    hass, coordinator_factory, monkeypatch, original, corrected, recovered
+):
+    client = SimpleNamespace(lifetime_energy=AsyncMock())
+    coord = coordinator_factory(serials=[], client=client)
+    coord.last_update_success = True
+    entity = EnphaseDirectionalBatteryEnergySensor(coord, "battery_energy_from_grid")
+    history = []
+    start = (dt_util.utcnow() - timedelta(minutes=1)).replace(second=0, microsecond=0)
+    source_start = start.date() - timedelta(days=len(original) - 1)
+    for index, values in enumerate((original, corrected, corrected, recovered)):
+        idle = [None if value is None else 0 for value in values]
+        timestamp = start + timedelta(seconds=index)
+        client.lifetime_energy.return_value = {
+            "start_date": source_start.isoformat(),
+            "last_report_date": timestamp.timestamp(),
+            "grid_battery": values,
+            "solar_battery": idle,
+            "battery_home": idle,
+            "battery_grid": idle,
+            "charge": values,
+            "discharge": idle,
+        }
+        await coord.energy._async_refresh_site_energy(force=True)
+        history.append(
+            State(
+                "sensor.site_energy",
+                str(entity.native_value) if entity.available else STATE_UNAVAILABLE,
+                {
+                    "state_class": entity.state_class,
+                    "device_class": entity.device_class,
+                    "unit_of_measurement": entity.native_unit_of_measurement,
+                    **entity.extra_state_attributes,
+                },
+                last_changed=timestamp,
+            )
+        )
+    assert [state.state for state in history] == [
+        "5.5",
+        STATE_UNAVAILABLE,
+        STATE_UNAVAILABLE,
+        "5.6",
+    ]
+    assert _compile_energy_sum(
+        hass, monkeypatch, history, start, baseline=5.5
+    ) == pytest.approx(42.1)
+    assert "sensor.site_energy" not in hass.data.get(sensor_recorder.SEEN_DIP, set())
+
+
+async def test_directional_battery_expires_without_another_poll(
+    hass, config_entry, coordinator_factory, monkeypatch
+):
+    now = dt_util.utcnow().replace(microsecond=0)
+    reported_at = now - timedelta(minutes=29)
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now)
+    client = SimpleNamespace(
+        lifetime_energy=AsyncMock(
+            return_value={
+                "start_date": reported_at.date().isoformat(),
+                "last_report_date": reported_at.timestamp(),
+                "charge": [1200],
+                "discharge": [0],
+                "grid_battery": [1200],
+                "solar_battery": [0],
+                "battery_home": [0],
+                "battery_grid": [0],
+            }
+        )
+    )
+    coord = coordinator_factory(serials=[], client=client)
+    coord.update_interval = None
+    coord.last_update_success = True
+    await coord.energy._async_refresh_site_energy(force=True)
+    entity = EnphaseDirectionalBatteryEnergySensor(coord, "battery_energy_from_grid")
+    entity.entity_id = "sensor.directional_battery_expiry"
+    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    component._platforms["sensor"].config_entry = config_entry
+    await component.async_add_entities([entity])
+    assert float(hass.states.get(entity.entity_id).state) == 1.2
+    now += timedelta(minutes=1)
+    async_fire_time_changed(hass, now)
+    await hass.async_block_till_done()
+    assert hass.states.get(entity.entity_id).state == STATE_UNAVAILABLE
+    await component.async_remove_entity(entity.entity_id)
 
 
 @pytest.mark.parametrize(

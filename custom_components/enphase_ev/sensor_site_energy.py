@@ -24,7 +24,12 @@ from homeassistant.util.unit_conversion import PowerConverter
 from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, CURRENT_POWER_STALE_AFTER_S, OPT_USE_15_MINUTE_POWER_AVERAGE
+from .const import (
+    CLOUD_TELEMETRY_STALE_AFTER_S,
+    DOMAIN,
+    CURRENT_POWER_STALE_AFTER_S,
+    OPT_USE_15_MINUTE_POWER_AVERAGE,
+)
 from .coordinator import EnphaseCoordinator
 from .current_power_runtime import is_idle_power_sample
 from .device_info_helpers import _cloud_device_info
@@ -33,6 +38,7 @@ from .energy import (
     LIFETIME_RESET_FLOOR_KWH,
     LIFETIME_RESET_RATIO,
     SiteEnergyFlow,
+    directional_battery_source_is_fresh,
 )
 from .power_validation import EXTREME_SITE_POWER_W, ExtremePowerValidator
 from .power_average import AverageUpdate, EnergyPowerAverage, WINDOW_SECONDS
@@ -43,6 +49,8 @@ from .power_restore import (
     power_restore_data,
 )
 from .runtime_helpers import inventory_type_device_info as _type_device_info
+from .runtime_helpers import site_battery_device_available
+from .serial_entity_metadata import site_sensor_unique_id
 from .sensor_base import EnphaseSiteSensorEntity as _SiteBaseEntity
 from .sensor_common import (
     callback,
@@ -300,6 +308,8 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
     _attr_suggested_display_precision = 2
     _attr_entity_registry_enabled_default = True
+    _value_precision = 2
+    _infer_reset_on_restore = True
 
     def __init__(
         self,
@@ -307,11 +317,13 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
         flow_key: str,
         translation_key: str,
         name: str,
+        *,
+        type_key: str = "envoy",
     ) -> None:
-        super().__init__(coord, flow_key, name)
+        super().__init__(coord, flow_key, name, type_key=type_key)
         self._flow_key = flow_key
         self._attr_translation_key = translation_key
-        self._attr_unique_id = f"{DOMAIN}_site_{coord.site_id}_{flow_key}"
+        self._attr_unique_id = site_sensor_unique_id(coord.site_id, flow_key)
         self._restored_value: float | None = None
         self._restored_reset_at: str | None = None
         self._last_source_value: float | None = None
@@ -342,22 +354,22 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
             reset_attr = attributes.get("last_reset_at")
             if isinstance(reset_attr, str):
                 self._restored_reset_at = reset_attr
-        last_extra = await self.async_get_last_extra_data()
-        composition_restore = _SiteEnergyRestoreData.from_dict(
-            last_extra.as_dict() if last_extra is not None else None
-        )
-        if (
-            self._flow_key == "grid_export"
-            and composition_restore.composition_migration_checked
-        ):
-            self._composition_offset_kwh = composition_restore.composition_offset_kwh
-            self._composition_offset_reset_at = (
-                composition_restore.composition_offset_reset_at
+        if self._flow_key == "grid_export":
+            last_extra = await self.async_get_last_extra_data()
+            composition_restore = _SiteEnergyRestoreData.from_dict(
+                last_extra.as_dict() if last_extra is not None else None
             )
-            self._composition_source_start_date = (
-                composition_restore.composition_source_start_date
-            )
-            self._composition_migration_checked = True
+            if composition_restore.composition_migration_checked:
+                self._composition_offset_kwh = (
+                    composition_restore.composition_offset_kwh
+                )
+                self._composition_offset_reset_at = (
+                    composition_restore.composition_offset_reset_at
+                )
+                self._composition_source_start_date = (
+                    composition_restore.composition_source_start_date
+                )
+                self._composition_migration_checked = True
         if self._restored_value is not None:
             self._last_source_value = (
                 self._restored_value + self._composition_offset_kwh
@@ -467,6 +479,8 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
 
     @property
     def device_info(self) -> Any:
+        if self._type_key == "encharge":
+            return super().device_info
         heatpump_available = self._flow_key == "heat_pump" and _has_type(
             self._coord, "heatpump"
         )
@@ -484,7 +498,9 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
         current = self._current_value()
         if current is not None:
             self._ensure_composition_migration()
-            value = round(max(current - self._composition_offset_kwh, 0.0), 2)
+            value = round(
+                max(current - self._composition_offset_kwh, 0.0), self._value_precision
+            )
             reset_at = self._flow_data().get("last_reset_at")
             previous = self._restored_value
             previous_source = self._last_source_value
@@ -497,6 +513,7 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
                 and (reset_at is None or reset_at == self._restored_reset_at)
                 and not (
                     previous_source is not None
+                    and self._infer_reset_on_restore
                     and previous_source - current >= LIFETIME_RESET_DROP_THRESHOLD_KWH
                     and (
                         current <= LIFETIME_RESET_FLOOR_KWH
@@ -504,7 +521,7 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
                     )
                 )
             ):
-                value = round(previous, 2)
+                value = round(previous, self._value_precision)
             self._restored_value = value
             # Attribute reads may already have cleared a migration offset.
             # Keep the corresponding raw baseline independently for resets.
@@ -514,7 +531,7 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
             return value
         if self._restored_value is None:
             return None
-        return round(self._restored_value, 2)
+        return round(self._restored_value, self._value_precision)
 
     @property
     def extra_restore_state_data(self) -> ExtraStoredData | None:
@@ -595,6 +612,36 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
             attrs[attr_key] = daily.get(key)
 
         return attrs
+
+
+class EnphaseDirectionalBatteryEnergySensor(EnphaseSiteEnergySensor):
+    """A cumulative site battery direction attached to the IQ Battery device."""
+
+    _value_precision = 3
+    _infer_reset_on_restore = False
+    _unrecorded_attributes = EnphaseSiteEnergySensor._unrecorded_attributes | frozenset(
+        {"sampled_at_utc"}
+    )
+
+    def __init__(self, coord: EnphaseCoordinator, flow_key: str) -> None:
+        super().__init__(coord, flow_key, flow_key, flow_key, type_key="encharge")
+
+    @property
+    def available(self) -> bool:
+        source = self._flow_data().get("last_report_date")
+        return (
+            site_battery_device_available(self._coord)
+            and isinstance(source, datetime)
+            and directional_battery_source_is_fresh(source)
+            and self._current_value() is not None
+            and super().available
+        )
+
+    def _freshness_deadline(self) -> datetime | None:
+        source = self._flow_data().get("last_report_date")
+        if not isinstance(source, datetime) or source.tzinfo is None:
+            return None
+        return source + timedelta(seconds=CLOUD_TELEMETRY_STALE_AFTER_S)
 
 
 class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: ignore[misc]

@@ -785,6 +785,7 @@
             "data": {
               "schedule_sync_enabled": "Enable EV Charger Scheduler",
               "battery_schedules_enabled": "Enable Battery Scheduler",
+              "directional_battery_energy_enabled": "Enable Directional Battery Energy",
               "system_event_repair_issues": "Enable System Event Repair Notifications",
               "pricing_edits_enabled": "Enable Pricing Edits",
               "weather_enabled": "Enable Weather",
@@ -799,6 +800,7 @@
               "nominal_voltage": "AC supply voltage used to estimate charger power when live voltage is unavailable. Default: Learned from charger telemetry when available; otherwise based on the Home Assistant region, with a 230 V fallback.",
               "schedule_sync_enabled": "Enable controls to view and manage IQ EV Charger charging schedules. Default: Enabled.",
               "battery_schedules_enabled": "Enable controls to view and manage IQ Battery schedules. Default: Enabled.",
+              "directional_battery_energy_enabled": "Add lifetime Energy Dashboard sensors for grid-to-battery, solar-to-battery, battery-to-home, and battery-to-grid. Default: Enabled.",
               "microinverter_lifetime_energy_enabled": "Enable individual lifetime energy sensors for each microinverter. Default: Disabled.",
               "vpp_events_enabled": "Fetch Virtual Power Plant (VPP) and Emergency Load Reduction Program (ELRP) schedules and create event entities for enrolled sites. Default: Disabled."
             }
@@ -822,6 +824,7 @@
           "advanced_features": "Advanced Features",
           "schedule_sync_enabled": "Enable EV Charger Scheduler",
           "battery_schedules_enabled": "Enable Battery Scheduler",
+          "directional_battery_energy_enabled": "Enable Directional Battery Energy",
           "system_event_repair_issues": "Enable System Event Repair Notifications",
           "pricing_edits_enabled": "Enable Pricing Edits",
           "weather_enabled": "Enable Weather",
@@ -839,6 +842,7 @@
           "nominal_voltage": "AC supply voltage used to estimate charger power when live voltage is unavailable. Default: Learned from charger telemetry when available; otherwise based on the Home Assistant region, with a 230 V fallback.",
           "schedule_sync_enabled": "Enable controls to view and manage IQ EV Charger charging schedules. Default: Enabled.",
           "battery_schedules_enabled": "Enable controls to view and manage IQ Battery schedules. Default: Enabled.",
+          "directional_battery_energy_enabled": "Add lifetime Energy Dashboard sensors for grid-to-battery, solar-to-battery, battery-to-home, and battery-to-grid. Default: Enabled.",
           "microinverter_lifetime_energy_enabled": "Enable individual lifetime energy sensors for each microinverter. Default: Disabled.",
           "microinverter_power_enabled": "Enable individual current power sensors for each microinverter when installer telemetry is available. Requires installer access. Default: Disabled.",
           "vpp_events_enabled": "Fetch Virtual Power Plant (VPP) and Emergency Load Reduction Program (ELRP) schedules and create event entities for enrolled sites. Default: Disabled.",
@@ -1545,6 +1549,38 @@
           },
           "last_reset_at": {
             "name": "Last Reset At"
+          }
+        }
+      },
+      "battery_energy_from_grid": {
+        "name": "Battery Energy From Grid",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Sampled At (UTC)"
+          }
+        }
+      },
+      "battery_energy_from_solar": {
+        "name": "Battery Energy From Solar",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Sampled At (UTC)"
+          }
+        }
+      },
+      "battery_energy_to_grid": {
+        "name": "Battery Energy To Grid",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Sampled At (UTC)"
+          }
+        }
+      },
+      "battery_energy_to_home": {
+        "name": "Battery Energy To Home",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Sampled At (UTC)"
           }
         }
       },

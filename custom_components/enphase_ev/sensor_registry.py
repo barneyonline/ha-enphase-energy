@@ -22,6 +22,7 @@ from .serial_entity_metadata import (
     inverter_entity_serial_from_unique_id,
     site_battery_entity_unique_id,
     site_battery_entity_unique_ids,
+    site_sensor_unique_id,
 )
 
 
@@ -47,7 +48,7 @@ class EnphaseSensorRegistrySetup:
     def site_sensor_unique_id(self, key: str) -> str:
         """Return the unique ID for a site-level sensor key."""
 
-        return f"{DOMAIN}_site_{self._site_id}_{key}"
+        return site_sensor_unique_id(self._site_id, key)
 
     def type_sensor_unique_id(self, type_key: str) -> str:
         """Return the unique ID for a type inventory sensor."""

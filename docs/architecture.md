@@ -662,6 +662,18 @@ clearing and entity attribute reads. Invalid flow metadata cannot clear migratio
 offsets and lose that baseline across another restart. Repeated equal totals remain
 valid `total_increasing` states.
 
+Directional battery energy uses the four reported lifetime Wh arrays as one
+set. Positive directional readings require corroborating charge or discharge
+in the same bucket. The integration saves the closed-bucket sums and the last
+accepted totals before publishing the group. A change to closed energy or a
+decrease in an already counted direction makes the group unavailable until a
+consistent response arrives. The same applies if existing directional entities
+lose the stored baseline, since reinitializing them could add old energy to
+Recorder. The site-scoped baseline survives removal and re-addition because
+Recorder also retains its statistics. The IQ Battery sensors retain Wh precision.
+The Device Features option controls whether the platform adds the sensors.
+Home Assistant retains the registry entries and their original enablement settings.
+
 Current Grid Power and Current Battery Power reseed their cumulative-energy
 baselines when missing source channels return, including during reload or reauth.
 Synthetic zero placeholders never authorize a delta from zero to a lifetime total.

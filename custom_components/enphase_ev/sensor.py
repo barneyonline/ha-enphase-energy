@@ -45,11 +45,14 @@ from .entity import evse_safe_limit_active, evse_charging_active
 from .control_updates import current_control_value
 from .labels import battery_profile_label
 from .const import (
+    DIRECTIONAL_BATTERY_ENERGY_FIELDS,
+    DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
     DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     DEFAULT_MICROINVERTER_POWER_ENABLED,
     DEFAULT_NOMINAL_VOLTAGE,
     DEFAULT_VPP_EVENTS_ENABLED,
     DOMAIN,
+    OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_MICROINVERTER_POWER_ENABLED,
     OPT_VPP_EVENTS_ENABLED,
@@ -76,6 +79,7 @@ from .scalar_helpers import (
     coerce_snapshot_bool,
 )
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
+from .directional_battery_energy import has_directional_battery_entities
 from .sensor_snapshot_helpers import restore_power_w
 from .sensor_cloud_metadata import (
     EnphaseAccountAccessSensor,
@@ -118,6 +122,7 @@ from .sensor_heatpump import (
 from .runtime_helpers import (
     coerce_optional_text as _gateway_clean_text,
     inventory_type_available as _type_available,
+    site_has_battery as _site_has_battery,
     inventory_type_device_info as _type_device_info,
     normalize_evse_session_energy,
 )
@@ -215,6 +220,7 @@ from .sensor_site_energy import (
     CURRENT_POWER_CACHE_TTL_MULTIPLIER as CURRENT_POWER_CACHE_TTL_MULTIPLIER,
     EnphaseBatteryPowerSensor as EnphaseBatteryPowerSensor,
     EnphaseCurrentPowerConsumptionSensor as EnphaseCurrentPowerConsumptionSensor,
+    EnphaseDirectionalBatteryEnergySensor,
     EnphaseGridPowerSensor as EnphaseGridPowerSensor,
     EnphaseSiteConsumptionPowerSensor as EnphaseSiteConsumptionPowerSensor,
     EnphaseSiteEnergySensor as EnphaseSiteEnergySensor,
@@ -281,11 +287,6 @@ _battery_optional_bool = _battery_helpers.battery_optional_bool
 _battery_snapshot_last_reported = _battery_helpers.battery_snapshot_last_reported
 
 
-def _site_has_battery(coord: EnphaseCoordinator) -> bool:
-    has_encharge = getattr(coord, "battery_has_encharge", None)
-    return has_encharge is not False
-
-
 def _grid_control_site_applicable(coord: EnphaseCoordinator) -> bool:
     has_encharge = getattr(coord, "battery_has_encharge", None)
     has_enpower = getattr(coord, "battery_has_enpower", None)
@@ -325,6 +326,16 @@ async def async_setup_entry(
         ent_reg,
         config_entry_id=entry.entry_id,
         site_id=str(coord.site_id),
+    )
+    directional_battery_energy_enabled = bool(
+        entry.options.get(
+            OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+            DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+        )
+    )
+    known_directional_battery_energy = (
+        directional_battery_energy_enabled
+        and has_directional_battery_entities(hass, str(coord.site_id))
     )
     microinverter_lifetime_energy_enabled = bool(
         entry.options.get(
@@ -830,6 +841,14 @@ async def async_setup_entry(
             "battery_charge"
         ) and _site_lifetime_power_channel_present("battery_discharge")
         if site_has_battery and battery_device_available:
+            if directional_battery_energy_enabled and (
+                known_directional_battery_energy
+                or DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys() <= site_energy.keys()
+            ):
+                for flow_key in DIRECTIONAL_BATTERY_ENERGY_FIELDS:
+                    _add_site_entity(
+                        flow_key, EnphaseDirectionalBatteryEnergySensor(coord, flow_key)
+                    )
             if battery_power_supported:
                 _add_site_entity("battery_power", EnphaseBatteryPowerSensor(coord))
             else:

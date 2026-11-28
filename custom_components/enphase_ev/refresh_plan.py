@@ -316,6 +316,23 @@ STARTUP_POWER_STAGE = RefreshStage(
 
 STARTUP_POWER_PLAN = RefreshPlan(stages=(STARTUP_POWER_STAGE,))
 
+DIRECTIONAL_BATTERY_WARMUP_PLAN = RefreshPlan(
+    stages=(
+        RefreshStage(
+            stage_key="directional_battery_retry",
+            deadline_s=WARMUP_STAGE_DEADLINE_S,
+            parallel_tasks=(
+                object_method_task(
+                    "directional_battery_energy_s",
+                    "directional battery energy",
+                    "refresh_runner",
+                    "async_refresh_site_energy_for_warmup",
+                ),
+            ),
+        ),
+    )
+)
+
 STARTUP_CURRENT_POWER_STAGE = RefreshStage(
     stage_key="power",
     deadline_s=STARTUP_POWER_DEADLINE_S,

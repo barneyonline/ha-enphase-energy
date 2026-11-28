@@ -96,6 +96,7 @@ from .const import (
     CONF_TOKEN_EXPIRES_AT,
     DEFAULT_API_TIMEOUT,
     DEFAULT_DEGRADED_SERVICE_REPAIR_ISSUES,
+    DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
     DEFAULT_FAST_POLL_INTERVAL,
     DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
     DEFAULT_PRICING_EDITS_ENABLED,
@@ -119,6 +120,7 @@ from .const import (
     HEMS_AUTH_MANUAL_CLEAR_COOLDOWN_S,
     OPT_API_TIMEOUT,
     OPT_DEGRADED_SERVICE_REPAIR_ISSUES,
+    OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
     OPT_FAST_POLL_INTERVAL,
     OPT_GRID_PROFILE_CONTROLS_ENABLED,
     OPT_NOMINAL_VOLTAGE,
@@ -135,6 +137,10 @@ from .const import (
 from .battery_runtime import BatteryRuntime
 from .coordinator_diagnostics import CoordinatorDiagnostics
 from .current_power_runtime import CurrentPowerRuntime, CurrentPowerSample
+from .directional_battery_energy import (
+    directional_battery_store,
+    has_directional_battery_entities,
+)
 from .discovery_snapshot import DiscoverySnapshotManager
 from .device_types import (
     normalize_type_key,
@@ -199,6 +205,7 @@ from .runtime_helpers import (
     resolve_inverter_start_date,
     resolve_site_local_current_date,
     resolve_site_timezone_name,
+    site_battery_device_available,
 )
 from .session_history import (
     MIN_SESSION_HISTORY_CACHE_TTL,
@@ -1055,6 +1062,28 @@ class EnphaseCoordinator(
             ),
             hems_auth_success=lambda endpoint: self._note_hems_auth_success(
                 endpoint=endpoint
+            ),
+            directional_battery_enabled=(
+                config_entry is None
+                or bool(
+                    config_entry.options.get(
+                        OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+                        DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+                    )
+                )
+            ),
+            directional_battery_store=(
+                directional_battery_store(hass, self.site_id)
+                if config_entry is not None
+                else None
+            ),
+            has_directional_battery_entities=lambda: has_directional_battery_entities(
+                hass, self.site_id
+            ),
+            directional_site_timezone=(
+                self._directional_battery_site_timezone
+                if config_entry is not None
+                else None
             ),
         )
         self.evse_timeseries = EVSETimeseriesManager(
@@ -2354,6 +2383,9 @@ class EnphaseCoordinator(
         export_limit_runtime = getattr(self, "export_limit_runtime", None)
         if export_limit_runtime is not None:
             await export_limit_runtime.async_wait_for_intent_transactions()
+        energy = self.__dict__.get("energy")
+        if isinstance(energy, EnergyManager):
+            await energy.async_wait_for_directional_battery_save()
         if cancelled_tasks:
             done, pending = await asyncio.wait(
                 cancelled_tasks,
@@ -2801,6 +2833,13 @@ class EnphaseCoordinator(
 
     def _site_timezone_name(self) -> str:
         return resolve_site_timezone_name(getattr(self, "_battery_timezone", None))
+
+    def _directional_battery_site_timezone(self) -> str | None:
+        if not site_battery_device_available(self):
+            return None
+        return self.battery_timezone or coerce_optional_text(
+            self.inventory_state.cloud_metadata.get("timezone")
+        )
 
     @staticmethod
     def _format_inverter_model_summary(model_counts: dict[str, int]) -> str | None:

@@ -49,6 +49,7 @@ OPT_API_TIMEOUT = "api_timeout"
 OPT_SESSION_HISTORY_INTERVAL = "session_history_interval"
 OPT_SCHEDULE_SYNC_ENABLED = "schedule_sync_enabled"
 OPT_BATTERY_SCHEDULES_ENABLED = "battery_schedules_enabled"
+OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED = "directional_battery_energy_enabled"
 OPT_SYSTEM_EVENT_REPAIR_ISSUES = "system_event_repair_issues"
 OPT_DEGRADED_SERVICE_REPAIR_ISSUES = "degraded_service_repair_issues"
 OPT_DESCRIPTIVE_ACTIVITY_ENTRIES = "descriptive_activity_entries"
@@ -60,6 +61,7 @@ OPT_MICROINVERTER_POWER_ENABLED = "microinverter_power_enabled"
 OPT_PRICING_EDITS_ENABLED = "pricing_edits_enabled"
 DEFAULT_SCHEDULE_SYNC_ENABLED = True
 DEFAULT_BATTERY_SCHEDULES_ENABLED = True
+DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED = True
 DEFAULT_SYSTEM_EVENT_REPAIR_ISSUES = False
 DEFAULT_DEGRADED_SERVICE_REPAIR_ISSUES = False
 DEFAULT_DESCRIPTIVE_ACTIVITY_ENTRIES = False
@@ -69,6 +71,14 @@ DEFAULT_GRID_PROFILE_CONTROLS_ENABLED = False
 DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED = False
 DEFAULT_MICROINVERTER_POWER_ENABLED = False
 DEFAULT_PRICING_EDITS_ENABLED = True
+
+DIRECTIONAL_BATTERY_ENERGY_FIELDS = {
+    "battery_energy_from_grid": "grid_battery",
+    "battery_energy_from_solar": "solar_battery",
+    "battery_energy_to_home": "battery_home",
+    "battery_energy_to_grid": "battery_grid",
+}
+
 ISSUE_NETWORK_UNREACHABLE = "cloud_unreachable"
 ISSUE_DNS_RESOLUTION = "cloud_dns_resolution"
 ISSUE_CLOUD_ERRORS = "cloud_service_unavailable"

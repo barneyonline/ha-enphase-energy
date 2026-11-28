@@ -785,6 +785,7 @@
             "data": {
               "schedule_sync_enabled": "Schakel Scheduler-ondersteuning in",
               "battery_schedules_enabled": "Schakel Batterijplanner in",
+              "directional_battery_energy_enabled": "Batterij-energie per richting inschakelen",
               "system_event_repair_issues": "Reparatiemeldingen voor systeemgebeurtenissen inschakelen",
               "pricing_edits_enabled": "Prijsbewerkingen inschakelen",
               "weather_enabled": "Weer inschakelen",
@@ -799,6 +800,7 @@
               "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is. Standaard: Afgeleid van de telemetrie van de lader indien beschikbaar; anders gebaseerd op de Home Assistant-regio, met een terugvalwaarde van 230 V.",
               "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger. Standaard: Ingeschakeld.",
               "battery_schedules_enabled": "Beheer schema's voor de IQ Battery. Standaard: Ingeschakeld.",
+              "directional_battery_energy_enabled": "Toont voor het energiedashboard de cumulatieve energie van het net en de zonnepanelen naar de batterij en van de batterij naar het huis en het net. Standaard ingeschakeld.",
               "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in. Standaard: Uitgeschakeld.",
               "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld. Standaard: Uitgeschakeld."
             }
@@ -822,6 +824,7 @@
           "advanced_features": "Geavanceerde functies",
           "schedule_sync_enabled": "Schakel Scheduler-ondersteuning in",
           "battery_schedules_enabled": "Schakel Batterijplanner in",
+          "directional_battery_energy_enabled": "Batterij-energie per richting inschakelen",
           "system_event_repair_issues": "Reparatiemeldingen voor systeemgebeurtenissen inschakelen",
           "pricing_edits_enabled": "Prijsbewerkingen inschakelen",
           "weather_enabled": "Weer inschakelen",
@@ -839,6 +842,7 @@
           "nominal_voltage": "Gebruikelijke AC-voedingsspanning om het vermogen te schatten wanneer live spanning niet beschikbaar is. Standaard: Afgeleid van de telemetrie van de lader indien beschikbaar; anders gebaseerd op de Home Assistant-regio, met een terugvalwaarde van 230 V.",
           "schedule_sync_enabled": "Beheer schema's voor de IQ EV Charger. Standaard: Ingeschakeld.",
           "battery_schedules_enabled": "Beheer schema's voor de IQ Battery. Standaard: Ingeschakeld.",
+          "directional_battery_energy_enabled": "Toont voor het energiedashboard de cumulatieve energie van het net en de zonnepanelen naar de batterij en van de batterij naar het huis en het net. Standaard ingeschakeld.",
           "microinverter_lifetime_energy_enabled": "Schakelt alle levensduurenergiesensoren per micro-omvormer in. Standaard: Uitgeschakeld.",
           "microinverter_power_enabled": "Schakelt alle vermogenssensoren per micro-omvormer in wanneer installateurtelemetrie beschikbaar is. Vereist installateurstoegang. Standaard: Uitgeschakeld.",
           "vpp_events_enabled": "Haalt VPP/ELRP-planningen op bij Enphase en maakt alleen gebeurtenisentiteiten voor aangemelde locaties. Standaard uitgeschakeld. Standaard: Uitgeschakeld.",
@@ -1437,6 +1441,38 @@
           },
           "last_reset_at": {
             "name": "Laatste reset op"
+          }
+        }
+      },
+      "battery_energy_from_grid": {
+        "name": "Batterij-energie uit het net",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Gemeten om (UTC)"
+          }
+        }
+      },
+      "battery_energy_from_solar": {
+        "name": "Batterij-energie uit zonnepanelen",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Gemeten om (UTC)"
+          }
+        }
+      },
+      "battery_energy_to_grid": {
+        "name": "Batterij-energie naar het net",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Gemeten om (UTC)"
+          }
+        }
+      },
+      "battery_energy_to_home": {
+        "name": "Batterij-energie naar het huis",
+        "state_attributes": {
+          "sampled_at_utc": {
+            "name": "Gemeten om (UTC)"
           }
         }
       },

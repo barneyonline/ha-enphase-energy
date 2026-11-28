@@ -1,4 +1,4 @@
-"""Shared unique-ID metadata for serial-backed Enphase entities."""
+"""Shared unique-ID metadata for Enphase entities."""
 
 from __future__ import annotations
 
@@ -86,6 +86,11 @@ def site_battery_entity_unique_id(site_id: str, serial: str, suffix: str) -> str
     """Return a per-storage-battery unique ID."""
 
     return f"{DOMAIN}_site_{site_id}_battery_{serial}{suffix}"
+
+
+def site_sensor_unique_id(site_id: str, key: str) -> str:
+    """Return the unique ID of a site-level sensor."""
+    return f"{DOMAIN}_site_{site_id}_{key}"
 
 
 def site_battery_entity_unique_ids(

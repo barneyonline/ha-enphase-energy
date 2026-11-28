@@ -157,6 +157,16 @@ def inventory_type_available(coord: object, type_key: str) -> bool:
     return bool(callable(has_type_for_entities) and has_type_for_entities(type_key))
 
 
+def site_has_battery(coord: object) -> bool:
+    """Allow inventory to establish support until settings rule out batteries."""
+    return getattr(coord, "battery_has_encharge", None) is not False
+
+
+def site_battery_device_available(coord: object) -> bool:
+    """Check the current site capability and the entity-facing inventory."""
+    return site_has_battery(coord) and inventory_type_available(coord, "encharge")
+
+
 def inventory_type_device_info(coord: object, type_key: str) -> DeviceInfo | None:
     inventory_view = getattr(coord, "inventory_view", None)
     type_device_info = getattr(inventory_view, "type_device_info", None)

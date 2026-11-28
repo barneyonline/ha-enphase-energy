@@ -12,10 +12,13 @@ from typing import Callable, Iterable, Protocol, runtime_checkable
 
 import aiohttp
 from homeassistant.const import UnitOfPower
+from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .api import SiteEnergyUnavailable, guarded_read_scope
 from .cloud_retry import retry_after_delay, transient_backoff_delay
+from .const import CLOUD_TELEMETRY_STALE_AFTER_S, DIRECTIONAL_BATTERY_ENERGY_FIELDS
+from .directional_battery_energy import DirectionalBatteryEnergy
 from .log_redaction import redact_site_id, redact_text
 
 LIFETIME_DROP_JITTER_KWH = 0.02
@@ -28,11 +31,21 @@ LIFETIME_CONFIRM_WINDOW_S = 180.0
 SITE_ENERGY_CACHE_TTL = 300.0
 SITE_ENERGY_SOURCE_FUTURE_SKEW_S = 60.0
 SITE_ENERGY_DEFAULT_INTERVAL_MIN = 5.0
+DAILY_ENERGY_BUCKET_MINUTES = 24 * 60
 SITE_ENERGY_FAILURE_BACKOFF_S = 15 * 60
 HEMS_LIFETIME_FAILURE_BACKOFF_S = 60 * 60
 DEVICE_LIFETIME_CHANNELS: tuple[str, ...] = ("evse", "heatpump", "water_heater")
 HEMS_DEVICE_CHANNELS_META_KEY = "_hems_device_channels"
 HEMS_DEVICE_METADATA_KEY = "_hems_device_metadata"
+
+
+def directional_battery_source_is_fresh(source: datetime | None) -> bool:
+    """Require an available cloud report that still represents current energy."""
+    if source is None or source.tzinfo is None:
+        return False
+    now: datetime = dt_util.utcnow()
+    age = (now - source).total_seconds()
+    return -SITE_ENERGY_SOURCE_FUTURE_SKEW_S <= age < CLOUD_TELEMETRY_STALE_AFTER_S
 
 
 class EnergyClient(Protocol):
@@ -88,6 +101,10 @@ class EnergyManager:
         hems_auth_skip: Callable[[str], bool] | None = None,
         hems_auth_failure: Callable[[BaseException, str], bool] | None = None,
         hems_auth_success: Callable[[str], None] | None = None,
+        directional_battery_enabled: bool = True,
+        directional_battery_store: Store[dict[str, object]] | None = None,
+        has_directional_battery_entities: Callable[[], bool] | None = None,
+        directional_site_timezone: Callable[[], str | None] | None = None,
     ) -> None:
         self._client_provider = client_provider
         self.site_id = site_id
@@ -105,6 +122,7 @@ class EnergyManager:
         self._site_energy_fetch_failures = 0
         self._site_energy_unchanged_responses = 0
         self._site_energy_source_timestamp: datetime | None = None
+        self._directional_battery_report_date: datetime | None = None
         self._site_energy_fetch_diagnostics: dict[str, object] = {}
         self._site_energy_meta: dict[str, object] = {}
         self._site_energy_cache_ts: float | None = None
@@ -112,6 +130,15 @@ class EnergyManager:
         self._site_energy_cache_ttl: float = SITE_ENERGY_CACHE_TTL
         self._site_energy_guard: dict[str, LifetimeGuardState] = {}
         self._site_energy_last_reset: dict[str, str | None] = {}
+        self._directional_battery = DirectionalBatteryEnergy(
+            self._coerce_lifetime_bucket,
+            directional_battery_store,
+            enabled=directional_battery_enabled,
+            has_previous_entities=has_directional_battery_entities,
+            site_timezone=directional_site_timezone,
+        )
+        self._directional_battery_save_idle = asyncio.Event()
+        self._directional_battery_save_idle.set()
         self._site_energy_force_refresh = False
         self._site_energy_refresh_lock = asyncio.Lock()
         self._site_energy_completed_attempts = 0
@@ -219,7 +246,11 @@ class EnergyManager:
 
         if not self._runtime_active() or self._service_backoff_active():
             return False
-        force_refresh = force or self._site_energy_force_refresh
+        force_refresh = (
+            force
+            or self._site_energy_force_refresh
+            or self.directional_battery_context_refresh_due()
+        )
         now_mono = time.monotonic()
         if (
             not force_refresh
@@ -298,7 +329,9 @@ class EnergyManager:
         except Exception:
             self._service_backoff_ends_utc = None
 
-    def _parse_site_energy_timestamp(self, value: object) -> datetime | None:
+    def _parse_site_energy_timestamp(
+        self, value: object, *, require_time: bool = False
+    ) -> datetime | None:
         """Best-effort parsing for last_report_date fields."""
         if value is None or isinstance(value, bool):
             return None
@@ -320,12 +353,14 @@ class EnergyManager:
                 except ValueError:
                     return None
                 return self._parse_site_energy_timestamp(numeric)
+            if require_time and "T" not in cleaned.upper() and " " not in cleaned:
+                return None
             parsed_dt = None
             try:
                 parsed_dt = dt_util.parse_datetime(cleaned)
             except Exception:  # noqa: BLE001
                 parsed_dt = None
-            if parsed_dt is None:
+            if parsed_dt is None and not require_time:
                 try:
                     parsed_date = dt_util.parse_date(cleaned)
                 except Exception:  # noqa: BLE001
@@ -513,7 +548,10 @@ class EnergyManager:
         return fallback_total, fallback_count, fallback_fields
 
     def _apply_site_energy_guard(
-        self, flow: str, sample: float | None, prev: float | None
+        self,
+        flow: str,
+        sample: float | None,
+        prev: float | None,
     ) -> tuple[float | None, str | None]:
         """Apply monotonic guard to a site energy flow."""
         state = self._site_energy_guard.setdefault(flow, LifetimeGuardState())
@@ -597,12 +635,54 @@ class EnergyManager:
         state.pending_count = 0
         return last, None
 
+    def _directional_battery_totals(
+        self,
+        payload: dict[str, object],
+        source: datetime | None,
+    ) -> dict[str, tuple[float, int]]:
+        start = payload.get("start_date")
+        interval = payload.get(
+            "interval_minutes", payload.get("interval", DAILY_ENERGY_BUCKET_MINUTES)
+        )
+        if (
+            source is None
+            or payload.get("update_pending")
+            or self._coerce_energy_value(interval) != DAILY_ENERGY_BUCKET_MINUTES
+            or not isinstance(start, str)
+            or (start_date := dt_util.parse_date(start)) is None
+        ):
+            return {}
+        return self._directional_battery.totals(payload, start_date, source)
+
+    def directional_battery_context_refresh_due(self) -> bool:
+        """Check whether later site metadata can qualify a fresh lifetime read."""
+        if not self._directional_battery.site_context_refresh_due():
+            return False
+        lengths = self._site_energy_meta.get("raw_bucket_lengths")
+        return (
+            directional_battery_source_is_fresh(self._directional_battery_report_date)
+            and isinstance(lengths, dict)
+            and all(
+                lengths.get(field)
+                for field in DIRECTIONAL_BATTERY_ENERGY_FIELDS.values()
+            )
+        )
+
+    async def async_wait_for_directional_battery_save(self) -> None:
+        """Drain an in-flight storage write once the coordinator retires."""
+        await self._directional_battery_save_idle.wait()
+
+    def _clear_directional_battery_flows(self) -> None:
+        for flow in DIRECTIONAL_BATTERY_ENERGY_FIELDS:
+            self.site_energy.pop(flow, None)
+
     def _aggregate_site_energy(
         self,
         payload: dict[str, object] | None,
         *,
         apply_guards: bool = True,
         device_totals: Mapping[str, tuple[float, int]] | None = None,
+        directional_totals: dict[str, tuple[float, int]] | None = None,
     ) -> tuple[dict[str, SiteEnergyFlow], dict[str, object]] | None:
         """Aggregate energy, reusing any totals for this payload's device arrays."""
         if not isinstance(payload, dict):
@@ -618,6 +698,8 @@ class EnergyManager:
         flows: dict[str, SiteEnergyFlow] = {}
         interval_minutes = self._site_energy_interval_minutes(payload)
         totals = dict(device_totals or {})
+        directional_totals = directional_totals or {}
+        totals.update(directional_totals)
 
         def bucket_total(field: str) -> tuple[float, int]:
             if field not in totals:
@@ -670,6 +752,7 @@ class EnergyManager:
             if total_wh == 0 and not allow_zero:
                 return
             total_kwh = round(total_wh / 1000.0, 3)
+            directional = flow in DIRECTIONAL_BATTERY_ENERGY_FIELDS
             prev_entry = prev.get(flow)
             prev_value = None
             prev_reset_at = None
@@ -687,9 +770,10 @@ class EnergyManager:
             filtered: float | None
             reset_at: str | None
             power_sample_error = None
-            if not apply_guards:
+            if not apply_guards or directional:
                 # Keep enough parsed information to recognize a valid response,
-                # without changing any counter or reset state.
+                # without changing any counter or reset state. The directional
+                # group has its own persisted monotonic baseline.
                 filtered, reset_at = total_kwh, None
             elif (
                 hold_zero_after_positive
@@ -716,7 +800,9 @@ class EnergyManager:
                 )
             else:
                 filtered, reset_at = self._apply_site_energy_guard(
-                    flow, total_kwh, prev_value
+                    flow,
+                    total_kwh,
+                    prev_value,
                 )
             if filtered is None:
                 return
@@ -725,6 +811,9 @@ class EnergyManager:
             )
             from_hems = fields[0] in hems_device_channels
             pending = hems_pending if from_hems else update_pending
+            flow_interval = hems_interval_minutes if from_hems else interval_minutes
+            if directional:
+                flow_interval = DAILY_ENERGY_BUCKET_MINUTES
             flows[flow] = SiteEnergyFlow(
                 value_kwh=filtered,
                 bucket_count=bucket_count,
@@ -734,9 +823,7 @@ class EnergyManager:
                 update_pending=bool(pending) if pending is not None else None,
                 source_unit=source_unit,
                 last_reset_at=last_reset,
-                interval_minutes=(
-                    hems_interval_minutes if from_hems else interval_minutes
-                ),
+                interval_minutes=flow_interval,
                 legacy_offset_kwh=round(legacy_offset_wh / 1000.0, 3),
                 latest_bucket_wh=latest_bucket_wh,
                 previous_bucket_wh=previous_bucket_wh,
@@ -918,6 +1005,17 @@ class EnergyManager:
                     discharge_total,
                     discharge_fields,
                     discharge_count,
+                )
+
+        for flow, field in DIRECTIONAL_BATTERY_ENERGY_FIELDS.items():
+            if field in directional_totals:
+                total, count = directional_totals[field]
+                _store(
+                    flow,
+                    total,
+                    [field],
+                    count,
+                    allow_zero=True,
                 )
 
         raw_bucket_lengths = {
@@ -1110,7 +1208,8 @@ class EnergyManager:
     async def _async_refresh_site_energy_locked(self, *, force: bool) -> None:
         """Refresh lifetime energy cache with TTL enforcement."""
         generation = self._site_energy_cache_generation
-        force_refresh = force or self._site_energy_force_refresh
+        context_retry = self.directional_battery_context_refresh_due()
+        force_refresh = force or self._site_energy_force_refresh or context_retry
         now_mono = time.monotonic()
         if self._service_backoff_active():
             return
@@ -1120,6 +1219,12 @@ class EnergyManager:
             and (now_mono - self._site_energy_refresh_ts) < self._site_energy_cache_ttl
         ):
             return
+        if context_retry:
+            # Consume the metadata-triggered retry before reading. A malformed
+            # response must obey the usual cache TTL on the following poll.
+            await self._directional_battery.async_load()
+            if self._site_energy_read_superseded(generation):
+                return
         self._site_energy_force_refresh = False
         self._site_energy_fetch_attempts += 1
         self._site_energy_fetch_diagnostics.update(
@@ -1136,6 +1241,7 @@ class EnergyManager:
         except SiteEnergyUnavailable as err:
             if self._site_energy_read_superseded(generation):
                 return
+            self._clear_directional_battery_flows()
             self._record_site_energy_fetch("service_unavailable")
             self._logger.debug(
                 "Site energy service unavailable for site %s: %s",
@@ -1147,6 +1253,7 @@ class EnergyManager:
         except Exception as err:  # noqa: BLE001
             if self._site_energy_read_superseded(generation):
                 return
+            self._clear_directional_battery_flows()
             self._record_site_energy_fetch("request_error")
             self._note_service_unavailable(
                 err,
@@ -1166,6 +1273,9 @@ class EnergyManager:
             payload.get("last_report_date") if isinstance(payload, dict) else None
         )
         source = self._parse_site_energy_timestamp(raw_source)
+        directional_source = self._parse_site_energy_timestamp(
+            raw_source, require_time=True
+        )
         malformed_source = raw_source is not None and source is None
         progress = self._site_energy_source_progress(
             source, self._site_energy_source_timestamp
@@ -1197,17 +1307,42 @@ class EnergyManager:
                             payload = merged
         if self._site_energy_read_superseded(generation):
             return
+        directional_totals: dict[str, tuple[float, int]] = {}
+        if (
+            accept
+            and isinstance(payload, dict)
+            and directional_battery_source_is_fresh(directional_source)
+        ):
+            await self._directional_battery.async_load()
+            if self._site_energy_read_superseded(generation):
+                return
+            directional_totals = self._directional_battery_totals(
+                payload, directional_source
+            )
+            if directional_totals:
+                self._directional_battery_save_idle.clear()
+                try:
+                    if not await self._directional_battery.async_save():
+                        directional_totals = {}
+                finally:
+                    self._directional_battery_save_idle.set()
+            if self._site_energy_read_superseded(generation):
+                return
         parsed = (
             None
             if malformed_source
             else self._aggregate_site_energy(
-                payload, apply_guards=accept, device_totals=device_totals
+                payload,
+                apply_guards=accept,
+                device_totals=device_totals,
+                directional_totals=directional_totals,
             )
         )
         # A completed read consumes the polling interval even if none of its
         # flows are usable. Only accepted flows advance the cache's freshness.
         self._site_energy_refresh_ts = time.monotonic()
         if parsed is None or not parsed[0]:
+            self._clear_directional_battery_flows()
             self._record_site_energy_fetch("invalid_payload")
             return
         self._record_site_energy_fetch("success")
@@ -1215,11 +1350,14 @@ class EnergyManager:
         self._record_site_energy_source(source, progress)
         self._mark_service_available()
         if accept:
+            self._directional_battery_report_date = directional_source
             self._site_energy_cache_ts = self._site_energy_refresh_ts
             if accepted_hems_source is not None:
                 self._hems_lifetime_source_timestamp = accepted_hems_source
             self.site_energy = flows
             self._site_energy_meta = meta
+        else:
+            self._clear_directional_battery_flows()
 
     def _apply_lifetime_guard(
         self,
