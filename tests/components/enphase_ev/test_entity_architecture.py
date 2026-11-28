@@ -1,6 +1,7 @@
 """Regression coverage for the architectural entity/state corrections."""
 
 from datetime import datetime, timedelta, timezone
+import logging
 from unittest.mock import AsyncMock, MagicMock
 from types import SimpleNamespace
 import asyncio
@@ -10,7 +11,9 @@ from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import State
 from homeassistant.components.sensor import SensorStateClass
 from homeassistant.components.sensor import recorder as sensor_recorder
+from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.util import dt as dt_util
+from pytest_homeassistant.common import async_fire_time_changed
 from custom_components.enphase_ev.sensor import (
     EnphaseDirectionalBatteryEnergySensor,
     EnphaseInverterLifetimeEnergySensor,
@@ -189,6 +192,40 @@ def test_directional_battery_does_not_record_source_corrections(
         hass, monkeypatch, history, start, baseline=5.5
     ) == pytest.approx(42.1)
     assert "sensor.site_energy" not in hass.data.get(sensor_recorder.SEEN_DIP, set())
+
+
+async def test_directional_battery_expires_without_another_poll(
+    hass, config_entry, coordinator_factory, monkeypatch
+):
+    now = dt_util.utcnow().replace(microsecond=0)
+    reported_at = now - timedelta(minutes=29)
+    monkeypatch.setattr(dt_util, "utcnow", lambda: now)
+    coord = coordinator_factory(serials=[])
+    coord.update_interval = None
+    coord.last_update_success = True
+    coord.energy.site_energy, _ = coord.energy._aggregate_site_energy(
+        {
+            "start_date": reported_at.date().isoformat(),
+            "last_report_date": reported_at.timestamp(),
+            "charge": [1200],
+            "discharge": [0],
+            "grid_battery": [1200],
+            "solar_battery": [0],
+            "battery_home": [0],
+            "battery_grid": [0],
+        }
+    )
+    entity = EnphaseDirectionalBatteryEnergySensor(coord, "battery_energy_from_grid")
+    entity.entity_id = "sensor.directional_battery_expiry"
+    component = EntityComponent(logging.getLogger(__name__), "sensor", hass)
+    component._platforms["sensor"].config_entry = config_entry
+    await component.async_add_entities([entity])
+    assert float(hass.states.get(entity.entity_id).state) == 1.2
+    now += timedelta(minutes=1)
+    async_fire_time_changed(hass, now)
+    await hass.async_block_till_done()
+    assert hass.states.get(entity.entity_id).state == STATE_UNAVAILABLE
+    await component.async_remove_entity(entity.entity_id)
 
 
 @pytest.mark.parametrize(

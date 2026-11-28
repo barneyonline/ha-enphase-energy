@@ -43,8 +43,9 @@ def directional_battery_source_is_fresh(source: datetime | None) -> bool:
     """Require an available cloud report that still represents current energy."""
     if source is None or source.tzinfo is None:
         return False
-    age = (dt_util.utcnow() - source).total_seconds()
-    return -SITE_ENERGY_SOURCE_FUTURE_SKEW_S <= age <= CLOUD_TELEMETRY_STALE_AFTER_S
+    now: datetime = dt_util.utcnow()
+    age = (now - source).total_seconds()
+    return -SITE_ENERGY_SOURCE_FUTURE_SKEW_S <= age < CLOUD_TELEMETRY_STALE_AFTER_S
 
 
 class EnergyClient(Protocol):

@@ -24,7 +24,12 @@ from homeassistant.util.unit_conversion import PowerConverter
 from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, CURRENT_POWER_STALE_AFTER_S, OPT_USE_15_MINUTE_POWER_AVERAGE
+from .const import (
+    CLOUD_TELEMETRY_STALE_AFTER_S,
+    DOMAIN,
+    CURRENT_POWER_STALE_AFTER_S,
+    OPT_USE_15_MINUTE_POWER_AVERAGE,
+)
 from .coordinator import EnphaseCoordinator
 from .current_power_runtime import is_idle_power_sample
 from .device_info_helpers import _cloud_device_info
@@ -626,8 +631,15 @@ class EnphaseDirectionalBatteryEnergySensor(EnphaseSiteEnergySensor):
         return (
             isinstance(source, datetime)
             and directional_battery_source_is_fresh(source)
+            and self._current_value() is not None
             and super().available
         )
+
+    def _freshness_deadline(self) -> datetime | None:
+        source = self._flow_data().get("last_report_date")
+        if not isinstance(source, datetime) or source.tzinfo is None:
+            return None
+        return source + timedelta(seconds=CLOUD_TELEMETRY_STALE_AFTER_S)
 
 
 class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: ignore[misc]
