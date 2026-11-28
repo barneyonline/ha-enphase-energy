@@ -4,19 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## v5.6.0 - 2026-11-28
+
+### 🚧 Breaking changes
+
+- None
+
 ### ✨ New features
 
-- Add four lifetime battery energy sensors to the IQ Battery device on supported sites. Directional Battery Energy is enabled by default and can be turned off under Features → Device Features.
+- Add four lifetime energy sensors to the IQ Battery device on supported sites. They measure energy from the grid and solar into the battery, and from the battery to the home and grid. Use all four together in the Home Assistant 2026.12 Energy Dashboard. The sensors are enabled by default and can be turned off under **Features → Device Features → Enable Directional Battery Energy**. (#1029)
 
 ### 🐛 Bug fixes
 
-- Honor Enphase session-history cooldowns for queued reads and preserve longer Retry-After deadlines.
-- Keep the last battery reserve reading and allow the ten-minute Repair to open when Enphase's profile response lacks a valid reserve. (#1025)
+- Honor Enphase session-history cooldowns for queued reads and preserve longer Retry-After deadlines. (#1027)
+- Keep the last valid battery reserve reading when Enphase omits the reserve or returns an unusable value. If an edit is still unconfirmed after ten minutes, use **Check again** in Home Assistant Repairs. (#1025, #1028)
 
 ### 🔧 Improvements
 
-- Share overlapping session-history reads and reuse complete System Events calendar ranges.
-- Reduce System Events processing for large payloads, Repairs, and diagnostic sensor updates.
+- Share overlapping session-history reads and reuse complete System Events calendar ranges. (#1027)
+- Reduce System Events processing for large payloads, Repairs, and diagnostic sensor updates. (#1027)
+
+### 🔄 Other changes
+
+- Add a CI compatibility test for newer Home Assistant versions alongside the pinned minimum-version suite. (#1026)
 
 ## v5.5.0 - 2026-11-26
 
