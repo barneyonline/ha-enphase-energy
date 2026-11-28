@@ -76,7 +76,9 @@ def test_site_energy_directional_battery_totals(
         assert flows[flow].fields_used == [field]
         assert flows[flow].bucket_count == 2
         assert flows[flow].source_unit == "Wh"
+        assert flows[flow].interval_minutes == 1440
     assert flows["battery_charge"].value_kwh == 4.032
+    assert flows["battery_charge"].interval_minutes == 5.0
     assert flows["battery_discharge"].value_kwh == 2.203
 
 
@@ -166,6 +168,19 @@ def test_directional_battery_boolean_does_not_become_measured_zero(
     )  # noqa: SLF001
     assert parsed is not None
     assert not parsed[0].keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
+
+
+@pytest.mark.parametrize("interval", [None, 0, -15, "invalid"])
+def test_directional_battery_explicit_invalid_interval_keeps_aggregates(
+    coordinator_factory, directional_battery_payload, interval
+) -> None:
+    payload = normalize_lifetime_energy_payload(
+        {**directional_battery_payload, "interval_minutes": interval}
+    )
+    flows, _ = coordinator_factory().energy._aggregate_site_energy(payload)
+    assert not flows.keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
+    assert flows["battery_charge"].value_kwh == 4.032
+    assert flows["battery_charge"].interval_minutes == 5.0
 
 
 @pytest.mark.parametrize(
@@ -312,8 +327,10 @@ def test_directional_battery_reconciles_across_bucket_rollover(
     ],
 )
 async def test_directional_battery_invalid_payload_invalidates_cached_directions(
-    coordinator_factory, directional_battery_payload, raw_response
+    coordinator_factory, directional_battery_payload, raw_response, monkeypatch
 ) -> None:
+    reported_at = datetime.fromtimestamp(1_700_000_001, timezone.utc)
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: reported_at)
     manager = coordinator_factory(
         client=SimpleNamespace(
             lifetime_energy=AsyncMock(
@@ -335,6 +352,39 @@ async def test_directional_battery_invalid_payload_invalidates_cached_directions
     await manager._async_refresh_site_energy(force=True)
     assert not manager.site_energy.keys() & keys
     assert manager.site_energy["battery_charge"] is charge
+
+
+async def test_directional_battery_requires_fresh_source_progress(
+    coordinator_factory, directional_battery_payload, monkeypatch
+) -> None:
+    now = datetime.fromtimestamp(1_700_000_001, timezone.utc)
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    payload = directional_battery_payload
+    manager = coordinator_factory(
+        client=SimpleNamespace(lifetime_energy=AsyncMock(return_value=payload))
+    ).energy
+    keys = DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
+    original_report = payload["last_report_date"]
+    payload["last_report_date"] = (now - timedelta(minutes=31)).timestamp()
+    await manager._async_refresh_site_energy(force=True)
+    assert not manager.site_energy.keys() & keys
+    assert manager.site_energy["battery_charge"].value_kwh == 4.032
+
+    payload["last_report_date"] = original_report
+    await manager._async_refresh_site_energy(force=True)
+    assert keys <= manager.site_energy.keys()
+    payload.update(grid_battery=[None, 2750, 205], charge=[None, 3510, 525])
+    await manager._async_refresh_site_energy(force=True)
+    assert not manager.site_energy.keys() & keys
+    assert manager.site_energy["battery_charge"].value_kwh == 4.035
+
+    now += timedelta(minutes=5)
+    payload["last_report_date"] = now.timestamp()
+    await manager._async_refresh_site_energy(force=True)
+    assert manager.site_energy["battery_energy_from_grid"].value_kwh == 2.955
+    now += timedelta(minutes=31)
+    await manager._async_refresh_site_energy(force=True)
+    assert not manager.site_energy.keys() & keys
 
 
 @pytest.mark.parametrize("variant", ["truncated", "relabeled", "subdaily"])
@@ -419,9 +469,10 @@ async def test_directional_battery_unrepresentable_site_day_keeps_aggregate_ener
         logger=logging.getLogger(__name__),
         directional_site_timezone=lambda: "America/New_York",
     )
-    await manager._async_refresh_site_energy(force=True)
-    assert not manager.site_energy.keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
-    assert manager.site_energy["battery_charge"].value_kwh == 0.1
+    await manager._directional_battery.async_load()
+    flows, _ = manager._aggregate_site_energy(values)
+    assert not flows.keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
+    assert flows["battery_charge"].value_kwh == 0.1
 
 
 def test_directional_battery_rejects_overflowing_total(coordinator_factory) -> None:
@@ -514,8 +565,10 @@ async def test_directional_battery_storage_does_not_publish_on_save_failure(
 
 
 async def test_directional_battery_refresh_preserves_aggregates_on_write_failure(
-    directional_battery_payload,
+    directional_battery_payload, monkeypatch
 ) -> None:
+    reported_at = datetime.fromtimestamp(1_700_000_001, timezone.utc)
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: reported_at)
     store = AsyncMock()
     store.async_load.return_value = None
     store.async_save.side_effect = OSError

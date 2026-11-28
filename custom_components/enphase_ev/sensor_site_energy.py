@@ -33,6 +33,7 @@ from .energy import (
     LIFETIME_RESET_FLOOR_KWH,
     LIFETIME_RESET_RATIO,
     SiteEnergyFlow,
+    directional_battery_source_is_fresh,
 )
 from .power_validation import EXTREME_SITE_POWER_W, ExtremePowerValidator
 from .power_average import AverageUpdate, EnergyPowerAverage, WINDOW_SECONDS
@@ -621,7 +622,12 @@ class EnphaseDirectionalBatteryEnergySensor(EnphaseSiteEnergySensor):
 
     @property
     def available(self) -> bool:
-        return self._current_value() is not None and super().available
+        source = self._flow_data().get("last_report_date")
+        return (
+            isinstance(source, datetime)
+            and directional_battery_source_is_fresh(source)
+            and super().available
+        )
 
 
 class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: ignore[misc]

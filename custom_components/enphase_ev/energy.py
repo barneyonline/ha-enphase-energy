@@ -17,7 +17,7 @@ from homeassistant.util import dt as dt_util
 
 from .api import SiteEnergyUnavailable, guarded_read_scope
 from .cloud_retry import retry_after_delay, transient_backoff_delay
-from .const import DIRECTIONAL_BATTERY_ENERGY_FIELDS
+from .const import CLOUD_TELEMETRY_STALE_AFTER_S, DIRECTIONAL_BATTERY_ENERGY_FIELDS
 from .directional_battery_energy import DirectionalBatteryEnergy
 from .log_redaction import redact_site_id, redact_text
 
@@ -37,6 +37,14 @@ HEMS_LIFETIME_FAILURE_BACKOFF_S = 60 * 60
 DEVICE_LIFETIME_CHANNELS: tuple[str, ...] = ("evse", "heatpump", "water_heater")
 HEMS_DEVICE_CHANNELS_META_KEY = "_hems_device_channels"
 HEMS_DEVICE_METADATA_KEY = "_hems_device_metadata"
+
+
+def directional_battery_source_is_fresh(source: datetime | None) -> bool:
+    """Require an available cloud report that still represents current energy."""
+    if source is None or source.tzinfo is None:
+        return False
+    age = (dt_util.utcnow() - source).total_seconds()
+    return -SITE_ENERGY_SOURCE_FUTURE_SKEW_S <= age <= CLOUD_TELEMETRY_STALE_AFTER_S
 
 
 class EnergyClient(Protocol):
@@ -625,14 +633,13 @@ class EnergyManager:
         accept: bool,
     ) -> dict[str, tuple[float, int]]:
         start = payload.get("start_date")
-        interval = payload.get("interval_minutes", payload.get("interval"))
+        interval = payload.get(
+            "interval_minutes", payload.get("interval", DAILY_ENERGY_BUCKET_MINUTES)
+        )
         if (
             source is None
             or payload.get("update_pending")
-            or (
-                interval is not None
-                and self._coerce_energy_value(interval) != DAILY_ENERGY_BUCKET_MINUTES
-            )
+            or self._coerce_energy_value(interval) != DAILY_ENERGY_BUCKET_MINUTES
             or not isinstance(start, str)
             or (start_date := dt_util.parse_date(start)) is None
         ):
@@ -728,6 +735,7 @@ class EnergyManager:
             if total_wh == 0 and not allow_zero:
                 return
             total_kwh = round(total_wh / 1000.0, 3)
+            directional = flow in DIRECTIONAL_BATTERY_ENERGY_FIELDS
             prev_entry = prev.get(flow)
             prev_value = None
             prev_reset_at = None
@@ -745,7 +753,7 @@ class EnergyManager:
             filtered: float | None
             reset_at: str | None
             power_sample_error = None
-            if not apply_guards or flow in DIRECTIONAL_BATTERY_ENERGY_FIELDS:
+            if not apply_guards or directional:
                 # Keep enough parsed information to recognize a valid response,
                 # without changing any counter or reset state. The directional
                 # group has its own persisted monotonic baseline.
@@ -786,6 +794,9 @@ class EnergyManager:
             )
             from_hems = fields[0] in hems_device_channels
             pending = hems_pending if from_hems else update_pending
+            flow_interval = hems_interval_minutes if from_hems else interval_minutes
+            if directional:
+                flow_interval = DAILY_ENERGY_BUCKET_MINUTES
             flows[flow] = SiteEnergyFlow(
                 value_kwh=filtered,
                 bucket_count=bucket_count,
@@ -795,9 +806,7 @@ class EnergyManager:
                 update_pending=bool(pending) if pending is not None else None,
                 source_unit=source_unit,
                 last_reset_at=last_reset,
-                interval_minutes=(
-                    hems_interval_minutes if from_hems else interval_minutes
-                ),
+                interval_minutes=flow_interval,
                 legacy_offset_kwh=round(legacy_offset_wh / 1000.0, 3),
                 latest_bucket_wh=latest_bucket_wh,
                 previous_bucket_wh=previous_bucket_wh,
@@ -1272,7 +1281,11 @@ class EnergyManager:
         if self._site_energy_read_superseded(generation):
             return
         directional_totals: dict[str, tuple[float, int]] = {}
-        if accept and isinstance(payload, dict):
+        if (
+            accept
+            and isinstance(payload, dict)
+            and directional_battery_source_is_fresh(source)
+        ):
             await self._directional_battery.async_load()
             if self._site_energy_read_superseded(generation):
                 return

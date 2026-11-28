@@ -314,6 +314,12 @@ class DirectionalBatteryEnergy:
                 return None
         if not all(math.isfinite(total) for total in totals.values()):
             return None
+        if (
+            previous is not None
+            and reported_at == previous.reported_at
+            and totals != previous.totals
+        ):
+            return None
         return (
             _BatteryHistory(start, zone_name, reported_at, size, closed, totals),
             count,

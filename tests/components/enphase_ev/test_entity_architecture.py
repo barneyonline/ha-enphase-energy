@@ -10,6 +10,7 @@ from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import State
 from homeassistant.components.sensor import SensorStateClass
 from homeassistant.components.sensor import recorder as sensor_recorder
+from homeassistant.util import dt as dt_util
 from custom_components.enphase_ev.sensor import (
     EnphaseDirectionalBatteryEnergySensor,
     EnphaseInverterLifetimeEnergySensor,
@@ -148,7 +149,7 @@ def test_directional_battery_does_not_record_source_corrections(
     coord.last_update_success = True
     entity = EnphaseDirectionalBatteryEnergySensor(coord, "battery_energy_from_grid")
     history = []
-    start = datetime(2026, 10, 2, 10, 5, tzinfo=timezone.utc)
+    start = (dt_util.utcnow() - timedelta(minutes=1)).replace(second=0, microsecond=0)
     source_start = start.date() - timedelta(days=len(original) - 1)
     for index, values in enumerate((original, corrected, corrected, recovered)):
         idle = [None if value is None else 0 for value in values]

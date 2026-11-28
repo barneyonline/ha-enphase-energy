@@ -184,6 +184,7 @@ async def test_directional_battery_real_platform_lifecycle(
     responses["site_livestream_payload"] = {
         "meters": {"gridRelay": "OPER_RELAY_CLOSED"}
     }
+    responses["lifetime_energy"].pop("interval")
     responses["lifetime_energy"].update(
         start_date="2026-09-05",
         charge=[12300],

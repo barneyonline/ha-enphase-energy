@@ -388,6 +388,13 @@ def normalize_lifetime_energy_payload(payload: object) -> PayloadMap | None:
     )
     if interval_minutes is not None and interval_minutes > 0:
         normalized["interval_minutes"] = interval_minutes
+    elif any(
+        key in data
+        for key in ("interval_minutes", "interval", "interval_min", "intervalMinutes")
+    ):
+        # Keep an explicit invalid declaration distinct from omission. Legacy
+        # aggregate flows still use their default when the interval is unknown.
+        normalized["interval_minutes"] = None
     return normalized
 
 
