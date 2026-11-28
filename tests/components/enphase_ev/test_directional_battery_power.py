@@ -919,3 +919,20 @@ def test_invalid_report_cannot_supply_a_new_recovery_checkpoint(replay):
     assert replay(0).interval is None
     assert replay(300, grid=1050).interval is None
     assert replay(600, grid=1100).interval.watts["grid_battery"] == 600
+
+
+def test_late_startup_reference_uses_already_observed_rejection(replay):
+    assert replay(300, overrides={"charge": [True]}).interval is None
+    startup = DirectionalBatteryRecovery(
+        _SOURCE,
+        _START,
+        1,
+        {
+            "charge": DirectionalBatteryPairReference(
+                _START, {"charge": 3050, "grid_battery": 1050, "solar_battery": 2000}
+            )
+        },
+    )
+    assert replay(600, grid=11050, startup=startup).interval is None
+    assert replay(900, grid=1100).interval is None
+    assert replay(1200, grid=1150).interval.watts["grid_battery"] == 600
