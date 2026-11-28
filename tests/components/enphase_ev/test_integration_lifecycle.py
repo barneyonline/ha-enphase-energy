@@ -23,6 +23,7 @@ from homeassistant.helpers.aiohttp_client import (
     async_get_clientsession,
 )
 from homeassistant.setup import async_setup_component
+from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant.common import async_fire_time_changed
 from yarl import URL
@@ -331,13 +332,48 @@ async def test_directional_battery_real_platform_lifecycle(
 
     assert all(registry.async_get(entity_id) is not None for entity_id in ids.values())
     assert not unexpected, ", ".join(unexpected)
-    assert await hass.config_entries.async_unload(config_entry.entry_id)
-    assert await directional_battery_store(hass, config_entry.entry_id).async_load()
-    assert await hass.config_entries.async_remove(config_entry.entry_id)
-    assert (
-        await directional_battery_store(hass, config_entry.entry_id).async_load()
-        is None
+    # Entry removal must join the durable write before deleting the file.
+    writing, release_write, waiting_for_write = (
+        asyncio.Event(),
+        asyncio.Event(),
+        asyncio.Event(),
     )
+    write_data = Store._async_write_data
+    wait_for_save = coord.energy.async_wait_for_directional_battery_save
+
+    async def pause_write(target, data):
+        if target.key == store.key:
+            writing.set()
+            await release_write.wait()
+        await write_data(target, data)
+
+    async def observe_drain():
+        waiting_for_write.set()
+        await wait_for_save()
+
+    monkeypatch.setattr(Store, "_async_write_data", pause_write)
+    monkeypatch.setattr(
+        coord.energy, "async_wait_for_directional_battery_save", observe_drain
+    )
+    freezer.tick(timedelta(minutes=5))
+    lifetime.update(
+        grid_battery=[12_006],
+        charge=[12_306],
+        last_report_date=dt_util.utcnow().timestamp(),
+    )
+    refresh = asyncio.create_task(coord.energy._async_refresh_site_energy(force=True))
+    try:
+        await asyncio.wait_for(writing.wait(), 3)
+        removal = asyncio.create_task(
+            hass.config_entries.async_remove(config_entry.entry_id)
+        )
+        await asyncio.wait_for(waiting_for_write.wait(), 3)
+        assert not removal.done()
+    finally:
+        release_write.set()
+    assert await removal
+    await refresh
+    assert await store.async_load() is None
 
 
 @pytest.mark.session_history_real

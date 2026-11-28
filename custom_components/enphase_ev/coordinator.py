@@ -1079,7 +1079,11 @@ class EnphaseCoordinator(
             has_directional_battery_entities=lambda: has_directional_battery_entities(
                 hass, self.site_id
             ),
-            directional_site_timezone=lambda: self.battery_timezone,
+            directional_site_timezone=(
+                self._directional_battery_site_timezone
+                if config_entry is not None
+                else None
+            ),
         )
         self.evse_timeseries = EVSETimeseriesManager(
             hass,
@@ -2378,6 +2382,9 @@ class EnphaseCoordinator(
         export_limit_runtime = getattr(self, "export_limit_runtime", None)
         if export_limit_runtime is not None:
             await export_limit_runtime.async_wait_for_intent_transactions()
+        energy = self.__dict__.get("energy")
+        if isinstance(energy, EnergyManager):
+            await energy.async_wait_for_directional_battery_save()
         if cancelled_tasks:
             done, pending = await asyncio.wait(
                 cancelled_tasks,
@@ -2825,6 +2832,11 @@ class EnphaseCoordinator(
 
     def _site_timezone_name(self) -> str:
         return resolve_site_timezone_name(getattr(self, "_battery_timezone", None))
+
+    def _directional_battery_site_timezone(self) -> str | None:
+        return self.battery_timezone or coerce_optional_text(
+            self.inventory_state.cloud_metadata.get("timezone")
+        )
 
     @staticmethod
     def _format_inverter_model_summary(model_counts: dict[str, int]) -> str | None:

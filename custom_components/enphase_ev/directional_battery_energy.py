@@ -6,7 +6,7 @@ import logging
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, tzinfo
+from datetime import date, datetime, timezone, tzinfo
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -50,6 +50,7 @@ def has_directional_battery_entities(hass: HomeAssistant, site_id: str) -> bool:
 @dataclass(frozen=True, slots=True)
 class _BatteryHistory:
     start: date
+    timezone: str
     reported_at: datetime
     size: int
     closed: dict[str, float]
@@ -58,6 +59,7 @@ class _BatteryHistory:
     def as_dict(self) -> dict[str, object]:
         return {
             "start": self.start.isoformat(),
+            "timezone": self.timezone,
             "reported_at": self.reported_at.isoformat(),
             "size": self.size,
             "closed": self.closed,
@@ -67,6 +69,7 @@ class _BatteryHistory:
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> _BatteryHistory | None:
         start = data.get("start")
+        zone_name = data.get("timezone")
         raw_reported_at = data.get("reported_at")
         size = data.get("size")
         closed = data.get("closed")
@@ -74,6 +77,8 @@ class _BatteryHistory:
         if (
             not isinstance(start, str)
             or (start_date := dt_util.parse_date(start)) is None
+            or not isinstance(zone_name, str)
+            or not zone_name
             or not isinstance(raw_reported_at, str)
             or type(size) is not int
             or size < 1
@@ -100,6 +105,7 @@ class _BatteryHistory:
                 return None
         return cls(
             start_date,
+            zone_name,
             reported_at,
             size,
             {key: closed[key] for key in _FIELDS},
@@ -124,8 +130,8 @@ class DirectionalBatteryEnergy:
         self._enabled = enabled
         self._has_previous_entities = has_previous_entities
         self._site_timezone = site_timezone
-        self._zone_name: str | None = None
-        self._zone: tzinfo | None = None
+        self._zone_name: str | None = "UTC" if site_timezone is None else None
+        self._zone: tzinfo | None = timezone.utc if site_timezone is None else None
         self._loaded = store is None
         self._history: _BatteryHistory | None = None
         self._saved_history: _BatteryHistory | None = None
@@ -186,7 +192,7 @@ class DirectionalBatteryEnergy:
         accept: bool,
     ) -> dict[str, tuple[float, int]]:
         """Return all four cumulative Wh totals only for a coherent observation."""
-        if not self._enabled or not self._loaded:
+        if not self._enabled or not self._loaded or self._zone is None:
             return {}
         result = self._evaluate(payload, start, reported_at)
         if result is None:
@@ -200,8 +206,13 @@ class DirectionalBatteryEnergy:
         self, payload: dict[str, object], start: date, reported_at: datetime
     ) -> tuple[_BatteryHistory, int] | None:
         previous = self._history
+        zone_name = self._zone_name
+        zone = self._zone
+        assert zone_name is not None and zone is not None
         if previous is not None and (
-            start != previous.start or reported_at < previous.reported_at
+            start != previous.start
+            or zone_name != previous.timezone
+            or reported_at < previous.reported_at
         ):
             return None
 
@@ -218,18 +229,13 @@ class DirectionalBatteryEnergy:
                 return None
             size = len(values)
             series[field] = values
-        if self._zone is not None:
-            last_day = reported_at.astimezone(self._zone).date()
-            if size != (last_day - start).days + 1:
-                return None
-        else:
-            # The lifetime start is a site-local day, while the report cursor
-            # is in UTC. Only the observed daily layout is supported.
-            earliest = (reported_at - timedelta(hours=12)).date()
-            latest = (reported_at + timedelta(hours=14)).date()
-            if not (earliest - start).days + 1 <= size <= (latest - start).days + 1:
-                return None
-        if previous is not None and size < previous.size:
+        # The source start is site-local, and the report cursor is UTC.
+        # A complete daily series includes the site's current partial bucket.
+        try:
+            last_day = reported_at.astimezone(zone).date()
+        except OverflowError:
+            return None
+        if size != (last_day - start).days + 1:
             return None
 
         aggregates: dict[str, list[object]] = {}
@@ -285,9 +291,9 @@ class DirectionalBatteryEnergy:
                     if total == 0 and (reporting_started or index == size - 1):
                         idle_pairs.add(key)
                     continue
-                # Captured daily attribution differed by up to 38 Wh with a
-                # zero direction and 3.17% with two positive directions.
-                tolerance = max(50.0, total * 0.05) if pair_total else 1.0
+                # Observed daily attribution differed by up to 3.17%.
+                # One Wh also accommodates rounding in small buckets.
+                tolerance = max(1.0, total * 0.05) if pair_total else 1.0
                 if abs(total - pair_total) > tolerance:
                     return None
             for field, sample in reported.items():
@@ -308,4 +314,7 @@ class DirectionalBatteryEnergy:
                 return None
         if not all(math.isfinite(total) for total in totals.values()):
             return None
-        return _BatteryHistory(start, reported_at, size, closed, totals), count
+        return (
+            _BatteryHistory(start, zone_name, reported_at, size, closed, totals),
+            count,
+        )

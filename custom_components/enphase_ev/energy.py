@@ -31,6 +31,7 @@ LIFETIME_CONFIRM_WINDOW_S = 180.0
 SITE_ENERGY_CACHE_TTL = 300.0
 SITE_ENERGY_SOURCE_FUTURE_SKEW_S = 60.0
 SITE_ENERGY_DEFAULT_INTERVAL_MIN = 5.0
+DAILY_ENERGY_BUCKET_MINUTES = 24 * 60
 SITE_ENERGY_FAILURE_BACKOFF_S = 15 * 60
 HEMS_LIFETIME_FAILURE_BACKOFF_S = 60 * 60
 DEVICE_LIFETIME_CHANNELS: tuple[str, ...] = ("evse", "heatpump", "water_heater")
@@ -126,6 +127,8 @@ class EnergyManager:
             has_previous_entities=has_directional_battery_entities,
             site_timezone=directional_site_timezone,
         )
+        self._directional_battery_save_idle = asyncio.Event()
+        self._directional_battery_save_idle.set()
         self._site_energy_force_refresh = False
         self._site_energy_refresh_lock = asyncio.Lock()
         self._site_energy_completed_attempts = 0
@@ -622,9 +625,14 @@ class EnergyManager:
         accept: bool,
     ) -> dict[str, tuple[float, int]]:
         start = payload.get("start_date")
+        interval = payload.get("interval_minutes", payload.get("interval"))
         if (
             source is None
             or payload.get("update_pending")
+            or (
+                interval is not None
+                and self._coerce_energy_value(interval) != DAILY_ENERGY_BUCKET_MINUTES
+            )
             or not isinstance(start, str)
             or (start_date := dt_util.parse_date(start)) is None
         ):
@@ -632,6 +640,14 @@ class EnergyManager:
         return self._directional_battery.totals(
             payload, start_date, source, accept=accept
         )
+
+    async def async_wait_for_directional_battery_save(self) -> None:
+        """Drain an in-flight storage write once the coordinator retires."""
+        await self._directional_battery_save_idle.wait()
+
+    def _clear_directional_battery_flows(self) -> None:
+        for flow in DIRECTIONAL_BATTERY_ENERGY_FIELDS:
+            self.site_energy.pop(flow, None)
 
     def _aggregate_site_energy(
         self,
@@ -1192,6 +1208,7 @@ class EnergyManager:
         except SiteEnergyUnavailable as err:
             if self._site_energy_read_superseded(generation):
                 return
+            self._clear_directional_battery_flows()
             self._record_site_energy_fetch("service_unavailable")
             self._logger.debug(
                 "Site energy service unavailable for site %s: %s",
@@ -1203,6 +1220,7 @@ class EnergyManager:
         except Exception as err:  # noqa: BLE001
             if self._site_energy_read_superseded(generation):
                 return
+            self._clear_directional_battery_flows()
             self._record_site_energy_fetch("request_error")
             self._note_service_unavailable(
                 err,
@@ -1261,8 +1279,13 @@ class EnergyManager:
             directional_totals = self._directional_battery_totals(
                 payload, source, accept=True
             )
-            if directional_totals and not await self._directional_battery.async_save():
-                directional_totals = {}
+            if directional_totals:
+                self._directional_battery_save_idle.clear()
+                try:
+                    if not await self._directional_battery.async_save():
+                        directional_totals = {}
+                finally:
+                    self._directional_battery_save_idle.set()
             if self._site_energy_read_superseded(generation):
                 return
         parsed = (
@@ -1279,8 +1302,7 @@ class EnergyManager:
         # flows are usable. Only accepted flows advance the cache's freshness.
         self._site_energy_refresh_ts = time.monotonic()
         if parsed is None or not parsed[0]:
-            for flow in DIRECTIONAL_BATTERY_ENERGY_FIELDS:
-                self.site_energy.pop(flow, None)
+            self._clear_directional_battery_flows()
             self._record_site_energy_fetch("invalid_payload")
             return
         self._record_site_energy_fetch("success")
@@ -1293,6 +1315,8 @@ class EnergyManager:
                 self._hems_lifetime_source_timestamp = accepted_hems_source
             self.site_energy = flows
             self._site_energy_meta = meta
+        else:
+            self._clear_directional_battery_flows()
 
     def _apply_lifetime_guard(
         self,
