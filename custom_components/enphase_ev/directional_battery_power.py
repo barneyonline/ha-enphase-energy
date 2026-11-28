@@ -247,7 +247,12 @@ class DirectionalBatteryPower:
                 reference = _pair_reference(report, aggregate, fields)
             else:
                 reference = _advance_pair_reference(
-                    reference, report, totals, aggregate, fields
+                    reference,
+                    report,
+                    totals,
+                    aggregate,
+                    fields,
+                    self._minimum_window_seconds,
                 )
             self._recovery_references[aggregate] = reference
 
@@ -278,6 +283,7 @@ def _advance_pair_reference(
     totals: dict[str, tuple[float, int]],
     aggregate: str,
     fields: tuple[str, str],
+    minimum_window_seconds: float,
 ) -> DirectionalBatteryPairReference:
     deltas = {field: report.wh[field] - value for field, value in reference.wh.items()}
     held = reference.held or (
@@ -287,19 +293,24 @@ def _advance_pair_reference(
     elapsed = (report.reported_at - reference.reported_at).total_seconds()
     if elapsed <= 0:
         return replace(reference, held=held)
-    allowed_elapsed = (
-        elapsed
-        if reference.max_elapsed_seconds is None
-        else min(elapsed, reference.max_elapsed_seconds)
+    allowed_elapsed = max(
+        minimum_window_seconds,
+        (
+            elapsed
+            if reference.max_elapsed_seconds is None
+            else min(elapsed, reference.max_elapsed_seconds)
+        ),
     )
     if not _counter_advances_are_plausible(deltas, allowed_elapsed, fields, totals):
         # The directional jump is visible even while the direct aggregate
         # lags. Retain this time allowance until the jump is resolved.
         return replace(reference, held=held, max_elapsed_seconds=allowed_elapsed)
-    if any(delta < 0 for delta in deltas.values()) or (
-        aggregate in deltas and not _pair_deltas_reconcile(deltas, aggregate, fields)
-    ):
+    if any(delta < 0 for delta in deltas.values()):
         return replace(reference, held=held)
+    if aggregate in deltas and not _pair_deltas_reconcile(deltas, aggregate, fields):
+        # Some counters have advanced and their partners have yet to agree.
+        # Keep the first observed interval when evaluating a later catch-up.
+        return replace(reference, held=held, max_elapsed_seconds=allowed_elapsed)
     return _pair_reference(report, aggregate, fields)
 
 

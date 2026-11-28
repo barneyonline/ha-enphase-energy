@@ -687,8 +687,10 @@ timestamp before power can seed again. Same-clock revisions break the window.
 Each charge and discharge pair tracks its last independently reconciled,
 plausible report and its timestamp. If a direction and its direct aggregate
 fall below that report, the group waits for a reconciled recovery to its
-pre-drop levels before reseeding. An implausible counter advance keeps the
-original time allowance while the pair is waiting for a plausible report.
+pre-drop levels before reseeding. An implausible advance or an unmatched
+increase keeps the original time allowance while the pair waits for a
+reconciled, plausible report. This check uses the same five-minute minimum
+window as the estimator.
 Site-local day rollover seeds a new power baseline even if the closing bucket
 was revised. The group's qualification and both power readings participate in
 coordinator snapshot equality. Each entity uses the group's source timestamp

@@ -465,6 +465,14 @@ def test_lagging_direct_counter_cannot_age_a_rejected_directional_jump(replay):
     assert replay(1200, grid=1150, solar=250000).interval.watts["grid_battery"] == 600
 
 
+def test_leading_direct_counter_cannot_age_a_rejected_directional_jump(replay):
+    replay(0, grid=1050, solar=250000)
+    assert replay(300, grid=1050, solar=250000, charge=261050).interval is None
+    assert replay(600, grid=11050, solar=250000).interval is None
+    assert replay(900, grid=1100, solar=250000).interval is None
+    assert replay(1200, grid=1150, solar=250000).interval.watts["grid_battery"] == 600
+
+
 @pytest.mark.parametrize("earlier_spike", [False, True])
 def test_routing_revision_cannot_approve_a_spike_in_its_pair(replay, earlier_spike):
     replay(0, grid=1050)
@@ -487,6 +495,15 @@ def test_recovery_guard_tracks_trusted_subminimum_reports(replay):
     assert replay(600, grid=1100).interval is None
     assert replay(900, grid=1150).interval is None
     assert replay(1200, grid=1200).interval.watts["grid_battery"] == 600
+
+
+def test_recovery_uses_at_least_the_minimum_power_window(replay):
+    replay(0, grid=1050)
+    assert replay(1, grid=1350).interval is None
+    assert replay(300, grid=1350).interval.watts["grid_battery"] == 3600
+    assert replay(600, grid=1075).interval is None
+    assert replay(900, grid=1350).interval is None
+    assert replay(1200, grid=1400).interval.watts["grid_battery"] == 600
 
 
 def test_staggered_discharge_drop_during_charge_recovery(replay):
