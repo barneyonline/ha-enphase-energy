@@ -143,7 +143,10 @@ from .directional_battery_energy import (
     directional_battery_store,
     has_directional_battery_entities,
 )
-from .directional_battery_power import DirectionalBatteryPowerSnapshot
+from .directional_battery_power import (
+    DIRECTIONAL_BATTERY_POWER_FIELDS,
+    DirectionalBatteryPowerSnapshot,
+)
 from .discovery_snapshot import DiscoverySnapshotManager
 from .device_types import (
     normalize_type_key,
@@ -1058,6 +1061,13 @@ class EnphaseCoordinator(
             site_id_getter=lambda: self.site_id,
             logger=_LOGGER,
         )
+        options = config_entry.options if config_entry is not None else {}
+        directional_battery_power_enabled = bool(
+            options.get(
+                OPT_DIRECTIONAL_BATTERY_POWER_ENABLED,
+                DEFAULT_DIRECTIONAL_BATTERY_POWER_ENABLED,
+            )
+        )
         self.energy = EnergyManager(
             client_provider=lambda: self.client,
             site_id=self.site_id,
@@ -1074,13 +1084,10 @@ class EnphaseCoordinator(
             hems_auth_success=lambda endpoint: self._note_hems_auth_success(
                 endpoint=endpoint
             ),
-            directional_battery_enabled=(
-                config_entry is None
-                or bool(
-                    config_entry.options.get(
-                        OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
-                        DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
-                    )
+            directional_battery_enabled=bool(
+                options.get(
+                    OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+                    DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
                 )
             ),
             directional_battery_store=(
@@ -1088,14 +1095,17 @@ class EnphaseCoordinator(
                 if config_entry is not None
                 else None
             ),
-            directional_battery_power_enabled=bool(
-                (config_entry.options if config_entry is not None else {}).get(
-                    OPT_DIRECTIONAL_BATTERY_POWER_ENABLED,
-                    DEFAULT_DIRECTIONAL_BATTERY_POWER_ENABLED,
-                )
+            directional_battery_power_enabled=directional_battery_power_enabled,
+            directional_battery_power_store=(
+                directional_battery_store(hass, self.site_id, for_power=True)
+                if config_entry is not None and directional_battery_power_enabled
+                else None
             ),
             has_directional_battery_entities=lambda: has_directional_battery_entities(
                 hass, self.site_id
+            ),
+            has_directional_battery_power_entities=lambda: has_directional_battery_entities(
+                hass, self.site_id, DIRECTIONAL_BATTERY_POWER_FIELDS
             ),
             directional_site_timezone=(
                 self._directional_battery_site_timezone

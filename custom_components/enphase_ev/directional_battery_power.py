@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -13,15 +14,20 @@ from .directional_battery_energy import (
     _AGGREGATE_PAIRS,
     _FIELDS,
     _pairs_reconcile,
+    OBSERVED_POWER_REPORT_LIMIT,
     DirectionalBatteryPairReference,
     DirectionalBatteryRecovery,
     DirectionalBatterySource,
+    merge_power_recovery,
+    power_observed_cumulative,
+    trusted_cumulative_recovery,
 )
 from .power_average import EnergyPowerAverage
 from .power_validation import (
-    EXTREME_SITE_POWER_W,
     ExtremePowerValidator,
     _energy_delta_to_power_w,
+    energy_advance_is_plausible,
+    power_recovery_elapsed,
     site_power_sample_is_plausible,
 )
 
@@ -69,6 +75,10 @@ class DirectionalBatteryPower:
         self._baseline: _Report | None = None
         self._last_report: _Report | None = None
         self._source_cursor: datetime | None = None
+        self._observed_signatures: deque[str] = deque(
+            maxlen=OBSERVED_POWER_REPORT_LIMIT
+        )
+        self._cumulative_signature: str | None = None
         self._recovery_scope: tuple[DirectionalBatterySource, int] | None = None
         self._recovery_references: dict[str, DirectionalBatteryPairReference] = {}
         self._validators = {field: ExtremePowerValidator() for field in _FIELDS}
@@ -130,20 +140,88 @@ class DirectionalBatteryPower:
         self._source_cursor = reported_at
         self._limit_recovery_elapsed(reported_at)
 
+    def reconcile_cumulative_floor(
+        self,
+        cumulative: DirectionalBatteryRecovery,
+        observed: DirectionalBatteryRecovery | None,
+    ) -> None:
+        """Rebase when cumulative energy supplies an unobserved trusted floor."""
+        if observed is not None and power_observed_cumulative(observed, cumulative):
+            return
+        if self._recovery_scope is None or self._source_cursor is None:
+            self._restore_recovery(
+                trusted_cumulative_recovery(cumulative)
+                if observed is None
+                else merge_power_recovery(observed, cumulative)
+            )
+            return
+        source, bucket_count = self._recovery_scope
+        existing = DirectionalBatteryRecovery(
+            source,
+            self._source_cursor,
+            bucket_count,
+            self._recovery_references,
+            tuple(self._observed_signatures),
+            self._cumulative_signature,
+        )
+        if power_observed_cumulative(existing, cumulative):
+            self._cumulative_signature = cumulative.cumulative_signature
+            return
+        recovery = merge_power_recovery(existing, cumulative)
+        if recovery != existing:
+            self._restore_recovery(recovery)
+            if (
+                replace(recovery, cumulative_signature=existing.cumulative_signature)
+                != existing
+            ):
+                self.invalidate()
+
     def _restore_recovery(self, startup: DirectionalBatteryRecovery) -> None:
         self._recovery_references = dict(startup.pairs)
         self._recovery_scope = startup.source, startup.bucket_count
+        self._observed_signatures = deque(
+            startup.observed_signatures, maxlen=OBSERVED_POWER_REPORT_LIMIT
+        )
+        self._cumulative_signature = startup.cumulative_signature
         if self._source_cursor is None or self._source_cursor <= startup.reported_at:
             self._source_cursor = startup.reported_at
         else:
             self._limit_recovery_elapsed(self._source_cursor)
+
+    def implausible_cumulative_pairs(
+        self,
+        cumulative: DirectionalBatteryRecovery,
+        totals: dict[str, tuple[float, int]],
+    ) -> frozenset[str]:
+        """Check a cumulative floor whose raw power report was unusable."""
+        if self._recovery_scope != (cumulative.source, cumulative.bucket_count):
+            return frozenset()
+        rejected = set()
+        for aggregate, fields in _AGGREGATE_PAIRS.items():
+            reference = self._recovery_references.get(aggregate)
+            if reference is None:
+                continue
+            floor = cumulative.pairs[aggregate]
+            elapsed = power_recovery_elapsed(
+                (floor.reported_at - reference.reported_at).total_seconds(),
+                reference.max_elapsed_seconds,
+                self._minimum_window_seconds,
+            )
+            if not _counter_advances_are_plausible(
+                {field: floor.wh[field] - reference.wh[field] for field in fields},
+                elapsed,
+                fields,
+                totals,
+            ):
+                rejected.add(aggregate)
+        return frozenset(rejected)
 
     def _limit_recovery_elapsed(self, reported_at: datetime) -> None:
         for aggregate, reference in self._recovery_references.items():
             elapsed = (reported_at - reference.reported_at).total_seconds()
             self._recovery_references[aggregate] = replace(
                 reference,
-                max_elapsed_seconds=_allowed_elapsed(
+                max_elapsed_seconds=power_recovery_elapsed(
                     elapsed, reference.max_elapsed_seconds, self._minimum_window_seconds
                 ),
             )
@@ -164,6 +242,7 @@ class DirectionalBatteryPower:
         coerce_bucket: Callable[[object], float | None],
         *,
         source: DirectionalBatterySource,
+        source_signature: str | None = None,
         startup: DirectionalBatteryRecovery | None = None,
     ) -> None:
         """Use a daily payload accepted for power by the lifetime source validator."""
@@ -188,6 +267,7 @@ class DirectionalBatteryPower:
             received_at,
             totals,
             startup,
+            source_signature,
         )
 
     def _observe(
@@ -196,9 +276,12 @@ class DirectionalBatteryPower:
         received_at: datetime,
         totals: dict[str, tuple[float, int]],
         startup: DirectionalBatteryRecovery | None,
+        source_signature: str | None,
     ) -> None:
         previous = self._last_report
-        if self._recovery_scope is None and startup is not None:
+        scope = report.source, report.bucket_count
+        if startup is not None and self._recovery_scope != scope:
+            self._reset_window()
             self._restore_recovery(startup)
         if (
             self._source_cursor is not None
@@ -209,11 +292,14 @@ class DirectionalBatteryPower:
             return
         self._source_cursor = report.reported_at
         self._last_report = report
-        scope = report.source, report.bucket_count
         if self._recovery_scope is not None and scope != self._recovery_scope:
             self._recovery_references.clear()
+            self._observed_signatures.clear()
+            self._cumulative_signature = None
             self._reset_window()
         self._recovery_scope = scope
+        if source_signature is not None:
+            self._observed_signatures.append(source_signature)
         self._track_recovery(report, totals)
         if any(reference.held for reference in self._recovery_references.values()):
             self._reset_window()
@@ -331,11 +417,20 @@ class DirectionalBatteryPower:
         self, reported_at: datetime
     ) -> DirectionalBatteryRecovery | None:
         """Checkpoint the raw source cursor and recovery state without watts."""
-        if self._recovery_scope is None or reported_at != self._source_cursor:
+        if (
+            self._recovery_scope is None
+            or reported_at != self._source_cursor
+            or len(self._recovery_references) != len(_AGGREGATE_PAIRS)
+        ):
             return None
         source, bucket_count = self._recovery_scope
         return DirectionalBatteryRecovery(
-            source, reported_at, bucket_count, self._recovery_references
+            source,
+            reported_at,
+            bucket_count,
+            self._recovery_references,
+            tuple(self._observed_signatures),
+            self._cumulative_signature,
         )
 
 
@@ -356,19 +451,29 @@ def _advance_pair_reference(
     fields: tuple[str, str],
     minimum_window_seconds: float,
 ) -> DirectionalBatteryPairReference:
+    below_aggregate_floor = (
+        reference.aggregate_floor_wh is not None
+        and report.wh[aggregate] < reference.aggregate_floor_wh
+    )
     deltas = {field: report.wh[field] - value for field, value in reference.wh.items()}
-    held = reference.held or (
-        any(deltas[field] < 0 for field in fields)
-        and (aggregate not in deltas or deltas[aggregate] < 0)
+    held = (
+        reference.held
+        or below_aggregate_floor
+        or (
+            any(deltas[field] < 0 for field in fields)
+            and (aggregate not in deltas or deltas[aggregate] < 0)
+        )
     )
     elapsed = (report.reported_at - reference.reported_at).total_seconds()
-    allowed_elapsed = _allowed_elapsed(
+    allowed_elapsed = power_recovery_elapsed(
         elapsed, reference.max_elapsed_seconds, minimum_window_seconds
     )
     if not _counter_advances_are_plausible(deltas, allowed_elapsed, fields, totals):
         # The directional jump is visible even while the direct aggregate
         # lags. Retain this time allowance until the jump is resolved.
         return replace(reference, held=held, max_elapsed_seconds=allowed_elapsed)
+    if below_aggregate_floor:
+        return replace(reference, held=True)
     if (
         any(delta > 0 for delta in deltas.values())
         and aggregate in deltas
@@ -380,10 +485,6 @@ def _advance_pair_reference(
     if any(delta < 0 for delta in deltas.values()):
         return replace(reference, held=held)
     return _pair_reference(report, aggregate, fields)
-
-
-def _allowed_elapsed(elapsed: float, maximum: float | None, minimum: float) -> float:
-    return max(minimum, elapsed if maximum is None else min(elapsed, maximum))
 
 
 def _confirm_pair_revision(
@@ -448,12 +549,7 @@ def _counter_advances_are_plausible(
     fields: tuple[str, str],
     totals: dict[str, tuple[float, int]],
 ) -> bool:
-    advances = {field: max(0.0, deltas[field]) for field in fields}
-    watts = _direction_watts(advances, elapsed, fields)
-    return watts is not None and all(
-        value < EXTREME_SITE_POWER_W
-        and site_power_sample_is_plausible(
-            value, advances[field] / 1000.0, (totals[field][0] / 1000.0,)
-        )
-        for field, value in watts.items()
+    return all(
+        energy_advance_is_plausible(max(0.0, deltas[field]), elapsed, totals[field][0])
+        for field in fields
     )

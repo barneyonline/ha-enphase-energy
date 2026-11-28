@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 import math
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone, tzinfo
 from hashlib import sha256
 from sys import float_info
@@ -17,7 +17,12 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from .const import DIRECTIONAL_BATTERY_ENERGY_FIELDS, DOMAIN
+from .const import (
+    DIRECTIONAL_BATTERY_ENERGY_FIELDS,
+    DOMAIN,
+    SITE_ENERGY_DEFAULT_INTERVAL_MIN,
+)
+from .power_validation import energy_advance_is_plausible, power_recovery_elapsed
 from .serial_entity_metadata import site_sensor_unique_id
 from .storage import AcknowledgedStore
 
@@ -27,6 +32,8 @@ _AGGREGATE_PAIRS = {
     "discharge": ("battery_home", "battery_grid"),
 }
 SITE_ENERGY_SOURCE_FUTURE_SKEW_S = 60.0
+# Retain the five-minute reports of a full local day, including a DST fold.
+OBSERVED_POWER_REPORT_LIMIT = 300
 _LOGGER = logging.getLogger(__name__)
 
 type DirectionalBatterySource = tuple[date, str]
@@ -40,21 +47,26 @@ def _pairs_reconcile(aggregate_wh: float, directional_wh: float) -> bool:
 
 
 def directional_battery_store(
-    hass: HomeAssistant, site_id: str
+    hass: HomeAssistant, site_id: str, *, for_power: bool = False
 ) -> Store[dict[str, object]]:
-    """Retain the baseline for Recorder statistics across same-site re-adds."""
+    """Retain the cumulative baseline or power checkpoint across same-site re-adds."""
     site_key = sha256(site_id.encode()).hexdigest()
+    feature = "power" if for_power else "energy"
     return AcknowledgedStore(
-        hass, 1, f"{DOMAIN}.directional_battery_energy.{site_key}", private=True
+        hass, 1, f"{DOMAIN}.directional_battery_{feature}.{site_key}", private=True
     )
 
 
-def has_directional_battery_entities(hass: HomeAssistant, site_id: str) -> bool:
+def has_directional_battery_entities(
+    hass: HomeAssistant,
+    site_id: str,
+    keys: Iterable[str] = DIRECTIONAL_BATTERY_ENERGY_FIELDS,
+) -> bool:
     """Check if this site already has directional entity IDs to protect."""
     registry = er.async_get(hass)
     get_entity_id = getattr(registry, "async_get_entity_id", None)
     deleted = getattr(registry, "deleted_entities", None)
-    for flow in DIRECTIONAL_BATTERY_ENERGY_FIELDS:
+    for flow in keys:
         unique_id = site_sensor_unique_id(site_id, flow)
         if (
             callable(get_entity_id)
@@ -75,13 +87,26 @@ class _BatteryHistory:
     closed: dict[str, float]
     totals: dict[str, float]
     closed_buckets: tuple[tuple[float | None, ...], ...] = ()
+    untrusted_power_pairs: frozenset[str] = frozenset()
 
     @property
     def source(self) -> DirectionalBatterySource:
         return self.start, self.timezone
 
+    @property
+    def signature(self) -> str:
+        """Identify the normalized scope, clock and counters of this report."""
+        fields = (
+            self.source,
+            self.size,
+            self.reported_at.isoformat(),
+            tuple(self.closed[field] for field in _FIELDS),
+            tuple(self.totals[field] for field in _FIELDS),
+        )
+        return sha256(repr(fields).encode()).hexdigest()
+
     def as_dict(self) -> dict[str, object]:
-        return {
+        data: dict[str, object] = {
             "start": self.start.isoformat(),
             "timezone": self.timezone,
             "reported_at": self.reported_at.isoformat(),
@@ -89,6 +114,9 @@ class _BatteryHistory:
             "closed": self.closed,
             "totals": self.totals,
         }
+        if self.untrusted_power_pairs:
+            data["untrusted_power_pairs"] = sorted(self.untrusted_power_pairs)
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> _BatteryHistory | None:
@@ -98,6 +126,7 @@ class _BatteryHistory:
         size = data.get("size")
         closed = data.get("closed")
         totals = data.get("totals")
+        untrusted_pairs = data.get("untrusted_power_pairs", [])
         if (
             not isinstance(start, str)
             or (start_date := dt_util.parse_date(start)) is None
@@ -108,13 +137,20 @@ class _BatteryHistory:
             or size < 1
             or not isinstance(closed, dict)
             or not isinstance(totals, dict)
+            or not isinstance(untrusted_pairs, list)
+            or any(
+                not isinstance(key, str) or key not in _AGGREGATE_PAIRS
+                for key in untrusted_pairs
+            )
         ):
             return None
         try:
             reported_at = datetime.fromisoformat(raw_reported_at)
         except ValueError:
             return None
-        if reported_at.tzinfo is None:
+        if reported_at.tzinfo is None or reported_at > dt_util.utcnow() + timedelta(
+            seconds=SITE_ENERGY_SOURCE_FUTURE_SKEW_S
+        ):
             return None
         for field in _FIELDS:
             closed_value = closed.get(field)
@@ -134,6 +170,7 @@ class _BatteryHistory:
             size,
             {key: closed[key] for key in _FIELDS},
             {key: totals[key] for key in _FIELDS},
+            untrusted_power_pairs=frozenset(untrusted_pairs),
         )
 
 
@@ -145,6 +182,7 @@ class DirectionalBatteryPairReference:
     wh: Mapping[str, float]
     held: bool = False
     max_elapsed_seconds: float | None = None
+    aggregate_floor_wh: float | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "wh", MappingProxyType(dict(self.wh)))
@@ -158,6 +196,10 @@ class DirectionalBatteryRecovery:
     reported_at: datetime
     bucket_count: int
     pairs: Mapping[str, DirectionalBatteryPairReference]
+    observed_signatures: tuple[str, ...] = ()
+    cumulative_signature: str | None = None
+    untrusted_pairs: frozenset[str] = frozenset()
+    lifetime_totals_wh: Mapping[str, float] | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "pairs", MappingProxyType(dict(self.pairs)))
@@ -168,6 +210,7 @@ class _PowerCheckpoint:
     """Source identity and trusted raw readings kept across a reload."""
 
     closed_signature: str | None
+    closed_signature_size: int | None
     recovery: DirectionalBatteryRecovery
 
     def as_dict(self) -> dict[str, object]:
@@ -176,14 +219,18 @@ class _PowerCheckpoint:
             "start": start.isoformat(),
             "timezone": zone_name,
             "reported_at": self.recovery.reported_at.isoformat(),
+            "observed_signatures": list(self.recovery.observed_signatures),
+            "cumulative_signature": self.recovery.cumulative_signature,
             "size": self.recovery.bucket_count,
             "closed_signature": self.closed_signature,
+            "closed_signature_size": self.closed_signature_size,
             "pairs": {
                 key: {
                     "reported_at": pair.reported_at.isoformat(),
                     "wh": dict(pair.wh),
                     "held": pair.held,
                     "max_elapsed_seconds": pair.max_elapsed_seconds,
+                    "aggregate_floor_wh": pair.aggregate_floor_wh,
                 }
                 for key, pair in self.recovery.pairs.items()
             },
@@ -197,19 +244,43 @@ class _PowerCheckpoint:
         zone_name = data.get("timezone")
         size = data.get("size")
         signature = data.get("closed_signature")
+        signature_size = data.get(
+            "closed_signature_size", size if signature is not None else None
+        )
         reported_at = _checkpoint_time(data.get("reported_at"))
+        observed_signatures = data.get("observed_signatures", [])
+        cumulative_signature = data.get("cumulative_signature")
         raw_pairs = data.get("pairs")
         if (
             not isinstance(start, str)
             or (start_date := dt_util.parse_date(start)) is None
             or not isinstance(zone_name, str)
+            or not zone_name
             or type(size) is not int
             or size < 1
             or (
                 signature is not None
-                and (not isinstance(signature, str) or len(signature) != 64)
+                and (
+                    not isinstance(signature, str)
+                    or len(signature) != 64
+                    or type(signature_size) is not int
+                    or not 1 <= signature_size <= size
+                )
             )
             or reported_at is None
+            or not isinstance(observed_signatures, list)
+            or len(observed_signatures) > OBSERVED_POWER_REPORT_LIMIT
+            or any(
+                not isinstance(item, str) or len(item) != 64
+                for item in observed_signatures
+            )
+            or (
+                cumulative_signature is not None
+                and (
+                    not isinstance(cumulative_signature, str)
+                    or len(cumulative_signature) != 64
+                )
+            )
             or reported_at
             > dt_util.utcnow() + timedelta(seconds=SITE_ENERGY_SOURCE_FUTURE_SKEW_S)
             or not isinstance(raw_pairs, dict)
@@ -224,8 +295,14 @@ class _PowerCheckpoint:
             pairs[aggregate] = reference
         return cls(
             signature,
+            signature_size if signature is not None else None,
             DirectionalBatteryRecovery(
-                (start_date, zone_name), reported_at, size, pairs
+                (start_date, zone_name),
+                reported_at,
+                size,
+                pairs,
+                tuple(observed_signatures),
+                cumulative_signature,
             ),
         )
 
@@ -249,6 +326,7 @@ def _decode_pair_reference(
     wh = raw.get("wh")
     held = raw.get("held")
     max_elapsed = raw.get("max_elapsed_seconds")
+    aggregate_floor = raw.get("aggregate_floor_wh")
     if (
         reported_at is None
         or reported_at > latest
@@ -260,6 +338,14 @@ def _decode_pair_reference(
                 not isinstance(max_elapsed, (int, float))
                 or isinstance(max_elapsed, bool)
                 or not 0 < max_elapsed <= float_info.max
+            )
+        )
+        or (
+            aggregate_floor is not None
+            and (
+                isinstance(aggregate_floor, bool)
+                or not isinstance(aggregate_floor, int | float)
+                or not 0 <= aggregate_floor <= float_info.max
             )
         )
     ):
@@ -274,7 +360,9 @@ def _decode_pair_reference(
         ):
             return None
         counters[field] = float(value)
-    return DirectionalBatteryPairReference(reported_at, counters, held, max_elapsed)
+    return DirectionalBatteryPairReference(
+        reported_at, counters, held, max_elapsed, aggregate_floor
+    )
 
 
 def _closed_signature(history: _BatteryHistory, size: int) -> str:
@@ -301,6 +389,108 @@ def _legacy_recovery(saved: _BatteryHistory) -> DirectionalBatteryRecovery:
             )
             for aggregate, fields in _AGGREGATE_PAIRS.items()
         },
+        cumulative_signature=saved.signature,
+        untrusted_pairs=saved.untrusted_power_pairs,
+        lifetime_totals_wh=MappingProxyType(saved.totals),
+    )
+
+
+def merge_power_recovery(
+    power: DirectionalBatteryRecovery,
+    cumulative: DirectionalBatteryRecovery,
+) -> DirectionalBatteryRecovery:
+    """Keep both trusted directional floors for the same source day."""
+    if (power.source, power.bucket_count) != (
+        cumulative.source,
+        cumulative.bucket_count,
+    ):
+        return max(
+            power,
+            trusted_cumulative_recovery(cumulative),
+            key=lambda recovery: recovery.reported_at,
+        )
+    pairs = dict(power.pairs)
+    for aggregate, fields in _AGGREGATE_PAIRS.items():
+        if aggregate in cumulative.untrusted_pairs:
+            continue
+        floor = cumulative.pairs[aggregate]
+        previous = pairs.setdefault(aggregate, floor)
+        if any(floor.wh[field] > previous.wh[field] for field in fields):
+            assert cumulative.lifetime_totals_wh is not None
+            elapsed = power_recovery_elapsed(
+                (floor.reported_at - previous.reported_at).total_seconds(),
+                previous.max_elapsed_seconds,
+                SITE_ENERGY_DEFAULT_INTERVAL_MIN * 60,
+            )
+            if not all(
+                energy_advance_is_plausible(
+                    max(0, floor.wh[field] - previous.wh[field]),
+                    elapsed,
+                    cumulative.lifetime_totals_wh[field],
+                )
+                for field in fields
+            ):
+                pairs[aggregate] = replace(previous, max_elapsed_seconds=elapsed)
+                continue
+            # The merged floors may come from different reports. There is no
+            # corresponding direct counter for this pair.
+            pairs[aggregate] = replace(
+                previous,
+                reported_at=max(previous.reported_at, floor.reported_at),
+                wh={
+                    field: max(previous.wh[field], floor.wh[field]) for field in fields
+                },
+                aggregate_floor_wh=previous.wh.get(
+                    aggregate, previous.aggregate_floor_wh
+                ),
+            )
+    return replace(
+        power,
+        reported_at=max(power.reported_at, cumulative.reported_at),
+        pairs=pairs,
+        cumulative_signature=cumulative.cumulative_signature,
+    )
+
+
+def trusted_cumulative_recovery(
+    cumulative: DirectionalBatteryRecovery,
+) -> DirectionalBatteryRecovery:
+    """Seed only the cumulative pairs that power has not rejected."""
+    return replace(
+        cumulative,
+        pairs={
+            name: reference
+            for name, reference in cumulative.pairs.items()
+            if name not in cumulative.untrusted_pairs
+        },
+    )
+
+
+def _startup_recovery(
+    power: DirectionalBatteryRecovery | None, saved: _BatteryHistory | None
+) -> DirectionalBatteryRecovery | None:
+    if saved is None:
+        return power
+    cumulative = _legacy_recovery(saved)
+    if power is None:
+        return trusted_cumulative_recovery(cumulative)
+    if power is not None and power_observed_cumulative(power, cumulative):
+        return replace(power, cumulative_signature=cumulative.cumulative_signature)
+    return merge_power_recovery(power, cumulative)
+
+
+def power_observed_cumulative(
+    power: DirectionalBatteryRecovery, cumulative: DirectionalBatteryRecovery
+) -> bool:
+    """Check if power already evaluated the cumulative report's source window."""
+    return (
+        (power.source, power.bucket_count)
+        == (cumulative.source, cumulative.bucket_count)
+        and cumulative.cumulative_signature is not None
+        and (
+            cumulative.cumulative_signature == power.cumulative_signature
+            or cumulative.cumulative_signature in power.observed_signatures
+        )
     )
 
 
@@ -313,23 +503,33 @@ class DirectionalBatteryEnergy:
         store: Store[dict[str, object]] | None,
         *,
         enabled: bool,
+        power_store: Store[dict[str, object]] | None = None,
         has_previous_entities: Callable[[], bool] | None = None,
+        has_previous_power_entities: Callable[[], bool] | None = None,
         site_timezone: Callable[[], str | None] | None = None,
     ) -> None:
         self._coerce_bucket = coerce_bucket
         self._store = store
+        self._power_store = power_store
         self._enabled = enabled
         self._has_previous_entities = has_previous_entities
+        self._has_previous_power_entities = has_previous_power_entities
         self._site_timezone = site_timezone
         self._zone_name: str | None = "UTC" if site_timezone is None else None
         self._zone: tzinfo | None = timezone.utc if site_timezone is None else None
         self._loaded = store is None
+        self._history_readable = store is None
+        self._power_loaded = power_store is None
         self._history: _BatteryHistory | None = None
         self._saved_history: _BatteryHistory | None = None
+        self._stored_history_record: dict[str, object] | None = None
         self._saved_power_checkpoint: _PowerCheckpoint | None = None
+        self._power_checkpoint_needs_migration = False
+        self._power_recovery_at_load: DirectionalBatteryRecovery | None = None
         self._power_source_history: _BatteryHistory | None = None
         self._pending_power_source_history: _BatteryHistory | None = None
         self._load_warning_logged = False
+        self._power_load_warning_logged = False
 
     def site_context_refresh_due(self) -> bool:
         """Retry once startup supplies site metadata after a lifetime read."""
@@ -343,10 +543,12 @@ class DirectionalBatteryEnergy:
             _LOGGER.warning(message)
             self._load_warning_logged = True
 
-    async def async_load(self) -> None:
-        """Load the whole baseline before the first publication."""
+    async def async_load(
+        self,
+    ) -> tuple[DirectionalBatteryRecovery, DirectionalBatteryRecovery | None] | None:
+        """Load both histories and return any cumulative floor discovered late."""
         if not self._enabled:
-            return
+            return None
         if self._site_timezone is not None:
             zone_name = self._site_timezone()
             if zone_name != self._zone_name:
@@ -354,24 +556,42 @@ class DirectionalBatteryEnergy:
                     await dt_util.async_get_time_zone(zone_name) if zone_name else None
                 )
                 self._zone_name = zone_name
-        if self._loaded or self._store is None:
-            return
+        had_history = self._loaded
+        power_was_loaded = self._power_loaded
+        if not self._loaded and self._store is not None:
+            await self._async_load_history(self._store)
+        if (
+            self._history_readable
+            and not self._power_loaded
+            and self._power_store is not None
+        ):
+            await self._async_load_power_checkpoint(self._power_store)
+        if not had_history and power_was_loaded and self._saved_history is not None:
+            return _legacy_recovery(self._saved_history), self._power_recovery_at_load
+        return None
+
+    async def _async_load_history(self, store: Store[dict[str, object]]) -> None:
         try:
-            saved = await self._store.async_load()
+            saved = await store.async_load()
         except (HomeAssistantError, OSError, KeyError, TypeError, ValueError):
+            self._history_readable = False
             self._warn_load_once("Unable to load directional battery energy history")
             return
+        self._history_readable = True
+        self._stored_history_record = saved if isinstance(saved, dict) else None
         if saved is not None:
-            self._history = (
-                _BatteryHistory.from_dict(saved) if isinstance(saved, dict) else None
-            )
-            if self._history is None:
+            if not isinstance(saved, dict):
                 self._warn_load_once("Invalid directional battery energy history")
                 return
-            assert isinstance(saved, dict)
-            self._saved_power_checkpoint = _PowerCheckpoint.from_dict(
-                saved.get("power")
-            )
+            history = _BatteryHistory.from_dict(saved)
+            if history is None or not await self._saved_scope_is_valid(
+                history.source,
+                history.size,
+                (history.reported_at,),
+            ):
+                self._warn_load_once("Invalid directional battery energy history")
+                return
+            self._history = history
         elif self._has_previous_entities is not None and self._has_previous_entities():
             # Core can also return None after renaming a corrupt storage file.
             # An existing entity may still have Recorder history to protect.
@@ -382,34 +602,91 @@ class DirectionalBatteryEnergy:
         self._saved_history = self._history
         self._loaded = True
 
-    async def async_save(
-        self, recovery: DirectionalBatteryRecovery | None = None
-    ) -> bool:
-        """Persist the accepted group history before the coordinator notifies sensors."""
-        history = self._history
-        checkpoint = self._saved_power_checkpoint
-        power_source = self._power_source_history
-        if recovery is not None:
-            signature = None
-            if power_source is not None and power_source.source == recovery.source:
-                signature = _closed_signature(power_source, recovery.bucket_count)
-            elif (
-                checkpoint is not None and checkpoint.recovery.source == recovery.source
-            ):
-                signature = checkpoint.closed_signature
-            checkpoint = _PowerCheckpoint(signature, recovery)
-        if (
-            self._store is None
-            or history is None
-            or (
-                history == self._saved_history
-                and checkpoint == self._saved_power_checkpoint
+    async def _async_load_power_checkpoint(
+        self, store: Store[dict[str, object]]
+    ) -> None:
+        try:
+            saved = await store.async_load()
+        except (HomeAssistantError, OSError, KeyError, TypeError, ValueError):
+            self._warn_power_load_once(
+                "Unable to load directional battery power checkpoint"
             )
+            return
+        checkpoint = await self._decode_power_checkpoint(saved)
+        if saved is None and self._stored_history_record is not None:
+            checkpoint = await self._decode_power_checkpoint(
+                self._stored_history_record.get("power")
+            )
+            self._power_checkpoint_needs_migration = checkpoint is not None
+        if (
+            checkpoint is None
+            and self._has_previous_power_entities is not None
+            and self._has_previous_power_entities()
         ):
+            self._warn_power_load_once(
+                "Missing or invalid power checkpoint for existing directional battery power sensors"
+            )
+            return
+        if saved is not None and checkpoint is None:
+            self._warn_power_load_once("Invalid directional battery power checkpoint")
+        self._saved_power_checkpoint = checkpoint
+        if checkpoint is not None:
+            self._power_recovery_at_load = checkpoint.recovery
+        self._power_loaded = True
+
+    async def _decode_power_checkpoint(self, saved: object) -> _PowerCheckpoint | None:
+        checkpoint = _PowerCheckpoint.from_dict(saved)
+        if checkpoint is None:
+            return None
+        recovery = checkpoint.recovery
+        if not await self._saved_scope_is_valid(
+            recovery.source,
+            recovery.bucket_count,
+            (pair.reported_at for pair in recovery.pairs.values()),
+        ):
+            return None
+        return checkpoint
+
+    async def _saved_scope_is_valid(
+        self,
+        source: DirectionalBatterySource,
+        bucket_count: int,
+        report_times: Iterable[datetime],
+    ) -> bool:
+        start, zone_name = source
+        zone = (
+            self._zone
+            if zone_name == self._zone_name
+            else await dt_util.async_get_time_zone(zone_name)
+        )
+        if zone is None:
+            return False
+        try:
+            return all(
+                (reported_at.astimezone(zone).date() - start).days + 1 == bucket_count
+                for reported_at in report_times
+            )
+        except OverflowError:
+            return False
+
+    def _warn_power_load_once(self, message: str) -> None:
+        if not self._power_load_warning_logged:
+            _LOGGER.warning(message)
+            self._power_load_warning_logged = True
+
+    async def async_save(self) -> bool:
+        """Persist the cumulative baseline before publishing lifetime energy."""
+        history = self._history
+        if self._store is None or history is None or history == self._saved_history:
             return True
         data = history.as_dict()
-        if checkpoint is not None:
-            data["power"] = checkpoint.as_dict()
+        # Preserve embedded checkpoints from older builds until a new power
+        # checkpoint can be written, including while power is disabled.
+        if (
+            self._stored_history_record is not None
+            and "power" in self._stored_history_record
+        ):
+            data["power"] = self._stored_history_record["power"]
         try:
             await self._store.async_save(data)
         except (HomeAssistantError, OSError):
@@ -417,7 +694,73 @@ class DirectionalBatteryEnergy:
             _LOGGER.warning("Unable to save directional battery energy history")
             return False
         self._saved_history = history
-        self._saved_power_checkpoint = checkpoint
+        self._stored_history_record = data
+        return True
+
+    async def async_save_power(self, recovery: DirectionalBatteryRecovery) -> bool:
+        """Persist the power checkpoint before publishing a window."""
+        if self._power_store is None:
+            return True
+        previous = self._saved_power_checkpoint
+        prior_recovery = (
+            previous.recovery
+            if previous is not None
+            and (previous.recovery.source, previous.recovery.bucket_count)
+            == (recovery.source, recovery.bucket_count)
+            else None
+        )
+        if self._saved_history is not None:
+            cumulative = _legacy_recovery(self._saved_history)
+            if power_observed_cumulative(recovery, cumulative) or (
+                prior_recovery is not None
+                and power_observed_cumulative(prior_recovery, cumulative)
+            ):
+                recovery = replace(
+                    recovery, cumulative_signature=cumulative.cumulative_signature
+                )
+        power_source = self._power_source_history
+        signature = None
+        signature_size = None
+        if (
+            power_source is not None
+            and power_source.source == recovery.source
+            and power_source.size >= recovery.bucket_count
+        ):
+            signature = _closed_signature(power_source, recovery.bucket_count)
+            signature_size = recovery.bucket_count
+        elif (
+            previous is not None
+            and previous.recovery.source == recovery.source
+            and previous.closed_signature_size is not None
+            and previous.closed_signature_size <= recovery.bucket_count
+        ):
+            signature = previous.closed_signature
+            signature_size = previous.closed_signature_size
+        checkpoint = _PowerCheckpoint(signature, signature_size, recovery)
+        if checkpoint != previous or self._power_checkpoint_needs_migration:
+            try:
+                await self._power_store.async_save(checkpoint.as_dict())
+            except (HomeAssistantError, OSError):
+                _LOGGER.warning("Unable to save directional battery power checkpoint")
+                return False
+            self._saved_power_checkpoint = checkpoint
+            self._power_checkpoint_needs_migration = False
+        return await self._async_remove_embedded_checkpoint()
+
+    async def _async_remove_embedded_checkpoint(self) -> bool:
+        record = self._stored_history_record
+        if self._store is None or record is None or "power" not in record:
+            return True
+        data = dict(record)
+        del data["power"]
+        try:
+            await self._store.async_save(data)
+        except (HomeAssistantError, OSError):
+            _LOGGER.warning(
+                "Unable to retire embedded directional battery power checkpoint"
+            )
+            return False
+        self._stored_history_record = data
         return True
 
     def totals(
@@ -429,7 +772,10 @@ class DirectionalBatteryEnergy:
         for_power: bool = False,
     ) -> dict[str, tuple[float, int]]:
         """Return all four cumulative Wh totals only for a coherent observation."""
-        if not self.source_context_ready:
+        ready = (
+            self._power_loaded and self._history_readable if for_power else self._loaded
+        )
+        if not self._enabled or not ready or self._zone is None:
             return {}
         previous = self._power_source_history if for_power else self._history
         if (
@@ -449,18 +795,42 @@ class DirectionalBatteryEnergy:
             if not self._accept_power_source_history(history):
                 return {}
         else:
+            if (
+                previous is not None
+                and previous.untrusted_power_pairs
+                and (history.source, history.size) == (previous.source, previous.size)
+            ):
+                # The same day's cumulative counter still includes the
+                # rejected advance until power independently reevaluates it.
+                history = replace(
+                    history,
+                    untrusted_power_pairs=previous.untrusted_power_pairs,
+                )
             self._history = history
         return {field: (total, count) for field, total in history.totals.items()}
 
     @property
-    def source_context_ready(self) -> bool:
-        return self._enabled and self._loaded and self._zone is not None
+    def power_source_context_ready(self) -> bool:
+        # A transient read failure can still conceal a newer cumulative floor.
+        # A successful read may establish that there is no usable floor.
+        return (
+            self._enabled
+            and self._power_loaded
+            and self._history_readable
+            and self._zone is not None
+        )
 
     @property
     def power_source(self) -> DirectionalBatterySource:
         history = self._power_source_history
         assert history is not None
         return history.source
+
+    @property
+    def power_source_signature(self) -> str:
+        history = self._power_source_history
+        assert history is not None
+        return history.signature
 
     def _accept_power_source_history(self, history: _BatteryHistory) -> bool:
         previous = self._power_source_history
@@ -479,8 +849,8 @@ class DirectionalBatteryEnergy:
                 return False
             changed = (
                 saved.source == history.source
-                and checkpoint.closed_signature is not None
-                and _closed_signature(history, saved.bucket_count)
+                and checkpoint.closed_signature_size is not None
+                and _closed_signature(history, checkpoint.closed_signature_size)
                 != checkpoint.closed_signature
             )
         if changed and (
@@ -501,29 +871,59 @@ class DirectionalBatteryEnergy:
         current = self._power_source_history
         assert current is not None
         checkpoint = self._saved_power_checkpoint
-        if (
-            checkpoint is not None
+        recovery = (
+            checkpoint.recovery
+            if checkpoint is not None
             and checkpoint.recovery.source == current.source
-            and current.size == checkpoint.recovery.bucket_count
-        ):
-            return checkpoint.recovery
+            and checkpoint.recovery.bucket_count == current.size
+            else None
+        )
         saved = self._saved_history
-        if (
-            saved is None
-            or saved.start != current.start
-            or saved.timezone != current.timezone
-            or saved.size != current.size
+        if saved is not None and (saved.source, saved.size) != (
+            current.source,
+            current.size,
         ):
-            return None
-        return _legacy_recovery(saved)
+            saved = None
+        return _startup_recovery(recovery, saved)
 
     def power_startup_for_rejected_report(self) -> DirectionalBatteryRecovery | None:
         """Retain the site clock on the last trusted source checkpoint."""
         checkpoint = self._saved_power_checkpoint
-        if checkpoint is not None:
-            return checkpoint.recovery
-        saved = self._saved_history
-        return _legacy_recovery(saved) if saved is not None else None
+        return _startup_recovery(
+            checkpoint.recovery if checkpoint is not None else None,
+            self._saved_history,
+        )
+
+    def cumulative_power_floor(self) -> DirectionalBatteryRecovery:
+        """Return the latest cumulative history after its publication is acknowledged."""
+        assert self._history is not None
+        return _legacy_recovery(self._history)
+
+    def mark_untrusted_power_pairs(
+        self,
+        observed: DirectionalBatteryRecovery | None,
+        rejected: frozenset[str],
+    ) -> None:
+        """Record rejections with cumulative energy before either write can fail."""
+        history = self._history
+        assert history is not None
+        if observed is None or history.signature not in observed.observed_signatures:
+            self._history = replace(
+                history, untrusted_power_pairs=history.untrusted_power_pairs | rejected
+            )
+            return
+        cumulative = _legacy_recovery(history)
+        untrusted = frozenset(
+            aggregate
+            for aggregate, fields in _AGGREGATE_PAIRS.items()
+            if observed.pairs[aggregate].reported_at < history.reported_at
+            and any(
+                cumulative.pairs[aggregate].wh[field]
+                > observed.pairs[aggregate].wh[field]
+                for field in fields
+            )
+        )
+        self._history = replace(history, untrusted_power_pairs=untrusted)
 
     def _evaluate(
         self,

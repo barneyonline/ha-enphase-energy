@@ -17,7 +17,11 @@ from homeassistant.util import dt as dt_util
 
 from .api import SiteEnergyUnavailable, guarded_read_scope
 from .cloud_retry import retry_after_delay, transient_backoff_delay
-from .const import CLOUD_TELEMETRY_STALE_AFTER_S, DIRECTIONAL_BATTERY_ENERGY_FIELDS
+from .const import (
+    CLOUD_TELEMETRY_STALE_AFTER_S,
+    DIRECTIONAL_BATTERY_ENERGY_FIELDS,
+    SITE_ENERGY_DEFAULT_INTERVAL_MIN,
+)
 from .directional_battery_energy import (
     SITE_ENERGY_SOURCE_FUTURE_SKEW_S,
     DirectionalBatteryEnergy,
@@ -33,7 +37,6 @@ LIFETIME_CONFIRM_TOLERANCE_KWH = 0.05
 LIFETIME_CONFIRM_COUNT = 2
 LIFETIME_CONFIRM_WINDOW_S = 180.0
 SITE_ENERGY_CACHE_TTL = 300.0
-SITE_ENERGY_DEFAULT_INTERVAL_MIN = 5.0
 DAILY_ENERGY_BUCKET_MINUTES = 24 * 60
 SITE_ENERGY_FAILURE_BACKOFF_S = 15 * 60
 HEMS_LIFETIME_FAILURE_BACKOFF_S = 60 * 60
@@ -107,7 +110,9 @@ class EnergyManager:
         directional_battery_enabled: bool = True,
         directional_battery_power_enabled: bool = False,
         directional_battery_store: Store[dict[str, object]] | None = None,
+        directional_battery_power_store: Store[dict[str, object]] | None = None,
         has_directional_battery_entities: Callable[[], bool] | None = None,
+        has_directional_battery_power_entities: Callable[[], bool] | None = None,
         directional_site_timezone: Callable[[], str | None] | None = None,
     ) -> None:
         self._client_provider = client_provider
@@ -139,7 +144,9 @@ class EnergyManager:
             self._coerce_lifetime_bucket,
             directional_battery_store,
             enabled=directional_battery_enabled or directional_battery_power_enabled,
+            power_store=directional_battery_power_store,
             has_previous_entities=has_directional_battery_entities,
+            has_previous_power_entities=has_directional_battery_power_entities,
             site_timezone=directional_site_timezone,
         )
         self._directional_battery_save_idle = asyncio.Event()
@@ -1221,6 +1228,11 @@ class EnergyManager:
         self._mark_hems_lifetime_available()
         return payload
 
+    async def _async_load_directional_battery_history(self) -> None:
+        loaded = await self._directional_battery.async_load()
+        if loaded is not None and self.directional_battery_power is not None:
+            self.directional_battery_power.reconcile_cumulative_floor(*loaded)
+
     async def _async_refresh_site_energy_locked(self, *, force: bool) -> None:
         """Refresh lifetime energy cache with TTL enforcement."""
         generation = self._site_energy_cache_generation
@@ -1238,7 +1250,7 @@ class EnergyManager:
         if context_retry:
             # Consume the metadata-triggered retry before reading. A malformed
             # response must obey the usual cache TTL on the following poll.
-            await self._directional_battery.async_load()
+            await self._async_load_directional_battery_history()
             if self._site_energy_read_superseded(generation):
                 return
         self._site_energy_force_refresh = False
@@ -1331,12 +1343,13 @@ class EnergyManager:
             and isinstance(payload, dict)
             and directional_battery_source_is_fresh(directional_source)
         ):
-            await self._directional_battery.async_load()
+            await self._async_load_directional_battery_history()
             if self._site_energy_read_superseded(generation):
                 return
-            directional_totals = self._directional_battery_totals(
-                payload, directional_source
-            )
+            if self._directional_battery_energy_enabled:
+                directional_totals = self._directional_battery_totals(
+                    payload, directional_source
+                )
             recovery = None
             if power is not None:
                 assert directional_source is not None
@@ -1352,9 +1365,10 @@ class EnergyManager:
                         power_totals,
                         self._coerce_lifetime_bucket,
                         source=self._directional_battery.power_source,
+                        source_signature=self._directional_battery.power_source_signature,
                         startup=self._directional_battery.power_startup_reference(),
                     )
-                elif self._directional_battery.source_context_ready:
+                elif self._directional_battery.power_source_context_ready:
                     power.reject_report(
                         directional_source,
                         self._directional_battery.power_startup_for_rejected_report(),
@@ -1363,8 +1377,47 @@ class EnergyManager:
             if directional_totals or recovery is not None:
                 self._directional_battery_save_idle.clear()
                 try:
-                    if not await self._directional_battery.async_save(recovery):
+                    if (
+                        power is not None
+                        and directional_totals
+                        and self._directional_battery.power_source_context_ready
+                    ):
+                        rejected = (
+                            frozenset()
+                            if power_totals
+                            else power.implausible_cumulative_pairs(
+                                self._directional_battery.cumulative_power_floor(),
+                                directional_totals,
+                            )
+                        )
+                        self._directional_battery.mark_untrusted_power_pairs(
+                            recovery, rejected
+                        )
+                    if (
+                        directional_totals
+                        and not await self._directional_battery.async_save()
+                    ):
                         directional_totals = {}
+                    if (
+                        power is not None
+                        and directional_totals
+                        and not power_totals
+                        and self._directional_battery.power_source_context_ready
+                        and self._site_energy_read_is_current(generation)
+                    ):
+                        assert directional_source is not None
+                        power.reconcile_cumulative_floor(
+                            self._directional_battery.cumulative_power_floor(),
+                            recovery,
+                        )
+                        recovery = power.recovery_checkpoint(directional_source)
+                    if (
+                        recovery is not None
+                        and self._site_energy_read_is_current(generation)
+                        and not await self._directional_battery.async_save_power(
+                            recovery
+                        )
+                    ):
                         power_totals = {}
                 except asyncio.CancelledError:
                     if power is not None:
@@ -1388,11 +1441,7 @@ class EnergyManager:
                 payload,
                 apply_guards=accept,
                 device_totals=device_totals,
-                directional_totals=(
-                    directional_totals
-                    if self._directional_battery_energy_enabled
-                    else {}
-                ),
+                directional_totals=directional_totals,
             )
         )
         # A completed read consumes the polling interval even if none of its

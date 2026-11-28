@@ -56,6 +56,25 @@ def site_power_sample_is_plausible(
     )
 
 
+def power_recovery_elapsed(
+    elapsed: float, maximum: float | None, minimum: float
+) -> float:
+    """Apply the normal window and any previously observed recovery limit."""
+    return max(minimum, elapsed if maximum is None else min(elapsed, maximum))
+
+
+def energy_advance_is_plausible(
+    advance_wh: float, elapsed: float, total_wh: float
+) -> bool:
+    """Check a counter advance against the existing site power outlier rules."""
+    if not math.isfinite(advance_wh * 3600.0 / elapsed):
+        return False
+    watts = _energy_delta_to_power_w(advance_wh, window_s=elapsed, wh_per_unit=1)
+    return watts < EXTREME_SITE_POWER_W and site_power_sample_is_plausible(
+        watts, advance_wh / 1000.0, (total_wh / 1000.0,)
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class ExtremePowerValidationResult:
     """Describe whether an observed power sample can be published."""

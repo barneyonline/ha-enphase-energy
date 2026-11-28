@@ -727,6 +727,15 @@ def test_directional_battery_rejects_overflowing_total(coordinator_factory) -> N
         {"reported_at": None},
         {"size": True},
         {"size": 0},
+        {"size": 100},
+        {"timezone": "Invalid/Timezone"},
+        {"untrusted_power_pairs": "charge"},
+        {"untrusted_power_pairs": ["unknown"]},
+        {
+            "start": "0001-01-01",
+            "reported_at": "0001-01-01T00:00:00+00:00",
+            "timezone": "America/New_York",
+        },
         {"closed": []},
         {"totals": []},
         {"closed": {"grid_battery": True}},
@@ -763,6 +772,579 @@ async def test_directional_battery_storage_refuses_invalid_history(
     assert not restored.totals(directional_battery_payload, start, reported_at)
 
 
+@pytest.mark.parametrize("fault", ["invalid", "load_failure", "write_failure"])
+async def test_directional_battery_power_storage_failure_preserves_energy(
+    directional_battery_payload, monkeypatch, caplog, fault
+) -> None:
+    now = datetime.fromtimestamp(1_700_000_001, timezone.utc)
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    client = SimpleNamespace(
+        lifetime_energy=AsyncMock(return_value=directional_battery_payload)
+    )
+    energy_store = AsyncMock()
+    energy_store.async_load.return_value = None
+    power_store = AsyncMock()
+    power_store.async_load.return_value = (
+        {"pairs": None} if fault == "invalid" else None
+    )
+    if fault == "load_failure":
+        power_store.async_load.side_effect = OSError
+    elif fault == "write_failure":
+        power_store.async_save.side_effect = OSError
+    manager = EnergyManager(
+        client_provider=lambda: client,
+        site_id="site",
+        logger=logging.getLogger(__name__),
+        directional_battery_power_enabled=True,
+        directional_battery_store=energy_store,
+        directional_battery_power_store=power_store,
+    )
+
+    async def refresh(grid_wh):
+        nonlocal now
+        now += timedelta(minutes=5)
+        directional_battery_payload.update(
+            last_report_date=now.timestamp(),
+            grid_battery=[None, 2750, grid_wh],
+            charge=[None, 3510, grid_wh + 320],
+        )
+        await manager._async_refresh_site_energy(force=True)
+        assert (
+            manager.site_energy["battery_energy_from_grid"].value_kwh
+            == (2750 + grid_wh) / 1000
+        )
+
+    await refresh(202)
+    await refresh(252)
+    if fault != "invalid":
+        assert manager.directional_battery_power.interval is None
+        power_store.async_load.side_effect = None
+        power_store.async_save.side_effect = None
+        await refresh(302)
+        await refresh(352)
+    assert manager.directional_battery_power.interval.watts["grid_battery"] == 600
+    assert "power" not in energy_store.async_save.await_args.args[0]
+    if fault == "load_failure":
+        assert (
+            caplog.messages.count("Unable to load directional battery power checkpoint")
+            == 1
+        )
+
+
+@pytest.mark.parametrize(
+    "opening",
+    [
+        "missing",
+        "missing_reload",
+        "missing_then_unreadable",
+        "unreadable",
+        "older",
+        "superseded",
+        "equal",
+        "equal_without_reload",
+        "same_clock",
+        "same_clock_first_energy",
+        "same_clock_redistribution",
+        "older_first_energy",
+        "future_history",
+        "late_site_timezone",
+        "initial_invalid",
+        "late_observed_outlier",
+        "late_observed_outlier_delayed",
+        "late_observed_outlier_reload",
+        "outlier_save_failure",
+        "outlier_immediate_reload",
+        "outlier_repeated_with_power_off",
+        "outlier_advanced_with_power_off",
+        "malformed_outlier",
+        "unreadable_power_spike",
+        "unreadable_power_spike_repeated",
+    ],
+)
+async def test_directional_power_respects_a_late_cumulative_history(
+    directional_battery_payload, monkeypatch, opening
+) -> None:
+    now = datetime.fromtimestamp(1_700_000_001, timezone.utc)
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    client = SimpleNamespace(
+        lifetime_energy=AsyncMock(return_value=directional_battery_payload)
+    )
+    energy_store, power_store = AsyncMock(), AsyncMock()
+    energy_store.async_load.return_value = power_store.async_load.return_value = None
+    closed_grid_wh = 2750
+
+    def new_manager(*, energy=True, power=True, existing=False, timezone_provider=None):
+        return EnergyManager(
+            client_provider=lambda: client,
+            site_id="site",
+            logger=logging.getLogger(__name__),
+            directional_battery_enabled=energy,
+            directional_battery_power_enabled=power,
+            directional_battery_store=energy_store,
+            directional_battery_power_store=power_store if power else None,
+            has_directional_battery_entities=lambda: existing,
+            directional_site_timezone=timezone_provider,
+        )
+
+    async def refresh(grid_wh, *, valid=True, minutes=5, lag=0, solar_wh=320):
+        nonlocal now
+        now += timedelta(minutes=minutes)
+        directional_battery_payload.update(
+            last_report_date=(now - timedelta(minutes=lag)).timestamp(),
+            grid_battery=[None, closed_grid_wh, grid_wh],
+            solar_battery=[None, 750, solar_wh],
+            charge=[None, closed_grid_wh + 760, grid_wh + solar_wh],
+            battery_grid=[None, 0, 0 if valid else False],
+        )
+        await manager._async_refresh_site_energy(force=True)
+
+    first_energy_history = opening in (
+        "same_clock_first_energy",
+        "same_clock_redistribution",
+        "older_first_energy",
+    )
+    manager = new_manager(energy=not first_energy_history)
+    if opening == "initial_invalid":
+        await refresh(850, valid=False)
+        await refresh(650)
+        await refresh(700)
+        assert manager.directional_battery_power.interval is None
+        await refresh(850)
+        assert manager.directional_battery_power.interval is None
+        await refresh(900)
+        assert manager.directional_battery_power.interval.watts["grid_battery"] == 600
+        return
+    solar_wh = 320
+    if opening == "superseded":
+        # Power validates a re-attribution while the cumulative floor holds.
+        await refresh(850)
+        solar_wh = 670
+        await refresh(500, solar_wh=solar_wh)
+        await refresh(550, solar_wh=solar_wh)
+    else:
+        await refresh(500)
+        await refresh(550)
+    assert manager.directional_battery_power.interval.watts["grid_battery"] == 600
+    if not first_energy_history:
+        energy_store.async_load.return_value = energy_store.async_save.await_args.args[
+            0
+        ]
+    power_store.async_load.return_value = power_store.async_save.await_args.args[0]
+    if opening == "late_site_timezone":
+        manager = new_manager(energy=False, existing=True)
+        await refresh(850)
+        power_store.async_load.return_value = power_store.async_save.await_args.args[0]
+        cumulative = energy_store.async_load.return_value
+        energy_store.async_load.side_effect = [None, cumulative]
+        zone = None
+        manager = new_manager(
+            energy=False, existing=True, timezone_provider=lambda: zone
+        )
+        await refresh(600)
+        assert manager.directional_battery_power.interval is None
+        zone = "UTC"
+        await refresh(650)
+        await refresh(700)
+        assert manager.directional_battery_power.interval is None
+        await refresh(850)
+        assert manager.directional_battery_power.interval is None
+        await refresh(900)
+        assert manager.directional_battery_power.interval.watts["grid_battery"] == 600
+        return
+    if opening == "malformed_outlier" or opening.startswith("unreadable_power_spike"):
+        unreadable = opening.startswith("unreadable_power_spike")
+        if unreadable:
+            checkpoint = power_store.async_load.return_value
+            power_store.async_load.side_effect = [OSError, checkpoint]
+            manager = new_manager()
+        await refresh(
+            50550 if opening == "unreadable_power_spike" else 10550, valid=False
+        )
+        assert manager.directional_battery_power.interval is None
+        assert energy_store.async_save.await_args.args[0].get(
+            "untrusted_power_pairs"
+        ) == (None if unreadable else ["charge"])
+        if opening == "unreadable_power_spike_repeated":
+            await refresh(10550)
+            assert manager.directional_battery_power.interval is None
+            assert (
+                power_store.async_save.await_args.args[0]["pairs"]["charge"][
+                    "max_elapsed_seconds"
+                ]
+                == 300
+            )
+        await refresh(600)
+        assert manager.directional_battery_power.interval is None
+        await refresh(650)
+        assert manager.directional_battery_power.interval.watts["grid_battery"] == 600
+        return
+    if opening in (
+        "outlier_save_failure",
+        "outlier_immediate_reload",
+        "outlier_repeated_with_power_off",
+        "outlier_advanced_with_power_off",
+    ):
+        power_store.async_save.side_effect = OSError
+        await refresh(10550)
+        assert manager.directional_battery_power.interval is None
+        cumulative = energy_store.async_save.await_args.args[0]
+        assert cumulative["untrusted_power_pairs"] == ["charge"]
+        power_store.async_save.side_effect = None
+        if opening != "outlier_save_failure":
+            energy_store.async_load.return_value = cumulative
+            if opening in (
+                "outlier_repeated_with_power_off",
+                "outlier_advanced_with_power_off",
+            ):
+                manager = new_manager(power=False, existing=True)
+                await refresh(
+                    10600 if opening == "outlier_advanced_with_power_off" else 10550
+                )
+                cumulative = energy_store.async_save.await_args.args[0]
+                assert cumulative["untrusted_power_pairs"] == ["charge"]
+                energy_store.async_load.return_value = cumulative
+            manager = new_manager()
+        await refresh(600)
+        assert manager.directional_battery_power.interval is None
+        await refresh(650)
+        assert manager.directional_battery_power.interval.watts["grid_battery"] == 600
+        energy_store.async_load.return_value = energy_store.async_save.await_args.args[
+            0
+        ]
+        power_store.async_load.return_value = power_store.async_save.await_args.args[0]
+        manager = new_manager()
+        await refresh(700)
+        assert manager.directional_battery_power.interval is None
+        await refresh(750)
+        assert manager.directional_battery_power.interval.watts["grid_battery"] == 600
+        return
+
+    unchanged_input_clock = opening.startswith("same_clock")
+    late_outlier = opening.startswith("late_observed_outlier")
+    if first_energy_history:
+        manager = new_manager(power=False)
+        earlier_clock = opening == "older_first_energy"
+        if opening == "same_clock_redistribution":
+            closed_grid_wh = 2450
+        await refresh(
+            850, minutes=1 if earlier_clock else 0, lag=3 if earlier_clock else 0
+        )
+    elif opening in ("equal", "equal_without_reload", "same_clock"):
+        await refresh(
+            850,
+            valid=unchanged_input_clock,
+            minutes=0 if unchanged_input_clock else 5,
+        )
+        power_store.async_load.return_value = power_store.async_save.await_args.args[0]
+    elif opening not in ("superseded", "future_history"):
+        manager = new_manager(power=False, existing=True)
+        grid = 10550 if late_outlier else 600 if opening == "older" else 850
+        await refresh(grid)
+    cumulative = energy_store.async_save.await_args.args[0]
+    if opening == "same_clock":
+        assert cumulative["totals"]["grid_battery"] == 3300
+    if opening == "future_history":
+        energy_store.async_load.return_value = {
+            **cumulative,
+            "reported_at": (now + timedelta(days=1)).isoformat(),
+        }
+    elif opening == "equal" or unchanged_input_clock or first_energy_history:
+        energy_store.async_load.return_value = cumulative
+    elif opening == "missing_then_unreadable":
+        energy_store.async_load.side_effect = [None, OSError, cumulative]
+    elif opening in ("late_observed_outlier_delayed", "late_observed_outlier_reload"):
+        energy_store.async_load.side_effect = [None, None, cumulative]
+    else:
+        energy_store.async_load.side_effect = [
+            OSError if opening == "unreadable" else None,
+            cumulative,
+        ]
+    if opening != "equal_without_reload":
+        manager = new_manager(energy=False, existing=True)
+    if late_outlier:
+        await refresh(10550, minutes=0)
+        assert manager.directional_battery_power.interval is None
+        await refresh(600)
+        assert manager.directional_battery_power.interval is None
+        if opening == "late_observed_outlier_reload":
+            power_store.async_load.return_value = (
+                power_store.async_save.await_args.args[0]
+            )
+            manager = new_manager(energy=False, existing=True)
+            await refresh(650)
+            assert manager.directional_battery_power.interval is None
+            await refresh(700)
+            assert (
+                manager.directional_battery_power.interval.watts["grid_battery"] == 600
+            )
+            return
+        await refresh(650)
+        assert manager.directional_battery_power.interval.watts["grid_battery"] == 600
+        return
+    initial_writes = power_store.async_save.await_count
+    await refresh(650, solar_wh=solar_wh)
+    assert manager.directional_battery_power.interval is None
+    if opening == "unreadable":
+        assert power_store.async_save.await_count == initial_writes
+    if opening == "missing_reload":
+        power_store.async_load.return_value = power_store.async_save.await_args.args[0]
+        manager = new_manager(energy=False, existing=True)
+    await refresh(700, solar_wh=solar_wh)
+    if opening in ("older", "superseded", "same_clock", "future_history"):
+        assert manager.directional_battery_power.interval.watts["grid_battery"] == 600
+        return
+    assert manager.directional_battery_power.interval is None
+    if opening == "missing_then_unreadable":
+        await refresh(750)
+        assert manager.directional_battery_power.interval is None
+    await refresh(850)
+    assert manager.directional_battery_power.interval is None
+    await refresh(900)
+    assert manager.directional_battery_power.interval.watts["grid_battery"] == 600
+
+
+@pytest.mark.parametrize("opening", ["accepted", "revised", "late", "reload"])
+async def test_directional_power_retains_its_closed_prefix_after_rollover(
+    monkeypatch, opening
+) -> None:
+    now = datetime(2023, 11, 14, 23, 45, tzinfo=timezone.utc)
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    client = SimpleNamespace(lifetime_energy=AsyncMock())
+    energy_store, power_store = AsyncMock(), AsyncMock()
+    energy_store.async_load.return_value = power_store.async_load.return_value = None
+
+    def new_manager(*, energy=True, power=True):
+        return EnergyManager(
+            client_provider=lambda: client,
+            site_id="site",
+            logger=logging.getLogger(__name__),
+            directional_battery_enabled=energy,
+            directional_battery_power_enabled=power,
+            directional_battery_store=energy_store,
+            directional_battery_power_store=power_store if power else None,
+            has_directional_battery_entities=lambda: True,
+        )
+
+    async def refresh(minutes, grid, *, valid=True):
+        nonlocal now
+        now += timedelta(minutes=minutes)
+        zeros = [0] * len(grid)
+        client.lifetime_energy.return_value = {
+            "start_date": "2023-11-13",
+            "last_report_date": now.timestamp(),
+            "grid_battery": grid,
+            "solar_battery": zeros if valid else [*zeros[:-1], None],
+            "charge": grid,
+            "battery_home": zeros,
+            "battery_grid": zeros,
+            "discharge": zeros,
+        }
+        await manager._async_refresh_site_energy(force=True)
+
+    # First setup has never registered energy entities, so seed its history.
+    manager = new_manager()
+    manager._directional_battery._has_previous_entities = None
+    await refresh(0, [475, 1000])
+    await refresh(5, [475, 1050])
+    assert manager.directional_battery_power.interval.watts["grid_battery"] == 600
+    energy_store.async_load.return_value = energy_store.async_save.await_args.args[0]
+    power_store.async_load.return_value = power_store.async_save.await_args.args[0]
+    saved_signature = power_store.async_load.return_value["closed_signature"]
+    assert saved_signature
+
+    manager = new_manager(power=False)
+    await refresh(10, [475, 1100, 850])
+    cumulative = energy_store.async_save.await_args.args[0]
+    withhold_initial_history = opening in ("late", "reload")
+    if withhold_initial_history:
+        energy_store.async_load.side_effect = [None, cumulative]
+    else:
+        energy_store.async_load.return_value = cumulative
+    manager = new_manager(energy=False)
+    await refresh(5, [475, 1100, 850], valid=False)
+    recovery = power_store.async_save.await_args.args[0]
+    assert recovery["size"] == (2 if withhold_initial_history else 3)
+    assert recovery["closed_signature_size"] == 2
+    assert recovery["closed_signature"] == saved_signature
+    if opening == "reload":
+        power_store.async_load.return_value = recovery
+        manager = new_manager(energy=False)
+        await refresh(0, [475, 1100, 850], valid=False)
+    if withhold_initial_history:
+        await refresh(5, [475, 1100, 650])
+        assert manager.directional_battery_power.interval is None
+        await refresh(5, [475, 1100, 700])
+        assert manager.directional_battery_power.interval is None
+    closed = 450 if opening == "revised" else 475
+    await refresh(5, [closed, 1100, 850])
+    assert manager.directional_battery_power.interval is None
+    await refresh(5, [closed, 1100, 900])
+    if opening == "revised":
+        assert manager.directional_battery_power.interval is None
+        await refresh(5, [closed, 1100, 950])
+    assert manager.directional_battery_power.interval.watts["grid_battery"] == 600
+
+
+@pytest.mark.parametrize("dropout_kind", ["coordinated", "staggered", "outlier"])
+async def test_directional_power_recovery_preserves_the_direct_counter_floor(
+    monkeypatch, dropout_kind
+) -> None:
+    now = datetime(2026, 9, 5, 12, tzinfo=timezone.utc)
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    client = SimpleNamespace(lifetime_energy=AsyncMock())
+    energy_store, power_store = AsyncMock(), AsyncMock()
+    energy_store.async_load.return_value = power_store.async_load.return_value = None
+
+    def new_manager(*, energy=False, power=True):
+        return EnergyManager(
+            client_provider=lambda: client,
+            site_id="site",
+            logger=logging.getLogger(__name__),
+            directional_battery_enabled=energy,
+            directional_battery_power_enabled=power,
+            directional_battery_store=energy_store,
+            directional_battery_power_store=power_store if power else None,
+        )
+
+    async def refresh(grid, solar, charge, *, minutes=5):
+        nonlocal now
+        now += timedelta(minutes=minutes)
+        client.lifetime_energy.return_value = {
+            "start_date": "2026-09-05",
+            "last_report_date": now.timestamp(),
+            "grid_battery": [grid],
+            "solar_battery": [solar],
+            "charge": [charge],
+            "battery_home": [0],
+            "battery_grid": [0],
+            "discharge": [0],
+        }
+        await manager._async_refresh_site_energy(force=True)
+
+    if dropout_kind == "outlier":
+        initial = (100, 20000, 20100)
+        dropout = (99, 20000, 20100)
+        cumulative = (150, 20000, 20150)
+        still_low = (10150, 1, 10151)
+        directional_recovery = (10150, 20000, 30150)
+        full_recovery = (200, 20000, 20200)
+        valid = (250, 20000, 20250)
+    elif dropout_kind == "staggered":
+        initial = (2000, 3000, 5000)
+        dropout = (1800, 3000, 5000)
+        cumulative = (1800, 3200, 5000)
+        still_low = (1800, 3200, 4800)
+        directional_recovery = (2000, 3200, 4980)
+        full_recovery = (2000, 3200, 5200)
+        valid = (2050, 3200, 5250)
+    else:
+        initial = (1000, 1000, 2000)
+        dropout = (900, 900, 1800)
+        cumulative = (1001, 900, 1901)
+        still_low = (1001, 1000, 1910)
+        directional_recovery = (1051, 1000, 1960)
+        full_recovery = (1051, 1000, 2051)
+        valid = (1101, 1000, 2101)
+    manager = new_manager()
+    await refresh(*initial)
+    await refresh(*initial)
+    assert manager.directional_battery_power.interval.watts["grid_battery"] == 0
+    await refresh(*dropout)
+    assert manager.directional_battery_power.interval is None
+    power_store.async_load.return_value = power_store.async_save.await_args.args[0]
+
+    manager = new_manager(energy=True, power=False)
+    await refresh(*cumulative)
+    energy_store.async_load.return_value = energy_store.async_save.await_args.args[0]
+    manager = new_manager()
+    await refresh(*still_low)
+    assert manager.directional_battery_power.interval is None
+    saved = power_store.async_save.await_args.args[0]
+    assert saved["pairs"]["charge"]["aggregate_floor_wh"] == initial[2]
+    if dropout_kind == "outlier":
+        assert saved["pairs"]["charge"]["max_elapsed_seconds"] == 300
+    power_store.async_load.return_value = saved
+
+    manager = new_manager()
+    await refresh(*directional_recovery, minutes=15 if dropout_kind == "outlier" else 5)
+    assert manager.directional_battery_power.interval is None
+    await refresh(*full_recovery)
+    assert manager.directional_battery_power.interval is None
+    await refresh(*valid)
+    assert manager.directional_battery_power.interval.watts["grid_battery"] == 600
+
+
+@pytest.mark.parametrize("previous_day_checkpoint", [False, True])
+async def test_directional_power_restores_the_trusted_pair_after_write_failure(
+    monkeypatch, previous_day_checkpoint
+) -> None:
+    now = datetime(2026, 9, 5, 12, tzinfo=timezone.utc)
+    if previous_day_checkpoint:
+        now = now.replace(hour=23, minute=40)
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    client = SimpleNamespace(lifetime_energy=AsyncMock())
+    energy_store, power_store = AsyncMock(), AsyncMock()
+    energy_store.async_load.return_value = power_store.async_load.return_value = None
+
+    def new_manager():
+        return EnergyManager(
+            client_provider=lambda: client,
+            site_id="site",
+            logger=logging.getLogger(__name__),
+            directional_battery_power_enabled=True,
+            directional_battery_store=energy_store,
+            directional_battery_power_store=power_store,
+        )
+
+    async def refresh(grid, home, *, minutes=5, valid=True):
+        nonlocal now
+        now += timedelta(minutes=minutes)
+        closed = now.day == 6 and previous_day_checkpoint
+        charge = [550, grid] if closed else [grid]
+        discharge = [900, home] if closed else [home]
+        zeros = [0] * len(charge)
+        client.lifetime_energy.return_value = {
+            "start_date": (
+                "2026-09-05" if previous_day_checkpoint else now.date().isoformat()
+            ),
+            "last_report_date": now.timestamp(),
+            "grid_battery": charge,
+            "solar_battery": zeros,
+            "charge": charge,
+            "battery_home": discharge,
+            "battery_grid": zeros if valid else [*zeros[:-1], False],
+            "discharge": discharge,
+        }
+        await manager._async_refresh_site_energy(force=True)
+
+    manager = new_manager()
+    if previous_day_checkpoint:
+        await refresh(500, 850)
+        await refresh(550, 900)
+        assert manager.directional_battery_power.interval.watts["grid_battery"] == 600
+        power_store.async_load.return_value = power_store.async_save.await_args.args[0]
+    power_store.async_save.side_effect = OSError
+    await refresh(500, 850, minutes=10 if previous_day_checkpoint else 5)
+    await refresh(10550, 900)
+    assert manager.directional_battery_power.interval is None
+    cumulative = energy_store.async_save.await_args.args[0]
+    assert cumulative["untrusted_power_pairs"] == ["charge"]
+    energy_store.async_load.return_value = cumulative
+
+    power_store.async_save.side_effect = None
+    manager = new_manager()
+    writes = power_store.async_save.await_count
+    await refresh(10550, 900, minutes=0, valid=False)
+    assert power_store.async_save.await_count == writes
+    await refresh(600, 700)
+    await refresh(650, 750)
+    assert manager.directional_battery_power.interval is None
+    await refresh(700, 900)
+    assert manager.directional_battery_power.interval is None
+    await refresh(750, 950)
+    assert manager.directional_battery_power.interval.watts["battery_home"] == 600
+
+
 async def test_directional_battery_storage_does_not_publish_on_save_failure(
     coordinator_factory, directional_battery_payload
 ) -> None:
@@ -784,6 +1366,23 @@ async def test_directional_battery_storage_does_not_publish_on_save_failure(
     assert await battery.async_save()
     assert await battery.async_save()
     assert store.async_save.await_count == 2
+
+    legacy_checkpoint = {"observed_at": reported_at.isoformat()}
+    store.async_load.side_effect = None
+    store.async_save.side_effect = None
+    store.async_load.return_value = {
+        **store.async_save.await_args.args[0],
+        "power": legacy_checkpoint,
+    }
+    battery = DirectionalBatteryEnergy(
+        manager._coerce_lifetime_bucket, store, enabled=True
+    )
+    await battery.async_load()
+    assert battery.totals(
+        directional_battery_payload, start, reported_at + timedelta(minutes=5)
+    )
+    assert await battery.async_save()
+    assert store.async_save.await_args.args[0]["power"] == legacy_checkpoint
 
 
 async def test_directional_battery_refresh_preserves_aggregates_on_write_failure(
