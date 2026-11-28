@@ -393,6 +393,10 @@ def test_directional_power_rejects_redistribution_between_closed_buckets(
     changed = {**payload, "grid_battery": [110, 190, 350], "charge": [110, 190, 350]}
     later = source + timedelta(minutes=5)
     assert not manager._directional_battery_totals(changed, later, for_power=True)
+    assert not manager._directional_battery_totals(changed, later, for_power=True)
+    assert manager._directional_battery_totals(
+        changed, later + timedelta(minutes=5), for_power=True
+    )
     assert manager._directional_battery_totals(changed, later)
 
 

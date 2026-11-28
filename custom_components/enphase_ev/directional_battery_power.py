@@ -84,6 +84,18 @@ class DirectionalBatteryPower:
         self.average = self._next_average
         self.qualified |= self.interval is not None
 
+    def source_clock_is_current(self, reported_at: datetime) -> bool:
+        """Check the site clock before validating or updating source history."""
+        return (
+            self._source_cursor is None
+            or reported_at > self._source_cursor
+            or (
+                reported_at == self._source_cursor
+                and self._last_report is not None
+                and self._last_report.reported_at == reported_at
+            )
+        )
+
     def reject_report(
         self, reported_at: datetime, startup: DirectionalBatteryRecovery | None = None
     ) -> None:

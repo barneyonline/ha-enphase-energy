@@ -1342,9 +1342,10 @@ class EnergyManager:
             recovery = None
             if power is not None:
                 assert directional_source is not None
-                power_totals = self._directional_battery_totals(
-                    payload, directional_source, for_power=True
-                )
+                if power.source_clock_is_current(directional_source):
+                    power_totals = self._directional_battery_totals(
+                        payload, directional_source, for_power=True
+                    )
                 if power_totals:
                     power.observe(
                         payload,

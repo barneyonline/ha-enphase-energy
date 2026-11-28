@@ -584,6 +584,7 @@ def test_dropout_recovery_compares_paired_and_direct_deltas(replay):
         "origin_shift",
         "regressed_origin",
         "conflicting_start_cursor",
+        "invalid_boolean_origin",
     ],
 )
 async def test_reload_during_dropout_uses_saved_same_day_counters(
@@ -623,6 +624,7 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         charge=None,
         receipt_seconds=None,
         source_start="known",
+        grid_export=0,
     ):
         nonlocal now
         reported_at = _START + timedelta(seconds=seconds)
@@ -645,7 +647,7 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
             "grid_battery": [closed_grid, grid],
             "solar_battery": [0, solar],
             "battery_home": [0, 0],
-            "battery_grid": [0, 0],
+            "battery_grid": [0, grid_export],
             "charge": [closed_grid, grid + solar if charge is None else charge],
             "discharge": [0, 0],
         }
@@ -741,6 +743,24 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         return
 
     manager = new_manager()
+    if history_kind == "invalid_boolean_origin":
+        assert (
+            await refresh(1200, 1050, source_start="shifted", grid_export=False) is None
+        )
+        manager = new_manager()
+        assert (
+            await refresh(900, 1050, receipt_seconds=1201, source_start="shifted")
+            is None
+        )
+        assert (
+            await refresh(1200, 1100, receipt_seconds=1202, source_start="shifted")
+            is None
+        )
+        assert await refresh(1500, 1150, source_start="shifted") is None
+        assert (await refresh(1800, 1200, source_start="shifted")).watts[
+            "grid_battery"
+        ] == 600
+        return
     if history_kind == "conflicting_start_cursor":
         assert await refresh(1200, 1050, source_start="other") is None
         manager = new_manager()
@@ -822,8 +842,9 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
     assert (await refresh(2700, recovery + 50)).watts["grid_battery"] == 600
 
 
+@pytest.mark.parametrize("regressed", [False, True])
 async def test_closed_day_revision_waits_for_confirmation_then_seeds_power(
-    coordinator_factory, monkeypatch
+    coordinator_factory, monkeypatch, regressed
 ):
     monkeypatch.setattr(energy_mod, "DIRECTIONAL_BATTERY_POWER_SOURCE_VALIDATED", True)
     now = _START
@@ -832,12 +853,17 @@ async def test_closed_day_revision_waits_for_confirmation_then_seeds_power(
     manager = coordinator_factory(client=SimpleNamespace(lifetime_energy=read)).energy
     power = manager.directional_battery_power
 
-    async def refresh(seconds, closed_grid, active_grid):
+    async def refresh(seconds, closed_grid, active_grid, *, receipt_seconds=None):
         nonlocal now
-        now = _START + timedelta(seconds=seconds)
+        reported_at = _START + timedelta(seconds=seconds)
+        now = (
+            reported_at
+            if receipt_seconds is None
+            else _START + timedelta(seconds=receipt_seconds)
+        )
         read.return_value = {
             "start_date": (_START.date() - timedelta(days=1)).isoformat(),
-            "last_report_date": now.timestamp(),
+            "last_report_date": reported_at.timestamp(),
             "grid_battery": [closed_grid, active_grid],
             "solar_battery": [100, 200],
             "battery_home": [0, 0],
@@ -850,6 +876,18 @@ async def test_closed_day_revision_waits_for_confirmation_then_seeds_power(
     await refresh(0, 500, 1000)
     await refresh(300, 500, 1050)
     assert power.interval.watts["grid_battery"] == 600
+    if regressed:
+        now = _START + timedelta(minutes=20)
+        read.return_value = {"last_report_date": now.timestamp()}
+        await manager._async_refresh_site_energy(force=True)
+        assert power.interval is power.average is None
+        await refresh(900, 400, 1100, receipt_seconds=1201)
+        for seconds, grid in ((1500, 1150), (1800, 1200)):
+            await refresh(seconds, 400, grid)
+            assert power.interval is power.average is None
+        await refresh(2100, 400, 1250)
+        assert power.interval.watts["grid_battery"] == 600
+        return
     for seconds, closed in ((600, 450), (600, 450), (900, 400), (1200, 400)):
         await refresh(seconds, closed, 1100)
         assert power.interval is power.average is None

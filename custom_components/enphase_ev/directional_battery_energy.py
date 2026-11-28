@@ -569,6 +569,7 @@ class DirectionalBatteryEnergy:
                     return None
                 aggregates[key] = values
 
+        source_series = (*series.values(), *aggregates.values())
         totals = dict.fromkeys(_FIELDS, 0.0)
         closed = totals.copy()
         closed_buckets: list[tuple[float | None, ...]] = []
@@ -576,6 +577,12 @@ class DirectionalBatteryEnergy:
         reporting_started = False
         count = 0
         for index in range(size):
+            if for_power and any(
+                isinstance(values[index], bool)
+                for values in source_series
+                if index < len(values)
+            ):
+                return None
             if (
                 previous is not None
                 and index == previous.size - 1
