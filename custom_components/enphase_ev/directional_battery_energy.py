@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timezone, tzinfo
+from hashlib import sha256
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -27,24 +28,30 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def directional_battery_store(
-    hass: HomeAssistant, entry_id: str
+    hass: HomeAssistant, site_id: str
 ) -> Store[dict[str, object]]:
-    """Store the site's published battery history independently of entity restore."""
+    """Retain the baseline for Recorder statistics across same-site re-adds."""
+    site_key = sha256(site_id.encode()).hexdigest()
     return AcknowledgedStore(
-        hass, 1, f"{DOMAIN}.directional_battery_energy.{entry_id}", private=True
+        hass, 1, f"{DOMAIN}.directional_battery_energy.{site_key}", private=True
     )
 
 
 def has_directional_battery_entities(hass: HomeAssistant, site_id: str) -> bool:
     """Check if this site already has directional entity IDs to protect."""
     registry = er.async_get(hass)
-    return any(
-        registry.async_get_entity_id(
-            "sensor", DOMAIN, site_sensor_unique_id(site_id, flow)
-        )
-        is not None
-        for flow in DIRECTIONAL_BATTERY_ENERGY_FIELDS
-    )
+    get_entity_id = getattr(registry, "async_get_entity_id", None)
+    deleted = getattr(registry, "deleted_entities", None)
+    for flow in DIRECTIONAL_BATTERY_ENERGY_FIELDS:
+        unique_id = site_sensor_unique_id(site_id, flow)
+        if (
+            callable(get_entity_id)
+            and get_entity_id("sensor", DOMAIN, unique_id) is not None
+        ) or (
+            isinstance(deleted, Mapping) and ("sensor", DOMAIN, unique_id) in deleted
+        ):
+            return True
+    return False
 
 
 @dataclass(frozen=True, slots=True)

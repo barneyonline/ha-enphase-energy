@@ -79,6 +79,7 @@ from .scalar_helpers import (
     coerce_snapshot_bool,
 )
 from .runtime_data import EnphaseConfigEntry, get_runtime_data
+from .directional_battery_energy import has_directional_battery_entities
 from .sensor_snapshot_helpers import restore_power_w
 from .sensor_cloud_metadata import (
     EnphaseAccountAccessSensor,
@@ -332,8 +333,9 @@ async def async_setup_entry(
             DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
         )
     )
-    known_directional_battery_energy, _ = registry_setup.sync_site_sensor_option(
-        DIRECTIONAL_BATTERY_ENERGY_FIELDS, enabled=directional_battery_energy_enabled
+    known_directional_battery_energy = (
+        directional_battery_energy_enabled
+        and has_directional_battery_entities(hass, str(coord.site_id))
     )
     microinverter_lifetime_energy_enabled = bool(
         entry.options.get(

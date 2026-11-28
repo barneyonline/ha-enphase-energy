@@ -1073,7 +1073,7 @@ class EnphaseCoordinator(
                 )
             ),
             directional_battery_store=(
-                directional_battery_store(hass, config_entry.entry_id)
+                directional_battery_store(hass, self.site_id)
                 if config_entry is not None
                 else None
             ),

@@ -44,7 +44,6 @@ class EnphaseRuntimeData:
     applied_data: dict[str, Any] | None = None
     applied_options: dict[str, Any] | None = None
     preserve_for_reload: bool = False
-    registry_reload_pending: bool = False
     unload_task: asyncio.Task[bool] | None = field(default=None, repr=False)
     update_listener_lock: asyncio.Lock = field(
         default_factory=asyncio.Lock,

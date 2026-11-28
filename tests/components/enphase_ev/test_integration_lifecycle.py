@@ -25,7 +25,7 @@ from homeassistant.helpers.aiohttp_client import (
 from homeassistant.setup import async_setup_component
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant.common import async_fire_time_changed
+from pytest_homeassistant.common import MockConfigEntry, async_fire_time_changed
 from yarl import URL
 
 from custom_components.enphase_ev.api import EnphaseEVClient
@@ -167,11 +167,7 @@ async def _finish_startup(hass, entry):
     await hass.async_block_till_done()
 
 
-@pytest.mark.session_history_real
-async def test_directional_battery_real_platform_lifecycle(
-    hass, config_entry, platform_cloud, freezer, monkeypatch
-):
-    responses, _, unexpected = platform_cloud
+def _configure_directional_battery_site(hass, config_entry, responses):
     responses["devices_inventory"]["result"].append(
         {"type": "encharge", "devices": [{"serial_number": "BAT-TEST"}]}
     )
@@ -205,6 +201,14 @@ async def test_directional_battery_real_platform_lifecycle(
             CONF_SELECTED_TYPE_KEYS: ["envoy", "encharge"],
         },
     )
+
+
+@pytest.mark.session_history_real
+async def test_directional_battery_real_platform_lifecycle(
+    hass, config_entry, platform_cloud, freezer, monkeypatch
+):
+    responses, _, unexpected = platform_cloud
+    _configure_directional_battery_site(hass, config_entry, responses)
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await _finish_startup(hass, config_entry)
     registry = er.async_get(hass)
@@ -251,9 +255,9 @@ async def test_directional_battery_real_platform_lifecycle(
     )
     await _finish_startup(hass, config_entry)
     reload.assert_awaited_once_with(config_entry.entry_id)
-    assert (
-        registry.async_get(grid_id).disabled_by is er.RegistryEntryDisabler.INTEGRATION
-    )
+    assert registry.async_get(grid_id).disabled_by is None
+    state = hass.states.get(grid_id)
+    assert state is None or state.state == STATE_UNAVAILABLE
     assert registry.async_get(disabled_id).disabled_by is er.RegistryEntryDisabler.USER
 
     lifetime = responses["lifetime_energy"]
@@ -261,18 +265,13 @@ async def test_directional_battery_real_platform_lifecycle(
     hass.config_entries.async_update_entry(
         config_entry, options={OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED: True}
     )
-    await hass.async_block_till_done()
-    reload.assert_awaited_once_with(config_entry.entry_id)
+    await _finish_startup(hass, config_entry)
+    assert reload.await_count == 2
     previous_data = dict(config_entry.data)
     updated_data = {**previous_data, CONF_HEMS_AUTH_FAILURE_COUNT: 1}
     config_entry.runtime_data.mark_internal_data_update(previous_data, updated_data)
     hass.config_entries.async_update_entry(config_entry, data=updated_data)
     await hass.async_block_till_done()
-    reload.assert_awaited_once_with(config_entry.entry_id)
-    freezer.tick(timedelta(seconds=RELOAD_AFTER_UPDATE_DELAY + 1))
-    lifetime["last_report_date"] = dt_util.utcnow().timestamp()
-    async_fire_time_changed(hass, dt_util.utcnow())
-    await _finish_startup(hass, config_entry)
     assert reload.await_count == 2
     assert registry.async_get(grid_id).disabled_by is None
     assert registry.async_get(disabled_id).disabled_by is er.RegistryEntryDisabler.USER
@@ -335,7 +334,7 @@ async def test_directional_battery_real_platform_lifecycle(
 
     # Core reports storage loss as an empty store. Existing entity IDs cannot
     # safely treat a rerouted historical total as a fresh Recorder baseline.
-    store = directional_battery_store(hass, config_entry.entry_id)
+    store = directional_battery_store(hass, coord.site_id)
     history = await store.async_load()
     assert history
     await store.async_remove()
@@ -352,7 +351,8 @@ async def test_directional_battery_real_platform_lifecycle(
 
     assert all(registry.async_get(entity_id) is not None for entity_id in ids.values())
     assert not unexpected, ", ".join(unexpected)
-    # Entry removal must join the durable write before deleting the file.
+    # Entry removal must join the durable write before a replacement runtime
+    # can load the retained site baseline.
     writing, release_write, waiting_for_write = (
         asyncio.Event(),
         asyncio.Event(),
@@ -393,7 +393,84 @@ async def test_directional_battery_real_platform_lifecycle(
         release_write.set()
     assert await removal
     await refresh
-    assert await store.async_load() is None
+    saved = await store.async_load()
+    assert saved["totals"]["grid_battery"] == 12_006
+
+    # Core can assign the old entity IDs and retain their statistics on re-add.
+    # The new entry must still reject an incompatible history for this site.
+    freezer.tick(timedelta(minutes=5))
+    lifetime.update(
+        grid_battery=[12_206],
+        solar_battery=[100],
+        last_report_date=dt_util.utcnow().timestamp(),
+    )
+    replacement = MockConfigEntry(
+        domain=DOMAIN,
+        data=dict(config_entry.data),
+        options=dict(config_entry.options),
+        unique_id=config_entry.unique_id,
+        version=config_entry.version,
+        minor_version=config_entry.minor_version,
+    )
+    replacement.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(replacement.entry_id)
+    await _finish_startup(hass, replacement)
+    assert hass.states.get(grid_id).state == STATE_UNAVAILABLE
+    assert await store.async_load() == saved
+    coord = replacement.runtime_data.coordinator
+    lifetime["solar_battery"] = [300]
+    assert float(await publish_grid(12_007, advance=True)) == 12.007
+    assert not unexpected, ", ".join(unexpected)
+    assert await hass.config_entries.async_unload(replacement.entry_id)
+
+
+@pytest.mark.session_history_real
+async def test_directional_battery_keeps_disable_new_entities_preference(
+    hass, config_entry, platform_cloud, monkeypatch
+):
+    responses, _, unexpected = platform_cloud
+    _configure_directional_battery_site(hass, config_entry, responses)
+    hass.config_entries.async_update_entry(config_entry, pref_disable_new_entities=True)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await _finish_startup(hass, config_entry)
+    registry = er.async_get(hass)
+    site_id = config_entry.runtime_data.coordinator.site_id
+    entity_ids = [
+        registry.async_get_entity_id("sensor", DOMAIN, f"{DOMAIN}_site_{site_id}_{key}")
+        for key in DIRECTIONAL_BATTERY_ENERGY_FIELDS
+    ]
+    assert all(
+        registry.async_get(entity_id).disabled_by
+        is er.RegistryEntryDisabler.INTEGRATION
+        for entity_id in entity_ids
+    )
+    assert await hass.config_entries.async_reload(config_entry.entry_id)
+    await _finish_startup(hass, config_entry)
+    assert all(
+        registry.async_get(entity_id).disabled_by
+        is er.RegistryEntryDisabler.INTEGRATION
+        for entity_id in entity_ids
+    )
+    device_id = registry.async_get(entity_ids[0]).device_id
+    devices = dr.async_get(hass)
+    devices.async_update_device(device_id, disabled_by=dr.DeviceEntryDisabler.USER)
+    await hass.async_block_till_done()
+    reload = AsyncMock(wraps=hass.config_entries.async_reload)
+    monkeypatch.setattr(hass.config_entries, "async_reload", reload)
+    for enabled in (False, True):
+        hass.config_entries.async_update_entry(
+            config_entry, options={OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED: enabled}
+        )
+        await _finish_startup(hass, config_entry)
+    assert reload.await_count == 2
+    assert devices.async_get(device_id).disabled_by is dr.DeviceEntryDisabler.USER
+    assert all(
+        registry.async_get(entity_id).disabled_by
+        is er.RegistryEntryDisabler.INTEGRATION
+        for entity_id in entity_ids
+    )
+    assert not unexpected, ", ".join(unexpected)
+    assert await hass.config_entries.async_unload(config_entry.entry_id)
 
 
 @pytest.mark.session_history_real
