@@ -25,9 +25,11 @@ from .const import (
     CONF_REMEMBER_PASSWORD,
     CONF_SELECTED_TYPE_KEYS,
     CONF_SERIALS,
+    CONF_SITE_ID,
     CONF_SITE_NAME,
     CONF_SITE_ONLY,
     DOMAIN,
+    DIRECTIONAL_BATTERY_ENERGY_FIELDS,
     DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
     DEFAULT_GRID_PROFILE_CONTROLS_ENABLED,
     DEFAULT_DESCRIPTIVE_ACTIVITY_ENTRIES,
@@ -367,6 +369,28 @@ async def _async_update_listener_locked(
             preserve_runtime = not bool(
                 changed_data_keys - _HOT_APPLY_DATA_KEYS - _RUNTIME_HANDOFF_DATA_KEYS
             )
+            if (
+                OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED in changed_reload_options
+                and target_options.get(
+                    OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+                    DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+                )
+                and entry.supports_unload
+            ):
+                from .sensor_registry import EnphaseSensorRegistrySetup
+
+                registry_setup = EnphaseSensorRegistrySetup(
+                    er.async_get(hass),
+                    config_entry_id=entry.entry_id,
+                    site_id=str(target_data[CONF_SITE_ID]),
+                )
+                _, reenabled = registry_setup.sync_site_sensor_option(
+                    DIRECTIONAL_BATTERY_ENERGY_FIELDS, enabled=True
+                )
+                if reenabled:
+                    # Core reloads after clearing a registry disabler.
+                    runtime_data.preserve_for_reload = preserve_runtime
+                    return
             if not reload_required:
                 coord = runtime_data.coordinator
                 try:

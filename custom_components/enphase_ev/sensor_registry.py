@@ -140,12 +140,15 @@ class EnphaseSensorRegistrySetup:
         if key.startswith(router_prefix):
             self.known_gateway_iq_router_keys.discard(key[len(router_prefix) :])
 
-    def sync_site_sensor_option(self, keys: Iterable[str], *, enabled: bool) -> bool:
-        """Apply a feature toggle and return whether any of its sensors exist."""
+    def sync_site_sensor_option(
+        self, keys: Iterable[str], *, enabled: bool
+    ) -> tuple[bool, bool]:
+        """Return whether any sensors exist and whether any were re-enabled."""
         known = False
+        reenabled = False
         get_entity = getattr(self._ent_reg, "async_get", None)
         if not callable(get_entity):
-            return known
+            return known, reenabled
         for key in keys:
             entity_id = self._async_get_sensor_entity_id(
                 self.site_sensor_unique_id(key)
@@ -159,7 +162,8 @@ class EnphaseSensorRegistrySetup:
                 )
             elif enabled and self._is_disabled_by_integration(entry.disabled_by):
                 self._ent_reg.async_update_entity(entity_id, disabled_by=None)
-        return known
+                reenabled = True
+        return known, reenabled
 
     def remove_type_sensor_entity(self, type_key: str) -> None:
         """Remove a type inventory sensor entity by type key."""

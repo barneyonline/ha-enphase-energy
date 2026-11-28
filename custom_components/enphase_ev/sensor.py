@@ -45,6 +45,7 @@ from .entity import evse_safe_limit_active, evse_charging_active
 from .control_updates import current_control_value
 from .labels import battery_profile_label
 from .const import (
+    DIRECTIONAL_BATTERY_ENERGY_FIELDS,
     DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
     DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     DEFAULT_MICROINVERTER_POWER_ENABLED,
@@ -61,7 +62,6 @@ from .const import (
 from .coordinator import EnphaseCoordinator
 from .cloud_errors import cloud_error_code
 from .device_info_helpers import _cloud_device_info
-from .energy import DIRECTIONAL_BATTERY_ENERGY_FIELDS
 from .entity import (
     EnphaseBaseEntity,
     evse_amp_control_applicable,
@@ -336,7 +336,7 @@ async def async_setup_entry(
             DEFAULT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
         )
     )
-    known_directional_battery_energy = registry_setup.sync_site_sensor_option(
+    known_directional_battery_energy, _ = registry_setup.sync_site_sensor_option(
         DIRECTIONAL_BATTERY_ENERGY_FIELDS, enabled=directional_battery_energy_enabled
     )
     microinverter_lifetime_energy_enabled = bool(

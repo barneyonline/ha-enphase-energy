@@ -653,10 +653,12 @@ offsets and lose that baseline across another restart. Repeated equal totals rem
 valid `total_increasing` states.
 
 Directional battery energy uses the four reported lifetime Wh arrays as one
-set. The manager requires aligned observations and a report timestamp, preserves
-observed zeroes, and holds the last accepted totals through missing data. The
-four IQ Battery sensors retain Wh precision for statistics. The Device Features
-option disables their registry entries without removing entity IDs or history.
+set. The manager requires aligned observations after battery reporting begins
+and checks zero readings against any recorded charge or discharge for the same
+bucket. A confirmed reset needs distinct report timestamps, including after
+Home Assistant restores the prior total. The IQ Battery sensors retain Wh
+precision and hold their last accepted totals through missing data. The Device
+Features option disables the registry entries without removing entity IDs or history.
 
 Current Grid Power and Current Battery Power reseed their cumulative-energy
 baselines when missing source channels return, including during reload or reauth.

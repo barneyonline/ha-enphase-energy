@@ -8,6 +8,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import TypedDict
 
 from .api_models import ChargerInfo, SiteInfo
+from .const import DIRECTIONAL_BATTERY_ENERGY_FIELDS
 from .runtime_helpers import coerce_optional_text
 
 type PayloadMap = dict[str, object]
@@ -362,9 +363,13 @@ def normalize_lifetime_energy_payload(payload: object) -> PayloadMap | None:
             ):
                 continue
             if isinstance(value, list):
-                normalized[canonical_key] = [
-                    coerce_lifetime_energy_value(v) for v in value
-                ]
+                coerce_bucket = (
+                    coerce_non_boolean_number
+                    if canonical_key in {"charge", "discharge"}
+                    or canonical_key in DIRECTIONAL_BATTERY_ENERGY_FIELDS.values()
+                    else coerce_lifetime_energy_value
+                )
+                normalized[canonical_key] = [coerce_bucket(v) for v in value]
             else:
                 normalized[canonical_key] = []
             continue

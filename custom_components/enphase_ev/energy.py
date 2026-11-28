@@ -16,6 +16,7 @@ from homeassistant.util import dt as dt_util
 
 from .api import SiteEnergyUnavailable, guarded_read_scope
 from .cloud_retry import retry_after_delay, transient_backoff_delay
+from .const import DIRECTIONAL_BATTERY_ENERGY_FIELDS
 from .log_redaction import redact_site_id, redact_text
 
 LIFETIME_DROP_JITTER_KWH = 0.02
@@ -31,12 +32,12 @@ SITE_ENERGY_DEFAULT_INTERVAL_MIN = 5.0
 SITE_ENERGY_FAILURE_BACKOFF_S = 15 * 60
 HEMS_LIFETIME_FAILURE_BACKOFF_S = 60 * 60
 DEVICE_LIFETIME_CHANNELS: tuple[str, ...] = ("evse", "heatpump", "water_heater")
-DIRECTIONAL_BATTERY_ENERGY_FIELDS = {
-    "battery_energy_from_grid": "grid_battery",
-    "battery_energy_from_solar": "solar_battery",
-    "battery_energy_to_home": "battery_home",
-    "battery_energy_to_grid": "battery_grid",
-}
+# Cross-check rows with a zero direction without relying on exact Enphase
+# aggregate totals. Observed one-zero daily residuals reached 38 Wh, and
+# quarter-hour rounding can account for 1 Wh.
+BATTERY_DIRECTION_ZERO_PAIR_TOLERANCE_WH = 1.0
+BATTERY_DIRECTION_SINGLE_ZERO_TOLERANCE_WH = 50.0
+BATTERY_DIRECTION_SINGLE_ZERO_TOLERANCE_RATIO = 0.05
 HEMS_DEVICE_CHANNELS_META_KEY = "_hems_device_channels"
 HEMS_DEVICE_METADATA_KEY = "_hems_device_metadata"
 
@@ -60,6 +61,7 @@ class LifetimeGuardState:
     pending_value: float | None = None
     pending_ts: float | None = None
     pending_count: int = 0
+    pending_source: datetime | None = None
 
 
 @dataclass(slots=True)
@@ -422,30 +424,66 @@ class EnergyManager:
                 return {}
             series.append(values)
 
-        aggregates = [
-            values
-            for field in ("charge", "discharge")
-            if isinstance(values := payload.get(field), list)
-        ]
+        charge = payload.get("charge")
+        discharge = payload.get("discharge")
+        direct_pairs = (
+            charge if isinstance(charge, list) else [],
+            discharge if isinstance(discharge, list) else [],
+        )
         totals = dict.fromkeys(fields, 0.0)
+        aggregate_zero_seen = [False, False]
+        reporting_started = False
         count = 0
         for index, row in enumerate(zip(*series, strict=True)):
             samples = [self._coerce_lifetime_bucket(value) for value in row]
             reported = [sample for sample in samples if sample is not None]
+            direct = [
+                (
+                    self._coerce_lifetime_bucket(values[index])
+                    if index < len(values)
+                    else None
+                )
+                for values in direct_pairs
+            ]
             if not reported:
-                # Sites can have common gaps before battery reporting began.
-                if any(
-                    index < len(values)
-                    and (self._coerce_lifetime_bucket(values[index]) or 0) > 0
-                    for values in aggregates
+                # The source can alternate zeros and nulls before measurable
+                # battery activity begins.
+                if reporting_started or any(
+                    total is not None and total > 0 for total in direct
                 ):
                     return {}
                 continue
             if len(reported) != len(fields):
                 return {}
+            reporting_started |= any(reported) or any(
+                total is not None for total in direct
+            )
+            for pair_index, total in enumerate(direct):
+                if total is None:
+                    continue
+                left, right = reported[pair_index * 2 : pair_index * 2 + 2]
+                if left and right:
+                    continue
+                pair_total = left + right
+                tolerance = (
+                    max(
+                        BATTERY_DIRECTION_SINGLE_ZERO_TOLERANCE_WH,
+                        total * BATTERY_DIRECTION_SINGLE_ZERO_TOLERANCE_RATIO,
+                    )
+                    if pair_total
+                    else BATTERY_DIRECTION_ZERO_PAIR_TOLERANCE_WH
+                )
+                if total - pair_total > tolerance:
+                    return {}
+                if total == 0:
+                    aggregate_zero_seen[pair_index] = True
             for field, sample in zip(fields, reported, strict=True):
                 totals[field] += sample
             count += 1
+        for pair_index, observed_zero in enumerate(aggregate_zero_seen):
+            left_field, right_field = fields[pair_index * 2 : pair_index * 2 + 2]
+            if not (totals[left_field] or totals[right_field] or observed_zero):
+                return {}
         return {field: (total, count) for field, total in totals.items()}
 
     def _latest_energy_buckets(
@@ -562,7 +600,12 @@ class EnergyManager:
         return fallback_total, fallback_count, fallback_fields
 
     def _apply_site_energy_guard(
-        self, flow: str, sample: float | None, prev: float | None
+        self,
+        flow: str,
+        sample: float | None,
+        prev: float | None,
+        *,
+        reset_source: datetime | None = None,
     ) -> tuple[float | None, str | None]:
         """Apply monotonic guard to a site energy flow."""
         state = self._site_energy_guard.setdefault(flow, LifetimeGuardState())
@@ -609,11 +652,14 @@ class EnergyManager:
                 state.pending_value is not None
                 and abs(value - state.pending_value) <= LIFETIME_CONFIRM_TOLERANCE_KWH
             ):
+                if reset_source is not None and reset_source == state.pending_source:
+                    return last, None
                 state.pending_count += 1
             else:
                 state.pending_value = value
                 state.pending_ts = now
                 state.pending_count = 1
+                state.pending_source = reset_source
                 self._site_energy_force_refresh = True
                 self._logger.debug(
                     "Ignoring suspected site energy reset for %s: %.3f -> %.3f",
@@ -645,6 +691,17 @@ class EnergyManager:
         state.pending_ts = None
         state.pending_count = 0
         return last, None
+
+    def restore_directional_battery_baseline(
+        self, flow: str, value: float, last_reset_at: str | None
+    ) -> None:
+        """Reinstate the recorder baseline before confirming any directional reset."""
+        confirmed_reset = self._site_energy_last_reset.get(flow)
+        if confirmed_reset is not None and confirmed_reset != last_reset_at:
+            return
+        state = self._site_energy_guard.setdefault(flow, LifetimeGuardState())
+        if state.last is None or value > state.last:
+            self._site_energy_guard[flow] = LifetimeGuardState(last=value)
 
     def _aggregate_site_energy(
         self,
@@ -771,7 +828,14 @@ class EnergyManager:
                 )
             else:
                 filtered, reset_at = self._apply_site_energy_guard(
-                    flow, total_kwh, prev_value
+                    flow,
+                    total_kwh,
+                    prev_value,
+                    reset_source=(
+                        last_report_date
+                        if flow in DIRECTIONAL_BATTERY_ENERGY_FIELDS
+                        else None
+                    ),
                 )
             if filtered is None:
                 return
@@ -975,15 +1039,8 @@ class EnergyManager:
                     discharge_count,
                 )
 
-        if directional_totals and all(
-            bucket_total(total_field)[0] == 0
-            or bucket_total(first)[0] + bucket_total(second)[0] > 0
-            for total_field, first, second in (
-                ("charge", "grid_battery", "solar_battery"),
-                ("discharge", "battery_home", "battery_grid"),
-            )
-        ):
-            for flow, field in DIRECTIONAL_BATTERY_ENERGY_FIELDS.items():
+        for flow, field in DIRECTIONAL_BATTERY_ENERGY_FIELDS.items():
+            if field in directional_totals:
                 total, count = directional_totals[field]
                 _store(
                     flow,

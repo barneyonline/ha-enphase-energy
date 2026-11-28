@@ -71,6 +71,15 @@ DEFAULT_GRID_PROFILE_CONTROLS_ENABLED = False
 DEFAULT_MICROINVERTER_LIFETIME_ENERGY_ENABLED = False
 DEFAULT_MICROINVERTER_POWER_ENABLED = False
 DEFAULT_PRICING_EDITS_ENABLED = True
+
+# Charge directions first, then discharge directions.
+DIRECTIONAL_BATTERY_ENERGY_FIELDS = {
+    "battery_energy_from_grid": "grid_battery",
+    "battery_energy_from_solar": "solar_battery",
+    "battery_energy_to_home": "battery_home",
+    "battery_energy_to_grid": "battery_grid",
+}
+
 ISSUE_NETWORK_UNREACHABLE = "cloud_unreachable"
 ISSUE_DNS_RESOLUTION = "cloud_dns_resolution"
 ISSUE_CLOUD_ERRORS = "cloud_service_unavailable"

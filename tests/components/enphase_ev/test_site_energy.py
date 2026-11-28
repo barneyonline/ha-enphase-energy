@@ -9,23 +9,19 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import UnitOfEnergy, UnitOfPower
-from homeassistant.helpers import entity_registry as er
 
 from custom_components.enphase_ev import energy as energy_mod
 from custom_components.enphase_ev import sensor as sensor_mod
 from custom_components.enphase_ev.api import SiteEnergyUnavailable
-from custom_components.enphase_ev.const import (
-    DOMAIN,
-    OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
+from custom_components.enphase_ev.api_parsers import (
+    normalize_lifetime_energy_payload,
 )
+from custom_components.enphase_ev.const import DIRECTIONAL_BATTERY_ENERGY_FIELDS
 from custom_components.enphase_ev.energy import (
-    DIRECTIONAL_BATTERY_ENERGY_FIELDS,
     LifetimeGuardState,
     SiteEnergyFlow,
 )
-from custom_components.enphase_ev.runtime_data import EnphaseRuntimeData
 from custom_components.enphase_ev.sensor import (
     EnphaseBatteryPowerSensor,
     EnphaseGridPowerSensor,
@@ -78,23 +74,56 @@ def test_site_energy_directional_battery_totals(
     assert flows["battery_discharge"].value_kwh == 2.203
 
 
-def test_directional_battery_sensor_holds_restored_total_on_zero_dropout(
+@pytest.mark.parametrize("has_aggregates", [False, True])
+def test_directional_battery_zero_history_requires_observations(
+    coordinator_factory, has_aggregates
+) -> None:
+    payload = {
+        "last_report_date": 1_700_000_001,
+        **dict.fromkeys(DIRECTIONAL_BATTERY_ENERGY_FIELDS.values(), [0]),
+    }
+    if has_aggregates:
+        payload.update(charge=[0], discharge=[0])
+    parsed = coordinator_factory().energy._aggregate_site_energy(
+        payload
+    )  # noqa: SLF001
+    assert parsed is not None
+    flows, _ = parsed
+    directions = flows.keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
+    assert len(directions) == (4 if has_aggregates else 0)
+    assert all(flows[key].value_kwh == 0 for key in directions)
+
+
+def test_directional_battery_allows_leading_zero_and_null_history(
+    coordinator_factory,
+) -> None:
+    payload = {
+        "last_report_date": 1_700_000_001,
+        "grid_battery": [0, None, 441],
+        "solar_battery": [0, None, 0],
+        "battery_home": [0, None, 221],
+        "battery_grid": [0, None, 0],
+        "charge": [None, None, 443],
+        "discharge": [None, None, 221],
+    }
+    parsed = coordinator_factory().energy._aggregate_site_energy(
+        payload
+    )  # noqa: SLF001
+    assert parsed is not None
+    assert parsed[0].keys() >= DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
+
+
+def test_directional_battery_boolean_does_not_become_measured_zero(
     coordinator_factory, directional_battery_payload
 ) -> None:
-    coord = coordinator_factory()
-    flow_key = "battery_energy_from_grid"
-    sensor = sensor_mod.EnphaseDirectionalBatteryEnergySensor(coord, flow_key)
-    parsed = coord.energy._aggregate_site_energy(  # noqa: SLF001
-        {**directional_battery_payload, "grid_battery": [None, 0, 0]}
+    payload = normalize_lifetime_energy_payload(
+        {**directional_battery_payload, "battery_grid": [None, 0, False]}
     )
+    parsed = coordinator_factory().energy._aggregate_site_energy(
+        payload
+    )  # noqa: SLF001
     assert parsed is not None
-    coord.energy.site_energy = parsed[0]
-    assert sensor.native_value == 0
-    sensor._restored_value = 2.952  # noqa: SLF001
-    sensor._last_source_value = 2.952  # noqa: SLF001
-    assert sensor.native_value == 2.952
-    coord.energy.site_energy[flow_key].last_reset_at = "2023-11-15T00:00:00+00:00"
-    assert sensor.native_value == 0
+    assert not parsed[0].keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
 
 
 @pytest.mark.parametrize(
@@ -108,6 +137,16 @@ def test_directional_battery_sensor_holds_restored_total_on_zero_dropout(
         {"grid_battery": [None, None, 202]},
         {"charge": [1000, 3510, 522]},
         {"battery_home": [None, 0, 0]},
+        {"grid_battery": [None, 2750, 0], "solar_battery": [None, 750, 0]},
+        {"grid_battery": [None, 2750, 1], "solar_battery": [None, 750, 0]},
+        {
+            "charge": [3510, None, 522],
+            "discharge": [1301, None, 902],
+            "grid_battery": [2750, None, 202],
+            "solar_battery": [750, None, 320],
+            "battery_home": [1300, None, 900],
+            "battery_grid": [0, None, 0],
+        },
         {"last_report_date": None},
         {"update_pending": True},
     ],
@@ -122,108 +161,6 @@ def test_site_energy_holds_back_incomplete_directional_battery_set(
     flows, _ = parsed
     assert not flows.keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
     assert {"battery_charge", "battery_discharge"} <= flows.keys()
-
-
-@pytest.mark.asyncio
-async def test_directional_battery_discovery_and_option_preserve_registry(
-    hass, config_entry, coordinator_factory, directional_battery_payload
-) -> None:
-    coord = coordinator_factory()
-    coord._battery_has_encharge = True  # noqa: SLF001
-    coord._type_device_buckets["encharge"] = {  # noqa: SLF001
-        "type_key": "encharge",
-        "type_label": "IQ Battery",
-        "count": 1,
-        "devices": [],
-    }
-    config_entry.runtime_data = EnphaseRuntimeData(coordinator=coord)
-    registry = er.async_get(hass)
-    added = []
-
-    def capture(entities, update_before_add=False):
-        added.extend(entities)
-
-    def directional_entities():
-        return [
-            entity
-            for entity in added
-            if isinstance(entity, sensor_mod.EnphaseDirectionalBatteryEnergySensor)
-        ]
-
-    await sensor_mod.async_setup_entry(hass, config_entry, capture)
-    assert not directional_entities()
-
-    # A normal lifetime refresh discovers the four directions together.
-    coord.client.lifetime_energy = AsyncMock(return_value=directional_battery_payload)
-    await coord.energy._async_refresh_site_energy(force=True)  # noqa: SLF001
-    coord.async_update_listeners()
-    entities = directional_entities()
-    assert len(entities) == 4
-    ids = {}
-    for entity in entities:
-        assert device_info_fields(entity.device_info)["identifiers"] == {
-            (DOMAIN, f"type:{coord.site_id}:encharge")
-        }
-        assert "sampled_at_utc" in entity._unrecorded_attributes  # noqa: SLF001
-        assert entity.entity_registry_enabled_default
-        assert entity.device_class == SensorDeviceClass.ENERGY
-        assert entity.state_class == SensorStateClass.TOTAL_INCREASING
-        registered = registry.async_get_or_create(
-            "sensor", DOMAIN, entity.unique_id, config_entry=config_entry
-        )
-        ids[entity.translation_key] = registered.entity_id
-    grid_sensor = next(
-        entity
-        for entity in entities
-        if entity.translation_key == "battery_energy_from_grid"
-    )
-    assert grid_sensor.native_value == 2.952
-    assert grid_sensor.native_unit_of_measurement == UnitOfEnergy.KILO_WATT_HOUR
-    grid_id = ids["battery_energy_from_grid"]
-    user_disabled_id = ids["battery_energy_to_grid"]
-    registry.async_update_entity(
-        user_disabled_id, disabled_by=er.RegistryEntryDisabler.USER
-    )
-
-    coord.client.lifetime_energy.return_value = {
-        **directional_battery_payload,
-        "grid_battery": [None, 2750, 205],
-    }
-    await coord.energy._async_refresh_site_energy(force=True)  # noqa: SLF001
-    assert grid_sensor.native_value == 2.955
-
-    # A response missing a channel does not replace a reading with zero.
-    coord.client.lifetime_energy.return_value = {
-        **directional_battery_payload,
-        "battery_grid": [None, 0, None],
-    }
-    await coord.energy._async_refresh_site_energy(force=True)  # noqa: SLF001
-    assert grid_sensor.native_value == 2.955
-
-    added.clear()
-    hass.config_entries.async_update_entry(
-        config_entry, options={OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED: False}
-    )
-    await sensor_mod.async_setup_entry(hass, config_entry, capture)
-    assert not directional_entities()
-    assert (
-        registry.async_get(grid_id).disabled_by is er.RegistryEntryDisabler.INTEGRATION
-    )
-    assert (
-        registry.async_get(user_disabled_id).disabled_by
-        is er.RegistryEntryDisabler.USER
-    )
-
-    hass.config_entries.async_update_entry(
-        config_entry, options={OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED: True}
-    )
-    await sensor_mod.async_setup_entry(hass, config_entry, capture)
-    assert len(directional_entities()) == 4
-    assert registry.async_get(grid_id).disabled_by is None
-    assert (
-        registry.async_get(user_disabled_id).disabled_by
-        is er.RegistryEntryDisabler.USER
-    )
 
 
 def test_site_energy_aggregation_with_fallbacks(coordinator_factory) -> None:

@@ -301,7 +301,7 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
     _attr_suggested_display_precision = 2
     _attr_entity_registry_enabled_default = True
     _value_precision = 2
-    _infer_zero_reset_on_restore = True
+    _infer_reset_on_restore = True
 
     def __init__(
         self,
@@ -505,7 +505,7 @@ class EnphaseSiteEnergySensor(_SiteBaseEntity, RestoreSensor):  # type: ignore[m
                 and (reset_at is None or reset_at == self._restored_reset_at)
                 and not (
                     previous_source is not None
-                    and (self._infer_zero_reset_on_restore or current > 0)
+                    and self._infer_reset_on_restore
                     and previous_source - current >= LIFETIME_RESET_DROP_THRESHOLD_KWH
                     and (
                         current <= LIFETIME_RESET_FLOOR_KWH
@@ -610,13 +610,20 @@ class EnphaseDirectionalBatteryEnergySensor(EnphaseSiteEnergySensor):
     """A cumulative site battery direction attached to the IQ Battery device."""
 
     _value_precision = 3
-    _infer_zero_reset_on_restore = False
+    _infer_reset_on_restore = False
     _unrecorded_attributes = EnphaseSiteEnergySensor._unrecorded_attributes | frozenset(
         {"sampled_at_utc"}
     )
 
     def __init__(self, coord: EnphaseCoordinator, flow_key: str) -> None:
         super().__init__(coord, flow_key, flow_key, flow_key, type_key="encharge")
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self._restored_value is not None:
+            self._coord.energy.restore_directional_battery_baseline(
+                self._flow_key, self._restored_value, self._restored_reset_at
+            )
 
 
 class _EnphaseSiteLifetimePowerSensor(_SiteBaseEntity, RestoreEntity):  # type: ignore[misc]

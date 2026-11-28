@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 from aiohttp import ClientResponseError, RequestInfo
 import pytest
 from freezegun import freeze_time
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import ConfigEntryState, RELOAD_AFTER_UPDATE_DELAY
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResultType
@@ -31,10 +31,13 @@ from custom_components.enphase_ev.api import EnphaseEVClient
 from custom_components.enphase_ev.api_client import evse_surface
 from custom_components.enphase_ev.const import (
     CONF_EAUTH,
+    CONF_INCLUDE_INVERTERS,
     CONF_SELECTED_TYPE_KEYS,
     CONF_SERIALS,
     CONF_SITE_ONLY,
+    DIRECTIONAL_BATTERY_ENERGY_FIELDS,
     DOMAIN,
+    OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED,
     OPT_MICROINVERTER_LIFETIME_ENERGY_ENABLED,
     OPT_WEATHER_ENABLED,
 )
@@ -157,6 +160,135 @@ async def _finish_startup(hass, entry):
     assert warmup is not None
     await asyncio.wait_for(asyncio.shield(warmup), 5)
     await hass.async_block_till_done()
+
+
+@pytest.mark.session_history_real
+async def test_directional_battery_real_platform_lifecycle(
+    hass, config_entry, platform_cloud, freezer, monkeypatch
+):
+    responses, _, unexpected = platform_cloud
+    responses["devices_inventory"]["result"].append(
+        {"type": "encharge", "devices": [{"serial_number": "BAT-TEST"}]}
+    )
+    responses["battery_site_settings"] = {"data": {"hasEncharge": True}}
+    responses["battery_status"] = {
+        "storages": [{"serial_number": "BAT-TEST", "current_charge": 70}]
+    }
+    responses["battery_backup_history"] = {"histories": []}
+    responses["site_livestream_payload"] = {
+        "meters": {"gridRelay": "OPER_RELAY_CLOSED"}
+    }
+    responses["lifetime_energy"].update(
+        start_date="2026-09-05",
+        charge=[12300],
+        discharge=[500],
+        grid_battery=[12000],
+        solar_battery=[300],
+        battery_home=[500],
+        battery_grid=[0],
+    )
+    hass.config_entries.async_update_entry(
+        config_entry,
+        data={
+            **config_entry.data,
+            CONF_INCLUDE_INVERTERS: False,
+            CONF_SERIALS: [],
+            CONF_SITE_ONLY: True,
+            CONF_SELECTED_TYPE_KEYS: ["envoy", "encharge"],
+        },
+    )
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await _finish_startup(hass, config_entry)
+    registry = er.async_get(hass)
+    coord = config_entry.runtime_data.coordinator
+    ids = {
+        key: registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{DOMAIN}_site_{coord.site_id}_{key}"
+        )
+        for key in DIRECTIONAL_BATTERY_ENERGY_FIELDS
+    }
+    assert all(ids.values())
+    assert (
+        len({registry.async_get(entity_id).device_id for entity_id in ids.values()})
+        == 1
+    )
+    grid_id = ids["battery_energy_from_grid"]
+    disabled_id = ids["battery_energy_to_grid"]
+    device = dr.async_get(hass).async_get(registry.async_get(grid_id).device_id)
+    assert (DOMAIN, f"type:{coord.site_id}:encharge") in device.identifiers
+    state = hass.states.get(grid_id)
+    assert float(state.state) == 12.0
+    assert state.attributes["unit_of_measurement"] == "kWh"
+    assert state.attributes["device_class"] == "energy"
+    assert state.attributes["state_class"] == "total_increasing"
+    assert float(hass.states.get(disabled_id).state) == 0.0
+
+    registry.async_update_entity(disabled_id, disabled_by=er.RegistryEntryDisabler.USER)
+    reload = AsyncMock(wraps=hass.config_entries.async_reload)
+    monkeypatch.setattr(hass.config_entries, "async_reload", reload)
+    hass.config_entries.async_update_entry(
+        config_entry, options={OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED: False}
+    )
+    await _finish_startup(hass, config_entry)
+    reload.assert_awaited_once_with(config_entry.entry_id)
+    assert (
+        registry.async_get(grid_id).disabled_by is er.RegistryEntryDisabler.INTEGRATION
+    )
+    assert registry.async_get(disabled_id).disabled_by is er.RegistryEntryDisabler.USER
+
+    lifetime = responses["lifetime_energy"]
+    lifetime["battery_grid"] = [None]
+    hass.config_entries.async_update_entry(
+        config_entry, options={OPT_DIRECTIONAL_BATTERY_ENERGY_ENABLED: True}
+    )
+    await hass.async_block_till_done()
+    reload.assert_awaited_once_with(config_entry.entry_id)
+    freezer.tick(timedelta(seconds=RELOAD_AFTER_UPDATE_DELAY + 1))
+    lifetime["last_report_date"] = dt_util.utcnow().timestamp()
+    async_fire_time_changed(hass, dt_util.utcnow())
+    await _finish_startup(hass, config_entry)
+    assert reload.await_count == 2
+    assert registry.async_get(grid_id).disabled_by is None
+    assert registry.async_get(disabled_id).disabled_by is er.RegistryEntryDisabler.USER
+    assert float(hass.states.get(grid_id).state) == 12.0
+    freezer.tick(timedelta(seconds=RELOAD_AFTER_UPDATE_DELAY + 1))
+    async_fire_time_changed(hass, dt_util.utcnow())
+    await hass.async_block_till_done()
+    assert reload.await_count == 2
+
+    # A normal reload starts a fresh guard. A shrinking snapshot at startup
+    # must not turn a later recovery into a new Recorder increment.
+    lifetime.update(
+        charge=[1300],
+        grid_battery=[1000],
+        battery_grid=[0],
+        last_report_date=dt_util.utcnow().timestamp(),
+    )
+    assert await hass.config_entries.async_reload(config_entry.entry_id)
+    await _finish_startup(hass, config_entry)
+    assert float(hass.states.get(grid_id).state) == 12.0
+    coord = config_entry.runtime_data.coordinator
+
+    async def publish_grid(bucket: int, *, advance: bool) -> float:
+        lifetime.update(charge=[300 + bucket], grid_battery=[bucket])
+        if advance:
+            freezer.tick(timedelta(minutes=5))
+            lifetime["last_report_date"] = dt_util.utcnow().timestamp()
+        await coord.energy._async_refresh_site_energy(force=True)
+        coord.async_set_updated_data(dict(coord.data))
+        await hass.async_block_till_done()
+        return float(hass.states.get(grid_id).state)
+
+    assert await publish_grid(1000, advance=False) == 12.0
+    assert await publish_grid(1000, advance=False) == 12.0
+    assert await publish_grid(12003, advance=True) == 12.003
+    assert await publish_grid(0, advance=True) == 12.003
+    assert await publish_grid(1000, advance=True) == 12.003
+    assert await publish_grid(1000, advance=True) == 1.0
+    assert hass.states.get(grid_id).attributes["last_reset_at"]
+    assert all(registry.async_get(entity_id) is not None for entity_id in ids.values())
+    assert not unexpected, ", ".join(unexpected)
+    assert await hass.config_entries.async_unload(config_entry.entry_id)
 
 
 @pytest.mark.session_history_real
