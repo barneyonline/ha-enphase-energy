@@ -1358,9 +1358,7 @@ class EnergyManager:
                 elif self._directional_battery.source_context_ready:
                     power.reject_report(
                         directional_source,
-                        self._directional_battery.power_startup_for_rejected_report(
-                            payload.get("start_date")
-                        ),
+                        self._directional_battery.power_startup_for_rejected_report(),
                     )
                 recovery = power.recovery_checkpoint(directional_source)
             if directional_totals or recovery is not None:

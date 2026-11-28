@@ -510,26 +510,13 @@ class DirectionalBatteryEnergy:
             return None
         return _legacy_recovery(saved)
 
-    def power_startup_for_rejected_report(
-        self, start: object
-    ) -> DirectionalBatteryRecovery | None:
-        """Reuse a known source checkpoint without trusting a rejected payload."""
-        start_date = dt_util.parse_date(start) if isinstance(start, str) else None
+    def power_startup_for_rejected_report(self) -> DirectionalBatteryRecovery | None:
+        """Retain the site clock on the last trusted source checkpoint."""
         checkpoint = self._saved_power_checkpoint
         if checkpoint is not None:
-            recovery = checkpoint.recovery
-            origin, zone_name = recovery.source
-            if start_date in (None, origin) and self._zone_name == zone_name:
-                return recovery
-            return None
+            return checkpoint.recovery
         saved = self._saved_history
-        if (
-            saved is not None
-            and start_date in (None, saved.start)
-            and self._zone_name == saved.timezone
-        ):
-            return _legacy_recovery(saved)
-        return None
+        return _legacy_recovery(saved) if saved is not None else None
 
     def _evaluate(
         self,

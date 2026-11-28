@@ -583,6 +583,7 @@ def test_dropout_recovery_compares_paired_and_direct_deltas(replay):
         "legacy_at_saved_clock",
         "origin_shift",
         "regressed_origin",
+        "conflicting_start_cursor",
     ],
 )
 async def test_reload_during_dropout_uses_saved_same_day_counters(
@@ -740,6 +741,14 @@ async def test_reload_during_dropout_uses_saved_same_day_counters(
         return
 
     manager = new_manager()
+    if history_kind == "conflicting_start_cursor":
+        assert await refresh(1200, 1050, source_start="other") is None
+        manager = new_manager()
+        assert await refresh(900, 1050, receipt_seconds=1201) is None
+        assert await refresh(1200, 1100, receipt_seconds=1202) is None
+        assert await refresh(1500, 1150) is None
+        assert (await refresh(1800, 1200)).watts["grid_battery"] == 600
+        return
     if history_kind == "origin_shift":
         assert await refresh(86400, 10, source_start="missing") is None
         assert await refresh(86700, 10, source_start="shifted") is None
