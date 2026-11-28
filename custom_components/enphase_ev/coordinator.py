@@ -141,6 +141,7 @@ from .directional_battery_energy import (
     directional_battery_store,
     has_directional_battery_entities,
 )
+from .directional_battery_power import DirectionalBatteryPowerSnapshot
 from .discovery_snapshot import DiscoverySnapshotManager
 from .device_types import (
     normalize_type_key,
@@ -656,6 +657,14 @@ class EnphaseCoordinator(
         """Return the current-power runtime's immutable snapshot."""
 
         return cast(CurrentPowerSample, self.current_power_runtime.snapshot)
+
+    @property
+    def directional_battery_power_snapshot(
+        self,
+    ) -> DirectionalBatteryPowerSnapshot | None:
+        """Return the published directional battery readings for this site."""
+        power = self.energy.directional_battery_power
+        return power.snapshot if power is not None else None
 
     @property
     def evse_feature_flags_snapshot(self) -> EvseFeatureFlagsSnapshot:
@@ -1272,7 +1281,6 @@ class EnphaseCoordinator(
                 serial: {**payload, "charge_mode_solar_modes": solar_choices(serial)}
                 for serial, payload in data.items()
             }
-        directional_power = self.energy.directional_battery_power
         candidate = IntegrationSnapshot(
             chargers=freeze_charger_data(charger_data),
             evse_feature_flags=feature_flags,
@@ -1293,15 +1301,7 @@ class EnphaseCoordinator(
                     "flows": self.energy.site_energy,
                     "metadata": self.energy.site_energy_meta,
                     "available": self.energy.service_available,
-                    "directional_power": (
-                        (
-                            directional_power.qualified,
-                            directional_power.interval,
-                            directional_power.average,
-                        )
-                        if directional_power is not None
-                        else None
-                    ),
+                    "directional_power": self.directional_battery_power_snapshot,
                 },
                 tariff={
                     name: getattr(self, name, None)

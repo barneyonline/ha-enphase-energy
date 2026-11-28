@@ -1,6 +1,7 @@
 """Replay constructed daily lifetime reports at source precision."""
 
 import asyncio
+from dataclasses import FrozenInstanceError
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -117,14 +118,19 @@ def test_single_window_smoothing_rounds_from_raw_watt_hours(
 def test_published_power_readings_are_read_only(replay):
     replay(0)
     power = replay(300, grid=1050)
+    with pytest.raises(FrozenInstanceError):
+        power.snapshot.qualified = False
     for reading in (power.interval, power.average):
         with pytest.raises(TypeError):
             reading.watts["grid_battery"] = 0
+    recovery = power.recovery_checkpoint(_START + timedelta(minutes=5))
+    with pytest.raises(TypeError):
+        recovery.pairs["charge"].wh["grid_battery"] = 0
 
 
 def test_entity_starts_without_value_or_source_attributes(coordinator_factory):
     entity = EnphaseDirectionalBatteryPowerSensor(
-        coordinator_factory(), "battery_power_from_grid", DirectionalBatteryPower(300)
+        coordinator_factory(), "battery_power_from_grid"
     )
     assert not entity.available
     assert entity.native_value is None

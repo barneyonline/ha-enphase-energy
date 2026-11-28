@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone, tzinfo
 from hashlib import sha256
 from sys import float_info
+from types import MappingProxyType
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -141,9 +142,12 @@ class DirectionalBatteryPairReference:
     """Trusted raw counters and recovery limits for one battery flow pair."""
 
     reported_at: datetime
-    wh: dict[str, float]
+    wh: Mapping[str, float]
     held: bool = False
     max_elapsed_seconds: float | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "wh", MappingProxyType(dict(self.wh)))
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,7 +157,10 @@ class DirectionalBatteryRecovery:
     source: DirectionalBatterySource
     reported_at: datetime
     bucket_count: int
-    pairs: dict[str, DirectionalBatteryPairReference]
+    pairs: Mapping[str, DirectionalBatteryPairReference]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "pairs", MappingProxyType(dict(self.pairs)))
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,7 +181,7 @@ class _PowerCheckpoint:
             "pairs": {
                 key: {
                     "reported_at": pair.reported_at.isoformat(),
-                    "wh": pair.wh,
+                    "wh": dict(pair.wh),
                     "held": pair.held,
                     "max_elapsed_seconds": pair.max_elapsed_seconds,
                 }

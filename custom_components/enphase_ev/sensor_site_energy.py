@@ -36,7 +36,6 @@ from .current_power_runtime import is_idle_power_sample
 from .device_info_helpers import _cloud_device_info
 from .directional_battery_power import (
     DIRECTIONAL_BATTERY_POWER_FIELDS,
-    DirectionalBatteryPower,
     DirectionalBatteryPowerReading,
 )
 from .energy import (
@@ -2810,17 +2809,17 @@ class EnphaseDirectionalBatteryPowerSensor(_SiteBaseEntity):
         {"sampled_at_utc", "last_window_seconds"}
     )
 
-    def __init__(
-        self, coord: EnphaseCoordinator, key: str, power: DirectionalBatteryPower
-    ) -> None:
+    def __init__(self, coord: EnphaseCoordinator, key: str) -> None:
         super().__init__(coord, key, key, type_key="encharge")
         self._attr_translation_key = key
         self._field = DIRECTIONAL_BATTERY_POWER_FIELDS[key]
-        self._power = power
         self._averaging_enabled = _power_averaging_enabled(coord)
 
     def _reading(self) -> DirectionalBatteryPowerReading | None:
-        return self._power.average if self._averaging_enabled else self._power.interval
+        snapshot = self._coord.directional_battery_power_snapshot
+        if snapshot is None:
+            return None
+        return snapshot.average if self._averaging_enabled else snapshot.interval
 
     def _freshness_deadline(self) -> datetime | None:
         reading = self._reading()

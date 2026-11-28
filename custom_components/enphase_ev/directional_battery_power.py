@@ -47,6 +47,15 @@ class DirectionalBatteryPowerReading:
 
 
 @dataclass(frozen=True, slots=True)
+class DirectionalBatteryPowerSnapshot:
+    """The last published state of the directional sensor group."""
+
+    qualified: bool = False
+    interval: DirectionalBatteryPowerReading | None = None
+    average: DirectionalBatteryPowerReading | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class _Report:
     """The current partial day's raw Wh counters and report clock."""
 
@@ -70,9 +79,23 @@ class DirectionalBatteryPower:
         self._averages = {field: EnergyPowerAverage(wh_per_unit=1) for field in _FIELDS}
         self._next_interval: DirectionalBatteryPowerReading | None = None
         self._next_average: DirectionalBatteryPowerReading | None = None
-        self.qualified = False
-        self.interval: DirectionalBatteryPowerReading | None = None
-        self.average: DirectionalBatteryPowerReading | None = None
+        self._snapshot = DirectionalBatteryPowerSnapshot()
+
+    @property
+    def snapshot(self) -> DirectionalBatteryPowerSnapshot:
+        return self._snapshot
+
+    @property
+    def qualified(self) -> bool:
+        return self._snapshot.qualified
+
+    @property
+    def interval(self) -> DirectionalBatteryPowerReading | None:
+        return self._snapshot.interval
+
+    @property
+    def average(self) -> DirectionalBatteryPowerReading | None:
+        return self._snapshot.average
 
     def invalidate(self) -> None:
         """Discard the window while retaining the source timestamp watermark."""
@@ -81,9 +104,11 @@ class DirectionalBatteryPower:
 
     def publish(self) -> None:
         """Expose the staged window after the source checkpoint is acknowledged."""
-        self.interval = self._next_interval
-        self.average = self._next_average
-        self.qualified |= self.interval is not None
+        self._snapshot = DirectionalBatteryPowerSnapshot(
+            self._snapshot.qualified or self._next_interval is not None,
+            self._next_interval,
+            self._next_average,
+        )
 
     def source_clock_is_current(self, reported_at: datetime) -> bool:
         """Check the site clock before validating or updating source history."""
@@ -110,7 +135,7 @@ class DirectionalBatteryPower:
         self._limit_recovery_elapsed(reported_at)
 
     def _restore_recovery(self, startup: DirectionalBatteryRecovery) -> None:
-        self._recovery_references = startup.pairs.copy()
+        self._recovery_references = dict(startup.pairs)
         self._recovery_scope = startup.source, startup.bucket_count
         if self._source_cursor is None or self._source_cursor <= startup.reported_at:
             self._source_cursor = startup.reported_at
@@ -314,7 +339,7 @@ class DirectionalBatteryPower:
             return None
         source, bucket_count = self._recovery_scope
         return DirectionalBatteryRecovery(
-            source, reported_at, bucket_count, self._recovery_references.copy()
+            source, reported_at, bucket_count, self._recovery_references
         )
 
 

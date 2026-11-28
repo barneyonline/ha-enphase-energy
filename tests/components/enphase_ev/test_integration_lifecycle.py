@@ -250,6 +250,8 @@ async def test_directional_battery_power_publishes_same_cursor_invalidation(
         for key in DIRECTIONAL_BATTERY_POWER_FIELDS
     }
     assert float(hass.states.get(ids["battery_power_from_grid"]).state) == 600
+    published = coord.directional_battery_power_snapshot
+    assert published.interval.watts["grid_battery"] == 600
 
     await coord.async_refresh()
     await hass.async_block_till_done()
@@ -263,7 +265,8 @@ async def test_directional_battery_power_publishes_same_cursor_invalidation(
     await hass.async_block_till_done()
     assert calls["lifetime_energy"].await_count == previous_reads + 1
     assert coord.energy.site_energy == previous_flows
-    assert coord.energy.directional_battery_power.interval is None
+    assert coord.directional_battery_power_snapshot.interval is None
+    assert published.interval.watts["grid_battery"] == 600
     assert all(
         hass.states.get(entity_id).state == STATE_UNAVAILABLE
         for entity_id in ids.values()
