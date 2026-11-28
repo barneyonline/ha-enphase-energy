@@ -52,6 +52,7 @@ from custom_components.enphase_ev.coordinator_refresh_metrics import (
     refresh_performance_history_summary,
     refresh_performance_summary,
 )
+from custom_components.enphase_ev.refresh_plan import DIRECTIONAL_BATTERY_WARMUP_PLAN
 from custom_components.enphase_ev.request_metrics import RequestMetrics
 from custom_components.enphase_ev.session_history import (
     SESSION_CACHE_STATE_UNAVAILABLE,
@@ -5159,6 +5160,37 @@ async def test_startup_warmup_publishes_power_before_discovery(
     assert first_publish < order.index("discovery")
     assert coord.publish_enrichment.call_count == 5  # type: ignore[attr-defined]
     assert "power_s" in coord._warmup_phase_timings  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_directional_battery_warmup_does_not_publish_after_retirement(
+    coordinator_factory, monkeypatch
+) -> None:
+    coord = coordinator_factory()
+    runner = coord.refresh_runner
+    publish = Mock()
+    schedule_save = Mock()
+
+    async def run_plan(_timings, *, plan):
+        if plan is DIRECTIONAL_BATTERY_WARMUP_PLAN:
+            publish.reset_mock()
+            coord.mark_runtime_stopped()
+
+    monkeypatch.setattr(coord, "publish_enrichment", publish)
+    monkeypatch.setattr(coord.discovery_snapshot, "schedule_save", schedule_save)
+    monkeypatch.setattr(
+        coord.energy, "directional_battery_context_refresh_due", lambda: True
+    )
+    monkeypatch.setattr(runner, "async_start_startup_power", AsyncMock())
+    monkeypatch.setattr(
+        runner, "async_run_refresh_plan", AsyncMock(side_effect=run_plan)
+    )
+
+    await runner.async_startup_warmup_runner()
+
+    assert not coord.runtime_active
+    publish.assert_not_called()
+    schedule_save.assert_not_called()
 
 
 @pytest.mark.asyncio

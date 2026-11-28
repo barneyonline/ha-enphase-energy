@@ -478,6 +478,60 @@ async def test_directional_battery_retries_when_site_context_arrives(
     assert client.lifetime_energy.await_count == (2 if has_all_directions else 1)
 
 
+@pytest.mark.parametrize("context_retry", [False, True])
+async def test_directional_battery_stale_context_load_cannot_publish(
+    directional_battery_payload, monkeypatch, context_retry
+) -> None:
+    now = datetime.fromtimestamp(1_700_000_001, timezone.utc)
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    zone_requested = asyncio.Event()
+    release_zone = asyncio.Event()
+
+    async def resolve_zone(name):
+        assert name == "UTC"
+        zone_requested.set()
+        await release_zone.wait()
+        return timezone.utc
+
+    monkeypatch.setattr(energy_mod.dt_util, "async_get_time_zone", resolve_zone)
+    zone = None if context_retry else "UTC"
+    client = SimpleNamespace(
+        lifetime_energy=AsyncMock(return_value=directional_battery_payload)
+    )
+    store = SimpleNamespace(
+        async_load=AsyncMock(return_value=None), async_save=AsyncMock()
+    )
+    manager = EnergyManager(
+        client_provider=lambda: client,
+        site_id="site",
+        logger=logging.getLogger(__name__),
+        directional_battery_store=store,
+        directional_site_timezone=lambda: zone,
+    )
+    if context_retry:
+        await manager._async_refresh_site_energy()
+        zone = "UTC"
+        assert manager.directional_battery_context_refresh_due()
+
+    previous_flows = manager.site_energy.copy()
+    refresh = asyncio.create_task(manager._async_refresh_site_energy())
+    try:
+        await asyncio.wait_for(zone_requested.wait(), timeout=5)
+        manager._invalidate_site_energy_cache()
+    finally:
+        release_zone.set()
+        await refresh
+
+    client.lifetime_energy.assert_awaited_once()
+    store.async_save.assert_not_awaited()
+    assert manager.site_energy == previous_flows
+
+    await manager._async_refresh_site_energy()
+    assert client.lifetime_energy.await_count == 2
+    store.async_save.assert_awaited_once()
+    assert DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys() <= manager.site_energy.keys()
+
+
 @pytest.mark.parametrize("variant", ["truncated", "relabeled", "subdaily"])
 def test_directional_battery_history_must_span_report_days(
     coordinator_factory, directional_battery_payload, variant
