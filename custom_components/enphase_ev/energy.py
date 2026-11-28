@@ -1339,7 +1339,7 @@ class EnergyManager:
             directional_totals = self._directional_battery_totals(
                 payload, directional_source
             )
-            power_wh = None
+            recovery = None
             if power is not None:
                 power_totals = self._directional_battery_totals(
                     payload, directional_source, for_power=True
@@ -1354,11 +1354,11 @@ class EnergyManager:
                         self._coerce_lifetime_bucket,
                         startup=self._directional_battery.power_startup_reference(),
                     )
-                    power_wh = power.recovery_wh(directional_source)
-            if directional_totals or power_wh is not None:
+                    recovery = power.recovery_checkpoint(directional_source)
+            if directional_totals or recovery is not None:
                 self._directional_battery_save_idle.clear()
                 try:
-                    if not await self._directional_battery.async_save(power_wh):
+                    if not await self._directional_battery.async_save(recovery):
                         directional_totals = {}
                         power_totals = {}
                 except asyncio.CancelledError:

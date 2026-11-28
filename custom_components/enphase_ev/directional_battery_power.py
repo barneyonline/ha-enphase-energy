@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 import math
 
 from .const import CLOUD_TELEMETRY_STALE_AFTER_S
-from .directional_battery_energy import _AGGREGATE_PAIRS, _FIELDS, _pairs_reconcile
+from .directional_battery_energy import (
+    _AGGREGATE_PAIRS,
+    _FIELDS,
+    _pairs_reconcile,
+    DirectionalBatteryPairReference,
+    DirectionalBatteryRecovery,
+)
 from .power_average import EnergyPowerAverage
 from .power_validation import (
     EXTREME_SITE_POWER_W,
@@ -27,8 +33,6 @@ DIRECTIONAL_BATTERY_POWER_FIELDS = {
     "battery_power_to_home": "battery_home",
     "battery_power_to_grid": "battery_grid",
 }
-
-_StartupReference = tuple[datetime, Mapping[str, float]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,8 +60,7 @@ class DirectionalBatteryPower:
         self._minimum_window_seconds = minimum_window_seconds
         self._baseline: _Report | None = None
         self._last_report: _Report | None = None
-        self._recovery_references: dict[str, _Report] = {}
-        self._dropout_watermarks: dict[str, dict[str, float]] = {}
+        self._recovery_references: dict[str, DirectionalBatteryPairReference] = {}
         self._validators = {field: ExtremePowerValidator() for field in _FIELDS}
         self._averages = {field: EnergyPowerAverage() for field in _FIELDS}
         self._next_interval: DirectionalBatteryPowerReading | None = None
@@ -92,7 +95,7 @@ class DirectionalBatteryPower:
         totals: dict[str, tuple[float, int]],
         coerce_bucket: Callable[[object], float | None],
         *,
-        startup: _StartupReference | None = None,
+        startup: DirectionalBatteryRecovery | None = None,
     ) -> None:
         """Use a daily payload accepted for power by the lifetime source validator."""
         wh: dict[str, float] = {}
@@ -123,7 +126,7 @@ class DirectionalBatteryPower:
         report: _Report,
         received_at: datetime,
         totals: dict[str, tuple[float, int]],
-        startup: _StartupReference | None,
+        startup: DirectionalBatteryRecovery | None,
     ) -> None:
         previous = self._last_report
         if previous is not None and report.reported_at <= previous.reported_at:
@@ -133,10 +136,9 @@ class DirectionalBatteryPower:
         self._last_report = report
         rollover = previous is not None and report.bucket_count != previous.bucket_count
         if rollover:
-            self._dropout_watermarks.clear()
             self._recovery_references.clear()
-        self._track_dropouts(report, totals, startup if previous is None else None)
-        if self._dropout_watermarks:
+        self._track_recovery(report, totals, startup if previous is None else None)
+        if any(reference.held for reference in self._recovery_references.values()):
             self._reset_window()
             return
         baseline = self._baseline
@@ -196,11 +198,13 @@ class DirectionalBatteryPower:
         for aggregate, fields in _AGGREGATE_PAIRS.items():
             trusted = self._recovery_references[aggregate]
             if any(validation[field].confirmed_extreme for field in fields) or any(
-                report.wh[field] < trusted.wh[field] for field in (aggregate, *fields)
+                report.wh[field] < value for field, value in trusted.wh.items()
             ):
                 # The window confirms the counter scale after an extreme or
                 # the new allocation after a same-day revision.
-                self._recovery_references[aggregate] = report
+                self._recovery_references[aggregate] = _pair_reference(
+                    report, aggregate, fields
+                )
         self._next_interval = DirectionalBatteryPowerReading(
             report.reported_at, seconds, watts
         )
@@ -228,97 +232,80 @@ class DirectionalBatteryPower:
             report.reported_at, window, averaged_watts
         )
 
-    def _track_dropouts(
+    def _track_recovery(
         self,
         report: _Report,
         totals: dict[str, tuple[float, int]],
-        startup: _StartupReference | None,
+        startup: DirectionalBatteryRecovery | None,
     ) -> None:
-        """Require the entire affected pair to recover before reseeding."""
         for aggregate, fields in _AGGREGATE_PAIRS.items():
-            pair = (aggregate, *fields)
-            previous = self._recovery_references.get(aggregate)
-            if previous is None:
-                self._seed_recovery_reference(
-                    report, totals, aggregate, fields, startup
+            reference = self._recovery_references.get(aggregate)
+            if reference is None and startup is not None:
+                reference = startup.pairs.get(aggregate)
+            if reference is None:
+                reference = _pair_reference(report, aggregate, fields)
+            else:
+                reference = _advance_pair_reference(
+                    reference, report, totals, aggregate, fields
                 )
-                continue
-            elapsed = (report.reported_at - previous.reported_at).total_seconds()
-            if (watermarks := self._dropout_watermarks.get(aggregate)) is not None:
-                if any(report.wh[field] < value for field, value in watermarks.items()):
-                    continue
-                excess = {
-                    field: report.wh[field] - watermarks[field] for field in fields
-                }
-                watts = _direction_watts(excess, elapsed, fields)
-                if _ordinary_power_is_plausible(watts, excess, totals):
-                    del self._dropout_watermarks[aggregate]
-                    self._recovery_references[aggregate] = report
-                continue
-            if report.wh[aggregate] < previous.wh[aggregate] and any(
-                report.wh[field] < previous.wh[field] for field in fields
-            ):
-                self._dropout_watermarks[aggregate] = {
-                    field: previous.wh[field] for field in pair
-                }
-                continue
+            self._recovery_references[aggregate] = reference
 
-            # Qualify this pair's recovery reference independently. This
-            # also guards subminimum reports without publishing watts early.
-            deltas = {field: report.wh[field] - previous.wh[field] for field in pair}
-            watts = _pair_watts(deltas, elapsed, aggregate, fields)
-            if _ordinary_power_is_plausible(watts, deltas, totals):
-                self._recovery_references[aggregate] = report
-
-    def _seed_recovery_reference(
-        self,
-        report: _Report,
-        totals: dict[str, tuple[float, int]],
-        aggregate: str,
-        fields: tuple[str, str],
-        startup: _StartupReference | None,
-    ) -> None:
-        self._recovery_references[aggregate] = report
-        if startup is None:
-            return
-        saved_at, saved_wh = startup
-        saved = {
-            field: saved_wh[field]
-            for field in (aggregate, *fields)
-            if field in saved_wh
-        }
-        if not saved:
-            return
-        if any(report.wh[field] < value for field, value in saved.items()):
-            self._dropout_watermarks[aggregate] = saved
-            return
-        elapsed = (report.reported_at - saved_at).total_seconds()
-        if elapsed > 0:
-            deltas = {field: report.wh[field] - value for field, value in saved.items()}
-            watts = (
-                _pair_watts(deltas, elapsed, aggregate, fields)
-                if aggregate in deltas
-                else _direction_watts(deltas, elapsed, fields)
-            )
-            if _ordinary_power_is_plausible(watts, deltas, totals):
-                return
-        self._recovery_references[aggregate] = _Report(
-            saved_at, report.bucket_count, report.wh | saved
-        )
-
-    def recovery_wh(self, reported_at: datetime) -> dict[str, float] | None:
-        """Checkpoint raw counters and pre-drop values without saving watts."""
+    def recovery_checkpoint(
+        self, reported_at: datetime
+    ) -> DirectionalBatteryRecovery | None:
+        """Checkpoint the raw source cursor and recovery state without watts."""
         report = self._last_report
         if report is None or report.reported_at != reported_at:
             return None
-        wh = {
-            field: self._recovery_references[aggregate].wh[field]
-            for aggregate, fields in _AGGREGATE_PAIRS.items()
-            for field in (aggregate, *fields)
-        }
-        for watermarks in self._dropout_watermarks.values():
-            wh.update(watermarks)
-        return wh
+        return DirectionalBatteryRecovery(
+            report.reported_at, self._recovery_references.copy()
+        )
+
+
+def _pair_reference(
+    report: _Report, aggregate: str, fields: tuple[str, str]
+) -> DirectionalBatteryPairReference:
+    return DirectionalBatteryPairReference(
+        report.reported_at,
+        {field: report.wh[field] for field in (aggregate, *fields)},
+    )
+
+
+def _advance_pair_reference(
+    reference: DirectionalBatteryPairReference,
+    report: _Report,
+    totals: dict[str, tuple[float, int]],
+    aggregate: str,
+    fields: tuple[str, str],
+) -> DirectionalBatteryPairReference:
+    deltas = {field: report.wh[field] - value for field, value in reference.wh.items()}
+    if reference.held:
+        if any(delta < 0 for delta in deltas.values()):
+            return reference
+    elif any(deltas[field] < 0 for field in fields) and (
+        aggregate not in deltas or deltas[aggregate] < 0
+    ):
+        return replace(reference, held=True)
+
+    elapsed = (report.reported_at - reference.reported_at).total_seconds()
+    if elapsed <= 0:
+        return reference
+    allowed_elapsed = (
+        elapsed
+        if reference.max_elapsed_seconds is None
+        else min(elapsed, reference.max_elapsed_seconds)
+    )
+    watts = (
+        _pair_watts(deltas, allowed_elapsed, aggregate, fields)
+        if aggregate in deltas
+        else _direction_watts(deltas, allowed_elapsed, fields)
+    )
+    if watts is None:
+        return reference
+    if _ordinary_power_is_plausible(watts, deltas, totals):
+        return _pair_reference(report, aggregate, fields)
+    # An unchanged suspect jump must not become plausible solely as clocks advance.
+    return replace(reference, max_elapsed_seconds=allowed_elapsed)
 
 
 def _pair_watts(
@@ -353,11 +340,11 @@ def _direction_watts(
 
 
 def _ordinary_power_is_plausible(
-    watts: dict[str, int] | None,
+    watts: dict[str, int],
     deltas: Mapping[str, float],
     totals: dict[str, tuple[float, int]],
 ) -> bool:
-    return watts is not None and all(
+    return all(
         value < EXTREME_SITE_POWER_W
         and site_power_sample_is_plausible(
             value, deltas[field] / 1000.0, (totals[field][0] / 1000.0,)

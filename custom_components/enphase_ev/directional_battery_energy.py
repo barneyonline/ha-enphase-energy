@@ -131,15 +131,32 @@ class _BatteryHistory:
 
 
 @dataclass(frozen=True, slots=True)
+class DirectionalBatteryPairReference:
+    """Trusted raw counters and recovery limits for one battery flow pair."""
+
+    reported_at: datetime
+    wh: dict[str, float]
+    held: bool = False
+    max_elapsed_seconds: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class DirectionalBatteryRecovery:
+    """The latest source cursor and each independently trusted pair."""
+
+    reported_at: datetime
+    pairs: dict[str, DirectionalBatteryPairReference]
+
+
+@dataclass(frozen=True, slots=True)
 class _PowerCheckpoint:
     """Source identity and trusted raw readings kept across a reload."""
 
     start: str
     timezone: str
-    reported_at: datetime
     size: int
     closed_signature: str
-    wh: dict[str, float]
+    recovery: DirectionalBatteryRecovery
 
     def same_source(self, history: _BatteryHistory) -> bool:
         return (
@@ -151,10 +168,18 @@ class _PowerCheckpoint:
         return {
             "start": self.start,
             "timezone": self.timezone,
-            "reported_at": self.reported_at.isoformat(),
+            "reported_at": self.recovery.reported_at.isoformat(),
             "size": self.size,
             "closed_signature": self.closed_signature,
-            "wh": self.wh,
+            "pairs": {
+                key: {
+                    "reported_at": pair.reported_at.isoformat(),
+                    "wh": pair.wh,
+                    "held": pair.held,
+                    "max_elapsed_seconds": pair.max_elapsed_seconds,
+                }
+                for key, pair in self.recovery.pairs.items()
+            },
         }
 
     @classmethod
@@ -165,8 +190,8 @@ class _PowerCheckpoint:
         zone_name = data.get("timezone")
         size = data.get("size")
         signature = data.get("closed_signature")
-        raw_clock = data.get("reported_at")
-        wh = data.get("wh")
+        reported_at = _checkpoint_time(data.get("reported_at"))
+        raw_pairs = data.get("pairs")
         if (
             not isinstance(start, str)
             or not isinstance(zone_name, str)
@@ -174,29 +199,73 @@ class _PowerCheckpoint:
             or size < 1
             or not isinstance(signature, str)
             or len(signature) != 64
-            or not isinstance(raw_clock, str)
-            or not isinstance(wh, dict)
+            or reported_at is None
+            or reported_at
+            > dt_util.utcnow() + timedelta(seconds=SITE_ENERGY_SOURCE_FUTURE_SKEW_S)
+            or not isinstance(raw_pairs, dict)
         ):
             return None
-        try:
-            reported_at = datetime.fromisoformat(raw_clock)
-        except ValueError:
-            return None
-        if reported_at.tzinfo is None or reported_at > dt_util.utcnow() + timedelta(
-            seconds=SITE_ENERGY_SOURCE_FUTURE_SKEW_S
-        ):
-            return None
-        counters = {}
-        for field in (*_FIELDS, *_AGGREGATE_PAIRS):
-            value = wh.get(field)
-            if (
-                not isinstance(value, (int, float))
-                or isinstance(value, bool)
-                or not 0 <= value <= float_info.max
-            ):
+        pairs = {}
+        for aggregate, fields in _AGGREGATE_PAIRS.items():
+            raw = raw_pairs.get(aggregate)
+            reference = _decode_pair_reference(raw, aggregate, fields, reported_at)
+            if reference is None:
                 return None
-            counters[field] = float(value)
-        return cls(start, zone_name, reported_at, size, signature, counters)
+            pairs[aggregate] = reference
+        return cls(
+            start,
+            zone_name,
+            size,
+            signature,
+            DirectionalBatteryRecovery(reported_at, pairs),
+        )
+
+
+def _checkpoint_time(raw: object) -> datetime | None:
+    if not isinstance(raw, str):
+        return None
+    try:
+        result = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    return result if result.tzinfo is not None else None
+
+
+def _decode_pair_reference(
+    raw: object, aggregate: str, fields: tuple[str, str], latest: datetime
+) -> DirectionalBatteryPairReference | None:
+    if not isinstance(raw, dict):
+        return None
+    reported_at = _checkpoint_time(raw.get("reported_at"))
+    wh = raw.get("wh")
+    held = raw.get("held")
+    max_elapsed = raw.get("max_elapsed_seconds")
+    if (
+        reported_at is None
+        or reported_at > latest
+        or not isinstance(wh, dict)
+        or not isinstance(held, bool)
+        or (
+            max_elapsed is not None
+            and (
+                not isinstance(max_elapsed, (int, float))
+                or isinstance(max_elapsed, bool)
+                or not 0 < max_elapsed <= float_info.max
+            )
+        )
+    ):
+        return None
+    counters = {}
+    for field in (*fields, aggregate) if aggregate in wh else fields:
+        value = wh.get(field)
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or not 0 <= value <= float_info.max
+        ):
+            return None
+        counters[field] = float(value)
+    return DirectionalBatteryPairReference(reported_at, counters, held, max_elapsed)
 
 
 def _closed_signature(history: _BatteryHistory, size: int) -> str:
@@ -282,20 +351,21 @@ class DirectionalBatteryEnergy:
         self._saved_history = self._history
         self._loaded = True
 
-    async def async_save(self, power_wh: dict[str, float] | None = None) -> bool:
+    async def async_save(
+        self, recovery: DirectionalBatteryRecovery | None = None
+    ) -> bool:
         """Persist the accepted group history before the coordinator notifies sensors."""
         history = self._history
         checkpoint = self._saved_power_checkpoint
         power_source = self._power_source_history
-        if power_wh is not None:
+        if recovery is not None:
             assert power_source is not None
             checkpoint = _PowerCheckpoint(
                 power_source.start.isoformat(),
                 power_source.timezone,
-                power_source.reported_at,
                 power_source.size,
                 _closed_signature(power_source, power_source.size),
-                power_wh,
+                recovery,
             )
         if (
             self._store is None
@@ -365,7 +435,7 @@ class DirectionalBatteryEnergy:
         elif (
             checkpoint := self._saved_power_checkpoint
         ) is not None and checkpoint.same_source(history):
-            if history.reported_at <= checkpoint.reported_at:
+            if history.reported_at <= checkpoint.recovery.reported_at:
                 return False
             changed = (
                 _closed_signature(history, checkpoint.size)
@@ -384,7 +454,7 @@ class DirectionalBatteryEnergy:
         self._pending_power_source_history = None
         return True
 
-    def power_startup_reference(self) -> tuple[datetime, dict[str, float]] | None:
+    def power_startup_reference(self) -> DirectionalBatteryRecovery | None:
         """Return saved same-day counters to guard a reload during a dropout."""
         current = self._power_source_history
         assert current is not None
@@ -394,7 +464,7 @@ class DirectionalBatteryEnergy:
             and checkpoint.same_source(current)
             and current.size == checkpoint.size
         ):
-            return checkpoint.reported_at, checkpoint.wh
+            return checkpoint.recovery
         saved = self._saved_history
         if (
             saved is None
@@ -404,7 +474,7 @@ class DirectionalBatteryEnergy:
         ):
             return None
         # The saved cumulative sums can round by a fraction of a raw Wh.
-        return saved.reported_at, {
+        counters = {
             field: max(
                 0.0,
                 saved.totals[field]
@@ -413,6 +483,16 @@ class DirectionalBatteryEnergy:
             )
             for field in _FIELDS
         }
+        return DirectionalBatteryRecovery(
+            saved.reported_at,
+            {
+                aggregate: DirectionalBatteryPairReference(
+                    saved.reported_at,
+                    {field: counters[field] for field in fields},
+                )
+                for aggregate, fields in _AGGREGATE_PAIRS.items()
+            },
+        )
 
     def _evaluate(
         self,

@@ -685,9 +685,10 @@ Missing, stale, or inconsistent data break the group's calculation history.
 Corrections to closed history need confirmation at an advancing report
 timestamp before power can seed again. Same-clock revisions break the window.
 Each charge and discharge pair tracks its last independently reconciled,
-plausible report. If a direction and its direct aggregate fall below that
-report, the group waits for the pair to recover to its pre-drop levels before
-reseeding.
+plausible report and its timestamp. If a direction and its direct aggregate
+fall below that report, the group waits for a reconciled recovery to its
+pre-drop levels before reseeding. An implausible counter advance keeps the
+original time allowance while the pair is waiting for a plausible report.
 Site-local day rollover seeds a new power baseline even if the closing bucket
 was revised. The group's qualification and both power readings participate in
 coordinator snapshot equality. Each entity uses the group's source timestamp
