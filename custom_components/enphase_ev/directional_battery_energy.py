@@ -142,6 +142,19 @@ class DirectionalBatteryEnergy:
         self._loaded = store is None
         self._history: _BatteryHistory | None = None
         self._saved_history: _BatteryHistory | None = None
+        self._load_warning_logged = False
+
+    def site_context_refresh_due(self) -> bool:
+        """Retry once startup supplies site metadata after a lifetime read."""
+        if not self._enabled or self._zone is not None or self._site_timezone is None:
+            return False
+        zone_name = self._site_timezone()
+        return bool(zone_name and zone_name != self._zone_name)
+
+    def _warn_load_once(self, message: str) -> None:
+        if not self._load_warning_logged:
+            _LOGGER.warning(message)
+            self._load_warning_logged = True
 
     async def async_load(self) -> None:
         """Load the whole baseline before the first publication."""
@@ -159,19 +172,21 @@ class DirectionalBatteryEnergy:
         try:
             saved = await self._store.async_load()
         except (HomeAssistantError, OSError, KeyError, TypeError, ValueError):
-            _LOGGER.warning("Unable to load directional battery energy history")
+            self._warn_load_once("Unable to load directional battery energy history")
             return
         if saved is not None:
             self._history = (
                 _BatteryHistory.from_dict(saved) if isinstance(saved, dict) else None
             )
             if self._history is None:
-                _LOGGER.warning("Invalid directional battery energy history")
+                self._warn_load_once("Invalid directional battery energy history")
                 return
         elif self._has_previous_entities is not None and self._has_previous_entities():
             # Core can also return None after renaming a corrupt storage file.
             # An existing entity may still have Recorder history to protect.
-            _LOGGER.warning("Missing history for existing directional battery sensors")
+            self._warn_load_once(
+                "Missing history for existing directional battery sensors"
+            )
             return
         self._saved_history = self._history
         self._loaded = True
@@ -195,8 +210,6 @@ class DirectionalBatteryEnergy:
         payload: dict[str, object],
         start: date,
         reported_at: datetime,
-        *,
-        accept: bool,
     ) -> dict[str, tuple[float, int]]:
         """Return all four cumulative Wh totals only for a coherent observation."""
         if not self._enabled or not self._loaded or self._zone is None:
@@ -205,8 +218,7 @@ class DirectionalBatteryEnergy:
         if result is None:
             return {}
         history, count = result
-        if accept:
-            self._history = history
+        self._history = history
         return {field: (total, count) for field, total in history.totals.items()}
 
     def _evaluate(

@@ -145,10 +145,11 @@ async def test_site_energy_recorder_preserves_restored_total(
     ],
     ids=["shallow-correction", "large-correction", "backfill", "closed-correction"],
 )
-def test_directional_battery_does_not_record_source_corrections(
+async def test_directional_battery_does_not_record_source_corrections(
     hass, coordinator_factory, monkeypatch, original, corrected, recovered
 ):
-    coord = coordinator_factory(serials=[])
+    client = SimpleNamespace(lifetime_energy=AsyncMock())
+    coord = coordinator_factory(serials=[], client=client)
     coord.last_update_success = True
     entity = EnphaseDirectionalBatteryEnergySensor(coord, "battery_energy_from_grid")
     history = []
@@ -157,18 +158,17 @@ def test_directional_battery_does_not_record_source_corrections(
     for index, values in enumerate((original, corrected, corrected, recovered)):
         idle = [None if value is None else 0 for value in values]
         timestamp = start + timedelta(seconds=index)
-        coord.energy.site_energy, _ = coord.energy._aggregate_site_energy(
-            {
-                "start_date": source_start.isoformat(),
-                "last_report_date": timestamp.timestamp(),
-                "grid_battery": values,
-                "solar_battery": idle,
-                "battery_home": idle,
-                "battery_grid": idle,
-                "charge": values,
-                "discharge": idle,
-            }
-        )
+        client.lifetime_energy.return_value = {
+            "start_date": source_start.isoformat(),
+            "last_report_date": timestamp.timestamp(),
+            "grid_battery": values,
+            "solar_battery": idle,
+            "battery_home": idle,
+            "battery_grid": idle,
+            "charge": values,
+            "discharge": idle,
+        }
+        await coord.energy._async_refresh_site_energy(force=True)
         history.append(
             State(
                 "sensor.site_energy",
@@ -200,21 +200,24 @@ async def test_directional_battery_expires_without_another_poll(
     now = dt_util.utcnow().replace(microsecond=0)
     reported_at = now - timedelta(minutes=29)
     monkeypatch.setattr(dt_util, "utcnow", lambda: now)
-    coord = coordinator_factory(serials=[])
+    client = SimpleNamespace(
+        lifetime_energy=AsyncMock(
+            return_value={
+                "start_date": reported_at.date().isoformat(),
+                "last_report_date": reported_at.timestamp(),
+                "charge": [1200],
+                "discharge": [0],
+                "grid_battery": [1200],
+                "solar_battery": [0],
+                "battery_home": [0],
+                "battery_grid": [0],
+            }
+        )
+    )
+    coord = coordinator_factory(serials=[], client=client)
     coord.update_interval = None
     coord.last_update_success = True
-    coord.energy.site_energy, _ = coord.energy._aggregate_site_energy(
-        {
-            "start_date": reported_at.date().isoformat(),
-            "last_report_date": reported_at.timestamp(),
-            "charge": [1200],
-            "discharge": [0],
-            "grid_battery": [1200],
-            "solar_battery": [0],
-            "battery_home": [0],
-            "battery_grid": [0],
-        }
-    )
+    await coord.energy._async_refresh_site_energy(force=True)
     entity = EnphaseDirectionalBatteryEnergySensor(coord, "battery_energy_from_grid")
     entity.entity_id = "sensor.directional_battery_expiry"
     component = EntityComponent(logging.getLogger(__name__), "sensor", hass)

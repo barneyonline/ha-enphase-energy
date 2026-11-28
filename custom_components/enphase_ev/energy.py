@@ -245,7 +245,11 @@ class EnergyManager:
 
         if not self._runtime_active() or self._service_backoff_active():
             return False
-        force_refresh = force or self._site_energy_force_refresh
+        force_refresh = (
+            force
+            or self._site_energy_force_refresh
+            or self._directional_context_refresh_due()
+        )
         now_mono = time.monotonic()
         if (
             not force_refresh
@@ -630,8 +634,6 @@ class EnergyManager:
         self,
         payload: dict[str, object],
         source: datetime | None,
-        *,
-        accept: bool,
     ) -> dict[str, tuple[float, int]]:
         start = payload.get("start_date")
         interval = payload.get(
@@ -645,8 +647,21 @@ class EnergyManager:
             or (start_date := dt_util.parse_date(start)) is None
         ):
             return {}
-        return self._directional_battery.totals(
-            payload, start_date, source, accept=accept
+        return self._directional_battery.totals(payload, start_date, source)
+
+    def _directional_context_refresh_due(self) -> bool:
+        if not self._directional_battery.site_context_refresh_due():
+            return False
+        source = self._site_energy_meta.get("last_report_date")
+        lengths = self._site_energy_meta.get("raw_bucket_lengths")
+        return (
+            isinstance(source, datetime)
+            and directional_battery_source_is_fresh(source)
+            and isinstance(lengths, dict)
+            and all(
+                lengths.get(field)
+                for field in DIRECTIONAL_BATTERY_ENERGY_FIELDS.values()
+            )
         )
 
     async def async_wait_for_directional_battery_save(self) -> None:
@@ -679,10 +694,7 @@ class EnergyManager:
         flows: dict[str, SiteEnergyFlow] = {}
         interval_minutes = self._site_energy_interval_minutes(payload)
         totals = dict(device_totals or {})
-        if directional_totals is None:
-            directional_totals = self._directional_battery_totals(
-                payload, last_report_date, accept=apply_guards
-            )
+        directional_totals = directional_totals or {}
         totals.update(directional_totals)
 
         def bucket_total(field: str) -> tuple[float, int]:
@@ -1192,7 +1204,11 @@ class EnergyManager:
     async def _async_refresh_site_energy_locked(self, *, force: bool) -> None:
         """Refresh lifetime energy cache with TTL enforcement."""
         generation = self._site_energy_cache_generation
-        force_refresh = force or self._site_energy_force_refresh
+        force_refresh = (
+            force
+            or self._site_energy_force_refresh
+            or self._directional_context_refresh_due()
+        )
         now_mono = time.monotonic()
         if self._service_backoff_active():
             return
@@ -1290,9 +1306,7 @@ class EnergyManager:
             await self._directional_battery.async_load()
             if self._site_energy_read_superseded(generation):
                 return
-            directional_totals = self._directional_battery_totals(
-                payload, source, accept=True
-            )
+            directional_totals = self._directional_battery_totals(payload, source)
             if directional_totals:
                 self._directional_battery_save_idle.clear()
                 try:

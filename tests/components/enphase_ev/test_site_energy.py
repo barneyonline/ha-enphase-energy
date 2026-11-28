@@ -42,6 +42,13 @@ from custom_components.enphase_ev.sensor import (
 from .device_info_helpers import device_info_fields
 
 
+def _assemble_directional_site_energy(manager, payload):
+    source = manager._parse_site_energy_timestamp(payload.get("last_report_date"))
+    return manager._aggregate_site_energy(
+        payload, directional_totals=manager._directional_battery_totals(payload, source)
+    )
+
+
 @pytest.fixture
 def directional_battery_payload() -> dict[str, object]:
     """Model common historical gaps, measured zeros and a partial current day."""
@@ -62,7 +69,7 @@ def test_site_energy_directional_battery_totals(
     coordinator_factory, directional_battery_payload
 ) -> None:
     manager = coordinator_factory().energy
-    parsed = manager._aggregate_site_energy(directional_battery_payload)  # noqa: SLF001
+    parsed = _assemble_directional_site_energy(manager, directional_battery_payload)
     assert parsed is not None
     flows, _ = parsed
     expected = {
@@ -96,9 +103,7 @@ def test_directional_battery_zero_history_requires_observations(
     payload["battery_home"] = [discharge]
     if has_aggregates:
         payload.update(charge=[0], discharge=[discharge])
-    parsed = coordinator_factory().energy._aggregate_site_energy(
-        payload
-    )  # noqa: SLF001
+    parsed = _assemble_directional_site_energy(coordinator_factory().energy, payload)
     assert parsed is not None
     flows, _ = parsed
     directions = flows.keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
@@ -123,9 +128,7 @@ def test_directional_battery_allows_leading_zero_and_null_history(
         "charge": [leading_total, None, 443],
         "discharge": [leading_total, None, 221],
     }
-    parsed = coordinator_factory().energy._aggregate_site_energy(
-        payload
-    )  # noqa: SLF001
+    parsed = _assemble_directional_site_energy(coordinator_factory().energy, payload)
     assert parsed is not None
     assert parsed[0].keys() >= DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
 
@@ -143,10 +146,10 @@ def test_directional_battery_ignores_leading_zero_as_support_for_inactive_pair(
         "charge": [0, None],
         "discharge": [0, 221],
     }
-    flows, _ = coordinator_factory().energy._aggregate_site_energy(payload)
+    flows, _ = _assemble_directional_site_energy(coordinator_factory().energy, payload)
     assert not flows.keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
     payload["charge"] = [0, 0]
-    flows, _ = coordinator_factory().energy._aggregate_site_energy(payload)
+    flows, _ = _assemble_directional_site_energy(coordinator_factory().energy, payload)
     assert flows.keys() >= DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
 
 
@@ -159,7 +162,7 @@ def test_directional_battery_accepts_empty_aggregate_padding(
         "charge": [None, 3510, 522, None],
         "discharge": [None, 1301, 902, None],
     }
-    flows, _ = coordinator_factory().energy._aggregate_site_energy(payload)
+    flows, _ = _assemble_directional_site_energy(coordinator_factory().energy, payload)
     assert flows["battery_energy_from_grid"].value_kwh == 2.952
 
 
@@ -169,9 +172,7 @@ def test_directional_battery_boolean_does_not_become_measured_zero(
     payload = normalize_lifetime_energy_payload(
         {**directional_battery_payload, "battery_grid": [None, 0, False]}
     )
-    parsed = coordinator_factory().energy._aggregate_site_energy(
-        payload
-    )  # noqa: SLF001
+    parsed = _assemble_directional_site_energy(coordinator_factory().energy, payload)
     assert parsed is not None
     assert not parsed[0].keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
 
@@ -183,7 +184,7 @@ def test_directional_battery_explicit_invalid_interval_keeps_aggregates(
     payload = normalize_lifetime_energy_payload(
         {**directional_battery_payload, "interval_minutes": interval}
     )
-    flows, _ = coordinator_factory().energy._aggregate_site_energy(payload)
+    flows, _ = _assemble_directional_site_energy(coordinator_factory().energy, payload)
     assert not flows.keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
     assert flows["battery_charge"].value_kwh == 4.032
     assert flows["battery_charge"].interval_minutes == 5.0
@@ -241,8 +242,8 @@ def test_directional_battery_explicit_invalid_interval_keeps_aggregates(
 def test_site_energy_holds_back_incomplete_directional_battery_set(
     coordinator_factory, directional_battery_payload, overrides
 ) -> None:
-    parsed = coordinator_factory().energy._aggregate_site_energy(  # noqa: SLF001
-        {**directional_battery_payload, **overrides}
+    parsed = _assemble_directional_site_energy(
+        coordinator_factory().energy, {**directional_battery_payload, **overrides}
     )
     assert parsed is not None
     flows, _ = parsed
@@ -262,7 +263,7 @@ def test_directional_battery_requires_previously_accepted_coverage(
         "last_report_date": source,
     }
     keys = DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
-    manager.site_energy, _ = manager._aggregate_site_energy(payload)
+    manager.site_energy, _ = _assemble_directional_site_energy(manager, payload)
     assert manager.site_energy.keys() >= keys
     if variant == "shifted-origin":
         incomplete = {**payload, "start_date": "2023-11-13"}
@@ -284,9 +285,9 @@ def test_directional_battery_requires_previously_accepted_coverage(
         }
     for timestamp in (source + 300, source + 600):
         incomplete["last_report_date"] = timestamp
-        manager.site_energy, _ = manager._aggregate_site_energy(incomplete)
+        manager.site_energy, _ = _assemble_directional_site_energy(manager, incomplete)
         assert not manager.site_energy.keys() & keys
-    manager.site_energy, _ = manager._aggregate_site_energy(payload)
+    manager.site_energy, _ = _assemble_directional_site_energy(manager, payload)
     assert manager.site_energy.keys() >= keys
     assert manager.site_energy["battery_energy_from_grid"].value_kwh == 2.952
 
@@ -298,7 +299,7 @@ def test_directional_battery_reconciles_across_bucket_rollover(
     manager = coordinator_factory().energy
     payload = directional_battery_payload
     keys = DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
-    manager.site_energy, _ = manager._aggregate_site_energy(payload)
+    manager.site_energy, _ = _assemble_directional_site_energy(manager, payload)
     assert manager.site_energy.keys() >= keys
     latest_grid, latest_solar = (102, 420) if corrected else (202, 320)
     next_payload = {
@@ -311,7 +312,7 @@ def test_directional_battery_reconciles_across_bucket_rollover(
         "battery_grid": [None, 0, 0, 100],
         "discharge": [None, 1301, 902, 100],
     }
-    flows, _ = manager._aggregate_site_energy(next_payload)
+    flows, _ = _assemble_directional_site_energy(manager, next_payload)
     if corrected:
         assert not flows.keys() & keys
     else:
@@ -393,6 +394,38 @@ async def test_directional_battery_requires_fresh_source_progress(
     assert not manager.site_energy.keys() & keys
 
 
+@pytest.mark.parametrize("has_all_directions", [False, True])
+async def test_directional_battery_retries_when_site_context_arrives(
+    directional_battery_payload, monkeypatch, has_all_directions
+) -> None:
+    now = datetime.fromtimestamp(1_700_000_001, timezone.utc)
+    monkeypatch.setattr(energy_mod.dt_util, "utcnow", lambda: now)
+    zone = None
+    payload = directional_battery_payload
+    if not has_all_directions:
+        del payload["battery_grid"]
+    client = SimpleNamespace(lifetime_energy=AsyncMock(return_value=payload))
+    manager = EnergyManager(
+        client_provider=lambda: client,
+        site_id="site",
+        logger=logging.getLogger(__name__),
+        directional_site_timezone=lambda: zone,
+    )
+    keys = DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
+    await manager._async_refresh_site_energy()
+    assert not manager.site_energy.keys() & keys
+    assert not manager.site_energy_refresh_due()
+    zone = "UTC"
+    assert manager.site_energy_refresh_due() is has_all_directions
+    await manager._async_refresh_site_energy()
+    if has_all_directions:
+        assert keys <= manager.site_energy.keys()
+        assert client.lifetime_energy.await_count == 2
+    else:
+        client.lifetime_energy.assert_awaited_once()
+    assert not manager.site_energy_refresh_due()
+
+
 @pytest.mark.parametrize("variant", ["truncated", "relabeled", "subdaily"])
 def test_directional_battery_history_must_span_report_days(
     coordinator_factory, directional_battery_payload, variant
@@ -409,7 +442,7 @@ def test_directional_battery_history_must_span_report_days(
             )
             for key, value in payload.items()
         }
-    flows, _ = coordinator_factory().energy._aggregate_site_energy(payload)
+    flows, _ = _assemble_directional_site_energy(coordinator_factory().energy, payload)
     assert not flows.keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
 
 
@@ -425,33 +458,26 @@ async def test_directional_battery_checks_daily_coverage_in_known_site_timezone(
     # 22:13 UTC on November 14 is already November 15 in Melbourne.
     reported_at = datetime.fromtimestamp(1_700_000_001, timezone.utc)
     start = datetime(2023, 11, 12, tzinfo=timezone.utc).date()
-    assert not battery.totals(
-        directional_battery_payload, start, reported_at, accept=True
-    )
+    assert not battery.totals(directional_battery_payload, start, reported_at)
     start += timedelta(days=1)
-    assert battery.totals(directional_battery_payload, start, reported_at, accept=True)
+    assert battery.totals(directional_battery_payload, start, reported_at)
     assert not battery.totals(
         directional_battery_payload,
         start,
         reported_at - timedelta(minutes=1),
-        accept=True,
     )
     assert not battery.totals(
-        directional_battery_payload, start, reported_at + timedelta(days=1), accept=True
+        directional_battery_payload, start, reported_at + timedelta(days=1)
     )
     zone = ""
     await battery.async_load()
-    assert not battery.totals(
-        directional_battery_payload, start, reported_at, accept=True
-    )
+    assert not battery.totals(directional_battery_payload, start, reported_at)
     zone = "Australia/Sydney"
     await battery.async_load()
-    assert not battery.totals(
-        directional_battery_payload, start, reported_at, accept=True
-    )
+    assert not battery.totals(directional_battery_payload, start, reported_at)
     zone = "Australia/Melbourne"
     await battery.async_load()
-    assert battery.totals(directional_battery_payload, start, reported_at, accept=True)
+    assert battery.totals(directional_battery_payload, start, reported_at)
 
 
 async def test_directional_battery_unrepresentable_site_day_keeps_aggregate_energy() -> (
@@ -476,7 +502,7 @@ async def test_directional_battery_unrepresentable_site_day_keeps_aggregate_ener
         directional_site_timezone=lambda: "America/New_York",
     )
     await manager._directional_battery.async_load()
-    flows, _ = manager._aggregate_site_energy(values)
+    flows, _ = _assemble_directional_site_energy(manager, values)
     assert not flows.keys() & DIRECTIONAL_BATTERY_ENERGY_FIELDS.keys()
     assert flows["battery_charge"].value_kwh == 0.1
 
@@ -496,7 +522,7 @@ def test_directional_battery_rejects_overflowing_total(coordinator_factory) -> N
         "battery_grid": [0, 0],
     }
     assert not battery.totals(
-        values, reported_at.date() - timedelta(days=1), reported_at, accept=True
+        values, reported_at.date() - timedelta(days=1), reported_at
     )
 
 
@@ -519,7 +545,7 @@ def test_directional_battery_rejects_overflowing_total(coordinator_factory) -> N
     ],
 )
 async def test_directional_battery_storage_refuses_invalid_history(
-    coordinator_factory, directional_battery_payload, invalid_entry
+    coordinator_factory, directional_battery_payload, invalid_entry, caplog
 ) -> None:
     manager = coordinator_factory().energy
     store = AsyncMock()
@@ -530,7 +556,7 @@ async def test_directional_battery_storage_refuses_invalid_history(
     start = datetime(2023, 11, 12, tzinfo=timezone.utc).date()
     reported_at = datetime.fromtimestamp(1_700_000_001, timezone.utc)
     await battery.async_load()
-    assert battery.totals(directional_battery_payload, start, reported_at, accept=True)
+    assert battery.totals(directional_battery_payload, start, reported_at)
     assert await battery.async_save()
     valid = store.async_save.await_args.args[0]
     store.async_load.return_value = (
@@ -540,9 +566,9 @@ async def test_directional_battery_storage_refuses_invalid_history(
         manager._coerce_lifetime_bucket, store, enabled=True
     )
     await restored.async_load()
-    assert not restored.totals(
-        directional_battery_payload, start, reported_at, accept=True
-    )
+    await restored.async_load()
+    assert caplog.messages.count("Invalid directional battery energy history") == 1
+    assert not restored.totals(directional_battery_payload, start, reported_at)
 
 
 async def test_directional_battery_storage_does_not_publish_on_save_failure(
@@ -558,13 +584,11 @@ async def test_directional_battery_storage_does_not_publish_on_save_failure(
     start = datetime(2023, 11, 12, tzinfo=timezone.utc).date()
     reported_at = datetime.fromtimestamp(1_700_000_001, timezone.utc)
     await battery.async_load()
-    assert not battery.totals(
-        directional_battery_payload, start, reported_at, accept=True
-    )
+    assert not battery.totals(directional_battery_payload, start, reported_at)
     await battery.async_load()
-    assert battery.totals(directional_battery_payload, start, reported_at, accept=True)
+    assert battery.totals(directional_battery_payload, start, reported_at)
     assert not await battery.async_save()
-    assert battery.totals(directional_battery_payload, start, reported_at, accept=True)
+    assert battery.totals(directional_battery_payload, start, reported_at)
     assert await battery.async_save()
     assert await battery.async_save()
     assert store.async_save.await_count == 2
